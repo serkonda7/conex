@@ -25,8 +25,8 @@ app.route("/api/v1", openapi);
 const port = Number(process.env.PORT ?? 3001);
 
 export default {
-  port,
-  fetch: app.fetch,
+	port,
+	fetch: app.fetch,
 };
 
 export type AppType = typeof app;

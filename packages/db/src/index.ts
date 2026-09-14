@@ -3,27 +3,27 @@ import postgres from "postgres";
 import * as schema from "./schema.js";
 
 const connectionString =
-  process.env.DATABASE_URL ?? "postgres://conex:conex@localhost:5432/conex";
+	process.env.DATABASE_URL ?? "postgres://conex:conex@localhost:5432/conex";
 
 let _client: postgres.Sql | null = null;
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 export function getClient(): postgres.Sql {
-  if (!_client) _client = postgres(connectionString, { max: 10 });
-  return _client;
+	if (!_client) _client = postgres(connectionString, { max: 10 });
+	return _client;
 }
 
 export function getDb() {
-  if (!_db) _db = drizzle(getClient(), { schema });
-  return _db;
+	if (!_db) _db = drizzle(getClient(), { schema });
+	return _db;
 }
 
 export const db = new Proxy({} as ReturnType<typeof getDb>, {
-  get(_t, prop) {
-    return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
-  },
+	get(_t, prop) {
+		return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
+	},
 });
 
 export { schema };
 export const sql = (strings: TemplateStringsArray, ...values: unknown[]) =>
-  getClient()(strings, ...(values as never[]));
+	getClient()(strings, ...(values as never[]));

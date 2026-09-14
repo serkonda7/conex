@@ -9,9 +9,9 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
-    "lint": "biome check ./apps ./packages",
-    "format": "biome check --write ./apps ./packages",
-    "typecheck": "turbo run typecheck",
+    "lint": "biome check --write",
+    "lint:ci": "biome ci",
+    "check": "turbo run check",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate"
   },

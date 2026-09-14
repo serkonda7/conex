@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "build": "tsc --noEmit -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
     "start": "bun src/index.ts"
   },
   "dependencies": {

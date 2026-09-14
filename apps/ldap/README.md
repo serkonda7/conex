@@ -95,7 +95,7 @@ In the Agfeo TK admin suite (LAN/Telefonanlage → Telefonbuch → LDAP):
 ## Local development
 
 ```sh
-# typecheck / tests (no database needed — server tests use a mock provider)
+# check / tests (no database needed — server tests use a mock provider)
 bun run build
 bun test
 

@@ -9,7 +9,10 @@ import { Hono } from "hono";
 export const placeholders = new Hono();
 
 for (const name of ["tickets", "devices", "auth"]) {
-  placeholders.get(`/${name}`, (c) =>
-    c.json({ data: [], todo: `GET /api/v1/${name} not implemented yet` }, 501),
-  );
+	placeholders.get(`/${name}`, (c) =>
+		c.json(
+			{ data: [], todo: `GET /api/v1/${name} not implemented yet` },
+			501,
+		),
+	);
 }

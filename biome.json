@@ -2,6 +2,7 @@
   "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
   "formatter": {
     "enabled": true,
+    "useEditorconfig": true,
     "indentStyle": "space",
     "indentWidth": 2
   },
@@ -15,10 +16,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "recommended"
     }
   },
   "files": {
-    "includes": ["apps/**/*", "packages/**/*", "!**/dist/**", "!**/node_modules/**"]
+    "includes": ["apps/**/*", "packages/**/*", "!**/dist", "!**/node_modules"]
   }
 }
