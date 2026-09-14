@@ -14,7 +14,7 @@ conex/
     api/      # hono + bun runtime
     web/      # solidjs + vite + @solidjs/router
   packages/
-    db/       # drizzle-orm + postgres-js + migrations
+    db/       # drizzle-orm + bun-sql (native) + migrations
     schemas/  # valibot shared contracts (single source of truth)
     ui/       # solidjs primitives, layout, tabler-icons wrapper
     auth/     # better-auth config + hono middleware
@@ -27,7 +27,7 @@ Why this:
 
 * `apps/api`: one Hono app, `hono/bun` adapter. Modules per domain, not per microservice.
 * `apps/web`: Vite SPA, no SSR. `SolidStart` is overkill for internal tool.
-* `packages/db`: `drizzle-orm` is the best fit for Bun+TS+PG. Alternative is `kysely`. Don't use raw `postgres.js` everywhere.
+* `packages/db`: `drizzle-orm` is the best fit for Bun+TS+PG. Alternative is `kysely`. Don't use raw `Bun.sql` everywhere.
 * `packages/schemas`: Valibot schemas imported by both Hono (`@hono/valibot-validator`) and Solid forms. Prevents drift.
 * Single `postgres:16` DB. One `api` deployment handles cron/automation with `bun:cron` or a `/internal/cron` route. No separate worker until you need RMM polling at scale.
 

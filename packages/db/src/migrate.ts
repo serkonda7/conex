@@ -1,4 +1,4 @@
-import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { migrate } from "drizzle-orm/bun-sql/migrator";
 import { getClient, getDb } from "./index.js";
 
 // Runs every `./drizzle/*.sql` migration not yet recorded in
