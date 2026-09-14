@@ -13,11 +13,11 @@
     "@conex/auth": "workspace:*",
     "@conex/db": "workspace:*",
     "@conex/schemas": "workspace:*",
-    "@hono/valibot-validator": "^0.4.1",
-    "drizzle-orm": "^0.44.4",
-    "hono": "^4.9.3"
+    "@hono/valibot-validator": "~0.6.1",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "catalog:"
   }
 }

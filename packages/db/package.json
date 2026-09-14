@@ -23,11 +23,11 @@
     "db:seed": "bun src/seed.ts"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.4",
-    "postgres": "^3.4.7"
+    "drizzle-orm": "catalog:",
+    "postgres": "~3.4.9"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.4",
-    "typescript": "^5.9.2"
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:"
   }
 }
