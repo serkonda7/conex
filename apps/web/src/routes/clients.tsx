@@ -1,5 +1,6 @@
 import { StatusBadge, Table } from "@conex/ui";
 import { A, useNavigate } from "@solidjs/router";
+import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-solidjs";
 import {
 	createMutation,
 	createQuery,
@@ -7,7 +8,6 @@ import {
 } from "@tanstack/solid-query";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
-import { IconPencil, IconPlus, IconTrash } from "solid-tabler-icons";
 import { ClientDrawer } from "../components/client-form.js";
 import { SearchInput } from "../components/search-input.js";
 import type { Col } from "../components/ui-helpers.js";

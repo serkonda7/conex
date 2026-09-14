@@ -20,8 +20,7 @@
     "dev": "echo 'ui: watch mode not needed for scaffold'"
   },
   "dependencies": {
-    "solid-js": "~1.9.15",
-    "solid-tabler-icons": "~1.119.0"
+    "solid-js": "~1.9.15"
   },
   "devDependencies": {
     "typescript": "catalog:"

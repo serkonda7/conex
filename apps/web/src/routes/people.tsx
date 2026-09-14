@@ -1,5 +1,6 @@
 import { Table } from "@conex/ui";
 import { A } from "@solidjs/router";
+import { IconPlus, IconTrash } from "@tabler/icons-solidjs";
 import {
 	createMutation,
 	createQuery,
@@ -7,7 +8,6 @@ import {
 } from "@tanstack/solid-query";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { IconPlus, IconTrash } from "solid-tabler-icons";
 import { ContactDrawer } from "../components/contact-drawer.js";
 import { SearchInput } from "../components/search-input.js";
 import type { Col } from "../components/ui-helpers.js";

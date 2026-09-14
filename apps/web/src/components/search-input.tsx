@@ -1,6 +1,6 @@
+import { IconSearch } from "@tabler/icons-solidjs";
 import type { JSX } from "solid-js";
 import { onCleanup, onMount } from "solid-js";
-import { IconSearch } from "solid-tabler-icons";
 
 /**
  * Search input with Cmd+K / Ctrl+K focus shortcut.

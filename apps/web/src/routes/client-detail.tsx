@@ -1,5 +1,6 @@
 import { StatusBadge, Table } from "@conex/ui";
 import { A, useNavigate, useParams } from "@solidjs/router";
+import { IconChevronLeft, IconPlus, IconTrash } from "@tabler/icons-solidjs";
 import {
 	createMutation,
 	createQuery,
@@ -7,7 +8,6 @@ import {
 } from "@tanstack/solid-query";
 import type { Component } from "solid-js";
 import { createSignal, For, Show } from "solid-js";
-import { IconChevronLeft, IconPlus, IconTrash } from "solid-tabler-icons";
 import { ClientForm } from "../components/client-form.js";
 import { ContactDrawer } from "../components/contact-drawer.js";
 import type { Col } from "../components/ui-helpers.js";
