@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.turbo/
+.vite/
+*.local
+.env
+.env.*.local
+coverage/
+drizzle/
+*.db
+.DS_Store

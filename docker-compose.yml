@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-conex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-conex}
+      POSTGRES_DB: ${POSTGRES_DB:-conex}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-conex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://${POSTGRES_USER:-conex}:${POSTGRES_PASSWORD:-conex}@db:5432/${POSTGRES_DB:-conex}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-secret-change-me}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3001}
+    ports:
+      - "${API_PORT:-3001}:3001"
+
+  web:
+    build: ./apps/web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+
+  ldap:
+    build: ./apps/ldap
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-dc=conex,dc=local}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-cn=admin,dc=conex,dc=local}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-secret}
+      LDAP_ALLOW_ANONYMOUS: ${LDAP_ALLOW_ANONYMOUS:-true}
+      LDAP_SIZE_LIMIT: ${LDAP_SIZE_LIMIT:-50}
+      LDAP_PORT: 1389
+      LDAP_HTTP_PORT: 3002
+      DATABASE_URL: postgres://${POSTGRES_USER:-conex}:${POSTGRES_PASSWORD:-conex}@db:5432/${POSTGRES_DB:-conex}
+    ports:
+      - "${LDAP_PORT:-389}:1389"
+      - "${LDAP_HTTP_PORT:-3002}:3002"
+
+volumes:
+  pgdata:

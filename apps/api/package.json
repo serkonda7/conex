@@ -1,0 +1,23 @@
+{
+  "name": "@conex/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "build": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@conex/auth": "workspace:*",
+    "@conex/db": "workspace:*",
+    "@conex/schemas": "workspace:*",
+    "@hono/valibot-validator": "^0.4.1",
+    "drizzle-orm": "^0.44.4",
+    "hono": "^4.9.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

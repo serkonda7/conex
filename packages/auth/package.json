@@ -1,0 +1,29 @@
+{
+  "name": "@conex/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "echo 'auth: watch mode not needed for scaffold'"
+  },
+  "dependencies": {
+    "better-auth": "^1.3.7",
+    "hono": "^4.9.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

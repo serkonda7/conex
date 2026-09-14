@@ -1,0 +1,29 @@
+{
+  "name": "@conex/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": {
+      "types": "./src/index.tsx",
+      "default": "./src/index.tsx"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "echo 'ui: watch mode not needed for scaffold'"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.7",
+    "solid-tabler-icons": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
