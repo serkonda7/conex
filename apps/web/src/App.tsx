@@ -1,6 +1,6 @@
 import { A, Route, Router } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import type { Component } from "solid-js";
+import type { Component, ParentComponent } from "solid-js";
 import "./app.css";
 import ClientDetailPage from "./routes/client-detail.js";
 import ClientsPage from "./routes/clients.js";
@@ -9,19 +9,25 @@ import QueuePage from "./routes/queue.js";
 
 const queryClient = new QueryClient();
 
+const Layout: ParentComponent = (props) => (
+	<>
+		<header class="topnav">
+			<A href="/queue" class="brand">
+				CONEX
+			</A>
+			<nav>
+				<A href="/queue">Queue</A>
+				<A href="/clients">Clients</A>
+				<A href="/people">People</A>
+			</nav>
+		</header>
+		{props.children}
+	</>
+);
+
 const App: Component = () => (
 	<QueryClientProvider client={queryClient}>
-		<Router>
-			<header class="topnav">
-				<A href="/queue" class="brand">
-					CONEX
-				</A>
-				<nav>
-					<A href="/queue">Queue</A>
-					<A href="/clients">Clients</A>
-					<A href="/people">People</A>
-				</nav>
-			</header>
+		<Router root={Layout}>
 			<Route path="/" component={QueuePage} />
 			<Route path="/queue" component={QueuePage} />
 			<Route path="/clients" component={ClientsPage} />
