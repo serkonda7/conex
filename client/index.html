@@ -1,9 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     <title>Conex</title>
+    <script>
+    try {
+      const stored = localStorage.getItem('conex-theme')
+      const theme =
+        stored === 'light' || stored === 'dark'
+          ? stored
+          : window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light'
+      document.documentElement.setAttribute('data-theme', theme)
+      document.documentElement.style.colorScheme = theme
+    } catch {
+      /* Storage unavailable; fall back to light. */
+    }
+    </script>
   </head>
 
   <body>

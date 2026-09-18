@@ -1,7 +1,6 @@
 {
   "name": "conex",
-  "description": "NetBox-lite: minimal datacenter inventory (tenants, sites, racks, devices, L1 cabling)",
-  "version": "0.1.0",
+  "version": "0.0.1-dev",
   "license": "MPL-2.0",
   "workspaces": [
     "server",

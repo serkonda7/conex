@@ -19,11 +19,11 @@ export const LoginSchema = v.strictObject({
 
 export type Login = v.InferInput<typeof LoginSchema>
 
-// First-run admin provisioning. Same email contract as login; password
-// requires a minimum length so the initial account is not trivially weak.
+// First-run admin provisioning. Same email/password contract as login;
+// no minimum password length is enforced.
 export const SetupSchema = v.strictObject({
 	email: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(320)),
-	password: v.pipe(v.string(), v.minLength(8), v.maxLength(1024)),
+	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 })
 
 export type Setup = v.InferInput<typeof SetupSchema>

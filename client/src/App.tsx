@@ -12,6 +12,7 @@ import { SitesPage } from './pages/sites'
 import { TemplatesPage } from './pages/templates'
 import { TenantsPage } from './pages/tenants'
 import { navigate, path } from './router'
+import { initTheme, theme, toggleTheme } from './theme'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -74,7 +75,7 @@ function SetupForm(props: {
 				/>
 				<input
 					type="password"
-					placeholder="Password (min 8 characters)"
+					placeholder="Password"
 					value={props.password()}
 					onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
 					autocomplete="new-password"
@@ -111,6 +112,7 @@ function App(): JSX.Element {
 	const [navSearch, setNavSearch] = createSignal('')
 
 	onMount(async () => {
+		initTheme()
 		const [loggedIn, setupNeeded] = await Promise.all([fetchMe(), fetchSetupStatus()])
 		// A fresh database reports needsSetup; an unreachable setup endpoint
 		// (null) falls back to the login form.
@@ -150,8 +152,8 @@ function App(): JSX.Element {
 			setSetupError('Email is required.')
 			return
 		}
-		if (setupPassword().length < 8) {
-			setSetupError('Password must be at least 8 characters.')
+		if (!setupPassword()) {
+			setSetupError('Password is required.')
 			return
 		}
 		if (setupPassword() !== setupConfirm()) {
@@ -260,7 +262,17 @@ function App(): JSX.Element {
 
 	return (
 		<main>
-			<h1>Conex</h1>
+			<div class="app-header">
+				<h1>Conex</h1>
+				<button
+					type="button"
+					class="theme-toggle"
+					onClick={toggleTheme}
+					aria-label={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
+				>
+					{theme() === 'dark' ? '☀️ Light' : '🌙 Dark'}
+				</button>
+			</div>
 			<p>
 				Server health: <code>{health()}</code>
 			</p>

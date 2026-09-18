@@ -4,17 +4,111 @@
 	box-sizing: border-box;
 }
 
+/* MakerWorld-inspired palette. Light mirrors MakerWorld's white/gray/green,
+   dark mirrors its #1c1c1c base / #242424 surface / #2e2e2e raised scheme. */
+:root {
+	color-scheme: light;
+	--bg-base: #f7f7f7;
+	--bg-default: #eeeeee;
+	--bg-surface: #ffffff;
+	--bg-raised: #ffffff;
+	--bg-input: #ffffff;
+	--bg-code: #f2f2f2;
+	--bg-hover: #f0f0f0;
+	--text: #1f1f1f;
+	--text-secondary: #616161;
+	--text-muted: #919eab;
+	--border: #e0e0e0;
+	--border-strong: #c4cdd5;
+	--primary: #00ae42;
+	--primary-hover: #007b55;
+	--primary-contrast: #ffffff;
+	--link: #0e65e9;
+	--error: #b00020;
+	--error-bg: #fae2e2;
+	--success: #00ae42;
+	--muted-dot: #919eab;
+	--shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--bg-base: #1c1c1c;
+	--bg-default: #222225;
+	--bg-surface: #242424;
+	--bg-raised: #2e2e2e;
+	--bg-input: #2d2d31;
+	--bg-code: #333333;
+	--bg-hover: #3d3d3d;
+	--text: #f5f5f5;
+	--text-secondary: #b8b8b8;
+	--text-muted: #858585;
+	--border: #3d3d3d;
+	--border-strong: #525252;
+	--primary: #08bf08;
+	--primary-hover: #00b800;
+	--primary-contrast: #ffffff;
+	--link: #74caff;
+	--error: #ffa48d;
+	--error-bg: rgba(225, 71, 71, 0.16);
+	--success: #5be584;
+	--muted-dot: #666666;
+	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+html {
+	background-color: var(--bg-base);
+}
+
 body {
 	font-family: system-ui, sans-serif;
 	margin: 0;
 	padding: 1rem;
-	background-color: #fff;
-	color: #111;
+	background-color: var(--bg-base);
+	color: var(--text);
+	transition:
+		background-color 150ms ease,
+		color 150ms ease;
 }
 
 main {
 	max-width: 40rem;
 	margin: 0 auto;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.75rem;
+	padding: 1.25rem 1.5rem 1.5rem;
+	box-shadow: var(--shadow);
+}
+
+h1,
+h2,
+h3 {
+	color: var(--text);
+}
+
+a {
+	color: var(--link);
+}
+
+code {
+	background-color: var(--bg-code);
+	color: var(--text);
+	padding: 0.1rem 0.35rem;
+	border-radius: 0.3rem;
+	border: 1px solid var(--border);
+}
+
+nav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.6rem;
+	padding: 0.6rem 0.75rem;
+	margin-bottom: 1rem;
 }
 
 form {
@@ -24,16 +118,114 @@ form {
 	max-width: 20rem;
 }
 
-input {
+nav form {
+	max-width: none;
+}
+
+input,
+select {
 	padding: 0.45rem 0.6rem;
+	background-color: var(--bg-input);
+	color: var(--text);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.4rem;
+}
+
+input::placeholder {
+	color: var(--text-muted);
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 1px;
 }
 
 button {
 	padding: 0.45rem 0.6rem;
 	cursor: pointer;
+	background-color: var(--bg-raised);
+	color: var(--text);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.4rem;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease;
+}
+
+button:hover {
+	background-color: var(--bg-hover);
+}
+
+button[type="submit"] {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+button[type="submit"]:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+table {
+	width: 100%;
+	max-width: 100%;
+	border-collapse: collapse;
+	margin: 0.75rem 0;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	overflow: hidden;
+}
+
+th,
+td {
+	text-align: left;
+	padding: 0.5rem 0.6rem;
+	border-bottom: 1px solid var(--border);
+}
+
+thead th {
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+	font-weight: 600;
+}
+
+tbody tr:hover {
+	background-color: var(--bg-hover);
+}
+
+tbody tr:last-child td {
+	border-bottom: none;
 }
 
 .app-inline-error {
-	color: #b00020;
+	color: var(--error);
+	background-color: var(--error-bg);
+	border: 1px solid var(--error);
+	border-radius: 0.4rem;
 	margin-top: 0.5rem;
+	padding: 0.5rem 0.6rem;
+}
+
+.app-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.theme-toggle {
+	white-space: nowrap;
+}
+
+.status-dot-connected {
+	color: var(--success);
+}
+
+.status-dot-free {
+	color: var(--muted-dot);
 }

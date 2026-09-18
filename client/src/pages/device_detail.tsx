@@ -255,7 +255,13 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 						{(iface: InterfaceJson): JSX.Element => (
 							<tr>
 								<td title={iface.connected ? 'connected' : 'free'}>
-									<span style={{ color: iface.connected ? 'green' : 'gray' }}>
+									<span
+										class={
+											iface.connected
+												? 'status-dot-connected'
+												: 'status-dot-free'
+										}
+									>
 										●
 									</span>
 								</td>
