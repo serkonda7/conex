@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { type AppConfig, initConfig, load_config_file, resolve_listen_port } from './config'
+import { type AppConfig, initConfig, load_config_file } from './config'
 import { initDb } from './db'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
@@ -108,8 +108,8 @@ if (import.meta.main) {
 	start_sweep(sweepExpired, SESSION_SWEEP_INTERVAL_MS)
 
 	const server = Bun.serve({
-		hostname: config.server.host,
-		port: resolve_listen_port(config),
+		hostname: '0.0.0.0',
+		port: 3000,
 		fetch: app.fetch,
 	})
 

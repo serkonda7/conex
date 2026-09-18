@@ -1,10 +1,9 @@
 /**
  * Single-line terminal prompt shared by the CLIs.
  *
- * `server-cli` (password entry) and `infra/updater.ts` (update confirmation)
- * both wrapped `node:readline` inline before; the readline mechanics live here
- * while each caller keeps its own parsing (empty-password rejection, y/N
- * confirmation, TTY guards).
+ * `server-cli` (password entry) wrapped `node:readline` inline before; the
+ * readline mechanics live here while each caller keeps its own parsing
+ * (empty-password rejection, y/N confirmation, TTY guards).
  */
 import { stdin as input, stdout as output } from 'node:process'
 import { createInterface } from 'node:readline/promises'

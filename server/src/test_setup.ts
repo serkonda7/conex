@@ -15,7 +15,6 @@ export function initTestEnv(): void {
 			loginRateLimit: { maxAttempts: 100, windowSeconds: 300 },
 			secureCookies: false,
 		},
-		server: { host: '127.0.0.1', port: 0 },
 	})
 	initDb({
 		dbPath: ':memory:',

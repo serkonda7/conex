@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import { Result } from 'better-result'
 import * as v from 'valibot'
-import { getTrimmedEnv } from './util/server_root'
 import { formatValibotIssues } from './util/valibot'
 
 /**
@@ -21,13 +20,6 @@ export const configSchema = v.strictObject({
 		),
 		secureCookies: v.optional(v.boolean(), true), // Only disable for plain-HTTP local development
 	}),
-	server: v.optional(
-		v.strictObject({
-			host: v.optional(v.string(), '0.0.0.0'),
-			port: v.optional(v.number(), 3000),
-		}),
-		{},
-	),
 	frontendUrl: v.optional(v.string()),
 })
 
@@ -61,22 +53,6 @@ export function load_config_file(path: string): Result<AppConfig, Error> {
 	}
 
 	return Result.ok(config_res.output as AppConfig)
-}
-
-/**
- * Resolves the listening port.
- *
- * Precedence: `CONEX_PORT` env var overrides `server.port` from the config.
- */
-export function resolve_listen_port(app_config: AppConfig): number {
-	const raw = getTrimmedEnv('CONEX_PORT')
-	if (raw) {
-		const port = Number(raw)
-		if (Number.isInteger(port) && port > 0 && port < 65536) {
-			return port
-		}
-	}
-	return app_config.server.port
 }
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,6 @@ Monorepo (`bun` workspaces + `turbo` + `biome` + `tsc`):
 - `client/` — `vite` + `solid-js` UI, typed `hono/client` fetcher.
 - `shared/` — Valibot contracts shared by server validation and the client.
 - `server-cli/` — `create-user` provisioning for local auth.
-- `infra/` — Dockerfiles + Caddy proxy.
 
 ## Prerequisites
 
@@ -27,10 +26,6 @@ The server needs a config file at `server/data/config.toml` (gitignored):
 [auth]
 appKey = "at-least-32-chars-long-random-secret-here"
 secureCookies = false  # plain HTTP local dev; keep true behind HTTPS
-
-[server]
-host = "127.0.0.1"
-port = 3000
 ```
 
 Provision a user, then start everything:
@@ -44,7 +39,7 @@ bun run dev
 - API: `http://localhost:3000` (`/health` for a smoke check).
 - UI: `http://localhost:5371` (proxies `/api` to the API).
 - DB path: `CONEX_DB_PATH` (default `server/data/conex.db`); config path:
-  `CONEX_CONFIG_PATH`; port override: `CONEX_PORT`.
+  `CONEX_CONFIG_PATH`. The API always listens on `0.0.0.0:3000`.
 
 ## Checks
 
@@ -64,7 +59,7 @@ bun run test:e2e
 
 The spec manages its own API + UI servers and an isolated database under
 `client/test-results/e2e-data/` (override with `CONEX_E2E_DATA_DIR`,
-`CONEX_E2E_API_PORT`, `CONEX_CLIENT_PORT`). Set
+`CONEX_CLIENT_PORT`). Set
 `CONEX_E2E_REUSE_SERVERS=1` to reuse hand-started servers.
 
 ## Features (P6)
@@ -78,14 +73,3 @@ The spec manages its own API + UI servers and an isolated database under
   - cables columns: `a_device,a_interface,b_device,b_interface,label,kind,status`
   - imports validate every row, create the good ones, and report per-row
     errors.
-
-## Docker
-
-```sh
-docker compose up --build
-```
-
-`server` + `client` images behind Caddy (`infra/`). The server reads
-`./server/data` (bind-mounted, holds `config.toml` + `conex.db`);
-`CONEX_PORT=3000` inside the container. See
-`docker-compose.override.yml.example` for local tweaks.

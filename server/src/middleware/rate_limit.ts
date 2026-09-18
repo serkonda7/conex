@@ -18,9 +18,10 @@ type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
 
 /**
- * Behind Caddy, `x-forwarded-for` holds the real client and the socket address
- * is the proxy. Take the first header entry and fall back to the socket
- * address. Trusting the header is safe here because Caddy is the only ingress.
+ * Direct connections only — no trusted reverse proxy sits in front of the
+ * server, so `x-forwarded-for` is client-controlled and used purely as a
+ * best-effort hint. Take the first header entry and fall back to the socket
+ * address.
  */
 function client_ip(c: Context): string {
 	const xff = c.req.header('x-forwarded-for')

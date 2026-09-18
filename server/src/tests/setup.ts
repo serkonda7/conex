@@ -11,7 +11,6 @@ initConfig({
 		loginRateLimit: { maxAttempts: 10, windowSeconds: 300 },
 		secureCookies: true,
 	},
-	server: { host: '127.0.0.1', port: 3000 },
 })
 Bun.env.CONEX_DB_PATH = ':memory:'
 initDb()

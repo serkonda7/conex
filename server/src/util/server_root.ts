@@ -1,6 +1,6 @@
 /**
  * Logic for finding the server root directory to locate data and migration files.
- * This is required as working directory might differ across local development, docker and server-cli.
+ * This is required as working directory might differ across local development and server-cli.
  *
  * Importing this module has no side effects: use `get_server_root()` during
  * startup and pass the resolved root explicitly.
@@ -46,9 +46,9 @@ export function get_server_root(): Result<string, Error> {
 }
 
 /**
- * Reads an env var trimmed, treating missing/blank as unset. The three path
- * and port resolutions (`db.ts`, `index.ts`, `config.ts`) all trimmed inline
- * before; they share this now so blank-vs-unset cannot diverge.
+ * Reads an env var trimmed, treating missing/blank as unset. The path
+ * resolutions (`db.ts`, `index.ts`) all trimmed inline before; they share
+ * this now so blank-vs-unset cannot diverge.
  */
 export function getTrimmedEnv(name: string): string | undefined {
 	const raw = Bun.env[name]?.trim()

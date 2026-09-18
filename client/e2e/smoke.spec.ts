@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test'
  * servers instead of the managed ones.
  */
 
-const API: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3100'
+const API: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3000'
 const EMAIL: string = process.env.CONEX_E2E_EMAIL ?? 'e2e@example.com'
 const PASSWORD: string = process.env.CONEX_E2E_PASSWORD ?? 'e2e-secret-123'
 const tag: string = `e2e-${Date.now().toString(36)}`

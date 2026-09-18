@@ -9,13 +9,12 @@ import { createLocalUser, getUserByEmail } from '../../server/src/db/users'
  * provisions the login user (idempotent — reruns reuse the same DB).
  *
  * Reads `CONEX_E2E_DATA_DIR` (absolute; set by `playwright.config.ts`),
- * `CONEX_E2E_EMAIL`, `CONEX_E2E_PASSWORD`, `CONEX_E2E_API_PORT`.
+ * `CONEX_E2E_EMAIL`, `CONEX_E2E_PASSWORD`.
  */
 
 const dataDir: string = process.env.CONEX_E2E_DATA_DIR ?? path.resolve('test-results/e2e-data')
 const email: string = process.env.CONEX_E2E_EMAIL ?? 'e2e@example.com'
 const password: string = process.env.CONEX_E2E_PASSWORD ?? 'e2e-secret-123'
-const apiPort: number = Number(process.env.CONEX_E2E_API_PORT ?? 3100)
 const repoRoot: string = path.resolve(import.meta.dir, '../..')
 
 fs.mkdirSync(dataDir, { recursive: true })
@@ -28,10 +27,6 @@ if (!fs.existsSync(configPath)) {
 			'[auth]',
 			'appKey = "e2e-app-key-0123456789abcdef-0123456789abcdef"',
 			'secureCookies = false',
-			'',
-			'[server]',
-			'host = "127.0.0.1"',
-			`port = ${apiPort}`,
 			'',
 		].join('\n'),
 	)
