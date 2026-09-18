@@ -4,7 +4,7 @@
  * message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
-import type { LocationRow, SiteRow, TenantRow } from 'server/src/db/tenancy'
+import type { LocationRow, SiteRow, TenantListItem, TenantRow } from 'server/src/db/tenancy'
 import { client, to_result } from './api'
 import type { ApiResponse } from './util/api_error'
 
@@ -17,6 +17,9 @@ export interface Page<T> {
 
 export type { LocationRow, SiteRow, TenantRow }
 
+/** Tenant row for the list view, with NetBox-style related-object counts. */
+export type TenantWithCounts = TenantListItem
+
 async function getPage<T>(
 	req: Promise<ApiResponse>,
 	fallback: string,
@@ -28,11 +31,31 @@ async function getPage<T>(
 // Tenants
 // ---------------------------------------------------------------------------
 
-export async function fetch_tenants(): Promise<Result<Page<TenantRow>, Error>> {
-	return getPage<TenantRow>(
-		client.tenants.$get({ query: { search: '', page: '1', limit: '200' } }),
+export async function fetch_tenants(
+	filters?: TenantFilters,
+): Promise<Result<Page<TenantWithCounts>, Error>> {
+	return getPage<TenantWithCounts>(
+		client.tenants.$get({
+			query: {
+				search: filters?.search ?? '',
+				page: String(filters?.page ?? 1),
+				limit: String(filters?.limit ?? 200),
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
+			},
+		}),
 		'Failed to load tenants',
 	)
+}
+
+export type TenantSort = 'name' | 'slug' | 'description'
+
+export interface TenantFilters {
+	search?: string
+	page?: number
+	limit?: number
+	sort?: TenantSort
+	order?: 'asc' | 'desc'
 }
 
 export interface TenantCreateInput {
@@ -54,9 +77,29 @@ export async function create_tenant(input: TenantCreateInput): Promise<Result<Te
 	return to_result<TenantRow>(res, 'Failed to create tenant')
 }
 
+export async function fetch_tenant(id: string): Promise<Result<TenantRow, Error>> {
+	const res = await client.tenants[':id'].$get({ param: { id } })
+	return to_result<TenantRow>(res, 'Failed to load tenant')
+}
+
 export async function delete_tenant(id: string): Promise<Result<unknown, Error>> {
 	const res = await client.tenants[':id'].$delete({ param: { id } })
 	return to_result<unknown>(res, 'Failed to delete tenant')
+}
+
+export interface TenantUpdateInput {
+	name?: string
+	slug?: string
+	description?: string | null
+	comments?: string | null
+}
+
+export async function update_tenant(
+	id: string,
+	patch: TenantUpdateInput,
+): Promise<Result<TenantRow, Error>> {
+	const res = await client.tenants[':id'].$patch({ param: { id }, json: patch })
+	return to_result<TenantRow>(res, 'Failed to update tenant')
 }
 
 // ---------------------------------------------------------------------------

@@ -162,7 +162,11 @@ const OptionalIdEntry = v.optional(
 	undefined,
 )
 
-export const TenantListQuerySchema = v.object({ ...ListQueryEntries })
+export const TenantListQuerySchema = v.object({
+	...ListQueryEntries,
+	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
 
 export const SiteListQuerySchema = v.object({
 	...ListQueryEntries,

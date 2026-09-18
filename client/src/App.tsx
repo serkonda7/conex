@@ -20,6 +20,8 @@ import { SiteDetailPage } from './pages/site_detail'
 import { SitesPage } from './pages/sites'
 import { TemplatesPage } from './pages/templates'
 import { TenantAddPage } from './pages/tenant_add'
+import { TenantDetailPage } from './pages/tenant_detail'
+import { TenantEditPage } from './pages/tenant_edit'
 import { TenantsPage } from './pages/tenants'
 import { navigate, path } from './router'
 import { initTheme, theme, toggleTheme } from './theme'
@@ -321,6 +323,7 @@ function App(): JSX.Element {
 
 	function route(): {
 		page: string
+		tenantId: string | null
 		siteId: string | null
 		rackId: string | null
 		deviceId: string | null
@@ -334,6 +337,25 @@ function App(): JSX.Element {
 			if (parts[1] === 'add') {
 				return {
 					page: 'tenant-add',
+					tenantId: null,
+					siteId: null,
+					rackId: null,
+					deviceId: null,
+				}
+			}
+			if (parts[1]) {
+				if (parts[2] === 'edit') {
+					return {
+						page: 'tenant-edit',
+						tenantId: parts[1] ?? null,
+						siteId: null,
+						rackId: null,
+						deviceId: null,
+					}
+				}
+				return {
+					page: 'tenant-detail',
+					tenantId: parts[1] ?? null,
 					siteId: null,
 					rackId: null,
 					deviceId: null,
@@ -341,17 +363,19 @@ function App(): JSX.Element {
 			}
 			return {
 				page: 'tenants',
+				tenantId: null,
 				siteId: null,
 				rackId: null,
 				deviceId: null,
 			}
 		}
 		if (parts[0] === 'sites' && parts.length === 1) {
-			return { page: 'sites', siteId: null, rackId: null, deviceId: null }
+			return { page: 'sites', tenantId: null, siteId: null, rackId: null, deviceId: null }
 		}
 		if (parts[0] === 'sites' && parts.length === 2) {
 			return {
 				page: 'site-detail',
+				tenantId: null,
 				siteId: parts[1] ?? null,
 				rackId: null,
 				deviceId: null,
@@ -360,6 +384,7 @@ function App(): JSX.Element {
 		if (parts[0] === 'racks' && parts.length === 2) {
 			return {
 				page: 'rack-detail',
+				tenantId: null,
 				siteId: null,
 				rackId: parts[1] ?? null,
 				deviceId: null,
@@ -368,6 +393,7 @@ function App(): JSX.Element {
 		if (parts[0] === 'templates') {
 			return {
 				page: 'templates',
+				tenantId: null,
 				siteId: null,
 				rackId: null,
 				deviceId: null,
@@ -376,6 +402,7 @@ function App(): JSX.Element {
 		if (parts[0] === 'devices' && parts.length === 1) {
 			return {
 				page: 'devices',
+				tenantId: null,
 				siteId: null,
 				rackId: null,
 				deviceId: null,
@@ -384,12 +411,19 @@ function App(): JSX.Element {
 		if (parts[0] === 'devices' && parts.length === 2) {
 			return {
 				page: 'device-detail',
+				tenantId: null,
 				siteId: null,
 				rackId: null,
 				deviceId: parts[1] ?? null,
 			}
 		}
-		return { page: 'not-found', siteId: null, rackId: null, deviceId: null }
+		return {
+			page: 'not-found',
+			tenantId: null,
+			siteId: null,
+			rackId: null,
+			deviceId: null,
+		}
 	}
 
 	return (
@@ -555,6 +589,22 @@ function App(): JSX.Element {
 									</Match>
 									<Match when={route().page === 'tenant-add'}>
 										<TenantAddPage />
+									</Match>
+									<Match
+										when={
+											route().page === 'tenant-detail' &&
+											route().tenantId !== null
+										}
+									>
+										<TenantDetailPage id={route().tenantId as string} />
+									</Match>
+									<Match
+										when={
+											route().page === 'tenant-edit' &&
+											route().tenantId !== null
+										}
+									>
+										<TenantEditPage id={route().tenantId as string} />
 									</Match>
 									<Match when={route().page === 'sites'}>
 										<SitesPage />

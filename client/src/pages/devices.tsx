@@ -1,12 +1,13 @@
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
+import { fetch_tenants, type TenantRow } from '../api_p1'
 import { fetch_racks, type RackRow } from '../api_p2'
 import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
 import { create_device, type DeviceRow, delete_device, fetch_devices } from '../api_p4'
 import { download_csv, type ImportResponse, upload_csv } from '../api_p6'
-import { navigate } from '../router'
+import { navigate, queryParam } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -23,6 +24,7 @@ export function DevicesPage(): JSX.Element {
 	const [search, setSearch] = createSignal('')
 	const [status, setStatus] = createSignal('')
 	const [rackFilter, setRackFilter] = createSignal('')
+	const [tenantFilter, setTenantFilter] = createSignal(queryParam('tenant'))
 	const [name, setName] = createSignal('')
 	const [typeId, setTypeId] = createSignal('')
 	const [rackId, setRackId] = createSignal('')
@@ -41,12 +43,21 @@ export function DevicesPage(): JSX.Element {
 				| 'decommissioned'
 				| undefined,
 			rack: rackFilter() || undefined,
+			tenant: tenantFilter() || undefined,
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return []
 		}
 		return res.value.items
+	})
+	// Follow tenant links from the tenants table (`/devices?tenant=<id>`).
+	createEffect(() => {
+		const fromUrl = queryParam('tenant')
+		if (fromUrl !== tenantFilter()) {
+			setTenantFilter(fromUrl)
+			void refetch()
+		}
 	})
 	const [types] = createResource(async () => {
 		const res = await fetch_device_types()
@@ -58,6 +69,14 @@ export function DevicesPage(): JSX.Element {
 	})
 	const [racks] = createResource(async () => {
 		const res = await fetch_racks()
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return []
+		}
+		return res.value.items
+	})
+	const [tenants] = createResource(async () => {
+		const res = await fetch_tenants()
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return []
@@ -172,6 +191,22 @@ export function DevicesPage(): JSX.Element {
 					<option value="">Any rack</option>
 					<For each={racks() ?? []}>
 						{(r: RackRow): JSX.Element => <option value={r.id}>{r.name}</option>}
+					</For>
+				</select>
+				<label class="visually-hidden" for="devices-tenant">
+					Tenant filter
+				</label>
+				<select
+					id="devices-tenant"
+					aria-label="Tenant filter"
+					value={tenantFilter()}
+					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+						setTenantFilter(e.currentTarget.value)
+					}
+				>
+					<option value="">Any tenant</option>
+					<For each={tenants() ?? []}>
+						{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 					</For>
 				</select>
 				<button type="submit">Filter</button>

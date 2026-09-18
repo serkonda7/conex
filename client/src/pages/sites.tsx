@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import {
 	create_site,
 	delete_site,
@@ -10,7 +10,7 @@ import {
 	type SiteRow,
 	type TenantRow,
 } from '../api_p1'
-import { navigate } from '../router'
+import { navigate, queryParam } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -23,7 +23,12 @@ export function SitesPage(): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
-	const [filterTenant, setFilterTenant] = createSignal('')
+	const [filterTenant, setFilterTenant] = createSignal(queryParam('tenant'))
+
+	// Follow tenant links from the tenants table (`/sites?tenant=<id>`).
+	createEffect(() => {
+		setFilterTenant(queryParam('tenant'))
+	})
 
 	const [tenants] = createResource(async () => {
 		const res = await fetch_tenants()

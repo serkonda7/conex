@@ -7,7 +7,7 @@ const [path, setPath] = createSignal(window.location.pathname)
 const [tagsChanged, setTagsChanged] = createSignal(false)
 
 window.addEventListener('popstate', () => {
-	setPath(window.location.pathname)
+	setPath(window.location.pathname + window.location.search)
 })
 
 export function navigate(to: string): void {
@@ -16,6 +16,13 @@ export function navigate(to: string): void {
 	}
 	window.history.pushState(null, '', to)
 	setPath(to)
+}
+
+/** Reads one query param from the current route (e.g. `?tenant=<id>`). */
+export function queryParam(key: string): string {
+	const current = path()
+	const query = current.includes('?') ? (current.split('?')[1] ?? '') : ''
+	return new URLSearchParams(query).get(key) ?? ''
 }
 
 export { path, setTagsChanged, tagsChanged }

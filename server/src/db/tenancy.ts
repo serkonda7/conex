@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, isNull, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm'
 import {
 	type LocationCreate,
 	type LocationUpdate,
@@ -9,7 +9,7 @@ import {
 	type TenantCreate,
 	type TenantUpdate,
 } from 'shared/src/schemas'
-import { locations, racks, sites, tenants } from '../schema'
+import { devices, locations, racks, sites, tenants } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -37,6 +37,18 @@ export interface ListParams {
 	limit: number
 }
 
+export interface TenantListParams extends ListParams {
+	sort: 'name' | 'slug' | 'description'
+	order: 'asc' | 'desc'
+}
+
+/** One tenant row for the list view, with NetBox-style related-object counts. */
+export interface TenantListItem extends TenantRow {
+	site_count: number
+	rack_count: number
+	device_count: number
+}
+
 function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
 	return { items, total, page: params.page, limit: params.limit }
 }
@@ -58,22 +70,86 @@ function newId(): string {
 // Tenants
 // ---------------------------------------------------------------------------
 
-export function listTenants(params: ListParams): Page<TenantRow> {
+export function listTenants(params: TenantListParams): Page<TenantListItem> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const where = params.search
-		? sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\')`
+		? sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\' OR ${tenants.description} LIKE ${pattern} ESCAPE '\\')`
 		: undefined
+	const orderColumn =
+		params.sort === 'slug'
+			? tenants.slug
+			: params.sort === 'description'
+				? tenants.description
+				: tenants.name
 	const items = db
 		.select()
 		.from(tenants)
 		.where(where)
-		.orderBy(asc(tenants.name))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
 	const totalRow = db.select({ n: count() }).from(tenants).where(where).get()
-	return pageOf(items, totalRow?.n ?? 0, params)
+	const total = totalRow?.n ?? 0
+
+	// NetBox-style related-object counts for the list view. One grouped
+	// query per table keeps this O(1) queries instead of O(page size).
+	const counts = new Map<string, { sites: number; racks: number; devices: number }>()
+	for (const t of items) {
+		counts.set(t.id, { sites: 0, racks: 0, devices: 0 })
+	}
+	if (items.length > 0) {
+		const ids = items.map((t) => t.id)
+		const apply = (
+			tenantId: string | null,
+			key: 'sites' | 'racks' | 'devices',
+			n: number,
+		): void => {
+			if (tenantId === null) {
+				return
+			}
+			const entry = counts.get(tenantId)
+			if (entry) {
+				entry[key] = n
+			}
+		}
+		for (const row of db
+			.select({ tenant_id: sites.tenant_id, n: count() })
+			.from(sites)
+			.where(inArray(sites.tenant_id, ids))
+			.groupBy(sites.tenant_id)
+			.all()) {
+			apply(row.tenant_id, 'sites', row.n)
+		}
+		for (const row of db
+			.select({ tenant_id: racks.tenant_id, n: count() })
+			.from(racks)
+			.where(inArray(racks.tenant_id, ids))
+			.groupBy(racks.tenant_id)
+			.all()) {
+			apply(row.tenant_id, 'racks', row.n)
+		}
+		for (const row of db
+			.select({ tenant_id: devices.tenant_id, n: count() })
+			.from(devices)
+			.where(inArray(devices.tenant_id, ids))
+			.groupBy(devices.tenant_id)
+			.all()) {
+			apply(row.tenant_id, 'devices', row.n)
+		}
+	}
+
+	return pageOf(
+		items.map((t) => ({
+			...t,
+			site_count: counts.get(t.id)?.sites ?? 0,
+			rack_count: counts.get(t.id)?.racks ?? 0,
+			device_count: counts.get(t.id)?.devices ?? 0,
+		})),
+		total,
+		params,
+	)
 }
 
 export function getTenant(id: string): Result<TenantRow, Error> {
