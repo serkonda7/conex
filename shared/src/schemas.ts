@@ -292,3 +292,129 @@ export interface ElevationResponse {
 	/** Top-down: highest U first, so the client renders without re-sorting. */
 	units: ElevationUnit[]
 }
+
+// ---------------------------------------------------------------------------
+// P3: manufacturers / device templates
+// ---------------------------------------------------------------------------
+
+/** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `console`). */
+export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
+
+/** Stub name prefix (e.g. `eth` expands to `eth0..ethN-1`). */
+export const InterfacePrefixSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1),
+	v.maxLength(50),
+	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
+)
+
+/** Port count of one stub row: at least 1. */
+export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
+
+/**
+ * Rack units a device type consumes on mount: 0 = virtual or shelf-only
+ * (P4 mounts those by shelf_id instead of position_u), otherwise 1..60.
+ */
+export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
+
+export const StubLabelSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
+
+export const ManufacturerCreateSchema = v.strictObject({
+	name: NameSchema,
+	slug: SlugSchema,
+	description: DescriptionSchema,
+})
+
+export const ManufacturerUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	slug: v.optional(SlugSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export const DeviceTypeCreateSchema = v.strictObject({
+	manufacturer_id: IdSchema,
+	model: NameSchema,
+	slug: SlugSchema,
+	u_height: v.optional(DeviceHeightSchema, 1),
+	description: DescriptionSchema,
+})
+
+export const DeviceTypeUpdateSchema = v.strictObject({
+	manufacturer_id: v.optional(IdSchema, undefined),
+	model: v.optional(NameSchema, undefined),
+	slug: v.optional(SlugSchema, undefined),
+	u_height: v.optional(DeviceHeightSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export const StubCreateSchema = v.strictObject({
+	prefix: InterfacePrefixSchema,
+	count: v.optional(StubCountSchema, 1),
+	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+	label: v.optional(v.nullable(StubLabelSchema), undefined),
+})
+
+export const StubUpdateSchema = v.strictObject({
+	prefix: v.optional(InterfacePrefixSchema, undefined),
+	count: v.optional(StubCountSchema, undefined),
+	kind: v.optional(InterfaceKindSchema, undefined),
+	label: v.optional(v.nullable(StubLabelSchema), undefined),
+})
+
+/** Ad-hoc preview body: expand one stub without storing it. */
+export const StubPreviewBodySchema = v.strictObject({
+	prefix: InterfacePrefixSchema,
+	count: v.optional(StubCountSchema, 1),
+	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+})
+
+export type ManufacturerCreate = v.InferInput<typeof ManufacturerCreateSchema>
+export type ManufacturerUpdate = v.InferInput<typeof ManufacturerUpdateSchema>
+export type DeviceTypeCreate = v.InferInput<typeof DeviceTypeCreateSchema>
+export type DeviceTypeUpdate = v.InferInput<typeof DeviceTypeUpdateSchema>
+export type StubCreate = v.InferInput<typeof StubCreateSchema>
+export type StubUpdate = v.InferInput<typeof StubUpdateSchema>
+export type StubPreviewBody = v.InferInput<typeof StubPreviewBodySchema>
+
+export const ManufacturerListQuerySchema = v.object({ ...ListQueryEntries })
+
+export const DeviceTypeListQuerySchema = v.object({
+	...ListQueryEntries,
+	manufacturer: OptionalIdEntry,
+})
+
+export type ManufacturerListQuery = v.InferInput<typeof ManufacturerListQuerySchema>
+export type DeviceTypeListQuery = v.InferInput<typeof DeviceTypeListQuerySchema>
+
+/** Ad-hoc preview query: `GET /device-types/preview?prefix=eth&count=24&kind=ethernet`. */
+export const StubPreviewQuerySchema = v.object({
+	prefix: InterfacePrefixSchema,
+	count: v.optional(
+		v.pipe(
+			v.union([v.string(), v.number()]),
+			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
+			v.number(),
+			v.integer(),
+			v.minValue(1),
+			v.maxValue(1024),
+		),
+		1,
+	),
+	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+})
+
+export type StubPreviewQuery = v.InferInput<typeof StubPreviewQuerySchema>
+
+/** One expanded interface name from a stub row. */
+export interface ExpandedInterface {
+	name: string
+	kind: string
+	label: string | null
+}
+
+/** Preview expansion response: stored stubs or one ad-hoc stub. */
+export interface StubPreviewResponse {
+	interfaces: ExpandedInterface[]
+	total: number
+}

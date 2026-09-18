@@ -5,7 +5,9 @@ import { AUDIT_SWEEP_INTERVAL_MS, pruneExpiredAuditLogs } from './audit'
 import { type AppConfig, initConfig, load_config_file, resolve_listen_port } from './config'
 import { initDb } from './db'
 import { authApp } from './routes/auth'
+import { deviceTypesApp } from './routes/device_types'
 import { locationsApp } from './routes/locations'
+import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
 import { shelvesApp } from './routes/shelves'
 import { sitesApp } from './routes/sites'
@@ -59,6 +61,8 @@ export function createApp() {
 			.route('/locations', locationsApp)
 			.route('/racks', racksApp)
 			.route('/shelves', shelvesApp)
+			.route('/manufacturers', manufacturersApp)
+			.route('/device-types', deviceTypesApp)
 	)
 }
 

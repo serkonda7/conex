@@ -175,3 +175,64 @@ export const rack_shelves = sqliteTable(
 		index('rack_shelves_position_idx').on(table.rack_id, table.position_u),
 	],
 )
+
+// ---------------------------------------------------------------------------
+// P3: manufacturers / device templates. A device type belongs to one
+// manufacturer; its interface stubs (`{prefix, count}`) expand into concrete
+// interface names (`prefix0..prefix{count-1}`) when a device is instantiated
+// in P4. Deletes are blocked while dependents exist (service layer), so FKs
+// carry no cascade.
+// ---------------------------------------------------------------------------
+
+export const manufacturers = sqliteTable(
+	'manufacturers',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull().unique(),
+		slug: text('slug').notNull().unique(),
+		description: text('description'),
+	},
+	(table) => [index('manufacturers_name_idx').on(table.name)],
+)
+
+export const device_types = sqliteTable(
+	'device_types',
+	{
+		id: text('id').primaryKey(),
+		manufacturer_id: text('manufacturer_id')
+			.notNull()
+			.references(() => manufacturers.id),
+		model: text('model').notNull(),
+		slug: text('slug').notNull().unique(),
+		// Rack units consumed on mount. 0 = virtual or shelf-only (P4 mounts
+		// those by shelf_id instead of position_u).
+		u_height: integer('u_height').notNull().default(1),
+		description: text('description'),
+	},
+	(table) => [
+		index('device_types_manufacturer_id_idx').on(table.manufacturer_id),
+		index('device_types_model_idx').on(table.model),
+	],
+)
+
+export const device_type_interfaces = sqliteTable(
+	'device_type_interfaces',
+	{
+		id: text('id').primaryKey(),
+		device_type_id: text('device_type_id')
+			.notNull()
+			.references(() => device_types.id),
+		prefix: text('prefix').notNull(),
+		count: integer('count').notNull().default(1),
+		kind: text('kind').notNull().default('ethernet'),
+		label: text('label'),
+	},
+	(table) => [
+		index('device_type_interfaces_type_id_idx').on(table.device_type_id),
+		uniqueIndex('device_type_interfaces_prefix_kind_idx').on(
+			table.device_type_id,
+			table.prefix,
+			table.kind,
+		),
+	],
+)

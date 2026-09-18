@@ -6,6 +6,7 @@ import { fetchMe, login, logout } from './api_auth'
 import { RackDetailPage } from './pages/rack_detail'
 import { SiteDetailPage } from './pages/site_detail'
 import { SitesPage } from './pages/sites'
+import { TemplatesPage } from './pages/templates'
 import { TenantsPage } from './pages/tenants'
 import { navigate, path } from './router'
 
@@ -104,6 +105,9 @@ function App(): JSX.Element {
 		if (parts[0] === 'racks' && parts.length === 2) {
 			return { page: 'rack-detail', siteId: null, rackId: parts[1] ?? null }
 		}
+		if (parts[0] === 'templates') {
+			return { page: 'templates', siteId: null, rackId: null }
+		}
 		return { page: 'not-found', siteId: null, rackId: null }
 	}
 
@@ -135,6 +139,13 @@ function App(): JSX.Element {
 								Sites
 							</a>{' '}
 							|{' '}
+							<a
+								href="/templates"
+								onClick={(e: MouseEvent): void => go(e, '/templates')}
+							>
+								Templates
+							</a>{' '}
+							|{' '}
 							<button type="button" onClick={handleLogout}>
 								Sign out ({email() || '…'})
 							</button>
@@ -151,6 +162,9 @@ function App(): JSX.Element {
 							</Match>
 							<Match when={route().page === 'rack-detail' && route().rackId !== null}>
 								<RackDetailPage id={route().rackId as string} />
+							</Match>
+							<Match when={route().page === 'templates'}>
+								<TemplatesPage />
 							</Match>
 							<Match when={route().page === 'not-found'}>
 								<p>Not found.</p>

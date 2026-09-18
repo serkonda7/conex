@@ -1,0 +1,142 @@
+import { vValidator } from '@hono/valibot-validator'
+import { Result } from 'better-result'
+import { Hono } from 'hono'
+import {
+	DeviceTypeCreateSchema,
+	DeviceTypeListQuerySchema,
+	DeviceTypeUpdateSchema,
+	EntityParamsSchema,
+	IdSchema,
+	StubCreateSchema,
+	StubPreviewBodySchema,
+	StubPreviewQuerySchema,
+	StubUpdateSchema,
+} from 'shared/src/schemas'
+import * as v from 'valibot'
+import { logAccess } from '../audit'
+import {
+	createDeviceType,
+	createStub,
+	deleteDeviceType,
+	deleteStub,
+	getDeviceType,
+	getStub,
+	listDeviceTypes,
+	listStubs,
+	previewDeviceType,
+	previewStub,
+	updateDeviceType,
+	updateStub,
+} from '../db/templates'
+import { authMiddleware } from '../middleware/auth'
+import { onValidationError } from '../middleware/validation'
+import { sendResult } from '../util/result_response'
+
+const stubIdParamsSchema = v.object({ id: IdSchema, stubId: IdSchema })
+
+export const deviceTypesApp = new Hono()
+	.use(authMiddleware)
+	// Ad-hoc preview (`?prefix=eth&count=24&kind=ethernet`) without storing a
+	// stub. Registered before `/:id` so "preview" is not parsed as an id.
+	.get('/preview', vValidator('query', StubPreviewQuerySchema, onValidationError), (c) => {
+		const query = c.req.valid('query')
+		return sendResult(c, previewStub(query.prefix, query.count, query.kind))
+	})
+	.post('/preview', vValidator('json', StubPreviewBodySchema, onValidationError), (c) => {
+		const body = c.req.valid('json')
+		return sendResult(c, previewStub(body.prefix, body.count ?? 1, body.kind ?? 'ethernet'))
+	})
+	.get('/', vValidator('query', DeviceTypeListQuerySchema, onValidationError), (c) => {
+		const query = c.req.valid('query')
+		return c.json(
+			listDeviceTypes({
+				search: query.search,
+				page: query.page,
+				limit: query.limit,
+				manufacturer: query.manufacturer,
+			}),
+		)
+	})
+	.post('/', vValidator('json', DeviceTypeCreateSchema, onValidationError), (c) => {
+		const result = createDeviceType(c.req.valid('json'))
+		if (Result.isOk(result)) {
+			logAccess(c, 'device-type.create', result.value.id)
+			return c.json(result.value, 201)
+		}
+		return sendResult(c, result)
+	})
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		return sendResult(c, getDeviceType(c.req.valid('param').id))
+	})
+	.patch(
+		'/:id',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', DeviceTypeUpdateSchema, onValidationError),
+		(c) => {
+			const result = updateDeviceType(c.req.valid('param').id, c.req.valid('json'))
+			if (Result.isOk(result)) {
+				logAccess(c, 'device-type.update', result.value.id)
+				return c.json(result.value)
+			}
+			return sendResult(c, result)
+		},
+	)
+	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		const result = deleteDeviceType(c.req.valid('param').id)
+		if (Result.isOk(result)) {
+			logAccess(c, 'device-type.delete', result.value.id)
+			return c.json(result.value)
+		}
+		return sendResult(c, result)
+	})
+	// Stored-stub expansion for one device type.
+	.get('/:id/preview', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		return sendResult(c, previewDeviceType(c.req.valid('param').id))
+	})
+	// Stub sub-resource.
+	.get('/:id/stubs', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		return sendResult(c, listStubs(c.req.valid('param').id))
+	})
+	.post(
+		'/:id/stubs',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', StubCreateSchema, onValidationError),
+		(c) => {
+			const result = createStub(c.req.valid('param').id, c.req.valid('json'))
+			if (Result.isOk(result)) {
+				logAccess(c, 'device-type-stub.create', result.value.id)
+				return c.json(result.value, 201)
+			}
+			return sendResult(c, result)
+		},
+	)
+	.patch(
+		'/:id/stubs/:stubId',
+		vValidator('param', stubIdParamsSchema, onValidationError),
+		vValidator('json', StubUpdateSchema, onValidationError),
+		(c) => {
+			// The `:id` segment is validated as a non-empty id; ownership is
+			// enforced by loading the stub itself.
+			const result = updateStub(c.req.param('stubId'), c.req.valid('json'))
+			if (Result.isOk(result)) {
+				logAccess(c, 'device-type-stub.update', result.value.id)
+				return c.json(result.value)
+			}
+			return sendResult(c, result)
+		},
+	)
+	.delete(
+		'/:id/stubs/:stubId',
+		vValidator('param', stubIdParamsSchema, onValidationError),
+		(c) => {
+			const result = deleteStub(c.req.param('stubId'))
+			if (Result.isOk(result)) {
+				logAccess(c, 'device-type-stub.delete', result.value.id)
+				return c.json(result.value)
+			}
+			return sendResult(c, result)
+		},
+	)
+	.get('/:id/stubs/:stubId', vValidator('param', stubIdParamsSchema, onValidationError), (c) => {
+		return sendResult(c, getStub(c.req.param('stubId')))
+	})
