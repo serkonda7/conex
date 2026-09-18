@@ -524,3 +524,81 @@ export const InterfaceListQuerySchema = v.object({ ...ListQueryEntries })
 
 export type DeviceListQuery = v.InferInput<typeof DeviceListQuerySchema>
 export type InterfaceListQuery = v.InferInput<typeof InterfaceListQuerySchema>
+
+// ---------------------------------------------------------------------------
+// P5: cables (L1)
+// ---------------------------------------------------------------------------
+
+/** Cable lifecycle label. `connected` is the normal live state. */
+export const CableStatusSchema = v.picklist(['connected', 'planned', 'decommissioned'])
+
+export type CableStatus = v.InferInput<typeof CableStatusSchema>
+
+/** Cable kind label (e.g. `cat6`, `fiber-om4`, `dac`). Free-form, like interface kinds. */
+export const CableKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
+
+export const CableLabelSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+
+export const CableCreateSchema = v.strictObject({
+	a_interface_id: IdSchema,
+	b_interface_id: IdSchema,
+	status: v.optional(CableStatusSchema, 'connected'),
+	kind: v.optional(CableKindSchema, undefined),
+	label: v.optional(CableLabelSchema, undefined),
+	description: DescriptionSchema,
+})
+
+export const CableUpdateSchema = v.strictObject({
+	// Endpoints are immutable after create: re-cabling is delete + recreate
+	// so both `connected` flags stay consistent.
+	status: v.optional(CableStatusSchema, undefined),
+	kind: v.optional(v.nullable(CableKindSchema), undefined),
+	label: v.optional(v.nullable(CableLabelSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+/** Convenience connect body: `POST` one end in the path, the peer in the body. */
+export const InterfaceConnectSchema = v.strictObject({
+	peer_interface_id: IdSchema,
+})
+
+export type CableCreate = v.InferInput<typeof CableCreateSchema>
+export type CableUpdate = v.InferInput<typeof CableUpdateSchema>
+export type InterfaceConnect = v.InferInput<typeof InterfaceConnectSchema>
+
+export const CableListQuerySchema = v.object({
+	...ListQueryEntries,
+	status: v.optional(CableStatusSchema, undefined),
+	/** Filter to cables touching this interface (either end). */
+	interface: OptionalIdEntry,
+	/** Filter to cables touching any interface of this device (either end). */
+	device: OptionalIdEntry,
+})
+
+export type CableListQuery = v.InferInput<typeof CableListQuerySchema>
+
+/** One peer link in a per-device trace. */
+export interface TracePeerInterface {
+	id: string
+	name: string
+	kind: string
+}
+
+export interface TracePeerDevice {
+	id: string
+	name: string
+}
+
+export interface TraceLink {
+	cable_id: string
+	cable_label: string | null
+	cable_status: string
+	local_interface: TracePeerInterface
+	peer_device: TracePeerDevice
+	peer_interface: TracePeerInterface
+}
+
+export interface DeviceTraceResponse {
+	device_id: string
+	links: TraceLink[]
+}

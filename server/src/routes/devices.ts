@@ -8,11 +8,13 @@ import {
 	DeviceUpdateSchema,
 	EntityParamsSchema,
 	IdSchema,
+	InterfaceConnectSchema,
 	InterfaceCreateSchema,
 	InterfaceUpdateSchema,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { logAccess } from '../audit'
+import { connectCable, getDeviceTrace } from '../db/cables'
 import {
 	addInterface,
 	createDevice,
@@ -132,3 +134,29 @@ export const devicesApp = new Hono()
 			return sendResult(c, result)
 		},
 	)
+	// Convenience connect: one end in the path, the peer in the body.
+	.post(
+		'/:id/interfaces/:ifaceId/connect',
+		vValidator('param', deviceIfaceParamsSchema, onValidationError),
+		vValidator('json', InterfaceConnectSchema, onValidationError),
+		(c) => {
+			const param = c.req.valid('param')
+			const local = getInterface(param.id, param.ifaceId)
+			if (Result.isError(local)) {
+				return sendResult(c, local)
+			}
+			const result = connectCable({
+				a_interface_id: param.ifaceId,
+				b_interface_id: c.req.valid('json').peer_interface_id,
+			})
+			if (Result.isOk(result)) {
+				logAccess(c, 'cable.create', result.value.id)
+				return c.json(result.value, 201)
+			}
+			return sendResult(c, result)
+		},
+	)
+	// Per-device L1 trace: peer links `dev:port <-> dev:port`.
+	.get('/:id/trace', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		return sendResult(c, getDeviceTrace(c.req.valid('param').id))
+	})

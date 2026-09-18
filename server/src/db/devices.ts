@@ -20,6 +20,7 @@ import {
 } from '../schema'
 import { checkBounds, checkOverlap } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
+import { deviceHasCables } from './cables'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import { deviceSpansOf } from './racks'
@@ -471,6 +472,13 @@ export function deleteDevice(id: string): Result<DeviceRow, Error> {
 	const current = getDevice(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	// Cabled ports stay consistent: remove cables first so no peer is left
+	// pointing at a deleted interface (FK + connected flag both matter).
+	if (deviceHasCables(id)) {
+		return Result.err(
+			new ConflictError('Device still has connected cables; disconnect them first'),
+		)
 	}
 	getDb().transaction((tx) => {
 		tx.delete(interfaces).where(eq(interfaces.device_id, id)).run()

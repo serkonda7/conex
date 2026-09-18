@@ -296,3 +296,36 @@ export const interfaces = sqliteTable(
 		uniqueIndex('interfaces_device_name_idx').on(table.device_id, table.name),
 	],
 )
+
+// ---------------------------------------------------------------------------
+// P5: cables (L1). A cable links exactly two distinct interfaces; each
+// interface appears on at most one cable (unique on both ends, enforced here
+// and in the service layer). `connected` on both interfaces flips true on
+// connect and back to false on cable delete; it is never edited directly.
+// Same-device links are allowed when the interfaces differ (v1); only the
+// same interface twice is rejected.
+// ---------------------------------------------------------------------------
+
+export const cables = sqliteTable(
+	'cables',
+	{
+		id: text('id').primaryKey(),
+		a_interface_id: text('a_interface_id')
+			.notNull()
+			.unique()
+			.references(() => interfaces.id),
+		b_interface_id: text('b_interface_id')
+			.notNull()
+			.unique()
+			.references(() => interfaces.id),
+		status: text('status').notNull().default('connected'),
+		kind: text('kind'),
+		label: text('label'),
+		description: text('description'),
+	},
+	(table) => [
+		index('cables_a_interface_id_idx').on(table.a_interface_id),
+		index('cables_b_interface_id_idx').on(table.b_interface_id),
+		index('cables_status_idx').on(table.status),
+	],
+)

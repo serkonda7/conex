@@ -5,6 +5,7 @@ import { AUDIT_SWEEP_INTERVAL_MS, pruneExpiredAuditLogs } from './audit'
 import { type AppConfig, initConfig, load_config_file, resolve_listen_port } from './config'
 import { initDb } from './db'
 import { authApp } from './routes/auth'
+import { cablesApp } from './routes/cables'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
 import { locationsApp } from './routes/locations'
@@ -65,6 +66,7 @@ export function createApp() {
 			.route('/manufacturers', manufacturersApp)
 			.route('/device-types', deviceTypesApp)
 			.route('/devices', devicesApp)
+			.route('/cables', cablesApp)
 	)
 }
 
