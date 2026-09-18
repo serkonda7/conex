@@ -76,6 +76,7 @@ export function SitesPage(): JSX.Element {
 	return (
 		<div>
 			<h2>Sites</h2>
+			<p class="page-subtitle">Group racks by site and tenant.</p>
 			<label>
 				Tenant filter:{' '}
 				<select
@@ -140,7 +141,11 @@ export function SitesPage(): JSX.Element {
 								</td>
 								<td>{tenantNameOf(s.tenant_id)}</td>
 								<td>
-									<button type="button" onClick={() => handleDelete(s.id)}>
+									<button
+										type="button"
+										class="btn-danger"
+										onClick={() => handleDelete(s.id)}
+									>
 										Delete
 									</button>
 								</td>
@@ -149,6 +154,9 @@ export function SitesPage(): JSX.Element {
 					</For>
 				</tbody>
 			</table>
+			<Show when={!sites.loading && (sites() ?? []).length === 0}>
+				<p class="empty">No sites yet. Add the first one above.</p>
+			</Show>
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

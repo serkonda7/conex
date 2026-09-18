@@ -13,7 +13,6 @@ import { racksApp } from './routes/racks'
 import { searchApp } from './routes/search'
 import { shelvesApp } from './routes/shelves'
 import { sitesApp } from './routes/sites'
-import { tenantGroupsApp } from './routes/tenant_groups'
 import { tenantsApp } from './routes/tenants'
 import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
 import { jsonError } from './util/http'
@@ -57,7 +56,6 @@ export function createApp() {
 				return c.json({ status: 'ok', version: '0.1.0' })
 			})
 			.route('/auth', authApp)
-			.route('/tenant-groups', tenantGroupsApp)
 			.route('/tenants', tenantsApp)
 			.route('/sites', sitesApp)
 			.route('/locations', locationsApp)

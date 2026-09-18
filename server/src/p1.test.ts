@@ -54,7 +54,7 @@ beforeAll(async () => {
 
 describe('auth guard', () => {
 	test('P1 endpoints require authentication', async () => {
-		for (const path of ['/tenant-groups', '/tenants', '/sites', '/locations']) {
+		for (const path of ['/tenants', '/sites', '/locations']) {
 			const res = await api('GET', path, undefined, undefined, false)
 			expect(res.status).toBe(401)
 		}
@@ -77,72 +77,12 @@ describe('slug contract', () => {
 	})
 })
 
-describe('tenant groups', () => {
-	test('full CRUD', async () => {
-		const created = await api('POST', '/tenant-groups', { name: 'Acme', slug: 'acme' })
-		expect(created.status).toBe(201)
-		const id = idOf(created)
-
-		const dup = await api('POST', '/tenant-groups', { name: 'Acme 2', slug: 'acme' })
-		expect(dup.status).toBe(409)
-
-		const listed = await api('GET', '/tenant-groups', undefined, '?search=acm')
-		expect(listed.status).toBe(200)
-		expect((listed.body as { total: number }).total).toBe(1)
-
-		const bad = await api('POST', '/tenant-groups', { name: 'Bad', slug: 'BAD SLUG' })
-		expect(bad.status).toBe(400)
-
-		const updated = await api('PATCH', `/tenant-groups/${id}`, { name: 'Acme Inc' })
-		expect(updated.status).toBe(200)
-		expect((updated.body as { name: string }).name).toBe('Acme Inc')
-
-		const missing = await api('GET', '/tenant-groups/does-not-exist')
-		expect(missing.status).toBe(404)
-
-		const deleted = await api('DELETE', `/tenant-groups/${id}`)
-		expect(deleted.status).toBe(200)
-		expect((await api('GET', `/tenant-groups/${id}`)).status).toBe(404)
-	})
-
-	test('delete blocked while tenants reference the group', async () => {
-		const group = await api('POST', '/tenant-groups', { name: 'G', slug: 'g-del' })
-		const tenant = await api('POST', '/tenants', {
-			name: 'T',
-			slug: 't-del',
-			group_id: idOf(group),
-		})
-		expect(tenant.status).toBe(201)
-
-		const blocked = await api('DELETE', `/tenant-groups/${idOf(group)}`)
-		expect(blocked.status).toBe(409)
-
-		expect((await api('DELETE', `/tenants/${idOf(tenant)}`)).status).toBe(200)
-		expect((await api('DELETE', `/tenant-groups/${idOf(group)}`)).status).toBe(200)
-	})
-})
-
 describe('tenants and sites', () => {
 	test('tenant filter and site delete-block chain', async () => {
-		const group = await api('POST', '/tenant-groups', { name: 'G2', slug: 'g2' })
-		const t1 = await api('POST', '/tenants', {
-			name: 'T1',
-			slug: 't1',
-			group_id: idOf(group),
-		})
+		const t1 = await api('POST', '/tenants', { name: 'T1', slug: 't1' })
 		const t2 = await api('POST', '/tenants', { name: 'T2', slug: 't2' })
 		expect(t1.status).toBe(201)
 		expect(t2.status).toBe(201)
-
-		const filtered = await api('GET', '/tenants', undefined, `?group_id=${idOf(group)}`)
-		expect((filtered.body as { total: number }).total).toBe(1)
-
-		const badGroup = await api('POST', '/tenants', {
-			name: 'TX',
-			slug: 'tx',
-			group_id: 'missing',
-		})
-		expect(badGroup.status).toBe(404)
 
 		const site = await api('POST', '/sites', {
 			name: 'DC1',
@@ -166,7 +106,6 @@ describe('tenants and sites', () => {
 		expect((await api('DELETE', `/sites/${idOf(site)}`)).status).toBe(200)
 		expect((await api('DELETE', `/tenants/${idOf(t1)}`)).status).toBe(200)
 		expect((await api('DELETE', `/tenants/${idOf(t2)}`)).status).toBe(200)
-		expect((await api('DELETE', `/tenant-groups/${idOf(group)}`)).status).toBe(200)
 	})
 })
 

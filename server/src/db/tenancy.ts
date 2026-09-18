@@ -7,11 +7,9 @@ import {
 	type SiteCreate,
 	type SiteUpdate,
 	type TenantCreate,
-	type TenantGroupCreate,
-	type TenantGroupUpdate,
 	type TenantUpdate,
 } from 'shared/src/schemas'
-import { locations, racks, sites, tenant_groups, tenants } from '../schema'
+import { locations, racks, sites, tenants } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -22,7 +20,6 @@ import {
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 
-export type TenantGroupRow = typeof tenant_groups.$inferSelect
 export type TenantRow = typeof tenants.$inferSelect
 export type SiteRow = typeof sites.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
@@ -58,136 +55,15 @@ function newId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Tenant groups
-// ---------------------------------------------------------------------------
-
-export function listTenantGroups(params: ListParams): Page<TenantGroupRow> {
-	const db = getDb()
-	const pattern = searchPattern(params.search)
-	const where = params.search
-		? sql`(${tenant_groups.name} LIKE ${pattern} ESCAPE '\\' OR ${tenant_groups.slug} LIKE ${pattern} ESCAPE '\\')`
-		: undefined
-	const items = db
-		.select()
-		.from(tenant_groups)
-		.where(where)
-		.orderBy(asc(tenant_groups.name))
-		.limit(params.limit)
-		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(tenant_groups).where(where).get()
-	return pageOf(items, totalRow?.n ?? 0, params)
-}
-
-export function getTenantGroup(id: string): Result<TenantGroupRow, Error> {
-	const row = getDb().select().from(tenant_groups).where(eq(tenant_groups.id, id)).get()
-	if (!row) {
-		return Result.err(new NotFoundError('Tenant group not found'))
-	}
-	return Result.ok(row)
-}
-
-export function createTenantGroup(input: TenantGroupCreate): Result<TenantGroupRow, Error> {
-	const db = getDb()
-	const clash = db.select().from(tenant_groups).where(eq(tenant_groups.slug, input.slug)).get()
-	if (clash) {
-		return Result.err(new DuplicateError('Tenant group slug is already in use'))
-	}
-	const row: TenantGroupRow = {
-		id: newId(),
-		name: input.name,
-		slug: input.slug,
-		description: input.description ?? null,
-	}
-	try {
-		db.insert(tenant_groups).values(row).run()
-	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Tenant group slug is already in use'))
-		}
-		return Result.err(err instanceof Error ? err : new Error(String(err)))
-	}
-	return Result.ok(row)
-}
-
-export function updateTenantGroup(
-	id: string,
-	input: TenantGroupUpdate,
-): Result<TenantGroupRow, Error> {
-	const current = getTenantGroup(id)
-	if (Result.isError(current)) {
-		return current
-	}
-	const db = getDb()
-	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		const clash = db
-			.select()
-			.from(tenant_groups)
-			.where(eq(tenant_groups.slug, input.slug))
-			.get()
-		if (clash) {
-			return Result.err(new DuplicateError('Tenant group slug is already in use'))
-		}
-	}
-	const patch: Partial<TenantGroupRow> = {}
-	if (input.name !== undefined) {
-		patch.name = input.name
-	}
-	if (input.slug !== undefined) {
-		patch.slug = input.slug
-	}
-	if (input.description !== undefined) {
-		patch.description = input.description
-	}
-	if (Object.keys(patch).length > 0) {
-		try {
-			db.update(tenant_groups).set(patch).where(eq(tenant_groups.id, id)).run()
-		} catch (err) {
-			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Tenant group slug is already in use'))
-			}
-			return Result.err(err instanceof Error ? err : new Error(String(err)))
-		}
-	}
-	return getTenantGroup(id)
-}
-
-export function deleteTenantGroup(id: string): Result<TenantGroupRow, Error> {
-	const current = getTenantGroup(id)
-	if (Result.isError(current)) {
-		return current
-	}
-	const child = getDb().select().from(tenants).where(eq(tenants.group_id, id)).get()
-	if (child) {
-		return Result.err(
-			new ConflictError('Tenant group still has tenants; move or delete them first'),
-		)
-	}
-	getDb().delete(tenant_groups).where(eq(tenant_groups.id, id)).run()
-	return Result.ok(current.value)
-}
-
-// ---------------------------------------------------------------------------
 // Tenants
 // ---------------------------------------------------------------------------
 
-export interface TenantListParams extends ListParams {
-	group_id?: string
-}
-
-export function listTenants(params: TenantListParams): Page<TenantRow> {
+export function listTenants(params: ListParams): Page<TenantRow> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
-	const conditions: SQL[] = []
-	if (params.search) {
-		conditions.push(
-			sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\')`,
-		)
-	}
-	if (params.group_id) {
-		conditions.push(eq(tenants.group_id, params.group_id))
-	}
-	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const where = params.search
+		? sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\')`
+		: undefined
 	const items = db
 		.select()
 		.from(tenants)
@@ -208,22 +84,7 @@ export function getTenant(id: string): Result<TenantRow, Error> {
 	return Result.ok(row)
 }
 
-function checkTenantGroup(groupId: string | null | undefined): Result<undefined, Error> {
-	if (groupId === null || groupId === undefined) {
-		return Result.ok(undefined)
-	}
-	const group = getDb().select().from(tenant_groups).where(eq(tenant_groups.id, groupId)).get()
-	if (!group) {
-		return Result.err(new NotFoundError('Tenant group not found'))
-	}
-	return Result.ok(undefined)
-}
-
 export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
-	const groupCheck = checkTenantGroup(input.group_id)
-	if (Result.isError(groupCheck)) {
-		return Result.err(groupCheck.error)
-	}
 	const db = getDb()
 	const clash = db.select().from(tenants).where(eq(tenants.slug, input.slug)).get()
 	if (clash) {
@@ -231,7 +92,6 @@ export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
 	}
 	const row: TenantRow = {
 		id: newId(),
-		group_id: input.group_id ?? null,
 		name: input.name,
 		slug: input.slug,
 		description: input.description ?? null,
@@ -252,12 +112,6 @@ export function updateTenant(id: string, input: TenantUpdate): Result<TenantRow,
 	if (Result.isError(current)) {
 		return current
 	}
-	if (input.group_id !== undefined) {
-		const groupCheck = checkTenantGroup(input.group_id)
-		if (Result.isError(groupCheck)) {
-			return Result.err(groupCheck.error)
-		}
-	}
 	const db = getDb()
 	if (input.slug !== undefined && input.slug !== current.value.slug) {
 		const clash = db.select().from(tenants).where(eq(tenants.slug, input.slug)).get()
@@ -271,9 +125,6 @@ export function updateTenant(id: string, input: TenantUpdate): Result<TenantRow,
 	}
 	if (input.slug !== undefined) {
 		patch.slug = input.slug
-	}
-	if (input.group_id !== undefined) {
-		patch.group_id = input.group_id
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description

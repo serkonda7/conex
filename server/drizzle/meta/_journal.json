@@ -50,6 +50,13 @@
       "when": 1789753227372,
       "tag": "0006_exotic_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789768085562,
+      "tag": "0007_worthless_wallow",
+      "breakpoints": true
     }
   ]
 }

@@ -47,30 +47,15 @@ export const auth_states = sqliteTable(
 // children exist (enforced in the service layer, not by FK cascade).
 // ---------------------------------------------------------------------------
 
-export const tenant_groups = sqliteTable(
-	'tenant_groups',
-	{
-		id: text('id').primaryKey(),
-		name: text('name').notNull(),
-		slug: text('slug').notNull().unique(),
-		description: text('description'),
-	},
-	(table) => [index('tenant_groups_name_idx').on(table.name)],
-)
-
 export const tenants = sqliteTable(
 	'tenants',
 	{
 		id: text('id').primaryKey(),
-		group_id: text('group_id').references(() => tenant_groups.id),
 		name: text('name').notNull(),
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
 	},
-	(table) => [
-		index('tenants_group_id_idx').on(table.group_id),
-		index('tenants_name_idx').on(table.name),
-	],
+	(table) => [index('tenants_name_idx').on(table.name)],
 )
 
 export const sites = sqliteTable(

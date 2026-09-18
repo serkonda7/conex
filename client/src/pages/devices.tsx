@@ -121,6 +121,9 @@ export function DevicesPage(): JSX.Element {
 	return (
 		<div>
 			<h2>Devices</h2>
+			<p class="page-subtitle">
+				Filter the fleet, instantiate from a template, or bulk import.
+			</p>
 			<form
 				onSubmit={(e: SubmitEvent): void => {
 					e.preventDefault()
@@ -128,12 +131,22 @@ export function DevicesPage(): JSX.Element {
 					void refetch()
 				}}
 			>
+				<label class="visually-hidden" for="devices-search">
+					Search devices
+				</label>
 				<input
+					id="devices-search"
 					placeholder="Search name, asset tag, serial…"
+					aria-label="Search devices"
 					value={search()}
 					onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 				/>
+				<label class="visually-hidden" for="devices-status">
+					Status filter
+				</label>
 				<select
+					id="devices-status"
+					aria-label="Status filter"
 					value={status()}
 					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 						setStatus(e.currentTarget.value)
@@ -145,7 +158,12 @@ export function DevicesPage(): JSX.Element {
 					<option value="staged">staged</option>
 					<option value="decommissioned">decommissioned</option>
 				</select>
+				<label class="visually-hidden" for="devices-rack">
+					Rack filter
+				</label>
 				<select
+					id="devices-rack"
+					aria-label="Rack filter"
 					value={rackFilter()}
 					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 						setRackFilter(e.currentTarget.value)
@@ -292,7 +310,9 @@ export function DevicesPage(): JSX.Element {
 									</a>
 								</td>
 								<td>{typeNameOf(d.device_type_id)}</td>
-								<td>{d.status}</td>
+								<td>
+									<span class={`badge badge-${d.status}`}>{d.status}</span>
+								</td>
 								<td>
 									{d.shelf_id ? (
 										<code>shelf:{d.shelf_id.slice(0, 8)}</code>
@@ -306,6 +326,7 @@ export function DevicesPage(): JSX.Element {
 								<td>
 									<button
 										type="button"
+										class="btn-danger"
 										onClick={async () => {
 											setError(null)
 											const res = await delete_device(d.id)
@@ -324,6 +345,12 @@ export function DevicesPage(): JSX.Element {
 					</For>
 				</tbody>
 			</table>
+			<Show when={!devices.loading && (devices() ?? []).length === 0}>
+				<p class="empty">No devices match. Adjust the filters or instantiate one above.</p>
+			</Show>
+			<Show when={devices.loading}>
+				<p class="skeleton">Loading devices…</p>
+			</Show>
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

@@ -66,29 +66,15 @@ const NullableIdSchema = v.optional(v.nullable(IdSchema), undefined)
 /** Maximum nesting depth of the location tree (root counts as depth 1). */
 export const MAX_LOCATION_DEPTH = 5
 
-export const TenantGroupCreateSchema = v.strictObject({
-	name: NameSchema,
-	slug: SlugSchema,
-	description: DescriptionSchema,
-})
-
-export const TenantGroupUpdateSchema = v.strictObject({
-	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
-})
-
 export const TenantCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
-	group_id: NullableIdSchema,
 	description: DescriptionSchema,
 })
 
 export const TenantUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
-	group_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
@@ -128,8 +114,6 @@ export const LocationUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
-export type TenantGroupCreate = v.InferInput<typeof TenantGroupCreateSchema>
-export type TenantGroupUpdate = v.InferInput<typeof TenantGroupUpdateSchema>
 export type TenantCreate = v.InferInput<typeof TenantCreateSchema>
 export type TenantUpdate = v.InferInput<typeof TenantUpdateSchema>
 export type SiteCreate = v.InferInput<typeof SiteCreateSchema>
@@ -174,12 +158,7 @@ const OptionalIdEntry = v.optional(
 	undefined,
 )
 
-export const TenantGroupListQuerySchema = v.object({ ...ListQueryEntries })
-
-export const TenantListQuerySchema = v.object({
-	...ListQueryEntries,
-	group_id: OptionalIdEntry,
-})
+export const TenantListQuerySchema = v.object({ ...ListQueryEntries })
 
 export const SiteListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -195,7 +174,6 @@ export const LocationListQuerySchema = v.object({
 
 export const EntityParamsSchema = v.object({ id: IdSchema })
 
-export type TenantGroupListQuery = v.InferInput<typeof TenantGroupListQuerySchema>
 export type TenantListQuery = v.InferInput<typeof TenantListQuerySchema>
 export type SiteListQuery = v.InferInput<typeof SiteListQuerySchema>
 export type LocationListQuery = v.InferInput<typeof LocationListQuerySchema>

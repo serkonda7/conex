@@ -54,7 +54,11 @@ function LocationBranch(props: {
 	return (
 		<li>
 			<code>{trail.join(' > ')}</code>{' '}
-			<button type="button" onClick={() => props.onDelete(props.node.row.id)}>
+			<button
+				type="button"
+				class="btn-danger"
+				onClick={() => props.onDelete(props.node.row.id)}
+			>
 				Delete
 			</button>
 			<Show when={props.node.children.length > 0}>
@@ -126,7 +130,7 @@ export function SiteDetailPage(props: { id: string }): JSX.Element {
 					← Sites
 				</a>
 			</p>
-			<Show when={site()} fallback={<p>Loading site…</p>}>
+			<Show when={site()} fallback={<p class="skeleton">Loading site…</p>}>
 				{(s: Accessor<SiteRow>): JSX.Element => (
 					<h2>
 						{s().name} <code>{s().slug}</code>
@@ -159,7 +163,7 @@ export function SiteDetailPage(props: { id: string }): JSX.Element {
 				<button type="submit">Add location</button>
 			</form>
 			<h3>Locations</h3>
-			<Show when={tree().length > 0} fallback={<p>No locations yet.</p>}>
+			<Show when={tree().length > 0} fallback={<p class="empty">No locations yet.</p>}>
 				<ul>
 					<For each={tree()}>
 						{(node: TreeNode): JSX.Element => (

@@ -1,10 +1,10 @@
 /**
- * P1 API wrappers: typed tenants/groups/sites/locations calls over the hono
+ * P1 API wrappers: typed tenants/sites/locations calls over the hono
  * RPC client. Errors surface as `Result.err` with the server's `{ error }`
  * message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
-import type { LocationRow, SiteRow, TenantGroupRow, TenantRow } from 'server/src/db/tenancy'
+import type { LocationRow, SiteRow, TenantRow } from 'server/src/db/tenancy'
 import { client, to_result } from './api'
 import type { ApiResponse } from './util/api_error'
 
@@ -15,7 +15,7 @@ export interface Page<T> {
 	limit: number
 }
 
-export type { LocationRow, SiteRow, TenantGroupRow, TenantRow }
+export type { LocationRow, SiteRow, TenantRow }
 
 async function getPage<T>(
 	req: Promise<ApiResponse>,
@@ -25,48 +25,18 @@ async function getPage<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Tenant groups
-// ---------------------------------------------------------------------------
-
-export async function fetch_tenant_groups(
-	search = '',
-): Promise<Result<Page<TenantGroupRow>, Error>> {
-	return getPage<TenantGroupRow>(
-		client['tenant-groups'].$get({ query: { search, page: '1', limit: '200' } }),
-		'Failed to load tenant groups',
-	)
-}
-
-export async function create_tenant_group(
-	name: string,
-	slug: string,
-): Promise<Result<TenantGroupRow, Error>> {
-	const res = await client['tenant-groups'].$post({ json: { name, slug } })
-	return to_result<TenantGroupRow>(res, 'Failed to create tenant group')
-}
-
-export async function delete_tenant_group(id: string): Promise<Result<unknown, Error>> {
-	const res = await client['tenant-groups'][':id'].$delete({ param: { id } })
-	return to_result<unknown>(res, 'Failed to delete tenant group')
-}
-
-// ---------------------------------------------------------------------------
 // Tenants
 // ---------------------------------------------------------------------------
 
-export async function fetch_tenants(group_id?: string): Promise<Result<Page<TenantRow>, Error>> {
+export async function fetch_tenants(): Promise<Result<Page<TenantRow>, Error>> {
 	return getPage<TenantRow>(
-		client.tenants.$get({ query: { search: '', page: '1', limit: '200', group_id } }),
+		client.tenants.$get({ query: { search: '', page: '1', limit: '200' } }),
 		'Failed to load tenants',
 	)
 }
 
-export async function create_tenant(
-	name: string,
-	slug: string,
-	group_id: string | null,
-): Promise<Result<TenantRow, Error>> {
-	const res = await client.tenants.$post({ json: { name, slug, group_id } })
+export async function create_tenant(name: string, slug: string): Promise<Result<TenantRow, Error>> {
+	const res = await client.tenants.$post({ json: { name, slug } })
 	return to_result<TenantRow>(res, 'Failed to create tenant')
 }
 

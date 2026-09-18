@@ -78,10 +78,11 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 					← Sites
 				</a>
 			</p>
-			<Show when={rack()} fallback={<p>Loading rack…</p>}>
+			<Show when={rack()} fallback={<p class="skeleton">Loading rack…</p>}>
 				<h2>
 					{rack()?.name} <code>{rack()?.slug}</code> <span>{rack()?.height_u}U</span>
 				</h2>
+				<p class="page-subtitle">Top-down elevation. Pick a free U to place a device.</p>
 			</Show>
 			<h3>Add shelf</h3>
 			<form onSubmit={handleCreateShelf}>
@@ -99,7 +100,7 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 				<button type="submit">Add shelf</button>
 			</form>
 			<h3>Elevation</h3>
-			<Show when={elevation()} fallback={<p>Loading elevation…</p>}>
+			<Show when={elevation()} fallback={<p class="skeleton">Loading elevation…</p>}>
 				<table>
 					<thead>
 						<tr>
@@ -151,6 +152,7 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 										>
 											<button
 												type="button"
+												class="btn-danger"
 												onClick={() =>
 													handleDeleteShelf(unit.shelf?.id ?? '')
 												}
@@ -166,7 +168,7 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 				</table>
 			</Show>
 			<Show when={pendingU() !== null}>
-				<p>
+				<p class="empty">
 					U{pendingU()} selected — instantiate the device from{' '}
 					<a href="/devices" onClick={(e: MouseEvent): void => go(e, '/devices')}>
 						Devices

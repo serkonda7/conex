@@ -21,7 +21,6 @@ export const tenantsApp = new Hono()
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
-				group_id: query.group_id,
 			}),
 		)
 	})

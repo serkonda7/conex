@@ -183,11 +183,12 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 					← Devices
 				</a>
 			</p>
-			<Show when={device()} fallback={<p>Loading device…</p>}>
+			<Show when={device()} fallback={<p class="skeleton">Loading device…</p>}>
 				<h2>{device()?.name}</h2>
 				<p>
-					Status: {device()?.status} · Asset: {device()?.asset_tag ?? '—'} · Serial:{' '}
-					{device()?.serial ?? '—'}
+					Status:{' '}
+					<span class={`badge badge-${device()?.status}`}>{device()?.status}</span> ·
+					Asset: {device()?.asset_tag ?? '—'} · Serial: {device()?.serial ?? '—'}
 				</p>
 				<p>
 					Mount:{' '}
@@ -217,6 +218,7 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 				<p>
 					<button
 						type="button"
+						class="btn-danger"
 						onClick={async () => {
 							setError(null)
 							const res = await delete_device(props.id)
@@ -352,22 +354,31 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 			</form>
 
 			<h3>Trace ({trace()?.links.length ?? 0})</h3>
-			<ul>
-				<For each={trace()?.links ?? []}>
-					{(link: TraceLink): JSX.Element => (
-						<li>
-							<code>
-								{device()?.name}:{link.local_interface.name} ↔{' '}
-								{link.peer_device.name}:{link.peer_interface.name}
-							</code>{' '}
-							{link.cable_label ? <span>({link.cable_label})</span> : null}{' '}
-							<button type="button" onClick={() => handleDisconnect(link.cable_id)}>
-								Disconnect
-							</button>
-						</li>
-					)}
-				</For>
-			</ul>
+			<Show
+				when={(trace()?.links ?? []).length > 0}
+				fallback={<p class="empty">No cable path yet. Connect the first cable below.</p>}
+			>
+				<ul>
+					<For each={trace()?.links ?? []}>
+						{(link: TraceLink): JSX.Element => (
+							<li>
+								<code>
+									{device()?.name}:{link.local_interface.name} ↔{' '}
+									{link.peer_device.name}:{link.peer_interface.name}
+								</code>{' '}
+								{link.cable_label ? <span>({link.cable_label})</span> : null}{' '}
+								<button
+									type="button"
+									class="btn-danger"
+									onClick={() => handleDisconnect(link.cable_id)}
+								>
+									Disconnect
+								</button>
+							</li>
+						)}
+					</For>
+				</ul>
+			</Show>
 
 			<h3>Cables ({cables()?.length ?? 0})</h3>
 			<table>
@@ -384,11 +395,14 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 						{(cable: CableRow): JSX.Element => (
 							<tr>
 								<td>{cable.label ?? '—'}</td>
-								<td>{cable.status}</td>
+								<td>
+									<span class="badge">{cable.status}</span>
+								</td>
 								<td>{cable.kind ?? '—'}</td>
 								<td>
 									<button
 										type="button"
+										class="btn-danger"
 										onClick={() => handleDisconnect(cable.id)}
 									>
 										Disconnect
@@ -399,6 +413,9 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 					</For>
 				</tbody>
 			</table>
+			<Show when={(cables() ?? []).length === 0}>
+				<p class="empty">No cables on this device yet.</p>
+			</Show>
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

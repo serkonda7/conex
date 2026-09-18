@@ -29,9 +29,6 @@ export type {
 	SiteListQuery,
 	SiteUpdate,
 	TenantCreate,
-	TenantGroupCreate,
-	TenantGroupListQuery,
-	TenantGroupUpdate,
 	TenantListQuery,
 	TenantUpdate,
 } from './schemas'

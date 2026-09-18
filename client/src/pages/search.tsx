@@ -42,6 +42,9 @@ export function SearchPage(props: { initial: string }): JSX.Element {
 	return (
 		<div>
 			<h2>Search</h2>
+			<p class="page-subtitle">
+				One query across tenants, sites, racks, devices, and cables.
+			</p>
 			<form
 				onSubmit={(e: SubmitEvent): void => {
 					e.preventDefault()

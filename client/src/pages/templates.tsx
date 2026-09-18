@@ -180,6 +180,7 @@ export function TemplatesPage(): JSX.Element {
 	return (
 		<div>
 			<h2>Manufacturers</h2>
+			<p class="page-subtitle">Hardware vendors for device-type templates.</p>
 			<form onSubmit={handleCreateMfr}>
 				<input
 					placeholder="Name"
@@ -212,6 +213,7 @@ export function TemplatesPage(): JSX.Element {
 								<td>
 									<button
 										type="button"
+										class="btn-danger"
 										onClick={async () => {
 											setError(null)
 											const res = await delete_manufacturer(m.id)
@@ -290,6 +292,7 @@ export function TemplatesPage(): JSX.Element {
 									</button>{' '}
 									<button
 										type="button"
+										class="btn-danger"
 										onClick={async () => {
 											setError(null)
 											const res = await delete_device_type(t.id)
@@ -353,6 +356,7 @@ export function TemplatesPage(): JSX.Element {
 									<td>
 										<button
 											type="button"
+											class="btn-danger"
 											onClick={() => handleDeleteStub(s.id)}
 										>
 											Delete
