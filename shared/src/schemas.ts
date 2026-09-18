@@ -602,3 +602,92 @@ export interface DeviceTraceResponse {
 	device_id: string
 	links: TraceLink[]
 }
+
+// ---------------------------------------------------------------------------
+// P6: global search / audit list / CSV import
+// ---------------------------------------------------------------------------
+
+/** Global search query: `GET /search?q=`. Empty query returns empty groups. */
+export const SearchQuerySchema = v.object({
+	q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ''),
+})
+
+export type SearchQuery = v.InferInput<typeof SearchQuerySchema>
+
+export const AuditListQuerySchema = v.object({ ...ListQueryEntries })
+
+export type AuditListQuery = v.InferInput<typeof AuditListQuerySchema>
+
+/** One audit log row as returned by `GET /audit`. */
+export interface AuditRow {
+	id: string
+	user_email: string
+	action: string
+	resource_id: string | null
+	created_at: number
+}
+
+/** JSON body for CSV imports: raw CSV text, parsed row-by-row server-side. */
+export const CsvImportBodySchema = v.strictObject({
+	csv: v.pipe(v.string(), v.minLength(1), v.maxLength(1_000_000)),
+})
+
+export type CsvImportBody = v.InferInput<typeof CsvImportBodySchema>
+
+/**
+ * One device CSV row (minimal columns). Slugs resolve to ids server-side;
+ * `position_u` arrives as text and coerces through Number.
+ */
+export const DeviceImportRowSchema = v.object({
+	name: NameSchema,
+	asset_tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	device_type_slug: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	site_slug: v.optional(
+		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+		undefined,
+	),
+	rack_slug: v.optional(
+		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+		undefined,
+	),
+	position_u: v.optional(
+		v.pipe(
+			v.union([v.string(), v.number()]),
+			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
+			v.number(),
+			v.integer(),
+			v.minValue(1),
+		),
+		undefined,
+	),
+	status: v.optional(DeviceStatusSchema, 'active'),
+})
+
+export type DeviceImportRow = v.InferInput<typeof DeviceImportRowSchema>
+
+/** One cable CSV row: device/interface names resolve to ids server-side. */
+export const CableImportRowSchema = v.object({
+	a_device: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	a_interface: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	b_device: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	b_interface: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	label: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), undefined),
+	kind: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50)), undefined),
+	status: v.optional(CableStatusSchema, 'connected'),
+})
+
+export type CableImportRow = v.InferInput<typeof CableImportRowSchema>
+
+/** Per-row import outcome: created id or the row's error message. */
+export interface ImportRowResult {
+	row: number
+	ok: boolean
+	id: string | null
+	error: string | null
+}
+
+export interface ImportResponse {
+	created: number
+	failed: number
+	rows: ImportRowResult[]
+}

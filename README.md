@@ -1,1 +1,95 @@
 # conex
+
+NetBox-lite: minimal datacenter inventory (tenants, sites, racks, devices, L1 cabling).
+
+Monorepo (`bun` workspaces + `turbo` + `biome` + `tsc`):
+
+- `server/` — `bun` + `hono` API, `drizzle-orm` + SQLite, Valibot validation.
+- `client/` — `vite` + `solid-js` UI, typed `hono/client` fetcher.
+- `shared/` — Valibot contracts shared by server validation and the client.
+- `server-cli/` — `create-user` provisioning for local auth.
+- `infra/` — Dockerfiles + Caddy proxy.
+
+## Prerequisites
+
+- `bun@1.4.2` (see `packageManager` in `package.json`).
+
+## Run
+
+```sh
+bun install
+bun run db:generate   # regenerate drizzle migrations after schema edits
+```
+
+The server needs a config file at `server/data/config.toml` (gitignored):
+
+```toml
+[auth]
+appKey = "at-least-32-chars-long-random-secret-here"
+secureCookies = false  # plain HTTP local dev; keep true behind HTTPS
+
+[server]
+host = "127.0.0.1"
+port = 3000
+
+[audit]
+retentionDays = 90
+```
+
+Provision a user, then start everything:
+
+```sh
+bun run --cwd server src/index.ts &   # or: bun run dev (turbo: api + ui)
+printf 'secret123\n' | bun run --cwd server-cli src/cli.ts create-user you@example.com
+bun run dev
+```
+
+- API: `http://localhost:3000` (`/health` for a smoke check).
+- UI: `http://localhost:5371` (proxies `/api` to the API).
+- DB path: `CONEX_DB_PATH` (default `server/data/conex.db`); config path:
+  `CONEX_CONFIG_PATH`; port override: `CONEX_PORT`.
+
+## Checks
+
+```sh
+bun run check   # tsc per workspace (depends on ^build)
+bun run build   # turbo build
+bun run test    # bun test per workspace
+bun run lint:ci # biome ci
+```
+
+End-to-end smoke (login → site → rack → device → cable, plus search +
+audit). Needs `bunx playwright install chromium` once:
+
+```sh
+bun run test:e2e
+```
+
+The spec manages its own API + UI servers and an isolated database under
+`client/test-results/e2e-data/` (override with `CONEX_E2E_DATA_DIR`,
+`CONEX_E2E_API_PORT`, `CONEX_CLIENT_PORT`). Set
+`CONEX_E2E_REUSE_SERVERS=1` to reuse hand-started servers.
+
+## Features (P6)
+
+- Global search: `GET /api/search?q=` groups hits across tenants, sites,
+  racks, devices (name/`asset_tag`/serial), and cables (label/kind).
+  Search box in the nav, results at `/search`.
+- CSV transfer on the Devices page (and `GET|POST /api/devices/export`,
+  `/import`, same for `/api/cables/`):
+  - devices columns: `name,asset_tag,device_type_slug,site_slug,rack_slug,position_u,status`
+  - cables columns: `a_device,a_interface,b_device,b_interface,label,kind,status`
+  - imports validate every row, create the good ones, and report per-row
+    errors; all imports are audited.
+- Audit log UI at `/audit` (`GET /api/audit?search=&page=&limit=`, newest first).
+
+## Docker
+
+```sh
+docker compose up --build
+```
+
+`server` + `client` images behind Caddy (`infra/`). The server reads
+`./server/data` (bind-mounted, holds `config.toml` + `conex.db`);
+`CONEX_PORT=3000` inside the container. See
+`docker-compose.override.yml.example` for local tweaks.

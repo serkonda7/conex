@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { AUDIT_SWEEP_INTERVAL_MS, pruneExpiredAuditLogs } from './audit'
 import { type AppConfig, initConfig, load_config_file, resolve_listen_port } from './config'
 import { initDb } from './db'
+import { auditApp } from './routes/audit'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
 import { deviceTypesApp } from './routes/device_types'
@@ -11,6 +12,7 @@ import { devicesApp } from './routes/devices'
 import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
+import { searchApp } from './routes/search'
 import { shelvesApp } from './routes/shelves'
 import { sitesApp } from './routes/sites'
 import { tenantGroupsApp } from './routes/tenant_groups'
@@ -67,6 +69,8 @@ export function createApp() {
 			.route('/device-types', deviceTypesApp)
 			.route('/devices', devicesApp)
 			.route('/cables', cablesApp)
+			.route('/search', searchApp)
+			.route('/audit', auditApp)
 	)
 }
 

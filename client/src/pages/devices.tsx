@@ -5,6 +5,7 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import { fetch_racks, type RackRow } from '../api_p2'
 import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
 import { create_device, type DeviceRow, delete_device, fetch_devices } from '../api_p4'
+import { download_csv, type ImportResponse, upload_csv } from '../api_p6'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -27,6 +28,8 @@ export function DevicesPage(): JSX.Element {
 	const [rackId, setRackId] = createSignal('')
 	const [positionU, setPositionU] = createSignal('')
 	const [shelfId, setShelfId] = createSignal('')
+	const [importSummary, setImportSummary] = createSignal<string | null>(null)
+	const [importErrors, setImportErrors] = createSignal<string[]>([])
 
 	const [devices, { refetch }] = createResource(async () => {
 		const res = await fetch_devices({
@@ -64,6 +67,26 @@ export function DevicesPage(): JSX.Element {
 
 	function typeNameOf(id: string): string {
 		return types()?.find((t) => t.id === id)?.model ?? id.slice(0, 8)
+	}
+
+	async function handleImport(kind: 'devices' | 'cables', file: File | undefined): Promise<void> {
+		setError(null)
+		setImportSummary(null)
+		setImportErrors([])
+		if (!file) {
+			return
+		}
+		const res = await upload_csv(kind, await file.text())
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		const outcome: ImportResponse = res.value
+		setImportSummary(`${kind} import: ${outcome.created} created, ${outcome.failed} failed`)
+		setImportErrors(
+			outcome.rows.filter((r) => !r.ok).map((r) => `Row ${r.row}: ${r.error ?? 'failed'}`),
+		)
+		void refetch()
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -182,6 +205,68 @@ export function DevicesPage(): JSX.Element {
 				/>
 				<button type="submit">Create device</button>
 			</form>
+
+			<h3>Import / export</h3>
+			<p>
+				<button
+					type="button"
+					onClick={async () => {
+						setError(null)
+						const res = await download_csv('devices')
+						if (Result.isError(res)) {
+							setError(res.error.message)
+						}
+					}}
+				>
+					Export devices CSV
+				</button>{' '}
+				<button
+					type="button"
+					onClick={async () => {
+						setError(null)
+						const res = await download_csv('cables')
+						if (Result.isError(res)) {
+							setError(res.error.message)
+						}
+					}}
+				>
+					Export cables CSV
+				</button>
+			</p>
+			<p>
+				<label>
+					Import devices CSV:{' '}
+					<input
+						type="file"
+						accept=".csv,text/csv"
+						onChange={(e: Event & { currentTarget: HTMLInputElement }) => {
+							void handleImport('devices', e.currentTarget.files?.[0])
+							e.currentTarget.value = ''
+						}}
+					/>
+				</label>
+			</p>
+			<p>
+				<label>
+					Import cables CSV:{' '}
+					<input
+						type="file"
+						accept=".csv,text/csv"
+						onChange={(e: Event & { currentTarget: HTMLInputElement }) => {
+							void handleImport('cables', e.currentTarget.files?.[0])
+							e.currentTarget.value = ''
+						}}
+					/>
+				</label>
+			</p>
+			<Show when={importSummary()}>
+				<p>{importSummary()}</p>
+			</Show>
+			<Show when={importErrors().length > 0}>
+				<ul>
+					<For each={importErrors()}>{(msg: string): JSX.Element => <li>{msg}</li>}</For>
+				</ul>
+			</Show>
 
 			<table>
 				<thead>

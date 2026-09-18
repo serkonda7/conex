@@ -5,10 +5,12 @@ import {
 	CableCreateSchema,
 	CableListQuerySchema,
 	CableUpdateSchema,
+	CsvImportBodySchema,
 	EntityParamsSchema,
 } from 'shared/src/schemas'
 import { logAccess } from '../audit'
 import { connectCable, deleteCable, getCable, listCables, updateCable } from '../db/cables'
+import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
@@ -32,6 +34,21 @@ export const cablesApp = new Hono()
 		const result = connectCable(c.req.valid('json'))
 		if (Result.isOk(result)) {
 			logAccess(c, 'cable.create', result.value.id)
+			return c.json(result.value, 201)
+		}
+		return sendResult(c, result)
+	})
+	// CSV transfer (registered before `/:id` so the literal paths win).
+	.get('/export', (c) => {
+		return c.text(exportCablesCsv(), 200, {
+			'Content-Type': 'text/csv; charset=utf-8',
+			'Content-Disposition': 'attachment; filename="cables.csv"',
+		})
+	})
+	.post('/import', vValidator('json', CsvImportBodySchema, onValidationError), (c) => {
+		const result = importCablesCsv(c.req.valid('json').csv)
+		if (Result.isOk(result)) {
+			logAccess(c, 'cable.import')
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)

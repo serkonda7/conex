@@ -2,6 +2,7 @@ import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
+	CsvImportBodySchema,
 	DeviceCreateSchema,
 	DeviceListQuerySchema,
 	DeviceMoveSchema,
@@ -15,6 +16,7 @@ import {
 import * as v from 'valibot'
 import { logAccess } from '../audit'
 import { connectCable, getDeviceTrace } from '../db/cables'
+import { exportDevicesCsv, importDevicesCsv } from '../db/csv_transfer'
 import {
 	addInterface,
 	createDevice,
@@ -53,6 +55,21 @@ export const devicesApp = new Hono()
 		const result = createDevice(c.req.valid('json'))
 		if (Result.isOk(result)) {
 			logAccess(c, 'device.create', result.value.id)
+			return c.json(result.value, 201)
+		}
+		return sendResult(c, result)
+	})
+	// CSV transfer (registered before `/:id` so the literal paths win).
+	.get('/export', (c) => {
+		return c.text(exportDevicesCsv(), 200, {
+			'Content-Type': 'text/csv; charset=utf-8',
+			'Content-Disposition': 'attachment; filename="devices.csv"',
+		})
+	})
+	.post('/import', vValidator('json', CsvImportBodySchema, onValidationError), (c) => {
+		const result = importDevicesCsv(c.req.valid('json').csv)
+		if (Result.isOk(result)) {
+			logAccess(c, 'device.import')
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)

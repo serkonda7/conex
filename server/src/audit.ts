@@ -1,5 +1,6 @@
-import { eq, lt } from 'drizzle-orm'
+import { and, count, desc, eq, lt, type SQL, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
+import type { AuditRow } from 'shared/src/schemas'
 import { getConfig } from './config'
 import { getDb } from './db'
 import type { JwtPayload } from './middleware/auth'
@@ -131,3 +132,51 @@ export function pruneExpiredAuditLogs(now = nowSeconds()): number {
 }
 
 export const AUDIT_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+export interface AuditListParams {
+	search: string
+	page: number
+	limit: number
+}
+
+/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
+function searchPattern(raw: string): string {
+	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+}
+
+/**
+ * Paginated audit log, newest first. `search` matches action, user email,
+ * or resource id as a literal substring.
+ */
+export function listAuditLogs(params: AuditListParams): {
+	items: AuditRow[]
+	total: number
+	page: number
+	limit: number
+} {
+	const db = getDb()
+	const pattern = searchPattern(params.search)
+	const conditions: SQL[] = []
+	if (params.search) {
+		conditions.push(
+			sql`(${access_log.action} LIKE ${pattern} ESCAPE '\\' OR ${access_log.user_email} LIKE ${pattern} ESCAPE '\\' OR ${access_log.resource_id} LIKE ${pattern} ESCAPE '\\')`,
+		)
+	}
+	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const items = db
+		.select({
+			id: access_log.id,
+			user_email: access_log.user_email,
+			action: access_log.action,
+			resource_id: access_log.resource_id,
+			created_at: access_log.created_at,
+		})
+		.from(access_log)
+		.where(where)
+		.orderBy(desc(access_log.created_at))
+		.limit(params.limit)
+		.offset((params.page - 1) * params.limit)
+		.all()
+	const totalRow = db.select({ n: count() }).from(access_log).where(where).get()
+	return { items, total: totalRow?.n ?? 0, page: params.page, limit: params.limit }
+}

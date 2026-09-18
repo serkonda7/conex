@@ -3,9 +3,11 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
 import { fetch_health, set_unauthorized_handler } from './api'
 import { fetchMe, login, logout } from './api_auth'
+import { AuditPage } from './pages/audit'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DevicesPage } from './pages/devices'
 import { RackDetailPage } from './pages/rack_detail'
+import { SearchPage } from './pages/search'
 import { SiteDetailPage } from './pages/site_detail'
 import { SitesPage } from './pages/sites'
 import { TemplatesPage } from './pages/templates'
@@ -57,6 +59,7 @@ function App(): JSX.Element {
 	const [email, setEmail] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
+	const [navSearch, setNavSearch] = createSignal('')
 
 	onMount(async () => {
 		setIsLoggedIn(await fetchMe())
@@ -96,32 +99,78 @@ function App(): JSX.Element {
 		siteId: string | null
 		rackId: string | null
 		deviceId: string | null
+		searchQuery: string | null
 	} {
-		const parts = path()
-			.split('/')
-			.filter((p) => p.length > 0)
+		const parts =
+			path()
+				.split('?')[0]
+				?.split('/')
+				.filter((p) => p.length > 0) ?? []
 		if (parts.length === 0 || parts[0] === 'tenants') {
-			return { page: 'tenants', siteId: null, rackId: null, deviceId: null }
+			return {
+				page: 'tenants',
+				siteId: null,
+				rackId: null,
+				deviceId: null,
+				searchQuery: null,
+			}
 		}
 		if (parts[0] === 'sites' && parts.length === 1) {
-			return { page: 'sites', siteId: null, rackId: null, deviceId: null }
+			return { page: 'sites', siteId: null, rackId: null, deviceId: null, searchQuery: null }
 		}
 		if (parts[0] === 'sites' && parts.length === 2) {
-			return { page: 'site-detail', siteId: parts[1] ?? null, rackId: null, deviceId: null }
+			return {
+				page: 'site-detail',
+				siteId: parts[1] ?? null,
+				rackId: null,
+				deviceId: null,
+				searchQuery: null,
+			}
 		}
 		if (parts[0] === 'racks' && parts.length === 2) {
-			return { page: 'rack-detail', siteId: null, rackId: parts[1] ?? null, deviceId: null }
+			return {
+				page: 'rack-detail',
+				siteId: null,
+				rackId: parts[1] ?? null,
+				deviceId: null,
+				searchQuery: null,
+			}
 		}
 		if (parts[0] === 'templates') {
-			return { page: 'templates', siteId: null, rackId: null, deviceId: null }
+			return {
+				page: 'templates',
+				siteId: null,
+				rackId: null,
+				deviceId: null,
+				searchQuery: null,
+			}
 		}
 		if (parts[0] === 'devices' && parts.length === 1) {
-			return { page: 'devices', siteId: null, rackId: null, deviceId: null }
+			return {
+				page: 'devices',
+				siteId: null,
+				rackId: null,
+				deviceId: null,
+				searchQuery: null,
+			}
 		}
 		if (parts[0] === 'devices' && parts.length === 2) {
-			return { page: 'device-detail', siteId: null, rackId: null, deviceId: parts[1] ?? null }
+			return {
+				page: 'device-detail',
+				siteId: null,
+				rackId: null,
+				deviceId: parts[1] ?? null,
+				searchQuery: null,
+			}
 		}
-		return { page: 'not-found', siteId: null, rackId: null, deviceId: null }
+		if (parts[0] === 'search') {
+			const q = new URLSearchParams(window.location.search).get('q') ?? ''
+			return { page: 'search', siteId: null, rackId: null, deviceId: null, searchQuery: q }
+		}
+		if (parts[0] === 'audit') {
+			return { page: 'audit', siteId: null, rackId: null, deviceId: null, searchQuery: null }
+		}
+		return { page: 'not-found', siteId: null, rackId: null, deviceId: null, searchQuery: null }
 	}
 
 	return (
@@ -163,6 +212,33 @@ function App(): JSX.Element {
 								Devices
 							</a>{' '}
 							|{' '}
+							<a href="/audit" onClick={(e: MouseEvent): void => go(e, '/audit')}>
+								Audit
+							</a>{' '}
+							|{' '}
+							<form
+								style={{ display: 'inline' }}
+								onSubmit={(e: SubmitEvent): void => {
+									e.preventDefault()
+									const q = navSearch().trim()
+									if (q) {
+										navigate(`/search?q=${encodeURIComponent(q)}`)
+									} else {
+										navigate('/search')
+									}
+								}}
+							>
+								<input
+									placeholder="Search…"
+									value={navSearch()}
+									onInput={(e: Event & { currentTarget: HTMLInputElement }) =>
+										setNavSearch(e.currentTarget.value)
+									}
+									aria-label="Global search"
+								/>{' '}
+								<button type="submit">Go</button>
+							</form>{' '}
+							|{' '}
 							<button type="button" onClick={handleLogout}>
 								Sign out ({email() || '…'})
 							</button>
@@ -190,6 +266,12 @@ function App(): JSX.Element {
 								when={route().page === 'device-detail' && route().deviceId !== null}
 							>
 								<DeviceDetailPage id={route().deviceId as string} />
+							</Match>
+							<Match when={route().page === 'search'}>
+								<SearchPage initial={route().searchQuery ?? ''} />
+							</Match>
+							<Match when={route().page === 'audit'}>
+								<AuditPage />
 							</Match>
 							<Match when={route().page === 'not-found'}>
 								<p>Not found.</p>
