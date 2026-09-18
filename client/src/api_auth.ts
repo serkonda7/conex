@@ -22,6 +22,39 @@ export async function fetchProviders(): Promise<AuthProviders | undefined> {
 	}
 }
 
+/** True when no admin account exists yet. Never throws: null on network error. */
+export async function fetchSetupStatus(): Promise<boolean | null> {
+	try {
+		const res = await fetch('/api/auth/setup-status')
+		if (!res.ok) {
+			return null
+		}
+		const data = (await res.json()) as { needsSetup?: unknown }
+		return data.needsSetup === true
+	} catch {
+		return null
+	}
+}
+
+/** Creates the first admin account (first-run only) and sets the session cookie. */
+export async function setupAdmin(email: string, password: string): Promise<Result<void, Error>> {
+	try {
+		const res = await fetch('/api/auth/setup', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ email, password }),
+		})
+
+		if (!res.ok) {
+			return Result.err(new Error(await read_api_error(res, 'Setup failed.')))
+		}
+
+		return Result.ok(undefined)
+	} catch {
+		return Result.err(new Error('A network error occurred. Please try again.'))
+	}
+}
+
 /** True when the server session is alive. Never throws. */
 export async function fetchMe(): Promise<boolean> {
 	try {

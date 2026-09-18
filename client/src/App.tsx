@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
 import { fetch_health, set_unauthorized_handler } from './api'
-import { fetchMe, login, logout } from './api_auth'
+import { fetchMe, fetchSetupStatus, login, logout, setupAdmin } from './api_auth'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DevicesPage } from './pages/devices'
 import { RackDetailPage } from './pages/rack_detail'
@@ -50,18 +50,72 @@ function LoginForm(props: {
 	)
 }
 
+function SetupForm(props: {
+	email: () => string
+	setEmail: (v: string) => void
+	password: () => string
+	setPassword: (v: string) => void
+	confirm: () => string
+	setConfirm: (v: string) => void
+	error: () => string | null
+	onSetup: (e: SubmitEvent) => void
+}): JSX.Element {
+	return (
+		<section aria-label="First-run setup">
+			<h2>Welcome to Conex</h2>
+			<p>Create the admin account to get started.</p>
+			<form onSubmit={props.onSetup}>
+				<input
+					type="email"
+					placeholder="Admin email"
+					value={props.email()}
+					onInput={(e: InputEventAndTarget) => props.setEmail(e.currentTarget.value)}
+					autocomplete="username"
+				/>
+				<input
+					type="password"
+					placeholder="Password (min 8 characters)"
+					value={props.password()}
+					onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
+					autocomplete="new-password"
+				/>
+				<input
+					type="password"
+					placeholder="Confirm password"
+					value={props.confirm()}
+					onInput={(e: InputEventAndTarget) => props.setConfirm(e.currentTarget.value)}
+					autocomplete="new-password"
+				/>
+				<button type="submit">Create admin account</button>
+				<Show when={props.error()}>
+					<div class="app-inline-error">{props.error()}</div>
+				</Show>
+			</form>
+		</section>
+	)
+}
+
 // P1 shell: local-auth gate plus the tenants/sites/location-tree pages.
 // Rack/device/cable pages arrive in P2-P5.
 function App(): JSX.Element {
 	const [isLoggedIn, setIsLoggedIn] = createSignal<boolean | null>(null)
+	const [needsSetup, setNeedsSetup] = createSignal<boolean | null>(null)
 	const [health, setHealth] = createSignal<string>('…')
 	const [email, setEmail] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
+	const [setupEmail, setSetupEmail] = createSignal('')
+	const [setupPassword, setSetupPassword] = createSignal('')
+	const [setupConfirm, setSetupConfirm] = createSignal('')
+	const [setupError, setSetupError] = createSignal<string | null>(null)
 	const [navSearch, setNavSearch] = createSignal('')
 
 	onMount(async () => {
-		setIsLoggedIn(await fetchMe())
+		const [loggedIn, setupNeeded] = await Promise.all([fetchMe(), fetchSetupStatus()])
+		// A fresh database reports needsSetup; an unreachable setup endpoint
+		// (null) falls back to the login form.
+		setNeedsSetup(setupNeeded ?? false)
+		setIsLoggedIn(setupNeeded === true ? false : loggedIn)
 		const res = await fetch_health()
 		if (Result.isError(res)) {
 			setHealth(`unreachable: ${res.error.message}`)
@@ -84,6 +138,41 @@ function App(): JSX.Element {
 			return
 		}
 		setPassword('')
+		setIsLoggedIn(true)
+	}
+
+	async function handleSetup(e: SubmitEvent): Promise<void> {
+		e.preventDefault()
+		setSetupError(null)
+
+		const trimmedEmail = setupEmail().trim()
+		if (!trimmedEmail) {
+			setSetupError('Email is required.')
+			return
+		}
+		if (setupPassword().length < 8) {
+			setSetupError('Password must be at least 8 characters.')
+			return
+		}
+		if (setupPassword() !== setupConfirm()) {
+			setSetupError('Passwords do not match.')
+			return
+		}
+
+		const res = await setupAdmin(trimmedEmail, setupPassword())
+		if (Result.isError(res)) {
+			// A 409 means another request finished setup first: fall back to login.
+			if (res.error.message.toLowerCase().includes('already completed')) {
+				setNeedsSetup(false)
+			}
+			setSetupError(res.error.message)
+			return
+		}
+		setEmail(trimmedEmail)
+		setPassword('')
+		setSetupPassword('')
+		setSetupConfirm('')
+		setNeedsSetup(false)
 		setIsLoggedIn(true)
 	}
 
@@ -175,8 +264,20 @@ function App(): JSX.Element {
 			<p>
 				Server health: <code>{health()}</code>
 			</p>
-			<Show when={isLoggedIn() !== null} fallback={<p>Loading…</p>}>
+			<Show when={isLoggedIn() !== null && needsSetup() !== null} fallback={<p>Loading…</p>}>
 				<Switch>
+					<Match when={needsSetup()}>
+						<SetupForm
+							email={setupEmail}
+							setEmail={setSetupEmail}
+							password={setupPassword}
+							setPassword={setSetupPassword}
+							confirm={setupConfirm}
+							setConfirm={setSetupConfirm}
+							error={setupError}
+							onSetup={handleSetup}
+						/>
+					</Match>
 					<Match when={!isLoggedIn()}>
 						<LoginForm
 							email={email}

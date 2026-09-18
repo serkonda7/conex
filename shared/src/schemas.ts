@@ -19,6 +19,15 @@ export const LoginSchema = v.strictObject({
 
 export type Login = v.InferInput<typeof LoginSchema>
 
+// First-run admin provisioning. Same email contract as login; password
+// requires a minimum length so the initial account is not trivially weak.
+export const SetupSchema = v.strictObject({
+	email: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(320)),
+	password: v.pipe(v.string(), v.minLength(8), v.maxLength(1024)),
+})
+
+export type Setup = v.InferInput<typeof SetupSchema>
+
 // Shared list-query contract (?search=&page=&limit=) used by every P1+
 // list endpoint. Defaults keep callers from re-declaring pagination math.
 export const ListQuerySchema = v.strictObject({

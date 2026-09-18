@@ -23,6 +23,12 @@ export function createLocalUser(email: string, passwordHash: string): User {
 	return user
 }
 
+/** True when at least one user exists. Drives first-run setup gating. */
+export function hasAnyUser(): boolean {
+	const row = getDb().select({ id: users.id }).from(users).limit(1).get()
+	return row !== undefined && row !== null
+}
+
 // ---------------------------------------------------------------------------
 // OAuth-style login states (kept for the session sweep; consumed by future
 // external providers, if any).

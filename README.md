@@ -7,7 +7,6 @@ Monorepo (`bun` workspaces + `turbo` + `biome` + `tsc`):
 - `server/` — `bun` + `hono` API, `drizzle-orm` + SQLite, Valibot validation.
 - `client/` — `vite` + `solid-js` UI, typed `hono/client` fetcher.
 - `shared/` — Valibot contracts shared by server validation and the client.
-- `server-cli/` — `create-user` provisioning for local auth.
 
 ## Prerequisites
 
@@ -28,16 +27,18 @@ appKey = "at-least-32-chars-long-random-secret-here"
 secureCookies = false  # plain HTTP local dev; keep true behind HTTPS
 ```
 
-Provision a user, then start everything:
+Start everything, then open the UI and create the admin account in the
+first-run dialog:
 
 ```sh
-bun run --cwd server src/index.ts &   # or: bun run dev (turbo: api + ui)
-printf 'secret123\n' | bun run --cwd server-cli src/cli.ts create-user you@example.com
 bun run dev
 ```
 
 - API: `http://localhost:3000` (`/health` for a smoke check).
-- UI: `http://localhost:5371` (proxies `/api` to the API).
+- UI: `http://localhost:5371` (proxies `/api` to the API). On a fresh
+  database it shows a first-run dialog; submitting it calls
+  `POST /api/auth/setup` (gated by `GET /api/auth/setup-status`,
+  409 once a user exists).
 - DB path: `CONEX_DB_PATH` (default `server/data/conex.db`); config path:
   `CONEX_CONFIG_PATH`. The API always listens on `0.0.0.0:3000`.
 

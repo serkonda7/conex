@@ -1,6 +1,7 @@
 /**
  * Logic for finding the server root directory to locate data and migration files.
- * This is required as working directory might differ across local development and server-cli.
+ * This is required as working directory might differ across local development,
+ * e2e seeds, and production startup.
  *
  * Importing this module has no side effects: use `get_server_root()` during
  * startup and pass the resolved root explicitly.

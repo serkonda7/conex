@@ -21,6 +21,7 @@ export type {
 	RackListQuery,
 	RackStatus,
 	RackUpdate,
+	Setup,
 	ShelfCreate,
 	ShelfListQuery,
 	ShelfUpdate,
