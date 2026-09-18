@@ -58,6 +58,8 @@ export const DescriptionSchema = v.optional(
 	undefined,
 )
 
+export const CommentsSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined)
+
 export const IdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100))
 
 /** Nullable FK field: accepts a missing key, null, or a non-empty id. */
@@ -70,12 +72,14 @@ export const TenantCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
 	description: DescriptionSchema,
+	comments: CommentsSchema,
 })
 
 export const TenantUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 export const SiteCreateSchema = v.strictObject({

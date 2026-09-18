@@ -1,14 +1,12 @@
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
-import { create_tenant, delete_tenant, fetch_tenants, type TenantRow } from '../api_p1'
+import { delete_tenant, fetch_tenants, type TenantRow } from '../api_p1'
+import { navigate } from '../router'
 
-/** /tenants — tenant table with inline create form. */
+/** /tenants — tenant table with a link to the /tenants/add create form. */
 export function TenantsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [tenantName, setTenantName] = createSignal('')
-	const [tenantSlug, setTenantSlug] = createSignal('')
 
 	const [tenants, { refetch: refetchTenants }] = createResource(async () => {
 		const res = await fetch_tenants()
@@ -18,19 +16,6 @@ export function TenantsPage(): JSX.Element {
 		}
 		return res.value.items
 	})
-
-	async function handleCreateTenant(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		const res = await create_tenant(tenantName(), tenantSlug())
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setTenantName('')
-		setTenantSlug('')
-		void refetchTenants()
-	}
 
 	async function handleDeleteTenant(id: string): Promise<void> {
 		setError(null)
@@ -44,25 +29,18 @@ export function TenantsPage(): JSX.Element {
 
 	return (
 		<div>
-			<h2>Tenants</h2>
-			<form onSubmit={handleCreateTenant}>
-				<input
-					placeholder="Name"
-					value={tenantName()}
-					onInput={(e: InputEventAndTarget) => setTenantName(e.currentTarget.value)}
-				/>
-				<input
-					placeholder="slug"
-					value={tenantSlug()}
-					onInput={(e: InputEventAndTarget) => setTenantSlug(e.currentTarget.value)}
-				/>
-				<button type="submit">Add tenant</button>
-			</form>
+			<div class="page-header">
+				<h2>Tenants</h2>
+				<button type="button" class="btn-add" onClick={() => navigate('/tenants/add')}>
+					+ Add
+				</button>
+			</div>
 			<table>
 				<thead>
 					<tr>
 						<th>Name</th>
 						<th>Slug</th>
+						<th>Description</th>
 						<th>Actions</th>
 					</tr>
 				</thead>
@@ -74,6 +52,7 @@ export function TenantsPage(): JSX.Element {
 								<td>
 									<code>{t.slug}</code>
 								</td>
+								<td>{t.description || '—'}</td>
 								<td>
 									<button
 										type="button"

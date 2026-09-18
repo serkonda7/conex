@@ -54,6 +54,7 @@ export const tenants = sqliteTable(
 		name: text('name').notNull(),
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
+		comments: text('comments'),
 	},
 	(table) => [index('tenants_name_idx').on(table.name)],
 )

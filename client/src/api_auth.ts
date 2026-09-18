@@ -55,13 +55,17 @@ export async function setupAdmin(email: string, password: string): Promise<Resul
 	}
 }
 
-/** True when the server session is alive. Never throws. */
-export async function fetchMe(): Promise<boolean> {
+/** Current session email, or null when logged out/unreachable. Never throws. */
+export async function fetchMe(): Promise<string | null> {
 	try {
 		const res = await fetch('/api/auth/me')
-		return res.ok
+		if (!res.ok) {
+			return null
+		}
+		const data = (await res.json()) as { email?: unknown }
+		return typeof data.email === 'string' ? data.email : null
 	} catch {
-		return false
+		return null
 	}
 }
 

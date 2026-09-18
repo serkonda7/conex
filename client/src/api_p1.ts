@@ -35,8 +35,22 @@ export async function fetch_tenants(): Promise<Result<Page<TenantRow>, Error>> {
 	)
 }
 
-export async function create_tenant(name: string, slug: string): Promise<Result<TenantRow, Error>> {
-	const res = await client.tenants.$post({ json: { name, slug } })
+export interface TenantCreateInput {
+	name: string
+	slug: string
+	description?: string
+	comments?: string
+}
+
+export async function create_tenant(input: TenantCreateInput): Promise<Result<TenantRow, Error>> {
+	const res = await client.tenants.$post({
+		json: {
+			name: input.name,
+			slug: input.slug,
+			description: input.description || undefined,
+			comments: input.comments || undefined,
+		},
+	})
 	return to_result<TenantRow>(res, 'Failed to create tenant')
 }
 

@@ -95,6 +95,7 @@ export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
 		name: input.name,
 		slug: input.slug,
 		description: input.description ?? null,
+		comments: input.comments ?? null,
 	}
 	try {
 		db.insert(tenants).values(row).run()
@@ -128,6 +129,9 @@ export function updateTenant(id: string, input: TenantUpdate): Result<TenantRow,
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
+	}
+	if (input.comments !== undefined) {
+		patch.comments = input.comments
 	}
 	if (Object.keys(patch).length > 0) {
 		try {
