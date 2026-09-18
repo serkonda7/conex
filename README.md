@@ -31,9 +31,6 @@ secureCookies = false  # plain HTTP local dev; keep true behind HTTPS
 [server]
 host = "127.0.0.1"
 port = 3000
-
-[audit]
-retentionDays = 90
 ```
 
 Provision a user, then start everything:
@@ -58,8 +55,8 @@ bun run test    # bun test per workspace
 bun run lint:ci # biome ci
 ```
 
-End-to-end smoke (login → site → rack → device → cable, plus search +
-audit). Needs `bunx playwright install chromium` once:
+End-to-end smoke (login → site → rack → device → cable, plus search).
+Needs `bunx playwright install chromium` once:
 
 ```sh
 bun run test:e2e
@@ -80,8 +77,7 @@ The spec manages its own API + UI servers and an isolated database under
   - devices columns: `name,asset_tag,device_type_slug,site_slug,rack_slug,position_u,status`
   - cables columns: `a_device,a_interface,b_device,b_interface,label,kind,status`
   - imports validate every row, create the good ones, and report per-row
-    errors; all imports are audited.
-- Audit log UI at `/audit` (`GET /api/audit?search=&page=&limit=`, newest first).
+    errors.
 
 ## Docker
 

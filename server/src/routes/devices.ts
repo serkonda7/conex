@@ -14,7 +14,6 @@ import {
 	InterfaceUpdateSchema,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { logAccess } from '../audit'
 import { connectCable, getDeviceTrace } from '../db/cables'
 import { exportDevicesCsv, importDevicesCsv } from '../db/csv_transfer'
 import {
@@ -54,7 +53,6 @@ export const devicesApp = new Hono()
 	.post('/', vValidator('json', DeviceCreateSchema, onValidationError), (c) => {
 		const result = createDevice(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'device.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -69,7 +67,6 @@ export const devicesApp = new Hono()
 	.post('/import', vValidator('json', CsvImportBodySchema, onValidationError), (c) => {
 		const result = importDevicesCsv(c.req.valid('json').csv)
 		if (Result.isOk(result)) {
-			logAccess(c, 'device.import')
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -84,7 +81,6 @@ export const devicesApp = new Hono()
 		(c) => {
 			const result = updateDevice(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -93,7 +89,6 @@ export const devicesApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteDevice(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'device.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)
@@ -106,7 +101,6 @@ export const devicesApp = new Hono()
 		(c) => {
 			const result = moveDevice(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device.move', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -123,7 +117,6 @@ export const devicesApp = new Hono()
 		(c) => {
 			const result = addInterface(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device-interface.create', result.value.id)
 				return c.json(result.value, 201)
 			}
 			return sendResult(c, result)
@@ -145,7 +138,6 @@ export const devicesApp = new Hono()
 			const param = c.req.valid('param')
 			const result = updateInterface(param.id, param.ifaceId, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device-interface.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -167,7 +159,6 @@ export const devicesApp = new Hono()
 				b_interface_id: c.req.valid('json').peer_interface_id,
 			})
 			if (Result.isOk(result)) {
-				logAccess(c, 'cable.create', result.value.id)
 				return c.json(result.value, 201)
 			}
 			return sendResult(c, result)

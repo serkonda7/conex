@@ -2,7 +2,6 @@ import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { LoginSchema } from 'shared/src/schemas'
-import { logLoginAttempt } from '../audit'
 import { getConfig } from '../config'
 import { getUserByEmail } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
@@ -33,22 +32,17 @@ authApp.post(
 
 		const user = getUserByEmail(body.email)
 		if (!user) {
-			logLoginAttempt({ email: body.email, action: 'login.failure' })
 			return jsonError(c, 'Invalid email or password', 401)
 		}
 
 		if (!user.password_hash) {
-			logLoginAttempt({ email: body.email, userId: user.id, action: 'login.failure' })
 			return jsonError(c, 'Invalid email or password', 401)
 		}
 
 		const isMatch = await Bun.password.verify(body.password, user.password_hash)
 		if (!isMatch) {
-			logLoginAttempt({ email: body.email, userId: user.id, action: 'login.failure' })
 			return jsonError(c, 'Invalid email or password', 401)
 		}
-
-		logLoginAttempt({ email: user.email, userId: user.id, action: 'login.success' })
 		const token = await get_signed_jwt(user)
 		setCookie(c, 'auth_token', token, getSessionCookieOpts())
 

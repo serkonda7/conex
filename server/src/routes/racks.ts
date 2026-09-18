@@ -7,7 +7,6 @@ import {
 	RackListQuerySchema,
 	RackUpdateSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import { createRack, deleteRack, getElevation, getRack, listRacks, updateRack } from '../db/racks'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
@@ -31,7 +30,6 @@ export const racksApp = new Hono()
 	.post('/', vValidator('json', RackCreateSchema, onValidationError), (c) => {
 		const result = createRack(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'rack.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -49,7 +47,6 @@ export const racksApp = new Hono()
 		(c) => {
 			const result = updateRack(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'rack.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -58,7 +55,6 @@ export const racksApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteRack(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'rack.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)

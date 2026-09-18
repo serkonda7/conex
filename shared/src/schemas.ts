@@ -604,7 +604,7 @@ export interface DeviceTraceResponse {
 }
 
 // ---------------------------------------------------------------------------
-// P6: global search / audit list / CSV import
+// P6: global search / CSV import
 // ---------------------------------------------------------------------------
 
 /** Global search query: `GET /search?q=`. Empty query returns empty groups. */
@@ -613,19 +613,6 @@ export const SearchQuerySchema = v.object({
 })
 
 export type SearchQuery = v.InferInput<typeof SearchQuerySchema>
-
-export const AuditListQuerySchema = v.object({ ...ListQueryEntries })
-
-export type AuditListQuery = v.InferInput<typeof AuditListQuerySchema>
-
-/** One audit log row as returned by `GET /audit`. */
-export interface AuditRow {
-	id: string
-	user_email: string
-	action: string
-	resource_id: string | null
-	created_at: number
-}
 
 /** JSON body for CSV imports: raw CSV text, parsed row-by-row server-side. */
 export const CsvImportBodySchema = v.strictObject({

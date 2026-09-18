@@ -13,7 +13,6 @@ import {
 	StubUpdateSchema,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { logAccess } from '../audit'
 import {
 	createDeviceType,
 	createStub,
@@ -60,7 +59,6 @@ export const deviceTypesApp = new Hono()
 	.post('/', vValidator('json', DeviceTypeCreateSchema, onValidationError), (c) => {
 		const result = createDeviceType(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'device-type.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -75,7 +73,6 @@ export const deviceTypesApp = new Hono()
 		(c) => {
 			const result = updateDeviceType(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device-type.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -84,7 +81,6 @@ export const deviceTypesApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteDeviceType(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'device-type.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)
@@ -104,7 +100,6 @@ export const deviceTypesApp = new Hono()
 		(c) => {
 			const result = createStub(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device-type-stub.create', result.value.id)
 				return c.json(result.value, 201)
 			}
 			return sendResult(c, result)
@@ -119,7 +114,6 @@ export const deviceTypesApp = new Hono()
 			// enforced by loading the stub itself.
 			const result = updateStub(c.req.param('stubId'), c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device-type-stub.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -131,7 +125,6 @@ export const deviceTypesApp = new Hono()
 		(c) => {
 			const result = deleteStub(c.req.param('stubId'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'device-type-stub.delete', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)

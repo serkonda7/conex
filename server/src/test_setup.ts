@@ -16,7 +16,6 @@ export function initTestEnv(): void {
 			secureCookies: false,
 		},
 		server: { host: '127.0.0.1', port: 0 },
-		audit: { retentionDays: 90 },
 	})
 	initDb({
 		dbPath: ':memory:',

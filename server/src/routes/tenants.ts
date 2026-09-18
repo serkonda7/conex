@@ -7,7 +7,6 @@ import {
 	TenantListQuerySchema,
 	TenantUpdateSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
@@ -29,7 +28,6 @@ export const tenantsApp = new Hono()
 	.post('/', vValidator('json', TenantCreateSchema, onValidationError), (c) => {
 		const result = createTenant(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'tenant.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -44,7 +42,6 @@ export const tenantsApp = new Hono()
 		(c) => {
 			const result = updateTenant(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'tenant.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -53,7 +50,6 @@ export const tenantsApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteTenant(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'tenant.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)

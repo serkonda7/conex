@@ -3,7 +3,6 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
 import { fetch_health, set_unauthorized_handler } from './api'
 import { fetchMe, login, logout } from './api_auth'
-import { AuditPage } from './pages/audit'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DevicesPage } from './pages/devices'
 import { RackDetailPage } from './pages/rack_detail'
@@ -167,9 +166,6 @@ function App(): JSX.Element {
 			const q = new URLSearchParams(window.location.search).get('q') ?? ''
 			return { page: 'search', siteId: null, rackId: null, deviceId: null, searchQuery: q }
 		}
-		if (parts[0] === 'audit') {
-			return { page: 'audit', siteId: null, rackId: null, deviceId: null, searchQuery: null }
-		}
 		return { page: 'not-found', siteId: null, rackId: null, deviceId: null, searchQuery: null }
 	}
 
@@ -210,10 +206,6 @@ function App(): JSX.Element {
 							|{' '}
 							<a href="/devices" onClick={(e: MouseEvent): void => go(e, '/devices')}>
 								Devices
-							</a>{' '}
-							|{' '}
-							<a href="/audit" onClick={(e: MouseEvent): void => go(e, '/audit')}>
-								Audit
 							</a>{' '}
 							|{' '}
 							<form
@@ -269,9 +261,6 @@ function App(): JSX.Element {
 							</Match>
 							<Match when={route().page === 'search'}>
 								<SearchPage initial={route().searchQuery ?? ''} />
-							</Match>
-							<Match when={route().page === 'audit'}>
-								<AuditPage />
 							</Match>
 							<Match when={route().page === 'not-found'}>
 								<p>Not found.</p>

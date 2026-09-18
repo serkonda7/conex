@@ -1,15 +1,14 @@
 /**
- * P6 API wrappers: global search, audit log, and CSV import/export.
- * Search/audit go over the typed hono RPC client; CSV download uses a raw
+ * P6 API wrappers: global search and CSV import/export.
+ * Search goes over the typed hono RPC client; CSV download uses a raw
  * fetch (binary blob) and CSV upload posts the file text as `{ csv }` JSON.
  */
 import { Result } from 'better-result'
-import type { AuditRow, ImportResponse } from 'shared/src/schemas'
+import type { ImportResponse } from 'shared/src/schemas'
 import { client, to_result } from './api'
-import type { Page } from './api_p4'
 import { read_api_error } from './util/api_error'
 
-export type { AuditRow, ImportResponse }
+export type { ImportResponse }
 
 export interface SearchGroup<T> {
 	items: T[]
@@ -58,15 +57,6 @@ export interface GlobalSearchResponse {
 export async function fetch_search(q: string): Promise<Result<GlobalSearchResponse, Error>> {
 	const res = await client.search.$get({ query: { q } })
 	return to_result<GlobalSearchResponse>(res, 'Failed to search')
-}
-
-export async function fetch_audit(
-	search = '',
-	page = '1',
-	limit = '50',
-): Promise<Result<Page<AuditRow>, Error>> {
-	const res = await client.audit.$get({ query: { search, page, limit } })
-	return to_result<Page<AuditRow>>(res, 'Failed to load audit log')
 }
 
 /** Downloads a CSV export (`devices` or `cables`) as a browser file save. */

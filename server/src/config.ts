@@ -29,12 +29,6 @@ export const configSchema = v.strictObject({
 		{},
 	),
 	frontendUrl: v.optional(v.string()),
-	audit: v.optional(
-		v.strictObject({
-			retentionDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 90),
-		}),
-		{ retentionDays: 90 },
-	),
 })
 
 type RawConfig = v.InferOutput<typeof configSchema>

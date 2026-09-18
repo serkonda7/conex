@@ -7,7 +7,6 @@ import {
 	SiteListQuerySchema,
 	SiteUpdateSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import { createSite, deleteSite, getSite, listSites, updateSite } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
@@ -29,7 +28,6 @@ export const sitesApp = new Hono()
 	.post('/', vValidator('json', SiteCreateSchema, onValidationError), (c) => {
 		const result = createSite(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'site.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -44,7 +42,6 @@ export const sitesApp = new Hono()
 		(c) => {
 			const result = updateSite(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'site.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -53,7 +50,6 @@ export const sitesApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteSite(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'site.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)

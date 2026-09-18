@@ -11,6 +11,3 @@ secureCookies = false # plain-HTTP local dev; keep true behind HTTPS
 [server]
 host = "127.0.0.1"
 port = 3000
-
-[audit]
-retentionDays = 90

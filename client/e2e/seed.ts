@@ -33,9 +33,6 @@ if (!fs.existsSync(configPath)) {
 			'host = "127.0.0.1"',
 			`port = ${apiPort}`,
 			'',
-			'[audit]',
-			'retentionDays = 90',
-			'',
 		].join('\n'),
 	)
 	console.log(`wrote ${configPath}`)

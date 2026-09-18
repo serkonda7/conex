@@ -58,9 +58,8 @@ beforeAll(async () => {
 })
 
 describe('auth guard', () => {
-	test('search, audit, and CSV endpoints require authentication', async () => {
+	test('search and CSV endpoints require authentication', async () => {
 		expect((await api('GET', '/search', undefined, '?q=x', false)).status).toBe(401)
-		expect((await api('GET', '/audit', undefined, undefined, false)).status).toBe(401)
 		expect((await api('GET', '/devices/export', undefined, undefined, false)).status).toBe(401)
 	})
 })
@@ -189,22 +188,5 @@ describe('CSV transfer', () => {
 
 	test('empty CSV body rejected', async () => {
 		expect((await api('POST', '/devices/import', { csv: '' })).status).toBe(400)
-	})
-})
-
-describe('audit list', () => {
-	test('lists entries newest-first with search filter', async () => {
-		const all = await api('GET', '/audit')
-		expect(all.status).toBe(200)
-		const total = (all.body as { total: number }).total
-		expect(total).toBeGreaterThanOrEqual(1)
-
-		const filtered = await api('GET', '/audit', undefined, '?search=device.import')
-		expect(filtered.status).toBe(200)
-		const items = (filtered.body as { items: { action: string }[] }).items
-		expect(items.length).toBeGreaterThanOrEqual(1)
-		for (const item of items) {
-			expect(item.action).toContain('device.import')
-		}
 	})
 })

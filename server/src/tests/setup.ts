@@ -12,7 +12,6 @@ initConfig({
 		secureCookies: true,
 	},
 	server: { host: '127.0.0.1', port: 3000 },
-	audit: { retentionDays: 90 },
 })
 Bun.env.CONEX_DB_PATH = ':memory:'
 initDb()

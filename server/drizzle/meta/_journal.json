@@ -43,6 +43,13 @@
       "when": 1789742720813,
       "tag": "0005_dark_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789753227372,
+      "tag": "0006_exotic_black_crow",
+      "breakpoints": true
     }
   ]
 }

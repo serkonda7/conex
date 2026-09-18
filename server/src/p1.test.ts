@@ -1,10 +1,8 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
 import { MAX_LOCATION_DEPTH, SlugSchema } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { getDb } from './db/connection'
 import { createLocalUser } from './db/users'
 import { createApp } from './index'
-import { access_log } from './schema'
 import { initTestEnv } from './test_setup'
 
 const app = createApp()
@@ -169,20 +167,6 @@ describe('tenants and sites', () => {
 		expect((await api('DELETE', `/tenants/${idOf(t1)}`)).status).toBe(200)
 		expect((await api('DELETE', `/tenants/${idOf(t2)}`)).status).toBe(200)
 		expect((await api('DELETE', `/tenant-groups/${idOf(group)}`)).status).toBe(200)
-	})
-})
-
-describe('audit', () => {
-	test('writes leave audit entries', async () => {
-		const before = getDb().select().from(access_log).all().length
-		const group = await api('POST', '/tenant-groups', { name: 'Audited', slug: 'audited' })
-		expect(group.status).toBe(201)
-		expect((await api('DELETE', `/tenant-groups/${idOf(group)}`)).status).toBe(200)
-		const rows = getDb().select().from(access_log).all()
-		const actions = rows.map((r) => r.action)
-		expect(rows.length).toBeGreaterThan(before)
-		expect(actions).toContain('tenant-group.create')
-		expect(actions).toContain('tenant-group.delete')
 	})
 })
 

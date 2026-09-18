@@ -1,10 +1,8 @@
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { AUDIT_SWEEP_INTERVAL_MS, pruneExpiredAuditLogs } from './audit'
 import { type AppConfig, initConfig, load_config_file, resolve_listen_port } from './config'
 import { initDb } from './db'
-import { auditApp } from './routes/audit'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
 import { deviceTypesApp } from './routes/device_types'
@@ -70,7 +68,6 @@ export function createApp() {
 			.route('/devices', devicesApp)
 			.route('/cables', cablesApp)
 			.route('/search', searchApp)
-			.route('/audit', auditApp)
 	)
 }
 
@@ -109,10 +106,6 @@ if (import.meta.main) {
 	// Scheduled here and not at module scope, so it never keeps a test process alive.
 	sweepExpired()
 	start_sweep(sweepExpired, SESSION_SWEEP_INTERVAL_MS)
-
-	// Prune audit log rows older than the configured retention (default 90 days).
-	pruneExpiredAuditLogs()
-	start_sweep(pruneExpiredAuditLogs, AUDIT_SWEEP_INTERVAL_MS)
 
 	const server = Bun.serve({
 		hostname: config.server.host,

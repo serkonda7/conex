@@ -7,7 +7,6 @@ import {
 	TenantGroupListQuerySchema,
 	TenantGroupUpdateSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import {
 	createTenantGroup,
 	deleteTenantGroup,
@@ -30,7 +29,6 @@ export const tenantGroupsApp = new Hono()
 	.post('/', vValidator('json', TenantGroupCreateSchema, onValidationError), (c) => {
 		const result = createTenantGroup(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'tenant-group.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -45,7 +43,6 @@ export const tenantGroupsApp = new Hono()
 		(c) => {
 			const result = updateTenantGroup(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'tenant-group.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -54,7 +51,6 @@ export const tenantGroupsApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteTenantGroup(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'tenant-group.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)

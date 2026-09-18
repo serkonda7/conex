@@ -7,7 +7,6 @@ import {
 	LocationListQuerySchema,
 	LocationUpdateSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import {
 	createLocation,
 	deleteLocation,
@@ -37,7 +36,6 @@ export const locationsApp = new Hono()
 	.post('/', vValidator('json', LocationCreateSchema, onValidationError), (c) => {
 		const result = createLocation(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'location.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -52,7 +50,6 @@ export const locationsApp = new Hono()
 		(c) => {
 			const result = updateLocation(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'location.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -61,7 +58,6 @@ export const locationsApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteLocation(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'location.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)

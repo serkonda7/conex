@@ -7,7 +7,7 @@ import {
 	uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 
-// P0 minimal schema: auth + audit only. Domain tables (tenants, sites, racks,
+// P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
 export const users = sqliteTable('users', {
 	id: text('id').primaryKey(),
@@ -39,19 +39,6 @@ export const auth_states = sqliteTable(
 		expires_at: integer('expires_at').notNull(),
 	},
 	(table) => [index('auth_states_expires_at_idx').on(table.expires_at)],
-)
-
-export const access_log = sqliteTable(
-	'access_log',
-	{
-		id: text('id').primaryKey(),
-		user_id: text('user_id').notNull(),
-		user_email: text('user_email').notNull(),
-		action: text('action').notNull(),
-		resource_id: text('resource_id'),
-		created_at: integer('created_at').notNull(),
-	},
-	(table) => [index('access_log_created_at_idx').on(table.created_at)],
 )
 
 // ---------------------------------------------------------------------------

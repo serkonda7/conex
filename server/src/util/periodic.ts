@@ -1,7 +1,7 @@
 /**
  * Schedules a periodic background sweep.
  *
- * Sessions and audit retention both sweep on an interval; the timer must not
+ * Sessions sweep on an interval; the timer must not
  * keep the process alive (tests import these modules without running a
  * server), so the single helper owns the `.unref()` instead of each call site.
  */

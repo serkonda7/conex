@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * P6 smoke: login → site → rack → device → cable, then search + audit.
+ * P6 smoke: login → site → rack → device → cable, then search.
  * UI-driven where the UI supports it (login, site create, device
  * instantiate, cable connect); the rack and device template go through the
  * API because they have no create form yet. Every entity is then asserted
@@ -147,10 +147,4 @@ test('smoke: login → site → rack → device → cable', async ({ page }) => 
 	await page.goto(`/search?q=${tag}`)
 	await expect(page.getByText(`${tag} site`)).toBeVisible()
 	await expect(page.getByText(`${tag}-a`)).toBeVisible()
-
-	// Audit log shows the cable creation.
-	await page.goto('/audit')
-	await page.locator('input[aria-label="Audit search"]').fill('cable.create')
-	await page.getByRole('button', { name: 'Filter' }).click()
-	await expect(page.locator('table').getByText('cable.create').first()).toBeVisible()
 })

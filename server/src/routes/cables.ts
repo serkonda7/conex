@@ -8,7 +8,6 @@ import {
 	CsvImportBodySchema,
 	EntityParamsSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import { connectCable, deleteCable, getCable, listCables, updateCable } from '../db/cables'
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
 import { authMiddleware } from '../middleware/auth'
@@ -33,7 +32,6 @@ export const cablesApp = new Hono()
 	.post('/', vValidator('json', CableCreateSchema, onValidationError), (c) => {
 		const result = connectCable(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'cable.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -48,7 +46,6 @@ export const cablesApp = new Hono()
 	.post('/import', vValidator('json', CsvImportBodySchema, onValidationError), (c) => {
 		const result = importCablesCsv(c.req.valid('json').csv)
 		if (Result.isOk(result)) {
-			logAccess(c, 'cable.import')
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -63,7 +60,6 @@ export const cablesApp = new Hono()
 		(c) => {
 			const result = updateCable(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'cable.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -72,7 +68,6 @@ export const cablesApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteCable(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'cable.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)

@@ -10,4 +10,4 @@
 - DB: `drizzle-orm` + SQLite, migrations in `server/drizzle/`, auto-run on
   startup; DB path via `CONEX_DB_PATH` env pattern (see `server/src/db/connection.ts`).
 - Auth: local auth only; `appKey` signs session JWTs, `server-cli create-user`
-  provisions users, audit log has retention sweep.
+  provisions users.

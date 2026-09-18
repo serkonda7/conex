@@ -7,7 +7,6 @@ import {
 	ManufacturerListQuerySchema,
 	ManufacturerUpdateSchema,
 } from 'shared/src/schemas'
-import { logAccess } from '../audit'
 import {
 	createManufacturer,
 	deleteManufacturer,
@@ -30,7 +29,6 @@ export const manufacturersApp = new Hono()
 	.post('/', vValidator('json', ManufacturerCreateSchema, onValidationError), (c) => {
 		const result = createManufacturer(c.req.valid('json'))
 		if (Result.isOk(result)) {
-			logAccess(c, 'manufacturer.create', result.value.id)
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
@@ -45,7 +43,6 @@ export const manufacturersApp = new Hono()
 		(c) => {
 			const result = updateManufacturer(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
-				logAccess(c, 'manufacturer.update', result.value.id)
 				return c.json(result.value)
 			}
 			return sendResult(c, result)
@@ -54,7 +51,6 @@ export const manufacturersApp = new Hono()
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = deleteManufacturer(c.req.valid('param').id)
 		if (Result.isOk(result)) {
-			logAccess(c, 'manufacturer.delete', result.value.id)
 			return c.json(result.value)
 		}
 		return sendResult(c, result)
