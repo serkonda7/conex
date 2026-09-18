@@ -1,6 +1,21 @@
 // Request payload types live in `schemas.ts`, derived from their runtime schema.
 // They are re-exported here so importers keep a single entry point for types.
-export type { ListQuery, Login } from './schemas'
+export type {
+	ListQuery,
+	LocationCreate,
+	LocationListQuery,
+	LocationUpdate,
+	Login,
+	SiteCreate,
+	SiteListQuery,
+	SiteUpdate,
+	TenantCreate,
+	TenantGroupCreate,
+	TenantGroupListQuery,
+	TenantGroupUpdate,
+	TenantListQuery,
+	TenantUpdate,
+} from './schemas'
 
 /** Health response shape returned by `GET /health`. */
 export interface HealthInfo {

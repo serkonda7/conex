@@ -29,3 +29,22 @@ export class DuplicateError extends Error {
 		this.name = 'DuplicateError'
 	}
 }
+
+/** Wrapped in a `Result.err` when a row is missing. Mapped to 404. */
+export class NotFoundError extends Error {
+	constructor(message = 'Not found') {
+		super(message)
+		this.name = 'NotFoundError'
+	}
+}
+
+/**
+ * Wrapped in a `Result.err` when a delete (or move) is refused because
+ * dependent rows exist. Mapped to 409.
+ */
+export class ConflictError extends Error {
+	constructor(message = 'Operation conflicts with existing data') {
+		super(message)
+		this.name = 'ConflictError'
+	}
+}

@@ -1,24 +1,58 @@
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { createResource, createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
+import { createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
 import { fetch_health, set_unauthorized_handler } from './api'
 import { fetchMe, login, logout } from './api_auth'
+import { SiteDetailPage } from './pages/site_detail'
+import { SitesPage } from './pages/sites'
+import { TenantsPage } from './pages/tenants'
+import { navigate, path } from './router'
 
-// P0 scaffold shell: proves the typed `hc` fetcher, the session cookie flow
-// and the minimal router wiring work. Domain pages arrive in P1-P6.
+function go(e: MouseEvent, to: string): void {
+	e.preventDefault()
+	navigate(to)
+}
+
+function LoginForm(props: {
+	email: () => string
+	setEmail: (v: string) => void
+	password: () => string
+	setPassword: (v: string) => void
+	error: () => string | null
+	onLogin: (e: SubmitEvent) => void
+}): JSX.Element {
+	return (
+		<form onSubmit={props.onLogin}>
+			<input
+				type="email"
+				placeholder="Email"
+				value={props.email()}
+				onInput={(e: InputEventAndTarget) => props.setEmail(e.currentTarget.value)}
+				autocomplete="username"
+			/>
+			<input
+				type="password"
+				placeholder="Password"
+				value={props.password()}
+				onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
+				autocomplete="current-password"
+			/>
+			<button type="submit">Sign in</button>
+			<Show when={props.error()}>
+				<div class="app-inline-error">{props.error()}</div>
+			</Show>
+		</form>
+	)
+}
+
+// P1 shell: local-auth gate plus the tenants/sites/location-tree pages.
+// Rack/device/cable pages arrive in P2-P5.
 function App(): JSX.Element {
 	const [isLoggedIn, setIsLoggedIn] = createSignal<boolean | null>(null)
 	const [health, setHealth] = createSignal<string>('…')
 	const [email, setEmail] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
-
-	const [meEmail, { refetch: refetchMe }] = createResource(isLoggedIn, async (loggedIn) => {
-		if (!loggedIn) {
-			return null
-		}
-		return email() || 'signed in'
-	})
 
 	onMount(async () => {
 		setIsLoggedIn(await fetchMe())
@@ -45,13 +79,28 @@ function App(): JSX.Element {
 		}
 		setPassword('')
 		setIsLoggedIn(true)
-		void refetchMe()
 	}
 
 	async function handleLogout(): Promise<void> {
 		await logout()
 		setIsLoggedIn(false)
 		setEmail('')
+	}
+
+	function route(): { page: string; siteId: string | null } {
+		const parts = path()
+			.split('/')
+			.filter((p) => p.length > 0)
+		if (parts.length === 0 || parts[0] === 'tenants') {
+			return { page: 'tenants', siteId: null }
+		}
+		if (parts[0] === 'sites' && parts.length === 1) {
+			return { page: 'sites', siteId: null }
+		}
+		if (parts[0] === 'sites' && parts.length === 2) {
+			return { page: 'site-detail', siteId: parts[1] ?? null }
+		}
+		return { page: 'not-found', siteId: null }
 	}
 
 	return (
@@ -62,37 +111,44 @@ function App(): JSX.Element {
 			</p>
 			<Show when={isLoggedIn() !== null} fallback={<p>Loading…</p>}>
 				<Switch>
-					<Match when={isLoggedIn()}>
-						<p>Signed in as {meEmail() ?? '…'}</p>
-						<button type="button" onClick={handleLogout}>
-							Sign out
-						</button>
-					</Match>
 					<Match when={!isLoggedIn()}>
-						<form onSubmit={handleLogin}>
-							<input
-								type="email"
-								placeholder="Email"
-								value={email()}
-								onInput={(e: InputEventAndTarget) =>
-									setEmail(e.currentTarget.value)
-								}
-								autocomplete="username"
-							/>
-							<input
-								type="password"
-								placeholder="Password"
-								value={password()}
-								onInput={(e: InputEventAndTarget) =>
-									setPassword(e.currentTarget.value)
-								}
-								autocomplete="current-password"
-							/>
-							<button type="submit">Sign in</button>
-						</form>
-						<Show when={error()}>
-							<div class="app-inline-error">{error()}</div>
-						</Show>
+						<LoginForm
+							email={email}
+							setEmail={setEmail}
+							password={password}
+							setPassword={setPassword}
+							error={error}
+							onLogin={handleLogin}
+						/>
+					</Match>
+					<Match when={isLoggedIn()}>
+						<nav>
+							<a href="/tenants" onClick={(e: MouseEvent): void => go(e, '/tenants')}>
+								Tenants
+							</a>{' '}
+							|{' '}
+							<a href="/sites" onClick={(e: MouseEvent): void => go(e, '/sites')}>
+								Sites
+							</a>{' '}
+							|{' '}
+							<button type="button" onClick={handleLogout}>
+								Sign out ({email() || '…'})
+							</button>
+						</nav>
+						<Switch>
+							<Match when={route().page === 'tenants'}>
+								<TenantsPage />
+							</Match>
+							<Match when={route().page === 'sites'}>
+								<SitesPage />
+							</Match>
+							<Match when={route().page === 'site-detail' && route().siteId !== null}>
+								<SiteDetailPage id={route().siteId as string} />
+							</Match>
+							<Match when={route().page === 'not-found'}>
+								<p>Not found.</p>
+							</Match>
+						</Switch>
 					</Match>
 				</Switch>
 			</Show>
