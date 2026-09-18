@@ -236,3 +236,63 @@ export const device_type_interfaces = sqliteTable(
 		),
 	],
 )
+
+// ---------------------------------------------------------------------------
+// P4: devices / interfaces. A device mounts XOR: either position_u (consumes
+// the template u_height in U, validated against rack bounds plus shelf/device
+// overlap) or shelf_id (consumes 0 U, shelf must sit in the same rack), never
+// both. Unracked devices leave rack_id, position_u, and shelf_id all null.
+// Interface rows are expanded from template stubs at create time; P5 cables
+// flip `connected`. Deletes of racks/shelves/device-types are blocked while
+// devices reference them (service layer); device delete removes its
+// interfaces in the same transaction.
+// ---------------------------------------------------------------------------
+
+export const devices = sqliteTable(
+	'devices',
+	{
+		id: text('id').primaryKey(),
+		device_type_id: text('device_type_id')
+			.notNull()
+			.references(() => device_types.id),
+		site_id: text('site_id').references(() => sites.id),
+		location_id: text('location_id').references(() => locations.id),
+		rack_id: text('rack_id').references(() => racks.id),
+		// Bottom-U, 1-based. Occupies position_u..position_u+u_height-1.
+		position_u: integer('position_u'),
+		shelf_id: text('shelf_id').references(() => rack_shelves.id),
+		status: text('status').notNull().default('active'),
+		name: text('name').notNull(),
+		serial: text('serial'),
+		asset_tag: text('asset_tag').unique(),
+		tenant_id: text('tenant_id').references(() => tenants.id),
+		description: text('description'),
+	},
+	(table) => [
+		index('devices_type_id_idx').on(table.device_type_id),
+		index('devices_site_id_idx').on(table.site_id),
+		index('devices_rack_id_idx').on(table.rack_id),
+		index('devices_shelf_id_idx').on(table.shelf_id),
+		index('devices_tenant_id_idx').on(table.tenant_id),
+		index('devices_status_idx').on(table.status),
+		index('devices_name_idx').on(table.name),
+	],
+)
+
+export const interfaces = sqliteTable(
+	'interfaces',
+	{
+		id: text('id').primaryKey(),
+		device_id: text('device_id')
+			.notNull()
+			.references(() => devices.id),
+		name: text('name').notNull(),
+		kind: text('kind').notNull().default('ethernet'),
+		connected: integer('connected').notNull().default(0),
+		description: text('description'),
+	},
+	(table) => [
+		index('interfaces_device_id_idx').on(table.device_id),
+		uniqueIndex('interfaces_device_name_idx').on(table.device_id, table.name),
+	],
+)

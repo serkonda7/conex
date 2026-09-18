@@ -12,8 +12,8 @@ function go(e: MouseEvent, to: string): void {
 
 /**
  * /racks/:id — elevation view (top-down U list). Shelves render as spanning
- * blocks (every covered U labelled with the shelf name); free U rows carry
- * a placeholder affordance that P4 wires to device placement.
+ * blocks and position-mounted devices as linked blocks; free U rows carry a
+ * placeholder affordance that selects the U for device placement.
  */
 export function RackDetailPage(props: { id: string }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -118,6 +118,19 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 									<td>
 										<Show when={unit.shelf} fallback={<span>free</span>}>
 											<span>▤ {unit.shelf?.name} (shelf)</span>
+										</Show>{' '}
+										<Show when={unit.device}>
+											<span>
+												▦{' '}
+												<a
+													href={`/devices/${unit.device?.id}`}
+													onClick={(e: MouseEvent): void =>
+														go(e, `/devices/${unit.device?.id ?? ''}`)
+													}
+												>
+													{unit.device?.name}
+												</a>
+											</span>
 										</Show>
 									</td>
 									<td>
@@ -126,7 +139,7 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 											fallback={
 												<button
 													type="button"
-													title="Device placement arrives in P4"
+													title="Pick a U below, then instantiate from Devices"
 													onClick={() => {
 														setPendingU(unit.u)
 														setShelfU(String(unit.u))
@@ -154,8 +167,11 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 			</Show>
 			<Show when={pendingU() !== null}>
 				<p>
-					U{pendingU()} selected — device placement arrives in P4; use the form above to
-					add a shelf at this U.
+					U{pendingU()} selected — instantiate the device from{' '}
+					<a href="/devices" onClick={(e: MouseEvent): void => go(e, '/devices')}>
+						Devices
+					</a>{' '}
+					with this rack and U position.
 				</p>
 			</Show>
 			<Show when={error()}>

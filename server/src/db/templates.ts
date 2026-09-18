@@ -10,7 +10,7 @@ import type {
 	StubPreviewResponse,
 	StubUpdate,
 } from 'shared/src/schemas'
-import { device_type_interfaces, device_types, manufacturers } from '../schema'
+import { device_type_interfaces, device_types, devices, manufacturers } from '../schema'
 import { expandStub, expandStubs } from '../services/templates'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -280,8 +280,12 @@ export function deleteDeviceType(id: string): Result<DeviceTypeRow, Error> {
 	if (Result.isError(current)) {
 		return current
 	}
-	// P4 adds the same guard for devices instantiated from this type; until
-	// the devices table exists there is nothing else to block on.
+	const device = getDb().select().from(devices).where(eq(devices.device_type_id, id)).get()
+	if (device) {
+		return Result.err(
+			new ConflictError('Device type still has devices; move or delete them first'),
+		)
+	}
 	const db = getDb()
 	db.delete(device_type_interfaces).where(eq(device_type_interfaces.device_type_id, id)).run()
 	db.delete(device_types).where(eq(device_types.id, id)).run()

@@ -1,9 +1,17 @@
 // Request payload types live in `schemas.ts`, derived from their runtime schema.
 // They are re-exported here so importers keep a single entry point for types.
 export type {
+	DeviceCreate,
+	DeviceListQuery,
+	DeviceMove,
+	DeviceStatus,
+	DeviceUpdate,
 	ElevationResponse,
 	ElevationShelfRef,
 	ElevationUnit,
+	InterfaceCreate,
+	InterfaceListQuery,
+	InterfaceUpdate,
 	ListQuery,
 	LocationCreate,
 	LocationListQuery,

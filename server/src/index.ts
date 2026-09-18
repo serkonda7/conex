@@ -6,6 +6,7 @@ import { type AppConfig, initConfig, load_config_file, resolve_listen_port } fro
 import { initDb } from './db'
 import { authApp } from './routes/auth'
 import { deviceTypesApp } from './routes/device_types'
+import { devicesApp } from './routes/devices'
 import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
@@ -63,6 +64,7 @@ export function createApp() {
 			.route('/shelves', shelvesApp)
 			.route('/manufacturers', manufacturersApp)
 			.route('/device-types', deviceTypesApp)
+			.route('/devices', devicesApp)
 	)
 }
 

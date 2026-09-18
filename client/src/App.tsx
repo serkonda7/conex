@@ -3,6 +3,8 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
 import { fetch_health, set_unauthorized_handler } from './api'
 import { fetchMe, login, logout } from './api_auth'
+import { DeviceDetailPage } from './pages/device_detail'
+import { DevicesPage } from './pages/devices'
 import { RackDetailPage } from './pages/rack_detail'
 import { SiteDetailPage } from './pages/site_detail'
 import { SitesPage } from './pages/sites'
@@ -89,26 +91,37 @@ function App(): JSX.Element {
 		setEmail('')
 	}
 
-	function route(): { page: string; siteId: string | null; rackId: string | null } {
+	function route(): {
+		page: string
+		siteId: string | null
+		rackId: string | null
+		deviceId: string | null
+	} {
 		const parts = path()
 			.split('/')
 			.filter((p) => p.length > 0)
 		if (parts.length === 0 || parts[0] === 'tenants') {
-			return { page: 'tenants', siteId: null, rackId: null }
+			return { page: 'tenants', siteId: null, rackId: null, deviceId: null }
 		}
 		if (parts[0] === 'sites' && parts.length === 1) {
-			return { page: 'sites', siteId: null, rackId: null }
+			return { page: 'sites', siteId: null, rackId: null, deviceId: null }
 		}
 		if (parts[0] === 'sites' && parts.length === 2) {
-			return { page: 'site-detail', siteId: parts[1] ?? null, rackId: null }
+			return { page: 'site-detail', siteId: parts[1] ?? null, rackId: null, deviceId: null }
 		}
 		if (parts[0] === 'racks' && parts.length === 2) {
-			return { page: 'rack-detail', siteId: null, rackId: parts[1] ?? null }
+			return { page: 'rack-detail', siteId: null, rackId: parts[1] ?? null, deviceId: null }
 		}
 		if (parts[0] === 'templates') {
-			return { page: 'templates', siteId: null, rackId: null }
+			return { page: 'templates', siteId: null, rackId: null, deviceId: null }
 		}
-		return { page: 'not-found', siteId: null, rackId: null }
+		if (parts[0] === 'devices' && parts.length === 1) {
+			return { page: 'devices', siteId: null, rackId: null, deviceId: null }
+		}
+		if (parts[0] === 'devices' && parts.length === 2) {
+			return { page: 'device-detail', siteId: null, rackId: null, deviceId: parts[1] ?? null }
+		}
+		return { page: 'not-found', siteId: null, rackId: null, deviceId: null }
 	}
 
 	return (
@@ -146,6 +159,10 @@ function App(): JSX.Element {
 								Templates
 							</a>{' '}
 							|{' '}
+							<a href="/devices" onClick={(e: MouseEvent): void => go(e, '/devices')}>
+								Devices
+							</a>{' '}
+							|{' '}
 							<button type="button" onClick={handleLogout}>
 								Sign out ({email() || '…'})
 							</button>
@@ -165,6 +182,14 @@ function App(): JSX.Element {
 							</Match>
 							<Match when={route().page === 'templates'}>
 								<TemplatesPage />
+							</Match>
+							<Match when={route().page === 'devices'}>
+								<DevicesPage />
+							</Match>
+							<Match
+								when={route().page === 'device-detail' && route().deviceId !== null}
+							>
+								<DeviceDetailPage id={route().deviceId as string} />
 							</Match>
 							<Match when={route().page === 'not-found'}>
 								<p>Not found.</p>

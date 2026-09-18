@@ -418,3 +418,109 @@ export interface StubPreviewResponse {
 	interfaces: ExpandedInterface[]
 	total: number
 }
+
+// ---------------------------------------------------------------------------
+// P4: devices / interfaces
+// ---------------------------------------------------------------------------
+
+/** Device lifecycle label. Same closed set as racks so filters stay uniform. */
+export const DeviceStatusSchema = v.picklist(['active', 'planned', 'staged', 'decommissioned'])
+
+export type DeviceStatus = v.InferInput<typeof DeviceStatusSchema>
+
+/** Interface name label (e.g. `eth0`). Same charset as stub prefixes. */
+export const InterfaceNameSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1),
+	v.maxLength(100),
+	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
+)
+
+const OptionalNullableIdEntry = v.optional(v.nullable(IdSchema), undefined)
+
+const OptionalNullablePositionEntry = v.optional(
+	v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
+	undefined,
+)
+
+export const DeviceCreateSchema = v.strictObject({
+	device_type_id: IdSchema,
+	name: NameSchema,
+	status: v.optional(DeviceStatusSchema, 'active'),
+	site_id: NullableIdSchema,
+	location_id: NullableIdSchema,
+	rack_id: NullableIdSchema,
+	// Mount is XOR (service-enforced): position_u XOR shelf_id, never both.
+	// Unracked devices leave rack_id, position_u, and shelf_id all empty.
+	position_u: v.optional(v.nullable(PositionUSchema), undefined),
+	shelf_id: NullableIdSchema,
+	serial: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	tenant_id: NullableIdSchema,
+	description: DescriptionSchema,
+})
+
+export const DeviceUpdateSchema = v.strictObject({
+	// device_type_id is immutable after create: swapping the template would
+	// silently invalidate the expanded interface set and the U footprint.
+	name: v.optional(NameSchema, undefined),
+	status: v.optional(DeviceStatusSchema, undefined),
+	site_id: v.optional(v.nullable(IdSchema), undefined),
+	location_id: v.optional(v.nullable(IdSchema), undefined),
+	rack_id: v.optional(v.nullable(IdSchema), undefined),
+	position_u: v.optional(v.nullable(PositionUSchema), undefined),
+	shelf_id: v.optional(v.nullable(IdSchema), undefined),
+	serial: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+/**
+ * Explicit remount body: `undefined` keeps the current value, `null` clears
+ * it. At least one key must be present so an empty body fails loudly.
+ */
+export const DeviceMoveSchema = v.pipe(
+	v.strictObject({
+		rack_id: OptionalNullableIdEntry,
+		position_u: OptionalNullablePositionEntry,
+		shelf_id: OptionalNullableIdEntry,
+	}),
+	v.check(
+		(m) => m.rack_id !== undefined || m.position_u !== undefined || m.shelf_id !== undefined,
+		'Provide at least one of rack_id, position_u, shelf_id',
+	),
+)
+
+export const InterfaceCreateSchema = v.strictObject({
+	name: InterfaceNameSchema,
+	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+})
+
+export const InterfaceUpdateSchema = v.strictObject({
+	// `connected` is owned by P5 cables, never edited directly.
+	name: v.optional(InterfaceNameSchema, undefined),
+	kind: v.optional(InterfaceKindSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export type DeviceCreate = v.InferInput<typeof DeviceCreateSchema>
+export type DeviceUpdate = v.InferInput<typeof DeviceUpdateSchema>
+export type DeviceMove = v.InferInput<typeof DeviceMoveSchema>
+export type InterfaceCreate = v.InferInput<typeof InterfaceCreateSchema>
+export type InterfaceUpdate = v.InferInput<typeof InterfaceUpdateSchema>
+
+export const DeviceListQuerySchema = v.object({
+	...ListQueryEntries,
+	site: OptionalIdEntry,
+	rack: OptionalIdEntry,
+	tenant: OptionalIdEntry,
+	status: v.optional(DeviceStatusSchema, undefined),
+})
+
+export const InterfaceListQuerySchema = v.object({ ...ListQueryEntries })
+
+export type DeviceListQuery = v.InferInput<typeof DeviceListQuerySchema>
+export type InterfaceListQuery = v.InferInput<typeof InterfaceListQuerySchema>

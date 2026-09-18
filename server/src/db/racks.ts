@@ -8,7 +8,7 @@ import type {
 	ShelfCreate,
 	ShelfUpdate,
 } from 'shared/src/schemas'
-import { locations, rack_shelves, racks, sites, tenants } from '../schema'
+import { device_types, devices, locations, rack_shelves, racks, sites, tenants } from '../schema'
 import { checkBounds, checkOverlap, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -113,7 +113,7 @@ function checkLocation(
 	return Result.ok(undefined)
 }
 
-/** Shelves of one rack, bottom-up. Devices join this list in P4. */
+/** Shelves of one rack, bottom-up. */
 function shelvesOf(rackId: string): ShelfRow[] {
 	return getDb()
 		.select()
@@ -121,6 +121,45 @@ function shelvesOf(rackId: string): ShelfRow[] {
 		.where(eq(rack_shelves.rack_id, rackId))
 		.orderBy(asc(rack_shelves.position_u))
 		.all()
+}
+
+/**
+ * U-consuming device spans of one rack (position-mounted only; shelf-sitters
+ * consume 0 U). Joins the template for `u_height`, the footprint each span
+ * occupies. Exported so `db/devices.ts` validates mounts against the same
+ * rows the elevation renders.
+ */
+export function deviceSpansOf(rackId: string): OccupantSpan[] {
+	const rows = getDb()
+		.select({
+			id: devices.id,
+			name: devices.name,
+			position_u: devices.position_u,
+			u_height: device_types.u_height,
+		})
+		.from(devices)
+		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
+		.where(eq(devices.rack_id, rackId))
+		.orderBy(asc(devices.position_u))
+		.all()
+	const spans: OccupantSpan[] = []
+	for (const row of rows) {
+		if (row.position_u === null) {
+			continue
+		}
+		spans.push({
+			id: row.id,
+			name: row.name,
+			position_u: row.position_u,
+			height_u: row.u_height,
+		})
+	}
+	return spans
+}
+
+/** Every U-consuming span of a rack: shelves plus position-mounted devices. */
+function allSpansOf(rackId: string): OccupantSpan[] {
+	return [...shelvesOf(rackId).map(shelfSpanOf), ...deviceSpansOf(rackId)]
 }
 
 export function createRack(input: RackCreate): Result<RackRow, Error> {
@@ -189,10 +228,17 @@ export function updateRack(id: string, input: RackUpdate): Result<RackRow, Error
 	}
 	const effectiveHeight = input.height_u ?? node.height_u
 	if (effectiveHeight !== node.height_u) {
-		// Shrinking below the topmost occupied U would strand shelves outside
-		// the rack; reject with the same bounds error creation uses.
+		// Shrinking below the topmost occupied U would strand shelves or
+		// devices outside the rack; reject with the same bounds error
+		// creation uses.
 		for (const shelf of shelvesOf(id)) {
 			const bounds = checkBounds(shelfSpanOf(shelf), effectiveHeight, `Shelf "${shelf.name}"`)
+			if (Result.isError(bounds)) {
+				return Result.err(bounds.error)
+			}
+		}
+		for (const device of deviceSpansOf(id)) {
+			const bounds = checkBounds(device, effectiveHeight, `Device "${device.name}"`)
 			if (Result.isError(bounds)) {
 				return Result.err(bounds.error)
 			}
@@ -239,12 +285,15 @@ export function deleteRack(id: string): Result<RackRow, Error> {
 	if (shelf) {
 		return Result.err(new ConflictError('Rack still has shelves; delete them first'))
 	}
-	// P4 adds the same guard for devices mounted in this rack.
+	const device = getDb().select().from(devices).where(eq(devices.rack_id, id)).get()
+	if (device) {
+		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
+	}
 	getDb().delete(racks).where(eq(racks.id, id)).run()
 	return Result.ok(current.value)
 }
 
-/** Ordered U map of a rack, top-down (highest U first). Devices stay empty until P4. */
+/** Ordered U map of a rack, top-down (highest U first), shelves plus devices. */
 export function getElevation(id: string): Result<ElevationResponse, Error> {
 	const current = getRack(id)
 	if (Result.isError(current)) {
@@ -252,7 +301,7 @@ export function getElevation(id: string): Result<ElevationResponse, Error> {
 	}
 	const rack = current.value
 	const shelves = shelvesOf(id)
-	const occupancy = getOccupancy(rack.height_u, shelves.map(shelfSpanOf))
+	const occupancy = getOccupancy(rack.height_u, shelves.map(shelfSpanOf), deviceSpansOf(id))
 	if (Result.isError(occupancy)) {
 		return Result.err(occupancy.error)
 	}
@@ -316,8 +365,8 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
-	const siblings = shelvesOf(input.rack_id)
-	const overlap = checkOverlap(candidate, siblings.map(shelfSpanOf), `Shelf "${input.name}"`)
+	const siblings = allSpansOf(input.rack_id)
+	const overlap = checkOverlap(candidate, siblings, `Shelf "${input.name}"`)
 	if (Result.isError(overlap)) {
 		return Result.err(overlap.error)
 	}
@@ -354,13 +403,8 @@ export function updateShelf(id: string, input: ShelfUpdate): Result<ShelfRow, Er
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
-	const siblings = shelvesOf(node.rack_id)
-	const overlap = checkOverlap(
-		effective,
-		siblings.map(shelfSpanOf),
-		`Shelf "${effectiveName}"`,
-		id,
-	)
+	const siblings = allSpansOf(node.rack_id)
+	const overlap = checkOverlap(effective, siblings, `Shelf "${effectiveName}"`, id)
 	if (Result.isError(overlap)) {
 		return Result.err(overlap.error)
 	}
@@ -388,7 +432,10 @@ export function deleteShelf(id: string): Result<ShelfRow, Error> {
 	if (Result.isError(current)) {
 		return current
 	}
-	// P4 adds a delete-block while devices sit on this shelf.
+	const sitter = getDb().select().from(devices).where(eq(devices.shelf_id, id)).get()
+	if (sitter) {
+		return Result.err(new ConflictError('Shelf still has devices; move or delete them first'))
+	}
 	getDb().delete(rack_shelves).where(eq(rack_shelves.id, id)).run()
 	return Result.ok(current.value)
 }
