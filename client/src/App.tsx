@@ -3,6 +3,7 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onMount, Show, Switch } from 'solid-js'
 import { fetch_health, set_unauthorized_handler } from './api'
 import { fetchMe, login, logout } from './api_auth'
+import { RackDetailPage } from './pages/rack_detail'
 import { SiteDetailPage } from './pages/site_detail'
 import { SitesPage } from './pages/sites'
 import { TenantsPage } from './pages/tenants'
@@ -87,20 +88,23 @@ function App(): JSX.Element {
 		setEmail('')
 	}
 
-	function route(): { page: string; siteId: string | null } {
+	function route(): { page: string; siteId: string | null; rackId: string | null } {
 		const parts = path()
 			.split('/')
 			.filter((p) => p.length > 0)
 		if (parts.length === 0 || parts[0] === 'tenants') {
-			return { page: 'tenants', siteId: null }
+			return { page: 'tenants', siteId: null, rackId: null }
 		}
 		if (parts[0] === 'sites' && parts.length === 1) {
-			return { page: 'sites', siteId: null }
+			return { page: 'sites', siteId: null, rackId: null }
 		}
 		if (parts[0] === 'sites' && parts.length === 2) {
-			return { page: 'site-detail', siteId: parts[1] ?? null }
+			return { page: 'site-detail', siteId: parts[1] ?? null, rackId: null }
 		}
-		return { page: 'not-found', siteId: null }
+		if (parts[0] === 'racks' && parts.length === 2) {
+			return { page: 'rack-detail', siteId: null, rackId: parts[1] ?? null }
+		}
+		return { page: 'not-found', siteId: null, rackId: null }
 	}
 
 	return (
@@ -144,6 +148,9 @@ function App(): JSX.Element {
 							</Match>
 							<Match when={route().page === 'site-detail' && route().siteId !== null}>
 								<SiteDetailPage id={route().siteId as string} />
+							</Match>
+							<Match when={route().page === 'rack-detail' && route().rackId !== null}>
+								<RackDetailPage id={route().rackId as string} />
 							</Match>
 							<Match when={route().page === 'not-found'}>
 								<p>Not found.</p>

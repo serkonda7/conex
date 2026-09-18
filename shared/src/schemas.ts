@@ -190,3 +190,105 @@ export type TenantGroupListQuery = v.InferInput<typeof TenantGroupListQuerySchem
 export type TenantListQuery = v.InferInput<typeof TenantListQuerySchema>
 export type SiteListQuery = v.InferInput<typeof SiteListQuerySchema>
 export type LocationListQuery = v.InferInput<typeof LocationListQuerySchema>
+
+// ---------------------------------------------------------------------------
+// P2: racks / shelves
+// ---------------------------------------------------------------------------
+
+/** Rack lifecycle label. Free-form on the wire is a typo magnet, so v1 is a closed set. */
+export const RackStatusSchema = v.picklist(['active', 'planned', 'staged', 'decommissioned'])
+
+export type RackStatus = v.InferInput<typeof RackStatusSchema>
+
+/** Rack height in U: 1..60, default 42. */
+export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+
+/** Bottom-U position, 1-based. Upper bound is rack-dependent, checked in the service layer. */
+export const PositionUSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
+
+/** U span of a shelf or device: at least 1 U. */
+export const SpanHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+
+export const RackCreateSchema = v.strictObject({
+	name: NameSchema,
+	slug: SlugSchema,
+	site_id: IdSchema,
+	location_id: NullableIdSchema,
+	tenant_id: NullableIdSchema,
+	height_u: v.optional(RackHeightSchema, 42),
+	status: v.optional(RackStatusSchema, 'active'),
+})
+
+export const RackUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	slug: v.optional(SlugSchema, undefined),
+	// site_id is immutable after create: shelves reference rack-local U
+	// positions that are meaningless without the original rack height.
+	location_id: v.optional(v.nullable(IdSchema), undefined),
+	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	height_u: v.optional(RackHeightSchema, undefined),
+	status: v.optional(RackStatusSchema, undefined),
+})
+
+export const ShelfCreateSchema = v.strictObject({
+	name: NameSchema,
+	rack_id: IdSchema,
+	position_u: PositionUSchema,
+	height_u: v.optional(SpanHeightSchema, 1),
+	capacity_slots: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
+		undefined,
+	),
+})
+
+export const ShelfUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	// rack_id is immutable after create: moving a shelf across racks would
+	// silently reinterpret its U position against another rack's height.
+	position_u: v.optional(PositionUSchema, undefined),
+	height_u: v.optional(SpanHeightSchema, undefined),
+	capacity_slots: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
+		undefined,
+	),
+})
+
+export type RackCreate = v.InferInput<typeof RackCreateSchema>
+export type RackUpdate = v.InferInput<typeof RackUpdateSchema>
+export type ShelfCreate = v.InferInput<typeof ShelfCreateSchema>
+export type ShelfUpdate = v.InferInput<typeof ShelfUpdateSchema>
+
+export const RackListQuerySchema = v.object({
+	...ListQueryEntries,
+	site: OptionalIdEntry,
+	location: OptionalIdEntry,
+	tenant: OptionalIdEntry,
+})
+
+export const ShelfListQuerySchema = v.object({
+	...ListQueryEntries,
+	rack: OptionalIdEntry,
+})
+
+export type RackListQuery = v.InferInput<typeof RackListQuerySchema>
+export type ShelfListQuery = v.InferInput<typeof ShelfListQuerySchema>
+
+// Elevation response (server-built, read by the client elevation view).
+// `device` stays null until P4 fills device occupancy.
+export interface ElevationShelfRef {
+	id: string
+	name: string
+}
+
+export interface ElevationUnit {
+	u: number
+	shelf: ElevationShelfRef | null
+	device: ElevationShelfRef | null
+}
+
+export interface ElevationResponse {
+	rack_id: string
+	height_u: number
+	/** Top-down: highest U first, so the client renders without re-sorting. */
+	units: ElevationUnit[]
+}

@@ -124,3 +124,54 @@ export const locations = sqliteTable(
 		uniqueIndex('locations_sibling_slug_idx').on(table.site_id, table.parent_id, table.slug),
 	],
 )
+
+// ---------------------------------------------------------------------------
+// P2: racks / shelves. A shelf occupies position_u..position_u+height_u-1
+// (bottom-U, 1-based); bounds and overlap are enforced in the service layer
+// (`services/occupancy.ts` + `db/racks.ts`) so the math stays unit-testable
+// without a database. Deletes are blocked while dependents exist (service
+// layer), so FKs carry no cascade.
+// ---------------------------------------------------------------------------
+
+export const racks = sqliteTable(
+	'racks',
+	{
+		id: text('id').primaryKey(),
+		site_id: text('site_id')
+			.notNull()
+			.references(() => sites.id),
+		location_id: text('location_id').references(() => locations.id),
+		tenant_id: text('tenant_id').references(() => tenants.id),
+		name: text('name').notNull(),
+		// v1 keeps the slug globally unique (same as sites); per-site scoping
+		// can replace this when rack counts grow.
+		slug: text('slug').notNull().unique(),
+		height_u: integer('height_u').notNull().default(42),
+		status: text('status').notNull().default('active'),
+	},
+	(table) => [
+		index('racks_site_id_idx').on(table.site_id),
+		index('racks_location_id_idx').on(table.location_id),
+		index('racks_tenant_id_idx').on(table.tenant_id),
+		index('racks_name_idx').on(table.name),
+	],
+)
+
+export const rack_shelves = sqliteTable(
+	'rack_shelves',
+	{
+		id: text('id').primaryKey(),
+		rack_id: text('rack_id')
+			.notNull()
+			.references(() => racks.id),
+		name: text('name').notNull(),
+		// Bottom-U, 1-based. Occupies position_u..position_u+height_u-1.
+		position_u: integer('position_u').notNull(),
+		height_u: integer('height_u').notNull().default(1),
+		capacity_slots: integer('capacity_slots'),
+	},
+	(table) => [
+		index('rack_shelves_rack_id_idx').on(table.rack_id),
+		index('rack_shelves_position_idx').on(table.rack_id, table.position_u),
+	],
+)

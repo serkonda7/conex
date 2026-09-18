@@ -11,7 +11,7 @@ import {
 	type TenantGroupUpdate,
 	type TenantUpdate,
 } from 'shared/src/schemas'
-import { locations, sites, tenant_groups, tenants } from '../schema'
+import { locations, racks, sites, tenant_groups, tenants } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -297,9 +297,13 @@ export function deleteTenant(id: string): Result<TenantRow, Error> {
 		return current
 	}
 	const db = getDb()
-	const child = db.select().from(sites).where(eq(sites.tenant_id, id)).get()
-	if (child) {
+	const siteChild = db.select().from(sites).where(eq(sites.tenant_id, id)).get()
+	if (siteChild) {
 		return Result.err(new ConflictError('Tenant still has sites; move or delete them first'))
+	}
+	const rackChild = db.select().from(racks).where(eq(racks.tenant_id, id)).get()
+	if (rackChild) {
+		return Result.err(new ConflictError('Tenant still has racks; move or delete them first'))
 	}
 	db.delete(tenants).where(eq(tenants.id, id)).run()
 	return Result.ok(current.value)
@@ -441,6 +445,10 @@ export function deleteSite(id: string): Result<SiteRow, Error> {
 	const child = getDb().select().from(locations).where(eq(locations.site_id, id)).get()
 	if (child) {
 		return Result.err(new ConflictError('Site still has locations; move or delete them first'))
+	}
+	const rackChild = getDb().select().from(racks).where(eq(racks.site_id, id)).get()
+	if (rackChild) {
+		return Result.err(new ConflictError('Site still has racks; move or delete them first'))
 	}
 	getDb().delete(sites).where(eq(sites.id, id)).run()
 	return Result.ok(current.value)
@@ -656,6 +664,10 @@ export function deleteLocation(id: string): Result<LocationRow, Error> {
 		return Result.err(
 			new ConflictError('Location still has child locations; move or delete them first'),
 		)
+	}
+	const rackChild = getDb().select().from(racks).where(eq(racks.location_id, id)).get()
+	if (rackChild) {
+		return Result.err(new ConflictError('Location still has racks; move or delete them first'))
 	}
 	getDb().delete(locations).where(eq(locations.id, id)).run()
 	return Result.ok(current.value)
