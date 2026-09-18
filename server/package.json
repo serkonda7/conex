@@ -1,0 +1,23 @@
+{
+  "name": "server",
+  "version": "0.0.0-dev",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "compile": "bun build ./src/index.ts --compile --outfile ./dist/backend.bin",
+    "check": "tsc",
+    "test": "bun test",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "shared": "workspace:*",
+    "better-result": "catalog:",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "@hono/valibot-validator": "catalog:",
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "drizzle-kit": "catalog:"
+  }
+}

@@ -1,0 +1,5 @@
+# Only picked up when `bun test` runs with cwd = server/ (which turbo does via
+# server/package.json). A root-level `bun test server/src/...` silently skips
+# this preload.
+[test]
+preload = ["./src/tests/setup.ts"]

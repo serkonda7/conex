@@ -1,0 +1,16 @@
+# VCS and local editor artifacts
+.git
+.gitignore
+.vscode
+
+# Dependency and build outputs
+**/node_modules
+**/.turbo
+**/dist
+
+# Local runtime data and backups
+server/data/*.db
+backups
+
+# OS junk
+.DS_Store

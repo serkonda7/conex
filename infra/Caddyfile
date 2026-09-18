@@ -1,0 +1,19 @@
+:80 {
+	redir https://{host}{uri} permanent
+}
+
+:443 {
+	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+
+	route {
+		handle_path /api* {
+			reverse_proxy server:3000
+		}
+
+		handle {
+			root * /usr/share/caddy
+			try_files {path} /index.html
+			file_server
+		}
+	}
+}

@@ -1,0 +1,25 @@
+# Usage:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#   nano docker-compose.override.yml
+#   docker compose config   # verify the merged result
+#   docker compose up -d --build
+#
+
+services:
+  client:
+    ports:
+      - "80:80"
+      - "443:443"
+
+    # Alternate host ports (replace the lines above):
+    #      - "8080:80"
+    #      - "8443:443"
+
+    # Real TLS certificates (host paths on the left):
+    # volumes:
+    #   - ./certs/cert.pem:/etc/caddy/certs/cert.pem:ro
+    #   - ./certs/key.pem:/etc/caddy/certs/key.pem:ro
+
+    # Custom Caddyfile:
+    # volumes:
+    #   - ./Caddyfile:/etc/caddy/Caddyfile:ro

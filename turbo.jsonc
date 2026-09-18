@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  // Read by `playwright.config.ts`, which runs outside of turbo
+  "globalPassThroughEnv": ["CONEX_E2E_REUSE_SERVERS"],
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["CONEX_DB_PATH"]
+    },
+    "build": {
+      "outputs": ["dist/**"]
+    },
+    "check": {
+      "dependsOn": ["^build"]
+    },
+    "test": {}
+  }
+}

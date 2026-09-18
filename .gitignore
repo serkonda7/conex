@@ -1,0 +1,21 @@
+# build output
+dist/
+
+# dependencies
+node_modules/
+
+# caches
+.turbo/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# editor files
+.vscode/
+!.vscode/extensions.json
+
+# config and app data
+data/
+config.toml
+backups/
+docker-compose.override.yml

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!**/*.md", "!**/*.svg"]
+  },
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "suspicious": {
+        "noVar": "error",
+        "noShadow": "error",
+        "noReturnAssign": "error",
+        "noEvolvingTypes": "error",
+        "noUnknownAttribute": "off" // TODO enable
+      },
+      "style": {
+        "useBlockStatements": "error"
+      },
+      "nursery": {
+        "useExplicitType": "error", // TODO implicit pbjects in function param are not catched
+        "useExplicitReturnType": {
+          "level": "error",
+          "options": {
+            "allowExpressions": true
+          }
+        },
+        "useDomQuerySelector": "error",
+        "useExhaustiveSwitchCases": "off", // off due to performance impact
+        "useNullishCoalescing": "off" // off due to performance impact
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "trailingCommas": "all",
+      "quoteStyle": "single",
+      "lineWidth": 100
+    }
+  },
+  "html": {
+    "formatter": {
+      "enabled": true
+    }
+  },
+  "css": {
+    "formatter": {
+      "enabled": true
+    }
+  },
+  "json": {
+    "formatter": {
+      "lineWidth": 100
+    }
+  }
+}
