@@ -1,0 +1,16 @@
+# Example server config. Copy to `data/config.toml` (gitignored) for manual setup:
+#   cp server/config.example.toml server/data/config.toml
+# Local `bun run dev` auto-creates `data/config.toml` with a random appKey
+# on first start, so this file is only needed as a reference / for production.
+
+[auth]
+# Minimum 32 chars. Generate one with: openssl rand -hex 48
+appKey = "REPLACE-ME-with-at-least-32-chars-long-random-secret"
+secureCookies = false # plain-HTTP local dev; keep true behind HTTPS
+
+[server]
+host = "127.0.0.1"
+port = 3000
+
+[audit]
+retentionDays = 90
