@@ -47,6 +47,8 @@ export const devicesApp = new Hono()
 				rack: query.rack,
 				tenant: query.tenant,
 				status: query.status,
+				sort: query.sort,
+				order: query.order,
 			}),
 		)
 	})

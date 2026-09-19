@@ -24,12 +24,16 @@ async function getPage<T>(
 	return to_result<Page<T>>(await req, fallback)
 }
 
+export type DeviceSort = 'name' | 'status'
+
 export interface DeviceFilters {
 	search?: string
 	site?: number
 	rack?: number
 	tenant?: number
 	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
+	sort?: DeviceSort
+	order?: 'asc' | 'desc'
 }
 
 export async function fetch_devices(
@@ -45,6 +49,8 @@ export async function fetch_devices(
 				rack: filters?.rack === undefined ? undefined : String(filters.rack),
 				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
 				status: filters?.status,
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
 			},
 		}),
 		'Failed to load devices',
@@ -60,14 +66,45 @@ export async function create_device(input: {
 	device_type_id: number
 	name: string
 	site_id?: number | null
+	location_id?: number | null
 	rack_id?: number | null
+	face?: 'front' | 'rear' | null
 	position_u?: number | null
 	shelf_id?: number | null
 	asset_tag?: string | null
+	serial?: string
+	tenant_id?: number | null
+	description?: string
 	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
 }): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices.$post({ json: input })
 	return to_result<DeviceRow>(res, 'Failed to create device')
+}
+
+export interface DeviceUpdateInput {
+	name?: string
+	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
+	site_id?: number | null
+	location_id?: number | null
+	rack_id?: number | null
+	face?: 'front' | 'rear' | null
+	position_u?: number | null
+	shelf_id?: number | null
+	serial?: string | null
+	asset_tag?: string | null
+	tenant_id?: number | null
+	description?: string | null
+}
+
+export async function update_device(
+	id: number,
+	patch: DeviceUpdateInput,
+): Promise<Result<DeviceRow, Error>> {
+	const res = await client.devices[':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<DeviceRow>(res, 'Failed to update device')
 }
 
 export async function move_device(

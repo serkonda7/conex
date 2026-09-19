@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 /**
  * P6 smoke: login → site → rack → device → cable, then search.
  * UI-driven where the UI supports it (login, site create, device
- * instantiate, cable connect); the rack and device template go through the
+ * add, cable connect); the rack and device template go through the
  * API because they have no create form yet. Every entity is then asserted
  * visible in the UI.
  *
@@ -96,31 +96,20 @@ test('smoke: login → site → rack → device → cable', async ({ page }) => 
 		(await api('POST', `/device-types/${typeId}/stubs`, { prefix: 'eth', count: 2 })).status,
 	).toBe(201)
 
-	// Devices through the UI instantiate form (needs a template + rack).
+	// Devices through the UI add page (needs a template + rack).
 	await page.getByRole('link', { name: 'Devices' }).click()
-	const instantiate = page.locator('form', {
-		has: page.getByRole('button', { name: 'Create device' }),
-	})
-	await instantiate.locator('input[placeholder="Name"]').fill(`${tag}-a`)
-	await instantiate
-		.locator('select')
-		.nth(0)
-		.selectOption({ label: `${tag} switch (1U)` })
-	await instantiate
-		.locator('select')
-		.nth(1)
-		.selectOption({ label: `${tag} rack` })
-	await instantiate.locator('input[placeholder="U position (or empty)"]').fill('10')
-	await instantiate.getByRole('button', { name: 'Create device' }).click()
+	await page.getByRole('button', { name: '+ Add' }).click()
+	await page.locator('#device-name').fill(`${tag}-a`)
+	await page.locator('#device-type').selectOption({ label: `${tag} switch (1U)` })
+	await page.locator('#device-rack').selectOption({ label: `${tag} rack` })
+	await page.locator('#device-position').fill('10')
+	await page.getByRole('button', { name: 'Create' }).click()
 	await expect(page.locator('table').getByText(`${tag}-a`)).toBeVisible()
 
-	await instantiate.locator('input[placeholder="Name"]').fill(`${tag}-b`)
-	await instantiate
-		.locator('select')
-		.nth(0)
-		.selectOption({ label: `${tag} switch (1U)` })
-	await instantiate.locator('select').nth(1).selectOption({ label: 'Unracked' })
-	await instantiate.getByRole('button', { name: 'Create device' }).click()
+	await page.getByRole('button', { name: '+ Add' }).click()
+	await page.locator('#device-name').fill(`${tag}-b`)
+	await page.locator('#device-type').selectOption({ label: `${tag} switch (1U)` })
+	await page.getByRole('button', { name: 'Create' }).click()
 	await expect(page.locator('table').getByText(`${tag}-b`)).toBeVisible()
 
 	const devList = await api('GET', '/devices?search=&page=1&limit=200')

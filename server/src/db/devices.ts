@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
 import type {
 	DeviceCreate,
 	DeviceMove,
@@ -209,6 +209,8 @@ export interface DeviceListParams extends ListParams {
 	rack?: number
 	tenant?: number
 	status?: string
+	sort: 'name' | 'status'
+	order: 'asc' | 'desc'
 }
 
 export function listDevices(params: DeviceListParams): Page<DeviceRow> {
@@ -233,11 +235,12 @@ export function listDevices(params: DeviceListParams): Page<DeviceRow> {
 		conditions.push(eq(devices.status, params.status))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn = params.sort === 'status' ? devices.status : devices.name
 	const items = db
 		.select()
 		.from(devices)
 		.where(where)
-		.orderBy(asc(devices.name))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
@@ -304,6 +307,7 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 		site_id: input.site_id ?? null,
 		location_id: input.location_id ?? null,
 		rack_id: input.rack_id ?? null,
+		face: input.face ?? null,
 		position_u: input.position_u ?? null,
 		shelf_id: input.shelf_id ?? null,
 		status: input.status ?? 'active',
@@ -403,6 +407,9 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	}
 	if (input.rack_id !== undefined) {
 		patch.rack_id = input.rack_id
+	}
+	if (input.face !== undefined) {
+		patch.face = input.face
 	}
 	if (input.position_u !== undefined) {
 		patch.position_u = input.position_u

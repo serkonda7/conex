@@ -1,8 +1,12 @@
+import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { TraceLink } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { fetch_locations, fetch_site, fetch_tenant } from '../api_p1'
+import { fetch_rack } from '../api_p2'
+import { fetch_device_types } from '../api_p3'
 import {
 	add_interface,
 	type DeviceRow,
@@ -76,6 +80,64 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			return []
 		}
 		return res.value.items.filter((d) => d.id !== props.id)
+	})
+	const [types] = createResource(async () => {
+		const res = await fetch_device_types()
+		if (Result.isError(res)) {
+			return []
+		}
+		return res.value.items
+	})
+	const siteId = createMemo(() => device()?.site_id ?? null)
+	const [site] = createResource(siteId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_site(id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
+	})
+	const rackId = createMemo(() => device()?.rack_id ?? null)
+	const [rack] = createResource(rackId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_rack(id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
+	})
+	const locationId = createMemo(() => device()?.location_id ?? null)
+	const [locationName] = createResource(
+		() => ({ site: siteId(), location: locationId() }),
+		async ({ site: siteKey, location: locationKey }) => {
+			if (!siteKey || !locationKey) {
+				return null
+			}
+			const res = await fetch_locations(siteKey)
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return null
+			}
+			return res.value.items.find((l) => l.id === locationKey)?.name ?? null
+		},
+	)
+	const tenantId = createMemo(() => device()?.tenant_id ?? null)
+	const [tenant] = createResource(tenantId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_tenant(id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
 	})
 	const [peerIfaces] = createResource(
 		() => peerDevice(),
@@ -176,6 +238,34 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		refetchAll()
 	}
 
+	async function handleDelete(): Promise<void> {
+		const d = device()
+		if (!d) {
+			return
+		}
+		if (!window.confirm(`Delete device "${d.name}"?`)) {
+			return
+		}
+		setError(null)
+		const res = await delete_device(props.id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		navigate('/devices')
+	}
+
+	function typeNameOf(id: number | undefined): string {
+		if (id === undefined) {
+			return '—'
+		}
+		return types()?.find((t) => t.id === id)?.model ?? String(id)
+	}
+
+	const ifaceCount = (): number => ifaces()?.length ?? 0
+	const traceCount = (): number => trace()?.links.length ?? 0
+	const cableCount = (): number => cables()?.length ?? 0
+
 	return (
 		<div>
 			<p>
@@ -183,58 +273,172 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					← Devices
 				</a>
 			</p>
-			<Show when={device()} fallback={<p class="skeleton">Loading device…</p>}>
-				<h2>{device()?.name}</h2>
-				<p>
-					Status:{' '}
-					<span class={`badge badge-${device()?.status}`}>{device()?.status}</span> ·
-					Asset: {device()?.asset_tag ?? '—'} · Serial: {device()?.serial ?? '—'}
-				</p>
-				<p>
-					Mount:{' '}
-					{device()?.shelf_id ? (
-						<code>shelf:{device()?.shelf_id}</code>
-					) : device()?.position_u !== null ? (
-						<code>U{device()?.position_u}</code>
-					) : (
-						<span>unracked</span>
-					)}
-				</p>
-				<h3>Move</h3>
-				<form onSubmit={handleMove}>
-					<input
-						placeholder="U position (empty clears)"
-						inputmode="numeric"
-						value={moveU()}
-						onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}
-					/>
-					<input
-						placeholder="Shelf id (empty clears)"
-						value={moveShelf()}
-						onInput={(e: InputEventAndTarget) => setMoveShelf(e.currentTarget.value)}
-					/>
-					<button type="submit">Move</button>
-				</form>
-				<p>
-					<button
-						type="button"
-						class="btn-danger"
-						onClick={async () => {
-							setError(null)
-							const res = await delete_device(props.id)
-							if (Result.isError(res)) {
-								setError(res.error.message)
-								return
-							}
-							navigate('/devices')
-						}}
-					>
-						Delete device
-					</button>
-				</p>
+			<Show when={!device.loading} fallback={<p class="skeleton">Loading device…</p>}>
+				<Show when={device()} fallback={<p class="empty">Device not found.</p>}>
+					<div class="page-header">
+						<h2>{device()?.name}</h2>
+						<div class="form-actions">
+							<button
+								type="button"
+								onClick={() => navigate(`/devices/${props.id}/edit`)}
+							>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconPencil size={14} />
+								</span>{' '}
+								Edit
+							</button>
+							<button type="button" class="btn-danger" onClick={handleDelete}>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconTrash size={14} />
+								</span>{' '}
+								Delete
+							</button>
+						</div>
+					</div>
+					<p class="page-subtitle">{device()?.description || 'No description.'}</p>
+
+					<div class="detail-stats">
+						<a class="detail-stat" href="#device-interfaces">
+							<span class="detail-stat-value">{ifaceCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Interface{ifaceCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+						<a class="detail-stat" href="#device-trace">
+							<span class="detail-stat-value">{traceCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Trace link{traceCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+						<a class="detail-stat" href="#device-cables">
+							<span class="detail-stat-value">{cableCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Cable{cableCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+					</div>
+
+					<section class="card" aria-label="Device details">
+						<dl class="detail-grid">
+							<dt>Type</dt>
+							<dd>{typeNameOf(device()?.device_type_id)}</dd>
+							<dt>Description</dt>
+							<dd>{device()?.description || '—'}</dd>
+							<dt>Serial</dt>
+							<dd>{device()?.serial ?? '—'}</dd>
+							<dt>Site</dt>
+							<dd>
+								<Show when={siteId() !== null} fallback="—">
+									<Show
+										when={!site.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										<Show when={site()} fallback={String(siteId() ?? '—')}>
+											<a
+												href={`/sites/${siteId() ?? ''}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/sites/${siteId() ?? ''}`)
+												}
+											>
+												{site()?.name}
+											</a>
+										</Show>
+									</Show>
+								</Show>
+							</dd>
+							<dt>Location</dt>
+							<dd>
+								<Show when={locationId() !== null} fallback="—">
+									<Show
+										when={!locationName.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										{locationName() ?? String(locationId() ?? '—')}
+									</Show>
+								</Show>
+							</dd>
+							<dt>Rack</dt>
+							<dd>
+								<Show when={rackId() !== null} fallback="—">
+									<Show
+										when={!rack.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										<Show when={rack()} fallback={String(rackId() ?? '—')}>
+											<a
+												href={`/racks/${rackId() ?? ''}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/racks/${rackId() ?? ''}`)
+												}
+											>
+												{rack()?.name}
+											</a>
+										</Show>
+									</Show>
+								</Show>
+							</dd>
+							<dt>Face</dt>
+							<dd>{device()?.face ?? '—'}</dd>
+							<dt>Position</dt>
+							<dd>
+								{device()?.shelf_id ? (
+									<code>shelf:{device()?.shelf_id}</code>
+								) : device()?.position_u !== null ? (
+									<code>U{device()?.position_u}</code>
+								) : (
+									<span>unracked</span>
+								)}
+							</dd>
+							<dt>Tenant</dt>
+							<dd>
+								<Show when={tenantId() !== null} fallback="—">
+									<Show
+										when={!tenant.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										<Show when={tenant()} fallback={String(tenantId() ?? '—')}>
+											<a
+												href={`/tenants/${tenantId() ?? ''}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/tenants/${tenantId() ?? ''}`)
+												}
+											>
+												{tenant()?.name}
+											</a>
+										</Show>
+									</Show>
+								</Show>
+							</dd>
+							<dt>Status</dt>
+							<dd>
+								<span class={`badge badge-${device()?.status}`}>
+									{device()?.status}
+								</span>
+							</dd>
+							<dt>Asset tag</dt>
+							<dd>{device()?.asset_tag ?? '—'}</dd>
+						</dl>
+					</section>
+				</Show>
 			</Show>
 
-			<h3>Interfaces ({ifaces()?.length ?? 0})</h3>
+			<h3>Move</h3>
+			<form onSubmit={handleMove}>
+				<input
+					placeholder="U position (empty clears)"
+					inputmode="numeric"
+					value={moveU()}
+					onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}
+				/>
+				<input
+					placeholder="Shelf id (empty clears)"
+					value={moveShelf()}
+					onInput={(e: InputEventAndTarget) => setMoveShelf(e.currentTarget.value)}
+				/>
+				<button type="submit">Move</button>
+			</form>
+
+			<h3 id="device-interfaces">Interfaces ({ifaces()?.length ?? 0})</h3>
 			<form onSubmit={handleAddIface}>
 				<input
 					placeholder="Interface name (e.g. mgmt0)"
@@ -353,7 +557,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<button type="submit">Connect</button>
 			</form>
 
-			<h3>Trace ({trace()?.links.length ?? 0})</h3>
+			<h3 id="device-trace">Trace ({trace()?.links.length ?? 0})</h3>
 			<Show
 				when={(trace()?.links ?? []).length > 0}
 				fallback={<p class="empty">No cable path yet. Connect the first cable below.</p>}
@@ -380,7 +584,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</ul>
 			</Show>
 
-			<h3>Cables ({cables()?.length ?? 0})</h3>
+			<h3 id="device-cables">Cables ({cables()?.length ?? 0})</h3>
 			<table>
 				<thead>
 					<tr>

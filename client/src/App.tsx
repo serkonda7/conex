@@ -14,7 +14,9 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, setupAdmin } from './api_auth'
+import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
+import { DeviceEditPage } from './pages/device_edit'
 import { DevicesPage } from './pages/devices'
 import { RackDetailPage } from './pages/rack_detail'
 import { SiteAddPage } from './pages/site_add'
@@ -416,14 +418,21 @@ function App(): JSX.Element {
 		if (parts[0] === 'templates') {
 			return emptyRoute('templates')
 		}
-		if (parts[0] === 'devices' && parts.length === 1) {
+		if (parts[0] === 'devices') {
+			if (parts[1] === 'add') {
+				return emptyRoute('device-add')
+			}
+			if (parts[1]) {
+				const deviceId = parseId(parts[1])
+				if (deviceId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('device-edit'), deviceId }
+				}
+				return { ...emptyRoute('device-detail'), deviceId }
+			}
 			return emptyRoute('devices')
-		}
-		if (parts[0] === 'devices' && parts.length === 2) {
-			const deviceId = parseId(parts[1])
-			return deviceId === null
-				? emptyRoute('not-found')
-				: { ...emptyRoute('device-detail'), deviceId }
 		}
 		return emptyRoute('not-found')
 	}
@@ -589,6 +598,7 @@ function App(): JSX.Element {
 										active={path().startsWith('/devices')}
 										icon={<IconServer size={16} />}
 										label="Devices"
+										addHref="/devices/add"
 									/>
 								</nav>
 							</aside>
@@ -673,6 +683,9 @@ function App(): JSX.Element {
 									<Match when={route().page === 'devices'}>
 										<DevicesPage />
 									</Match>
+									<Match when={route().page === 'device-add'}>
+										<DeviceAddPage />
+									</Match>
 									<Match
 										when={
 											route().page === 'device-detail' &&
@@ -680,6 +693,14 @@ function App(): JSX.Element {
 										}
 									>
 										<DeviceDetailPage id={route().deviceId as number} />
+									</Match>
+									<Match
+										when={
+											route().page === 'device-edit' &&
+											route().deviceId !== null
+										}
+									>
+										<DeviceEditPage id={route().deviceId as number} />
 									</Match>
 									<Match when={route().page === 'not-found'}>
 										<p>Not found.</p>

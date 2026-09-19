@@ -497,6 +497,11 @@ const OptionalNullablePositionEntry = v.optional(
 	undefined,
 )
 
+/** Rack face a device is mounted on. Only meaningful for rack-mounted devices. */
+export const DeviceFaceSchema = v.picklist(['front', 'rear'])
+
+export type DeviceFace = v.InferOutput<typeof DeviceFaceSchema>
+
 export const DeviceCreateSchema = v.strictObject({
 	device_type_id: IdSchema,
 	name: NameSchema,
@@ -504,6 +509,7 @@ export const DeviceCreateSchema = v.strictObject({
 	site_id: NullableIdSchema,
 	location_id: NullableIdSchema,
 	rack_id: NullableIdSchema,
+	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
 	// Mount is XOR (service-enforced): position_u XOR shelf_id, never both.
 	// Unracked devices leave rack_id, position_u, and shelf_id all empty.
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
@@ -522,6 +528,7 @@ export const DeviceUpdateSchema = v.strictObject({
 	site_id: v.optional(v.nullable(IdSchema), undefined),
 	location_id: v.optional(v.nullable(IdSchema), undefined),
 	rack_id: v.optional(v.nullable(IdSchema), undefined),
+	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
 	shelf_id: v.optional(v.nullable(IdSchema), undefined),
 	serial: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
@@ -571,6 +578,8 @@ export const DeviceListQuerySchema = v.object({
 	rack: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
+	sort: v.optional(v.picklist(['name', 'status']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export const InterfaceListQuerySchema = v.object({ ...ListQueryEntries })

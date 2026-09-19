@@ -257,6 +257,9 @@ export const devices = sqliteTable(
 		site_id: integer('site_id').references(() => sites.id),
 		location_id: integer('location_id').references(() => locations.id),
 		rack_id: integer('rack_id').references(() => racks.id),
+		// Rack face the device is mounted on (`front`/`rear`); only
+		// meaningful for rack-mounted devices, otherwise null.
+		face: text('face'),
 		// Bottom-U, 1-based. Occupies position_u..position_u+u_height-1.
 		position_u: integer('position_u'),
 		shelf_id: integer('shelf_id').references(() => rack_shelves.id),
