@@ -1,5 +1,6 @@
 import {
 	IconFolder,
+	IconLocation,
 	IconLogout,
 	IconMapPin,
 	IconMoon,
@@ -18,6 +19,10 @@ import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DeviceEditPage } from './pages/device_edit'
 import { DevicesPage } from './pages/devices'
+import { LocationAddPage } from './pages/location_add'
+import { LocationDetailPage } from './pages/location_detail'
+import { LocationEditPage } from './pages/location_edit'
+import { LocationsPage } from './pages/locations'
 import { RackDetailPage } from './pages/rack_detail'
 import { SiteAddPage } from './pages/site_add'
 import { SiteDetailPage } from './pages/site_detail'
@@ -335,6 +340,7 @@ function App(): JSX.Element {
 		tenantId: number | null
 		siteId: number | null
 		siteGroupId: number | null
+		locationId: number | null
 		rackId: number | null
 		deviceId: number | null
 	} {
@@ -343,6 +349,7 @@ function App(): JSX.Element {
 			tenantId: null,
 			siteId: null,
 			siteGroupId: null,
+			locationId: null,
 			rackId: null,
 			deviceId: null,
 		}
@@ -353,6 +360,7 @@ function App(): JSX.Element {
 		tenantId: number | null
 		siteId: number | null
 		siteGroupId: number | null
+		locationId: number | null
 		rackId: number | null
 		deviceId: number | null
 	} {
@@ -408,6 +416,22 @@ function App(): JSX.Element {
 				return { ...emptyRoute('site-group-detail'), siteGroupId }
 			}
 			return emptyRoute('site-groups')
+		}
+		if (parts[0] === 'locations') {
+			if (parts[1] === 'add') {
+				return emptyRoute('location-add')
+			}
+			if (parts[1]) {
+				const locationId = parseId(parts[1])
+				if (locationId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('location-edit'), locationId }
+				}
+				return { ...emptyRoute('location-detail'), locationId }
+			}
+			return emptyRoute('locations')
 		}
 		if (parts[0] === 'racks' && parts.length === 2) {
 			const rackId = parseId(parts[1])
@@ -588,6 +612,13 @@ function App(): JSX.Element {
 										addHref="/sites/add"
 									/>
 									<NavItem
+										href="/locations"
+										active={path().startsWith('/locations')}
+										icon={<IconLocation size={16} />}
+										label="Locations"
+										addHref="/locations/add"
+									/>
+									<NavItem
 										href="/templates"
 										active={path().startsWith('/templates')}
 										icon={<IconTemplate size={16} />}
@@ -646,6 +677,28 @@ function App(): JSX.Element {
 										}
 									>
 										<SiteEditPage id={route().siteId as number} />
+									</Match>
+									<Match when={route().page === 'locations'}>
+										<LocationsPage />
+									</Match>
+									<Match when={route().page === 'location-add'}>
+										<LocationAddPage />
+									</Match>
+									<Match
+										when={
+											route().page === 'location-detail' &&
+											route().locationId !== null
+										}
+									>
+										<LocationDetailPage id={route().locationId as number} />
+									</Match>
+									<Match
+										when={
+											route().page === 'location-edit' &&
+											route().locationId !== null
+										}
+									>
+										<LocationEditPage id={route().locationId as number} />
 									</Match>
 									<Match when={route().page === 'site-groups'}>
 										<SiteGroupsPage />

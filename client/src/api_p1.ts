@@ -212,28 +212,81 @@ export async function delete_site(id: number): Promise<Result<unknown, Error>> {
 // Locations
 // ---------------------------------------------------------------------------
 
-export async function fetch_locations(site: number): Promise<Result<Page<LocationRow>, Error>> {
+export interface LocationFilters {
+	search?: string
+	page?: number
+	limit?: number
+	site?: number
+	tenant?: number
+	parent?: number
+}
+
+export interface LocationCreateInput {
+	name: string
+	slug: string
+	site_id: number
+	parent_id: number | null
+	tenant_id?: number | null
+	description?: string
+}
+
+export interface LocationUpdateInput {
+	name?: string
+	slug?: string
+	parent_id?: number | null
+	tenant_id?: number | null
+	description?: string | null
+}
+
+export async function fetch_locations(
+	filters?: LocationFilters | number,
+): Promise<Result<Page<LocationRow>, Error>> {
+	const f: LocationFilters = typeof filters === 'number' ? { site: filters } : (filters ?? {})
 	return getPage<LocationRow>(
 		client.locations.$get({
 			query: {
-				search: '',
-				page: '1',
-				limit: '200',
-				site: site === undefined ? undefined : String(site),
+				search: f.search ?? '',
+				page: String(f.page ?? 1),
+				limit: String(f.limit ?? 200),
+				site: f.site === undefined ? undefined : String(f.site),
+				tenant: f.tenant === undefined ? undefined : String(f.tenant),
+				parent: f.parent === undefined ? undefined : String(f.parent),
 			},
 		}),
 		'Failed to load locations',
 	)
 }
 
+export async function fetch_location(id: number): Promise<Result<LocationRow, Error>> {
+	const res = await client.locations[':id'].$get({ param: { id: String(id) } })
+	return to_result<LocationRow>(res, 'Failed to load location')
+}
+
 export async function create_location(
-	name: string,
-	slug: string,
-	site_id: number,
-	parent_id: number | null,
+	input: LocationCreateInput,
 ): Promise<Result<LocationRow, Error>> {
-	const res = await client.locations.$post({ json: { name, slug, site_id, parent_id } })
+	const res = await client.locations.$post({
+		json: {
+			name: input.name,
+			slug: input.slug,
+			site_id: input.site_id,
+			parent_id: input.parent_id,
+			tenant_id: input.tenant_id ?? null,
+			description: input.description || undefined,
+		},
+	})
 	return to_result<LocationRow>(res, 'Failed to create location')
+}
+
+export async function update_location(
+	id: number,
+	patch: LocationUpdateInput,
+): Promise<Result<LocationRow, Error>> {
+	const res = await client.locations[':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<LocationRow>(res, 'Failed to update location')
 }
 
 export async function delete_location(id: number): Promise<Result<unknown, Error>> {

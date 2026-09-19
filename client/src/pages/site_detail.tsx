@@ -163,12 +163,12 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
-		const res = await create_location(
-			name(),
-			slug(),
-			props.id,
-			parentId() ? Number(parentId()) : null,
-		)
+		const res = await create_location({
+			name: name(),
+			slug: slug(),
+			site_id: props.id,
+			parent_id: parentId() ? Number(parentId()) : null,
+		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
