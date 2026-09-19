@@ -4,34 +4,8 @@
 	box-sizing: border-box;
 }
 
-/* MakerWorld-inspired palette. Light mirrors MakerWorld's white/gray/green,
-   dark mirrors its #1c1c1c base / #242424 surface / #2e2e2e raised scheme. */
+/* MakerWorld-inspired dark palette. */
 :root {
-	color-scheme: light;
-	--bg-base: #f7f7f7;
-	--bg-default: #eeeeee;
-	--bg-surface: #ffffff;
-	--bg-raised: #ffffff;
-	--bg-input: #ffffff;
-	--bg-code: #f2f2f2;
-	--bg-hover: #f0f0f0;
-	--text: #1f1f1f;
-	--text-secondary: #616161;
-	--text-muted: #919eab;
-	--border: #e0e0e0;
-	--border-strong: #c4cdd5;
-	--primary: #00ae42;
-	--primary-hover: #007b55;
-	--primary-contrast: #ffffff;
-	--link: #0e65e9;
-	--error: #b00020;
-	--error-bg: #fae2e2;
-	--success: #00ae42;
-	--muted-dot: #919eab;
-	--shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 3px 8px rgba(0, 0, 0, 0.12);
-}
-
-:root[data-theme="dark"] {
 	color-scheme: dark;
 	--bg-base: #1c1c1c;
 	--bg-default: #222225;
@@ -699,28 +673,6 @@ tbody tr:last-child td {
 	align-items: center;
 	justify-content: space-between;
 	gap: 0.75rem;
-}
-
-.theme-toggle {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-	white-space: nowrap;
-}
-
-.theme-toggle svg {
-	display: block;
-	flex-shrink: 0;
-}
-
-.theme-toggle--icon {
-	padding: 0.34rem;
-	border: none;
-	background: transparent;
-}
-
-.theme-toggle--icon:hover {
-	background-color: var(--bg-hover);
 }
 
 .status-dot-connected {

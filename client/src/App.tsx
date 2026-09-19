@@ -5,10 +5,8 @@ import {
 	IconLocation,
 	IconLogout,
 	IconMapPin,
-	IconMoon,
 	IconPlus,
 	IconServer,
-	IconSun,
 	IconTemplate,
 	IconUsers,
 } from '@tabler/icons-solidjs'
@@ -47,23 +45,10 @@ import { TenantDetailPage } from './pages/tenant_detail'
 import { TenantEditPage } from './pages/tenant_edit'
 import { TenantsPage } from './pages/tenants'
 import { navigate, parseId, path } from './router'
-import { initTheme, theme, toggleTheme } from './theme'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
 	navigate(to)
-}
-
-function ThemeIcon(): JSX.Element {
-	// NOTE: must use <Show>, not a body-level ternary. In dev, solid-refresh
-	// runs component bodies untracked, so `theme() === ... ? <A/> : <B/>`
-	// would render once and never swap. <Show> reads `when` in its own
-	// tracked context and updates in both dev and prod.
-	return (
-		<Show when={theme() === 'dark'} fallback={<IconMoon size={16} />}>
-			<IconSun size={16} />
-		</Show>
-	)
 }
 
 function LoginForm(props: {
@@ -257,7 +242,6 @@ function App(): JSX.Element {
 	const [userMenuOpen, setUserMenuOpen] = createSignal(false)
 
 	onMount(async () => {
-		initTheme()
 		const [me, setupNeeded] = await Promise.all([fetchMe(), fetchSetupStatus()])
 		// A fresh database reports needsSetup; an unreachable setup endpoint
 		// (null) falls back to the login form.
@@ -518,15 +502,6 @@ function App(): JSX.Element {
 							<div class="app-auth">
 								<div class="app-header">
 									<h1>Conex</h1>
-									<button
-										type="button"
-										class="theme-toggle"
-										onClick={toggleTheme}
-										title={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
-										aria-label={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
-									>
-										<ThemeIcon /> {theme() === 'dark' ? 'Light' : 'Dark'}
-									</button>
 								</div>
 								<SetupForm
 									email={setupEmail}
@@ -546,15 +521,6 @@ function App(): JSX.Element {
 							<div class="app-auth">
 								<div class="app-header">
 									<h1>Conex</h1>
-									<button
-										type="button"
-										class="theme-toggle"
-										onClick={toggleTheme}
-										title={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
-										aria-label={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
-									>
-										<ThemeIcon /> {theme() === 'dark' ? 'Light' : 'Dark'}
-									</button>
 								</div>
 								<LoginForm
 									email={email}
@@ -577,15 +543,6 @@ function App(): JSX.Element {
 								Conex
 							</a>
 							<div class="app-topbar-actions">
-								<button
-									type="button"
-									class="theme-toggle theme-toggle--icon"
-									onClick={toggleTheme}
-									title={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
-									aria-label={`Switch to ${theme() === 'dark' ? 'light' : 'dark'} mode`}
-								>
-									<ThemeIcon />
-								</button>
 								<div class="app-user-menu">
 									<button
 										type="button"
