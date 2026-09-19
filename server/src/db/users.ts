@@ -12,15 +12,26 @@ export function getUserByEmail(email: string): User | null {
 
 export function createLocalUser(email: string, passwordHash: string): User {
 	const normalizedEmail = normalize_email(email)
-	const user: User = {
-		id: Bun.randomUUIDv7(),
+	const inserted = getDb()
+		.insert(users)
+		.values({
+			email: normalizedEmail,
+			password_hash: passwordHash,
+			provider: 'local',
+			provider_id: null,
+		})
+		.returning({ id: users.id })
+		.get()
+	if (!inserted) {
+		throw new Error('User insert did not return an id')
+	}
+	return {
+		id: inserted.id,
 		email: normalizedEmail,
 		password_hash: passwordHash,
 		provider: 'local',
 		provider_id: null,
 	}
-	getDb().insert(users).values(user).run()
-	return user
 }
 
 /** True when at least one user exists. Drives first-run setup gating. */

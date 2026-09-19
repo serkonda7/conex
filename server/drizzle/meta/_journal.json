@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1789741011076,
-      "tag": "0000_early_fantastic_four",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1789741315820,
-      "tag": "0001_jittery_roland_deschain",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1789741788078,
-      "tag": "0002_nebulous_bloodscream",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1789742095852,
-      "tag": "0003_glossy_tyger_tiger",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1789742392095,
-      "tag": "0004_tough_lenny_balinger",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1789742720813,
-      "tag": "0005_dark_luke_cage",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1789753227372,
-      "tag": "0006_exotic_black_crow",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1789768085562,
-      "tag": "0007_worthless_wallow",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1789769025315,
-      "tag": "0008_remarkable_onslaught",
+      "when": 1789776189651,
+      "tag": "0000_integer_ids",
       "breakpoints": true
     }
   ]

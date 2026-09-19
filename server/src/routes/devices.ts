@@ -157,6 +157,7 @@ export const devicesApp = new Hono()
 			const result = connectCable({
 				a_interface_id: param.ifaceId,
 				b_interface_id: c.req.valid('json').peer_interface_id,
+				status: 'connected',
 			})
 			if (Result.isOk(result)) {
 				return c.json(result.value, 201)

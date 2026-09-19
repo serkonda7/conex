@@ -33,10 +33,6 @@ function searchPattern(raw: string): string {
 	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
-function newId(): string {
-	return Bun.randomUUIDv7()
-}
-
 // ---------------------------------------------------------------------------
 // Manufacturers
 // ---------------------------------------------------------------------------
@@ -59,7 +55,7 @@ export function listManufacturers(params: ListParams): Page<ManufacturerRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getManufacturer(id: string): Result<ManufacturerRow, Error> {
+export function getManufacturer(id: number): Result<ManufacturerRow, Error> {
 	const row = getDb().select().from(manufacturers).where(eq(manufacturers.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Manufacturer not found'))
@@ -75,25 +71,31 @@ export function createManufacturer(input: ManufacturerCreate): Result<Manufactur
 	if (db.select().from(manufacturers).where(eq(manufacturers.name, input.name)).get()) {
 		return Result.err(new DuplicateError('Manufacturer name is already in use'))
 	}
-	const row: ManufacturerRow = {
-		id: newId(),
+	const row: Omit<ManufacturerRow, 'id'> = {
 		name: input.name,
 		slug: input.slug,
 		description: input.description ?? null,
 	}
 	try {
-		db.insert(manufacturers).values(row).run()
+		const inserted = db
+			.insert(manufacturers)
+			.values(row)
+			.returning({ id: manufacturers.id })
+			.get()
+		if (!inserted) {
+			return Result.err(new Error('Manufacturer insert did not return an id'))
+		}
+		return getManufacturer(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Manufacturer slug or name is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
 export function updateManufacturer(
-	id: string,
+	id: number,
 	input: ManufacturerUpdate,
 ): Result<ManufacturerRow, Error> {
 	const current = getManufacturer(id)
@@ -134,7 +136,7 @@ export function updateManufacturer(
 	return getManufacturer(id)
 }
 
-export function deleteManufacturer(id: string): Result<ManufacturerRow, Error> {
+export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
 	const current = getManufacturer(id)
 	if (Result.isError(current)) {
 		return current
@@ -158,7 +160,7 @@ export function deleteManufacturer(id: string): Result<ManufacturerRow, Error> {
 // ---------------------------------------------------------------------------
 
 export interface DeviceTypeListParams extends ListParams {
-	manufacturer?: string
+	manufacturer?: number
 }
 
 export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRow> {
@@ -186,7 +188,7 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getDeviceType(id: string): Result<DeviceTypeRow, Error> {
+export function getDeviceType(id: number): Result<DeviceTypeRow, Error> {
 	const row = getDb().select().from(device_types).where(eq(device_types.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Device type not found'))
@@ -202,8 +204,7 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 	if (db.select().from(device_types).where(eq(device_types.slug, input.slug)).get()) {
 		return Result.err(new DuplicateError('Device type slug is already in use'))
 	}
-	const row: DeviceTypeRow = {
-		id: newId(),
+	const row: Omit<DeviceTypeRow, 'id'> = {
 		manufacturer_id: input.manufacturer_id,
 		model: input.model,
 		slug: input.slug,
@@ -211,18 +212,25 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		description: input.description ?? null,
 	}
 	try {
-		db.insert(device_types).values(row).run()
+		const inserted = db
+			.insert(device_types)
+			.values(row)
+			.returning({ id: device_types.id })
+			.get()
+		if (!inserted) {
+			return Result.err(new Error('Device type insert did not return an id'))
+		}
+		return getDeviceType(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Device type slug is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
 export function updateDeviceType(
-	id: string,
+	id: number,
 	input: DeviceTypeUpdate,
 ): Result<DeviceTypeRow, Error> {
 	const current = getDeviceType(id)
@@ -275,7 +283,7 @@ export function updateDeviceType(
 	return getDeviceType(id)
 }
 
-export function deleteDeviceType(id: string): Result<DeviceTypeRow, Error> {
+export function deleteDeviceType(id: number): Result<DeviceTypeRow, Error> {
 	const current = getDeviceType(id)
 	if (Result.isError(current)) {
 		return current
@@ -296,7 +304,7 @@ export function deleteDeviceType(id: string): Result<DeviceTypeRow, Error> {
 // Stub rows
 // ---------------------------------------------------------------------------
 
-export function listStubs(deviceTypeId: string): Result<StubRow[], Error> {
+export function listStubs(deviceTypeId: number): Result<StubRow[], Error> {
 	const current = getDeviceType(deviceTypeId)
 	if (Result.isError(current)) {
 		return Result.err(current.error)
@@ -310,7 +318,7 @@ export function listStubs(deviceTypeId: string): Result<StubRow[], Error> {
 	return Result.ok(rows)
 }
 
-export function getStub(id: string): Result<StubRow, Error> {
+export function getStub(id: number): Result<StubRow, Error> {
 	const row = getDb()
 		.select()
 		.from(device_type_interfaces)
@@ -327,9 +335,9 @@ export function getStub(id: string): Result<StubRow, Error> {
  * of the same device type. `excludeId` skips the row being updated.
  */
 function checkStubExpansion(
-	deviceTypeId: string,
+	deviceTypeId: number,
 	candidate: { prefix: string; count: number; kind: string; label?: string | null },
-	excludeId?: string,
+	excludeId?: number,
 ): Result<undefined, Error> {
 	const db = getDb()
 	const siblings = db
@@ -353,7 +361,7 @@ function checkStubExpansion(
 	return Result.ok(undefined)
 }
 
-export function createStub(deviceTypeId: string, input: StubCreate): Result<StubRow, Error> {
+export function createStub(deviceTypeId: number, input: StubCreate): Result<StubRow, Error> {
 	const current = getDeviceType(deviceTypeId)
 	if (Result.isError(current)) {
 		return Result.err(current.error)
@@ -368,8 +376,7 @@ export function createStub(deviceTypeId: string, input: StubCreate): Result<Stub
 	if (Result.isError(clash)) {
 		return Result.err(clash.error)
 	}
-	const row: StubRow = {
-		id: newId(),
+	const row: Omit<StubRow, 'id'> = {
 		device_type_id: deviceTypeId,
 		prefix: candidate.prefix,
 		count: candidate.count,
@@ -377,7 +384,15 @@ export function createStub(deviceTypeId: string, input: StubCreate): Result<Stub
 		label: candidate.label,
 	}
 	try {
-		getDb().insert(device_type_interfaces).values(row).run()
+		const inserted = getDb()
+			.insert(device_type_interfaces)
+			.values(row)
+			.returning({ id: device_type_interfaces.id })
+			.get()
+		if (!inserted) {
+			return Result.err(new Error('Stub insert did not return an id'))
+		}
+		return getStub(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -386,10 +401,9 @@ export function createStub(deviceTypeId: string, input: StubCreate): Result<Stub
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
-export function updateStub(id: string, input: StubUpdate): Result<StubRow, Error> {
+export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error> {
 	const current = getStub(id)
 	if (Result.isError(current)) {
 		return current
@@ -439,7 +453,7 @@ export function updateStub(id: string, input: StubUpdate): Result<StubRow, Error
 	return getStub(id)
 }
 
-export function deleteStub(id: string): Result<StubRow, Error> {
+export function deleteStub(id: number): Result<StubRow, Error> {
 	const current = getStub(id)
 	if (Result.isError(current)) {
 		return current
@@ -453,7 +467,7 @@ export function deleteStub(id: string): Result<StubRow, Error> {
 // ---------------------------------------------------------------------------
 
 /** Expands the stored stubs of a device type into concrete interface names. */
-export function previewDeviceType(id: string): Result<StubPreviewResponse, Error> {
+export function previewDeviceType(id: number): Result<StubPreviewResponse, Error> {
 	const stubs = listStubs(id)
 	if (Result.isError(stubs)) {
 		return Result.err(stubs.error)

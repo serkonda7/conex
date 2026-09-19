@@ -9,8 +9,12 @@ import {
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
+//
+// Ids are SQLite autoincrement integers (human readable in URLs and UIs).
+// Session ids and auth-state values stay opaque random strings: they are
+// credentials, not entity references.
 export const users = sqliteTable('users', {
-	id: text('id').primaryKey(),
+	id: integer('id').primaryKey({ autoIncrement: true }),
 	email: text('email').notNull().unique(),
 	password_hash: text('password_hash'),
 	provider: text('provider').notNull().default('local'),
@@ -21,7 +25,7 @@ export const sessions = sqliteTable(
 	'sessions',
 	{
 		id: text('id').primaryKey(),
-		user_id: text('user_id')
+		user_id: integer('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		created_at: integer('created_at').notNull(),
@@ -50,7 +54,7 @@ export const auth_states = sqliteTable(
 export const tenants = sqliteTable(
 	'tenants',
 	{
-		id: text('id').primaryKey(),
+		id: integer('id').primaryKey({ autoIncrement: true }),
 		name: text('name').notNull(),
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
@@ -62,8 +66,8 @@ export const tenants = sqliteTable(
 export const sites = sqliteTable(
 	'sites',
 	{
-		id: text('id').primaryKey(),
-		tenant_id: text('tenant_id').references(() => tenants.id),
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		tenant_id: integer('tenant_id').references(() => tenants.id),
 		name: text('name').notNull(),
 		slug: text('slug').notNull().unique(),
 		// v1 keeps the site group as a free-form label, not a FK.
@@ -79,12 +83,12 @@ export const sites = sqliteTable(
 export const locations = sqliteTable(
 	'locations',
 	{
-		id: text('id').primaryKey(),
-		site_id: text('site_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		site_id: integer('site_id')
 			.notNull()
 			.references(() => sites.id),
-		parent_id: text('parent_id').references((): AnySQLiteColumn => locations.id),
-		tenant_id: text('tenant_id').references(() => tenants.id),
+		parent_id: integer('parent_id').references((): AnySQLiteColumn => locations.id),
+		tenant_id: integer('tenant_id').references(() => tenants.id),
 		name: text('name').notNull(),
 		// Slug is unique per parent (service-enforced; SQLite treats NULL
 		// parents as distinct so a composite unique index cannot cover roots).
@@ -109,12 +113,12 @@ export const locations = sqliteTable(
 export const racks = sqliteTable(
 	'racks',
 	{
-		id: text('id').primaryKey(),
-		site_id: text('site_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		site_id: integer('site_id')
 			.notNull()
 			.references(() => sites.id),
-		location_id: text('location_id').references(() => locations.id),
-		tenant_id: text('tenant_id').references(() => tenants.id),
+		location_id: integer('location_id').references(() => locations.id),
+		tenant_id: integer('tenant_id').references(() => tenants.id),
 		name: text('name').notNull(),
 		// v1 keeps the slug globally unique (same as sites); per-site scoping
 		// can replace this when rack counts grow.
@@ -133,8 +137,8 @@ export const racks = sqliteTable(
 export const rack_shelves = sqliteTable(
 	'rack_shelves',
 	{
-		id: text('id').primaryKey(),
-		rack_id: text('rack_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		rack_id: integer('rack_id')
 			.notNull()
 			.references(() => racks.id),
 		name: text('name').notNull(),
@@ -160,7 +164,7 @@ export const rack_shelves = sqliteTable(
 export const manufacturers = sqliteTable(
 	'manufacturers',
 	{
-		id: text('id').primaryKey(),
+		id: integer('id').primaryKey({ autoIncrement: true }),
 		name: text('name').notNull().unique(),
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
@@ -171,8 +175,8 @@ export const manufacturers = sqliteTable(
 export const device_types = sqliteTable(
 	'device_types',
 	{
-		id: text('id').primaryKey(),
-		manufacturer_id: text('manufacturer_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		manufacturer_id: integer('manufacturer_id')
 			.notNull()
 			.references(() => manufacturers.id),
 		model: text('model').notNull(),
@@ -191,8 +195,8 @@ export const device_types = sqliteTable(
 export const device_type_interfaces = sqliteTable(
 	'device_type_interfaces',
 	{
-		id: text('id').primaryKey(),
-		device_type_id: text('device_type_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		device_type_id: integer('device_type_id')
 			.notNull()
 			.references(() => device_types.id),
 		prefix: text('prefix').notNull(),
@@ -224,21 +228,21 @@ export const device_type_interfaces = sqliteTable(
 export const devices = sqliteTable(
 	'devices',
 	{
-		id: text('id').primaryKey(),
-		device_type_id: text('device_type_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		device_type_id: integer('device_type_id')
 			.notNull()
 			.references(() => device_types.id),
-		site_id: text('site_id').references(() => sites.id),
-		location_id: text('location_id').references(() => locations.id),
-		rack_id: text('rack_id').references(() => racks.id),
+		site_id: integer('site_id').references(() => sites.id),
+		location_id: integer('location_id').references(() => locations.id),
+		rack_id: integer('rack_id').references(() => racks.id),
 		// Bottom-U, 1-based. Occupies position_u..position_u+u_height-1.
 		position_u: integer('position_u'),
-		shelf_id: text('shelf_id').references(() => rack_shelves.id),
+		shelf_id: integer('shelf_id').references(() => rack_shelves.id),
 		status: text('status').notNull().default('active'),
 		name: text('name').notNull(),
 		serial: text('serial'),
 		asset_tag: text('asset_tag').unique(),
-		tenant_id: text('tenant_id').references(() => tenants.id),
+		tenant_id: integer('tenant_id').references(() => tenants.id),
 		description: text('description'),
 	},
 	(table) => [
@@ -255,8 +259,8 @@ export const devices = sqliteTable(
 export const interfaces = sqliteTable(
 	'interfaces',
 	{
-		id: text('id').primaryKey(),
-		device_id: text('device_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		device_id: integer('device_id')
 			.notNull()
 			.references(() => devices.id),
 		name: text('name').notNull(),
@@ -282,12 +286,12 @@ export const interfaces = sqliteTable(
 export const cables = sqliteTable(
 	'cables',
 	{
-		id: text('id').primaryKey(),
-		a_interface_id: text('a_interface_id')
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		a_interface_id: integer('a_interface_id')
 			.notNull()
 			.unique()
 			.references(() => interfaces.id),
-		b_interface_id: text('b_interface_id')
+		b_interface_id: integer('b_interface_id')
 			.notNull()
 			.unique()
 			.references(() => interfaces.id),

@@ -24,7 +24,7 @@ interface TreeNode {
 
 /** Nests the flat location list into a forest ordered by name. */
 function buildTree(rows: LocationRow[]): TreeNode[] {
-	const byId = new Map<string, TreeNode>()
+	const byId = new Map<number, TreeNode>()
 	for (const row of rows) {
 		byId.set(row.id, { row, children: [] })
 	}
@@ -48,7 +48,7 @@ function buildTree(rows: LocationRow[]): TreeNode[] {
 function LocationBranch(props: {
 	node: TreeNode
 	trail: string[]
-	onDelete: (id: string) => void
+	onDelete: (id: number) => void
 }): JSX.Element {
 	const trail = [...props.trail, props.node.row.name]
 	return (
@@ -75,7 +75,7 @@ function LocationBranch(props: {
 }
 
 /** /sites/:id — site detail with the location tree and per-node breadcrumbs. */
-export function SiteDetailPage(props: { id: string }): JSX.Element {
+export function SiteDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
@@ -102,7 +102,12 @@ export function SiteDetailPage(props: { id: string }): JSX.Element {
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
-		const res = await create_location(name(), slug(), props.id, parentId() || null)
+		const res = await create_location(
+			name(),
+			slug(),
+			props.id,
+			parentId() ? Number(parentId()) : null,
+		)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
@@ -113,7 +118,7 @@ export function SiteDetailPage(props: { id: string }): JSX.Element {
 		void refetch()
 	}
 
-	async function handleDelete(id: string): Promise<void> {
+	async function handleDelete(id: number): Promise<void> {
 		setError(null)
 		const res = await delete_location(id)
 		if (Result.isError(res)) {

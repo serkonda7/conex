@@ -15,8 +15,8 @@ export type { CableRow, DeviceTraceResponse }
 export interface CableFilters {
 	search?: string
 	status?: 'connected' | 'planned' | 'decommissioned'
-	device?: string
-	iface?: string
+	device?: number
+	iface?: number
 }
 
 export async function fetch_cables(filters?: CableFilters): Promise<Result<Page<CableRow>, Error>> {
@@ -26,16 +26,16 @@ export async function fetch_cables(filters?: CableFilters): Promise<Result<Page<
 			page: '1',
 			limit: '200',
 			status: filters?.status,
-			interface: filters?.iface,
-			device: filters?.device,
+			interface: filters?.iface === undefined ? undefined : String(filters.iface),
+			device: filters?.device === undefined ? undefined : String(filters.device),
 		},
 	})
 	return to_result<Page<CableRow>>(res, 'Failed to load cables')
 }
 
 export async function create_cable(input: {
-	a_interface_id: string
-	b_interface_id: string
+	a_interface_id: number
+	b_interface_id: number
 	label?: string
 	kind?: string
 	status?: 'connected' | 'planned' | 'decommissioned'
@@ -44,26 +44,26 @@ export async function create_cable(input: {
 	return to_result<CableRow>(res, 'Failed to create cable')
 }
 
-export async function delete_cable(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.cables[':id'].$delete({ param: { id } })
+export async function delete_cable(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.cables[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete cable')
 }
 
 export async function connect_interface(
-	deviceId: string,
-	ifaceId: string,
-	peerInterfaceId: string,
+	deviceId: number,
+	ifaceId: number,
+	peerInterfaceId: number,
 ): Promise<Result<CableRow, Error>> {
 	const res = await client.devices[':id'].interfaces[':ifaceId'].connect.$post({
-		param: { id: deviceId, ifaceId },
+		param: { id: String(deviceId), ifaceId: String(ifaceId) },
 		json: { peer_interface_id: peerInterfaceId },
 	})
 	return to_result<CableRow>(res, 'Failed to connect interface')
 }
 
-export async function fetch_trace(deviceId: string): Promise<Result<DeviceTraceResponse, Error>> {
+export async function fetch_trace(deviceId: number): Promise<Result<DeviceTraceResponse, Error>> {
 	const res: ApiResponse = await client.devices[':id'].trace.$get({
-		param: { id: deviceId },
+		param: { id: String(deviceId) },
 	})
 	return to_result<DeviceTraceResponse>(res, 'Failed to load trace')
 }

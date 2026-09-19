@@ -35,7 +35,7 @@ export function TemplatesPage(): JSX.Element {
 	const [stubPrefix, setStubPrefix] = createSignal('')
 	const [stubCount, setStubCount] = createSignal('24')
 	const [previewNames, setPreviewNames] = createSignal<string[]>([])
-	const [selectedType, setSelectedType] = createSignal<string | null>(null)
+	const [selectedType, setSelectedType] = createSignal<number | null>(null)
 
 	const [manufacturers, { refetch: refetchMfrs }] = createResource(async () => {
 		const res = await fetch_manufacturers()
@@ -66,11 +66,11 @@ export function TemplatesPage(): JSX.Element {
 		return res.value
 	})
 
-	function mfrNameOf(id: string): string {
-		return manufacturers()?.find((m) => m.id === id)?.name ?? id.slice(0, 8)
+	function mfrNameOf(id: number): string {
+		return manufacturers()?.find((m) => m.id === id)?.name ?? String(id)
 	}
 
-	async function refreshPreview(typeId: string): Promise<void> {
+	async function refreshPreview(typeId: number): Promise<void> {
 		const res = await fetch_type_preview(typeId)
 		if (Result.isError(res)) {
 			setError(res.error.message)
@@ -101,7 +101,7 @@ export function TemplatesPage(): JSX.Element {
 			return
 		}
 		const res = await create_device_type({
-			manufacturer_id: typeMfr(),
+			manufacturer_id: Number(typeMfr()),
 			model: typeModel(),
 			slug: typeSlug(),
 			u_height: height,
@@ -155,14 +155,14 @@ export function TemplatesPage(): JSX.Element {
 		setPreviewNames(res.value.interfaces.map((i) => i.name))
 	}
 
-	async function handleSelectType(id: string): Promise<void> {
+	async function handleSelectType(id: number): Promise<void> {
 		setSelectedType(id)
 		setError(null)
 		void refetchStubs()
 		void refreshPreview(id)
 	}
 
-	async function handleDeleteStub(stubId: string): Promise<void> {
+	async function handleDeleteStub(stubId: number): Promise<void> {
 		const typeId = selectedType()
 		if (!typeId) {
 			return
@@ -180,7 +180,6 @@ export function TemplatesPage(): JSX.Element {
 	return (
 		<div>
 			<h2>Manufacturers</h2>
-			<p class="page-subtitle">Hardware vendors for device-type templates.</p>
 			<form onSubmit={handleCreateMfr}>
 				<input
 					placeholder="Name"

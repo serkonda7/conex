@@ -30,9 +30,9 @@ async function getPage<T>(
 // ---------------------------------------------------------------------------
 
 export async function fetch_racks(filters?: {
-	site?: string
-	location?: string
-	tenant?: string
+	site?: number
+	location?: number
+	tenant?: number
 }): Promise<Result<Page<RackRow>, Error>> {
 	return getPage<RackRow>(
 		client.racks.$get({
@@ -40,39 +40,39 @@ export async function fetch_racks(filters?: {
 				search: '',
 				page: '1',
 				limit: '200',
-				site: filters?.site,
-				location: filters?.location,
-				tenant: filters?.tenant,
+				site: filters?.site === undefined ? undefined : String(filters.site),
+				location: filters?.location === undefined ? undefined : String(filters.location),
+				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
 			},
 		}),
 		'Failed to load racks',
 	)
 }
 
-export async function fetch_rack(id: string): Promise<Result<RackRow, Error>> {
-	const res = await client.racks[':id'].$get({ param: { id } })
+export async function fetch_rack(id: number): Promise<Result<RackRow, Error>> {
+	const res = await client.racks[':id'].$get({ param: { id: String(id) } })
 	return to_result<RackRow>(res, 'Failed to load rack')
 }
 
-export async function fetch_elevation(id: string): Promise<Result<ElevationResponse, Error>> {
-	const res = await client.racks[':id'].elevation.$get({ param: { id } })
+export async function fetch_elevation(id: number): Promise<Result<ElevationResponse, Error>> {
+	const res = await client.racks[':id'].elevation.$get({ param: { id: String(id) } })
 	return to_result<ElevationResponse>(res, 'Failed to load rack elevation')
 }
 
 export async function create_rack(input: {
 	name: string
 	slug: string
-	site_id: string
-	location_id: string | null
-	tenant_id: string | null
+	site_id: number
+	location_id: number | null
+	tenant_id: number | null
 	height_u?: number
 }): Promise<Result<RackRow, Error>> {
 	const res = await client.racks.$post({ json: input })
 	return to_result<RackRow>(res, 'Failed to create rack')
 }
 
-export async function delete_rack(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.racks[':id'].$delete({ param: { id } })
+export async function delete_rack(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.racks[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete rack')
 }
 
@@ -80,16 +80,23 @@ export async function delete_rack(id: string): Promise<Result<unknown, Error>> {
 // Shelves
 // ---------------------------------------------------------------------------
 
-export async function fetch_shelves(rack: string): Promise<Result<Page<ShelfRow>, Error>> {
+export async function fetch_shelves(rack: number): Promise<Result<Page<ShelfRow>, Error>> {
 	return getPage<ShelfRow>(
-		client.shelves.$get({ query: { search: '', page: '1', limit: '200', rack } }),
+		client.shelves.$get({
+			query: {
+				search: '',
+				page: '1',
+				limit: '200',
+				rack: rack === undefined ? undefined : String(rack),
+			},
+		}),
 		'Failed to load shelves',
 	)
 }
 
 export async function create_shelf(input: {
 	name: string
-	rack_id: string
+	rack_id: number
 	position_u: number
 	height_u?: number
 }): Promise<Result<ShelfRow, Error>> {
@@ -97,7 +104,7 @@ export async function create_shelf(input: {
 	return to_result<ShelfRow>(res, 'Failed to create shelf')
 }
 
-export async function delete_shelf(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.shelves[':id'].$delete({ param: { id } })
+export async function delete_shelf(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.shelves[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete shelf')
 }

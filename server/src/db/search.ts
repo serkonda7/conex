@@ -8,11 +8,11 @@ export interface SearchGroup<T> {
 
 export interface GlobalSearchResponse {
 	q: string
-	tenants: SearchGroup<{ id: string; name: string; slug: string }>
-	sites: SearchGroup<{ id: string; name: string; slug: string }>
-	racks: SearchGroup<{ id: string; name: string; slug: string }>
-	devices: SearchGroup<{ id: string; name: string; asset_tag: string | null }>
-	cables: SearchGroup<{ id: string; label: string | null; kind: string | null }>
+	tenants: SearchGroup<{ id: number; name: string; slug: string }>
+	sites: SearchGroup<{ id: number; name: string; slug: string }>
+	racks: SearchGroup<{ id: number; name: string; slug: string }>
+	devices: SearchGroup<{ id: number; name: string; asset_tag: string | null }>
+	cables: SearchGroup<{ id: number; label: string | null; kind: string | null }>
 }
 
 const GROUP_LIMIT = 10
@@ -45,21 +45,21 @@ export function globalSearch(q: string): GlobalSearchResponse {
 	const pattern = searchPattern(query)
 
 	const tenantRows = db
-		.select({ id: sql<string>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
+		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
 		.from(sql`tenants`)
 		.where(sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\')`)
 		.orderBy(asc(sql`name`))
 		.limit(GROUP_LIMIT)
 		.all()
 	const siteRows = db
-		.select({ id: sql<string>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
+		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
 		.from(sql`sites`)
 		.where(sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\')`)
 		.orderBy(asc(sql`name`))
 		.limit(GROUP_LIMIT)
 		.all()
 	const rackRows = db
-		.select({ id: sql<string>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
+		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
 		.from(sql`racks`)
 		.where(sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\')`)
 		.orderBy(asc(sql`name`))
@@ -67,7 +67,7 @@ export function globalSearch(q: string): GlobalSearchResponse {
 		.all()
 	const deviceRows = db
 		.select({
-			id: sql<string>`id`,
+			id: sql<number>`id`,
 			name: sql<string>`name`,
 			asset_tag: sql<string | null>`asset_tag`,
 		})
@@ -80,7 +80,7 @@ export function globalSearch(q: string): GlobalSearchResponse {
 		.all()
 	const cableRows = db
 		.select({
-			id: sql<string>`id`,
+			id: sql<number>`id`,
 			label: sql<string | null>`label`,
 			kind: sql<string | null>`kind`,
 		})

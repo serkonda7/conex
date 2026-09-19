@@ -23,7 +23,7 @@ import { TenantAddPage } from './pages/tenant_add'
 import { TenantDetailPage } from './pages/tenant_detail'
 import { TenantEditPage } from './pages/tenant_edit'
 import { TenantsPage } from './pages/tenants'
-import { navigate, path } from './router'
+import { navigate, parseId, path } from './router'
 import { initTheme, theme, toggleTheme } from './theme'
 
 function go(e: MouseEvent, to: string): void {
@@ -321,12 +321,22 @@ function App(): JSX.Element {
 		setEmail('')
 	}
 
+	function emptyRoute(page: string): {
+		page: string
+		tenantId: number | null
+		siteId: number | null
+		rackId: number | null
+		deviceId: number | null
+	} {
+		return { page, tenantId: null, siteId: null, rackId: null, deviceId: null }
+	}
+
 	function route(): {
 		page: string
-		tenantId: string | null
-		siteId: string | null
-		rackId: string | null
-		deviceId: string | null
+		tenantId: number | null
+		siteId: number | null
+		rackId: number | null
+		deviceId: number | null
 	} {
 		const parts =
 			path()
@@ -335,95 +345,48 @@ function App(): JSX.Element {
 				.filter((p) => p.length > 0) ?? []
 		if (parts.length === 0 || parts[0] === 'tenants') {
 			if (parts[1] === 'add') {
-				return {
-					page: 'tenant-add',
-					tenantId: null,
-					siteId: null,
-					rackId: null,
-					deviceId: null,
-				}
+				return emptyRoute('tenant-add')
 			}
 			if (parts[1]) {
+				const tenantId = parseId(parts[1])
+				if (tenantId === null) {
+					return emptyRoute('not-found')
+				}
 				if (parts[2] === 'edit') {
-					return {
-						page: 'tenant-edit',
-						tenantId: parts[1] ?? null,
-						siteId: null,
-						rackId: null,
-						deviceId: null,
-					}
+					return { ...emptyRoute('tenant-edit'), tenantId }
 				}
-				return {
-					page: 'tenant-detail',
-					tenantId: parts[1] ?? null,
-					siteId: null,
-					rackId: null,
-					deviceId: null,
-				}
+				return { ...emptyRoute('tenant-detail'), tenantId }
 			}
-			return {
-				page: 'tenants',
-				tenantId: null,
-				siteId: null,
-				rackId: null,
-				deviceId: null,
-			}
+			return emptyRoute('tenants')
 		}
 		if (parts[0] === 'sites' && parts.length === 1) {
-			return { page: 'sites', tenantId: null, siteId: null, rackId: null, deviceId: null }
+			return emptyRoute('sites')
 		}
 		if (parts[0] === 'sites' && parts.length === 2) {
-			return {
-				page: 'site-detail',
-				tenantId: null,
-				siteId: parts[1] ?? null,
-				rackId: null,
-				deviceId: null,
-			}
+			const siteId = parseId(parts[1])
+			return siteId === null
+				? emptyRoute('not-found')
+				: { ...emptyRoute('site-detail'), siteId }
 		}
 		if (parts[0] === 'racks' && parts.length === 2) {
-			return {
-				page: 'rack-detail',
-				tenantId: null,
-				siteId: null,
-				rackId: parts[1] ?? null,
-				deviceId: null,
-			}
+			const rackId = parseId(parts[1])
+			return rackId === null
+				? emptyRoute('not-found')
+				: { ...emptyRoute('rack-detail'), rackId }
 		}
 		if (parts[0] === 'templates') {
-			return {
-				page: 'templates',
-				tenantId: null,
-				siteId: null,
-				rackId: null,
-				deviceId: null,
-			}
+			return emptyRoute('templates')
 		}
 		if (parts[0] === 'devices' && parts.length === 1) {
-			return {
-				page: 'devices',
-				tenantId: null,
-				siteId: null,
-				rackId: null,
-				deviceId: null,
-			}
+			return emptyRoute('devices')
 		}
 		if (parts[0] === 'devices' && parts.length === 2) {
-			return {
-				page: 'device-detail',
-				tenantId: null,
-				siteId: null,
-				rackId: null,
-				deviceId: parts[1] ?? null,
-			}
+			const deviceId = parseId(parts[1])
+			return deviceId === null
+				? emptyRoute('not-found')
+				: { ...emptyRoute('device-detail'), deviceId }
 		}
-		return {
-			page: 'not-found',
-			tenantId: null,
-			siteId: null,
-			rackId: null,
-			deviceId: null,
-		}
+		return emptyRoute('not-found')
 	}
 
 	return (
@@ -596,7 +559,7 @@ function App(): JSX.Element {
 											route().tenantId !== null
 										}
 									>
-										<TenantDetailPage id={route().tenantId as string} />
+										<TenantDetailPage id={route().tenantId as number} />
 									</Match>
 									<Match
 										when={
@@ -604,7 +567,7 @@ function App(): JSX.Element {
 											route().tenantId !== null
 										}
 									>
-										<TenantEditPage id={route().tenantId as string} />
+										<TenantEditPage id={route().tenantId as number} />
 									</Match>
 									<Match when={route().page === 'sites'}>
 										<SitesPage />
@@ -615,7 +578,7 @@ function App(): JSX.Element {
 											route().siteId !== null
 										}
 									>
-										<SiteDetailPage id={route().siteId as string} />
+										<SiteDetailPage id={route().siteId as number} />
 									</Match>
 									<Match
 										when={
@@ -623,7 +586,7 @@ function App(): JSX.Element {
 											route().rackId !== null
 										}
 									>
-										<RackDetailPage id={route().rackId as string} />
+										<RackDetailPage id={route().rackId as number} />
 									</Match>
 									<Match when={route().page === 'templates'}>
 										<TemplatesPage />
@@ -637,7 +600,7 @@ function App(): JSX.Element {
 											route().deviceId !== null
 										}
 									>
-										<DeviceDetailPage id={route().deviceId as string} />
+										<DeviceDetailPage id={route().deviceId as number} />
 									</Match>
 									<Match when={route().page === 'not-found'}>
 										<p>Not found.</p>

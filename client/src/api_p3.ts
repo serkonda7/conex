@@ -46,8 +46,8 @@ export async function create_manufacturer(
 	return to_result<ManufacturerRow>(res, 'Failed to create manufacturer')
 }
 
-export async function delete_manufacturer(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.manufacturers[':id'].$delete({ param: { id } })
+export async function delete_manufacturer(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.manufacturers[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete manufacturer')
 }
 
@@ -56,18 +56,23 @@ export async function delete_manufacturer(id: string): Promise<Result<unknown, E
 // ---------------------------------------------------------------------------
 
 export async function fetch_device_types(
-	manufacturer?: string,
+	manufacturer?: number,
 ): Promise<Result<Page<DeviceTypeRow>, Error>> {
 	return getPage<DeviceTypeRow>(
 		client['device-types'].$get({
-			query: { search: '', page: '1', limit: '200', manufacturer },
+			query: {
+				search: '',
+				page: '1',
+				limit: '200',
+				manufacturer: manufacturer === undefined ? undefined : String(manufacturer),
+			},
 		}),
 		'Failed to load device types',
 	)
 }
 
 export async function create_device_type(input: {
-	manufacturer_id: string
+	manufacturer_id: number
 	model: string
 	slug: string
 	u_height?: number
@@ -76,8 +81,8 @@ export async function create_device_type(input: {
 	return to_result<DeviceTypeRow>(res, 'Failed to create device type')
 }
 
-export async function delete_device_type(id: string): Promise<Result<unknown, Error>> {
-	const res = await client['device-types'][':id'].$delete({ param: { id } })
+export async function delete_device_type(id: number): Promise<Result<unknown, Error>> {
+	const res = await client['device-types'][':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete device type')
 }
 
@@ -85,36 +90,40 @@ export async function delete_device_type(id: string): Promise<Result<unknown, Er
 // Stubs + preview
 // ---------------------------------------------------------------------------
 
-export async function fetch_stubs(deviceTypeId: string): Promise<Result<StubRow[], Error>> {
-	const res = await client['device-types'][':id'].stubs.$get({ param: { id: deviceTypeId } })
+export async function fetch_stubs(deviceTypeId: number): Promise<Result<StubRow[], Error>> {
+	const res = await client['device-types'][':id'].stubs.$get({
+		param: { id: String(deviceTypeId) },
+	})
 	return to_result<StubRow[]>(res, 'Failed to load interface stubs')
 }
 
 export async function create_stub(
-	deviceTypeId: string,
+	deviceTypeId: number,
 	input: { prefix: string; count: number; kind?: string },
 ): Promise<Result<StubRow, Error>> {
 	const res = await client['device-types'][':id'].stubs.$post({
-		param: { id: deviceTypeId },
+		param: { id: String(deviceTypeId) },
 		json: input,
 	})
 	return to_result<StubRow>(res, 'Failed to create interface stub')
 }
 
 export async function delete_stub(
-	deviceTypeId: string,
-	stubId: string,
+	deviceTypeId: number,
+	stubId: number,
 ): Promise<Result<unknown, Error>> {
 	const res = await client['device-types'][':id'].stubs[':stubId'].$delete({
-		param: { id: deviceTypeId, stubId },
+		param: { id: String(deviceTypeId), stubId: String(stubId) },
 	})
 	return to_result<unknown>(res, 'Failed to delete interface stub')
 }
 
 export async function fetch_type_preview(
-	deviceTypeId: string,
+	deviceTypeId: number,
 ): Promise<Result<StubPreviewResponse, Error>> {
-	const res = await client['device-types'][':id'].preview.$get({ param: { id: deviceTypeId } })
+	const res = await client['device-types'][':id'].preview.$get({
+		param: { id: String(deviceTypeId) },
+	})
 	return to_result<StubPreviewResponse>(res, 'Failed to load stub preview')
 }
 

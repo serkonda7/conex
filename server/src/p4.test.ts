@@ -35,18 +35,18 @@ async function api(
 	return { status: res.status, body: parsed, headers: res.headers }
 }
 
-function idOf(res: { body: unknown }): string {
-	return (res.body as { id: string }).id
+function idOf(res: { body: unknown }): number {
+	return (res.body as { id: number }).id
 }
 
 interface Fixture {
-	siteId: string
-	rackId: string
-	shelfId: string
-	typeId: string
-	virtualTypeId: string
-	bigTypeId: string
-	tenantId: string
+	siteId: number
+	rackId: number
+	shelfId: number
+	typeId: number
+	virtualTypeId: number
+	bigTypeId: number
+	tenantId: number
 }
 
 /** Rack (42U, shelf at U10) + 1U switch template (eth x24) + 0U virtual template. */
@@ -353,7 +353,7 @@ describe('device create', () => {
 		expect(
 			(
 				await api('POST', '/devices', {
-					device_type_id: 'missing',
+					device_type_id: 99999,
 					name: 'ghost',
 				})
 			).status,

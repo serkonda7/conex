@@ -102,23 +102,23 @@ export function exportCablesCsv(): string {
 	return toCsv(CABLE_CSV_HEADER, dataRows)
 }
 
-function deviceTypeId(slug: string): string | undefined {
+function deviceTypeId(slug: string): number | undefined {
 	return getDb().select().from(device_types).where(eq(device_types.slug, slug)).get()?.id
 }
 
-function siteId(slug: string): string | undefined {
+function siteId(slug: string): number | undefined {
 	return getDb().select().from(sites).where(eq(sites.slug, slug)).get()?.id
 }
 
-function rackId(slug: string): string | undefined {
+function rackId(slug: string): number | undefined {
 	return getDb().select().from(racks).where(eq(racks.slug, slug)).get()?.id
 }
 
-function deviceByName(name: string): string | undefined {
+function deviceByName(name: string): number | undefined {
 	return getDb().select().from(devices).where(eq(devices.name, name)).get()?.id
 }
 
-function ifaceId(deviceId: string, name: string): string | undefined {
+function ifaceId(deviceId: number, name: string): number | undefined {
 	return getDb()
 		.select()
 		.from(interfaces)
@@ -161,18 +161,18 @@ export function importDevicesCsv(text: string): Result<ImportResponse, Error> {
 			fail(`Unknown device_type_slug "${input.device_type_slug}"`)
 			continue
 		}
-		let foundSiteId: string | undefined
+		let foundSiteId: number | undefined
 		if (input.site_slug) {
 			foundSiteId = siteId(input.site_slug)
-			if (!siteId) {
+			if (!foundSiteId) {
 				fail(`Unknown site_slug "${input.site_slug}"`)
 				continue
 			}
 		}
-		let foundRackId: string | undefined
+		let foundRackId: number | undefined
 		if (input.rack_slug) {
 			foundRackId = rackId(input.rack_slug)
-			if (!rackId) {
+			if (!foundRackId) {
 				fail(`Unknown rack_slug "${input.rack_slug}"`)
 				continue
 			}

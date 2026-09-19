@@ -17,7 +17,7 @@ export const LoginSchema = v.strictObject({
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 })
 
-export type Login = v.InferInput<typeof LoginSchema>
+export type Login = v.InferOutput<typeof LoginSchema>
 
 // First-run admin provisioning. Same email/password contract as login;
 // no minimum password length is enforced.
@@ -26,7 +26,7 @@ export const SetupSchema = v.strictObject({
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 })
 
-export type Setup = v.InferInput<typeof SetupSchema>
+export type Setup = v.InferOutput<typeof SetupSchema>
 
 // Shared list-query contract (?search=&page=&limit=) used by every P1+
 // list endpoint. Defaults keep callers from re-declaring pagination math.
@@ -36,7 +36,7 @@ export const ListQuerySchema = v.strictObject({
 	limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
 })
 
-export type ListQuery = v.InferInput<typeof ListQuerySchema>
+export type ListQuery = v.InferOutput<typeof ListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P1: tenants / sites / locations
@@ -60,9 +60,20 @@ export const DescriptionSchema = v.optional(
 
 export const CommentsSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined)
 
-export const IdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100))
+/**
+ * Entity id: a positive integer. Accepts a JSON number or the numeric string
+ * forms that route params and query strings arrive as, and coerces to number
+ * so the server always works with integer ids.
+ */
+export const IdSchema = v.pipe(
+	v.union([v.string(), v.number()]),
+	v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw.trim()))),
+	v.number('Id must be an integer'),
+	v.integer('Id must be an integer'),
+	v.minValue(1, 'Id must be a positive integer'),
+)
 
-/** Nullable FK field: accepts a missing key, null, or a non-empty id. */
+/** Nullable FK field: accepts a missing key, null, or an id. */
 const NullableIdSchema = v.optional(v.nullable(IdSchema), undefined)
 
 /** Maximum nesting depth of the location tree (root counts as depth 1). */
@@ -118,12 +129,12 @@ export const LocationUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
-export type TenantCreate = v.InferInput<typeof TenantCreateSchema>
-export type TenantUpdate = v.InferInput<typeof TenantUpdateSchema>
-export type SiteCreate = v.InferInput<typeof SiteCreateSchema>
-export type SiteUpdate = v.InferInput<typeof SiteUpdateSchema>
-export type LocationCreate = v.InferInput<typeof LocationCreateSchema>
-export type LocationUpdate = v.InferInput<typeof LocationUpdateSchema>
+export type TenantCreate = v.InferOutput<typeof TenantCreateSchema>
+export type TenantUpdate = v.InferOutput<typeof TenantUpdateSchema>
+export type SiteCreate = v.InferOutput<typeof SiteCreateSchema>
+export type SiteUpdate = v.InferOutput<typeof SiteUpdateSchema>
+export type LocationCreate = v.InferOutput<typeof LocationCreateSchema>
+export type LocationUpdate = v.InferOutput<typeof LocationUpdateSchema>
 
 // Query-string contracts. Query values always arrive as strings, so page/limit
 // coerce through Number instead of demanding JSON numbers like ListQuerySchema.
@@ -157,10 +168,7 @@ const ListQueryEntries = {
 	limit: CoercedLimitSchema,
 }
 
-const OptionalIdEntry = v.optional(
-	v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
-	undefined,
-)
+const OptionalIdEntry = v.optional(IdSchema, undefined)
 
 export const TenantListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -182,9 +190,9 @@ export const LocationListQuerySchema = v.object({
 
 export const EntityParamsSchema = v.object({ id: IdSchema })
 
-export type TenantListQuery = v.InferInput<typeof TenantListQuerySchema>
-export type SiteListQuery = v.InferInput<typeof SiteListQuerySchema>
-export type LocationListQuery = v.InferInput<typeof LocationListQuerySchema>
+export type TenantListQuery = v.InferOutput<typeof TenantListQuerySchema>
+export type SiteListQuery = v.InferOutput<typeof SiteListQuerySchema>
+export type LocationListQuery = v.InferOutput<typeof LocationListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P2: racks / shelves
@@ -193,7 +201,7 @@ export type LocationListQuery = v.InferInput<typeof LocationListQuerySchema>
 /** Rack lifecycle label. Free-form on the wire is a typo magnet, so v1 is a closed set. */
 export const RackStatusSchema = v.picklist(['active', 'planned', 'staged', 'decommissioned'])
 
-export type RackStatus = v.InferInput<typeof RackStatusSchema>
+export type RackStatus = v.InferOutput<typeof RackStatusSchema>
 
 /** Rack height in U: 1..60, default 42. */
 export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
@@ -248,10 +256,10 @@ export const ShelfUpdateSchema = v.strictObject({
 	),
 })
 
-export type RackCreate = v.InferInput<typeof RackCreateSchema>
-export type RackUpdate = v.InferInput<typeof RackUpdateSchema>
-export type ShelfCreate = v.InferInput<typeof ShelfCreateSchema>
-export type ShelfUpdate = v.InferInput<typeof ShelfUpdateSchema>
+export type RackCreate = v.InferOutput<typeof RackCreateSchema>
+export type RackUpdate = v.InferOutput<typeof RackUpdateSchema>
+export type ShelfCreate = v.InferOutput<typeof ShelfCreateSchema>
+export type ShelfUpdate = v.InferOutput<typeof ShelfUpdateSchema>
 
 export const RackListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -265,13 +273,13 @@ export const ShelfListQuerySchema = v.object({
 	rack: OptionalIdEntry,
 })
 
-export type RackListQuery = v.InferInput<typeof RackListQuerySchema>
-export type ShelfListQuery = v.InferInput<typeof ShelfListQuerySchema>
+export type RackListQuery = v.InferOutput<typeof RackListQuerySchema>
+export type ShelfListQuery = v.InferOutput<typeof ShelfListQuerySchema>
 
 // Elevation response (server-built, read by the client elevation view).
 // `device` stays null until P4 fills device occupancy.
 export interface ElevationShelfRef {
-	id: string
+	id: number
 	name: string
 }
 
@@ -282,7 +290,7 @@ export interface ElevationUnit {
 }
 
 export interface ElevationResponse {
-	rack_id: string
+	rack_id: number
 	height_u: number
 	/** Top-down: highest U first, so the client renders without re-sorting. */
 	units: ElevationUnit[]
@@ -364,13 +372,13 @@ export const StubPreviewBodySchema = v.strictObject({
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
 })
 
-export type ManufacturerCreate = v.InferInput<typeof ManufacturerCreateSchema>
-export type ManufacturerUpdate = v.InferInput<typeof ManufacturerUpdateSchema>
-export type DeviceTypeCreate = v.InferInput<typeof DeviceTypeCreateSchema>
-export type DeviceTypeUpdate = v.InferInput<typeof DeviceTypeUpdateSchema>
-export type StubCreate = v.InferInput<typeof StubCreateSchema>
-export type StubUpdate = v.InferInput<typeof StubUpdateSchema>
-export type StubPreviewBody = v.InferInput<typeof StubPreviewBodySchema>
+export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
+export type ManufacturerUpdate = v.InferOutput<typeof ManufacturerUpdateSchema>
+export type DeviceTypeCreate = v.InferOutput<typeof DeviceTypeCreateSchema>
+export type DeviceTypeUpdate = v.InferOutput<typeof DeviceTypeUpdateSchema>
+export type StubCreate = v.InferOutput<typeof StubCreateSchema>
+export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
+export type StubPreviewBody = v.InferOutput<typeof StubPreviewBodySchema>
 
 export const ManufacturerListQuerySchema = v.object({ ...ListQueryEntries })
 
@@ -379,8 +387,8 @@ export const DeviceTypeListQuerySchema = v.object({
 	manufacturer: OptionalIdEntry,
 })
 
-export type ManufacturerListQuery = v.InferInput<typeof ManufacturerListQuerySchema>
-export type DeviceTypeListQuery = v.InferInput<typeof DeviceTypeListQuerySchema>
+export type ManufacturerListQuery = v.InferOutput<typeof ManufacturerListQuerySchema>
+export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema>
 
 /** Ad-hoc preview query: `GET /device-types/preview?prefix=eth&count=24&kind=ethernet`. */
 export const StubPreviewQuerySchema = v.object({
@@ -399,7 +407,7 @@ export const StubPreviewQuerySchema = v.object({
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
 })
 
-export type StubPreviewQuery = v.InferInput<typeof StubPreviewQuerySchema>
+export type StubPreviewQuery = v.InferOutput<typeof StubPreviewQuerySchema>
 
 /** One expanded interface name from a stub row. */
 export interface ExpandedInterface {
@@ -421,7 +429,7 @@ export interface StubPreviewResponse {
 /** Device lifecycle label. Same closed set as racks so filters stay uniform. */
 export const DeviceStatusSchema = v.picklist(['active', 'planned', 'staged', 'decommissioned'])
 
-export type DeviceStatus = v.InferInput<typeof DeviceStatusSchema>
+export type DeviceStatus = v.InferOutput<typeof DeviceStatusSchema>
 
 /** Interface name label (e.g. `eth0`). Same charset as stub prefixes. */
 export const InterfaceNameSchema = v.pipe(
@@ -501,11 +509,11 @@ export const InterfaceUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
-export type DeviceCreate = v.InferInput<typeof DeviceCreateSchema>
-export type DeviceUpdate = v.InferInput<typeof DeviceUpdateSchema>
-export type DeviceMove = v.InferInput<typeof DeviceMoveSchema>
-export type InterfaceCreate = v.InferInput<typeof InterfaceCreateSchema>
-export type InterfaceUpdate = v.InferInput<typeof InterfaceUpdateSchema>
+export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
+export type DeviceUpdate = v.InferOutput<typeof DeviceUpdateSchema>
+export type DeviceMove = v.InferOutput<typeof DeviceMoveSchema>
+export type InterfaceCreate = v.InferOutput<typeof InterfaceCreateSchema>
+export type InterfaceUpdate = v.InferOutput<typeof InterfaceUpdateSchema>
 
 export const DeviceListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -517,8 +525,8 @@ export const DeviceListQuerySchema = v.object({
 
 export const InterfaceListQuerySchema = v.object({ ...ListQueryEntries })
 
-export type DeviceListQuery = v.InferInput<typeof DeviceListQuerySchema>
-export type InterfaceListQuery = v.InferInput<typeof InterfaceListQuerySchema>
+export type DeviceListQuery = v.InferOutput<typeof DeviceListQuerySchema>
+export type InterfaceListQuery = v.InferOutput<typeof InterfaceListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P5: cables (L1)
@@ -527,7 +535,7 @@ export type InterfaceListQuery = v.InferInput<typeof InterfaceListQuerySchema>
 /** Cable lifecycle label. `connected` is the normal live state. */
 export const CableStatusSchema = v.picklist(['connected', 'planned', 'decommissioned'])
 
-export type CableStatus = v.InferInput<typeof CableStatusSchema>
+export type CableStatus = v.InferOutput<typeof CableStatusSchema>
 
 /** Cable kind label (e.g. `cat6`, `fiber-om4`, `dac`). Free-form, like interface kinds. */
 export const CableKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
@@ -557,9 +565,9 @@ export const InterfaceConnectSchema = v.strictObject({
 	peer_interface_id: IdSchema,
 })
 
-export type CableCreate = v.InferInput<typeof CableCreateSchema>
-export type CableUpdate = v.InferInput<typeof CableUpdateSchema>
-export type InterfaceConnect = v.InferInput<typeof InterfaceConnectSchema>
+export type CableCreate = v.InferOutput<typeof CableCreateSchema>
+export type CableUpdate = v.InferOutput<typeof CableUpdateSchema>
+export type InterfaceConnect = v.InferOutput<typeof InterfaceConnectSchema>
 
 export const CableListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -570,22 +578,22 @@ export const CableListQuerySchema = v.object({
 	device: OptionalIdEntry,
 })
 
-export type CableListQuery = v.InferInput<typeof CableListQuerySchema>
+export type CableListQuery = v.InferOutput<typeof CableListQuerySchema>
 
 /** One peer link in a per-device trace. */
 export interface TracePeerInterface {
-	id: string
+	id: number
 	name: string
 	kind: string
 }
 
 export interface TracePeerDevice {
-	id: string
+	id: number
 	name: string
 }
 
 export interface TraceLink {
-	cable_id: string
+	cable_id: number
 	cable_label: string | null
 	cable_status: string
 	local_interface: TracePeerInterface
@@ -594,7 +602,7 @@ export interface TraceLink {
 }
 
 export interface DeviceTraceResponse {
-	device_id: string
+	device_id: number
 	links: TraceLink[]
 }
 
@@ -607,14 +615,14 @@ export const SearchQuerySchema = v.object({
 	q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ''),
 })
 
-export type SearchQuery = v.InferInput<typeof SearchQuerySchema>
+export type SearchQuery = v.InferOutput<typeof SearchQuerySchema>
 
 /** JSON body for CSV imports: raw CSV text, parsed row-by-row server-side. */
 export const CsvImportBodySchema = v.strictObject({
 	csv: v.pipe(v.string(), v.minLength(1), v.maxLength(1_000_000)),
 })
 
-export type CsvImportBody = v.InferInput<typeof CsvImportBodySchema>
+export type CsvImportBody = v.InferOutput<typeof CsvImportBodySchema>
 
 /**
  * One device CSV row (minimal columns). Slugs resolve to ids server-side;
@@ -645,7 +653,7 @@ export const DeviceImportRowSchema = v.object({
 	status: v.optional(DeviceStatusSchema, 'active'),
 })
 
-export type DeviceImportRow = v.InferInput<typeof DeviceImportRowSchema>
+export type DeviceImportRow = v.InferOutput<typeof DeviceImportRowSchema>
 
 /** One cable CSV row: device/interface names resolve to ids server-side. */
 export const CableImportRowSchema = v.object({
@@ -658,13 +666,13 @@ export const CableImportRowSchema = v.object({
 	status: v.optional(CableStatusSchema, 'connected'),
 })
 
-export type CableImportRow = v.InferInput<typeof CableImportRowSchema>
+export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 
 /** Per-row import outcome: created id or the row's error message. */
 export interface ImportRowResult {
 	row: number
 	ok: boolean
-	id: string | null
+	id: number | null
 	error: string | null
 }
 

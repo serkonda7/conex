@@ -7,7 +7,7 @@ import { fetch_racks, type RackRow } from '../api_p2'
 import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
 import { create_device, type DeviceRow, delete_device, fetch_devices } from '../api_p4'
 import { download_csv, type ImportResponse, upload_csv } from '../api_p6'
-import { navigate, queryParam } from '../router'
+import { navigate, parseId, queryParam } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -42,8 +42,8 @@ export function DevicesPage(): JSX.Element {
 				| 'staged'
 				| 'decommissioned'
 				| undefined,
-			rack: rackFilter() || undefined,
-			tenant: tenantFilter() || undefined,
+			rack: rackFilter() ? (parseId(rackFilter()) ?? undefined) : undefined,
+			tenant: tenantFilter() ? (parseId(tenantFilter()) ?? undefined) : undefined,
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
@@ -84,8 +84,8 @@ export function DevicesPage(): JSX.Element {
 		return res.value.items
 	})
 
-	function typeNameOf(id: string): string {
-		return types()?.find((t) => t.id === id)?.model ?? id.slice(0, 8)
+	function typeNameOf(id: number): string {
+		return types()?.find((t) => t.id === id)?.model ?? String(id)
 	}
 
 	async function handleImport(kind: 'devices' | 'cables', file: File | undefined): Promise<void> {
@@ -121,11 +121,11 @@ export function DevicesPage(): JSX.Element {
 			return
 		}
 		const res = await create_device({
-			device_type_id: typeId(),
+			device_type_id: Number(typeId()),
 			name: name(),
-			rack_id: rackId() === '' ? null : rackId(),
+			rack_id: rackId() === '' ? null : Number(rackId()),
 			position_u: position,
-			shelf_id: shelfId().trim() === '' ? null : shelfId().trim(),
+			shelf_id: shelfId().trim() === '' ? null : Number(shelfId().trim()),
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
@@ -140,9 +140,6 @@ export function DevicesPage(): JSX.Element {
 	return (
 		<div>
 			<h2>Devices</h2>
-			<p class="page-subtitle">
-				Filter the fleet, instantiate from a template, or bulk import.
-			</p>
 			<form
 				onSubmit={(e: SubmitEvent): void => {
 					e.preventDefault()
@@ -350,7 +347,7 @@ export function DevicesPage(): JSX.Element {
 								</td>
 								<td>
 									{d.shelf_id ? (
-										<code>shelf:{d.shelf_id.slice(0, 8)}</code>
+										<code>shelf:{d.shelf_id}</code>
 									) : d.position_u !== null ? (
 										<code>U{d.position_u}</code>
 									) : (

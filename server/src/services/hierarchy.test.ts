@@ -10,8 +10,8 @@ import {
 
 describe('depthOf', () => {
 	test('root has depth 1', () => {
-		const parents = buildParentMap([{ id: 'a', parent_id: null }])
-		const res = depthOf('a', parents)
+		const parents = buildParentMap([{ id: 1, parent_id: null }])
+		const res = depthOf(1, parents)
 		expect(Result.isOk(res)).toBe(true)
 		if (Result.isOk(res)) {
 			expect(res.value).toBe(1)
@@ -20,11 +20,11 @@ describe('depthOf', () => {
 
 	test('three-level chain has depth 3', () => {
 		const parents = buildParentMap([
-			{ id: 'a', parent_id: null },
-			{ id: 'b', parent_id: 'a' },
-			{ id: 'c', parent_id: 'b' },
+			{ id: 1, parent_id: null },
+			{ id: 2, parent_id: 1 },
+			{ id: 3, parent_id: 2 },
 		])
-		const res = depthOf('c', parents)
+		const res = depthOf(3, parents)
 		expect(Result.isOk(res)).toBe(true)
 		if (Result.isOk(res)) {
 			expect(res.value).toBe(3)
@@ -32,68 +32,68 @@ describe('depthOf', () => {
 	})
 
 	test('unknown id errors', () => {
-		const parents = buildParentMap([{ id: 'a', parent_id: null }])
-		expect(Result.isError(depthOf('missing', parents))).toBe(true)
+		const parents = buildParentMap([{ id: 1, parent_id: null }])
+		expect(Result.isError(depthOf(999, parents))).toBe(true)
 	})
 
 	test('cycle errors instead of looping', () => {
-		const parents = new Map<string, string | null>([
-			['a', 'b'],
-			['b', 'a'],
+		const parents = new Map<number, number | null>([
+			[1, 2],
+			[2, 1],
 		])
-		expect(Result.isError(depthOf('a', parents))).toBe(true)
+		expect(Result.isError(depthOf(1, parents))).toBe(true)
 	})
 })
 
 describe('createsCycle', () => {
 	const parents = buildParentMap([
-		{ id: 'a', parent_id: null },
-		{ id: 'b', parent_id: 'a' },
-		{ id: 'c', parent_id: 'b' },
-		{ id: 'sibling', parent_id: 'a' },
+		{ id: 1, parent_id: null },
+		{ id: 2, parent_id: 1 },
+		{ id: 3, parent_id: 2 },
+		{ id: 4, parent_id: 1 },
 	])
 
 	test('self-parent is a cycle', () => {
-		expect(createsCycle('b', 'b', parents)).toBe(true)
+		expect(createsCycle(2, 2, parents)).toBe(true)
 	})
 
 	test('parenting under a descendant is a cycle', () => {
-		expect(createsCycle('a', 'c', parents)).toBe(true)
+		expect(createsCycle(1, 3, parents)).toBe(true)
 	})
 
 	test('parenting under an ancestor is fine', () => {
-		expect(createsCycle('c', 'a', parents)).toBe(false)
+		expect(createsCycle(3, 1, parents)).toBe(false)
 	})
 
 	test('parenting under a sibling subtree is fine', () => {
-		expect(createsCycle('c', 'sibling', parents)).toBe(false)
+		expect(createsCycle(3, 4, parents)).toBe(false)
 	})
 })
 
 describe('maxDescendantOffset', () => {
 	test('leaf has offset 0', () => {
-		const children = buildChildrenMap([{ id: 'a', parent_id: null }])
-		expect(maxDescendantOffset('a', children)).toBe(0)
+		const children = buildChildrenMap([{ id: 1, parent_id: null }])
+		expect(maxDescendantOffset(1, children)).toBe(0)
 	})
 
 	test('chain of three below the node has offset 2', () => {
 		const children = buildChildrenMap([
-			{ id: 'a', parent_id: null },
-			{ id: 'b', parent_id: 'a' },
-			{ id: 'c', parent_id: 'b' },
+			{ id: 1, parent_id: null },
+			{ id: 2, parent_id: 1 },
+			{ id: 3, parent_id: 2 },
 		])
-		expect(maxDescendantOffset('a', children)).toBe(2)
+		expect(maxDescendantOffset(1, children)).toBe(2)
 	})
 
 	test('takes the deepest branch', () => {
 		const children = buildChildrenMap([
-			{ id: 'a', parent_id: null },
-			{ id: 'b', parent_id: 'a' },
-			{ id: 'c', parent_id: 'a' },
-			{ id: 'd', parent_id: 'c' },
-			{ id: 'e', parent_id: 'd' },
+			{ id: 1, parent_id: null },
+			{ id: 2, parent_id: 1 },
+			{ id: 3, parent_id: 1 },
+			{ id: 4, parent_id: 3 },
+			{ id: 5, parent_id: 4 },
 		])
-		expect(maxDescendantOffset('a', children)).toBe(3)
-		expect(maxDescendantOffset('b', children)).toBe(0)
+		expect(maxDescendantOffset(1, children)).toBe(3)
+		expect(maxDescendantOffset(2, children)).toBe(0)
 	})
 })

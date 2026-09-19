@@ -41,8 +41,8 @@ async function apiText(path: string): Promise<{ status: number; text: string; he
 	return { status: res.status, text: await res.text(), headers: res.headers }
 }
 
-function idOf(res: { body: unknown }): string {
-	return (res.body as { id: string }).id
+function idOf(res: { body: unknown }): number {
+	return (res.body as { id: number }).id
 }
 
 beforeAll(async () => {

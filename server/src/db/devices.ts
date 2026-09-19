@@ -51,18 +51,14 @@ function searchPattern(raw: string): string {
 	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
-function newId(): string {
-	return Bun.randomUUIDv7()
-}
-
 // ---------------------------------------------------------------------------
 // Mount validation
 // ---------------------------------------------------------------------------
 
 export interface MountInput {
-	rack_id: string | null
+	rack_id: number | null
 	position_u: number | null
-	shelf_id: string | null
+	shelf_id: number | null
 }
 
 /**
@@ -77,7 +73,7 @@ function checkMount(
 	deviceName: string,
 	mount: MountInput,
 	uHeight: number,
-	excludeDeviceId?: string,
+	excludeDeviceId?: number,
 ): Result<undefined, Error> {
 	const db = getDb()
 	if (mount.position_u !== null && mount.shelf_id !== null) {
@@ -125,7 +121,7 @@ function checkMount(
 		)
 	}
 	const candidate = {
-		id: excludeDeviceId ?? '',
+		id: excludeDeviceId ?? 0,
 		name: deviceName,
 		position_u: positionU,
 		height_u: uHeight,
@@ -152,7 +148,7 @@ function checkMount(
 	return Result.ok(undefined)
 }
 
-function checkSite(siteId: string | null | undefined): Result<undefined, Error> {
+function checkSite(siteId: number | null | undefined): Result<undefined, Error> {
 	if (siteId === null || siteId === undefined) {
 		return Result.ok(undefined)
 	}
@@ -162,7 +158,7 @@ function checkSite(siteId: string | null | undefined): Result<undefined, Error> 
 	return Result.ok(undefined)
 }
 
-function checkTenant(tenantId: string | null | undefined): Result<undefined, Error> {
+function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
 	if (tenantId === null || tenantId === undefined) {
 		return Result.ok(undefined)
 	}
@@ -174,8 +170,8 @@ function checkTenant(tenantId: string | null | undefined): Result<undefined, Err
 
 /** Location must exist; when a site is also given it must belong to that site. */
 function checkLocation(
-	locationId: string | null | undefined,
-	siteId: string | null | undefined,
+	locationId: number | null | undefined,
+	siteId: number | null | undefined,
 ): Result<undefined, Error> {
 	if (locationId === null || locationId === undefined) {
 		return Result.ok(undefined)
@@ -192,7 +188,7 @@ function checkLocation(
 
 function checkAssetTag(
 	assetTag: string | null | undefined,
-	excludeDeviceId?: string,
+	excludeDeviceId?: number,
 ): Result<undefined, Error> {
 	if (assetTag === null || assetTag === undefined) {
 		return Result.ok(undefined)
@@ -209,9 +205,9 @@ function checkAssetTag(
 // ---------------------------------------------------------------------------
 
 export interface DeviceListParams extends ListParams {
-	site?: string
-	rack?: string
-	tenant?: string
+	site?: number
+	rack?: number
+	tenant?: number
 	status?: string
 }
 
@@ -249,7 +245,7 @@ export function listDevices(params: DeviceListParams): Page<DeviceRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getDevice(id: string): Result<DeviceRow, Error> {
+export function getDevice(id: number): Result<DeviceRow, Error> {
 	const row = getDb().select().from(devices).where(eq(devices.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Device not found'))
@@ -258,9 +254,9 @@ export function getDevice(id: string): Result<DeviceRow, Error> {
 }
 
 function mountOf(input: {
-	rack_id?: string | null
+	rack_id?: number | null
 	position_u?: number | null
-	shelf_id?: string | null
+	shelf_id?: number | null
 }): MountInput {
 	return {
 		rack_id: input.rack_id ?? null,
@@ -303,8 +299,7 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	if (Result.isError(expanded)) {
 		return Result.err(new ConflictError(expanded.error.message))
 	}
-	const row: DeviceRow = {
-		id: newId(),
+	const values: Omit<DeviceRow, 'id'> = {
 		device_type_id: input.device_type_id,
 		site_id: input.site_id ?? null,
 		location_id: input.location_id ?? null,
@@ -318,14 +313,18 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 		tenant_id: input.tenant_id ?? null,
 		description: input.description ?? null,
 	}
+	let deviceId: number | undefined
 	try {
 		db.transaction((tx) => {
-			tx.insert(devices).values(row).run()
+			const inserted = tx.insert(devices).values(values).returning({ id: devices.id }).get()
+			if (!inserted) {
+				throw new Error('Device insert did not return an id')
+			}
+			deviceId = inserted.id
 			for (const iface of expanded.value) {
 				tx.insert(interfaces)
 					.values({
-						id: newId(),
-						device_id: row.id,
+						device_id: inserted.id,
 						name: iface.name,
 						kind: iface.kind,
 						connected: 0,
@@ -340,10 +339,13 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return getDevice(row.id)
+	if (deviceId === undefined) {
+		return Result.err(new Error('Device insert did not return an id'))
+	}
+	return getDevice(deviceId)
 }
 
-export function updateDevice(id: string, input: DeviceUpdate): Result<DeviceRow, Error> {
+export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow, Error> {
 	const current = getDevice(id)
 	if (Result.isError(current)) {
 		return current
@@ -437,7 +439,7 @@ export function updateDevice(id: string, input: DeviceUpdate): Result<DeviceRow,
  * Explicit remount: `undefined` keeps the current mount value, `null` clears
  * it. The effective mount re-validates U/shelf exactly like creation.
  */
-export function moveDevice(id: string, input: DeviceMove): Result<DeviceRow, Error> {
+export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Error> {
 	const current = getDevice(id)
 	if (Result.isError(current)) {
 		return current
@@ -468,7 +470,7 @@ export function moveDevice(id: string, input: DeviceMove): Result<DeviceRow, Err
 	return getDevice(id)
 }
 
-export function deleteDevice(id: string): Result<DeviceRow, Error> {
+export function deleteDevice(id: number): Result<DeviceRow, Error> {
 	const current = getDevice(id)
 	if (Result.isError(current)) {
 		return current
@@ -491,7 +493,7 @@ export function deleteDevice(id: string): Result<DeviceRow, Error> {
 // Interfaces
 // ---------------------------------------------------------------------------
 
-export function listInterfaces(deviceId: string): Result<InterfaceJson[], Error> {
+export function listInterfaces(deviceId: number): Result<InterfaceJson[], Error> {
 	const device = getDevice(deviceId)
 	if (Result.isError(device)) {
 		return Result.err(device.error)
@@ -508,7 +510,7 @@ export function listInterfaces(deviceId: string): Result<InterfaceJson[], Error>
 	return Result.ok(rows.map(toInterfaceJson))
 }
 
-export function getInterface(deviceId: string, ifaceId: string): Result<InterfaceJson, Error> {
+export function getInterface(deviceId: number, ifaceId: number): Result<InterfaceJson, Error> {
 	const row = getDb().select().from(interfaces).where(eq(interfaces.id, ifaceId)).get()
 	if (!row || row.device_id !== deviceId) {
 		return Result.err(new NotFoundError('Interface not found on this device'))
@@ -517,7 +519,7 @@ export function getInterface(deviceId: string, ifaceId: string): Result<Interfac
 }
 
 export function addInterface(
-	deviceId: string,
+	deviceId: number,
 	input: InterfaceCreate,
 ): Result<InterfaceJson, Error> {
 	const device = getDevice(deviceId)
@@ -532,8 +534,7 @@ export function addInterface(
 	if (clash) {
 		return Result.err(new DuplicateError('This device already has an interface with this name'))
 	}
-	const row: InterfaceRow = {
-		id: newId(),
+	const row: Omit<InterfaceRow, 'id'> = {
 		device_id: deviceId,
 		name: input.name,
 		kind: input.kind ?? 'ethernet',
@@ -541,7 +542,15 @@ export function addInterface(
 		description: input.description ?? null,
 	}
 	try {
-		getDb().insert(interfaces).values(row).run()
+		const inserted = getDb()
+			.insert(interfaces)
+			.values(row)
+			.returning({ id: interfaces.id })
+			.get()
+		if (!inserted) {
+			return Result.err(new Error('Interface insert did not return an id'))
+		}
+		return getInterface(deviceId, inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -550,12 +559,11 @@ export function addInterface(
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(toInterfaceJson(row))
 }
 
 export function updateInterface(
-	deviceId: string,
-	ifaceId: string,
+	deviceId: number,
+	ifaceId: number,
 	input: InterfaceUpdate,
 ): Result<InterfaceJson, Error> {
 	const current = getInterface(deviceId, ifaceId)

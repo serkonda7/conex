@@ -110,9 +110,9 @@ export const deviceTypesApp = new Hono()
 		vValidator('param', stubIdParamsSchema, onValidationError),
 		vValidator('json', StubUpdateSchema, onValidationError),
 		(c) => {
-			// The `:id` segment is validated as a non-empty id; ownership is
-			// enforced by loading the stub itself.
-			const result = updateStub(c.req.param('stubId'), c.req.valid('json'))
+			// The `:id` segment is validated as an id; ownership is enforced by
+			// loading the stub itself.
+			const result = updateStub(c.req.valid('param').stubId, c.req.valid('json'))
 			if (Result.isOk(result)) {
 				return c.json(result.value)
 			}
@@ -123,7 +123,7 @@ export const deviceTypesApp = new Hono()
 		'/:id/stubs/:stubId',
 		vValidator('param', stubIdParamsSchema, onValidationError),
 		(c) => {
-			const result = deleteStub(c.req.param('stubId'))
+			const result = deleteStub(c.req.valid('param').stubId)
 			if (Result.isOk(result)) {
 				return c.json(result.value)
 			}
@@ -131,5 +131,5 @@ export const deviceTypesApp = new Hono()
 		},
 	)
 	.get('/:id/stubs/:stubId', vValidator('param', stubIdParamsSchema, onValidationError), (c) => {
-		return sendResult(c, getStub(c.req.param('stubId')))
+		return sendResult(c, getStub(c.req.valid('param').stubId))
 	})

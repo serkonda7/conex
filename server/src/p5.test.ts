@@ -35,17 +35,17 @@ async function api(
 	return { status: res.status, body: parsed, headers: res.headers }
 }
 
-function idOf(res: { body: unknown }): string {
-	return (res.body as { id: string }).id
+function idOf(res: { body: unknown }): number {
+	return (res.body as { id: number }).id
 }
 
 interface Fixture {
-	devA: string
-	devB: string
-	a0: string
-	a1: string
-	b0: string
-	b1: string
+	devA: number
+	devB: number
+	a0: number
+	a1: number
+	b0: number
+	b1: number
 }
 
 async function setupPair(prefix: string): Promise<Fixture> {
@@ -70,7 +70,7 @@ async function setupPair(prefix: string): Promise<Fixture> {
 			})
 		).status,
 	).toBe(201)
-	async function mkDevice(name: string): Promise<string> {
+	async function mkDevice(name: string): Promise<number> {
 		const dev = await api('POST', '/devices', {
 			device_type_id: idOf(type),
 			name,
@@ -80,17 +80,17 @@ async function setupPair(prefix: string): Promise<Fixture> {
 	}
 	const devA = await mkDevice(`${prefix}-a`)
 	const devB = await mkDevice(`${prefix}-b`)
-	async function ifaceIds(dev: string): Promise<string[]> {
+	async function ifaceIds(dev: number): Promise<number[]> {
 		const list = await api('GET', `/devices/${dev}/interfaces`)
 		expect(list.status).toBe(200)
-		return (list.body as { id: string; name: string }[]).map((r) => r.id)
+		return (list.body as { id: number; name: string }[]).map((r) => r.id)
 	}
-	const [a0, a1] = (await ifaceIds(devA)) as [string, string]
-	const [b0, b1] = (await ifaceIds(devB)) as [string, string]
-	return { devA, devB, a0: a0 as string, a1: a1 as string, b0: b0 as string, b1: b1 as string }
+	const [a0, a1] = (await ifaceIds(devA)) as [number, number]
+	const [b0, b1] = (await ifaceIds(devB)) as [number, number]
+	return { devA, devB, a0: a0 as number, a1: a1 as number, b0: b0 as number, b1: b1 as number }
 }
 
-async function connectedOf(dev: string, iface: string): Promise<boolean> {
+async function connectedOf(dev: number, iface: number): Promise<boolean> {
 	const res = await api('GET', `/devices/${dev}/interfaces/${iface}`)
 	expect(res.status).toBe(200)
 	return (res.body as { connected: boolean }).connected
@@ -164,8 +164,7 @@ describe('cables', () => {
 		).toBe(409)
 		// Missing endpoint 404s.
 		expect(
-			(await api('POST', '/cables', { a_interface_id: f.a1, b_interface_id: 'missing' }))
-				.status,
+			(await api('POST', '/cables', { a_interface_id: f.a1, b_interface_id: 99999 })).status,
 		).toBe(404)
 
 		expect((await api('DELETE', `/cables/${idOf(first)}`)).status).toBe(200)
@@ -222,7 +221,7 @@ describe('cables', () => {
 			(await api('POST', '/cables', { a_interface_id: f.a1, b_interface_id: f.b1 })).status,
 		).toBe(201)
 		const again = await api('GET', '/cables', undefined, `?device=${f.devA}`)
-		const againId = ((again.body as { items: { id: string }[] }).items[0] as { id: string }).id
+		const againId = ((again.body as { items: { id: number }[] }).items[0] as { id: number }).id
 		expect((await api('DELETE', `/cables/${againId}`)).status).toBe(200)
 
 		expect((await api('DELETE', `/devices/${f.devA}`)).status).toBe(200)
@@ -230,8 +229,8 @@ describe('cables', () => {
 	})
 
 	test('trace of unknown device 404s; unknown cable 404s', async () => {
-		expect((await api('GET', '/devices/missing/trace')).status).toBe(404)
-		expect((await api('GET', '/cables/missing')).status).toBe(404)
-		expect((await api('DELETE', '/cables/missing')).status).toBe(404)
+		expect((await api('GET', '/devices/99999/trace')).status).toBe(404)
+		expect((await api('GET', '/cables/99999')).status).toBe(404)
+		expect((await api('DELETE', '/cables/99999')).status).toBe(404)
 	})
 })

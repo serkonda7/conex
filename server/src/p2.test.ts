@@ -35,8 +35,8 @@ async function api(
 	return { status: res.status, body: parsed, headers: res.headers }
 }
 
-function idOf(res: { body: unknown }): string {
-	return (res.body as { id: string }).id
+function idOf(res: { body: unknown }): number {
+	return (res.body as { id: number }).id
 }
 
 beforeAll(async () => {
@@ -89,7 +89,7 @@ describe('racks', () => {
 		const missingSite = await api('POST', '/racks', {
 			name: 'Ghost',
 			slug: 'ghost-rack',
-			site_id: 'missing',
+			site_id: 99999,
 		})
 		expect(missingSite.status).toBe(404)
 
@@ -171,7 +171,7 @@ describe('racks', () => {
 		expect((byTenant.body as { total: number }).total).toBe(1)
 		const byLocation = await api('GET', '/racks', undefined, `?location=${idOf(loc)}`)
 		expect((byLocation.body as { total: number }).total).toBe(1)
-		const byOther = await api('GET', '/racks', undefined, '?tenant=missing-tenant')
+		const byOther = await api('GET', '/racks', undefined, '?tenant=99999')
 		expect((byOther.body as { total: number }).total).toBe(0)
 
 		expect((await api('DELETE', `/racks/${idOf(rack)}`)).status).toBe(200)
@@ -226,7 +226,7 @@ describe('shelves', () => {
 
 		const missingRack = await api('POST', '/shelves', {
 			name: 'Ghost',
-			rack_id: 'missing',
+			rack_id: 99999,
 			position_u: 1,
 		})
 		expect(missingRack.status).toBe(404)
@@ -290,7 +290,7 @@ describe('elevation', () => {
 			expect(unit.device).toBeNull()
 		}
 
-		expect((await api('GET', '/racks/missing/elevation')).status).toBe(404)
+		expect((await api('GET', '/racks/99999/elevation')).status).toBe(404)
 
 		expect((await api('DELETE', `/shelves/${idOf(shelf)}`)).status).toBe(200)
 		expect((await api('DELETE', `/racks/${rackId}`)).status).toBe(200)

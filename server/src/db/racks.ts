@@ -30,10 +30,6 @@ function searchPattern(raw: string): string {
 	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
-function newId(): string {
-	return Bun.randomUUIDv7()
-}
-
 function shelfSpanOf(row: ShelfRow): OccupantSpan {
 	return { id: row.id, name: row.name, position_u: row.position_u, height_u: row.height_u }
 }
@@ -43,9 +39,9 @@ function shelfSpanOf(row: ShelfRow): OccupantSpan {
 // ---------------------------------------------------------------------------
 
 export interface RackListParams extends ListParams {
-	site?: string
-	location?: string
-	tenant?: string
+	site?: number
+	location?: number
+	tenant?: number
 }
 
 export function listRacks(params: RackListParams): Page<RackRow> {
@@ -79,7 +75,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getRack(id: string): Result<RackRow, Error> {
+export function getRack(id: number): Result<RackRow, Error> {
 	const row = getDb().select().from(racks).where(eq(racks.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Rack not found'))
@@ -87,7 +83,7 @@ export function getRack(id: string): Result<RackRow, Error> {
 	return Result.ok(row)
 }
 
-function checkTenant(tenantId: string | null | undefined): Result<undefined, Error> {
+function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
 	if (tenantId === null || tenantId === undefined) {
 		return Result.ok(undefined)
 	}
@@ -100,8 +96,8 @@ function checkTenant(tenantId: string | null | undefined): Result<undefined, Err
 
 /** Location must exist and belong to the rack's site; null clears the link. */
 function checkLocation(
-	locationId: string | null | undefined,
-	siteId: string,
+	locationId: number | null | undefined,
+	siteId: number,
 ): Result<undefined, Error> {
 	if (locationId === null || locationId === undefined) {
 		return Result.ok(undefined)
@@ -114,7 +110,7 @@ function checkLocation(
 }
 
 /** Shelves of one rack, bottom-up. */
-function shelvesOf(rackId: string): ShelfRow[] {
+function shelvesOf(rackId: number): ShelfRow[] {
 	return getDb()
 		.select()
 		.from(rack_shelves)
@@ -129,7 +125,7 @@ function shelvesOf(rackId: string): ShelfRow[] {
  * occupies. Exported so `db/devices.ts` validates mounts against the same
  * rows the elevation renders.
  */
-export function deviceSpansOf(rackId: string): OccupantSpan[] {
+export function deviceSpansOf(rackId: number): OccupantSpan[] {
 	const rows = getDb()
 		.select({
 			id: devices.id,
@@ -158,7 +154,7 @@ export function deviceSpansOf(rackId: string): OccupantSpan[] {
 }
 
 /** Every U-consuming span of a rack: shelves plus position-mounted devices. */
-function allSpansOf(rackId: string): OccupantSpan[] {
+function allSpansOf(rackId: number): OccupantSpan[] {
 	return [...shelvesOf(rackId).map(shelfSpanOf), ...deviceSpansOf(rackId)]
 }
 
@@ -180,8 +176,7 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 	if (clash) {
 		return Result.err(new DuplicateError('Rack slug is already in use'))
 	}
-	const row: RackRow = {
-		id: newId(),
+	const row: Omit<RackRow, 'id'> = {
 		site_id: input.site_id,
 		location_id: input.location_id ?? null,
 		tenant_id: input.tenant_id ?? null,
@@ -191,17 +186,20 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 		status: input.status ?? 'active',
 	}
 	try {
-		db.insert(racks).values(row).run()
+		const inserted = db.insert(racks).values(row).returning({ id: racks.id }).get()
+		if (!inserted) {
+			return Result.err(new Error('Rack insert did not return an id'))
+		}
+		return getRack(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Rack slug is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
-export function updateRack(id: string, input: RackUpdate): Result<RackRow, Error> {
+export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error> {
 	const current = getRack(id)
 	if (Result.isError(current)) {
 		return current
@@ -276,7 +274,7 @@ export function updateRack(id: string, input: RackUpdate): Result<RackRow, Error
 	return getRack(id)
 }
 
-export function deleteRack(id: string): Result<RackRow, Error> {
+export function deleteRack(id: number): Result<RackRow, Error> {
 	const current = getRack(id)
 	if (Result.isError(current)) {
 		return current
@@ -294,7 +292,7 @@ export function deleteRack(id: string): Result<RackRow, Error> {
 }
 
 /** Ordered U map of a rack, top-down (highest U first), shelves plus devices. */
-export function getElevation(id: string): Result<ElevationResponse, Error> {
+export function getElevation(id: number): Result<ElevationResponse, Error> {
 	const current = getRack(id)
 	if (Result.isError(current)) {
 		return current
@@ -316,7 +314,7 @@ export function getElevation(id: string): Result<ElevationResponse, Error> {
 // ---------------------------------------------------------------------------
 
 export interface ShelfListParams extends ListParams {
-	rack?: string
+	rack?: number
 }
 
 export function listShelves(params: ShelfListParams): Page<ShelfRow> {
@@ -342,7 +340,7 @@ export function listShelves(params: ShelfListParams): Page<ShelfRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getShelf(id: string): Result<ShelfRow, Error> {
+export function getShelf(id: number): Result<ShelfRow, Error> {
 	const row = getDb().select().from(rack_shelves).where(eq(rack_shelves.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Shelf not found'))
@@ -356,7 +354,7 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 		return Result.err(rack.error)
 	}
 	const candidate: OccupantSpan = {
-		id: '',
+		id: 0,
 		name: input.name,
 		position_u: input.position_u,
 		height_u: input.height_u ?? 1,
@@ -370,19 +368,29 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 	if (Result.isError(overlap)) {
 		return Result.err(overlap.error)
 	}
-	const row: ShelfRow = {
-		id: newId(),
+	const row: Omit<ShelfRow, 'id'> = {
 		rack_id: input.rack_id,
 		name: input.name,
 		position_u: input.position_u,
 		height_u: input.height_u ?? 1,
 		capacity_slots: input.capacity_slots ?? null,
 	}
-	getDb().insert(rack_shelves).values(row).run()
-	return Result.ok(row)
+	try {
+		const inserted = getDb()
+			.insert(rack_shelves)
+			.values(row)
+			.returning({ id: rack_shelves.id })
+			.get()
+		if (!inserted) {
+			return Result.err(new Error('Shelf insert did not return an id'))
+		}
+		return getShelf(inserted.id)
+	} catch (err) {
+		return Result.err(err instanceof Error ? err : new Error(String(err)))
+	}
 }
 
-export function updateShelf(id: string, input: ShelfUpdate): Result<ShelfRow, Error> {
+export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Error> {
 	const current = getShelf(id)
 	if (Result.isError(current)) {
 		return current
@@ -427,7 +435,7 @@ export function updateShelf(id: string, input: ShelfUpdate): Result<ShelfRow, Er
 	return getShelf(id)
 }
 
-export function deleteShelf(id: string): Result<ShelfRow, Error> {
+export function deleteShelf(id: number): Result<ShelfRow, Error> {
 	const current = getShelf(id)
 	if (Result.isError(current)) {
 		return current

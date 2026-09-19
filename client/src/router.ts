@@ -25,4 +25,16 @@ export function queryParam(key: string): string {
 	return new URLSearchParams(query).get(key) ?? ''
 }
 
+/**
+ * Parses a positive integer entity id from a URL segment or query value.
+ * Returns null for missing or malformed values so callers can 404 cleanly.
+ */
+export function parseId(raw: string | null | undefined): number | null {
+	if (raw === null || raw === undefined || raw === '') {
+		return null
+	}
+	const id = Number(raw)
+	return Number.isInteger(id) && id >= 1 ? id : null
+}
+
 export { path, setTagsChanged, tagsChanged }

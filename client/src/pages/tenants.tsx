@@ -33,14 +33,14 @@ export function TenantsPage(): JSX.Element {
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
 	const [sort, setSort] = createSignal<TenantSort>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
-	const [selected, setSelected] = createSignal<string[]>([])
+	const [selected, setSelected] = createSignal<number[]>([])
 	/**
 	 * Anchor for the row menu, rendered in a Portal so the table's scroll
 	 * container can never clip it. `edge` is a viewport `top` offset when
 	 * opening downward, a `bottom` offset when flipped upward.
 	 */
 	interface RowMenuAnchor {
-		id: string
+		id: number
 		name: string
 		edge: number
 		right: number
@@ -130,11 +130,11 @@ export function TenantsPage(): JSX.Element {
 		return order() === 'asc' ? 'ascending' : 'descending'
 	}
 
-	function isSelected(id: string): boolean {
+	function isSelected(id: number): boolean {
 		return selected().includes(id)
 	}
 
-	function toggleSelected(id: string): void {
+	function toggleSelected(id: number): void {
 		setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
 	}
 
@@ -163,7 +163,7 @@ export function TenantsPage(): JSX.Element {
 	 */
 	function toggleMenu(
 		e: MouseEvent & { currentTarget: HTMLButtonElement },
-		id: string,
+		id: number,
 		name: string,
 	): void {
 		if (openMenu()?.id === id) {
@@ -187,7 +187,7 @@ export function TenantsPage(): JSX.Element {
 		})
 	}
 
-	async function handleDelete(id: string, name: string): Promise<void> {
+	async function handleDelete(id: number, name: string): Promise<void> {
 		if (!window.confirm(`Delete tenant "${name}"?`)) {
 			return
 		}
@@ -232,7 +232,6 @@ export function TenantsPage(): JSX.Element {
 					+ Add
 				</button>
 			</div>
-			<p class="page-subtitle">Group sites, racks, and devices by tenant.</p>
 
 			<div class="toolbar-row">
 				<label class="toolbar-search">

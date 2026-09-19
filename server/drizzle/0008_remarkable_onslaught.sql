@@ -1,1 +1,0 @@
-ALTER TABLE `tenants` ADD `comments` text;

@@ -35,8 +35,8 @@ async function api(
 	return { status: res.status, body: parsed, headers: res.headers }
 }
 
-function idOf(res: { body: unknown }): string {
-	return (res.body as { id: string }).id
+function idOf(res: { body: unknown }): number {
+	return (res.body as { id: number }).id
 }
 
 beforeAll(async () => {
@@ -121,7 +121,7 @@ describe('device types', () => {
 		const mfrId = idOf(mfr)
 
 		const missing = await api('POST', '/device-types', {
-			manufacturer_id: 'missing',
+			manufacturer_id: 99999,
 			model: 'Ghost',
 			slug: 'p3-ghost',
 		})
@@ -162,7 +162,7 @@ describe('device types', () => {
 
 		const filtered = await api('GET', '/device-types', undefined, `?manufacturer=${mfrId}`)
 		expect((filtered.body as { total: number }).total).toBe(2)
-		const other = await api('GET', '/device-types', undefined, '?manufacturer=missing-mfr')
+		const other = await api('GET', '/device-types', undefined, '?manufacturer=99999')
 		expect((other.body as { total: number }).total).toBe(0)
 
 		const patched = await api('PATCH', `/device-types/${id}`, { u_height: 2 })
@@ -253,10 +253,10 @@ describe('stubs', () => {
 	})
 
 	test('stub endpoints 404 on unknown device type', async () => {
-		expect((await api('GET', '/device-types/missing/stubs')).status).toBe(404)
-		expect((await api('GET', '/device-types/missing/preview')).status).toBe(404)
+		expect((await api('GET', '/device-types/99999/stubs')).status).toBe(404)
+		expect((await api('GET', '/device-types/99999/preview')).status).toBe(404)
 		expect(
-			(await api('POST', '/device-types/missing/stubs', { prefix: 'eth', count: 1 })).status,
+			(await api('POST', '/device-types/99999/stubs', { prefix: 'eth', count: 1 })).status,
 		).toBe(404)
 	})
 })

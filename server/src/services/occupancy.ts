@@ -12,7 +12,7 @@ import { ConflictError } from '../db/errors'
  */
 
 export interface OccupantSpan {
-	id: string
+	id: number
 	name: string
 	position_u: number
 	height_u: number
@@ -20,8 +20,8 @@ export interface OccupantSpan {
 
 export interface ElevationUnit {
 	u: number
-	shelf: { id: string; name: string } | null
-	device: { id: string; name: string } | null
+	shelf: { id: number; name: string } | null
+	device: { id: number; name: string } | null
 }
 
 export interface OccupancyMap {
@@ -68,7 +68,7 @@ export function checkOverlap(
 	candidate: OccupantSpan,
 	existing: OccupantSpan[],
 	label: string,
-	excludeId?: string,
+	excludeId?: number,
 ): Result<undefined, Error> {
 	const range = spanRange(candidate)
 	for (const other of existing) {
@@ -125,14 +125,14 @@ export function getOccupancy(
 		seen.push(device)
 	}
 
-	const shelfByU = new Map<number, { id: string; name: string }>()
+	const shelfByU = new Map<number, { id: number; name: string }>()
 	for (const shelf of shelves) {
 		const [first, last] = spanRange(shelf)
 		for (let u = first; u <= last; u += 1) {
 			shelfByU.set(u, { id: shelf.id, name: shelf.name })
 		}
 	}
-	const deviceByU = new Map<number, { id: string; name: string }>()
+	const deviceByU = new Map<number, { id: number; name: string }>()
 	for (const device of devices) {
 		const [first, last] = spanRange(device)
 		for (let u = first; u <= last; u += 1) {

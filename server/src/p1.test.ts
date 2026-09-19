@@ -36,8 +36,8 @@ async function api(
 	return { status: res.status, body: parsed, headers: res.headers }
 }
 
-function idOf(res: { body: unknown }): string {
-	return (res.body as { id: string }).id
+function idOf(res: { body: unknown }): number {
+	return (res.body as { id: number }).id
 }
 
 beforeAll(async () => {
@@ -201,12 +201,12 @@ describe('locations', () => {
 		// Cleanup deepest-first.
 		const all = (await api('GET', '/locations', undefined, `?site=${siteId}&limit=200`))
 			.body as {
-			items: Array<{ id: string; parent_id: string | null }>
+			items: Array<{ id: number; parent_id: number | null }>
 		}
 		const byId = new Map(all.items.map((l) => [l.id, l.parent_id]))
-		const depthOfTest = (id: string): number => {
+		const depthOfTest = (id: number): number => {
 			let d = 0
-			let cur: string | null | undefined = id
+			let cur: number | null | undefined = id
 			while (cur) {
 				d += 1
 				cur = byId.get(cur) ?? null
@@ -224,7 +224,7 @@ describe('locations', () => {
 	test('moving a subtree past the depth cap is rejected', async () => {
 		const site = await api('POST', '/sites', { name: 'Depth', slug: 'depth-site' })
 		const siteId = idOf(site)
-		const mk = async (slug: string, parent: string | null): Promise<string> => {
+		const mk = async (slug: string, parent: number | null): Promise<number> => {
 			const res = await api('POST', '/locations', {
 				name: slug,
 				slug,
@@ -235,7 +235,7 @@ describe('locations', () => {
 			return idOf(res)
 		}
 		// Chain a1..a5 (depth 5) and a separate root b with child b1.
-		let p: string | null = null
+		let p: number | null = null
 		for (let i = 1; i <= 5; i += 1) {
 			p = await mk(`a${i}`, p)
 		}
@@ -246,19 +246,19 @@ describe('locations', () => {
 		// Moving leaf b1 under a4 (depth 4) lands exactly at 5: allowed.
 		const a4 = (
 			(await api('GET', '/locations', undefined, `?site=${siteId}&search=a4`)).body as {
-				items: Array<{ id: string }>
+				items: Array<{ id: number }>
 			}
 		).items[0].id
 		expect((await api('PATCH', `/locations/${b1}`, { parent_id: a4 })).status).toBe(200)
 
 		const all = (await api('GET', '/locations', undefined, `?site=${siteId}&limit=200`))
 			.body as {
-			items: Array<{ id: string; parent_id: string | null }>
+			items: Array<{ id: number; parent_id: number | null }>
 		}
 		const byId = new Map(all.items.map((l) => [l.id, l.parent_id]))
-		const depth = (id: string): number => {
+		const depth = (id: number): number => {
 			let d = 0
-			let cur: string | null | undefined = id
+			let cur: number | null | undefined = id
 			while (cur) {
 				d += 1
 				cur = byId.get(cur) ?? null

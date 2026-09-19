@@ -11,7 +11,7 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /** /tenants/:id/edit — tenant edit form. Saves back to the detail page. */
-export function TenantEditPage(props: { id: string }): JSX.Element {
+export function TenantEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
 	const [description, setDescription] = createSignal('')
@@ -22,7 +22,7 @@ export function TenantEditPage(props: { id: string }): JSX.Element {
 
 	const [tenant] = createResource(
 		() => props.id,
-		async (id: string) => {
+		async (id: number) => {
 			const res = await fetch_tenant(id)
 			if (Result.isError(res)) {
 				setFormError(res.error.message)

@@ -10,7 +10,7 @@ import {
 	type SiteRow,
 	type TenantRow,
 } from '../api_p1'
-import { navigate, queryParam } from '../router'
+import { navigate, parseId, queryParam } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -39,7 +39,7 @@ export function SitesPage(): JSX.Element {
 		return res.value.items
 	})
 	const [sites, { refetch }] = createResource(filterTenant, async (tenant) => {
-		const res = await fetch_sites(tenant || undefined)
+		const res = await fetch_sites(parseId(tenant) ?? undefined)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return []
@@ -47,17 +47,17 @@ export function SitesPage(): JSX.Element {
 		return res.value.items
 	})
 
-	function tenantNameOf(id: string | null): string {
+	function tenantNameOf(id: number | null): string {
 		if (!id) {
 			return '—'
 		}
-		return tenants()?.find((t) => t.id === id)?.name ?? id.slice(0, 8)
+		return tenants()?.find((t) => t.id === id)?.name ?? String(id)
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
-		const res = await create_site(name(), slug(), tenantId() || null)
+		const res = await create_site(name(), slug(), tenantId() ? Number(tenantId()) : null)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
@@ -68,7 +68,7 @@ export function SitesPage(): JSX.Element {
 		void refetch()
 	}
 
-	async function handleDelete(id: string): Promise<void> {
+	async function handleDelete(id: number): Promise<void> {
 		setError(null)
 		const res = await delete_site(id)
 		if (Result.isError(res)) {
@@ -81,7 +81,6 @@ export function SitesPage(): JSX.Element {
 	return (
 		<div>
 			<h2>Sites</h2>
-			<p class="page-subtitle">Group racks by site and tenant.</p>
 			<label>
 				Tenant filter:{' '}
 				<select

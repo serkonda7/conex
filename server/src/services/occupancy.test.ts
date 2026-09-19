@@ -55,8 +55,8 @@ describe('checkBounds', () => {
 describe('checkOverlap', () => {
 	test('non-overlapping siblings pass', () => {
 		const res = checkOverlap(
-			{ id: 'b', name: 'b', position_u: 12, height_u: 1 },
-			[{ id: 'a', name: 'a', position_u: 10, height_u: 1 }],
+			{ id: 2, name: 'b', position_u: 12, height_u: 1 },
+			[{ id: 1, name: 'a', position_u: 10, height_u: 1 }],
 			'Shelf "b"',
 		)
 		expect(Result.isOk(res)).toBe(true)
@@ -64,8 +64,8 @@ describe('checkOverlap', () => {
 
 	test('overlapping sibling is rejected', () => {
 		const res = checkOverlap(
-			{ id: 'b', name: 'b', position_u: 10, height_u: 2 },
-			[{ id: 'a', name: 'a', position_u: 10, height_u: 1 }],
+			{ id: 2, name: 'b', position_u: 10, height_u: 2 },
+			[{ id: 1, name: 'a', position_u: 10, height_u: 1 }],
 			'Shelf "b"',
 		)
 		expect(Result.isError(res)).toBe(true)
@@ -73,10 +73,10 @@ describe('checkOverlap', () => {
 
 	test('excluded id (self on update) does not conflict', () => {
 		const res = checkOverlap(
-			{ id: 'a', name: 'a', position_u: 10, height_u: 1 },
-			[{ id: 'a', name: 'a', position_u: 10, height_u: 1 }],
+			{ id: 1, name: 'a', position_u: 10, height_u: 1 },
+			[{ id: 1, name: 'a', position_u: 10, height_u: 1 }],
 			'Shelf "a"',
-			'a',
+			1,
 		)
 		expect(Result.isOk(res)).toBe(true)
 	})
@@ -84,7 +84,7 @@ describe('checkOverlap', () => {
 
 describe('getOccupancy', () => {
 	test('42U rack with a shelf at U10 h1 marks exactly U10', () => {
-		const res = getOccupancy(42, [{ id: 's1', name: 'shelf', position_u: 10, height_u: 1 }])
+		const res = getOccupancy(42, [{ id: 11, name: 'shelf', position_u: 10, height_u: 1 }])
 		expect(Result.isOk(res)).toBe(true)
 		if (Result.isError(res)) {
 			return
@@ -93,7 +93,7 @@ describe('getOccupancy', () => {
 		expect(res.value.units).toHaveLength(42)
 		for (const unit of res.value.units) {
 			if (unit.u === 10) {
-				expect(unit.shelf).toEqual({ id: 's1', name: 'shelf' })
+				expect(unit.shelf).toEqual({ id: 11, name: 'shelf' })
 			} else {
 				expect(unit.shelf).toBeNull()
 			}
@@ -102,7 +102,7 @@ describe('getOccupancy', () => {
 	})
 
 	test('multi-U shelf fills every covered U', () => {
-		const res = getOccupancy(42, [{ id: 's1', name: 'big', position_u: 5, height_u: 3 }])
+		const res = getOccupancy(42, [{ id: 11, name: 'big', position_u: 5, height_u: 3 }])
 		expect(Result.isOk(res)).toBe(true)
 		if (Result.isError(res)) {
 			return
@@ -113,14 +113,14 @@ describe('getOccupancy', () => {
 
 	test('overlapping shelves are rejected', () => {
 		const res = getOccupancy(42, [
-			{ id: 'a', name: 'a', position_u: 10, height_u: 2 },
-			{ id: 'b', name: 'b', position_u: 11, height_u: 1 },
+			{ id: 1, name: 'a', position_u: 10, height_u: 2 },
+			{ id: 2, name: 'b', position_u: 11, height_u: 1 },
 		])
 		expect(Result.isError(res)).toBe(true)
 	})
 
 	test('out-of-bounds shelf is rejected', () => {
-		const res = getOccupancy(42, [{ id: 'a', name: 'a', position_u: 42, height_u: 2 }])
+		const res = getOccupancy(42, [{ id: 1, name: 'a', position_u: 42, height_u: 2 }])
 		expect(Result.isError(res)).toBe(true)
 	})
 })

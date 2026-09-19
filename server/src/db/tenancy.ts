@@ -62,10 +62,6 @@ function searchPattern(raw: string): string {
 	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
-function newId(): string {
-	return Bun.randomUUIDv7()
-}
-
 // ---------------------------------------------------------------------------
 // Tenants
 // ---------------------------------------------------------------------------
@@ -95,14 +91,14 @@ export function listTenants(params: TenantListParams): Page<TenantListItem> {
 
 	// NetBox-style related-object counts for the list view. One grouped
 	// query per table keeps this O(1) queries instead of O(page size).
-	const counts = new Map<string, { sites: number; racks: number; devices: number }>()
+	const counts = new Map<number, { sites: number; racks: number; devices: number }>()
 	for (const t of items) {
 		counts.set(t.id, { sites: 0, racks: 0, devices: 0 })
 	}
 	if (items.length > 0) {
 		const ids = items.map((t) => t.id)
 		const apply = (
-			tenantId: string | null,
+			tenantId: number | null,
 			key: 'sites' | 'racks' | 'devices',
 			n: number,
 		): void => {
@@ -152,7 +148,7 @@ export function listTenants(params: TenantListParams): Page<TenantListItem> {
 	)
 }
 
-export function getTenant(id: string): Result<TenantRow, Error> {
+export function getTenant(id: number): Result<TenantRow, Error> {
 	const row = getDb().select().from(tenants).where(eq(tenants.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Tenant not found'))
@@ -166,25 +162,27 @@ export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
 	if (clash) {
 		return Result.err(new DuplicateError('Tenant slug is already in use'))
 	}
-	const row: TenantRow = {
-		id: newId(),
+	const row: Omit<TenantRow, 'id'> = {
 		name: input.name,
 		slug: input.slug,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
 	try {
-		db.insert(tenants).values(row).run()
+		const inserted = db.insert(tenants).values(row).returning({ id: tenants.id }).get()
+		if (!inserted) {
+			return Result.err(new Error('Tenant insert did not return an id'))
+		}
+		return getTenant(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Tenant slug is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
-export function updateTenant(id: string, input: TenantUpdate): Result<TenantRow, Error> {
+export function updateTenant(id: number, input: TenantUpdate): Result<TenantRow, Error> {
 	const current = getTenant(id)
 	if (Result.isError(current)) {
 		return current
@@ -222,7 +220,7 @@ export function updateTenant(id: string, input: TenantUpdate): Result<TenantRow,
 	return getTenant(id)
 }
 
-export function deleteTenant(id: string): Result<TenantRow, Error> {
+export function deleteTenant(id: number): Result<TenantRow, Error> {
 	const current = getTenant(id)
 	if (Result.isError(current)) {
 		return current
@@ -245,7 +243,7 @@ export function deleteTenant(id: string): Result<TenantRow, Error> {
 // ---------------------------------------------------------------------------
 
 export interface SiteListParams extends ListParams {
-	tenant?: string
+	tenant?: number
 }
 
 export function listSites(params: SiteListParams): Page<SiteRow> {
@@ -273,7 +271,7 @@ export function listSites(params: SiteListParams): Page<SiteRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getSite(id: string): Result<SiteRow, Error> {
+export function getSite(id: number): Result<SiteRow, Error> {
 	const row = getDb().select().from(sites).where(eq(sites.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Site not found'))
@@ -281,7 +279,7 @@ export function getSite(id: string): Result<SiteRow, Error> {
 	return Result.ok(row)
 }
 
-function checkTenant(tenantId: string | null | undefined): Result<undefined, Error> {
+function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
 	if (tenantId === null || tenantId === undefined) {
 		return Result.ok(undefined)
 	}
@@ -302,8 +300,7 @@ export function createSite(input: SiteCreate): Result<SiteRow, Error> {
 	if (clash) {
 		return Result.err(new DuplicateError('Site slug is already in use'))
 	}
-	const row: SiteRow = {
-		id: newId(),
+	const row: Omit<SiteRow, 'id'> = {
 		tenant_id: input.tenant_id ?? null,
 		name: input.name,
 		slug: input.slug,
@@ -311,17 +308,20 @@ export function createSite(input: SiteCreate): Result<SiteRow, Error> {
 		description: input.description ?? null,
 	}
 	try {
-		db.insert(sites).values(row).run()
+		const inserted = db.insert(sites).values(row).returning({ id: sites.id }).get()
+		if (!inserted) {
+			return Result.err(new Error('Site insert did not return an id'))
+		}
+		return getSite(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Site slug is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
-export function updateSite(id: string, input: SiteUpdate): Result<SiteRow, Error> {
+export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error> {
 	const current = getSite(id)
 	if (Result.isError(current)) {
 		return current
@@ -368,7 +368,7 @@ export function updateSite(id: string, input: SiteUpdate): Result<SiteRow, Error
 	return getSite(id)
 }
 
-export function deleteSite(id: string): Result<SiteRow, Error> {
+export function deleteSite(id: number): Result<SiteRow, Error> {
 	const current = getSite(id)
 	if (Result.isError(current)) {
 		return current
@@ -390,9 +390,9 @@ export function deleteSite(id: string): Result<SiteRow, Error> {
 // ---------------------------------------------------------------------------
 
 export interface LocationListParams extends ListParams {
-	site?: string
-	tenant?: string
-	parent?: string
+	site?: number
+	tenant?: number
+	parent?: number
 }
 
 export function listLocations(params: LocationListParams): Page<LocationRow> {
@@ -426,7 +426,7 @@ export function listLocations(params: LocationListParams): Page<LocationRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getLocation(id: string): Result<LocationRow, Error> {
+export function getLocation(id: number): Result<LocationRow, Error> {
 	const row = getDb().select().from(locations).where(eq(locations.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Location not found'))
@@ -435,10 +435,10 @@ export function getLocation(id: string): Result<LocationRow, Error> {
 }
 
 function siblingSlugClash(
-	siteId: string,
-	parentId: string | null,
+	siteId: number,
+	parentId: number | null,
 	slug: string,
-	excludeId?: string,
+	excludeId?: number,
 ): boolean {
 	const db = getDb()
 	const parentCond =
@@ -452,7 +452,7 @@ function siblingSlugClash(
 }
 
 /** Parent links of every location in a site, for depth/cycle checks. */
-function siteParentMap(siteId: string): Map<string, string | null> {
+function siteParentMap(siteId: number): Map<number, number | null> {
 	const rows = getDb()
 		.select({ id: locations.id, parent_id: locations.parent_id })
 		.from(locations)
@@ -490,8 +490,7 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 	if (siblingSlugClash(input.site_id, parentId, input.slug)) {
 		return Result.err(new DuplicateError('Location slug is already used under this parent'))
 	}
-	const row: LocationRow = {
-		id: newId(),
+	const row: Omit<LocationRow, 'id'> = {
 		site_id: input.site_id,
 		parent_id: parentId,
 		tenant_id: input.tenant_id ?? null,
@@ -500,17 +499,20 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 		description: input.description ?? null,
 	}
 	try {
-		db.insert(locations).values(row).run()
+		const inserted = db.insert(locations).values(row).returning({ id: locations.id }).get()
+		if (!inserted) {
+			return Result.err(new Error('Location insert did not return an id'))
+		}
+		return getLocation(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Location slug is already used under this parent'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return Result.ok(row)
 }
 
-export function updateLocation(id: string, input: LocationUpdate): Result<LocationRow, Error> {
+export function updateLocation(id: number, input: LocationUpdate): Result<LocationRow, Error> {
 	const current = getLocation(id)
 	if (Result.isError(current)) {
 		return current
@@ -585,7 +587,7 @@ export function updateLocation(id: string, input: LocationUpdate): Result<Locati
 	return getLocation(id)
 }
 
-export function deleteLocation(id: string): Result<LocationRow, Error> {
+export function deleteLocation(id: number): Result<LocationRow, Error> {
 	const current = getLocation(id)
 	if (Result.isError(current)) {
 		return current

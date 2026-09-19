@@ -18,12 +18,12 @@ function go(e: MouseEvent, to: string): void {
  * Tenant name links elsewhere navigate here; the edit dialog stays inline
  * so the list page keeps its quick-edit affordance.
  */
-export function TenantDetailPage(props: { id: string }): JSX.Element {
+export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 
 	const [tenant] = createResource(
 		() => props.id,
-		async (id: string) => {
+		async (id: number) => {
 			setError(null)
 			const res = await fetch_tenant(id)
 			if (Result.isError(res)) {
@@ -35,7 +35,7 @@ export function TenantDetailPage(props: { id: string }): JSX.Element {
 	)
 	const [sites] = createResource(
 		() => props.id,
-		async (id: string) => {
+		async (id: number) => {
 			const res = await fetch_sites(id)
 			if (Result.isError(res)) {
 				setError(res.error.message)
@@ -46,7 +46,7 @@ export function TenantDetailPage(props: { id: string }): JSX.Element {
 	)
 	const [racks] = createResource(
 		() => props.id,
-		async (id: string) => {
+		async (id: number) => {
 			const res = await fetch_racks({ tenant: id })
 			if (Result.isError(res)) {
 				setError(res.error.message)
@@ -57,7 +57,7 @@ export function TenantDetailPage(props: { id: string }): JSX.Element {
 	)
 	const [devices] = createResource(
 		() => props.id,
-		async (id: string) => {
+		async (id: number) => {
 			const res = await fetch_devices({ tenant: id })
 			if (Result.isError(res)) {
 				setError(res.error.message)

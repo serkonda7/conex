@@ -26,9 +26,9 @@ async function getPage<T>(
 
 export interface DeviceFilters {
 	search?: string
-	site?: string
-	rack?: string
-	tenant?: string
+	site?: number
+	rack?: number
+	tenant?: number
 	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
 }
 
@@ -41,9 +41,9 @@ export async function fetch_devices(
 				search: filters?.search ?? '',
 				page: '1',
 				limit: '200',
-				site: filters?.site,
-				rack: filters?.rack,
-				tenant: filters?.tenant,
+				site: filters?.site === undefined ? undefined : String(filters.site),
+				rack: filters?.rack === undefined ? undefined : String(filters.rack),
+				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
 				status: filters?.status,
 			},
 		}),
@@ -51,18 +51,18 @@ export async function fetch_devices(
 	)
 }
 
-export async function fetch_device(id: string): Promise<Result<DeviceRow, Error>> {
-	const res = await client.devices[':id'].$get({ param: { id } })
+export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {
+	const res = await client.devices[':id'].$get({ param: { id: String(id) } })
 	return to_result<DeviceRow>(res, 'Failed to load device')
 }
 
 export async function create_device(input: {
-	device_type_id: string
+	device_type_id: number
 	name: string
-	site_id?: string | null
-	rack_id?: string | null
+	site_id?: number | null
+	rack_id?: number | null
 	position_u?: number | null
-	shelf_id?: string | null
+	shelf_id?: number | null
 	asset_tag?: string | null
 	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
 }): Promise<Result<DeviceRow, Error>> {
@@ -71,15 +71,15 @@ export async function create_device(input: {
 }
 
 export async function move_device(
-	id: string,
-	input: { rack_id?: string | null; position_u?: number | null; shelf_id?: string | null },
+	id: number,
+	input: { rack_id?: number | null; position_u?: number | null; shelf_id?: number | null },
 ): Promise<Result<DeviceRow, Error>> {
-	const res = await client.devices[':id'].move.$post({ param: { id }, json: input })
+	const res = await client.devices[':id'].move.$post({ param: { id: String(id) }, json: input })
 	return to_result<DeviceRow>(res, 'Failed to move device')
 }
 
-export async function delete_device(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.devices[':id'].$delete({ param: { id } })
+export async function delete_device(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.devices[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete device')
 }
 
@@ -87,29 +87,29 @@ export async function delete_device(id: string): Promise<Result<unknown, Error>>
 // Interfaces
 // ---------------------------------------------------------------------------
 
-export async function fetch_interfaces(deviceId: string): Promise<Result<InterfaceJson[], Error>> {
-	const res = await client.devices[':id'].interfaces.$get({ param: { id: deviceId } })
+export async function fetch_interfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
+	const res = await client.devices[':id'].interfaces.$get({ param: { id: String(deviceId) } })
 	return to_result<InterfaceJson[]>(res, 'Failed to load interfaces')
 }
 
 export async function add_interface(
-	deviceId: string,
+	deviceId: number,
 	input: { name: string; kind?: string },
 ): Promise<Result<InterfaceJson, Error>> {
 	const res = await client.devices[':id'].interfaces.$post({
-		param: { id: deviceId },
+		param: { id: String(deviceId) },
 		json: input,
 	})
 	return to_result<InterfaceJson>(res, 'Failed to add interface')
 }
 
 export async function update_interface(
-	deviceId: string,
-	ifaceId: string,
+	deviceId: number,
+	ifaceId: number,
 	input: { name?: string; kind?: string },
 ): Promise<Result<InterfaceJson, Error>> {
 	const res = await client.devices[':id'].interfaces[':ifaceId'].$patch({
-		param: { id: deviceId, ifaceId },
+		param: { id: String(deviceId), ifaceId: String(ifaceId) },
 		json: input,
 	})
 	return to_result<InterfaceJson>(res, 'Failed to update interface')

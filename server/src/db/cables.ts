@@ -22,18 +22,14 @@ function searchPattern(raw: string): string {
 	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
-function newId(): string {
-	return Bun.randomUUIDv7()
-}
-
 // ---------------------------------------------------------------------------
 // Cables
 // ---------------------------------------------------------------------------
 
 export interface CableListParams extends ListParams {
 	status?: string
-	interface?: string
-	device?: string
+	interface?: number
+	device?: number
 }
 
 export function listCables(params: CableListParams): Page<CableRow> {
@@ -89,7 +85,7 @@ export function listCables(params: CableListParams): Page<CableRow> {
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getCable(id: string): Result<CableRow, Error> {
+export function getCable(id: number): Result<CableRow, Error> {
 	const row = getDb().select().from(cables).where(eq(cables.id, id)).get()
 	if (!row) {
 		return Result.err(new NotFoundError('Cable not found'))
@@ -97,7 +93,7 @@ export function getCable(id: string): Result<CableRow, Error> {
 	return Result.ok(row)
 }
 
-export function getCableForInterface(interfaceId: string): CableRow | undefined {
+export function getCableForInterface(interfaceId: number): CableRow | undefined {
 	return getDb()
 		.select()
 		.from(cables)
@@ -105,7 +101,7 @@ export function getCableForInterface(interfaceId: string): CableRow | undefined 
 		.get()
 }
 
-function getInterfaceRow(id: string): InterfaceRow | undefined {
+function getInterfaceRow(id: number): InterfaceRow | undefined {
 	return getDb().select().from(interfaces).where(eq(interfaces.id, id)).get()
 }
 
@@ -136,8 +132,7 @@ export function connectCable(input: CableCreate): Result<CableRow, Error> {
 	if (b.connected !== 0 || getCableForInterface(b.id)) {
 		return Result.err(new ConflictError(`Interface ${b.name} is already connected`))
 	}
-	const row: CableRow = {
-		id: newId(),
+	const row: Omit<CableRow, 'id'> = {
 		a_interface_id: input.a_interface_id,
 		b_interface_id: input.b_interface_id,
 		status: input.status ?? 'connected',
@@ -145,9 +140,14 @@ export function connectCable(input: CableCreate): Result<CableRow, Error> {
 		label: input.label ?? null,
 		description: input.description ?? null,
 	}
+	let cableId: number | undefined
 	try {
 		getDb().transaction((tx) => {
-			tx.insert(cables).values(row).run()
+			const inserted = tx.insert(cables).values(row).returning({ id: cables.id }).get()
+			if (!inserted) {
+				throw new Error('Cable insert did not return an id')
+			}
+			cableId = inserted.id
 			tx.update(interfaces).set({ connected: 1 }).where(eq(interfaces.id, a.id)).run()
 			tx.update(interfaces).set({ connected: 1 }).where(eq(interfaces.id, b.id)).run()
 		})
@@ -157,10 +157,13 @@ export function connectCable(input: CableCreate): Result<CableRow, Error> {
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return getCable(row.id)
+	if (cableId === undefined) {
+		return Result.err(new Error('Cable insert did not return an id'))
+	}
+	return getCable(cableId)
 }
 
-export function updateCable(id: string, input: CableUpdate): Result<CableRow, Error> {
+export function updateCable(id: number, input: CableUpdate): Result<CableRow, Error> {
 	const current = getCable(id)
 	if (Result.isError(current)) {
 		return current
@@ -196,7 +199,7 @@ export function updateCable(id: string, input: CableUpdate): Result<CableRow, Er
  * interface rows (e.g. after a forced cleanup) are tolerated: the flags that
  * can be cleared are cleared and the cable row is always removed.
  */
-export function deleteCable(id: string): Result<CableRow, Error> {
+export function deleteCable(id: number): Result<CableRow, Error> {
 	const current = getCable(id)
 	if (Result.isError(current)) {
 		return current
@@ -217,7 +220,7 @@ export function deleteCable(id: string): Result<CableRow, Error> {
 }
 
 /** True when any cable touches an interface of the device (blocks device delete). */
-export function deviceHasCables(deviceId: string): boolean {
+export function deviceHasCables(deviceId: number): boolean {
 	const db = getDb()
 	const ifaceIds = db
 		.select({ id: interfaces.id })
@@ -237,7 +240,7 @@ export function deviceHasCables(deviceId: string): boolean {
  * Per-device trace: every local interface carrying a cable resolves to its
  * peer as `dev:port <-> dev:port`. Unconnected local ports produce no link.
  */
-export function getDeviceTrace(deviceId: string): Result<DeviceTraceResponse, Error> {
+export function getDeviceTrace(deviceId: number): Result<DeviceTraceResponse, Error> {
 	const db = getDb()
 	const device = db.select().from(devices).where(eq(devices.id, deviceId)).get()
 	if (!device) {

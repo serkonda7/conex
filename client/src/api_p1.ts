@@ -77,13 +77,13 @@ export async function create_tenant(input: TenantCreateInput): Promise<Result<Te
 	return to_result<TenantRow>(res, 'Failed to create tenant')
 }
 
-export async function fetch_tenant(id: string): Promise<Result<TenantRow, Error>> {
-	const res = await client.tenants[':id'].$get({ param: { id } })
+export async function fetch_tenant(id: number): Promise<Result<TenantRow, Error>> {
+	const res = await client.tenants[':id'].$get({ param: { id: String(id) } })
 	return to_result<TenantRow>(res, 'Failed to load tenant')
 }
 
-export async function delete_tenant(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.tenants[':id'].$delete({ param: { id } })
+export async function delete_tenant(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.tenants[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete tenant')
 }
 
@@ -95,10 +95,10 @@ export interface TenantUpdateInput {
 }
 
 export async function update_tenant(
-	id: string,
+	id: number,
 	patch: TenantUpdateInput,
 ): Promise<Result<TenantRow, Error>> {
-	const res = await client.tenants[':id'].$patch({ param: { id }, json: patch })
+	const res = await client.tenants[':id'].$patch({ param: { id: String(id) }, json: patch })
 	return to_result<TenantRow>(res, 'Failed to update tenant')
 }
 
@@ -106,29 +106,36 @@ export async function update_tenant(
 // Sites
 // ---------------------------------------------------------------------------
 
-export async function fetch_sites(tenant?: string): Promise<Result<Page<SiteRow>, Error>> {
+export async function fetch_sites(tenant?: number): Promise<Result<Page<SiteRow>, Error>> {
 	return getPage<SiteRow>(
-		client.sites.$get({ query: { search: '', page: '1', limit: '200', tenant } }),
+		client.sites.$get({
+			query: {
+				search: '',
+				page: '1',
+				limit: '200',
+				tenant: tenant === undefined ? undefined : String(tenant),
+			},
+		}),
 		'Failed to load sites',
 	)
 }
 
-export async function fetch_site(id: string): Promise<Result<SiteRow, Error>> {
-	const res = await client.sites[':id'].$get({ param: { id } })
+export async function fetch_site(id: number): Promise<Result<SiteRow, Error>> {
+	const res = await client.sites[':id'].$get({ param: { id: String(id) } })
 	return to_result<SiteRow>(res, 'Failed to load site')
 }
 
 export async function create_site(
 	name: string,
 	slug: string,
-	tenant_id: string | null,
+	tenant_id: number | null,
 ): Promise<Result<SiteRow, Error>> {
 	const res = await client.sites.$post({ json: { name, slug, tenant_id } })
 	return to_result<SiteRow>(res, 'Failed to create site')
 }
 
-export async function delete_site(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.sites[':id'].$delete({ param: { id } })
+export async function delete_site(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.sites[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete site')
 }
 
@@ -136,9 +143,16 @@ export async function delete_site(id: string): Promise<Result<unknown, Error>> {
 // Locations
 // ---------------------------------------------------------------------------
 
-export async function fetch_locations(site: string): Promise<Result<Page<LocationRow>, Error>> {
+export async function fetch_locations(site: number): Promise<Result<Page<LocationRow>, Error>> {
 	return getPage<LocationRow>(
-		client.locations.$get({ query: { search: '', page: '1', limit: '200', site } }),
+		client.locations.$get({
+			query: {
+				search: '',
+				page: '1',
+				limit: '200',
+				site: site === undefined ? undefined : String(site),
+			},
+		}),
 		'Failed to load locations',
 	)
 }
@@ -146,14 +160,14 @@ export async function fetch_locations(site: string): Promise<Result<Page<Locatio
 export async function create_location(
 	name: string,
 	slug: string,
-	site_id: string,
-	parent_id: string | null,
+	site_id: number,
+	parent_id: number | null,
 ): Promise<Result<LocationRow, Error>> {
 	const res = await client.locations.$post({ json: { name, slug, site_id, parent_id } })
 	return to_result<LocationRow>(res, 'Failed to create location')
 }
 
-export async function delete_location(id: string): Promise<Result<unknown, Error>> {
-	const res = await client.locations[':id'].$delete({ param: { id } })
+export async function delete_location(id: number): Promise<Result<unknown, Error>> {
+	const res = await client.locations[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete location')
 }

@@ -15,7 +15,7 @@ function go(e: MouseEvent, to: string): void {
  * blocks and position-mounted devices as linked blocks; free U rows carry a
  * placeholder affordance that selects the U for device placement.
  */
-export function RackDetailPage(props: { id: string }): JSX.Element {
+export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [shelfName, setShelfName] = createSignal('')
 	const [shelfU, setShelfU] = createSignal('')
@@ -61,7 +61,7 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 		void refetch()
 	}
 
-	async function handleDeleteShelf(id: string): Promise<void> {
+	async function handleDeleteShelf(id: number): Promise<void> {
 		setError(null)
 		const res = await delete_shelf(id)
 		if (Result.isError(res)) {
@@ -153,9 +153,11 @@ export function RackDetailPage(props: { id: string }): JSX.Element {
 											<button
 												type="button"
 												class="btn-danger"
-												onClick={() =>
-													handleDeleteShelf(unit.shelf?.id ?? '')
-												}
+												onClick={() => {
+													if (unit.shelf) {
+														handleDeleteShelf(unit.shelf.id)
+													}
+												}}
 											>
 												Delete shelf
 											</button>

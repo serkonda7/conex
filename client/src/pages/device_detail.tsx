@@ -28,7 +28,7 @@ function go(e: MouseEvent, to: string): void {
  * dialog (free-port pickers on both ends), the per-device trace peer links
  * (`dev:port <-> dev:port`), and the cable list with disconnect.
  */
-export function DeviceDetailPage(props: { id: string }): JSX.Element {
+export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [ifaceName, setIfaceName] = createSignal('')
 	const [moveU, setMoveU] = createSignal('')
@@ -83,7 +83,7 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 			if (!peerId) {
 				return []
 			}
-			const res = await fetch_interfaces(peerId)
+			const res = await fetch_interfaces(Number(peerId))
 			if (Result.isError(res)) {
 				setError(res.error.message)
 				return []
@@ -126,7 +126,7 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 			setError('Rack position must be a positive U number or empty')
 			return
 		}
-		const shelf = moveShelf().trim() === '' ? undefined : moveShelf().trim()
+		const shelf = moveShelf().trim() === '' ? undefined : Number(moveShelf().trim())
 		if (position === undefined && shelf === undefined) {
 			setError('Enter a U position or a shelf id to move')
 			return
@@ -152,8 +152,8 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 			return
 		}
 		const res = await create_cable({
-			a_interface_id: localIface(),
-			b_interface_id: peerIface(),
+			a_interface_id: Number(localIface()),
+			b_interface_id: Number(peerIface()),
 			label: cableLabel().trim() === '' ? undefined : cableLabel().trim(),
 		})
 		if (Result.isError(res)) {
@@ -166,7 +166,7 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 		refetchAll()
 	}
 
-	async function handleDisconnect(cableId: string): Promise<void> {
+	async function handleDisconnect(cableId: number): Promise<void> {
 		setError(null)
 		const res = await delete_cable(cableId)
 		if (Result.isError(res)) {
@@ -193,7 +193,7 @@ export function DeviceDetailPage(props: { id: string }): JSX.Element {
 				<p>
 					Mount:{' '}
 					{device()?.shelf_id ? (
-						<code>shelf:{device()?.shelf_id?.slice(0, 8)}</code>
+						<code>shelf:{device()?.shelf_id}</code>
 					) : device()?.position_u !== null ? (
 						<code>U{device()?.position_u}</code>
 					) : (
