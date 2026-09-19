@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
-import { MAX_LOCATION_DEPTH, SlugSchema } from 'shared/src/schemas'
+import { MAX_LOCATION_DEPTH, MAX_SITE_GROUP_DEPTH, SlugSchema } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { createLocalUser } from './db/users'
 import { createApp } from './index'
@@ -88,9 +88,37 @@ describe('tenants and sites', () => {
 			name: 'DC1',
 			slug: 'dc1',
 			tenant_id: idOf(t1),
-			group: 'primary',
+			comments: 'Main datacenter',
+			physical_address: '123 Main St',
+			shipping_address: 'PO Box 456',
 		})
 		expect(site.status).toBe(201)
+		const siteId = idOf(site)
+		const siteBody = site.body as Record<string, unknown>
+		expect(siteBody.comments).toBe('Main datacenter')
+		expect(siteBody.physical_address).toBe('123 Main St')
+		expect(siteBody.shipping_address).toBe('PO Box 456')
+
+		const fetched = await api('GET', `/sites/${siteId}`)
+		expect(fetched.status).toBe(200)
+		const fetchedBody = fetched.body as Record<string, unknown>
+		expect(fetchedBody.comments).toBe('Main datacenter')
+		expect(fetchedBody.physical_address).toBe('123 Main St')
+		expect(fetchedBody.shipping_address).toBe('PO Box 456')
+
+		const patched = await api('PATCH', `/sites/${siteId}`, {
+			physical_address: '789 Updated Ave',
+			shipping_address: null,
+		})
+		expect(patched.status).toBe(200)
+		const patchedBody = patched.body as Record<string, unknown>
+		expect(patchedBody.physical_address).toBe('789 Updated Ave')
+		expect(patchedBody.shipping_address).toBeNull()
+		expect(patchedBody.comments).toBe('Main datacenter')
+
+		const refetched = await api('GET', `/sites/${siteId}`)
+		expect((refetched.body as Record<string, unknown>).physical_address).toBe('789 Updated Ave')
+		expect((refetched.body as Record<string, unknown>).shipping_address).toBeNull()
 
 		const dupSite = await api('POST', '/sites', { name: 'DC1 copy', slug: 'dc1' })
 		expect(dupSite.status).toBe(409)
@@ -269,5 +297,137 @@ describe('locations', () => {
 			expect((await api('DELETE', `/locations/${loc.id}`)).status).toBe(200)
 		}
 		expect((await api('DELETE', `/sites/${siteId}`)).status).toBe(200)
+	})
+})
+
+describe('site groups', () => {
+	test('nesting, sibling slugs, depth cap, cycles, and delete blocks', async () => {
+		const root = await api('POST', '/site-groups', {
+			name: 'Region A',
+			slug: 'region-a',
+			description: 'Primary region',
+			comments: 'Top-level group',
+		})
+		expect(root.status).toBe(201)
+		const rootBody = root.body as Record<string, unknown>
+		expect(rootBody.description).toBe('Primary region')
+		expect(rootBody.comments).toBe('Top-level group')
+		let parentId = idOf(root)
+
+		// Build down to the depth cap (root counts as level 1).
+		for (let level = 2; level <= MAX_SITE_GROUP_DEPTH; level += 1) {
+			const child = await api('POST', '/site-groups', {
+				name: `Level ${level}`,
+				slug: `level-${level}`,
+				parent_id: parentId,
+			})
+			expect(child.status).toBe(201)
+			parentId = idOf(child)
+		}
+
+		const tooDeep = await api('POST', '/site-groups', {
+			name: 'Too deep',
+			slug: 'too-deep',
+			parent_id: parentId,
+		})
+		expect(tooDeep.status).toBe(409)
+
+		// Same slug under a different parent is allowed (unique per parent).
+		const otherRoot = await api('POST', '/site-groups', {
+			name: 'Region B',
+			slug: 'region-b',
+		})
+		expect(otherRoot.status).toBe(201)
+		const sameSlug = await api('POST', '/site-groups', {
+			name: 'Level 2 copy',
+			slug: 'level-2',
+			parent_id: idOf(otherRoot),
+		})
+		expect(sameSlug.status).toBe(201)
+
+		// Same slug under the same parent is rejected.
+		const dupSibling = await api('POST', '/site-groups', {
+			name: 'Level 2 dup',
+			slug: 'level-2',
+			parent_id: idOf(otherRoot),
+		})
+		expect(dupSibling.status).toBe(409)
+
+		// Same slug at the root level is rejected.
+		const dupRoot = await api('POST', '/site-groups', {
+			name: 'Region A copy',
+			slug: 'region-a',
+		})
+		expect(dupRoot.status).toBe(409)
+
+		// Unknown parent is rejected.
+		const badParent = await api('POST', '/site-groups', {
+			name: 'Orphan',
+			slug: 'orphan-group',
+			parent_id: 999999,
+		})
+		expect(badParent.status).toBe(404)
+
+		// Self-parent and descendant-parent are rejected.
+		expect(
+			(await api('PATCH', `/site-groups/${parentId}`, { parent_id: parentId })).status,
+		).toBe(409)
+		expect(
+			(await api('PATCH', `/site-groups/${idOf(root)}`, { parent_id: parentId })).status,
+		).toBe(409)
+
+		// Parent filter.
+		const byParent = await api('GET', '/site-groups', undefined, `?parent=${idOf(otherRoot)}`)
+		expect((byParent.body as { total: number }).total).toBe(1)
+
+		// Delete blocked while child groups exist.
+		expect((await api('DELETE', `/site-groups/${idOf(root)}`)).status).toBe(409)
+
+		// Delete blocked while sites reference the group.
+		const site = await api('POST', '/sites', {
+			name: 'Grouped',
+			slug: 'grouped-site',
+			site_group_id: idOf(otherRoot),
+		})
+		expect(site.status).toBe(201)
+		expect((site.body as Record<string, unknown>).site_group_id).toBe(idOf(otherRoot))
+		expect((await api('DELETE', `/site-groups/${idOf(otherRoot)}`)).status).toBe(409)
+
+		// Site filter ?group= works.
+		const byGroup = await api('GET', '/sites', undefined, `?group=${idOf(otherRoot)}`)
+		expect((byGroup.body as { total: number }).total).toBe(1)
+
+		// Site with an unknown group is rejected.
+		const badGroupSite = await api('POST', '/sites', {
+			name: 'Bad group',
+			slug: 'bad-group-site',
+			site_group_id: 999999,
+		})
+		expect(badGroupSite.status).toBe(404)
+
+		// Unassign the site, then delete it.
+		expect((await api('PATCH', `/sites/${idOf(site)}`, { site_group_id: null })).status).toBe(
+			200,
+		)
+		expect((await api('DELETE', `/sites/${idOf(site)}`)).status).toBe(200)
+
+		// Cleanup deepest-first.
+		const all = (await api('GET', '/site-groups', undefined, '?limit=200')).body as {
+			items: Array<{ id: number; parent_id: number | null }>
+		}
+		const byId = new Map(all.items.map((g) => [g.id, g.parent_id]))
+		const depthOfTest = (id: number): number => {
+			let d = 0
+			let cur: number | null | undefined = id
+			while (cur) {
+				d += 1
+				cur = byId.get(cur) ?? null
+			}
+			return d
+		}
+		const deepestFirst = [...all.items].sort((a, b) => depthOfTest(b.id) - depthOfTest(a.id))
+		for (const group of deepestFirst) {
+			expect((await api('DELETE', `/site-groups/${group.id}`)).status).toBe(200)
+		}
 	})
 })

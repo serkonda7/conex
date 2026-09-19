@@ -8,6 +8,20 @@
       "when": 1789776189651,
       "tag": "0000_integer_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789810136102,
+      "tag": "0001_common_sage",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789811123061,
+      "tag": "0002_site-groups",
+      "breakpoints": true
     }
   ]
 }

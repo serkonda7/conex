@@ -1,15 +1,20 @@
+import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
-import type { Accessor, JSX } from 'solid-js'
+import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import {
 	create_location,
 	delete_location,
+	delete_site,
 	fetch_locations,
 	fetch_site,
+	fetch_site_group,
+	fetch_tenant,
 	type LocationRow,
-	type SiteRow,
 } from '../api_p1'
+import { fetch_racks, type RackRow } from '../api_p2'
+import { type DeviceRow, fetch_devices } from '../api_p4'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -74,29 +79,85 @@ function LocationBranch(props: {
 	)
 }
 
-/** /sites/:id — site detail with the location tree and per-node breadcrumbs. */
+/**
+ * /sites/:id — site detail: header with slug/description, related-object
+ * counts, and the related locations/racks/devices sections.
+ */
 export function SiteDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
 	const [parentId, setParentId] = createSignal('')
 
-	const [site] = createResource(async () => {
-		const res = await fetch_site(props.id)
+	const [site] = createResource(
+		() => props.id,
+		async (id: number) => {
+			setError(null)
+			const res = await fetch_site(id)
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return null
+			}
+			return res.value
+		},
+	)
+	const tenantId = createMemo(() => site()?.tenant_id ?? null)
+	const [tenant] = createResource(tenantId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_tenant(id)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return null
 		}
 		return res.value
 	})
-	const [locations, { refetch }] = createResource(async () => {
-		const res = await fetch_locations(props.id)
+	const groupId = createMemo(() => site()?.site_group_id ?? null)
+	const [siteGroup] = createResource(groupId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_site_group(id)
 		if (Result.isError(res)) {
 			setError(res.error.message)
-			return []
+			return null
 		}
-		return res.value.items
+		return res.value
 	})
+	const [locations, { refetch }] = createResource(
+		() => props.id,
+		async (id: number) => {
+			const res = await fetch_locations(id)
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return []
+			}
+			return res.value.items
+		},
+	)
+	const [racks] = createResource(
+		() => props.id,
+		async (id: number) => {
+			const res = await fetch_racks({ site: id })
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return []
+			}
+			return res.value.items
+		},
+	)
+	const [devices] = createResource(
+		() => props.id,
+		async (id: number) => {
+			const res = await fetch_devices({ site: id })
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return []
+			}
+			return res.value.items
+		},
+	)
 	const tree = createMemo(() => buildTree(locations() ?? []))
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -118,7 +179,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		void refetch()
 	}
 
-	async function handleDelete(id: number): Promise<void> {
+	async function handleLocationDelete(id: number): Promise<void> {
 		setError(null)
 		const res = await delete_location(id)
 		if (Result.isError(res)) {
@@ -128,6 +189,27 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		void refetch()
 	}
 
+	async function handleDelete(): Promise<void> {
+		const s = site()
+		if (!s) {
+			return
+		}
+		if (!window.confirm(`Delete site "${s.name}"?`)) {
+			return
+		}
+		setError(null)
+		const res = await delete_site(props.id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		navigate('/sites')
+	}
+
+	const locationCount = (): number => locations()?.length ?? 0
+	const rackCount = (): number => racks()?.length ?? 0
+	const deviceCount = (): number => devices()?.length ?? 0
+
 	return (
 		<div>
 			<p>
@@ -135,52 +217,259 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					← Sites
 				</a>
 			</p>
-			<Show when={site()} fallback={<p class="skeleton">Loading site…</p>}>
-				{(s: Accessor<SiteRow>): JSX.Element => (
-					<h2>
-						{s().name} <code>{s().slug}</code>
-					</h2>
-				)}
+			<Show when={!site.loading} fallback={<p class="skeleton">Loading site…</p>}>
+				<Show when={site()} fallback={<p class="empty">Site not found.</p>}>
+					<div class="page-header">
+						<h2>
+							{site()?.name} <code>{site()?.slug}</code>
+						</h2>
+						<div class="form-actions">
+							<button
+								type="button"
+								onClick={() => navigate(`/sites/${props.id}/edit`)}
+							>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconPencil size={14} />
+								</span>{' '}
+								Edit
+							</button>
+							<button type="button" class="btn-danger" onClick={handleDelete}>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconTrash size={14} />
+								</span>{' '}
+								Delete
+							</button>
+						</div>
+					</div>
+					<p class="page-subtitle">{site()?.description || 'No description.'}</p>
+
+					<div class="detail-stats">
+						<a class="detail-stat" href="#site-locations">
+							<span class="detail-stat-value">{locationCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Location{locationCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+						<a class="detail-stat" href="#site-racks">
+							<span class="detail-stat-value">{rackCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Rack{rackCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+						<a class="detail-stat" href="#site-devices">
+							<span class="detail-stat-value">{deviceCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Device{deviceCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+					</div>
+
+					<section class="card" aria-label="Site details">
+						<dl class="detail-grid">
+							<dt>Slug</dt>
+							<dd>
+								<code>{site()?.slug}</code>
+							</dd>
+							<dt>Tenant</dt>
+							<dd>
+								<Show when={tenantId() !== null} fallback="—">
+									<Show
+										when={!tenant.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										<Show when={tenant()} fallback={String(tenantId() ?? '—')}>
+											<a
+												href={`/tenants/${tenantId() ?? ''}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/tenants/${tenantId() ?? ''}`)
+												}
+											>
+												{tenant()?.name}
+											</a>
+										</Show>
+									</Show>
+								</Show>
+							</dd>
+							<dt>Group</dt>
+							<dd>
+								<Show when={groupId() !== null} fallback="—">
+									<Show
+										when={!siteGroup.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										<Show
+											when={siteGroup()}
+											fallback={String(groupId() ?? '—')}
+										>
+											<a
+												href={`/site-groups/${groupId() ?? ''}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/site-groups/${groupId() ?? ''}`)
+												}
+											>
+												{siteGroup()?.name}
+											</a>
+										</Show>
+									</Show>
+								</Show>
+							</dd>
+							<dt>Description</dt>
+							<dd>{site()?.description || '—'}</dd>
+							<dt>Comments</dt>
+							<dd>{(site()?.comments ?? '') || '—'}</dd>
+							<dt>Physical address</dt>
+							<dd>{(site()?.physical_address ?? '') || '—'}</dd>
+							<dt>Shipping address</dt>
+							<dd>{(site()?.shipping_address ?? '') || '—'}</dd>
+						</dl>
+					</section>
+				</Show>
 			</Show>
-			<h3>Add location</h3>
-			<form onSubmit={handleCreate}>
-				<input
-					placeholder="Name"
-					value={name()}
-					onInput={(e: InputEventAndTarget) => setName(e.currentTarget.value)}
-				/>
-				<input
-					placeholder="slug"
-					value={slug()}
-					onInput={(e: InputEventAndTarget) => setSlug(e.currentTarget.value)}
-				/>
-				<select
-					value={parentId()}
-					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-						setParentId(e.currentTarget.value)
-					}
+
+			<section aria-label="Locations">
+				<h3 id="site-locations">
+					Locations <span class="badge">{locationCount()}</span>
+				</h3>
+				<form onSubmit={handleCreate}>
+					<input
+						placeholder="Name"
+						aria-label="Location name"
+						value={name()}
+						onInput={(e: InputEventAndTarget) => setName(e.currentTarget.value)}
+					/>
+					<input
+						placeholder="slug"
+						aria-label="Location slug"
+						value={slug()}
+						onInput={(e: InputEventAndTarget) => setSlug(e.currentTarget.value)}
+					/>
+					<select
+						aria-label="Parent location"
+						value={parentId()}
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+							setParentId(e.currentTarget.value)
+						}
+					>
+						<option value="">Top level</option>
+						<For each={locations() ?? []}>
+							{(l: LocationRow): JSX.Element => (
+								<option value={l.id}>{l.name}</option>
+							)}
+						</For>
+					</select>
+					<button type="submit">Add location</button>
+				</form>
+				<Show
+					when={!locations.loading}
+					fallback={<p class="skeleton">Loading locations…</p>}
 				>
-					<option value="">Top level</option>
-					<For each={locations() ?? []}>
-						{(l: LocationRow): JSX.Element => <option value={l.id}>{l.name}</option>}
-					</For>
-				</select>
-				<button type="submit">Add location</button>
-			</form>
-			<h3>Locations</h3>
-			<Show when={tree().length > 0} fallback={<p class="empty">No locations yet.</p>}>
-				<ul>
-					<For each={tree()}>
-						{(node: TreeNode): JSX.Element => (
-							<LocationBranch
-								node={node}
-								trail={[site()?.name ?? 'site']}
-								onDelete={handleDelete}
-							/>
-						)}
-					</For>
-				</ul>
+					<Show
+						when={tree().length > 0}
+						fallback={<p class="empty">No locations yet.</p>}
+					>
+						<ul>
+							<For each={tree()}>
+								{(node: TreeNode): JSX.Element => (
+									<LocationBranch
+										node={node}
+										trail={[site()?.name ?? 'site']}
+										onDelete={handleLocationDelete}
+									/>
+								)}
+							</For>
+						</ul>
+					</Show>
+				</Show>
+			</section>
+
+			<h3 id="site-racks">
+				Racks <span class="badge">{rackCount()}</span>
+			</h3>
+			<Show when={!racks.loading} fallback={<p class="skeleton">Loading racks…</p>}>
+				<Show
+					when={rackCount() > 0}
+					fallback={<p class="empty">No racks for this site yet.</p>}
+				>
+					<table>
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Height</th>
+								<th>Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							<For each={racks() ?? []}>
+								{(r: RackRow): JSX.Element => (
+									<tr>
+										<td>
+											<a
+												href={`/racks/${r.id}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/racks/${r.id}`)
+												}
+											>
+												{r.name}
+											</a>
+										</td>
+										<td>{r.height_u}U</td>
+										<td>
+											<span class={`badge badge-${r.status}`}>
+												{r.status}
+											</span>
+										</td>
+									</tr>
+								)}
+							</For>
+						</tbody>
+					</table>
+				</Show>
 			</Show>
+
+			<h3 id="site-devices">
+				Devices <span class="badge">{deviceCount()}</span>
+			</h3>
+			<Show when={!devices.loading} fallback={<p class="skeleton">Loading devices…</p>}>
+				<Show
+					when={deviceCount() > 0}
+					fallback={<p class="empty">No devices for this site yet.</p>}
+				>
+					<table>
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Status</th>
+								<th>Asset tag</th>
+							</tr>
+						</thead>
+						<tbody>
+							<For each={devices() ?? []}>
+								{(d: DeviceRow): JSX.Element => (
+									<tr>
+										<td>
+											<a
+												href={`/devices/${d.id}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/devices/${d.id}`)
+												}
+											>
+												{d.name}
+											</a>
+										</td>
+										<td>
+											<span class={`badge badge-${d.status}`}>
+												{d.status}
+											</span>
+										</td>
+										<td>{d.asset_tag ?? '—'}</td>
+									</tr>
+								)}
+							</For>
+						</tbody>
+					</table>
+				</Show>
+			</Show>
+
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

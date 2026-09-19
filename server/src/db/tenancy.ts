@@ -4,12 +4,15 @@ import {
 	type LocationCreate,
 	type LocationUpdate,
 	MAX_LOCATION_DEPTH,
+	MAX_SITE_GROUP_DEPTH,
 	type SiteCreate,
+	type SiteGroupCreate,
+	type SiteGroupUpdate,
 	type SiteUpdate,
 	type TenantCreate,
 	type TenantUpdate,
 } from 'shared/src/schemas'
-import { devices, locations, racks, sites, tenants } from '../schema'
+import { devices, locations, racks, site_groups, sites, tenants } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -22,6 +25,7 @@ import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from 
 
 export type TenantRow = typeof tenants.$inferSelect
 export type SiteRow = typeof sites.$inferSelect
+export type SiteGroupRow = typeof site_groups.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
 
 export interface Page<T> {
@@ -244,6 +248,9 @@ export function deleteTenant(id: number): Result<TenantRow, Error> {
 
 export interface SiteListParams extends ListParams {
 	tenant?: number
+	group?: number
+	sort: 'name' | 'slug' | 'description'
+	order: 'asc' | 'desc'
 }
 
 export function listSites(params: SiteListParams): Page<SiteRow> {
@@ -252,18 +259,27 @@ export function listSites(params: SiteListParams): Page<SiteRow> {
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${sites.name} LIKE ${pattern} ESCAPE '\\' OR ${sites.slug} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${sites.name} LIKE ${pattern} ESCAPE '\\' OR ${sites.slug} LIKE ${pattern} ESCAPE '\\' OR ${sites.description} LIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.tenant) {
 		conditions.push(eq(sites.tenant_id, params.tenant))
 	}
+	if (params.group) {
+		conditions.push(eq(sites.site_group_id, params.group))
+	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn =
+		params.sort === 'slug'
+			? sites.slug
+			: params.sort === 'description'
+				? sites.description
+				: sites.name
 	const items = db
 		.select()
 		.from(sites)
 		.where(where)
-		.orderBy(asc(sites.name))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
@@ -290,10 +306,25 @@ function checkTenant(tenantId: number | null | undefined): Result<undefined, Err
 	return Result.ok(undefined)
 }
 
+function checkSiteGroup(groupId: number | null | undefined): Result<undefined, Error> {
+	if (groupId === null || groupId === undefined) {
+		return Result.ok(undefined)
+	}
+	const group = getDb().select().from(site_groups).where(eq(site_groups.id, groupId)).get()
+	if (!group) {
+		return Result.err(new NotFoundError('Site group not found'))
+	}
+	return Result.ok(undefined)
+}
+
 export function createSite(input: SiteCreate): Result<SiteRow, Error> {
 	const tenantCheck = checkTenant(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
+	}
+	const groupCheck = checkSiteGroup(input.site_group_id)
+	if (Result.isError(groupCheck)) {
+		return Result.err(groupCheck.error)
 	}
 	const db = getDb()
 	const clash = db.select().from(sites).where(eq(sites.slug, input.slug)).get()
@@ -302,10 +333,13 @@ export function createSite(input: SiteCreate): Result<SiteRow, Error> {
 	}
 	const row: Omit<SiteRow, 'id'> = {
 		tenant_id: input.tenant_id ?? null,
+		site_group_id: input.site_group_id ?? null,
 		name: input.name,
 		slug: input.slug,
-		group: input.group ?? null,
 		description: input.description ?? null,
+		comments: input.comments ?? null,
+		physical_address: input.physical_address ?? null,
+		shipping_address: input.shipping_address ?? null,
 	}
 	try {
 		const inserted = db.insert(sites).values(row).returning({ id: sites.id }).get()
@@ -332,6 +366,12 @@ export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error
 			return Result.err(tenantCheck.error)
 		}
 	}
+	if (input.site_group_id !== undefined) {
+		const groupCheck = checkSiteGroup(input.site_group_id)
+		if (Result.isError(groupCheck)) {
+			return Result.err(groupCheck.error)
+		}
+	}
 	const db = getDb()
 	if (input.slug !== undefined && input.slug !== current.value.slug) {
 		const clash = db.select().from(sites).where(eq(sites.slug, input.slug)).get()
@@ -349,11 +389,20 @@ export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error
 	if (input.tenant_id !== undefined) {
 		patch.tenant_id = input.tenant_id
 	}
-	if (input.group !== undefined) {
-		patch.group = input.group
+	if (input.site_group_id !== undefined) {
+		patch.site_group_id = input.site_group_id
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
+	}
+	if (input.comments !== undefined) {
+		patch.comments = input.comments
+	}
+	if (input.physical_address !== undefined) {
+		patch.physical_address = input.physical_address
+	}
+	if (input.shipping_address !== undefined) {
+		patch.shipping_address = input.shipping_address
 	}
 	if (Object.keys(patch).length > 0) {
 		try {
@@ -382,6 +431,217 @@ export function deleteSite(id: number): Result<SiteRow, Error> {
 		return Result.err(new ConflictError('Site still has racks; move or delete them first'))
 	}
 	getDb().delete(sites).where(eq(sites.id, id)).run()
+	return Result.ok(current.value)
+}
+
+// ---------------------------------------------------------------------------
+// Site groups (global nestable tree, no site scoping)
+// ---------------------------------------------------------------------------
+
+export interface SiteGroupListParams extends ListParams {
+	parent?: number
+	sort: 'name' | 'slug' | 'description'
+	order: 'asc' | 'desc'
+}
+
+export function listSiteGroups(params: SiteGroupListParams): Page<SiteGroupRow> {
+	const db = getDb()
+	const pattern = searchPattern(params.search)
+	const conditions: SQL[] = []
+	if (params.search) {
+		conditions.push(
+			sql`(${site_groups.name} LIKE ${pattern} ESCAPE '\\' OR ${site_groups.slug} LIKE ${pattern} ESCAPE '\\')`,
+		)
+	}
+	if (params.parent) {
+		conditions.push(eq(site_groups.parent_id, params.parent))
+	}
+	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn =
+		params.sort === 'slug'
+			? site_groups.slug
+			: params.sort === 'description'
+				? site_groups.description
+				: site_groups.name
+	const items = db
+		.select()
+		.from(site_groups)
+		.where(where)
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.limit(params.limit)
+		.offset(offsetOf(params))
+		.all()
+	const totalRow = db.select({ n: count() }).from(site_groups).where(where).get()
+	return pageOf(items, totalRow?.n ?? 0, params)
+}
+
+export function getSiteGroup(id: number): Result<SiteGroupRow, Error> {
+	const row = getDb().select().from(site_groups).where(eq(site_groups.id, id)).get()
+	if (!row) {
+		return Result.err(new NotFoundError('Site group not found'))
+	}
+	return Result.ok(row)
+}
+
+function groupSlugClash(parentId: number | null, slug: string, excludeId?: number): boolean {
+	const db = getDb()
+	const parentCond =
+		parentId === null ? isNull(site_groups.parent_id) : eq(site_groups.parent_id, parentId)
+	const clash = db
+		.select()
+		.from(site_groups)
+		.where(and(parentCond, eq(site_groups.slug, slug)))
+		.get()
+	return !!clash && clash.id !== excludeId
+}
+
+/** Parent links of every site group, for depth/cycle checks. */
+function groupParentMap(): Map<number, number | null> {
+	const rows = getDb()
+		.select({ id: site_groups.id, parent_id: site_groups.parent_id })
+		.from(site_groups)
+		.all()
+	return buildParentMap(rows)
+}
+
+export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Error> {
+	const parentId = input.parent_id ?? null
+	const parents = groupParentMap()
+	if (parentId !== null) {
+		if (!parents.has(parentId)) {
+			return Result.err(new NotFoundError('Parent site group not found'))
+		}
+		const parentDepth = depthOf(parentId, parents)
+		if (Result.isError(parentDepth)) {
+			return Result.err(new ConflictError(parentDepth.error.message))
+		}
+		if (parentDepth.value + 1 > MAX_SITE_GROUP_DEPTH) {
+			return Result.err(
+				new ConflictError(
+					`Site group hierarchy is limited to ${MAX_SITE_GROUP_DEPTH} levels`,
+				),
+			)
+		}
+	}
+	if (groupSlugClash(parentId, input.slug)) {
+		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
+	}
+	const row: Omit<SiteGroupRow, 'id'> = {
+		parent_id: parentId,
+		name: input.name,
+		slug: input.slug,
+		description: input.description ?? null,
+		comments: input.comments ?? null,
+	}
+	try {
+		const inserted = getDb()
+			.insert(site_groups)
+			.values(row)
+			.returning({ id: site_groups.id })
+			.get()
+		if (!inserted) {
+			return Result.err(new Error('Site group insert did not return an id'))
+		}
+		return getSiteGroup(inserted.id)
+	} catch (err) {
+		if (isUniqueViolation(err)) {
+			return Result.err(
+				new DuplicateError('Site group slug is already used under this parent'),
+			)
+		}
+		return Result.err(err instanceof Error ? err : new Error(String(err)))
+	}
+}
+
+export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<SiteGroupRow, Error> {
+	const current = getSiteGroup(id)
+	if (Result.isError(current)) {
+		return current
+	}
+	const node = current.value
+	const effectiveParent = input.parent_id !== undefined ? input.parent_id : node.parent_id
+	const effectiveSlug = input.slug !== undefined ? input.slug : node.slug
+
+	if (effectiveParent !== undefined && effectiveParent !== null) {
+		const parents = groupParentMap()
+		if (!parents.has(effectiveParent)) {
+			return Result.err(new NotFoundError('Parent site group not found'))
+		}
+		if (effectiveParent === id || createsCycle(id, effectiveParent, parents)) {
+			return Result.err(
+				new ConflictError('Cannot set a site group as its own parent or descendant'),
+			)
+		}
+		const parentDepth = depthOf(effectiveParent, parents)
+		if (Result.isError(parentDepth)) {
+			return Result.err(new ConflictError(parentDepth.error.message))
+		}
+		const rows = getDb()
+			.select({ id: site_groups.id, parent_id: site_groups.parent_id })
+			.from(site_groups)
+			.all()
+		const subtreeGrowth = maxDescendantOffset(id, buildChildrenMap(rows))
+		if (parentDepth.value + 1 + subtreeGrowth > MAX_SITE_GROUP_DEPTH) {
+			return Result.err(
+				new ConflictError(
+					`Site group hierarchy is limited to ${MAX_SITE_GROUP_DEPTH} levels`,
+				),
+			)
+		}
+	}
+	if (groupSlugClash(effectiveParent ?? null, effectiveSlug, id)) {
+		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
+	}
+	const patch: Partial<SiteGroupRow> = {}
+	if (input.name !== undefined) {
+		patch.name = input.name
+	}
+	if (input.slug !== undefined) {
+		patch.slug = input.slug
+	}
+	if (input.parent_id !== undefined) {
+		patch.parent_id = input.parent_id
+	}
+	if (input.description !== undefined) {
+		patch.description = input.description
+	}
+	if (input.comments !== undefined) {
+		patch.comments = input.comments
+	}
+	if (Object.keys(patch).length > 0) {
+		try {
+			getDb().update(site_groups).set(patch).where(eq(site_groups.id, id)).run()
+		} catch (err) {
+			if (isUniqueViolation(err)) {
+				return Result.err(
+					new DuplicateError('Site group slug is already used under this parent'),
+				)
+			}
+			return Result.err(err instanceof Error ? err : new Error(String(err)))
+		}
+	}
+	return getSiteGroup(id)
+}
+
+export function deleteSiteGroup(id: number): Result<SiteGroupRow, Error> {
+	const current = getSiteGroup(id)
+	if (Result.isError(current)) {
+		return current
+	}
+	const db = getDb()
+	const child = db.select().from(site_groups).where(eq(site_groups.parent_id, id)).get()
+	if (child) {
+		return Result.err(
+			new ConflictError('Site group still has child groups; move or delete them first'),
+		)
+	}
+	const siteChild = db.select().from(sites).where(eq(sites.site_group_id, id)).get()
+	if (siteChild) {
+		return Result.err(
+			new ConflictError('Site group still has sites; move or delete them first'),
+		)
+	}
+	db.delete(site_groups).where(eq(site_groups.id, id)).run()
 	return Result.ok(current.value)
 }
 

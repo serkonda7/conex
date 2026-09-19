@@ -106,32 +106,101 @@ export async function update_tenant(
 // Sites
 // ---------------------------------------------------------------------------
 
-export async function fetch_sites(tenant?: number): Promise<Result<Page<SiteRow>, Error>> {
+export type SiteSort = 'name' | 'slug' | 'description'
+
+export interface SiteFilters {
+	search?: string
+	page?: number
+	limit?: number
+	sort?: SiteSort
+	order?: 'asc' | 'desc'
+	tenant?: number
+	group?: number
+}
+
+export interface SiteCreateInput {
+	name: string
+	slug: string
+	tenant_id: number | null
+	site_group_id: number | null
+	description?: string
+	comments?: string
+	physical_address?: string
+	shipping_address?: string
+}
+
+export interface SiteUpdateInput {
+	name?: string
+	slug?: string
+	tenant_id?: number | null
+	site_group_id?: number | null
+	description?: string | null
+	comments?: string | null
+	physical_address?: string | null
+	shipping_address?: string | null
+}
+
+/**
+ * Site row plus the newer nullable text columns (comments, addresses) and
+ * the site-group FK. Declared optional so the frontend compiles whether or
+ * not the backend migration has landed yet.
+ */
+export type SiteWithExtras = SiteRow & {
+	comments?: string | null
+	physical_address?: string | null
+	shipping_address?: string | null
+	site_group_id?: number | null
+	/** Legacy free-text group column, removed by the site-groups migration. */
+	group?: string | null
+}
+
+export async function fetch_sites(filters?: SiteFilters): Promise<Result<Page<SiteRow>, Error>> {
 	return getPage<SiteRow>(
 		client.sites.$get({
 			query: {
-				search: '',
-				page: '1',
-				limit: '200',
-				tenant: tenant === undefined ? undefined : String(tenant),
+				search: filters?.search ?? '',
+				page: String(filters?.page ?? 1),
+				limit: String(filters?.limit ?? 200),
+				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
+				group: filters?.group === undefined ? undefined : String(filters.group),
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
 			},
 		}),
 		'Failed to load sites',
 	)
 }
 
-export async function fetch_site(id: number): Promise<Result<SiteRow, Error>> {
+export async function fetch_site(id: number): Promise<Result<SiteWithExtras, Error>> {
 	const res = await client.sites[':id'].$get({ param: { id: String(id) } })
-	return to_result<SiteRow>(res, 'Failed to load site')
+	return to_result<SiteWithExtras>(res, 'Failed to load site')
 }
 
-export async function create_site(
-	name: string,
-	slug: string,
-	tenant_id: number | null,
-): Promise<Result<SiteRow, Error>> {
-	const res = await client.sites.$post({ json: { name, slug, tenant_id } })
+export async function create_site(input: SiteCreateInput): Promise<Result<SiteRow, Error>> {
+	const res = await client.sites.$post({
+		json: {
+			name: input.name,
+			slug: input.slug,
+			tenant_id: input.tenant_id,
+			site_group_id: input.site_group_id,
+			description: input.description || undefined,
+			comments: input.comments || undefined,
+			physical_address: input.physical_address || undefined,
+			shipping_address: input.shipping_address || undefined,
+		},
+	})
 	return to_result<SiteRow>(res, 'Failed to create site')
+}
+
+export async function update_site(
+	id: number,
+	patch: SiteUpdateInput,
+): Promise<Result<SiteRow, Error>> {
+	const res = await client.sites[':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<SiteRow>(res, 'Failed to update site')
 }
 
 export async function delete_site(id: number): Promise<Result<unknown, Error>> {
@@ -170,4 +239,98 @@ export async function create_location(
 export async function delete_location(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.locations[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete location')
+}
+
+// ---------------------------------------------------------------------------
+// Site groups
+// ---------------------------------------------------------------------------
+
+export interface SiteGroupRow {
+	id: number
+	parent_id: number | null
+	name: string
+	slug: string
+	description: string | null
+	comments: string | null
+}
+
+export type SiteGroupSort = 'name' | 'slug' | 'description'
+
+export interface SiteGroupFilters {
+	search?: string
+	page?: number
+	limit?: number
+	sort?: SiteGroupSort
+	order?: 'asc' | 'desc'
+	parent?: number
+}
+
+export interface SiteGroupCreateInput {
+	name: string
+	slug: string
+	parent_id: number | null
+	description?: string
+	comments?: string
+}
+
+export interface SiteGroupUpdateInput {
+	name?: string
+	slug?: string
+	parent_id?: number | null
+	description?: string | null
+	comments?: string | null
+}
+
+export async function fetch_site_groups(
+	filters?: SiteGroupFilters,
+): Promise<Result<Page<SiteGroupRow>, Error>> {
+	return getPage<SiteGroupRow>(
+		client['site-groups'].$get({
+			query: {
+				search: filters?.search ?? '',
+				page: String(filters?.page ?? 1),
+				limit: String(filters?.limit ?? 200),
+				parent: filters?.parent === undefined ? undefined : String(filters.parent),
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
+			},
+		}),
+		'Failed to load site groups',
+	)
+}
+
+export async function fetch_site_group(id: number): Promise<Result<SiteGroupRow, Error>> {
+	const res = await client['site-groups'][':id'].$get({ param: { id: String(id) } })
+	return to_result<SiteGroupRow>(res, 'Failed to load site group')
+}
+
+export async function create_site_group(
+	input: SiteGroupCreateInput,
+): Promise<Result<SiteGroupRow, Error>> {
+	const res = await client['site-groups'].$post({
+		json: {
+			name: input.name,
+			slug: input.slug,
+			parent_id: input.parent_id,
+			description: input.description || undefined,
+			comments: input.comments || undefined,
+		},
+	})
+	return to_result<SiteGroupRow>(res, 'Failed to create site group')
+}
+
+export async function update_site_group(
+	id: number,
+	patch: SiteGroupUpdateInput,
+): Promise<Result<SiteGroupRow, Error>> {
+	const res = await client['site-groups'][':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<SiteGroupRow>(res, 'Failed to update site group')
+}
+
+export async function delete_site_group(id: number): Promise<Result<unknown, Error>> {
+	const res = await client['site-groups'][':id'].$delete({ param: { id: String(id) } })
+	return to_result<unknown>(res, 'Failed to delete site group')
 }

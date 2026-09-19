@@ -11,6 +11,9 @@ export interface LocationNode {
 	parent_id: number | null
 }
 
+/** Site groups share the same {id, parent_id} shape; tree math is reused as-is. */
+export type TreeNode = LocationNode
+
 /** Builds `child id -> parent id` from sibling rows of one site. */
 export function buildParentMap(rows: LocationNode[]): Map<number, number | null> {
 	const parents = new Map<number, number | null>()

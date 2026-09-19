@@ -770,6 +770,7 @@ tbody tr:last-child td {
 }
 
 .app-content .form-stacked .field input,
+.app-content .form-stacked .field select,
 .app-content .form-stacked .field textarea {
 	flex: none;
 	width: 100%;

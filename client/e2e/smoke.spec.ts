@@ -50,11 +50,12 @@ test('smoke: login → site → rack → device → cable', async ({ page }) => 
 	await page.getByRole('button', { name: 'Sign in' }).click()
 	await expect(page.getByRole('link', { name: 'Devices' })).toBeVisible()
 
-	// Site through the UI (Add site form on /sites).
+	// Site through the UI (Add site page at /sites/add).
 	await page.getByRole('link', { name: 'Sites' }).click()
-	await page.locator('input[placeholder="Name"]').fill(`${tag} site`)
-	await page.locator('input[placeholder="slug"]').fill(`${tag}-site`)
-	await page.getByRole('button', { name: 'Add site' }).click()
+	await page.getByRole('button', { name: '+ Add' }).click()
+	await page.locator('#site-name').fill(`${tag} site`)
+	await page.locator('#site-slug').fill(`${tag}-site`)
+	await page.getByRole('button', { name: 'Create' }).click()
 	await expect(page.locator('table').getByText(`${tag} site`)).toBeVisible()
 
 	// API session mirrors the browser login for the setup calls.

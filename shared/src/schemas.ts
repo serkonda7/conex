@@ -79,6 +79,9 @@ const NullableIdSchema = v.optional(v.nullable(IdSchema), undefined)
 /** Maximum nesting depth of the location tree (root counts as depth 1). */
 export const MAX_LOCATION_DEPTH = 5
 
+/** Maximum nesting depth of the site-group tree (root counts as depth 1). */
+export const MAX_SITE_GROUP_DEPTH = 5
+
 export const TenantCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
@@ -93,21 +96,39 @@ export const TenantUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
+export const AddressSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined)
+
+export const SiteCommentsSchema = v.optional(
+	v.pipe(v.string(), v.trim(), v.maxLength(2000)),
+	undefined,
+)
+
 export const SiteCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
 	tenant_id: NullableIdSchema,
-	// v1 keeps the site group as a free-form label, not a FK.
-	group: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	site_group_id: NullableIdSchema,
 	description: DescriptionSchema,
+	comments: SiteCommentsSchema,
+	physical_address: AddressSchema,
+	shipping_address: AddressSchema,
 })
 
 export const SiteUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	group: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	site_group_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
+	physical_address: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+		undefined,
+	),
+	shipping_address: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+		undefined,
+	),
 })
 
 export const LocationCreateSchema = v.strictObject({
@@ -117,6 +138,22 @@ export const LocationCreateSchema = v.strictObject({
 	parent_id: NullableIdSchema,
 	tenant_id: NullableIdSchema,
 	description: DescriptionSchema,
+})
+
+export const SiteGroupCreateSchema = v.strictObject({
+	name: NameSchema,
+	slug: SlugSchema,
+	parent_id: NullableIdSchema,
+	description: DescriptionSchema,
+	comments: CommentsSchema,
+})
+
+export const SiteGroupUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	slug: v.optional(SlugSchema, undefined),
+	parent_id: v.optional(v.nullable(IdSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 export const LocationUpdateSchema = v.strictObject({
@@ -135,6 +172,8 @@ export type SiteCreate = v.InferOutput<typeof SiteCreateSchema>
 export type SiteUpdate = v.InferOutput<typeof SiteUpdateSchema>
 export type LocationCreate = v.InferOutput<typeof LocationCreateSchema>
 export type LocationUpdate = v.InferOutput<typeof LocationUpdateSchema>
+export type SiteGroupCreate = v.InferOutput<typeof SiteGroupCreateSchema>
+export type SiteGroupUpdate = v.InferOutput<typeof SiteGroupUpdateSchema>
 
 // Query-string contracts. Query values always arrive as strings, so page/limit
 // coerce through Number instead of demanding JSON numbers like ListQuerySchema.
@@ -179,6 +218,16 @@ export const TenantListQuerySchema = v.object({
 export const SiteListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
+	group: OptionalIdEntry,
+	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export const SiteGroupListQuerySchema = v.object({
+	...ListQueryEntries,
+	parent: OptionalIdEntry,
+	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export const LocationListQuerySchema = v.object({
@@ -192,6 +241,7 @@ export const EntityParamsSchema = v.object({ id: IdSchema })
 
 export type TenantListQuery = v.InferOutput<typeof TenantListQuerySchema>
 export type SiteListQuery = v.InferOutput<typeof SiteListQuerySchema>
+export type SiteGroupListQuery = v.InferOutput<typeof SiteGroupListQuerySchema>
 export type LocationListQuery = v.InferOutput<typeof LocationListQuerySchema>
 
 // ---------------------------------------------------------------------------

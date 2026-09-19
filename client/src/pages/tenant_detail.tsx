@@ -36,7 +36,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [sites] = createResource(
 		() => props.id,
 		async (id: number) => {
-			const res = await fetch_sites(id)
+			const res = await fetch_sites({ tenant: id })
 			if (Result.isError(res)) {
 				setError(res.error.message)
 				return []

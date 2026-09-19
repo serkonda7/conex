@@ -63,19 +63,41 @@ export const tenants = sqliteTable(
 	(table) => [index('tenants_name_idx').on(table.name)],
 )
 
+export const site_groups = sqliteTable(
+	'site_groups',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		parent_id: integer('parent_id').references((): AnySQLiteColumn => site_groups.id),
+		name: text('name').notNull(),
+		// Slug is unique per parent (service-enforced; SQLite treats NULL
+		// parents as distinct so a composite unique index cannot cover roots).
+		slug: text('slug').notNull(),
+		description: text('description'),
+		comments: text('comments'),
+	},
+	(table) => [
+		index('site_groups_parent_id_idx').on(table.parent_id),
+		index('site_groups_name_idx').on(table.name),
+		uniqueIndex('site_groups_sibling_slug_idx').on(table.parent_id, table.slug),
+	],
+)
+
 export const sites = sqliteTable(
 	'sites',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
+		site_group_id: integer('site_group_id').references(() => site_groups.id),
 		name: text('name').notNull(),
 		slug: text('slug').notNull().unique(),
-		// v1 keeps the site group as a free-form label, not a FK.
-		group: text('group'),
 		description: text('description'),
+		comments: text('comments'),
+		physical_address: text('physical_address'),
+		shipping_address: text('shipping_address'),
 	},
 	(table) => [
 		index('sites_tenant_id_idx').on(table.tenant_id),
+		index('sites_site_group_id_idx').on(table.site_group_id),
 		index('sites_name_idx').on(table.name),
 	],
 )

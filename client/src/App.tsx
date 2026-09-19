@@ -1,4 +1,5 @@
 import {
+	IconFolder,
 	IconLogout,
 	IconMapPin,
 	IconMoon,
@@ -16,7 +17,13 @@ import { fetchMe, fetchSetupStatus, login, logout, setupAdmin } from './api_auth
 import { DeviceDetailPage } from './pages/device_detail'
 import { DevicesPage } from './pages/devices'
 import { RackDetailPage } from './pages/rack_detail'
+import { SiteAddPage } from './pages/site_add'
 import { SiteDetailPage } from './pages/site_detail'
+import { SiteEditPage } from './pages/site_edit'
+import { SiteGroupAddPage } from './pages/site_group_add'
+import { SiteGroupDetailPage } from './pages/site_group_detail'
+import { SiteGroupEditPage } from './pages/site_group_edit'
+import { SiteGroupsPage } from './pages/site_groups'
 import { SitesPage } from './pages/sites'
 import { TemplatesPage } from './pages/templates'
 import { TenantAddPage } from './pages/tenant_add'
@@ -325,16 +332,25 @@ function App(): JSX.Element {
 		page: string
 		tenantId: number | null
 		siteId: number | null
+		siteGroupId: number | null
 		rackId: number | null
 		deviceId: number | null
 	} {
-		return { page, tenantId: null, siteId: null, rackId: null, deviceId: null }
+		return {
+			page,
+			tenantId: null,
+			siteId: null,
+			siteGroupId: null,
+			rackId: null,
+			deviceId: null,
+		}
 	}
 
 	function route(): {
 		page: string
 		tenantId: number | null
 		siteId: number | null
+		siteGroupId: number | null
 		rackId: number | null
 		deviceId: number | null
 	} {
@@ -359,14 +375,37 @@ function App(): JSX.Element {
 			}
 			return emptyRoute('tenants')
 		}
-		if (parts[0] === 'sites' && parts.length === 1) {
+		if (parts[0] === 'sites') {
+			if (parts[1] === 'add') {
+				return emptyRoute('site-add')
+			}
+			if (parts[1]) {
+				const siteId = parseId(parts[1])
+				if (siteId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('site-edit'), siteId }
+				}
+				return { ...emptyRoute('site-detail'), siteId }
+			}
 			return emptyRoute('sites')
 		}
-		if (parts[0] === 'sites' && parts.length === 2) {
-			const siteId = parseId(parts[1])
-			return siteId === null
-				? emptyRoute('not-found')
-				: { ...emptyRoute('site-detail'), siteId }
+		if (parts[0] === 'site-groups') {
+			if (parts[1] === 'add') {
+				return emptyRoute('site-group-add')
+			}
+			if (parts[1]) {
+				const siteGroupId = parseId(parts[1])
+				if (siteGroupId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('site-group-edit'), siteGroupId }
+				}
+				return { ...emptyRoute('site-group-detail'), siteGroupId }
+			}
+			return emptyRoute('site-groups')
 		}
 		if (parts[0] === 'racks' && parts.length === 2) {
 			const rackId = parseId(parts[1])
@@ -526,10 +565,18 @@ function App(): JSX.Element {
 										addHref="/tenants/add"
 									/>
 									<NavItem
+										href="/site-groups"
+										active={path().startsWith('/site-groups')}
+										icon={<IconFolder size={16} />}
+										label="Site Groups"
+										addHref="/site-groups/add"
+									/>
+									<NavItem
 										href="/sites"
 										active={path().startsWith('/sites')}
 										icon={<IconMapPin size={16} />}
 										label="Sites"
+										addHref="/sites/add"
 									/>
 									<NavItem
 										href="/templates"
@@ -572,6 +619,9 @@ function App(): JSX.Element {
 									<Match when={route().page === 'sites'}>
 										<SitesPage />
 									</Match>
+									<Match when={route().page === 'site-add'}>
+										<SiteAddPage />
+									</Match>
 									<Match
 										when={
 											route().page === 'site-detail' &&
@@ -579,6 +629,35 @@ function App(): JSX.Element {
 										}
 									>
 										<SiteDetailPage id={route().siteId as number} />
+									</Match>
+									<Match
+										when={
+											route().page === 'site-edit' && route().siteId !== null
+										}
+									>
+										<SiteEditPage id={route().siteId as number} />
+									</Match>
+									<Match when={route().page === 'site-groups'}>
+										<SiteGroupsPage />
+									</Match>
+									<Match when={route().page === 'site-group-add'}>
+										<SiteGroupAddPage />
+									</Match>
+									<Match
+										when={
+											route().page === 'site-group-detail' &&
+											route().siteGroupId !== null
+										}
+									>
+										<SiteGroupDetailPage id={route().siteGroupId as number} />
+									</Match>
+									<Match
+										when={
+											route().page === 'site-group-edit' &&
+											route().siteGroupId !== null
+										}
+									>
+										<SiteGroupEditPage id={route().siteGroupId as number} />
 									</Match>
 									<Match
 										when={

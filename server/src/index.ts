@@ -12,6 +12,7 @@ import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
 import { searchApp } from './routes/search'
 import { shelvesApp } from './routes/shelves'
+import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
 import { tenantsApp } from './routes/tenants'
 import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
@@ -58,6 +59,7 @@ export function createApp() {
 			.route('/auth', authApp)
 			.route('/tenants', tenantsApp)
 			.route('/sites', sitesApp)
+			.route('/site-groups', siteGroupsApp)
 			.route('/locations', locationsApp)
 			.route('/racks', racksApp)
 			.route('/shelves', shelvesApp)

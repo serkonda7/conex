@@ -14,17 +14,12 @@ import {
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import {
-	delete_site,
+	delete_site_group,
 	fetch_site_groups,
-	fetch_sites,
-	fetch_tenants,
 	type SiteGroupRow,
-	type SiteRow,
-	type SiteSort,
-	type SiteWithExtras,
-	type TenantRow,
+	type SiteGroupSort,
 } from '../api_p1'
-import { navigate, parseId, queryParam } from '../router'
+import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -32,20 +27,19 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /sites — NetBox-style site list: search, sortable columns, tenant
- * filter (deep-linkable via `?tenant=<id>`), row selection with bulk
- * delete, and icon actions with delete in a row menu. Editing lives on
- * the dedicated /sites/:id/edit page. The whole result set renders at
- * once (API cap: 200).
+ * /site-groups — NetBox-style site group list: search, sortable columns,
+ * parent column, row selection with bulk delete, and icon actions with
+ * delete in a row menu. Editing lives on the dedicated
+ * /site-groups/:id/edit page. The whole result set renders at once
+ * (API cap: 200).
  */
-export function SitesPage(): JSX.Element {
+export function SiteGroupsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-	const [sort, setSort] = createSignal<SiteSort>('name')
+	const [sort, setSort] = createSignal<SiteGroupSort>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
-	const [filterTenant, setFilterTenant] = createSignal(queryParam('tenant'))
 	/**
 	 * Anchor for the row menu, rendered in a Portal so the table's scroll
 	 * container can never clip it. `edge` is a viewport `top` offset when
@@ -59,11 +53,6 @@ export function SitesPage(): JSX.Element {
 		up: boolean
 	}
 	const [openMenu, setOpenMenu] = createSignal<RowMenuAnchor | null>(null)
-
-	// Follow tenant links from the tenant detail page (`/sites?tenant=<id>`).
-	createEffect(() => {
-		setFilterTenant(queryParam('tenant'))
-	})
 
 	let debounceTimer: number | undefined
 	onMount(() => {
@@ -98,34 +87,14 @@ export function SitesPage(): JSX.Element {
 		window.clearTimeout(debounceTimer)
 	})
 
-	const [tenants] = createResource(async () => {
-		const res = await fetch_tenants()
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
-
-	const [groups] = createResource(async () => {
-		const res = await fetch_site_groups()
-		if (Result.isError(res)) {
-			// The site-groups backend may lag this frontend change; a failed
-			// group lookup degrades to '—' cells rather than an error.
-			return []
-		}
-		return res.value.items
-	})
-
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
 		sort: sort(),
 		order: order(),
-		tenant: parseId(filterTenant()) ?? undefined,
 	}))
 
-	const [sitesPage, { refetch }] = createResource(listSource, async (s) => {
-		const res = await fetch_sites(s)
+	const [groupsPage, { refetch }] = createResource(listSource, async (s) => {
+		const res = await fetch_site_groups(s)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return null
@@ -133,10 +102,24 @@ export function SitesPage(): JSX.Element {
 		return res.value
 	})
 
-	const rows = createMemo(() => sitesPage()?.items ?? [])
-	const total = createMemo(() => sitesPage()?.total ?? 0)
+	const rows = createMemo(() => groupsPage()?.items ?? [])
+	const total = createMemo(() => groupsPage()?.total ?? 0)
 	const rangeStart = createMemo(() => (total() === 0 ? 0 : 1))
 	const rangeEnd = createMemo(() => total())
+
+	// Id → name map for the Parent column, resolved from the same result set.
+	const parentNameOf = createMemo(() => {
+		const byId = new Map<number, string>()
+		for (const g of rows()) {
+			byId.set(g.id, g.name)
+		}
+		return (id: number | null): string => {
+			if (id === null || id === undefined) {
+				return '—'
+			}
+			return byId.get(id) ?? String(id)
+		}
+	})
 
 	// A new result set invalidates the checkbox selection.
 	createEffect(() => {
@@ -144,22 +127,7 @@ export function SitesPage(): JSX.Element {
 		setSelected([])
 	})
 
-	function tenantNameOf(id: number | null): string {
-		if (!id) {
-			return '—'
-		}
-		return tenants()?.find((t) => t.id === id)?.name ?? String(id)
-	}
-
-	function groupNameOf(row: SiteRow): string {
-		const id = (row as SiteWithExtras).site_group_id ?? null
-		if (!id) {
-			return '—'
-		}
-		return groups()?.find((g: SiteGroupRow) => g.id === id)?.name ?? String(id)
-	}
-
-	function toggleSort(col: SiteSort): void {
+	function toggleSort(col: SiteGroupSort): void {
 		if (sort() === col) {
 			setOrder(order() === 'asc' ? 'desc' : 'asc')
 		} else {
@@ -168,14 +136,14 @@ export function SitesPage(): JSX.Element {
 		}
 	}
 
-	function sortIndicator(col: SiteSort): string {
+	function sortIndicator(col: SiteGroupSort): string {
 		if (sort() !== col) {
 			return ''
 		}
 		return order() === 'asc' ? ' ▲' : ' ▼'
 	}
 
-	function ariaSort(col: SiteSort): 'ascending' | 'descending' | 'none' {
+	function ariaSort(col: SiteGroupSort): 'ascending' | 'descending' | 'none' {
 		if (sort() !== col) {
 			return 'none'
 		}
@@ -191,11 +159,11 @@ export function SitesPage(): JSX.Element {
 	}
 
 	function toggleSelectAll(checked: boolean): void {
-		setSelected(checked ? rows().map((s) => s.id) : [])
+		setSelected(checked ? rows().map((g) => g.id) : [])
 	}
 
 	const allVisibleSelected = createMemo(
-		() => rows().length > 0 && rows().every((s) => isSelected(s.id)),
+		() => rows().length > 0 && rows().every((g) => isSelected(g.id)),
 	)
 	let selectAllRef: HTMLInputElement | undefined
 	createEffect(() => {
@@ -240,11 +208,11 @@ export function SitesPage(): JSX.Element {
 	}
 
 	async function handleDelete(id: number, name: string): Promise<void> {
-		if (!window.confirm(`Delete site "${name}"?`)) {
+		if (!window.confirm(`Delete site group "${name}"?`)) {
 			return
 		}
 		setError(null)
-		const res = await delete_site(id)
+		const res = await delete_site_group(id)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
@@ -258,13 +226,13 @@ export function SitesPage(): JSX.Element {
 		if (ids.length === 0) {
 			return
 		}
-		if (!window.confirm(`Delete ${ids.length} site${ids.length === 1 ? '' : 's'}?`)) {
+		if (!window.confirm(`Delete ${ids.length} site group${ids.length === 1 ? '' : 's'}?`)) {
 			return
 		}
 		setError(null)
 		const failures: string[] = []
 		for (const id of ids) {
-			const res = await delete_site(id)
+			const res = await delete_site_group(id)
 			if (Result.isError(res)) {
 				failures.push(res.error.message)
 			}
@@ -279,38 +247,23 @@ export function SitesPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>Sites</h2>
-				<button type="button" class="btn-add" onClick={() => navigate('/sites/add')}>
+				<h2>Site Groups</h2>
+				<button type="button" class="btn-add" onClick={() => navigate('/site-groups/add')}>
 					+ Add
 				</button>
 			</div>
 
 			<div class="toolbar-row">
 				<label class="toolbar-search">
-					<span class="visually-hidden">Search sites</span>
+					<span class="visually-hidden">Search site groups</span>
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Search name, slug…"
-						aria-label="Search sites"
+						placeholder="Search name, slug, description…"
+						aria-label="Search site groups"
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
-				</label>
-				<label>
-					<span class="visually-hidden">Filter by tenant</span>
-					<select
-						aria-label="Filter by tenant"
-						value={filterTenant()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setFilterTenant(e.currentTarget.value)
-						}
-					>
-						<option value="">All tenants</option>
-						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
-						</For>
-					</select>
 				</label>
 				<span class="toolbar-spacer" />
 				<Show when={selected().length > 0}>
@@ -328,7 +281,7 @@ export function SitesPage(): JSX.Element {
 							<input
 								ref={selectAllRef}
 								type="checkbox"
-								aria-label="Select all sites"
+								aria-label="Select all site groups"
 								checked={allVisibleSelected()}
 								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
 									toggleSelectAll(e.currentTarget.checked)
@@ -341,7 +294,7 @@ export function SitesPage(): JSX.Element {
 								class="sort-th"
 								onClick={() => toggleSort('name')}
 							>
-								Site{sortIndicator('name')}
+								Group{sortIndicator('name')}
 							</button>
 						</th>
 						<th aria-sort={ariaSort('description')}>
@@ -353,44 +306,44 @@ export function SitesPage(): JSX.Element {
 								Description{sortIndicator('description')}
 							</button>
 						</th>
-						<th>Tenant</th>
-						<th>Group</th>
+						<th>Parent</th>
 						<th>Actions</th>
 					</tr>
 				</thead>
 				<tbody>
 					<For each={rows()}>
-						{(s: SiteRow): JSX.Element => (
+						{(g: SiteGroupRow): JSX.Element => (
 							<tr>
 								<td class="cell-checkbox">
 									<input
 										type="checkbox"
-										aria-label={`Select site ${s.name}`}
-										checked={isSelected(s.id)}
-										onChange={() => toggleSelected(s.id)}
+										aria-label={`Select site group ${g.name}`}
+										checked={isSelected(g.id)}
+										onChange={() => toggleSelected(g.id)}
 									/>
 								</td>
 								<td>
 									<a
-										href={`/sites/${s.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+										href={`/site-groups/${g.id}`}
+										onClick={(e: MouseEvent): void =>
+											go(e, `/site-groups/${g.id}`)
+										}
 									>
-										{s.name}
+										{g.name}
 									</a>
 								</td>
-								<td class="cell-truncate" title={s.description ?? ''}>
-									{s.description || '—'}
+								<td class="cell-truncate" title={g.description ?? ''}>
+									{g.description || '—'}
 								</td>
-								<td>{tenantNameOf(s.tenant_id)}</td>
-								<td>{groupNameOf(s)}</td>
+								<td>{parentNameOf()(g.parent_id)}</td>
 								<td>
 									<div class="row-actions">
 										<button
 											type="button"
 											class="icon-btn"
-											title={`Edit ${s.name}`}
-											aria-label={`Edit site ${s.name}`}
-											onClick={() => navigate(`/sites/${s.id}/edit`)}
+											title={`Edit ${g.name}`}
+											aria-label={`Edit site group ${g.name}`}
+											onClick={() => navigate(`/site-groups/${g.id}/edit`)}
 										>
 											<IconPencil size={16} />
 										</button>
@@ -398,14 +351,14 @@ export function SitesPage(): JSX.Element {
 											<button
 												type="button"
 												class="icon-btn"
-												aria-label={`More actions for ${s.name}`}
+												aria-label={`More actions for ${g.name}`}
 												aria-haspopup="menu"
-												aria-expanded={openMenu()?.id === s.id}
+												aria-expanded={openMenu()?.id === g.id}
 												onClick={(
 													e: MouseEvent & {
 														currentTarget: HTMLButtonElement
 													},
-												): void => toggleMenu(e, s.id, s.name)}
+												): void => toggleMenu(e, g.id, g.name)}
 												onKeyDown={(e: KeyboardEvent): void => {
 													if (e.key === 'Escape') {
 														setOpenMenu(null)
@@ -423,14 +376,14 @@ export function SitesPage(): JSX.Element {
 				</tbody>
 			</table>
 
-			<Show when={sitesPage.loading}>
-				<p class="skeleton">Loading sites…</p>
+			<Show when={groupsPage.loading}>
+				<p class="skeleton">Loading site groups…</p>
 			</Show>
-			<Show when={!sitesPage.loading && rows().length === 0}>
+			<Show when={!groupsPage.loading && rows().length === 0}>
 				<p class="empty">
-					{debouncedSearch() || filterTenant()
-						? 'No sites match the current filters.'
-						: 'No sites yet. Add the first one above.'}
+					{debouncedSearch()
+						? `No site groups match "${debouncedSearch()}".`
+						: 'No site groups yet. Add the first one above.'}
 				</p>
 			</Show>
 
