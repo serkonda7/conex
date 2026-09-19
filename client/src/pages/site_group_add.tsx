@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import { slugify } from 'shared/src/slug'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, onMount, Show } from 'solid-js'
@@ -8,17 +9,6 @@ import { navigate } from '../router'
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
 	navigate(to)
-}
-
-/** Auto-fill helper: "US East" → "us-east" (matches SlugSchema). */
-function slugify(raw: string): string {
-	return raw
-		.toLowerCase()
-		.trim()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.replace(/-{2,}/g, '-')
-		.slice(0, 100)
 }
 
 /** /site-groups/add — NetBox-style site group create form. */
