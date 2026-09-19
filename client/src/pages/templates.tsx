@@ -28,6 +28,7 @@ export function TemplatesPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [mfrName, setMfrName] = createSignal('')
 	const [mfrSlug, setMfrSlug] = createSignal('')
+	const [mfrDescription, setMfrDescription] = createSignal('')
 	const [typeModel, setTypeModel] = createSignal('')
 	const [typeSlug, setTypeSlug] = createSignal('')
 	const [typeHeight, setTypeHeight] = createSignal('1')
@@ -82,13 +83,18 @@ export function TemplatesPage(): JSX.Element {
 	async function handleCreateMfr(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
-		const res = await create_manufacturer(mfrName(), mfrSlug())
+		const res = await create_manufacturer(
+			mfrName(),
+			mfrSlug(),
+			mfrDescription().trim() || undefined,
+		)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
 		}
 		setMfrName('')
 		setMfrSlug('')
+		setMfrDescription('')
 		void refetchMfrs()
 	}
 
@@ -191,6 +197,11 @@ export function TemplatesPage(): JSX.Element {
 					value={mfrSlug()}
 					onInput={(e: InputEventAndTarget) => setMfrSlug(e.currentTarget.value)}
 				/>
+				<input
+					placeholder="Description (optional)"
+					value={mfrDescription()}
+					onInput={(e: InputEventAndTarget) => setMfrDescription(e.currentTarget.value)}
+				/>
 				<button type="submit">Add manufacturer</button>
 			</form>
 			<table>
@@ -198,6 +209,7 @@ export function TemplatesPage(): JSX.Element {
 					<tr>
 						<th>Name</th>
 						<th>Slug</th>
+						<th>Description</th>
 						<th>Actions</th>
 					</tr>
 				</thead>
@@ -208,6 +220,9 @@ export function TemplatesPage(): JSX.Element {
 								<td>{m.name}</td>
 								<td>
 									<code>{m.slug}</code>
+								</td>
+								<td class="cell-truncate" title={m.description ?? ''}>
+									{m.description || '—'}
 								</td>
 								<td>
 									<button

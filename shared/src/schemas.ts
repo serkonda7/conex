@@ -268,6 +268,7 @@ export const RackCreateSchema = v.strictObject({
 	site_id: IdSchema,
 	location_id: NullableIdSchema,
 	tenant_id: NullableIdSchema,
+	description: DescriptionSchema,
 	height_u: v.optional(RackHeightSchema, 42),
 	status: v.optional(RackStatusSchema, 'active'),
 })
@@ -279,6 +280,7 @@ export const RackUpdateSchema = v.strictObject({
 	// positions that are meaningless without the original rack height.
 	location_id: v.optional(v.nullable(IdSchema), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	height_u: v.optional(RackHeightSchema, undefined),
 	status: v.optional(RackStatusSchema, undefined),
 })

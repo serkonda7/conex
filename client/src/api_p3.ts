@@ -41,9 +41,34 @@ export async function fetch_manufacturers(
 export async function create_manufacturer(
 	name: string,
 	slug: string,
+	description?: string,
 ): Promise<Result<ManufacturerRow, Error>> {
-	const res = await client.manufacturers.$post({ json: { name, slug } })
+	const res = await client.manufacturers.$post({
+		json: { name, slug, description: description || undefined },
+	})
 	return to_result<ManufacturerRow>(res, 'Failed to create manufacturer')
+}
+
+export async function fetch_manufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
+	const res = await client.manufacturers[':id'].$get({ param: { id: String(id) } })
+	return to_result<ManufacturerRow>(res, 'Failed to load manufacturer')
+}
+
+export interface ManufacturerUpdateInput {
+	name?: string
+	slug?: string
+	description?: string | null
+}
+
+export async function update_manufacturer(
+	id: number,
+	patch: ManufacturerUpdateInput,
+): Promise<Result<ManufacturerRow, Error>> {
+	const res = await client.manufacturers[':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<ManufacturerRow>(res, 'Failed to update manufacturer')
 }
 
 export async function delete_manufacturer(id: number): Promise<Result<unknown, Error>> {

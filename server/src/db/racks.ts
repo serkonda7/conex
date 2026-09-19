@@ -50,7 +50,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${racks.name} LIKE ${pattern} ESCAPE '\\' OR ${racks.slug} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${racks.name} LIKE ${pattern} ESCAPE '\\' OR ${racks.slug} LIKE ${pattern} ESCAPE '\\' OR ${racks.description} LIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.site) {
@@ -182,6 +182,7 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 		tenant_id: input.tenant_id ?? null,
 		name: input.name,
 		slug: input.slug,
+		description: input.description ?? null,
 		height_u: input.height_u ?? 42,
 		status: input.status ?? 'active',
 	}
@@ -254,6 +255,9 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	}
 	if (input.tenant_id !== undefined) {
 		patch.tenant_id = input.tenant_id
+	}
+	if (input.description !== undefined) {
+		patch.description = input.description
 	}
 	if (input.height_u !== undefined) {
 		patch.height_u = input.height_u

@@ -29,15 +29,37 @@ async function getPage<T>(
 // Racks
 // ---------------------------------------------------------------------------
 
-export async function fetch_racks(filters?: {
+export interface RackFilters {
+	search?: string
 	site?: number
 	location?: number
 	tenant?: number
-}): Promise<Result<Page<RackRow>, Error>> {
+}
+
+export interface RackCreateInput {
+	name: string
+	slug: string
+	site_id: number
+	location_id: number | null
+	tenant_id: number | null
+	description?: string
+	height_u?: number
+}
+
+export interface RackUpdateInput {
+	name?: string
+	slug?: string
+	location_id?: number | null
+	tenant_id?: number | null
+	description?: string | null
+	height_u?: number
+}
+
+export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<RackRow>, Error>> {
 	return getPage<RackRow>(
 		client.racks.$get({
 			query: {
-				search: '',
+				search: filters?.search ?? '',
 				page: '1',
 				limit: '200',
 				site: filters?.site === undefined ? undefined : String(filters.site),
@@ -59,16 +81,30 @@ export async function fetch_elevation(id: number): Promise<Result<ElevationRespo
 	return to_result<ElevationResponse>(res, 'Failed to load rack elevation')
 }
 
-export async function create_rack(input: {
-	name: string
-	slug: string
-	site_id: number
-	location_id: number | null
-	tenant_id: number | null
-	height_u?: number
-}): Promise<Result<RackRow, Error>> {
-	const res = await client.racks.$post({ json: input })
+export async function create_rack(input: RackCreateInput): Promise<Result<RackRow, Error>> {
+	const res = await client.racks.$post({
+		json: {
+			name: input.name,
+			slug: input.slug,
+			site_id: input.site_id,
+			location_id: input.location_id,
+			tenant_id: input.tenant_id,
+			description: input.description || undefined,
+			height_u: input.height_u,
+		},
+	})
 	return to_result<RackRow>(res, 'Failed to create rack')
+}
+
+export async function update_rack(
+	id: number,
+	patch: RackUpdateInput,
+): Promise<Result<RackRow, Error>> {
+	const res = await client.racks[':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<RackRow>(res, 'Failed to update rack')
 }
 
 export async function delete_rack(id: number): Promise<Result<unknown, Error>> {

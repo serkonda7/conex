@@ -145,6 +145,7 @@ export const racks = sqliteTable(
 		// v1 keeps the slug globally unique (same as sites); per-site scoping
 		// can replace this when rack counts grow.
 		slug: text('slug').notNull().unique(),
+		description: text('description'),
 		height_u: integer('height_u').notNull().default(42),
 		status: text('status').notNull().default('active'),
 	},

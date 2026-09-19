@@ -1,4 +1,6 @@
 import {
+	IconBox,
+	IconBuildingFactory,
 	IconFolder,
 	IconLocation,
 	IconLogout,
@@ -23,7 +25,14 @@ import { LocationAddPage } from './pages/location_add'
 import { LocationDetailPage } from './pages/location_detail'
 import { LocationEditPage } from './pages/location_edit'
 import { LocationsPage } from './pages/locations'
+import { ManufacturerAddPage } from './pages/manufacturer_add'
+import { ManufacturerDetailPage } from './pages/manufacturer_detail'
+import { ManufacturerEditPage } from './pages/manufacturer_edit'
+import { ManufacturersPage } from './pages/manufacturers'
+import { RackAddPage } from './pages/rack_add'
 import { RackDetailPage } from './pages/rack_detail'
+import { RackEditPage } from './pages/rack_edit'
+import { RacksPage } from './pages/racks'
 import { SiteAddPage } from './pages/site_add'
 import { SiteDetailPage } from './pages/site_detail'
 import { SiteEditPage } from './pages/site_edit'
@@ -343,6 +352,7 @@ function App(): JSX.Element {
 		locationId: number | null
 		rackId: number | null
 		deviceId: number | null
+		manufacturerId: number | null
 	} {
 		return {
 			page,
@@ -352,6 +362,7 @@ function App(): JSX.Element {
 			locationId: null,
 			rackId: null,
 			deviceId: null,
+			manufacturerId: null,
 		}
 	}
 
@@ -363,6 +374,7 @@ function App(): JSX.Element {
 		locationId: number | null
 		rackId: number | null
 		deviceId: number | null
+		manufacturerId: number | null
 	} {
 		const parts =
 			path()
@@ -433,14 +445,40 @@ function App(): JSX.Element {
 			}
 			return emptyRoute('locations')
 		}
-		if (parts[0] === 'racks' && parts.length === 2) {
-			const rackId = parseId(parts[1])
-			return rackId === null
-				? emptyRoute('not-found')
-				: { ...emptyRoute('rack-detail'), rackId }
+		if (parts[0] === 'racks') {
+			if (parts[1] === 'add') {
+				return emptyRoute('rack-add')
+			}
+			if (parts[1]) {
+				const rackId = parseId(parts[1])
+				if (rackId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('rack-edit'), rackId }
+				}
+				return { ...emptyRoute('rack-detail'), rackId }
+			}
+			return emptyRoute('racks')
 		}
 		if (parts[0] === 'templates') {
 			return emptyRoute('templates')
+		}
+		if (parts[0] === 'manufacturers') {
+			if (parts[1] === 'add') {
+				return emptyRoute('manufacturer-add')
+			}
+			if (parts[1]) {
+				const manufacturerId = parseId(parts[1])
+				if (manufacturerId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('manufacturer-edit'), manufacturerId }
+				}
+				return { ...emptyRoute('manufacturer-detail'), manufacturerId }
+			}
+			return emptyRoute('manufacturers')
 		}
 		if (parts[0] === 'devices') {
 			if (parts[1] === 'add') {
@@ -619,10 +657,24 @@ function App(): JSX.Element {
 										addHref="/locations/add"
 									/>
 									<NavItem
+										href="/racks"
+										active={path().startsWith('/racks')}
+										icon={<IconBox size={16} />}
+										label="Racks"
+										addHref="/racks/add"
+									/>
+									<NavItem
 										href="/templates"
 										active={path().startsWith('/templates')}
 										icon={<IconTemplate size={16} />}
 										label="Templates"
+									/>
+									<NavItem
+										href="/manufacturers"
+										active={path().startsWith('/manufacturers')}
+										icon={<IconBuildingFactory size={16} />}
+										label="Manufacturers"
+										addHref="/manufacturers/add"
 									/>
 									<NavItem
 										href="/devices"
@@ -722,6 +774,12 @@ function App(): JSX.Element {
 									>
 										<SiteGroupEditPage id={route().siteGroupId as number} />
 									</Match>
+									<Match when={route().page === 'racks'}>
+										<RacksPage />
+									</Match>
+									<Match when={route().page === 'rack-add'}>
+										<RackAddPage />
+									</Match>
 									<Match
 										when={
 											route().page === 'rack-detail' &&
@@ -730,8 +788,41 @@ function App(): JSX.Element {
 									>
 										<RackDetailPage id={route().rackId as number} />
 									</Match>
+									<Match
+										when={
+											route().page === 'rack-edit' && route().rackId !== null
+										}
+									>
+										<RackEditPage id={route().rackId as number} />
+									</Match>
 									<Match when={route().page === 'templates'}>
 										<TemplatesPage />
+									</Match>
+									<Match when={route().page === 'manufacturers'}>
+										<ManufacturersPage />
+									</Match>
+									<Match when={route().page === 'manufacturer-add'}>
+										<ManufacturerAddPage />
+									</Match>
+									<Match
+										when={
+											route().page === 'manufacturer-detail' &&
+											route().manufacturerId !== null
+										}
+									>
+										<ManufacturerDetailPage
+											id={route().manufacturerId as number}
+										/>
+									</Match>
+									<Match
+										when={
+											route().page === 'manufacturer-edit' &&
+											route().manufacturerId !== null
+										}
+									>
+										<ManufacturerEditPage
+											id={route().manufacturerId as number}
+										/>
 									</Match>
 									<Match when={route().page === 'devices'}>
 										<DevicesPage />
