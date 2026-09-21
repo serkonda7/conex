@@ -23,6 +23,7 @@ import {
 	type TenantRow,
 } from '../api_p1'
 import { navigate, parseId, queryParam } from '../router'
+import { use_visible_columns } from '../util/column_visibility'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -198,6 +199,12 @@ export function SiteGroupsPage(): JSX.Element {
 		},
 	]
 
+	const group_column_keys = columns.map((c) => c.key)
+	const [visibleColumns, setVisibleColumns] = use_visible_columns(
+		'site-groups',
+		group_column_keys,
+	)
+
 	function closeMenu(): void {
 		setOpenMenu(null)
 	}
@@ -320,6 +327,9 @@ export function SiteGroupsPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
 				selected={selected}
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))

@@ -13,8 +13,14 @@ import {
 	Show,
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { delete_manufacturer, fetch_manufacturers, type ManufacturerRow } from '../api_p3'
+import {
+	delete_manufacturer,
+	fetch_manufacturers,
+	type ManufacturerRow,
+	type ManufacturerSort,
+} from '../api_p3'
 import { navigate } from '../router'
+import { use_visible_columns } from '../util/column_visibility'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -22,15 +28,17 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /manufacturers — manufacturer list: search, row selection with bulk
- * delete, and icon actions with delete in a row menu. Editing lives on the
- * dedicated /manufacturers/:id/edit page. The whole result set renders at
- * once (API cap: 200).
+ * /manufacturers — manufacturer list: search, sortable columns, row
+ * selection with bulk delete, and icon actions with delete in a row menu.
+ * Editing lives on the dedicated /manufacturers/:id/edit page. The whole
+ * result set renders at once (API cap: 200).
  */
 export function ManufacturersPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
+	const [sort, setSort] = createSignal<ManufacturerSort>('name')
+	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	/**
 	 * Anchor for the row menu, rendered in a Portal so the table's scroll
@@ -79,7 +87,11 @@ export function ManufacturersPage(): JSX.Element {
 		window.clearTimeout(debounceTimer)
 	})
 
-	const listSource = createMemo(() => debouncedSearch())
+	const listSource = createMemo(() => ({
+		search: debouncedSearch(),
+		sort: sort(),
+		order: order(),
+	}))
 
 	const [manufacturersPage, { refetch }] = createResource(listSource, async (s) => {
 		const res = await fetch_manufacturers(s)
@@ -105,6 +117,7 @@ export function ManufacturersPage(): JSX.Element {
 		{
 			key: 'name',
 			label: 'Name',
+			sortable: true,
 			getValue: (m: ManufacturerRow): JSX.Element => (
 				<a
 					href={`/manufacturers/${m.id}`}
@@ -117,17 +130,35 @@ export function ManufacturersPage(): JSX.Element {
 		{
 			key: 'slug',
 			label: 'Slug',
+			sortable: true,
 			getValue: (m: ManufacturerRow): JSX.Element => <code>{m.slug}</code>,
 		},
 		{
 			key: 'description',
 			label: 'Description',
+			sortable: true,
 			class: 'cell-truncate',
 			getValue: (m: ManufacturerRow): JSX.Element => (
 				<span title={m.description ?? ''}>{m.description || '—'}</span>
 			),
 		},
 	]
+
+	function handleSort(key: string): void {
+		const col = key as ManufacturerSort
+		if (sort() === col) {
+			setOrder(order() === 'asc' ? 'desc' : 'asc')
+		} else {
+			setSort(col)
+			setOrder('asc')
+		}
+	}
+
+	const manufacturer_column_keys = columns.map((c) => c.key)
+	const [visibleColumns, setVisibleColumns] = use_visible_columns(
+		'manufacturers',
+		manufacturer_column_keys,
+	)
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -237,6 +268,12 @@ export function ManufacturersPage(): JSX.Element {
 				rows={rows}
 				getRowId={(m: ManufacturerRow): number => m.id}
 				columns={columns}
+				sortKey={sort}
+				sortDirection={order}
+				onSort={handleSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
 				selected={selected}
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))

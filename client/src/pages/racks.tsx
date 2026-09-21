@@ -22,8 +22,9 @@ import {
 	type SiteRow,
 	type TenantRow,
 } from '../api_p1'
-import { delete_rack, fetch_racks, type RackRow } from '../api_p2'
+import { delete_rack, fetch_racks, type RackRow, type RackSort } from '../api_p2'
 import { navigate, parseId, queryParam } from '../router'
+import { use_visible_columns } from '../util/column_visibility'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -31,10 +32,10 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /racks — NetBox-style rack list: search, site / location / tenant
- * filters (deep-linkable via `?site=<id>` / `?location=<id>` /
- * `?tenant=<id>`), row selection with bulk delete, and icon actions
- * with delete in a row menu. Creating lives on the dedicated
+ * /racks — NetBox-style rack list: search, sortable columns, site /
+ * location / tenant filters (deep-linkable via `?site=<id>` /
+ * `?location=<id>` / `?tenant=<id>`), row selection with bulk delete, and
+ * icon actions with delete in a row menu. Creating lives on the dedicated
  * /racks/add page, editing on /racks/:id/edit. The whole result set
  * renders at once (API cap: 200).
  */
@@ -42,6 +43,8 @@ export function RacksPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
+	const [sort, setSort] = createSignal<RackSort>('name')
+	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	const [filterSite, setFilterSite] = createSignal(queryParam('site'))
 	const [filterLocation, setFilterLocation] = createSignal(queryParam('location'))
@@ -132,6 +135,8 @@ export function RacksPage(): JSX.Element {
 		site: parseId(filterSite()) ?? undefined,
 		location: parseId(filterLocation()) ?? undefined,
 		tenant: parseId(filterTenant()) ?? undefined,
+		sort: sort(),
+		order: order(),
 	}))
 
 	const [racksPage, { refetch }] = createResource(listSource, async (s) => {
@@ -178,10 +183,21 @@ export function RacksPage(): JSX.Element {
 		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
 	}
 
+	function handleSort(key: string): void {
+		const col = key as RackSort
+		if (sort() === col) {
+			setOrder(order() === 'asc' ? 'desc' : 'asc')
+		} else {
+			setSort(col)
+			setOrder('asc')
+		}
+	}
+
 	const columns: DataTableColumn<RackRow>[] = [
 		{
 			key: 'name',
 			label: 'Rack',
+			sortable: true,
 			getValue: (r: RackRow): JSX.Element => (
 				<a
 					href={`/racks/${r.id}`}
@@ -210,6 +226,14 @@ export function RacksPage(): JSX.Element {
 			),
 		},
 		{
+			key: 'status',
+			label: 'Status',
+			sortable: true,
+			getValue: (r: RackRow): JSX.Element => (
+				<span class={`badge badge-${r.status}`}>{r.status}</span>
+			),
+		},
+		{
 			key: 'type',
 			label: 'Type',
 			getValue: () => <span title="Rack types coming soon">—</span>,
@@ -220,6 +244,9 @@ export function RacksPage(): JSX.Element {
 			getValue: (r: RackRow): string => tenantNameOf(r.tenant_id),
 		},
 	]
+
+	const rack_column_keys = columns.map((c) => c.key)
+	const [visibleColumns, setVisibleColumns] = use_visible_columns('racks', rack_column_keys)
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -370,6 +397,12 @@ export function RacksPage(): JSX.Element {
 				rows={rows}
 				getRowId={(r: RackRow): number => r.id}
 				columns={columns}
+				sortKey={sort}
+				sortDirection={order}
+				onSort={handleSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
 				selected={selected}
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))

@@ -15,6 +15,7 @@ import {
 import { Portal } from 'solid-js/web'
 import { delete_tenant, fetch_tenants, type TenantSort, type TenantWithCounts } from '../api_p1'
 import { navigate } from '../router'
+import { use_visible_columns } from '../util/column_visibility'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -142,6 +143,9 @@ export function TenantsPage(): JSX.Element {
 		},
 	]
 
+	const tenant_column_keys = columns.map((c) => c.key)
+	const [visibleColumns, setVisibleColumns] = use_visible_columns('tenants', tenant_column_keys)
+
 	function closeMenu(): void {
 		setOpenMenu(null)
 	}
@@ -249,6 +253,9 @@ export function TenantsPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
 				selected={selected}
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))

@@ -467,6 +467,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			<DataTable
 				rows={() => ifaces() ?? []}
 				getRowId={(iface: InterfaceJson): number => iface.id}
+				showColumnCustomizer
 				columns={[
 					{
 						key: 'status',
@@ -584,6 +585,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			<DataTable
 				rows={() => cables() ?? []}
 				getRowId={(cable: CableRow): number => cable.id}
+				showColumnCustomizer
 				columns={[
 					{
 						key: 'label',

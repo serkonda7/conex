@@ -677,6 +677,8 @@ export interface LocationListParams extends ListParams {
 	site?: number
 	tenant?: number
 	parent?: number
+	sort: 'name' | 'slug' | 'description'
+	order: 'asc' | 'desc'
 }
 
 export function listLocations(params: LocationListParams): Page<LocationRow> {
@@ -698,11 +700,17 @@ export function listLocations(params: LocationListParams): Page<LocationRow> {
 		conditions.push(eq(locations.parent_id, params.parent))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn =
+		params.sort === 'slug'
+			? locations.slug
+			: params.sort === 'description'
+				? locations.description
+				: locations.name
 	const items = db
 		.select()
 		.from(locations)
 		.where(where)
-		.orderBy(asc(locations.name))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()

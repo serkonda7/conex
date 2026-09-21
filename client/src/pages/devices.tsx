@@ -19,6 +19,7 @@ import { fetch_racks, type RackRow } from '../api_p2'
 import { fetch_device_types } from '../api_p3'
 import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../api_p4'
 import { navigate, parseId, queryParam } from '../router'
+import { use_visible_columns } from '../util/column_visibility'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -225,6 +226,9 @@ export function DevicesPage(): JSX.Element {
 		},
 	]
 
+	const device_column_keys = columns.map((c) => c.key)
+	const [visibleColumns, setVisibleColumns] = use_visible_columns('devices', device_column_keys)
+
 	function closeMenu(): void {
 		setOpenMenu(null)
 	}
@@ -386,6 +390,9 @@ export function DevicesPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
 				selected={selected}
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))

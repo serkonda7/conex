@@ -265,6 +265,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => elevation()?.units ?? []}
 					getRowId={(unit: ElevationUnit) => unit.u}
+					showColumnCustomizer
 					columns={[
 						{
 							key: 'u',

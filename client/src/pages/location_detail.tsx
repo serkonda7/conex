@@ -268,6 +268,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					<DataTable
 						rows={() => children() ?? []}
 						getRowId={(l: LocationRow): number => l.id}
+						showColumnCustomizer
 						columns={[
 							{
 								key: 'name',
@@ -301,6 +302,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					<DataTable
 						rows={() => racks() ?? []}
 						getRowId={(r: RackRow): number => r.id}
+						showColumnCustomizer
 						columns={[
 							{
 								key: 'name',
@@ -339,6 +341,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					<DataTable
 						rows={() => devices() ?? []}
 						getRowId={(d: DeviceRow): number => d.id}
+						showColumnCustomizer
 						columns={[
 							{
 								key: 'name',

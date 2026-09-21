@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
 import type {
 	DeviceTypeCreate,
 	DeviceTypeUpdate,
@@ -37,17 +37,28 @@ function searchPattern(raw: string): string {
 // Manufacturers
 // ---------------------------------------------------------------------------
 
-export function listManufacturers(params: ListParams): Page<ManufacturerRow> {
+export interface ManufacturerListParams extends ListParams {
+	sort: 'name' | 'slug' | 'description'
+	order: 'asc' | 'desc'
+}
+
+export function listManufacturers(params: ManufacturerListParams): Page<ManufacturerRow> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const where = params.search
 		? sql`(${manufacturers.name} LIKE ${pattern} ESCAPE '\\' OR ${manufacturers.slug} LIKE ${pattern} ESCAPE '\\')`
 		: undefined
+	const orderColumn =
+		params.sort === 'slug'
+			? manufacturers.slug
+			: params.sort === 'description'
+				? manufacturers.description
+				: manufacturers.name
 	const items = db
 		.select()
 		.from(manufacturers)
 		.where(where)
-		.orderBy(asc(manufacturers.name))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
@@ -161,6 +172,8 @@ export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
 
 export interface DeviceTypeListParams extends ListParams {
 	manufacturer?: number
+	sort: 'model' | 'slug'
+	order: 'asc' | 'desc'
 }
 
 export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRow> {
@@ -176,11 +189,12 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 		conditions.push(eq(device_types.manufacturer_id, params.manufacturer))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn = params.sort === 'slug' ? device_types.slug : device_types.model
 	const items = db
 		.select()
 		.from(device_types)
 		.where(where)
-		.orderBy(asc(device_types.model))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()

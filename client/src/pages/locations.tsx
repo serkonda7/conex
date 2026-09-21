@@ -20,10 +20,12 @@ import {
 	fetch_sites,
 	fetch_tenants,
 	type LocationRow,
+	type LocationSort,
 	type SiteRow,
 	type TenantRow,
 } from '../api_p1'
 import { navigate, parseId, queryParam } from '../router'
+import { use_visible_columns } from '../util/column_visibility'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -31,16 +33,18 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /locations — NetBox-style location list: search, site + tenant filters
- * (deep-linkable via `?site=<id>` / `?tenant=<id>`), row selection with
- * bulk delete, and icon actions with delete in a row menu. Editing lives
- * on the dedicated /locations/:id/edit page. The whole result set renders
- * at once (API cap: 200).
+ * /locations — NetBox-style location list: search, sortable columns, site +
+ * tenant filters (deep-linkable via `?site=<id>` / `?tenant=<id>`), row
+ * selection with bulk delete, and icon actions with delete in a row menu.
+ * Editing lives on the dedicated /locations/:id/edit page. The whole
+ * result set renders at once (API cap: 200).
  */
 export function LocationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
+	const [sort, setSort] = createSignal<LocationSort>('name')
+	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	const [filterSite, setFilterSite] = createSignal(queryParam('site'))
 	const [filterTenant, setFilterTenant] = createSignal(queryParam('tenant'))
@@ -119,6 +123,8 @@ export function LocationsPage(): JSX.Element {
 		search: debouncedSearch(),
 		site: parseId(filterSite()) ?? undefined,
 		tenant: parseId(filterTenant()) ?? undefined,
+		sort: sort(),
+		order: order(),
 	}))
 
 	const [locationsPage, { refetch }] = createResource(listSource, async (s) => {
@@ -166,10 +172,21 @@ export function LocationsPage(): JSX.Element {
 		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
 	}
 
+	function handleSort(key: string): void {
+		const col = key as LocationSort
+		if (sort() === col) {
+			setOrder(order() === 'asc' ? 'desc' : 'asc')
+		} else {
+			setSort(col)
+			setOrder('asc')
+		}
+	}
+
 	const columns: DataTableColumn<LocationRow>[] = [
 		{
 			key: 'name',
 			label: 'Location',
+			sortable: true,
 			getValue: (l: LocationRow): JSX.Element => (
 				<a
 					href={`/locations/${l.id}`}
@@ -195,6 +212,12 @@ export function LocationsPage(): JSX.Element {
 			getValue: (l: LocationRow): string => tenantNameOf(l.tenant_id),
 		},
 	]
+
+	const location_column_keys = columns.map((c) => c.key)
+	const [visibleColumns, setVisibleColumns] = use_visible_columns(
+		'locations',
+		location_column_keys,
+	)
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -330,6 +353,12 @@ export function LocationsPage(): JSX.Element {
 				rows={rows}
 				getRowId={(l: LocationRow): number => l.id}
 				columns={columns}
+				sortKey={sort}
+				sortDirection={order}
+				onSort={handleSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
 				selected={selected}
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))

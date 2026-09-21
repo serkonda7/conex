@@ -129,6 +129,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 					<DataTable
 						rows={() => deviceTypes() ?? []}
 						getRowId={(t: DeviceTypeRow): number => t.id}
+						showColumnCustomizer
 						columns={[
 							{
 								key: 'model',

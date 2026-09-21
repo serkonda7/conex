@@ -2,12 +2,13 @@ import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import {
 	create_device_type,
 	create_manufacturer,
 	create_stub,
 	type DeviceTypeRow,
+	type DeviceTypeSort,
 	delete_device_type,
 	delete_manufacturer,
 	delete_stub,
@@ -17,8 +18,10 @@ import {
 	fetch_stubs,
 	fetch_type_preview,
 	type ManufacturerRow,
+	type ManufacturerSort,
 	type StubRow,
 } from '../api_p3'
+import { use_visible_columns } from '../util/column_visibility'
 
 /**
  * /templates — manufacturer + device-type editor with stub preview.
@@ -38,17 +41,24 @@ export function TemplatesPage(): JSX.Element {
 	const [stubCount, setStubCount] = createSignal('24')
 	const [previewNames, setPreviewNames] = createSignal<string[]>([])
 	const [selectedType, setSelectedType] = createSignal<number | null>(null)
+	const [mfrSort, setMfrSort] = createSignal<ManufacturerSort>('name')
+	const [mfrOrder, setMfrOrder] = createSignal<'asc' | 'desc'>('asc')
+	const [typeSort, setTypeSort] = createSignal<DeviceTypeSort>('model')
+	const [typeOrder, setTypeOrder] = createSignal<'asc' | 'desc'>('asc')
 
-	const [manufacturers, { refetch: refetchMfrs }] = createResource(async () => {
-		const res = await fetch_manufacturers()
+	const mfrSource = createMemo(() => ({ sort: mfrSort(), order: mfrOrder() }))
+	const typeSource = createMemo(() => ({ sort: typeSort(), order: typeOrder() }))
+
+	const [manufacturers, { refetch: refetchMfrs }] = createResource(mfrSource, async (s) => {
+		const res = await fetch_manufacturers(s)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return []
 		}
 		return res.value.items
 	})
-	const [types, { refetch: refetchTypes }] = createResource(async () => {
-		const res = await fetch_device_types()
+	const [types, { refetch: refetchTypes }] = createResource(typeSource, async (s) => {
+		const res = await fetch_device_types(s)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return []
@@ -97,15 +107,22 @@ export function TemplatesPage(): JSX.Element {
 	}
 
 	const mfrColumns: DataTableColumn<ManufacturerRow>[] = [
-		{ key: 'name', label: 'Name', getValue: (m: ManufacturerRow): string => m.name },
+		{
+			key: 'name',
+			label: 'Name',
+			sortable: true,
+			getValue: (m: ManufacturerRow): string => m.name,
+		},
 		{
 			key: 'slug',
 			label: 'Slug',
+			sortable: true,
 			getValue: (m: ManufacturerRow): JSX.Element => <code>{m.slug}</code>,
 		},
 		{
 			key: 'description',
 			label: 'Description',
+			sortable: true,
 			class: 'cell-truncate',
 			getValue: (m: ManufacturerRow): JSX.Element => (
 				<span title={m.description ?? ''}>{m.description || '—'}</span>
@@ -114,10 +131,16 @@ export function TemplatesPage(): JSX.Element {
 	]
 
 	const typeColumns: DataTableColumn<DeviceTypeRow>[] = [
-		{ key: 'model', label: 'Model', getValue: (t: DeviceTypeRow): string => t.model },
+		{
+			key: 'model',
+			label: 'Model',
+			sortable: true,
+			getValue: (t: DeviceTypeRow): string => t.model,
+		},
 		{
 			key: 'slug',
 			label: 'Slug',
+			sortable: true,
 			getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
 		},
 		{
@@ -132,6 +155,37 @@ export function TemplatesPage(): JSX.Element {
 				t.u_height === 0 ? '0 (virtual)' : t.u_height,
 		},
 	]
+
+	function handleMfrSort(key: string): void {
+		const col = key as ManufacturerSort
+		if (mfrSort() === col) {
+			setMfrOrder(mfrOrder() === 'asc' ? 'desc' : 'asc')
+		} else {
+			setMfrSort(col)
+			setMfrOrder('asc')
+		}
+	}
+
+	function handleTypeSort(key: string): void {
+		const col = key as DeviceTypeSort
+		if (typeSort() === col) {
+			setTypeOrder(typeOrder() === 'asc' ? 'desc' : 'asc')
+		} else {
+			setTypeSort(col)
+			setTypeOrder('asc')
+		}
+	}
+
+	const template_mfr_keys = mfrColumns.map((c) => c.key)
+	const [visibleMfrColumns, setVisibleMfrColumns] = use_visible_columns(
+		'templates-manufacturers',
+		template_mfr_keys,
+	)
+	const template_type_keys = typeColumns.map((c) => c.key)
+	const [visibleTypeColumns, setVisibleTypeColumns] = use_visible_columns(
+		'templates-device-types',
+		template_type_keys,
+	)
 
 	const stubColumns: DataTableColumn<StubRow>[] = [
 		{
@@ -280,6 +334,12 @@ export function TemplatesPage(): JSX.Element {
 				rows={() => manufacturers() ?? []}
 				getRowId={(m: ManufacturerRow): number => m.id}
 				columns={mfrColumns}
+				sortKey={mfrSort}
+				sortDirection={mfrOrder}
+				onSort={handleMfrSort}
+				showColumnCustomizer
+				visibleColumns={visibleMfrColumns}
+				onVisibleColumnsChange={setVisibleMfrColumns}
 				rowActions={(m: ManufacturerRow): JSX.Element => (
 					<button type="button" class="btn-danger" onClick={() => handleDeleteMfr(m)}>
 						Delete
@@ -327,6 +387,12 @@ export function TemplatesPage(): JSX.Element {
 				rows={() => types() ?? []}
 				getRowId={(t: DeviceTypeRow): number => t.id}
 				columns={typeColumns}
+				sortKey={typeSort}
+				sortDirection={typeOrder}
+				onSort={handleTypeSort}
+				showColumnCustomizer
+				visibleColumns={visibleTypeColumns}
+				onVisibleColumnsChange={setVisibleTypeColumns}
 				rowActions={(t: DeviceTypeRow): JSX.Element => (
 					<span>
 						<button type="button" onClick={() => handleSelectType(t.id)}>
@@ -369,6 +435,7 @@ export function TemplatesPage(): JSX.Element {
 					rows={() => stubs() ?? []}
 					getRowId={(s: StubRow): number => s.id}
 					columns={stubColumns}
+					showColumnCustomizer
 					rowActions={(s: StubRow): JSX.Element => (
 						<button
 							type="button"

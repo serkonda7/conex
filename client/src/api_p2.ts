@@ -29,11 +29,15 @@ async function getPage<T>(
 // Racks
 // ---------------------------------------------------------------------------
 
+export type RackSort = 'name' | 'slug' | 'status'
+
 export interface RackFilters {
 	search?: string
 	site?: number
 	location?: number
 	tenant?: number
+	sort?: RackSort
+	order?: 'asc' | 'desc'
 }
 
 export interface RackCreateInput {
@@ -65,6 +69,8 @@ export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<Ra
 				site: filters?.site === undefined ? undefined : String(filters.site),
 				location: filters?.location === undefined ? undefined : String(filters.location),
 				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
 			},
 		}),
 		'Failed to load racks',

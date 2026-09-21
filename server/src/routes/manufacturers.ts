@@ -23,7 +23,13 @@ export const manufacturersApp = new Hono()
 	.get('/', vValidator('query', ManufacturerListQuerySchema, onValidationError), (c) => {
 		const query = c.req.valid('query')
 		return c.json(
-			listManufacturers({ search: query.search, page: query.page, limit: query.limit }),
+			listManufacturers({
+				search: query.search,
+				page: query.page,
+				limit: query.limit,
+				sort: query.sort,
+				order: query.order,
+			}),
 		)
 	})
 	.post('/', vValidator('json', ManufacturerCreateSchema, onValidationError), (c) => {

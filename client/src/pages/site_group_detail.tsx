@@ -214,6 +214,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					<DataTable
 						rows={() => children() ?? []}
 						getRowId={(g: SiteGroupRow): number => g.id}
+						showColumnCustomizer
 						columns={[
 							{
 								key: 'name',
@@ -250,6 +251,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					<DataTable
 						rows={() => sites() ?? []}
 						getRowId={(s: SiteRow): number => s.id}
+						showColumnCustomizer
 						columns={[
 							{
 								key: 'name',

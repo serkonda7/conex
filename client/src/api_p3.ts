@@ -29,11 +29,28 @@ async function getPage<T>(
 // Manufacturers
 // ---------------------------------------------------------------------------
 
+export type ManufacturerSort = 'name' | 'slug' | 'description'
+
+export interface ManufacturerFilters {
+	search?: string
+	sort?: ManufacturerSort
+	order?: 'asc' | 'desc'
+}
+
 export async function fetch_manufacturers(
-	search = '',
+	filters: string | ManufacturerFilters = '',
 ): Promise<Result<Page<ManufacturerRow>, Error>> {
+	const f: ManufacturerFilters = typeof filters === 'string' ? { search: filters } : filters
 	return getPage<ManufacturerRow>(
-		client.manufacturers.$get({ query: { search, page: '1', limit: '200' } }),
+		client.manufacturers.$get({
+			query: {
+				search: f.search ?? '',
+				page: '1',
+				limit: '200',
+				sort: f.sort ?? 'name',
+				order: f.order ?? 'asc',
+			},
+		}),
 		'Failed to load manufacturers',
 	)
 }
@@ -80,16 +97,29 @@ export async function delete_manufacturer(id: number): Promise<Result<unknown, E
 // Device types
 // ---------------------------------------------------------------------------
 
+export type DeviceTypeSort = 'model' | 'slug'
+
+export interface DeviceTypeFilters {
+	search?: string
+	manufacturer?: number
+	sort?: DeviceTypeSort
+	order?: 'asc' | 'desc'
+}
+
 export async function fetch_device_types(
-	manufacturer?: number,
+	filters?: number | DeviceTypeFilters,
 ): Promise<Result<Page<DeviceTypeRow>, Error>> {
+	const f: DeviceTypeFilters =
+		typeof filters === 'number' ? { manufacturer: filters } : (filters ?? {})
 	return getPage<DeviceTypeRow>(
 		client['device-types'].$get({
 			query: {
-				search: '',
+				search: f.search ?? '',
 				page: '1',
 				limit: '200',
-				manufacturer: manufacturer === undefined ? undefined : String(manufacturer),
+				manufacturer: f.manufacturer === undefined ? undefined : String(f.manufacturer),
+				sort: f.sort ?? 'model',
+				order: f.order ?? 'asc',
 			},
 		}),
 		'Failed to load device types',

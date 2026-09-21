@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
 import type {
 	ElevationResponse,
 	ElevationUnit,
@@ -42,6 +42,8 @@ export interface RackListParams extends ListParams {
 	site?: number
 	location?: number
 	tenant?: number
+	sort: 'name' | 'slug' | 'status'
+	order: 'asc' | 'desc'
 }
 
 export function listRacks(params: RackListParams): Page<RackRow> {
@@ -63,11 +65,13 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		conditions.push(eq(racks.tenant_id, params.tenant))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn =
+		params.sort === 'slug' ? racks.slug : params.sort === 'status' ? racks.status : racks.name
 	const items = db
 		.select()
 		.from(racks)
 		.where(where)
-		.orderBy(asc(racks.name))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()

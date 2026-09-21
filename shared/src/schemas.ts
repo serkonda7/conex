@@ -238,6 +238,8 @@ export const LocationListQuerySchema = v.object({
 	site: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	parent: OptionalIdEntry,
+	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export const EntityParamsSchema = v.object({ id: IdSchema })
@@ -321,6 +323,8 @@ export const RackListQuerySchema = v.object({
 	site: OptionalIdEntry,
 	location: OptionalIdEntry,
 	tenant: OptionalIdEntry,
+	sort: v.optional(v.picklist(['name', 'slug', 'status']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export const ShelfListQuerySchema = v.object({
@@ -435,11 +439,17 @@ export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export type StubPreviewBody = v.InferOutput<typeof StubPreviewBodySchema>
 
-export const ManufacturerListQuerySchema = v.object({ ...ListQueryEntries })
+export const ManufacturerListQuerySchema = v.object({
+	...ListQueryEntries,
+	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
 
 export const DeviceTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdEntry,
+	sort: v.optional(v.picklist(['model', 'slug']), 'model'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export type ManufacturerListQuery = v.InferOutput<typeof ManufacturerListQuerySchema>

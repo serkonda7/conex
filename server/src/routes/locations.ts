@@ -30,6 +30,8 @@ export const locationsApp = new Hono()
 				site: query.site,
 				tenant: query.tenant,
 				parent: query.parent,
+				sort: query.sort,
+				order: query.order,
 			}),
 		)
 	})

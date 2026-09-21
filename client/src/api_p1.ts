@@ -212,6 +212,8 @@ export async function delete_site(id: number): Promise<Result<unknown, Error>> {
 // Locations
 // ---------------------------------------------------------------------------
 
+export type LocationSort = 'name' | 'slug' | 'description'
+
 export interface LocationFilters {
 	search?: string
 	page?: number
@@ -219,6 +221,8 @@ export interface LocationFilters {
 	site?: number
 	tenant?: number
 	parent?: number
+	sort?: LocationSort
+	order?: 'asc' | 'desc'
 }
 
 export interface LocationCreateInput {
@@ -251,6 +255,8 @@ export async function fetch_locations(
 				site: f.site === undefined ? undefined : String(f.site),
 				tenant: f.tenant === undefined ? undefined : String(f.tenant),
 				parent: f.parent === undefined ? undefined : String(f.parent),
+				sort: f.sort ?? 'name',
+				order: f.order ?? 'asc',
 			},
 		}),
 		'Failed to load locations',

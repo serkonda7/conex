@@ -24,6 +24,8 @@ export const racksApp = new Hono()
 				site: query.site,
 				location: query.location,
 				tenant: query.tenant,
+				sort: query.sort,
+				order: query.order,
 			}),
 		)
 	})
