@@ -1,0 +1,270 @@
+/**
+ * Shared building blocks for the entity create forms: the page shell,
+ * labelled field wrappers, and the submit/cancel action row.
+ *
+ * Field ids stay page-specific (`#site-name`, …) because the e2e smoke test
+ * and the detail-page deep links address them directly.
+ */
+import type { InputEventAndTarget } from 'shared/src/types'
+import { For, type JSX, onMount, Show } from 'solid-js'
+import { navigate } from '../router'
+
+/** Default hint under a slug input, where the slug is auto-filled from the name. */
+const SLUG_HINT =
+	'URL-safe identifier: lowercase letters, digits, single dashes. Auto-filled from the name.'
+
+/** One `<select>` entry. */
+export interface FormOption {
+	value: number | string
+	label: string
+}
+
+/** Maps list rows (`{ id, name }`) to `<select>` options. */
+export function row_options(rows: { id: number; name: string }[]): FormOption[] {
+	return rows.map((row) => ({ value: row.id, label: row.name }))
+}
+
+/** Wraps a plain anchor so in-page links use the history router. */
+function go(e: MouseEvent, to: string): void {
+	e.preventDefault()
+	navigate(to)
+}
+
+/** Muted helper text below a field control. */
+export function Hint(props: { id?: string; children: JSX.Element }): JSX.Element {
+	return (
+		<p class="field-hint" id={props.id}>
+			{props.children}
+		</p>
+	)
+}
+
+/** Label + control + hint wrapper, keeping the `for`/`id` pairing in one place. */
+export function Field(props: {
+	label: string
+	for: string
+	required?: boolean
+	hint?: JSX.Element
+	children: JSX.Element
+}): JSX.Element {
+	return (
+		<div class="field">
+			<label for={props.for}>
+				{props.label}{' '}
+				<Show when={props.required}>
+					<span class="required" aria-hidden="true">
+						*
+					</span>
+				</Show>
+			</label>
+			{props.children}
+			{props.hint}
+		</div>
+	)
+}
+
+/** Single-line text input; `type` defaults to text. */
+export function TextField(props: {
+	id: string
+	label: string
+	value: string
+	onInput: (value: string) => void
+	placeholder?: string
+	type?: 'text' | 'password'
+	maxLength?: number
+	required?: boolean
+	inputmode?: 'numeric' | 'text'
+	autocomplete?: string
+	autofocus?: boolean
+	hint?: JSX.Element
+}): JSX.Element {
+	let input: HTMLInputElement | undefined
+	onMount(() => {
+		if (props.autofocus ?? false) {
+			input?.focus()
+		}
+	})
+
+	return (
+		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
+			<input
+				id={props.id}
+				ref={input}
+				type={props.type ?? 'text'}
+				placeholder={props.placeholder}
+				required={props.required}
+				maxLength={props.maxLength}
+				inputmode={props.inputmode}
+				autocomplete={props.autocomplete}
+				value={props.value}
+				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
+			/>
+		</Field>
+	)
+}
+
+/** Multi-line text input. */
+export function TextAreaField(props: {
+	id: string
+	label: string
+	value: string
+	onInput: (value: string) => void
+	placeholder?: string
+	rows?: number
+	maxLength?: number
+}): JSX.Element {
+	return (
+		<Field label={props.label} for={props.id}>
+			<textarea
+				id={props.id}
+				placeholder={props.placeholder}
+				rows={props.rows ?? 4}
+				maxLength={props.maxLength}
+				value={props.value}
+				onInput={(e: InputEvent & { currentTarget: HTMLTextAreaElement }) =>
+					props.onInput(e.currentTarget.value)
+				}
+			/>
+		</Field>
+	)
+}
+
+/** Dropdown of `options`, with an optional leading empty choice. */
+export function SelectField(props: {
+	id: string
+	label: string
+	value: string
+	/** Omitted on read-only selects (e.g. placeholders for unbuilt features). */
+	onChange?: (value: string) => void
+	options: FormOption[]
+	/** Label of the `<option value="">` first entry; omit for no empty choice. */
+	emptyLabel?: string
+	required?: boolean
+	disabled?: boolean
+	describedBy?: string
+	hint?: JSX.Element
+}): JSX.Element {
+	return (
+		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
+			<select
+				id={props.id}
+				required={props.required}
+				disabled={props.disabled}
+				aria-describedby={props.describedBy}
+				value={props.value}
+				onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+					props.onChange?.(e.currentTarget.value)
+				}
+			>
+				<Show when={props.emptyLabel}>
+					<option value="">{props.emptyLabel}</option>
+				</Show>
+				<For each={props.options}>
+					{(option: FormOption): JSX.Element => (
+						<option value={option.value}>{option.label}</option>
+					)}
+				</For>
+			</select>
+		</Field>
+	)
+}
+
+/** Required entity name input, optionally autofocused when the form mounts. */
+export function NameField(props: {
+	id: string
+	placeholder: string
+	value: string
+	onInput: (value: string) => void
+	autofocus?: boolean
+}): JSX.Element {
+	let input: HTMLInputElement | undefined
+	onMount(() => {
+		if (props.autofocus ?? false) {
+			input?.focus()
+		}
+	})
+
+	return (
+		<Field label="Name" for={props.id} required>
+			<input
+				id={props.id}
+				ref={input}
+				placeholder={props.placeholder}
+				required
+				maxLength={100}
+				value={props.value}
+				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
+			/>
+		</Field>
+	)
+}
+
+/** Required URL slug input, pattern-checked against `SlugSchema`. */
+export function SlugField(props: {
+	id: string
+	placeholder: string
+	value: string
+	onInput: (value: string) => void
+}): JSX.Element {
+	return (
+		<Field label="Slug" for={props.id} required hint={<Hint>{SLUG_HINT}</Hint>}>
+			<input
+				id={props.id}
+				placeholder={props.placeholder}
+				required
+				maxLength={100}
+				pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+				value={props.value}
+				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
+			/>
+		</Field>
+	)
+}
+
+/** Inline form-level error, announced to assistive tech. */
+export function FormError(props: { message: () => string | null }): JSX.Element {
+	return (
+		<Show when={props.message()}>
+			<div class="app-inline-error" role="alert">
+				{props.message()}
+			</div>
+		</Show>
+	)
+}
+
+/** Create/Cancel action row, disabled while the form is saving. */
+export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.Element {
+	return (
+		<div class="form-actions">
+			<button type="submit" disabled={props.saving}>
+				{props.saving ? 'Creating…' : 'Create'}
+			</button>
+			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
+				Cancel
+			</button>
+		</div>
+	)
+}
+
+/** Create-page shell: back link, heading, and the stacked form. */
+export function FormPage(props: {
+	backTo: string
+	backLabel: string
+	title: string
+	onSubmit: (e: SubmitEvent) => void
+	children: JSX.Element
+}): JSX.Element {
+	return (
+		<div class="form-page">
+			<p>
+				<a href={props.backTo} onClick={(e: MouseEvent): void => go(e, props.backTo)}>
+					← {props.backLabel}
+				</a>
+			</p>
+			<h2>{props.title}</h2>
+			<form class="form-stacked" onSubmit={props.onSubmit}>
+				{props.children}
+			</form>
+		</div>
+	)
+}

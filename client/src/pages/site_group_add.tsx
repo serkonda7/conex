@@ -1,217 +1,106 @@
-import { Result } from 'better-result'
-import { slugify } from 'shared/src/slug'
-import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, onMount, Show } from 'solid-js'
+import { createResource, createSignal } from 'solid-js'
+import { create_site_group, fetch_site_groups, fetch_tenants } from '../api_p1'
 import {
-	create_site_group,
-	fetch_site_groups,
-	fetch_tenants,
-	type SiteGroupRow,
-	type TenantRow,
-} from '../api_p1'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+	FormActions,
+	FormError,
+	FormPage,
+	NameField,
+	row_options,
+	SelectField,
+	SlugField,
+	TextAreaField,
+	TextField,
+} from '../components/form'
+import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
 
 /** /site-groups/add — NetBox-style site group create form. */
 export function SiteGroupAddPage(): JSX.Element {
-	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
-	const [slugTouched, setSlugTouched] = createSignal(false)
+	const slugFields = use_slug_fields()
 	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
-	let nameInput: HTMLInputElement | undefined
 
-	const [groups] = createResource(async () => {
-		const res = await fetch_site_groups()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
-
-	const [tenants] = createResource(async () => {
-		const res = await fetch_tenants()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
-
-	onMount(() => {
-		nameInput?.focus()
-	})
-
-	function handleNameInput(value: string): void {
-		setName(value)
-		if (!slugTouched()) {
-			setSlug(slugify(value))
-		}
-	}
+	const [groups] = createResource(() => load_rows(fetch_site_groups, setFormError))
+	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		setFormError(null)
-		const trimmedName = name().trim()
-		const trimmedSlug = slug().trim()
-		if (!trimmedName) {
-			setFormError('Name is required.')
-			return
-		}
-		if (!trimmedSlug) {
-			setFormError('Slug is required.')
-			return
-		}
-		setSaving(true)
-		const res = await create_site_group({
-			name: trimmedName,
-			slug: trimmedSlug,
-			tenant_id: tenantId() ? Number(tenantId()) : null,
-			parent_id: parentId() ? Number(parentId()) : null,
-			description: description().trim() || undefined,
-			comments: comments().trim() || undefined,
+		await submit_form({
+			name: slugFields.name(),
+			slug: slugFields.slug(),
+			save: (values: FormValues) =>
+				create_site_group({
+					name: values.name,
+					slug: values.slug,
+					tenant_id: tenantId() ? Number(tenantId()) : null,
+					parent_id: parentId() ? Number(parentId()) : null,
+					description: description().trim() || undefined,
+					comments: comments().trim() || undefined,
+				}),
+			setError: setFormError,
+			setSaving,
+			navigateTo: '/site-groups',
 		})
-		setSaving(false)
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return
-		}
-		navigate('/site-groups')
 	}
 
 	return (
-		<div class="form-page">
-			<p>
-				<a href="/site-groups" onClick={(e: MouseEvent): void => go(e, '/site-groups')}>
-					← Site Groups
-				</a>
-			</p>
-			<h2>Add a new site group</h2>
-			<form class="form-stacked" onSubmit={handleCreate}>
-				<div class="field">
-					<label for="site-group-name">
-						Name{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<input
-						id="site-group-name"
-						ref={nameInput}
-						placeholder="US East"
-						required
-						maxLength={100}
-						value={name()}
-						onInput={(e: InputEventAndTarget) => handleNameInput(e.currentTarget.value)}
-					/>
-				</div>
-				<div class="field">
-					<label for="site-group-slug">
-						Slug{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<input
-						id="site-group-slug"
-						placeholder="us-east"
-						required
-						maxLength={100}
-						pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-						value={slug()}
-						onInput={(e: InputEventAndTarget) => {
-							setSlugTouched(true)
-							setSlug(e.currentTarget.value)
-						}}
-					/>
-					<p class="field-hint">
-						URL-safe identifier: lowercase letters, digits, single dashes. Auto-filled
-						from the name.
-					</p>
-				</div>
-				<div class="field">
-					<label for="site-group-tenant">Tenant</label>
-					<select
-						id="site-group-tenant"
-						value={tenantId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setTenantId(e.currentTarget.value)
-						}
-					>
-						<option value="">No tenant</option>
-						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
-						</For>
-					</select>
-				</div>
-				<div class="field">
-					<label for="site-group-parent">Parent</label>
-					<select
-						id="site-group-parent"
-						value={parentId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setParentId(e.currentTarget.value)
-						}
-					>
-						<option value="">Top level</option>
-						<For each={groups() ?? []}>
-							{(g: SiteGroupRow): JSX.Element => (
-								<option value={g.id}>{g.name}</option>
-							)}
-						</For>
-					</select>
-				</div>
-				<div class="field">
-					<label for="site-group-description">Description</label>
-					<input
-						id="site-group-description"
-						placeholder="Short summary (optional)"
-						maxLength={500}
-						value={description()}
-						onInput={(e: InputEventAndTarget) => setDescription(e.currentTarget.value)}
-					/>
-				</div>
-				<div class="field">
-					<label for="site-group-comments">Comments</label>
-					<textarea
-						id="site-group-comments"
-						placeholder="Additional notes (optional)"
-						rows={4}
-						maxLength={2000}
-						value={comments()}
-						onInput={(e: InputEvent & { currentTarget: HTMLTextAreaElement }) =>
-							setComments(e.currentTarget.value)
-						}
-					/>
-				</div>
-				<Show when={formError()}>
-					<div class="app-inline-error" role="alert">
-						{formError()}
-					</div>
-				</Show>
-				<div class="form-actions">
-					<button type="submit" disabled={saving()}>
-						{saving() ? 'Creating…' : 'Create'}
-					</button>
-					<button
-						type="button"
-						onClick={() => navigate('/site-groups')}
-						disabled={saving()}
-					>
-						Cancel
-					</button>
-				</div>
-			</form>
-		</div>
+		<FormPage
+			backTo="/site-groups"
+			backLabel="Site Groups"
+			title="Add a new site group"
+			onSubmit={handleCreate}
+		>
+			<NameField
+				id="site-group-name"
+				placeholder="US East"
+				value={slugFields.name()}
+				onInput={slugFields.handleNameInput}
+				autofocus
+			/>
+			<SlugField
+				id="site-group-slug"
+				placeholder="us-east"
+				value={slugFields.slug()}
+				onInput={slugFields.handleSlugInput}
+			/>
+			<SelectField
+				id="site-group-tenant"
+				label="Tenant"
+				value={tenantId()}
+				onChange={setTenantId}
+				options={row_options(tenants() ?? [])}
+				emptyLabel="No tenant"
+			/>
+			<SelectField
+				id="site-group-parent"
+				label="Parent"
+				value={parentId()}
+				onChange={setParentId}
+				options={row_options(groups() ?? [])}
+				emptyLabel="Top level"
+			/>
+			<TextField
+				id="site-group-description"
+				label="Description"
+				placeholder="Short summary (optional)"
+				maxLength={500}
+				value={description()}
+				onInput={setDescription}
+			/>
+			<TextAreaField
+				id="site-group-comments"
+				label="Comments"
+				placeholder="Additional notes (optional)"
+				maxLength={2000}
+				value={comments()}
+				onInput={setComments}
+			/>
+			<FormError message={formError} />
+			<FormActions saving={saving()} cancelTo="/site-groups" />
+		</FormPage>
 	)
 }

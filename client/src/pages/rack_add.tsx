@@ -1,54 +1,36 @@
-import { Result } from 'better-result'
-import { slugify } from 'shared/src/slug'
-import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, onMount, Show } from 'solid-js'
-import {
-	fetch_locations,
-	fetch_sites,
-	fetch_tenants,
-	type LocationRow,
-	type SiteRow,
-	type TenantRow,
-} from '../api_p1'
+import { createResource, createSignal, Show } from 'solid-js'
+import { fetch_locations, fetch_sites, fetch_tenants } from '../api_p1'
 import { create_rack } from '../api_p2'
-import { navigate, parseId, queryParam } from '../router'
+import {
+	FormActions,
+	FormError,
+	FormPage,
+	Hint,
+	NameField,
+	row_options,
+	SelectField,
+	SlugField,
+	TextField,
+} from '../components/form'
+import { parseId, queryParam } from '../router'
+import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
 
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+/** Id of the hint under the disabled rack-type select. */
+const RACK_TYPE_HINT_ID = 'rack-type-hint'
 
 /** /racks/add — NetBox-style rack create form. */
 export function RackAddPage(): JSX.Element {
-	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
-	const [slugTouched, setSlugTouched] = createSignal(false)
+	const slugFields = use_slug_fields()
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
-	let nameInput: HTMLInputElement | undefined
 
-	const [sites] = createResource(async () => {
-		const res = await fetch_sites()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
-
-	const [tenants] = createResource(async () => {
-		const res = await fetch_tenants()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
+	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
+	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
 
 	// Location options belong to a site, so they follow the site picker.
 	const [locations] = createResource(siteId, async (site: string) => {
@@ -56,24 +38,8 @@ export function RackAddPage(): JSX.Element {
 		if (id === null) {
 			return []
 		}
-		const res = await fetch_locations({ site: id })
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
+		return load_rows(() => fetch_locations({ site: id }), setFormError)
 	})
-
-	onMount(() => {
-		nameInput?.focus()
-	})
-
-	function handleNameInput(value: string): void {
-		setName(value)
-		if (!slugTouched()) {
-			setSlug(slugify(value))
-		}
-	}
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -82,179 +48,91 @@ export function RackAddPage(): JSX.Element {
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		setFormError(null)
-		const trimmedName = name().trim()
-		const trimmedSlug = slug().trim()
-		if (!trimmedName) {
-			setFormError('Name is required.')
-			return
-		}
-		if (!trimmedSlug) {
-			setFormError('Slug is required.')
-			return
-		}
-		const site = parseId(siteId())
-		if (site === null) {
-			setFormError('Select a site first.')
-			return
-		}
-		setSaving(true)
-		const res = await create_rack({
-			name: trimmedName,
-			slug: trimmedSlug,
-			site_id: site,
-			location_id: locationId() ? Number(locationId()) : null,
-			tenant_id: tenantId() ? Number(tenantId()) : null,
-			description: description().trim() || undefined,
+		await submit_form({
+			name: slugFields.name(),
+			slug: slugFields.slug(),
+			validate: () => (parseId(siteId()) === null ? 'Select a site first.' : null),
+			save: (values: FormValues) =>
+				create_rack({
+					name: values.name,
+					slug: values.slug,
+					site_id: Number(siteId()),
+					location_id: locationId() ? Number(locationId()) : null,
+					tenant_id: tenantId() ? Number(tenantId()) : null,
+					description: description().trim() || undefined,
+				}),
+			setError: setFormError,
+			setSaving,
+			navigateTo: '/racks',
 		})
-		setSaving(false)
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return
-		}
-		navigate('/racks')
 	}
 
 	return (
-		<div class="form-page">
-			<p>
-				<a href="/racks" onClick={(e: MouseEvent): void => go(e, '/racks')}>
-					← Racks
-				</a>
-			</p>
-			<h2>Add a new rack</h2>
-			<form class="form-stacked" onSubmit={handleCreate}>
-				<div class="field">
-					<label for="rack-site">
-						Site{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<select
-						id="rack-site"
-						required
-						value={siteId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							handleSiteChange(e.currentTarget.value)
-						}
-					>
-						<option value="">Site…</option>
-						<For each={sites() ?? []}>
-							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
-						</For>
-					</select>
-				</div>
-				<div class="field">
-					<label for="rack-location">Location</label>
-					<select
-						id="rack-location"
-						value={locationId()}
-						disabled={siteId() === ''}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setLocationId(e.currentTarget.value)
-						}
-					>
-						<option value="">No location</option>
-						<For each={locations() ?? []}>
-							{(l: LocationRow): JSX.Element => (
-								<option value={l.id}>{l.name}</option>
-							)}
-						</For>
-					</select>
+		<FormPage backTo="/racks" backLabel="Racks" title="Add a new rack" onSubmit={handleCreate}>
+			<SelectField
+				id="rack-site"
+				label="Site"
+				required
+				value={siteId()}
+				onChange={handleSiteChange}
+				options={row_options(sites() ?? [])}
+				emptyLabel="Site…"
+			/>
+			<SelectField
+				id="rack-location"
+				label="Location"
+				value={locationId()}
+				disabled={siteId() === ''}
+				onChange={setLocationId}
+				options={row_options(locations() ?? [])}
+				emptyLabel="No location"
+				hint={
 					<Show when={siteId() === ''}>
-						<p class="field-hint">Pick a site first to choose a location.</p>
+						<Hint>Pick a site first to choose a location.</Hint>
 					</Show>
-				</div>
-				<div class="field">
-					<label for="rack-name">
-						Name{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<input
-						id="rack-name"
-						ref={nameInput}
-						placeholder="A1"
-						required
-						maxLength={100}
-						value={name()}
-						onInput={(e: InputEventAndTarget) => handleNameInput(e.currentTarget.value)}
-					/>
-				</div>
-				<div class="field">
-					<label for="rack-slug">
-						Slug{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<input
-						id="rack-slug"
-						placeholder="a1"
-						required
-						maxLength={100}
-						pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-						value={slug()}
-						onInput={(e: InputEventAndTarget) => {
-							setSlugTouched(true)
-							setSlug(e.currentTarget.value)
-						}}
-					/>
-					<p class="field-hint">
-						URL-safe identifier: lowercase letters, digits, single dashes. Auto-filled
-						from the name.
-					</p>
-				</div>
-				<div class="field">
-					<label for="rack-description">Description</label>
-					<input
-						id="rack-description"
-						placeholder="Short summary (optional)"
-						maxLength={500}
-						value={description()}
-						onInput={(e: InputEventAndTarget) => setDescription(e.currentTarget.value)}
-					/>
-				</div>
-				<div class="field">
-					<label for="rack-type">Rack type</label>
-					<select id="rack-type" disabled aria-describedby="rack-type-hint">
-						<option value="">No type</option>
-					</select>
-					<p class="field-hint" id="rack-type-hint">
-						Rack types are coming soon.
-					</p>
-				</div>
-				<div class="field">
-					<label for="rack-tenant">Tenant</label>
-					<select
-						id="rack-tenant"
-						value={tenantId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setTenantId(e.currentTarget.value)
-						}
-					>
-						<option value="">No tenant</option>
-						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
-						</For>
-					</select>
-				</div>
-				<Show when={formError()}>
-					<div class="app-inline-error" role="alert">
-						{formError()}
-					</div>
-				</Show>
-				<div class="form-actions">
-					<button type="submit" disabled={saving()}>
-						{saving() ? 'Creating…' : 'Create'}
-					</button>
-					<button type="button" onClick={() => navigate('/racks')} disabled={saving()}>
-						Cancel
-					</button>
-				</div>
-			</form>
-		</div>
+				}
+			/>
+			<NameField
+				id="rack-name"
+				placeholder="A1"
+				value={slugFields.name()}
+				onInput={slugFields.handleNameInput}
+				autofocus
+			/>
+			<SlugField
+				id="rack-slug"
+				placeholder="a1"
+				value={slugFields.slug()}
+				onInput={slugFields.handleSlugInput}
+			/>
+			<TextField
+				id="rack-description"
+				label="Description"
+				placeholder="Short summary (optional)"
+				maxLength={500}
+				value={description()}
+				onInput={setDescription}
+			/>
+			<SelectField
+				id="rack-type"
+				label="Rack type"
+				value=""
+				options={[]}
+				emptyLabel="No type"
+				disabled
+				describedBy={RACK_TYPE_HINT_ID}
+				hint={<Hint id={RACK_TYPE_HINT_ID}>Rack types are coming soon.</Hint>}
+			/>
+			<SelectField
+				id="rack-tenant"
+				label="Tenant"
+				value={tenantId()}
+				onChange={setTenantId}
+				options={row_options(tenants() ?? [])}
+				emptyLabel="No tenant"
+			/>
+			<FormError message={formError} />
+			<FormActions saving={saving()} cancelTo="/racks" />
+		</FormPage>
 	)
 }

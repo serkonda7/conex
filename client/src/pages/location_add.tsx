@@ -1,37 +1,29 @@
-import { Result } from 'better-result'
-import { slugify } from 'shared/src/slug'
-import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import {
-	createEffect,
-	createMemo,
-	createResource,
-	createSignal,
-	For,
-	onMount,
-	Show,
-} from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import {
 	create_location,
 	fetch_locations,
 	fetch_sites,
 	fetch_tenants,
-	type LocationRow,
 	type SiteRow,
-	type TenantRow,
 } from '../api_p1'
-import { navigate, parseId, queryParam } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+import {
+	FormActions,
+	FormError,
+	FormPage,
+	Hint,
+	NameField,
+	row_options,
+	SelectField,
+	SlugField,
+	TextField,
+} from '../components/form'
+import { parseId, queryParam } from '../router'
+import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
-	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
-	const [slugTouched, setSlugTouched] = createSignal(false)
+	const slugFields = use_slug_fields()
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
@@ -39,25 +31,9 @@ export function LocationAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
-	let nameInput: HTMLInputElement | undefined
 
-	const [sites] = createResource(async () => {
-		const res = await fetch_sites()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
-
-	const [tenants] = createResource(async () => {
-		const res = await fetch_tenants()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
+	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
+	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
 
 	// Parent options belong to a site, so they follow the site picker.
 	const [parents] = createResource(siteId, async (site: string) => {
@@ -65,15 +41,20 @@ export function LocationAddPage(): JSX.Element {
 		if (id === null) {
 			return []
 		}
-		const res = await fetch_locations({ site: id })
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
+		return load_rows(() => fetch_locations({ site: id }), setFormError)
 	})
 
 	const parentOptions = createMemo(() => parents() ?? [])
+
+	// If a tenant is picked, only offer that tenant's sites.
+	const filteredSites = createMemo(() => {
+		const all = sites() ?? []
+		const tenant = parseId(tenantId())
+		if (tenant === null) {
+			return all
+		}
+		return all.filter((s: SiteRow) => s.tenant_id === tenant)
+	})
 
 	// Tenant defaults to the selected site's tenant until the user picks one
 	// explicitly (or `?tenant=` is present, which counts as explicit).
@@ -96,196 +77,147 @@ export function LocationAddPage(): JSX.Element {
 		setTenantId(tenant ? String(tenant) : '')
 	})
 
-	onMount(() => {
-		nameInput?.focus()
-	})
-
-	function handleNameInput(value: string): void {
-		setName(value)
-		if (!slugTouched()) {
-			setSlug(slugify(value))
+	// Enforce the tenant → sites filter for explicit tenant choices (including
+	// `?tenant=` deep links): drop a selected site that belongs to another
+	// tenant once the site list is known.
+	createEffect(() => {
+		const all = sites()
+		if (all === undefined) {
+			return
 		}
-	}
+		if (!tenantTouched()) {
+			return
+		}
+		const tenant = parseId(tenantId())
+		if (tenant === null) {
+			return
+		}
+		const site = parseId(siteId())
+		if (site === null) {
+			return
+		}
+		const current = all.find((s: SiteRow) => s.id === site)
+		if (current && current.tenant_id !== tenant) {
+			setSiteId('')
+			setParentId('')
+		}
+	})
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
 		setParentId('')
 	}
 
-	async function handleCreate(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setFormError(null)
-		const trimmedName = name().trim()
-		const trimmedSlug = slug().trim()
-		if (!trimmedName) {
-			setFormError('Name is required.')
-			return
-		}
-		if (!trimmedSlug) {
-			setFormError('Slug is required.')
+	function handleTenantChange(value: string): void {
+		setTenantTouched(true)
+		setTenantId(value)
+		const tenant = parseId(value)
+		if (tenant === null) {
 			return
 		}
 		const site = parseId(siteId())
 		if (site === null) {
-			setFormError('Select a site first.')
 			return
 		}
-		setSaving(true)
-		const res = await create_location({
-			name: trimmedName,
-			slug: trimmedSlug,
-			site_id: site,
-			parent_id: parentId() ? Number(parentId()) : null,
-			tenant_id: tenantId() ? Number(tenantId()) : null,
-			description: description().trim() || undefined,
+		const current = (sites() ?? []).find((s: SiteRow) => s.id === site)
+		if (current && current.tenant_id !== tenant) {
+			setSiteId('')
+			setParentId('')
+		}
+	}
+
+	async function handleCreate(e: SubmitEvent): Promise<void> {
+		e.preventDefault()
+		await submit_form({
+			name: slugFields.name(),
+			slug: slugFields.slug(),
+			validate: () => (parseId(siteId()) === null ? 'Select a site first.' : null),
+			save: (values: FormValues) =>
+				create_location({
+					name: values.name,
+					slug: values.slug,
+					site_id: Number(siteId()),
+					parent_id: parentId() ? Number(parentId()) : null,
+					tenant_id: tenantId() ? Number(tenantId()) : null,
+					description: description().trim() || undefined,
+				}),
+			setError: setFormError,
+			setSaving,
+			navigateTo: '/locations',
 		})
-		setSaving(false)
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return
-		}
-		navigate('/locations')
 	}
 
 	return (
-		<div class="form-page">
-			<p>
-				<a href="/locations" onClick={(e: MouseEvent): void => go(e, '/locations')}>
-					← Locations
-				</a>
-			</p>
-			<h2>Add a new location</h2>
-			<form class="form-stacked" onSubmit={handleCreate}>
-				<div class="field">
-					<label for="location-name">
-						Name{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<input
-						id="location-name"
-						ref={nameInput}
-						placeholder="Floor 2"
-						required
-						maxLength={100}
-						value={name()}
-						onInput={(e: InputEventAndTarget) => handleNameInput(e.currentTarget.value)}
-					/>
-				</div>
-				<div class="field">
-					<label for="location-slug">
-						Slug{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<input
-						id="location-slug"
-						placeholder="floor-2"
-						required
-						maxLength={100}
-						pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-						value={slug()}
-						onInput={(e: InputEventAndTarget) => {
-							setSlugTouched(true)
-							setSlug(e.currentTarget.value)
-						}}
-					/>
-					<p class="field-hint">
-						URL-safe identifier: lowercase letters, digits, single dashes. Auto-filled
-						from the name.
-					</p>
-				</div>
-				<div class="field">
-					<label for="location-site">
-						Site{' '}
-						<span class="required" aria-hidden="true">
-							*
-						</span>
-					</label>
-					<select
-						id="location-site"
-						required
-						value={siteId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							handleSiteChange(e.currentTarget.value)
-						}
-					>
-						<option value="">Site…</option>
-						<For each={sites() ?? []}>
-							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
-						</For>
-					</select>
-				</div>
-				<div class="field">
-					<label for="location-parent">Parent</label>
-					<select
-						id="location-parent"
-						value={parentId()}
-						disabled={siteId() === ''}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setParentId(e.currentTarget.value)
-						}
-					>
-						<option value="">Top level</option>
-						<For each={parentOptions()}>
-							{(l: LocationRow): JSX.Element => (
-								<option value={l.id}>{l.name}</option>
-							)}
-						</For>
-					</select>
+		<FormPage
+			backTo="/locations"
+			backLabel="Locations"
+			title="Add a new location"
+			onSubmit={handleCreate}
+		>
+			<NameField
+				id="location-name"
+				placeholder="Floor 2"
+				value={slugFields.name()}
+				onInput={slugFields.handleNameInput}
+				autofocus
+			/>
+			<SlugField
+				id="location-slug"
+				placeholder="floor-2"
+				value={slugFields.slug()}
+				onInput={slugFields.handleSlugInput}
+			/>
+			<SelectField
+				id="location-site"
+				label="Site"
+				required
+				value={siteId()}
+				onChange={handleSiteChange}
+				options={row_options(filteredSites())}
+				emptyLabel="Site…"
+				hint={
+					<Show when={parseId(tenantId()) !== null}>
+						<Hint>Showing only sites for the selected tenant.</Hint>
+					</Show>
+				}
+			/>
+			<SelectField
+				id="location-parent"
+				label="Parent"
+				value={parentId()}
+				disabled={siteId() === ''}
+				onChange={setParentId}
+				options={row_options(parentOptions())}
+				emptyLabel="Top level"
+				hint={
 					<Show when={siteId() === ''}>
-						<p class="field-hint">Pick a site first to choose a parent.</p>
+						<Hint>Pick a site first to choose a parent.</Hint>
 					</Show>
-				</div>
-				<div class="field">
-					<label for="location-tenant">Tenant</label>
-					<select
-						id="location-tenant"
-						value={tenantId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
-							setTenantTouched(true)
-							setTenantId(e.currentTarget.value)
-						}}
-					>
-						<option value="">No tenant</option>
-						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
-						</For>
-					</select>
+				}
+			/>
+			<SelectField
+				id="location-tenant"
+				label="Tenant"
+				value={tenantId()}
+				onChange={handleTenantChange}
+				options={row_options(tenants() ?? [])}
+				emptyLabel="No tenant"
+				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
-						<p class="field-hint">Defaults to the site's tenant.</p>
+						<Hint>Defaults to the site's tenant.</Hint>
 					</Show>
-				</div>
-				<div class="field">
-					<label for="location-description">Description</label>
-					<input
-						id="location-description"
-						placeholder="Short summary (optional)"
-						maxLength={500}
-						value={description()}
-						onInput={(e: InputEventAndTarget) => setDescription(e.currentTarget.value)}
-					/>
-				</div>
-				<Show when={formError()}>
-					<div class="app-inline-error" role="alert">
-						{formError()}
-					</div>
-				</Show>
-				<div class="form-actions">
-					<button type="submit" disabled={saving()}>
-						{saving() ? 'Creating…' : 'Create'}
-					</button>
-					<button
-						type="button"
-						onClick={() => navigate('/locations')}
-						disabled={saving()}
-					>
-						Cancel
-					</button>
-				</div>
-			</form>
-		</div>
+				}
+			/>
+			<TextField
+				id="location-description"
+				label="Description"
+				placeholder="Short summary (optional)"
+				maxLength={500}
+				value={description()}
+				onInput={setDescription}
+			/>
+			<FormError message={formError} />
+			<FormActions saving={saving()} cancelTo="/locations" />
+		</FormPage>
 	)
 }
