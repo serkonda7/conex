@@ -9,7 +9,7 @@ import {
 	SlugField,
 	TextField,
 } from '../components/form'
-import { type FormValues, submit_form, use_slug_fields } from '../util/form'
+import { type FormValues, is_add_another_submit, submit_form, use_slug_fields } from '../util/form'
 
 /** /manufacturers/add — manufacturer create form. */
 export function ManufacturerAddPage(): JSX.Element {
@@ -28,6 +28,7 @@ export function ManufacturerAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/manufacturers',
+			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
 

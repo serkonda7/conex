@@ -19,7 +19,13 @@ import {
 	TextField,
 } from '../components/form'
 import { parseId, queryParam } from '../router'
-import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
+import {
+	type FormValues,
+	is_add_another_submit,
+	load_rows,
+	submit_form,
+	use_slug_fields,
+} from '../util/form'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -144,6 +150,7 @@ export function LocationAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/locations',
+			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
 

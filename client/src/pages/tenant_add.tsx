@@ -10,7 +10,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
-import { type FormValues, submit_form, use_slug_fields } from '../util/form'
+import { type FormValues, is_add_another_submit, submit_form, use_slug_fields } from '../util/form'
 
 /** /tenants/add — NetBox-style tenant create form. */
 export function TenantAddPage(): JSX.Element {
@@ -35,6 +35,7 @@ export function TenantAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/tenants',
+			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
 

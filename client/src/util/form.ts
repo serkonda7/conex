@@ -10,6 +10,11 @@ import { slugify } from 'shared/src/slug'
 import { createSignal } from 'solid-js'
 import { navigate } from '../router'
 
+/** Whether a form was submitted with the Create & Add Another action. */
+export function is_add_another_submit(e: SubmitEvent): boolean {
+	return (e.submitter as HTMLButtonElement | null)?.value === 'add-another'
+}
+
 /** Accessors for the name/slug pair of an entity form. */
 export interface SlugFields {
 	/** Current name value. */
@@ -20,6 +25,8 @@ export interface SlugFields {
 	handleNameInput: (value: string) => void
 	/** Slug input handler: marks the slug as user-owned. */
 	handleSlugInput: (value: string) => void
+	/** Clears only the name and slug for the next item. */
+	resetName: () => void
 }
 
 /**
@@ -43,6 +50,11 @@ export function use_slug_fields(): SlugFields {
 		handleSlugInput: (value: string): void => {
 			setSlugTouched(true)
 			setSlug(value)
+		},
+		resetName: (): void => {
+			setName('')
+			setSlug('')
+			setSlugTouched(false)
 		},
 	}
 }
@@ -86,6 +98,8 @@ export interface SubmitFormOptions<T> {
 	setSaving: (saving: boolean) => void
 	/** Route opened after a successful save. */
 	navigateTo: string
+	/** Called instead of navigation for Create & Add Another. */
+	onSuccess?: () => void
 }
 
 /**
@@ -118,6 +132,10 @@ export async function submit_form<T>(options: SubmitFormOptions<T>): Promise<voi
 	options.setSaving(false)
 	if (Result.isError(res)) {
 		options.setError(res.error.message)
+		return
+	}
+	if (options.onSuccess) {
+		options.onSuccess()
 		return
 	}
 	navigate(options.navigateTo)

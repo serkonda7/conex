@@ -14,7 +14,13 @@ import {
 	TextField,
 } from '../components/form'
 import { parseId, queryParam } from '../router'
-import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
+import {
+	type FormValues,
+	is_add_another_submit,
+	load_rows,
+	submit_form,
+	use_slug_fields,
+} from '../util/form'
 
 /** /sites/add — NetBox-style site create form. */
 export function SiteAddPage(): JSX.Element {
@@ -72,6 +78,7 @@ export function SiteAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/sites',
+			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
 

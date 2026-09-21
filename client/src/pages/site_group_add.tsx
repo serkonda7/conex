@@ -12,7 +12,13 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
-import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
+import {
+	type FormValues,
+	is_add_another_submit,
+	load_rows,
+	submit_form,
+	use_slug_fields,
+} from '../util/form'
 
 /** /site-groups/add — NetBox-style site group create form. */
 export function SiteGroupAddPage(): JSX.Element {
@@ -44,6 +50,7 @@ export function SiteGroupAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/site-groups',
+			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
 

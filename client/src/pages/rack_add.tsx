@@ -14,7 +14,13 @@ import {
 	TextField,
 } from '../components/form'
 import { parseId, queryParam } from '../router'
-import { type FormValues, load_rows, submit_form, use_slug_fields } from '../util/form'
+import {
+	type FormValues,
+	is_add_another_submit,
+	load_rows,
+	submit_form,
+	use_slug_fields,
+} from '../util/form'
 
 /** Id of the hint under the disabled rack-type select. */
 const RACK_TYPE_HINT_ID = 'rack-type-hint'
@@ -64,6 +70,7 @@ export function RackAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/racks',
+			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
 

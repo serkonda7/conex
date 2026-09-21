@@ -232,15 +232,18 @@ export function FormError(props: { message: () => string | null }): JSX.Element 
 	)
 }
 
-/** Create/Cancel action row, disabled while the form is saving. */
+/** Create actions, disabled while the form is saving. */
 export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.Element {
 	return (
 		<div class="form-actions">
-			<button type="submit" disabled={props.saving}>
-				{props.saving ? 'Creating…' : 'Create'}
-			</button>
 			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
 				Cancel
+			</button>
+			<button type="submit" name="action" value="create" disabled={props.saving}>
+				{props.saving ? 'Creating…' : 'Create'}
+			</button>
+			<button type="submit" name="action" value="add-another" disabled={props.saving}>
+				Create &amp; Add Another
 			</button>
 		</div>
 	)

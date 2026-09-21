@@ -16,7 +16,7 @@ import {
 	TextField,
 } from '../components/form'
 import { parseId } from '../router'
-import { type FormValues, load_rows, submit_form } from '../util/form'
+import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** Rack faces a device can be mounted on. */
 const FACE_OPTIONS: FormOption[] = [
@@ -106,6 +106,7 @@ export function DeviceAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/devices',
+			onSuccess: is_add_another_submit(e) ? () => setName('') : undefined,
 		})
 	}
 

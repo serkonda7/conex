@@ -12,7 +12,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
-import { type FormValues, load_rows, submit_form } from '../util/form'
+import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 const ROLES: UserRole[] = ['admin', 'editor', 'viewer']
 
@@ -56,6 +56,7 @@ export function UserAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/users',
+			onSuccess: is_add_another_submit(e) ? () => setUsername('') : undefined,
 		})
 	}
 
