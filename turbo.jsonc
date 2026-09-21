@@ -1,5 +1,14 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
+  "globalPassThroughEnv": [
+    "CONEX_CLIENT_PORT",
+    "CONEX_E2E_API_URL",
+    "CONEX_E2E_BASE_URL",
+    "CONEX_E2E_DATA_DIR",
+    "CONEX_E2E_PASSWORD",
+    "CONEX_E2E_REUSE_SERVERS",
+    "CONEX_E2E_USERNAME"
+  ],
   "tasks": {
     "dev": {
       "cache": false,

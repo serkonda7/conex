@@ -13,7 +13,8 @@
     "check": "turbo run check",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "db:generate": "bun run --cwd server db:generate"
+    "db:generate": "bun run --cwd server db:generate",
+    "test:e2e": "playwright test"
   },
   "packageManager": "bun@1.4.2",
   "catalog": {
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
+    "@playwright/test": "~1.63.0",
     "@types/bun": "1.4.2",
     "@types/node": "~26.6.2",
     "typescript": "~7.0.2",

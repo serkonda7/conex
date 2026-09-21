@@ -55,6 +55,12 @@ export function LocationAddPage(): JSX.Element {
 	// If a tenant is picked, only offer that tenant's sites.
 	const filteredSites = createMemo(() => {
 		const all = sites() ?? []
+		// The tenant is also derived from a selected site's tenant. Do not
+		// rebuild the site options for that implicit value: replacing the
+		// options causes the browser to reset the selected site.
+		if (!tenantTouched()) {
+			return all
+		}
 		const tenant = parseId(tenantId())
 		if (tenant === null) {
 			return all
