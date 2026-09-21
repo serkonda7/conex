@@ -6,7 +6,6 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "compile": "bun build ./src/index.ts --compile --outfile ./dist/backend.bin",
     "check": "tsc",
-    "test": "bun test",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

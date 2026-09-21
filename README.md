@@ -47,21 +47,9 @@ bun run dev
 ```sh
 bun run check   # tsc per workspace (depends on ^build)
 bun run build   # turbo build
-bun run test    # bun test per workspace
 bun run lint:ci # biome ci
 ```
 
-End-to-end smoke (login → site → rack → device → cable, plus search).
-Needs `bunx playwright install chromium` once:
-
-```sh
-bun run test:e2e
-```
-
-The spec manages its own API + UI servers and an isolated database under
-`client/test-results/e2e-data/` (override with `CONEX_E2E_DATA_DIR`,
-`CONEX_CLIENT_PORT`). Set
-`CONEX_E2E_REUSE_SERVERS=1` to reuse hand-started servers.
 
 ## Features (P6)
 

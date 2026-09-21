@@ -13,9 +13,7 @@
     "check": "turbo run check",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "db:generate": "bun run --cwd server db:generate",
-    "test": "turbo run test",
-    "test:e2e": "bun run --cwd client test:e2e"
+    "db:generate": "bun run --cwd server db:generate"
   },
   "packageManager": "bun@1.4.2",
   "catalog": {
