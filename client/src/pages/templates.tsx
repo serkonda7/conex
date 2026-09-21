@@ -1,3 +1,4 @@
+import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -70,6 +71,77 @@ export function TemplatesPage(): JSX.Element {
 	function mfrNameOf(id: number): string {
 		return manufacturers()?.find((m) => m.id === id)?.name ?? String(id)
 	}
+
+	async function handleDeleteMfr(m: ManufacturerRow): Promise<void> {
+		setError(null)
+		const res = await delete_manufacturer(m.id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		void refetchMfrs()
+	}
+
+	async function handleDeleteType(t: DeviceTypeRow): Promise<void> {
+		setError(null)
+		const res = await delete_device_type(t.id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		if (selectedType() === t.id) {
+			setSelectedType(null)
+			setPreviewNames([])
+		}
+		void refetchTypes()
+	}
+
+	const mfrColumns: DataTableColumn<ManufacturerRow>[] = [
+		{ key: 'name', label: 'Name', getValue: (m: ManufacturerRow): string => m.name },
+		{
+			key: 'slug',
+			label: 'Slug',
+			getValue: (m: ManufacturerRow): JSX.Element => <code>{m.slug}</code>,
+		},
+		{
+			key: 'description',
+			label: 'Description',
+			class: 'cell-truncate',
+			getValue: (m: ManufacturerRow): JSX.Element => (
+				<span title={m.description ?? ''}>{m.description || '—'}</span>
+			),
+		},
+	]
+
+	const typeColumns: DataTableColumn<DeviceTypeRow>[] = [
+		{ key: 'model', label: 'Model', getValue: (t: DeviceTypeRow): string => t.model },
+		{
+			key: 'slug',
+			label: 'Slug',
+			getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
+		},
+		{
+			key: 'manufacturer',
+			label: 'Manufacturer',
+			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
+		},
+		{
+			key: 'u_height',
+			label: 'U height',
+			getValue: (t: DeviceTypeRow): string | number =>
+				t.u_height === 0 ? '0 (virtual)' : t.u_height,
+		},
+	]
+
+	const stubColumns: DataTableColumn<StubRow>[] = [
+		{
+			key: 'prefix',
+			label: 'Prefix',
+			getValue: (s: StubRow): JSX.Element => <code>{s.prefix}</code>,
+		},
+		{ key: 'count', label: 'Count', getValue: (s: StubRow): number => s.count },
+		{ key: 'kind', label: 'Kind', getValue: (s: StubRow): string => s.kind },
+	]
 
 	async function refreshPreview(typeId: number): Promise<void> {
 		const res = await fetch_type_preview(typeId)
@@ -204,48 +276,19 @@ export function TemplatesPage(): JSX.Element {
 				/>
 				<button type="submit">Add manufacturer</button>
 			</form>
-			<table>
-				<thead>
-					<tr>
-						<th>Name</th>
-						<th>Slug</th>
-						<th>Description</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={manufacturers() ?? []}>
-						{(m: ManufacturerRow): JSX.Element => (
-							<tr>
-								<td>{m.name}</td>
-								<td>
-									<code>{m.slug}</code>
-								</td>
-								<td class="cell-truncate" title={m.description ?? ''}>
-									{m.description || '—'}
-								</td>
-								<td>
-									<button
-										type="button"
-										class="btn-danger"
-										onClick={async () => {
-											setError(null)
-											const res = await delete_manufacturer(m.id)
-											if (Result.isError(res)) {
-												setError(res.error.message)
-												return
-											}
-											void refetchMfrs()
-										}}
-									>
-										Delete
-									</button>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
+			<DataTable
+				rows={() => manufacturers() ?? []}
+				getRowId={(m: ManufacturerRow): number => m.id}
+				columns={mfrColumns}
+				rowActions={(m: ManufacturerRow): JSX.Element => (
+					<button type="button" class="btn-danger" onClick={() => handleDeleteMfr(m)}>
+						Delete
+					</button>
+				)}
+				loading={() => manufacturers.loading}
+				loadingContent={<p class="skeleton">Loading manufacturers…</p>}
+				emptyContent={<p class="empty">No manufacturers yet.</p>}
+			/>
 
 			<h2>Device types</h2>
 			<form onSubmit={handleCreateType}>
@@ -280,55 +323,28 @@ export function TemplatesPage(): JSX.Element {
 				</select>
 				<button type="submit">Add device type</button>
 			</form>
-			<table>
-				<thead>
-					<tr>
-						<th>Model</th>
-						<th>Slug</th>
-						<th>Manufacturer</th>
-						<th>U height</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={types() ?? []}>
-						{(t: DeviceTypeRow): JSX.Element => (
-							<tr>
-								<td>{t.model}</td>
-								<td>
-									<code>{t.slug}</code>
-								</td>
-								<td>{mfrNameOf(t.manufacturer_id)}</td>
-								<td>{t.u_height === 0 ? '0 (virtual)' : t.u_height}</td>
-								<td>
-									<button type="button" onClick={() => handleSelectType(t.id)}>
-										{selectedType() === t.id ? 'Selected' : 'Select'}
-									</button>{' '}
-									<button
-										type="button"
-										class="btn-danger"
-										onClick={async () => {
-											setError(null)
-											const res = await delete_device_type(t.id)
-											if (Result.isError(res)) {
-												setError(res.error.message)
-												return
-											}
-											if (selectedType() === t.id) {
-												setSelectedType(null)
-												setPreviewNames([])
-											}
-											void refetchTypes()
-										}}
-									>
-										Delete
-									</button>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
+			<DataTable
+				rows={() => types() ?? []}
+				getRowId={(t: DeviceTypeRow): number => t.id}
+				columns={typeColumns}
+				rowActions={(t: DeviceTypeRow): JSX.Element => (
+					<span>
+						<button type="button" onClick={() => handleSelectType(t.id)}>
+							{selectedType() === t.id ? 'Selected' : 'Select'}
+						</button>{' '}
+						<button
+							type="button"
+							class="btn-danger"
+							onClick={() => handleDeleteType(t)}
+						>
+							Delete
+						</button>
+					</span>
+				)}
+				loading={() => types.loading}
+				loadingContent={<p class="skeleton">Loading device types…</p>}
+				emptyContent={<p class="empty">No device types yet.</p>}
+			/>
 
 			<Show when={selectedType() !== null}>
 				<h2>Interface stubs</h2>
@@ -349,38 +365,23 @@ export function TemplatesPage(): JSX.Element {
 						Preview {stubPrefix() || 'prefix'} × {stubCount() || '?'}
 					</button>
 				</form>
-				<table>
-					<thead>
-						<tr>
-							<th>Prefix</th>
-							<th>Count</th>
-							<th>Kind</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						<For each={stubs() ?? []}>
-							{(s: StubRow): JSX.Element => (
-								<tr>
-									<td>
-										<code>{s.prefix}</code>
-									</td>
-									<td>{s.count}</td>
-									<td>{s.kind}</td>
-									<td>
-										<button
-											type="button"
-											class="btn-danger"
-											onClick={() => handleDeleteStub(s.id)}
-										>
-											Delete
-										</button>
-									</td>
-								</tr>
-							)}
-						</For>
-					</tbody>
-				</table>
+				<DataTable
+					rows={() => stubs() ?? []}
+					getRowId={(s: StubRow): number => s.id}
+					columns={stubColumns}
+					rowActions={(s: StubRow): JSX.Element => (
+						<button
+							type="button"
+							class="btn-danger"
+							onClick={() => handleDeleteStub(s.id)}
+						>
+							Delete
+						</button>
+					)}
+					loading={() => stubs.loading}
+					loadingContent={<p class="skeleton">Loading stubs…</p>}
+					emptyContent={<p class="empty">No stubs yet.</p>}
+				/>
 				<h3>Expansion preview ({previewNames().length} interfaces)</h3>
 				<p>
 					<code>{previewNames().join(', ') || '—'}</code>

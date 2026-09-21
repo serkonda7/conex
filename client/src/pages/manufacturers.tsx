@@ -1,3 +1,4 @@
+import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -7,7 +8,6 @@ import {
 	createMemo,
 	createResource,
 	createSignal,
-	For,
 	onCleanup,
 	onMount,
 	Show,
@@ -101,28 +101,33 @@ export function ManufacturersPage(): JSX.Element {
 		setSelected([])
 	})
 
-	function isSelected(id: number): boolean {
-		return selected().includes(id)
-	}
-
-	function toggleSelected(id: number): void {
-		setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
-	}
-
-	function toggleSelectAll(checked: boolean): void {
-		setSelected(checked ? rows().map((m) => m.id) : [])
-	}
-
-	const allVisibleSelected = createMemo(
-		() => rows().length > 0 && rows().every((m) => isSelected(m.id)),
-	)
-	let selectAllRef: HTMLInputElement | undefined
-	createEffect(() => {
-		if (selectAllRef) {
-			const some = selected().length > 0
-			selectAllRef.indeterminate = some && !allVisibleSelected()
-		}
-	})
+	const columns: DataTableColumn<ManufacturerRow>[] = [
+		{
+			key: 'name',
+			label: 'Name',
+			getValue: (m: ManufacturerRow): JSX.Element => (
+				<a
+					href={`/manufacturers/${m.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/manufacturers/${m.id}`)}
+				>
+					{m.name}
+				</a>
+			),
+		},
+		{
+			key: 'slug',
+			label: 'Slug',
+			getValue: (m: ManufacturerRow): JSX.Element => <code>{m.slug}</code>,
+		},
+		{
+			key: 'description',
+			label: 'Description',
+			class: 'cell-truncate',
+			getValue: (m: ManufacturerRow): JSX.Element => (
+				<span title={m.description ?? ''}>{m.description || '—'}</span>
+			),
+		},
+	]
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -228,105 +233,59 @@ export function ManufacturersPage(): JSX.Element {
 				</Show>
 			</div>
 
-			<table>
-				<thead>
-					<tr>
-						<th class="cell-checkbox">
-							<span class="visually-hidden">Select rows</span>
-							<input
-								ref={selectAllRef}
-								type="checkbox"
-								aria-label="Select all manufacturers"
-								checked={allVisibleSelected()}
-								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-									toggleSelectAll(e.currentTarget.checked)
-								}
-							/>
-						</th>
-						<th>Name</th>
-						<th>Slug</th>
-						<th>Description</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={rows()}>
-						{(m: ManufacturerRow): JSX.Element => (
-							<tr>
-								<td class="cell-checkbox">
-									<input
-										type="checkbox"
-										aria-label={`Select manufacturer ${m.name}`}
-										checked={isSelected(m.id)}
-										onChange={() => toggleSelected(m.id)}
-									/>
-								</td>
-								<td>
-									<a
-										href={`/manufacturers/${m.id}`}
-										onClick={(e: MouseEvent): void =>
-											go(e, `/manufacturers/${m.id}`)
-										}
-									>
-										{m.name}
-									</a>
-								</td>
-								<td>
-									<code>{m.slug}</code>
-								</td>
-								<td class="cell-truncate" title={m.description ?? ''}>
-									{m.description || '—'}
-								</td>
-								<td>
-									<div class="row-actions">
-										<button
-											type="button"
-											class="icon-btn"
-											title={`Edit ${m.name}`}
-											aria-label={`Edit manufacturer ${m.name}`}
-											onClick={() => navigate(`/manufacturers/${m.id}/edit`)}
-										>
-											<IconPencil size={16} />
-										</button>
-										<div class="row-menu-wrap">
-											<button
-												type="button"
-												class="icon-btn"
-												aria-label={`More actions for ${m.name}`}
-												aria-haspopup="menu"
-												aria-expanded={openMenu()?.id === m.id}
-												onClick={(
-													e: MouseEvent & {
-														currentTarget: HTMLButtonElement
-													},
-												): void => toggleMenu(e, m.id, m.name)}
-												onKeyDown={(e: KeyboardEvent): void => {
-													if (e.key === 'Escape') {
-														setOpenMenu(null)
-													}
-												}}
-											>
-												<IconDotsVertical size={16} />
-											</button>
-										</div>
-									</div>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-
-			<Show when={manufacturersPage.loading}>
-				<p class="skeleton">Loading manufacturers…</p>
-			</Show>
-			<Show when={!manufacturersPage.loading && rows().length === 0}>
-				<p class="empty">
-					{debouncedSearch()
-						? `No manufacturers match "${debouncedSearch()}".`
-						: 'No manufacturers yet. Add the first one above.'}
-				</p>
-			</Show>
+			<DataTable
+				rows={rows}
+				getRowId={(m: ManufacturerRow): number => m.id}
+				columns={columns}
+				selected={selected}
+				onSelectionChange={(ids: (string | number)[]): void => {
+					setSelected(ids.map((id) => Number(id)))
+				}}
+				selectionLabel="Select all manufacturers"
+				rowActions={(m: ManufacturerRow): JSX.Element => (
+					<div class="row-actions">
+						<button
+							type="button"
+							class="icon-btn"
+							title={`Edit ${m.name}`}
+							aria-label={`Edit manufacturer ${m.name}`}
+							onClick={() => navigate(`/manufacturers/${m.id}/edit`)}
+						>
+							<IconPencil size={16} />
+						</button>
+						<div class="row-menu-wrap">
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label={`More actions for ${m.name}`}
+								aria-haspopup="menu"
+								aria-expanded={openMenu()?.id === m.id}
+								onClick={(
+									e: MouseEvent & {
+										currentTarget: HTMLButtonElement
+									},
+								): void => toggleMenu(e, m.id, m.name)}
+								onKeyDown={(e: KeyboardEvent): void => {
+									if (e.key === 'Escape') {
+										setOpenMenu(null)
+									}
+								}}
+							>
+								<IconDotsVertical size={16} />
+							</button>
+						</div>
+					</div>
+				)}
+				loading={() => manufacturersPage.loading}
+				loadingContent={<p class="skeleton">Loading manufacturers…</p>}
+				emptyContent={
+					<p class="empty">
+						{debouncedSearch()
+							? `No manufacturers match "${debouncedSearch()}".`
+							: 'No manufacturers yet. Add the first one above.'}
+					</p>
+				}
+			/>
 
 			<p class="paginator-showing" role="status">
 				Showing {rangeStart()}-{rangeEnd()} of {total()}

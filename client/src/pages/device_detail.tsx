@@ -1,3 +1,4 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { TraceLink } from 'shared/src/schemas'
@@ -262,6 +263,22 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		return types()?.find((t) => t.id === id)?.model ?? String(id)
 	}
 
+	async function handleRename(iface: InterfaceJson): Promise<void> {
+		setError(null)
+		const renamed = window.prompt('Rename interface', iface.name)
+		if (!renamed || renamed === iface.name) {
+			return
+		}
+		const res = await update_interface(props.id, iface.id, {
+			name: renamed,
+		})
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		void refetchIfaces()
+	}
+
 	const ifaceCount = (): number => ifaces()?.length ?? 0
 	const traceCount = (): number => trace()?.links.length ?? 0
 	const cableCount = (): number => cables()?.length ?? 0
@@ -447,64 +464,43 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<button type="submit">Add interface</button>
 			</form>
-			<table>
-				<thead>
-					<tr>
-						<th>Status</th>
-						<th>Name</th>
-						<th>Kind</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={ifaces() ?? []}>
-						{(iface: InterfaceJson): JSX.Element => (
-							<tr>
-								<td title={iface.connected ? 'connected' : 'free'}>
-									<span
-										class={
-											iface.connected
-												? 'status-dot-connected'
-												: 'status-dot-free'
-										}
-									>
-										●
-									</span>
-								</td>
-								<td>
-									<code>{iface.name}</code>
-								</td>
-								<td>{iface.kind}</td>
-								<td>
-									<button
-										type="button"
-										onClick={async () => {
-											setError(null)
-											const renamed = window.prompt(
-												'Rename interface',
-												iface.name,
-											)
-											if (!renamed || renamed === iface.name) {
-												return
-											}
-											const res = await update_interface(props.id, iface.id, {
-												name: renamed,
-											})
-											if (Result.isError(res)) {
-												setError(res.error.message)
-												return
-											}
-											void refetchIfaces()
-										}}
-									>
-										Rename
-									</button>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
+			<DataTable
+				rows={() => ifaces() ?? []}
+				getRowId={(iface: InterfaceJson): number => iface.id}
+				columns={[
+					{
+						key: 'status',
+						label: 'Status',
+						getValue: (iface: InterfaceJson): JSX.Element => (
+							<span title={iface.connected ? 'connected' : 'free'}>
+								<span
+									class={
+										iface.connected ? 'status-dot-connected' : 'status-dot-free'
+									}
+								>
+									●
+								</span>
+							</span>
+						),
+					},
+					{
+						key: 'name',
+						label: 'Name',
+						getValue: (iface: InterfaceJson): JSX.Element => <code>{iface.name}</code>,
+					},
+					{
+						key: 'kind',
+						label: 'Kind',
+						getValue: (iface: InterfaceJson): string => iface.kind,
+					},
+				]}
+				rowActions={(iface: InterfaceJson): JSX.Element => (
+					<button type="button" onClick={() => handleRename(iface)}>
+						Rename
+					</button>
+				)}
+				empty={false}
+			/>
 
 			<h3>Connect a cable</h3>
 			<form onSubmit={handleConnect}>
@@ -585,41 +581,39 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			</Show>
 
 			<h3 id="device-cables">Cables ({cables()?.length ?? 0})</h3>
-			<table>
-				<thead>
-					<tr>
-						<th>Label</th>
-						<th>Status</th>
-						<th>Kind</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={cables() ?? []}>
-						{(cable: CableRow): JSX.Element => (
-							<tr>
-								<td>{cable.label ?? '—'}</td>
-								<td>
-									<span class="badge">{cable.status}</span>
-								</td>
-								<td>{cable.kind ?? '—'}</td>
-								<td>
-									<button
-										type="button"
-										class="btn-danger"
-										onClick={() => handleDisconnect(cable.id)}
-									>
-										Disconnect
-									</button>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-			<Show when={(cables() ?? []).length === 0}>
-				<p class="empty">No cables on this device yet.</p>
-			</Show>
+			<DataTable
+				rows={() => cables() ?? []}
+				getRowId={(cable: CableRow): number => cable.id}
+				columns={[
+					{
+						key: 'label',
+						label: 'Label',
+						getValue: (cable: CableRow): string => cable.label ?? '—',
+					},
+					{
+						key: 'status',
+						label: 'Status',
+						getValue: (cable: CableRow): JSX.Element => (
+							<span class="badge">{cable.status}</span>
+						),
+					},
+					{
+						key: 'kind',
+						label: 'Kind',
+						getValue: (cable: CableRow): string => cable.kind ?? '—',
+					},
+				]}
+				rowActions={(cable: CableRow): JSX.Element => (
+					<button
+						type="button"
+						class="btn-danger"
+						onClick={() => handleDisconnect(cable.id)}
+					>
+						Disconnect
+					</button>
+				)}
+				emptyContent={<p class="empty">No cables on this device yet.</p>}
+			/>
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

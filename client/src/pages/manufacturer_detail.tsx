@@ -1,7 +1,8 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, Show } from 'solid-js'
 import {
 	type DeviceTypeRow,
 	delete_manufacturer,
@@ -125,28 +126,28 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 					when={typeCount() > 0}
 					fallback={<p class="empty">No device types for this manufacturer yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Model</th>
-								<th>Slug</th>
-								<th>U height</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={deviceTypes() ?? []}>
-								{(t: DeviceTypeRow): JSX.Element => (
-									<tr>
-										<td>{t.model}</td>
-										<td>
-											<code>{t.slug}</code>
-										</td>
-										<td>{t.u_height === 0 ? '0 (virtual)' : t.u_height}</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => deviceTypes() ?? []}
+						getRowId={(t: DeviceTypeRow): number => t.id}
+						columns={[
+							{
+								key: 'model',
+								label: 'Model',
+								getValue: (t: DeviceTypeRow): string => t.model,
+							},
+							{
+								key: 'slug',
+								label: 'Slug',
+								getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
+							},
+							{
+								key: 'u_height',
+								label: 'U height',
+								getValue: (t: DeviceTypeRow): string | number =>
+									t.u_height === 0 ? '0 (virtual)' : t.u_height,
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 			<p>

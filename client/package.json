@@ -17,11 +17,12 @@
     "vite-plugin-solid": "~2.11.14"
   },
   "dependencies": {
+    "@serkonda7/solid-components": "^0.0.3",
+    "@tabler/icons-solidjs": "~3.47.0",
     "better-result": "catalog:",
     "hono": "catalog:",
     "server": "workspace:*",
     "shared": "workspace:*",
-    "solid-js": "~1.9.15",
-    "@tabler/icons-solidjs": "~3.46.0"
+    "solid-js": "~1.9.15"
   }
 }

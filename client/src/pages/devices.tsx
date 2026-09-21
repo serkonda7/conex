@@ -1,3 +1,4 @@
+import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -163,7 +164,8 @@ export function DevicesPage(): JSX.Element {
 		return racks()?.find((r) => r.id === id)?.name ?? String(id)
 	}
 
-	function toggleSort(col: DeviceSort): void {
+	function handleSort(key: string): void {
+		const col = key as DeviceSort
 		if (sort() === col) {
 			setOrder(order() === 'asc' ? 'desc' : 'asc')
 		} else {
@@ -172,42 +174,56 @@ export function DevicesPage(): JSX.Element {
 		}
 	}
 
-	function sortIndicator(col: DeviceSort): string {
-		if (sort() !== col) {
-			return ''
-		}
-		return order() === 'asc' ? ' ▲' : ' ▼'
-	}
-
-	function ariaSort(col: DeviceSort): 'ascending' | 'descending' | 'none' {
-		if (sort() !== col) {
-			return 'none'
-		}
-		return order() === 'asc' ? 'ascending' : 'descending'
-	}
-
-	function isSelected(id: number): boolean {
-		return selected().includes(id)
-	}
-
-	function toggleSelected(id: number): void {
-		setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
-	}
-
-	function toggleSelectAll(checked: boolean): void {
-		setSelected(checked ? rows().map((d) => d.id) : [])
-	}
-
-	const allVisibleSelected = createMemo(
-		() => rows().length > 0 && rows().every((d) => isSelected(d.id)),
-	)
-	let selectAllRef: HTMLInputElement | undefined
-	createEffect(() => {
-		if (selectAllRef) {
-			const some = selected().length > 0
-			selectAllRef.indeterminate = some && !allVisibleSelected()
-		}
-	})
+	const columns: DataTableColumn<DeviceRow>[] = [
+		{
+			key: 'name',
+			label: 'Device',
+			sortable: true,
+			getValue: (d: DeviceRow): JSX.Element => (
+				<a
+					href={`/devices/${d.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+				>
+					{d.name}
+				</a>
+			),
+		},
+		{
+			key: 'type',
+			label: 'Type',
+			getValue: (d: DeviceRow): string => typeNameOf(d.device_type_id),
+		},
+		{
+			key: 'status',
+			label: 'Status',
+			sortable: true,
+			getValue: (d: DeviceRow): JSX.Element => (
+				<span class={`badge badge-${d.status}`}>{d.status}</span>
+			),
+		},
+		{
+			key: 'mount',
+			label: 'Mount',
+			getValue: (d: DeviceRow): JSX.Element => (
+				<span>
+					{d.shelf_id ? (
+						<code>shelf:{d.shelf_id}</code>
+					) : d.position_u !== null ? (
+						<code>
+							{rackNameOf(d.rack_id) ?? 'rack'} U{d.position_u}
+						</code>
+					) : (
+						<span>unracked</span>
+					)}
+				</span>
+			),
+		},
+		{
+			key: 'asset_tag',
+			label: 'Asset tag',
+			getValue: (d: DeviceRow): string => d.asset_tag ?? '—',
+		},
+	]
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -363,131 +379,62 @@ export function DevicesPage(): JSX.Element {
 				</Show>
 			</div>
 
-			<table>
-				<thead>
-					<tr>
-						<th class="cell-checkbox">
-							<span class="visually-hidden">Select rows</span>
-							<input
-								ref={selectAllRef}
-								type="checkbox"
-								aria-label="Select all devices"
-								checked={allVisibleSelected()}
-								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-									toggleSelectAll(e.currentTarget.checked)
-								}
-							/>
-						</th>
-						<th aria-sort={ariaSort('name')}>
+			<DataTable
+				rows={rows}
+				getRowId={(d: DeviceRow): number => d.id}
+				columns={columns}
+				sortKey={sort}
+				sortDirection={order}
+				onSort={handleSort}
+				selected={selected}
+				onSelectionChange={(ids: (string | number)[]): void => {
+					setSelected(ids.map((id) => Number(id)))
+				}}
+				selectionLabel="Select all devices"
+				rowActions={(d: DeviceRow): JSX.Element => (
+					<div class="row-actions">
+						<button
+							type="button"
+							class="icon-btn"
+							title={`Edit ${d.name}`}
+							aria-label={`Edit device ${d.name}`}
+							onClick={() => navigate(`/devices/${d.id}/edit`)}
+						>
+							<IconPencil size={16} />
+						</button>
+						<div class="row-menu-wrap">
 							<button
 								type="button"
-								class="sort-th"
-								onClick={() => toggleSort('name')}
+								class="icon-btn"
+								aria-label={`More actions for ${d.name}`}
+								aria-haspopup="menu"
+								aria-expanded={openMenu()?.id === d.id}
+								onClick={(
+									e: MouseEvent & {
+										currentTarget: HTMLButtonElement
+									},
+								): void => toggleMenu(e, d.id, d.name)}
+								onKeyDown={(e: KeyboardEvent): void => {
+									if (e.key === 'Escape') {
+										setOpenMenu(null)
+									}
+								}}
 							>
-								Device{sortIndicator('name')}
+								<IconDotsVertical size={16} />
 							</button>
-						</th>
-						<th>Type</th>
-						<th aria-sort={ariaSort('status')}>
-							<button
-								type="button"
-								class="sort-th"
-								onClick={() => toggleSort('status')}
-							>
-								Status{sortIndicator('status')}
-							</button>
-						</th>
-						<th>Mount</th>
-						<th>Asset tag</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={rows()}>
-						{(d: DeviceRow): JSX.Element => (
-							<tr>
-								<td class="cell-checkbox">
-									<input
-										type="checkbox"
-										aria-label={`Select device ${d.name}`}
-										checked={isSelected(d.id)}
-										onChange={() => toggleSelected(d.id)}
-									/>
-								</td>
-								<td>
-									<a
-										href={`/devices/${d.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
-									>
-										{d.name}
-									</a>
-								</td>
-								<td>{typeNameOf(d.device_type_id)}</td>
-								<td>
-									<span class={`badge badge-${d.status}`}>{d.status}</span>
-								</td>
-								<td>
-									{d.shelf_id ? (
-										<code>shelf:{d.shelf_id}</code>
-									) : d.position_u !== null ? (
-										<code>
-											{rackNameOf(d.rack_id) ?? 'rack'} U{d.position_u}
-										</code>
-									) : (
-										<span>unracked</span>
-									)}
-								</td>
-								<td>{d.asset_tag ?? '—'}</td>
-								<td>
-									<div class="row-actions">
-										<button
-											type="button"
-											class="icon-btn"
-											title={`Edit ${d.name}`}
-											aria-label={`Edit device ${d.name}`}
-											onClick={() => navigate(`/devices/${d.id}/edit`)}
-										>
-											<IconPencil size={16} />
-										</button>
-										<div class="row-menu-wrap">
-											<button
-												type="button"
-												class="icon-btn"
-												aria-label={`More actions for ${d.name}`}
-												aria-haspopup="menu"
-												aria-expanded={openMenu()?.id === d.id}
-												onClick={(
-													e: MouseEvent & {
-														currentTarget: HTMLButtonElement
-													},
-												): void => toggleMenu(e, d.id, d.name)}
-												onKeyDown={(e: KeyboardEvent): void => {
-													if (e.key === 'Escape') {
-														setOpenMenu(null)
-													}
-												}}
-											>
-												<IconDotsVertical size={16} />
-											</button>
-										</div>
-									</div>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-
-			<Show when={devicesPage.loading}>
-				<p class="skeleton">Loading devices…</p>
-			</Show>
-			<Show when={!devicesPage.loading && rows().length === 0}>
-				<p class="empty">
-					{hasFilters()
-						? 'No devices match the current filters.'
-						: 'No devices yet. Add the first one above.'}
-				</p>
-			</Show>
+						</div>
+					</div>
+				)}
+				loading={() => devicesPage.loading}
+				loadingContent={<p class="skeleton">Loading devices…</p>}
+				emptyContent={
+					<p class="empty">
+						{hasFilters()
+							? 'No devices match the current filters.'
+							: 'No devices yet. Add the first one above.'}
+					</p>
+				}
+			/>
 
 			<p class="paginator-showing" role="status">
 				Showing {rangeStart()}-{rangeEnd()} of {total()}

@@ -1,3 +1,4 @@
+import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -177,28 +178,48 @@ export function RacksPage(): JSX.Element {
 		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
 	}
 
-	function isSelected(id: number): boolean {
-		return selected().includes(id)
-	}
-
-	function toggleSelected(id: number): void {
-		setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
-	}
-
-	function toggleSelectAll(checked: boolean): void {
-		setSelected(checked ? rows().map((r) => r.id) : [])
-	}
-
-	const allVisibleSelected = createMemo(
-		() => rows().length > 0 && rows().every((r) => isSelected(r.id)),
-	)
-	let selectAllRef: HTMLInputElement | undefined
-	createEffect(() => {
-		if (selectAllRef) {
-			const some = selected().length > 0
-			selectAllRef.indeterminate = some && !allVisibleSelected()
-		}
-	})
+	const columns: DataTableColumn<RackRow>[] = [
+		{
+			key: 'name',
+			label: 'Rack',
+			getValue: (r: RackRow): JSX.Element => (
+				<a
+					href={`/racks/${r.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+				>
+					{r.name}
+				</a>
+			),
+		},
+		{
+			key: 'site',
+			label: 'Site',
+			getValue: (r: RackRow): string => siteNameOf(r.site_id),
+		},
+		{
+			key: 'location',
+			label: 'Location',
+			getValue: (r: RackRow): string => locationNameOf(r.location_id),
+		},
+		{
+			key: 'description',
+			label: 'Description',
+			class: 'cell-truncate',
+			getValue: (r: RackRow): JSX.Element => (
+				<span title={r.description ?? ''}>{r.description || '—'}</span>
+			),
+		},
+		{
+			key: 'type',
+			label: 'Type',
+			getValue: () => <span title="Rack types coming soon">—</span>,
+		},
+		{
+			key: 'tenant',
+			label: 'Tenant',
+			getValue: (r: RackRow): string => tenantNameOf(r.tenant_id),
+		},
+	]
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -345,107 +366,59 @@ export function RacksPage(): JSX.Element {
 				</Show>
 			</div>
 
-			<table>
-				<thead>
-					<tr>
-						<th class="cell-checkbox">
-							<span class="visually-hidden">Select rows</span>
-							<input
-								ref={selectAllRef}
-								type="checkbox"
-								aria-label="Select all racks"
-								checked={allVisibleSelected()}
-								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-									toggleSelectAll(e.currentTarget.checked)
-								}
-							/>
-						</th>
-						<th>Rack</th>
-						<th>Site</th>
-						<th>Location</th>
-						<th>Description</th>
-						<th>Type</th>
-						<th>Tenant</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={rows()}>
-						{(r: RackRow): JSX.Element => (
-							<tr>
-								<td class="cell-checkbox">
-									<input
-										type="checkbox"
-										aria-label={`Select rack ${r.name}`}
-										checked={isSelected(r.id)}
-										onChange={() => toggleSelected(r.id)}
-									/>
-								</td>
-								<td>
-									<a
-										href={`/racks/${r.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
-									>
-										{r.name}
-									</a>
-								</td>
-								<td>{siteNameOf(r.site_id)}</td>
-								<td>{locationNameOf(r.location_id)}</td>
-								<td class="cell-truncate" title={r.description ?? ''}>
-									{r.description || '—'}
-								</td>
-								<td title="Rack types coming soon">—</td>
-								<td>{tenantNameOf(r.tenant_id)}</td>
-								<td>
-									<div class="row-actions">
-										<button
-											type="button"
-											class="icon-btn"
-											title={`Edit ${r.name}`}
-											aria-label={`Edit rack ${r.name}`}
-											onClick={() => navigate(`/racks/${r.id}/edit`)}
-										>
-											<IconPencil size={16} />
-										</button>
-										<div class="row-menu-wrap">
-											<button
-												type="button"
-												class="icon-btn"
-												aria-label={`More actions for ${r.name}`}
-												aria-haspopup="menu"
-												aria-expanded={openMenu()?.id === r.id}
-												onClick={(
-													e: MouseEvent & {
-														currentTarget: HTMLButtonElement
-													},
-												): void => toggleMenu(e, r.id, r.name)}
-												onKeyDown={(e: KeyboardEvent): void => {
-													if (e.key === 'Escape') {
-														setOpenMenu(null)
-													}
-												}}
-											>
-												<IconDotsVertical size={16} />
-											</button>
-										</div>
-									</div>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-
-			<Show when={racksPage.loading}>
-				<p class="skeleton">Loading racks…</p>
-			</Show>
-			<Show when={!racksPage.loading && rows().length === 0}>
-				<p class="empty">
-					{debouncedSearch() || filterSite() || filterLocation() || filterTenant()
-						? 'No racks match the current filters.'
-						: 'No racks yet. Add the first one above.'}
-				</p>
-			</Show>
+			<DataTable
+				rows={rows}
+				getRowId={(r: RackRow): number => r.id}
+				columns={columns}
+				selected={selected}
+				onSelectionChange={(ids: (string | number)[]): void => {
+					setSelected(ids.map((id) => Number(id)))
+				}}
+				selectionLabel="Select all racks"
+				rowActions={(r: RackRow): JSX.Element => (
+					<div class="row-actions">
+						<button
+							type="button"
+							class="icon-btn"
+							title={`Edit ${r.name}`}
+							aria-label={`Edit rack ${r.name}`}
+							onClick={() => navigate(`/racks/${r.id}/edit`)}
+						>
+							<IconPencil size={16} />
+						</button>
+						<div class="row-menu-wrap">
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label={`More actions for ${r.name}`}
+								aria-haspopup="menu"
+								aria-expanded={openMenu()?.id === r.id}
+								onClick={(
+									e: MouseEvent & {
+										currentTarget: HTMLButtonElement
+									},
+								): void => toggleMenu(e, r.id, r.name)}
+								onKeyDown={(e: KeyboardEvent): void => {
+									if (e.key === 'Escape') {
+										setOpenMenu(null)
+									}
+								}}
+							>
+								<IconDotsVertical size={16} />
+							</button>
+						</div>
+					</div>
+				)}
+				loading={() => racksPage.loading}
+				loadingContent={<p class="skeleton">Loading racks…</p>}
+				emptyContent={
+					<p class="empty">
+						{debouncedSearch() || filterSite() || filterLocation() || filterTenant()
+							? 'No racks match the current filters.'
+							: 'No racks yet. Add the first one above.'}
+					</p>
+				}
+			/>
 
 			<p class="paginator-showing" role="status">
 				Showing {rangeStart()}-{rangeEnd()} of {total()}

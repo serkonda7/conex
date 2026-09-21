@@ -1,8 +1,9 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ElevationUnit, InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_location, fetch_site, fetch_tenant } from '../api_p1'
 import { create_shelf, delete_rack, delete_shelf, fetch_elevation, fetch_rack } from '../api_p2'
 import { navigate } from '../router'
@@ -261,73 +262,70 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			<h3>Elevation</h3>
 			<p class="page-subtitle">Top-down elevation. Pick a free U to place a device.</p>
 			<Show when={elevation()} fallback={<p class="skeleton">Loading elevation…</p>}>
-				<table>
-					<thead>
-						<tr>
-							<th>U</th>
-							<th>Occupant</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						<For each={elevation()?.units ?? []}>
-							{(unit: ElevationUnit) => (
-								<tr>
-									<td>
-										<code>U{unit.u}</code>
-									</td>
-									<td>
-										<Show when={unit.shelf} fallback={<span>free</span>}>
-											<span>▤ {unit.shelf?.name} (shelf)</span>
-										</Show>{' '}
-										<Show when={unit.device}>
-											<span>
-												▦{' '}
-												<a
-													href={`/devices/${unit.device?.id}`}
-													onClick={(e: MouseEvent): void =>
-														go(e, `/devices/${unit.device?.id ?? ''}`)
-													}
-												>
-													{unit.device?.name}
-												</a>
-											</span>
-										</Show>
-									</td>
-									<td>
-										<Show
-											when={unit.shelf}
-											fallback={
-												<button
-													type="button"
-													title="Pick a U below, then instantiate from Devices"
-													onClick={() => {
-														setPendingU(unit.u)
-														setShelfU(String(unit.u))
-													}}
-												>
-													Place here
-												</button>
-											}
-										>
-											<button
-												type="button"
-												class="btn-danger"
-												onClick={() => {
-													if (unit.shelf) {
-														handleDeleteShelf(unit.shelf.id)
-													}
-												}}
+				<DataTable
+					rows={() => elevation()?.units ?? []}
+					getRowId={(unit: ElevationUnit) => unit.u}
+					columns={[
+						{
+							key: 'u',
+							label: 'U',
+							getValue: (unit: ElevationUnit) => <code>U{unit.u}</code>,
+						},
+						{
+							key: 'occupant',
+							label: 'Occupant',
+							getValue: (unit: ElevationUnit) => (
+								<span>
+									<Show when={unit.shelf} fallback={<span>free</span>}>
+										<span>▤ {unit.shelf?.name} (shelf)</span>
+									</Show>{' '}
+									<Show when={unit.device}>
+										<span>
+											▦{' '}
+											<a
+												href={`/devices/${unit.device?.id}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/devices/${unit.device?.id ?? ''}`)
+												}
 											>
-												Delete shelf
-											</button>
-										</Show>
-									</td>
-								</tr>
-							)}
-						</For>
-					</tbody>
-				</table>
+												{unit.device?.name}
+											</a>
+										</span>
+									</Show>
+								</span>
+							),
+						},
+					]}
+					rowActions={(unit: ElevationUnit) => (
+						<Show
+							when={unit.shelf}
+							fallback={
+								<button
+									type="button"
+									title="Pick a U below, then instantiate from Devices"
+									onClick={() => {
+										setPendingU(unit.u)
+										setShelfU(String(unit.u))
+									}}
+								>
+									Place here
+								</button>
+							}
+						>
+							<button
+								type="button"
+								class="btn-danger"
+								onClick={() => {
+									if (unit.shelf) {
+										handleDeleteShelf(unit.shelf.id)
+									}
+								}}
+							>
+								Delete shelf
+							</button>
+						</Show>
+					)}
+				/>
 			</Show>
 			<Show when={pendingU() !== null}>
 				<p class="empty">

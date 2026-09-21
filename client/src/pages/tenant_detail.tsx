@@ -1,7 +1,8 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, Show } from 'solid-js'
 import {
 	delete_tenant,
 	fetch_site_groups,
@@ -190,35 +191,29 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					when={siteCount() > 0}
 					fallback={<p class="empty">No sites for this tenant yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Slug</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={sites() ?? []}>
-								{(s: SiteRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/sites/${s.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/sites/${s.id}`)
-												}
-											>
-												{s.name}
-											</a>
-										</td>
-										<td>
-											<code>{s.slug}</code>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => sites() ?? []}
+						getRowId={(s: SiteRow): number => s.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (s: SiteRow): JSX.Element => (
+									<a
+										href={`/sites/${s.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+									>
+										{s.name}
+									</a>
+								),
+							},
+							{
+								key: 'slug',
+								label: 'Slug',
+								getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 			<p>
@@ -241,35 +236,31 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					when={siteGroupCount() > 0}
 					fallback={<p class="empty">No site groups for this tenant yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Slug</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={siteGroups() ?? []}>
-								{(g: SiteGroupRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/site-groups/${g.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/site-groups/${g.id}`)
-												}
-											>
-												{g.name}
-											</a>
-										</td>
-										<td>
-											<code>{g.slug}</code>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => siteGroups() ?? []}
+						getRowId={(g: SiteGroupRow): number => g.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (g: SiteGroupRow): JSX.Element => (
+									<a
+										href={`/site-groups/${g.id}`}
+										onClick={(e: MouseEvent): void =>
+											go(e, `/site-groups/${g.id}`)
+										}
+									>
+										{g.name}
+									</a>
+								),
+							},
+							{
+								key: 'slug',
+								label: 'Slug',
+								getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 			<p>
@@ -289,39 +280,36 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					when={rackCount() > 0}
 					fallback={<p class="empty">No racks for this tenant yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Height</th>
-								<th>Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={racks() ?? []}>
-								{(r: RackRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/racks/${r.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/racks/${r.id}`)
-												}
-											>
-												{r.name}
-											</a>
-										</td>
-										<td>{r.height_u}U</td>
-										<td>
-											<span class={`badge badge-${r.status}`}>
-												{r.status}
-											</span>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => racks() ?? []}
+						getRowId={(r: RackRow): number => r.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (r: RackRow): JSX.Element => (
+									<a
+										href={`/racks/${r.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+									>
+										{r.name}
+									</a>
+								),
+							},
+							{
+								key: 'height',
+								label: 'Height',
+								getValue: (r: RackRow): string => `${r.height_u}U`,
+							},
+							{
+								key: 'status',
+								label: 'Status',
+								getValue: (r: RackRow): JSX.Element => (
+									<span class={`badge badge-${r.status}`}>{r.status}</span>
+								),
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 
@@ -333,39 +321,36 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					when={deviceCount() > 0}
 					fallback={<p class="empty">No devices for this tenant yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Status</th>
-								<th>Asset tag</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={devices() ?? []}>
-								{(d: DeviceRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/devices/${d.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/devices/${d.id}`)
-												}
-											>
-												{d.name}
-											</a>
-										</td>
-										<td>
-											<span class={`badge badge-${d.status}`}>
-												{d.status}
-											</span>
-										</td>
-										<td>{d.asset_tag ?? '—'}</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => devices() ?? []}
+						getRowId={(d: DeviceRow): number => d.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (d: DeviceRow): JSX.Element => (
+									<a
+										href={`/devices/${d.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									>
+										{d.name}
+									</a>
+								),
+							},
+							{
+								key: 'status',
+								label: 'Status',
+								getValue: (d: DeviceRow): JSX.Element => (
+									<span class={`badge badge-${d.status}`}>{d.status}</span>
+								),
+							},
+							{
+								key: 'asset_tag',
+								label: 'Asset tag',
+								getValue: (d: DeviceRow): string => d.asset_tag ?? '—',
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 			<p>

@@ -1,3 +1,4 @@
+import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -159,7 +160,8 @@ export function SitesPage(): JSX.Element {
 		return groups()?.find((g: SiteGroupRow) => g.id === id)?.name ?? String(id)
 	}
 
-	function toggleSort(col: SiteSort): void {
+	function handleSort(key: string): void {
+		const col = key as SiteSort
 		if (sort() === col) {
 			setOrder(order() === 'asc' ? 'desc' : 'asc')
 		} else {
@@ -168,42 +170,40 @@ export function SitesPage(): JSX.Element {
 		}
 	}
 
-	function sortIndicator(col: SiteSort): string {
-		if (sort() !== col) {
-			return ''
-		}
-		return order() === 'asc' ? ' ▲' : ' ▼'
-	}
-
-	function ariaSort(col: SiteSort): 'ascending' | 'descending' | 'none' {
-		if (sort() !== col) {
-			return 'none'
-		}
-		return order() === 'asc' ? 'ascending' : 'descending'
-	}
-
-	function isSelected(id: number): boolean {
-		return selected().includes(id)
-	}
-
-	function toggleSelected(id: number): void {
-		setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
-	}
-
-	function toggleSelectAll(checked: boolean): void {
-		setSelected(checked ? rows().map((s) => s.id) : [])
-	}
-
-	const allVisibleSelected = createMemo(
-		() => rows().length > 0 && rows().every((s) => isSelected(s.id)),
-	)
-	let selectAllRef: HTMLInputElement | undefined
-	createEffect(() => {
-		if (selectAllRef) {
-			const some = selected().length > 0
-			selectAllRef.indeterminate = some && !allVisibleSelected()
-		}
-	})
+	const columns: DataTableColumn<SiteRow>[] = [
+		{
+			key: 'name',
+			label: 'Site',
+			sortable: true,
+			getValue: (s: SiteRow): JSX.Element => (
+				<a
+					href={`/sites/${s.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+				>
+					{s.name}
+				</a>
+			),
+		},
+		{
+			key: 'description',
+			label: 'Description',
+			sortable: true,
+			class: 'cell-truncate',
+			getValue: (s: SiteRow): JSX.Element => (
+				<span title={s.description ?? ''}>{s.description || '—'}</span>
+			),
+		},
+		{
+			key: 'tenant',
+			label: 'Tenant',
+			getValue: (s: SiteRow): string => tenantNameOf(s.tenant_id),
+		},
+		{
+			key: 'group',
+			label: 'Group',
+			getValue: (s: SiteRow): string => groupNameOf(s),
+		},
+	]
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -320,119 +320,62 @@ export function SitesPage(): JSX.Element {
 				</Show>
 			</div>
 
-			<table>
-				<thead>
-					<tr>
-						<th class="cell-checkbox">
-							<span class="visually-hidden">Select rows</span>
-							<input
-								ref={selectAllRef}
-								type="checkbox"
-								aria-label="Select all sites"
-								checked={allVisibleSelected()}
-								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-									toggleSelectAll(e.currentTarget.checked)
-								}
-							/>
-						</th>
-						<th aria-sort={ariaSort('name')}>
+			<DataTable
+				rows={rows}
+				getRowId={(s: SiteRow): number => s.id}
+				columns={columns}
+				sortKey={sort}
+				sortDirection={order}
+				onSort={handleSort}
+				selected={selected}
+				onSelectionChange={(ids: (string | number)[]): void => {
+					setSelected(ids.map((id) => Number(id)))
+				}}
+				selectionLabel="Select all sites"
+				rowActions={(s: SiteRow): JSX.Element => (
+					<div class="row-actions">
+						<button
+							type="button"
+							class="icon-btn"
+							title={`Edit ${s.name}`}
+							aria-label={`Edit site ${s.name}`}
+							onClick={() => navigate(`/sites/${s.id}/edit`)}
+						>
+							<IconPencil size={16} />
+						</button>
+						<div class="row-menu-wrap">
 							<button
 								type="button"
-								class="sort-th"
-								onClick={() => toggleSort('name')}
+								class="icon-btn"
+								aria-label={`More actions for ${s.name}`}
+								aria-haspopup="menu"
+								aria-expanded={openMenu()?.id === s.id}
+								onClick={(
+									e: MouseEvent & {
+										currentTarget: HTMLButtonElement
+									},
+								): void => toggleMenu(e, s.id, s.name)}
+								onKeyDown={(e: KeyboardEvent): void => {
+									if (e.key === 'Escape') {
+										setOpenMenu(null)
+									}
+								}}
 							>
-								Site{sortIndicator('name')}
+								<IconDotsVertical size={16} />
 							</button>
-						</th>
-						<th aria-sort={ariaSort('description')}>
-							<button
-								type="button"
-								class="sort-th"
-								onClick={() => toggleSort('description')}
-							>
-								Description{sortIndicator('description')}
-							</button>
-						</th>
-						<th>Tenant</th>
-						<th>Group</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={rows()}>
-						{(s: SiteRow): JSX.Element => (
-							<tr>
-								<td class="cell-checkbox">
-									<input
-										type="checkbox"
-										aria-label={`Select site ${s.name}`}
-										checked={isSelected(s.id)}
-										onChange={() => toggleSelected(s.id)}
-									/>
-								</td>
-								<td>
-									<a
-										href={`/sites/${s.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
-									>
-										{s.name}
-									</a>
-								</td>
-								<td class="cell-truncate" title={s.description ?? ''}>
-									{s.description || '—'}
-								</td>
-								<td>{tenantNameOf(s.tenant_id)}</td>
-								<td>{groupNameOf(s)}</td>
-								<td>
-									<div class="row-actions">
-										<button
-											type="button"
-											class="icon-btn"
-											title={`Edit ${s.name}`}
-											aria-label={`Edit site ${s.name}`}
-											onClick={() => navigate(`/sites/${s.id}/edit`)}
-										>
-											<IconPencil size={16} />
-										</button>
-										<div class="row-menu-wrap">
-											<button
-												type="button"
-												class="icon-btn"
-												aria-label={`More actions for ${s.name}`}
-												aria-haspopup="menu"
-												aria-expanded={openMenu()?.id === s.id}
-												onClick={(
-													e: MouseEvent & {
-														currentTarget: HTMLButtonElement
-													},
-												): void => toggleMenu(e, s.id, s.name)}
-												onKeyDown={(e: KeyboardEvent): void => {
-													if (e.key === 'Escape') {
-														setOpenMenu(null)
-													}
-												}}
-											>
-												<IconDotsVertical size={16} />
-											</button>
-										</div>
-									</div>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-
-			<Show when={sitesPage.loading}>
-				<p class="skeleton">Loading sites…</p>
-			</Show>
-			<Show when={!sitesPage.loading && rows().length === 0}>
-				<p class="empty">
-					{debouncedSearch() || filterTenant()
-						? 'No sites match the current filters.'
-						: 'No sites yet. Add the first one above.'}
-				</p>
-			</Show>
+						</div>
+					</div>
+				)}
+				loading={() => sitesPage.loading}
+				loadingContent={<p class="skeleton">Loading sites…</p>}
+				emptyContent={
+					<p class="empty">
+						{debouncedSearch() || filterTenant()
+							? 'No sites match the current filters.'
+							: 'No sites yet. Add the first one above.'}
+					</p>
+				}
+			/>
 
 			<p class="paginator-showing" role="status">
 				Showing {rangeStart()}-{rangeEnd()} of {total()}

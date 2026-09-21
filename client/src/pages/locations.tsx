@@ -1,3 +1,4 @@
+import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -165,28 +166,35 @@ export function LocationsPage(): JSX.Element {
 		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
 	}
 
-	function isSelected(id: number): boolean {
-		return selected().includes(id)
-	}
-
-	function toggleSelected(id: number): void {
-		setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
-	}
-
-	function toggleSelectAll(checked: boolean): void {
-		setSelected(checked ? rows().map((l) => l.id) : [])
-	}
-
-	const allVisibleSelected = createMemo(
-		() => rows().length > 0 && rows().every((l) => isSelected(l.id)),
-	)
-	let selectAllRef: HTMLInputElement | undefined
-	createEffect(() => {
-		if (selectAllRef) {
-			const some = selected().length > 0
-			selectAllRef.indeterminate = some && !allVisibleSelected()
-		}
-	})
+	const columns: DataTableColumn<LocationRow>[] = [
+		{
+			key: 'name',
+			label: 'Location',
+			getValue: (l: LocationRow): JSX.Element => (
+				<a
+					href={`/locations/${l.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/locations/${l.id}`)}
+				>
+					{l.name}
+				</a>
+			),
+		},
+		{
+			key: 'site',
+			label: 'Site',
+			getValue: (l: LocationRow): string => siteNameOf(l.site_id),
+		},
+		{
+			key: 'parent',
+			label: 'Parent',
+			getValue: (l: LocationRow): string => parentNameOf()(l.parent_id),
+		},
+		{
+			key: 'tenant',
+			label: 'Tenant',
+			getValue: (l: LocationRow): string => tenantNameOf(l.tenant_id),
+		},
+	]
 
 	function closeMenu(): void {
 		setOpenMenu(null)
@@ -318,103 +326,59 @@ export function LocationsPage(): JSX.Element {
 				</Show>
 			</div>
 
-			<table>
-				<thead>
-					<tr>
-						<th class="cell-checkbox">
-							<span class="visually-hidden">Select rows</span>
-							<input
-								ref={selectAllRef}
-								type="checkbox"
-								aria-label="Select all locations"
-								checked={allVisibleSelected()}
-								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-									toggleSelectAll(e.currentTarget.checked)
-								}
-							/>
-						</th>
-						<th>Location</th>
-						<th>Site</th>
-						<th>Parent</th>
-						<th>Tenant</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={rows()}>
-						{(l: LocationRow): JSX.Element => (
-							<tr>
-								<td class="cell-checkbox">
-									<input
-										type="checkbox"
-										aria-label={`Select location ${l.name}`}
-										checked={isSelected(l.id)}
-										onChange={() => toggleSelected(l.id)}
-									/>
-								</td>
-								<td>
-									<a
-										href={`/locations/${l.id}`}
-										onClick={(e: MouseEvent): void =>
-											go(e, `/locations/${l.id}`)
-										}
-									>
-										{l.name}
-									</a>
-								</td>
-								<td>{siteNameOf(l.site_id)}</td>
-								<td>{parentNameOf()(l.parent_id)}</td>
-								<td>{tenantNameOf(l.tenant_id)}</td>
-								<td>
-									<div class="row-actions">
-										<button
-											type="button"
-											class="icon-btn"
-											title={`Edit ${l.name}`}
-											aria-label={`Edit location ${l.name}`}
-											onClick={() => navigate(`/locations/${l.id}/edit`)}
-										>
-											<IconPencil size={16} />
-										</button>
-										<div class="row-menu-wrap">
-											<button
-												type="button"
-												class="icon-btn"
-												aria-label={`More actions for ${l.name}`}
-												aria-haspopup="menu"
-												aria-expanded={openMenu()?.id === l.id}
-												onClick={(
-													e: MouseEvent & {
-														currentTarget: HTMLButtonElement
-													},
-												): void => toggleMenu(e, l.id, l.name)}
-												onKeyDown={(e: KeyboardEvent): void => {
-													if (e.key === 'Escape') {
-														setOpenMenu(null)
-													}
-												}}
-											>
-												<IconDotsVertical size={16} />
-											</button>
-										</div>
-									</div>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-
-			<Show when={locationsPage.loading}>
-				<p class="skeleton">Loading locations…</p>
-			</Show>
-			<Show when={!locationsPage.loading && rows().length === 0}>
-				<p class="empty">
-					{debouncedSearch() || filterSite() || filterTenant()
-						? 'No locations match the current filters.'
-						: 'No locations yet. Add the first one above.'}
-				</p>
-			</Show>
+			<DataTable
+				rows={rows}
+				getRowId={(l: LocationRow): number => l.id}
+				columns={columns}
+				selected={selected}
+				onSelectionChange={(ids: (string | number)[]): void => {
+					setSelected(ids.map((id) => Number(id)))
+				}}
+				selectionLabel="Select all locations"
+				rowActions={(l: LocationRow): JSX.Element => (
+					<div class="row-actions">
+						<button
+							type="button"
+							class="icon-btn"
+							title={`Edit ${l.name}`}
+							aria-label={`Edit location ${l.name}`}
+							onClick={() => navigate(`/locations/${l.id}/edit`)}
+						>
+							<IconPencil size={16} />
+						</button>
+						<div class="row-menu-wrap">
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label={`More actions for ${l.name}`}
+								aria-haspopup="menu"
+								aria-expanded={openMenu()?.id === l.id}
+								onClick={(
+									e: MouseEvent & {
+										currentTarget: HTMLButtonElement
+									},
+								): void => toggleMenu(e, l.id, l.name)}
+								onKeyDown={(e: KeyboardEvent): void => {
+									if (e.key === 'Escape') {
+										setOpenMenu(null)
+									}
+								}}
+							>
+								<IconDotsVertical size={16} />
+							</button>
+						</div>
+					</div>
+				)}
+				loading={() => locationsPage.loading}
+				loadingContent={<p class="skeleton">Loading locations…</p>}
+				emptyContent={
+					<p class="empty">
+						{debouncedSearch() || filterSite() || filterTenant()
+							? 'No locations match the current filters.'
+							: 'No locations yet. Add the first one above.'}
+					</p>
+				}
+			/>
 
 			<p class="paginator-showing" role="status">
 				Showing {rangeStart()}-{rangeEnd()} of {total()}

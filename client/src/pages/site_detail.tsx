@@ -1,3 +1,4 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -391,39 +392,36 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					when={rackCount() > 0}
 					fallback={<p class="empty">No racks for this site yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Height</th>
-								<th>Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={racks() ?? []}>
-								{(r: RackRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/racks/${r.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/racks/${r.id}`)
-												}
-											>
-												{r.name}
-											</a>
-										</td>
-										<td>{r.height_u}U</td>
-										<td>
-											<span class={`badge badge-${r.status}`}>
-												{r.status}
-											</span>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => racks() ?? []}
+						getRowId={(r: RackRow): number => r.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (r: RackRow): JSX.Element => (
+									<a
+										href={`/racks/${r.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+									>
+										{r.name}
+									</a>
+								),
+							},
+							{
+								key: 'height',
+								label: 'Height',
+								getValue: (r: RackRow): string => `${r.height_u}U`,
+							},
+							{
+								key: 'status',
+								label: 'Status',
+								getValue: (r: RackRow): JSX.Element => (
+									<span class={`badge badge-${r.status}`}>{r.status}</span>
+								),
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 
@@ -435,39 +433,36 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					when={deviceCount() > 0}
 					fallback={<p class="empty">No devices for this site yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Status</th>
-								<th>Asset tag</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={devices() ?? []}>
-								{(d: DeviceRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/devices/${d.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/devices/${d.id}`)
-												}
-											>
-												{d.name}
-											</a>
-										</td>
-										<td>
-											<span class={`badge badge-${d.status}`}>
-												{d.status}
-											</span>
-										</td>
-										<td>{d.asset_tag ?? '—'}</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => devices() ?? []}
+						getRowId={(d: DeviceRow): number => d.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (d: DeviceRow): JSX.Element => (
+									<a
+										href={`/devices/${d.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									>
+										{d.name}
+									</a>
+								),
+							},
+							{
+								key: 'status',
+								label: 'Status',
+								getValue: (d: DeviceRow): JSX.Element => (
+									<span class={`badge badge-${d.status}`}>{d.status}</span>
+								),
+							},
+							{
+								key: 'asset_tag',
+								label: 'Asset tag',
+								getValue: (d: DeviceRow): string => d.asset_tag ?? '—',
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 

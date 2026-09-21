@@ -1,7 +1,8 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import {
 	delete_site_group,
 	fetch_site_group,
@@ -210,35 +211,31 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 			</h3>
 			<Show when={!children.loading} fallback={<p class="skeleton">Loading child groups…</p>}>
 				<Show when={childCount() > 0} fallback={<p class="empty">No child groups yet.</p>}>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Slug</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={children() ?? []}>
-								{(g: SiteGroupRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/site-groups/${g.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/site-groups/${g.id}`)
-												}
-											>
-												{g.name}
-											</a>
-										</td>
-										<td>
-											<code>{g.slug}</code>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => children() ?? []}
+						getRowId={(g: SiteGroupRow): number => g.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (g: SiteGroupRow): JSX.Element => (
+									<a
+										href={`/site-groups/${g.id}`}
+										onClick={(e: MouseEvent): void =>
+											go(e, `/site-groups/${g.id}`)
+										}
+									>
+										{g.name}
+									</a>
+								),
+							},
+							{
+								key: 'slug',
+								label: 'Slug',
+								getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 
@@ -250,35 +247,29 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					when={siteCount() > 0}
 					fallback={<p class="empty">No sites in this group yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Slug</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={sites() ?? []}>
-								{(s: SiteRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/sites/${s.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/sites/${s.id}`)
-												}
-											>
-												{s.name}
-											</a>
-										</td>
-										<td>
-											<code>{s.slug}</code>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => sites() ?? []}
+						getRowId={(s: SiteRow): number => s.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (s: SiteRow): JSX.Element => (
+									<a
+										href={`/sites/${s.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+									>
+										{s.name}
+									</a>
+								),
+							},
+							{
+								key: 'slug',
+								label: 'Slug',
+								getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 

@@ -1,7 +1,8 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import {
 	delete_location,
 	fetch_location,
@@ -264,35 +265,31 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					when={childCount() > 0}
 					fallback={<p class="empty">No child locations yet.</p>}
 				>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Slug</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={children() ?? []}>
-								{(l: LocationRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/locations/${l.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/locations/${l.id}`)
-												}
-											>
-												{l.name}
-											</a>
-										</td>
-										<td>
-											<code>{l.slug}</code>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => children() ?? []}
+						getRowId={(l: LocationRow): number => l.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (l: LocationRow): JSX.Element => (
+									<a
+										href={`/locations/${l.id}`}
+										onClick={(e: MouseEvent): void =>
+											go(e, `/locations/${l.id}`)
+										}
+									>
+										{l.name}
+									</a>
+								),
+							},
+							{
+								key: 'slug',
+								label: 'Slug',
+								getValue: (l: LocationRow): JSX.Element => <code>{l.slug}</code>,
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 
@@ -301,39 +298,36 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 			</h3>
 			<Show when={!racks.loading} fallback={<p class="skeleton">Loading racks…</p>}>
 				<Show when={rackCount() > 0} fallback={<p class="empty">No racks here yet.</p>}>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Height</th>
-								<th>Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={racks() ?? []}>
-								{(r: RackRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/racks/${r.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/racks/${r.id}`)
-												}
-											>
-												{r.name}
-											</a>
-										</td>
-										<td>{r.height_u}U</td>
-										<td>
-											<span class={`badge badge-${r.status}`}>
-												{r.status}
-											</span>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => racks() ?? []}
+						getRowId={(r: RackRow): number => r.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (r: RackRow): JSX.Element => (
+									<a
+										href={`/racks/${r.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+									>
+										{r.name}
+									</a>
+								),
+							},
+							{
+								key: 'height',
+								label: 'Height',
+								getValue: (r: RackRow): string => `${r.height_u}U`,
+							},
+							{
+								key: 'status',
+								label: 'Status',
+								getValue: (r: RackRow): JSX.Element => (
+									<span class={`badge badge-${r.status}`}>{r.status}</span>
+								),
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 
@@ -342,37 +336,31 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 			</h3>
 			<Show when={!devices.loading} fallback={<p class="skeleton">Loading devices…</p>}>
 				<Show when={deviceCount() > 0} fallback={<p class="empty">No devices here yet.</p>}>
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							<For each={devices() ?? []}>
-								{(d: DeviceRow): JSX.Element => (
-									<tr>
-										<td>
-											<a
-												href={`/devices/${d.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/devices/${d.id}`)
-												}
-											>
-												{d.name}
-											</a>
-										</td>
-										<td>
-											<span class={`badge badge-${d.status}`}>
-												{d.status}
-											</span>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+					<DataTable
+						rows={() => devices() ?? []}
+						getRowId={(d: DeviceRow): number => d.id}
+						columns={[
+							{
+								key: 'name',
+								label: 'Name',
+								getValue: (d: DeviceRow): JSX.Element => (
+									<a
+										href={`/devices/${d.id}`}
+										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									>
+										{d.name}
+									</a>
+								),
+							},
+							{
+								key: 'status',
+								label: 'Status',
+								getValue: (d: DeviceRow): JSX.Element => (
+									<span class={`badge badge-${d.status}`}>{d.status}</span>
+								),
+							},
+						]}
+					/>
 				</Show>
 			</Show>
 
