@@ -2,7 +2,14 @@ import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
-import { delete_tenant, fetch_sites, fetch_tenant, type SiteRow } from '../api_p1'
+import {
+	delete_tenant,
+	fetch_site_groups,
+	fetch_sites,
+	fetch_tenant,
+	type SiteGroupRow,
+	type SiteRow,
+} from '../api_p1'
 import { fetch_racks, type RackRow } from '../api_p2'
 import { type DeviceRow, fetch_devices } from '../api_p4'
 import { navigate } from '../router'
@@ -37,6 +44,17 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		() => props.id,
 		async (id: number) => {
 			const res = await fetch_sites({ tenant: id })
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return []
+			}
+			return res.value.items
+		},
+	)
+	const [siteGroups] = createResource(
+		() => props.id,
+		async (id: number) => {
+			const res = await fetch_site_groups({ tenant: id })
 			if (Result.isError(res)) {
 				setError(res.error.message)
 				return []
@@ -85,6 +103,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	}
 
 	const siteCount = (): number => sites()?.length ?? 0
+	const siteGroupCount = (): number => siteGroups()?.length ?? 0
 	const rackCount = (): number => racks()?.length ?? 0
 	const deviceCount = (): number => devices()?.length ?? 0
 
@@ -126,6 +145,12 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							<span class="detail-stat-value">{siteCount()}</span>{' '}
 							<span class="detail-stat-label">
 								Site{siteCount() === 1 ? '' : 's'}
+							</span>
+						</a>
+						<a class="detail-stat" href="#tenant-site-groups">
+							<span class="detail-stat-value">{siteGroupCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Site group{siteGroupCount() === 1 ? '' : 's'}
 							</span>
 						</a>
 						<a class="detail-stat" href="#tenant-racks">
@@ -202,6 +227,57 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					onClick={(e: MouseEvent): void => go(e, `/sites?tenant=${props.id}`)}
 				>
 					View in Sites →
+				</a>
+			</p>
+
+			<h3 id="tenant-site-groups">
+				Site groups <span class="badge">{siteGroupCount()}</span>
+			</h3>
+			<Show
+				when={!siteGroups.loading}
+				fallback={<p class="skeleton">Loading site groups…</p>}
+			>
+				<Show
+					when={siteGroupCount() > 0}
+					fallback={<p class="empty">No site groups for this tenant yet.</p>}
+				>
+					<table>
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Slug</th>
+							</tr>
+						</thead>
+						<tbody>
+							<For each={siteGroups() ?? []}>
+								{(g: SiteGroupRow): JSX.Element => (
+									<tr>
+										<td>
+											<a
+												href={`/site-groups/${g.id}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/site-groups/${g.id}`)
+												}
+											>
+												{g.name}
+											</a>
+										</td>
+										<td>
+											<code>{g.slug}</code>
+										</td>
+									</tr>
+								)}
+							</For>
+						</tbody>
+					</table>
+				</Show>
+			</Show>
+			<p>
+				<a
+					href={`/site-groups?tenant=${props.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/site-groups?tenant=${props.id}`)}
+				>
+					View in Site Groups →
 				</a>
 			</p>
 

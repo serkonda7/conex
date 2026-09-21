@@ -143,6 +143,7 @@ export const LocationCreateSchema = v.strictObject({
 export const SiteGroupCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
+	tenant_id: NullableIdSchema,
 	parent_id: NullableIdSchema,
 	description: DescriptionSchema,
 	comments: CommentsSchema,
@@ -151,6 +152,7 @@ export const SiteGroupCreateSchema = v.strictObject({
 export const SiteGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
+	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	parent_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
@@ -225,6 +227,7 @@ export const SiteListQuerySchema = v.object({
 
 export const SiteGroupListQuerySchema = v.object({
 	...ListQueryEntries,
+	tenant: OptionalIdEntry,
 	parent: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),

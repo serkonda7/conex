@@ -27,6 +27,7 @@ export const siteGroupsApp = new Hono()
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
+				tenant: query.tenant,
 				parent: query.parent,
 				sort: query.sort,
 				order: query.order,

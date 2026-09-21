@@ -234,6 +234,12 @@ export function deleteTenant(id: number): Result<TenantRow, Error> {
 	if (siteChild) {
 		return Result.err(new ConflictError('Tenant still has sites; move or delete them first'))
 	}
+	const groupChild = db.select().from(site_groups).where(eq(site_groups.tenant_id, id)).get()
+	if (groupChild) {
+		return Result.err(
+			new ConflictError('Tenant still has site groups; move or delete them first'),
+		)
+	}
 	const rackChild = db.select().from(racks).where(eq(racks.tenant_id, id)).get()
 	if (rackChild) {
 		return Result.err(new ConflictError('Tenant still has racks; move or delete them first'))
@@ -439,6 +445,7 @@ export function deleteSite(id: number): Result<SiteRow, Error> {
 // ---------------------------------------------------------------------------
 
 export interface SiteGroupListParams extends ListParams {
+	tenant?: number
 	parent?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
@@ -452,6 +459,9 @@ export function listSiteGroups(params: SiteGroupListParams): Page<SiteGroupRow> 
 		conditions.push(
 			sql`(${site_groups.name} LIKE ${pattern} ESCAPE '\\' OR ${site_groups.slug} LIKE ${pattern} ESCAPE '\\')`,
 		)
+	}
+	if (params.tenant) {
+		conditions.push(eq(site_groups.tenant_id, params.tenant))
 	}
 	if (params.parent) {
 		conditions.push(eq(site_groups.parent_id, params.parent))
@@ -505,6 +515,10 @@ function groupParentMap(): Map<number, number | null> {
 }
 
 export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Error> {
+	const tenantCheck = checkTenant(input.tenant_id)
+	if (Result.isError(tenantCheck)) {
+		return Result.err(tenantCheck.error)
+	}
 	const parentId = input.parent_id ?? null
 	const parents = groupParentMap()
 	if (parentId !== null) {
@@ -527,6 +541,7 @@ export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Er
 		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
 	}
 	const row: Omit<SiteGroupRow, 'id'> = {
+		tenant_id: input.tenant_id ?? null,
 		parent_id: parentId,
 		name: input.name,
 		slug: input.slug,
@@ -557,6 +572,12 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 	const current = getSiteGroup(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (input.tenant_id !== undefined) {
+		const tenantCheck = checkTenant(input.tenant_id)
+		if (Result.isError(tenantCheck)) {
+			return Result.err(tenantCheck.error)
+		}
 	}
 	const node = current.value
 	const effectiveParent = input.parent_id !== undefined ? input.parent_id : node.parent_id
@@ -601,6 +622,9 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 	}
 	if (input.parent_id !== undefined) {
 		patch.parent_id = input.parent_id
+	}
+	if (input.tenant_id !== undefined) {
+		patch.tenant_id = input.tenant_id
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description

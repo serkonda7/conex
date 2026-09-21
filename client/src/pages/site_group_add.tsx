@@ -3,7 +3,13 @@ import { slugify } from 'shared/src/slug'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, onMount, Show } from 'solid-js'
-import { create_site_group, fetch_site_groups, type SiteGroupRow } from '../api_p1'
+import {
+	create_site_group,
+	fetch_site_groups,
+	fetch_tenants,
+	type SiteGroupRow,
+	type TenantRow,
+} from '../api_p1'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -17,6 +23,7 @@ export function SiteGroupAddPage(): JSX.Element {
 	const [slug, setSlug] = createSignal('')
 	const [slugTouched, setSlugTouched] = createSignal(false)
 	const [parentId, setParentId] = createSignal('')
+	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
@@ -25,6 +32,15 @@ export function SiteGroupAddPage(): JSX.Element {
 
 	const [groups] = createResource(async () => {
 		const res = await fetch_site_groups()
+		if (Result.isError(res)) {
+			setFormError(res.error.message)
+			return []
+		}
+		return res.value.items
+	})
+
+	const [tenants] = createResource(async () => {
+		const res = await fetch_tenants()
 		if (Result.isError(res)) {
 			setFormError(res.error.message)
 			return []
@@ -60,6 +76,7 @@ export function SiteGroupAddPage(): JSX.Element {
 		const res = await create_site_group({
 			name: trimmedName,
 			slug: trimmedSlug,
+			tenant_id: tenantId() ? Number(tenantId()) : null,
 			parent_id: parentId() ? Number(parentId()) : null,
 			description: description().trim() || undefined,
 			comments: comments().trim() || undefined,
@@ -121,6 +138,21 @@ export function SiteGroupAddPage(): JSX.Element {
 						URL-safe identifier: lowercase letters, digits, single dashes. Auto-filled
 						from the name.
 					</p>
+				</div>
+				<div class="field">
+					<label for="site-group-tenant">Tenant</label>
+					<select
+						id="site-group-tenant"
+						value={tenantId()}
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+							setTenantId(e.currentTarget.value)
+						}
+					>
+						<option value="">No tenant</option>
+						<For each={tenants() ?? []}>
+							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+						</For>
+					</select>
 				</div>
 				<div class="field">
 					<label for="site-group-parent">Parent</label>

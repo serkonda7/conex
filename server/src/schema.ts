@@ -67,6 +67,7 @@ export const site_groups = sqliteTable(
 	'site_groups',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
+		tenant_id: integer('tenant_id').references(() => tenants.id),
 		parent_id: integer('parent_id').references((): AnySQLiteColumn => site_groups.id),
 		name: text('name').notNull(),
 		// Slug is unique per parent (service-enforced; SQLite treats NULL
@@ -76,6 +77,7 @@ export const site_groups = sqliteTable(
 		comments: text('comments'),
 	},
 	(table) => [
+		index('site_groups_tenant_id_idx').on(table.tenant_id),
 		index('site_groups_parent_id_idx').on(table.parent_id),
 		index('site_groups_name_idx').on(table.name),
 		uniqueIndex('site_groups_sibling_slug_idx').on(table.parent_id, table.slug),

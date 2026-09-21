@@ -2,7 +2,15 @@ import { Result } from 'better-result'
 import { slugify } from 'shared/src/slug'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, For, onMount, Show } from 'solid-js'
+import {
+	createEffect,
+	createMemo,
+	createResource,
+	createSignal,
+	For,
+	onMount,
+	Show,
+} from 'solid-js'
 import {
 	create_location,
 	fetch_locations,
@@ -27,6 +35,7 @@ export function LocationAddPage(): JSX.Element {
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
@@ -65,6 +74,27 @@ export function LocationAddPage(): JSX.Element {
 	})
 
 	const parentOptions = createMemo(() => parents() ?? [])
+
+	// Tenant defaults to the selected site's tenant until the user picks one
+	// explicitly (or `?tenant=` is present, which counts as explicit).
+	const siteTenantId = createMemo(() => {
+		const id = parseId(siteId())
+		if (id === null) {
+			return null
+		}
+		return (sites() ?? []).find((s: SiteRow) => s.id === id)?.tenant_id ?? null
+	})
+
+	createEffect(() => {
+		if (tenantTouched()) {
+			return
+		}
+		if (sites() === undefined) {
+			return
+		}
+		const tenant = siteTenantId()
+		setTenantId(tenant ? String(tenant) : '')
+	})
 
 	onMount(() => {
 		nameInput?.focus()
@@ -214,15 +244,19 @@ export function LocationAddPage(): JSX.Element {
 					<select
 						id="location-tenant"
 						value={tenantId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
+							setTenantTouched(true)
 							setTenantId(e.currentTarget.value)
-						}
+						}}
 					>
 						<option value="">No tenant</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
 					</select>
+					<Show when={!tenantTouched() && siteTenantId() !== null}>
+						<p class="field-hint">Defaults to the site's tenant.</p>
+					</Show>
 				</div>
 				<div class="field">
 					<label for="location-description">Description</label>

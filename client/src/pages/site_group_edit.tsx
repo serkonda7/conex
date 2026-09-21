@@ -5,7 +5,9 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import {
 	fetch_site_group,
 	fetch_site_groups,
+	fetch_tenants,
 	type SiteGroupRow,
+	type TenantRow,
 	update_site_group,
 } from '../api_p1'
 import { navigate } from '../router'
@@ -20,6 +22,7 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
 	const [parentId, setParentId] = createSignal('')
+	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
@@ -28,6 +31,15 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 
 	const [groups] = createResource(async () => {
 		const res = await fetch_site_groups()
+		if (Result.isError(res)) {
+			setFormError(res.error.message)
+			return []
+		}
+		return res.value.items
+	})
+
+	const [tenants] = createResource(async () => {
+		const res = await fetch_tenants()
 		if (Result.isError(res)) {
 			setFormError(res.error.message)
 			return []
@@ -45,6 +57,7 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 			}
 			setName(res.value.name)
 			setSlug(res.value.slug)
+			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
 			setParentId(res.value.parent_id ? String(res.value.parent_id) : '')
 			setDescription(res.value.description ?? '')
 			setComments(res.value.comments ?? '')
@@ -72,6 +85,7 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 		const res = await update_site_group(props.id, {
 			name: trimmedName,
 			slug: trimmedSlug,
+			tenant_id: tenantId() ? Number(tenantId()) : null,
 			parent_id: parentId() ? Number(parentId()) : null,
 			description: trimmedDescription === '' ? null : trimmedDescription,
 			comments: trimmedComments === '' ? null : trimmedComments,
@@ -132,6 +146,23 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 						<p class="field-hint">
 							URL-safe identifier: lowercase letters, digits, single dashes.
 						</p>
+					</div>
+					<div class="field">
+						<label for="site-group-edit-tenant">Tenant</label>
+						<select
+							id="site-group-edit-tenant"
+							value={tenantId()}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+								setTenantId(e.currentTarget.value)
+							}
+						>
+							<option value="">No tenant</option>
+							<For each={tenants() ?? []}>
+								{(t: TenantRow): JSX.Element => (
+									<option value={t.id}>{t.name}</option>
+								)}
+							</For>
+						</select>
 					</div>
 					<div class="field">
 						<label for="site-group-edit-parent">Parent</label>

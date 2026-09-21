@@ -2,7 +2,15 @@ import { Result } from 'better-result'
 import { slugify } from 'shared/src/slug'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, onMount, Show } from 'solid-js'
+import {
+	createEffect,
+	createMemo,
+	createResource,
+	createSignal,
+	For,
+	onMount,
+	Show,
+} from 'solid-js'
 import {
 	create_site,
 	fetch_site_groups,
@@ -10,7 +18,7 @@ import {
 	type SiteGroupRow,
 	type TenantRow,
 } from '../api_p1'
-import { navigate } from '../router'
+import { navigate, parseId, queryParam } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -22,8 +30,9 @@ export function SiteAddPage(): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
 	const [slugTouched, setSlugTouched] = createSignal(false)
-	const [tenantId, setTenantId] = createSignal('')
-	const [groupId, setGroupId] = createSignal('')
+	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
+	const [groupId, setGroupId] = createSignal(queryParam('group'))
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [physicalAddress, setPhysicalAddress] = createSignal('')
@@ -48,6 +57,27 @@ export function SiteAddPage(): JSX.Element {
 			return []
 		}
 		return res.value.items
+	})
+
+	// Tenant defaults to the selected group's tenant until the user picks one
+	// explicitly (or `?tenant=` is present, which counts as explicit).
+	const groupTenantId = createMemo(() => {
+		const id = parseId(groupId())
+		if (id === null) {
+			return null
+		}
+		return (groups() ?? []).find((g: SiteGroupRow) => g.id === id)?.tenant_id ?? null
+	})
+
+	createEffect(() => {
+		if (tenantTouched()) {
+			return
+		}
+		if (groups() === undefined) {
+			return
+		}
+		const tenant = groupTenantId()
+		setTenantId(tenant ? String(tenant) : '')
 	})
 
 	onMount(() => {
@@ -148,15 +178,19 @@ export function SiteAddPage(): JSX.Element {
 					<select
 						id="site-tenant"
 						value={tenantId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
+							setTenantTouched(true)
 							setTenantId(e.currentTarget.value)
-						}
+						}}
 					>
 						<option value="">No tenant</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
 					</select>
+					<Show when={!tenantTouched() && groupTenantId() !== null}>
+						<p class="field-hint">Defaults to the group's tenant.</p>
+					</Show>
 				</div>
 				<div class="field">
 					<label for="site-group">Group</label>

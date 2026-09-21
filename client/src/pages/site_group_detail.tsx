@@ -7,6 +7,7 @@ import {
 	fetch_site_group,
 	fetch_site_groups,
 	fetch_sites,
+	fetch_tenant,
 	type SiteGroupRow,
 	type SiteRow,
 } from '../api_p1'
@@ -37,6 +38,18 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 		},
 	)
 	const parentId = createMemo(() => group()?.parent_id ?? null)
+	const tenantId = createMemo(() => group()?.tenant_id ?? null)
+	const [tenant] = createResource(tenantId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_tenant(id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
+	})
 	const [parent] = createResource(parentId, async (id: number | null) => {
 		if (!id) {
 			return null
@@ -142,6 +155,26 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							<dt>Slug</dt>
 							<dd>
 								<code>{group()?.slug}</code>
+							</dd>
+							<dt>Tenant</dt>
+							<dd>
+								<Show when={tenantId() !== null} fallback="—">
+									<Show
+										when={!tenant.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										<Show when={tenant()} fallback={String(tenantId() ?? '—')}>
+											<a
+												href={`/tenants/${tenantId() ?? ''}`}
+												onClick={(e: MouseEvent): void =>
+													go(e, `/tenants/${tenantId() ?? ''}`)
+												}
+											>
+												{tenant()?.name}
+											</a>
+										</Show>
+									</Show>
+								</Show>
 							</dd>
 							<dt>Parent</dt>
 							<dd>

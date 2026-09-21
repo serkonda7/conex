@@ -16,10 +16,12 @@ import { Portal } from 'solid-js/web'
 import {
 	delete_site_group,
 	fetch_site_groups,
+	fetch_tenants,
 	type SiteGroupRow,
 	type SiteGroupSort,
+	type TenantRow,
 } from '../api_p1'
-import { navigate } from '../router'
+import { navigate, parseId, queryParam } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -40,6 +42,7 @@ export function SiteGroupsPage(): JSX.Element {
 	const [sort, setSort] = createSignal<SiteGroupSort>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
+	const [filterTenant, setFilterTenant] = createSignal(queryParam('tenant'))
 	/**
 	 * Anchor for the row menu, rendered in a Portal so the table's scroll
 	 * container can never clip it. `edge` is a viewport `top` offset when
@@ -53,6 +56,11 @@ export function SiteGroupsPage(): JSX.Element {
 		up: boolean
 	}
 	const [openMenu, setOpenMenu] = createSignal<RowMenuAnchor | null>(null)
+
+	// Follow tenant links from the tenant detail page (`/site-groups?tenant=<id>`).
+	createEffect(() => {
+		setFilterTenant(queryParam('tenant'))
+	})
 
 	let debounceTimer: number | undefined
 	onMount(() => {
@@ -91,6 +99,7 @@ export function SiteGroupsPage(): JSX.Element {
 		search: debouncedSearch(),
 		sort: sort(),
 		order: order(),
+		tenant: parseId(filterTenant()) ?? undefined,
 	}))
 
 	const [groupsPage, { refetch }] = createResource(listSource, async (s) => {
@@ -106,6 +115,22 @@ export function SiteGroupsPage(): JSX.Element {
 	const total = createMemo(() => groupsPage()?.total ?? 0)
 	const rangeStart = createMemo(() => (total() === 0 ? 0 : 1))
 	const rangeEnd = createMemo(() => total())
+
+	const [tenants] = createResource(async () => {
+		const res = await fetch_tenants()
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return []
+		}
+		return res.value.items
+	})
+
+	function tenantNameOf(id: number | null): string {
+		if (!id) {
+			return '—'
+		}
+		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
+	}
 
 	// Id → name map for the Parent column, resolved from the same result set.
 	const parentNameOf = createMemo(() => {
@@ -265,6 +290,21 @@ export function SiteGroupsPage(): JSX.Element {
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
 				</label>
+				<label>
+					<span class="visually-hidden">Filter by tenant</span>
+					<select
+						aria-label="Filter by tenant"
+						value={filterTenant()}
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+							setFilterTenant(e.currentTarget.value)
+						}
+					>
+						<option value="">All tenants</option>
+						<For each={tenants() ?? []}>
+							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+						</For>
+					</select>
+				</label>
 				<span class="toolbar-spacer" />
 				<Show when={selected().length > 0}>
 					<button type="button" class="btn-danger" onClick={handleBulkDelete}>
@@ -307,6 +347,7 @@ export function SiteGroupsPage(): JSX.Element {
 							</button>
 						</th>
 						<th>Parent</th>
+						<th>Tenant</th>
 						<th>Actions</th>
 					</tr>
 				</thead>
@@ -336,6 +377,7 @@ export function SiteGroupsPage(): JSX.Element {
 									{g.description || '—'}
 								</td>
 								<td>{parentNameOf()(g.parent_id)}</td>
+								<td>{tenantNameOf(g.tenant_id)}</td>
 								<td>
 									<div class="row-actions">
 										<button
@@ -381,8 +423,8 @@ export function SiteGroupsPage(): JSX.Element {
 			</Show>
 			<Show when={!groupsPage.loading && rows().length === 0}>
 				<p class="empty">
-					{debouncedSearch()
-						? `No site groups match "${debouncedSearch()}".`
+					{debouncedSearch() || filterTenant()
+						? 'No site groups match the current filters.'
 						: 'No site groups yet. Add the first one above.'}
 				</p>
 			</Show>

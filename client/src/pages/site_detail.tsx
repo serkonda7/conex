@@ -168,6 +168,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 			slug: slug(),
 			site_id: props.id,
 			parent_id: parentId() ? Number(parentId()) : null,
+			tenant_id: site()?.tenant_id ?? null,
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
