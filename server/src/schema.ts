@@ -217,6 +217,9 @@ export const device_types = sqliteTable(
 		// Rack units consumed on mount. 0 = virtual or shelf-only (P4 mounts
 		// those by shelf_id instead of position_u).
 		u_height: integer('u_height').notNull().default(1),
+		// Rack-template dimensions. Null keeps existing non-rack templates valid.
+		form_factor: text('form_factor'),
+		width: integer('width'),
 		description: text('description'),
 	},
 	(table) => [

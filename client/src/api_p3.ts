@@ -131,6 +131,16 @@ export async function create_device_type(input: {
 	model: string
 	slug: string
 	u_height?: number
+	description?: string
+	form_factor?:
+		| '2-post frame'
+		| '4-post frame'
+		| '4-post cabinet'
+		| 'wall-mounted frame'
+		| 'wall-mounted cabinet'
+		| 'wall-mounted swing-out'
+		| 'outdoor cabinet'
+	width?: 10 | 19 | 23
 }): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'].$post({ json: input })
 	return to_result<DeviceTypeRow>(res, 'Failed to create device type')

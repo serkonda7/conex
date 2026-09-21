@@ -40,6 +40,7 @@ import { SiteGroupDetailPage } from './pages/site_group_detail'
 import { SiteGroupEditPage } from './pages/site_group_edit'
 import { SiteGroupsPage } from './pages/site_groups'
 import { SitesPage } from './pages/sites'
+import { TemplateAddPage } from './pages/template_add'
 import { TemplatesPage } from './pages/templates'
 import { TenantAddPage } from './pages/tenant_add'
 import { TenantDetailPage } from './pages/tenant_detail'
@@ -455,6 +456,9 @@ function App(): JSX.Element {
 			return emptyRoute('racks')
 		}
 		if (parts[0] === 'templates') {
+			if (parts[1] === 'add') {
+				return emptyRoute('template-add')
+			}
 			return emptyRoute('templates')
 		}
 		if (parts[0] === 'manufacturers') {
@@ -793,6 +797,9 @@ function App(): JSX.Element {
 									</Match>
 									<Match when={route().page === 'templates'}>
 										<TemplatesPage />
+									</Match>
+									<Match when={route().page === 'template-add'}>
+										<TemplateAddPage />
 									</Match>
 									<Match when={route().page === 'manufacturers'}>
 										<ManufacturersPage />

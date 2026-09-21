@@ -223,6 +223,8 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		model: input.model,
 		slug: input.slug,
 		u_height: input.u_height ?? 1,
+		form_factor: input.form_factor ?? null,
+		width: input.width ?? null,
 		description: input.description ?? null,
 	}
 	try {
@@ -280,6 +282,12 @@ export function updateDeviceType(
 	}
 	if (input.u_height !== undefined) {
 		patch.u_height = input.u_height
+	}
+	if (input.form_factor !== undefined) {
+		patch.form_factor = input.form_factor
+	}
+	if (input.width !== undefined) {
+		patch.width = input.width
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description

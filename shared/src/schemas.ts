@@ -395,6 +395,19 @@ export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.
  */
 export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
 
+/** NetBox rack form-factor choices. */
+export const RackFormFactorSchema = v.picklist([
+	'2-post frame',
+	'4-post frame',
+	'4-post cabinet',
+	'wall-mounted frame',
+	'wall-mounted cabinet',
+	'wall-mounted swing-out',
+	'outdoor cabinet',
+])
+
+export const RackWidthSchema = v.picklist([10, 19, 23])
+
 export const StubLabelSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
 
 export const ManufacturerCreateSchema = v.strictObject({
@@ -414,6 +427,8 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	model: NameSchema,
 	slug: SlugSchema,
 	u_height: v.optional(DeviceHeightSchema, 1),
+	form_factor: v.optional(RackFormFactorSchema, undefined),
+	width: v.optional(RackWidthSchema, undefined),
 	description: DescriptionSchema,
 })
 
@@ -422,6 +437,8 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
 	u_height: v.optional(DeviceHeightSchema, undefined),
+	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
+	width: v.optional(v.nullable(RackWidthSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
