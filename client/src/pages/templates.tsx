@@ -31,7 +31,7 @@ export function TemplatesPage(): JSX.Element {
 	const [stubCount, setStubCount] = createSignal('24')
 	const [previewNames, setPreviewNames] = createSignal<string[]>([])
 	const [selectedType, setSelectedType] = createSignal<number | null>(null)
-	const [typeSort, setTypeSort] = createSignal<DeviceTypeSort>('model')
+	const [typeSort, setTypeSort] = createSignal<DeviceTypeSort | undefined>('model')
 	const [typeOrder, setTypeOrder] = createSignal<'asc' | 'desc'>('asc')
 
 	let debounceTimer: number | undefined
@@ -44,7 +44,7 @@ export function TemplatesPage(): JSX.Element {
 
 	const typeSource = createMemo(() => ({
 		search: debouncedSearch(),
-		sort: typeSort(),
+		sort: typeSort() ?? 'model',
 		order: typeOrder(),
 	}))
 
@@ -245,6 +245,10 @@ export function TemplatesPage(): JSX.Element {
 				sortKey={typeSort}
 				sortDirection={typeOrder}
 				onSort={handleTypeSort}
+				onSortClear={() => {
+					setTypeSort(undefined)
+					setTypeOrder('asc')
+				}}
 				showColumnCustomizer
 				visibleColumns={visibleTypeColumns}
 				onVisibleColumnsChange={setVisibleTypeColumns}

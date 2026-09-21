@@ -43,7 +43,7 @@ export function RacksPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-	const [sort, setSort] = createSignal<RackSort>('name')
+	const [sort, setSort] = createSignal<RackSort | undefined>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	const [filterSite, setFilterSite] = createSignal(queryParam('site'))
@@ -135,7 +135,7 @@ export function RacksPage(): JSX.Element {
 		site: parseId(filterSite()) ?? undefined,
 		location: parseId(filterLocation()) ?? undefined,
 		tenant: parseId(filterTenant()) ?? undefined,
-		sort: sort(),
+		sort: sort() ?? 'name',
 		order: order(),
 	}))
 
@@ -400,6 +400,10 @@ export function RacksPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				onSortClear={() => {
+					setSort(undefined)
+					setOrder('asc')
+				}}
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}

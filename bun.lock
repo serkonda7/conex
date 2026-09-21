@@ -17,7 +17,7 @@
       "name": "client",
       "version": "0.0.0-dev",
       "dependencies": {
-        "@serkonda7/solid-components": "^0.0.3",
+        "@serkonda7/solid-components": "~0.0.4",
         "@tabler/icons-solidjs": "~3.47.0",
         "better-result": "catalog:",
         "hono": "catalog:",
@@ -236,7 +236,7 @@
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
 
-    "@serkonda7/solid-components": ["@serkonda7/solid-components@0.0.3", "", { "peerDependencies": { "solid-js": ">=1.9.0" } }, "sha512-/lQqh+Bu2o7I1nr8DeDs6U+dMzhB78aFK5VfNbDNF/5ADqW9tYTQyjNZ6CVIFrjBRnqQ0MIwPCuDCW280ieorA=="],
+    "@serkonda7/solid-components": ["@serkonda7/solid-components@0.0.4", "", { "peerDependencies": { "solid-js": ">=1.9.0" } }, "sha512-ZwjeN5FZU2fKcczh/T7gHBM28Tt4Wm1KcF2wXpLbekwJBUUgoGRPP9FKo4Z4qr100DB5RHAWzQDM9QTU8OoXrQ=="],
 
     "@solid-devtools/debugger": ["@solid-devtools/debugger@0.28.1", "", { "dependencies": { "@nothing-but/utils": "~0.17.0", "@solid-devtools/shared": "^0.20.0", "@solid-primitives/bounds": "^0.1.1", "@solid-primitives/event-listener": "^2.4.1", "@solid-primitives/keyboard": "^1.3.1", "@solid-primitives/rootless": "^1.5.1", "@solid-primitives/scheduled": "^1.5.1", "@solid-primitives/static-store": "^0.1.1", "@solid-primitives/utils": "^6.3.1" }, "peerDependencies": { "solid-js": "^1.9.0" } }, "sha512-6qIUI6VYkXoRnL8oF5bvh2KgH71qlJ18hNw/mwSyY6v48eb80ZR48/5PDXufUa3q+MBSuYa1uqTMwLewpay9eg=="],
 

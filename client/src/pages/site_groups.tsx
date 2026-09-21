@@ -41,7 +41,7 @@ export function SiteGroupsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-	const [sort, setSort] = createSignal<SiteGroupSort>('name')
+	const [sort, setSort] = createSignal<SiteGroupSort | undefined>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	const [filterTenant, setFilterTenant] = createSignal(queryParam('tenant'))
@@ -99,7 +99,7 @@ export function SiteGroupsPage(): JSX.Element {
 
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
-		sort: sort(),
+		sort: sort() ?? 'name',
 		order: order(),
 		tenant: parseId(filterTenant()) ?? undefined,
 	}))
@@ -327,6 +327,10 @@ export function SiteGroupsPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				onSortClear={() => {
+					setSort(undefined)
+					setOrder('asc')
+				}}
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}

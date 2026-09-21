@@ -37,7 +37,7 @@ export function ManufacturersPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-	const [sort, setSort] = createSignal<ManufacturerSort>('name')
+	const [sort, setSort] = createSignal<ManufacturerSort | undefined>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	/**
@@ -89,7 +89,7 @@ export function ManufacturersPage(): JSX.Element {
 
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
-		sort: sort(),
+		sort: sort() ?? 'name',
 		order: order(),
 	}))
 
@@ -271,6 +271,10 @@ export function ManufacturersPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				onSortClear={() => {
+					setSort(undefined)
+					setOrder('asc')
+				}}
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}

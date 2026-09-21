@@ -37,7 +37,7 @@ export function DevicesPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-	const [sort, setSort] = createSignal<DeviceSort>('name')
+	const [sort, setSort] = createSignal<DeviceSort | undefined>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [status, setStatus] = createSignal('')
 	const [rackFilter, setRackFilter] = createSignal('')
@@ -97,7 +97,7 @@ export function DevicesPage(): JSX.Element {
 
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
-		sort: sort(),
+		sort: sort() ?? 'name',
 		order: order(),
 		status: (status() || undefined) as
 			| 'active'
@@ -390,6 +390,10 @@ export function DevicesPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				onSortClear={() => {
+					setSort(undefined)
+					setOrder('asc')
+				}}
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}

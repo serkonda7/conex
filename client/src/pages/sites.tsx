@@ -44,7 +44,7 @@ export function SitesPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-	const [sort, setSort] = createSignal<SiteSort>('name')
+	const [sort, setSort] = createSignal<SiteSort | undefined>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
 	const [selected, setSelected] = createSignal<number[]>([])
 	const [filterTenant, setFilterTenant] = createSignal(queryParam('tenant'))
@@ -121,7 +121,7 @@ export function SitesPage(): JSX.Element {
 
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
-		sort: sort(),
+		sort: sort() ?? 'name',
 		order: order(),
 		tenant: parseId(filterTenant()) ?? undefined,
 	}))
@@ -331,6 +331,10 @@ export function SitesPage(): JSX.Element {
 				sortKey={sort}
 				sortDirection={order}
 				onSort={handleSort}
+				onSortClear={() => {
+					setSort(undefined)
+					setOrder('asc')
+				}}
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
