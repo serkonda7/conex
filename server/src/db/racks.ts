@@ -44,6 +44,8 @@ export interface RackListParams extends ListParams {
 	tenant?: number
 	sort: 'name' | 'slug' | 'status'
 	order: 'asc' | 'desc'
+	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
+	scopeTenantId?: number
 }
 
 export function listRacks(params: RackListParams): Page<RackRow> {
@@ -63,6 +65,9 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 	}
 	if (params.tenant) {
 		conditions.push(eq(racks.tenant_id, params.tenant))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(racks.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =
@@ -323,6 +328,12 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 
 export interface ShelfListParams extends ListParams {
 	rack?: number
+	/**
+	 * Tenant scope for scoped editors/viewers: restricts the list to shelves
+	 * whose rack sits in the scope tenant (strict — shared racks excluded).
+	 * `undefined` means unconstrained.
+	 */
+	scopeTenantId?: number
 }
 
 export function listShelves(params: ShelfListParams): Page<ShelfRow> {
@@ -334,6 +345,11 @@ export function listShelves(params: ShelfListParams): Page<ShelfRow> {
 	}
 	if (params.rack) {
 		conditions.push(eq(rack_shelves.rack_id, params.rack))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(
+			sql`EXISTS (SELECT 1 FROM ${racks} AS scope_rack WHERE scope_rack.id = ${rack_shelves.rack_id} AND scope_rack.tenant_id = ${params.scopeTenantId})`,
+		)
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const items = db

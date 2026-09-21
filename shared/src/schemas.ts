@@ -9,20 +9,35 @@
  */
 import * as v from 'valibot'
 
+// Username identity for local auth. Stored lowercase (see
+// `server/src/util/username.ts`); 1-64 chars of letters, digits, dot,
+// dash, or underscore so it is URL-safe and unambiguous in logs.
+export const UsernameSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1),
+	v.maxLength(64),
+	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
+)
+
 // Local-login credentials. strictObject so unknown keys fail loudly instead
 // of being stripped; the route validator reports them through the shared
 // onValidationError hook.
+// `username` stays permissive (max 320, no charset check) so installs
+// created before the email→username migration can still log in with their
+// existing `admin@example.com`-style identity; new accounts are restricted
+// by UsernameSchema in SetupSchema/UserCreateSchema.
 export const LoginSchema = v.strictObject({
-	email: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(320)),
+	username: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(320)),
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 })
 
 export type Login = v.InferOutput<typeof LoginSchema>
 
-// First-run admin provisioning. Same email/password contract as login;
-// no minimum password length is enforced.
+// First-run admin provisioning. Same username/password contract as login;
+// new usernames must satisfy UsernameSchema (no minimum password length).
 export const SetupSchema = v.strictObject({
-	email: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(320)),
+	username: UsernameSchema,
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 })
 
@@ -679,6 +694,52 @@ export interface DeviceTraceResponse {
 	device_id: number
 	links: TraceLink[]
 }
+
+// ---------------------------------------------------------------------------
+// P7: users / roles
+// ---------------------------------------------------------------------------
+
+/**
+ * User role: `admin` manages users/roles and reads+writes everything;
+ * `editor` reads+writes inventory (no user management); `viewer` reads only.
+ * Editors and viewers with a `tenant_id` set are strictly limited to that
+ * single tenant (null-tenant rows are invisible to them); `tenant_id = NULL`
+ * means global (all tenants). Admins ignore tenant scope entirely.
+ */
+export const RoleSchema = v.picklist(['admin', 'editor', 'viewer'])
+
+export type Role = v.InferOutput<typeof RoleSchema>
+
+export const UserCreateSchema = v.strictObject({
+	username: UsernameSchema,
+	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
+	role: v.optional(RoleSchema, 'viewer'),
+	tenant_id: NullableIdSchema,
+})
+
+export const UserUpdateSchema = v.strictObject({
+	role: v.optional(RoleSchema, undefined),
+	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	password: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(1024)), undefined),
+})
+
+export const UserListQuerySchema = v.object({
+	...ListQueryEntries,
+	role: v.optional(RoleSchema, undefined),
+	tenant: OptionalIdEntry,
+})
+
+/** Public user shape: password hashes never leave the server. */
+export interface UserJson {
+	id: number
+	username: string
+	role: Role
+	tenant_id: number | null
+}
+
+export type UserCreate = v.InferOutput<typeof UserCreateSchema>
+export type UserUpdate = v.InferOutput<typeof UserUpdateSchema>
+export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P6: global search / CSV import

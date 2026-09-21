@@ -15,10 +15,18 @@ import {
 // credentials, not entity references.
 export const users = sqliteTable('users', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
-	email: text('email').notNull().unique(),
+	username: text('username').notNull().unique(),
 	password_hash: text('password_hash'),
 	provider: text('provider').notNull().default('local'),
 	provider_id: text('provider_id').unique(),
+	// RBAC role (`admin` | `editor` | `viewer`, default `viewer`; the
+	// first-run setup account is created as `admin`). Service-enforced enum:
+	// SQLite has no native enum, so writes go through `RoleSchema`.
+	role: text('role').notNull().default('viewer'),
+	// Tenant scope for editors/viewers (`NULL` = global, all tenants).
+	// Admins ignore this column. Delete-blocked while referenced (service
+	// layer in `db/tenancy.ts`), so the FK carries no cascade.
+	tenant_id: integer('tenant_id').references(() => tenants.id),
 })
 
 export const sessions = sqliteTable(

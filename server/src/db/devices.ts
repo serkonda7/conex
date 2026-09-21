@@ -211,6 +211,8 @@ export interface DeviceListParams extends ListParams {
 	status?: string
 	sort: 'name' | 'status'
 	order: 'asc' | 'desc'
+	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
+	scopeTenantId?: number
 }
 
 export function listDevices(params: DeviceListParams): Page<DeviceRow> {
@@ -230,6 +232,9 @@ export function listDevices(params: DeviceListParams): Page<DeviceRow> {
 	}
 	if (params.tenant) {
 		conditions.push(eq(devices.tenant_id, params.tenant))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(devices.tenant_id, params.scopeTenantId))
 	}
 	if (params.status) {
 		conditions.push(eq(devices.status, params.status))

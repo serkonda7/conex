@@ -37,12 +37,12 @@ export async function fetchSetupStatus(): Promise<boolean | null> {
 }
 
 /** Creates the first admin account (first-run only) and sets the session cookie. */
-export async function setupAdmin(email: string, password: string): Promise<Result<void, Error>> {
+export async function setupAdmin(username: string, password: string): Promise<Result<void, Error>> {
 	try {
 		const res = await fetch('/api/auth/setup', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email, password }),
+			body: JSON.stringify({ username, password }),
 		})
 
 		if (!res.ok) {
@@ -55,27 +55,44 @@ export async function setupAdmin(email: string, password: string): Promise<Resul
 	}
 }
 
-/** Current session email, or null when logged out/unreachable. Never throws. */
-export async function fetchMe(): Promise<string | null> {
+/** Current session identity: username plus the RBAC role and tenant scope. */
+export interface SessionUser {
+	username: string
+	role: 'admin' | 'editor' | 'viewer'
+	tenant_id: number | null
+}
+
+/** Current session identity, or null when logged out/unreachable. Never throws. */
+export async function fetchMe(): Promise<SessionUser | null> {
 	try {
 		const res = await fetch('/api/auth/me')
 		if (!res.ok) {
 			return null
 		}
-		const data = (await res.json()) as { email?: unknown }
-		return typeof data.email === 'string' ? data.email : null
+		const data = (await res.json()) as Partial<SessionUser>
+		if (typeof data.username !== 'string') {
+			return null
+		}
+		return {
+			username: data.username,
+			role:
+				data.role === 'admin' || data.role === 'editor' || data.role === 'viewer'
+					? data.role
+					: 'viewer',
+			tenant_id: typeof data.tenant_id === 'number' ? data.tenant_id : null,
+		}
 	} catch {
 		return null
 	}
 }
 
 /** Logs in and lets the server set the session cookie. */
-export async function login(email: string, password: string): Promise<Result<void, Error>> {
+export async function login(username: string, password: string): Promise<Result<void, Error>> {
 	try {
 		const res = await fetch('/api/auth/login', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email, password }),
+			body: JSON.stringify({ username, password }),
 		})
 
 		if (!res.ok) {

@@ -3,6 +3,7 @@ import {
 	IconBuildingFactory,
 	IconFolder,
 	IconLocation,
+	IconLock,
 	IconLogout,
 	IconMapPin,
 	IconPlus,
@@ -14,7 +15,7 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { set_unauthorized_handler } from './api'
-import { fetchMe, fetchSetupStatus, login, logout, setupAdmin } from './api_auth'
+import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
 import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DeviceEditPage } from './pages/device_edit'
@@ -44,6 +45,9 @@ import { TenantAddPage } from './pages/tenant_add'
 import { TenantDetailPage } from './pages/tenant_detail'
 import { TenantEditPage } from './pages/tenant_edit'
 import { TenantsPage } from './pages/tenants'
+import { UserAddPage } from './pages/user_add'
+import { UserEditPage } from './pages/user_edit'
+import { UsersPage } from './pages/users'
 import { navigate, parseId, path } from './router'
 
 function go(e: MouseEvent, to: string): void {
@@ -52,8 +56,8 @@ function go(e: MouseEvent, to: string): void {
 }
 
 function LoginForm(props: {
-	email: () => string
-	setEmail: (v: string) => void
+	username: () => string
+	setUsername: (v: string) => void
 	password: () => string
 	setPassword: (v: string) => void
 	error: () => string | null
@@ -61,17 +65,17 @@ function LoginForm(props: {
 }): JSX.Element {
 	return (
 		<form onSubmit={props.onLogin}>
-			<label class="visually-hidden" for="login-email">
-				Email
+			<label class="visually-hidden" for="login-username">
+				Username
 			</label>
 			<input
-				id="login-email"
-				type="email"
-				placeholder="Email"
-				aria-label="Email"
+				id="login-username"
+				type="text"
+				placeholder="Username"
+				aria-label="Username"
 				required
-				value={props.email()}
-				onInput={(e: InputEventAndTarget) => props.setEmail(e.currentTarget.value)}
+				value={props.username()}
+				onInput={(e: InputEventAndTarget) => props.setUsername(e.currentTarget.value)}
 				autocomplete="username"
 			/>
 			<label class="visually-hidden" for="login-password">
@@ -98,8 +102,8 @@ function LoginForm(props: {
 }
 
 function SetupForm(props: {
-	email: () => string
-	setEmail: (v: string) => void
+	username: () => string
+	setUsername: (v: string) => void
 	password: () => string
 	setPassword: (v: string) => void
 	confirm: () => string
@@ -112,17 +116,17 @@ function SetupForm(props: {
 			<h2>Welcome to Conex</h2>
 			<p class="page-subtitle">Create the admin account to get started.</p>
 			<form onSubmit={props.onSetup}>
-				<label class="visually-hidden" for="setup-email">
-					Admin email
+				<label class="visually-hidden" for="setup-username">
+					Admin username
 				</label>
 				<input
-					id="setup-email"
-					type="email"
-					placeholder="Admin email"
-					aria-label="Admin email"
+					id="setup-username"
+					type="text"
+					placeholder="Admin username"
+					aria-label="Admin username"
 					required
-					value={props.email()}
-					onInput={(e: InputEventAndTarget) => props.setEmail(e.currentTarget.value)}
+					value={props.username()}
+					onInput={(e: InputEventAndTarget) => props.setUsername(e.currentTarget.value)}
 					autocomplete="username"
 				/>
 				<label class="visually-hidden" for="setup-password">
@@ -231,14 +235,14 @@ function NavItem(props: {
 function App(): JSX.Element {
 	const [isLoggedIn, setIsLoggedIn] = createSignal<boolean | null>(null)
 	const [needsSetup, setNeedsSetup] = createSignal<boolean | null>(null)
-	const [email, setEmail] = createSignal('')
+	const [username, setUsername] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
-	const [setupEmail, setSetupEmail] = createSignal('')
+	const [setupUsername, setSetupUsername] = createSignal('')
 	const [setupPassword, setSetupPassword] = createSignal('')
 	const [setupConfirm, setSetupConfirm] = createSignal('')
 	const [setupError, setSetupError] = createSignal<string | null>(null)
-	const [currentUser, setCurrentUser] = createSignal<string | null>(null)
+	const [currentUser, setCurrentUser] = createSignal<SessionUser | null>(null)
 	const [userMenuOpen, setUserMenuOpen] = createSignal(false)
 
 	onMount(async () => {
@@ -273,13 +277,15 @@ function App(): JSX.Element {
 	async function handleLogin(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
-		const res = await login(email(), password())
+		const res = await login(username(), password())
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
 		}
 		setPassword('')
-		const me = (await fetchMe()) ?? (email().trim() || null)
+		const me =
+			(await fetchMe()) ??
+			({ username: username().trim(), role: 'viewer', tenant_id: null } as SessionUser)
 		setCurrentUser(me)
 		setIsLoggedIn(me !== null)
 	}
@@ -288,9 +294,9 @@ function App(): JSX.Element {
 		e.preventDefault()
 		setSetupError(null)
 
-		const trimmedEmail = setupEmail().trim()
-		if (!trimmedEmail) {
-			setSetupError('Email is required.')
+		const trimmedUsername = setupUsername().trim()
+		if (!trimmedUsername) {
+			setSetupError('Username is required.')
 			return
 		}
 		if (!setupPassword()) {
@@ -302,7 +308,7 @@ function App(): JSX.Element {
 			return
 		}
 
-		const res = await setupAdmin(trimmedEmail, setupPassword())
+		const res = await setupAdmin(trimmedUsername, setupPassword())
 		if (Result.isError(res)) {
 			// A 409 means another request finished setup first: fall back to login.
 			if (res.error.message.toLowerCase().includes('already completed')) {
@@ -311,12 +317,12 @@ function App(): JSX.Element {
 			setSetupError(res.error.message)
 			return
 		}
-		setEmail(trimmedEmail)
+		setUsername(trimmedUsername)
 		setPassword('')
 		setSetupPassword('')
 		setSetupConfirm('')
 		setNeedsSetup(false)
-		setCurrentUser(trimmedEmail)
+		setCurrentUser({ username: trimmedUsername, role: 'admin', tenant_id: null })
 		setIsLoggedIn(true)
 	}
 
@@ -325,7 +331,7 @@ function App(): JSX.Element {
 		await logout()
 		setIsLoggedIn(false)
 		setCurrentUser(null)
-		setEmail('')
+		setUsername('')
 	}
 
 	function emptyRoute(page: string): {
@@ -337,6 +343,7 @@ function App(): JSX.Element {
 		rackId: number | null
 		deviceId: number | null
 		manufacturerId: number | null
+		userId: number | null
 	} {
 		return {
 			page,
@@ -347,6 +354,7 @@ function App(): JSX.Element {
 			rackId: null,
 			deviceId: null,
 			manufacturerId: null,
+			userId: null,
 		}
 	}
 
@@ -359,6 +367,7 @@ function App(): JSX.Element {
 		rackId: number | null
 		deviceId: number | null
 		manufacturerId: number | null
+		userId: number | null
 	} {
 		const parts =
 			path()
@@ -480,6 +489,25 @@ function App(): JSX.Element {
 			}
 			return emptyRoute('devices')
 		}
+		if (parts[0] === 'users') {
+			if (currentUser()?.role !== 'admin') {
+				return emptyRoute('not-found')
+			}
+			if (parts[1] === 'add') {
+				return emptyRoute('user-add')
+			}
+			if (parts[1]) {
+				const userId = parseId(parts[1])
+				if (userId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('user-edit'), userId }
+				}
+				return emptyRoute('not-found')
+			}
+			return emptyRoute('users')
+		}
 		return emptyRoute('not-found')
 	}
 
@@ -504,8 +532,8 @@ function App(): JSX.Element {
 									<h1>Conex</h1>
 								</div>
 								<SetupForm
-									email={setupEmail}
-									setEmail={setSetupEmail}
+									username={setupUsername}
+									setUsername={setSetupUsername}
 									password={setupPassword}
 									setPassword={setSetupPassword}
 									confirm={setupConfirm}
@@ -523,8 +551,8 @@ function App(): JSX.Element {
 									<h1>Conex</h1>
 								</div>
 								<LoginForm
-									email={email}
-									setEmail={setEmail}
+									username={username}
+									setUsername={setUsername}
 									password={password}
 									setPassword={setPassword}
 									error={error}
@@ -549,7 +577,7 @@ function App(): JSX.Element {
 										class="app-user-button"
 										aria-haspopup="menu"
 										aria-expanded={userMenuOpen()}
-										aria-label={`Account: ${currentUser() ?? '…'}`}
+										aria-label={`Account: ${currentUser()?.username ?? '…'}`}
 										onClick={() => setUserMenuOpen(!userMenuOpen())}
 										onKeyDown={(e: KeyboardEvent): void => {
 											if (e.key === 'Escape') {
@@ -557,7 +585,9 @@ function App(): JSX.Element {
 											}
 										}}
 									>
-										<span class="app-user-email">{currentUser() ?? '…'}</span>
+										<span class="app-user-username">
+											{currentUser()?.username ?? '…'}
+										</span>
 									</button>
 									<Show when={userMenuOpen()}>
 										<div
@@ -640,6 +670,15 @@ function App(): JSX.Element {
 										label="Devices"
 										addHref="/devices/add"
 									/>
+									<Show when={currentUser()?.role === 'admin'}>
+										<NavItem
+											href="/users"
+											active={path().startsWith('/users')}
+											icon={<IconLock size={16} />}
+											label="Users"
+											addHref="/users/add"
+										/>
+									</Show>
 								</nav>
 							</aside>
 							<main class="app-content" id="main">
@@ -802,6 +841,19 @@ function App(): JSX.Element {
 										}
 									>
 										<DeviceEditPage id={route().deviceId as number} />
+									</Match>
+									<Match when={route().page === 'users'}>
+										<UsersPage />
+									</Match>
+									<Match when={route().page === 'user-add'}>
+										<UserAddPage />
+									</Match>
+									<Match
+										when={
+											route().page === 'user-edit' && route().userId !== null
+										}
+									>
+										<UserEditPage id={route().userId as number} />
 									</Match>
 									<Match when={route().page === 'not-found'}>
 										<p>Not found.</p>

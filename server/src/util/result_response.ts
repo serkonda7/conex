@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { ConflictError, DuplicateError, NotFoundError } from '../db/errors'
+import { ConflictError, DuplicateError, ForbiddenError, NotFoundError } from '../db/errors'
 import { jsonError } from './http'
 
 /**
@@ -20,6 +20,9 @@ export function sendResult<T>(
 	const err = result.error
 	if (err instanceof NotFoundError) {
 		return jsonError(c, err.message, 404)
+	}
+	if (err instanceof ForbiddenError) {
+		return jsonError(c, err.message, 403)
 	}
 	if (err instanceof DuplicateError || err instanceof ConflictError) {
 		return jsonError(c, err.message, 409)

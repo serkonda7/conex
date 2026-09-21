@@ -30,6 +30,13 @@ export interface CableListParams extends ListParams {
 	status?: string
 	interface?: number
 	device?: number
+	/**
+	 * Tenant scope for scoped editors/viewers: restricts the list to cables
+	 * whose both endpoint devices sit in the scope tenant (strict — shared
+	 * endpoints excluded), so no peer name from another tenant leaks.
+	 * `undefined` means unconstrained.
+	 */
+	scopeTenantId?: number
 }
 
 export function listCables(params: CableListParams): Page<CableRow> {
@@ -71,6 +78,15 @@ export function listCables(params: CableListParams): Page<CableRow> {
 		if (combined) {
 			conditions.push(combined)
 		}
+	}
+	if (params.scopeTenantId !== undefined) {
+		const scope = params.scopeTenantId
+		conditions.push(
+			sql`EXISTS (SELECT 1 FROM ${interfaces} AS scope_ia JOIN ${devices} AS scope_da ON scope_da.id = scope_ia.device_id WHERE scope_ia.id = ${cables.a_interface_id} AND scope_da.tenant_id = ${scope})`,
+		)
+		conditions.push(
+			sql`EXISTS (SELECT 1 FROM ${interfaces} AS scope_ib JOIN ${devices} AS scope_db ON scope_db.id = scope_ib.device_id WHERE scope_ib.id = ${cables.b_interface_id} AND scope_db.tenant_id = ${scope})`,
+		)
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const items = db

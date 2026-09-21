@@ -47,9 +47,9 @@ function idOf(res: { body: unknown }): number {
 
 beforeAll(async () => {
 	initTestEnv()
-	createLocalUser('p6@example.com', await Bun.password.hash('secret123'))
+	createLocalUser('p6user', await Bun.password.hash('secret123'))
 	const login = await api('POST', '/auth/login', {
-		email: 'p6@example.com',
+		username: 'p6user',
 		password: 'secret123',
 	})
 	expect(login.status).toBe(200)

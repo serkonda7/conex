@@ -43,6 +43,20 @@
       "when": 1789978577611,
       "tag": "0005_open_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789985946244,
+      "tag": "0006_tiresome_lockheed",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789999999999,
+      "tag": "0007_username_login",
+      "breakpoints": true
     }
   ]
 }

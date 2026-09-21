@@ -112,7 +112,7 @@ export async function get_signed_jwt(user: User): Promise<string> {
 	const now = nowSeconds()
 	const sid = createSession(user.id)
 	const payload: JwtPayload = {
-		sub: user.email,
+		sub: user.username,
 		jti: sid,
 		iat: now,
 		exp: now + SESSION_ABSOLUTE_TIMEOUT_S,

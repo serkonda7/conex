@@ -112,9 +112,9 @@ async function setupFixture(prefix: string): Promise<Fixture> {
 
 beforeAll(async () => {
 	initTestEnv()
-	createLocalUser('p4@example.com', await Bun.password.hash('secret123'))
+	createLocalUser('p4user', await Bun.password.hash('secret123'))
 	const login = await api('POST', '/auth/login', {
-		email: 'p4@example.com',
+		username: 'p4user',
 		password: 'secret123',
 	})
 	expect(login.status).toBe(200)

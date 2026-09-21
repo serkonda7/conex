@@ -7,6 +7,7 @@ import {
 	ManufacturerListQuerySchema,
 	ManufacturerUpdateSchema,
 } from 'shared/src/schemas'
+import { requireGlobalWrite } from '../authz'
 import {
 	createManufacturer,
 	deleteManufacturer,
@@ -18,6 +19,11 @@ import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 
+/**
+ * Manufacturers are shared catalog data (no tenant column): readable by
+ * every authenticated user, writable only by global editors/admins, so a
+ * tenant-scoped editor cannot rename shared rows out from under others.
+ */
 export const manufacturersApp = new Hono()
 	.use(authMiddleware)
 	.get('/', vValidator('query', ManufacturerListQuerySchema, onValidationError), (c) => {
@@ -33,6 +39,10 @@ export const manufacturersApp = new Hono()
 		)
 	})
 	.post('/', vValidator('json', ManufacturerCreateSchema, onValidationError), (c) => {
+		const denied = requireGlobalWrite(c)
+		if (denied) {
+			return denied
+		}
 		const result = createManufacturer(c.req.valid('json'))
 		if (Result.isOk(result)) {
 			return c.json(result.value, 201)
@@ -47,6 +57,10 @@ export const manufacturersApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ManufacturerUpdateSchema, onValidationError),
 		(c) => {
+			const denied = requireGlobalWrite(c)
+			if (denied) {
+				return denied
+			}
 			const result = updateManufacturer(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
 				return c.json(result.value)
@@ -55,6 +69,10 @@ export const manufacturersApp = new Hono()
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		const denied = requireGlobalWrite(c)
+		if (denied) {
+			return denied
+		}
 		const result = deleteManufacturer(c.req.valid('param').id)
 		if (Result.isOk(result)) {
 			return c.json(result.value)

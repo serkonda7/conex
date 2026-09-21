@@ -8,6 +8,14 @@ import {
 	SiteGroupUpdateSchema,
 } from 'shared/src/schemas'
 import {
+	guardUpdate,
+	guardWrite,
+	listTenantScope,
+	requireWrite,
+	resolveCreateTenant,
+	sendTenantRow,
+} from '../authz'
+import {
 	createSiteGroup,
 	deleteSiteGroup,
 	getSiteGroup,
@@ -22,34 +30,57 @@ export const siteGroupsApp = new Hono()
 	.use(authMiddleware)
 	.get('/', vValidator('query', SiteGroupListQuerySchema, onValidationError), (c) => {
 		const query = c.req.valid('query')
+		const scope = listTenantScope(c, query.tenant)
+		if (scope instanceof Response) {
+			return scope
+		}
 		return c.json(
 			listSiteGroups({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
-				tenant: query.tenant,
 				parent: query.parent,
 				sort: query.sort,
 				order: query.order,
+				...scope,
 			}),
 		)
 	})
 	.post('/', vValidator('json', SiteGroupCreateSchema, onValidationError), (c) => {
-		const result = createSiteGroup(c.req.valid('json'))
+		const denied = requireWrite(c)
+		if (denied) {
+			return denied
+		}
+		const body = c.req.valid('json')
+		const tenant = resolveCreateTenant(c, body.tenant_id)
+		if (tenant instanceof Response) {
+			return tenant
+		}
+		const result = createSiteGroup({ ...body, tenant_id: tenant })
 		if (Result.isOk(result)) {
 			return c.json(result.value, 201)
 		}
 		return sendResult(c, result)
 	})
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendResult(c, getSiteGroup(c.req.valid('param').id))
+		return sendTenantRow(c, getSiteGroup(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', SiteGroupUpdateSchema, onValidationError),
 		(c) => {
-			const result = updateSiteGroup(c.req.valid('param').id, c.req.valid('json'))
+			const id = c.req.valid('param').id
+			const body = c.req.valid('json')
+			const current = getSiteGroup(id)
+			if (Result.isError(current)) {
+				return sendResult(c, current)
+			}
+			const denied = guardUpdate(c, current.value.tenant_id, body.tenant_id)
+			if (denied) {
+				return denied
+			}
+			const result = updateSiteGroup(id, body)
 			if (Result.isOk(result)) {
 				return c.json(result.value)
 			}
@@ -57,7 +88,16 @@ export const siteGroupsApp = new Hono()
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const result = deleteSiteGroup(c.req.valid('param').id)
+		const id = c.req.valid('param').id
+		const current = getSiteGroup(id)
+		if (Result.isError(current)) {
+			return sendResult(c, current)
+		}
+		const denied = guardWrite(c, current.value.tenant_id)
+		if (denied) {
+			return denied
+		}
+		const result = deleteSiteGroup(id)
 		if (Result.isOk(result)) {
 			return c.json(result.value)
 		}

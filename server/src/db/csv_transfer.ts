@@ -35,8 +35,9 @@ export const CABLE_CSV_HEADER = [
 ]
 
 /** Devices export: one row per device, slugs for the FK columns. */
-export function exportDevicesCsv(): string {
+export function exportDevicesCsv(scopeTenantId?: number): string {
 	const db = getDb()
+	const scopeCond = scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId)
 	const rows = db
 		.select({
 			name: devices.name,
@@ -51,6 +52,7 @@ export function exportDevicesCsv(): string {
 		.leftJoin(device_types, eq(devices.device_type_id, device_types.id))
 		.leftJoin(sites, eq(devices.site_id, sites.id))
 		.leftJoin(racks, eq(devices.rack_id, racks.id))
+		.where(scopeCond)
 		.orderBy(devices.name)
 		.all()
 	return toCsv(
@@ -68,9 +70,9 @@ export function exportDevicesCsv(): string {
 }
 
 /** Cables export: endpoint device/interface names plus label/kind/status. */
-export function exportCablesCsv(): string {
+export function exportCablesCsv(scopeTenantId?: number): string {
 	const db = getDb()
-	const page = listCables({ search: '', page: 1, limit: 200 })
+	const page = listCables({ search: '', page: 1, limit: 200, scopeTenantId })
 	const dataRows: (string | null)[][] = []
 	for (const cable of page.items) {
 		const aIface = db
@@ -118,6 +120,25 @@ function deviceByName(name: string): number | undefined {
 	return getDb().select().from(devices).where(eq(devices.name, name)).get()?.id
 }
 
+/** Tenant of a site/rack row; `undefined` when the row is missing. */
+function siteTenant(id: number): number | null | undefined {
+	return getDb().select().from(sites).where(eq(sites.id, id)).get()?.tenant_id
+}
+
+function rackTenant(id: number): number | null | undefined {
+	return getDb().select().from(racks).where(eq(racks.id, id)).get()?.tenant_id
+}
+
+/** Scope readability (strict): exactly the scope tenant, no shared rows. */
+function scopeReadable(tenant: number | null | undefined, scope: number): boolean {
+	return tenant !== undefined && tenant !== null && tenant === scope
+}
+
+/** Tenant of a device row; `undefined` when the row is missing. */
+function deviceTenant(id: number): number | null | undefined {
+	return getDb().select().from(devices).where(eq(devices.id, id)).get()?.tenant_id
+}
+
 function ifaceId(deviceId: number, name: string): number | undefined {
 	return getDb()
 		.select()
@@ -138,8 +159,15 @@ function importResult(rows: ImportRowResult[]): ImportResponse {
  * Devices import: validates each row with `DeviceImportRowSchema`, resolves
  * slugs to ids, and creates the device (stub expansion included). One bad
  * row fails only itself; the response reports per-row errors.
+ *
+ * `scopeTenantId` serves scoped editors: rows referencing a site/rack
+ * outside the scope (or shared rows they may not claim) fail per-row, and
+ * created devices are forced into the scope tenant.
  */
-export function importDevicesCsv(text: string): Result<ImportResponse, Error> {
+export function importDevicesCsv(
+	text: string,
+	scopeTenantId?: number,
+): Result<ImportResponse, Error> {
 	const parsed = parseCsv(text)
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
@@ -168,12 +196,26 @@ export function importDevicesCsv(text: string): Result<ImportResponse, Error> {
 				fail(`Unknown site_slug "${input.site_slug}"`)
 				continue
 			}
+			if (
+				scopeTenantId !== undefined &&
+				!scopeReadable(siteTenant(foundSiteId), scopeTenantId)
+			) {
+				fail(`Site "${input.site_slug}" is outside your tenant scope`)
+				continue
+			}
 		}
 		let foundRackId: number | undefined
 		if (input.rack_slug) {
 			foundRackId = rackId(input.rack_slug)
 			if (!foundRackId) {
 				fail(`Unknown rack_slug "${input.rack_slug}"`)
+				continue
+			}
+			if (
+				scopeTenantId !== undefined &&
+				!scopeReadable(rackTenant(foundRackId), scopeTenantId)
+			) {
+				fail(`Rack "${input.rack_slug}" is outside your tenant scope`)
 				continue
 			}
 		}
@@ -185,6 +227,7 @@ export function importDevicesCsv(text: string): Result<ImportResponse, Error> {
 			rack_id: foundRackId,
 			position_u: input.position_u,
 			asset_tag: input.asset_tag,
+			...(scopeTenantId !== undefined ? { tenant_id: scopeTenantId } : {}),
 		})
 		if (Result.isError(created)) {
 			fail(created.error.message)
@@ -199,8 +242,15 @@ export function importDevicesCsv(text: string): Result<ImportResponse, Error> {
  * Cables import: validates each row with `CableImportRowSchema`, resolves
  * device/interface names to ids, and connects the free ports. One bad row
  * fails only itself; the response reports per-row errors.
+ *
+ * `scopeTenantId` serves scoped editors: rows whose endpoint devices are
+ * not both in the scope tenant fail per-row, mirroring the cable write
+ * rule in `authz.ts`.
  */
-export function importCablesCsv(text: string): Result<ImportResponse, Error> {
+export function importCablesCsv(
+	text: string,
+	scopeTenantId?: number,
+): Result<ImportResponse, Error> {
 	const parsed = parseCsv(text)
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
@@ -236,6 +286,14 @@ export function importCablesCsv(text: string): Result<ImportResponse, Error> {
 		if (!bIfaceId) {
 			fail(`Device "${input.b_device}" has no interface "${input.b_interface}"`)
 			continue
+		}
+		if (scopeTenantId !== undefined) {
+			const tenantA = deviceTenant(aDevId)
+			const tenantB = deviceTenant(bDevId)
+			if (!scopeReadable(tenantA, scopeTenantId) || !scopeReadable(tenantB, scopeTenantId)) {
+				fail('Cable endpoints are outside your tenant scope')
+				continue
+			}
 		}
 		const created = connectCable({
 			a_interface_id: aIfaceId,

@@ -267,7 +267,7 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 }
 
-.app-user-email {
+.app-user-username {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

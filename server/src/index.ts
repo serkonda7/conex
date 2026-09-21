@@ -15,6 +15,7 @@ import { shelvesApp } from './routes/shelves'
 import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
 import { tenantsApp } from './routes/tenants'
+import { usersApp } from './routes/users'
 import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
 import { jsonError } from './util/http'
 import { start_sweep } from './util/periodic'
@@ -57,6 +58,7 @@ export function createApp() {
 				return c.json({ status: 'ok', version: '0.1.0' })
 			})
 			.route('/auth', authApp)
+			.route('/users', usersApp)
 			.route('/tenants', tenantsApp)
 			.route('/sites', sitesApp)
 			.route('/site-groups', siteGroupsApp)

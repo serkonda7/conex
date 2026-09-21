@@ -13,7 +13,7 @@ import { expect, test } from '@playwright/test'
  */
 
 const API: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3000'
-const EMAIL: string = process.env.CONEX_E2E_EMAIL ?? 'e2e@example.com'
+const USERNAME: string = process.env.CONEX_E2E_USERNAME ?? 'e2e-user'
 const PASSWORD: string = process.env.CONEX_E2E_PASSWORD ?? 'e2e-secret-123'
 const tag: string = `e2e-${Date.now().toString(36)}`
 
@@ -45,7 +45,7 @@ function idOf(res: { json: unknown }): string {
 test('smoke: login → site → rack → device → cable', async ({ page }) => {
 	// Login through the UI.
 	await page.goto('/')
-	await page.locator('input[type="email"]').fill(EMAIL)
+	await page.getByLabel('Username').fill(USERNAME)
 	await page.locator('input[type="password"]').fill(PASSWORD)
 	await page.getByRole('button', { name: 'Sign in' }).click()
 	await expect(page.getByRole('link', { name: 'Devices' })).toBeVisible()
@@ -62,7 +62,7 @@ test('smoke: login → site → rack → device → cable', async ({ page }) => 
 	const login = await fetch(`${API}/auth/login`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+		body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
 	})
 	expect(login.status).toBe(200)
 	cookie = login.headers.get('set-cookie') ?? ''

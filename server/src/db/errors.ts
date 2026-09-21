@@ -48,3 +48,11 @@ export class ConflictError extends Error {
 		this.name = 'ConflictError'
 	}
 }
+
+/** Wrapped in a `Result.err` when RBAC refuses an operation. Mapped to 403. */
+export class ForbiddenError extends Error {
+	constructor(message = 'Forbidden') {
+		super(message)
+		this.name = 'ForbiddenError'
+	}
+}

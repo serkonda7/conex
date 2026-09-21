@@ -2,15 +2,16 @@ import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { LoginSchema, SetupSchema } from 'shared/src/schemas'
+import { requestUser } from '../authz'
 import { getConfig } from '../config'
 import { isUniqueViolation } from '../db/errors'
-import { createLocalUser, getUserByEmail, hasAnyUser } from '../db/users'
+import { createLocalUser, getUserByUsername, hasAnyUser } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
 import { onValidationError } from '../middleware/validation'
 import { get_signed_jwt, getSessionCookieOpts, invalidateSession } from '../sessions'
-import { normalize_email } from '../util/email'
 import { jsonError } from '../util/http'
+import { normalize_username } from '../util/username'
 
 export const authApp = new Hono()
 
@@ -45,18 +46,21 @@ authApp.post(
 		}
 
 		const body = c.req.valid('json')
-		const email = normalize_email(body.email)
-		if (!email) {
-			return jsonError(c, 'Email and password are required.', 400)
+		const username = normalize_username(body.username)
+		if (!username) {
+			return jsonError(c, 'Username and password are required.', 400)
 		}
 
-		if (getUserByEmail(email)) {
+		if (getUserByUsername(username)) {
 			return jsonError(c, 'Setup already completed', 409)
 		}
 
 		try {
 			const password_hash = await Bun.password.hash(body.password)
-			const user = createLocalUser(email, password_hash)
+			// First account owns the instance: always an admin (createLocalUser
+			// defaults to `admin`; passed explicitly so the role survives any
+			// future default change).
+			const user = createLocalUser(username, password_hash, 'admin', null)
 			const token = await get_signed_jwt(user)
 			setCookie(c, 'auth_token', token, getSessionCookieOpts())
 			return c.json({ success: true }, 201)
@@ -76,18 +80,18 @@ authApp.post(
 	async (c) => {
 		const body = c.req.valid('json')
 
-		const user = getUserByEmail(body.email)
+		const user = getUserByUsername(body.username)
 		if (!user) {
-			return jsonError(c, 'Invalid email or password', 401)
+			return jsonError(c, 'Invalid username or password', 401)
 		}
 
 		if (!user.password_hash) {
-			return jsonError(c, 'Invalid email or password', 401)
+			return jsonError(c, 'Invalid username or password', 401)
 		}
 
 		const isMatch = await Bun.password.verify(body.password, user.password_hash)
 		if (!isMatch) {
-			return jsonError(c, 'Invalid email or password', 401)
+			return jsonError(c, 'Invalid username or password', 401)
 		}
 		const token = await get_signed_jwt(user)
 		setCookie(c, 'auth_token', token, getSessionCookieOpts())
@@ -109,6 +113,6 @@ authApp.post('/logout', authMiddleware, async (c) => {
 })
 
 authApp.get('/me', authMiddleware, (c) => {
-	const payload = c.get('jwtPayload')
-	return c.json({ email: payload.sub })
+	const user = requestUser(c)
+	return c.json({ username: user.username, role: user.role, tenant_id: user.tenant_id })
 })

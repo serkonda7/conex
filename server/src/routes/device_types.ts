@@ -13,6 +13,7 @@ import {
 	StubUpdateSchema,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
+import { requireGlobalWrite } from '../authz'
 import {
 	createDeviceType,
 	createStub,
@@ -59,6 +60,10 @@ export const deviceTypesApp = new Hono()
 		)
 	})
 	.post('/', vValidator('json', DeviceTypeCreateSchema, onValidationError), (c) => {
+		const denied = requireGlobalWrite(c)
+		if (denied) {
+			return denied
+		}
 		const result = createDeviceType(c.req.valid('json'))
 		if (Result.isOk(result)) {
 			return c.json(result.value, 201)
@@ -73,6 +78,10 @@ export const deviceTypesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceTypeUpdateSchema, onValidationError),
 		(c) => {
+			const denied = requireGlobalWrite(c)
+			if (denied) {
+				return denied
+			}
 			const result = updateDeviceType(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
 				return c.json(result.value)
@@ -81,6 +90,10 @@ export const deviceTypesApp = new Hono()
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+		const denied = requireGlobalWrite(c)
+		if (denied) {
+			return denied
+		}
 		const result = deleteDeviceType(c.req.valid('param').id)
 		if (Result.isOk(result)) {
 			return c.json(result.value)
@@ -100,6 +113,10 @@ export const deviceTypesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', StubCreateSchema, onValidationError),
 		(c) => {
+			const denied = requireGlobalWrite(c)
+			if (denied) {
+				return denied
+			}
 			const result = createStub(c.req.valid('param').id, c.req.valid('json'))
 			if (Result.isOk(result)) {
 				return c.json(result.value, 201)
@@ -114,6 +131,10 @@ export const deviceTypesApp = new Hono()
 		(c) => {
 			// The `:id` segment is validated as an id; ownership is enforced by
 			// loading the stub itself.
+			const denied = requireGlobalWrite(c)
+			if (denied) {
+				return denied
+			}
 			const result = updateStub(c.req.valid('param').stubId, c.req.valid('json'))
 			if (Result.isOk(result)) {
 				return c.json(result.value)
@@ -125,6 +146,10 @@ export const deviceTypesApp = new Hono()
 		'/:id/stubs/:stubId',
 		vValidator('param', stubIdParamsSchema, onValidationError),
 		(c) => {
+			const denied = requireGlobalWrite(c)
+			if (denied) {
+				return denied
+			}
 			const result = deleteStub(c.req.valid('param').stubId)
 			if (Result.isOk(result)) {
 				return c.json(result.value)

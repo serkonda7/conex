@@ -27,7 +27,7 @@ export default defineConfig({
 					command: 'bun ./e2e/seed.ts && cd ../server && bun src/index.ts',
 					env: {
 						CONEX_E2E_DATA_DIR: dataDir,
-						CONEX_E2E_EMAIL: process.env.CONEX_E2E_EMAIL ?? 'e2e@example.com',
+						CONEX_E2E_USERNAME: process.env.CONEX_E2E_USERNAME ?? 'e2e-user',
 						CONEX_E2E_PASSWORD: process.env.CONEX_E2E_PASSWORD ?? 'e2e-secret-123',
 						CONEX_CONFIG_PATH: path.join(dataDir, 'config.toml'),
 						CONEX_DB_PATH: path.join(dataDir, 'e2e.db'),

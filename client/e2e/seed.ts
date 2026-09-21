@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { initDb } from '../../server/src/db/connection'
-import { createLocalUser, getUserByEmail } from '../../server/src/db/users'
+import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 
 /**
  * E2E database seed. Runs under bun before the API webServer starts:
@@ -9,11 +9,11 @@ import { createLocalUser, getUserByEmail } from '../../server/src/db/users'
  * provisions the login user (idempotent — reruns reuse the same DB).
  *
  * Reads `CONEX_E2E_DATA_DIR` (absolute; set by `playwright.config.ts`),
- * `CONEX_E2E_EMAIL`, `CONEX_E2E_PASSWORD`.
+ * `CONEX_E2E_USERNAME`, `CONEX_E2E_PASSWORD`.
  */
 
 const dataDir: string = process.env.CONEX_E2E_DATA_DIR ?? path.resolve('test-results/e2e-data')
-const email: string = process.env.CONEX_E2E_EMAIL ?? 'e2e@example.com'
+const username: string = process.env.CONEX_E2E_USERNAME ?? 'e2e-user'
 const password: string = process.env.CONEX_E2E_PASSWORD ?? 'e2e-secret-123'
 const repoRoot: string = path.resolve(import.meta.dir, '../..')
 
@@ -39,9 +39,9 @@ initDb({
 	serverRoot: path.join(repoRoot, 'server'),
 })
 
-if (!getUserByEmail(email)) {
-	createLocalUser(email, await Bun.password.hash(password))
-	console.log(`created user ${email}`)
+if (!getUserByUsername(username)) {
+	createLocalUser(username, await Bun.password.hash(password))
+	console.log(`created user ${username}`)
 } else {
-	console.log(`user ${email} exists`)
+	console.log(`user ${username} exists`)
 }

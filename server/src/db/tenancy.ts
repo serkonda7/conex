@@ -12,7 +12,7 @@ import {
 	type TenantCreate,
 	type TenantUpdate,
 } from 'shared/src/schemas'
-import { devices, locations, racks, site_groups, sites, tenants } from '../schema'
+import { devices, locations, racks, site_groups, sites, tenants, users } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -44,6 +44,12 @@ export interface ListParams {
 export interface TenantListParams extends ListParams {
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
+	/**
+	 * Tenant scope for scoped editors/viewers: restricts the list to this
+	 * tenant only (exact id match — tenants have no shared `NULL` row).
+	 * `undefined` means unconstrained (admin or global user).
+	 */
+	scopeTenantId?: number
 }
 
 /** One tenant row for the list view, with NetBox-style related-object counts. */
@@ -73,9 +79,16 @@ function searchPattern(raw: string): string {
 export function listTenants(params: TenantListParams): Page<TenantListItem> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
-	const where = params.search
-		? sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\' OR ${tenants.description} LIKE ${pattern} ESCAPE '\\')`
-		: undefined
+	const conditions: SQL[] = []
+	if (params.search) {
+		conditions.push(
+			sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\' OR ${tenants.description} LIKE ${pattern} ESCAPE '\\')`,
+		)
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(tenants.id, params.scopeTenantId))
+	}
+	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =
 		params.sort === 'slug'
 			? tenants.slug
@@ -244,6 +257,16 @@ export function deleteTenant(id: number): Result<TenantRow, Error> {
 	if (rackChild) {
 		return Result.err(new ConflictError('Tenant still has racks; move or delete them first'))
 	}
+	const deviceChild = db.select().from(devices).where(eq(devices.tenant_id, id)).get()
+	if (deviceChild) {
+		return Result.err(new ConflictError('Tenant still has devices; move or delete them first'))
+	}
+	const userChild = db.select().from(users).where(eq(users.tenant_id, id)).get()
+	if (userChild) {
+		return Result.err(
+			new ConflictError('Tenant still has users; reassign them before deleting'),
+		)
+	}
 	db.delete(tenants).where(eq(tenants.id, id)).run()
 	return Result.ok(current.value)
 }
@@ -257,6 +280,14 @@ export interface SiteListParams extends ListParams {
 	group?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
+	/**
+	 * Tenant scope for scoped editors/viewers: restricts the list to this
+	 * tenant only (strict — shared `NULL` rows are excluded).
+	 * `undefined` means unconstrained (admin or global user). The route
+	 * rejects an explicit `?tenant=` naming any other tenant before this is
+	 * applied.
+	 */
+	scopeTenantId?: number
 }
 
 export function listSites(params: SiteListParams): Page<SiteRow> {
@@ -273,6 +304,9 @@ export function listSites(params: SiteListParams): Page<SiteRow> {
 	}
 	if (params.group) {
 		conditions.push(eq(sites.site_group_id, params.group))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(sites.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =
@@ -449,6 +483,8 @@ export interface SiteGroupListParams extends ListParams {
 	parent?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
+	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
+	scopeTenantId?: number
 }
 
 export function listSiteGroups(params: SiteGroupListParams): Page<SiteGroupRow> {
@@ -465,6 +501,9 @@ export function listSiteGroups(params: SiteGroupListParams): Page<SiteGroupRow> 
 	}
 	if (params.parent) {
 		conditions.push(eq(site_groups.parent_id, params.parent))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(site_groups.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =
@@ -679,6 +718,8 @@ export interface LocationListParams extends ListParams {
 	parent?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
+	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
+	scopeTenantId?: number
 }
 
 export function listLocations(params: LocationListParams): Page<LocationRow> {
@@ -698,6 +739,9 @@ export function listLocations(params: LocationListParams): Page<LocationRow> {
 	}
 	if (params.parent) {
 		conditions.push(eq(locations.parent_id, params.parent))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(locations.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =

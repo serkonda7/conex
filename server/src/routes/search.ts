@@ -1,6 +1,7 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { SearchQuerySchema } from 'shared/src/schemas'
+import { requestUser, scopeTenantId } from '../authz'
 import { globalSearch } from '../db/search'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
@@ -9,5 +10,6 @@ import { onValidationError } from '../middleware/validation'
 export const searchApp = new Hono()
 	.use(authMiddleware)
 	.get('/', vValidator('query', SearchQuerySchema, onValidationError), (c) => {
-		return c.json(globalSearch(c.req.valid('query').q))
+		const scope = scopeTenantId(requestUser(c))
+		return c.json(globalSearch(c.req.valid('query').q, scope ?? undefined))
 	})
