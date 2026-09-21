@@ -722,6 +722,69 @@ export interface LocationListParams extends ListParams {
 	scopeTenantId?: number
 }
 
+/**
+ * Sort locations as a preorder tree: roots and each sibling group are sorted
+ * by the requested field, while every parent stays immediately before its
+ * descendants. This keeps the API order aligned with the indented list view.
+ */
+function sortLocationsHierarchically(
+	rows: LocationRow[],
+	sort: LocationListParams['sort'],
+	order: LocationListParams['order'],
+): LocationRow[] {
+	const children = new Map<number | null, LocationRow[]>()
+	const included = new Set(rows.map((row) => row.id))
+	for (const row of rows) {
+		// A filtered result may omit a row's parent; treat that row as a root in
+		// the returned subset rather than hiding it from the tree.
+		const parentId =
+			row.parent_id !== null && included.has(row.parent_id) ? row.parent_id : null
+		const siblings = children.get(parentId)
+		if (siblings) {
+			siblings.push(row)
+		} else {
+			children.set(parentId, [row])
+		}
+	}
+
+	const sortValueOf = (row: LocationRow): string => {
+		const value = row[sort]
+		return value === null ? '' : String(value)
+	}
+	const direction = order === 'desc' ? -1 : 1
+	const compare = (a: LocationRow, b: LocationRow): number => {
+		const byField = sortValueOf(a).localeCompare(sortValueOf(b), undefined, {
+			numeric: true,
+			sensitivity: 'base',
+		})
+		if (byField !== 0) {
+			return byField * direction
+		}
+		// Stable tie-breakers make pagination deterministic when sibling values
+		// are equal (and match the selected direction for the name tie-breaker).
+		const byName = a.name.localeCompare(b.name, undefined, {
+			numeric: true,
+			sensitivity: 'base',
+		})
+		return (byName !== 0 ? byName : a.id - b.id) * direction
+	}
+
+	const sorted: LocationRow[] = []
+	const visit = (parentId: number | null): void => {
+		const siblings = children.get(parentId)
+		if (!siblings) {
+			return
+		}
+		siblings.sort(compare)
+		for (const row of siblings) {
+			sorted.push(row)
+			visit(row.id)
+		}
+	}
+	visit(null)
+	return sorted
+}
+
 export function listLocations(params: LocationListParams): Page<LocationRow> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
@@ -744,20 +807,9 @@ export function listLocations(params: LocationListParams): Page<LocationRow> {
 		conditions.push(eq(locations.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn =
-		params.sort === 'slug'
-			? locations.slug
-			: params.sort === 'description'
-				? locations.description
-				: locations.name
-	const items = db
-		.select()
-		.from(locations)
-		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
-		.limit(params.limit)
-		.offset(offsetOf(params))
-		.all()
+	const matching = db.select().from(locations).where(where).all()
+	const ordered = sortLocationsHierarchically(matching, params.sort, params.order)
+	const items = ordered.slice(offsetOf(params), offsetOf(params) + params.limit)
 	const totalRow = db.select({ n: count() }).from(locations).where(where).get()
 	return pageOf(items, totalRow?.n ?? 0, params)
 }

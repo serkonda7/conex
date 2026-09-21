@@ -32,14 +32,16 @@ function save_visible_columns(key: string, visible: string[]): void {
  * Controlled `visibleColumns` state for a DataTable column customizer,
  * persisted to localStorage under `conex:columns:<key>`. Unknown stored
  * keys (from an older column set) are dropped; when nothing valid is
- * stored, every column starts visible.
+ * stored, every column starts visible unless default_keys is provided.
  */
 export function use_visible_columns(
 	key: string,
 	all_keys: string[],
+	default_keys: string[] = all_keys,
 ): [() => string[], (visible: string[]) => void] {
 	const stored = load_visible_columns(key)?.filter((k) => all_keys.includes(k))
-	const [visible, setVisible] = createSignal<string[]>(stored ?? [...all_keys])
+	const defaults = all_keys.filter((k) => default_keys.includes(k))
+	const [visible, setVisible] = createSignal<string[]>(stored ?? defaults)
 
 	function handle_change(next: string[]): void {
 		// Keep the DataTable's canonical column order; the customizer may

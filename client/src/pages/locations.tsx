@@ -151,17 +151,35 @@ export function LocationsPage(): JSX.Element {
 		return sites()?.find((s: SiteRow) => s.id === siteId)?.name ?? String(siteId)
 	}
 
-	// Id → name map for the Parent column, resolved from the same result set.
+	// Keep the parent value available when the optional Parent column is
+	// enabled through the column customizer.
 	const parentNameOf = createMemo(() => {
 		const byId = new Map<number, string>()
 		for (const l of rows()) {
 			byId.set(l.id, l.name)
 		}
-		return (id: number | null): string => {
-			if (id === null || id === undefined) {
-				return '—'
+		return (id: number | null): string =>
+			id === null || id === undefined ? '—' : (byId.get(id) ?? String(id))
+	})
+
+	// Derive the nesting level from the parent links so the table can show the
+	// hierarchy without spending a column on the parent name. The visited set
+	// also keeps a malformed response from causing an infinite loop.
+	const locationDepthOf = createMemo(() => {
+		const parentOf = new Map<number, number | null>()
+		for (const l of rows()) {
+			parentOf.set(l.id, l.parent_id)
+		}
+		return (location: LocationRow): number => {
+			let depth = 0
+			let parent = location.parent_id
+			const visited = new Set<number>([location.id])
+			while (parent !== null && parentOf.has(parent) && !visited.has(parent)) {
+				visited.add(parent)
+				depth += 1
+				parent = parentOf.get(parent) ?? null
 			}
-			return byId.get(id) ?? String(id)
+			return depth
 		}
 	})
 
@@ -188,12 +206,17 @@ export function LocationsPage(): JSX.Element {
 			label: 'Location',
 			sortable: true,
 			getValue: (l: LocationRow): JSX.Element => (
-				<a
-					href={`/locations/${l.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/locations/${l.id}`)}
+				<div
+					class={`location-tree-name${locationDepthOf()(l) > 0 ? ' location-tree-child' : ''}`}
+					style={{ '--location-depth': locationDepthOf()(l) }}
 				>
-					{l.name}
-				</a>
+					<a
+						href={`/locations/${l.id}`}
+						onClick={(e: MouseEvent): void => go(e, `/locations/${l.id}`)}
+					>
+						{l.name}
+					</a>
+				</div>
 			),
 		},
 		{
@@ -217,6 +240,7 @@ export function LocationsPage(): JSX.Element {
 	const [visibleColumns, setVisibleColumns] = use_visible_columns(
 		'locations',
 		location_column_keys,
+		['name', 'site', 'tenant'],
 	)
 
 	function closeMenu(): void {

@@ -208,6 +208,33 @@ tbody tr:last-child td {
 	border-bottom: none;
 }
 
+/* Locations use the name cell as the tree view instead of a Parent column. */
+.location-tree-name {
+	position: relative;
+	padding-left: calc(var(--location-depth, 0) * 1.25rem);
+	min-height: 1.25rem;
+	display: flex;
+	align-items: center;
+}
+
+.location-tree-child::before {
+	content: "";
+	position: absolute;
+	left: calc(var(--location-depth, 0) * 1.25rem - 0.55rem);
+	top: 0;
+	bottom: 0;
+	border-left: 1px solid var(--border-strong);
+}
+
+.location-tree-child::after {
+	content: "";
+	position: absolute;
+	left: calc(var(--location-depth, 0) * 1.25rem - 0.55rem);
+	top: 50%;
+	width: 0.4rem;
+	border-top: 1px solid var(--border-strong);
+}
+
 .app-shell {
 	display: flex;
 	flex-direction: column;
