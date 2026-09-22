@@ -61,9 +61,13 @@ export async function connect_interface(
 	return to_result<CableRow>(res, 'Failed to connect interface')
 }
 
-export async function fetch_trace(deviceId: number): Promise<Result<DeviceTraceResponse, Error>> {
+export async function fetch_trace(
+	deviceId: number,
+	depth?: number,
+): Promise<Result<DeviceTraceResponse, Error>> {
 	const res: ApiResponse = await client.devices[':id'].trace.$get({
 		param: { id: String(deviceId) },
+		query: { depth: depth === undefined ? undefined : String(depth) },
 	})
 	return to_result<DeviceTraceResponse>(res, 'Failed to load trace')
 }

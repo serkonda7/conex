@@ -1291,3 +1291,77 @@ tbody tr:last-child td {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/* Topology view: device graph in SVG. */
+.topo-wrap {
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	margin: 0.5rem 0;
+	overflow-x: auto;
+}
+
+.topo-svg {
+	display: block;
+	width: 100%;
+	min-width: 32rem;
+	height: auto;
+}
+
+.topo-edge {
+	stroke: var(--border-strong);
+	stroke-width: 2;
+	cursor: pointer;
+}
+
+.topo-edge:hover {
+	stroke: var(--link);
+	stroke-width: 3;
+}
+
+.topo-edge-active {
+	stroke: var(--primary);
+	stroke-width: 3;
+}
+
+.topo-node {
+	cursor: pointer;
+	outline: none;
+}
+
+.topo-circle {
+	fill: var(--bg-raised);
+	stroke: var(--border-strong);
+	stroke-width: 2;
+}
+
+.topo-node:focus-visible .topo-circle {
+	stroke: var(--primary);
+	stroke-width: 3;
+}
+
+.topo-circle:hover {
+	stroke: var(--link);
+}
+
+.topo-status-active {
+	stroke: var(--success);
+}
+
+.topo-status-planned,
+.topo-status-staged {
+	stroke: var(--link);
+}
+
+.topo-status-decommissioned {
+	stroke: var(--error);
+}
+
+.topo-label {
+	fill: var(--text-secondary);
+	font-size: 12px;
+}
+
+.topo-dimmed {
+	opacity: 0.3;
+}

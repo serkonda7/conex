@@ -1,7 +1,7 @@
 import { DataTable } from '@serkonda7/solid-components'
 import { IconLinkPlus, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { TraceLink } from 'shared/src/schemas'
+import type { TraceLink, TracePath } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
@@ -41,6 +41,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [peerDevice, setPeerDevice] = createSignal('')
 	const [peerIface, setPeerIface] = createSignal('')
 	const [cableLabel, setCableLabel] = createSignal('')
+	const [traceDepth, setTraceDepth] = createSignal('4')
 
 	const [device, { refetch: refetchDevice }] = createResource(async () => {
 		const res = await fetch_device(props.id)
@@ -58,8 +59,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
-	const [trace, { refetch: refetchTrace }] = createResource(async () => {
-		const res = await fetch_trace(props.id)
+	const traceSource = createMemo(() => ({ id: props.id, depth: Number(traceDepth()) || 4 }))
+	const [trace, { refetch: refetchTrace }] = createResource(traceSource, async (s) => {
+		const res = await fetch_trace(s.id, s.depth)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return null
@@ -426,7 +428,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</section>
 				</Show>
 			</Show>
-
 			<h3>Move</h3>
 			<form onSubmit={handleMove}>
 				<input
@@ -437,7 +438,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<button type="submit">Move</button>
 			</form>
-
 			<h3 id="device-interfaces">Interfaces ({ifaces()?.length ?? 0})</h3>
 			<form onSubmit={handleAddIface}>
 				<input
@@ -501,7 +501,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				)}
 				empty={false}
 			/>
-
 			<h3 id="device-connect">Connect a cable</h3>
 			<form onSubmit={handleConnect}>
 				<select
@@ -552,8 +551,27 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				/>{' '}
 				<button type="submit">Connect</button>
 			</form>
-
 			<h3 id="device-trace">Trace ({trace()?.links.length ?? 0})</h3>
+			<label>
+				<span class="visually-hidden">Trace depth</span>
+				<select
+					aria-label="Trace depth"
+					value={traceDepth()}
+					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+						setTraceDepth(e.currentTarget.value)
+					}
+				>
+					<option value="1">Depth 1</option>
+					<option value="2">Depth 2</option>
+					<option value="3">Depth 3</option>
+					<option value="4">Depth 4</option>
+					<option value="6">Depth 6</option>
+					<option value="10">Depth 10</option>
+				</select>
+			</label>{' '}
+			<a href="/topology" onClick={(e: MouseEvent): void => go(e, '/topology')}>
+				Open in topology
+			</a>
 			<Show
 				when={(trace()?.links ?? []).length > 0}
 				fallback={<p class="empty">No cable path yet. Connect the first cable below.</p>}
@@ -579,7 +597,34 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</For>
 				</ul>
 			</Show>
-
+			<Show when={(trace()?.paths ?? []).length > 0}>
+				<h4>Multi-hop paths ({trace()?.paths.length ?? 0})</h4>
+				<ul>
+					<For each={trace()?.paths ?? []}>
+						{(path: TracePath): JSX.Element => (
+							<li>
+								<code>
+									{path.hops
+										.map(
+											(h) =>
+												`${h.from_device.name}:${h.from_interface.name} → ${h.to_device.name}:${h.to_interface.name}`,
+										)
+										.join(' · ')}
+								</code>{' '}
+								→{' '}
+								<a
+									href={`/devices/${path.end_device.id}`}
+									onClick={(e: MouseEvent): void =>
+										go(e, `/devices/${path.end_device.id}`)
+									}
+								>
+									{path.end_device.name}
+								</a>
+							</li>
+						)}
+					</For>
+				</ul>
+			</Show>
 			<h3 id="device-cables">
 				Cables ({cables()?.length ?? 0}){' '}
 				<a

@@ -721,10 +721,110 @@ export interface TraceLink {
 	peer_interface: TracePeerInterface
 }
 
+/** One cable hop in a multi-hop trace path (`from` -> `to`). */
+export interface TraceHop {
+	cable_id: number
+	cable_label: string | null
+	cable_status: string
+	from_device: TracePeerDevice
+	from_interface: TracePeerInterface
+	to_device: TracePeerDevice
+	to_interface: TracePeerInterface
+}
+
+/** One shortest path from a trace source to a reachable device. */
+export interface TracePath {
+	hops: TraceHop[]
+	end_device: TracePeerDevice
+}
+
 export interface DeviceTraceResponse {
 	device_id: number
 	links: TraceLink[]
+	/** Shortest-path multi-hop traces (depth-limited, see TraceQuerySchema). */
+	paths: TracePath[]
 }
+
+/** Per-interface trace: all shortest paths starting at one port. */
+export interface InterfaceTraceResponse {
+	start_device: TracePeerDevice
+	start_interface: TracePeerInterface
+	paths: TracePath[]
+}
+
+/** Per-cable trace: endpoints plus onward paths from each side. */
+export interface CableTraceResponse {
+	cable_id: number
+	cable_label: string | null
+	cable_status: string
+	a_device: TracePeerDevice
+	a_interface: TracePeerInterface
+	b_device: TracePeerDevice
+	b_interface: TracePeerInterface
+	paths_from_a: TracePath[]
+	paths_from_b: TracePath[]
+}
+
+/**
+ * Trace depth query (`?depth=`): how many cable hops a multi-hop trace may
+ * follow. Capped at 10 so a dense mesh cannot explode the response.
+ */
+export const TraceQuerySchema = v.object({
+	depth: v.optional(
+		v.pipe(
+			v.union([v.string(), v.number()]),
+			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
+			v.number(),
+			v.integer(),
+			v.minValue(1),
+			v.maxValue(10),
+		),
+		4,
+	),
+})
+
+export type TraceQuery = v.InferOutput<typeof TraceQuerySchema>
+
+// ---------------------------------------------------------------------------
+// Topology view (device graph)
+// ---------------------------------------------------------------------------
+
+/** One device node in the topology graph. */
+export interface TopologyNode {
+	id: number
+	name: string
+	status: string
+	site_id: number | null
+	rack_id: number | null
+	tenant_id: number | null
+}
+
+export interface TopologyEndpoint {
+	device: TracePeerDevice
+	iface: TracePeerInterface
+}
+
+/** One cable edge in the topology graph (device-to-device). */
+export interface TopologyEdge {
+	cable_id: number
+	cable_label: string | null
+	cable_status: string
+	cable_kind: string | null
+	a: TopologyEndpoint
+	b: TopologyEndpoint
+}
+
+export interface TopologyResponse {
+	nodes: TopologyNode[]
+	edges: TopologyEdge[]
+}
+
+export const TopologyQuerySchema = v.object({
+	site: OptionalIdEntry,
+	device: OptionalIdEntry,
+})
+
+export type TopologyQuery = v.InferOutput<typeof TopologyQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P7: users / roles

@@ -7,6 +7,7 @@ import {
 	CableUpdateSchema,
 	CsvImportBodySchema,
 	EntityParamsSchema,
+	TraceQuerySchema,
 } from 'shared/src/schemas'
 import {
 	cableTenants,
@@ -22,6 +23,7 @@ import {
 import { connectCable, deleteCable, getCable, listCables, updateCable } from '../db/cables'
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
 import { ForbiddenError } from '../db/errors'
+import { getCableTrace } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
@@ -109,6 +111,27 @@ export const cablesApp = new Hono()
 		}
 		return sendResult(c, result)
 	})
+	.get(
+		'/:id/trace',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('query', TraceQuerySchema, onValidationError),
+		(c) => {
+			const id = c.req.valid('param').id
+			const depth = c.req.valid('query').depth
+			const result = getCable(id)
+			if (Result.isError(result)) {
+				return sendResult(c, result)
+			}
+			if (!canReadCable(requestUser(c), cableTenants(result.value))) {
+				return sendResult(
+					c,
+					Result.err(new ForbiddenError('Cable endpoints are outside your tenant scope')),
+				)
+			}
+			const scope = scopeTenantId(requestUser(c))
+			return sendResult(c, getCableTrace(id, depth, scope ?? undefined))
+		},
+	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = getCable(c.req.valid('param').id)
 		if (Result.isError(result)) {

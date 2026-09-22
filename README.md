@@ -62,3 +62,13 @@ bun run lint:ci # biome ci
   - cables columns: `a_device,a_interface,b_device,b_interface,label,kind,status`
   - imports validate every row, create the good ones, and report per-row
     errors.
+- Topology view at `/topology` (`GET /api/topology?site=&device=`):
+  devices as nodes, cables as edges (SVG graph with site/focus filters,
+  keyboard-accessible selection, and an edge table fallback).
+- Cable traces (BFS shortest paths, `?depth=1..10`, default 4):
+  - `GET /api/devices/:id/trace` — direct peer `links` plus multi-hop
+    `paths` (also shown on the device page with a depth picker).
+  - `GET /api/devices/:id/interfaces/:ifaceId/trace` — all paths
+    starting at one port.
+  - `GET /api/cables/:id/trace` — endpoints plus onward paths from each
+    side (linked from each Connections row via Trace).

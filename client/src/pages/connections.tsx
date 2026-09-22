@@ -505,9 +505,18 @@ export function ConnectionsPage(): JSX.Element {
 				}}
 				selectionLabel="Select all connections"
 				rowActions={(c: CableRow): JSX.Element => (
-					<button type="button" class="btn-danger" onClick={() => handleDisconnect(c.id)}>
-						Disconnect
-					</button>
+					<span class="row-actions">
+						<button type="button" onClick={() => navigate(`/topology?cable=${c.id}`)}>
+							Trace
+						</button>
+						<button
+							type="button"
+							class="btn-danger"
+							onClick={() => handleDisconnect(c.id)}
+						>
+							Disconnect
+						</button>
+					</span>
 				)}
 				loading={() => cablesPage.loading}
 				loadingContent={<p class="skeleton">Loading connections…</p>}

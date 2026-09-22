@@ -6,6 +6,7 @@ import { getDb } from './connection'
 import type { InterfaceRow } from './devices'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './tenancy'
+import { getDevicePaths } from './topology'
 
 export type CableRow = typeof cables.$inferSelect
 
@@ -255,8 +256,15 @@ export function deviceHasCables(deviceId: number): boolean {
 /**
  * Per-device trace: every local interface carrying a cable resolves to its
  * peer as `dev:port <-> dev:port`. Unconnected local ports produce no link.
+ * `paths` holds the depth-limited multi-hop shortest paths (BFS over the
+ * cable graph) so callers can render full cable traces, not just direct
+ * peers. Scoped callers only traverse cables with both ends in their tenant.
  */
-export function getDeviceTrace(deviceId: number): Result<DeviceTraceResponse, Error> {
+export function getDeviceTrace(
+	deviceId: number,
+	depth = 4,
+	scopeTenantId?: number,
+): Result<DeviceTraceResponse, Error> {
 	const db = getDb()
 	const device = db.select().from(devices).where(eq(devices.id, deviceId)).get()
 	if (!device) {
@@ -279,6 +287,13 @@ export function getDeviceTrace(deviceId: number): Result<DeviceTraceResponse, Er
 		if (!peerDevice) {
 			continue
 		}
+		// Scoped callers see only cables with both ends in their tenant, so
+		// no peer name from another tenant leaks through direct links.
+		if (scopeTenantId !== undefined) {
+			if (device.tenant_id !== scopeTenantId || peerDevice.tenant_id !== scopeTenantId) {
+				continue
+			}
+		}
 		links.push({
 			cable_id: cable.id,
 			cable_label: cable.label,
@@ -288,5 +303,12 @@ export function getDeviceTrace(deviceId: number): Result<DeviceTraceResponse, Er
 			peer_interface: { id: peer.id, name: peer.name, kind: peer.kind },
 		})
 	}
-	return Result.ok({ device_id: deviceId, links })
+	const boundedDepth = Math.min(Math.max(Math.floor(depth), 1), 10)
+	const pathsResult = getDevicePaths(deviceId, boundedDepth, scopeTenantId)
+	if (Result.isError(pathsResult)) {
+		// The device exists (checked above); a scope miss here just means no
+		// visible paths, so fall back to an empty set instead of a 404.
+		return Result.ok({ device_id: deviceId, links, paths: [] })
+	}
+	return Result.ok({ device_id: deviceId, links, paths: pathsResult.value })
 }

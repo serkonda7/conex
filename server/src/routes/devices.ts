@@ -12,6 +12,7 @@ import {
 	InterfaceConnectSchema,
 	InterfaceCreateSchema,
 	InterfaceUpdateSchema,
+	TraceQuerySchema,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import {
@@ -44,6 +45,7 @@ import {
 	updateInterface,
 } from '../db/devices'
 import { ForbiddenError } from '../db/errors'
+import { getInterfaceTrace } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
@@ -305,16 +307,51 @@ export const devicesApp = new Hono()
 			return sendResult(c, result)
 		},
 	)
-	// Per-device L1 trace: peer links `dev:port <-> dev:port`.
-	.get('/:id/trace', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const id = c.req.valid('param').id
-		const tenant = deviceTenant(id)
-		if (tenant === undefined) {
-			return sendResult(c, getDeviceTrace(id))
-		}
-		const denied = checkRead(c, tenant)
-		if (denied) {
-			return denied
-		}
-		return sendResult(c, getDeviceTrace(id))
-	})
+	// Per-device L1 trace: direct peer links plus depth-limited multi-hop
+	// shortest paths (`?depth=1..10`, default 4). Scoped callers traverse
+	// only cables with both ends in their tenant.
+	.get(
+		'/:id/trace',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('query', TraceQuerySchema, onValidationError),
+		(c) => {
+			const id = c.req.valid('param').id
+			const depth = c.req.valid('query').depth
+			const tenant = deviceTenant(id)
+			const scope = scopeTenantId(requestUser(c))
+			if (tenant === undefined) {
+				return sendResult(c, getDeviceTrace(id, depth, scope ?? undefined))
+			}
+			const denied = checkRead(c, tenant)
+			if (denied) {
+				return denied
+			}
+			return sendResult(c, getDeviceTrace(id, depth, scope ?? undefined))
+		},
+	)
+	// Per-interface cable trace: all shortest paths starting at one port.
+	.get(
+		'/:id/interfaces/:ifaceId/trace',
+		vValidator('param', deviceIfaceParamsSchema, onValidationError),
+		vValidator('query', TraceQuerySchema, onValidationError),
+		(c) => {
+			const param = c.req.valid('param')
+			const depth = c.req.valid('query').depth
+			const tenant = deviceTenant(param.id)
+			const scope = scopeTenantId(requestUser(c))
+			if (tenant === undefined) {
+				return sendResult(
+					c,
+					getInterfaceTrace(param.id, param.ifaceId, depth, scope ?? undefined),
+				)
+			}
+			const denied = checkRead(c, tenant)
+			if (denied) {
+				return denied
+			}
+			return sendResult(
+				c,
+				getInterfaceTrace(param.id, param.ifaceId, depth, scope ?? undefined),
+			)
+		},
+	)

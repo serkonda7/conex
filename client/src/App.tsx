@@ -9,6 +9,7 @@ import {
 	IconLock,
 	IconLogout,
 	IconMapPin,
+	IconNetwork,
 	IconPlug,
 	IconPlus,
 	IconServer,
@@ -57,6 +58,7 @@ import { TenantAddPage } from './pages/tenant_add'
 import { TenantDetailPage } from './pages/tenant_detail'
 import { TenantEditPage } from './pages/tenant_edit'
 import { TenantsPage } from './pages/tenants'
+import { TopologyPage } from './pages/topology'
 import { UserAddPage } from './pages/user_add'
 import { UserEditPage } from './pages/user_edit'
 import { UsersPage } from './pages/users'
@@ -554,6 +556,9 @@ function App(): JSX.Element {
 		if (parts[0] === 'connections' || parts[0] === 'cables') {
 			return emptyRoute('connections')
 		}
+		if (parts[0] === 'topology') {
+			return emptyRoute('topology')
+		}
 		if (parts[0] === 'users') {
 			if (currentUser()?.role !== 'admin') {
 				return emptyRoute('not-found')
@@ -762,6 +767,12 @@ function App(): JSX.Element {
 										icon={<IconLink size={16} />}
 										label="Connections"
 									/>
+									<NavItem
+										href="/topology"
+										active={path().startsWith('/topology')}
+										icon={<IconNetwork size={16} />}
+										label="Topology"
+									/>
 									<Show when={currentUser()?.role === 'admin'}>
 										<NavItem
 											href="/users"
@@ -967,6 +978,9 @@ function App(): JSX.Element {
 									</Match>
 									<Match when={route().page === 'connections'}>
 										<ConnectionsPage />
+									</Match>
+									<Match when={route().page === 'topology'}>
+										<TopologyPage />
 									</Match>
 									<Match when={route().page === 'users'}>
 										<UsersPage />
