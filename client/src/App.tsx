@@ -71,10 +71,12 @@ import {
 	openInNewTab,
 	parseId,
 	path,
+	isDetailRoute,
+	setTabLabel,
 	type TabState,
 	tabPathContext,
+	tabLabel,
 	tabs,
-	tabTitle,
 } from './router'
 
 function go(e: MouseEvent, to: string): void {
@@ -491,7 +493,7 @@ function TabBar(): JSX.Element {
 					<div
 						role="tab"
 						aria-selected={tab.id === activeTabId()}
-						aria-label={tabTitle(tab.path)}
+						aria-label={tabLabel(tab.id, tab.path)}
 						title={tab.path}
 						tabIndex={0}
 						class={tab.id === activeTabId() ? 'tab-item active' : 'tab-item'}
@@ -510,14 +512,14 @@ function TabBar(): JSX.Element {
 						}}
 					>
 						<TabContext.Provider value={tab.path}>
-							<span class="tab-title">{tabTitle(tab.path)}</span>
+							<span class="tab-title">{tabLabel(tab.id, tab.path)}</span>
 						</TabContext.Provider>
 						<Show when={tabs().length > 1}>
 							<button
 								type="button"
 								class="tab-close"
-								aria-label={`Close ${tabTitle(tab.path)}`}
-								title={`Close ${tabTitle(tab.path)}`}
+								aria-label={`Close ${tabLabel(tab.id, tab.path)}`}
+								title={`Close ${tabLabel(tab.id, tab.path)}`}
 								onClick={(e: MouseEvent): void => {
 									e.stopPropagation()
 									closeTab(tab.id)
@@ -536,9 +538,33 @@ function TabBar(): JSX.Element {
 }
 
 /** Page content for one tab; `routePath` is that tab's own path. */
-function RouteContent(props: { routePath: string; isAdmin: boolean }): JSX.Element {
+function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolean }): JSX.Element {
 	const TabContext = tabPathContext()
 	const info = (): RouteInfo => parseRoute(props.routePath, props.isAdmin)
+	onMount(() => {
+		if (!isDetailRoute(props.routePath)) {
+			return
+		}
+		const pageRoot = document.querySelector<HTMLElement>(`[data-tab-id="${props.tabId}"]`)
+		if (!pageRoot) {
+			return
+		}
+		const updateLabel = (): void => {
+			const heading = pageRoot.querySelector('h2')
+			const label = heading
+				? Array.from(heading.childNodes)
+						.map((node) => node.textContent?.trim() ?? '')
+						.find((text) => text.length > 0) || heading.textContent?.trim()
+				: undefined
+			if (label) {
+				setTabLabel(props.tabId, label)
+			}
+		}
+		const observer = new MutationObserver(updateLabel)
+		observer.observe(pageRoot, { childList: true, subtree: true, characterData: true })
+		updateLabel()
+		onCleanup(() => observer.disconnect())
+	})
 	return (
 		<TabContext.Provider value={props.routePath}>
 			<Switch>
@@ -1020,23 +1046,27 @@ function App(): JSX.Element {
 									</Show>
 								</nav>
 							</aside>
-							<main class="app-content" id="main">
+							<div class="app-main">
 								<TabBar />
-								<For each={tabs()}>
-									{(tab: TabState) => (
-										<div
-											class="tab-pane"
-											hidden={tab.id !== activeTabId()}
-											aria-hidden={tab.id !== activeTabId()}
-										>
-											<RouteContent
-												routePath={tab.path}
-												isAdmin={currentUser()?.role === 'admin'}
-											/>
-										</div>
-									)}
-								</For>
-							</main>
+								<main class="app-content" id="main">
+									<For each={tabs()}>
+										{(tab: TabState) => (
+											<div
+												class="tab-pane"
+												data-tab-id={tab.id}
+												hidden={tab.id !== activeTabId()}
+												aria-hidden={tab.id !== activeTabId()}
+											>
+												<RouteContent
+													routePath={tab.path}
+													tabId={tab.id}
+													isAdmin={currentUser()?.role === 'admin'}
+												/>
+											</div>
+										)}
+									</For>
+								</main>
+							</div>
 						</div>
 					</Match>
 				</Switch>

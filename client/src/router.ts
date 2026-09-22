@@ -39,6 +39,7 @@ const [tabs, setTabs] = createSignal<TabState[]>([
 	{ id: nextTabId++, path: initialPath(), openerId: null, gen: 0 },
 ])
 const [activeTabId, setActiveTabId] = createSignal<number>(tabs()[0]?.id ?? 1)
+const [tabLabels, setTabLabels] = createSignal<Record<number, string>>({})
 
 /** Set when tags are created or deleted so the home view can refresh entries. */
 const [tagsChanged, setTagsChanged] = createSignal(false)
@@ -163,6 +164,18 @@ export function tabTitle(raw: string): string {
 		return `${head.replace(/s$/, '')} ${segments[1]}`
 	}
 	return head
+}
+
+/** Label populated from the loaded detail page when an object name is known. */
+export function tabLabel(id: number, raw: string): string {
+	return tabLabels()[id] ?? tabTitle(raw)
+}
+
+export function setTabLabel(id: number, label: string): void {
+	if (!label || tabLabels()[id] === label) {
+		return
+	}
+	setTabLabels((current) => ({ ...current, [id]: label }))
 }
 
 function findTabByPath(to: string): TabState | null {
