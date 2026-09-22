@@ -336,7 +336,7 @@ export function RacksPage(): JSX.Element {
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Search name, slug…"
+						placeholder="Search name…"
 						aria-label="Search racks"
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}

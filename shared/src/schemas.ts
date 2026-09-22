@@ -279,7 +279,6 @@ export const SpanHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v
 
 export const RackCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: SlugSchema,
 	site_id: IdSchema,
 	location_id: NullableIdSchema,
 	tenant_id: NullableIdSchema,
@@ -290,7 +289,6 @@ export const RackCreateSchema = v.strictObject({
 
 export const RackUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	rack_type_id: v.optional(IdSchema, undefined),
 	// site_id is immutable after create: shelves reference rack-local U
 	// positions that are meaningless without the original rack height.
@@ -333,7 +331,7 @@ export const RackListQuerySchema = v.object({
 	site: OptionalIdEntry,
 	location: OptionalIdEntry,
 	tenant: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'slug']), 'name'),
+	sort: v.optional(v.picklist(['name']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -895,7 +893,7 @@ export const YamlImportBodySchema = v.strictObject({
 export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
 
 /**
- * One device CSV row (minimal columns). Slugs resolve to ids server-side;
+ * One device CSV row (minimal columns). Slugs and rack names resolve to ids server-side;
  * `position_u` arrives as text and coerces through Number.
  */
 export const DeviceImportRowSchema = v.object({
@@ -906,7 +904,7 @@ export const DeviceImportRowSchema = v.object({
 		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 		undefined,
 	),
-	rack_slug: v.optional(
+	rack_name: v.optional(
 		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 		undefined,
 	),

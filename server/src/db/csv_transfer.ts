@@ -21,7 +21,7 @@ export const DEVICE_CSV_HEADER = [
 	'asset_tag',
 	'device_type_slug',
 	'site_slug',
-	'rack_slug',
+	'rack_name',
 	'position_u',
 	'status',
 ]
@@ -259,7 +259,7 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 			asset_tag: devices.asset_tag,
 			type_slug: device_types.slug,
 			site_slug: sites.slug,
-			rack_slug: racks.slug,
+			rack_name: racks.name,
 			position_u: devices.position_u,
 			status: devices.status,
 		})
@@ -277,7 +277,7 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 			r.asset_tag,
 			r.type_slug,
 			r.site_slug,
-			r.rack_slug,
+		r.rack_name,
 			r.position_u === null ? null : String(r.position_u),
 			r.status,
 		]),
@@ -328,7 +328,7 @@ function siteId(slug: string): number | undefined {
 }
 
 function rackId(slug: string): number | undefined {
-	return getDb().select().from(racks).where(eq(racks.slug, slug)).get()?.id
+	return getDb().select().from(racks).where(eq(racks.name, slug)).get()?.id
 }
 
 function deviceByName(name: string): number | undefined {
@@ -420,17 +420,17 @@ export function importDevicesCsv(
 			}
 		}
 		let foundRackId: number | undefined
-		if (input.rack_slug) {
-			foundRackId = rackId(input.rack_slug)
+		if (input.rack_name) {
+			foundRackId = rackId(input.rack_name)
 			if (!foundRackId) {
-				fail(`Unknown rack_slug "${input.rack_slug}"`)
+				fail(`Unknown rack_name "${input.rack_name}"`)
 				continue
 			}
 			if (
 				scopeTenantId !== undefined &&
 				!scopeReadable(rackTenant(foundRackId), scopeTenantId)
 			) {
-				fail(`Rack "${input.rack_slug}" is outside your tenant scope`)
+				fail(`Rack "${input.rack_name}" is outside your tenant scope`)
 				continue
 			}
 		}

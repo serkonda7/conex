@@ -1159,17 +1159,32 @@ tbody tr:last-child td {
 	overflow-wrap: anywhere;
 }
 
+/* Two-column detail layout: facts/stats left, main content right. */
+.detail-columns {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+	align-items: start;
+	margin: 0.6rem 0;
+}
+
+@media (max-width: 60rem) {
+	.detail-columns {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
 /* NetBox-like visual rack elevation: front and rear side by side. */
 .rack-elev-dual {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 22rem));
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 1rem;
 	margin: 0.5rem 0;
 }
 
 @media (max-width: 48rem) {
 	.rack-elev-dual {
-		grid-template-columns: minmax(0, 22rem);
+		grid-template-columns: minmax(0, 1fr);
 	}
 }
 
@@ -1193,7 +1208,6 @@ tbody tr:last-child td {
 
 .rack-util-bar {
 	flex: 1 1 12rem;
-	max-width: 24rem;
 	height: 0.6rem;
 	border-radius: 999px;
 	background-color: var(--bg-raised);

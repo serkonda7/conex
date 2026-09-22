@@ -92,6 +92,13 @@
       "when": 1790086209202,
       "tag": "0012_early_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790086209203,
+      "tag": "0013_remove_rack_slug",
+      "breakpoints": true
     }
   ]
 }

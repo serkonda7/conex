@@ -10,7 +10,7 @@ export interface GlobalSearchResponse {
 	q: string
 	tenants: SearchGroup<{ id: number; name: string; slug: string }>
 	sites: SearchGroup<{ id: number; name: string; slug: string }>
-	racks: SearchGroup<{ id: number; name: string; slug: string }>
+	racks: SearchGroup<{ id: number; name: string }>
 	devices: SearchGroup<{ id: number; name: string; asset_tag: string | null }>
 	cables: SearchGroup<{ id: number; label: string | null; kind: string | null }>
 }
@@ -73,10 +73,10 @@ export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchRes
 		.limit(GROUP_LIMIT)
 		.all()
 	const rackRows = db
-		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
+		.select({ id: sql<number>`id`, name: sql<string>`name` })
 		.from(sql`racks`)
 		.where(
-			sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\')${tenantScope}`,
+			sql`name LIKE ${pattern} ESCAPE '\\'${tenantScope}`,
 		)
 		.orderBy(asc(sql`name`))
 		.limit(GROUP_LIMIT)

@@ -42,7 +42,7 @@ export interface RackListParams extends ListParams {
 	site?: number
 	location?: number
 	tenant?: number
-	sort: 'name' | 'slug'
+	sort: 'name'
 	order: 'asc' | 'desc'
 	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
 	scopeTenantId?: number
@@ -54,7 +54,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${racks.name} LIKE ${pattern} ESCAPE '\\' OR ${racks.slug} LIKE ${pattern} ESCAPE '\\' OR ${racks.description} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${racks.name} LIKE ${pattern} ESCAPE '\\' OR ${racks.description} LIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.site) {
@@ -70,12 +70,11 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		conditions.push(eq(racks.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn = params.sort === 'slug' ? racks.slug : racks.name
 	const items = db
 		.select()
 		.from(racks)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(params.order === 'desc' ? desc(racks.name) : asc(racks.name))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
@@ -228,17 +227,12 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 	if (Result.isError(locationCheck)) {
 		return Result.err(locationCheck.error)
 	}
-	const clash = db.select().from(racks).where(eq(racks.slug, input.slug)).get()
-	if (clash) {
-		return Result.err(new DuplicateError('Rack slug is already in use'))
-	}
 	const row: Omit<RackRow, 'id'> = {
 		site_id: input.site_id,
 		location_id: input.location_id ?? null,
 		tenant_id: input.tenant_id ?? null,
 		rack_type_id: input.rack_type_id,
 		name: input.name,
-		slug: input.slug,
 		description: input.description ?? null,
 		height_u: input.height_u ?? 42,
 	}
@@ -250,7 +244,7 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 		return getRack(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Rack slug is already in use'))
+			return Result.err(new DuplicateError('Rack name is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
@@ -285,12 +279,6 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 			return Result.err(new NotFoundError('Rack type not found'))
 		}
 	}
-	if (input.slug !== undefined && input.slug !== node.slug) {
-		const clash = db.select().from(racks).where(eq(racks.slug, input.slug)).get()
-		if (clash) {
-			return Result.err(new DuplicateError('Rack slug is already in use'))
-		}
-	}
 	const effectiveHeight = input.height_u ?? node.height_u
 	if (effectiveHeight !== node.height_u) {
 		// Shrinking below the topmost occupied U would strand shelves or
@@ -313,9 +301,6 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	if (input.name !== undefined) {
 		patch.name = input.name
 	}
-	if (input.slug !== undefined) {
-		patch.slug = input.slug
-	}
 	if (input.rack_type_id !== undefined) {
 		patch.rack_type_id = input.rack_type_id
 	}
@@ -336,7 +321,7 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 			db.update(racks).set(patch).where(eq(racks.id, id)).run()
 		} catch (err) {
 			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Rack slug is already in use'))
+				return Result.err(new DuplicateError('Rack name is already in use'))
 			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}

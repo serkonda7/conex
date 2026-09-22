@@ -21,7 +21,6 @@ import {
 	is_add_another_submit,
 	load_rows,
 	submit_form,
-	use_slug_fields,
 } from '../util/form'
 
 /** Id of the hint under the rack-type select. */
@@ -29,7 +28,7 @@ const RACK_TYPE_HINT_ID = 'rack-type-hint'
 
 /** /racks/add — NetBox-style rack create form. */
 export function RackAddPage(): JSX.Element {
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
@@ -90,8 +89,7 @@ export function RackAddPage(): JSX.Element {
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_form({
-			name: slugFields.name(),
-			slug: slugFields.slug(),
+			name: name(),
 			validate: () =>
 				parseId(siteId()) === null
 					? 'Select a site first.'
@@ -101,7 +99,6 @@ export function RackAddPage(): JSX.Element {
 			save: (values: FormValues) =>
 				create_rack({
 					name: values.name,
-					slug: values.slug,
 					site_id: Number(siteId()),
 					location_id: locationId() ? Number(locationId()) : null,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
@@ -111,7 +108,7 @@ export function RackAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/racks',
-			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
+			onSuccess: is_add_another_submit(e) ? () => setName('') : undefined,
 		})
 	}
 
@@ -143,8 +140,8 @@ export function RackAddPage(): JSX.Element {
 			<NameField
 				id="rack-name"
 				placeholder="A1"
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
+				value={name()}
+				onInput={setName}
 				autofocus
 			/>
 			<SelectField

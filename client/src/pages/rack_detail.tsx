@@ -15,8 +15,8 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /racks/:id — rack detail: header with name/slug/description, detail
- * grid (site, location, tenant, status), utilization strip, and the
+ * /racks/:id — rack detail: header with name/description, two-column
+ * layout (details left, elevation right) with a utilization strip and the
  * NetBox-like visual elevation (front/rear faces, spanning multi-U blocks,
  * click-free-U to install) with shelf management.
  */
@@ -194,7 +194,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				<Show when={rack()} fallback={<p class="empty">Rack not found.</p>}>
 					<div class="page-header">
 						<h2>
-							{rack()?.name} <code>{rack()?.slug}</code>{' '}
+							{rack()?.name}{' '}
 							<span>{rack()?.height_u}U</span>
 						</h2>
 						<div class="form-actions">
@@ -217,166 +217,196 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 					</div>
 					<p class="page-subtitle">{rack()?.description || 'No description.'}</p>
 
-					<section class="card" aria-label="Rack details">
-						<dl class="detail-grid">
-							<dt>Site</dt>
-							<dd>
-								<Show when={siteId() !== null} fallback="—">
-									<Show
-										when={!site.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show when={site()} fallback={String(siteId() ?? '—')}>
-											<a
-												href={`/sites/${siteId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/sites/${siteId() ?? ''}`)
-												}
+					<div class="detail-columns">
+						<div>
+							<section class="card" aria-label="Rack details">
+								<dl class="detail-grid">
+									<dt>Site</dt>
+									<dd>
+										<Show when={siteId() !== null} fallback="—">
+											<Show
+												when={!site.loading}
+												fallback={<span class="skeleton">…</span>}
 											>
-												{site()?.name}
-											</a>
+												<Show
+													when={site()}
+													fallback={String(siteId() ?? '—')}
+												>
+													<a
+														href={`/sites/${siteId() ?? ''}`}
+														onClick={(e: MouseEvent): void =>
+															go(e, `/sites/${siteId() ?? ''}`)
+														}
+													>
+														{site()?.name}
+													</a>
+												</Show>
+											</Show>
 										</Show>
-									</Show>
-								</Show>
-							</dd>
-							<dt>Location</dt>
-							<dd>
-								<Show when={locationId() !== null} fallback="—">
-									<Show
-										when={!location.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show
-											when={location()}
-											fallback={String(locationId() ?? '—')}
-										>
-											<a
-												href={`/locations/${locationId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/locations/${locationId() ?? ''}`)
-												}
+									</dd>
+									<dt>Location</dt>
+									<dd>
+										<Show when={locationId() !== null} fallback="—">
+											<Show
+												when={!location.loading}
+												fallback={<span class="skeleton">…</span>}
 											>
-												{location()?.name}
-											</a>
+												<Show
+													when={location()}
+													fallback={String(locationId() ?? '—')}
+												>
+													<a
+														href={`/locations/${locationId() ?? ''}`}
+														onClick={(e: MouseEvent): void =>
+															go(
+																e,
+																`/locations/${locationId() ?? ''}`,
+															)
+														}
+													>
+														{location()?.name}
+													</a>
+												</Show>
+											</Show>
 										</Show>
-									</Show>
-								</Show>
-							</dd>
-							<dt>Description</dt>
-							<dd>{rack()?.description || '—'}</dd>
-							<dt>Rack type</dt>
-							<dd>
-								<Show when={rackTypeId() !== null} fallback="—">
-									<Show
-										when={!rackType.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										{rackType()?.model ?? String(rackTypeId() ?? '—')}
-									</Show>
-								</Show>
-							</dd>
-							<dt>Tenant</dt>
-							<dd>
-								<Show when={tenantId() !== null} fallback="—">
-									<Show
-										when={!tenant.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show when={tenant()} fallback={String(tenantId() ?? '—')}>
-											<a
-												href={`/tenants/${tenantId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/tenants/${tenantId() ?? ''}`)
-												}
+									</dd>
+									<dt>Description</dt>
+									<dd>{rack()?.description || '—'}</dd>
+									<dt>Rack type</dt>
+									<dd>
+										<Show when={rackTypeId() !== null} fallback="—">
+											<Show
+												when={!rackType.loading}
+												fallback={<span class="skeleton">…</span>}
 											>
-												{tenant()?.name}
-											</a>
+												{rackType()?.model ?? String(rackTypeId() ?? '—')}
+											</Show>
 										</Show>
-									</Show>
-								</Show>
-							</dd>
-						</dl>
-					</section>
+									</dd>
+									<dt>Tenant</dt>
+									<dd>
+										<Show when={tenantId() !== null} fallback="—">
+											<Show
+												when={!tenant.loading}
+												fallback={<span class="skeleton">…</span>}
+											>
+												<Show
+													when={tenant()}
+													fallback={String(tenantId() ?? '—')}
+												>
+													<a
+														href={`/tenants/${tenantId() ?? ''}`}
+														onClick={(e: MouseEvent): void =>
+															go(e, `/tenants/${tenantId() ?? ''}`)
+														}
+													>
+														{tenant()?.name}
+													</a>
+												</Show>
+											</Show>
+										</Show>
+									</dd>
+								</dl>
+							</section>
 
-					<div class="detail-stats">
-						<span class="detail-stat">
-							<span class="detail-stat-value">{deviceCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Device{deviceCount() === 1 ? '' : 's'}
-							</span>
-						</span>
-						<span class="detail-stat">
-							<span class="detail-stat-value">{shelfCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Shel{shelfCount() === 1 ? 'f' : 'ves'}
-							</span>
-						</span>
-						<span class="detail-stat">
-							<span class="detail-stat-value">
-								{occupiedU()}/{totalU()}U
-							</span>{' '}
-							<span class="detail-stat-label">Used ({utilPct()}%)</span>
-						</span>
+							<div class="detail-stats">
+								<span class="detail-stat">
+									<span class="detail-stat-value">{deviceCount()}</span>{' '}
+									<span class="detail-stat-label">
+										Device{deviceCount() === 1 ? '' : 's'}
+									</span>
+								</span>
+								<span class="detail-stat">
+									<span class="detail-stat-value">{shelfCount()}</span>{' '}
+									<span class="detail-stat-label">
+										Shel{shelfCount() === 1 ? 'f' : 'ves'}
+									</span>
+								</span>
+								<span class="detail-stat">
+									<span class="detail-stat-value">
+										{occupiedU()}/{totalU()}U
+									</span>{' '}
+									<span class="detail-stat-label">Used ({utilPct()}%)</span>
+								</span>
+							</div>
+						</div>
+
+						<div>
+							<div
+								class="rack-util"
+								role="status"
+								aria-label={`${occupiedU()} of ${totalU()}U used`}
+							>
+								<span>
+									{occupiedU()}/{totalU()}U · {utilPct()}% used
+								</span>
+								<span class="rack-util-bar" aria-hidden="true">
+									<span
+										class="rack-util-fill"
+										style={{ width: `${utilPct()}%` }}
+									/>
+								</span>
+							</div>
+							<Show
+								when={elevation()}
+								fallback={<p class="skeleton">Loading elevation…</p>}
+							>
+								<RackElevation
+									units={elevation()?.units ?? []}
+									selected_u={pendingU()}
+									selected_face={face()}
+									on_select_u={pickU}
+									on_delete_shelf={(id: number) => void handleDeleteShelf(id)}
+								/>
+							</Show>
+							<Show when={pendingU() !== null}>
+								<p class="empty">
+									U{pendingU()} selected on the {face()} face —{' '}
+									<button
+										type="button"
+										onClick={() => installDevice(pendingU() as number)}
+									>
+										install a device here
+									</button>{' '}
+									or add a shelf below.
+								</p>
+							</Show>
+
+							<h3>Add shelf</h3>
+							<form onSubmit={handleCreateShelf}>
+								<input
+									placeholder="Name"
+									aria-label="Shelf name"
+									value={shelfName()}
+									onInput={(e: InputEventAndTarget) =>
+										setShelfName(e.currentTarget.value)
+									}
+								/>
+								<input
+									placeholder="U position"
+									aria-label="Shelf U position"
+									inputmode="numeric"
+									value={shelfU()}
+									onInput={(e: InputEventAndTarget) =>
+										setShelfU(e.currentTarget.value)
+									}
+								/>
+								<input
+									placeholder="Height (U)"
+									aria-label="Shelf height in U"
+									inputmode="numeric"
+									value={shelfH()}
+									onInput={(e: InputEventAndTarget) =>
+										setShelfH(e.currentTarget.value)
+									}
+								/>
+								<button type="submit">Add shelf</button>
+							</form>
+						</div>
 					</div>
 				</Show>
 			</Show>
 
-			<h3>Elevation</h3>
-			<p class="page-subtitle">
-				NetBox-style front and rear elevations, top-down with one row per U. Pick a free U
-				to install a device or shelf.
-			</p>
-			<div class="rack-util" role="status" aria-label={`${occupiedU()} of ${totalU()}U used`}>
-				<span>
-					{occupiedU()}/{totalU()}U · {utilPct()}% used
-				</span>
-				<span class="rack-util-bar" aria-hidden="true">
-					<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
-				</span>
-			</div>
-			<Show when={elevation()} fallback={<p class="skeleton">Loading elevation…</p>}>
-				<RackElevation
-					units={elevation()?.units ?? []}
-					selected_u={pendingU()}
-					selected_face={face()}
-					on_select_u={pickU}
-					on_delete_shelf={(id: number) => void handleDeleteShelf(id)}
-				/>
-			</Show>
-			<Show when={pendingU() !== null}>
-				<p class="empty">
-					U{pendingU()} selected on the {face()} face —{' '}
-					<button type="button" onClick={() => installDevice(pendingU() as number)}>
-						install a device here
-					</button>{' '}
-					or add a shelf below.
-				</p>
-			</Show>
-
-			<h3>Add shelf</h3>
-			<form onSubmit={handleCreateShelf}>
-				<input
-					placeholder="Name"
-					aria-label="Shelf name"
-					value={shelfName()}
-					onInput={(e: InputEventAndTarget) => setShelfName(e.currentTarget.value)}
-				/>
-				<input
-					placeholder="U position"
-					aria-label="Shelf U position"
-					inputmode="numeric"
-					value={shelfU()}
-					onInput={(e: InputEventAndTarget) => setShelfU(e.currentTarget.value)}
-				/>
-				<input
-					placeholder="Height (U)"
-					aria-label="Shelf height in U"
-					inputmode="numeric"
-					value={shelfH()}
-					onInput={(e: InputEventAndTarget) => setShelfH(e.currentTarget.value)}
-				/>
-				<button type="submit">Add shelf</button>
-			</form>
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

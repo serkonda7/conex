@@ -29,7 +29,7 @@ async function getPage<T>(
 // Racks
 // ---------------------------------------------------------------------------
 
-export type RackSort = 'name' | 'slug'
+export type RackSort = 'name'
 
 export interface RackFilters {
 	search?: string
@@ -42,7 +42,6 @@ export interface RackFilters {
 
 export interface RackCreateInput {
 	name: string
-	slug: string
 	site_id: number
 	location_id: number | null
 	tenant_id: number | null
@@ -53,7 +52,6 @@ export interface RackCreateInput {
 
 export interface RackUpdateInput {
 	name?: string
-	slug?: string
 	rack_type_id?: number
 	location_id?: number | null
 	tenant_id?: number | null
@@ -93,7 +91,6 @@ export async function create_rack(input: RackCreateInput): Promise<Result<RackRo
 	const res = await client.racks.$post({
 		json: {
 			name: input.name,
-			slug: input.slug,
 			site_id: input.site_id,
 			location_id: input.location_id,
 			tenant_id: input.tenant_id,
