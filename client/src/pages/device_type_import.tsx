@@ -52,6 +52,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setCreated(res.value.created)
 		setFailed(res.value.failed)
 		setResults(res.value.rows)
+		setYamlText('')
 	}
 
 	return (
@@ -126,9 +127,14 @@ export function DeviceTypeImportPage(): JSX.Element {
 								<td>Full-depth device (true/false, defaults to true).</td>
 							</tr>
 							<tr>
+								<td>description</td>
+								<td>—</td>
+								<td>Optional short device-type summary.</td>
+							</tr>
+							<tr>
 								<td>comments</td>
 								<td>—</td>
-								<td>Optional device-type description.</td>
+								<td>Optional longer device-type notes.</td>
 							</tr>
 							<tr>
 								<td>interfaces</td>

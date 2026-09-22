@@ -133,6 +133,7 @@ export async function create_device_type(input: {
 	u_height?: number
 	is_full_depth?: boolean
 	description?: string
+	comments?: string
 	form_factor?:
 		| '2-post frame'
 		| '4-post frame'
@@ -170,6 +171,7 @@ export interface DeviceTypeUpdateInput {
 		| null
 	width?: 10 | 19 | 23 | null
 	description?: string | null
+	comments?: string | null
 }
 
 export async function update_device_type(

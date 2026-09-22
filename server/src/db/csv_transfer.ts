@@ -64,6 +64,7 @@ export function exportDeviceTypesCsv(): string {
 			form_factor: device_types.form_factor,
 			width: device_types.width,
 			description: device_types.description,
+			comments: device_types.comments,
 		})
 		.from(device_types)
 		.leftJoin(manufacturers, eq(device_types.manufacturer_id, manufacturers.id))
@@ -120,6 +121,7 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 			form_factor: input.form_factor,
 			width: (input.width ?? undefined) as 10 | 19 | 23 | undefined,
 			description: input.description,
+			comments: input.comments,
 		})
 		if (Result.isError(created)) {
 			fail(created.error.message)
@@ -209,7 +211,8 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 			slug,
 			u_height: height,
 			is_full_depth: fullDepth,
-			description: typeof item.comments === 'string' ? item.comments : undefined,
+			description: typeof item.description === 'string' ? item.description : undefined,
+			comments: typeof item.comments === 'string' ? item.comments : undefined,
 		})
 		if (Result.isError(created)) {
 			fail(created.error.message)

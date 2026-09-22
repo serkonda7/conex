@@ -143,9 +143,8 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 							},
 							{
 								key: 'u_height',
-								label: 'Height',
-								getValue: (t: DeviceTypeRow): string | number =>
-									t.u_height === 0 ? '0 (virtual)' : `${t.u_height}U`,
+								label: 'U height',
+								getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
 							},
 							{
 								key: 'is_full_depth',

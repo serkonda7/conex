@@ -227,6 +227,7 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		form_factor: input.form_factor ?? null,
 		width: input.width ?? null,
 		description: input.description ?? null,
+		comments: input.comments ?? null,
 	}
 	try {
 		const inserted = db
@@ -295,6 +296,9 @@ export function updateDeviceType(
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
+	}
+	if (input.comments !== undefined) {
+		patch.comments = input.comments
 	}
 	if (Object.keys(patch).length > 0) {
 		try {

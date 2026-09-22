@@ -279,10 +279,7 @@ export function DevicesPage(): JSX.Element {
 	}
 
 	const hasFilters = createMemo(
-		() =>
-			debouncedSearch() !== '' ||
-			rackFilter() !== '' ||
-			tenantFilter() !== '',
+		() => debouncedSearch() !== '' || rackFilter() !== '' || tenantFilter() !== '',
 	)
 
 	return (

@@ -1,0 +1,1 @@
+ALTER TABLE `device_types` ADD `comments` text;

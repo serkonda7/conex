@@ -214,7 +214,7 @@ export const device_types = sqliteTable(
 			.references(() => manufacturers.id),
 		model: text('model').notNull(),
 		slug: text('slug').notNull().unique(),
-		// Rack units consumed on mount. 0 = virtual or shelf-only (P4 mounts
+		// Rack units consumed on mount. 0 = shelf-only (P4 mounts
 		// those by shelf_id instead of position_u).
 		u_height: integer('u_height').notNull().default(1),
 		// NetBox `is_full_depth`: false = half-depth / shelf-only.
@@ -223,6 +223,7 @@ export const device_types = sqliteTable(
 		form_factor: text('form_factor'),
 		width: integer('width'),
 		description: text('description'),
+		comments: text('comments'),
 	},
 	(table) => [
 		index('device_types_manufacturer_id_idx').on(table.manufacturer_id),

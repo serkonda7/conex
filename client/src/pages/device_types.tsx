@@ -178,10 +178,14 @@ export function DeviceTypesPage(): JSX.Element {
 			getValue: (t: DeviceTypeRow): string => t.description ?? '—',
 		},
 		{
+			key: 'comments',
+			label: 'Comments',
+			getValue: (t: DeviceTypeRow): string => t.comments ?? '—',
+		},
+		{
 			key: 'u_height',
-			label: 'Height',
-			getValue: (t: DeviceTypeRow): string | number =>
-				t.u_height === 0 ? '0 (virtual)' : `${t.u_height}U`,
+			label: 'U height',
+			getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
 		},
 		{
 			key: 'is_full_depth',

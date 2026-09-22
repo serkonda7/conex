@@ -217,12 +217,10 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 							<dt>Description</dt>
 							<dd>{deviceType()?.description || '—'}</dd>
-							<dt>Height</dt>
-							<dd>
-								{deviceType()?.u_height === 0
-									? '0 (virtual)'
-									: `${deviceType()?.u_height}U`}
-							</dd>
+							<dt>Comments</dt>
+							<dd>{deviceType()?.comments || '—'}</dd>
+							<dt>U height</dt>
+							<dd>{deviceType()?.u_height}</dd>
 							<dt>Full depth</dt>
 							<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>
 						</dl>

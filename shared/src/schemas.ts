@@ -390,7 +390,7 @@ export const InterfacePrefixSchema = v.pipe(
 export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
 
 /**
- * Rack units a device type consumes on mount: 0 = virtual or shelf-only
+ * Rack units a device type consumes on mount: 0 = shelf-only
  * (P4 mounts those by shelf_id instead of position_u), otherwise 1..60.
  */
 export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
@@ -429,6 +429,7 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	width: v.optional(RackWidthSchema, undefined),
 	description: DescriptionSchema,
+	comments: CommentsSchema,
 })
 
 export const DeviceTypeUpdateSchema = v.strictObject({
@@ -440,6 +441,7 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
 	width: v.optional(v.nullable(RackWidthSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 export const StubCreateSchema = v.strictObject({
@@ -885,6 +887,7 @@ export const DeviceTypeImportRowSchema = v.object({
 		undefined,
 	),
 	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+	comments: CommentsSchema,
 })
 
 export type DeviceTypeImportRow = v.InferOutput<typeof DeviceTypeImportRowSchema>

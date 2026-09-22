@@ -23,6 +23,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [uHeight, setUHeight] = createSignal('1')
 	const [fullDepth, setFullDepth] = createSignal(true)
 	const [description, setDescription] = createSignal('')
+	const [comments, setComments] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 	const [loaded, setLoaded] = createSignal(false)
@@ -50,6 +51,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			setUHeight(String(res.value.u_height))
 			setFullDepth(Boolean(res.value.is_full_depth))
 			setDescription(res.value.description ?? '')
+			setComments(res.value.comments ?? '')
 			setLoaded(true)
 			return res.value
 		},
@@ -75,11 +77,12 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 		}
 		const height = Number(uHeight())
 		if (!Number.isInteger(height) || height < 0 || height > 60) {
-			setFormError('U height must be an integer from 0 to 60 (0 = virtual).')
+			setFormError('U height must be an integer from 0 to 60.')
 			return
 		}
 		setSaving(true)
 		const trimmedDescription = description().trim()
+		const trimmedComments = comments().trim()
 		const res = await update_device_type(props.id, {
 			manufacturer_id: manufacturer,
 			model: trimmedModel,
@@ -87,6 +90,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			u_height: height,
 			is_full_depth: fullDepth(),
 			description: trimmedDescription === '' ? null : trimmedDescription,
+			comments: trimmedComments === '' ? null : trimmedComments,
 		})
 		setSaving(false)
 		if (Result.isError(res)) {
@@ -181,7 +185,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 							value={uHeight()}
 							onInput={(e: InputEventAndTarget) => setUHeight(e.currentTarget.value)}
 						/>
-						<p class="field-hint">0 = virtual or shelf-only, otherwise 1–60.</p>
+						<p class="field-hint">0 = shelf-only, otherwise 1–60.</p>
 					</div>
 					<div class="field">
 						<label for="device-type-edit-full-depth">Full depth</label>
@@ -204,6 +208,18 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 							value={description()}
 							onInput={(e: InputEventAndTarget) =>
 								setDescription(e.currentTarget.value)
+							}
+						/>
+					</div>
+					<div class="field">
+						<label for="device-type-edit-comments">Comments</label>
+						<textarea
+							id="device-type-edit-comments"
+							rows={4}
+							maxLength={2000}
+							value={comments()}
+							onInput={(e: InputEvent & { currentTarget: HTMLTextAreaElement }) =>
+								setComments(e.currentTarget.value)
 							}
 						/>
 					</div>
