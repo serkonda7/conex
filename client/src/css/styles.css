@@ -745,15 +745,17 @@ tbody tr:last-child td {
 	border-bottom: none;
 }
 
-/* Narrow left-aligned column for create/edit views (NetBox-style). The
-   child combinator + element matches the specificity of the generic
-   `.app-content > div` rule above and wins by source order. */
-.app-content > div.form-page {
-	max-width: 32rem;
+/* Centered column for create/edit views (NetBox-style two-column rows:
+   label on the left, control on the right). Pages render inside
+   `.tab-pane`, so this must be a descendant selector — a child combinator
+   off `.app-content` never matches and the max-width silently stops
+   applying. */
+.app-content .form-page {
+	max-width: 66rem;
 	margin-inline: auto;
 }
 
-.app-content > div.device-type-import-page {
+.app-content .device-type-import-page {
 	max-width: 52rem;
 }
 
@@ -776,12 +778,14 @@ tbody tr:last-child td {
 	display: flex;
 	gap: 0.4rem;
 	padding-top: 0.2rem;
+	margin-left: calc(10rem + 0.75rem);
 }
 
 .field {
-	display: flex;
-	flex-direction: column;
-	gap: 0.25rem;
+	display: grid;
+	grid-template-columns: 10rem minmax(0, 1fr);
+	gap: 0.25rem 0.75rem;
+	align-items: start;
 }
 
 .field label {
@@ -798,6 +802,53 @@ tbody tr:last-child td {
 	margin: 0;
 	font-size: var(--font-size-sm);
 	color: var(--text-muted);
+}
+
+.field > label {
+	padding-top: 0.35rem;
+	text-align: right;
+}
+
+.field-control {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
+	grid-column: 2;
+}
+
+/* Legacy edit-page rows render the control and hint as direct `.field`
+   children (no `.field-control` wrapper); pin them to the right column so
+   they share the same two-column layout. */
+.app-content .form-stacked .field > input,
+.app-content .form-stacked .field > select,
+.app-content .form-stacked .field > textarea,
+.field > .field-hint {
+	grid-column: 2;
+	min-width: 0;
+}
+
+@media (max-width: 36rem) {
+	.field {
+		grid-template-columns: 1fr;
+	}
+
+	.field > label {
+		padding-top: 0;
+		text-align: left;
+	}
+
+	.field-control,
+	.app-content .form-stacked .field > input,
+	.app-content .form-stacked .field > select,
+	.app-content .form-stacked .field > textarea,
+	.field > .field-hint {
+		grid-column: auto;
+	}
+
+	.form-actions {
+		margin-left: 0;
+	}
 }
 
 .import-field-options {

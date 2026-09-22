@@ -39,7 +39,9 @@ export function Hint(props: { id?: string; children: JSX.Element }): JSX.Element
 	)
 }
 
-/** Label + control + hint wrapper, keeping the `for`/`id` pairing in one place. */
+/** Label + control + hint wrapper, keeping the `for`/`id` pairing in one place.
+ * Two-column layout: the label sits in the left column, the control and
+ * hint stack in the right column via `.field-control`. */
 export function Field(props: {
 	label: string
 	for: string
@@ -57,8 +59,10 @@ export function Field(props: {
 					</span>
 				</Show>
 			</label>
-			{props.children}
-			{props.hint}
+			<div class="field-control">
+				{props.children}
+				{props.hint}
+			</div>
 		</div>
 	)
 }
