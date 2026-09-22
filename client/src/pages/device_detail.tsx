@@ -247,7 +247,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/devices')
+		navigate('/devices', { refresh: true })
 	}
 
 	function typeNameOf(id: number | undefined): string {

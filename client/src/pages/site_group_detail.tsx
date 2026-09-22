@@ -99,7 +99,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/site-groups')
+		navigate('/site-groups', { refresh: true })
 	}
 
 	const childCount = (): number => children()?.length ?? 0

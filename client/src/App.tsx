@@ -15,10 +15,11 @@ import {
 	IconServer,
 	IconTemplate,
 	IconUsers,
+	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { createSignal, type JSX, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
+import { createSignal, For, type JSX, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
 import { ConnectionsPage } from './pages/connections'
@@ -62,11 +63,22 @@ import { TopologyPage } from './pages/topology'
 import { UserAddPage } from './pages/user_add'
 import { UserEditPage } from './pages/user_edit'
 import { UsersPage } from './pages/users'
-import { navigate, parseId, path } from './router'
+import {
+	activateTab,
+	activeTabId,
+	closeTab,
+	goTo,
+	openInNewTab,
+	parseId,
+	path,
+	type TabState,
+	tabPathContext,
+	tabs,
+	tabTitle,
+} from './router'
 
 function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
+	goTo(e, to)
 }
 
 function LoginForm(props: {
@@ -191,23 +203,20 @@ function NavItem(props: {
 	importHref?: string
 }): JSX.Element {
 	function goLink(e: MouseEvent): void {
-		e.preventDefault()
-		navigate(props.href)
+		goTo(e, props.href)
 	}
 
 	function goAdd(e: MouseEvent): void {
-		e.preventDefault()
 		e.stopPropagation()
 		if (props.addHref) {
-			navigate(props.addHref)
+			goTo(e, props.addHref)
 		}
 	}
 
 	function goImport(e: MouseEvent): void {
-		e.preventDefault()
 		e.stopPropagation()
 		if (props.importHref) {
-			navigate(props.importHref)
+			goTo(e, props.importHref)
 		}
 	}
 
@@ -266,6 +275,406 @@ function NavItem(props: {
 	)
 }
 
+interface RouteInfo {
+	page: string
+	tenantId: number | null
+	siteId: number | null
+	siteGroupId: number | null
+	locationId: number | null
+	rackId: number | null
+	deviceId: number | null
+	deviceTypeId: number | null
+	manufacturerId: number | null
+	userId: number | null
+}
+
+function emptyRoute(page: string): RouteInfo {
+	return {
+		page,
+		tenantId: null,
+		siteId: null,
+		siteGroupId: null,
+		locationId: null,
+		rackId: null,
+		deviceId: null,
+		deviceTypeId: null,
+		manufacturerId: null,
+		userId: null,
+	}
+}
+
+/** Pure route parser so every background tab can resolve its own path. */
+function parseRoute(routePath: string, isAdmin: boolean): RouteInfo {
+	const parts =
+		routePath
+			.split('?')[0]
+			?.split('/')
+			.filter((p) => p.length > 0) ?? []
+	if (parts.length === 0 || parts[0] === 'tenants') {
+		if (parts[1] === 'add') {
+			return emptyRoute('tenant-add')
+		}
+		if (parts[1]) {
+			const tenantId = parseId(parts[1])
+			if (tenantId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('tenant-edit'), tenantId }
+			}
+			return { ...emptyRoute('tenant-detail'), tenantId }
+		}
+		return emptyRoute('tenants')
+	}
+	if (parts[0] === 'sites') {
+		if (parts[1] === 'add') {
+			return emptyRoute('site-add')
+		}
+		if (parts[1]) {
+			const siteId = parseId(parts[1])
+			if (siteId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('site-edit'), siteId }
+			}
+			return { ...emptyRoute('site-detail'), siteId }
+		}
+		return emptyRoute('sites')
+	}
+	if (parts[0] === 'site-groups') {
+		if (parts[1] === 'add') {
+			return emptyRoute('site-group-add')
+		}
+		if (parts[1]) {
+			const siteGroupId = parseId(parts[1])
+			if (siteGroupId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('site-group-edit'), siteGroupId }
+			}
+			return { ...emptyRoute('site-group-detail'), siteGroupId }
+		}
+		return emptyRoute('site-groups')
+	}
+	if (parts[0] === 'locations') {
+		if (parts[1] === 'add') {
+			return emptyRoute('location-add')
+		}
+		if (parts[1]) {
+			const locationId = parseId(parts[1])
+			if (locationId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('location-edit'), locationId }
+			}
+			return { ...emptyRoute('location-detail'), locationId }
+		}
+		return emptyRoute('locations')
+	}
+	if (parts[0] === 'racks') {
+		if (parts[1] === 'add') {
+			return emptyRoute('rack-add')
+		}
+		if (parts[1]) {
+			const rackId = parseId(parts[1])
+			if (rackId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('rack-edit'), rackId }
+			}
+			return { ...emptyRoute('rack-detail'), rackId }
+		}
+		return emptyRoute('racks')
+	}
+	if (parts[0] === 'rack-types' || parts[0] === 'templates') {
+		if (parts[1] === 'add') {
+			return emptyRoute('rack-type-add')
+		}
+		return emptyRoute('rack-types')
+	}
+	if (parts[0] === 'device-types') {
+		if (parts[1] === 'add') {
+			return emptyRoute('device-type-add')
+		}
+		if (parts[1] === 'import') {
+			return emptyRoute('device-type-import')
+		}
+		if (parts[1]) {
+			const deviceTypeId = parseId(parts[1])
+			if (deviceTypeId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('device-type-edit'), deviceTypeId }
+			}
+			return { ...emptyRoute('device-type-detail'), deviceTypeId }
+		}
+		return emptyRoute('device-types')
+	}
+	if (parts[0] === 'manufacturers') {
+		if (parts[1] === 'add') {
+			return emptyRoute('manufacturer-add')
+		}
+		if (parts[1]) {
+			const manufacturerId = parseId(parts[1])
+			if (manufacturerId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('manufacturer-edit'), manufacturerId }
+			}
+			return { ...emptyRoute('manufacturer-detail'), manufacturerId }
+		}
+		return emptyRoute('manufacturers')
+	}
+	if (parts[0] === 'devices') {
+		if (parts[1] === 'add') {
+			return emptyRoute('device-add')
+		}
+		if (parts[1]) {
+			const deviceId = parseId(parts[1])
+			if (deviceId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('device-edit'), deviceId }
+			}
+			return { ...emptyRoute('device-detail'), deviceId }
+		}
+		return emptyRoute('devices')
+	}
+	if (parts[0] === 'interfaces') {
+		return emptyRoute('interfaces')
+	}
+	if (parts[0] === 'connections' || parts[0] === 'cables') {
+		return emptyRoute('connections')
+	}
+	if (parts[0] === 'topology') {
+		return emptyRoute('topology')
+	}
+	if (parts[0] === 'users') {
+		if (!isAdmin) {
+			return emptyRoute('not-found')
+		}
+		if (parts[1] === 'add') {
+			return emptyRoute('user-add')
+		}
+		if (parts[1]) {
+			const userId = parseId(parts[1])
+			if (userId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('user-edit'), userId }
+			}
+			return emptyRoute('not-found')
+		}
+		return emptyRoute('users')
+	}
+	return emptyRoute('not-found')
+}
+
+/**
+ * In-app tab strip: each entry keeps its page mounted in the background so
+ * opening an add/edit form never discards the list/detail behind it.
+ */
+function TabBar(): JSX.Element {
+	const TabContext = tabPathContext()
+	return (
+		<div class="tab-bar" role="tablist" aria-label="Open pages">
+			<For each={tabs()}>
+				{(tab: TabState) => (
+					<div
+						role="tab"
+						aria-selected={tab.id === activeTabId()}
+						aria-label={tabTitle(tab.path)}
+						title={tab.path}
+						tabIndex={0}
+						class={tab.id === activeTabId() ? 'tab-item active' : 'tab-item'}
+						onClick={() => activateTab(tab.id)}
+						onKeyDown={(e: KeyboardEvent): void => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault()
+								activateTab(tab.id)
+							}
+						}}
+						onAuxClick={(e: MouseEvent): void => {
+							if (e.button === 1) {
+								e.preventDefault()
+								closeTab(tab.id)
+							}
+						}}
+					>
+						<TabContext.Provider value={tab.path}>
+							<span class="tab-title">{tabTitle(tab.path)}</span>
+						</TabContext.Provider>
+						<Show when={tabs().length > 1}>
+							<button
+								type="button"
+								class="tab-close"
+								aria-label={`Close ${tabTitle(tab.path)}`}
+								title={`Close ${tabTitle(tab.path)}`}
+								onClick={(e: MouseEvent): void => {
+									e.stopPropagation()
+									closeTab(tab.id)
+								}}
+							>
+								<span aria-hidden="true" class="tab-close-icon">
+									<IconX size={12} />
+								</span>
+							</button>
+						</Show>
+					</div>
+				)}
+			</For>
+		</div>
+	)
+}
+
+/** Page content for one tab; `routePath` is that tab's own path. */
+function RouteContent(props: { routePath: string; isAdmin: boolean }): JSX.Element {
+	const TabContext = tabPathContext()
+	const info = (): RouteInfo => parseRoute(props.routePath, props.isAdmin)
+	return (
+		<TabContext.Provider value={props.routePath}>
+			<Switch>
+				<Match when={info().page === 'tenants'}>
+					<TenantsPage />
+				</Match>
+				<Match when={info().page === 'tenant-add'}>
+					<TenantAddPage />
+				</Match>
+				<Match when={info().page === 'tenant-detail' && info().tenantId !== null}>
+					<TenantDetailPage id={info().tenantId as number} />
+				</Match>
+				<Match when={info().page === 'tenant-edit' && info().tenantId !== null}>
+					<TenantEditPage id={info().tenantId as number} />
+				</Match>
+				<Match when={info().page === 'sites'}>
+					<SitesPage />
+				</Match>
+				<Match when={info().page === 'site-add'}>
+					<SiteAddPage />
+				</Match>
+				<Match when={info().page === 'site-detail' && info().siteId !== null}>
+					<SiteDetailPage id={info().siteId as number} />
+				</Match>
+				<Match when={info().page === 'site-edit' && info().siteId !== null}>
+					<SiteEditPage id={info().siteId as number} />
+				</Match>
+				<Match when={info().page === 'locations'}>
+					<LocationsPage />
+				</Match>
+				<Match when={info().page === 'location-add'}>
+					<LocationAddPage />
+				</Match>
+				<Match when={info().page === 'location-detail' && info().locationId !== null}>
+					<LocationDetailPage id={info().locationId as number} />
+				</Match>
+				<Match when={info().page === 'location-edit' && info().locationId !== null}>
+					<LocationEditPage id={info().locationId as number} />
+				</Match>
+				<Match when={info().page === 'site-groups'}>
+					<SiteGroupsPage />
+				</Match>
+				<Match when={info().page === 'site-group-add'}>
+					<SiteGroupAddPage />
+				</Match>
+				<Match when={info().page === 'site-group-detail' && info().siteGroupId !== null}>
+					<SiteGroupDetailPage id={info().siteGroupId as number} />
+				</Match>
+				<Match when={info().page === 'site-group-edit' && info().siteGroupId !== null}>
+					<SiteGroupEditPage id={info().siteGroupId as number} />
+				</Match>
+				<Match when={info().page === 'racks'}>
+					<RacksPage />
+				</Match>
+				<Match when={info().page === 'rack-add'}>
+					<RackAddPage />
+				</Match>
+				<Match when={info().page === 'rack-detail' && info().rackId !== null}>
+					<RackDetailPage id={info().rackId as number} />
+				</Match>
+				<Match when={info().page === 'rack-edit' && info().rackId !== null}>
+					<RackEditPage id={info().rackId as number} />
+				</Match>
+				<Match when={info().page === 'rack-types'}>
+					<RackTypesPage />
+				</Match>
+				<Match when={info().page === 'rack-type-add'}>
+					<RackTypeAddPage />
+				</Match>
+				<Match when={info().page === 'device-types'}>
+					<DeviceTypesPage />
+				</Match>
+				<Match when={info().page === 'device-type-add'}>
+					<DeviceTypeAddPage />
+				</Match>
+				<Match when={info().page === 'device-type-import'}>
+					<DeviceTypeImportPage />
+				</Match>
+				<Match when={info().page === 'device-type-detail' && info().deviceTypeId !== null}>
+					<DeviceTypeDetailPage id={info().deviceTypeId as number} />
+				</Match>
+				<Match when={info().page === 'device-type-edit' && info().deviceTypeId !== null}>
+					<DeviceTypeEditPage id={info().deviceTypeId as number} />
+				</Match>
+				<Match when={info().page === 'manufacturers'}>
+					<ManufacturersPage />
+				</Match>
+				<Match when={info().page === 'manufacturer-add'}>
+					<ManufacturerAddPage />
+				</Match>
+				<Match
+					when={info().page === 'manufacturer-detail' && info().manufacturerId !== null}
+				>
+					<ManufacturerDetailPage id={info().manufacturerId as number} />
+				</Match>
+				<Match when={info().page === 'manufacturer-edit' && info().manufacturerId !== null}>
+					<ManufacturerEditPage id={info().manufacturerId as number} />
+				</Match>
+				<Match when={info().page === 'devices'}>
+					<DevicesPage />
+				</Match>
+				<Match when={info().page === 'device-add'}>
+					<DeviceAddPage />
+				</Match>
+				<Match when={info().page === 'device-detail' && info().deviceId !== null}>
+					<DeviceDetailPage id={info().deviceId as number} />
+				</Match>
+				<Match when={info().page === 'device-edit' && info().deviceId !== null}>
+					<DeviceEditPage id={info().deviceId as number} />
+				</Match>
+				<Match when={info().page === 'interfaces'}>
+					<InterfacesPage />
+				</Match>
+				<Match when={info().page === 'connections'}>
+					<ConnectionsPage />
+				</Match>
+				<Match when={info().page === 'topology'}>
+					<TopologyPage />
+				</Match>
+				<Match when={info().page === 'users'}>
+					<UsersPage />
+				</Match>
+				<Match when={info().page === 'user-add'}>
+					<UserAddPage />
+				</Match>
+				<Match when={info().page === 'user-edit' && info().userId !== null}>
+					<UserEditPage id={info().userId as number} />
+				</Match>
+				<Match when={info().page === 'not-found'}>
+					<p>Not found.</p>
+				</Match>
+			</Switch>
+		</TabContext.Provider>
+	)
+}
+
 // P1 shell: local-auth gate plus the tenants/sites/location-tree pages.
 // Rack/device/cable pages arrive in P2-P5.
 function App(): JSX.Element {
@@ -297,9 +706,47 @@ function App(): JSX.Element {
 				setUserMenuOpen(false)
 			}
 		}
+		// Smart tabs: Ctrl/Cmd/Shift-click or middle-click on any in-app link
+		// opens it in a new tab instead of replacing the current page.
+		const onLinkClick = (e: MouseEvent): void => {
+			if (!(e.target instanceof Element)) {
+				return
+			}
+			const anchor = e.target.closest('a[href]')
+			if (!anchor || !(anchor instanceof HTMLAnchorElement)) {
+				return
+			}
+			const href = anchor.getAttribute('href') ?? ''
+			if (!href.startsWith('/') || href.startsWith('//')) {
+				return
+			}
+			if (e.ctrlKey || e.metaKey || e.shiftKey) {
+				e.preventDefault()
+				openInNewTab(href)
+			}
+		}
+		const onAuxClick = (e: MouseEvent): void => {
+			if (e.button !== 1 || !(e.target instanceof Element)) {
+				return
+			}
+			const anchor = e.target.closest('a[href]')
+			if (!anchor || !(anchor instanceof HTMLAnchorElement)) {
+				return
+			}
+			const href = anchor.getAttribute('href') ?? ''
+			if (!href.startsWith('/') || href.startsWith('//')) {
+				return
+			}
+			e.preventDefault()
+			openInNewTab(href)
+		}
 		document.addEventListener('click', onDocClick)
+		document.addEventListener('click', onLinkClick)
+		document.addEventListener('auxclick', onAuxClick)
 		onCleanup(() => {
 			document.removeEventListener('click', onDocClick)
+			document.removeEventListener('click', onLinkClick)
+			document.removeEventListener('auxclick', onAuxClick)
 		})
 	})
 
@@ -368,217 +815,6 @@ function App(): JSX.Element {
 		setIsLoggedIn(false)
 		setCurrentUser(null)
 		setUsername('')
-	}
-
-	function emptyRoute(page: string): {
-		page: string
-		tenantId: number | null
-		siteId: number | null
-		siteGroupId: number | null
-		locationId: number | null
-		rackId: number | null
-		deviceId: number | null
-		deviceTypeId: number | null
-		manufacturerId: number | null
-		userId: number | null
-	} {
-		return {
-			page,
-			tenantId: null,
-			siteId: null,
-			siteGroupId: null,
-			locationId: null,
-			rackId: null,
-			deviceId: null,
-			deviceTypeId: null,
-			manufacturerId: null,
-			userId: null,
-		}
-	}
-
-	function route(): {
-		page: string
-		tenantId: number | null
-		siteId: number | null
-		siteGroupId: number | null
-		locationId: number | null
-		rackId: number | null
-		deviceId: number | null
-		deviceTypeId: number | null
-		manufacturerId: number | null
-		userId: number | null
-	} {
-		const parts =
-			path()
-				.split('?')[0]
-				?.split('/')
-				.filter((p) => p.length > 0) ?? []
-		if (parts.length === 0 || parts[0] === 'tenants') {
-			if (parts[1] === 'add') {
-				return emptyRoute('tenant-add')
-			}
-			if (parts[1]) {
-				const tenantId = parseId(parts[1])
-				if (tenantId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('tenant-edit'), tenantId }
-				}
-				return { ...emptyRoute('tenant-detail'), tenantId }
-			}
-			return emptyRoute('tenants')
-		}
-		if (parts[0] === 'sites') {
-			if (parts[1] === 'add') {
-				return emptyRoute('site-add')
-			}
-			if (parts[1]) {
-				const siteId = parseId(parts[1])
-				if (siteId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('site-edit'), siteId }
-				}
-				return { ...emptyRoute('site-detail'), siteId }
-			}
-			return emptyRoute('sites')
-		}
-		if (parts[0] === 'site-groups') {
-			if (parts[1] === 'add') {
-				return emptyRoute('site-group-add')
-			}
-			if (parts[1]) {
-				const siteGroupId = parseId(parts[1])
-				if (siteGroupId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('site-group-edit'), siteGroupId }
-				}
-				return { ...emptyRoute('site-group-detail'), siteGroupId }
-			}
-			return emptyRoute('site-groups')
-		}
-		if (parts[0] === 'locations') {
-			if (parts[1] === 'add') {
-				return emptyRoute('location-add')
-			}
-			if (parts[1]) {
-				const locationId = parseId(parts[1])
-				if (locationId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('location-edit'), locationId }
-				}
-				return { ...emptyRoute('location-detail'), locationId }
-			}
-			return emptyRoute('locations')
-		}
-		if (parts[0] === 'racks') {
-			if (parts[1] === 'add') {
-				return emptyRoute('rack-add')
-			}
-			if (parts[1]) {
-				const rackId = parseId(parts[1])
-				if (rackId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('rack-edit'), rackId }
-				}
-				return { ...emptyRoute('rack-detail'), rackId }
-			}
-			return emptyRoute('racks')
-		}
-		if (parts[0] === 'rack-types' || parts[0] === 'templates') {
-			if (parts[1] === 'add') {
-				return emptyRoute('rack-type-add')
-			}
-			return emptyRoute('rack-types')
-		}
-		if (parts[0] === 'device-types') {
-			if (parts[1] === 'add') {
-				return emptyRoute('device-type-add')
-			}
-			if (parts[1] === 'import') {
-				return emptyRoute('device-type-import')
-			}
-			if (parts[1]) {
-				const deviceTypeId = parseId(parts[1])
-				if (deviceTypeId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('device-type-edit'), deviceTypeId }
-				}
-				return { ...emptyRoute('device-type-detail'), deviceTypeId }
-			}
-			return emptyRoute('device-types')
-		}
-		if (parts[0] === 'manufacturers') {
-			if (parts[1] === 'add') {
-				return emptyRoute('manufacturer-add')
-			}
-			if (parts[1]) {
-				const manufacturerId = parseId(parts[1])
-				if (manufacturerId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('manufacturer-edit'), manufacturerId }
-				}
-				return { ...emptyRoute('manufacturer-detail'), manufacturerId }
-			}
-			return emptyRoute('manufacturers')
-		}
-		if (parts[0] === 'devices') {
-			if (parts[1] === 'add') {
-				return emptyRoute('device-add')
-			}
-			if (parts[1]) {
-				const deviceId = parseId(parts[1])
-				if (deviceId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('device-edit'), deviceId }
-				}
-				return { ...emptyRoute('device-detail'), deviceId }
-			}
-			return emptyRoute('devices')
-		}
-		if (parts[0] === 'interfaces') {
-			return emptyRoute('interfaces')
-		}
-		if (parts[0] === 'connections' || parts[0] === 'cables') {
-			return emptyRoute('connections')
-		}
-		if (parts[0] === 'topology') {
-			return emptyRoute('topology')
-		}
-		if (parts[0] === 'users') {
-			if (currentUser()?.role !== 'admin') {
-				return emptyRoute('not-found')
-			}
-			if (parts[1] === 'add') {
-				return emptyRoute('user-add')
-			}
-			if (parts[1]) {
-				const userId = parseId(parts[1])
-				if (userId === null) {
-					return emptyRoute('not-found')
-				}
-				if (parts[2] === 'edit') {
-					return { ...emptyRoute('user-edit'), userId }
-				}
-				return emptyRoute('not-found')
-			}
-			return emptyRoute('users')
-		}
-		return emptyRoute('not-found')
 	}
 
 	return (
@@ -785,220 +1021,21 @@ function App(): JSX.Element {
 								</nav>
 							</aside>
 							<main class="app-content" id="main">
-								<Switch>
-									<Match when={route().page === 'tenants'}>
-										<TenantsPage />
-									</Match>
-									<Match when={route().page === 'tenant-add'}>
-										<TenantAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'tenant-detail' &&
-											route().tenantId !== null
-										}
-									>
-										<TenantDetailPage id={route().tenantId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'tenant-edit' &&
-											route().tenantId !== null
-										}
-									>
-										<TenantEditPage id={route().tenantId as number} />
-									</Match>
-									<Match when={route().page === 'sites'}>
-										<SitesPage />
-									</Match>
-									<Match when={route().page === 'site-add'}>
-										<SiteAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'site-detail' &&
-											route().siteId !== null
-										}
-									>
-										<SiteDetailPage id={route().siteId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'site-edit' && route().siteId !== null
-										}
-									>
-										<SiteEditPage id={route().siteId as number} />
-									</Match>
-									<Match when={route().page === 'locations'}>
-										<LocationsPage />
-									</Match>
-									<Match when={route().page === 'location-add'}>
-										<LocationAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'location-detail' &&
-											route().locationId !== null
-										}
-									>
-										<LocationDetailPage id={route().locationId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'location-edit' &&
-											route().locationId !== null
-										}
-									>
-										<LocationEditPage id={route().locationId as number} />
-									</Match>
-									<Match when={route().page === 'site-groups'}>
-										<SiteGroupsPage />
-									</Match>
-									<Match when={route().page === 'site-group-add'}>
-										<SiteGroupAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'site-group-detail' &&
-											route().siteGroupId !== null
-										}
-									>
-										<SiteGroupDetailPage id={route().siteGroupId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'site-group-edit' &&
-											route().siteGroupId !== null
-										}
-									>
-										<SiteGroupEditPage id={route().siteGroupId as number} />
-									</Match>
-									<Match when={route().page === 'racks'}>
-										<RacksPage />
-									</Match>
-									<Match when={route().page === 'rack-add'}>
-										<RackAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'rack-detail' &&
-											route().rackId !== null
-										}
-									>
-										<RackDetailPage id={route().rackId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'rack-edit' && route().rackId !== null
-										}
-									>
-										<RackEditPage id={route().rackId as number} />
-									</Match>
-									<Match when={route().page === 'rack-types'}>
-										<RackTypesPage />
-									</Match>
-									<Match when={route().page === 'rack-type-add'}>
-										<RackTypeAddPage />
-									</Match>
-									<Match when={route().page === 'device-types'}>
-										<DeviceTypesPage />
-									</Match>
-									<Match when={route().page === 'device-type-add'}>
-										<DeviceTypeAddPage />
-									</Match>
-									<Match when={route().page === 'device-type-import'}>
-										<DeviceTypeImportPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'device-type-detail' &&
-											route().deviceTypeId !== null
-										}
-									>
-										<DeviceTypeDetailPage id={route().deviceTypeId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'device-type-edit' &&
-											route().deviceTypeId !== null
-										}
-									>
-										<DeviceTypeEditPage id={route().deviceTypeId as number} />
-									</Match>
-									<Match when={route().page === 'manufacturers'}>
-										<ManufacturersPage />
-									</Match>
-									<Match when={route().page === 'manufacturer-add'}>
-										<ManufacturerAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'manufacturer-detail' &&
-											route().manufacturerId !== null
-										}
-									>
-										<ManufacturerDetailPage
-											id={route().manufacturerId as number}
-										/>
-									</Match>
-									<Match
-										when={
-											route().page === 'manufacturer-edit' &&
-											route().manufacturerId !== null
-										}
-									>
-										<ManufacturerEditPage
-											id={route().manufacturerId as number}
-										/>
-									</Match>
-									<Match when={route().page === 'devices'}>
-										<DevicesPage />
-									</Match>
-									<Match when={route().page === 'device-add'}>
-										<DeviceAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'device-detail' &&
-											route().deviceId !== null
-										}
-									>
-										<DeviceDetailPage id={route().deviceId as number} />
-									</Match>
-									<Match
-										when={
-											route().page === 'device-edit' &&
-											route().deviceId !== null
-										}
-									>
-										<DeviceEditPage id={route().deviceId as number} />
-									</Match>
-									<Match when={route().page === 'interfaces'}>
-										<InterfacesPage />
-									</Match>
-									<Match when={route().page === 'connections'}>
-										<ConnectionsPage />
-									</Match>
-									<Match when={route().page === 'topology'}>
-										<TopologyPage />
-									</Match>
-									<Match when={route().page === 'users'}>
-										<UsersPage />
-									</Match>
-									<Match when={route().page === 'user-add'}>
-										<UserAddPage />
-									</Match>
-									<Match
-										when={
-											route().page === 'user-edit' && route().userId !== null
-										}
-									>
-										<UserEditPage id={route().userId as number} />
-									</Match>
-									<Match when={route().page === 'not-found'}>
-										<p>Not found.</p>
-									</Match>
-								</Switch>
+								<TabBar />
+								<For each={tabs()}>
+									{(tab: TabState) => (
+										<div
+											class="tab-pane"
+											hidden={tab.id !== activeTabId()}
+											aria-hidden={tab.id !== activeTabId()}
+										>
+											<RouteContent
+												routePath={tab.path}
+												isAdmin={currentUser()?.role === 'admin'}
+											/>
+										</div>
+									)}
+								</For>
 							</main>
 						</div>
 					</Match>

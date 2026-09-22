@@ -100,7 +100,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/tenants')
+		navigate('/tenants', { refresh: true })
 	}
 
 	const siteCount = (): number => sites()?.length ?? 0

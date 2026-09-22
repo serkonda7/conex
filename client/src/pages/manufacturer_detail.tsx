@@ -61,7 +61,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/manufacturers')
+		navigate('/manufacturers', { refresh: true })
 	}
 
 	const typeCount = (): number => deviceTypes()?.length ?? 0

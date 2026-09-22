@@ -1388,3 +1388,77 @@ tbody tr:last-child td {
 .topo-dimmed {
 	opacity: 0.3;
 }
+
+/* Smart tabs: add/edit forms open as new tabs so the page behind keeps its
+   state. Only the active pane is visible; the rest stay mounted. */
+.tab-bar {
+	display: flex;
+	align-items: stretch;
+	gap: 0.3rem;
+	overflow-x: auto;
+	padding-bottom: 0.55rem;
+	margin-bottom: 0.55rem;
+	border-bottom: 1px solid var(--border);
+	scrollbar-width: thin;
+}
+
+.tab-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-shrink: 0;
+	max-width: 14rem;
+	padding: 0.3rem 0.35rem 0.3rem 0.6rem;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	background-color: var(--bg-surface);
+	color: var(--text-secondary);
+	font-size: var(--font-size-base);
+	cursor: pointer;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.tab-item:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.tab-item.active {
+	background-color: var(--bg-raised);
+	border-color: var(--border-strong);
+	color: var(--text);
+	font-weight: 600;
+}
+
+.tab-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 10rem;
+}
+
+.tab-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	padding: 0.15rem;
+	border: 1px solid transparent;
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.tab-close:hover {
+	background-color: var(--bg-hover);
+	border-color: var(--border);
+	color: var(--text);
+}
+
+.tab-close-icon {
+	display: inline-flex;
+}
+
+.tab-pane[hidden] {
+	display: none;
+}

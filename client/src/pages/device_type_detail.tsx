@@ -123,7 +123,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/device-types')
+		navigate('/device-types', { refresh: true })
 	}
 
 	const stubColumns: DataTableColumn<StubRow>[] = [

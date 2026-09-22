@@ -205,7 +205,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/sites')
+		navigate('/sites', { refresh: true })
 	}
 
 	const locationCount = (): number => locations()?.length ?? 0

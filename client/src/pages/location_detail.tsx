@@ -128,7 +128,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/locations')
+		navigate('/locations', { refresh: true })
 	}
 
 	const childCount = (): number => children()?.length ?? 0

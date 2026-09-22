@@ -8,7 +8,7 @@ import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
-	navigate(to)
+	navigate(to, { refresh: false })
 }
 
 const ROLES: UserRole[] = ['admin', 'editor', 'viewer']
@@ -139,7 +139,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 						</button>
 						<button
 							type="button"
-							onClick={() => navigate('/users')}
+							onClick={() => navigate('/users', { refresh: false })}
 							disabled={saving()}
 						>
 							Cancel

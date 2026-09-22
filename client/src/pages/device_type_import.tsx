@@ -8,7 +8,7 @@ import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
-	navigate(to)
+	navigate(to, { refresh: false })
 }
 
 const SAMPLE_YAML = `manufacturer: Acme
@@ -155,7 +155,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 				<div class="form-actions">
 					<button
 						type="button"
-						onClick={() => navigate('/device-types')}
+						onClick={() => navigate('/device-types', { refresh: false })}
 						disabled={importing()}
 					>
 						Cancel

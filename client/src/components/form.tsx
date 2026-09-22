@@ -27,7 +27,7 @@ export function row_options(rows: { id: number; name: string }[]): FormOption[] 
 /** Wraps a plain anchor so in-page links use the history router. */
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
-	navigate(to)
+	navigate(to, { refresh: false })
 }
 
 /** Muted helper text below a field control. */
@@ -232,11 +232,16 @@ export function FormError(props: { message: () => string | null }): JSX.Element 
 	)
 }
 
-/** Create actions, disabled while the form is saving. */
+/** Create actions, disabled while the form is saving. Cancel closes the tab
+ * without refreshing so the underlying list keeps its exact contents. */
 export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.Element {
 	return (
 		<div class="form-actions">
-			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
+			<button
+				type="button"
+				onClick={() => navigate(props.cancelTo, { refresh: false })}
+				disabled={props.saving}
+			>
 				Cancel
 			</button>
 			<button type="submit" name="action" value="create" disabled={props.saving}>

@@ -117,7 +117,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/racks')
+		navigate('/racks', { refresh: true })
 	}
 
 	async function handleCreateShelf(e: SubmitEvent): Promise<void> {
