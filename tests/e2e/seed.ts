@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { getDb, initDb } from '../../server/src/db/connection'
+import { getDb, getSqliteHandle, initDb } from '../../server/src/db/connection'
 import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 import { device_types, manufacturers, sites, tenants } from '../../server/src/schema'
 
@@ -69,8 +69,35 @@ if (
 			slug: 'e2e-rack-type',
 			form_factor: '4-post cabinet',
 			width: 19,
+			u_height: 42,
 		})
 		.run()
+} else {
+	getSqliteHandle()
+		.query('UPDATE device_types SET u_height = 42, form_factor = ?, width = 19 WHERE slug = ?')
+		.run('4-post cabinet', 'e2e-rack-type')
+}
+if (
+	!db
+		.select()
+		.from(device_types)
+		.all()
+		.some((row) => row.slug === 'e2e-rack-type-10u')
+) {
+	db.insert(device_types)
+		.values({
+			manufacturer_id: manufacturer.id,
+			model: 'E2E 10U Cabinet',
+			slug: 'e2e-rack-type-10u',
+			form_factor: '4-post cabinet',
+			width: 19,
+			u_height: 10,
+		})
+		.run()
+} else {
+	getSqliteHandle()
+		.query('UPDATE device_types SET u_height = 10, form_factor = ?, width = 19 WHERE slug = ?')
+		.run('4-post cabinet', 'e2e-rack-type-10u')
 }
 
 if (!getUserByUsername(username)) {

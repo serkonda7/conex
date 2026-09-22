@@ -277,7 +277,7 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 			r.asset_tag,
 			r.type_slug,
 			r.site_slug,
-		r.rack_name,
+			r.rack_name,
 			r.position_u === null ? null : String(r.position_u),
 			r.status,
 		]),

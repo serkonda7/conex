@@ -135,7 +135,7 @@ function addRack(
 	locationId: number,
 	tenantId: number | null,
 	name: string,
-	slug: string,
+	rackTypeId: number,
 ): typeof racks.$inferSelect {
 	return db
 		.insert(racks)
@@ -143,9 +143,8 @@ function addRack(
 			site_id: siteId,
 			location_id: locationId,
 			tenant_id: tenantId,
+			rack_type_id: rackTypeId,
 			name,
-			slug,
-			height_u: 12,
 		})
 		.returning()
 		.get()
@@ -157,20 +156,6 @@ const dentistEmpfang = addLocation(dentistSite.id, 'Empfang', 'empfang', dentist
 const dentistBehandlung1 = addLocation(dentistSite.id, 'Behandlung 1', 'behandlung-1', dentist.id)
 const schoolRoom = addLocation(schoolSite.id, 'Network Closet', 'network-closet', school.id)
 const mspRoom = addLocation(mspSite.id, 'Staging Room', 'staging-room', null)
-const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', 'dent-r01')
-const schoolRack = addRack(schoolSite.id, schoolRoom.id, school.id, 'SCHOOL-R01', 'school-r01')
-const mspRack = addRack(mspSite.id, mspRoom.id, null, 'MSP-R01', 'msp-r01')
-const mspShelf = db
-	.insert(rack_shelves)
-	.values({
-		rack_id: mspRack.id,
-		name: 'Staging shelf',
-		position_u: 1,
-		height_u: 2,
-		capacity_slots: 6,
-	})
-	.returning()
-	.get()
 
 const ubiquiti = db
 	.insert(manufacturers)
@@ -229,6 +214,21 @@ const clientType = db
 		u_height: 0,
 		form_factor: 'desktop',
 		width: 19,
+	})
+	.returning()
+	.get()
+
+const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', serverType.id)
+const schoolRack = addRack(schoolSite.id, schoolRoom.id, school.id, 'SCHOOL-R01', serverType.id)
+const mspRack = addRack(mspSite.id, mspRoom.id, null, 'MSP-R01', switchType.id)
+const mspShelf = db
+	.insert(rack_shelves)
+	.values({
+		rack_id: mspRack.id,
+		name: 'Staging shelf',
+		position_u: 1,
+		height_u: 2,
+		capacity_slots: 6,
 	})
 	.returning()
 	.get()

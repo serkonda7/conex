@@ -16,12 +16,7 @@ import {
 	TextField,
 } from '../components/form'
 import { navigate, parseId, queryParam } from '../router'
-import {
-	type FormValues,
-	is_add_another_submit,
-	load_rows,
-	submit_form,
-} from '../util/form'
+import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** Id of the hint under the rack-type select. */
 const RACK_TYPE_HINT_ID = 'rack-type-hint'
@@ -137,13 +132,7 @@ export function RackAddPage(): JSX.Element {
 					</Show>
 				}
 			/>
-			<NameField
-				id="rack-name"
-				placeholder="A1"
-				value={name()}
-				onInput={setName}
-				autofocus
-			/>
+			<NameField id="rack-name" placeholder="A1" value={name()} onInput={setName} autofocus />
 			<SelectField
 				id="rack-type"
 				label="Rack type"

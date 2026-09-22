@@ -268,9 +268,6 @@ export type LocationListQuery = v.InferOutput<typeof LocationListQuerySchema>
 // P2: racks / shelves
 // ---------------------------------------------------------------------------
 
-/** Rack height in U: 1..60, default 42. */
-export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
-
 /** Bottom-U position, 1-based. Upper bound is rack-dependent, checked in the service layer. */
 export const PositionUSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
 
@@ -284,7 +281,6 @@ export const RackCreateSchema = v.strictObject({
 	tenant_id: NullableIdSchema,
 	rack_type_id: IdSchema,
 	description: DescriptionSchema,
-	height_u: v.optional(RackHeightSchema, 42),
 })
 
 export const RackUpdateSchema = v.strictObject({
@@ -295,7 +291,6 @@ export const RackUpdateSchema = v.strictObject({
 	location_id: v.optional(v.nullable(IdSchema), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
-	height_u: v.optional(RackHeightSchema, undefined),
 })
 
 export const ShelfCreateSchema = v.strictObject({

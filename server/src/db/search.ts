@@ -75,9 +75,7 @@ export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchRes
 	const rackRows = db
 		.select({ id: sql<number>`id`, name: sql<string>`name` })
 		.from(sql`racks`)
-		.where(
-			sql`name LIKE ${pattern} ESCAPE '\\'${tenantScope}`,
-		)
+		.where(sql`name LIKE ${pattern} ESCAPE '\\'${tenantScope}`)
 		.orderBy(asc(sql`name`))
 		.limit(GROUP_LIMIT)
 		.all()

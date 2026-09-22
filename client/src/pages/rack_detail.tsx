@@ -102,7 +102,11 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const occupiedU = createMemo(
 		() => elevation()?.units.filter((u) => u.shelf !== null || u.device !== null).length ?? 0,
 	)
-	const totalU = createMemo(() => elevation()?.height_u ?? rack()?.height_u ?? 0)
+	/** Rack height is owned by the rack type; the stored rack row is only a fallback. */
+	const displayHeight = createMemo(
+		() => elevation()?.height_u ?? rackType()?.u_height ?? rack()?.height_u ?? 0,
+	)
+	const totalU = displayHeight
 	const utilPct = createMemo(() =>
 		totalU() > 0 ? Math.round((occupiedU() / totalU()) * 100) : 0,
 	)
@@ -194,8 +198,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				<Show when={rack()} fallback={<p class="empty">Rack not found.</p>}>
 					<div class="page-header">
 						<h2>
-							{rack()?.name}{' '}
-							<span>{rack()?.height_u}U</span>
+							{rack()?.name} <span>{displayHeight()}U</span>
 						</h2>
 						<div class="form-actions">
 							<button

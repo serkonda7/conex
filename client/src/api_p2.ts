@@ -47,7 +47,6 @@ export interface RackCreateInput {
 	tenant_id: number | null
 	rack_type_id: number
 	description?: string
-	height_u?: number
 }
 
 export interface RackUpdateInput {
@@ -56,7 +55,6 @@ export interface RackUpdateInput {
 	location_id?: number | null
 	tenant_id?: number | null
 	description?: string | null
-	height_u?: number
 }
 
 export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<RackRow>, Error>> {
@@ -96,7 +94,6 @@ export async function create_rack(input: RackCreateInput): Promise<Result<RackRo
 			tenant_id: input.tenant_id,
 			rack_type_id: input.rack_type_id,
 			description: input.description || undefined,
-			height_u: input.height_u,
 		},
 	})
 	return to_result<RackRow>(res, 'Failed to create rack')

@@ -99,6 +99,13 @@
       "when": 1790086209203,
       "tag": "0013_remove_rack_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790086209204,
+      "tag": "0014_remove_rack_height",
+      "breakpoints": true
     }
   ]
 }

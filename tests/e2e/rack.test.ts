@@ -20,7 +20,7 @@ test('selecting a site prefills the rack tenant', async ({ page }) => {
 	await expect(page.locator('#rack-tenant option:checked')).toHaveText('E2E Tenant')
 })
 
-test('rack type is saved and displayed', async ({ page }) => {
+test('rack type is saved, displayed, and drives elevation', async ({ page }) => {
 	await page.goto('/')
 	await page.getByLabel('Username').fill(username)
 	await page.locator('input[type="password"]').fill(password)
@@ -35,4 +35,21 @@ test('rack type is saved and displayed', async ({ page }) => {
 
 	await expect(page.getByRole('link', { name: 'Type display rack' })).toBeVisible()
 	await expect(page.getByText('E2E 42U Cabinet')).toBeVisible()
+	await page.getByRole('link', { name: 'Type display rack' }).click()
+
+	// The selected rack type supplies the height shown in the heading and elevation.
+	await expect(page.getByRole('heading', { name: /Type display rack.*42U/ })).toBeVisible()
+	await expect(page.getByText('0/42U · 0% used')).toBeVisible()
+	await expect(page.getByRole('status', { name: '0 of 42U used' })).toBeVisible()
+	await expect(
+		page.locator('section[aria-label="Rack elevation (front face)"] li.rack-u'),
+	).toHaveCount(42)
+	await expect(
+		page.locator('section[aria-label="Rack elevation (rear face)"] li.rack-u'),
+	).toHaveCount(42)
+	const frontUnits = page.locator(
+		'section[aria-label="Rack elevation (front face)"] li.rack-u .rack-u-gutter',
+	)
+	await expect(frontUnits.first()).toHaveText('42')
+	await expect(frontUnits.last()).toHaveText('1')
 })

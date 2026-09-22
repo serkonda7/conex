@@ -14,8 +14,22 @@ import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './tenancy'
 
-export type RackRow = typeof racks.$inferSelect
+type RackRecord = typeof racks.$inferSelect
+/** Rack height is computed from the linked rack type, not stored on racks. */
+export type RackRow = Omit<RackRecord, 'height_u'> & { height_u: number }
 export type ShelfRow = typeof rack_shelves.$inferSelect
+
+function withRackHeight(row: RackRecord): RackRow {
+	const rackType =
+		row.rack_type_id === null
+			? undefined
+			: getDb()
+					.select({ u_height: device_types.u_height })
+					.from(device_types)
+					.where(eq(device_types.id, row.rack_type_id))
+					.get()
+	return { ...row, height_u: rackType?.u_height ?? 0 }
+}
 
 function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
 	return { items, total, page: params.page, limit: params.limit }
@@ -78,6 +92,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
+		.map(withRackHeight)
 	const totalRow = db.select({ n: count() }).from(racks).where(where).get()
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
@@ -87,7 +102,23 @@ export function getRack(id: number): Result<RackRow, Error> {
 	if (!row) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
-	return Result.ok(row)
+	return Result.ok(withRackHeight(row))
+}
+
+/**
+ * Authoritative rack height in U, supplied by the rack type.
+ */
+export function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): number {
+	if (rack.rack_type_id === null) {
+		return 0
+	}
+	return (
+		getDb()
+			.select({ u_height: device_types.u_height })
+			.from(device_types)
+			.where(eq(device_types.id, rack.rack_type_id))
+			.get()?.u_height ?? 0
+	)
 }
 
 function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
@@ -227,14 +258,13 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 	if (Result.isError(locationCheck)) {
 		return Result.err(locationCheck.error)
 	}
-	const row: Omit<RackRow, 'id'> = {
+	const row: Omit<RackRecord, 'id'> = {
 		site_id: input.site_id,
 		location_id: input.location_id ?? null,
 		tenant_id: input.tenant_id ?? null,
 		rack_type_id: input.rack_type_id,
 		name: input.name,
 		description: input.description ?? null,
-		height_u: input.height_u ?? 42,
 	}
 	try {
 		const inserted = db.insert(racks).values(row).returning({ id: racks.id }).get()
@@ -269,6 +299,7 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 		}
 	}
 	const db = getDb()
+	let newTypeHeight: number | null = null
 	if (input.rack_type_id !== undefined) {
 		const rackType = db
 			.select()
@@ -278,9 +309,11 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 		if (!rackType || rackType.form_factor === null) {
 			return Result.err(new NotFoundError('Rack type not found'))
 		}
+		newTypeHeight = rackType.u_height
 	}
-	const effectiveHeight = input.height_u ?? node.height_u
-	if (effectiveHeight !== node.height_u) {
+	const storedHeight = rackHeightOf(node)
+	const effectiveHeight = newTypeHeight ?? storedHeight
+	if (effectiveHeight !== storedHeight) {
 		// Shrinking below the topmost occupied U would strand shelves or
 		// devices outside the rack; reject with the same bounds error
 		// creation uses.
@@ -312,9 +345,6 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
-	}
-	if (input.height_u !== undefined) {
-		patch.height_u = input.height_u
 	}
 	if (Object.keys(patch).length > 0) {
 		try {
@@ -353,10 +383,11 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 		return current
 	}
 	const rack = current.value
+	const heightU = rackHeightOf(rack)
 	const shelves = shelvesOf(id)
 	const details = deviceDetailsOf(id)
 	const occupancy = getOccupancy(
-		rack.height_u,
+		heightU,
 		shelves.map(shelfSpanOf),
 		details.map((d) => ({
 			id: d.id,
@@ -402,7 +433,7 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 						},
 		}
 	})
-	return Result.ok({ rack_id: rack.id, height_u: rack.height_u, units })
+	return Result.ok({ rack_id: rack.id, height_u: heightU, units })
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +497,7 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 		position_u: input.position_u,
 		height_u: input.height_u ?? 1,
 	}
-	const bounds = checkBounds(candidate, rack.value.height_u, `Shelf "${input.name}"`)
+	const bounds = checkBounds(candidate, rackHeightOf(rack.value), `Shelf "${input.name}"`)
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
@@ -514,7 +545,7 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 		position_u: input.position_u ?? node.position_u,
 		height_u: input.height_u ?? node.height_u,
 	}
-	const bounds = checkBounds(effective, rack.value.height_u, `Shelf "${effectiveName}"`)
+	const bounds = checkBounds(effective, rackHeightOf(rack.value), `Shelf "${effectiveName}"`)
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}

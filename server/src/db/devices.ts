@@ -23,7 +23,7 @@ import { expandStubs } from '../services/templates'
 import { deviceHasCables } from './cables'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
-import { deviceSpansOf } from './racks'
+import { deviceSpansOf, rackHeightOf } from './racks'
 import type { ListParams, Page } from './tenancy'
 
 export type DeviceRow = typeof devices.$inferSelect
@@ -126,7 +126,7 @@ function checkMount(
 		position_u: positionU,
 		height_u: uHeight,
 	}
-	const bounds = checkBounds(candidate, rack.height_u, `Device "${deviceName}"`)
+	const bounds = checkBounds(candidate, rackHeightOf(rack), `Device "${deviceName}"`)
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
