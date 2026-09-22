@@ -11,11 +11,6 @@ function go(e: MouseEvent, to: string): void {
 	navigate(to)
 }
 
-/** Deterministic hue per device so blocks are distinguishable like NetBox roles. */
-export function device_hue(id: number): number {
-	return (id * 137 + 29) % 360
-}
-
 type RowKind = 'free' | 'shelf' | 'device' | 'ghost'
 
 function device_for_face(unit: ElevationUnit, face: RackFace): ElevationDeviceRef | undefined {
@@ -34,15 +29,6 @@ function row_kind(unit: ElevationUnit, face: RackFace): RowKind {
 			: 'free'
 	}
 	return 'free'
-}
-
-function span_label(unit: ElevationUnit, device = unit.device): string {
-	if (!device) {
-		return `U${unit.u}`
-	}
-	return device.position_u === unit.u && device.u_height === 1
-		? `U${unit.u}`
-		: `U${unit.u} of U${device.position_u}–U${device.position_u + device.u_height - 1}`
 }
 
 /**
@@ -75,18 +61,11 @@ export function RackElevation(props: {
 									return (
 										<li
 											class={`rack-u rack-u-${kind}`}
-											classList={{
-												'rack-u-selected':
-													props.selected_u === unit.u &&
-													props.selected_face === face,
-											}}
-											style={
-												kind === 'device' && device
-													? {
-															'--rack-hue': `${device_hue(device.id)}`,
-														}
-													: {}
-											}
+												classList={{
+													'rack-u-selected':
+														props.selected_u === unit.u &&
+														props.selected_face === face,
+												}}
 										>
 											<span class="rack-u-gutter" aria-hidden="true">
 												{unit.u}
@@ -166,8 +145,7 @@ export function RackElevation(props: {
 																	{device?.name}
 																</span>
 																<span class="rack-dev-meta">
-																	{device?.device_type_model} ·{' '}
-																	{span_label(unit, device)}
+																	{device?.device_type_model}
 																</span>
 																<Show
 																	when={

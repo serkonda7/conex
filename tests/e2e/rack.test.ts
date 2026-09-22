@@ -30,7 +30,7 @@ test('rack type is saved, displayed, and drives elevation', async ({ page }) => 
 	await page.goto('/racks/add')
 	await page.locator('#rack-site').selectOption({ label: 'E2E Site' })
 	await page.getByLabel('Name').fill('Type display rack')
-	await page.locator('#rack-type').selectOption({ label: 'E2E 42U Cabinet' })
+	await page.locator('#rack-type').selectOption({ label: 'E2E 42U Cabinet (E2E Maker)' })
 	await page.getByRole('button', { name: 'Create', exact: true }).click()
 
 	await expect(page.getByRole('link', { name: 'Type display rack' })).toBeVisible()

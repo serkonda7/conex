@@ -1,10 +1,9 @@
 import { IconPlus } from '@tabler/icons-solidjs'
-import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_p1'
 import { create_rack } from '../api_p2'
-import { fetch_device_types } from '../api_p3'
+import { fetch_device_types, fetch_manufacturers, type ManufacturerRow } from '../api_p3'
 import {
 	FormActions,
 	FormError,
@@ -35,14 +34,17 @@ export function RackAddPage(): JSX.Element {
 
 	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
 	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
-	const [rackTypes] = createResource(async () => {
-		const result = await fetch_device_types({ kind: 'rack' })
-		if (Result.isError(result)) {
-			setFormError(result.error.message)
-			return []
-		}
-		return result.value.items
-	})
+	const [rackTypes] = createResource(() =>
+		load_rows(() => fetch_device_types({ kind: 'rack' }), setFormError),
+	)
+	const [manufacturers] = createResource(() => load_rows(fetch_manufacturers, setFormError))
+
+	function manufacturerName(id: number): string {
+		return (
+			(manufacturers() ?? []).find((manufacturer: ManufacturerRow) => manufacturer.id === id)
+				?.name ?? ''
+		)
+	}
 
 	// Tenant defaults to the selected site's tenant until the user picks one
 	// explicitly (or `?tenant=` is present, which counts as explicit).
@@ -138,7 +140,10 @@ export function RackAddPage(): JSX.Element {
 				label="Rack type"
 				value={rackTypeId()}
 				onChange={setRackTypeId}
-				options={(rackTypes() ?? []).map((type) => ({ value: type.id, label: type.model }))}
+				options={(rackTypes() ?? []).map((type) => ({
+					value: type.id,
+					label: `${type.model} (${manufacturerName(type.manufacturer_id)})`,
+				}))}
 				emptyLabel="Rack type…"
 				required
 				describedBy={RACK_TYPE_HINT_ID}

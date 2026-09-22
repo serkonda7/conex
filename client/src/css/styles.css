@@ -1328,11 +1328,11 @@ tbody tr:last-child td {
 }
 
 .rack-u-device {
-	background-color: hsl(var(--rack-hue, 210) 30% 22%);
+	background-color: var(--bg-raised);
 }
 
 .rack-u-device:hover {
-	background-color: hsl(var(--rack-hue, 210) 30% 26%);
+	background-color: var(--bg-hover);
 }
 
 .rack-u-shelf {

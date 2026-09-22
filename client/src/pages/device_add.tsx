@@ -3,7 +3,7 @@ import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_p1'
 import { fetch_racks } from '../api_p2'
-import { fetch_device_types } from '../api_p3'
+import { fetch_device_types, fetch_manufacturers, type ManufacturerRow } from '../api_p3'
 import { create_device } from '../api_p4'
 import {
 	FormActions,
@@ -47,9 +47,17 @@ export function DeviceAddPage(): JSX.Element {
 	const [saving, setSaving] = createSignal(false)
 
 	const [types] = createResource(() => load_rows(fetch_device_types, setFormError))
+	const [manufacturers] = createResource(() => load_rows(fetch_manufacturers, setFormError))
 	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
 	const [racks] = createResource(() => load_rows(fetch_racks, setFormError))
 	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
+
+	function manufacturerName(id: number): string {
+		return (
+			(manufacturers() ?? []).find((manufacturer: ManufacturerRow) => manufacturer.id === id)
+				?.name ?? ''
+		)
+	}
 
 	// Tenant defaults to the selected site's tenant until the user picks one
 	// explicitly (or `?tenant=` is present, which counts as explicit).
@@ -151,7 +159,7 @@ export function DeviceAddPage(): JSX.Element {
 				onChange={setTypeId}
 				options={(types() ?? []).map((t) => ({
 					value: t.id,
-					label: `${t.model} (${t.u_height}U)`,
+					label: `${t.model} (${manufacturerName(t.manufacturer_id)})`,
 				}))}
 				emptyLabel="Device type…"
 				action={

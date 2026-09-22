@@ -190,6 +190,19 @@ function checkLocation(
 	return Result.ok(undefined)
 }
 
+/** The rack location is authoritative for a rack-mounted device. */
+function rackLocationId(rackId: number): Result<number | null, Error> {
+	const rack = getDb()
+		.select({ location_id: racks.location_id })
+		.from(racks)
+		.where(eq(racks.id, rackId))
+		.get()
+	if (!rack) {
+		return Result.err(new NotFoundError('Rack not found'))
+	}
+	return Result.ok(rack.location_id)
+}
+
 function checkAssetTag(
 	assetTag: string | null | undefined,
 	excludeDeviceId?: number,
@@ -293,9 +306,17 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	}
 	const createMount = mountOf(input)
 	createMount.is_full_depth = template.is_full_depth !== 0
+	let deviceLocationId = input.location_id ?? null
+	if (createMount.rack_id !== null) {
+		const rackLocation = rackLocationId(createMount.rack_id)
+		if (Result.isError(rackLocation)) {
+			return Result.err(rackLocation.error)
+		}
+		deviceLocationId = rackLocation.value
+	}
 	for (const guard of [
 		checkSite(input.site_id),
-		checkLocation(input.location_id, input.site_id),
+		checkLocation(deviceLocationId, input.site_id),
 		checkTenant(input.tenant_id),
 		checkAssetTag(input.asset_tag),
 		checkMount(input.name, createMount, template.u_height),
@@ -326,7 +347,7 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	const values: Omit<DeviceRow, 'id'> = {
 		device_type_id: input.device_type_id,
 		site_id: input.site_id ?? null,
-		location_id: input.location_id ?? null,
+		location_id: deviceLocationId,
 		rack_id: input.rack_id ?? null,
 		face: input.face ?? null,
 		position_u: input.position_u ?? null,
@@ -385,10 +406,23 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 		return Result.err(new NotFoundError('Device type not found'))
 	}
 	const effectiveSite = input.site_id !== undefined ? input.site_id : node.site_id
+	const effectiveRackId = input.rack_id !== undefined ? input.rack_id : node.rack_id
+	const mountChanged =
+		input.rack_id !== undefined ||
+		input.position_u !== undefined ||
+		input.shelf_id !== undefined
+	let deviceLocationId = input.location_id !== undefined ? input.location_id : node.location_id
+	if (mountChanged && effectiveRackId !== null && effectiveRackId !== undefined) {
+		const rackLocation = rackLocationId(effectiveRackId)
+		if (Result.isError(rackLocation)) {
+			return Result.err(rackLocation.error)
+		}
+		deviceLocationId = rackLocation.value
+	}
 	for (const guard of [
 		checkSite(input.site_id),
 		checkLocation(
-			input.location_id !== undefined ? input.location_id : node.location_id,
+			deviceLocationId,
 			input.site_id !== undefined ? input.site_id : effectiveSite,
 		),
 		checkTenant(input.tenant_id),
@@ -398,11 +432,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 			return Result.err(guard.error)
 		}
 	}
-	if (
-		input.rack_id !== undefined ||
-		input.position_u !== undefined ||
-		input.shelf_id !== undefined
-	) {
+	if (mountChanged) {
 		const mount: MountInput = {
 			rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 			position_u: input.position_u !== undefined ? input.position_u : node.position_u,
@@ -430,8 +460,8 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	if (input.site_id !== undefined) {
 		patch.site_id = input.site_id
 	}
-	if (input.location_id !== undefined) {
-		patch.location_id = input.location_id
+	if (input.location_id !== undefined || (mountChanged && effectiveRackId !== null)) {
+		patch.location_id = deviceLocationId
 	}
 	if (input.rack_id !== undefined) {
 		patch.rack_id = input.rack_id
@@ -499,11 +529,19 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 	if (Result.isError(mountCheck)) {
 		return Result.err(mountCheck.error)
 	}
-	getDb()
-		.update(devices)
-		.set({ rack_id: mount.rack_id, position_u: mount.position_u, shelf_id: mount.shelf_id })
-		.where(eq(devices.id, id))
-		.run()
+	const patch: Partial<DeviceRow> = {
+		rack_id: mount.rack_id,
+		position_u: mount.position_u,
+		shelf_id: mount.shelf_id,
+	}
+	if (mount.rack_id !== null) {
+		const rackLocation = rackLocationId(mount.rack_id)
+		if (Result.isError(rackLocation)) {
+			return Result.err(rackLocation.error)
+		}
+		patch.location_id = rackLocation.value
+	}
+	getDb().update(devices).set(patch).where(eq(devices.id, id)).run()
 	return getDevice(id)
 }
 
