@@ -124,6 +124,33 @@ export async function delete_device(id: number): Promise<Result<unknown, Error>>
 // Interfaces
 // ---------------------------------------------------------------------------
 
+export interface InterfaceListItem extends InterfaceJson {
+	device_name: string
+}
+
+export interface InterfaceFilters {
+	search?: string
+	device?: number
+	connected?: boolean
+}
+
+export async function fetch_all_interfaces(
+	filters?: InterfaceFilters,
+): Promise<Result<Page<InterfaceListItem>, Error>> {
+	return getPage<InterfaceListItem>(
+		client.interfaces.$get({
+			query: {
+				search: filters?.search ?? '',
+				page: '1',
+				limit: '200',
+				device: filters?.device === undefined ? undefined : String(filters.device),
+				connected: filters?.connected === undefined ? undefined : String(filters.connected),
+			},
+		}),
+		'Failed to load interfaces',
+	)
+}
+
 export async function fetch_interfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
 	const res = await client.devices[':id'].interfaces.$get({ param: { id: String(deviceId) } })
 	return to_result<InterfaceJson[]>(res, 'Failed to load interfaces')

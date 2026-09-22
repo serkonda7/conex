@@ -7,6 +7,7 @@ import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
+import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
@@ -68,6 +69,7 @@ export function createApp() {
 			.route('/manufacturers', manufacturersApp)
 			.route('/device-types', deviceTypesApp)
 			.route('/devices', devicesApp)
+			.route('/interfaces', interfacesApp)
 			.route('/cables', cablesApp)
 			.route('/search', searchApp)
 	)

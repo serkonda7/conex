@@ -522,6 +522,69 @@ export function listInterfaces(deviceId: number): Result<InterfaceJson[], Error>
 	return Result.ok(rows.map(toInterfaceJson))
 }
 
+export interface InterfaceListParams extends ListParams {
+	device?: number
+	connected?: boolean
+	/**
+	 * Tenant scope for scoped editors/viewers: restricts the list to
+	 * interfaces whose device sits in the scope tenant (strict — shared
+	 * `NULL` rows are excluded). `undefined` means unconstrained.
+	 */
+	scopeTenantId?: number
+}
+
+/** One interface row for the global list view, with its device's name. */
+export interface InterfaceListItem extends InterfaceJson {
+	device_name: string
+}
+
+/**
+ * Global interface list across devices. Ordered by device name, then port
+ * creation order (stub expansion inserts eth0..ethN sequentially, so each
+ * device's ports read back in natural order — lexicographic name order
+ * would put eth10 before eth2).
+ */
+export function listAllInterfaces(params: InterfaceListParams): Page<InterfaceListItem> {
+	const db = getDb()
+	const pattern = searchPattern(params.search)
+	const conditions: SQL[] = []
+	if (params.search) {
+		conditions.push(
+			sql`(${interfaces.name} LIKE ${pattern} ESCAPE '\\' OR ${interfaces.kind} LIKE ${pattern} ESCAPE '\\' OR ${devices.name} LIKE ${pattern} ESCAPE '\\')`,
+		)
+	}
+	if (params.device !== undefined) {
+		conditions.push(eq(interfaces.device_id, params.device))
+	}
+	if (params.connected !== undefined) {
+		conditions.push(eq(interfaces.connected, params.connected ? 1 : 0))
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(devices.tenant_id, params.scopeTenantId))
+	}
+	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const rows = db
+		.select({ iface: interfaces, device_name: devices.name })
+		.from(interfaces)
+		.innerJoin(devices, eq(interfaces.device_id, devices.id))
+		.where(where)
+		.orderBy(sql`${devices.name}`, sql`"interfaces"."rowid"`)
+		.limit(params.limit)
+		.offset(offsetOf(params))
+		.all()
+	const totalRow = db
+		.select({ n: count() })
+		.from(interfaces)
+		.innerJoin(devices, eq(interfaces.device_id, devices.id))
+		.where(where)
+		.get()
+	return pageOf(
+		rows.map((r) => ({ ...toInterfaceJson(r.iface), device_name: r.device_name })),
+		totalRow?.n ?? 0,
+		params,
+	)
+}
+
 export function getInterface(deviceId: number, ifaceId: number): Result<InterfaceJson, Error> {
 	const row = getDb().select().from(interfaces).where(eq(interfaces.id, ifaceId)).get()
 	if (!row || row.device_id !== deviceId) {

@@ -8,6 +8,7 @@ import {
 	IconLock,
 	IconLogout,
 	IconMapPin,
+	IconPlug,
 	IconPlus,
 	IconServer,
 	IconTemplate,
@@ -27,6 +28,7 @@ import { DeviceTypeEditPage } from './pages/device_type_edit'
 import { DeviceTypeImportPage } from './pages/device_type_import'
 import { DeviceTypesPage } from './pages/device_types'
 import { DevicesPage } from './pages/devices'
+import { InterfacesPage } from './pages/interfaces'
 import { LocationAddPage } from './pages/location_add'
 import { LocationDetailPage } from './pages/location_detail'
 import { LocationEditPage } from './pages/location_edit'
@@ -544,6 +546,9 @@ function App(): JSX.Element {
 			}
 			return emptyRoute('devices')
 		}
+		if (parts[0] === 'interfaces') {
+			return emptyRoute('interfaces')
+		}
 		if (parts[0] === 'users') {
 			if (currentUser()?.role !== 'admin') {
 				return emptyRoute('not-found')
@@ -736,6 +741,12 @@ function App(): JSX.Element {
 										icon={<IconServer size={16} />}
 										label="Devices"
 										addHref="/devices/add"
+									/>
+									<NavItem
+										href="/interfaces"
+										active={path().startsWith('/interfaces')}
+										icon={<IconPlug size={16} />}
+										label="Interfaces"
 									/>
 									<Show when={currentUser()?.role === 'admin'}>
 										<NavItem
@@ -936,6 +947,9 @@ function App(): JSX.Element {
 										}
 									>
 										<DeviceEditPage id={route().deviceId as number} />
+									</Match>
+									<Match when={route().page === 'interfaces'}>
+										<InterfacesPage />
 									</Match>
 									<Match when={route().page === 'users'}>
 										<UsersPage />

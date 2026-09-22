@@ -631,7 +631,33 @@ export const DeviceListQuerySchema = v.object({
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
-export const InterfaceListQuerySchema = v.object({ ...ListQueryEntries })
+export const InterfaceListQuerySchema = v.object({
+	...ListQueryEntries,
+	device: OptionalIdEntry,
+	connected: v.optional(
+		v.pipe(
+			v.union([v.string(), v.number(), v.boolean()]),
+			v.transform((raw): unknown => {
+				if (typeof raw === 'boolean') {
+					return raw
+				}
+				if (typeof raw === 'number') {
+					return raw !== 0
+				}
+				const s = raw.trim().toLowerCase()
+				if (s === 'true' || s === '1' || s === 'yes' || s === 'y') {
+					return true
+				}
+				if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
+					return false
+				}
+				return raw
+			}),
+			v.boolean('Must be a boolean (true/false)'),
+		),
+		undefined,
+	),
+})
 
 export type DeviceListQuery = v.InferOutput<typeof DeviceListQuerySchema>
 export type InterfaceListQuery = v.InferOutput<typeof InterfaceListQuerySchema>
