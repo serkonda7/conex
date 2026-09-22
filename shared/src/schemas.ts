@@ -288,6 +288,7 @@ export const RackCreateSchema = v.strictObject({
 	site_id: IdSchema,
 	location_id: NullableIdSchema,
 	tenant_id: NullableIdSchema,
+	rack_type_id: IdSchema,
 	description: DescriptionSchema,
 	height_u: v.optional(RackHeightSchema, 42),
 	status: v.optional(RackStatusSchema, 'active'),
@@ -429,7 +430,7 @@ export const StubLabelSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: SlugSchema,
+	slug: v.optional(SlugSchema, undefined),
 	description: DescriptionSchema,
 })
 
@@ -485,7 +486,7 @@ export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 

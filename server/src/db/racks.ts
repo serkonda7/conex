@@ -213,6 +213,14 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 	if (!site) {
 		return Result.err(new NotFoundError('Site not found'))
 	}
+	const rackType = db
+		.select()
+		.from(device_types)
+		.where(eq(device_types.id, input.rack_type_id))
+		.get()
+	if (!rackType || rackType.form_factor === null) {
+		return Result.err(new NotFoundError('Rack type not found'))
+	}
 	const tenantCheck = checkTenant(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
@@ -229,6 +237,7 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 		site_id: input.site_id,
 		location_id: input.location_id ?? null,
 		tenant_id: input.tenant_id ?? null,
+		rack_type_id: input.rack_type_id,
 		name: input.name,
 		slug: input.slug,
 		description: input.description ?? null,

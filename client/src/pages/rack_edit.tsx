@@ -21,7 +21,6 @@ function go(e: MouseEvent, to: string): void {
 /** /racks/:id/edit — rack edit form. Saves back to the detail page. */
 export function RackEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
@@ -48,7 +47,6 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 				return null
 			}
 			setName(res.value.name)
-			setSlug(res.value.slug)
 			setLocationId(res.value.location_id ? String(res.value.location_id) : '')
 			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
 			setDescription(res.value.description ?? '')
@@ -97,20 +95,14 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 		e.preventDefault()
 		setFormError(null)
 		const trimmedName = name().trim()
-		const trimmedSlug = slug().trim()
 		if (!trimmedName) {
 			setFormError('Name is required.')
-			return
-		}
-		if (!trimmedSlug) {
-			setFormError('Slug is required.')
 			return
 		}
 		setSaving(true)
 		const trimmedDescription = description().trim()
 		const res = await update_rack(props.id, {
 			name: trimmedName,
-			slug: trimmedSlug,
 			location_id: locationId() ? Number(locationId()) : null,
 			tenant_id: tenantId() ? Number(tenantId()) : null,
 			description: trimmedDescription === '' ? null : trimmedDescription,
@@ -193,26 +185,6 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 							value={name()}
 							onInput={(e: InputEventAndTarget) => setName(e.currentTarget.value)}
 						/>
-					</div>
-					<div class="field">
-						<label for="rack-edit-slug">
-							Slug{' '}
-							<span class="required" aria-hidden="true">
-								*
-							</span>
-						</label>
-						<input
-							id="rack-edit-slug"
-							placeholder="a1"
-							required
-							maxLength={100}
-							pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-							value={slug()}
-							onInput={(e: InputEventAndTarget) => setSlug(e.currentTarget.value)}
-						/>
-						<p class="field-hint">
-							URL-safe identifier: lowercase letters, digits, single dashes.
-						</p>
 					</div>
 					<div class="field">
 						<label for="rack-edit-description">Description</label>

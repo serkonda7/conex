@@ -1,35 +1,32 @@
+import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createSignal } from 'solid-js'
 import { create_manufacturer } from '../api_p3'
-import {
-	FormActions,
-	FormError,
-	FormPage,
-	NameField,
-	SlugField,
-	TextField,
-} from '../components/form'
-import { type FormValues, is_add_another_submit, submit_form, use_slug_fields } from '../util/form'
+import { FormActions, FormError, FormPage, NameField, TextField } from '../components/form'
+import { navigate } from '../router'
 
 /** /manufacturers/add — manufacturer create form. */
 export function ManufacturerAddPage(): JSX.Element {
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		await submit_form({
-			name: slugFields.name(),
-			slug: slugFields.slug(),
-			save: (values: FormValues) =>
-				create_manufacturer(values.name, values.slug, description().trim() || undefined),
-			setError: setFormError,
-			setSaving,
-			navigateTo: '/manufacturers',
-			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
-		})
+		setFormError(null)
+		if (!name().trim()) {
+			setFormError('Name is required.')
+			return
+		}
+		setSaving(true)
+		const res = await create_manufacturer(name().trim(), description().trim() || undefined)
+		setSaving(false)
+		if (Result.isError(res)) {
+			setFormError(res.error.message)
+			return
+		}
+		navigate('/manufacturers')
 	}
 
 	return (
@@ -42,15 +39,9 @@ export function ManufacturerAddPage(): JSX.Element {
 			<NameField
 				id="manufacturer-name"
 				placeholder="Acme"
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
+				value={name()}
+				onInput={setName}
 				autofocus
-			/>
-			<SlugField
-				id="manufacturer-slug"
-				placeholder="acme"
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
 			/>
 			<TextField
 				id="manufacturer-description"

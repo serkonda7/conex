@@ -150,12 +150,6 @@ export function RackTypesPage(): JSX.Element {
 			getValue: (t: DeviceTypeRow): string => t.model,
 		},
 		{
-			key: 'slug',
-			label: 'Slug',
-			sortable: true,
-			getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
-		},
-		{
 			key: 'manufacturer',
 			label: 'Manufacturer',
 			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
@@ -269,7 +263,7 @@ export function RackTypesPage(): JSX.Element {
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Search model, slug…"
+						placeholder="Search model…"
 						aria-label="Search rack types"
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}

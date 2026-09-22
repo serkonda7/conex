@@ -151,6 +151,7 @@ export const racks = sqliteTable(
 			.references(() => sites.id),
 		location_id: integer('location_id').references(() => locations.id),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
+		rack_type_id: integer('rack_type_id').references(() => device_types.id),
 		name: text('name').notNull(),
 		// v1 keeps the slug globally unique (same as sites); per-site scoping
 		// can replace this when rack counts grow.

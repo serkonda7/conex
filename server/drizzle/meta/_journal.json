@@ -78,6 +78,13 @@
       "when": 1790064467705,
       "tag": "0010_closed_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790085044977,
+      "tag": "0011_curvy_white_queen",
+      "breakpoints": true
     }
   ]
 }

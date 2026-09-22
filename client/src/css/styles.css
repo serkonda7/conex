@@ -817,6 +817,16 @@ tbody tr:last-child td {
 	grid-column: 2;
 }
 
+.rack-type-fixed-width {
+	padding: 0.36rem 0.5rem;
+}
+
+.field-inline-actions {
+	display: flex;
+	align-items: stretch;
+	gap: 0.4rem;
+}
+
 /* Legacy edit-page rows render the control and hint as direct `.field`
    children (no `.field-control` wrapper); pin them to the right column so
    they share the same two-column layout. */
@@ -825,6 +835,12 @@ tbody tr:last-child td {
 .app-content .form-stacked .field > textarea,
 .field > .field-hint {
 	grid-column: 2;
+	min-width: 0;
+}
+
+.app-content .form-stacked .field .field-inline-actions > select {
+	flex: 1 1 auto;
+	width: auto;
 	min-width: 0;
 }
 

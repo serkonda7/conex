@@ -1,14 +1,16 @@
+import { IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import { slugify } from 'shared/src/slug'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
 import { create_device_type, fetch_manufacturers } from '../api_p3'
 import {
+	Field,
 	FormActions,
 	FormError,
 	FormPage,
 	row_options,
 	SelectField,
-	SlugField,
 	TextAreaField,
 	TextField,
 } from '../components/form'
@@ -29,16 +31,12 @@ const FORM_FACTORS: RackFormFactor[] = [
 	'wall-mounted cabinet',
 ]
 
-const WIDTHS = [10, 19, 23] as const
-
 /** /rack-types/add — create a NetBox-compatible rack type. */
 export function RackTypeAddPage(): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
 	const [model, setModel] = createSignal('')
-	const [slug, setSlug] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [formFactor, setFormFactor] = createSignal<RackFormFactor | ''>('')
-	const [width, setWidth] = createSignal('19')
 	const [height, setHeight] = createSignal('1')
 	const [error, setError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
@@ -73,10 +71,10 @@ export function RackTypeAddPage(): JSX.Element {
 		const res = await create_device_type({
 			manufacturer_id: manufacturer,
 			model: model().trim(),
-			slug: slug().trim(),
+			slug: slugify(model()),
 			description: description().trim() || undefined,
 			form_factor: formFactor() || undefined,
-			width: Number(width()) as (typeof WIDTHS)[number],
+			width: 19,
 			u_height: rackHeight,
 		})
 		setSaving(false)
@@ -102,6 +100,17 @@ export function RackTypeAddPage(): JSX.Element {
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel="Manufacturer…"
+				action={
+					<button
+						type="button"
+						class="icon-btn btn-add"
+						aria-label="Add manufacturer"
+						title="Add manufacturer"
+						onClick={() => navigate('/manufacturers/add')}
+					>
+						<IconPlus size={16} />
+					</button>
+				}
 			/>
 			<TextField
 				id="rack-type-model"
@@ -112,20 +121,6 @@ export function RackTypeAddPage(): JSX.Element {
 				placeholder="Example Rack 42U"
 				autofocus
 			/>
-			<SlugField
-				id="rack-type-slug"
-				value={slug()}
-				onInput={setSlug}
-				placeholder="example-rack-42u"
-			/>
-			<TextAreaField
-				id="rack-type-description"
-				label="Description"
-				value={description()}
-				onInput={setDescription}
-				placeholder="Short summary (optional)"
-				maxLength={500}
-			/>
 			<SelectField
 				id="rack-type-form-factor"
 				label="Form factor"
@@ -135,14 +130,11 @@ export function RackTypeAddPage(): JSX.Element {
 				options={FORM_FACTORS.map((value) => ({ value, label: value }))}
 				emptyLabel="Form factor…"
 			/>
-			<SelectField
-				id="rack-type-width"
-				label="Width (inches)"
-				required
-				value={width()}
-				onChange={setWidth}
-				options={WIDTHS.map((value) => ({ value, label: String(value) }))}
-			/>
+			<Field label="Width (inches)" for="rack-type-width" required>
+				<span id="rack-type-width" class="rack-type-fixed-width">
+					19
+				</span>
+			</Field>
 			<TextField
 				id="rack-type-height"
 				label="Height (U)"
@@ -151,6 +143,14 @@ export function RackTypeAddPage(): JSX.Element {
 				value={height()}
 				onInput={setHeight}
 				placeholder="42"
+			/>
+			<TextAreaField
+				id="rack-type-description"
+				label="Description"
+				value={description()}
+				onInput={setDescription}
+				placeholder="Short summary (optional)"
+				maxLength={500}
 			/>
 			<FormError message={error} />
 			<FormActions saving={saving()} cancelTo="/rack-types" />

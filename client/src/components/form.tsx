@@ -147,28 +147,32 @@ export function SelectField(props: {
 	disabled?: boolean
 	describedBy?: string
 	hint?: JSX.Element
+	action?: JSX.Element
 }): JSX.Element {
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
-			<select
-				id={props.id}
-				required={props.required}
-				disabled={props.disabled}
-				aria-describedby={props.describedBy}
-				value={props.value}
-				onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-					props.onChange?.(e.currentTarget.value)
-				}
-			>
-				<Show when={props.emptyLabel}>
-					<option value="">{props.emptyLabel}</option>
-				</Show>
-				<For each={props.options}>
-					{(option: FormOption): JSX.Element => (
-						<option value={option.value}>{option.label}</option>
-					)}
-				</For>
-			</select>
+			<div class="field-inline-actions">
+				<select
+					id={props.id}
+					required={props.required}
+					disabled={props.disabled}
+					aria-describedby={props.describedBy}
+					value={props.value}
+					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+						props.onChange?.(e.currentTarget.value)
+					}
+				>
+					<Show when={props.emptyLabel}>
+						<option value="">{props.emptyLabel}</option>
+					</Show>
+					<For each={props.options}>
+						{(option: FormOption): JSX.Element => (
+							<option value={option.value}>{option.label}</option>
+						)}
+					</For>
+				</select>
+				{props.action}
+			</div>
 		</Field>
 	)
 }

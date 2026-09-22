@@ -46,6 +46,7 @@ export interface RackCreateInput {
 	site_id: number
 	location_id: number | null
 	tenant_id: number | null
+	rack_type_id: number
 	description?: string
 	height_u?: number
 }
@@ -95,6 +96,7 @@ export async function create_rack(input: RackCreateInput): Promise<Result<RackRo
 			site_id: input.site_id,
 			location_id: input.location_id,
 			tenant_id: input.tenant_id,
+			rack_type_id: input.rack_type_id,
 			description: input.description || undefined,
 			height_u: input.height_u,
 		},

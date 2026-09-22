@@ -8,6 +8,7 @@ import type {
 	StubCreate,
 	StubUpdate,
 } from 'shared/src/schemas'
+import { slugify } from 'shared/src/slug'
 import { device_type_interfaces, device_types, devices, manufacturers } from '../schema'
 import { expandStubs } from '../services/templates'
 import { getDb } from './connection'
@@ -36,22 +37,16 @@ function searchPattern(raw: string): string {
 // ---------------------------------------------------------------------------
 
 export interface ManufacturerListParams extends ListParams {
-	sort: 'name' | 'slug' | 'description'
+	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 }
 
 export function listManufacturers(params: ManufacturerListParams): Page<ManufacturerRow> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
-	const where = params.search
-		? sql`(${manufacturers.name} LIKE ${pattern} ESCAPE '\\' OR ${manufacturers.slug} LIKE ${pattern} ESCAPE '\\')`
-		: undefined
+	const where = params.search ? sql`${manufacturers.name} LIKE ${pattern} ESCAPE '\\'` : undefined
 	const orderColumn =
-		params.sort === 'slug'
-			? manufacturers.slug
-			: params.sort === 'description'
-				? manufacturers.description
-				: manufacturers.name
+		params.sort === 'description' ? manufacturers.description : manufacturers.name
 	const items = db
 		.select()
 		.from(manufacturers)
@@ -74,7 +69,8 @@ export function getManufacturer(id: number): Result<ManufacturerRow, Error> {
 
 export function createManufacturer(input: ManufacturerCreate): Result<ManufacturerRow, Error> {
 	const db = getDb()
-	if (db.select().from(manufacturers).where(eq(manufacturers.slug, input.slug)).get()) {
+	const slug = input.slug ?? slugify(input.name)
+	if (db.select().from(manufacturers).where(eq(manufacturers.slug, slug)).get()) {
 		return Result.err(new DuplicateError('Manufacturer slug is already in use'))
 	}
 	if (db.select().from(manufacturers).where(eq(manufacturers.name, input.name)).get()) {
@@ -82,7 +78,7 @@ export function createManufacturer(input: ManufacturerCreate): Result<Manufactur
 	}
 	const row: Omit<ManufacturerRow, 'id'> = {
 		name: input.name,
-		slug: input.slug,
+		slug,
 		description: input.description ?? null,
 	}
 	try {
@@ -181,7 +177,9 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${device_types.model} LIKE ${pattern} ESCAPE '\\' OR ${device_types.slug} LIKE ${pattern} ESCAPE '\\')`,
+			params.kind === 'rack'
+				? sql`${device_types.model} LIKE ${pattern} ESCAPE '\\'`
+				: sql`(${device_types.model} LIKE ${pattern} ESCAPE '\\' OR ${device_types.slug} LIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.manufacturer) {
@@ -232,7 +230,9 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		u_height: input.u_height ?? 1,
 		is_full_depth: (input.is_full_depth ?? true) ? 1 : 0,
 		form_factor: input.form_factor ?? null,
-		width: input.width ?? null,
+		// Rack types use the standard 19-inch mounting width. Keep the generic
+		// device-type API's other width options for non-rack device types.
+		width: input.form_factor !== undefined ? 19 : (input.width ?? null),
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
@@ -298,7 +298,11 @@ export function updateDeviceType(
 	if (input.form_factor !== undefined) {
 		patch.form_factor = input.form_factor
 	}
-	if (input.width !== undefined) {
+	const resultingFormFactor =
+		input.form_factor !== undefined ? input.form_factor : current.value.form_factor
+	if (resultingFormFactor !== null) {
+		patch.width = 19
+	} else if (input.width !== undefined) {
 		patch.width = input.width
 	}
 	if (input.description !== undefined) {

@@ -28,7 +28,7 @@ async function getPage<T>(
 // Manufacturers
 // ---------------------------------------------------------------------------
 
-export type ManufacturerSort = 'name' | 'slug' | 'description'
+export type ManufacturerSort = 'name' | 'description'
 
 export interface ManufacturerFilters {
 	search?: string
@@ -56,11 +56,10 @@ export async function fetch_manufacturers(
 
 export async function create_manufacturer(
 	name: string,
-	slug: string,
 	description?: string,
 ): Promise<Result<ManufacturerRow, Error>> {
 	const res = await client.manufacturers.$post({
-		json: { name, slug, description: description || undefined },
+		json: { name, description: description || undefined },
 	})
 	return to_result<ManufacturerRow>(res, 'Failed to create manufacturer')
 }

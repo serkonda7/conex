@@ -17,7 +17,7 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /manufacturers/:id — manufacturer detail: header with slug/description
+ * /manufacturers/:id — manufacturer detail: header with description
  * and the related device-types table.
  */
 export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
@@ -79,9 +79,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 			>
 				<Show when={manufacturer()} fallback={<p class="empty">Manufacturer not found.</p>}>
 					<div class="page-header">
-						<h2>
-							{manufacturer()?.name} <code>{manufacturer()?.slug}</code>
-						</h2>
+						<h2>{manufacturer()?.name}</h2>
 						<div class="form-actions">
 							<button
 								type="button"
@@ -104,10 +102,6 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 
 					<section class="card" aria-label="Manufacturer details">
 						<dl class="detail-grid">
-							<dt>Slug</dt>
-							<dd>
-								<code>{manufacturer()?.slug}</code>
-							</dd>
 							<dt>Description</dt>
 							<dd>{manufacturer()?.description || '—'}</dd>
 						</dl>

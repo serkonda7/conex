@@ -1,7 +1,10 @@
+import { IconPlus } from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_p1'
 import { create_rack } from '../api_p2'
+import { fetch_device_types } from '../api_p3'
 import {
 	FormActions,
 	FormError,
@@ -10,10 +13,9 @@ import {
 	NameField,
 	row_options,
 	SelectField,
-	SlugField,
 	TextField,
 } from '../components/form'
-import { parseId, queryParam } from '../router'
+import { navigate, parseId, queryParam } from '../router'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -22,7 +24,7 @@ import {
 	use_slug_fields,
 } from '../util/form'
 
-/** Id of the hint under the disabled rack-type select. */
+/** Id of the hint under the rack-type select. */
 const RACK_TYPE_HINT_ID = 'rack-type-hint'
 
 /** /racks/add — NetBox-style rack create form. */
@@ -33,11 +35,20 @@ export function RackAddPage(): JSX.Element {
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [description, setDescription] = createSignal('')
+	const [rackTypeId, setRackTypeId] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 
 	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
 	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
+	const [rackTypes] = createResource(async () => {
+		const result = await fetch_device_types({ kind: 'rack' })
+		if (Result.isError(result)) {
+			setFormError(result.error.message)
+			return []
+		}
+		return result.value.items
+	})
 
 	// Tenant defaults to the selected site's tenant until the user picks one
 	// explicitly (or `?tenant=` is present, which counts as explicit).
@@ -81,7 +92,12 @@ export function RackAddPage(): JSX.Element {
 		await submit_form({
 			name: slugFields.name(),
 			slug: slugFields.slug(),
-			validate: () => (parseId(siteId()) === null ? 'Select a site first.' : null),
+			validate: () =>
+				parseId(siteId()) === null
+					? 'Select a site first.'
+					: parseId(rackTypeId()) === null
+						? 'Select a rack type.'
+						: null,
 			save: (values: FormValues) =>
 				create_rack({
 					name: values.name,
@@ -89,6 +105,7 @@ export function RackAddPage(): JSX.Element {
 					site_id: Number(siteId()),
 					location_id: locationId() ? Number(locationId()) : null,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
+					rack_type_id: Number(rackTypeId()),
 					description: description().trim() || undefined,
 				}),
 			setError: setFormError,
@@ -130,11 +147,26 @@ export function RackAddPage(): JSX.Element {
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
-			<SlugField
-				id="rack-slug"
-				placeholder="a1"
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
+			<SelectField
+				id="rack-type"
+				label="Rack type"
+				value={rackTypeId()}
+				onChange={setRackTypeId}
+				options={(rackTypes() ?? []).map((type) => ({ value: type.id, label: type.model }))}
+				emptyLabel="Rack type…"
+				required
+				describedBy={RACK_TYPE_HINT_ID}
+				action={
+					<button
+						type="button"
+						class="icon-btn btn-add"
+						aria-label="Add rack type"
+						title="Add rack type"
+						onClick={() => navigate('/rack-types/add')}
+					>
+						<IconPlus size={16} />
+					</button>
+				}
 			/>
 			<TextField
 				id="rack-description"
@@ -143,20 +175,6 @@ export function RackAddPage(): JSX.Element {
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
-			/>
-			<SelectField
-				id="rack-type"
-				label="Rack type"
-				value=""
-				options={[]}
-				emptyLabel="No type"
-				disabled
-				describedBy={RACK_TYPE_HINT_ID}
-				hint={
-					<Hint id={RACK_TYPE_HINT_ID}>
-						Pick the rack-type catalog entry for this rack.
-					</Hint>
-				}
 			/>
 			<SelectField
 				id="rack-tenant"
