@@ -425,6 +425,7 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	model: NameSchema,
 	slug: SlugSchema,
 	u_height: v.optional(DeviceHeightSchema, 1),
+	is_full_depth: v.optional(v.boolean(), true),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	width: v.optional(RackWidthSchema, undefined),
 	description: DescriptionSchema,
@@ -435,6 +436,7 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
 	u_height: v.optional(DeviceHeightSchema, undefined),
+	is_full_depth: v.optional(v.boolean(), undefined),
 	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
 	width: v.optional(v.nullable(RackWidthSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
@@ -826,6 +828,32 @@ export const CableImportRowSchema = v.object({
 export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 
 /**
+ * Loose boolean for CSV cells: true/false, 1/0, yes/no (case-insensitive),
+ * with an empty cell defaulting to true (full depth). Unknown text falls
+ * through so the trailing `v.boolean()` fails validation loudly.
+ */
+const LooseBooleanSchema = v.pipe(
+	v.union([v.string(), v.number(), v.boolean()]),
+	v.transform((raw): unknown => {
+		if (typeof raw === 'boolean') {
+			return raw
+		}
+		if (typeof raw === 'number') {
+			return raw !== 0
+		}
+		const s = raw.trim().toLowerCase()
+		if (s === '' || s === 'true' || s === '1' || s === 'yes' || s === 'y') {
+			return true
+		}
+		if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
+			return false
+		}
+		return raw
+	}),
+	v.boolean('Must be a boolean (true/false)'),
+)
+
+/**
  * One device-type CSV row. `manufacturer_slug` resolves to an id
  * server-side; `u_height`/`width` arrive as text and coerce through Number.
  */
@@ -844,6 +872,7 @@ export const DeviceTypeImportRowSchema = v.object({
 		),
 		1,
 	),
+	is_full_depth: v.optional(LooseBooleanSchema, true),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	width: v.optional(
 		v.pipe(

@@ -64,6 +64,13 @@
       "when": 1790000000000,
       "tag": "0008_rack_template_dimensions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790062388236,
+      "tag": "0009_mixed_romulus",
+      "breakpoints": true
     }
   ]
 }

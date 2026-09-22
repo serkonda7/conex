@@ -121,6 +121,11 @@ export function DeviceTypeImportPage(): JSX.Element {
 								<td>Rack height from 0 to 60; defaults to 1.</td>
 							</tr>
 							<tr>
+								<td>is_full_depth</td>
+								<td>—</td>
+								<td>Full-depth device (true/false, defaults to true).</td>
+							</tr>
+							<tr>
 								<td>comments</td>
 								<td>—</td>
 								<td>Optional device-type description.</td>

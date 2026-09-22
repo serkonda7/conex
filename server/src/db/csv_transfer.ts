@@ -41,6 +41,7 @@ export const DEVICE_TYPE_CSV_HEADER = [
 	'model',
 	'slug',
 	'u_height',
+	'is_full_depth',
 	'form_factor',
 	'width',
 	'description',
@@ -59,6 +60,7 @@ export function exportDeviceTypesCsv(): string {
 			model: device_types.model,
 			slug: device_types.slug,
 			u_height: device_types.u_height,
+			is_full_depth: device_types.is_full_depth,
 			form_factor: device_types.form_factor,
 			width: device_types.width,
 			description: device_types.description,
@@ -74,6 +76,7 @@ export function exportDeviceTypesCsv(): string {
 			r.model,
 			r.slug,
 			String(r.u_height),
+			r.is_full_depth ? 'true' : 'false',
 			r.form_factor,
 			r.width === null ? null : String(r.width),
 			r.description,
@@ -113,6 +116,7 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 			model: input.model,
 			slug: input.slug,
 			u_height: input.u_height ?? 1,
+			is_full_depth: input.is_full_depth ?? true,
 			form_factor: input.form_factor,
 			width: (input.width ?? undefined) as 10 | 19 | 23 | undefined,
 			description: input.description,
@@ -178,11 +182,33 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 			fail('u_height must be an integer between 0 and 60')
 			continue
 		}
+		let fullDepth = true
+		if (item.is_full_depth !== undefined) {
+			if (typeof item.is_full_depth === 'boolean') {
+				fullDepth = item.is_full_depth
+			} else if (typeof item.is_full_depth === 'number') {
+				fullDepth = item.is_full_depth !== 0
+			} else if (typeof item.is_full_depth === 'string') {
+				const s = item.is_full_depth.trim().toLowerCase()
+				if (s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === '') {
+					fullDepth = true
+				} else if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
+					fullDepth = false
+				} else {
+					fail('is_full_depth must be a boolean (true/false)')
+					continue
+				}
+			} else {
+				fail('is_full_depth must be a boolean (true/false)')
+				continue
+			}
+		}
 		const created = createDeviceType({
 			manufacturer_id: mfr.id,
 			model,
 			slug,
 			u_height: height,
+			is_full_depth: fullDepth,
 			description: typeof item.comments === 'string' ? item.comments : undefined,
 		})
 		if (Result.isError(created)) {

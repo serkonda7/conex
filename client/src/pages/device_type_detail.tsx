@@ -209,18 +209,22 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						<dl class="detail-grid">
 							<dt>Manufacturer</dt>
 							<dd>{mfrNameOf(deviceType()?.manufacturer_id)}</dd>
+							<dt>Model</dt>
+							<dd>{deviceType()?.model}</dd>
 							<dt>Slug</dt>
 							<dd>
 								<code>{deviceType()?.slug}</code>
 							</dd>
-							<dt>U height</dt>
+							<dt>Description</dt>
+							<dd>{deviceType()?.description || '—'}</dd>
+							<dt>Height</dt>
 							<dd>
 								{deviceType()?.u_height === 0
 									? '0 (virtual)'
 									: `${deviceType()?.u_height}U`}
 							</dd>
-							<dt>Description</dt>
-							<dd>{deviceType()?.description || '—'}</dd>
+							<dt>Full depth</dt>
+							<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>
 						</dl>
 					</section>
 				</Show>

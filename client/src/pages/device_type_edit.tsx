@@ -21,6 +21,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [model, setModel] = createSignal('')
 	const [slug, setSlug] = createSignal('')
 	const [uHeight, setUHeight] = createSignal('1')
+	const [fullDepth, setFullDepth] = createSignal(true)
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
@@ -47,6 +48,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			setModel(res.value.model)
 			setSlug(res.value.slug)
 			setUHeight(String(res.value.u_height))
+			setFullDepth(Boolean(res.value.is_full_depth))
 			setDescription(res.value.description ?? '')
 			setLoaded(true)
 			return res.value
@@ -83,6 +85,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			model: trimmedModel,
 			slug: trimmedSlug,
 			u_height: height,
+			is_full_depth: fullDepth(),
 			description: trimmedDescription === '' ? null : trimmedDescription,
 		})
 		setSaving(false)
@@ -165,7 +168,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 					</div>
 					<div class="field">
 						<label for="device-type-edit-u-height">
-							U height{' '}
+							Height{' '}
 							<span class="required" aria-hidden="true">
 								*
 							</span>
@@ -179,6 +182,18 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 							onInput={(e: InputEventAndTarget) => setUHeight(e.currentTarget.value)}
 						/>
 						<p class="field-hint">0 = virtual or shelf-only, otherwise 1–60.</p>
+					</div>
+					<div class="field">
+						<label for="device-type-edit-full-depth">Full depth</label>
+						<input
+							id="device-type-edit-full-depth"
+							type="checkbox"
+							checked={fullDepth()}
+							onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+								setFullDepth(e.currentTarget.checked)
+							}
+						/>
+						<p class="field-hint">Off for half-depth or shelf-only devices.</p>
 					</div>
 					<div class="field">
 						<label for="device-type-edit-description">Description</label>

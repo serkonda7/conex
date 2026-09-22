@@ -149,6 +149,11 @@ export function DeviceTypesPage(): JSX.Element {
 
 	const columns: DataTableColumn<DeviceTypeRow>[] = [
 		{
+			key: 'manufacturer',
+			label: 'Manufacturer',
+			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
+		},
+		{
 			key: 'model',
 			label: 'Model',
 			sortable: true,
@@ -168,15 +173,20 @@ export function DeviceTypesPage(): JSX.Element {
 			getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
 		},
 		{
-			key: 'manufacturer',
-			label: 'Manufacturer',
-			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
+			key: 'description',
+			label: 'Description',
+			getValue: (t: DeviceTypeRow): string => t.description ?? '—',
 		},
 		{
 			key: 'u_height',
-			label: 'U height',
+			label: 'Height',
 			getValue: (t: DeviceTypeRow): string | number =>
-				t.u_height === 0 ? '0 (virtual)' : t.u_height,
+				t.u_height === 0 ? '0 (virtual)' : `${t.u_height}U`,
+		},
+		{
+			key: 'is_full_depth',
+			label: 'Full depth',
+			getValue: (t: DeviceTypeRow): string => (t.is_full_depth ? 'Yes' : 'No'),
 		},
 	]
 
