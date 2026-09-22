@@ -693,6 +693,7 @@ function App(): JSX.Element {
 										active={path().startsWith('/device-types')}
 										icon={<IconCpu size={16} />}
 										label="Device types"
+										addHref="/device-types/import"
 									/>
 									<NavItem
 										href="/manufacturers"

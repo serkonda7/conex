@@ -774,6 +774,13 @@ export const CsvImportBodySchema = v.strictObject({
 
 export type CsvImportBody = v.InferOutput<typeof CsvImportBodySchema>
 
+/** JSON body for NetBox device-type YAML imports. */
+export const YamlImportBodySchema = v.strictObject({
+	yaml: v.pipe(v.string(), v.minLength(1), v.maxLength(1_000_000)),
+})
+
+export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
+
 /**
  * One device CSV row (minimal columns). Slugs resolve to ids server-side;
  * `position_u` arrives as text and coerces through Number.

@@ -1,5 +1,5 @@
 /**
- * P6 API wrappers: CSV import/export.
+ * P6 API wrappers: CSV transfer and NetBox YAML device-type import.
  * CSV download uses a raw fetch (binary blob) and CSV upload posts the
  * file text as `{ csv }` JSON.
  */
@@ -50,5 +50,22 @@ export async function upload_csv(
 		return Result.ok((await res.json()) as ImportResponse)
 	} catch {
 		return Result.err(new Error(`Failed to import ${kind}`))
+	}
+}
+
+/** Uploads a NetBox device-type YAML document or collection. */
+export async function upload_yaml(yaml: string): Promise<Result<ImportResponse, Error>> {
+	try {
+		const res = await fetch('/api/device-types/import', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ yaml }),
+		})
+		if (!res.ok) {
+			return Result.err(new Error(await read_api_error(res, 'Failed to import device types')))
+		}
+		return Result.ok((await res.json()) as ImportResponse)
+	} catch {
+		return Result.err(new Error('Failed to import device types'))
 	}
 }

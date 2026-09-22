@@ -28,6 +28,11 @@
 	--success: #5be584;
 	--muted-dot: #666666;
 	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+	--font-size-sm: 0.75rem;
+	--font-size-base: 0.875rem;
+	--font-size-lg: 1rem;
+	--font-size-xl: 1.15rem;
+	--font-size-2xl: 1.3rem;
 }
 
 html {
@@ -48,7 +53,7 @@ body {
 	padding: 0;
 	background-color: var(--bg-base);
 	color: var(--text);
-	font-size: 0.8125rem;
+	font-size: var(--font-size-base);
 	line-height: 1.45;
 	transition:
 		background-color 150ms ease,
@@ -65,12 +70,12 @@ h3 {
 }
 
 h2 {
-	font-size: 1.25rem;
+	font-size: var(--font-size-2xl);
 	margin: 0 0 0.5rem;
 }
 
 h3 {
-	font-size: 0.95rem;
+	font-size: var(--font-size-lg);
 	margin: 1rem 0 0.4rem;
 }
 
@@ -101,7 +106,7 @@ code {
 	padding: 0.05rem 0.3rem;
 	border-radius: 0.25rem;
 	border: 1px solid var(--border);
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 }
 
 form {
@@ -116,7 +121,7 @@ select,
 textarea {
 	padding: 0.36rem 0.5rem;
 	font-family: inherit;
-	font-size: 0.8125rem;
+	font-size: var(--font-size-base);
 	background-color: var(--bg-input);
 	color: var(--text);
 	border: 1px solid var(--border-strong);
@@ -145,7 +150,7 @@ a:focus-visible {
 
 button {
 	padding: 0.36rem 0.6rem;
-	font-size: 0.8125rem;
+	font-size: var(--font-size-base);
 	cursor: pointer;
 	background-color: var(--bg-raised);
 	color: var(--text);
@@ -176,7 +181,7 @@ table {
 	max-width: 100%;
 	border-collapse: collapse;
 	margin: 0.5rem 0;
-	font-size: 0.8125rem;
+	font-size: var(--font-size-base);
 	background-color: var(--bg-surface);
 	border: 1px solid var(--border);
 	border-radius: 0.35rem;
@@ -194,7 +199,7 @@ thead th {
 	background-color: var(--bg-raised);
 	color: var(--text-secondary);
 	font-weight: 600;
-	font-size: 0.72rem;
+	font-size: var(--font-size-sm);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	white-space: nowrap;
@@ -257,7 +262,7 @@ tbody tr:last-child td {
 }
 
 .app-topbar-brand {
-	font-size: 1rem;
+	font-size: var(--font-size-lg);
 	font-weight: 700;
 	color: var(--text);
 	text-decoration: none;
@@ -285,7 +290,7 @@ tbody tr:last-child td {
 	align-items: center;
 	gap: 0.35rem;
 	max-width: 12rem;
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 	border: none;
 	background: transparent;
 }
@@ -358,7 +363,7 @@ tbody tr:last-child td {
 
 .app-nav-label {
 	margin: 0.2rem 0.25rem 0.15rem;
-	font-size: 0.68rem;
+	font-size: var(--font-size-sm);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
@@ -373,7 +378,7 @@ tbody tr:last-child td {
 	padding: 0.35rem 0.5rem;
 	border-radius: 0.3rem;
 	text-decoration: none;
-	font-size: 0.8125rem;
+	font-size: var(--font-size-base);
 	color: var(--text);
 	border: 1px solid transparent;
 }
@@ -481,7 +486,7 @@ tbody tr:last-child td {
 .page-subtitle {
 	color: var(--text-secondary);
 	margin-top: -0.25rem;
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 }
 
 .card {
@@ -507,7 +512,7 @@ tbody tr:last-child td {
 	border-radius: 0.35rem;
 	padding: 0.6rem 0.75rem;
 	margin: 0.5rem 0;
-	font-size: 0.8125rem;
+	font-size: var(--font-size-base);
 }
 
 .skeleton {
@@ -520,7 +525,7 @@ tbody tr:last-child td {
 	padding: 0.05rem 0.4rem;
 	border-radius: 999px;
 	border: 1px solid var(--border-strong);
-	font-size: 0.7rem;
+	font-size: var(--font-size-sm);
 	font-weight: 600;
 	line-height: 1.4;
 	white-space: nowrap;
@@ -692,7 +697,7 @@ tbody tr:last-child td {
 	border-radius: 0.3rem;
 	margin-top: 0.4rem;
 	padding: 0.35rem 0.5rem;
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 }
 
 .app-header {
@@ -740,6 +745,10 @@ tbody tr:last-child td {
 	margin-inline: auto;
 }
 
+.app-content > div.device-type-import-page {
+	max-width: 52rem;
+}
+
 .app-content form.form-stacked {
 	flex-direction: column;
 	align-items: stretch;
@@ -768,7 +777,7 @@ tbody tr:last-child td {
 }
 
 .field label {
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 	font-weight: 600;
 	color: var(--text);
 }
@@ -779,8 +788,56 @@ tbody tr:last-child td {
 
 .field-hint {
 	margin: 0;
-	font-size: 0.72rem;
+	font-size: var(--font-size-sm);
 	color: var(--text-muted);
+}
+
+.import-field-options {
+	margin-top: 0.35rem;
+	padding: 0.7rem 0.8rem;
+	border: 1px solid var(--border);
+	border-radius: 0.25rem;
+	background: var(--bg-surface);
+}
+
+.import-field-options h3 {
+	margin: 0 0 0.25rem;
+	font-size: var(--font-size-lg);
+}
+
+.app-content .import-field-options-table {
+	width: 100%;
+	margin-top: 0.65rem;
+	border-collapse: collapse;
+	font-size: var(--font-size-sm);
+}
+
+.app-content .import-field-options-table th,
+.app-content .import-field-options-table td {
+	padding: 0.35rem 0.45rem;
+	border-bottom: 1px solid var(--border);
+	text-align: left;
+}
+
+.app-content .import-field-options-table th {
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.app-content .import-field-options-table td:nth-child(2) {
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+@media (max-width: 36rem) {
+	.import-field-options {
+		overflow-x: auto;
+	}
+
+	.import-field-options-table {
+		min-width: 30rem;
+	}
 }
 
 /* NetBox-style list toolbar: search + paging controls + selection actions. */
@@ -804,7 +861,7 @@ tbody tr:last-child td {
 }
 
 .toolbar-count {
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 	color: var(--text-secondary);
 	white-space: nowrap;
 }
@@ -910,7 +967,7 @@ tbody tr:last-child td {
 /* "Showing X-Y of Z" result status under the table. */
 .paginator-showing {
 	margin: 0.5rem 0;
-	font-size: 0.78rem;
+	font-size: var(--font-size-base);
 	color: var(--text-secondary);
 	white-space: nowrap;
 }
@@ -982,12 +1039,12 @@ tbody tr:last-child td {
 }
 
 .detail-stat-value {
-	font-size: 1.1rem;
+	font-size: var(--font-size-xl);
 	font-weight: 700;
 }
 
 .detail-stat-label {
-	font-size: 0.72rem;
+	font-size: var(--font-size-sm);
 	color: var(--text-secondary);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -1002,7 +1059,7 @@ tbody tr:last-child td {
 }
 
 .detail-grid dt {
-	font-size: 0.72rem;
+	font-size: var(--font-size-sm);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;

@@ -3,7 +3,7 @@ import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
-import { download_csv, upload_csv } from '../api_p6'
+import { upload_yaml } from '../api_p6'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -11,54 +11,39 @@ function go(e: MouseEvent, to: string): void {
 	navigate(to)
 }
 
-const SAMPLE_CSV = `manufacturer_slug,model,slug,u_height,form_factor,width,description
-acme,Example Switch 48,example-switch-48,1,,,48-port switch
+const SAMPLE_YAML = `manufacturer: Acme
+model: Example Switch 48
+slug: acme-example-switch-48
+u_height: 1
+is_full_depth: true
+interfaces:
+  - name: GigabitEthernet
+    type: 1000base-t
 `
 
 /**
- * /device-types/import — CSV import for device types (no manual add form).
- * Posts the file text as `{ csv }` JSON; one bad row fails only itself and
+ * /device-types/import — NetBox YAML import for device types (no manual add form).
+ * Posts the file text as `{ yaml }` JSON; one bad document fails only itself and
  * the response reports per-row errors below.
  */
 export function DeviceTypeImportPage(): JSX.Element {
-	const [csvText, setCsvText] = createSignal('')
+	const [yamlText, setYamlText] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
 	const [importing, setImporting] = createSignal(false)
 	const [results, setResults] = createSignal<ImportRowResult[] | null>(null)
 	const [created, setCreated] = createSignal(0)
 	const [failed, setFailed] = createSignal(0)
 
-	async function handleFile(e: Event & { currentTarget: HTMLInputElement }): Promise<void> {
-		const file = e.currentTarget.files?.[0]
-		if (!file) {
-			return
-		}
-		setCsvText(await file.text())
-	}
-
-	function useSample(): void {
-		setCsvText(SAMPLE_CSV)
-	}
-
-	async function handleDownload(e: MouseEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		const res = await download_csv('device-types')
-		if (Result.isError(res)) {
-			setError(res.error.message)
-		}
-	}
-
 	async function handleImport(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
 		setResults(null)
-		if (!csvText().trim()) {
-			setError('Paste CSV text or pick a file first.')
+		if (!yamlText().trim()) {
+			setError('Paste NetBox YAML first.')
 			return
 		}
 		setImporting(true)
-		const res = await upload_csv('device-types', csvText())
+		const res = await upload_yaml(yamlText())
 		setImporting(false)
 		if (Result.isError(res)) {
 			setError(res.error.message)
@@ -70,7 +55,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 	}
 
 	return (
-		<div class="form-page">
+		<div class="form-page device-type-import-page">
 			<p>
 				<a href="/device-types" onClick={(e: MouseEvent): void => go(e, '/device-types')}>
 					← Device types
@@ -78,56 +63,94 @@ export function DeviceTypeImportPage(): JSX.Element {
 			</p>
 			<h2>Import device types</h2>
 			<p class="page-subtitle">
-				CSV columns:{' '}
-				<code>manufacturer_slug,model,slug,u_height,form_factor,width,description</code>.
-				Only <code>manufacturer_slug</code>, <code>model</code> and <code>slug</code> are
-				required; <code>u_height</code> defaults to 1. Rows with an unknown manufacturer
-				slug fail individually.{' '}
-				<a href="/api/device-types/export" onClick={handleDownload}>
-					Download current export
-				</a>{' '}
-				for the exact format, or start from the sample below.
+				For prebuilt definitions see{' '}
+				<a
+					href="https://github.com/netbox-community/devicetype-library"
+					target="_blank"
+					rel="noreferrer"
+				>
+					NetBox device-type library
+				</a>
 			</p>
 			<form class="form-stacked" onSubmit={handleImport}>
 				<div class="field">
-					<label for="device-type-import-file">CSV file</label>
-					<input
-						id="device-type-import-file"
-						type="file"
-						accept=".csv,text/csv"
-						onChange={handleFile}
-					/>
-				</div>
-				<div class="field">
-					<label for="device-type-import-text">CSV text</label>
+					<label for="device-type-import-text">YAML text</label>
 					<textarea
 						id="device-type-import-text"
 						rows={10}
-						placeholder={SAMPLE_CSV}
-						value={csvText()}
+						placeholder={SAMPLE_YAML}
+						value={yamlText()}
 						onInput={(e: InputEvent & { currentTarget: HTMLTextAreaElement }) =>
-							setCsvText(e.currentTarget.value)
+							setYamlText(e.currentTarget.value)
 						}
 					/>
 				</div>
+				<section class="import-field-options" aria-labelledby="device-type-import-fields">
+					<h3 id="device-type-import-fields">Field options</h3>
+					<p class="field-hint">
+						Use these NetBox YAML fields in each device-type definition. Required fields
+						are marked.
+					</p>
+					<table class="import-field-options-table">
+						<thead>
+							<tr>
+								<th scope="col">Field</th>
+								<th scope="col">Required</th>
+								<th scope="col">Description</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>manufacturer</td>
+								<td>Yes</td>
+								<td>Manufacturer name or slug.</td>
+							</tr>
+							<tr>
+								<td>model</td>
+								<td>Yes</td>
+								<td>Device model name.</td>
+							</tr>
+							<tr>
+								<td>slug</td>
+								<td>Yes</td>
+								<td>Unique URL-safe identifier.</td>
+							</tr>
+							<tr>
+								<td>u_height</td>
+								<td>—</td>
+								<td>Rack height from 0 to 60; defaults to 1.</td>
+							</tr>
+							<tr>
+								<td>comments</td>
+								<td>—</td>
+								<td>Optional device-type description.</td>
+							</tr>
+							<tr>
+								<td>interfaces</td>
+								<td>—</td>
+								<td>
+									List of ports with <code>name</code>, optional <code>type</code>{' '}
+									and <code>label</code>.
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</section>
 				<Show when={error()}>
 					<div class="app-inline-error" role="alert">
 						{error()}
 					</div>
 				</Show>
 				<div class="form-actions">
-					<button type="button" onClick={useSample} disabled={importing()}>
-						Use sample
-					</button>
-					<button type="submit" disabled={importing()}>
-						{importing() ? 'Importing…' : 'Import'}
-					</button>
 					<button
 						type="button"
 						onClick={() => navigate('/device-types')}
 						disabled={importing()}
 					>
 						Cancel
+					</button>
+					<button type="submit" disabled={importing()}>
+						{importing() ? 'Importing…' : 'Import'}
 					</button>
 				</div>
 			</form>

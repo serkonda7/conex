@@ -14,7 +14,7 @@ import { formatValibotIssues } from '../util/valibot'
 import { connectCable, listCables } from './cables'
 import { getDb } from './connection'
 import { createDevice } from './devices'
-import { createDeviceType } from './templates'
+import { createDeviceType, createStub } from './templates'
 
 export const DEVICE_CSV_HEADER = [
 	'name',
@@ -120,6 +120,100 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 		if (Result.isError(created)) {
 			fail(created.error.message)
 			continue
+		}
+		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
+	}
+	return Result.ok(importResult(rows))
+}
+
+/**
+ * Imports the device-type YAML used by NetBox's device-type library. NetBox
+ * uses manufacturer names (rather than Conex manufacturer slugs), and one
+ * YAML document represents one device type. A YAML sequence is accepted too,
+ * which makes pasting a collection of library definitions convenient.
+ */
+export function importDeviceTypesYaml(text: string): Result<ImportResponse, Error> {
+	let parsed: unknown
+	try {
+		parsed = Bun.YAML.parse(text)
+	} catch (error) {
+		return Result.err(
+			new Error(`Invalid YAML: ${error instanceof Error ? error.message : String(error)}`),
+		)
+	}
+	const definitions = Array.isArray(parsed) ? parsed : [parsed]
+	const rows: ImportRowResult[] = []
+	for (const [index, definition] of definitions.entries()) {
+		const rowNumber = index + 1
+		const fail = (error: string): void => {
+			rows.push({ row: rowNumber, ok: false, id: null, error })
+		}
+		if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+			fail('Each YAML document must be a mapping')
+			continue
+		}
+		const item = definition as Record<string, unknown>
+		const manufacturer = typeof item.manufacturer === 'string' ? item.manufacturer.trim() : ''
+		const model = typeof item.model === 'string' ? item.model.trim() : ''
+		const slug = typeof item.slug === 'string' ? item.slug.trim() : ''
+		if (!manufacturer || !model || !slug) {
+			fail('manufacturer, model, and slug are required by NetBox YAML')
+			continue
+		}
+		const mfr = getDb()
+			.select()
+			.from(manufacturers)
+			.all()
+			.find(
+				(row) =>
+					row.name.toLowerCase() === manufacturer.toLowerCase() ||
+					row.slug === manufacturer,
+			)
+		if (!mfr) {
+			fail(`Unknown manufacturer "${manufacturer}"`)
+			continue
+		}
+		const height = item.u_height === undefined ? 1 : Number(item.u_height)
+		if (!Number.isInteger(height) || height < 0 || height > 60) {
+			fail('u_height must be an integer between 0 and 60')
+			continue
+		}
+		const created = createDeviceType({
+			manufacturer_id: mfr.id,
+			model,
+			slug,
+			u_height: height,
+			description: typeof item.comments === 'string' ? item.comments : undefined,
+		})
+		if (Result.isError(created)) {
+			fail(created.error.message)
+			continue
+		}
+		const components = item.interfaces
+		if (Array.isArray(components)) {
+			for (const component of components) {
+				if (!component || typeof component !== 'object' || Array.isArray(component)) {
+					continue
+				}
+				const port = component as Record<string, unknown>
+				const name = typeof port.name === 'string' ? port.name.trim() : ''
+				if (!name) {
+					continue
+				}
+				const kind = Array.isArray(port.type)
+					? String(port.type[0] ?? 'ethernet')
+					: String(port.type ?? 'ethernet')
+				const stub = createStub(created.value.id, {
+					prefix: name,
+					count: 1,
+					kind,
+					label: typeof port.label === 'string' ? port.label : undefined,
+				})
+				if (Result.isError(stub)) {
+					fail(`Interface "${name}": ${stub.error.message}`)
+					break
+				}
+			}
 		}
 		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
 	}
