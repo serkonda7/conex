@@ -20,8 +20,6 @@ type RackFormFactor =
 	| '4-post cabinet'
 	| 'wall-mounted frame'
 	| 'wall-mounted cabinet'
-	| 'wall-mounted swing-out'
-	| 'outdoor cabinet'
 
 const FORM_FACTORS: RackFormFactor[] = [
 	'2-post frame',
@@ -29,8 +27,6 @@ const FORM_FACTORS: RackFormFactor[] = [
 	'4-post cabinet',
 	'wall-mounted frame',
 	'wall-mounted cabinet',
-	'wall-mounted swing-out',
-	'outdoor cabinet',
 ]
 
 const WIDTHS = [10, 19, 23] as const

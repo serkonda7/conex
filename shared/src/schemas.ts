@@ -402,8 +402,6 @@ export const RackFormFactorSchema = v.picklist([
 	'4-post cabinet',
 	'wall-mounted frame',
 	'wall-mounted cabinet',
-	'wall-mounted swing-out',
-	'outdoor cabinet',
 ])
 
 export const RackWidthSchema = v.picklist([10, 19, 23])

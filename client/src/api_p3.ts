@@ -138,8 +138,6 @@ export async function create_device_type(input: {
 		| '4-post cabinet'
 		| 'wall-mounted frame'
 		| 'wall-mounted cabinet'
-		| 'wall-mounted swing-out'
-		| 'outdoor cabinet'
 	width?: 10 | 19 | 23
 }): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'].$post({ json: input })
@@ -167,8 +165,6 @@ export interface DeviceTypeUpdateInput {
 		| '4-post cabinet'
 		| 'wall-mounted frame'
 		| 'wall-mounted cabinet'
-		| 'wall-mounted swing-out'
-		| 'outdoor cabinet'
 		| null
 	width?: 10 | 19 | 23 | null
 	description?: string | null
