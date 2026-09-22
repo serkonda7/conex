@@ -931,6 +931,18 @@ tbody tr:last-child td {
 	padding: 0.3rem;
 }
 
+/* Connect-cable row action: bigger green icon so the primary action stands out. */
+.icon-btn-connect {
+	color: var(--success);
+	padding: 0.45rem;
+}
+
+.icon-btn-connect:disabled {
+	color: var(--text-secondary);
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
 .row-menu-wrap {
 	position: relative;
 	display: inline-flex;

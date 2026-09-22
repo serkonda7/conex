@@ -377,7 +377,7 @@ export interface ElevationResponse {
 /** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `console`). */
 export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
 
-/** Stub name prefix (e.g. `eth` expands to `eth0..ethN-1`). */
+/** Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`). */
 export const InterfacePrefixSchema = v.pipe(
 	v.string(),
 	v.trim(),
@@ -458,21 +458,12 @@ export const StubUpdateSchema = v.strictObject({
 	label: v.optional(v.nullable(StubLabelSchema), undefined),
 })
 
-/** Ad-hoc preview body: expand one stub without storing it. */
-export const StubPreviewBodySchema = v.strictObject({
-	prefix: InterfacePrefixSchema,
-	count: v.optional(StubCountSchema, 1),
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-})
-
 export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
 export type ManufacturerUpdate = v.InferOutput<typeof ManufacturerUpdateSchema>
 export type DeviceTypeCreate = v.InferOutput<typeof DeviceTypeCreateSchema>
 export type DeviceTypeUpdate = v.InferOutput<typeof DeviceTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
-export type StubPreviewBody = v.InferOutput<typeof StubPreviewBodySchema>
-
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
@@ -490,36 +481,11 @@ export const DeviceTypeListQuerySchema = v.object({
 export type ManufacturerListQuery = v.InferOutput<typeof ManufacturerListQuerySchema>
 export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema>
 
-/** Ad-hoc preview query: `GET /device-types/preview?prefix=eth&count=24&kind=ethernet`. */
-export const StubPreviewQuerySchema = v.object({
-	prefix: InterfacePrefixSchema,
-	count: v.optional(
-		v.pipe(
-			v.union([v.string(), v.number()]),
-			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-			v.number(),
-			v.integer(),
-			v.minValue(1),
-			v.maxValue(1024),
-		),
-		1,
-	),
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-})
-
-export type StubPreviewQuery = v.InferOutput<typeof StubPreviewQuerySchema>
-
 /** One expanded interface name from a stub row. */
 export interface ExpandedInterface {
 	name: string
 	kind: string
 	label: string | null
-}
-
-/** Preview expansion response: stored stubs or one ad-hoc stub. */
-export interface StubPreviewResponse {
-	interfaces: ExpandedInterface[]
-	total: number
 }
 
 // ---------------------------------------------------------------------------
@@ -531,7 +497,7 @@ export const DeviceStatusSchema = v.picklist(['active', 'planned', 'staged', 'de
 
 export type DeviceStatus = v.InferOutput<typeof DeviceStatusSchema>
 
-/** Interface name label (e.g. `eth0`). Same charset as stub prefixes. */
+/** Interface name label (e.g. `eth1`). Same charset as stub prefixes. */
 export const InterfaceNameSchema = v.pipe(
 	v.string(),
 	v.trim(),

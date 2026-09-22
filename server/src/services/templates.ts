@@ -3,7 +3,7 @@ import type { ExpandedInterface } from 'shared/src/schemas'
 
 /**
  * Pure stub-expansion helpers for device templates. They operate on in-memory
- * rows so the `{prefix, count} -> prefix0..prefix{count-1}` math stays
+ * rows so the `{prefix, count} -> prefix1..prefix{count}` math stays
  * unit-testable without a database; `db/templates.ts` loads the rows and
  * delegates here.
  */
@@ -21,7 +21,9 @@ function invalid(message: string): Result<never, Error> {
 
 /**
  * Expands one stub row into concrete interface names:
- * `{prefix: "eth", count: 24}` -> `eth0..eth23`.
+ * `{prefix: "eth", count: 24}` -> `eth1..eth24`.
+ * A single-port stub keeps its name verbatim (`Port 1` stays `Port 1`);
+ * only multi-port stubs append a 1-based index.
  */
 export function expandStub(prefix: string, count: number): Result<string[], Error> {
 	const trimmed = prefix.trim()
@@ -31,8 +33,11 @@ export function expandStub(prefix: string, count: number): Result<string[], Erro
 	if (!Number.isInteger(count) || count < 1) {
 		return invalid('Stub count must be an integer of at least 1')
 	}
+	if (count === 1) {
+		return Result.ok([trimmed])
+	}
 	const names: string[] = []
-	for (let i = 0; i < count; i += 1) {
+	for (let i = 1; i <= count; i += 1) {
 		names.push(`${trimmed}${i}`)
 	}
 	return Result.ok(names)

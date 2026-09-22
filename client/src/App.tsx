@@ -4,6 +4,7 @@ import {
 	IconCpu,
 	IconDownload,
 	IconFolder,
+	IconLink,
 	IconLocation,
 	IconLock,
 	IconLogout,
@@ -19,6 +20,7 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, type JSX, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
+import { ConnectionsPage } from './pages/connections'
 import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DeviceEditPage } from './pages/device_edit'
@@ -549,6 +551,9 @@ function App(): JSX.Element {
 		if (parts[0] === 'interfaces') {
 			return emptyRoute('interfaces')
 		}
+		if (parts[0] === 'connections' || parts[0] === 'cables') {
+			return emptyRoute('connections')
+		}
 		if (parts[0] === 'users') {
 			if (currentUser()?.role !== 'admin') {
 				return emptyRoute('not-found')
@@ -747,6 +752,15 @@ function App(): JSX.Element {
 										active={path().startsWith('/interfaces')}
 										icon={<IconPlug size={16} />}
 										label="Interfaces"
+									/>
+									<NavItem
+										href="/connections"
+										active={
+											path().startsWith('/connections') ||
+											path().startsWith('/cables')
+										}
+										icon={<IconLink size={16} />}
+										label="Connections"
 									/>
 									<Show when={currentUser()?.role === 'admin'}>
 										<NavItem
@@ -950,6 +964,9 @@ function App(): JSX.Element {
 									</Match>
 									<Match when={route().page === 'interfaces'}>
 										<InterfacesPage />
+									</Match>
+									<Match when={route().page === 'connections'}>
+										<ConnectionsPage />
 									</Match>
 									<Match when={route().page === 'users'}>
 										<UsersPage />

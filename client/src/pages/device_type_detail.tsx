@@ -8,11 +8,9 @@ import {
 	create_stub,
 	delete_device_type,
 	delete_stub,
-	fetch_adhoc_preview,
 	fetch_device_type,
 	fetch_manufacturers,
 	fetch_stubs,
-	fetch_type_preview,
 	type StubRow,
 } from '../api_p3'
 import { type DeviceRow, fetch_devices } from '../api_p4'
@@ -25,14 +23,13 @@ function go(e: MouseEvent, to: string): void {
 
 /**
  * /device-types/:id — device-type detail: header with model/slug, detail
- * grid (manufacturer, U height, description), the interface-stub editor with
- * the expanded interface-name preview, and the devices using this type.
+ * grid (manufacturer, U height, description), the interface-stub editor,
+ * and the devices using this type.
  */
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [stubPrefix, setStubPrefix] = createSignal('')
 	const [stubCount, setStubCount] = createSignal('24')
-	const [previewNames, setPreviewNames] = createSignal<string[]>([])
 
 	const [deviceType] = createResource(
 		() => props.id,
@@ -43,7 +40,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				setError(res.error.message)
 				return null
 			}
-			void refreshPreview(id)
 			return res.value
 		},
 	)
@@ -85,15 +81,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		return manufacturers()?.find((m) => m.id === id)?.name ?? String(id)
 	}
 
-	async function refreshPreview(typeId: number): Promise<void> {
-		const res = await fetch_type_preview(typeId)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setPreviewNames(res.value.interfaces.map((i) => i.name))
-	}
-
 	async function handleCreateStub(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
@@ -110,22 +97,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		setStubPrefix('')
 		setStubCount('24')
 		void refetchStubs()
-		void refreshPreview(props.id)
-	}
-
-	async function handleAdhocPreview(): Promise<void> {
-		setError(null)
-		const count = Number(stubCount())
-		if (!stubPrefix() || !Number.isInteger(count) || count < 1) {
-			setError('Enter a prefix and a count of at least 1 to preview')
-			return
-		}
-		const res = await fetch_adhoc_preview(stubPrefix(), count)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setPreviewNames(res.value.interfaces.map((i) => i.name))
 	}
 
 	async function handleDeleteStub(stubId: number): Promise<void> {
@@ -136,7 +107,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			return
 		}
 		void refetchStubs()
-		void refreshPreview(props.id)
 	}
 
 	async function handleDelete(): Promise<void> {
@@ -243,10 +213,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					value={stubCount()}
 					onInput={(e: InputEventAndTarget) => setStubCount(e.currentTarget.value)}
 				/>
-				<button type="submit">Add stub</button>{' '}
-				<button type="button" onClick={handleAdhocPreview}>
-					Preview {stubPrefix() || 'prefix'} × {stubCount() || '?'}
-				</button>
+				<button type="submit">Add stub</button>
 			</form>
 			<DataTable
 				rows={() => stubs() ?? []}
@@ -262,11 +229,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				loadingContent={<p class="skeleton">Loading stubs…</p>}
 				emptyContent={<p class="empty">No stubs yet.</p>}
 			/>
-			<h3>Expansion preview ({previewNames().length} interfaces)</h3>
-			<p>
-				<code>{previewNames().join(', ') || '—'}</code>
-			</p>
-
 			<h3 id="device-type-devices">
 				Devices <span class="badge">{deviceCount()}</span>
 			</h3>

@@ -514,7 +514,7 @@ export function listInterfaces(deviceId: number): Result<InterfaceJson[], Error>
 		.select()
 		.from(interfaces)
 		.where(eq(interfaces.device_id, deviceId))
-		// Creation order, not name order: stub expansion inserts eth0..eth23
+		// Creation order, not name order: stub expansion inserts eth1..eth24
 		// sequentially, so the list reads back in natural port order
 		// (lexicographic name order would put eth10 before eth2).
 		.orderBy(sql`"interfaces"."rowid"`)
@@ -540,7 +540,7 @@ export interface InterfaceListItem extends InterfaceJson {
 
 /**
  * Global interface list across devices. Ordered by device name, then port
- * creation order (stub expansion inserts eth0..ethN sequentially, so each
+ * creation order (stub expansion inserts eth1..ethN sequentially, so each
  * device's ports read back in natural order — lexicographic name order
  * would put eth10 before eth2).
  */

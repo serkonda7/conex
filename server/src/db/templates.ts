@@ -3,15 +3,13 @@ import { and, asc, count, desc, eq, isNotNull, isNull, type SQL, sql } from 'dri
 import type {
 	DeviceTypeCreate,
 	DeviceTypeUpdate,
-	ExpandedInterface,
 	ManufacturerCreate,
 	ManufacturerUpdate,
 	StubCreate,
-	StubPreviewResponse,
 	StubUpdate,
 } from 'shared/src/schemas'
 import { device_type_interfaces, device_types, devices, manufacturers } from '../schema'
-import { expandStub, expandStubs } from '../services/templates'
+import { expandStubs } from '../services/templates'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './tenancy'
@@ -499,46 +497,4 @@ export function deleteStub(id: number): Result<StubRow, Error> {
 	}
 	getDb().delete(device_type_interfaces).where(eq(device_type_interfaces.id, id)).run()
 	return Result.ok(current.value)
-}
-
-// ---------------------------------------------------------------------------
-// Preview expansion
-// ---------------------------------------------------------------------------
-
-/** Expands the stored stubs of a device type into concrete interface names. */
-export function previewDeviceType(id: number): Result<StubPreviewResponse, Error> {
-	const stubs = listStubs(id)
-	if (Result.isError(stubs)) {
-		return Result.err(stubs.error)
-	}
-	const expanded = expandStubs(
-		stubs.value.map((s) => ({
-			prefix: s.prefix,
-			count: s.count,
-			kind: s.kind,
-			label: s.label,
-		})),
-	)
-	if (Result.isError(expanded)) {
-		return Result.err(new ConflictError(expanded.error.message))
-	}
-	return Result.ok({ interfaces: expanded.value, total: expanded.value.length })
-}
-
-/** Expands one ad-hoc stub (`?prefix=&count=&kind=`) without storing it. */
-export function previewStub(
-	prefix: string,
-	stubCount: number,
-	kind: string,
-): Result<StubPreviewResponse, Error> {
-	const names = expandStub(prefix, stubCount)
-	if (Result.isError(names)) {
-		return Result.err(new ConflictError(names.error.message))
-	}
-	const interfaces: ExpandedInterface[] = names.value.map((name) => ({
-		name,
-		kind,
-		label: null,
-	}))
-	return Result.ok({ interfaces, total: interfaces.length })
 }

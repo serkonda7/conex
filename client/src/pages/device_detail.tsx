@@ -1,5 +1,5 @@
 import { DataTable } from '@serkonda7/solid-components'
-import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconLinkPlus, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { TraceLink } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -271,6 +271,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		void refetchIfaces()
 	}
 
+	function handleConnectCable(iface: InterfaceJson): void {
+		setError(null)
+		setLocalIface(String(iface.id))
+		document.querySelector('#device-connect')?.scrollIntoView({ behavior: 'smooth' })
+	}
+
 	const ifaceCount = (): number => ifaces()?.length ?? 0
 	const traceCount = (): number => trace()?.links.length ?? 0
 	const cableCount = (): number => cables()?.length ?? 0
@@ -435,7 +441,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			<h3 id="device-interfaces">Interfaces ({ifaces()?.length ?? 0})</h3>
 			<form onSubmit={handleAddIface}>
 				<input
-					placeholder="Interface name (e.g. mgmt0)"
+					placeholder="Interface name (e.g. mgmt1)"
 					value={ifaceName()}
 					onInput={(e: InputEventAndTarget) => setIfaceName(e.currentTarget.value)}
 				/>
@@ -473,14 +479,30 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					},
 				]}
 				rowActions={(iface: InterfaceJson): JSX.Element => (
-					<button type="button" onClick={() => handleRename(iface)}>
-						Rename
-					</button>
+					<span class="row-actions">
+						<button
+							type="button"
+							class="icon-btn icon-btn-connect"
+							disabled={iface.connected}
+							title={
+								iface.connected
+									? 'Already connected'
+									: `Connect ${iface.name} to a peer port`
+							}
+							aria-label={`Connect cable for ${iface.name}`}
+							onClick={() => handleConnectCable(iface)}
+						>
+							<IconLinkPlus size={20} />
+						</button>
+						<button type="button" onClick={() => handleRename(iface)}>
+							Rename
+						</button>
+					</span>
 				)}
 				empty={false}
 			/>
 
-			<h3>Connect a cable</h3>
+			<h3 id="device-connect">Connect a cable</h3>
 			<form onSubmit={handleConnect}>
 				<select
 					value={localIface()}
@@ -558,7 +580,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</ul>
 			</Show>
 
-			<h3 id="device-cables">Cables ({cables()?.length ?? 0})</h3>
+			<h3 id="device-cables">
+				Cables ({cables()?.length ?? 0}){' '}
+				<a
+					href={`/connections?device=${props.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/connections?device=${props.id}`)}
+				>
+					View all
+				</a>
+			</h3>
 			<DataTable
 				rows={() => cables() ?? []}
 				getRowId={(cable: CableRow): number => cable.id}

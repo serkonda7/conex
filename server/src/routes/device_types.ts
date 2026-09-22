@@ -8,8 +8,6 @@ import {
 	EntityParamsSchema,
 	IdSchema,
 	StubCreateSchema,
-	StubPreviewBodySchema,
-	StubPreviewQuerySchema,
 	StubUpdateSchema,
 	YamlImportBodySchema,
 } from 'shared/src/schemas'
@@ -25,8 +23,6 @@ import {
 	getStub,
 	listDeviceTypes,
 	listStubs,
-	previewDeviceType,
-	previewStub,
 	updateDeviceType,
 	updateStub,
 } from '../db/templates'
@@ -38,16 +34,6 @@ const stubIdParamsSchema = v.object({ id: IdSchema, stubId: IdSchema })
 
 export const deviceTypesApp = new Hono()
 	.use(authMiddleware)
-	// Ad-hoc preview (`?prefix=eth&count=24&kind=ethernet`) without storing a
-	// stub. Registered before `/:id` so "preview" is not parsed as an id.
-	.get('/preview', vValidator('query', StubPreviewQuerySchema, onValidationError), (c) => {
-		const query = c.req.valid('query')
-		return sendResult(c, previewStub(query.prefix, query.count, query.kind))
-	})
-	.post('/preview', vValidator('json', StubPreviewBodySchema, onValidationError), (c) => {
-		const body = c.req.valid('json')
-		return sendResult(c, previewStub(body.prefix, body.count ?? 1, body.kind ?? 'ethernet'))
-	})
 	.get('/', vValidator('query', DeviceTypeListQuerySchema, onValidationError), (c) => {
 		const query = c.req.valid('query')
 		return c.json(
@@ -120,10 +106,6 @@ export const deviceTypesApp = new Hono()
 			return c.json(result.value)
 		}
 		return sendResult(c, result)
-	})
-	// Stored-stub expansion for one device type.
-	.get('/:id/preview', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendResult(c, previewDeviceType(c.req.valid('param').id))
 	})
 	// Stub sub-resource.
 	.get('/:id/stubs', vValidator('param', EntityParamsSchema, onValidationError), (c) => {

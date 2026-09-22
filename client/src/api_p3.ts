@@ -1,11 +1,10 @@
 /**
- * P3 API wrappers: typed manufacturers/device-types/stubs/preview calls over
+ * P3 API wrappers: typed manufacturers/device-types/stubs calls over
  * the hono RPC client. Errors surface as `Result.err` with the server's
  * `{ error }` message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
 import type { DeviceTypeRow, ManufacturerRow, StubRow } from 'server/src/db/templates'
-import type { StubPreviewResponse } from 'shared/src/schemas'
 import { client, to_result } from './api'
 import type { ApiResponse } from './util/api_error'
 
@@ -16,7 +15,7 @@ export interface Page<T> {
 	limit: number
 }
 
-export type { DeviceTypeRow, ManufacturerRow, StubPreviewResponse, StubRow }
+export type { DeviceTypeRow, ManufacturerRow, StubRow }
 
 async function getPage<T>(
 	req: Promise<ApiResponse>,
@@ -188,7 +187,7 @@ export async function update_device_type(
 }
 
 // ---------------------------------------------------------------------------
-// Stubs + preview
+// Stubs
 // ---------------------------------------------------------------------------
 
 export async function fetch_stubs(deviceTypeId: number): Promise<Result<StubRow[], Error>> {
@@ -217,23 +216,4 @@ export async function delete_stub(
 		param: { id: String(deviceTypeId), stubId: String(stubId) },
 	})
 	return to_result<unknown>(res, 'Failed to delete interface stub')
-}
-
-export async function fetch_type_preview(
-	deviceTypeId: number,
-): Promise<Result<StubPreviewResponse, Error>> {
-	const res = await client['device-types'][':id'].preview.$get({
-		param: { id: String(deviceTypeId) },
-	})
-	return to_result<StubPreviewResponse>(res, 'Failed to load stub preview')
-}
-
-export async function fetch_adhoc_preview(
-	prefix: string,
-	count: number,
-): Promise<Result<StubPreviewResponse, Error>> {
-	const res = await client['device-types'].preview.$get({
-		query: { prefix, count: String(count) },
-	})
-	return to_result<StubPreviewResponse>(res, 'Failed to load stub preview')
 }

@@ -189,7 +189,7 @@ export const rack_shelves = sqliteTable(
 // ---------------------------------------------------------------------------
 // P3: manufacturers / device templates. A device type belongs to one
 // manufacturer; its interface stubs (`{prefix, count}`) expand into concrete
-// interface names (`prefix0..prefix{count-1}`) when a device is instantiated
+// interface names (`prefix1..prefix{count}`) when a device is instantiated
 // in P4. Deletes are blocked while dependents exist (service layer), so FKs
 // carry no cascade.
 // ---------------------------------------------------------------------------
