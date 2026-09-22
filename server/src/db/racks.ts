@@ -135,31 +135,71 @@ function shelvesOf(rackId: number): ShelfRow[] {
  * rows the elevation renders.
  */
 export function deviceSpansOf(rackId: number): OccupantSpan[] {
+	return deviceDetailsOf(rackId).map((d) => ({
+		id: d.id,
+		name: d.name,
+		position_u: d.position_u,
+		height_u: d.u_height,
+	}))
+}
+
+/** Full device mount details behind each span, for the enriched elevation. */
+export function deviceDetailsOf(rackId: number): {
+	id: number
+	name: string
+	position_u: number
+	u_height: number
+	face: 'front' | 'rear' | null
+	status: string
+	device_type_id: number
+	device_type_model: string
+	is_full_depth: boolean
+}[] {
 	const rows = getDb()
 		.select({
 			id: devices.id,
 			name: devices.name,
 			position_u: devices.position_u,
+			face: devices.face,
+			status: devices.status,
+			device_type_id: devices.device_type_id,
+			device_type_model: device_types.model,
 			u_height: device_types.u_height,
+			is_full_depth: device_types.is_full_depth,
 		})
 		.from(devices)
 		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
 		.where(eq(devices.rack_id, rackId))
 		.orderBy(asc(devices.position_u))
 		.all()
-	const spans: OccupantSpan[] = []
+	const details: {
+		id: number
+		name: string
+		position_u: number
+		u_height: number
+		face: 'front' | 'rear' | null
+		status: string
+		device_type_id: number
+		device_type_model: string
+		is_full_depth: boolean
+	}[] = []
 	for (const row of rows) {
 		if (row.position_u === null) {
 			continue
 		}
-		spans.push({
+		details.push({
 			id: row.id,
 			name: row.name,
 			position_u: row.position_u,
-			height_u: row.u_height,
+			u_height: row.u_height,
+			face: row.face === 'front' || row.face === 'rear' ? row.face : null,
+			status: row.status,
+			device_type_id: row.device_type_id,
+			device_type_model: row.device_type_model,
+			is_full_depth: row.is_full_depth !== 0,
 		})
 	}
-	return spans
+	return details
 }
 
 /** Every U-consuming span of a rack: shelves plus position-mounted devices. */
@@ -312,13 +352,54 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 	}
 	const rack = current.value
 	const shelves = shelvesOf(id)
-	const occupancy = getOccupancy(rack.height_u, shelves.map(shelfSpanOf), deviceSpansOf(id))
+	const details = deviceDetailsOf(id)
+	const occupancy = getOccupancy(
+		rack.height_u,
+		shelves.map(shelfSpanOf),
+		details.map((d) => ({
+			id: d.id,
+			name: d.name,
+			position_u: d.position_u,
+			height_u: d.u_height,
+		})),
+	)
 	if (Result.isError(occupancy)) {
 		return Result.err(occupancy.error)
 	}
-	const units: ElevationUnit[] = [...occupancy.value.units]
-		.reverse()
-		.map((u) => ({ u: u.u, shelf: u.shelf, device: u.device }))
+	const shelfById = new Map(shelves.map((s) => [s.id, s]))
+	const deviceById = new Map(details.map((d) => [d.id, d]))
+	const units: ElevationUnit[] = [...occupancy.value.units].reverse().map((u) => {
+		const shelfId = u.shelf?.id ?? null
+		const shelfRow = shelfId !== null ? shelfById.get(shelfId) : undefined
+		const deviceId = u.device?.id ?? null
+		const deviceRow = deviceId !== null ? deviceById.get(deviceId) : undefined
+		return {
+			u: u.u,
+			shelf:
+				shelfRow === undefined
+					? null
+					: {
+							id: shelfRow.id,
+							name: shelfRow.name,
+							position_u: shelfRow.position_u,
+							height_u: shelfRow.height_u,
+						},
+			device:
+				deviceRow === undefined
+					? null
+					: {
+							id: deviceRow.id,
+							name: deviceRow.name,
+							face: deviceRow.face,
+							position_u: deviceRow.position_u,
+							u_height: deviceRow.u_height,
+							status: deviceRow.status,
+							device_type_id: deviceRow.device_type_id,
+							device_type_model: deviceRow.device_type_model,
+							is_full_depth: deviceRow.is_full_depth,
+						},
+		}
+	})
 	return Result.ok({ rack_id: rack.id, height_u: rack.height_u, units })
 }
 

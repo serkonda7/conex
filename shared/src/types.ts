@@ -6,6 +6,7 @@ export type {
 	DeviceMove,
 	DeviceStatus,
 	DeviceUpdate,
+	ElevationDeviceRef,
 	ElevationResponse,
 	ElevationShelfRef,
 	ElevationUnit,

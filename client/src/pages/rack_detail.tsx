@@ -1,11 +1,11 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { ElevationUnit, InputEventAndTarget } from 'shared/src/types'
+import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_location, fetch_site, fetch_tenant } from '../api_p1'
 import { create_shelf, delete_rack, delete_shelf, fetch_elevation, fetch_rack } from '../api_p2'
+import { RackElevation, type RackFace } from '../components/rack_elevation'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -15,14 +15,17 @@ function go(e: MouseEvent, to: string): void {
 
 /**
  * /racks/:id — rack detail: header with name/slug/description, detail
- * grid (site, location, type placeholder, tenant), related-device counts
- * via the elevation, and the top-down elevation with shelf management.
+ * grid (site, location, tenant, status), utilization strip, and the
+ * NetBox-like visual elevation (front/rear faces, spanning multi-U blocks,
+ * click-free-U to install) with shelf management.
  */
 export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [shelfName, setShelfName] = createSignal('')
 	const [shelfU, setShelfU] = createSignal('')
+	const [shelfH, setShelfH] = createSignal('1')
 	const [pendingU, setPendingU] = createSignal<number | null>(null)
+	const [face, setFace] = createSignal<RackFace>('front')
 
 	const [rack] = createResource(
 		() => props.id,
@@ -83,6 +86,23 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		},
 	)
 
+	const occupiedU = createMemo(
+		() => elevation()?.units.filter((u) => u.shelf !== null || u.device !== null).length ?? 0,
+	)
+	const totalU = createMemo(() => elevation()?.height_u ?? rack()?.height_u ?? 0)
+	const utilPct = createMemo(() =>
+		totalU() > 0 ? Math.round((occupiedU() / totalU()) * 100) : 0,
+	)
+	const deviceCount = createMemo(
+		() =>
+			new Set((elevation()?.units ?? []).flatMap((u) => (u.device ? [u.device.id] : [])))
+				.size,
+	)
+	const shelfCount = createMemo(
+		() =>
+			new Set((elevation()?.units ?? []).flatMap((u) => (u.shelf ? [u.shelf.id] : []))).size,
+	)
+
 	async function handleDelete(): Promise<void> {
 		const r = rack()
 		if (!r) {
@@ -108,10 +128,16 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			setError('Shelf position must be a positive U number')
 			return
 		}
+		const height = shelfH().trim() === '' ? 1 : Number(shelfH())
+		if (!Number.isInteger(height) || height < 1) {
+			setError('Shelf height must be a positive U number')
+			return
+		}
 		const res = await create_shelf({
 			name: shelfName(),
 			rack_id: props.id,
 			position_u: position,
+			height_u: height,
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
@@ -119,6 +145,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		}
 		setShelfName('')
 		setShelfU('')
+		setShelfH('1')
 		setPendingU(null)
 		void refetch()
 	}
@@ -131,6 +158,16 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			return
 		}
 		void refetch()
+	}
+
+	function pickU(u: number, pickedFace: RackFace): void {
+		setPendingU(u)
+		setFace(pickedFace)
+		setShelfU(String(u))
+	}
+
+	function installDevice(u: number): void {
+		navigate(`/devices/add?rack=${props.id}&position_u=${u}&face=${face()}`)
 	}
 
 	return (
@@ -240,8 +277,62 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							<dd>{rack()?.status ?? '—'}</dd>
 						</dl>
 					</section>
+
+					<div class="detail-stats">
+						<span class="detail-stat">
+							<span class="detail-stat-value">{deviceCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Device{deviceCount() === 1 ? '' : 's'}
+							</span>
+						</span>
+						<span class="detail-stat">
+							<span class="detail-stat-value">{shelfCount()}</span>{' '}
+							<span class="detail-stat-label">
+								Shel{shelfCount() === 1 ? 'f' : 'ves'}
+							</span>
+						</span>
+						<span class="detail-stat">
+							<span class="detail-stat-value">
+								{occupiedU()}/{totalU()}U
+							</span>{' '}
+							<span class="detail-stat-label">Used ({utilPct()}%)</span>
+						</span>
+					</div>
 				</Show>
 			</Show>
+
+			<h3>Elevation</h3>
+			<p class="page-subtitle">
+				NetBox-style front and rear elevations, top-down with one row per U. Pick a free U
+				to install a device or shelf.
+			</p>
+			<div class="rack-util" role="status" aria-label={`${occupiedU()} of ${totalU()}U used`}>
+				<span>
+					{occupiedU()}/{totalU()}U · {utilPct()}% used
+				</span>
+				<span class="rack-util-bar" aria-hidden="true">
+					<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
+				</span>
+			</div>
+			<Show when={elevation()} fallback={<p class="skeleton">Loading elevation…</p>}>
+				<RackElevation
+					units={elevation()?.units ?? []}
+					selected_u={pendingU()}
+					selected_face={face()}
+					on_select_u={pickU}
+					on_delete_shelf={(id: number) => void handleDeleteShelf(id)}
+				/>
+			</Show>
+			<Show when={pendingU() !== null}>
+				<p class="empty">
+					U{pendingU()} selected on the {face()} face —{' '}
+					<button type="button" onClick={() => installDevice(pendingU() as number)}>
+						install a device here
+					</button>{' '}
+					or add a shelf below.
+				</p>
+			</Show>
+
 			<h3>Add shelf</h3>
 			<form onSubmit={handleCreateShelf}>
 				<input
@@ -257,86 +348,15 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 					value={shelfU()}
 					onInput={(e: InputEventAndTarget) => setShelfU(e.currentTarget.value)}
 				/>
+				<input
+					placeholder="Height (U)"
+					aria-label="Shelf height in U"
+					inputmode="numeric"
+					value={shelfH()}
+					onInput={(e: InputEventAndTarget) => setShelfH(e.currentTarget.value)}
+				/>
 				<button type="submit">Add shelf</button>
 			</form>
-			<h3>Elevation</h3>
-			<p class="page-subtitle">Top-down elevation. Pick a free U to place a device.</p>
-			<Show when={elevation()} fallback={<p class="skeleton">Loading elevation…</p>}>
-				<DataTable
-					rows={() => elevation()?.units ?? []}
-					getRowId={(unit: ElevationUnit) => unit.u}
-					showColumnCustomizer
-					columns={[
-						{
-							key: 'u',
-							label: 'U',
-							getValue: (unit: ElevationUnit) => <code>U{unit.u}</code>,
-						},
-						{
-							key: 'occupant',
-							label: 'Occupant',
-							getValue: (unit: ElevationUnit) => (
-								<span>
-									<Show when={unit.shelf} fallback={<span>free</span>}>
-										<span>▤ {unit.shelf?.name} (shelf)</span>
-									</Show>{' '}
-									<Show when={unit.device}>
-										<span>
-											▦{' '}
-											<a
-												href={`/devices/${unit.device?.id}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/devices/${unit.device?.id ?? ''}`)
-												}
-											>
-												{unit.device?.name}
-											</a>
-										</span>
-									</Show>
-								</span>
-							),
-						},
-					]}
-					rowActions={(unit: ElevationUnit) => (
-						<Show
-							when={unit.shelf}
-							fallback={
-								<button
-									type="button"
-									title="Pick a U below, then instantiate from Devices"
-									onClick={() => {
-										setPendingU(unit.u)
-										setShelfU(String(unit.u))
-									}}
-								>
-									Place here
-								</button>
-							}
-						>
-							<button
-								type="button"
-								class="btn-danger"
-								onClick={() => {
-									if (unit.shelf) {
-										handleDeleteShelf(unit.shelf.id)
-									}
-								}}
-							>
-								Delete shelf
-							</button>
-						</Show>
-					)}
-				/>
-			</Show>
-			<Show when={pendingU() !== null}>
-				<p class="empty">
-					U{pendingU()} selected — instantiate the device from{' '}
-					<a href="/devices" onClick={(e: MouseEvent): void => go(e, '/devices')}>
-						Devices
-					</a>{' '}
-					with this rack and U position.
-				</p>
-			</Show>
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>
 			</Show>

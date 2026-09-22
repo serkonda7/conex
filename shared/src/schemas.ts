@@ -351,16 +351,35 @@ export type RackListQuery = v.InferOutput<typeof RackListQuerySchema>
 export type ShelfListQuery = v.InferOutput<typeof ShelfListQuerySchema>
 
 // Elevation response (server-built, read by the client elevation view).
-// `device` stays null until P4 fills device occupancy.
 export interface ElevationShelfRef {
 	id: number
 	name: string
+	/** Bottom-U of the shelf span (1-based). */
+	position_u: number
+	/** U height of the shelf span. */
+	height_u: number
+}
+
+export interface ElevationDeviceRef {
+	id: number
+	name: string
+	/** Rack face the device is mounted on, if set. */
+	face: 'front' | 'rear' | null
+	/** Bottom-U of the device span (1-based). */
+	position_u: number
+	/** U height consumed on mount (from the device-type template). */
+	u_height: number
+	status: string
+	device_type_id: number
+	device_type_model: string
+	/** NetBox `is_full_depth`: false renders ghosted on the opposite face. */
+	is_full_depth: boolean
 }
 
 export interface ElevationUnit {
 	u: number
 	shelf: ElevationShelfRef | null
-	device: ElevationShelfRef | null
+	device: ElevationDeviceRef | null
 }
 
 export interface ElevationResponse {

@@ -15,7 +15,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
-import { parseId } from '../router'
+import { parseId, queryParam } from '../router'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** Rack faces a device can be mounted on. */
@@ -32,9 +32,14 @@ export function DeviceAddPage(): JSX.Element {
 	const [serial, setSerial] = createSignal('')
 	const [siteId, setSiteId] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
-	const [rackId, setRackId] = createSignal('')
-	const [face, setFace] = createSignal('')
-	const [positionU, setPositionU] = createSignal('')
+	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
+	// from the rack elevation pre-fills the mount so the U picker flows
+	// straight into instantiation.
+	const [rackId, setRackId] = createSignal(queryParam('rack'))
+	const [face, setFace] = createSignal(
+		queryParam('face') === 'front' || queryParam('face') === 'rear' ? queryParam('face') : '',
+	)
+	const [positionU, setPositionU] = createSignal(queryParam('position_u'))
 	const [tenantId, setTenantId] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
