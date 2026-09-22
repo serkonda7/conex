@@ -15,6 +15,7 @@ import type { ApiResponse } from './util/api_error'
 export type { CableTraceResponse, InterfaceTraceResponse, TopologyResponse }
 
 export interface TopologyFilters {
+	group?: number
 	site?: number
 	device?: number
 }
@@ -24,6 +25,7 @@ export async function fetch_topology(
 ): Promise<Result<TopologyResponse, Error>> {
 	const res: ApiResponse = await client.topology.$get({
 		query: {
+			group: filters?.group === undefined ? undefined : String(filters.group),
 			site: filters?.site === undefined ? undefined : String(filters.site),
 			device: filters?.device === undefined ? undefined : String(filters.device),
 		},

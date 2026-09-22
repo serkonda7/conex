@@ -1,22 +1,29 @@
 import { Result } from 'better-result'
 import type { TopologyEdge, TopologyNode, TracePath } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
-import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import { fetch_sites, type SiteRow } from '../api_p1'
+import {
+	createEffect,
+	createMemo,
+	createResource,
+	createSignal,
+	For,
+	onCleanup,
+	onMount,
+	Show,
+} from 'solid-js'
+import { fetch_site_groups, fetch_sites, type SiteGroupRow, type SiteRow } from '../api_p1'
 import { type DeviceRow, fetch_devices } from '../api_p4'
 import { fetch_trace } from '../api_p5'
 import { fetch_cable_trace, fetch_topology } from '../api_topology'
 import { navigate, parseId, queryParam } from '../router'
 
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
-
-const SVG_W: number = 800
-const SVG_H: number = 520
+const SVG_W: number = 560
+const SVG_H: number = 360
 const CX: number = SVG_W / 2
 const CY: number = SVG_H / 2
+const MIN_VIEW_W: number = 100
+const MAX_VIEW_W: number = SVG_W * 3
+const ZOOM_FACTOR: number = 1.2
 
 /** Deterministic circular layout: nodes sorted by id around a ring. */
 function layout(ids: number[]): Map<number, { x: number; y: number }> {
@@ -28,7 +35,7 @@ function layout(ids: number[]): Map<number, { x: number; y: number }> {
 		pos.set(ids[0] as number, { x: CX, y: CY })
 		return pos
 	}
-	const radius = Math.min(300, 34 * ids.length)
+	const radius = Math.min(200, 30 * ids.length)
 	ids.forEach((id, i) => {
 		const angle = (2 * Math.PI * i) / ids.length - Math.PI / 2
 		pos.set(id, { x: CX + radius * Math.cos(angle), y: CY + radius * 0.72 * Math.sin(angle) })
@@ -46,29 +53,112 @@ function pathLabel(path: TracePath): string {
 
 /**
  * /topology — device-graph view of L1 cabling: every device is a node,
- * every cable an edge. Site/focus-device filters narrow the snapshot;
- * clicking a node highlights its direct neighborhood and loads its
- * multi-hop cable trace, clicking an edge loads that cable's trace.
+ * every cable an edge. Site-group/site/focus-device filters narrow the
+ * snapshot; clicking a node highlights its direct neighborhood and loads
+ * its multi-hop cable trace, clicking an edge loads that cable's trace.
+ * The canvas pans on drag and zooms on wheel/buttons.
  */
 export function TopologyPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [siteFilter, setSiteFilter] = createSignal('')
+	const [groupFilter, setGroupFilter] = createSignal(queryParam('group'))
+	const [siteFilter, setSiteFilter] = createSignal(queryParam('site'))
 	const [focusFilter, setFocusFilter] = createSignal('')
 	const [selectedNode, setSelectedNode] = createSignal<number | null>(null)
 	const [selectedEdge, setSelectedEdge] = createSignal<number | null>(null)
 	const [traceDepth, setTraceDepth] = createSignal('4')
+	const [view, setView] = createSignal({ x: 0, y: 0, w: SVG_W, h: SVG_H })
+
+	let svgRef: SVGSVGElement | undefined
+	let dragState: {
+		pointerId: number
+		startX: number
+		startY: number
+		viewX: number
+		viewY: number
+		moved: boolean
+	} | null = null
 
 	const topoSource = createMemo(() => ({
+		group: parseId(groupFilter()) ?? undefined,
 		site: parseId(siteFilter()) ?? undefined,
 		device: parseId(focusFilter()) ?? undefined,
 	}))
 
-	// A new snapshot invalidates node/edge selection (runs before the
-	// deep-link effect below, so deep links re-apply after clearing).
+	// A new snapshot invalidates node/edge selection and resets the
+	// viewport (runs before the deep-link effect below, so deep links
+	// re-apply after clearing).
 	createEffect(() => {
 		topoSource()
 		setSelectedNode(null)
 		setSelectedEdge(null)
+		setView({ x: 0, y: 0, w: SVG_W, h: SVG_H })
+	})
+
+	const [siteGroups] = createResource(async () => {
+		const res = await fetch_site_groups({ limit: 200 })
+		if (Result.isError(res)) {
+			return []
+		}
+		return res.value.items
+	})
+	const [sites] = createResource(async () => {
+		const res = await fetch_sites({ limit: 200 })
+		if (Result.isError(res)) {
+			return []
+		}
+		return res.value.items
+	})
+	const [devices] = createResource(async () => {
+		const res = await fetch_devices()
+		if (Result.isError(res)) {
+			return []
+		}
+		return res.value.items
+	})
+
+	const groupSites = createMemo(() => {
+		const g = parseId(groupFilter()) ?? undefined
+		const all: SiteRow[] = sites() ?? []
+		if (g === undefined) {
+			return all
+		}
+		return all.filter((s) => s.site_group_id === g)
+	})
+	const filteredDevices = createMemo(() => {
+		const g = parseId(groupFilter()) ?? undefined
+		const site = parseId(siteFilter()) ?? undefined
+		const allSites: SiteRow[] = sites() ?? []
+		let all: DeviceRow[] = devices() ?? []
+		if (g !== undefined) {
+			const siteIds = new Set(allSites.filter((s) => s.site_group_id === g).map((s) => s.id))
+			all = all.filter((d) => d.site_id !== null && siteIds.has(d.site_id))
+		}
+		if (site !== undefined) {
+			all = all.filter((d) => d.site_id === site)
+		}
+		return all
+	})
+
+	// Changing the group drops a site choice from another group; changing
+	// group/site drops a focus device outside the narrowed snapshot.
+	createEffect(() => {
+		const g = parseId(groupFilter()) ?? undefined
+		const site = parseId(siteFilter())
+		if (site !== null) {
+			const row = (sites() ?? []).find((s) => s.id === site)
+			if (!row || (g !== undefined && row.site_group_id !== g)) {
+				setSiteFilter('')
+			}
+		}
+	})
+	createEffect(() => {
+		const focus = parseId(focusFilter())
+		if (focus !== null && !filteredDevices().some((d) => d.id === focus)) {
+			const known = (devices() ?? []).some((d) => d.id === focus)
+			if (known) {
+				setFocusFilter('')
+			}
+		}
 	})
 
 	// Follow device/cable deep links (`/topology?device=<id>`, `?cable=<id>`).
@@ -93,21 +183,6 @@ export function TopologyPage(): JSX.Element {
 			return null
 		}
 		return res.value
-	})
-
-	const [sites] = createResource(async () => {
-		const res = await fetch_sites({ limit: 200 })
-		if (Result.isError(res)) {
-			return []
-		}
-		return res.value.items
-	})
-	const [devices] = createResource(async () => {
-		const res = await fetch_devices()
-		if (Result.isError(res)) {
-			return []
-		}
-		return res.value.items
 	})
 
 	const nodes = createMemo(() => topology()?.nodes ?? [])
@@ -167,15 +242,145 @@ export function TopologyPage(): JSX.Element {
 	})
 
 	function toggleNode(id: number): void {
+		if (dragState?.moved) {
+			return
+		}
 		setError(null)
 		setSelectedEdge(null)
 		setSelectedNode((prev) => (prev === id ? null : id))
 	}
 
 	function toggleEdge(id: number): void {
+		if (dragState?.moved) {
+			return
+		}
 		setError(null)
 		setSelectedNode(null)
 		setSelectedEdge((prev) => (prev === id ? null : id))
+	}
+
+	function zoomAt(clientX: number, clientY: number, factor: number): void {
+		const svg = svgRef
+		if (!svg) {
+			return
+		}
+		const rect = svg.getBoundingClientRect()
+		if (rect.width === 0 || rect.height === 0) {
+			return
+		}
+		const v = view()
+		const px = (clientX - rect.left) / rect.width
+		const py = (clientY - rect.top) / rect.height
+		const svgX = v.x + px * v.w
+		const svgY = v.y + py * v.h
+		const newW = Math.min(MAX_VIEW_W, Math.max(MIN_VIEW_W, v.w * factor))
+		const newH = (newW * SVG_H) / SVG_W
+		setView({
+			x: svgX - px * newW,
+			y: svgY - py * newH,
+			w: newW,
+			h: newH,
+		})
+	}
+
+	function zoomCenter(factor: number): void {
+		const svg = svgRef
+		if (!svg) {
+			return
+		}
+		const rect = svg.getBoundingClientRect()
+		zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
+	}
+
+	function resetView(): void {
+		setView({ x: 0, y: 0, w: SVG_W, h: SVG_H })
+	}
+
+	function onPointerDown(e: PointerEvent): void {
+		const svg = svgRef
+		if (!svg) {
+			return
+		}
+		dragState = {
+			pointerId: e.pointerId,
+			startX: e.clientX,
+			startY: e.clientY,
+			viewX: view().x,
+			viewY: view().y,
+			moved: false,
+		}
+		try {
+			svg.setPointerCapture(e.pointerId)
+		} catch {
+			// setPointerCapture is best-effort (mouse already tracks).
+		}
+	}
+
+	function onPointerMove(e: PointerEvent): void {
+		if (!dragState || e.pointerId !== dragState.pointerId) {
+			return
+		}
+		const svg = svgRef
+		if (!svg) {
+			return
+		}
+		const dx = e.clientX - dragState.startX
+		const dy = e.clientY - dragState.startY
+		if (!dragState.moved && Math.hypot(dx, dy) > 4) {
+			dragState.moved = true
+		}
+		if (!dragState.moved) {
+			return
+		}
+		const rect = svg.getBoundingClientRect()
+		if (rect.width === 0 || rect.height === 0) {
+			return
+		}
+		const v = view()
+		setView({
+			...v,
+			x: dragState.viewX - (dx / rect.width) * v.w,
+			y: dragState.viewY - (dy / rect.height) * v.h,
+		})
+	}
+
+	function onPointerUp(e: PointerEvent): void {
+		if (!dragState || e.pointerId !== dragState.pointerId) {
+			return
+		}
+		const wasDrag = dragState.moved
+		dragState = wasDrag ? { ...dragState, moved: true } : null
+		if (!wasDrag) {
+			dragState = null
+		}
+		// Clear the drag-suppression flag after click handlers run.
+		if (wasDrag) {
+			window.setTimeout(() => {
+				dragState = null
+			}, 0)
+		}
+	}
+
+	onMount(() => {
+		const svg = svgRef
+		if (!svg) {
+			return
+		}
+		const onWheel = (e: WheelEvent): void => {
+			e.preventDefault()
+			zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR)
+		}
+		svg.addEventListener('wheel', onWheel, { passive: false })
+		onCleanup(() => {
+			svg.removeEventListener('wheel', onWheel)
+		})
+	})
+
+	const zoomPct = createMemo(() => Math.round((SVG_W / view().w) * 100))
+
+	function go(e: MouseEvent, to: string): void {
+		e.preventDefault()
+		navigate(to)
 	}
 
 	return (
@@ -192,6 +397,23 @@ export function TopologyPage(): JSX.Element {
 
 			<div class="toolbar-row">
 				<label>
+					<span class="visually-hidden">Filter by site group</span>
+					<select
+						aria-label="Filter by site group"
+						value={groupFilter()}
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+							setGroupFilter(e.currentTarget.value)
+						}
+					>
+						<option value="">Any group</option>
+						<For each={siteGroups() ?? []}>
+							{(g: SiteGroupRow): JSX.Element => (
+								<option value={g.id}>{g.name}</option>
+							)}
+						</For>
+					</select>
+				</label>
+				<label>
 					<span class="visually-hidden">Filter by site</span>
 					<select
 						aria-label="Filter by site"
@@ -201,7 +423,7 @@ export function TopologyPage(): JSX.Element {
 						}
 					>
 						<option value="">Any site</option>
-						<For each={sites() ?? []}>
+						<For each={groupSites()}>
 							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
 						</For>
 					</select>
@@ -216,7 +438,7 @@ export function TopologyPage(): JSX.Element {
 						}
 					>
 						<option value="">Whole graph</option>
-						<For each={devices() ?? []}>
+						<For each={filteredDevices()}>
 							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 						</For>
 					</select>
@@ -236,10 +458,26 @@ export function TopologyPage(): JSX.Element {
 					</select>
 				</label>
 				<span class="toolbar-count" role="status">
-					{nodes().length} devices · {edges().length} cables
+					{nodes().length} devices · {edges().length} cables · {zoomPct()}%
 				</span>
 			</div>
 
+			<div class="topo-controls" role="toolbar" aria-label="Graph view controls">
+				<button
+					type="button"
+					onClick={() => zoomCenter(1 / ZOOM_FACTOR)}
+					aria-label="Zoom in"
+				>
+					+
+				</button>
+				<button type="button" onClick={() => zoomCenter(ZOOM_FACTOR)} aria-label="Zoom out">
+					−
+				</button>
+				<button type="button" onClick={resetView}>
+					Reset view
+				</button>
+				<span class="topo-hint">Drag to pan · scroll to zoom</span>
+			</div>
 			<Show when={!topology.loading} fallback={<p class="skeleton">Loading topology…</p>}>
 				<Show
 					when={nodes().length > 0}
@@ -247,10 +485,27 @@ export function TopologyPage(): JSX.Element {
 				>
 					<div class="topo-wrap">
 						<svg
-							class="topo-svg"
-							viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+							ref={svgRef}
+							class="topo-svg topo-pannable"
+							viewBox={`${view().x} ${view().y} ${view().w} ${view().h}`}
 							role="img"
-							aria-label={`Topology graph with ${nodes().length} devices and ${edges().length} cables`}
+							aria-label={`Topology graph with ${nodes().length} devices and ${edges().length} cables. Drag to pan, scroll to zoom.`}
+							onPointerDown={onPointerDown}
+							onPointerMove={onPointerMove}
+							onPointerUp={onPointerUp}
+							onPointerCancel={onPointerUp}
+							onKeyDown={(ev: KeyboardEvent) => {
+								if (ev.key === '+' || ev.key === '=') {
+									ev.preventDefault()
+									zoomCenter(1 / ZOOM_FACTOR)
+								} else if (ev.key === '-') {
+									ev.preventDefault()
+									zoomCenter(ZOOM_FACTOR)
+								} else if (ev.key === '0') {
+									ev.preventDefault()
+									resetView()
+								}
+							}}
 						>
 							<For each={edges()}>
 								{(e: TopologyEdge): JSX.Element => {

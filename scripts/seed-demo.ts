@@ -152,6 +152,9 @@ function addRack(
 }
 
 const dentistRoom = addLocation(dentistSite.id, 'IT Closet', 'it-closet', dentist.id)
+const dentistBackoffice = addLocation(dentistSite.id, 'Backoffice', 'backoffice', dentist.id)
+const dentistEmpfang = addLocation(dentistSite.id, 'Empfang', 'empfang', dentist.id)
+const dentistBehandlung1 = addLocation(dentistSite.id, 'Behandlung 1', 'behandlung-1', dentist.id)
 const schoolRoom = addLocation(schoolSite.id, 'Network Closet', 'network-closet', school.id)
 const mspRoom = addLocation(mspSite.id, 'Staging Room', 'staging-room', null)
 const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', 'dent-r01')
@@ -217,6 +220,18 @@ const serverType = db
 	})
 	.returning()
 	.get()
+const clientType = db
+	.insert(device_types)
+	.values({
+		manufacturer_id: dell.id,
+		model: 'OptiPlex Micro',
+		slug: 'dell-optiplex-micro',
+		u_height: 0,
+		form_factor: 'desktop',
+		width: 19,
+	})
+	.returning()
+	.get()
 
 db.insert(device_type_interfaces)
 	.values({ device_type_id: switchType.id, prefix: 'Port', count: 4, kind: 'ethernet' })
@@ -226,6 +241,9 @@ db.insert(device_type_interfaces)
 	.run()
 db.insert(device_type_interfaces)
 	.values({ device_type_id: serverType.id, prefix: 'eno', count: 2, kind: 'ethernet' })
+	.run()
+db.insert(device_type_interfaces)
+	.values({ device_type_id: clientType.id, prefix: 'eth', count: 1, kind: 'ethernet' })
 	.run()
 
 function addDevice(
@@ -280,6 +298,39 @@ const dentistSwitch = addDevice(
 	'BSD-002',
 	'USW-DEMO-001',
 	8,
+)
+const dentistBackofficeClient = addDevice(
+	clientType.id,
+	dentistSite.id,
+	dentistBackoffice.id,
+	null,
+	dentist.id,
+	'DENT-BACKOFFICE-01',
+	'BSD-003',
+	'OPTIPLEX-DEMO-001',
+	null,
+)
+const dentistEmpfangClient = addDevice(
+	clientType.id,
+	dentistSite.id,
+	dentistEmpfang.id,
+	null,
+	dentist.id,
+	'DENT-EMPFANG-01',
+	'BSD-004',
+	'OPTIPLEX-DEMO-002',
+	null,
+)
+const dentistBehandlung1Client = addDevice(
+	clientType.id,
+	dentistSite.id,
+	dentistBehandlung1.id,
+	null,
+	dentist.id,
+	'DENT-BEHANDLUNG-1-01',
+	'BSD-005',
+	'OPTIPLEX-DEMO-003',
+	null,
 )
 const schoolFirewall = addDevice(
 	firewallType.id,
@@ -347,13 +398,19 @@ function addInterfaces(deviceId: number, names: string[]): Array<typeof interfac
 			.get(),
 	)
 }
-const [dentSwitchPort] = addInterfaces(dentistSwitch.id, ['Port1', 'Port2', 'Port3', 'Port4'])
+const [dentSwitchPort, dentClientPort1, dentClientPort2, dentClientPort3] = addInterfaces(
+	dentistSwitch.id,
+	['Port1', 'Port2', 'Port3', 'Port4'],
+)
 const [dentFirewallPort] = addInterfaces(dentistFirewall.id, ['WAN1', 'WAN2'])
 const [schoolSwitchPort] = addInterfaces(schoolSwitch.id, ['Port1', 'Port2', 'Port3', 'Port4'])
 const [schoolFirewallPort] = addInterfaces(schoolFirewall.id, ['WAN1', 'WAN2'])
 const [schoolServerPort] = addInterfaces(schoolServer.id, ['eno1', 'eno2'])
 addInterfaces(mspFirewall.id, ['WAN1', 'WAN2'])
 addInterfaces(mspSpare.id, ['eno1', 'eno2'])
+const [dentBackofficePort] = addInterfaces(dentistBackofficeClient.id, ['eth1'])
+const [dentEmpfangPort] = addInterfaces(dentistEmpfangClient.id, ['eth1'])
+const [dentBehandlung1Port] = addInterfaces(dentistBehandlung1Client.id, ['eth1'])
 
 db.insert(cables)
 	.values({
@@ -361,6 +418,30 @@ db.insert(cables)
 		b_interface_id: dentSwitchPort.id,
 		kind: 'cat6a',
 		label: 'Dental firewall to switch',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentBackofficePort.id,
+		b_interface_id: dentClientPort1.id,
+		kind: 'cat6a',
+		label: 'Backoffice client to switch',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentEmpfangPort.id,
+		b_interface_id: dentClientPort2.id,
+		kind: 'cat6a',
+		label: 'Empfang client to switch',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentBehandlung1Port.id,
+		b_interface_id: dentClientPort3.id,
+		kind: 'cat6a',
+		label: 'Behandlung 1 client to switch',
 	})
 	.run()
 db.insert(cables)
@@ -392,5 +473,5 @@ db.insert(users)
 console.log(`Demo database reset at ${dbPath}`)
 console.log('Login: demo / demo-password')
 console.log(
-	'Created 2 customer tenants, 1 MSP-owned site, 3 sites, 3 racks, 7 devices, and 3 cables.',
+	'Created 2 customer tenants, 1 MSP-owned site, 3 sites, 3 racks, 10 devices, and 6 cables.',
 )

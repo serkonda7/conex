@@ -1298,14 +1298,37 @@ tbody tr:last-child td {
 	border: 1px solid var(--border);
 	border-radius: 0.35rem;
 	margin: 0.5rem 0;
-	overflow-x: auto;
+	max-width: 46rem;
+	overflow: hidden;
 }
 
 .topo-svg {
 	display: block;
 	width: 100%;
-	min-width: 32rem;
+	min-width: 24rem;
 	height: auto;
+}
+
+.topo-pannable {
+	cursor: grab;
+	touch-action: none;
+	user-select: none;
+}
+
+.topo-pannable:active {
+	cursor: grabbing;
+}
+
+.topo-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.5rem 0 0;
+}
+
+.topo-hint {
+	color: var(--text-muted);
+	font-size: 0.8rem;
 }
 
 .topo-edge {

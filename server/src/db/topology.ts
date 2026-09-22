@@ -11,7 +11,7 @@ import type {
 	TracePeerDevice,
 	TracePeerInterface,
 } from 'shared/src/schemas'
-import { cables, devices, interfaces } from '../schema'
+import { cables, devices, interfaces, sites } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
 
@@ -233,23 +233,46 @@ export function bfsInterfacePaths(
 export interface TopologyParams {
 	site?: number
 	device?: number
+	tenant?: number
+	group?: number
 	scopeTenantId?: number
 }
 
 /**
  * Device-graph snapshot for the topology view: every visible device is a
- * node, every visible cable an edge. `site` keeps only that site's nodes
- * (edges need both ends inside); `device` keeps the connected component
- * containing that device (after the site filter).
+ * node, every visible cable an edge. `tenant` keeps only that tenant's
+ * nodes, `group` keeps only nodes whose site sits in that site group,
+ * `site` keeps only that site's nodes (edges need both ends inside);
+ * `device` keeps the connected component containing that device (after
+ * the other filters). Filters intersect — each narrows the previous set.
  */
 export function getTopology(params: TopologyParams): TopologyResponse {
 	const graph = loadGraph(params.scopeTenantId)
 	let nodeIds = new Set(graph.deviceById.keys())
+	if (params.tenant !== undefined) {
+		nodeIds = new Set(
+			[...nodeIds].filter((id) => graph.deviceById.get(id)?.tenant_id === params.tenant),
+		)
+	}
+	if (params.group !== undefined) {
+		const siteIds = new Set(
+			getDb()
+				.select()
+				.from(sites)
+				.all()
+				.filter((s) => s.site_group_id === params.group)
+				.map((s) => s.id),
+		)
+		nodeIds = new Set(
+			[...nodeIds].filter((id) => {
+				const siteId = graph.deviceById.get(id)?.site_id
+				return siteId !== null && siteId !== undefined && siteIds.has(siteId)
+			}),
+		)
+	}
 	if (params.site !== undefined) {
 		nodeIds = new Set(
-			[...graph.deviceById.values()]
-				.filter((d) => d.site_id === params.site)
-				.map((d) => d.id),
+			[...nodeIds].filter((id) => graph.deviceById.get(id)?.site_id === params.site),
 		)
 	}
 	if (params.device !== undefined) {

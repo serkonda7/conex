@@ -822,6 +822,8 @@ export interface TopologyResponse {
 export const TopologyQuerySchema = v.object({
 	site: OptionalIdEntry,
 	device: OptionalIdEntry,
+	tenant: OptionalIdEntry,
+	group: OptionalIdEntry,
 })
 
 export type TopologyQuery = v.InferOutput<typeof TopologyQuerySchema>
