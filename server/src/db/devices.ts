@@ -59,6 +59,8 @@ export interface MountInput {
 	rack_id: number | null
 	position_u: number | null
 	shelf_id: number | null
+	face: 'front' | 'rear' | null
+	is_full_depth: boolean
 }
 
 /**
@@ -125,6 +127,8 @@ function checkMount(
 		name: deviceName,
 		position_u: positionU,
 		height_u: uHeight,
+		face: mount.face,
+		is_full_depth: mount.is_full_depth,
 	}
 	const bounds = checkBounds(candidate, rackHeightOf(rack), `Device "${deviceName}"`)
 	if (Result.isError(bounds)) {
@@ -265,11 +269,15 @@ function mountOf(input: {
 	rack_id?: number | null
 	position_u?: number | null
 	shelf_id?: number | null
+	face?: 'front' | 'rear' | null
+	is_full_depth?: boolean
 }): MountInput {
 	return {
 		rack_id: input.rack_id ?? null,
 		position_u: input.position_u ?? null,
 		shelf_id: input.shelf_id ?? null,
+		face: input.face ?? null,
+		is_full_depth: input.is_full_depth ?? true,
 	}
 }
 
@@ -283,12 +291,14 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	if (!template) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
+	const createMount = mountOf(input)
+	createMount.is_full_depth = template.is_full_depth !== 0
 	for (const guard of [
 		checkSite(input.site_id),
 		checkLocation(input.location_id, input.site_id),
 		checkTenant(input.tenant_id),
 		checkAssetTag(input.asset_tag),
-		checkMount(input.name, mountOf(input), template.u_height),
+		checkMount(input.name, createMount, template.u_height),
 	]) {
 		if (Result.isError(guard)) {
 			return Result.err(guard.error)
@@ -397,6 +407,13 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 			rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 			position_u: input.position_u !== undefined ? input.position_u : node.position_u,
 			shelf_id: input.shelf_id !== undefined ? input.shelf_id : node.shelf_id,
+			face:
+				input.face !== undefined
+					? input.face
+					: node.face === 'front' || node.face === 'rear'
+						? node.face
+						: null,
+			is_full_depth: template.is_full_depth !== 0,
 		}
 		const mountCheck = checkMount(input.name ?? node.name, mount, template.u_height, id)
 		if (Result.isError(mountCheck)) {
@@ -475,6 +492,8 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 		rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 		position_u: input.position_u !== undefined ? input.position_u : node.position_u,
 		shelf_id: input.shelf_id !== undefined ? input.shelf_id : node.shelf_id,
+		face: node.face === 'front' || node.face === 'rear' ? node.face : null,
+		is_full_depth: template.is_full_depth !== 0,
 	}
 	const mountCheck = checkMount(node.name, mount, template.u_height, id)
 	if (Result.isError(mountCheck)) {

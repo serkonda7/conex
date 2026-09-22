@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "33ebcec9-5afd-4bda-a976-ae7cf95f9b25",
-  "prevId": "d221cd8e-9da2-4679-8e02-5f607820e35b",
+  "id": "5c956273-2359-4685-a594-0eafa6cf729d",
+  "prevId": "33ebcec9-5afd-4bda-a976-ae7cf95f9b25",
   "tables": {
     "auth_states": {
       "name": "auth_states",
@@ -282,13 +282,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "u_height": {
           "name": "u_height",
           "type": "integer",
@@ -335,13 +328,6 @@
         }
       },
       "indexes": {
-        "device_types_slug_unique": {
-          "name": "device_types_slug_unique",
-          "columns": [
-            "slug"
-          ],
-          "isUnique": true
-        },
         "device_types_manufacturer_id_idx": {
           "name": "device_types_manufacturer_id_idx",
           "columns": [

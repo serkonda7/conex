@@ -368,6 +368,8 @@ export interface ElevationUnit {
 	u: number
 	shelf: ElevationShelfRef | null
 	device: ElevationDeviceRef | null
+	/** All devices sharing this U, including opposite-face half-depth mounts. */
+	devices?: ElevationDeviceRef[]
 }
 
 export interface ElevationResponse {
@@ -430,7 +432,6 @@ export const ManufacturerUpdateSchema = v.strictObject({
 export const DeviceTypeCreateSchema = v.strictObject({
 	manufacturer_id: IdSchema,
 	model: NameSchema,
-	slug: SlugSchema,
 	u_height: v.optional(DeviceHeightSchema, 1),
 	is_full_depth: v.optional(v.boolean(), true),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
@@ -442,7 +443,6 @@ export const DeviceTypeCreateSchema = v.strictObject({
 export const DeviceTypeUpdateSchema = v.strictObject({
 	manufacturer_id: v.optional(IdSchema, undefined),
 	model: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	u_height: v.optional(DeviceHeightSchema, undefined),
 	is_full_depth: v.optional(v.boolean(), undefined),
 	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
@@ -483,7 +483,7 @@ export const DeviceTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdEntry,
 	kind: v.optional(v.picklist(['device', 'rack']), 'device'),
-	sort: v.optional(v.picklist(['model', 'slug']), 'model'),
+	sort: v.optional(v.picklist(['model']), 'model'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -891,13 +891,13 @@ export const YamlImportBodySchema = v.strictObject({
 export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
 
 /**
- * One device CSV row (minimal columns). Slugs and rack names resolve to ids server-side;
+ * One device CSV row (minimal columns). Device type models and rack names resolve to ids server-side;
  * `position_u` arrives as text and coerces through Number.
  */
 export const DeviceImportRowSchema = v.object({
 	name: NameSchema,
 	asset_tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
-	device_type_slug: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	device_type_model: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	site_slug: v.optional(
 		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 		undefined,
@@ -967,7 +967,6 @@ const LooseBooleanSchema = v.pipe(
 export const DeviceTypeImportRowSchema = v.object({
 	manufacturer_slug: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	model: NameSchema,
-	slug: SlugSchema,
 	u_height: v.optional(
 		v.pipe(
 			v.union([v.string(), v.number()]),

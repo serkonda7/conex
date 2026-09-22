@@ -9,7 +9,6 @@ import {
 	FormPage,
 	row_options,
 	SelectField,
-	SlugField,
 	TextAreaField,
 	TextField,
 } from '../components/form'
@@ -19,7 +18,6 @@ import { navigate } from '../router'
 export function DeviceTypeAddPage(): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
 	const [model, setModel] = createSignal('')
-	const [slug, setSlug] = createSignal('')
 	const [uHeight, setUHeight] = createSignal('1')
 	const [fullDepth, setFullDepth] = createSignal(true)
 	const [description, setDescription] = createSignal('')
@@ -49,10 +47,6 @@ export function DeviceTypeAddPage(): JSX.Element {
 			setError('Model is required.')
 			return
 		}
-		if (!slug().trim()) {
-			setError('Slug is required.')
-			return
-		}
 		if (!Number.isInteger(height) || height < 0 || height > 60) {
 			setError('U height must be an integer from 0 to 60.')
 			return
@@ -61,7 +55,6 @@ export function DeviceTypeAddPage(): JSX.Element {
 		const res = await create_device_type({
 			manufacturer_id: manufacturer,
 			model: model().trim(),
-			slug: slug().trim(),
 			u_height: height,
 			is_full_depth: fullDepth(),
 			description: description().trim() || undefined,
@@ -99,12 +92,6 @@ export function DeviceTypeAddPage(): JSX.Element {
 				onInput={setModel}
 				placeholder="Example Switch 48"
 				autofocus
-			/>
-			<SlugField
-				id="device-type-slug"
-				value={slug()}
-				onInput={setSlug}
-				placeholder="example-switch-48"
 			/>
 			<TextField
 				id="device-type-u-height"

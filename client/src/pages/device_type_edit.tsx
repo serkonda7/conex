@@ -19,7 +19,6 @@ function go(e: MouseEvent, to: string): void {
 export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
 	const [model, setModel] = createSignal('')
-	const [slug, setSlug] = createSignal('')
 	const [uHeight, setUHeight] = createSignal('1')
 	const [fullDepth, setFullDepth] = createSignal(true)
 	const [description, setDescription] = createSignal('')
@@ -47,7 +46,6 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			}
 			setManufacturerId(String(res.value.manufacturer_id))
 			setModel(res.value.model)
-			setSlug(res.value.slug)
 			setUHeight(String(res.value.u_height))
 			setFullDepth(Boolean(res.value.is_full_depth))
 			setDescription(res.value.description ?? '')
@@ -66,13 +64,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			return
 		}
 		const trimmedModel = model().trim()
-		const trimmedSlug = slug().trim()
 		if (!trimmedModel) {
 			setFormError('Model is required.')
-			return
-		}
-		if (!trimmedSlug) {
-			setFormError('Slug is required.')
 			return
 		}
 		const height = Number(uHeight())
@@ -86,7 +79,6 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 		const res = await update_device_type(props.id, {
 			manufacturer_id: manufacturer,
 			model: trimmedModel,
-			slug: trimmedSlug,
 			u_height: height,
 			is_full_depth: fullDepth(),
 			description: trimmedDescription === '' ? null : trimmedDescription,
@@ -149,26 +141,6 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 							value={model()}
 							onInput={(e: InputEventAndTarget) => setModel(e.currentTarget.value)}
 						/>
-					</div>
-					<div class="field">
-						<label for="device-type-edit-slug">
-							Slug{' '}
-							<span class="required" aria-hidden="true">
-								*
-							</span>
-						</label>
-						<input
-							id="device-type-edit-slug"
-							placeholder="example-switch-48"
-							required
-							maxLength={100}
-							pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-							value={slug()}
-							onInput={(e: InputEventAndTarget) => setSlug(e.currentTarget.value)}
-						/>
-						<p class="field-hint">
-							URL-safe identifier: lowercase letters, digits, single dashes.
-						</p>
 					</div>
 					<div class="field">
 						<label for="device-type-edit-u-height">

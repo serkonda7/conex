@@ -19,7 +19,7 @@ import { createDeviceType, createStub } from './templates'
 export const DEVICE_CSV_HEADER = [
 	'name',
 	'asset_tag',
-	'device_type_slug',
+	'device_type_model',
 	'site_slug',
 	'rack_name',
 	'position_u',
@@ -39,7 +39,6 @@ export const CABLE_CSV_HEADER = [
 export const DEVICE_TYPE_CSV_HEADER = [
 	'manufacturer_slug',
 	'model',
-	'slug',
 	'u_height',
 	'is_full_depth',
 	'form_factor',
@@ -58,7 +57,6 @@ export function exportDeviceTypesCsv(): string {
 		.select({
 			manufacturer_slug: manufacturers.slug,
 			model: device_types.model,
-			slug: device_types.slug,
 			u_height: device_types.u_height,
 			is_full_depth: device_types.is_full_depth,
 			form_factor: device_types.form_factor,
@@ -75,7 +73,6 @@ export function exportDeviceTypesCsv(): string {
 		rows.map((r) => [
 			r.manufacturer_slug,
 			r.model,
-			r.slug,
 			String(r.u_height),
 			r.is_full_depth ? 'true' : 'false',
 			r.form_factor,
@@ -115,7 +112,6 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 		const created = createDeviceType({
 			manufacturer_id: mfrId,
 			model: input.model,
-			slug: input.slug,
 			u_height: input.u_height ?? 1,
 			is_full_depth: input.is_full_depth ?? true,
 			form_factor: input.form_factor,
@@ -161,9 +157,8 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 		const item = definition as Record<string, unknown>
 		const manufacturer = typeof item.manufacturer === 'string' ? item.manufacturer.trim() : ''
 		const model = typeof item.model === 'string' ? item.model.trim() : ''
-		const slug = typeof item.slug === 'string' ? item.slug.trim() : ''
-		if (!manufacturer || !model || !slug) {
-			fail('manufacturer, model, and slug are required by NetBox YAML')
+		if (!manufacturer || !model) {
+			fail('manufacturer and model are required by NetBox YAML')
 			continue
 		}
 		const mfr = getDb()
@@ -208,7 +203,6 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 		const created = createDeviceType({
 			manufacturer_id: mfr.id,
 			model,
-			slug,
 			u_height: height,
 			is_full_depth: fullDepth,
 			description: typeof item.description === 'string' ? item.description : undefined,
@@ -290,7 +284,7 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 		.select({
 			name: devices.name,
 			asset_tag: devices.asset_tag,
-			type_slug: device_types.slug,
+			type_model: device_types.model,
 			site_slug: sites.slug,
 			rack_name: racks.name,
 			position_u: devices.position_u,
@@ -308,7 +302,7 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 		rows.map((r) => [
 			r.name,
 			r.asset_tag,
-			r.type_slug,
+			r.type_model,
 			r.site_slug,
 			r.rack_name,
 			r.position_u === null ? null : String(r.position_u),
@@ -352,8 +346,8 @@ export function exportCablesCsv(scopeTenantId?: number): string {
 	return toCsv(CABLE_CSV_HEADER, dataRows)
 }
 
-function deviceTypeId(slug: string): number | undefined {
-	return getDb().select().from(device_types).where(eq(device_types.slug, slug)).get()?.id
+function deviceTypeId(model: string): number | undefined {
+	return getDb().select().from(device_types).where(eq(device_types.model, model)).get()?.id
 }
 
 function siteId(slug: string): number | undefined {
@@ -432,9 +426,9 @@ export function importDevicesCsv(
 			continue
 		}
 		const input = validated.output
-		const typeId = deviceTypeId(input.device_type_slug)
+		const typeId = deviceTypeId(input.device_type_model)
 		if (!typeId) {
-			fail(`Unknown device_type_slug "${input.device_type_slug}"`)
+			fail(`Unknown device_type_model "${input.device_type_model}"`)
 			continue
 		}
 		let foundSiteId: number | undefined

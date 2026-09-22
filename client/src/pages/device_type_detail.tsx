@@ -22,7 +22,7 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /device-types/:id — device-type detail: header with model/slug, detail
+ * /device-types/:id — device-type detail: header with model and details
  * grid (manufacturer, U height, description), the interface-stub editor,
  * and the devices using this type.
  */
@@ -152,9 +152,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			>
 				<Show when={deviceType()} fallback={<p class="empty">Device type not found.</p>}>
 					<div class="page-header">
-						<h2>
-							{deviceType()?.model} <code>{deviceType()?.slug}</code>
-						</h2>
+						<h2>{deviceType()?.model}</h2>
 						<div class="form-actions">
 							<button
 								type="button"
@@ -181,10 +179,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							<dd>{mfrNameOf(deviceType()?.manufacturer_id)}</dd>
 							<dt>Model</dt>
 							<dd>{deviceType()?.model}</dd>
-							<dt>Slug</dt>
-							<dd>
-								<code>{deviceType()?.slug}</code>
-							</dd>
 							<dt>Description</dt>
 							<dd>{deviceType()?.description || '—'}</dd>
 							<dt>Comments</dt>

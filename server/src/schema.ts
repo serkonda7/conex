@@ -209,7 +209,6 @@ export const device_types = sqliteTable(
 			.notNull()
 			.references(() => manufacturers.id),
 		model: text('model').notNull(),
-		slug: text('slug').notNull().unique(),
 		// Rack units consumed on mount. 0 = shelf-only (P4 mounts
 		// those by shelf_id instead of position_u).
 		u_height: integer('u_height').notNull().default(1),

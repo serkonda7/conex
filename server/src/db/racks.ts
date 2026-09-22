@@ -169,6 +169,8 @@ export function deviceSpansOf(rackId: number): OccupantSpan[] {
 		name: d.name,
 		position_u: d.position_u,
 		height_u: d.u_height,
+		face: d.face,
+		is_full_depth: d.is_full_depth,
 	}))
 }
 
@@ -394,6 +396,8 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 			name: d.name,
 			position_u: d.position_u,
 			height_u: d.u_height,
+			face: d.face,
+			is_full_depth: d.is_full_depth,
 		})),
 	)
 	if (Result.isError(occupancy)) {
@@ -431,6 +435,19 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 							device_type_model: deviceRow.device_type_model,
 							is_full_depth: deviceRow.is_full_depth,
 						},
+			devices: details
+				.filter((d) => d.position_u <= u.u && d.position_u + d.u_height > u.u)
+				.map((d) => ({
+					id: d.id,
+					name: d.name,
+					face: d.face,
+					position_u: d.position_u,
+					u_height: d.u_height,
+					status: d.status,
+					device_type_id: d.device_type_id,
+					device_type_model: d.device_type_model,
+					is_full_depth: d.is_full_depth,
+				})),
 		}
 	})
 	return Result.ok({ rack_id: rack.id, height_u: heightU, units })

@@ -131,11 +131,6 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 								getValue: (t: DeviceTypeRow): string => t.model,
 							},
 							{
-								key: 'slug',
-								label: 'Slug',
-								getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
-							},
-							{
 								key: 'u_height',
 								label: 'U height',
 								getValue: (t: DeviceTypeRow): string => `${t.u_height}`,

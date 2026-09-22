@@ -407,18 +407,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									on_close={() => setSelectingDevice(false)}
 								/>
 							</Show>
-							<Show when={pendingU() !== null}>
-								<p class="empty">
-									U{pendingU()} selected on the {face()} face —{' '}
-									<button
-										type="button"
-										onClick={() => installDevice(pendingU() as number)}
-									>
-										install a device here
-									</button>{' '}
-									or add a shelf below.
-								</p>
-							</Show>
 
 							<h3>Add shelf</h3>
 							<form onSubmit={handleCreateShelf}>

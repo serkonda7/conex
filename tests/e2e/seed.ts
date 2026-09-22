@@ -60,13 +60,12 @@ if (
 		.select()
 		.from(device_types)
 		.all()
-		.some((row) => row.slug === 'e2e-rack-type')
+		.some((row) => row.model === 'E2E 42U Cabinet')
 ) {
 	db.insert(device_types)
 		.values({
 			manufacturer_id: manufacturer.id,
 			model: 'E2E 42U Cabinet',
-			slug: 'e2e-rack-type',
 			form_factor: '4-post cabinet',
 			width: 19,
 			u_height: 42,
@@ -74,21 +73,20 @@ if (
 		.run()
 } else {
 	getSqliteHandle()
-		.query('UPDATE device_types SET u_height = 42, form_factor = ?, width = 19 WHERE slug = ?')
-		.run('4-post cabinet', 'e2e-rack-type')
+		.query('UPDATE device_types SET u_height = 42, form_factor = ?, width = 19 WHERE model = ?')
+		.run('4-post cabinet', 'E2E 42U Cabinet')
 }
 if (
 	!db
 		.select()
 		.from(device_types)
 		.all()
-		.some((row) => row.slug === 'e2e-rack-type-10u')
+		.some((row) => row.model === 'E2E 10U Cabinet')
 ) {
 	db.insert(device_types)
 		.values({
 			manufacturer_id: manufacturer.id,
 			model: 'E2E 10U Cabinet',
-			slug: 'e2e-rack-type-10u',
 			form_factor: '4-post cabinet',
 			width: 19,
 			u_height: 10,
@@ -96,8 +94,8 @@ if (
 		.run()
 } else {
 	getSqliteHandle()
-		.query('UPDATE device_types SET u_height = 10, form_factor = ?, width = 19 WHERE slug = ?')
-		.run('4-post cabinet', 'e2e-rack-type-10u')
+		.query('UPDATE device_types SET u_height = 10, form_factor = ?, width = 19 WHERE model = ?')
+		.run('4-post cabinet', 'E2E 10U Cabinet')
 }
 
 if (!getUserByUsername(username)) {

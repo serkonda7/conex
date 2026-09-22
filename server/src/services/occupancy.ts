@@ -16,6 +16,9 @@ export interface OccupantSpan {
 	name: string
 	position_u: number
 	height_u: number
+	/** Devices may share a U across opposite faces when both are half-depth. */
+	face?: 'front' | 'rear' | null
+	is_full_depth?: boolean
 }
 
 export interface ElevationUnit {
@@ -75,7 +78,14 @@ export function checkOverlap(
 		if (other.id === excludeId || other.id === candidate.id) {
 			continue
 		}
-		if (rangesOverlap(range, spanRange(other))) {
+		const sameFace =
+			candidate.face === undefined ||
+			other.face === undefined ||
+			candidate.face === null ||
+			other.face === null ||
+			candidate.face === other.face
+		const depthConflict = candidate.is_full_depth === true || other.is_full_depth === true
+		if (rangesOverlap(range, spanRange(other)) && (sameFace || depthConflict)) {
 			const [first, last] = range
 			return Result.err(
 				new ConflictError(

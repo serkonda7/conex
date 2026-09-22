@@ -58,7 +58,7 @@ bun run lint:ci # biome ci
   Search box in the nav, results at `/search`.
 - CSV transfer on the Devices page (and `GET|POST /api/devices/export`,
   `/import`, same for `/api/cables/`):
-  - devices columns: `name,asset_tag,device_type_slug,site_slug,rack_slug,position_u,status`
+  - devices columns: `name,asset_tag,device_type_model,site_slug,rack_name,position_u,status`
   - cables columns: `a_device,a_interface,b_device,b_interface,label,kind,status`
   - imports validate every row, create the good ones, and report per-row
     errors.

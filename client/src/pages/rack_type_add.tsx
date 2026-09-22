@@ -1,6 +1,5 @@
 import { IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { slugify } from 'shared/src/slug'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
 import { create_device_type, fetch_manufacturers } from '../api_p3'
@@ -71,7 +70,6 @@ export function RackTypeAddPage(): JSX.Element {
 		const res = await create_device_type({
 			manufacturer_id: manufacturer,
 			model: model().trim(),
-			slug: slugify(model()),
 			description: description().trim() || undefined,
 			form_factor: formFactor() || undefined,
 			width: 19,

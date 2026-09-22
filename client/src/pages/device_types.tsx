@@ -167,12 +167,6 @@ export function DeviceTypesPage(): JSX.Element {
 			),
 		},
 		{
-			key: 'slug',
-			label: 'Slug',
-			sortable: true,
-			getValue: (t: DeviceTypeRow): JSX.Element => <code>{t.slug}</code>,
-		},
-		{
 			key: 'description',
 			label: 'Description',
 			getValue: (t: DeviceTypeRow): string => t.description ?? '—',
@@ -275,13 +269,22 @@ export function DeviceTypesPage(): JSX.Element {
 		<div>
 			<div class="page-header">
 				<h2>Device types</h2>
-				<button
-					type="button"
-					class="btn-add"
-					onClick={() => navigate('/device-types/import')}
-				>
-					⭳ Import
-				</button>
+				<div class="page-header-actions">
+					<button
+						type="button"
+						class="btn-add"
+						onClick={() => navigate('/device-types/add')}
+					>
+						+ Add
+					</button>
+					<button
+						type="button"
+						class="btn-add"
+						onClick={() => navigate('/device-types/import')}
+					>
+						⭳ Import
+					</button>
+				</div>
 			</div>
 
 			<div class="toolbar-row">
@@ -290,7 +293,7 @@ export function DeviceTypesPage(): JSX.Element {
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Search model, slug…"
+						placeholder="Search model…"
 						aria-label="Search device types"
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}

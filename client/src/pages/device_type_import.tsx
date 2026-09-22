@@ -13,7 +13,6 @@ function go(e: MouseEvent, to: string): void {
 
 const SAMPLE_YAML = `manufacturer: Acme
 model: Example Switch 48
-slug: acme-example-switch-48
 u_height: 1
 is_full_depth: true
 interfaces:
@@ -105,17 +104,15 @@ export function DeviceTypeImportPage(): JSX.Element {
 							<tr>
 								<td>manufacturer</td>
 								<td>Yes</td>
-								<td>Manufacturer name or slug.</td>
+								<td>
+									Manufacturer name or slug; device type model identifies the
+									type.
+								</td>
 							</tr>
 							<tr>
 								<td>model</td>
 								<td>Yes</td>
 								<td>Device model name.</td>
-							</tr>
-							<tr>
-								<td>slug</td>
-								<td>Yes</td>
-								<td>Unique URL-safe identifier.</td>
 							</tr>
 							<tr>
 								<td>u_height</td>

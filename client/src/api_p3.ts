@@ -95,7 +95,7 @@ export async function delete_manufacturer(id: number): Promise<Result<unknown, E
 // Device types
 // ---------------------------------------------------------------------------
 
-export type DeviceTypeSort = 'model' | 'slug'
+export type DeviceTypeSort = 'model'
 
 export interface DeviceTypeFilters {
 	search?: string
@@ -129,7 +129,6 @@ export async function fetch_device_types(
 export async function create_device_type(input: {
 	manufacturer_id: number
 	model: string
-	slug: string
 	u_height?: number
 	is_full_depth?: boolean
 	description?: string
@@ -159,7 +158,6 @@ export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRo
 export interface DeviceTypeUpdateInput {
 	manufacturer_id?: number
 	model?: string
-	slug?: string
 	u_height?: number
 	is_full_depth?: boolean
 	form_factor?:

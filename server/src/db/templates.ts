@@ -167,7 +167,7 @@ export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
 export interface DeviceTypeListParams extends ListParams {
 	manufacturer?: number
 	kind: 'device' | 'rack'
-	sort: 'model' | 'slug'
+	sort: 'model'
 	order: 'asc' | 'desc'
 }
 
@@ -179,7 +179,7 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 		conditions.push(
 			params.kind === 'rack'
 				? sql`${device_types.model} LIKE ${pattern} ESCAPE '\\'`
-				: sql`(${device_types.model} LIKE ${pattern} ESCAPE '\\' OR ${device_types.slug} LIKE ${pattern} ESCAPE '\\')`,
+				: sql`${device_types.model} LIKE ${pattern} ESCAPE '\\'`,
 		)
 	}
 	if (params.manufacturer) {
@@ -194,7 +194,7 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 			: isNull(device_types.form_factor),
 	)
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn = params.sort === 'slug' ? device_types.slug : device_types.model
+	const orderColumn = device_types.model
 	const items = db
 		.select()
 		.from(device_types)
@@ -220,13 +220,9 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 	if (!db.select().from(manufacturers).where(eq(manufacturers.id, input.manufacturer_id)).get()) {
 		return Result.err(new NotFoundError('Manufacturer not found'))
 	}
-	if (db.select().from(device_types).where(eq(device_types.slug, input.slug)).get()) {
-		return Result.err(new DuplicateError('Device type slug is already in use'))
-	}
 	const row: Omit<DeviceTypeRow, 'id'> = {
 		manufacturer_id: input.manufacturer_id,
 		model: input.model,
-		slug: input.slug,
 		u_height: input.u_height ?? 1,
 		is_full_depth: (input.is_full_depth ?? true) ? 1 : 0,
 		form_factor: input.form_factor ?? null,
@@ -248,7 +244,7 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		return getDeviceType(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Device type slug is already in use'))
+			return Result.err(new DuplicateError('Device type already exists'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
@@ -274,20 +270,12 @@ export function updateDeviceType(
 			return Result.err(new NotFoundError('Manufacturer not found'))
 		}
 	}
-	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		if (db.select().from(device_types).where(eq(device_types.slug, input.slug)).get()) {
-			return Result.err(new DuplicateError('Device type slug is already in use'))
-		}
-	}
 	const patch: Partial<DeviceTypeRow> = {}
 	if (input.manufacturer_id !== undefined) {
 		patch.manufacturer_id = input.manufacturer_id
 	}
 	if (input.model !== undefined) {
 		patch.model = input.model
-	}
-	if (input.slug !== undefined) {
-		patch.slug = input.slug
 	}
 	if (input.u_height !== undefined) {
 		patch.u_height = input.u_height
@@ -316,7 +304,7 @@ export function updateDeviceType(
 			db.update(device_types).set(patch).where(eq(device_types.id, id)).run()
 		} catch (err) {
 			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Device type slug is already in use'))
+				return Result.err(new DuplicateError('Device type already exists'))
 			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}

@@ -1,4 +1,4 @@
-import type { ElevationUnit } from 'shared/src/types'
+import type { ElevationDeviceRef, ElevationUnit } from 'shared/src/types'
 import { For, type JSX, Show } from 'solid-js'
 import { navigate } from '../router'
 
@@ -18,18 +18,25 @@ export function device_hue(id: number): number {
 
 type RowKind = 'free' | 'shelf' | 'device' | 'ghost'
 
+function device_for_face(unit: ElevationUnit, face: RackFace): ElevationDeviceRef | undefined {
+	const devices = unit.devices ?? (unit.device ? [unit.device] : [])
+	return devices.find((device) => device.face === face || device.face === null) ?? devices[0]
+}
+
 function row_kind(unit: ElevationUnit, face: RackFace): RowKind {
 	if (unit.shelf) {
 		return 'shelf'
 	}
-	if (unit.device) {
-		return unit.device.face === null || unit.device.face === face ? 'device' : 'ghost'
+	const device = device_for_face(unit, face)
+	if (device) {
+		return device.face === null || device.face === face || device.is_full_depth
+			? 'device'
+			: 'free'
 	}
 	return 'free'
 }
 
-function span_label(unit: ElevationUnit): string {
-	const device = unit.device
+function span_label(unit: ElevationUnit, device = unit.device): string {
 	if (!device) {
 		return `U${unit.u}`
 	}
@@ -64,6 +71,7 @@ export function RackElevation(props: {
 							<For each={props.units}>
 								{(unit: ElevationUnit): JSX.Element => {
 									const kind: RowKind = row_kind(unit, face)
+									const device = device_for_face(unit, face)
 									return (
 										<li
 											class={`rack-u rack-u-${kind}`}
@@ -73,9 +81,9 @@ export function RackElevation(props: {
 													props.selected_face === face,
 											}}
 											style={
-												kind === 'device' && unit.device
+												kind === 'device' && device
 													? {
-															'--rack-hue': `${device_hue(unit.device.id)}`,
+															'--rack-hue': `${device_hue(device.id)}`,
 														}
 													: {}
 											}
@@ -134,7 +142,7 @@ export function RackElevation(props: {
 																		title="Occupied on the opposite face"
 																	>
 																		<span class="rack-dev-name">
-																			◧ {unit.device?.name}
+																			◧ {device?.name}
 																		</span>
 																		<span class="rack-dev-meta">
 																			opposite face
@@ -144,33 +152,33 @@ export function RackElevation(props: {
 															}
 														>
 															<a
-																href={`/devices/${unit.device?.id ?? ''}`}
+																href={`/devices/${device?.id ?? ''}`}
 																class="rack-dev"
 																onClick={(e: MouseEvent): void =>
 																	go(
 																		e,
-																		`/devices/${unit.device?.id ?? ''}`,
+																		`/devices/${device?.id ?? ''}`,
 																	)
 																}
-																title={`${unit.device?.name ?? ''} (${unit.device?.device_type_model ?? ''}, ${unit.device?.u_height ?? 1}U)`}
+																title={`${device?.name ?? ''} (${device?.device_type_model ?? ''}, ${device?.u_height ?? 1}U)`}
 															>
 																<span class="rack-dev-name">
-																	{unit.device?.name}
+																	{device?.name}
 																</span>
 																<span class="rack-dev-meta">
-																	{unit.device?.device_type_model}{' '}
-																	· {span_label(unit)}
+																	{device?.device_type_model} ·{' '}
+																	{span_label(unit, device)}
 																</span>
 																<Show
 																	when={
-																		(unit.device?.status ??
+																		(device?.status ??
 																			'active') !== 'active'
 																	}
 																>
 																	<span
-																		class={`badge badge-${unit.device?.status}`}
+																		class={`badge badge-${device?.status}`}
 																	>
-																		{unit.device?.status}
+																		{device?.status}
 																	</span>
 																</Show>
 															</a>

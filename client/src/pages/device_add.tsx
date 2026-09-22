@@ -1,7 +1,7 @@
 import { IconPlus } from '@tabler/icons-solidjs'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, Show } from 'solid-js'
-import { fetch_locations, fetch_sites, fetch_tenants } from '../api_p1'
+import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
+import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_p1'
 import { fetch_racks } from '../api_p2'
 import { fetch_device_types } from '../api_p3'
 import { create_device } from '../api_p4'
@@ -31,7 +31,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [typeId, setTypeId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
-	const [siteId, setSiteId] = createSignal('')
+	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal('')
 	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
 	// from the rack elevation pre-fills the mount so the U picker flows
@@ -41,7 +41,8 @@ export function DeviceAddPage(): JSX.Element {
 		queryParam('face') === 'front' || queryParam('face') === 'rear' ? queryParam('face') : '',
 	)
 	const [positionU, setPositionU] = createSignal(queryParam('position_u'))
-	const [tenantId, setTenantId] = createSignal('')
+	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 
@@ -49,6 +50,24 @@ export function DeviceAddPage(): JSX.Element {
 	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
 	const [racks] = createResource(() => load_rows(fetch_racks, setFormError))
 	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
+
+	// Tenant defaults to the selected site's tenant until the user picks one
+	// explicitly (or `?tenant=` is present, which counts as explicit).
+	const siteTenantId = createMemo(() => {
+		const id = parseId(siteId())
+		if (id === null) {
+			return null
+		}
+		return (sites() ?? []).find((site: SiteRow) => site.id === id)?.tenant_id ?? null
+	})
+
+	createEffect(() => {
+		if (tenantTouched() || sites() === undefined) {
+			return
+		}
+		const tenant = siteTenantId()
+		setTenantId(tenant ? String(tenant) : '')
+	})
 
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createResource(siteId, async (site: string) => {
@@ -62,6 +81,11 @@ export function DeviceAddPage(): JSX.Element {
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
 		setLocationId('')
+	}
+
+	function handleTenantChange(value: string): void {
+		setTenantTouched(true)
+		setTenantId(value)
 	}
 
 	function handleRackChange(value: string): void {
@@ -141,9 +165,6 @@ export function DeviceAddPage(): JSX.Element {
 						<IconPlus size={16} />
 					</button>
 				}
-				hint={
-					<Hint>The template decides the U footprint and the expanded interfaces.</Hint>
-				}
 			/>
 			<TextField
 				id="device-description"
@@ -215,20 +236,19 @@ export function DeviceAddPage(): JSX.Element {
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
-				hint={
-					<Hint>
-						Either a rack position or a shelf, never both. Leave both empty for an
-						unracked device.
-					</Hint>
-				}
 			/>
 			<SelectField
 				id="device-tenant"
 				label="Tenant"
 				value={tenantId()}
-				onChange={setTenantId}
+				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
 				emptyLabel="No tenant"
+				hint={
+					<Show when={!tenantTouched() && siteTenantId() !== null}>
+						<Hint>Defaults to the site's tenant.</Hint>
+					</Show>
+				}
 			/>
 			<FormError message={formError} />
 			<FormActions saving={saving()} cancelTo="/devices" />

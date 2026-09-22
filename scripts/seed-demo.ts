@@ -168,16 +168,50 @@ const fortinet = db
 	.values({ name: 'Fortinet', slug: 'fortinet' })
 	.returning()
 	.get()
+const apc = db.insert(manufacturers).values({ name: 'APC', slug: 'apc' }).returning().get()
+
+// Rack types are device-type templates too, but are distinguished by their
+// NetBox form factor. Keep regular device types form_factor=NULL so they do
+// not leak into the rack-type catalog.
+const rack42Type = db
+	.insert(device_types)
+	.values({
+		manufacturer_id: apc.id,
+		model: 'NetShelter SX 42U',
+		u_height: 42,
+		form_factor: '4-post cabinet',
+		width: 19,
+	})
+	.returning()
+	.get()
+const rack10Type = db
+	.insert(device_types)
+	.values({
+		manufacturer_id: apc.id,
+		model: 'NetShelter Wall 10U',
+		u_height: 10,
+		form_factor: 'wall-mounted cabinet',
+		width: 19,
+	})
+	.returning()
+	.get()
 
 const switchType = db
 	.insert(device_types)
 	.values({
 		manufacturer_id: ubiquiti.id,
 		model: 'USW-Pro-24',
-		slug: 'ubiquiti-usw-pro-24',
 		u_height: 1,
-		form_factor: 'rack',
-		width: 19,
+	})
+	.returning()
+	.get()
+const halfDepthSwitchType = db
+	.insert(device_types)
+	.values({
+		manufacturer_id: ubiquiti.id,
+		model: 'USW-Lite-24',
+		u_height: 1,
+		is_full_depth: false,
 	})
 	.returning()
 	.get()
@@ -186,10 +220,7 @@ const firewallType = db
 	.values({
 		manufacturer_id: fortinet.id,
 		model: 'FortiGate 60F',
-		slug: 'fortinet-fortigate-60f',
 		u_height: 1,
-		form_factor: 'desktop',
-		width: 19,
 	})
 	.returning()
 	.get()
@@ -198,10 +229,7 @@ const serverType = db
 	.values({
 		manufacturer_id: dell.id,
 		model: 'PowerEdge R250',
-		slug: 'dell-poweredge-r250',
 		u_height: 1,
-		form_factor: 'rack',
-		width: 19,
 	})
 	.returning()
 	.get()
@@ -210,17 +238,14 @@ const clientType = db
 	.values({
 		manufacturer_id: dell.id,
 		model: 'OptiPlex Micro',
-		slug: 'dell-optiplex-micro',
 		u_height: 0,
-		form_factor: 'desktop',
-		width: 19,
 	})
 	.returning()
 	.get()
 
-const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', serverType.id)
-const schoolRack = addRack(schoolSite.id, schoolRoom.id, school.id, 'SCHOOL-R01', serverType.id)
-const mspRack = addRack(mspSite.id, mspRoom.id, null, 'MSP-R01', switchType.id)
+const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', rack42Type.id)
+const schoolRack = addRack(schoolSite.id, schoolRoom.id, school.id, 'SCHOOL-R01', rack42Type.id)
+const mspRack = addRack(mspSite.id, mspRoom.id, null, 'MSP-R01', rack10Type.id)
 const mspShelf = db
 	.insert(rack_shelves)
 	.values({
@@ -235,6 +260,9 @@ const mspShelf = db
 
 db.insert(device_type_interfaces)
 	.values({ device_type_id: switchType.id, prefix: 'Port', count: 4, kind: 'ethernet' })
+	.run()
+db.insert(device_type_interfaces)
+	.values({ device_type_id: halfDepthSwitchType.id, prefix: 'Port', count: 4, kind: 'ethernet' })
 	.run()
 db.insert(device_type_interfaces)
 	.values({ device_type_id: firewallType.id, prefix: 'WAN', count: 2, kind: 'ethernet' })
@@ -344,7 +372,7 @@ const schoolFirewall = addDevice(
 	10,
 )
 const schoolSwitch = addDevice(
-	switchType.id,
+	halfDepthSwitchType.id,
 	schoolSite.id,
 	schoolRoom.id,
 	schoolRack.id,
@@ -403,7 +431,8 @@ const [dentSwitchPort, dentClientPort1, dentClientPort2, dentClientPort3] = addI
 	['Port1', 'Port2', 'Port3', 'Port4'],
 )
 const [dentFirewallPort] = addInterfaces(dentistFirewall.id, ['WAN1', 'WAN2'])
-const [schoolSwitchPort] = addInterfaces(schoolSwitch.id, ['Port1', 'Port2', 'Port3', 'Port4'])
+const schoolSwitchPorts = addInterfaces(schoolSwitch.id, ['Port1', 'Port2', 'Port3', 'Port4'])
+const schoolSwitchPort: typeof interfaces.$inferSelect = schoolSwitchPorts[0]
 const [schoolFirewallPort] = addInterfaces(schoolFirewall.id, ['WAN1', 'WAN2'])
 const [schoolServerPort] = addInterfaces(schoolServer.id, ['eno1', 'eno2'])
 addInterfaces(mspFirewall.id, ['WAN1', 'WAN2'])
@@ -455,7 +484,7 @@ db.insert(cables)
 db.insert(cables)
 	.values({
 		a_interface_id: schoolServerPort.id,
-		b_interface_id: schoolSwitchPort.id + 1,
+		b_interface_id: schoolSwitchPorts[1].id,
 		kind: 'cat6a',
 		label: 'School server to switch',
 	})
@@ -473,5 +502,5 @@ db.insert(users)
 console.log(`Demo database reset at ${dbPath}`)
 console.log('Login: demo / demo-password')
 console.log(
-	'Created 2 customer tenants, 1 MSP-owned site, 3 sites, 3 racks, 10 devices, and 6 cables.',
+	'Created 2 customer tenants, 1 MSP-owned site, 3 sites, 3 racks, 7 device types (including 2 rack types), 10 devices, and 6 cables. The school switch is half-depth.',
 )
