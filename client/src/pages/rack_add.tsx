@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, Show } from 'solid-js'
-import { fetch_locations, fetch_sites, fetch_tenants } from '../api_p1'
+import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
+import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_p1'
 import { create_rack } from '../api_p2'
 import {
 	FormActions,
@@ -31,12 +31,31 @@ export function RackAddPage(): JSX.Element {
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 
 	const [sites] = createResource(() => load_rows(fetch_sites, setFormError))
 	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
+
+	// Tenant defaults to the selected site's tenant until the user picks one
+	// explicitly (or `?tenant=` is present, which counts as explicit).
+	const siteTenantId = createMemo(() => {
+		const id = parseId(siteId())
+		if (id === null) {
+			return null
+		}
+		return (sites() ?? []).find((site: SiteRow) => site.id === id)?.tenant_id ?? null
+	})
+
+	createEffect(() => {
+		if (tenantTouched() || sites() === undefined) {
+			return
+		}
+		const tenant = siteTenantId()
+		setTenantId(tenant ? String(tenant) : '')
+	})
 
 	// Location options belong to a site, so they follow the site picker.
 	const [locations] = createResource(siteId, async (site: string) => {
@@ -50,6 +69,11 @@ export function RackAddPage(): JSX.Element {
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
 		setLocationId('')
+	}
+
+	function handleTenantChange(value: string): void {
+		setTenantTouched(true)
+		setTenantId(value)
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -138,9 +162,14 @@ export function RackAddPage(): JSX.Element {
 				id="rack-tenant"
 				label="Tenant"
 				value={tenantId()}
-				onChange={setTenantId}
+				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
 				emptyLabel="No tenant"
+				hint={
+					<Show when={!tenantTouched() && siteTenantId() !== null}>
+						<Hint>Defaults to the site's tenant.</Hint>
+					</Show>
+				}
 			/>
 			<FormError message={formError} />
 			<FormActions saving={saving()} cancelTo="/racks" />
