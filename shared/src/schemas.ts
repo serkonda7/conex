@@ -820,6 +820,41 @@ export const CableImportRowSchema = v.object({
 
 export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 
+/**
+ * One device-type CSV row. `manufacturer_slug` resolves to an id
+ * server-side; `u_height`/`width` arrive as text and coerce through Number.
+ */
+export const DeviceTypeImportRowSchema = v.object({
+	manufacturer_slug: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	model: NameSchema,
+	slug: SlugSchema,
+	u_height: v.optional(
+		v.pipe(
+			v.union([v.string(), v.number()]),
+			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
+			v.number(),
+			v.integer(),
+			v.minValue(0),
+			v.maxValue(60),
+		),
+		1,
+	),
+	form_factor: v.optional(RackFormFactorSchema, undefined),
+	width: v.optional(
+		v.pipe(
+			v.union([v.string(), v.number()]),
+			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
+			v.number(),
+			v.integer(),
+			v.check((n) => n === 10 || n === 19 || n === 23, 'Must be one of 10, 19, 23'),
+		),
+		undefined,
+	),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+})
+
+export type DeviceTypeImportRow = v.InferOutput<typeof DeviceTypeImportRowSchema>
+
 /** Per-row import outcome: created id or the row's error message. */
 export interface ImportRowResult {
 	row: number

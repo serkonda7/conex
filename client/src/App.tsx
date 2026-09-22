@@ -1,6 +1,7 @@
 import {
 	IconBox,
 	IconBuildingFactory,
+	IconCpu,
 	IconFolder,
 	IconLocation,
 	IconLock,
@@ -19,6 +20,10 @@ import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin 
 import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DeviceEditPage } from './pages/device_edit'
+import { DeviceTypeDetailPage } from './pages/device_type_detail'
+import { DeviceTypeEditPage } from './pages/device_type_edit'
+import { DeviceTypeImportPage } from './pages/device_type_import'
+import { DeviceTypesPage } from './pages/device_types'
 import { DevicesPage } from './pages/devices'
 import { LocationAddPage } from './pages/location_add'
 import { LocationDetailPage } from './pages/location_detail'
@@ -31,6 +36,8 @@ import { ManufacturersPage } from './pages/manufacturers'
 import { RackAddPage } from './pages/rack_add'
 import { RackDetailPage } from './pages/rack_detail'
 import { RackEditPage } from './pages/rack_edit'
+import { RackTypeAddPage } from './pages/rack_type_add'
+import { RackTypesPage } from './pages/rack_types'
 import { RacksPage } from './pages/racks'
 import { SiteAddPage } from './pages/site_add'
 import { SiteDetailPage } from './pages/site_detail'
@@ -40,8 +47,6 @@ import { SiteGroupDetailPage } from './pages/site_group_detail'
 import { SiteGroupEditPage } from './pages/site_group_edit'
 import { SiteGroupsPage } from './pages/site_groups'
 import { SitesPage } from './pages/sites'
-import { TemplateAddPage } from './pages/template_add'
-import { TemplatesPage } from './pages/templates'
 import { TenantAddPage } from './pages/tenant_add'
 import { TenantDetailPage } from './pages/tenant_detail'
 import { TenantEditPage } from './pages/tenant_edit'
@@ -343,6 +348,7 @@ function App(): JSX.Element {
 		locationId: number | null
 		rackId: number | null
 		deviceId: number | null
+		deviceTypeId: number | null
 		manufacturerId: number | null
 		userId: number | null
 	} {
@@ -354,6 +360,7 @@ function App(): JSX.Element {
 			locationId: null,
 			rackId: null,
 			deviceId: null,
+			deviceTypeId: null,
 			manufacturerId: null,
 			userId: null,
 		}
@@ -367,6 +374,7 @@ function App(): JSX.Element {
 		locationId: number | null
 		rackId: number | null
 		deviceId: number | null
+		deviceTypeId: number | null
 		manufacturerId: number | null
 		userId: number | null
 	} {
@@ -455,11 +463,27 @@ function App(): JSX.Element {
 			}
 			return emptyRoute('racks')
 		}
-		if (parts[0] === 'templates') {
+		if (parts[0] === 'rack-types' || parts[0] === 'templates') {
 			if (parts[1] === 'add') {
-				return emptyRoute('template-add')
+				return emptyRoute('rack-type-add')
 			}
-			return emptyRoute('templates')
+			return emptyRoute('rack-types')
+		}
+		if (parts[0] === 'device-types') {
+			if (parts[1] === 'import') {
+				return emptyRoute('device-type-import')
+			}
+			if (parts[1]) {
+				const deviceTypeId = parseId(parts[1])
+				if (deviceTypeId === null) {
+					return emptyRoute('not-found')
+				}
+				if (parts[2] === 'edit') {
+					return { ...emptyRoute('device-type-edit'), deviceTypeId }
+				}
+				return { ...emptyRoute('device-type-detail'), deviceTypeId }
+			}
+			return emptyRoute('device-types')
 		}
 		if (parts[0] === 'manufacturers') {
 			if (parts[1] === 'add') {
@@ -655,10 +679,20 @@ function App(): JSX.Element {
 										addHref="/racks/add"
 									/>
 									<NavItem
-										href="/templates"
-										active={path().startsWith('/templates')}
+										href="/rack-types"
+										active={
+											path().startsWith('/rack-types') ||
+											path().startsWith('/templates')
+										}
 										icon={<IconTemplate size={16} />}
-										label="Templates"
+										label="Rack types"
+										addHref="/rack-types/add"
+									/>
+									<NavItem
+										href="/device-types"
+										active={path().startsWith('/device-types')}
+										icon={<IconCpu size={16} />}
+										label="Device types"
 									/>
 									<NavItem
 										href="/manufacturers"
@@ -795,11 +829,33 @@ function App(): JSX.Element {
 									>
 										<RackEditPage id={route().rackId as number} />
 									</Match>
-									<Match when={route().page === 'templates'}>
-										<TemplatesPage />
+									<Match when={route().page === 'rack-types'}>
+										<RackTypesPage />
 									</Match>
-									<Match when={route().page === 'template-add'}>
-										<TemplateAddPage />
+									<Match when={route().page === 'rack-type-add'}>
+										<RackTypeAddPage />
+									</Match>
+									<Match when={route().page === 'device-types'}>
+										<DeviceTypesPage />
+									</Match>
+									<Match when={route().page === 'device-type-import'}>
+										<DeviceTypeImportPage />
+									</Match>
+									<Match
+										when={
+											route().page === 'device-type-detail' &&
+											route().deviceTypeId !== null
+										}
+									>
+										<DeviceTypeDetailPage id={route().deviceTypeId as number} />
+									</Match>
+									<Match
+										when={
+											route().page === 'device-type-edit' &&
+											route().deviceTypeId !== null
+										}
+									>
+										<DeviceTypeEditPage id={route().deviceTypeId as number} />
 									</Match>
 									<Match when={route().page === 'manufacturers'}>
 										<ManufacturersPage />

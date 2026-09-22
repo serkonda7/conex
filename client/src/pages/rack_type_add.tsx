@@ -35,8 +35,8 @@ const FORM_FACTORS: RackFormFactor[] = [
 
 const WIDTHS = [10, 19, 23] as const
 
-/** /templates/add — create a NetBox-compatible rack template. */
-export function TemplateAddPage(): JSX.Element {
+/** /rack-types/add — create a NetBox-compatible rack type. */
+export function RackTypeAddPage(): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
 	const [model, setModel] = createSignal('')
 	const [slug, setSlug] = createSignal('')
@@ -88,18 +88,18 @@ export function TemplateAddPage(): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		navigate('/templates')
+		navigate('/rack-types')
 	}
 
 	return (
 		<FormPage
-			backTo="/templates"
-			backLabel="Templates"
-			title="Add a rack template"
+			backTo="/rack-types"
+			backLabel="Rack types"
+			title="Add a rack type"
 			onSubmit={handleCreate}
 		>
 			<SelectField
-				id="template-manufacturer"
+				id="rack-type-manufacturer"
 				label="Manufacturer"
 				required
 				value={manufacturerId()}
@@ -108,7 +108,7 @@ export function TemplateAddPage(): JSX.Element {
 				emptyLabel="Manufacturer…"
 			/>
 			<TextField
-				id="template-model"
+				id="rack-type-model"
 				label="Model"
 				required
 				value={model()}
@@ -117,13 +117,13 @@ export function TemplateAddPage(): JSX.Element {
 				autofocus
 			/>
 			<SlugField
-				id="template-slug"
+				id="rack-type-slug"
 				value={slug()}
 				onInput={setSlug}
 				placeholder="example-rack-42u"
 			/>
 			<TextAreaField
-				id="template-description"
+				id="rack-type-description"
 				label="Description"
 				value={description()}
 				onInput={setDescription}
@@ -131,7 +131,7 @@ export function TemplateAddPage(): JSX.Element {
 				maxLength={500}
 			/>
 			<SelectField
-				id="template-form-factor"
+				id="rack-type-form-factor"
 				label="Form factor"
 				required
 				value={formFactor()}
@@ -140,7 +140,7 @@ export function TemplateAddPage(): JSX.Element {
 				emptyLabel="Form factor…"
 			/>
 			<SelectField
-				id="template-width"
+				id="rack-type-width"
 				label="Width (inches)"
 				required
 				value={width()}
@@ -148,7 +148,7 @@ export function TemplateAddPage(): JSX.Element {
 				options={WIDTHS.map((value) => ({ value, label: String(value) }))}
 			/>
 			<TextField
-				id="template-height"
+				id="rack-type-height"
 				label="Height (U)"
 				required
 				inputmode="numeric"
@@ -157,7 +157,7 @@ export function TemplateAddPage(): JSX.Element {
 				placeholder="42"
 			/>
 			<FormError message={error} />
-			<FormActions saving={saving()} cancelTo="/templates" />
+			<FormActions saving={saving()} cancelTo="/rack-types" />
 		</FormPage>
 	)
 }

@@ -9,8 +9,10 @@ import { read_api_error } from './util/api_error'
 
 export type { ImportResponse }
 
-/** Downloads a CSV export (`devices` or `cables`) as a browser file save. */
-export async function download_csv(kind: 'devices' | 'cables'): Promise<Result<void, Error>> {
+/** Downloads a CSV export (`devices`, `cables`, or `device-types`) as a browser file save. */
+export async function download_csv(
+	kind: 'devices' | 'cables' | 'device-types',
+): Promise<Result<void, Error>> {
 	try {
 		const res = await fetch(`/api/${kind}/export`)
 		if (!res.ok) {
@@ -31,9 +33,9 @@ export async function download_csv(kind: 'devices' | 'cables'): Promise<Result<v
 	}
 }
 
-/** Uploads CSV text to the `devices`/`cables` import endpoint. */
+/** Uploads CSV text to the `devices`/`cables`/`device-types` import endpoint. */
 export async function upload_csv(
-	kind: 'devices' | 'cables',
+	kind: 'devices' | 'cables' | 'device-types',
 	csv: string,
 ): Promise<Result<ImportResponse, Error>> {
 	try {

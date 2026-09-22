@@ -3,16 +3,18 @@ import { and, eq } from 'drizzle-orm'
 import {
 	CableImportRowSchema,
 	DeviceImportRowSchema,
+	DeviceTypeImportRowSchema,
 	type ImportResponse,
 	type ImportRowResult,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { device_types, devices, interfaces, racks, sites } from '../schema'
+import { device_types, devices, interfaces, manufacturers, racks, sites } from '../schema'
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
 import { connectCable, listCables } from './cables'
 import { getDb } from './connection'
 import { createDevice } from './devices'
+import { createDeviceType } from './templates'
 
 export const DEVICE_CSV_HEADER = [
 	'name',
@@ -33,6 +35,96 @@ export const CABLE_CSV_HEADER = [
 	'kind',
 	'status',
 ]
+
+export const DEVICE_TYPE_CSV_HEADER = [
+	'manufacturer_slug',
+	'model',
+	'slug',
+	'u_height',
+	'form_factor',
+	'width',
+	'description',
+]
+
+function manufacturerId(slug: string): number | undefined {
+	return getDb().select().from(manufacturers).where(eq(manufacturers.slug, slug)).get()?.id
+}
+
+/** Device-type export: one row per type, manufacturer as slug for re-import. */
+export function exportDeviceTypesCsv(): string {
+	const db = getDb()
+	const rows = db
+		.select({
+			manufacturer_slug: manufacturers.slug,
+			model: device_types.model,
+			slug: device_types.slug,
+			u_height: device_types.u_height,
+			form_factor: device_types.form_factor,
+			width: device_types.width,
+			description: device_types.description,
+		})
+		.from(device_types)
+		.leftJoin(manufacturers, eq(device_types.manufacturer_id, manufacturers.id))
+		.orderBy(device_types.model)
+		.all()
+	return toCsv(
+		DEVICE_TYPE_CSV_HEADER,
+		rows.map((r) => [
+			r.manufacturer_slug,
+			r.model,
+			r.slug,
+			String(r.u_height),
+			r.form_factor,
+			r.width === null ? null : String(r.width),
+			r.description,
+		]),
+	)
+}
+
+/**
+ * Device-type import: validates each row with `DeviceTypeImportRowSchema`,
+ * resolves `manufacturer_slug` to an id, and creates the type. One bad row
+ * fails only itself; the response reports per-row errors.
+ */
+export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error> {
+	const parsed = parseCsv(text)
+	if (Result.isError(parsed)) {
+		return Result.err(parsed.error)
+	}
+	const rows: ImportRowResult[] = []
+	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
+		const rowNumber = index + 2
+		const fail = (error: string): void => {
+			rows.push({ row: rowNumber, ok: false, id: null, error })
+		}
+		const validated = v.safeParse(DeviceTypeImportRowSchema, obj)
+		if (!validated.success) {
+			fail(formatValibotIssues(validated.issues))
+			continue
+		}
+		const input = validated.output
+		const mfrId = manufacturerId(input.manufacturer_slug)
+		if (!mfrId) {
+			fail(`Unknown manufacturer_slug "${input.manufacturer_slug}"`)
+			continue
+		}
+		const created = createDeviceType({
+			manufacturer_id: mfrId,
+			model: input.model,
+			slug: input.slug,
+			u_height: input.u_height ?? 1,
+			form_factor: input.form_factor,
+			width: (input.width ?? undefined) as 10 | 19 | 23 | undefined,
+			description: input.description,
+		})
+		if (Result.isError(created)) {
+			fail(created.error.message)
+			continue
+		}
+		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
+	}
+	return Result.ok(importResult(rows))
+}
 
 /** Devices export: one row per device, slugs for the FK columns. */
 export function exportDevicesCsv(scopeTenantId?: number): string {

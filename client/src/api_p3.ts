@@ -151,6 +151,40 @@ export async function delete_device_type(id: number): Promise<Result<unknown, Er
 	return to_result<unknown>(res, 'Failed to delete device type')
 }
 
+export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRow, Error>> {
+	const res = await client['device-types'][':id'].$get({ param: { id: String(id) } })
+	return to_result<DeviceTypeRow>(res, 'Failed to load device type')
+}
+
+export interface DeviceTypeUpdateInput {
+	manufacturer_id?: number
+	model?: string
+	slug?: string
+	u_height?: number
+	form_factor?:
+		| '2-post frame'
+		| '4-post frame'
+		| '4-post cabinet'
+		| 'wall-mounted frame'
+		| 'wall-mounted cabinet'
+		| 'wall-mounted swing-out'
+		| 'outdoor cabinet'
+		| null
+	width?: 10 | 19 | 23 | null
+	description?: string | null
+}
+
+export async function update_device_type(
+	id: number,
+	patch: DeviceTypeUpdateInput,
+): Promise<Result<DeviceTypeRow, Error>> {
+	const res = await client['device-types'][':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<DeviceTypeRow>(res, 'Failed to update device type')
+}
+
 // ---------------------------------------------------------------------------
 // Stubs + preview
 // ---------------------------------------------------------------------------

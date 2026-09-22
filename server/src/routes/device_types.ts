@@ -2,6 +2,7 @@ import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
+	CsvImportBodySchema,
 	DeviceTypeCreateSchema,
 	DeviceTypeListQuerySchema,
 	DeviceTypeUpdateSchema,
@@ -14,6 +15,7 @@ import {
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { requireGlobalWrite } from '../authz'
+import { exportDeviceTypesCsv, importDeviceTypesCsv } from '../db/csv_transfer'
 import {
 	createDeviceType,
 	createStub,
@@ -65,6 +67,24 @@ export const deviceTypesApp = new Hono()
 			return denied
 		}
 		const result = createDeviceType(c.req.valid('json'))
+		if (Result.isOk(result)) {
+			return c.json(result.value, 201)
+		}
+		return sendResult(c, result)
+	})
+	// CSV transfer (registered before `/:id` so the literal paths win).
+	.get('/export', (c) => {
+		return c.text(exportDeviceTypesCsv(), 200, {
+			'Content-Type': 'text/csv; charset=utf-8',
+			'Content-Disposition': 'attachment; filename="device-types.csv"',
+		})
+	})
+	.post('/import', vValidator('json', CsvImportBodySchema, onValidationError), (c) => {
+		const denied = requireGlobalWrite(c)
+		if (denied) {
+			return denied
+		}
+		const result = importDeviceTypesCsv(c.req.valid('json').csv)
 		if (Result.isOk(result)) {
 			return c.json(result.value, 201)
 		}

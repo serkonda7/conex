@@ -128,7 +128,11 @@ export function RackAddPage(): JSX.Element {
 				emptyLabel="No type"
 				disabled
 				describedBy={RACK_TYPE_HINT_ID}
-				hint={<Hint id={RACK_TYPE_HINT_ID}>Rack types are coming soon.</Hint>}
+				hint={
+					<Hint id={RACK_TYPE_HINT_ID}>
+						Pick the rack-type catalog entry for this rack.
+					</Hint>
+				}
 			/>
 			<SelectField
 				id="rack-tenant"

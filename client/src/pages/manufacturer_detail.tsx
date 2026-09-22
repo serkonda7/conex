@@ -152,8 +152,13 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 				</Show>
 			</Show>
 			<p>
-				<a href="/templates" onClick={(e: MouseEvent): void => go(e, '/templates')}>
-					View in Templates →
+				<a
+					href={`/device-types?manufacturer=${props.id}`}
+					onClick={(e: MouseEvent): void =>
+						go(e, `/device-types?manufacturer=${props.id}`)
+					}
+				>
+					View in Device types →
 				</a>
 			</p>
 
