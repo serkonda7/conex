@@ -377,7 +377,13 @@ export function getStub(id: number): Result<StubRow, Error> {
  */
 function checkStubExpansion(
 	deviceTypeId: number,
-	candidate: { prefix: string; count: number; kind: string; label?: string | null },
+	candidate: {
+		prefix: string
+		count: number
+		kind: string
+		label?: string | null
+		description?: string | null
+	},
 	excludeId?: number,
 ): Result<undefined, Error> {
 	const db = getDb()
@@ -393,6 +399,7 @@ function checkStubExpansion(
 			count: s.count,
 			kind: s.kind,
 			label: s.label,
+			description: s.description,
 		})),
 		candidate,
 	])
@@ -412,6 +419,7 @@ export function createStub(deviceTypeId: number, input: StubCreate): Result<Stub
 		count: input.count ?? 1,
 		kind: input.kind ?? 'ethernet',
 		label: input.label ?? null,
+		description: input.description ?? null,
 	}
 	const clash = checkStubExpansion(deviceTypeId, candidate)
 	if (Result.isError(clash)) {
@@ -423,6 +431,7 @@ export function createStub(deviceTypeId: number, input: StubCreate): Result<Stub
 		count: candidate.count,
 		kind: candidate.kind,
 		label: candidate.label,
+		description: candidate.description,
 	}
 	try {
 		const inserted = getDb()
@@ -455,6 +464,7 @@ export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error
 		count: input.count ?? node.count,
 		kind: input.kind ?? node.kind,
 		label: input.label !== undefined ? input.label : node.label,
+		description: input.description !== undefined ? input.description : node.description,
 	}
 	const clash = checkStubExpansion(node.device_type_id, candidate, id)
 	if (Result.isError(clash)) {
@@ -472,6 +482,9 @@ export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error
 	}
 	if (input.label !== undefined) {
 		patch.label = input.label
+	}
+	if (input.description !== undefined) {
+		patch.description = input.description
 	}
 	if (Object.keys(patch).length > 0) {
 		try {

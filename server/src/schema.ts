@@ -238,6 +238,7 @@ export const device_type_interfaces = sqliteTable(
 		count: integer('count').notNull().default(1),
 		kind: text('kind').notNull().default('ethernet'),
 		label: text('label'),
+		description: text('description'),
 	},
 	(table) => [
 		index('device_type_interfaces_type_id_idx').on(table.device_type_id),

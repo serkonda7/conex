@@ -13,6 +13,7 @@ export interface StubInput {
 	count: number
 	kind: string
 	label?: string | null
+	description?: string | null
 }
 
 function invalid(message: string): Result<never, Error> {
@@ -60,7 +61,12 @@ export function expandStubs(stubs: StubInput[]): Result<ExpandedInterface[], Err
 				return Result.err(new Error(`Stub rows produce duplicate interface name "${name}"`))
 			}
 			seen.add(name)
-			out.push({ name, kind: stub.kind, label: stub.label ?? null })
+			out.push({
+				name,
+				kind: stub.kind,
+				label: stub.label ?? null,
+				description: stub.description ?? null,
+			})
 		}
 	}
 	return Result.ok(out)

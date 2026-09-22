@@ -456,6 +456,7 @@ export const StubCreateSchema = v.strictObject({
 	count: v.optional(StubCountSchema, 1),
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
 	label: v.optional(v.nullable(StubLabelSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
 export const StubUpdateSchema = v.strictObject({
@@ -463,6 +464,7 @@ export const StubUpdateSchema = v.strictObject({
 	count: v.optional(StubCountSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	label: v.optional(v.nullable(StubLabelSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
 export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
@@ -493,6 +495,7 @@ export interface ExpandedInterface {
 	name: string
 	kind: string
 	label: string | null
+	description: string | null
 }
 
 // ---------------------------------------------------------------------------

@@ -237,9 +237,42 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 					count: 1,
 					kind,
 					label: typeof port.label === 'string' ? port.label : undefined,
+					description:
+						typeof port.description === 'string' ? port.description : undefined,
 				})
 				if (Result.isError(stub)) {
 					fail(`Interface "${name}": ${stub.error.message}`)
+					break
+				}
+			}
+		}
+		for (const [key, defaultKind] of [
+			['console-ports', 'console'],
+			['power-ports', 'power'],
+		] as const) {
+			const ports = item[key]
+			if (!Array.isArray(ports)) {
+				continue
+			}
+			for (const component of ports) {
+				if (!component || typeof component !== 'object' || Array.isArray(component)) {
+					continue
+				}
+				const port = component as Record<string, unknown>
+				const name = typeof port.name === 'string' ? port.name.trim() : ''
+				if (!name) {
+					continue
+				}
+				const type = typeof port.type === 'string' ? port.type : defaultKind
+				const stub = createStub(created.value.id, {
+					prefix: name,
+					count: 1,
+					kind: type,
+					description:
+						typeof port.description === 'string' ? port.description : undefined,
+				})
+				if (Result.isError(stub)) {
+					fail(`${key} "${name}": ${stub.error.message}`)
 					break
 				}
 			}

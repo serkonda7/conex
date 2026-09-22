@@ -302,7 +302,13 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 		.where(eq(device_type_interfaces.device_type_id, input.device_type_id))
 		.all()
 	const expanded = expandStubs(
-		stubs.map((s) => ({ prefix: s.prefix, count: s.count, kind: s.kind, label: s.label })),
+		stubs.map((s) => ({
+			prefix: s.prefix,
+			count: s.count,
+			kind: s.kind,
+			label: s.label,
+			description: s.description,
+		})),
 	)
 	if (Result.isError(expanded)) {
 		return Result.err(new ConflictError(expanded.error.message))
@@ -337,7 +343,7 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 						name: iface.name,
 						kind: iface.kind,
 						connected: 0,
-						description: iface.label,
+						description: iface.description ?? iface.label,
 					})
 					.run()
 			}
