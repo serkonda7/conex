@@ -482,6 +482,7 @@ export const ManufacturerListQuerySchema = v.object({
 export const DeviceTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdEntry,
+	kind: v.optional(v.picklist(['device', 'rack']), 'device'),
 	sort: v.optional(v.picklist(['model', 'slug']), 'model'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

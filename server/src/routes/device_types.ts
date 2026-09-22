@@ -56,6 +56,7 @@ export const deviceTypesApp = new Hono()
 				page: query.page,
 				limit: query.limit,
 				manufacturer: query.manufacturer,
+				kind: query.kind,
 				sort: query.sort,
 				order: query.order,
 			}),

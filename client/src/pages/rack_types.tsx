@@ -94,6 +94,7 @@ export function RackTypesPage(): JSX.Element {
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
 		manufacturer: parseId(manufacturerFilter()) ?? undefined,
+		kind: 'rack' as const,
 		sort: sort() ?? 'model',
 		order: order(),
 	}))

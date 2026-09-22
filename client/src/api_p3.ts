@@ -102,6 +102,7 @@ export type DeviceTypeSort = 'model' | 'slug'
 export interface DeviceTypeFilters {
 	search?: string
 	manufacturer?: number
+	kind?: 'device' | 'rack'
 	sort?: DeviceTypeSort
 	order?: 'asc' | 'desc'
 }
@@ -118,6 +119,7 @@ export async function fetch_device_types(
 				page: '1',
 				limit: '200',
 				manufacturer: f.manufacturer === undefined ? undefined : String(f.manufacturer),
+				kind: f.kind,
 				sort: f.sort ?? 'model',
 				order: f.order ?? 'asc',
 			},

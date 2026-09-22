@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
 import type {
 	DeviceTypeCreate,
 	DeviceTypeUpdate,
@@ -172,6 +172,7 @@ export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
 
 export interface DeviceTypeListParams extends ListParams {
 	manufacturer?: number
+	kind: 'device' | 'rack'
 	sort: 'model' | 'slug'
 	order: 'asc' | 'desc'
 }
@@ -188,6 +189,14 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 	if (params.manufacturer) {
 		conditions.push(eq(device_types.manufacturer_id, params.manufacturer))
 	}
+	// Rack types are the rows with rack-template dimensions; regular device
+	// types deliberately have no form factor. Keep this filter in the query so
+	// totals and pagination describe the selected catalog accurately.
+	conditions.push(
+		params.kind === 'rack'
+			? isNotNull(device_types.form_factor)
+			: isNull(device_types.form_factor),
+	)
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn = params.sort === 'slug' ? device_types.slug : device_types.model
 	const items = db
