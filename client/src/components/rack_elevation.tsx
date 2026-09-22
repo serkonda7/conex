@@ -50,6 +50,7 @@ export function RackElevation(props: {
 	selected_u: number | null
 	selected_face: RackFace | null
 	on_select_u: (u: number, face: RackFace) => void
+	on_select_device: (u: number, face: RackFace) => void
 	on_add_device: (u: number, face: RackFace) => void
 	on_delete_shelf: (id: number) => void
 }): JSX.Element {
@@ -98,12 +99,16 @@ export function RackElevation(props: {
 																				class="rack-free-btn"
 																				aria-label="Select device"
 																				title={`Select device at U${unit.u} (${face} face)`}
-																				onClick={() =>
+																				onClick={() => {
 																					props.on_select_u(
 																						unit.u,
 																						face,
 																					)
-																				}
+																					props.on_select_device(
+																						unit.u,
+																						face,
+																					)
+																				}}
 																			>
 																				Select device
 																			</button>

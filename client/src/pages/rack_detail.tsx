@@ -6,6 +6,8 @@ import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_location, fetch_site, fetch_tenant } from '../api_p1'
 import { create_shelf, delete_rack, delete_shelf, fetch_elevation, fetch_rack } from '../api_p2'
 import { fetch_device_type } from '../api_p3'
+import { type DeviceRow, fetch_devices, update_device } from '../api_p4'
+import { ObjectSelector } from '../components/object_selector'
 import { RackElevation, type RackFace } from '../components/rack_elevation'
 import { navigate } from '../router'
 
@@ -27,6 +29,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [shelfH, setShelfH] = createSignal('1')
 	const [pendingU, setPendingU] = createSignal<number | null>(null)
 	const [face, setFace] = createSignal<RackFace>('front')
+	const [selectingDevice, setSelectingDevice] = createSignal(false)
 
 	const [rack] = createResource(
 		() => props.id,
@@ -185,6 +188,31 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 
 	function installDevice(u: number, targetFace: RackFace = face()): void {
 		navigate(`/devices/add?rack=${props.id}&position_u=${u}&face=${targetFace}`)
+	}
+
+	function openDeviceSelector(u: number, targetFace: RackFace): void {
+		pickU(u, targetFace)
+		setSelectingDevice(true)
+	}
+
+	async function placeDevice(device: DeviceRow): Promise<void> {
+		const u = pendingU()
+		if (u === null) {
+			return
+		}
+		setSelectingDevice(false)
+		setError(null)
+		const result = await update_device(device.id, {
+			rack_id: props.id,
+			position_u: u,
+			shelf_id: null,
+			face: face(),
+		})
+		if (Result.isError(result)) {
+			setError(result.error.message)
+			return
+		}
+		void refetch()
 	}
 
 	return (
@@ -359,8 +387,24 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									selected_u={pendingU()}
 									selected_face={face()}
 									on_select_u={pickU}
+									on_select_device={openDeviceSelector}
 									on_add_device={installDevice}
 									on_delete_shelf={(id: number) => void handleDeleteShelf(id)}
+								/>
+							</Show>
+							<Show when={selectingDevice()}>
+								<ObjectSelector
+									label={`Select device for U${pendingU() ?? ''} (${face()} face)`}
+									placeholder="Search devices…"
+									load={async (search: string) => {
+										const result = await fetch_devices({ search })
+										return Result.isError(result)
+											? Result.err(result.error)
+											: Result.ok(result.value.items)
+									}}
+									get_label={(device: DeviceRow) => device.name}
+									on_select={(device: DeviceRow) => void placeDevice(device)}
+									on_close={() => setSelectingDevice(false)}
 								/>
 							</Show>
 							<Show when={pendingU() !== null}>

@@ -1102,6 +1102,49 @@ tbody tr:last-child td {
 	margin-top: 0;
 }
 
+.object-selector {
+	max-width: 34rem;
+}
+
+.object-selector-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.object-selector-header h3 {
+	margin-bottom: 0.75rem;
+}
+
+.object-selector-search {
+	width: 100%;
+}
+
+.object-selector-results {
+	max-height: 22rem;
+	overflow-y: auto;
+	margin-top: 0.75rem;
+}
+
+.object-selector-results ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.object-selector-option {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	text-align: left;
+	border-radius: 0.25rem;
+}
+
+.object-selector-option small {
+	color: var(--text-muted);
+}
+
 /* Detail page: stat strip linking to each related-object section. */
 .detail-stats {
 	display: flex;
