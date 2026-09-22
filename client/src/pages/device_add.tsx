@@ -24,14 +24,6 @@ const FACE_OPTIONS: FormOption[] = [
 	{ value: 'rear', label: 'rear' },
 ]
 
-/** Lifecycle states accepted by the device API. */
-const STATUS_OPTIONS: FormOption[] = [
-	{ value: 'active', label: 'active' },
-	{ value: 'planned', label: 'planned' },
-	{ value: 'staged', label: 'staged' },
-	{ value: 'decommissioned', label: 'decommissioned' },
-]
-
 /** /devices/add — NetBox-style device instantiate form. */
 export function DeviceAddPage(): JSX.Element {
 	const [name, setName] = createSignal('')
@@ -44,9 +36,6 @@ export function DeviceAddPage(): JSX.Element {
 	const [face, setFace] = createSignal('')
 	const [positionU, setPositionU] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
-	const [status, setStatus] = createSignal('active')
-	const [assetTag, setAssetTag] = createSignal('')
-	const [shelfId, setShelfId] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 
@@ -72,7 +61,6 @@ export function DeviceAddPage(): JSX.Element {
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		const position = positionU().trim() === '' ? null : Number(positionU())
-		const shelf = shelfId().trim() === '' ? null : Number(shelfId().trim())
 		await submit_form({
 			name: name(),
 			validate: (): string | null => {
@@ -81,9 +69,6 @@ export function DeviceAddPage(): JSX.Element {
 				}
 				if (position !== null && (!Number.isInteger(position) || position < 1)) {
 					return 'Rack position must be a positive U number or empty.'
-				}
-				if (shelf !== null && (!Number.isInteger(shelf) || shelf < 1)) {
-					return 'Shelf id must be a positive integer or empty.'
 				}
 				return null
 			},
@@ -98,10 +83,7 @@ export function DeviceAddPage(): JSX.Element {
 					rack_id: rackId() ? Number(rackId()) : null,
 					face: (face() || null) as 'front' | 'rear' | null,
 					position_u: position,
-					shelf_id: shelf,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
-					status: status() as 'active' | 'planned' | 'staged' | 'decommissioned',
-					asset_tag: assetTag().trim() === '' ? null : assetTag().trim(),
 				}),
 			setError: setFormError,
 			setSaving,
@@ -215,29 +197,6 @@ export function DeviceAddPage(): JSX.Element {
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
 				emptyLabel="No tenant"
-			/>
-			<SelectField
-				id="device-status"
-				label="Status"
-				value={status()}
-				onChange={setStatus}
-				options={STATUS_OPTIONS}
-			/>
-			<TextField
-				id="device-asset-tag"
-				label="Asset tag"
-				placeholder="Asset tag (optional)"
-				maxLength={100}
-				value={assetTag()}
-				onInput={setAssetTag}
-			/>
-			<TextField
-				id="device-shelf"
-				label="Shelf id"
-				placeholder="Shelf id (or empty)"
-				inputmode="numeric"
-				value={shelfId()}
-				onInput={setShelfId}
 			/>
 			<FormError message={formError} />
 			<FormActions saving={saving()} cancelTo="/devices" />

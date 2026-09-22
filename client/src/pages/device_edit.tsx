@@ -31,9 +31,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [face, setFace] = createSignal('')
 	const [positionU, setPositionU] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
-	const [status, setStatus] = createSignal('active')
-	const [assetTag, setAssetTag] = createSignal('')
-	const [shelfId, setShelfId] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 	const [loaded, setLoaded] = createSignal(false)
@@ -107,9 +104,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setFace(res.value.face ?? '')
 			setPositionU(res.value.position_u !== null ? String(res.value.position_u) : '')
 			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
-			setStatus(res.value.status)
-			setAssetTag(res.value.asset_tag ?? '')
-			setShelfId(res.value.shelf_id !== null ? String(res.value.shelf_id) : '')
 			setLoaded(true)
 			return res.value
 		},
@@ -133,15 +127,9 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setFormError('Rack position must be a positive U number or empty.')
 			return
 		}
-		const shelf = shelfId().trim() === '' ? null : Number(shelfId().trim())
-		if (shelf !== null && (!Number.isInteger(shelf) || shelf < 1)) {
-			setFormError('Shelf id must be a positive integer or empty.')
-			return
-		}
 		setSaving(true)
 		const trimmedSerial = serial().trim()
 		const trimmedDescription = description().trim()
-		const trimmedAsset = assetTag().trim()
 		const res = await update_device(props.id, {
 			name: trimmedName,
 			description: trimmedDescription === '' ? null : trimmedDescription,
@@ -152,9 +140,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			face: (face() || null) as 'front' | 'rear' | null,
 			position_u: position,
 			tenant_id: tenantId() ? Number(tenantId()) : null,
-			status: status() as 'active' | 'planned' | 'staged' | 'decommissioned',
-			asset_tag: trimmedAsset === '' ? null : trimmedAsset,
-			shelf_id: shelf,
 		})
 		setSaving(false)
 		if (Result.isError(res)) {
@@ -324,41 +309,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 								)}
 							</For>
 						</select>
-					</div>
-					<div class="field">
-						<label for="device-edit-status">Status</label>
-						<select
-							id="device-edit-status"
-							value={status()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setStatus(e.currentTarget.value)
-							}
-						>
-							<option value="active">active</option>
-							<option value="planned">planned</option>
-							<option value="staged">staged</option>
-							<option value="decommissioned">decommissioned</option>
-						</select>
-					</div>
-					<div class="field">
-						<label for="device-edit-asset-tag">Asset tag</label>
-						<input
-							id="device-edit-asset-tag"
-							placeholder="Asset tag (optional)"
-							maxLength={100}
-							value={assetTag()}
-							onInput={(e: InputEventAndTarget) => setAssetTag(e.currentTarget.value)}
-						/>
-					</div>
-					<div class="field">
-						<label for="device-edit-shelf">Shelf id</label>
-						<input
-							id="device-edit-shelf"
-							placeholder="Shelf id (empty clears)"
-							inputmode="numeric"
-							value={shelfId()}
-							onInput={(e: InputEventAndTarget) => setShelfId(e.currentTarget.value)}
-						/>
 					</div>
 					<Show when={formError()}>
 						<div class="app-inline-error" role="alert">

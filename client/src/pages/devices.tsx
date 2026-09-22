@@ -27,8 +27,8 @@ function go(e: MouseEvent, to: string): void {
 }
 
 /**
- * /devices — NetBox-style device list: search, sortable columns, status /
- * rack / tenant filters (tenant deep-linkable via `?tenant=<id>`), row
+ * /devices — NetBox-style device list: search, sortable columns, rack / tenant
+ * filters (tenant deep-linkable via `?tenant=<id>`), row
  * selection with bulk delete, and icon actions with delete in a row menu.
  * Creating lives on the dedicated /devices/add page, editing on
  * /devices/:id/edit. The whole result set renders at once (API cap: 200).
@@ -39,7 +39,6 @@ export function DevicesPage(): JSX.Element {
 	const [debouncedSearch, setDebouncedSearch] = createSignal('')
 	const [sort, setSort] = createSignal<DeviceSort | undefined>('name')
 	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
-	const [status, setStatus] = createSignal('')
 	const [rackFilter, setRackFilter] = createSignal('')
 	const [tenantFilter, setTenantFilter] = createSignal(queryParam('tenant'))
 	const [selected, setSelected] = createSignal<number[]>([])
@@ -99,12 +98,6 @@ export function DevicesPage(): JSX.Element {
 		search: debouncedSearch(),
 		sort: sort() ?? 'name',
 		order: order(),
-		status: (status() || undefined) as
-			| 'active'
-			| 'planned'
-			| 'staged'
-			| 'decommissioned'
-			| undefined,
 		rack: parseId(rackFilter()) ?? undefined,
 		tenant: parseId(tenantFilter()) ?? undefined,
 	}))
@@ -195,21 +188,11 @@ export function DevicesPage(): JSX.Element {
 			getValue: (d: DeviceRow): string => typeNameOf(d.device_type_id),
 		},
 		{
-			key: 'status',
-			label: 'Status',
-			sortable: true,
-			getValue: (d: DeviceRow): JSX.Element => (
-				<span class={`badge badge-${d.status}`}>{d.status}</span>
-			),
-		},
-		{
 			key: 'mount',
 			label: 'Mount',
 			getValue: (d: DeviceRow): JSX.Element => (
 				<span>
-					{d.shelf_id ? (
-						<code>shelf:{d.shelf_id}</code>
-					) : d.position_u !== null ? (
+					{d.position_u !== null ? (
 						<code>
 							{rackNameOf(d.rack_id) ?? 'rack'} U{d.position_u}
 						</code>
@@ -218,11 +201,6 @@ export function DevicesPage(): JSX.Element {
 					)}
 				</span>
 			),
-		},
-		{
-			key: 'asset_tag',
-			label: 'Asset tag',
-			getValue: (d: DeviceRow): string => d.asset_tag ?? '—',
 		},
 	]
 
@@ -303,7 +281,6 @@ export function DevicesPage(): JSX.Element {
 	const hasFilters = createMemo(
 		() =>
 			debouncedSearch() !== '' ||
-			status() !== '' ||
 			rackFilter() !== '' ||
 			tenantFilter() !== '',
 	)
@@ -323,27 +300,11 @@ export function DevicesPage(): JSX.Element {
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Search name, asset tag, serial…"
+						placeholder="Search name, serial…"
 						aria-label="Search devices"
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
-				</label>
-				<label>
-					<span class="visually-hidden">Filter by status</span>
-					<select
-						aria-label="Filter by status"
-						value={status()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setStatus(e.currentTarget.value)
-						}
-					>
-						<option value="">Any status</option>
-						<option value="active">active</option>
-						<option value="planned">planned</option>
-						<option value="staged">staged</option>
-						<option value="decommissioned">decommissioned</option>
-					</select>
 				</label>
 				<label>
 					<span class="visually-hidden">Filter by rack</span>

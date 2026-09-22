@@ -29,7 +29,7 @@ function go(e: MouseEvent, to: string): void {
 
 /**
  * /devices/:id — detail with the interface list (port status dots), a manual
- * interface add/rename form, a rack/shelf remount form, the P5 cable connect
+ * interface add/rename form, a rack remount form, the P5 cable connect
  * dialog (free-port pickers on both ends), the per-device trace peer links
  * (`dev:port <-> dev:port`), and the cable list with disconnect.
  */
@@ -37,7 +37,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [ifaceName, setIfaceName] = createSignal('')
 	const [moveU, setMoveU] = createSignal('')
-	const [moveShelf, setMoveShelf] = createSignal('')
 	const [localIface, setLocalIface] = createSignal('')
 	const [peerDevice, setPeerDevice] = createSignal('')
 	const [peerIface, setPeerIface] = createSignal('')
@@ -189,21 +188,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			setError('Rack position must be a positive U number or empty')
 			return
 		}
-		const shelf = moveShelf().trim() === '' ? undefined : Number(moveShelf().trim())
-		if (position === undefined && shelf === undefined) {
-			setError('Enter a U position or a shelf id to move')
-			return
-		}
 		const res = await move_device(props.id, {
 			position_u: position ?? null,
-			shelf_id: shelf ?? null,
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
 		}
 		setMoveU('')
-		setMoveShelf('')
 		void refetchDevice()
 	}
 
@@ -398,9 +390,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							<dd>{device()?.face ?? '—'}</dd>
 							<dt>Position</dt>
 							<dd>
-								{device()?.shelf_id ? (
-									<code>shelf:{device()?.shelf_id}</code>
-								) : device()?.position_u !== null ? (
+								{device()?.position_u !== null ? (
 									<code>U{device()?.position_u}</code>
 								) : (
 									<span>unracked</span>
@@ -426,14 +416,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 									</Show>
 								</Show>
 							</dd>
-							<dt>Status</dt>
-							<dd>
-								<span class={`badge badge-${device()?.status}`}>
-									{device()?.status}
-								</span>
-							</dd>
-							<dt>Asset tag</dt>
-							<dd>{device()?.asset_tag ?? '—'}</dd>
 						</dl>
 					</section>
 				</Show>
@@ -446,11 +428,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					inputmode="numeric"
 					value={moveU()}
 					onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}
-				/>
-				<input
-					placeholder="Shelf id (empty clears)"
-					value={moveShelf()}
-					onInput={(e: InputEventAndTarget) => setMoveShelf(e.currentTarget.value)}
 				/>
 				<button type="submit">Move</button>
 			</form>

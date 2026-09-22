@@ -341,18 +341,6 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 									</a>
 								),
 							},
-							{
-								key: 'status',
-								label: 'Status',
-								getValue: (d: DeviceRow): JSX.Element => (
-									<span class={`badge badge-${d.status}`}>{d.status}</span>
-								),
-							},
-							{
-								key: 'asset_tag',
-								label: 'Asset tag',
-								getValue: (d: DeviceRow): string => d.asset_tag ?? '—',
-							},
 						]}
 					/>
 				</Show>

@@ -24,7 +24,7 @@ async function getPage<T>(
 	return to_result<Page<T>>(await req, fallback)
 }
 
-export type DeviceSort = 'name' | 'status'
+export type DeviceSort = 'name'
 
 export interface DeviceFilters {
 	search?: string

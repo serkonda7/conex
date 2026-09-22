@@ -355,13 +355,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 									</a>
 								),
 							},
-							{
-								key: 'status',
-								label: 'Status',
-								getValue: (d: DeviceRow): JSX.Element => (
-									<span class={`badge badge-${d.status}`}>{d.status}</span>
-								),
-							},
 						]}
 					/>
 				</Show>
