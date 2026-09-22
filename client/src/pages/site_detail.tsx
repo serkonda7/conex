@@ -414,13 +414,6 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 								label: 'Height',
 								getValue: (r: RackRow): string => `${r.height_u}U`,
 							},
-							{
-								key: 'status',
-								label: 'Status',
-								getValue: (r: RackRow): JSX.Element => (
-									<span class={`badge badge-${r.status}`}>{r.status}</span>
-								),
-							},
 						]}
 					/>
 				</Show>

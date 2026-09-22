@@ -29,7 +29,7 @@ async function getPage<T>(
 // Racks
 // ---------------------------------------------------------------------------
 
-export type RackSort = 'name' | 'slug' | 'status'
+export type RackSort = 'name' | 'slug'
 
 export interface RackFilters {
 	search?: string
@@ -54,6 +54,7 @@ export interface RackCreateInput {
 export interface RackUpdateInput {
 	name?: string
 	slug?: string
+	rack_type_id?: number
 	location_id?: number | null
 	tenant_id?: number | null
 	description?: string | null

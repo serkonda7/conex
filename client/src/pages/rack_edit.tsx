@@ -11,6 +11,7 @@ import {
 	type TenantRow,
 } from '../api_p1'
 import { fetch_rack, update_rack } from '../api_p2'
+import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -24,6 +25,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 	const [locationId, setLocationId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
+	const [rackTypeId, setRackTypeId] = createSignal('')
 	const [siteId, setSiteId] = createSignal<number | null>(null)
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
@@ -31,6 +33,14 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 
 	const [tenants] = createResource(async () => {
 		const res = await fetch_tenants()
+		if (Result.isError(res)) {
+			setFormError(res.error.message)
+			return []
+		}
+		return res.value.items
+	})
+	const [rackTypes] = createResource(async () => {
+		const res = await fetch_device_types({ kind: 'rack' })
 		if (Result.isError(res)) {
 			setFormError(res.error.message)
 			return []
@@ -50,6 +60,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			setLocationId(res.value.location_id ? String(res.value.location_id) : '')
 			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
 			setDescription(res.value.description ?? '')
+			setRackTypeId(String(res.value.rack_type_id))
 			setSiteId(res.value.site_id)
 			setLoaded(true)
 			return res.value
@@ -103,6 +114,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 		const trimmedDescription = description().trim()
 		const res = await update_rack(props.id, {
 			name: trimmedName,
+			rack_type_id: Number(rackTypeId()),
 			location_id: locationId() ? Number(locationId()) : null,
 			tenant_id: tenantId() ? Number(tenantId()) : null,
 			description: trimmedDescription === '' ? null : trimmedDescription,
@@ -200,12 +212,20 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 					</div>
 					<div class="field">
 						<label for="rack-edit-type">Rack type</label>
-						<select id="rack-edit-type" disabled aria-describedby="rack-edit-type-hint">
-							<option value="">No type</option>
+						<select
+							id="rack-edit-type"
+							value={rackTypeId()}
+							required
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+								setRackTypeId(e.currentTarget.value)
+							}
+						>
+							<For each={rackTypes()}>
+								{(type: DeviceTypeRow): JSX.Element => (
+									<option value={type.id}>{type.model}</option>
+								)}
+							</For>
 						</select>
-						<p class="field-hint" id="rack-edit-type-hint">
-							Rack types are coming soon.
-						</p>
 					</div>
 					<div class="field">
 						<label for="rack-edit-tenant">Tenant</label>

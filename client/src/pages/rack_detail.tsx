@@ -5,6 +5,7 @@ import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { fetch_location, fetch_site, fetch_tenant } from '../api_p1'
 import { create_shelf, delete_rack, delete_shelf, fetch_elevation, fetch_rack } from '../api_p2'
+import { fetch_device_type } from '../api_p3'
 import { RackElevation, type RackFace } from '../components/rack_elevation'
 import { navigate } from '../router'
 
@@ -68,6 +69,18 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			return null
 		}
 		const res = await fetch_tenant(id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
+	})
+	const rackTypeId = createMemo(() => rack()?.rack_type_id ?? null)
+	const [rackType] = createResource(rackTypeId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_device_type(id)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return null
@@ -252,7 +265,16 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							<dt>Description</dt>
 							<dd>{rack()?.description || '—'}</dd>
 							<dt>Rack type</dt>
-							<dd title="Rack types coming soon">—</dd>
+							<dd>
+								<Show when={rackTypeId() !== null} fallback="—">
+									<Show
+										when={!rackType.loading}
+										fallback={<span class="skeleton">…</span>}
+									>
+										{rackType()?.model ?? String(rackTypeId() ?? '—')}
+									</Show>
+								</Show>
+							</dd>
 							<dt>Tenant</dt>
 							<dd>
 								<Show when={tenantId() !== null} fallback="—">
@@ -273,8 +295,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									</Show>
 								</Show>
 							</dd>
-							<dt>Status</dt>
-							<dd>{rack()?.status ?? '—'}</dd>
 						</dl>
 					</section>
 

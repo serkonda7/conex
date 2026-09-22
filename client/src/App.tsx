@@ -68,14 +68,14 @@ import {
 	activeTabId,
 	closeTab,
 	goTo,
+	isDetailRoute,
 	openInNewTab,
 	parseId,
 	path,
-	isDetailRoute,
 	setTabLabel,
 	type TabState,
-	tabPathContext,
 	tabLabel,
+	tabPathContext,
 	tabs,
 } from './router'
 

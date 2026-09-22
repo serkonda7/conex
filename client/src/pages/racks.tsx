@@ -23,6 +23,7 @@ import {
 	type TenantRow,
 } from '../api_p1'
 import { delete_rack, fetch_racks, type RackRow, type RackSort } from '../api_p2'
+import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 
@@ -149,6 +150,10 @@ export function RacksPage(): JSX.Element {
 	})
 
 	const rows = createMemo(() => racksPage()?.items ?? [])
+	const [rackTypes] = createResource(async () => {
+		const result = await fetch_device_types({ kind: 'rack' })
+		return Result.isOk(result) ? result.value.items : []
+	})
 	const total = createMemo(() => racksPage()?.total ?? 0)
 	const rangeStart = createMemo(() => (total() === 0 ? 0 : 1))
 	const rangeEnd = createMemo(() => total())
@@ -181,6 +186,13 @@ export function RacksPage(): JSX.Element {
 			return '—'
 		}
 		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
+	}
+
+	function rackTypeNameOf(id: number | null): string {
+		if (!id) {
+			return '—'
+		}
+		return rackTypes()?.find((type: DeviceTypeRow) => type.id === id)?.model ?? String(id)
 	}
 
 	function handleSort(key: string): void {
@@ -226,17 +238,9 @@ export function RacksPage(): JSX.Element {
 			),
 		},
 		{
-			key: 'status',
-			label: 'Status',
-			sortable: true,
-			getValue: (r: RackRow): JSX.Element => (
-				<span class={`badge badge-${r.status}`}>{r.status}</span>
-			),
-		},
-		{
 			key: 'type',
 			label: 'Type',
-			getValue: () => <span title="Rack types coming soon">—</span>,
+			getValue: (r: RackRow): string => rackTypeNameOf(r.rack_type_id),
 		},
 		{
 			key: 'tenant',

@@ -20,7 +20,6 @@ export type {
 	Login,
 	RackCreate,
 	RackListQuery,
-	RackStatus,
 	RackUpdate,
 	Setup,
 	ShelfCreate,

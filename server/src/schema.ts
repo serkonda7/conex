@@ -158,7 +158,6 @@ export const racks = sqliteTable(
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
 		height_u: integer('height_u').notNull().default(42),
-		status: text('status').notNull().default('active'),
 	},
 	(table) => [
 		index('racks_site_id_idx').on(table.site_id),

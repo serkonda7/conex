@@ -42,7 +42,7 @@ export interface RackListParams extends ListParams {
 	site?: number
 	location?: number
 	tenant?: number
-	sort: 'name' | 'slug' | 'status'
+	sort: 'name' | 'slug'
 	order: 'asc' | 'desc'
 	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
 	scopeTenantId?: number
@@ -70,8 +70,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		conditions.push(eq(racks.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn =
-		params.sort === 'slug' ? racks.slug : params.sort === 'status' ? racks.status : racks.name
+	const orderColumn = params.sort === 'slug' ? racks.slug : racks.name
 	const items = db
 		.select()
 		.from(racks)
@@ -242,7 +241,6 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 		slug: input.slug,
 		description: input.description ?? null,
 		height_u: input.height_u ?? 42,
-		status: input.status ?? 'active',
 	}
 	try {
 		const inserted = db.insert(racks).values(row).returning({ id: racks.id }).get()
@@ -277,6 +275,16 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 		}
 	}
 	const db = getDb()
+	if (input.rack_type_id !== undefined) {
+		const rackType = db
+			.select()
+			.from(device_types)
+			.where(eq(device_types.id, input.rack_type_id))
+			.get()
+		if (!rackType || rackType.form_factor === null) {
+			return Result.err(new NotFoundError('Rack type not found'))
+		}
+	}
 	if (input.slug !== undefined && input.slug !== node.slug) {
 		const clash = db.select().from(racks).where(eq(racks.slug, input.slug)).get()
 		if (clash) {
@@ -308,6 +316,9 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	if (input.slug !== undefined) {
 		patch.slug = input.slug
 	}
+	if (input.rack_type_id !== undefined) {
+		patch.rack_type_id = input.rack_type_id
+	}
 	if (input.location_id !== undefined) {
 		patch.location_id = input.location_id
 	}
@@ -319,9 +330,6 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	}
 	if (input.height_u !== undefined) {
 		patch.height_u = input.height_u
-	}
-	if (input.status !== undefined) {
-		patch.status = input.status
 	}
 	if (Object.keys(patch).length > 0) {
 		try {

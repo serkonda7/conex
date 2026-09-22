@@ -19,3 +19,20 @@ test('selecting a site prefills the rack tenant', async ({ page }) => {
 	await expect(page.locator('#rack-tenant')).toHaveValue(/\d+/)
 	await expect(page.locator('#rack-tenant option:checked')).toHaveText('E2E Tenant')
 })
+
+test('rack type is saved and displayed', async ({ page }) => {
+	await page.goto('/')
+	await page.getByLabel('Username').fill(username)
+	await page.locator('input[type="password"]').fill(password)
+	await page.getByRole('button', { name: 'Sign in' }).click()
+	await expect(page.getByRole('link', { name: 'Racks' })).toBeVisible()
+
+	await page.goto('/racks/add')
+	await page.locator('#rack-site').selectOption({ label: 'E2E Site' })
+	await page.getByLabel('Name').fill('Type display rack')
+	await page.locator('#rack-type').selectOption({ label: 'E2E 42U Cabinet' })
+	await page.getByRole('button', { name: 'Create', exact: true }).click()
+
+	await expect(page.getByRole('link', { name: 'Type display rack' })).toBeVisible()
+	await expect(page.getByText('E2E 42U Cabinet')).toBeVisible()
+})
