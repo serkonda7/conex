@@ -2,6 +2,7 @@ import {
 	IconBox,
 	IconBuildingFactory,
 	IconCpu,
+	IconDownload,
 	IconFolder,
 	IconLocation,
 	IconLock,
@@ -20,6 +21,7 @@ import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin 
 import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DeviceEditPage } from './pages/device_edit'
+import { DeviceTypeAddPage } from './pages/device_type_add'
 import { DeviceTypeDetailPage } from './pages/device_type_detail'
 import { DeviceTypeEditPage } from './pages/device_type_edit'
 import { DeviceTypeImportPage } from './pages/device_type_import'
@@ -180,6 +182,7 @@ function NavItem(props: {
 	icon: JSX.Element
 	label: string
 	addHref?: string
+	importHref?: string
 }): JSX.Element {
 	function goLink(e: MouseEvent): void {
 		e.preventDefault()
@@ -191,6 +194,14 @@ function NavItem(props: {
 		e.stopPropagation()
 		if (props.addHref) {
 			navigate(props.addHref)
+		}
+	}
+
+	function goImport(e: MouseEvent): void {
+		e.preventDefault()
+		e.stopPropagation()
+		if (props.importHref) {
+			navigate(props.importHref)
 		}
 	}
 
@@ -232,6 +243,19 @@ function NavItem(props: {
 					</span>
 				</button>
 			)}
+			{props.importHref ? (
+				<button
+					type="button"
+					class="app-nav-add app-nav-import"
+					aria-label={`Import ${props.label}`}
+					title={`Import ${props.label}`}
+					onClick={goImport}
+				>
+					<span aria-hidden="true" class="app-nav-add-icon">
+						<IconDownload size={14} />
+					</span>
+				</button>
+			) : null}
 		</div>
 	)
 }
@@ -470,6 +494,9 @@ function App(): JSX.Element {
 			return emptyRoute('rack-types')
 		}
 		if (parts[0] === 'device-types') {
+			if (parts[1] === 'add') {
+				return emptyRoute('device-type-add')
+			}
 			if (parts[1] === 'import') {
 				return emptyRoute('device-type-import')
 			}
@@ -693,7 +720,8 @@ function App(): JSX.Element {
 										active={path().startsWith('/device-types')}
 										icon={<IconCpu size={16} />}
 										label="Device types"
-										addHref="/device-types/import"
+										addHref="/device-types/add"
+										importHref="/device-types/import"
 									/>
 									<NavItem
 										href="/manufacturers"
@@ -838,6 +866,9 @@ function App(): JSX.Element {
 									</Match>
 									<Match when={route().page === 'device-types'}>
 										<DeviceTypesPage />
+									</Match>
+									<Match when={route().page === 'device-type-add'}>
+										<DeviceTypeAddPage />
 									</Match>
 									<Match when={route().page === 'device-type-import'}>
 										<DeviceTypeImportPage />

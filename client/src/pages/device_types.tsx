@@ -33,8 +33,8 @@ function go(e: MouseEvent, to: string): void {
 /**
  * /device-types — device-type list: search, sortable columns, manufacturer
  * filter (deep-linkable via `?manufacturer=<id>`), row selection with bulk
- * delete, and icon actions with delete in a row menu. New types arrive via
- * the /device-types/import page instead of a manual add form.
+ * delete, and icon actions with delete in a row menu. New types can be added
+ * manually or imported from the /device-types/import page.
  * The whole result set renders at once (API cap: 200).
  */
 export function DeviceTypesPage(): JSX.Element {
