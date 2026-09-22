@@ -1,3 +1,4 @@
+import { IconPlus } from '@tabler/icons-solidjs'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, Show } from 'solid-js'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../api_p1'
@@ -15,7 +16,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
-import { parseId, queryParam } from '../router'
+import { navigate, parseId, queryParam } from '../router'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** Rack faces a device can be mounted on. */
@@ -61,6 +62,13 @@ export function DeviceAddPage(): JSX.Element {
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
 		setLocationId('')
+	}
+
+	function handleRackChange(value: string): void {
+		setRackId(value)
+		if (value === '') {
+			setFace('')
+		}
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -122,6 +130,17 @@ export function DeviceAddPage(): JSX.Element {
 					label: `${t.model} (${t.u_height}U)`,
 				}))}
 				emptyLabel="Device type…"
+				action={
+					<button
+						type="button"
+						class="icon-btn btn-add"
+						aria-label="Add device type"
+						title="Add device type"
+						onClick={() => navigate('/device-types/add')}
+					>
+						<IconPlus size={16} />
+					</button>
+				}
 				hint={
 					<Hint>The template decides the U footprint and the expanded interfaces.</Hint>
 				}
@@ -168,7 +187,7 @@ export function DeviceAddPage(): JSX.Element {
 				id="device-rack"
 				label="Rack"
 				value={rackId()}
-				onChange={setRackId}
+				onChange={handleRackChange}
 				options={row_options(racks() ?? [])}
 				emptyLabel="Unracked"
 			/>
@@ -176,10 +195,18 @@ export function DeviceAddPage(): JSX.Element {
 				id="device-face"
 				label="Face"
 				value={face()}
+				disabled={rackId() === ''}
 				onChange={setFace}
 				options={FACE_OPTIONS}
 				emptyLabel="No face"
-				hint={<Hint>Which rack face the device is mounted on.</Hint>}
+				hint={
+					<Show
+						when={rackId() === ''}
+						fallback={<Hint>Which rack face the device is mounted on.</Hint>}
+					>
+						<Hint>Pick a rack first to choose a face.</Hint>
+					</Show>
+				}
 			/>
 			<TextField
 				id="device-position"

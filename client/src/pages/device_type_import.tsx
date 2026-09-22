@@ -75,9 +75,10 @@ export function DeviceTypeImportPage(): JSX.Element {
 			</p>
 			<form class="form-stacked" onSubmit={handleImport}>
 				<div class="field">
-					<label for="device-type-import-text">YAML text</label>
+					<label for="device-type-import-text">Data</label>
 					<textarea
 						id="device-type-import-text"
+						class="import-data"
 						rows={10}
 						placeholder={SAMPLE_YAML}
 						value={yamlText()}
