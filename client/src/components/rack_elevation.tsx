@@ -50,6 +50,7 @@ export function RackElevation(props: {
 	selected_u: number | null
 	selected_face: RackFace | null
 	on_select_u: (u: number, face: RackFace) => void
+	on_add_device: (u: number, face: RackFace) => void
 	on_delete_shelf: (id: number) => void
 }): JSX.Element {
 	return (
@@ -91,21 +92,36 @@ export function RackElevation(props: {
 																<Show
 																	when={kind === 'ghost'}
 																	fallback={
-																		<button
-																			type="button"
-																			class="rack-free-btn"
-																			aria-label={`Install at U${unit.u} (${face} face)`}
-																			onClick={() =>
-																				props.on_select_u(
-																					unit.u,
-																					face,
-																				)
-																			}
-																		>
-																			<span class="rack-free-hint">
-																				free — install here
-																			</span>
-																		</button>
+																		<div class="rack-free-actions">
+																			<button
+																				type="button"
+																				class="rack-free-btn"
+																				aria-label="Select device"
+																				title={`Select device at U${unit.u} (${face} face)`}
+																				onClick={() =>
+																					props.on_select_u(
+																						unit.u,
+																						face,
+																					)
+																				}
+																			>
+																				Select device
+																			</button>
+																			<button
+																				type="button"
+																				class="rack-free-btn"
+																				aria-label="Add device"
+																				title={`Add device at U${unit.u} (${face} face)`}
+																				onClick={() =>
+																					props.on_add_device(
+																						unit.u,
+																						face,
+																					)
+																				}
+																			>
+																				Add device
+																			</button>
+																		</div>
 																	}
 																>
 																	<span

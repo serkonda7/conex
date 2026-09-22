@@ -183,8 +183,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		setShelfU(String(u))
 	}
 
-	function installDevice(u: number): void {
-		navigate(`/devices/add?rack=${props.id}&position_u=${u}&face=${face()}`)
+	function installDevice(u: number, targetFace: RackFace = face()): void {
+		navigate(`/devices/add?rack=${props.id}&position_u=${u}&face=${targetFace}`)
 	}
 
 	return (
@@ -359,6 +359,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									selected_u={pendingU()}
 									selected_face={face()}
 									on_select_u={pickU}
+									on_add_device={installDevice}
 									on_delete_shelf={(id: number) => void handleDeleteShelf(id)}
 								/>
 							</Show>

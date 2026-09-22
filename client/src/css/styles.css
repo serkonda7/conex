@@ -1244,13 +1244,13 @@ tbody tr:last-child td {
 }
 
 .rack-u-gutter {
-	flex: 0 0 2.75rem;
+	flex: 0 0 1.65rem;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	background-color: var(--bg-raised);
 	color: var(--text-muted);
-	font-size: var(--font-size-sm);
+	font-size: 0.7rem;
 	font-variant-numeric: tabular-nums;
 	border-right: 1px solid var(--border);
 	padding: 0 0.25rem;
@@ -1356,29 +1356,34 @@ tbody tr:last-child td {
 }
 
 .rack-free-btn {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
-	gap: 0.5rem;
-	width: 100%;
+	justify-content: center;
 	min-width: 0;
-	padding: 0.1rem 0.2rem;
-	border: none;
-	background: transparent;
+	padding: 0.15rem 0.45rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.2rem;
+	background: var(--bg-raised);
 	color: var(--text-muted);
-	text-align: left;
-	overflow: hidden;
-}
-
-.rack-free-btn:hover {
-	background: transparent;
-	color: var(--primary-contrast);
-}
-
-.rack-free-hint {
 	font-size: var(--font-size-sm);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+}
+
+.rack-free-actions {
+	display: none;
+	gap: 0.35rem;
+	align-items: center;
+	width: 100%;
+}
+
+.rack-u-free:hover .rack-free-actions,
+.rack-u-free:focus-within .rack-free-actions {
+	display: flex;
+}
+
+.rack-free-btn:hover,
+.rack-free-btn:focus-visible {
+	background: var(--primary);
+	color: var(--primary-contrast);
 }
 
 /* Topology view: device graph in SVG. */
