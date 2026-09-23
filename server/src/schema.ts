@@ -253,7 +253,8 @@ export const device_type_interfaces = sqliteTable(
 // P4: devices / interfaces. A device mounts XOR: either position_u (consumes
 // the template u_height in U, validated against rack bounds plus shelf/device
 // overlap) or shelf_id (consumes 0 U, shelf must sit in the same rack), never
-// both. Unracked devices leave rack_id, position_u, and shelf_id all null.
+// both. Unmounted devices leave position_u and shelf_id null; rack_id may
+// still be set (rack-assigned but unracked) or null (fully unracked).
 // Interface rows are expanded from template stubs at create time; P5 cables
 // flip `connected`. Deletes of racks/shelves/device-types are blocked while
 // devices reference them (service layer); device delete removes its

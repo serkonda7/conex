@@ -245,6 +245,7 @@ export function DeviceAddPage(): JSX.Element {
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
+				hint={<Hint>Optional, even with a rack: empty leaves the device unracked.</Hint>}
 			/>
 			<SelectField
 				id="device-tenant"

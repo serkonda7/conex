@@ -227,8 +227,8 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				onInput={setPositionU}
 				hint={
 					<Hint>
-						Either a rack position or a shelf, never both. Empty both plus no rack to
-						unrack the device.
+						Either a rack position or a shelf, never both. Empty both to leave the
+						device unracked (a rack may stay assigned).
 					</Hint>
 				}
 			/>

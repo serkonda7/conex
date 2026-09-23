@@ -51,8 +51,10 @@ export interface MountInput {
 }
 
 /**
- * Enforces the mount XOR: position_u XOR shelf_id, never both. Racked
- * devices carry exactly one; unracked devices carry neither. Position mounts
+ * Enforces the mount XOR: position_u XOR shelf_id, never both. Mounted
+ * devices carry exactly one; unmounted devices carry neither — including
+ * devices assigned to a rack but with no U position or shelf (rack_id set,
+ * mount empty, displays as unracked). Position mounts
  * consume the template `u_height` in U (bounds + shelf/device overlap
  * checked); shelf mounts consume 0 U but the shelf must sit in the same
  * rack. `excludeDeviceId` skips the device being moved so a no-op move is
@@ -83,9 +85,8 @@ function checkMount(
 		return Result.err(new NotFoundError('Rack not found'))
 	}
 	if (mount.position_u === null && mount.shelf_id === null) {
-		return Result.err(
-			new ConflictError('Rack-mounted device needs either position_u or shelf_id'),
-		)
+		// Rack-assigned but unmounted: displays as unracked, needs no U or shelf.
+		return Result.ok(undefined)
 	}
 	if (mount.shelf_id !== null) {
 		const shelf = db

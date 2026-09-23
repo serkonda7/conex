@@ -536,7 +536,8 @@ export const DeviceCreateSchema = v.strictObject({
 	rack_id: NullableIdSchema,
 	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
 	// Mount is XOR (service-enforced): position_u XOR shelf_id, never both.
-	// Unracked devices leave rack_id, position_u, and shelf_id all empty.
+	// Unmounted devices leave position_u and shelf_id empty; rack_id may
+	// still be set (rack-assigned but unracked) or empty (fully unracked).
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
 	shelf_id: NullableIdSchema,
 	serial: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
