@@ -1,5 +1,5 @@
 import { DataTable } from '@serkonda7/solid-components'
-import { IconLinkPlus, IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconLinkPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget, TraceLink, TracePath } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -19,12 +19,17 @@ import {
 import { fetch_rack } from '../api_racks'
 import { fetch_device_types } from '../api_templates'
 import { fetch_locations, fetch_site, fetch_tenant } from '../api_tenancy'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+import {
+	DetailCard,
+	DetailHeader,
+	DetailShell,
+	DetailSubtitle,
+	Empty,
+	ForeignKeyLink,
+	InlineError,
+	useDetailDelete,
+} from '../components/detail_page'
+import { go } from '../components/list_page'
 
 /**
  * /devices/:id — detail with the interface list (port status dots), a manual
@@ -232,22 +237,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		refetchAll()
 	}
 
-	async function handleDelete(): Promise<void> {
-		const d = device()
-		if (!d) {
-			return
-		}
-		if (!window.confirm(`Delete device "${d.name}"?`)) {
-			return
-		}
-		setError(null)
-		const res = await delete_device(props.id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		navigate('/devices', { refresh: true })
-	}
+	const { handleDelete } = useDetailDelete({
+		noun: 'device',
+		name: () => device()?.name,
+		id: props.id,
+		remove: delete_device,
+		setError,
+		listRoute: '/devices',
+	})
 
 	function typeNameOf(id: number | undefined): string {
 		if (id === undefined) {
@@ -284,149 +281,94 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 
 	return (
 		<div>
-			<p>
-				<a href="/devices" onClick={(e: MouseEvent): void => go(e, '/devices')}>
-					← Devices
-				</a>
-			</p>
-			<Show when={!device.loading} fallback={<p class="skeleton">Loading device…</p>}>
-				<Show when={device()} fallback={<p class="empty">Device not found.</p>}>
-					<div class="page-header">
-						<h2>{device()?.name}</h2>
-						<div class="form-actions">
-							<button
-								type="button"
-								onClick={() => navigate(`/devices/${props.id}/edit`)}
-							>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconPencil size={14} />
-								</span>{' '}
-								Edit
-							</button>
-							<button type="button" class="btn-danger" onClick={handleDelete}>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconTrash size={14} />
-								</span>{' '}
-								Delete
-							</button>
-						</div>
-					</div>
-					<p class="page-subtitle">{device()?.description || 'No description.'}</p>
+			<DetailShell
+				backTo="/devices"
+				backLabel="Devices"
+				loading={device.loading}
+				loadingText="Loading device…"
+				record={device()}
+				emptyText="Device not found."
+			>
+				<DetailHeader
+					name={device()?.name}
+					editHref={`/devices/${props.id}/edit`}
+					onDelete={handleDelete}
+				/>
+				<DetailSubtitle>{device()?.description || 'No description.'}</DetailSubtitle>
 
-					<div class="detail-stats">
-						<a class="detail-stat" href="#device-interfaces">
-							<span class="detail-stat-value">{ifaceCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Interface{ifaceCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#device-trace">
-							<span class="detail-stat-value">{traceCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Trace link{traceCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#device-cables">
-							<span class="detail-stat-value">{cableCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Cable{cableCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-					</div>
+				<div class="detail-stats">
+					<a class="detail-stat" href="#device-interfaces">
+						<span class="detail-stat-value">{ifaceCount()}</span>{' '}
+						<span class="detail-stat-label">
+							Interface{ifaceCount() === 1 ? '' : 's'}
+						</span>
+					</a>
+					<a class="detail-stat" href="#device-trace">
+						<span class="detail-stat-value">{traceCount()}</span>{' '}
+						<span class="detail-stat-label">
+							Trace link{traceCount() === 1 ? '' : 's'}
+						</span>
+					</a>
+					<a class="detail-stat" href="#device-cables">
+						<span class="detail-stat-value">{cableCount()}</span>{' '}
+						<span class="detail-stat-label">Cable{cableCount() === 1 ? '' : 's'}</span>
+					</a>
+				</div>
 
-					<section class="card" aria-label="Device details">
-						<dl class="detail-grid">
-							<dt>Type</dt>
-							<dd>{typeNameOf(device()?.device_type_id)}</dd>
-							<dt>Description</dt>
-							<dd>{device()?.description || '—'}</dd>
-							<dt>Serial</dt>
-							<dd>{device()?.serial ?? '—'}</dd>
-							<dt>Site</dt>
-							<dd>
-								<Show when={siteId() !== null} fallback="—">
-									<Show
-										when={!site.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show when={site()} fallback={String(siteId() ?? '—')}>
-											<a
-												href={`/sites/${siteId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/sites/${siteId() ?? ''}`)
-												}
-											>
-												{site()?.name}
-											</a>
-										</Show>
-									</Show>
-								</Show>
-							</dd>
-							<dt>Location</dt>
-							<dd>
-								<Show when={locationId() !== null} fallback="—">
-									<Show
-										when={!locationName.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										{locationName() ?? String(locationId() ?? '—')}
-									</Show>
-								</Show>
-							</dd>
-							<dt>Rack</dt>
-							<dd>
-								<Show when={rackId() !== null} fallback="—">
-									<Show
-										when={!rack.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show when={rack()} fallback={String(rackId() ?? '—')}>
-											<a
-												href={`/racks/${rackId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/racks/${rackId() ?? ''}`)
-												}
-											>
-												{rack()?.name}
-											</a>
-										</Show>
-									</Show>
-								</Show>
-							</dd>
-							<dt>Face</dt>
-							<dd>{device()?.face ?? '—'}</dd>
-							<dt>Position</dt>
-							<dd>
-								{device()?.position_u !== null ? (
-									<code>U{device()?.position_u}</code>
-								) : (
-									<span>unracked</span>
-								)}
-							</dd>
-							<dt>Tenant</dt>
-							<dd>
-								<Show when={tenantId() !== null} fallback="—">
-									<Show
-										when={!tenant.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show when={tenant()} fallback={String(tenantId() ?? '—')}>
-											<a
-												href={`/tenants/${tenantId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/tenants/${tenantId() ?? ''}`)
-												}
-											>
-												{tenant()?.name}
-											</a>
-										</Show>
-									</Show>
-								</Show>
-							</dd>
-						</dl>
-					</section>
-				</Show>
-			</Show>
+				<DetailCard label="Device details">
+					<dt>Type</dt>
+					<dd>{typeNameOf(device()?.device_type_id)}</dd>
+					<dt>Description</dt>
+					<dd>{device()?.description || '—'}</dd>
+					<dt>Serial</dt>
+					<dd>{device()?.serial ?? '—'}</dd>
+					<dt>Site</dt>
+					<dd>
+						<ForeignKeyLink
+							id={siteId()}
+							loading={site.loading}
+							name={site()?.name}
+							href={`/sites/${siteId() ?? ''}`}
+						/>
+					</dd>
+					<dt>Location</dt>
+					<dd>
+						<ForeignKeyLink
+							id={locationId()}
+							loading={locationName.loading}
+							name={locationName()}
+						/>
+					</dd>
+					<dt>Rack</dt>
+					<dd>
+						<ForeignKeyLink
+							id={rackId()}
+							loading={rack.loading}
+							name={rack()?.name}
+							href={`/racks/${rackId() ?? ''}`}
+						/>
+					</dd>
+					<dt>Face</dt>
+					<dd>{device()?.face ?? '—'}</dd>
+					<dt>Position</dt>
+					<dd>
+						{device()?.position_u !== null ? (
+							<code>U{device()?.position_u}</code>
+						) : (
+							<span>unracked</span>
+						)}
+					</dd>
+					<dt>Tenant</dt>
+					<dd>
+						<ForeignKeyLink
+							id={tenantId()}
+							loading={tenant.loading}
+							name={tenant()?.name}
+							href={`/tenants/${tenantId() ?? ''}`}
+						/>
+					</dd>
+				</DetailCard>
+			</DetailShell>
 			<h3>Move</h3>
 			<form onSubmit={handleMove}>
 				<input
@@ -573,7 +515,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			</a>
 			<Show
 				when={(trace()?.links ?? []).length > 0}
-				fallback={<p class="empty">No cable path yet. Connect the first cable below.</p>}
+				fallback={<Empty message="No cable path yet. Connect the first cable below." />}
 			>
 				<ul>
 					<For each={trace()?.links ?? []}>
@@ -665,11 +607,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						Disconnect
 					</button>
 				)}
-				emptyContent={<p class="empty">No cables on this device yet.</p>}
+				emptyContent={<Empty message="No cables on this device yet." />}
 			/>
-			<Show when={error()}>
-				<div class="app-inline-error">{error()}</div>
-			</Show>
+			<InlineError message={error()} />
 		</div>
 	)
 }

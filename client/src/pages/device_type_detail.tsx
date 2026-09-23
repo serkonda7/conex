@@ -1,9 +1,8 @@
 import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
-import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, For } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../api_devices'
 import {
 	create_stub,
@@ -14,12 +13,18 @@ import {
 	fetch_stubs,
 	type StubRow,
 } from '../api_templates'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+import {
+	DetailCard,
+	DetailHeader,
+	DetailShell,
+	DetailSubtitle,
+	Empty,
+	InlineError,
+	Loading,
+	RelatedSection,
+	useDetailDelete,
+} from '../components/detail_page'
+import { go } from '../components/list_page'
 
 /**
  * /device-types/:id — device-type detail: header with model and details
@@ -109,22 +114,14 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		void refetchStubs()
 	}
 
-	async function handleDelete(): Promise<void> {
-		const t = deviceType()
-		if (!t) {
-			return
-		}
-		if (!window.confirm(`Delete device type "${t.model}"?`)) {
-			return
-		}
-		setError(null)
-		const res = await delete_device_type(props.id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		navigate('/device-types', { refresh: true })
-	}
+	const { handleDelete } = useDetailDelete({
+		noun: 'device type',
+		name: () => deviceType()?.model,
+		id: props.id,
+		remove: delete_device_type,
+		setError,
+		listRoute: '/device-types',
+	})
 
 	const stubColumns: DataTableColumn<StubRow>[] = [
 		{
@@ -141,56 +138,36 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 
 	return (
 		<div>
-			<p>
-				<a href="/device-types" onClick={(e: MouseEvent): void => go(e, '/device-types')}>
-					← Device types
-				</a>
-			</p>
-			<Show
-				when={!deviceType.loading}
-				fallback={<p class="skeleton">Loading device type…</p>}
+			<DetailShell
+				backTo="/device-types"
+				backLabel="Device types"
+				loading={deviceType.loading}
+				loadingText="Loading device type…"
+				record={deviceType()}
+				emptyText="Device type not found."
 			>
-				<Show when={deviceType()} fallback={<p class="empty">Device type not found.</p>}>
-					<div class="page-header">
-						<h2>{deviceType()?.model}</h2>
-						<div class="form-actions">
-							<button
-								type="button"
-								onClick={() => navigate(`/device-types/${props.id}/edit`)}
-							>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconPencil size={14} />
-								</span>{' '}
-								Edit
-							</button>
-							<button type="button" class="btn-danger" onClick={handleDelete}>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconTrash size={14} />
-								</span>{' '}
-								Delete
-							</button>
-						</div>
-					</div>
-					<p class="page-subtitle">{deviceType()?.description || 'No description.'}</p>
+				<DetailHeader
+					name={deviceType()?.model}
+					editHref={`/device-types/${props.id}/edit`}
+					onDelete={handleDelete}
+				/>
+				<DetailSubtitle>{deviceType()?.description || 'No description.'}</DetailSubtitle>
 
-					<section class="card" aria-label="Device type details">
-						<dl class="detail-grid">
-							<dt>Manufacturer</dt>
-							<dd>{mfrNameOf(deviceType()?.manufacturer_id)}</dd>
-							<dt>Model</dt>
-							<dd>{deviceType()?.model}</dd>
-							<dt>Description</dt>
-							<dd>{deviceType()?.description || '—'}</dd>
-							<dt>Comments</dt>
-							<dd>{deviceType()?.comments || '—'}</dd>
-							<dt>U height</dt>
-							<dd>{deviceType()?.u_height}</dd>
-							<dt>Full depth</dt>
-							<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>
-						</dl>
-					</section>
-				</Show>
-			</Show>
+				<DetailCard label="Device type details">
+					<dt>Manufacturer</dt>
+					<dd>{mfrNameOf(deviceType()?.manufacturer_id)}</dd>
+					<dt>Model</dt>
+					<dd>{deviceType()?.model}</dd>
+					<dt>Description</dt>
+					<dd>{deviceType()?.description || '—'}</dd>
+					<dt>Comments</dt>
+					<dd>{deviceType()?.comments || '—'}</dd>
+					<dt>U height</dt>
+					<dd>{deviceType()?.u_height}</dd>
+					<dt>Full depth</dt>
+					<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>
+				</DetailCard>
+			</DetailShell>
 
 			<h3 id="device-type-stubs">Interface stubs ({stubCountText()})</h3>
 			<form onSubmit={handleCreateStub}>
@@ -220,36 +197,34 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					</button>
 				)}
 				loading={() => stubs.loading}
-				loadingContent={<p class="skeleton">Loading stubs…</p>}
-				emptyContent={<p class="empty">No stubs yet.</p>}
+				loadingContent={<Loading message="Loading stubs…" />}
+				emptyContent={<Empty message="No stubs yet." />}
 			/>
-			<h3 id="device-type-devices">
-				Devices <span class="badge">{deviceCount()}</span>
-			</h3>
-			<Show when={!devices.loading} fallback={<p class="skeleton">Loading devices…</p>}>
-				<Show
-					when={deviceCount() > 0}
-					fallback={<p class="empty">No devices use this type yet.</p>}
-				>
-					<ul>
-						<For each={devices() ?? []}>
-							{(d: DeviceRow) => (
-								<li>
-									<a
-										href={`/devices/${d.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
-									>
-										{d.name}
-									</a>
-								</li>
-							)}
-						</For>
-					</ul>
-				</Show>
-			</Show>
-			<Show when={error()}>
-				<div class="app-inline-error">{error()}</div>
-			</Show>
+			<RelatedSection
+				id="device-type-devices"
+				title="Devices"
+				count={deviceCount()}
+				loading={devices.loading}
+				loadingText="Loading devices…"
+				emptyText="No devices use this type yet."
+				hasItems={deviceCount() > 0}
+			>
+				<ul>
+					<For each={devices() ?? []}>
+						{(d: DeviceRow) => (
+							<li>
+								<a
+									href={`/devices/${d.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+								>
+									{d.name}
+								</a>
+							</li>
+						)}
+					</For>
+				</ul>
+			</RelatedSection>
+			<InlineError message={error()} />
 		</div>
 	)
 }

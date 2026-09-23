@@ -1,8 +1,7 @@
 import { DataTable } from '@serkonda7/solid-components'
-import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, Show } from 'solid-js'
+import { createResource, createSignal } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../api_devices'
 import { fetch_racks, type RackRow } from '../api_racks'
 import {
@@ -13,12 +12,16 @@ import {
 	type SiteGroupRow,
 	type SiteRow,
 } from '../api_tenancy'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+import {
+	DetailCard,
+	DetailHeader,
+	DetailShell,
+	DetailSubtitle,
+	InlineError,
+	RelatedSection,
+	useDetailDelete,
+} from '../components/detail_page'
+import { go } from '../components/list_page'
 
 /**
  * /tenants/:id — tenant detail: header with slug/description/comments,
@@ -86,22 +89,14 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		},
 	)
 
-	async function handleDelete(): Promise<void> {
-		const t = tenant()
-		if (!t) {
-			return
-		}
-		if (!window.confirm(`Delete tenant "${t.name}"?`)) {
-			return
-		}
-		setError(null)
-		const res = await delete_tenant(props.id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		navigate('/tenants', { refresh: true })
-	}
+	const { handleDelete } = useDetailDelete({
+		noun: 'tenant',
+		name: () => tenant()?.name,
+		id: props.id,
+		remove: delete_tenant,
+		setError,
+		listRoute: '/tenants',
+	})
 
 	const siteCount = (): number => sites()?.length ?? 0
 	const siteGroupCount = (): number => siteGroups()?.length ?? 0
@@ -110,246 +105,199 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 
 	return (
 		<div>
-			<p>
-				<a href="/tenants" onClick={(e: MouseEvent): void => go(e, '/tenants')}>
-					← Tenants
-				</a>
-			</p>
-			<Show when={!tenant.loading} fallback={<p class="skeleton">Loading tenant…</p>}>
-				<Show when={tenant()} fallback={<p class="empty">Tenant not found.</p>}>
-					<div class="page-header">
-						<h2>
-							{tenant()?.name} <code>{tenant()?.slug}</code>
-						</h2>
-						<div class="form-actions">
-							<button
-								type="button"
-								onClick={() => navigate(`/tenants/${props.id}/edit`)}
-							>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconPencil size={14} />
-								</span>{' '}
-								Edit
-							</button>
-							<button type="button" class="btn-danger" onClick={handleDelete}>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconTrash size={14} />
-								</span>{' '}
-								Delete
-							</button>
-						</div>
-					</div>
-					<p class="page-subtitle">{tenant()?.description || 'No description.'}</p>
-
-					<div class="detail-stats">
-						<a class="detail-stat" href="#tenant-sites">
-							<span class="detail-stat-value">{siteCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Site{siteCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#tenant-site-groups">
-							<span class="detail-stat-value">{siteGroupCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Site group{siteGroupCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#tenant-racks">
-							<span class="detail-stat-value">{rackCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Rack{rackCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#tenant-devices">
-							<span class="detail-stat-value">{deviceCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Device{deviceCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-					</div>
-
-					<section class="card" aria-label="Tenant details">
-						<dl class="detail-grid">
-							<dt>Slug</dt>
-							<dd>
-								<code>{tenant()?.slug}</code>
-							</dd>
-							<dt>Description</dt>
-							<dd>{tenant()?.description || '—'}</dd>
-							<dt>Comments</dt>
-							<dd>{tenant()?.comments || '—'}</dd>
-						</dl>
-					</section>
-				</Show>
-			</Show>
-
-			<h3 id="tenant-sites">
-				Sites <span class="badge">{siteCount()}</span>
-			</h3>
-			<Show when={!sites.loading} fallback={<p class="skeleton">Loading sites…</p>}>
-				<Show
-					when={siteCount() > 0}
-					fallback={<p class="empty">No sites for this tenant yet.</p>}
-				>
-					<DataTable
-						rows={() => sites() ?? []}
-						getRowId={(s: SiteRow): number => s.id}
-						showColumnCustomizer
-						columns={[
-							{
-								key: 'name',
-								label: 'Name',
-								getValue: (s: SiteRow): JSX.Element => (
-									<a
-										href={`/sites/${s.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
-									>
-										{s.name}
-									</a>
-								),
-							},
-							{
-								key: 'slug',
-								label: 'Slug',
-								getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
-							},
-						]}
-					/>
-				</Show>
-			</Show>
-			<p>
-				<a
-					href={`/sites?tenant=${props.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/sites?tenant=${props.id}`)}
-				>
-					View in Sites →
-				</a>
-			</p>
-
-			<h3 id="tenant-site-groups">
-				Site groups <span class="badge">{siteGroupCount()}</span>
-			</h3>
-			<Show
-				when={!siteGroups.loading}
-				fallback={<p class="skeleton">Loading site groups…</p>}
+			<DetailShell
+				backTo="/tenants"
+				backLabel="Tenants"
+				loading={tenant.loading}
+				loadingText="Loading tenant…"
+				record={tenant()}
+				emptyText="Tenant not found."
 			>
-				<Show
-					when={siteGroupCount() > 0}
-					fallback={<p class="empty">No site groups for this tenant yet.</p>}
-				>
-					<DataTable
-						rows={() => siteGroups() ?? []}
-						getRowId={(g: SiteGroupRow): number => g.id}
-						showColumnCustomizer
-						columns={[
-							{
-								key: 'name',
-								label: 'Name',
-								getValue: (g: SiteGroupRow): JSX.Element => (
-									<a
-										href={`/site-groups/${g.id}`}
-										onClick={(e: MouseEvent): void =>
-											go(e, `/site-groups/${g.id}`)
-										}
-									>
-										{g.name}
-									</a>
-								),
-							},
-							{
-								key: 'slug',
-								label: 'Slug',
-								getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
-							},
-						]}
-					/>
-				</Show>
-			</Show>
-			<p>
-				<a
-					href={`/site-groups?tenant=${props.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/site-groups?tenant=${props.id}`)}
-				>
-					View in Site Groups →
-				</a>
-			</p>
+				<DetailHeader
+					name={tenant()?.name}
+					slug={tenant()?.slug}
+					editHref={`/tenants/${props.id}/edit`}
+					onDelete={handleDelete}
+				/>
+				<DetailSubtitle>{tenant()?.description || 'No description.'}</DetailSubtitle>
 
-			<h3 id="tenant-racks">
-				Racks <span class="badge">{rackCount()}</span>
-			</h3>
-			<Show when={!racks.loading} fallback={<p class="skeleton">Loading racks…</p>}>
-				<Show
-					when={rackCount() > 0}
-					fallback={<p class="empty">No racks for this tenant yet.</p>}
-				>
-					<DataTable
-						rows={() => racks() ?? []}
-						getRowId={(r: RackRow): number => r.id}
-						showColumnCustomizer
-						columns={[
-							{
-								key: 'name',
-								label: 'Name',
-								getValue: (r: RackRow): JSX.Element => (
-									<a
-										href={`/racks/${r.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
-									>
-										{r.name}
-									</a>
-								),
-							},
-							{
-								key: 'height',
-								label: 'Height',
-								getValue: (r: RackRow): string => `${r.height_u}U`,
-							},
-						]}
-					/>
-				</Show>
-			</Show>
+				<div class="detail-stats">
+					<a class="detail-stat" href="#tenant-sites">
+						<span class="detail-stat-value">{siteCount()}</span>{' '}
+						<span class="detail-stat-label">Site{siteCount() === 1 ? '' : 's'}</span>
+					</a>
+					<a class="detail-stat" href="#tenant-site-groups">
+						<span class="detail-stat-value">{siteGroupCount()}</span>{' '}
+						<span class="detail-stat-label">
+							Site group{siteGroupCount() === 1 ? '' : 's'}
+						</span>
+					</a>
+					<a class="detail-stat" href="#tenant-racks">
+						<span class="detail-stat-value">{rackCount()}</span>{' '}
+						<span class="detail-stat-label">Rack{rackCount() === 1 ? '' : 's'}</span>
+					</a>
+					<a class="detail-stat" href="#tenant-devices">
+						<span class="detail-stat-value">{deviceCount()}</span>{' '}
+						<span class="detail-stat-label">
+							Device{deviceCount() === 1 ? '' : 's'}
+						</span>
+					</a>
+				</div>
 
-			<h3 id="tenant-devices">
-				Devices <span class="badge">{deviceCount()}</span>
-			</h3>
-			<Show when={!devices.loading} fallback={<p class="skeleton">Loading devices…</p>}>
-				<Show
-					when={deviceCount() > 0}
-					fallback={<p class="empty">No devices for this tenant yet.</p>}
-				>
-					<DataTable
-						rows={() => devices() ?? []}
-						getRowId={(d: DeviceRow): number => d.id}
-						showColumnCustomizer
-						columns={[
-							{
-								key: 'name',
-								label: 'Name',
-								getValue: (d: DeviceRow): JSX.Element => (
-									<a
-										href={`/devices/${d.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
-									>
-										{d.name}
-									</a>
-								),
-							},
-						]}
-					/>
-				</Show>
-			</Show>
-			<p>
-				<a
-					href={`/devices?tenant=${props.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/devices?tenant=${props.id}`)}
-				>
-					View in Devices →
-				</a>
-			</p>
+				<DetailCard label="Tenant details">
+					<dt>Slug</dt>
+					<dd>
+						<code>{tenant()?.slug}</code>
+					</dd>
+					<dt>Description</dt>
+					<dd>{tenant()?.description || '—'}</dd>
+					<dt>Comments</dt>
+					<dd>{tenant()?.comments || '—'}</dd>
+				</DetailCard>
+			</DetailShell>
 
-			<Show when={error()}>
-				<div class="app-inline-error">{error()}</div>
-			</Show>
+			<RelatedSection
+				id="tenant-sites"
+				title="Sites"
+				count={siteCount()}
+				loading={sites.loading}
+				loadingText="Loading sites…"
+				emptyText="No sites for this tenant yet."
+				hasItems={siteCount() > 0}
+				viewAllHref={`/sites?tenant=${props.id}`}
+				viewAllLabel="View in Sites →"
+			>
+				<DataTable
+					rows={() => sites() ?? []}
+					getRowId={(s: SiteRow): number => s.id}
+					showColumnCustomizer
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							getValue: (s: SiteRow): JSX.Element => (
+								<a
+									href={`/sites/${s.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+								>
+									{s.name}
+								</a>
+							),
+						},
+						{
+							key: 'slug',
+							label: 'Slug',
+							getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
+						},
+					]}
+				/>
+			</RelatedSection>
+
+			<RelatedSection
+				id="tenant-site-groups"
+				title="Site groups"
+				count={siteGroupCount()}
+				loading={siteGroups.loading}
+				loadingText="Loading site groups…"
+				emptyText="No site groups for this tenant yet."
+				hasItems={siteGroupCount() > 0}
+				viewAllHref={`/site-groups?tenant=${props.id}`}
+				viewAllLabel="View in Site Groups →"
+			>
+				<DataTable
+					rows={() => siteGroups() ?? []}
+					getRowId={(g: SiteGroupRow): number => g.id}
+					showColumnCustomizer
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							getValue: (g: SiteGroupRow): JSX.Element => (
+								<a
+									href={`/site-groups/${g.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/site-groups/${g.id}`)}
+								>
+									{g.name}
+								</a>
+							),
+						},
+						{
+							key: 'slug',
+							label: 'Slug',
+							getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
+						},
+					]}
+				/>
+			</RelatedSection>
+
+			<RelatedSection
+				id="tenant-racks"
+				title="Racks"
+				count={rackCount()}
+				loading={racks.loading}
+				loadingText="Loading racks…"
+				emptyText="No racks for this tenant yet."
+				hasItems={rackCount() > 0}
+			>
+				<DataTable
+					rows={() => racks() ?? []}
+					getRowId={(r: RackRow): number => r.id}
+					showColumnCustomizer
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							getValue: (r: RackRow): JSX.Element => (
+								<a
+									href={`/racks/${r.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+								>
+									{r.name}
+								</a>
+							),
+						},
+						{
+							key: 'height',
+							label: 'Height',
+							getValue: (r: RackRow): string => `${r.height_u}U`,
+						},
+					]}
+				/>
+			</RelatedSection>
+
+			<RelatedSection
+				id="tenant-devices"
+				title="Devices"
+				count={deviceCount()}
+				loading={devices.loading}
+				loadingText="Loading devices…"
+				emptyText="No devices for this tenant yet."
+				hasItems={deviceCount() > 0}
+				viewAllHref={`/devices?tenant=${props.id}`}
+				viewAllLabel="View in Devices →"
+			>
+				<DataTable
+					rows={() => devices() ?? []}
+					getRowId={(d: DeviceRow): number => d.id}
+					showColumnCustomizer
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							getValue: (d: DeviceRow): JSX.Element => (
+								<a
+									href={`/devices/${d.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+								>
+									{d.name}
+								</a>
+							),
+						},
+					]}
+				/>
+			</RelatedSection>
+
+			<InlineError message={error()} />
 		</div>
 	)
 }

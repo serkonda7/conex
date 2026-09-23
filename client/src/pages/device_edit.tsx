@@ -1,24 +1,20 @@
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
-import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device, update_device } from '../api_devices'
-import { fetch_racks, type RackRow } from '../api_racks'
+import { fetch_racks } from '../api_racks'
 import { fetch_device_types } from '../api_templates'
+import { fetch_locations, fetch_sites, fetch_tenants } from '../api_tenancy'
 import {
-	fetch_locations,
-	fetch_sites,
-	fetch_tenants,
-	type LocationRow,
-	type SiteRow,
-	type TenantRow,
-} from '../api_tenancy'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+	EditActions,
+	EditPageShell,
+	FormError,
+	Hint,
+	NameField,
+	row_options,
+	SelectField,
+	TextField,
+} from '../components/form'
+import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /devices/:id/edit — device edit form. Saves back to the detail page. */
 export function DeviceEditPage(props: { id: number }): JSX.Element {
@@ -31,9 +27,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [face, setFace] = createSignal('')
 	const [positionU, setPositionU] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
-	const [formError, setFormError] = createSignal<string | null>(null)
-	const [saving, setSaving] = createSignal(false)
-	const [loaded, setLoaded] = createSignal(false)
+	const { formError, setFormError, saving, setSaving, loaded, setLoaded } = useEditForm()
 
 	const [sites] = createResource(async () => {
 		const res = await fetch_sites()
@@ -116,219 +110,137 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		setFormError(null)
-		const trimmedName = name().trim()
-		if (!trimmedName) {
-			setFormError('Name is required.')
-			return
-		}
-		const position = positionU().trim() === '' ? null : Number(positionU())
-		if (position !== null && (!Number.isInteger(position) || position < 1)) {
-			setFormError('Rack position must be a positive U number or empty.')
-			return
-		}
-		setSaving(true)
-		const trimmedSerial = serial().trim()
-		const trimmedDescription = description().trim()
-		const res = await update_device(props.id, {
-			name: trimmedName,
-			description: trimmedDescription === '' ? null : trimmedDescription,
-			serial: trimmedSerial === '' ? null : trimmedSerial,
-			site_id: siteId() ? Number(siteId()) : null,
-			location_id: locationId() ? Number(locationId()) : null,
-			rack_id: rackId() ? Number(rackId()) : null,
-			face: (face() || null) as 'front' | 'rear' | null,
-			position_u: position,
-			tenant_id: tenantId() ? Number(tenantId()) : null,
+		await submit_edit({
+			name: name(),
+			validate: () => {
+				const position = positionU().trim() === '' ? null : Number(positionU())
+				if (position !== null && (!Number.isInteger(position) || position < 1)) {
+					return 'Rack position must be a positive U number or empty.'
+				}
+				return null
+			},
+			save: (values: FormValues) =>
+				update_device(props.id, {
+					name: values.name,
+					description: description().trim() === '' ? null : description().trim(),
+					serial: serial().trim() === '' ? null : serial().trim(),
+					site_id: siteId() ? Number(siteId()) : null,
+					location_id: locationId() ? Number(locationId()) : null,
+					rack_id: rackId() ? Number(rackId()) : null,
+					face: (face() || null) as 'front' | 'rear' | null,
+					position_u: positionU().trim() === '' ? null : Number(positionU().trim()),
+					tenant_id: tenantId() ? Number(tenantId()) : null,
+				}),
+			setError: setFormError,
+			setSaving,
+			navigateTo: `/devices/${props.id}`,
 		})
-		setSaving(false)
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return
-		}
-		navigate(`/devices/${props.id}`)
 	}
 
 	return (
-		<div class="form-page">
-			<p>
-				<a
-					href={`/devices/${props.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/devices/${props.id}`)}
-				>
-					← {device()?.name ?? 'Device'}
-				</a>
-			</p>
-			<h2>Edit device</h2>
-			<Show when={loaded()} fallback={<p class="skeleton">Loading device…</p>}>
-				<form class="form-stacked" onSubmit={handleSave}>
-					<div class="field">
-						<label for="device-edit-name">
-							Name{' '}
-							<span class="required" aria-hidden="true">
-								*
-							</span>
-						</label>
-						<input
-							id="device-edit-name"
-							placeholder="sw-access-01"
-							required
-							maxLength={100}
-							value={name()}
-							onInput={(e: InputEventAndTarget) => setName(e.currentTarget.value)}
-						/>
-					</div>
-					<div class="field">
-						<label for="device-edit-type">Device type</label>
-						<input id="device-edit-type" value={typeName()} disabled />
-						<p class="field-hint">
-							The device type is immutable after create: swapping the template would
-							invalidate the interfaces and the U footprint.
-						</p>
-					</div>
-					<div class="field">
-						<label for="device-edit-description">Description</label>
-						<input
-							id="device-edit-description"
-							placeholder="Short summary (optional)"
-							maxLength={500}
-							value={description()}
-							onInput={(e: InputEventAndTarget) =>
-								setDescription(e.currentTarget.value)
-							}
-						/>
-					</div>
-					<div class="field">
-						<label for="device-edit-serial">Serial</label>
-						<input
-							id="device-edit-serial"
-							placeholder="Serial (optional)"
-							maxLength={100}
-							value={serial()}
-							onInput={(e: InputEventAndTarget) => setSerial(e.currentTarget.value)}
-						/>
-					</div>
-					<div class="field">
-						<label for="device-edit-site">Site</label>
-						<select
-							id="device-edit-site"
-							value={siteId()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								handleSiteChange(e.currentTarget.value)
-							}
-						>
-							<option value="">No site</option>
-							<For each={sites() ?? []}>
-								{(s: SiteRow): JSX.Element => (
-									<option value={s.id}>{s.name}</option>
-								)}
-							</For>
-						</select>
-					</div>
-					<div class="field">
-						<label for="device-edit-location">Location</label>
-						<select
-							id="device-edit-location"
-							value={locationId()}
-							disabled={siteId() === ''}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setLocationId(e.currentTarget.value)
-							}
-						>
-							<option value="">No location</option>
-							<For each={locations() ?? []}>
-								{(l: LocationRow): JSX.Element => (
-									<option value={l.id}>{l.name}</option>
-								)}
-							</For>
-						</select>
-						<Show when={siteId() === ''}>
-							<p class="field-hint">Pick a site first to choose a location.</p>
-						</Show>
-					</div>
-					<div class="field">
-						<label for="device-edit-rack">Rack</label>
-						<select
-							id="device-edit-rack"
-							value={rackId()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setRackId(e.currentTarget.value)
-							}
-						>
-							<option value="">Unracked</option>
-							<For each={racks() ?? []}>
-								{(r: RackRow): JSX.Element => (
-									<option value={r.id}>{r.name}</option>
-								)}
-							</For>
-						</select>
-					</div>
-					<div class="field">
-						<label for="device-edit-face">Face</label>
-						<select
-							id="device-edit-face"
-							value={face()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setFace(e.currentTarget.value)
-							}
-						>
-							<option value="">No face</option>
-							<option value="front">front</option>
-							<option value="rear">rear</option>
-						</select>
-					</div>
-					<div class="field">
-						<label for="device-edit-position">U position</label>
-						<input
-							id="device-edit-position"
-							placeholder="U position (empty clears)"
-							inputmode="numeric"
-							value={positionU()}
-							onInput={(e: InputEventAndTarget) =>
-								setPositionU(e.currentTarget.value)
-							}
-						/>
-						<p class="field-hint">
-							Either a rack position or a shelf, never both. Empty both plus no rack
-							to unrack the device.
-						</p>
-					</div>
-					<div class="field">
-						<label for="device-edit-tenant">Tenant</label>
-						<select
-							id="device-edit-tenant"
-							value={tenantId()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setTenantId(e.currentTarget.value)
-							}
-						>
-							<option value="">No tenant</option>
-							<For each={tenants() ?? []}>
-								{(t: TenantRow): JSX.Element => (
-									<option value={t.id}>{t.name}</option>
-								)}
-							</For>
-						</select>
-					</div>
-					<Show when={formError()}>
-						<div class="app-inline-error" role="alert">
-							{formError()}
-						</div>
+		<EditPageShell
+			backTo={`/devices/${props.id}`}
+			backLabel={device()?.name ?? 'Device'}
+			title="Edit device"
+			loaded={loaded()}
+			loadingText="Loading device…"
+			onSubmit={handleSave}
+		>
+			<NameField
+				id="device-edit-name"
+				placeholder="sw-access-01"
+				value={name()}
+				onInput={setName}
+			/>
+			<div class="field">
+				<label for="device-edit-type">Device type</label>
+				<input id="device-edit-type" value={typeName()} disabled />
+				<p class="field-hint">
+					The device type is immutable after create: swapping the template would
+					invalidate the interfaces and the U footprint.
+				</p>
+			</div>
+			<TextField
+				id="device-edit-description"
+				label="Description"
+				placeholder="Short summary (optional)"
+				maxLength={500}
+				value={description()}
+				onInput={setDescription}
+			/>
+			<TextField
+				id="device-edit-serial"
+				label="Serial"
+				placeholder="Serial (optional)"
+				maxLength={100}
+				value={serial()}
+				onInput={setSerial}
+			/>
+			<SelectField
+				id="device-edit-site"
+				label="Site"
+				value={siteId()}
+				onChange={handleSiteChange}
+				options={row_options(sites() ?? [])}
+				emptyLabel="No site"
+			/>
+			<SelectField
+				id="device-edit-location"
+				label="Location"
+				value={locationId()}
+				onChange={setLocationId}
+				options={row_options(locations() ?? [])}
+				emptyLabel="No location"
+				disabled={siteId() === ''}
+				hint={
+					<Show when={siteId() === ''}>
+						<Hint>Pick a site first to choose a location.</Hint>
 					</Show>
-					<div class="form-actions">
-						<button type="submit" disabled={saving()}>
-							{saving() ? 'Saving…' : 'Save'}
-						</button>
-						<button
-							type="button"
-							onClick={() => navigate(`/devices/${props.id}`)}
-							disabled={saving()}
-						>
-							Cancel
-						</button>
-					</div>
-				</form>
-			</Show>
-		</div>
+				}
+			/>
+			<SelectField
+				id="device-edit-rack"
+				label="Rack"
+				value={rackId()}
+				onChange={setRackId}
+				options={row_options(racks() ?? [])}
+				emptyLabel="Unracked"
+			/>
+			<SelectField
+				id="device-edit-face"
+				label="Face"
+				value={face()}
+				onChange={setFace}
+				options={[
+					{ value: 'front', label: 'front' },
+					{ value: 'rear', label: 'rear' },
+				]}
+				emptyLabel="No face"
+			/>
+			<TextField
+				id="device-edit-position"
+				label="U position"
+				placeholder="U position (empty clears)"
+				inputmode="numeric"
+				value={positionU()}
+				onInput={setPositionU}
+				hint={
+					<Hint>
+						Either a rack position or a shelf, never both. Empty both plus no rack to
+						unrack the device.
+					</Hint>
+				}
+			/>
+			<SelectField
+				id="device-edit-tenant"
+				label="Tenant"
+				value={tenantId()}
+				onChange={setTenantId}
+				options={row_options(tenants() ?? [])}
+				emptyLabel="No tenant"
+			/>
+			<FormError message={formError} />
+			<EditActions saving={saving()} cancelTo={`/devices/${props.id}`} />
+		</EditPageShell>
 	)
 }

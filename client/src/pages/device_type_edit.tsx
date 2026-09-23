@@ -1,19 +1,17 @@
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
-import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, type JSX } from 'solid-js'
+import { fetch_device_type, fetch_manufacturers, update_device_type } from '../api_templates'
 import {
-	fetch_device_type,
-	fetch_manufacturers,
-	type ManufacturerRow,
-	update_device_type,
-} from '../api_templates'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+	EditActions,
+	EditPageShell,
+	FormError,
+	Hint,
+	row_options,
+	SelectField,
+	TextAreaField,
+	TextField,
+} from '../components/form'
+import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /device-types/:id/edit — device-type edit form. Saves back to the detail page. */
 export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
@@ -23,9 +21,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [fullDepth, setFullDepth] = createSignal(true)
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
-	const [formError, setFormError] = createSignal<string | null>(null)
-	const [saving, setSaving] = createSignal(false)
-	const [loaded, setLoaded] = createSignal(false)
+	const { formError, setFormError, saving, setSaving, loaded, setLoaded } = useEditForm()
 
 	const [manufacturers] = createResource(async () => {
 		const res = await fetch_manufacturers({})
@@ -57,163 +53,102 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		setFormError(null)
-		const manufacturer = Number(manufacturerId())
-		if (!Number.isInteger(manufacturer) || manufacturer < 1) {
-			setFormError('Select a manufacturer.')
-			return
-		}
-		const trimmedModel = model().trim()
-		if (!trimmedModel) {
-			setFormError('Model is required.')
-			return
-		}
-		const height = Number(uHeight())
-		if (!Number.isInteger(height) || height < 0 || height > 60) {
-			setFormError('U height must be an integer from 0 to 60.')
-			return
-		}
-		setSaving(true)
-		const trimmedDescription = description().trim()
-		const trimmedComments = comments().trim()
-		const res = await update_device_type(props.id, {
-			manufacturer_id: manufacturer,
-			model: trimmedModel,
-			u_height: height,
-			is_full_depth: fullDepth(),
-			description: trimmedDescription === '' ? null : trimmedDescription,
-			comments: trimmedComments === '' ? null : trimmedComments,
+		await submit_edit({
+			name: model(),
+			nameError: 'Model is required.',
+			validate: () => {
+				const manufacturer = Number(manufacturerId())
+				if (!Number.isInteger(manufacturer) || manufacturer < 1) {
+					return 'Select a manufacturer.'
+				}
+				const height = Number(uHeight())
+				if (!Number.isInteger(height) || height < 0 || height > 60) {
+					return 'U height must be an integer from 0 to 60.'
+				}
+				return null
+			},
+			save: (values: FormValues) =>
+				update_device_type(props.id, {
+					manufacturer_id: Number(manufacturerId()),
+					model: values.name,
+					u_height: Number(uHeight()),
+					is_full_depth: fullDepth(),
+					description: description().trim() === '' ? null : description().trim(),
+					comments: comments().trim() === '' ? null : comments().trim(),
+				}),
+			setError: setFormError,
+			setSaving,
+			navigateTo: `/device-types/${props.id}`,
 		})
-		setSaving(false)
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return
-		}
-		navigate(`/device-types/${props.id}`)
 	}
 
 	return (
-		<div class="form-page">
-			<p>
-				<a
-					href={`/device-types/${props.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/device-types/${props.id}`)}
-				>
-					← {deviceType()?.model ?? 'Device type'}
-				</a>
-			</p>
-			<h2>Edit device type</h2>
-			<Show when={loaded()} fallback={<p class="skeleton">Loading device type…</p>}>
-				<form class="form-stacked" onSubmit={handleSave}>
-					<div class="field">
-						<label for="device-type-edit-manufacturer">
-							Manufacturer{' '}
-							<span class="required" aria-hidden="true">
-								*
-							</span>
-						</label>
-						<select
-							id="device-type-edit-manufacturer"
-							required
-							value={manufacturerId()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setManufacturerId(e.currentTarget.value)
-							}
-						>
-							<option value="">Manufacturer…</option>
-							<For each={manufacturers() ?? []}>
-								{(m: ManufacturerRow) => <option value={m.id}>{m.name}</option>}
-							</For>
-						</select>
-					</div>
-					<div class="field">
-						<label for="device-type-edit-model">
-							Model{' '}
-							<span class="required" aria-hidden="true">
-								*
-							</span>
-						</label>
-						<input
-							id="device-type-edit-model"
-							placeholder="Example Switch 48"
-							required
-							maxLength={100}
-							value={model()}
-							onInput={(e: InputEventAndTarget) => setModel(e.currentTarget.value)}
-						/>
-					</div>
-					<div class="field">
-						<label for="device-type-edit-u-height">
-							Height{' '}
-							<span class="required" aria-hidden="true">
-								*
-							</span>
-						</label>
-						<input
-							id="device-type-edit-u-height"
-							placeholder="1"
-							required
-							inputmode="numeric"
-							value={uHeight()}
-							onInput={(e: InputEventAndTarget) => setUHeight(e.currentTarget.value)}
-						/>
-						<p class="field-hint">0 = shelf-only, otherwise 1–60.</p>
-					</div>
-					<div class="field">
-						<label for="device-type-edit-full-depth">Full depth</label>
-						<input
-							id="device-type-edit-full-depth"
-							type="checkbox"
-							checked={fullDepth()}
-							onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-								setFullDepth(e.currentTarget.checked)
-							}
-						/>
-						<p class="field-hint">Off for half-depth or shelf-only devices.</p>
-					</div>
-					<div class="field">
-						<label for="device-type-edit-description">Description</label>
-						<input
-							id="device-type-edit-description"
-							placeholder="Short summary (optional)"
-							maxLength={500}
-							value={description()}
-							onInput={(e: InputEventAndTarget) =>
-								setDescription(e.currentTarget.value)
-							}
-						/>
-					</div>
-					<div class="field">
-						<label for="device-type-edit-comments">Comments</label>
-						<textarea
-							id="device-type-edit-comments"
-							rows={4}
-							maxLength={2000}
-							value={comments()}
-							onInput={(e: InputEvent & { currentTarget: HTMLTextAreaElement }) =>
-								setComments(e.currentTarget.value)
-							}
-						/>
-					</div>
-					<Show when={formError()}>
-						<div class="app-inline-error" role="alert">
-							{formError()}
-						</div>
-					</Show>
-					<div class="form-actions">
-						<button type="submit" disabled={saving()}>
-							{saving() ? 'Saving…' : 'Save'}
-						</button>
-						<button
-							type="button"
-							onClick={() => navigate(`/device-types/${props.id}`)}
-							disabled={saving()}
-						>
-							Cancel
-						</button>
-					</div>
-				</form>
-			</Show>
-		</div>
+		<EditPageShell
+			backTo={`/device-types/${props.id}`}
+			backLabel={deviceType()?.model ?? 'Device type'}
+			title="Edit device type"
+			loaded={loaded()}
+			loadingText="Loading device type…"
+			onSubmit={handleSave}
+		>
+			<SelectField
+				id="device-type-edit-manufacturer"
+				label="Manufacturer"
+				value={manufacturerId()}
+				onChange={setManufacturerId}
+				options={row_options(manufacturers() ?? [])}
+				emptyLabel="Manufacturer…"
+				required
+			/>
+			<TextField
+				id="device-type-edit-model"
+				label="Model"
+				placeholder="Example Switch 48"
+				maxLength={100}
+				required
+				value={model()}
+				onInput={setModel}
+			/>
+			<TextField
+				id="device-type-edit-u-height"
+				label="Height"
+				placeholder="1"
+				required
+				inputmode="numeric"
+				value={uHeight()}
+				onInput={setUHeight}
+				hint={<Hint>0 = shelf-only, otherwise 1–60.</Hint>}
+			/>
+			<div class="field">
+				<label for="device-type-edit-full-depth">Full depth</label>
+				<input
+					id="device-type-edit-full-depth"
+					type="checkbox"
+					checked={fullDepth()}
+					onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+						setFullDepth(e.currentTarget.checked)
+					}
+				/>
+				<p class="field-hint">Off for half-depth or shelf-only devices.</p>
+			</div>
+			<TextField
+				id="device-type-edit-description"
+				label="Description"
+				placeholder="Short summary (optional)"
+				maxLength={500}
+				value={description()}
+				onInput={setDescription}
+			/>
+			<TextAreaField
+				id="device-type-edit-comments"
+				label="Comments"
+				rows={4}
+				maxLength={2000}
+				value={comments()}
+				onInput={setComments}
+			/>
+			<FormError message={formError} />
+			<EditActions saving={saving()} cancelTo={`/device-types/${props.id}`} />
+		</EditPageShell>
 	)
 }

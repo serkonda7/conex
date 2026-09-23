@@ -1,15 +1,17 @@
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
-import type { JSX } from 'solid-js'
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_tenants } from '../api_tenancy'
 import { fetch_user, type UserRole, update_user } from '../api_users'
+import {
+	EditActions,
+	EditPageShell,
+	FormError,
+	Hint,
+	SelectField,
+	TextField,
+} from '../components/form'
 import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to, { refresh: false })
-}
+import { useEditForm } from '../util/form'
 
 const ROLES: UserRole[] = ['admin', 'editor', 'viewer']
 
@@ -18,9 +20,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 	const [role, setRole] = createSignal<UserRole>('viewer')
 	const [tenantId, setTenantId] = createSignal<string>('')
 	const [password, setPassword] = createSignal('')
-	const [formError, setFormError] = createSignal<string | null>(null)
-	const [saving, setSaving] = createSignal(false)
-	const [loaded, setLoaded] = createSignal(false)
+	const { formError, setFormError, saving, setSaving, loaded, setLoaded } = useEditForm()
 
 	const [user] = createResource(
 		() => props.id,
@@ -68,85 +68,58 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 	}
 
 	return (
-		<div class="form-page">
-			<p>
-				<a href="/users" onClick={(e: MouseEvent): void => go(e, '/users')}>
-					← {user()?.username ?? 'User'}
-				</a>
-			</p>
-			<h2>Edit user</h2>
-			<Show when={loaded()} fallback={<p class="skeleton">Loading user…</p>}>
-				<form class="form-stacked" onSubmit={handleSave}>
-					<div class="field">
-						<label for="user-edit-role">Role</label>
-						<select
-							id="user-edit-role"
-							value={role()}
-							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-								setRole(e.currentTarget.value as UserRole)
-							}
-						>
-							<For each={ROLES}>
-								{(r: UserRole) => <option value={r}>{r}</option>}
-							</For>
-						</select>
-						<p class="field-hint">
-							Admin manages users and everything; editor reads and writes inventory;
-							viewer reads only. The last admin cannot be demoted.
-						</p>
-					</div>
-					<Show when={role() !== 'admin'}>
-						<div class="field">
-							<label for="user-edit-tenant">Tenant scope</label>
-							<select
-								id="user-edit-tenant"
-								value={tenantId()}
-								onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-									setTenantId(e.currentTarget.value)
-								}
-							>
-								<option value="">All tenants</option>
-								<For each={tenantsPage()?.items ?? []}>
-									{(t: { id: number; name: string }) => (
-										<option value={String(t.id)}>{t.name}</option>
-									)}
-								</For>
-							</select>
-							<p class="field-hint">
-								Limit an editor or viewer to a single tenant. Empty means global.
-							</p>
-						</div>
-					</Show>
-					<div class="field">
-						<label for="user-edit-password">New password</label>
-						<input
-							id="user-edit-password"
-							type="password"
-							placeholder="Leave empty to keep the current password"
-							value={password()}
-							onInput={(e: InputEventAndTarget) => setPassword(e.currentTarget.value)}
-							autocomplete="new-password"
-						/>
-					</div>
-					<Show when={formError()}>
-						<div class="app-inline-error" role="alert">
-							{formError()}
-						</div>
-					</Show>
-					<div class="form-actions">
-						<button type="submit" disabled={saving()}>
-							{saving() ? 'Saving…' : 'Save'}
-						</button>
-						<button
-							type="button"
-							onClick={() => navigate('/users', { refresh: false })}
-							disabled={saving()}
-						>
-							Cancel
-						</button>
-					</div>
-				</form>
+		<EditPageShell
+			backTo="/users"
+			backLabel={user()?.username ?? 'User'}
+			title="Edit user"
+			loaded={loaded()}
+			loadingText="Loading user…"
+			onSubmit={handleSave}
+		>
+			<SelectField
+				id="user-edit-role"
+				label="Role"
+				value={role()}
+				onChange={(value: string): void => {
+					setRole(value as UserRole)
+				}}
+				options={ROLES.map((r) => ({ value: r, label: r }))}
+				hint={
+					<Hint>
+						Admin manages users and everything; editor reads and writes inventory;
+						viewer reads only. The last admin cannot be demoted.
+					</Hint>
+				}
+			/>
+			<Show when={role() !== 'admin'}>
+				<SelectField
+					id="user-edit-tenant"
+					label="Tenant scope"
+					value={tenantId()}
+					onChange={setTenantId}
+					options={(tenantsPage()?.items ?? []).map((t) => ({
+						value: String(t.id),
+						label: t.name,
+					}))}
+					emptyLabel="All tenants"
+					hint={
+						<Hint>
+							Limit an editor or viewer to a single tenant. Empty means global.
+						</Hint>
+					}
+				/>
 			</Show>
-		</div>
+			<TextField
+				id="user-edit-password"
+				label="New password"
+				type="password"
+				placeholder="Leave empty to keep the current password"
+				value={password()}
+				onInput={setPassword}
+				autocomplete="new-password"
+			/>
+			<FormError message={formError} />
+			<EditActions saving={saving()} cancelTo="/users" />
+		</EditPageShell>
 	)
 }

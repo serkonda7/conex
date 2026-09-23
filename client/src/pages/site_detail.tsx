@@ -1,5 +1,4 @@
 import { DataTable } from '@serkonda7/solid-components'
-import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -16,12 +15,19 @@ import {
 	fetch_tenant,
 	type LocationRow,
 } from '../api_tenancy'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
+import {
+	DetailCard,
+	DetailHeader,
+	DetailShell,
+	DetailSubtitle,
+	Empty,
+	ForeignKeyLink,
+	InlineError,
+	Loading,
+	RelatedSection,
+	useDetailDelete,
+} from '../components/detail_page'
+import { go } from '../components/list_page'
 
 interface TreeNode {
 	row: LocationRow
@@ -191,22 +197,14 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		void refetch()
 	}
 
-	async function handleDelete(): Promise<void> {
-		const s = site()
-		if (!s) {
-			return
-		}
-		if (!window.confirm(`Delete site "${s.name}"?`)) {
-			return
-		}
-		setError(null)
-		const res = await delete_site(props.id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		navigate('/sites', { refresh: true })
-	}
+	const { handleDelete } = useDetailDelete({
+		noun: 'site',
+		name: () => site()?.name,
+		id: props.id,
+		remove: delete_site,
+		setError,
+		listRoute: '/sites',
+	})
 
 	const locationCount = (): number => locations()?.length ?? 0
 	const rackCount = (): number => racks()?.length ?? 0
@@ -214,119 +212,74 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 
 	return (
 		<div>
-			<p>
-				<a href="/sites" onClick={(e: MouseEvent): void => go(e, '/sites')}>
-					← Sites
-				</a>
-			</p>
-			<Show when={!site.loading} fallback={<p class="skeleton">Loading site…</p>}>
-				<Show when={site()} fallback={<p class="empty">Site not found.</p>}>
-					<div class="page-header">
-						<h2>
-							{site()?.name} <code>{site()?.slug}</code>
-						</h2>
-						<div class="form-actions">
-							<button
-								type="button"
-								onClick={() => navigate(`/sites/${props.id}/edit`)}
-							>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconPencil size={14} />
-								</span>{' '}
-								Edit
-							</button>
-							<button type="button" class="btn-danger" onClick={handleDelete}>
-								<span aria-hidden="true" class="app-nav-icon">
-									<IconTrash size={14} />
-								</span>{' '}
-								Delete
-							</button>
-						</div>
-					</div>
-					<p class="page-subtitle">{site()?.description || 'No description.'}</p>
+			<DetailShell
+				backTo="/sites"
+				backLabel="Sites"
+				loading={site.loading}
+				loadingText="Loading site…"
+				record={site()}
+				emptyText="Site not found."
+			>
+				<DetailHeader
+					name={site()?.name}
+					slug={site()?.slug}
+					editHref={`/sites/${props.id}/edit`}
+					onDelete={handleDelete}
+				/>
+				<DetailSubtitle>{site()?.description || 'No description.'}</DetailSubtitle>
 
-					<div class="detail-stats">
-						<a class="detail-stat" href="#site-locations">
-							<span class="detail-stat-value">{locationCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Location{locationCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#site-racks">
-							<span class="detail-stat-value">{rackCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Rack{rackCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-						<a class="detail-stat" href="#site-devices">
-							<span class="detail-stat-value">{deviceCount()}</span>{' '}
-							<span class="detail-stat-label">
-								Device{deviceCount() === 1 ? '' : 's'}
-							</span>
-						</a>
-					</div>
+				<div class="detail-stats">
+					<a class="detail-stat" href="#site-locations">
+						<span class="detail-stat-value">{locationCount()}</span>{' '}
+						<span class="detail-stat-label">
+							Location{locationCount() === 1 ? '' : 's'}
+						</span>
+					</a>
+					<a class="detail-stat" href="#site-racks">
+						<span class="detail-stat-value">{rackCount()}</span>{' '}
+						<span class="detail-stat-label">Rack{rackCount() === 1 ? '' : 's'}</span>
+					</a>
+					<a class="detail-stat" href="#site-devices">
+						<span class="detail-stat-value">{deviceCount()}</span>{' '}
+						<span class="detail-stat-label">
+							Device{deviceCount() === 1 ? '' : 's'}
+						</span>
+					</a>
+				</div>
 
-					<section class="card" aria-label="Site details">
-						<dl class="detail-grid">
-							<dt>Slug</dt>
-							<dd>
-								<code>{site()?.slug}</code>
-							</dd>
-							<dt>Tenant</dt>
-							<dd>
-								<Show when={tenantId() !== null} fallback="—">
-									<Show
-										when={!tenant.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show when={tenant()} fallback={String(tenantId() ?? '—')}>
-											<a
-												href={`/tenants/${tenantId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/tenants/${tenantId() ?? ''}`)
-												}
-											>
-												{tenant()?.name}
-											</a>
-										</Show>
-									</Show>
-								</Show>
-							</dd>
-							<dt>Group</dt>
-							<dd>
-								<Show when={groupId() !== null} fallback="—">
-									<Show
-										when={!siteGroup.loading}
-										fallback={<span class="skeleton">…</span>}
-									>
-										<Show
-											when={siteGroup()}
-											fallback={String(groupId() ?? '—')}
-										>
-											<a
-												href={`/site-groups/${groupId() ?? ''}`}
-												onClick={(e: MouseEvent): void =>
-													go(e, `/site-groups/${groupId() ?? ''}`)
-												}
-											>
-												{siteGroup()?.name}
-											</a>
-										</Show>
-									</Show>
-								</Show>
-							</dd>
-							<dt>Description</dt>
-							<dd>{site()?.description || '—'}</dd>
-							<dt>Comments</dt>
-							<dd>{(site()?.comments ?? '') || '—'}</dd>
-							<dt>Physical address</dt>
-							<dd>{(site()?.physical_address ?? '') || '—'}</dd>
-							<dt>Shipping address</dt>
-							<dd>{(site()?.shipping_address ?? '') || '—'}</dd>
-						</dl>
-					</section>
-				</Show>
-			</Show>
+				<DetailCard label="Site details">
+					<dt>Slug</dt>
+					<dd>
+						<code>{site()?.slug}</code>
+					</dd>
+					<dt>Tenant</dt>
+					<dd>
+						<ForeignKeyLink
+							id={tenantId()}
+							loading={tenant.loading}
+							name={tenant()?.name}
+							href={`/tenants/${tenantId() ?? ''}`}
+						/>
+					</dd>
+					<dt>Group</dt>
+					<dd>
+						<ForeignKeyLink
+							id={groupId()}
+							loading={siteGroup.loading}
+							name={siteGroup()?.name}
+							href={`/site-groups/${groupId() ?? ''}`}
+						/>
+					</dd>
+					<dt>Description</dt>
+					<dd>{site()?.description || '—'}</dd>
+					<dt>Comments</dt>
+					<dd>{(site()?.comments ?? '') || '—'}</dd>
+					<dt>Physical address</dt>
+					<dd>{(site()?.physical_address ?? '') || '—'}</dd>
+					<dt>Shipping address</dt>
+					<dd>{(site()?.shipping_address ?? '') || '—'}</dd>
+				</DetailCard>
+			</DetailShell>
 
 			<section aria-label="Locations">
 				<h3 id="site-locations">
@@ -361,14 +314,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					</select>
 					<button type="submit">Add location</button>
 				</form>
-				<Show
-					when={!locations.loading}
-					fallback={<p class="skeleton">Loading locations…</p>}
-				>
-					<Show
-						when={tree().length > 0}
-						fallback={<p class="empty">No locations yet.</p>}
-					>
+				<Show when={!locations.loading} fallback={<Loading message="Loading locations…" />}>
+					<Show when={tree().length > 0} fallback={<Empty message="No locations yet." />}>
 						<ul>
 							<For each={tree()}>
 								{(node: TreeNode): JSX.Element => (
@@ -384,74 +331,72 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				</Show>
 			</section>
 
-			<h3 id="site-racks">
-				Racks <span class="badge">{rackCount()}</span>
-			</h3>
-			<Show when={!racks.loading} fallback={<p class="skeleton">Loading racks…</p>}>
-				<Show
-					when={rackCount() > 0}
-					fallback={<p class="empty">No racks for this site yet.</p>}
-				>
-					<DataTable
-						rows={() => racks() ?? []}
-						getRowId={(r: RackRow): number => r.id}
-						showColumnCustomizer
-						columns={[
-							{
-								key: 'name',
-								label: 'Name',
-								getValue: (r: RackRow): JSX.Element => (
-									<a
-										href={`/racks/${r.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
-									>
-										{r.name}
-									</a>
-								),
-							},
-							{
-								key: 'height',
-								label: 'Height',
-								getValue: (r: RackRow): string => `${r.height_u}U`,
-							},
-						]}
-					/>
-				</Show>
-			</Show>
+			<RelatedSection
+				id="site-racks"
+				title="Racks"
+				count={rackCount()}
+				loading={racks.loading}
+				loadingText="Loading racks…"
+				emptyText="No racks for this site yet."
+				hasItems={rackCount() > 0}
+			>
+				<DataTable
+					rows={() => racks() ?? []}
+					getRowId={(r: RackRow): number => r.id}
+					showColumnCustomizer
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							getValue: (r: RackRow): JSX.Element => (
+								<a
+									href={`/racks/${r.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+								>
+									{r.name}
+								</a>
+							),
+						},
+						{
+							key: 'height',
+							label: 'Height',
+							getValue: (r: RackRow): string => `${r.height_u}U`,
+						},
+					]}
+				/>
+			</RelatedSection>
 
-			<h3 id="site-devices">
-				Devices <span class="badge">{deviceCount()}</span>
-			</h3>
-			<Show when={!devices.loading} fallback={<p class="skeleton">Loading devices…</p>}>
-				<Show
-					when={deviceCount() > 0}
-					fallback={<p class="empty">No devices for this site yet.</p>}
-				>
-					<DataTable
-						rows={() => devices() ?? []}
-						getRowId={(d: DeviceRow): number => d.id}
-						showColumnCustomizer
-						columns={[
-							{
-								key: 'name',
-								label: 'Name',
-								getValue: (d: DeviceRow): JSX.Element => (
-									<a
-										href={`/devices/${d.id}`}
-										onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
-									>
-										{d.name}
-									</a>
-								),
-							},
-						]}
-					/>
-				</Show>
-			</Show>
+			<RelatedSection
+				id="site-devices"
+				title="Devices"
+				count={deviceCount()}
+				loading={devices.loading}
+				loadingText="Loading devices…"
+				emptyText="No devices for this site yet."
+				hasItems={deviceCount() > 0}
+			>
+				<DataTable
+					rows={() => devices() ?? []}
+					getRowId={(d: DeviceRow): number => d.id}
+					showColumnCustomizer
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							getValue: (d: DeviceRow): JSX.Element => (
+								<a
+									href={`/devices/${d.id}`}
+									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+								>
+									{d.name}
+								</a>
+							),
+						},
+					]}
+				/>
+			</RelatedSection>
 
-			<Show when={error()}>
-				<div class="app-inline-error">{error()}</div>
-			</Show>
+			<InlineError message={error()} />
 		</div>
 	)
 }

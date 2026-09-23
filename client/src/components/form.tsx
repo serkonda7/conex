@@ -8,6 +8,8 @@
 import type { InputEventAndTarget } from 'shared/src/types'
 import { For, type JSX, onMount, Show } from 'solid-js'
 import { navigate } from '../router'
+import { Loading } from './feedback'
+import { go } from './list_page'
 
 /** Default hint under a slug input, where the slug is auto-filled from the name. */
 const SLUG_HINT =
@@ -24,8 +26,9 @@ export function row_options(rows: { id: number; name: string }[]): FormOption[] 
 	return rows.map((row) => ({ value: row.id, label: row.name }))
 }
 
-/** Wraps a plain anchor so in-page links use the history router. */
-function go(e: MouseEvent, to: string): void {
+/** Wraps a plain anchor so cancel/back closes the form tab without
+ * refreshing, keeping the underlying list's exact contents. */
+function goNoRefresh(e: MouseEvent, to: string): void {
 	e.preventDefault()
 	navigate(to, { refresh: false })
 }
@@ -148,6 +151,8 @@ export function SelectField(props: {
 	describedBy?: string
 	hint?: JSX.Element
 	action?: JSX.Element
+	/** Extra `<option>` entries after the generated ones (e.g. a stale value). */
+	children?: JSX.Element
 }): JSX.Element {
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
@@ -170,6 +175,7 @@ export function SelectField(props: {
 							<option value={option.value}>{option.label}</option>
 						)}
 					</For>
+					{props.children}
 				</select>
 				{props.action}
 			</div>
@@ -213,9 +219,11 @@ export function SlugField(props: {
 	placeholder: string
 	value: string
 	onInput: (value: string) => void
+	/** Overrides the auto-fill hint (edit forms use the shorter variant). */
+	hint?: JSX.Element
 }): JSX.Element {
 	return (
-		<Field label="Slug" for={props.id} required hint={<Hint>{SLUG_HINT}</Hint>}>
+		<Field label="Slug" for={props.id} required hint={props.hint ?? <Hint>{SLUG_HINT}</Hint>}>
 			<input
 				id={props.id}
 				placeholder={props.placeholder}
@@ -273,7 +281,10 @@ export function FormPage(props: {
 	return (
 		<div class="form-page">
 			<p>
-				<a href={props.backTo} onClick={(e: MouseEvent): void => go(e, props.backTo)}>
+				<a
+					href={props.backTo}
+					onClick={(e: MouseEvent): void => goNoRefresh(e, props.backTo)}
+				>
 					← {props.backLabel}
 				</a>
 			</p>
@@ -281,6 +292,53 @@ export function FormPage(props: {
 			<form class="form-stacked" onSubmit={props.onSubmit}>
 				{props.children}
 			</form>
+		</div>
+	)
+}
+
+/** Edit actions, disabled while the form is saving. Save navigates back to
+ * the detail page; cancel returns without forcing a refresh. */
+export function EditActions(props: { saving: boolean; cancelTo: string }): JSX.Element {
+	return (
+		<div class="form-actions">
+			<button type="submit" disabled={props.saving}>
+				{props.saving ? 'Saving…' : 'Save'}
+			</button>
+			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
+				Cancel
+			</button>
+		</div>
+	)
+}
+
+/**
+ * Edit-page shell: back link to the detail page, heading, and the stacked
+ * form gated on the loaded flag. `backLabel` is the entity name once loaded
+ * (callers pass `entity()?.name ?? 'Fallback'`); `loadingText` preserves
+ * each page's exact skeleton string.
+ */
+export function EditPageShell(props: {
+	backTo: string
+	backLabel: string
+	title: string
+	loaded: boolean
+	loadingText: string
+	onSubmit: (e: SubmitEvent) => void
+	children: JSX.Element
+}): JSX.Element {
+	return (
+		<div class="form-page">
+			<p>
+				<a href={props.backTo} onClick={(e: MouseEvent): void => go(e, props.backTo)}>
+					← {props.backLabel}
+				</a>
+			</p>
+			<h2>{props.title}</h2>
+			<Show when={props.loaded} fallback={<Loading message={props.loadingText} />}>
+				<form class="form-stacked" onSubmit={props.onSubmit}>
+					{props.children}
+				</form>
+			</Show>
 		</div>
 	)
 }

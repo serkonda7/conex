@@ -3,11 +3,13 @@
  * list-option loading that routes a failure into the form's error slot, and
  * the trim → validate → save → navigate flow.
  *
- * The matching markup lives in `../components/form`.
+ * The matching markup lives in `../components/form`. Edit pages share the
+ * same flow through `useEditForm` + `submit_edit` and the `EditPageShell` /
+ * `EditActions` markup.
  */
 import { Result } from 'better-result'
 import { slugify } from 'shared/src/slug'
-import { createSignal } from 'solid-js'
+import { createSignal, type Setter } from 'solid-js'
 import { navigate } from '../router'
 
 /** Whether a form was submitted with the Create & Add Another action. */
@@ -139,4 +141,58 @@ export async function submit_form<T>(options: SubmitFormOptions<T>): Promise<voi
 		return
 	}
 	navigate(options.navigateTo)
+}
+
+/** Error / saving / loaded signals shared by every entity edit form. */
+export interface EditFormState {
+	formError: () => string | null
+	setFormError: Setter<string | null>
+	saving: () => boolean
+	setSaving: Setter<boolean>
+	loaded: () => boolean
+	setLoaded: Setter<boolean>
+}
+
+/** Creates the `formError` / `saving` / `loaded` signals of an edit form. */
+export function useEditForm(): EditFormState {
+	const [formError, setFormError] = createSignal<string | null>(null)
+	const [saving, setSaving] = createSignal(false)
+	const [loaded, setLoaded] = createSignal(false)
+	return { formError, setFormError, saving, setSaving, loaded, setLoaded }
+}
+
+/** Options for {@link submit_edit}; mirrors {@link SubmitFormOptions}
+ * without the Create & Add Another continuation. */
+export interface SubmitEditOptions<T> {
+	/** Raw name value; trimmed and required. */
+	name: string
+	/** Overrides the default "Name is required." message. */
+	nameError?: string
+	/** Raw slug value; omit on forms without a slug. */
+	slug?: string
+	/** Form-specific checks; return a message to abort the submit. */
+	validate?: () => string | null
+	/** Persists the entity using the trimmed name and slug. */
+	save: (values: FormValues) => Promise<Result<T, Error>>
+	setError: (message: string | null) => void
+	setSaving: (saving: boolean) => void
+	/** Detail route opened after a successful save. */
+	navigateTo: string
+}
+
+/**
+ * Shared edit/save flow: the same trim → validate → save → navigate
+ * sequence as `submit_form`, landing back on the detail page.
+ */
+export async function submit_edit<T>(options: SubmitEditOptions<T>): Promise<void> {
+	await submit_form({
+		name: options.name,
+		nameError: options.nameError,
+		slug: options.slug,
+		validate: options.validate,
+		save: options.save,
+		setError: options.setError,
+		setSaving: options.setSaving,
+		navigateTo: options.navigateTo,
+	})
 }
