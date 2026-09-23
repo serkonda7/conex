@@ -9,7 +9,7 @@ import {
 	type SiteGroupRow,
 	type TenantRow,
 	update_site,
-} from '../api_p1'
+} from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

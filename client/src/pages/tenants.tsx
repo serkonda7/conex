@@ -13,7 +13,12 @@ import {
 	Show,
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { delete_tenant, fetch_tenants, type TenantSort, type TenantWithCounts } from '../api_p1'
+import {
+	delete_tenant,
+	fetch_tenants,
+	type TenantSort,
+	type TenantWithCounts,
+} from '../api_tenancy'
 import { navigate } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

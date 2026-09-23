@@ -79,6 +79,8 @@ import {
 	tabs,
 } from './router'
 
+const APP_TITLE = 'CoNetBox'
+
 function go(e: MouseEvent, to: string): void {
 	goTo(e, to)
 }
@@ -717,6 +719,7 @@ function App(): JSX.Element {
 	const [userMenuOpen, setUserMenuOpen] = createSignal(false)
 
 	onMount(async () => {
+		document.title = APP_TITLE
 		const [me, setupNeeded] = await Promise.all([fetchMe(), fetchSetupStatus()])
 		// A fresh database reports needsSetup; an unreachable setup endpoint
 		// (null) falls back to the login form.
@@ -861,7 +864,7 @@ function App(): JSX.Element {
 						<main class="app-content app-content--centered">
 							<div class="app-auth">
 								<div class="app-header">
-									<h1>Conex</h1>
+								<h1>{APP_TITLE}</h1>
 								</div>
 								<SetupForm
 									username={setupUsername}
@@ -880,7 +883,7 @@ function App(): JSX.Element {
 						<main class="app-content app-content--centered">
 							<div class="app-auth">
 								<div class="app-header">
-									<h1>Conex</h1>
+								<h1>{APP_TITLE}</h1>
 								</div>
 								<LoginForm
 									username={username}
@@ -900,7 +903,7 @@ function App(): JSX.Element {
 								class="app-topbar-brand"
 								onClick={(e: MouseEvent): void => go(e, '/tenants')}
 							>
-								Conex
+								{APP_TITLE}
 							</a>
 							<div class="app-topbar-actions">
 								<div class="app-user-menu">

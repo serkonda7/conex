@@ -1,31 +1,17 @@
 /**
- * P1 API wrappers: typed tenants/sites/locations calls over the hono
- * RPC client. Errors surface as `Result.err` with the server's `{ error }`
- * message, matching the auth wrappers in `api_auth.ts`.
+ * Tenancy API wrappers: typed tenants/sites/locations/site-groups calls
+ * over the hono RPC client. Errors surface as `Result.err` with the server's
+ * `{ error }` message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
 import type { LocationRow, SiteRow, TenantListItem, TenantRow } from 'server/src/db/tenancy'
-import { client, to_result } from './api'
-import type { ApiResponse } from './util/api_error'
-
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
+import type { Page } from 'shared/src/types'
+import { client, getPage, to_query, to_result } from './api'
 
 export type { LocationRow, SiteRow, TenantRow }
 
 /** Tenant row for the list view, with NetBox-style related-object counts. */
 export type TenantWithCounts = TenantListItem
-
-async function getPage<T>(
-	req: Promise<ApiResponse>,
-	fallback: string,
-): Promise<Result<Page<T>, Error>> {
-	return to_result<Page<T>>(await req, fallback)
-}
 
 // ---------------------------------------------------------------------------
 // Tenants
@@ -36,13 +22,13 @@ export async function fetch_tenants(
 ): Promise<Result<Page<TenantWithCounts>, Error>> {
 	return getPage<TenantWithCounts>(
 		client.tenants.$get({
-			query: {
+			query: to_query({
 				search: filters?.search ?? '',
-				page: String(filters?.page ?? 1),
-				limit: String(filters?.limit ?? 200),
+				page: filters?.page ?? 1,
+				limit: filters?.limit ?? 200,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load tenants',
 	)
@@ -157,15 +143,15 @@ export type SiteWithExtras = SiteRow & {
 export async function fetch_sites(filters?: SiteFilters): Promise<Result<Page<SiteRow>, Error>> {
 	return getPage<SiteRow>(
 		client.sites.$get({
-			query: {
+			query: to_query({
 				search: filters?.search ?? '',
-				page: String(filters?.page ?? 1),
-				limit: String(filters?.limit ?? 200),
-				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
-				group: filters?.group === undefined ? undefined : String(filters.group),
+				page: filters?.page ?? 1,
+				limit: filters?.limit ?? 200,
+				tenant: filters?.tenant,
+				group: filters?.group,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load sites',
 	)
@@ -248,16 +234,16 @@ export async function fetch_locations(
 	const f: LocationFilters = typeof filters === 'number' ? { site: filters } : (filters ?? {})
 	return getPage<LocationRow>(
 		client.locations.$get({
-			query: {
+			query: to_query({
 				search: f.search ?? '',
-				page: String(f.page ?? 1),
-				limit: String(f.limit ?? 200),
-				site: f.site === undefined ? undefined : String(f.site),
-				tenant: f.tenant === undefined ? undefined : String(f.tenant),
-				parent: f.parent === undefined ? undefined : String(f.parent),
+				page: f.page ?? 1,
+				limit: f.limit ?? 200,
+				site: f.site,
+				tenant: f.tenant,
+				parent: f.parent,
 				sort: f.sort ?? 'name',
 				order: f.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load locations',
 	)
@@ -349,15 +335,15 @@ export async function fetch_site_groups(
 ): Promise<Result<Page<SiteGroupRow>, Error>> {
 	return getPage<SiteGroupRow>(
 		client['site-groups'].$get({
-			query: {
+			query: to_query({
 				search: filters?.search ?? '',
-				page: String(filters?.page ?? 1),
-				limit: String(filters?.limit ?? 200),
-				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
-				parent: filters?.parent === undefined ? undefined : String(filters.parent),
+				page: filters?.page ?? 1,
+				limit: filters?.limit ?? 200,
+				tenant: filters?.tenant,
+				parent: filters?.parent,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load site groups',
 	)

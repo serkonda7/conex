@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
-import { create_device_type, fetch_manufacturers } from '../api_p3'
+import { create_device_type, fetch_manufacturers } from '../api_templates'
 import {
 	Field,
 	FormActions,

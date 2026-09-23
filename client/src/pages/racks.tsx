@@ -14,6 +14,8 @@ import {
 	Show,
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { delete_rack, fetch_racks, type RackRow, type RackSort } from '../api_racks'
+import { type DeviceTypeRow, fetch_device_types } from '../api_templates'
 import {
 	fetch_locations,
 	fetch_sites,
@@ -21,9 +23,7 @@ import {
 	type LocationRow,
 	type SiteRow,
 	type TenantRow,
-} from '../api_p1'
-import { delete_rack, fetch_racks, type RackRow, type RackSort } from '../api_p2'
-import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
+} from '../api_tenancy'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

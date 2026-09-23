@@ -2,6 +2,9 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
+import { fetch_device, update_device } from '../api_devices'
+import { fetch_racks, type RackRow } from '../api_racks'
+import { fetch_device_types } from '../api_templates'
 import {
 	fetch_locations,
 	fetch_sites,
@@ -9,10 +12,7 @@ import {
 	type LocationRow,
 	type SiteRow,
 	type TenantRow,
-} from '../api_p1'
-import { fetch_racks, type RackRow } from '../api_p2'
-import { fetch_device_types } from '../api_p3'
-import { fetch_device, update_device } from '../api_p4'
+} from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

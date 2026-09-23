@@ -1,13 +1,10 @@
 import { DataTable } from '@serkonda7/solid-components'
 import { IconLinkPlus, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { TraceLink, TracePath } from 'shared/src/schemas'
-import type { InputEventAndTarget } from 'shared/src/types'
+import type { InputEventAndTarget, TraceLink, TracePath } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import { fetch_locations, fetch_site, fetch_tenant } from '../api_p1'
-import { fetch_rack } from '../api_p2'
-import { fetch_device_types } from '../api_p3'
+import { type CableRow, create_cable, delete_cable, fetch_cables, fetch_trace } from '../api_cables'
 import {
 	add_interface,
 	type DeviceRow,
@@ -18,8 +15,10 @@ import {
 	type InterfaceJson,
 	move_device,
 	update_interface,
-} from '../api_p4'
-import { type CableRow, create_cable, delete_cable, fetch_cables, fetch_trace } from '../api_p5'
+} from '../api_devices'
+import { fetch_rack } from '../api_racks'
+import { fetch_device_types } from '../api_templates'
+import { fetch_locations, fetch_site, fetch_tenant } from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

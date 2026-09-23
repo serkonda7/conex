@@ -3,6 +3,8 @@ import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, Show } from 'solid-js'
+import { type DeviceRow, fetch_devices } from '../api_devices'
+import { fetch_racks, type RackRow } from '../api_racks'
 import {
 	delete_location,
 	fetch_location,
@@ -10,9 +12,7 @@ import {
 	fetch_site,
 	fetch_tenant,
 	type LocationRow,
-} from '../api_p1'
-import { fetch_racks, type RackRow } from '../api_p2'
-import { type DeviceRow, fetch_devices } from '../api_p4'
+} from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
-import { fetch_tenants } from '../api_p1'
+import { fetch_tenants } from '../api_tenancy'
 import { fetch_user, type UserRole, update_user } from '../api_users'
 import { navigate } from '../router'
 

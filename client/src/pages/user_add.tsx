@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, Show } from 'solid-js'
-import { fetch_tenants } from '../api_p1'
+import { fetch_tenants } from '../api_tenancy'
 import { create_user, type UserRole } from '../api_users'
 import {
 	FormActions,

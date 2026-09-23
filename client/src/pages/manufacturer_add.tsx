@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createSignal } from 'solid-js'
-import { create_manufacturer } from '../api_p3'
+import { create_manufacturer } from '../api_templates'
 import { FormActions, FormError, FormPage, NameField, TextField } from '../components/form'
 import { navigate } from '../router'
 

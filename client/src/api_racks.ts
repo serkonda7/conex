@@ -1,29 +1,14 @@
 /**
- * P2 API wrappers: typed racks/shelves/elevation calls over the hono RPC
+ * Racks API wrappers: typed racks/shelves/elevation calls over the hono RPC
  * client. Errors surface as `Result.err` with the server's `{ error }`
  * message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
 import type { RackRow, ShelfRow } from 'server/src/db/racks'
-import type { ElevationResponse } from 'shared/src/schemas'
-import { client, to_result } from './api'
-import type { ApiResponse } from './util/api_error'
-
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
+import type { ElevationResponse, Page } from 'shared/src/types'
+import { client, getPage, to_query, to_result } from './api'
 
 export type { ElevationResponse, RackRow, ShelfRow }
-
-async function getPage<T>(
-	req: Promise<ApiResponse>,
-	fallback: string,
-): Promise<Result<Page<T>, Error>> {
-	return to_result<Page<T>>(await req, fallback)
-}
 
 // ---------------------------------------------------------------------------
 // Racks
@@ -60,16 +45,16 @@ export interface RackUpdateInput {
 export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<RackRow>, Error>> {
 	return getPage<RackRow>(
 		client.racks.$get({
-			query: {
+			query: to_query({
 				search: filters?.search ?? '',
-				page: '1',
-				limit: '200',
-				site: filters?.site === undefined ? undefined : String(filters.site),
-				location: filters?.location === undefined ? undefined : String(filters.location),
-				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
+				page: 1,
+				limit: 200,
+				site: filters?.site,
+				location: filters?.location,
+				tenant: filters?.tenant,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load racks',
 	)
@@ -122,12 +107,12 @@ export async function delete_rack(id: number): Promise<Result<unknown, Error>> {
 export async function fetch_shelves(rack: number): Promise<Result<Page<ShelfRow>, Error>> {
 	return getPage<ShelfRow>(
 		client.shelves.$get({
-			query: {
+			query: to_query({
 				search: '',
-				page: '1',
-				limit: '200',
-				rack: rack === undefined ? undefined : String(rack),
-			},
+				page: 1,
+				limit: 200,
+				rack,
+			}),
 		}),
 		'Failed to load shelves',
 	)

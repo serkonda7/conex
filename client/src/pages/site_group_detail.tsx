@@ -11,7 +11,7 @@ import {
 	fetch_tenant,
 	type SiteGroupRow,
 	type SiteRow,
-} from '../api_p1'
+} from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

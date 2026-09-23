@@ -1,9 +1,9 @@
 import { DataTable } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
-import type { ImportRowResult } from 'shared/src/schemas'
+import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
-import { upload_yaml } from '../api_p6'
+import { upload_yaml } from '../api_transfer'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

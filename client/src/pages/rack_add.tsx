@@ -1,9 +1,9 @@
 import { IconPlus } from '@tabler/icons-solidjs'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
-import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_p1'
-import { create_rack } from '../api_p2'
-import { fetch_device_types, fetch_manufacturers, type ManufacturerRow } from '../api_p3'
+import { create_rack } from '../api_racks'
+import { fetch_device_types, fetch_manufacturers, type ManufacturerRow } from '../api_templates'
+import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_tenancy'
 import {
 	FormActions,
 	FormError,

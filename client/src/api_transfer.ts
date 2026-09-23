@@ -1,10 +1,10 @@
 /**
- * P6 API wrappers: CSV transfer and NetBox YAML device-type import.
+ * Transfer API wrappers: CSV transfer and NetBox YAML device-type import.
  * CSV download uses a raw fetch (binary blob) and CSV upload posts the
  * file text as `{ csv }` JSON.
  */
 import { Result } from 'better-result'
-import type { ImportResponse } from 'shared/src/schemas'
+import type { ImportResponse } from 'shared/src/types'
 import { read_api_error } from './util/api_error'
 
 export type { ImportResponse }

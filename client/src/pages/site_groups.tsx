@@ -21,7 +21,7 @@ import {
 	type SiteGroupRow,
 	type SiteGroupSort,
 	type TenantRow,
-} from '../api_p1'
+} from '../api_tenancy'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

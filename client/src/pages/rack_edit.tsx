@@ -2,6 +2,8 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
+import { fetch_rack, update_rack } from '../api_racks'
+import { type DeviceTypeRow, fetch_device_types } from '../api_templates'
 import {
 	fetch_location,
 	fetch_locations,
@@ -9,9 +11,7 @@ import {
 	fetch_tenants,
 	type LocationRow,
 	type TenantRow,
-} from '../api_p1'
-import { fetch_rack, update_rack } from '../api_p2'
-import { type DeviceTypeRow, fetch_device_types } from '../api_p3'
+} from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

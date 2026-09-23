@@ -21,7 +21,7 @@ import {
 	fetch_device_types,
 	fetch_manufacturers,
 	type ManufacturerRow,
-} from '../api_p3'
+} from '../api_templates'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

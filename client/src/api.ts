@@ -2,7 +2,7 @@
 import { Result } from 'better-result'
 import { hc } from 'hono/client'
 import type { AppType } from 'server/src/index'
-import type { HealthInfo } from 'shared/src/types'
+import type { HealthInfo, Page } from 'shared/src/types'
 import { type ApiResponse, read_api_error } from './util/api_error'
 
 /** RPC client */
@@ -47,6 +47,52 @@ export async function to_result<T>(res: ApiResponse, fallback: string): Promise<
 	}
 
 	return Result.ok((await res.json()) as T)
+}
+
+/** Query-string value before coercion: strings pass through, numbers/booleans stringify, `undefined` omits the param. */
+export type QueryValue = string | number | boolean | undefined
+
+/**
+ * Coerces one query value to its string form, preserving string literals
+ * (sort/order enums) so the generated RPC client types still check while
+ * numbers/booleans become `String(v)`.
+ */
+export type CoercedQueryValue<V> = undefined extends V
+	? Exclude<V, undefined> extends string
+		? V
+		: string | undefined
+	: V extends string
+		? V
+		: string
+
+/**
+ * Builds the string map the hono RPC client expects from raw filter values.
+ * Replaces the per-call `String(filters.x ?? ...)` boilerplate in every list
+ * function: pass numbers/booleans directly, `undefined` stays `undefined` so
+ * the param is omitted.
+ */
+export function to_query<T extends Record<string, QueryValue>>(
+	query: T,
+): {
+	[K in keyof T]: CoercedQueryValue<T[K]>
+} {
+	const out: Record<string, string | undefined> = {}
+	for (const [key, value] of Object.entries(query)) {
+		out[key] = value === undefined ? undefined : String(value)
+	}
+	return out as { [K in keyof T]: CoercedQueryValue<T[K]> }
+}
+
+/**
+ * Awaits a paginated RPC request and wraps the `Page<T>` body in a Result.
+ * Single shared helper so the `api_p*` modules don't copy-paste the same
+ * 3-line `to_result<Page<...>>` call.
+ */
+export async function getPage<T>(
+	req: Promise<ApiResponse>,
+	fallback: string,
+): Promise<Result<Page<T>, Error>> {
+	return to_result<Page<T>>(await req, fallback)
 }
 
 /** Fetches the server health status (P0 scaffold smoke check). */

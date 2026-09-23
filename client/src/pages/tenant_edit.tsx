@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, Show } from 'solid-js'
-import { fetch_tenant, update_tenant } from '../api_p1'
+import { fetch_tenant, update_tenant } from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

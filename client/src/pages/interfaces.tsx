@@ -16,7 +16,7 @@ import {
 	fetch_all_interfaces,
 	fetch_devices,
 	type InterfaceListItem,
-} from '../api_p4'
+} from '../api_devices'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

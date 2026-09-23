@@ -4,6 +4,7 @@ import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
+import { type DeviceRow, fetch_devices } from '../api_devices'
 import {
 	create_stub,
 	delete_device_type,
@@ -12,8 +13,7 @@ import {
 	fetch_manufacturers,
 	fetch_stubs,
 	type StubRow,
-} from '../api_p3'
-import { type DeviceRow, fetch_devices } from '../api_p4'
+} from '../api_templates'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

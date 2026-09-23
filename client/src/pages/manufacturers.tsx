@@ -18,7 +18,7 @@ import {
 	fetch_manufacturers,
 	type ManufacturerRow,
 	type ManufacturerSort,
-} from '../api_p3'
+} from '../api_templates'
 import { navigate } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

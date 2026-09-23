@@ -1,28 +1,14 @@
 /**
- * P4 API wrappers: typed devices/interfaces calls over the hono RPC client.
+ * Devices API wrappers: typed devices/interfaces calls over the hono RPC client.
  * Errors surface as `Result.err` with the server's `{ error }` message,
  * matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
 import type { DeviceRow, InterfaceJson } from 'server/src/db/devices'
-import { client, to_result } from './api'
-import type { ApiResponse } from './util/api_error'
-
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
+import type { Page } from 'shared/src/types'
+import { client, getPage, to_query, to_result } from './api'
 
 export type { DeviceRow, InterfaceJson }
-
-async function getPage<T>(
-	req: Promise<ApiResponse>,
-	fallback: string,
-): Promise<Result<Page<T>, Error>> {
-	return to_result<Page<T>>(await req, fallback)
-}
 
 export type DeviceSort = 'name'
 
@@ -41,17 +27,17 @@ export async function fetch_devices(
 ): Promise<Result<Page<DeviceRow>, Error>> {
 	return getPage<DeviceRow>(
 		client.devices.$get({
-			query: {
+			query: to_query({
 				search: filters?.search ?? '',
-				page: '1',
-				limit: '200',
-				site: filters?.site === undefined ? undefined : String(filters.site),
-				rack: filters?.rack === undefined ? undefined : String(filters.rack),
-				tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
+				page: 1,
+				limit: 200,
+				site: filters?.site,
+				rack: filters?.rack,
+				tenant: filters?.tenant,
 				status: filters?.status,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load devices',
 	)
@@ -139,13 +125,13 @@ export async function fetch_all_interfaces(
 ): Promise<Result<Page<InterfaceListItem>, Error>> {
 	return getPage<InterfaceListItem>(
 		client.interfaces.$get({
-			query: {
+			query: to_query({
 				search: filters?.search ?? '',
-				page: '1',
-				limit: '200',
-				device: filters?.device === undefined ? undefined : String(filters.device),
-				connected: filters?.connected === undefined ? undefined : String(filters.connected),
-			},
+				page: 1,
+				limit: 200,
+				device: filters?.device,
+				connected: filters?.connected,
+			}),
 		}),
 		'Failed to load interfaces',
 	)

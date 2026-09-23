@@ -10,7 +10,7 @@ import {
 	type LocationRow,
 	type TenantRow,
 	update_location,
-} from '../api_p1'
+} from '../api_tenancy'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

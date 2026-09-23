@@ -1,28 +1,14 @@
 /**
- * P3 API wrappers: typed manufacturers/device-types/stubs calls over
+ * Templates API wrappers: typed manufacturers/device-types/stubs calls over
  * the hono RPC client. Errors surface as `Result.err` with the server's
  * `{ error }` message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
 import type { DeviceTypeRow, ManufacturerRow, StubRow } from 'server/src/db/templates'
-import { client, to_result } from './api'
-import type { ApiResponse } from './util/api_error'
-
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
+import type { Page } from 'shared/src/types'
+import { client, getPage, to_query, to_result } from './api'
 
 export type { DeviceTypeRow, ManufacturerRow, StubRow }
-
-async function getPage<T>(
-	req: Promise<ApiResponse>,
-	fallback: string,
-): Promise<Result<Page<T>, Error>> {
-	return to_result<Page<T>>(await req, fallback)
-}
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -42,13 +28,13 @@ export async function fetch_manufacturers(
 	const f: ManufacturerFilters = typeof filters === 'string' ? { search: filters } : filters
 	return getPage<ManufacturerRow>(
 		client.manufacturers.$get({
-			query: {
+			query: to_query({
 				search: f.search ?? '',
-				page: '1',
-				limit: '200',
+				page: 1,
+				limit: 200,
 				sort: f.sort ?? 'name',
 				order: f.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load manufacturers',
 	)
@@ -112,15 +98,15 @@ export async function fetch_device_types(
 		typeof filters === 'number' ? { manufacturer: filters } : (filters ?? {})
 	return getPage<DeviceTypeRow>(
 		client['device-types'].$get({
-			query: {
+			query: to_query({
 				search: f.search ?? '',
-				page: '1',
-				limit: '200',
-				manufacturer: f.manufacturer === undefined ? undefined : String(f.manufacturer),
+				page: 1,
+				limit: 200,
+				manufacturer: f.manufacturer,
 				kind: f.kind,
 				sort: f.sort ?? 'model',
 				order: f.order ?? 'asc',
-			},
+			}),
 		}),
 		'Failed to load device types',
 	)

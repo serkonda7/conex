@@ -6,7 +6,7 @@ import {
 	fetch_sites,
 	fetch_tenants,
 	type SiteRow,
-} from '../api_p1'
+} from '../api_tenancy'
 import {
 	FormActions,
 	FormError,

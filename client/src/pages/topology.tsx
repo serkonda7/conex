@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import type { TopologyEdge, TopologyNode, TracePath } from 'shared/src/schemas'
+import type { TopologyEdge, TopologyNode, TracePath } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import {
 	createEffect,
@@ -11,9 +11,9 @@ import {
 	onMount,
 	Show,
 } from 'solid-js'
-import { fetch_site_groups, fetch_sites, type SiteGroupRow, type SiteRow } from '../api_p1'
-import { type DeviceRow, fetch_devices } from '../api_p4'
-import { fetch_trace } from '../api_p5'
+import { fetch_trace } from '../api_cables'
+import { type DeviceRow, fetch_devices } from '../api_devices'
+import { fetch_site_groups, fetch_sites, type SiteGroupRow, type SiteRow } from '../api_tenancy'
 import { fetch_cable_trace, fetch_topology } from '../api_topology'
 import { navigate, parseId, queryParam } from '../router'
 

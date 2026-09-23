@@ -7,7 +7,7 @@ import {
 	fetch_manufacturers,
 	type ManufacturerRow,
 	update_device_type,
-} from '../api_p3'
+} from '../api_templates'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {

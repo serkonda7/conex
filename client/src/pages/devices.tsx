@@ -14,10 +14,10 @@ import {
 	Show,
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { fetch_tenants, type TenantRow } from '../api_p1'
-import { fetch_racks, type RackRow } from '../api_p2'
-import { fetch_device_types } from '../api_p3'
-import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../api_p4'
+import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../api_devices'
+import { fetch_racks, type RackRow } from '../api_racks'
+import { fetch_device_types } from '../api_templates'
+import { fetch_tenants, type TenantRow } from '../api_tenancy'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

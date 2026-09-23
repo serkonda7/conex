@@ -1,7 +1,6 @@
 import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
-import type { ImportRowResult } from 'shared/src/schemas'
-import type { InputEventAndTarget } from 'shared/src/types'
+import type { ImportRowResult, InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import {
 	createEffect,
@@ -12,15 +11,15 @@ import {
 	onCleanup,
 	Show,
 } from 'solid-js'
+import { type CableRow, create_cable, delete_cable, fetch_cables } from '../api_cables'
 import {
 	type DeviceRow,
 	fetch_all_interfaces,
 	fetch_devices,
 	fetch_interfaces,
 	type InterfaceJson,
-} from '../api_p4'
-import { type CableRow, create_cable, delete_cable, fetch_cables } from '../api_p5'
-import { download_csv, upload_csv } from '../api_p6'
+} from '../api_devices'
+import { download_csv, upload_csv } from '../api_transfer'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 

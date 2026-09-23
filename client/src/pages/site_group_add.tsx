@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
-import { create_site_group, fetch_site_groups, fetch_tenants } from '../api_p1'
+import { create_site_group, fetch_site_groups, fetch_tenants } from '../api_tenancy'
 import {
 	FormActions,
 	FormError,

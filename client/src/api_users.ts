@@ -4,10 +4,8 @@
  * message, matching the other API modules.
  */
 import type { Result } from 'better-result'
-import type { UserJson } from 'shared/src/schemas'
-import { client, to_result } from './api'
-import type { Page } from './api_p1'
-import type { ApiResponse } from './util/api_error'
+import type { Page, UserJson } from 'shared/src/types'
+import { client, to_query, to_result } from './api'
 
 export type { UserJson }
 export type UserRole = UserJson['role']
@@ -21,14 +19,14 @@ export interface UserFilters {
 }
 
 export async function fetch_users(filters?: UserFilters): Promise<Result<Page<UserJson>, Error>> {
-	const res: ApiResponse = await client.users.$get({
-		query: {
+	const res = await client.users.$get({
+		query: to_query({
 			search: filters?.search ?? '',
-			page: String(filters?.page ?? 1),
-			limit: String(filters?.limit ?? 200),
+			page: filters?.page ?? 1,
+			limit: filters?.limit ?? 200,
 			role: filters?.role,
-			tenant: filters?.tenant === undefined ? undefined : String(filters.tenant),
-		},
+			tenant: filters?.tenant,
+		}),
 	})
 	return to_result<Page<UserJson>>(res, 'Failed to load users')
 }

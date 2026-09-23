@@ -8,7 +8,7 @@ import {
 	delete_manufacturer,
 	fetch_device_types,
 	fetch_manufacturer,
-} from '../api_p3'
+} from '../api_templates'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
