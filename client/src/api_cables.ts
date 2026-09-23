@@ -5,17 +5,18 @@
  */
 import type { Result } from 'better-result'
 import type { CableRow } from 'server/src/db/cables'
-import type { DeviceTraceResponse, Page } from 'shared/src/types'
+import type {
+	CableCreate,
+	CableListQuery,
+	CableStatus,
+	DeviceTraceResponse,
+	Page,
+} from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 
 export type { CableRow, DeviceTraceResponse }
 
-export interface CableFilters {
-	search?: string
-	status?: 'connected' | 'planned' | 'decommissioned'
-	device?: number
-	iface?: number
-}
+export type CableFilters = Partial<CableListQuery>
 
 export async function fetch_cables(filters?: CableFilters): Promise<Result<Page<CableRow>, Error>> {
 	return getPage<CableRow>(
@@ -25,7 +26,7 @@ export async function fetch_cables(filters?: CableFilters): Promise<Result<Page<
 				page: 1,
 				limit: 200,
 				status: filters?.status,
-				interface: filters?.iface,
+				interface: filters?.interface,
 				device: filters?.device,
 			}),
 		}),
@@ -33,13 +34,15 @@ export async function fetch_cables(filters?: CableFilters): Promise<Result<Page<
 	)
 }
 
-export async function create_cable(input: {
-	a_interface_id: number
-	b_interface_id: number
-	label?: string
-	kind?: string
-	status?: 'connected' | 'planned' | 'decommissioned'
-}): Promise<Result<CableRow, Error>> {
+/**
+ * Cable create body. `status` stays optional here even though the shared
+ * output type marks it required: the server defaults it to `connected`.
+ */
+export type CableCreateInput = Omit<CableCreate, 'status'> & {
+	status?: CableStatus
+}
+
+export async function create_cable(input: CableCreateInput): Promise<Result<CableRow, Error>> {
 	const res = await client.cables.$post({ json: input })
 	return to_result<CableRow>(res, 'Failed to create cable')
 }

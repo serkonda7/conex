@@ -1,8 +1,8 @@
-import type { ElevationDeviceRef, ElevationUnit } from 'shared/src/types'
+import type { DeviceFace, ElevationDeviceRef, ElevationUnit } from 'shared/src/types'
 import { For, type JSX, Show } from 'solid-js'
 import { navigate } from '../router'
 
-export type RackFace = 'front' | 'rear'
+export type RackFace = DeviceFace
 
 const FACES: RackFace[] = ['front', 'rear']
 
@@ -61,11 +61,11 @@ export function RackElevation(props: {
 									return (
 										<li
 											class={`rack-u rack-u-${kind}`}
-												classList={{
-													'rack-u-selected':
-														props.selected_u === unit.u &&
-														props.selected_face === face,
-												}}
+											classList={{
+												'rack-u-selected':
+													props.selected_u === unit.u &&
+													props.selected_face === face,
+											}}
 										>
 											<span class="rack-u-gutter" aria-hidden="true">
 												{unit.u}

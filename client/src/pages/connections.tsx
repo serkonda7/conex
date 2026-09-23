@@ -1,6 +1,6 @@
 import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
-import type { ImportRowResult, InputEventAndTarget } from 'shared/src/types'
+import type { CableStatus, ImportRowResult, InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import {
 	createEffect,
@@ -256,7 +256,7 @@ export function ConnectionsPage(): JSX.Element {
 			b_interface_id: Number(bIface()),
 			label: cableLabel().trim() === '' ? undefined : cableLabel().trim(),
 			kind: cableKind().trim() === '' ? undefined : cableKind().trim(),
-			status: cableStatus() as 'connected' | 'planned' | 'decommissioned',
+			status: cableStatus() as CableStatus,
 		})
 		if (Result.isError(res)) {
 			setError(res.error.message)

@@ -6,6 +6,7 @@
  * of inline in components, so endpoint paths and `{ error }` parsing exist once.
  */
 import type { Result } from 'better-result'
+import type { Role } from 'shared/src/types'
 import { post_json } from './api'
 
 export type AuthProviders = { local: boolean; microsoft: boolean }
@@ -50,7 +51,7 @@ export async function setupAdmin(username: string, password: string): Promise<Re
 /** Current session identity: username plus the RBAC role and tenant scope. */
 export interface SessionUser {
 	username: string
-	role: 'admin' | 'editor' | 'viewer'
+	role: Role
 	tenant_id: number | null
 }
 

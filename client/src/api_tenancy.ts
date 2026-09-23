@@ -5,7 +5,21 @@
  */
 import type { Result } from 'better-result'
 import type { LocationRow, SiteRow, TenantListItem, TenantRow } from 'server/src/db/tenancy'
-import type { Page } from 'shared/src/types'
+import type {
+	LocationCreate,
+	LocationListQuery,
+	LocationUpdate,
+	Page,
+	SiteCreate,
+	SiteGroupCreate,
+	SiteGroupListQuery,
+	SiteGroupUpdate,
+	SiteListQuery,
+	SiteUpdate,
+	TenantCreate,
+	TenantListQuery,
+	TenantUpdate,
+} from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 
 export type { LocationRow, SiteRow, TenantRow }
@@ -34,22 +48,11 @@ export async function fetch_tenants(
 	)
 }
 
-export type TenantSort = 'name' | 'slug' | 'description'
+export type TenantSort = TenantListQuery['sort']
 
-export interface TenantFilters {
-	search?: string
-	page?: number
-	limit?: number
-	sort?: TenantSort
-	order?: 'asc' | 'desc'
-}
+export type TenantFilters = Partial<TenantListQuery>
 
-export interface TenantCreateInput {
-	name: string
-	slug: string
-	description?: string
-	comments?: string
-}
+export type TenantCreateInput = TenantCreate
 
 export async function create_tenant(input: TenantCreateInput): Promise<Result<TenantRow, Error>> {
 	const res = await client.tenants.$post({
@@ -73,12 +76,7 @@ export async function delete_tenant(id: number): Promise<Result<unknown, Error>>
 	return to_result<unknown>(res, 'Failed to delete tenant')
 }
 
-export interface TenantUpdateInput {
-	name?: string
-	slug?: string
-	description?: string | null
-	comments?: string | null
-}
+export type TenantUpdateInput = TenantUpdate
 
 export async function update_tenant(
 	id: number,
@@ -92,39 +90,13 @@ export async function update_tenant(
 // Sites
 // ---------------------------------------------------------------------------
 
-export type SiteSort = 'name' | 'slug' | 'description'
+export type SiteSort = SiteListQuery['sort']
 
-export interface SiteFilters {
-	search?: string
-	page?: number
-	limit?: number
-	sort?: SiteSort
-	order?: 'asc' | 'desc'
-	tenant?: number
-	group?: number
-}
+export type SiteFilters = Partial<SiteListQuery>
 
-export interface SiteCreateInput {
-	name: string
-	slug: string
-	tenant_id: number | null
-	site_group_id: number | null
-	description?: string
-	comments?: string
-	physical_address?: string
-	shipping_address?: string
-}
+export type SiteCreateInput = SiteCreate
 
-export interface SiteUpdateInput {
-	name?: string
-	slug?: string
-	tenant_id?: number | null
-	site_group_id?: number | null
-	description?: string | null
-	comments?: string | null
-	physical_address?: string | null
-	shipping_address?: string | null
-}
+export type SiteUpdateInput = SiteUpdate
 
 /**
  * Site row plus the newer nullable text columns (comments, addresses) and
@@ -198,35 +170,13 @@ export async function delete_site(id: number): Promise<Result<unknown, Error>> {
 // Locations
 // ---------------------------------------------------------------------------
 
-export type LocationSort = 'name' | 'slug' | 'description'
+export type LocationSort = LocationListQuery['sort']
 
-export interface LocationFilters {
-	search?: string
-	page?: number
-	limit?: number
-	site?: number
-	tenant?: number
-	parent?: number
-	sort?: LocationSort
-	order?: 'asc' | 'desc'
-}
+export type LocationFilters = Partial<LocationListQuery>
 
-export interface LocationCreateInput {
-	name: string
-	slug: string
-	site_id: number
-	parent_id: number | null
-	tenant_id?: number | null
-	description?: string
-}
+export type LocationCreateInput = LocationCreate
 
-export interface LocationUpdateInput {
-	name?: string
-	slug?: string
-	parent_id?: number | null
-	tenant_id?: number | null
-	description?: string | null
-}
+export type LocationUpdateInput = LocationUpdate
 
 export async function fetch_locations(
 	filters?: LocationFilters | number,
@@ -300,35 +250,13 @@ export interface SiteGroupRow {
 	comments: string | null
 }
 
-export type SiteGroupSort = 'name' | 'slug' | 'description'
+export type SiteGroupSort = SiteGroupListQuery['sort']
 
-export interface SiteGroupFilters {
-	search?: string
-	page?: number
-	limit?: number
-	sort?: SiteGroupSort
-	order?: 'asc' | 'desc'
-	tenant?: number
-	parent?: number
-}
+export type SiteGroupFilters = Partial<SiteGroupListQuery>
 
-export interface SiteGroupCreateInput {
-	name: string
-	slug: string
-	tenant_id: number | null
-	parent_id: number | null
-	description?: string
-	comments?: string
-}
+export type SiteGroupCreateInput = SiteGroupCreate
 
-export interface SiteGroupUpdateInput {
-	name?: string
-	slug?: string
-	tenant_id?: number | null
-	parent_id?: number | null
-	description?: string | null
-	comments?: string | null
-}
+export type SiteGroupUpdateInput = SiteGroupUpdate
 
 export async function fetch_site_groups(
 	filters?: SiteGroupFilters,

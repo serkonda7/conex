@@ -2,7 +2,7 @@ import { IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
-import { create_device_type, fetch_manufacturers } from '../api_templates'
+import { create_device_type, fetch_manufacturers, type RackFormFactor } from '../api_templates'
 import {
 	Field,
 	FormActions,
@@ -14,13 +14,6 @@ import {
 	TextField,
 } from '../components/form'
 import { navigate } from '../router'
-
-type RackFormFactor =
-	| '2-post frame'
-	| '4-post frame'
-	| '4-post cabinet'
-	| 'wall-mounted frame'
-	| 'wall-mounted cabinet'
 
 const FORM_FACTORS: RackFormFactor[] = [
 	'2-post frame',

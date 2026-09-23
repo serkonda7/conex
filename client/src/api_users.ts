@@ -4,19 +4,13 @@
  * message, matching the other API modules.
  */
 import type { Result } from 'better-result'
-import type { Page, UserJson } from 'shared/src/types'
+import type { Page, UserCreate, UserJson, UserListQuery, UserUpdate } from 'shared/src/types'
 import { client, to_query, to_result } from './api'
 
 export type { UserJson }
 export type UserRole = UserJson['role']
 
-export interface UserFilters {
-	search?: string
-	page?: number
-	limit?: number
-	role?: UserRole
-	tenant?: number
-}
+export type UserFilters = Partial<UserListQuery>
 
 export async function fetch_users(filters?: UserFilters): Promise<Result<Page<UserJson>, Error>> {
 	const res = await client.users.$get({
@@ -36,11 +30,12 @@ export async function fetch_user(id: number): Promise<Result<UserJson, Error>> {
 	return to_result<UserJson>(res, 'Failed to load user')
 }
 
-export interface UserCreateInput {
-	username: string
-	password: string
-	role: UserRole
-	tenant_id: number | null
+/**
+ * User create body. `role` stays optional here even though the shared
+ * output type marks it required: the server defaults it to `viewer`.
+ */
+export type UserCreateInput = Omit<UserCreate, 'role'> & {
+	role?: UserCreate['role']
 }
 
 export async function create_user(input: UserCreateInput): Promise<Result<UserJson, Error>> {
@@ -55,11 +50,7 @@ export async function create_user(input: UserCreateInput): Promise<Result<UserJs
 	return to_result<UserJson>(res, 'Failed to create user')
 }
 
-export interface UserUpdateInput {
-	role?: UserRole
-	tenant_id?: number | null
-	password?: string
-}
+export type UserUpdateInput = UserUpdate
 
 export async function update_user(
 	id: number,

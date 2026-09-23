@@ -5,7 +5,16 @@
  */
 import type { Result } from 'better-result'
 import type { DeviceTypeRow, ManufacturerRow, StubRow } from 'server/src/db/templates'
-import type { Page } from 'shared/src/types'
+import type {
+	DeviceTypeCreate,
+	DeviceTypeListQuery,
+	DeviceTypeUpdate,
+	ManufacturerCreate,
+	ManufacturerListQuery,
+	ManufacturerUpdate,
+	Page,
+	StubCreate,
+} from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 
 export type { DeviceTypeRow, ManufacturerRow, StubRow }
@@ -14,13 +23,9 @@ export type { DeviceTypeRow, ManufacturerRow, StubRow }
 // Manufacturers
 // ---------------------------------------------------------------------------
 
-export type ManufacturerSort = 'name' | 'description'
+export type ManufacturerSort = ManufacturerListQuery['sort']
 
-export interface ManufacturerFilters {
-	search?: string
-	sort?: ManufacturerSort
-	order?: 'asc' | 'desc'
-}
+export type ManufacturerFilters = Partial<ManufacturerListQuery>
 
 export async function fetch_manufacturers(
 	filters: string | ManufacturerFilters = '',
@@ -41,8 +46,8 @@ export async function fetch_manufacturers(
 }
 
 export async function create_manufacturer(
-	name: string,
-	description?: string,
+	name: ManufacturerCreate['name'],
+	description?: ManufacturerCreate['description'],
 ): Promise<Result<ManufacturerRow, Error>> {
 	const res = await client.manufacturers.$post({
 		json: { name, description: description || undefined },
@@ -55,11 +60,7 @@ export async function fetch_manufacturer(id: number): Promise<Result<Manufacture
 	return to_result<ManufacturerRow>(res, 'Failed to load manufacturer')
 }
 
-export interface ManufacturerUpdateInput {
-	name?: string
-	slug?: string
-	description?: string | null
-}
+export type ManufacturerUpdateInput = ManufacturerUpdate
 
 export async function update_manufacturer(
 	id: number,
@@ -81,15 +82,9 @@ export async function delete_manufacturer(id: number): Promise<Result<unknown, E
 // Device types
 // ---------------------------------------------------------------------------
 
-export type DeviceTypeSort = 'model'
+export type DeviceTypeSort = DeviceTypeListQuery['sort']
 
-export interface DeviceTypeFilters {
-	search?: string
-	manufacturer?: number
-	kind?: 'device' | 'rack'
-	sort?: DeviceTypeSort
-	order?: 'asc' | 'desc'
-}
+export type DeviceTypeFilters = Partial<DeviceTypeListQuery>
 
 export async function fetch_device_types(
 	filters?: number | DeviceTypeFilters,
@@ -112,21 +107,25 @@ export async function fetch_device_types(
 	)
 }
 
-export async function create_device_type(input: {
-	manufacturer_id: number
-	model: string
-	u_height?: number
-	is_full_depth?: boolean
-	description?: string
-	comments?: string
-	form_factor?:
-		| '2-post frame'
-		| '4-post frame'
-		| '4-post cabinet'
-		| 'wall-mounted frame'
-		| 'wall-mounted cabinet'
-	width?: 10 | 19 | 23
-}): Promise<Result<DeviceTypeRow, Error>> {
+/** NetBox rack form-factor choices, from the shared device-type contract. */
+export type RackFormFactor = NonNullable<DeviceTypeCreate['form_factor']>
+
+/** Rack width choices in inches, from the shared device-type contract. */
+export type RackWidth = NonNullable<DeviceTypeCreate['width']>
+
+/**
+ * Device-type create body. `u_height` / `is_full_depth` stay optional here
+ * even though the shared output type marks them required: the server
+ * defaults them to 1 / true.
+ */
+export type DeviceTypeCreateInput = Omit<DeviceTypeCreate, 'u_height' | 'is_full_depth'> & {
+	u_height?: DeviceTypeCreate['u_height']
+	is_full_depth?: DeviceTypeCreate['is_full_depth']
+}
+
+export async function create_device_type(
+	input: DeviceTypeCreateInput,
+): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'].$post({ json: input })
 	return to_result<DeviceTypeRow>(res, 'Failed to create device type')
 }
@@ -141,22 +140,7 @@ export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRo
 	return to_result<DeviceTypeRow>(res, 'Failed to load device type')
 }
 
-export interface DeviceTypeUpdateInput {
-	manufacturer_id?: number
-	model?: string
-	u_height?: number
-	is_full_depth?: boolean
-	form_factor?:
-		| '2-post frame'
-		| '4-post frame'
-		| '4-post cabinet'
-		| 'wall-mounted frame'
-		| 'wall-mounted cabinet'
-		| null
-	width?: 10 | 19 | 23 | null
-	description?: string | null
-	comments?: string | null
-}
+export type DeviceTypeUpdateInput = DeviceTypeUpdate
 
 export async function update_device_type(
 	id: number,
@@ -180,9 +164,19 @@ export async function fetch_stubs(deviceTypeId: number): Promise<Result<StubRow[
 	return to_result<StubRow[]>(res, 'Failed to load interface stubs')
 }
 
+/**
+ * Stub create body. `count` / `kind` stay optional here even though the
+ * shared output type marks them required: the server defaults them to
+ * 1 / `ethernet`.
+ */
+export type StubCreateInput = Omit<StubCreate, 'count' | 'kind'> & {
+	count?: StubCreate['count']
+	kind?: StubCreate['kind']
+}
+
 export async function create_stub(
 	deviceTypeId: number,
-	input: { prefix: string; count: number; kind?: string },
+	input: StubCreateInput,
 ): Promise<Result<StubRow, Error>> {
 	const res = await client['device-types'][':id'].stubs.$post({
 		param: { id: String(deviceTypeId) },

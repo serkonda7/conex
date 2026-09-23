@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import type { DeviceFace } from 'shared/src/types'
 import { createResource, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device, update_device } from '../api_devices'
 import { fetch_racks } from '../api_racks'
@@ -127,7 +128,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					site_id: siteId() ? Number(siteId()) : null,
 					location_id: locationId() ? Number(locationId()) : null,
 					rack_id: rackId() ? Number(rackId()) : null,
-					face: (face() || null) as 'front' | 'rear' | null,
+					face: (face() || null) as DeviceFace | null,
 					position_u: positionU().trim() === '' ? null : Number(positionU().trim()),
 					tenant_id: tenantId() ? Number(tenantId()) : null,
 				}),

@@ -4,16 +4,17 @@
  * `{ error }` message, matching the cable wrappers in `api_cables.ts`.
  */
 import type { Result } from 'better-result'
-import type { CableTraceResponse, InterfaceTraceResponse, TopologyResponse } from 'shared/src/types'
+import type {
+	CableTraceResponse,
+	InterfaceTraceResponse,
+	TopologyQuery,
+	TopologyResponse,
+} from 'shared/src/types'
 import { client, to_query, to_result } from './api'
 
 export type { CableTraceResponse, InterfaceTraceResponse, TopologyResponse }
 
-export interface TopologyFilters {
-	group?: number
-	site?: number
-	device?: number
-}
+export type TopologyFilters = Partial<TopologyQuery>
 
 export async function fetch_topology(
 	filters?: TopologyFilters,

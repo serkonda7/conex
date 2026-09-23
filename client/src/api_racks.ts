@@ -5,7 +5,14 @@
  */
 import type { Result } from 'better-result'
 import type { RackRow, ShelfRow } from 'server/src/db/racks'
-import type { ElevationResponse, Page } from 'shared/src/types'
+import type {
+	ElevationResponse,
+	Page,
+	RackCreate,
+	RackListQuery,
+	RackUpdate,
+	ShelfCreate,
+} from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 
 export type { ElevationResponse, RackRow, ShelfRow }
@@ -14,33 +21,13 @@ export type { ElevationResponse, RackRow, ShelfRow }
 // Racks
 // ---------------------------------------------------------------------------
 
-export type RackSort = 'name'
+export type RackSort = RackListQuery['sort']
 
-export interface RackFilters {
-	search?: string
-	site?: number
-	location?: number
-	tenant?: number
-	sort?: RackSort
-	order?: 'asc' | 'desc'
-}
+export type RackFilters = Partial<RackListQuery>
 
-export interface RackCreateInput {
-	name: string
-	site_id: number
-	location_id: number | null
-	tenant_id: number | null
-	rack_type_id: number
-	description?: string
-}
+export type RackCreateInput = RackCreate
 
-export interface RackUpdateInput {
-	name?: string
-	rack_type_id?: number
-	location_id?: number | null
-	tenant_id?: number | null
-	description?: string | null
-}
+export type RackUpdateInput = RackUpdate
 
 export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<RackRow>, Error>> {
 	return getPage<RackRow>(
@@ -118,12 +105,15 @@ export async function fetch_shelves(rack: number): Promise<Result<Page<ShelfRow>
 	)
 }
 
-export async function create_shelf(input: {
-	name: string
-	rack_id: number
-	position_u: number
-	height_u?: number
-}): Promise<Result<ShelfRow, Error>> {
+/**
+ * Shelf create body. `height_u` stays optional here even though the shared
+ * output type marks it required: the server defaults it to 1.
+ */
+export type ShelfCreateInput = Omit<ShelfCreate, 'height_u'> & {
+	height_u?: ShelfCreate['height_u']
+}
+
+export async function create_shelf(input: ShelfCreateInput): Promise<Result<ShelfRow, Error>> {
 	const res = await client.shelves.$post({ json: input })
 	return to_result<ShelfRow>(res, 'Failed to create shelf')
 }

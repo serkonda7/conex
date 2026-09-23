@@ -1,4 +1,5 @@
 import { IconPlus } from '@tabler/icons-solidjs'
+import type { DeviceFace } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import { create_device } from '../api_devices'
@@ -126,7 +127,7 @@ export function DeviceAddPage(): JSX.Element {
 					site_id: siteId() ? Number(siteId()) : null,
 					location_id: locationId() ? Number(locationId()) : null,
 					rack_id: rackId() ? Number(rackId()) : null,
-					face: (face() || null) as 'front' | 'rear' | null,
+					face: (face() || null) as DeviceFace | null,
 					position_u: position,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
 				}),

@@ -5,22 +5,24 @@
  */
 import type { Result } from 'better-result'
 import type { DeviceRow, InterfaceJson } from 'server/src/db/devices'
-import type { Page } from 'shared/src/types'
+import type {
+	DeviceCreate,
+	DeviceListQuery,
+	DeviceMove,
+	DeviceStatus,
+	DeviceUpdate,
+	InterfaceCreate,
+	InterfaceListQuery,
+	InterfaceUpdate,
+	Page,
+} from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 
 export type { DeviceRow, InterfaceJson }
 
-export type DeviceSort = 'name'
+export type DeviceSort = DeviceListQuery['sort']
 
-export interface DeviceFilters {
-	search?: string
-	site?: number
-	rack?: number
-	tenant?: number
-	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
-	sort?: DeviceSort
-	order?: 'asc' | 'desc'
-}
+export type DeviceFilters = Partial<DeviceListQuery>
 
 export async function fetch_devices(
 	filters?: DeviceFilters,
@@ -48,39 +50,20 @@ export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>
 	return to_result<DeviceRow>(res, 'Failed to load device')
 }
 
-export async function create_device(input: {
-	device_type_id: number
-	name: string
-	site_id?: number | null
-	location_id?: number | null
-	rack_id?: number | null
-	face?: 'front' | 'rear' | null
-	position_u?: number | null
-	shelf_id?: number | null
-	asset_tag?: string | null
-	serial?: string
-	tenant_id?: number | null
-	description?: string
-	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
-}): Promise<Result<DeviceRow, Error>> {
+/**
+ * Device create body. `status` stays optional here even though the shared
+ * output type marks it required: the server defaults it to `active`.
+ */
+export type DeviceCreateInput = Omit<DeviceCreate, 'status'> & {
+	status?: DeviceStatus
+}
+
+export async function create_device(input: DeviceCreateInput): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices.$post({ json: input })
 	return to_result<DeviceRow>(res, 'Failed to create device')
 }
 
-export interface DeviceUpdateInput {
-	name?: string
-	status?: 'active' | 'planned' | 'staged' | 'decommissioned'
-	site_id?: number | null
-	location_id?: number | null
-	rack_id?: number | null
-	face?: 'front' | 'rear' | null
-	position_u?: number | null
-	shelf_id?: number | null
-	serial?: string | null
-	asset_tag?: string | null
-	tenant_id?: number | null
-	description?: string | null
-}
+export type DeviceUpdateInput = DeviceUpdate
 
 export async function update_device(
 	id: number,
@@ -95,7 +78,7 @@ export async function update_device(
 
 export async function move_device(
 	id: number,
-	input: { rack_id?: number | null; position_u?: number | null; shelf_id?: number | null },
+	input: DeviceMove,
 ): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices[':id'].move.$post({ param: { id: String(id) }, json: input })
 	return to_result<DeviceRow>(res, 'Failed to move device')
@@ -114,11 +97,7 @@ export interface InterfaceListItem extends InterfaceJson {
 	device_name: string
 }
 
-export interface InterfaceFilters {
-	search?: string
-	device?: number
-	connected?: boolean
-}
+export type InterfaceFilters = Partial<InterfaceListQuery>
 
 export async function fetch_all_interfaces(
 	filters?: InterfaceFilters,
@@ -142,9 +121,17 @@ export async function fetch_interfaces(deviceId: number): Promise<Result<Interfa
 	return to_result<InterfaceJson[]>(res, 'Failed to load interfaces')
 }
 
+/**
+ * Interface create body. `kind` stays optional here even though the shared
+ * output type marks it required: the server defaults it to `ethernet`.
+ */
+export type InterfaceCreateInput = Omit<InterfaceCreate, 'kind'> & {
+	kind?: InterfaceCreate['kind']
+}
+
 export async function add_interface(
 	deviceId: number,
-	input: { name: string; kind?: string },
+	input: InterfaceCreateInput,
 ): Promise<Result<InterfaceJson, Error>> {
 	const res = await client.devices[':id'].interfaces.$post({
 		param: { id: String(deviceId) },
@@ -156,7 +143,7 @@ export async function add_interface(
 export async function update_interface(
 	deviceId: number,
 	ifaceId: number,
-	input: { name?: string; kind?: string },
+	input: InterfaceUpdate,
 ): Promise<Result<InterfaceJson, Error>> {
 	const res = await client.devices[':id'].interfaces[':ifaceId'].$patch({
 		param: { id: String(deviceId), ifaceId: String(ifaceId) },
