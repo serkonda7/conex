@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
 	EntityParamsSchema,
@@ -7,11 +6,12 @@ import {
 	UserListQuerySchema,
 	UserUpdateSchema,
 } from 'shared/src/schemas'
-import { requestUser, requireAdmin } from '../authz'
+import { requestUser } from '../authz'
 import { createUser, deleteUser, getUserResult, listUsers, updateUser } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
+import { requireAdminMiddleware } from '../middleware/roles'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
+import { sendCreated, sendRow } from './helpers'
 
 /**
  * User management: admin-only. Admins create accounts with an explicit
@@ -22,13 +22,7 @@ import { sendResult } from '../util/result_response'
  */
 export const usersApp = new Hono()
 	.use(authMiddleware)
-	.use(async (c, next) => {
-		const denied = requireAdmin(c)
-		if (denied) {
-			return denied
-		}
-		await next()
-	})
+	.use(requireAdminMiddleware)
 	.get('/', vValidator('query', UserListQuerySchema, onValidationError), (c) => {
 		const query = c.req.valid('query')
 		return c.json(
@@ -42,31 +36,19 @@ export const usersApp = new Hono()
 		)
 	})
 	.post('/', vValidator('json', UserCreateSchema, onValidationError), async (c) => {
-		const result = await createUser(c.req.valid('json'))
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
+		return sendCreated(c, await createUser(c.req.valid('json')))
 	})
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendResult(c, getUserResult(c.req.valid('param').id))
+		return sendRow(c, getUserResult(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', UserUpdateSchema, onValidationError),
 		async (c) => {
-			const result = await updateUser(c.req.valid('param').id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, await updateUser(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const result = deleteUser(c.req.valid('param').id, requestUser(c).id)
-		if (Result.isOk(result)) {
-			return c.json(result.value)
-		}
-		return sendResult(c, result)
+		return sendRow(c, deleteUser(c.req.valid('param').id, requestUser(c).id))
 	})

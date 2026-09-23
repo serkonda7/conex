@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
 	EntityParamsSchema,
@@ -7,7 +6,6 @@ import {
 	ManufacturerListQuerySchema,
 	ManufacturerUpdateSchema,
 } from 'shared/src/schemas'
-import { requireGlobalWrite } from '../authz'
 import {
 	createManufacturer,
 	deleteManufacturer,
@@ -16,8 +14,9 @@ import {
 	updateManufacturer,
 } from '../db/templates'
 import { authMiddleware } from '../middleware/auth'
+import { requireGlobalWriteMiddleware } from '../middleware/roles'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
+import { sendCreated, sendRow } from './helpers'
 
 /**
  * Manufacturers are shared catalog data (no tenant column): readable by
@@ -38,44 +37,31 @@ export const manufacturersApp = new Hono()
 			}),
 		)
 	})
-	.post('/', vValidator('json', ManufacturerCreateSchema, onValidationError), (c) => {
-		const denied = requireGlobalWrite(c)
-		if (denied) {
-			return denied
-		}
-		const result = createManufacturer(c.req.valid('json'))
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+	.post(
+		'/',
+		requireGlobalWriteMiddleware,
+		vValidator('json', ManufacturerCreateSchema, onValidationError),
+		(c) => {
+			return sendCreated(c, createManufacturer(c.req.valid('json')))
+		},
+	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendResult(c, getManufacturer(c.req.valid('param').id))
+		return sendRow(c, getManufacturer(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
+		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ManufacturerUpdateSchema, onValidationError),
 		(c) => {
-			const denied = requireGlobalWrite(c)
-			if (denied) {
-				return denied
-			}
-			const result = updateManufacturer(c.req.valid('param').id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, updateManufacturer(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const denied = requireGlobalWrite(c)
-		if (denied) {
-			return denied
-		}
-		const result = deleteManufacturer(c.req.valid('param').id)
-		if (Result.isOk(result)) {
-			return c.json(result.value)
-		}
-		return sendResult(c, result)
-	})
+	.delete(
+		'/:id',
+		requireGlobalWriteMiddleware,
+		vValidator('param', EntityParamsSchema, onValidationError),
+		(c) => {
+			return sendRow(c, deleteManufacturer(c.req.valid('param').id))
+		},
+	)

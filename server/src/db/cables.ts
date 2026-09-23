@@ -1,27 +1,15 @@
 import { Result } from 'better-result'
-import { and, count, eq, or, type SQL, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 import type { CableCreate, CableUpdate, DeviceTraceResponse, TraceLink } from 'shared/src/schemas'
 import { cables, devices, interfaces } from '../schema'
 import { getDb } from './connection'
 import type { InterfaceRow } from './devices'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
-import type { ListParams, Page } from './tenancy'
+import type { ListParams, Page } from './list'
+import { errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
 import { getDevicePaths } from './topology'
 
 export type CableRow = typeof cables.$inferSelect
-
-function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
-	return { items, total, page: params.page, limit: params.limit }
-}
-
-function offsetOf(params: ListParams): number {
-	return (params.page - 1) * params.limit
-}
-
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
-}
 
 // ---------------------------------------------------------------------------
 // Cables
@@ -71,13 +59,12 @@ export function listCables(params: CableListParams): Page<CableRow> {
 		if (deviceIfaces.length === 0) {
 			return pageOf([], 0, params)
 		}
-		const ors: SQL[] = []
-		for (const id of deviceIfaces) {
-			ors.push(eq(cables.a_interface_id, id), eq(cables.b_interface_id, id))
-		}
-		const combined = or(...ors)
-		if (combined) {
-			conditions.push(combined)
+		const eitherEnd = or(
+			inArray(cables.a_interface_id, deviceIfaces),
+			inArray(cables.b_interface_id, deviceIfaces),
+		)
+		if (eitherEnd) {
+			conditions.push(eitherEnd)
 		}
 	}
 	if (params.scopeTenantId !== undefined) {
@@ -198,7 +185,7 @@ export function updateCable(id: number, input: CableUpdate): Result<CableRow, Er
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb().update(cables).set(patch).where(eq(cables.id, id)).run()
 		} catch (err) {
@@ -222,35 +209,35 @@ export function deleteCable(id: number): Result<CableRow, Error> {
 		return current
 	}
 	const cable = current.value
-	getDb().transaction((tx) => {
-		tx.delete(cables).where(eq(cables.id, id)).run()
-		tx.update(interfaces)
-			.set({ connected: 0 })
-			.where(eq(interfaces.id, cable.a_interface_id))
-			.run()
-		tx.update(interfaces)
-			.set({ connected: 0 })
-			.where(eq(interfaces.id, cable.b_interface_id))
-			.run()
-	})
+	try {
+		getDb().transaction((tx) => {
+			tx.delete(cables).where(eq(cables.id, id)).run()
+			tx.update(interfaces)
+				.set({ connected: 0 })
+				.where(eq(interfaces.id, cable.a_interface_id))
+				.run()
+			tx.update(interfaces)
+				.set({ connected: 0 })
+				.where(eq(interfaces.id, cable.b_interface_id))
+				.run()
+		})
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(cable)
 }
 
 /** True when any cable touches an interface of the device (blocks device delete). */
 export function deviceHasCables(deviceId: number): boolean {
-	const db = getDb()
-	const ifaceIds = db
-		.select({ id: interfaces.id })
-		.from(interfaces)
-		.where(eq(interfaces.device_id, deviceId))
-		.all()
-		.map((r) => r.id)
-	for (const id of ifaceIds) {
-		if (getCableForInterface(id)) {
-			return true
-		}
-	}
-	return false
+	const row = getDb()
+		.select({ id: cables.id })
+		.from(cables)
+		.where(
+			sql`EXISTS (SELECT 1 FROM ${interfaces} WHERE ${interfaces.device_id} = ${deviceId} AND (${interfaces.id} = ${cables.a_interface_id} OR ${interfaces.id} = ${cables.b_interface_id}))`,
+		)
+		.limit(1)
+		.get()
+	return row !== undefined
 }
 
 /**
@@ -271,19 +258,58 @@ export function getDeviceTrace(
 		return Result.err(new NotFoundError('Device not found'))
 	}
 	const local = db.select().from(interfaces).where(eq(interfaces.device_id, deviceId)).all()
+	const localIds = local.map((i) => i.id)
+	const cablesByIface = new Map<number, typeof cables.$inferSelect>()
+	if (localIds.length > 0) {
+		for (const cable of db
+			.select()
+			.from(cables)
+			.where(
+				or(
+					inArray(cables.a_interface_id, localIds),
+					inArray(cables.b_interface_id, localIds),
+				),
+			)
+			.all()) {
+			cablesByIface.set(cable.a_interface_id, cable)
+			cablesByIface.set(cable.b_interface_id, cable)
+		}
+	}
+	const peerIds = [...cablesByIface.values()].flatMap((c) => [c.a_interface_id, c.b_interface_id])
+	const ifacesById = new Map<number, InterfaceRow>()
+	if (peerIds.length > 0) {
+		for (const row of db
+			.select()
+			.from(interfaces)
+			.where(inArray(interfaces.id, [...new Set(peerIds)]))
+			.all()) {
+			ifacesById.set(row.id, row)
+		}
+	}
+	const peerDeviceIds = [...new Set([...ifacesById.values()].map((r) => r.device_id))]
+	const devicesById = new Map<number, typeof devices.$inferSelect>()
+	if (peerDeviceIds.length > 0) {
+		for (const row of db
+			.select()
+			.from(devices)
+			.where(inArray(devices.id, peerDeviceIds))
+			.all()) {
+			devicesById.set(row.id, row)
+		}
+	}
 	const links: TraceLink[] = []
 	for (const iface of local) {
-		const cable = getCableForInterface(iface.id)
+		const cable = cablesByIface.get(iface.id)
 		if (!cable) {
 			continue
 		}
 		const peerId =
 			cable.a_interface_id === iface.id ? cable.b_interface_id : cable.a_interface_id
-		const peer = getInterfaceRow(peerId)
+		const peer = ifacesById.get(peerId)
 		if (!peer) {
 			continue
 		}
-		const peerDevice = db.select().from(devices).where(eq(devices.id, peer.device_id)).get()
+		const peerDevice = devicesById.get(peer.device_id)
 		if (!peerDevice) {
 			continue
 		}

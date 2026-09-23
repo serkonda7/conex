@@ -1,18 +1,15 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
 	DeviceTypeCreateSchema,
 	DeviceTypeListQuerySchema,
 	DeviceTypeUpdateSchema,
 	EntityParamsSchema,
-	IdSchema,
 	StubCreateSchema,
+	StubIdParamsSchema,
 	StubUpdateSchema,
 	YamlImportBodySchema,
 } from 'shared/src/schemas'
-import * as v from 'valibot'
-import { requireGlobalWrite } from '../authz'
 import { exportDeviceTypesCsv, importDeviceTypesYaml } from '../db/csv_transfer'
 import {
 	createDeviceType,
@@ -27,10 +24,10 @@ import {
 	updateStub,
 } from '../db/templates'
 import { authMiddleware } from '../middleware/auth'
+import { requireGlobalWriteMiddleware } from '../middleware/roles'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
-
-const stubIdParamsSchema = v.object({ id: IdSchema, stubId: IdSchema })
+import { sendCreated, sendCsv, sendRow } from './helpers'
 
 export const deviceTypesApp = new Hono()
 	.use(authMiddleware)
@@ -48,118 +45,78 @@ export const deviceTypesApp = new Hono()
 			}),
 		)
 	})
-	.post('/', vValidator('json', DeviceTypeCreateSchema, onValidationError), (c) => {
-		const denied = requireGlobalWrite(c)
-		if (denied) {
-			return denied
-		}
-		const result = createDeviceType(c.req.valid('json'))
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+	.post(
+		'/',
+		requireGlobalWriteMiddleware,
+		vValidator('json', DeviceTypeCreateSchema, onValidationError),
+		(c) => {
+			return sendCreated(c, createDeviceType(c.req.valid('json')))
+		},
+	)
 	// Transfer (registered before `/:id` so the literal paths win).
 	.get('/export', (c) => {
-		return c.text(exportDeviceTypesCsv(), 200, {
-			'Content-Type': 'text/csv; charset=utf-8',
-			'Content-Disposition': 'attachment; filename="device-types.csv"',
-		})
+		return sendCsv(c, exportDeviceTypesCsv(), 'device-types.csv')
 	})
-	.post('/import', vValidator('json', YamlImportBodySchema, onValidationError), (c) => {
-		const denied = requireGlobalWrite(c)
-		if (denied) {
-			return denied
-		}
-		const result = importDeviceTypesYaml(c.req.valid('json').yaml)
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+	.post(
+		'/import',
+		requireGlobalWriteMiddleware,
+		vValidator('json', YamlImportBodySchema, onValidationError),
+		(c) => {
+			return sendCreated(c, importDeviceTypesYaml(c.req.valid('json').yaml))
+		},
+	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		return sendResult(c, getDeviceType(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
+		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceTypeUpdateSchema, onValidationError),
 		(c) => {
-			const denied = requireGlobalWrite(c)
-			if (denied) {
-				return denied
-			}
-			const result = updateDeviceType(c.req.valid('param').id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, updateDeviceType(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const denied = requireGlobalWrite(c)
-		if (denied) {
-			return denied
-		}
-		const result = deleteDeviceType(c.req.valid('param').id)
-		if (Result.isOk(result)) {
-			return c.json(result.value)
-		}
-		return sendResult(c, result)
-	})
+	.delete(
+		'/:id',
+		requireGlobalWriteMiddleware,
+		vValidator('param', EntityParamsSchema, onValidationError),
+		(c) => {
+			return sendRow(c, deleteDeviceType(c.req.valid('param').id))
+		},
+	)
 	// Stub sub-resource.
 	.get('/:id/stubs', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		return sendResult(c, listStubs(c.req.valid('param').id))
 	})
 	.post(
 		'/:id/stubs',
+		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', StubCreateSchema, onValidationError),
 		(c) => {
-			const denied = requireGlobalWrite(c)
-			if (denied) {
-				return denied
-			}
-			const result = createStub(c.req.valid('param').id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value, 201)
-			}
-			return sendResult(c, result)
+			return sendCreated(c, createStub(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.patch(
 		'/:id/stubs/:stubId',
-		vValidator('param', stubIdParamsSchema, onValidationError),
+		requireGlobalWriteMiddleware,
+		vValidator('param', StubIdParamsSchema, onValidationError),
 		vValidator('json', StubUpdateSchema, onValidationError),
 		(c) => {
 			// The `:id` segment is validated as an id; ownership is enforced by
 			// loading the stub itself.
-			const denied = requireGlobalWrite(c)
-			if (denied) {
-				return denied
-			}
-			const result = updateStub(c.req.valid('param').stubId, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, updateStub(c.req.valid('param').stubId, c.req.valid('json')))
 		},
 	)
 	.delete(
 		'/:id/stubs/:stubId',
-		vValidator('param', stubIdParamsSchema, onValidationError),
+		requireGlobalWriteMiddleware,
+		vValidator('param', StubIdParamsSchema, onValidationError),
 		(c) => {
-			const denied = requireGlobalWrite(c)
-			if (denied) {
-				return denied
-			}
-			const result = deleteStub(c.req.valid('param').stubId)
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, deleteStub(c.req.valid('param').stubId))
 		},
 	)
-	.get('/:id/stubs/:stubId', vValidator('param', stubIdParamsSchema, onValidationError), (c) => {
+	.get('/:id/stubs/:stubId', vValidator('param', StubIdParamsSchema, onValidationError), (c) => {
 		return sendResult(c, getStub(c.req.valid('param').stubId))
 	})

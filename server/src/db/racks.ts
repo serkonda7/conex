@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type {
 	ElevationResponse,
 	ElevationUnit,
@@ -8,40 +8,38 @@ import type {
 	ShelfCreate,
 	ShelfUpdate,
 } from 'shared/src/schemas'
-import { device_types, devices, locations, rack_shelves, racks, sites, tenants } from '../schema'
+import { device_types, devices, locations, rack_shelves, racks, sites } from '../schema'
 import { checkBounds, checkOverlap, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
-import type { ListParams, Page } from './tenancy'
+import type { ListParams, Page } from './list'
+import { checkTenantExists, errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
 
 type RackRecord = typeof racks.$inferSelect
 /** Rack height is computed from the linked rack type, not stored on racks. */
 export type RackRow = Omit<RackRecord, 'height_u'> & { height_u: number }
 export type ShelfRow = typeof rack_shelves.$inferSelect
 
+function withRackHeights(rows: RackRecord[]): RackRow[] {
+	const typeIds = [...new Set(rows.map((r) => r.rack_type_id).filter((id) => id !== null))]
+	const heights = new Map<number, number>()
+	if (typeIds.length > 0) {
+		for (const row of getDb()
+			.select({ id: device_types.id, u_height: device_types.u_height })
+			.from(device_types)
+			.where(inArray(device_types.id, typeIds as number[]))
+			.all()) {
+			heights.set(row.id, row.u_height)
+		}
+	}
+	return rows.map((row) => ({
+		...row,
+		height_u: row.rack_type_id === null ? 0 : (heights.get(row.rack_type_id) ?? 0),
+	}))
+}
+
 function withRackHeight(row: RackRecord): RackRow {
-	const rackType =
-		row.rack_type_id === null
-			? undefined
-			: getDb()
-					.select({ u_height: device_types.u_height })
-					.from(device_types)
-					.where(eq(device_types.id, row.rack_type_id))
-					.get()
-	return { ...row, height_u: rackType?.u_height ?? 0 }
-}
-
-function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
-	return { items, total, page: params.page, limit: params.limit }
-}
-
-function offsetOf(params: ListParams): number {
-	return (params.page - 1) * params.limit
-}
-
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+	return withRackHeights([row])[0] as RackRow
 }
 
 function shelfSpanOf(row: ShelfRow): OccupantSpan {
@@ -84,7 +82,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		conditions.push(eq(racks.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const items = db
+	const rows = db
 		.select()
 		.from(racks)
 		.where(where)
@@ -92,7 +90,7 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		.limit(params.limit)
 		.offset(offsetOf(params))
 		.all()
-		.map(withRackHeight)
+	const items = withRackHeights(rows)
 	const totalRow = db.select({ n: count() }).from(racks).where(where).get()
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
@@ -119,17 +117,6 @@ export function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): number {
 			.where(eq(device_types.id, rack.rack_type_id))
 			.get()?.u_height ?? 0
 	)
-}
-
-function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
-	if (tenantId === null || tenantId === undefined) {
-		return Result.ok(undefined)
-	}
-	const tenant = getDb().select().from(tenants).where(eq(tenants.id, tenantId)).get()
-	if (!tenant) {
-		return Result.err(new NotFoundError('Tenant not found'))
-	}
-	return Result.ok(undefined)
 }
 
 /** Location must exist and belong to the rack's site; null clears the link. */
@@ -252,7 +239,7 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 	if (!rackType || rackType.form_factor === null) {
 		return Result.err(new NotFoundError('Rack type not found'))
 	}
-	const tenantCheck = checkTenant(input.tenant_id)
+	const tenantCheck = checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
@@ -289,7 +276,7 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	}
 	const node = current.value
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenant(input.tenant_id)
+		const tenantCheck = checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
@@ -348,7 +335,7 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			db.update(racks).set(patch).where(eq(racks.id, id)).run()
 		} catch (err) {
@@ -374,7 +361,11 @@ export function deleteRack(id: number): Result<RackRow, Error> {
 	if (device) {
 		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
 	}
-	getDb().delete(racks).where(eq(racks.id, id)).run()
+	try {
+		getDb().delete(racks).where(eq(racks.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -584,7 +575,7 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 	if (input.capacity_slots !== undefined) {
 		patch.capacity_slots = input.capacity_slots
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		getDb().update(rack_shelves).set(patch).where(eq(rack_shelves.id, id)).run()
 	}
 	return getShelf(id)
@@ -599,6 +590,10 @@ export function deleteShelf(id: number): Result<ShelfRow, Error> {
 	if (sitter) {
 		return Result.err(new ConflictError('Shelf still has devices; move or delete them first'))
 	}
-	getDb().delete(rack_shelves).where(eq(rack_shelves.id, id)).run()
+	try {
+		getDb().delete(rack_shelves).where(eq(rack_shelves.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }

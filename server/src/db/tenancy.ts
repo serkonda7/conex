@@ -22,24 +22,22 @@ import {
 } from '../services/hierarchy'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import {
+	checkTenantExists,
+	errOf,
+	isPatchEmpty,
+	type ListParams,
+	offsetOf,
+	type Page,
+	pageOf,
+	searchPattern,
+} from './list'
 
+export type { ListParams, Page } from './list'
 export type TenantRow = typeof tenants.$inferSelect
 export type SiteRow = typeof sites.$inferSelect
 export type SiteGroupRow = typeof site_groups.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
-
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
-
-export interface ListParams {
-	search: string
-	page: number
-	limit: number
-}
 
 export interface TenantListParams extends ListParams {
 	sort: 'name' | 'slug' | 'description'
@@ -57,19 +55,6 @@ export interface TenantListItem extends TenantRow {
 	site_count: number
 	rack_count: number
 	device_count: number
-}
-
-function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
-	return { items, total, page: params.page, limit: params.limit }
-}
-
-function offsetOf(params: ListParams): number {
-	return (params.page - 1) * params.limit
-}
-
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +209,7 @@ export function updateTenant(id: number, input: TenantUpdate): Result<TenantRow,
 	if (input.comments !== undefined) {
 		patch.comments = input.comments
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			db.update(tenants).set(patch).where(eq(tenants.id, id)).run()
 		} catch (err) {
@@ -267,7 +252,11 @@ export function deleteTenant(id: number): Result<TenantRow, Error> {
 			new ConflictError('Tenant still has users; reassign them before deleting'),
 		)
 	}
-	db.delete(tenants).where(eq(tenants.id, id)).run()
+	try {
+		db.delete(tenants).where(eq(tenants.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -335,17 +324,6 @@ export function getSite(id: number): Result<SiteRow, Error> {
 	return Result.ok(row)
 }
 
-function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
-	if (tenantId === null || tenantId === undefined) {
-		return Result.ok(undefined)
-	}
-	const tenant = getDb().select().from(tenants).where(eq(tenants.id, tenantId)).get()
-	if (!tenant) {
-		return Result.err(new NotFoundError('Tenant not found'))
-	}
-	return Result.ok(undefined)
-}
-
 function checkSiteGroup(groupId: number | null | undefined): Result<undefined, Error> {
 	if (groupId === null || groupId === undefined) {
 		return Result.ok(undefined)
@@ -358,7 +336,7 @@ function checkSiteGroup(groupId: number | null | undefined): Result<undefined, E
 }
 
 export function createSite(input: SiteCreate): Result<SiteRow, Error> {
-	const tenantCheck = checkTenant(input.tenant_id)
+	const tenantCheck = checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
@@ -401,7 +379,7 @@ export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error
 		return current
 	}
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenant(input.tenant_id)
+		const tenantCheck = checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
@@ -444,7 +422,7 @@ export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error
 	if (input.shipping_address !== undefined) {
 		patch.shipping_address = input.shipping_address
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			db.update(sites).set(patch).where(eq(sites.id, id)).run()
 		} catch (err) {
@@ -470,7 +448,11 @@ export function deleteSite(id: number): Result<SiteRow, Error> {
 	if (rackChild) {
 		return Result.err(new ConflictError('Site still has racks; move or delete them first'))
 	}
-	getDb().delete(sites).where(eq(sites.id, id)).run()
+	try {
+		getDb().delete(sites).where(eq(sites.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -532,16 +514,35 @@ export function getSiteGroup(id: number): Result<SiteGroupRow, Error> {
 	return Result.ok(row)
 }
 
-function groupSlugClash(parentId: number | null, slug: string, excludeId?: number): boolean {
-	const db = getDb()
-	const parentCond =
-		parentId === null ? isNull(site_groups.parent_id) : eq(site_groups.parent_id, parentId)
-	const clash = db
+function slugUnderParentClash(
+	table: typeof site_groups | typeof locations,
+	parentCol: typeof site_groups.parent_id | typeof locations.parent_id,
+	slugCol: typeof site_groups.slug | typeof locations.slug,
+	parentId: number | null,
+	slug: string,
+	excludeId?: number,
+	extra?: SQL,
+): boolean {
+	const parentCond = parentId === null ? isNull(parentCol) : eq(parentCol, parentId)
+	const conds = extra ? [parentCond, eq(slugCol, slug), extra] : [parentCond, eq(slugCol, slug)]
+	const clash = getDb()
 		.select()
-		.from(site_groups)
-		.where(and(parentCond, eq(site_groups.slug, slug)))
-		.get()
+		// biome-ignore lint/suspicious/noExplicitAny: generic over two tables with identical columns
+		.from(table as any)
+		.where(and(...conds))
+		.get() as { id: number } | undefined
 	return !!clash && clash.id !== excludeId
+}
+
+function groupSlugClash(parentId: number | null, slug: string, excludeId?: number): boolean {
+	return slugUnderParentClash(
+		site_groups,
+		site_groups.parent_id,
+		site_groups.slug,
+		parentId,
+		slug,
+		excludeId,
+	)
 }
 
 /** Parent links of every site group, for depth/cycle checks. */
@@ -554,7 +555,7 @@ function groupParentMap(): Map<number, number | null> {
 }
 
 export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Error> {
-	const tenantCheck = checkTenant(input.tenant_id)
+	const tenantCheck = checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
@@ -613,7 +614,7 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 		return current
 	}
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenant(input.tenant_id)
+		const tenantCheck = checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
@@ -671,7 +672,7 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 	if (input.comments !== undefined) {
 		patch.comments = input.comments
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb().update(site_groups).set(patch).where(eq(site_groups.id, id)).run()
 		} catch (err) {
@@ -704,7 +705,11 @@ export function deleteSiteGroup(id: number): Result<SiteGroupRow, Error> {
 			new ConflictError('Site group still has sites; move or delete them first'),
 		)
 	}
-	db.delete(site_groups).where(eq(site_groups.id, id)).run()
+	try {
+		db.delete(site_groups).where(eq(site_groups.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -828,15 +833,15 @@ function siblingSlugClash(
 	slug: string,
 	excludeId?: number,
 ): boolean {
-	const db = getDb()
-	const parentCond =
-		parentId === null ? isNull(locations.parent_id) : eq(locations.parent_id, parentId)
-	const clash = db
-		.select()
-		.from(locations)
-		.where(and(eq(locations.site_id, siteId), parentCond, eq(locations.slug, slug)))
-		.get()
-	return !!clash && clash.id !== excludeId
+	return slugUnderParentClash(
+		locations,
+		locations.parent_id,
+		locations.slug,
+		parentId,
+		slug,
+		excludeId,
+		eq(locations.site_id, siteId),
+	)
 }
 
 /** Parent links of every location in a site, for depth/cycle checks. */
@@ -855,7 +860,7 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 	if (!site) {
 		return Result.err(new NotFoundError('Site not found'))
 	}
-	const tenantCheck = checkTenant(input.tenant_id)
+	const tenantCheck = checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
@@ -907,7 +912,7 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 	}
 	const node = current.value
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenant(input.tenant_id)
+		const tenantCheck = checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
@@ -960,7 +965,7 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb().update(locations).set(patch).where(eq(locations.id, id)).run()
 		} catch (err) {
@@ -990,6 +995,10 @@ export function deleteLocation(id: number): Result<LocationRow, Error> {
 	if (rackChild) {
 		return Result.err(new ConflictError('Location still has racks; move or delete them first'))
 	}
-	getDb().delete(locations).where(eq(locations.id, id)).run()
+	try {
+		getDb().delete(locations).where(eq(locations.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }

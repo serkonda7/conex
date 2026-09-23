@@ -95,17 +95,19 @@ export function sweepExpired(): number {
 		lte(sessions.expires_at, now),
 		lte(sessions.last_seen_at, now - SESSION_IDLE_TIMEOUT_S),
 	)
-	const sessionsRemoved = getDb()
-		.delete(sessions)
-		.where(expiredSessions)
-		.returning({ id: sessions.id })
-		.all().length
-	const statesRemoved = getDb()
-		.delete(auth_states)
-		.where(lte(auth_states.expires_at, now))
-		.returning({ state: auth_states.state })
-		.all().length
-	return sessionsRemoved + statesRemoved
+	return getDb().transaction((tx) => {
+		const sessionsRemoved = tx
+			.delete(sessions)
+			.where(expiredSessions)
+			.returning({ id: sessions.id })
+			.all().length
+		const statesRemoved = tx
+			.delete(auth_states)
+			.where(lte(auth_states.expires_at, now))
+			.returning({ state: auth_states.state })
+			.all().length
+		return sessionsRemoved + statesRemoved
+	})
 }
 
 export async function get_signed_jwt(user: User): Promise<string> {

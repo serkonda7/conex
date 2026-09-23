@@ -194,28 +194,25 @@ export type SiteGroupUpdate = v.InferOutput<typeof SiteGroupUpdateSchema>
 
 // Query-string contracts. Query values always arrive as strings, so page/limit
 // coerce through Number instead of demanding JSON numbers like ListQuerySchema.
-const CoercedPageSchema = v.optional(
-	v.pipe(
-		v.union([v.string(), v.number()]),
-		v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-		v.number(),
-		v.integer(),
-		v.minValue(1),
-	),
-	1,
-)
+// biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
+// biome-ignore lint/nursery/useExplicitReturnType: valibot schema inference must stay unannotated
+function coercedInt(min: number, max: number, fallback: number) {
+	return v.optional(
+		v.pipe(
+			v.union([v.string(), v.number()]),
+			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
+			v.number(),
+			v.integer(),
+			v.minValue(min),
+			v.maxValue(max),
+		),
+		fallback,
+	)
+}
 
-const CoercedLimitSchema = v.optional(
-	v.pipe(
-		v.union([v.string(), v.number()]),
-		v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-		v.number(),
-		v.integer(),
-		v.minValue(1),
-		v.maxValue(200),
-	),
-	50,
-)
+const CoercedPageSchema = coercedInt(1, Number.MAX_SAFE_INTEGER, 1)
+
+const CoercedLimitSchema = coercedInt(1, 200, 50)
 
 // biome-ignore lint/nursery/useExplicitType: entries are spread into v.object schemas — an annotation would erase the per-field inference the query types depend on
 const ListQueryEntries = {
@@ -258,6 +255,8 @@ export const LocationListQuerySchema = v.object({
 })
 
 export const EntityParamsSchema = v.object({ id: IdSchema })
+export const DeviceIfaceParamsSchema = v.object({ id: IdSchema, ifaceId: IdSchema })
+export const StubIdParamsSchema = v.object({ id: IdSchema, stubId: IdSchema })
 
 export type TenantListQuery = v.InferOutput<typeof TenantListQuerySchema>
 export type SiteListQuery = v.InferOutput<typeof SiteListQuerySchema>
@@ -608,32 +607,41 @@ export const DeviceListQuerySchema = v.object({
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
+// biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
+// biome-ignore lint/nursery/useExplicitReturnType: valibot schema inference must stay unannotated
+function looseBoolean(emptyAsTrue: boolean) {
+	return v.pipe(
+		v.union([v.string(), v.number(), v.boolean()]),
+		v.transform((raw): unknown => {
+			if (typeof raw === 'boolean') {
+				return raw
+			}
+			if (typeof raw === 'number') {
+				return raw !== 0
+			}
+			const s = raw.trim().toLowerCase()
+			if (
+				s === 'true' ||
+				s === '1' ||
+				s === 'yes' ||
+				s === 'y' ||
+				(emptyAsTrue && s === '')
+			) {
+				return true
+			}
+			if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
+				return false
+			}
+			return raw
+		}),
+		v.boolean('Must be a boolean (true/false)'),
+	)
+}
+
 export const InterfaceListQuerySchema = v.object({
 	...ListQueryEntries,
 	device: OptionalIdEntry,
-	connected: v.optional(
-		v.pipe(
-			v.union([v.string(), v.number(), v.boolean()]),
-			v.transform((raw): unknown => {
-				if (typeof raw === 'boolean') {
-					return raw
-				}
-				if (typeof raw === 'number') {
-					return raw !== 0
-				}
-				const s = raw.trim().toLowerCase()
-				if (s === 'true' || s === '1' || s === 'yes' || s === 'y') {
-					return true
-				}
-				if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
-					return false
-				}
-				return raw
-			}),
-			v.boolean('Must be a boolean (true/false)'),
-		),
-		undefined,
-	),
+	connected: v.optional(looseBoolean(false), undefined),
 })
 
 export type DeviceListQuery = v.InferOutput<typeof DeviceListQuerySchema>
@@ -761,17 +769,7 @@ export interface CableTraceResponse {
  * follow. Capped at 10 so a dense mesh cannot explode the response.
  */
 export const TraceQuerySchema = v.object({
-	depth: v.optional(
-		v.pipe(
-			v.union([v.string(), v.number()]),
-			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-			v.number(),
-			v.integer(),
-			v.minValue(1),
-			v.maxValue(10),
-		),
-		4,
-	),
+	depth: coercedInt(1, 10, 4),
 })
 
 export type TraceQuery = v.InferOutput<typeof TraceQuerySchema>
@@ -939,26 +937,7 @@ export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
  * with an empty cell defaulting to true (full depth). Unknown text falls
  * through so the trailing `v.boolean()` fails validation loudly.
  */
-const LooseBooleanSchema = v.pipe(
-	v.union([v.string(), v.number(), v.boolean()]),
-	v.transform((raw): unknown => {
-		if (typeof raw === 'boolean') {
-			return raw
-		}
-		if (typeof raw === 'number') {
-			return raw !== 0
-		}
-		const s = raw.trim().toLowerCase()
-		if (s === '' || s === 'true' || s === '1' || s === 'yes' || s === 'y') {
-			return true
-		}
-		if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
-			return false
-		}
-		return raw
-	}),
-	v.boolean('Must be a boolean (true/false)'),
-)
+const LooseBooleanSchema = looseBoolean(true)
 
 /**
  * One device-type CSV row. `manufacturer_slug` resolves to an id

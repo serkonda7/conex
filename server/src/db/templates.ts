@@ -13,24 +13,12 @@ import { device_type_interfaces, device_types, devices, manufacturers } from '..
 import { expandStubs } from '../services/templates'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
-import type { ListParams, Page } from './tenancy'
+import type { ListParams, Page } from './list'
+import { errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
 
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
 export type StubRow = typeof device_type_interfaces.$inferSelect
-
-function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
-	return { items, total, page: params.page, limit: params.limit }
-}
-
-function offsetOf(params: ListParams): number {
-	return (params.page - 1) * params.limit
-}
-
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
-}
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -128,7 +116,7 @@ export function updateManufacturer(
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			db.update(manufacturers).set(patch).where(eq(manufacturers.id, id)).run()
 		} catch (err) {
@@ -156,7 +144,11 @@ export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
 			new ConflictError('Manufacturer still has device types; move or delete them first'),
 		)
 	}
-	getDb().delete(manufacturers).where(eq(manufacturers.id, id)).run()
+	try {
+		getDb().delete(manufacturers).where(eq(manufacturers.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -299,7 +291,7 @@ export function updateDeviceType(
 	if (input.comments !== undefined) {
 		patch.comments = input.comments
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			db.update(device_types).set(patch).where(eq(device_types.id, id)).run()
 		} catch (err) {
@@ -323,9 +315,16 @@ export function deleteDeviceType(id: number): Result<DeviceTypeRow, Error> {
 			new ConflictError('Device type still has devices; move or delete them first'),
 		)
 	}
-	const db = getDb()
-	db.delete(device_type_interfaces).where(eq(device_type_interfaces.device_type_id, id)).run()
-	db.delete(device_types).where(eq(device_types.id, id)).run()
+	try {
+		getDb().transaction((tx) => {
+			tx.delete(device_type_interfaces)
+				.where(eq(device_type_interfaces.device_type_id, id))
+				.run()
+			tx.delete(device_types).where(eq(device_types.id, id)).run()
+		})
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -474,7 +473,7 @@ export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb()
 				.update(device_type_interfaces)
@@ -500,6 +499,10 @@ export function deleteStub(id: number): Result<StubRow, Error> {
 	if (Result.isError(current)) {
 		return current
 	}
-	getDb().delete(device_type_interfaces).where(eq(device_type_interfaces.id, id)).run()
+	try {
+		getDb().delete(device_type_interfaces).where(eq(device_type_interfaces.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }

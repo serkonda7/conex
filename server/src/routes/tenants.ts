@@ -7,12 +7,14 @@ import {
 	TenantListQuerySchema,
 	TenantUpdateSchema,
 } from 'shared/src/schemas'
-import { checkRead, requestUser, requireWrite, scopeTenantId } from '../authz'
+import { checkRead, requestUser, scopeTenantId } from '../authz'
 import { ForbiddenError } from '../db/errors'
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
+import { requireWriteMiddleware } from '../middleware/roles'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
+import { sendCreated, sendRow } from './helpers'
 
 /**
  * Tenants are the scope boundary itself: scoped editors/viewers see exactly
@@ -36,23 +38,20 @@ export const tenantsApp = new Hono()
 			}),
 		)
 	})
-	.post('/', vValidator('json', TenantCreateSchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		if (scopeTenantId(requestUser(c)) !== null) {
-			return sendResult(
-				c,
-				Result.err(new ForbiddenError('Tenant-scoped users cannot create tenants')),
-			)
-		}
-		const result = createTenant(c.req.valid('json'))
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+	.post(
+		'/',
+		requireWriteMiddleware,
+		vValidator('json', TenantCreateSchema, onValidationError),
+		(c) => {
+			if (scopeTenantId(requestUser(c)) !== null) {
+				return sendResult(
+					c,
+					Result.err(new ForbiddenError('Tenant-scoped users cannot create tenants')),
+				)
+			}
+			return sendCreated(c, createTenant(c.req.valid('json')))
+		},
+	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = getTenant(c.req.valid('param').id)
 		if (Result.isError(result)) {
@@ -67,40 +66,30 @@ export const tenantsApp = new Hono()
 	})
 	.patch(
 		'/:id',
+		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', TenantUpdateSchema, onValidationError),
 		(c) => {
-			const denied = requireWrite(c)
-			if (denied) {
-				return denied
-			}
 			if (scopeTenantId(requestUser(c)) !== null) {
 				return sendResult(
 					c,
 					Result.err(new ForbiddenError('Tenant-scoped users cannot rename tenants')),
 				)
 			}
-			const result = updateTenant(c.req.valid('param').id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, updateTenant(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		if (scopeTenantId(requestUser(c)) !== null) {
-			return sendResult(
-				c,
-				Result.err(new ForbiddenError('Tenant-scoped users cannot delete tenants')),
-			)
-		}
-		const result = deleteTenant(c.req.valid('param').id)
-		if (Result.isOk(result)) {
-			return c.json(result.value)
-		}
-		return sendResult(c, result)
-	})
+	.delete(
+		'/:id',
+		requireWriteMiddleware,
+		vValidator('param', EntityParamsSchema, onValidationError),
+		(c) => {
+			if (scopeTenantId(requestUser(c)) !== null) {
+				return sendResult(
+					c,
+					Result.err(new ForbiddenError('Tenant-scoped users cannot delete tenants')),
+				)
+			}
+			return sendRow(c, deleteTenant(c.req.valid('param').id))
+		},
+	)

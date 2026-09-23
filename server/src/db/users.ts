@@ -1,11 +1,21 @@
 import { Result } from 'better-result'
 import { and, asc, count, eq, gt, type SQL, sql } from 'drizzle-orm'
 import type { Role, UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
-import { auth_states, tenants, users } from '../schema'
+import { auth_states, users } from '../schema'
 import type { User } from '../types'
 import { normalize_username } from '../util/username'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import {
+	checkTenantExists,
+	errOf,
+	isPatchEmpty,
+	type ListParams,
+	offsetOf,
+	type Page,
+	pageOf,
+	searchPattern,
+} from './list'
 
 export function getUserByUsername(username: string): User | null {
 	const normalized = normalize_username(username)
@@ -66,29 +76,16 @@ export function hasAnyUser(): boolean {
 // User management (admin-only via `routes/users.ts`)
 // ---------------------------------------------------------------------------
 
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
-}
-
 export function toUserJson(row: User): UserJson {
 	return { id: row.id, username: row.username, role: row.role, tenant_id: row.tenant_id }
 }
 
-export interface UserListParams {
-	search: string
-	page: number
-	limit: number
+export interface UserListParams extends ListParams {
 	role?: Role
 	tenant?: number
 }
 
-export interface UserPage {
-	items: UserJson[]
-	total: number
-	page: number
-	limit: number
-}
+export type UserPage = Page<UserJson>
 
 export function listUsers(params: UserListParams): UserPage {
 	const db = getDb()
@@ -110,15 +107,10 @@ export function listUsers(params: UserListParams): UserPage {
 		.where(where)
 		.orderBy(asc(users.username))
 		.limit(params.limit)
-		.offset((params.page - 1) * params.limit)
+		.offset(offsetOf(params))
 		.all() as User[]
 	const totalRow = db.select({ n: count() }).from(users).where(where).get()
-	return {
-		items: rows.map(toUserJson),
-		total: totalRow?.n ?? 0,
-		page: params.page,
-		limit: params.limit,
-	}
+	return pageOf(rows.map(toUserJson), totalRow?.n ?? 0, params)
 }
 
 export function getUserResult(id: number): Result<UserJson, Error> {
@@ -127,14 +119,6 @@ export function getUserResult(id: number): Result<UserJson, Error> {
 		return Result.err(new NotFoundError('User not found'))
 	}
 	return Result.ok(toUserJson(row))
-}
-
-function checkTenantRef(tenantId: number | null | undefined): Error | null {
-	if (tenantId === null || tenantId === undefined) {
-		return null
-	}
-	const tenant = getDb().select().from(tenants).where(eq(tenants.id, tenantId)).get()
-	return tenant ? null : new NotFoundError('Tenant not found')
 }
 
 /** Number of admin accounts, optionally excluding one user id. */
@@ -156,9 +140,9 @@ export async function createUser(input: UserCreate): Promise<Result<UserJson, Er
 	if (getUserByUsername(username)) {
 		return Result.err(new DuplicateError('Username is already in use'))
 	}
-	const tenantErr = checkTenantRef(input.tenant_id)
-	if (tenantErr) {
-		return Result.err(tenantErr)
+	const tenantCheck = checkTenantExists(input.tenant_id)
+	if (Result.isError(tenantCheck)) {
+		return Result.err(tenantCheck.error)
 	}
 	const role = input.role ?? 'viewer'
 	if (role === 'admin' && input.tenant_id != null) {
@@ -184,9 +168,9 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 		return Result.err(new NotFoundError('User not found'))
 	}
 	if (input.tenant_id !== undefined) {
-		const tenantErr = checkTenantRef(input.tenant_id)
-		if (tenantErr) {
-			return Result.err(tenantErr)
+		const tenantCheck = checkTenantExists(input.tenant_id)
+		if (Result.isError(tenantCheck)) {
+			return Result.err(tenantCheck.error)
 		}
 	}
 	const effectiveRole = input.role ?? current.role
@@ -213,7 +197,7 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb().update(users).set(patch).where(eq(users.id, id)).run()
 		} catch (err) {
@@ -238,7 +222,11 @@ export function deleteUser(id: number, actorId: number): Result<UserJson, Error>
 	if (current.role === 'admin' && countAdmins(id) === 0) {
 		return Result.err(new ConflictError('Cannot delete the last admin account'))
 	}
-	getDb().delete(users).where(eq(users.id, id)).run()
+	try {
+		getDb().delete(users).where(eq(users.id, id)).run()
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(toUserJson(current))
 }
 

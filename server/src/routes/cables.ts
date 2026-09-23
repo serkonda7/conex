@@ -17,16 +17,16 @@ import {
 	deviceTenant,
 	interfaceTenant,
 	requestUser,
-	requireWrite,
 	scopeTenantId,
 } from '../authz'
 import { connectCable, deleteCable, getCable, listCables, updateCable } from '../db/cables'
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
-import { ForbiddenError } from '../db/errors'
 import { getCableTrace } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
+import { requireWriteMiddleware } from '../middleware/roles'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
+import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
 
 /**
  * Cables carry no tenant of their own: every gate follows both endpoint
@@ -69,48 +69,36 @@ export const cablesApp = new Hono()
 			}),
 		)
 	})
-	.post('/', vValidator('json', CableCreateSchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		const body = c.req.valid('json')
-		const tenantA = interfaceTenant(body.a_interface_id)
-		const tenantB = interfaceTenant(body.b_interface_id)
-		if (tenantA !== undefined && tenantB !== undefined) {
-			if (!canWriteCable(requestUser(c), [tenantA, tenantB])) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Cable endpoints are outside your tenant scope')),
-				)
+	.post(
+		'/',
+		requireWriteMiddleware,
+		vValidator('json', CableCreateSchema, onValidationError),
+		(c) => {
+			const body = c.req.valid('json')
+			const tenantA = interfaceTenant(body.a_interface_id)
+			const tenantB = interfaceTenant(body.b_interface_id)
+			if (tenantA !== undefined && tenantB !== undefined) {
+				if (!canWriteCable(requestUser(c), [tenantA, tenantB])) {
+					return sendResult(c, cableScopeDenied())
+				}
 			}
-		}
-		const result = connectCable(body)
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+			return sendCreated(c, connectCable(body))
+		},
+	)
 	// CSV transfer (registered before `/:id` so the literal paths win).
 	.get('/export', (c) => {
 		const scope = scopeTenantId(requestUser(c))
-		return c.text(exportCablesCsv(scope ?? undefined), 200, {
-			'Content-Type': 'text/csv; charset=utf-8',
-			'Content-Disposition': 'attachment; filename="cables.csv"',
-		})
+		return sendCsv(c, exportCablesCsv(scope ?? undefined), 'cables.csv')
 	})
-	.post('/import', vValidator('json', CsvImportBodySchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		const scope = scopeTenantId(requestUser(c))
-		const result = importCablesCsv(c.req.valid('json').csv, scope ?? undefined)
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+	.post(
+		'/import',
+		requireWriteMiddleware,
+		vValidator('json', CsvImportBodySchema, onValidationError),
+		(c) => {
+			const scope = scopeTenantId(requestUser(c))
+			return sendCreated(c, importCablesCsv(c.req.valid('json').csv, scope ?? undefined))
+		},
+	)
 	.get(
 		'/:id/trace',
 		vValidator('param', EntityParamsSchema, onValidationError),
@@ -123,10 +111,7 @@ export const cablesApp = new Hono()
 				return sendResult(c, result)
 			}
 			if (!canReadCable(requestUser(c), cableTenants(result.value))) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Cable endpoints are outside your tenant scope')),
-				)
+				return sendResult(c, cableScopeDenied())
 			}
 			const scope = scopeTenantId(requestUser(c))
 			return sendResult(c, getCableTrace(id, depth, scope ?? undefined))
@@ -138,59 +123,40 @@ export const cablesApp = new Hono()
 			return sendResult(c, result)
 		}
 		if (!canReadCable(requestUser(c), cableTenants(result.value))) {
-			return sendResult(
-				c,
-				Result.err(new ForbiddenError('Cable endpoints are outside your tenant scope')),
-			)
+			return sendResult(c, cableScopeDenied())
 		}
 		return c.json(result.value)
 	})
 	.patch(
 		'/:id',
+		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', CableUpdateSchema, onValidationError),
 		(c) => {
-			const denied = requireWrite(c)
-			if (denied) {
-				return denied
-			}
 			const id = c.req.valid('param').id
 			const current = getCable(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
 			if (!canWriteCable(requestUser(c), cableTenants(current.value))) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Cable endpoints are outside your tenant scope')),
-				)
+				return sendResult(c, cableScopeDenied())
 			}
-			const result = updateCable(id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, updateCable(id, c.req.valid('json')))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		const id = c.req.valid('param').id
-		const current = getCable(id)
-		if (Result.isError(current)) {
-			return sendResult(c, current)
-		}
-		if (!canWriteCable(requestUser(c), cableTenants(current.value))) {
-			return sendResult(
-				c,
-				Result.err(new ForbiddenError('Cable endpoints are outside your tenant scope')),
-			)
-		}
-		const result = deleteCable(id)
-		if (Result.isOk(result)) {
-			return c.json(result.value)
-		}
-		return sendResult(c, result)
-	})
+	.delete(
+		'/:id',
+		requireWriteMiddleware,
+		vValidator('param', EntityParamsSchema, onValidationError),
+		(c) => {
+			const id = c.req.valid('param').id
+			const current = getCable(id)
+			if (Result.isError(current)) {
+				return sendResult(c, current)
+			}
+			if (!canWriteCable(requestUser(c), cableTenants(current.value))) {
+				return sendResult(c, cableScopeDenied())
+			}
+			return sendRow(c, deleteCable(id))
+		},
+	)

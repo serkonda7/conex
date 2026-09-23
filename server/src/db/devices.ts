@@ -16,15 +16,15 @@ import {
 	rack_shelves,
 	racks,
 	sites,
-	tenants,
 } from '../schema'
 import { checkBounds, checkOverlap } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
 import { deviceHasCables } from './cables'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import type { ListParams, Page } from './list'
+import { checkTenantExists, errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
 import { deviceSpansOf, rackHeightOf } from './racks'
-import type { ListParams, Page } from './tenancy'
 
 export type DeviceRow = typeof devices.$inferSelect
 export type InterfaceRow = typeof interfaces.$inferSelect
@@ -36,19 +36,6 @@ export interface InterfaceJson extends Omit<InterfaceRow, 'connected'> {
 
 function toInterfaceJson(row: InterfaceRow): InterfaceJson {
 	return { ...row, connected: row.connected !== 0 }
-}
-
-function pageOf<T>(items: T[], total: number, params: ListParams): Page<T> {
-	return { items, total, page: params.page, limit: params.limit }
-}
-
-function offsetOf(params: ListParams): number {
-	return (params.page - 1) * params.limit
-}
-
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 
 // ---------------------------------------------------------------------------
@@ -158,16 +145,6 @@ function checkSite(siteId: number | null | undefined): Result<undefined, Error> 
 	}
 	if (!getDb().select().from(sites).where(eq(sites.id, siteId)).get()) {
 		return Result.err(new NotFoundError('Site not found'))
-	}
-	return Result.ok(undefined)
-}
-
-function checkTenant(tenantId: number | null | undefined): Result<undefined, Error> {
-	if (tenantId === null || tenantId === undefined) {
-		return Result.ok(undefined)
-	}
-	if (!getDb().select().from(tenants).where(eq(tenants.id, tenantId)).get()) {
-		return Result.err(new NotFoundError('Tenant not found'))
 	}
 	return Result.ok(undefined)
 }
@@ -317,7 +294,7 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	for (const guard of [
 		checkSite(input.site_id),
 		checkLocation(deviceLocationId, input.site_id),
-		checkTenant(input.tenant_id),
+		checkTenantExists(input.tenant_id),
 		checkAssetTag(input.asset_tag),
 		checkMount(input.name, createMount, template.u_height),
 	]) {
@@ -425,7 +402,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 			deviceLocationId,
 			input.site_id !== undefined ? input.site_id : effectiveSite,
 		),
-		checkTenant(input.tenant_id),
+		checkTenantExists(input.tenant_id),
 		checkAssetTag(input.asset_tag, id),
 	]) {
 		if (Result.isError(guard)) {
@@ -487,7 +464,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb().update(devices).set(patch).where(eq(devices.id, id)).run()
 		} catch (err) {
@@ -557,10 +534,14 @@ export function deleteDevice(id: number): Result<DeviceRow, Error> {
 			new ConflictError('Device still has connected cables; disconnect them first'),
 		)
 	}
-	getDb().transaction((tx) => {
-		tx.delete(interfaces).where(eq(interfaces.device_id, id)).run()
-		tx.delete(devices).where(eq(devices.id, id)).run()
-	})
+	try {
+		getDb().transaction((tx) => {
+			tx.delete(interfaces).where(eq(interfaces.device_id, id)).run()
+			tx.delete(devices).where(eq(devices.id, id)).run()
+		})
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
 	return Result.ok(current.value)
 }
 
@@ -730,7 +711,7 @@ export function updateInterface(
 	if (input.description !== undefined) {
 		patch.description = input.description
 	}
-	if (Object.keys(patch).length > 0) {
+	if (!isPatchEmpty(patch)) {
 		try {
 			getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId)).run()
 		} catch (err) {

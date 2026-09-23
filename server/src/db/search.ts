@@ -1,5 +1,6 @@
 import { asc, sql } from 'drizzle-orm'
 import { getDb } from './connection'
+import { searchPattern } from './list'
 
 export interface SearchGroup<T> {
 	items: T[]
@@ -16,11 +17,6 @@ export interface GlobalSearchResponse {
 }
 
 const GROUP_LIMIT = 10
-
-/** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-function searchPattern(raw: string): string {
-	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
-}
 
 /**
  * Cross-entity substring search over name/slug/asset_tag/label columns.

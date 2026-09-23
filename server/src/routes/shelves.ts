@@ -12,14 +12,15 @@ import {
 	checkWrite,
 	rackTenant,
 	requestUser,
-	requireWrite,
 	scopeTenantId,
 	shelfTenant,
 } from '../authz'
 import { createShelf, deleteShelf, getShelf, listShelves, updateShelf } from '../db/racks'
 import { authMiddleware } from '../middleware/auth'
+import { requireWriteMiddleware } from '../middleware/roles'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
+import { sendCreated, sendRow } from './helpers'
 
 /**
  * Shelves carry no tenant of their own: every gate follows the parent rack's
@@ -50,25 +51,22 @@ export const shelvesApp = new Hono()
 			}),
 		)
 	})
-	.post('/', vValidator('json', ShelfCreateSchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		const body = c.req.valid('json')
-		const tenant = rackTenant(body.rack_id)
-		if (tenant !== undefined) {
-			const scopeDenied = checkWrite(c, tenant)
-			if (scopeDenied) {
-				return scopeDenied
+	.post(
+		'/',
+		requireWriteMiddleware,
+		vValidator('json', ShelfCreateSchema, onValidationError),
+		(c) => {
+			const body = c.req.valid('json')
+			const tenant = rackTenant(body.rack_id)
+			if (tenant !== undefined) {
+				const scopeDenied = checkWrite(c, tenant)
+				if (scopeDenied) {
+					return scopeDenied
+				}
 			}
-		}
-		const result = createShelf(body)
-		if (Result.isOk(result)) {
-			return c.json(result.value, 201)
-		}
-		return sendResult(c, result)
-	})
+			return sendCreated(c, createShelf(body))
+		},
+	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
 		const result = getShelf(c.req.valid('param').id)
 		if (Result.isError(result)) {
@@ -85,13 +83,10 @@ export const shelvesApp = new Hono()
 	})
 	.patch(
 		'/:id',
+		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ShelfUpdateSchema, onValidationError),
 		(c) => {
-			const denied = requireWrite(c)
-			if (denied) {
-				return denied
-			}
 			const id = c.req.valid('param').id
 			const current = getShelf(id)
 			if (Result.isError(current)) {
@@ -104,33 +99,26 @@ export const shelvesApp = new Hono()
 					return scopeDenied
 				}
 			}
-			const result = updateShelf(id, c.req.valid('json'))
-			if (Result.isOk(result)) {
-				return c.json(result.value)
-			}
-			return sendResult(c, result)
+			return sendRow(c, updateShelf(id, c.req.valid('json')))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const denied = requireWrite(c)
-		if (denied) {
-			return denied
-		}
-		const id = c.req.valid('param').id
-		const current = getShelf(id)
-		if (Result.isError(current)) {
-			return sendResult(c, current)
-		}
-		const tenant = shelfTenant(id)
-		if (tenant !== undefined) {
-			const scopeDenied = checkWrite(c, tenant)
-			if (scopeDenied) {
-				return scopeDenied
+	.delete(
+		'/:id',
+		requireWriteMiddleware,
+		vValidator('param', EntityParamsSchema, onValidationError),
+		(c) => {
+			const id = c.req.valid('param').id
+			const current = getShelf(id)
+			if (Result.isError(current)) {
+				return sendResult(c, current)
 			}
-		}
-		const result = deleteShelf(id)
-		if (Result.isOk(result)) {
-			return c.json(result.value)
-		}
-		return sendResult(c, result)
-	})
+			const tenant = shelfTenant(id)
+			if (tenant !== undefined) {
+				const scopeDenied = checkWrite(c, tenant)
+				if (scopeDenied) {
+					return scopeDenied
+				}
+			}
+			return sendRow(c, deleteShelf(id))
+		},
+	)

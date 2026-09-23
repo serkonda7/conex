@@ -23,7 +23,7 @@ export function getDb(): DbHandle {
 	return dbInstance
 }
 
-/** Returns the underlying Bun SQLite handle (used for transactions on one connection). */
+/** Raw Bun SQLite handle for scripts/tests needing `.exec`/`.query` (server code uses `getDb`). */
 export function getSqliteHandle(): Database {
 	if (!sqliteInstance) {
 		throw new Error('Database has not been initialized. Call initDb() during startup.')

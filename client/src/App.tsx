@@ -864,7 +864,7 @@ function App(): JSX.Element {
 						<main class="app-content app-content--centered">
 							<div class="app-auth">
 								<div class="app-header">
-								<h1>{APP_TITLE}</h1>
+									<h1>{APP_TITLE}</h1>
 								</div>
 								<SetupForm
 									username={setupUsername}
@@ -883,7 +883,7 @@ function App(): JSX.Element {
 						<main class="app-content app-content--centered">
 							<div class="app-auth">
 								<div class="app-header">
-								<h1>{APP_TITLE}</h1>
+									<h1>{APP_TITLE}</h1>
 								</div>
 								<LoginForm
 									username={username}

@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import {
 	CableImportRowSchema,
 	DeviceImportRowSchema,
@@ -8,10 +8,10 @@ import {
 	type ImportRowResult,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { device_types, devices, interfaces, manufacturers, racks, sites } from '../schema'
+import { cables, device_types, devices, interfaces, manufacturers, racks, sites } from '../schema'
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
-import { connectCable, listCables } from './cables'
+import { connectCable } from './cables'
 import { getDb } from './connection'
 import { createDevice } from './devices'
 import { createDeviceType, createStub } from './templates'
@@ -45,10 +45,6 @@ export const DEVICE_TYPE_CSV_HEADER = [
 	'width',
 	'description',
 ]
-
-function manufacturerId(slug: string): number | undefined {
-	return getDb().select().from(manufacturers).where(eq(manufacturers.slug, slug)).get()?.id
-}
 
 /** Device-type export: one row per type, manufacturer as slug for re-import. */
 export function exportDeviceTypesCsv(): string {
@@ -92,6 +88,13 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
 	}
+	const mfrBySlug = new Map(
+		getDb()
+			.select()
+			.from(manufacturers)
+			.all()
+			.map((r) => [r.slug, r.id]),
+	)
 	const rows: ImportRowResult[] = []
 	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
 		const rowNumber = index + 2
@@ -104,7 +107,7 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 			continue
 		}
 		const input = validated.output
-		const mfrId = manufacturerId(input.manufacturer_slug)
+		const mfrId = mfrBySlug.get(input.manufacturer_slug)
 		if (!mfrId) {
 			fail(`Unknown manufacturer_slug "${input.manufacturer_slug}"`)
 			continue
@@ -314,79 +317,56 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 /** Cables export: endpoint device/interface names plus label/kind/status. */
 export function exportCablesCsv(scopeTenantId?: number): string {
 	const db = getDb()
-	const page = listCables({ search: '', page: 1, limit: 200, scopeTenantId })
-	const dataRows: (string | null)[][] = []
-	for (const cable of page.items) {
-		const aIface = db
-			.select()
-			.from(interfaces)
-			.where(eq(interfaces.id, cable.a_interface_id))
-			.get()
-		const bIface = db
-			.select()
-			.from(interfaces)
-			.where(eq(interfaces.id, cable.b_interface_id))
-			.get()
-		const aDev = aIface
-			? db.select().from(devices).where(eq(devices.id, aIface.device_id)).get()
-			: undefined
-		const bDev = bIface
-			? db.select().from(devices).where(eq(devices.id, bIface.device_id)).get()
-			: undefined
-		dataRows.push([
-			aDev?.name ?? '',
-			aIface?.name ?? '',
-			bDev?.name ?? '',
-			bIface?.name ?? '',
-			cable.label,
-			cable.kind,
-			cable.status,
-		])
-	}
-	return toCsv(CABLE_CSV_HEADER, dataRows)
-}
-
-function deviceTypeId(model: string): number | undefined {
-	return getDb().select().from(device_types).where(eq(device_types.model, model)).get()?.id
-}
-
-function siteId(slug: string): number | undefined {
-	return getDb().select().from(sites).where(eq(sites.slug, slug)).get()?.id
-}
-
-function rackId(slug: string): number | undefined {
-	return getDb().select().from(racks).where(eq(racks.name, slug)).get()?.id
-}
-
-function deviceByName(name: string): number | undefined {
-	return getDb().select().from(devices).where(eq(devices.name, name)).get()?.id
-}
-
-/** Tenant of a site/rack row; `undefined` when the row is missing. */
-function siteTenant(id: number): number | null | undefined {
-	return getDb().select().from(sites).where(eq(sites.id, id)).get()?.tenant_id
-}
-
-function rackTenant(id: number): number | null | undefined {
-	return getDb().select().from(racks).where(eq(racks.id, id)).get()?.tenant_id
-}
-
-/** Scope readability (strict): exactly the scope tenant, no shared rows. */
-function scopeReadable(tenant: number | null | undefined, scope: number): boolean {
-	return tenant !== undefined && tenant !== null && tenant === scope
-}
-
-/** Tenant of a device row; `undefined` when the row is missing. */
-function deviceTenant(id: number): number | null | undefined {
-	return getDb().select().from(devices).where(eq(devices.id, id)).get()?.tenant_id
-}
-
-function ifaceId(deviceId: number, name: string): number | undefined {
-	return getDb()
+	// All cables (no 200-row cap); scope filter is an EXISTS on both ends so
+	// no peer name from another tenant leaks. Batched iface/device loads keep
+	// this O(1) queries instead of O(cables).
+	const items = db
 		.select()
-		.from(interfaces)
-		.where(and(eq(interfaces.device_id, deviceId), eq(interfaces.name, name)))
-		.get()?.id
+		.from(cables)
+		.where(
+			scopeTenantId === undefined
+				? undefined
+				: and(
+						sql`EXISTS (SELECT 1 FROM interfaces AS scope_ia JOIN devices AS scope_da ON scope_da.id = scope_ia.device_id WHERE scope_ia.id = ${cables.a_interface_id} AND scope_da.tenant_id = ${scopeTenantId})`,
+						sql`EXISTS (SELECT 1 FROM interfaces AS scope_ib JOIN devices AS scope_db ON scope_db.id = scope_ib.device_id WHERE scope_ib.id = ${cables.b_interface_id} AND scope_db.tenant_id = ${scopeTenantId})`,
+					),
+		)
+		.orderBy(cables.id)
+		.all()
+	const ifaceIds = [...new Set(items.flatMap((c) => [c.a_interface_id, c.b_interface_id]))]
+	const ifacesById = new Map<number, typeof interfaces.$inferSelect>()
+	if (ifaceIds.length > 0) {
+		for (const row of db
+			.select()
+			.from(interfaces)
+			.where(inArray(interfaces.id, ifaceIds))
+			.all()) {
+			ifacesById.set(row.id, row)
+		}
+	}
+	const deviceIds = [...new Set([...ifacesById.values()].map((r) => r.device_id))]
+	const devicesById = new Map<number, typeof devices.$inferSelect>()
+	if (deviceIds.length > 0) {
+		for (const row of db.select().from(devices).where(inArray(devices.id, deviceIds)).all()) {
+			devicesById.set(row.id, row)
+		}
+	}
+	return toCsv(
+		CABLE_CSV_HEADER,
+		items.map((cable) => {
+			const aIface = ifacesById.get(cable.a_interface_id)
+			const bIface = ifacesById.get(cable.b_interface_id)
+			return [
+				aIface ? (devicesById.get(aIface.device_id)?.name ?? '') : '',
+				aIface?.name ?? '',
+				bIface ? (devicesById.get(bIface.device_id)?.name ?? '') : '',
+				bIface?.name ?? '',
+				cable.label,
+				cable.kind,
+				cable.status,
+			]
+		}),
+	)
 }
 
 function importResult(rows: ImportRowResult[]): ImportResponse {
@@ -395,6 +375,11 @@ function importResult(rows: ImportRowResult[]): ImportResponse {
 		failed: rows.filter((r) => !r.ok).length,
 		rows,
 	}
+}
+
+/** Strict scope check: exactly the scope tenant, no shared rows. */
+function inScope(tenant: number | null | undefined, scope: number): boolean {
+	return tenant !== undefined && tenant !== null && tenant === scope
 }
 
 /**
@@ -414,6 +399,28 @@ export function importDevicesCsv(
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
 	}
+	const db = getDb()
+	const typeByModel = new Map(
+		db
+			.select()
+			.from(device_types)
+			.all()
+			.map((r) => [r.model, r.id]),
+	)
+	const siteBySlug = new Map(
+		db
+			.select()
+			.from(sites)
+			.all()
+			.map((r) => [r.slug, { id: r.id, tenant_id: r.tenant_id }]),
+	)
+	const rackByName = new Map(
+		db
+			.select()
+			.from(racks)
+			.all()
+			.map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
+	)
 	const rows: ImportRowResult[] = []
 	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
 		const rowNumber = index + 2
@@ -426,37 +433,33 @@ export function importDevicesCsv(
 			continue
 		}
 		const input = validated.output
-		const typeId = deviceTypeId(input.device_type_model)
+		const typeId = typeByModel.get(input.device_type_model)
 		if (!typeId) {
 			fail(`Unknown device_type_model "${input.device_type_model}"`)
 			continue
 		}
 		let foundSiteId: number | undefined
 		if (input.site_slug) {
-			foundSiteId = siteId(input.site_slug)
-			if (!foundSiteId) {
+			const site = siteBySlug.get(input.site_slug)
+			if (!site) {
 				fail(`Unknown site_slug "${input.site_slug}"`)
 				continue
 			}
-			if (
-				scopeTenantId !== undefined &&
-				!scopeReadable(siteTenant(foundSiteId), scopeTenantId)
-			) {
+			foundSiteId = site.id
+			if (scopeTenantId !== undefined && !inScope(site.tenant_id, scopeTenantId)) {
 				fail(`Site "${input.site_slug}" is outside your tenant scope`)
 				continue
 			}
 		}
 		let foundRackId: number | undefined
 		if (input.rack_name) {
-			foundRackId = rackId(input.rack_name)
-			if (!foundRackId) {
+			const rack = rackByName.get(input.rack_name)
+			if (!rack) {
 				fail(`Unknown rack_name "${input.rack_name}"`)
 				continue
 			}
-			if (
-				scopeTenantId !== undefined &&
-				!scopeReadable(rackTenant(foundRackId), scopeTenantId)
-			) {
+			foundRackId = rack.id
+			if (scopeTenantId !== undefined && !inScope(rack.tenant_id, scopeTenantId)) {
 				fail(`Rack "${input.rack_name}" is outside your tenant scope`)
 				continue
 			}
@@ -497,6 +500,21 @@ export function importCablesCsv(
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
 	}
+	const db = getDb()
+	const deviceByName = new Map(
+		db
+			.select()
+			.from(devices)
+			.all()
+			.map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
+	)
+	const ifaceByKey = new Map(
+		db
+			.select()
+			.from(interfaces)
+			.all()
+			.map((r) => [`${r.device_id}:${r.name}`, r.id]),
+	)
 	const rows: ImportRowResult[] = []
 	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
 		const rowNumber = index + 2
@@ -509,30 +527,31 @@ export function importCablesCsv(
 			continue
 		}
 		const input = validated.output
-		const aDevId = deviceByName(input.a_device)
-		if (!aDevId) {
+		const aDev = deviceByName.get(input.a_device)
+		if (!aDev) {
 			fail(`Unknown a_device "${input.a_device}"`)
 			continue
 		}
-		const bDevId = deviceByName(input.b_device)
-		if (!bDevId) {
+		const bDev = deviceByName.get(input.b_device)
+		if (!bDev) {
 			fail(`Unknown b_device "${input.b_device}"`)
 			continue
 		}
-		const aIfaceId = ifaceId(aDevId, input.a_interface)
+		const aIfaceId = ifaceByKey.get(`${aDev.id}:${input.a_interface}`)
 		if (!aIfaceId) {
 			fail(`Device "${input.a_device}" has no interface "${input.a_interface}"`)
 			continue
 		}
-		const bIfaceId = ifaceId(bDevId, input.b_interface)
+		const bIfaceId = ifaceByKey.get(`${bDev.id}:${input.b_interface}`)
 		if (!bIfaceId) {
 			fail(`Device "${input.b_device}" has no interface "${input.b_interface}"`)
 			continue
 		}
 		if (scopeTenantId !== undefined) {
-			const tenantA = deviceTenant(aDevId)
-			const tenantB = deviceTenant(bDevId)
-			if (!scopeReadable(tenantA, scopeTenantId) || !scopeReadable(tenantB, scopeTenantId)) {
+			if (
+				!inScope(aDev.tenant_id, scopeTenantId) ||
+				!inScope(bDev.tenant_id, scopeTenantId)
+			) {
 				fail('Cable endpoints are outside your tenant scope')
 				continue
 			}
