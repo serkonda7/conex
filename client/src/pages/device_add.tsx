@@ -114,7 +114,7 @@ export function DeviceAddPage(): JSX.Element {
 					return 'Select a device type first.'
 				}
 				if (position !== null && (!Number.isInteger(position) || position < 1)) {
-					return 'Rack position must be a positive U number or empty.'
+					return 'Rack position must be a positive integer or empty.'
 				}
 				return null
 			},
@@ -240,8 +240,8 @@ export function DeviceAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-position"
-				label="U-Position"
-				placeholder="U-Position (oder leer lassen)"
+				label="Position"
+				placeholder="Position (oder leer lassen)"
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}

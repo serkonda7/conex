@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { loginAsE2E } from './helpers'
+
+// Auth comes from `auth.setup.ts` storageState — no per-test login.
 
 test('selecting a site keeps the tenant selected and site present', async ({ page }) => {
-	await loginAsE2E(page)
-
 	await page.goto('/locations/add')
 	await expect(page.locator('#location-site option', { hasText: 'E2E Site' })).toHaveCount(1)
 	await page.locator('#location-name').fill('E2E Location')

@@ -129,7 +129,7 @@ export function DevicesPage(): JSX.Element {
 				<span>
 					{d.position_u !== null ? (
 						<code>
-							{rackNameOf(d.rack_id) ?? 'rack'} U{d.position_u}
+							{rackNameOf(d.rack_id) ?? 'rack'} HE{d.position_u}
 						</code>
 					) : (
 						<span>unracked</span>

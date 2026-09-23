@@ -203,12 +203,12 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		setError(null)
 		const position = Number(shelfU())
 		if (!Number.isInteger(position) || position < 1) {
-			setError('Shelf position must be a positive U number')
+			setError('Shelf position must be a positive integer')
 			return
 		}
 		const height = shelfH().trim() === '' ? 1 : Number(shelfH())
 		if (!Number.isInteger(height) || height < 1) {
-			setError('Shelf height must be a positive U number')
+			setError('Shelf height must be a positive integer in HE')
 			return
 		}
 		const res = await create_shelf({
@@ -286,7 +286,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			>
 				<div class="page-header">
 					<h2>
-						{rack()?.name} <span>{displayHeight()}U</span>
+						{rack()?.name} <span>{displayHeight()} HE</span>
 					</h2>
 					<div class="form-actions">
 						<button type="button" onClick={() => navigate(`/racks/${props.id}/edit`)}>
@@ -430,10 +430,10 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						<div
 							class="rack-util"
 							role="status"
-							aria-label={`${occupiedU()} von ${totalU()} U belegt`}
+							aria-label={`${occupiedU()} von ${totalU()} HE belegt`}
 						>
 							<span>
-								{occupiedU()}/{totalU()} U · {utilPct()} % belegt
+								{occupiedU()}/{totalU()} HE · {utilPct()} % belegt
 							</span>
 							<span class="rack-util-bar" aria-hidden="true">
 								<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
@@ -455,7 +455,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 						<Show when={selectingDevice()}>
 							<ObjectSelector
-								label={`Gerät für U${pendingU() ?? ''} auswählen (${face()})`}
+								label={`Gerät für HE${pendingU() ?? ''} auswählen (${face()})`}
 								placeholder="Geräte suchen…"
 								load={async (search: string) => {
 									const result = await fetch_devices({ search })
@@ -480,8 +480,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								}
 							/>
 							<input
-								placeholder="U-Position"
-								aria-label="U-Position des Fachbodens"
+								placeholder="Position"
+								aria-label="Position des Fachbodens"
 								inputmode="numeric"
 								value={shelfU()}
 								onInput={(e: InputEventAndTarget) =>
@@ -489,8 +489,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								}
 							/>
 							<input
-								placeholder="Höhe (U)"
-								aria-label="Höhe des Fachbodens in U"
+								placeholder="Höhe (HE)"
+								aria-label="Höhe des Fachbodens in HE"
 								inputmode="numeric"
 								value={shelfH()}
 								onInput={(e: InputEventAndTarget) =>

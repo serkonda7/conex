@@ -366,7 +366,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 						{
 							key: 'height',
 							label: 'Height',
-							getValue: (r: RackRow): string => `${r.height_u}U`,
+							getValue: (r: RackRow): string => `${r.height_u} HE`,
 						},
 					]}
 				/>

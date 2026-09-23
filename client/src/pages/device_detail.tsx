@@ -191,7 +191,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		setError(null)
 		const position = moveU().trim() === '' ? undefined : Number(moveU().trim())
 		if (position !== undefined && (!Number.isInteger(position) || position < 1)) {
-			setError('Rack position must be a positive U number or empty')
+			setError('Rack position must be a positive integer or empty')
 			return
 		}
 		const res = await move_device(props.id, {
@@ -353,7 +353,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dt>Position</dt>
 					<dd>
 						{device()?.position_u !== null ? (
-							<code>U{device()?.position_u}</code>
+							<code>HE{device()?.position_u}</code>
 						) : (
 							<span>unracked</span>
 						)}
@@ -372,7 +372,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			<h3>Move</h3>
 			<form onSubmit={handleMove}>
 				<input
-					placeholder="U position (empty clears)"
+					placeholder="Position (empty clears)"
 					inputmode="numeric"
 					value={moveU()}
 					onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}

@@ -63,7 +63,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				}
 				const height = Number(uHeight())
 				if (!Number.isInteger(height) || height < 0 || height > 60) {
-					return 'U height must be an integer from 0 to 60.'
+					return 'Height (HE) must be an integer from 0 to 60.'
 				}
 				return null
 			},

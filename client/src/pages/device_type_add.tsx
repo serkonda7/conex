@@ -49,7 +49,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 			return
 		}
 		if (!Number.isInteger(height) || height < 0 || height > 60) {
-			setError('U height must be an integer from 0 to 60.')
+			setError('Height (HE) must be an integer from 0 to 60.')
 			return
 		}
 		setSaving(true)
@@ -115,7 +115,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-type-u-height"
-				label="Höhe (U)"
+				label="Höhe (HE)"
 				type="number"
 				required
 				min={0}

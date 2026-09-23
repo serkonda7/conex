@@ -57,7 +57,7 @@ export function RackTypeAddPage(): JSX.Element {
 			return
 		}
 		if (!Number.isInteger(rackHeight) || rackHeight < 1 || rackHeight > 60) {
-			setError('Height must be an integer from 1 to 60 U.')
+			setError('Height must be an integer from 1 to 60 HE.')
 			return
 		}
 		setSaving(true)
@@ -136,7 +136,7 @@ export function RackTypeAddPage(): JSX.Element {
 			</Field>
 			<TextField
 				id="rack-type-height"
-				label="Höhe (U)"
+				label="Höhe (HE)"
 				required
 				inputmode="numeric"
 				value={height()}

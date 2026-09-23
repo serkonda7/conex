@@ -85,7 +85,7 @@ export function RackElevation(props: {
 																				type="button"
 																				class="rack-free-btn"
 																				aria-label="Select device"
-																				title={`Select device at U${unit.u} (${face} face)`}
+																				title={`Select device at HE${unit.u} (${face} face)`}
 																				onClick={() => {
 																					props.on_select_u(
 																						unit.u,
@@ -103,7 +103,7 @@ export function RackElevation(props: {
 																				type="button"
 																				class="rack-free-btn"
 																				aria-label="Add device"
-																				title={`Add device at U${unit.u} (${face} face)`}
+																				title={`Add device at HE${unit.u} (${face} face)`}
 																				onClick={() =>
 																					props.on_add_device(
 																						unit.u,
@@ -139,7 +139,7 @@ export function RackElevation(props: {
 																		`/devices/${device?.id ?? ''}`,
 																	)
 																}
-																title={`${device?.name ?? ''} (${device?.device_type_model ?? ''}, ${device?.u_height ?? 1}U)`}
+																title={`${device?.name ?? ''} (${device?.device_type_model ?? ''}, ${device?.u_height ?? 1} HE)`}
 															>
 																<span class="rack-dev-name">
 																	{device?.name}

@@ -162,7 +162,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<dd>{deviceType()?.description || '—'}</dd>
 					<dt>Kommentare</dt>
 					<dd>{deviceType()?.comments || '—'}</dd>
-					<dt>Höhe (U)</dt>
+					<dt>Höhe (HE)</dt>
 					<dd>{deviceType()?.u_height}</dd>
 					<dt>Volle Tiefe</dt>
 					<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>

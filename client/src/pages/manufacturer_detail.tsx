@@ -106,7 +106,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'u_height',
-							label: 'U height',
+							label: 'Height (HE)',
 							getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
 						},
 						{

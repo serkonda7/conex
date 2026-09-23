@@ -108,7 +108,7 @@ export function RackTypesPage(): JSX.Element {
 		},
 		{
 			key: 'u_height',
-			label: 'Höhe (U)',
+			label: 'Höhe (HE)',
 			getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
 		},
 	]

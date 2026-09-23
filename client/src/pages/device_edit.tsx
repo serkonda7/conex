@@ -116,7 +116,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			validate: () => {
 				const position = positionU().trim() === '' ? null : Number(positionU())
 				if (position !== null && (!Number.isInteger(position) || position < 1)) {
-					return 'Rack position must be a positive U number or empty.'
+					return 'Rack position must be a positive integer or empty.'
 				}
 				return null
 			},
@@ -220,8 +220,8 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextField
 				id="device-edit-position"
-				label="U-Position"
-				placeholder="U-Position (leer zum Entfernen)"
+				label="Position"
+				placeholder="Position (leer zum Entfernen)"
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}

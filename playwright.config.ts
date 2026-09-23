@@ -6,11 +6,14 @@ const dataDir: string = path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-r
 const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3000'
 const apiPort: number = Number(new URL(apiUrl).port || 3000)
 const reuse: boolean = (process.env.CONEX_E2E_REUSE_SERVERS ?? '') !== ''
+export const e2eAuthFile: string = path.resolve('./test-results/.auth/user.json')
 
 export default defineConfig({
 	testDir: './tests/e2e',
 	timeout: 60_000,
 	retries: 0,
+	fullyParallel: true,
+	workers: process.env.CI ? 4 : undefined,
 	// Visual baselines are Linux-CI canonical at 1920x1080. Regenerate with
 	// `bun run test:visual:update` and review the PNG diff before committing.
 	snapshotPathTemplate: './tests/e2e/__snapshots__/{testFileName}/{arg}-{projectName}{ext}',
@@ -52,5 +55,12 @@ export default defineConfig({
 					timeout: 60_000,
 				},
 			],
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	projects: [
+		{ name: 'setup', testMatch: /.*\.setup\.ts/ },
+		{
+			name: 'chromium',
+			use: { ...devices['Desktop Chrome'], storageState: e2eAuthFile },
+			dependencies: ['setup'],
+		},
+	],
 })
