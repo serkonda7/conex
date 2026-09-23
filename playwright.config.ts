@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
 const clientPort: number = Number(process.env.CONEX_CLIENT_PORT ?? 5372)
 const dataDir: string = path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
 const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3000'
+const apiPort: number = Number(new URL(apiUrl).port || 3000)
 const reuse: boolean = (process.env.CONEX_E2E_REUSE_SERVERS ?? '') !== ''
 
 export default defineConfig({
@@ -37,6 +38,7 @@ export default defineConfig({
 						CONEX_E2E_DATA_DIR: dataDir,
 						CONEX_CONFIG_PATH: path.join(dataDir, 'config.toml'),
 						CONEX_DB_PATH: path.join(dataDir, 'e2e.db'),
+						CONEX_SERVER_PORT: String(apiPort),
 					},
 					url: `${apiUrl}/health`,
 					reuseExistingServer: true,

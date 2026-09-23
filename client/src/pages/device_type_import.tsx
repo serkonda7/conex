@@ -1,4 +1,5 @@
 import { DataTable } from '@serkonda7/solid-components'
+import { IconExternalLink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -69,7 +70,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 					target="_blank"
 					rel="noreferrer"
 				>
-					NetBox device-type library
+					NetBox device-type library <IconExternalLink size={14} aria-hidden="true" />
 				</a>
 			</p>
 			<form class="form-stacked" onSubmit={handleImport}>

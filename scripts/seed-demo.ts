@@ -9,7 +9,6 @@ import {
 	interfaces,
 	locations,
 	manufacturers,
-	rack_shelves,
 	racks,
 	site_groups,
 	sites,
@@ -52,16 +51,7 @@ const dentist = db
 	.values({
 		name: 'Bright Smile Dental',
 		slug: 'bright-smile-dental',
-		description: 'Small dental practice managed by Northstar IT Services.',
-	})
-	.returning()
-	.get()
-const school = db
-	.insert(tenants)
-	.values({
-		name: 'Maple Grove School',
-		slug: 'maple-grove-school',
-		description: 'Small K-8 school managed by Northstar IT Services.',
+		description: 'Small dental practice.',
 	})
 	.returning()
 	.get()
@@ -69,16 +59,6 @@ const school = db
 const dentistGroup = db
 	.insert(site_groups)
 	.values({ tenant_id: dentist.id, name: 'Customer Sites', slug: 'customer-sites' })
-	.returning()
-	.get()
-const schoolGroup = db
-	.insert(site_groups)
-	.values({ tenant_id: school.id, name: 'Customer Sites', slug: 'customer-sites' })
-	.returning()
-	.get()
-const mspGroup = db
-	.insert(site_groups)
-	.values({ name: 'Northstar Properties', slug: 'northstar-properties' })
 	.returning()
 	.get()
 
@@ -91,29 +71,6 @@ const dentistSite = db
 		slug: 'bright-smile-main-office',
 		description: 'Single-location dental practice.',
 		physical_address: '14 Oak Avenue, Brookfield, NY',
-	})
-	.returning()
-	.get()
-const schoolSite = db
-	.insert(sites)
-	.values({
-		tenant_id: school.id,
-		site_group_id: schoolGroup.id,
-		name: 'Maple Grove Campus',
-		slug: 'maple-grove-campus',
-		description: 'Main school campus with administration and classrooms.',
-		physical_address: '88 Maple Street, Brookfield, NY',
-	})
-	.returning()
-	.get()
-const mspSite = db
-	.insert(sites)
-	.values({
-		site_group_id: mspGroup.id,
-		name: 'Northstar IT Services HQ',
-		slug: 'northstar-hq',
-		description: 'MSP-owned office and staging facility.',
-		physical_address: '200 Commerce Drive, Brookfield, NY',
 	})
 	.returning()
 	.get()
@@ -154,8 +111,6 @@ const dentistRoom = addLocation(dentistSite.id, 'IT Closet', 'it-closet', dentis
 const dentistBackoffice = addLocation(dentistSite.id, 'Backoffice', 'backoffice', dentist.id)
 const dentistEmpfang = addLocation(dentistSite.id, 'Empfang', 'empfang', dentist.id)
 const dentistBehandlung1 = addLocation(dentistSite.id, 'Behandlung 1', 'behandlung-1', dentist.id)
-const schoolRoom = addLocation(schoolSite.id, 'Network Closet', 'network-closet', school.id)
-const mspRoom = addLocation(mspSite.id, 'Staging Room', 'staging-room', null)
 
 const ubiquiti = db
 	.insert(manufacturers)
@@ -169,30 +124,14 @@ const fortinet = db
 	.returning()
 	.get()
 const apc = db.insert(manufacturers).values({ name: 'APC', slug: 'apc' }).returning().get()
-
-// Rack types are device-type templates too, but are distinguished by their
-// NetBox form factor. Keep regular device types form_factor=NULL so they do
-// not leak into the rack-type catalog.
-const rack42Type = db
-	.insert(device_types)
-	.values({
-		manufacturer_id: apc.id,
-		model: 'NetShelter SX 42U',
-		u_height: 42,
-		form_factor: '4-post cabinet',
-		width: 19,
-	})
+const grandstream = db
+	.insert(manufacturers)
+	.values({ name: 'Grandstream', slug: 'grandstream' })
 	.returning()
 	.get()
-const rack10Type = db
-	.insert(device_types)
-	.values({
-		manufacturer_id: apc.id,
-		model: 'NetShelter Wall 10U',
-		u_height: 10,
-		form_factor: 'wall-mounted cabinet',
-		width: 19,
-	})
+const generic = db
+	.insert(manufacturers)
+	.values({ name: 'Generic', slug: 'generic' })
 	.returning()
 	.get()
 
@@ -205,30 +144,11 @@ const switchType = db
 	})
 	.returning()
 	.get()
-const halfDepthSwitchType = db
-	.insert(device_types)
-	.values({
-		manufacturer_id: ubiquiti.id,
-		model: 'USW-Lite-24',
-		u_height: 1,
-		is_full_depth: false,
-	})
-	.returning()
-	.get()
 const firewallType = db
 	.insert(device_types)
 	.values({
 		manufacturer_id: fortinet.id,
 		model: 'FortiGate 60F',
-		u_height: 1,
-	})
-	.returning()
-	.get()
-const serverType = db
-	.insert(device_types)
-	.values({
-		manufacturer_id: dell.id,
-		model: 'PowerEdge R250',
 		u_height: 1,
 	})
 	.returning()
@@ -242,36 +162,70 @@ const clientType = db
 	})
 	.returning()
 	.get()
-
-const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', rack42Type.id)
-const schoolRack = addRack(schoolSite.id, schoolRoom.id, school.id, 'SCHOOL-R01', rack42Type.id)
-const mspRack = addRack(mspSite.id, mspRoom.id, null, 'MSP-R01', rack10Type.id)
-const mspShelf = db
-	.insert(rack_shelves)
-	.values({
-		rack_id: mspRack.id,
-		name: 'Staging shelf',
-		position_u: 1,
-		height_u: 2,
-		capacity_slots: 6,
-	})
+const phoneSystemType = db
+	.insert(device_types)
+	.values({ manufacturer_id: grandstream.id, model: 'UCM6302', u_height: 1 })
+	.returning()
+	.get()
+const powerOutletBarType = db
+	.insert(device_types)
+	.values({ manufacturer_id: apc.id, model: 'Basic Rack PDU 1U', u_height: 1 })
+	.returning()
+	.get()
+const cableOrganizerType = db
+	.insert(device_types)
+	.values({ manufacturer_id: apc.id, model: '1U Cable Management Panel', u_height: 1 })
+	.returning()
+	.get()
+const tiConnectorType = db
+	.insert(device_types)
+	.values({ manufacturer_id: generic.id, model: 'TI Connector', u_height: 0 })
+	.returning()
+	.get()
+const cloudKeyType = db
+	.insert(device_types)
+	.values({ manufacturer_id: ubiquiti.id, model: 'UniFi Cloud Key Gen2', u_height: 0 })
+	.returning()
+	.get()
+const modemType = db
+	.insert(device_types)
+	.values({ manufacturer_id: generic.id, model: 'Cable Modem', u_height: 0 })
 	.returning()
 	.get()
 
+const rackType = db
+	.insert(device_types)
+	.values({
+		manufacturer_id: apc.id,
+		model: 'NetShelter SX 24U',
+		u_height: 24,
+		form_factor: '4-post cabinet',
+		width: 19,
+	})
+	.returning()
+	.get()
+const dentistRack = addRack(dentistSite.id, dentistRoom.id, dentist.id, 'DENT-R01', rackType.id)
+
 db.insert(device_type_interfaces)
-	.values({ device_type_id: switchType.id, prefix: 'Port', count: 4, kind: 'ethernet' })
-	.run()
-db.insert(device_type_interfaces)
-	.values({ device_type_id: halfDepthSwitchType.id, prefix: 'Port', count: 4, kind: 'ethernet' })
+	.values({ device_type_id: switchType.id, prefix: 'Port', count: 7, kind: 'ethernet' })
 	.run()
 db.insert(device_type_interfaces)
 	.values({ device_type_id: firewallType.id, prefix: 'WAN', count: 2, kind: 'ethernet' })
 	.run()
 db.insert(device_type_interfaces)
-	.values({ device_type_id: serverType.id, prefix: 'eno', count: 2, kind: 'ethernet' })
+	.values({ device_type_id: clientType.id, prefix: 'eth', count: 1, kind: 'ethernet' })
 	.run()
 db.insert(device_type_interfaces)
-	.values({ device_type_id: clientType.id, prefix: 'eth', count: 1, kind: 'ethernet' })
+	.values({ device_type_id: phoneSystemType.id, prefix: 'LAN', count: 1, kind: 'ethernet' })
+	.run()
+db.insert(device_type_interfaces)
+	.values({ device_type_id: tiConnectorType.id, prefix: 'LAN', count: 1, kind: 'ethernet' })
+	.run()
+db.insert(device_type_interfaces)
+	.values({ device_type_id: cloudKeyType.id, prefix: 'eth', count: 1, kind: 'ethernet' })
+	.run()
+db.insert(device_type_interfaces)
+	.values({ device_type_id: modemType.id, prefix: 'LAN', count: 1, kind: 'ethernet' })
 	.run()
 
 function addDevice(
@@ -315,6 +269,39 @@ const dentistFirewall = addDevice(
 	'BSD-001',
 	'FGT60F-DEMO-001',
 	10,
+)
+const dentistPhoneSystem = addDevice(
+	phoneSystemType.id,
+	dentistSite.id,
+	dentistRoom.id,
+	dentistRack.id,
+	dentist.id,
+	'DENT-PBX-01',
+	'BSD-006',
+	'UCM6302-DEMO-001',
+	6,
+)
+addDevice(
+	powerOutletBarType.id,
+	dentistSite.id,
+	dentistRoom.id,
+	dentistRack.id,
+	dentist.id,
+	'DENT-PDU-01',
+	'BSD-007',
+	'APC-PDU-DEMO-001',
+	4,
+)
+addDevice(
+	cableOrganizerType.id,
+	dentistSite.id,
+	dentistRoom.id,
+	dentistRack.id,
+	dentist.id,
+	'DENT-CABLE-MGMT-01',
+	'BSD-008',
+	'CM-PANEL-DEMO-001',
+	2,
 )
 const dentistSwitch = addDevice(
 	switchType.id,
@@ -360,63 +347,39 @@ const dentistBehandlung1Client = addDevice(
 	'OPTIPLEX-DEMO-003',
 	null,
 )
-const schoolFirewall = addDevice(
-	firewallType.id,
-	schoolSite.id,
-	schoolRoom.id,
-	schoolRack.id,
-	school.id,
-	'SCHOOL-FW-01',
-	'MGS-001',
-	'FGT60F-DEMO-002',
-	10,
-)
-const schoolSwitch = addDevice(
-	halfDepthSwitchType.id,
-	schoolSite.id,
-	schoolRoom.id,
-	schoolRack.id,
-	school.id,
-	'SCHOOL-SW-01',
-	'MGS-002',
-	'USW-DEMO-002',
-	8,
-)
-const schoolServer = addDevice(
-	serverType.id,
-	schoolSite.id,
-	schoolRoom.id,
-	schoolRack.id,
-	school.id,
-	'SCHOOL-SRV-01',
-	'MGS-003',
-	'R250-DEMO-001',
-	5,
-)
-const mspFirewall = addDevice(
-	firewallType.id,
-	mspSite.id,
-	mspRoom.id,
-	mspRack.id,
+const dentistTiConnector = addDevice(
+	tiConnectorType.id,
+	dentistSite.id,
+	dentistRoom.id,
 	null,
-	'MSP-FW-01',
-	'NS-001',
-	'FGT60F-DEMO-003',
-	10,
-)
-const mspSpare = addDevice(
-	serverType.id,
-	mspSite.id,
-	mspRoom.id,
-	mspRack.id,
+	dentist.id,
+	'DENT-TI-CONNECTOR-01',
+	'BSD-009',
+	'TI-CONNECTOR-DEMO-001',
 	null,
-	'MSP-SPARE-SRV-01',
-	'NS-002',
-	'R250-DEMO-002',
-	null,
-	mspShelf.id,
 )
-
+const dentistCloudKey = addDevice(
+	cloudKeyType.id,
+	dentistSite.id,
+	dentistRoom.id,
+	null,
+	dentist.id,
+	'DENT-CLOUD-KEY-01',
+	'BSD-010',
+	'UCK-GEN2-DEMO-001',
+	null,
+)
+const dentistModem = addDevice(
+	modemType.id,
+	dentistSite.id,
+	dentistRoom.id,
+	null,
+	dentist.id,
+	'DENT-MODEM-01',
+	'BSD-011',
+	'MODEM-DEMO-001',
+	null,
+)
 function addInterfaces(deviceId: number, names: string[]): Array<typeof interfaces.$inferSelect> {
 	return names.map((name) =>
 		db
@@ -426,17 +389,23 @@ function addInterfaces(deviceId: number, names: string[]): Array<typeof interfac
 			.get(),
 	)
 }
-const [dentSwitchPort, dentClientPort1, dentClientPort2, dentClientPort3] = addInterfaces(
-	dentistSwitch.id,
-	['Port1', 'Port2', 'Port3', 'Port4'],
-)
-const [dentFirewallPort] = addInterfaces(dentistFirewall.id, ['WAN1', 'WAN2'])
-const schoolSwitchPorts = addInterfaces(schoolSwitch.id, ['Port1', 'Port2', 'Port3', 'Port4'])
-const schoolSwitchPort: typeof interfaces.$inferSelect = schoolSwitchPorts[0]
-const [schoolFirewallPort] = addInterfaces(schoolFirewall.id, ['WAN1', 'WAN2'])
-const [schoolServerPort] = addInterfaces(schoolServer.id, ['eno1', 'eno2'])
-addInterfaces(mspFirewall.id, ['WAN1', 'WAN2'])
-addInterfaces(mspSpare.id, ['eno1', 'eno2'])
+const [
+	dentSwitchPort,
+	dentClientPort1,
+	dentClientPort2,
+	dentClientPort3,
+	dentPhoneSystemSwitchPort,
+	dentCloudKeySwitchPort,
+	dentTiConnectorSwitchPort,
+] = addInterfaces(dentistSwitch.id, ['Port1', 'Port2', 'Port3', 'Port4', 'Port5', 'Port6', 'Port7'])
+const [dentFirewallPort, dentModemFirewallPort] = addInterfaces(dentistFirewall.id, [
+	'WAN1',
+	'WAN2',
+])
+const [dentPhoneSystemPort] = addInterfaces(dentistPhoneSystem.id, ['LAN1'])
+const [dentTiConnectorPort] = addInterfaces(dentistTiConnector.id, ['LAN1'])
+const [dentCloudKeyPort] = addInterfaces(dentistCloudKey.id, ['eth0'])
+const [dentModemPort] = addInterfaces(dentistModem.id, ['LAN1'])
 const [dentBackofficePort] = addInterfaces(dentistBackofficeClient.id, ['eth1'])
 const [dentEmpfangPort] = addInterfaces(dentistEmpfangClient.id, ['eth1'])
 const [dentBehandlung1Port] = addInterfaces(dentistBehandlung1Client.id, ['eth1'])
@@ -447,6 +416,38 @@ db.insert(cables)
 		b_interface_id: dentSwitchPort.id,
 		kind: 'cat6a',
 		label: 'Dental firewall to switch',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentPhoneSystemPort.id,
+		b_interface_id: dentPhoneSystemSwitchPort.id,
+		kind: 'cat6a',
+		label: 'Phone system to switch',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentModemPort.id,
+		b_interface_id: dentModemFirewallPort.id,
+		kind: 'cat6a',
+		label: 'Modem to firewall',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentCloudKeyPort.id,
+		b_interface_id: dentCloudKeySwitchPort.id,
+		kind: 'cat6a',
+		label: 'Cloud Key to switch',
+	})
+	.run()
+db.insert(cables)
+	.values({
+		a_interface_id: dentTiConnectorPort.id,
+		b_interface_id: dentTiConnectorSwitchPort.id,
+		kind: 'cat6a',
+		label: 'TI connector to switch',
 	})
 	.run()
 db.insert(cables)
@@ -473,23 +474,6 @@ db.insert(cables)
 		label: 'Behandlung 1 client to switch',
 	})
 	.run()
-db.insert(cables)
-	.values({
-		a_interface_id: schoolFirewallPort.id,
-		b_interface_id: schoolSwitchPort.id,
-		kind: 'cat6a',
-		label: 'School firewall to switch',
-	})
-	.run()
-db.insert(cables)
-	.values({
-		a_interface_id: schoolServerPort.id,
-		b_interface_id: schoolSwitchPorts[1].id,
-		kind: 'cat6a',
-		label: 'School server to switch',
-	})
-	.run()
-
 db.insert(users)
 	.values({
 		username: 'demo',
@@ -502,5 +486,5 @@ db.insert(users)
 console.log(`Demo database reset at ${dbPath}`)
 console.log('Login: demo / demo-password')
 console.log(
-	'Created 2 customer tenants, 1 MSP-owned site, 3 sites, 3 racks, 7 device types (including 2 rack types), 10 devices, and 6 cables. The school switch is half-depth.',
+	'Created 1 tenant, 1 site, 1 24U rack, 9 device models, 1 rack type, 11 devices, and 8 cables.',
 )

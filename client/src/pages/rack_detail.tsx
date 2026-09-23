@@ -1,3 +1,4 @@
+import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -5,7 +6,12 @@ import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices, update_device } from '../api_devices'
 import { create_shelf, delete_rack, delete_shelf, fetch_elevation, fetch_rack } from '../api_racks'
-import { fetch_device_type } from '../api_templates'
+import {
+	type DeviceTypeRow,
+	fetch_device_type,
+	fetch_device_types,
+	fetch_manufacturers,
+} from '../api_templates'
 import { fetch_location, fetch_site, fetch_tenant } from '../api_tenancy'
 import {
 	DetailCard,
@@ -16,6 +22,7 @@ import {
 	Loading,
 	useDetailDelete,
 } from '../components/detail_page'
+import { useSort } from '../components/list_page'
 import { ObjectSelector } from '../components/object_selector'
 import { RackElevation, type RackFace } from '../components/rack_elevation'
 import { navigate } from '../router'
@@ -105,6 +112,71 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			return res.value
 		},
 	)
+	const [unrackedDevices, { refetch: refetchUnrackedDevices }] = createResource(
+		() => props.id,
+		async (id: number) => {
+			const result = await fetch_devices({ rack: id })
+			if (Result.isError(result)) {
+				setError(result.error.message)
+				return []
+			}
+			return result.value.items.filter(
+				(device) => device.position_u === null && device.shelf_id === null,
+			)
+		},
+	)
+	const [deviceTypes] = createResource(async () => {
+		const result = await fetch_device_types()
+		if (Result.isError(result)) {
+			setError(result.error.message)
+			return []
+		}
+		return result.value.items
+	})
+	const [manufacturers] = createResource(async () => {
+		const result = await fetch_manufacturers()
+		if (Result.isError(result)) {
+			setError(result.error.message)
+			return []
+		}
+		return result.value.items
+	})
+
+	function deviceTypeOf(id: number): DeviceTypeRow | undefined {
+		return deviceTypes()?.find((type) => type.id === id)
+	}
+
+	function manufacturerNameOf(deviceTypeId: number): string {
+		const manufacturerId = deviceTypeOf(deviceTypeId)?.manufacturer_id
+		return (
+			manufacturers()?.find((manufacturer) => manufacturer.id === manufacturerId)?.name ??
+			(manufacturerId === undefined ? '—' : String(manufacturerId))
+		)
+	}
+	const { sort, order, handleSort, clearSort } = useSort<'name' | 'type' | 'manufacturer'>('name')
+	const sortedUnrackedDevices = createMemo(() => {
+		const rows = [...(unrackedDevices() ?? [])]
+		const key = sort()
+		if (!key) {
+			return rows
+		}
+		const fieldValue = (device: DeviceRow): string => {
+			switch (key) {
+				case 'name':
+					return device.name
+				case 'type':
+					return deviceTypeOf(device.device_type_id)?.model ?? ''
+				case 'manufacturer':
+					return manufacturerNameOf(device.device_type_id)
+			}
+		}
+		return rows.sort((a, b) => {
+			const comparison = fieldValue(a).localeCompare(fieldValue(b), undefined, {
+				sensitivity: 'base',
+			})
+			return order() === 'asc' ? comparison : -comparison
+		})
+	})
 
 	const occupiedU = createMemo(
 		() => elevation()?.units.filter((u) => u.shelf !== null || u.device !== null).length ?? 0,
@@ -117,16 +189,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const utilPct = createMemo(() =>
 		totalU() > 0 ? Math.round((occupiedU() / totalU()) * 100) : 0,
 	)
-	const deviceCount = createMemo(
-		() =>
-			new Set((elevation()?.units ?? []).flatMap((u) => (u.device ? [u.device.id] : [])))
-				.size,
-	)
-	const shelfCount = createMemo(
-		() =>
-			new Set((elevation()?.units ?? []).flatMap((u) => (u.shelf ? [u.shelf.id] : []))).size,
-	)
-
 	const { handleDelete } = useDetailDelete({
 		noun: 'rack',
 		name: () => rack()?.name,
@@ -209,6 +271,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			return
 		}
 		void refetch()
+		void refetchUnrackedDevices()
 	}
 
 	return (
@@ -263,14 +326,24 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/locations/${locationId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Description</dt>
-							<dd>{rack()?.description || '—'}</dd>
 							<dt>Rack type</dt>
 							<dd>
+								<ForeignKeyLink
+									id={rackType()?.manufacturer_id ?? null}
+									loading={manufacturers.loading}
+									name={
+										manufacturers()?.find(
+											(m) => m.id === rackType()?.manufacturer_id,
+										)?.name
+									}
+									href={`/manufacturers/${rackType()?.manufacturer_id ?? ''}`}
+								/>
+								{' / '}
 								<ForeignKeyLink
 									id={rackTypeId()}
 									loading={rackType.loading}
 									name={rackType()?.model}
+									href={`/device-types/${rackTypeId() ?? ''}`}
 								/>
 							</dd>
 							<dt>Tenant</dt>
@@ -284,26 +357,71 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 						</DetailCard>
 
-						<div class="detail-stats">
-							<span class="detail-stat">
-								<span class="detail-stat-value">{deviceCount()}</span>{' '}
-								<span class="detail-stat-label">
-									Device{deviceCount() === 1 ? '' : 's'}
-								</span>
-							</span>
-							<span class="detail-stat">
-								<span class="detail-stat-value">{shelfCount()}</span>{' '}
-								<span class="detail-stat-label">
-									Shel{shelfCount() === 1 ? 'f' : 'ves'}
-								</span>
-							</span>
-							<span class="detail-stat">
-								<span class="detail-stat-value">
-									{occupiedU()}/{totalU()}U
-								</span>{' '}
-								<span class="detail-stat-label">Used ({utilPct()}%)</span>
-							</span>
-						</div>
+						<section class="rack-unracked" aria-label="Unracked devices">
+							<h3>
+								Unracked devices{' '}
+								<span class="badge">{unrackedDevices()?.length ?? 0}</span>
+							</h3>
+							<Show
+								when={
+									!unrackedDevices.loading &&
+									!deviceTypes.loading &&
+									!manufacturers.loading
+								}
+								fallback={<Loading message="Loading unracked devices…" />}
+							>
+								<Show
+									when={(unrackedDevices()?.length ?? 0) > 0}
+									fallback={
+										<p class="rack-unracked-empty">
+											No unracked devices assigned to this rack.
+										</p>
+									}
+								>
+									<DataTable
+										rows={sortedUnrackedDevices}
+										getRowId={(device: DeviceRow): number => device.id}
+										sortKey={sort}
+										sortDirection={order}
+										onSort={handleSort}
+										onSortClear={clearSort}
+										columns={[
+											{
+												key: 'name',
+												label: 'Name',
+												sortable: true,
+												getValue: (device: DeviceRow): JSX.Element => (
+													<a
+														href={`/devices/${device.id}`}
+														onClick={(e: MouseEvent): void => {
+															e.preventDefault()
+															navigate(`/devices/${device.id}`)
+														}}
+													>
+														{device.name}
+													</a>
+												),
+											},
+											{
+												key: 'type',
+												label: 'Type',
+												sortable: true,
+												getValue: (device: DeviceRow): string =>
+													deviceTypeOf(device.device_type_id)?.model ??
+													String(device.device_type_id),
+											},
+											{
+												key: 'manufacturer',
+												label: 'Manufacturer',
+												sortable: true,
+												getValue: (device: DeviceRow): string =>
+													manufacturerNameOf(device.device_type_id),
+											},
+										]}
+									/>
+								</Show>
+							</Show>
+						</section>
 					</div>
 
 					<div>
