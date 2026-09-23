@@ -95,6 +95,30 @@ export async function getPage<T>(
 	return to_result<Page<T>>(await req, fallback)
 }
 
+/**
+ * POSTs a JSON body via raw `fetch` and wraps the JSON response in a Result.
+ * Single shared helper for the non-RPC call sites (`api_auth`, `api_transfer`)
+ * so `{ error }` parsing, 401 handling, and network-error mapping exist once.
+ * Chain `.map()` to discard the body for void endpoints (login/setup).
+ */
+export async function post_json<T>(
+	url: string,
+	body: unknown,
+	fallback: string,
+	network_fallback?: string,
+): Promise<Result<T, Error>> {
+	try {
+		const res = await fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+		})
+		return to_result<T>(res, fallback)
+	} catch {
+		return Result.err(new Error(network_fallback ?? fallback))
+	}
+}
+
 /** Fetches the server health status (P0 scaffold smoke check). */
 export async function fetch_health(): Promise<Result<HealthInfo, Error>> {
 	const res = await client.health.$get()

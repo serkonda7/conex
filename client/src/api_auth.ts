@@ -5,8 +5,8 @@
  * bypass the typed `hono/client` RPC in `api.ts`. They still live here instead
  * of inline in components, so endpoint paths and `{ error }` parsing exist once.
  */
-import { Result } from 'better-result'
-import { read_api_error } from './util/api_error'
+import type { Result } from 'better-result'
+import { post_json } from './api'
 
 export type AuthProviders = { local: boolean; microsoft: boolean }
 
@@ -38,21 +38,13 @@ export async function fetchSetupStatus(): Promise<boolean | null> {
 
 /** Creates the first admin account (first-run only) and sets the session cookie. */
 export async function setupAdmin(username: string, password: string): Promise<Result<void, Error>> {
-	try {
-		const res = await fetch('/api/auth/setup', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ username, password }),
-		})
-
-		if (!res.ok) {
-			return Result.err(new Error(await read_api_error(res, 'Setup failed.')))
-		}
-
-		return Result.ok(undefined)
-	} catch {
-		return Result.err(new Error('A network error occurred. Please try again.'))
-	}
+	const res = await post_json<unknown>(
+		'/api/auth/setup',
+		{ username, password },
+		'Setup failed.',
+		'A network error occurred. Please try again.',
+	)
+	return res.map(() => undefined)
 }
 
 /** Current session identity: username plus the RBAC role and tenant scope. */
@@ -88,21 +80,13 @@ export async function fetchMe(): Promise<SessionUser | null> {
 
 /** Logs in and lets the server set the session cookie. */
 export async function login(username: string, password: string): Promise<Result<void, Error>> {
-	try {
-		const res = await fetch('/api/auth/login', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ username, password }),
-		})
-
-		if (!res.ok) {
-			return Result.err(new Error(await read_api_error(res, 'Sign-in failed.')))
-		}
-
-		return Result.ok(undefined)
-	} catch {
-		return Result.err(new Error('A network error occurred. Please try again.'))
-	}
+	const res = await post_json<unknown>(
+		'/api/auth/login',
+		{ username, password },
+		'Sign-in failed.',
+		'A network error occurred. Please try again.',
+	)
+	return res.map(() => undefined)
 }
 
 /** Releases the server session. Never throws: logout is best-effort. */
