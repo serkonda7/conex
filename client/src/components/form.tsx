@@ -107,6 +107,7 @@ export function TextField(props: {
 				step={props.step}
 				inputmode={props.inputmode}
 				autocomplete={props.autocomplete}
+				data-autofocus={props.autofocus || undefined}
 				value={props.value}
 				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
 			/>
@@ -152,19 +153,29 @@ export function SelectField(props: {
 	emptyLabel?: string
 	required?: boolean
 	disabled?: boolean
+	autofocus?: boolean
 	describedBy?: string
 	hint?: JSX.Element
 	action?: JSX.Element
 	/** Extra `<option>` entries after the generated ones (e.g. a stale value). */
 	children?: JSX.Element
 }): JSX.Element {
+	let select: HTMLSelectElement | undefined
+	onMount(() => {
+		if (props.autofocus ?? false) {
+			select?.focus()
+		}
+	})
+
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
 			<div class="field-inline-actions">
 				<select
 					id={props.id}
+					ref={select}
 					required={props.required}
 					disabled={props.disabled}
+					data-autofocus={props.autofocus || undefined}
 					aria-describedby={props.describedBy}
 					value={props.value}
 					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
@@ -210,6 +221,7 @@ export function NameField(props: {
 				placeholder={props.placeholder}
 				required
 				maxLength={100}
+				data-autofocus={props.autofocus || undefined}
 				value={props.value}
 				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
 			/>

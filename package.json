@@ -15,7 +15,9 @@
     "dev": "turbo run dev",
     "db:generate": "bun run --cwd server db:generate",
     "db:seed:demo": "bun scripts/seed-demo.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test tests/e2e/visual.spec.ts --project=chromium",
+    "test:visual:update": "playwright test tests/e2e/visual.spec.ts --project=chromium --update-snapshots"
   },
   "packageManager": "bun@1.4.2",
   "catalog": {

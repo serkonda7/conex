@@ -10,9 +10,23 @@ export default defineConfig({
 	testDir: './tests/e2e',
 	timeout: 60_000,
 	retries: 0,
+	// Visual baselines are Linux-CI canonical at 1920x1080. Regenerate with
+	// `bun run test:visual:update` and review the PNG diff before committing.
+	snapshotPathTemplate: './tests/e2e/__snapshots__/{testFileName}/{arg}-{projectName}{ext}',
+	expect: {
+		toHaveScreenshot: {
+			maxDiffPixels: 100,
+			threshold: 0.2,
+			animations: 'disabled',
+		},
+	},
 	use: {
 		baseURL: process.env.CONEX_E2E_BASE_URL ?? `http://localhost:${clientPort}`,
 		trace: 'retain-on-failure',
+		screenshot: 'only-on-failure',
+		viewport: { width: 1920, height: 1080 },
+		deviceScaleFactor: 1,
+		colorScheme: 'dark',
 	},
 	webServer: reuse
 		? undefined

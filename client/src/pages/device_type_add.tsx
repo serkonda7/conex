@@ -88,6 +88,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 				id="device-type-manufacturer"
 				label="Manufacturer"
 				required
+				autofocus
 				value={manufacturerId()}
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
@@ -111,7 +112,6 @@ export function DeviceTypeAddPage(): JSX.Element {
 				value={model()}
 				onInput={setModel}
 				placeholder="Example Switch 48"
-				autofocus
 			/>
 			<TextField
 				id="device-type-u-height"

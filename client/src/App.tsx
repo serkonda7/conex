@@ -19,7 +19,17 @@ import {
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { createSignal, For, type JSX, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
+import {
+	createEffect,
+	createSignal,
+	For,
+	type JSX,
+	Match,
+	onCleanup,
+	onMount,
+	Show,
+	Switch,
+} from 'solid-js'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
 import { ConnectionsPage } from './pages/connections'
@@ -543,6 +553,24 @@ function TabBar(): JSX.Element {
 function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolean }): JSX.Element {
 	const TabContext = tabPathContext()
 	const info = (): RouteInfo => parseRoute(props.routePath, props.isAdmin)
+	// Tabs stay mounted in the background, so autofocus-on-mount only fires
+	// on first visit. Refocus the page's autofocus target on activation, but
+	// leave focus alone when it is already inside this tab (e.g. switching
+	// back mid-edit).
+	createEffect(() => {
+		if (activeTabId() !== props.tabId) {
+			return
+		}
+		const pane = document.querySelector<HTMLElement>(`[data-tab-id="${props.tabId}"]`)
+		if (!pane) {
+			return
+		}
+		const focused = document.activeElement
+		if (focused instanceof HTMLElement && pane.contains(focused)) {
+			return
+		}
+		pane.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+	})
 	onMount(() => {
 		if (!isDetailRoute(props.routePath)) {
 			return
