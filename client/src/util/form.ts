@@ -113,14 +113,14 @@ export async function submit_form<T>(options: SubmitFormOptions<T>): Promise<voi
 	options.setError(null)
 	const name = options.name.trim()
 	if (!name) {
-		options.setError(options.nameError ?? 'Name is required.')
+		options.setError(options.nameError ?? 'Name ist erforderlich.')
 		return
 	}
 	let slug = ''
 	if (options.slug !== undefined) {
 		slug = options.slug.trim()
 		if (!slug) {
-			options.setError('Slug is required.')
+			options.setError('Kurzname ist erforderlich.')
 			return
 		}
 	}

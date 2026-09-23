@@ -280,7 +280,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				backTo="/racks"
 				backLabel="Racks"
 				loading={rack.loading}
-				loadingText="Loading rack…"
+				loadingText="Rack wird geladen…"
 				record={rack()}
 				emptyText="Rack not found."
 			>
@@ -293,22 +293,22 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							<span aria-hidden="true" class="app-nav-icon">
 								<IconPencil size={14} />
 							</span>{' '}
-							Edit
+							Bearbeiten
 						</button>
 						<button type="button" class="btn-danger" onClick={handleDelete}>
 							<span aria-hidden="true" class="app-nav-icon">
 								<IconTrash size={14} />
 							</span>{' '}
-							Delete
+							Löschen
 						</button>
 					</div>
 				</div>
-				<DetailSubtitle>{rack()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>{rack()?.description || 'Keine Beschreibung.'}</DetailSubtitle>
 
 				<div class="detail-columns">
 					<div>
-						<DetailCard label="Rack details">
-							<dt>Site</dt>
+						<DetailCard label="Rackdetails">
+							<dt>Standort</dt>
 							<dd>
 								<ForeignKeyLink
 									id={siteId()}
@@ -317,7 +317,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/sites/${siteId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Location</dt>
+							<dt>Bereich</dt>
 							<dd>
 								<ForeignKeyLink
 									id={locationId()}
@@ -326,7 +326,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/locations/${locationId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Rack type</dt>
+							<dt>Racktyp</dt>
 							<dd>
 								<ForeignKeyLink
 									id={rackType()?.manufacturer_id ?? null}
@@ -346,7 +346,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/device-types/${rackTypeId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Tenant</dt>
+							<dt>Mandant</dt>
 							<dd>
 								<ForeignKeyLink
 									id={tenantId()}
@@ -357,9 +357,9 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 						</DetailCard>
 
-						<section class="rack-unracked" aria-label="Unracked devices">
+						<section class="rack-unracked" aria-label="Nicht eingebaute Geräte">
 							<h3>
-								Unracked devices{' '}
+								Nicht eingebaute Geräte{' '}
 								<span class="badge">{unrackedDevices()?.length ?? 0}</span>
 							</h3>
 							<Show
@@ -368,13 +368,15 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									!deviceTypes.loading &&
 									!manufacturers.loading
 								}
-								fallback={<Loading message="Loading unracked devices…" />}
+								fallback={
+									<Loading message="Nicht eingebaute Geräte werden geladen…" />
+								}
 							>
 								<Show
 									when={(unrackedDevices()?.length ?? 0) > 0}
 									fallback={
 										<p class="rack-unracked-empty">
-											No unracked devices assigned to this rack.
+											Diesem Rack sind keine unverbauten Geräte zugeordnet.
 										</p>
 									}
 								>
@@ -404,7 +406,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 											},
 											{
 												key: 'type',
-												label: 'Type',
+												label: 'Typ',
 												sortable: true,
 												getValue: (device: DeviceRow): string =>
 													deviceTypeOf(device.device_type_id)?.model ??
@@ -412,7 +414,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 											},
 											{
 												key: 'manufacturer',
-												label: 'Manufacturer',
+												label: 'Hersteller',
 												sortable: true,
 												getValue: (device: DeviceRow): string =>
 													manufacturerNameOf(device.device_type_id),
@@ -428,10 +430,10 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						<div
 							class="rack-util"
 							role="status"
-							aria-label={`${occupiedU()} of ${totalU()}U used`}
+							aria-label={`${occupiedU()} von ${totalU()} U belegt`}
 						>
 							<span>
-								{occupiedU()}/{totalU()}U · {utilPct()}% used
+								{occupiedU()}/{totalU()} U · {utilPct()} % belegt
 							</span>
 							<span class="rack-util-bar" aria-hidden="true">
 								<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
@@ -439,7 +441,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						</div>
 						<Show
 							when={elevation()}
-							fallback={<Loading message="Loading elevation…" />}
+							fallback={<Loading message="Rackansicht wird geladen…" />}
 						>
 							<RackElevation
 								units={elevation()?.units ?? []}
@@ -453,8 +455,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 						<Show when={selectingDevice()}>
 							<ObjectSelector
-								label={`Select device for U${pendingU() ?? ''} (${face()} face)`}
-								placeholder="Search devices…"
+								label={`Gerät für U${pendingU() ?? ''} auswählen (${face()})`}
+								placeholder="Geräte suchen…"
 								load={async (search: string) => {
 									const result = await fetch_devices({ search })
 									return Result.isError(result)
@@ -467,19 +469,19 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							/>
 						</Show>
 
-						<h3>Add shelf</h3>
+						<h3>Fachboden hinzufügen</h3>
 						<form onSubmit={handleCreateShelf}>
 							<input
 								placeholder="Name"
-								aria-label="Shelf name"
+								aria-label="Name des Fachbodens"
 								value={shelfName()}
 								onInput={(e: InputEventAndTarget) =>
 									setShelfName(e.currentTarget.value)
 								}
 							/>
 							<input
-								placeholder="U position"
-								aria-label="Shelf U position"
+								placeholder="U-Position"
+								aria-label="U-Position des Fachbodens"
 								inputmode="numeric"
 								value={shelfU()}
 								onInput={(e: InputEventAndTarget) =>
@@ -487,15 +489,15 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								}
 							/>
 							<input
-								placeholder="Height (U)"
-								aria-label="Shelf height in U"
+								placeholder="Höhe (U)"
+								aria-label="Höhe des Fachbodens in U"
 								inputmode="numeric"
 								value={shelfH()}
 								onInput={(e: InputEventAndTarget) =>
 									setShelfH(e.currentTarget.value)
 								}
 							/>
-							<button type="submit">Add shelf</button>
+							<button type="submit">Fachboden hinzufügen</button>
 						</form>
 					</div>
 				</div>

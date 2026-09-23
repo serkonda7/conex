@@ -214,9 +214,9 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/sites"
-				backLabel="Sites"
+				backLabel="Standorte"
 				loading={site.loading}
-				loadingText="Loading site…"
+				loadingText="Standort wird geladen…"
 				record={site()}
 				emptyText="Site not found."
 			>
@@ -247,12 +247,12 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					</a>
 				</div>
 
-				<DetailCard label="Site details">
-					<dt>Slug</dt>
+				<DetailCard label="Standortdetails">
+					<dt>Kurzname</dt>
 					<dd>
 						<code>{site()?.slug}</code>
 					</dd>
-					<dt>Tenant</dt>
+					<dt>Mandant</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -261,7 +261,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Group</dt>
+					<dt>Gruppe</dt>
 					<dd>
 						<ForeignKeyLink
 							id={groupId()}
@@ -270,52 +270,58 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 							href={`/site-groups/${groupId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Description</dt>
+					<dt>Beschreibung</dt>
 					<dd>{site()?.description || '—'}</dd>
-					<dt>Comments</dt>
+					<dt>Kommentare</dt>
 					<dd>{(site()?.comments ?? '') || '—'}</dd>
-					<dt>Physical address</dt>
+					<dt>Standortadresse</dt>
 					<dd>{(site()?.physical_address ?? '') || '—'}</dd>
-					<dt>Shipping address</dt>
+					<dt>Lieferadresse</dt>
 					<dd>{(site()?.shipping_address ?? '') || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 
-			<section aria-label="Locations">
+			<section aria-label="Bereiche">
 				<h3 id="site-locations">
 					Locations <span class="badge">{locationCount()}</span>
 				</h3>
 				<form onSubmit={handleCreate}>
 					<input
 						placeholder="Name"
-						aria-label="Location name"
+						aria-label="Bereichsname"
 						value={name()}
 						onInput={(e: InputEventAndTarget) => setName(e.currentTarget.value)}
 					/>
 					<input
 						placeholder="slug"
-						aria-label="Location slug"
+						aria-label="Kurzname des Bereichs"
 						value={slug()}
 						onInput={(e: InputEventAndTarget) => setSlug(e.currentTarget.value)}
 					/>
 					<select
-						aria-label="Parent location"
+						aria-label="Übergeordneter Bereich"
 						value={parentId()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setParentId(e.currentTarget.value)
 						}
 					>
-						<option value="">Top level</option>
+						<option value="">Oberste Ebene</option>
 						<For each={locations() ?? []}>
 							{(l: LocationRow): JSX.Element => (
 								<option value={l.id}>{l.name}</option>
 							)}
 						</For>
 					</select>
-					<button type="submit">Add location</button>
+					<button type="submit">Bereich hinzufügen</button>
 				</form>
-				<Show when={!locations.loading} fallback={<Loading message="Loading locations…" />}>
-					<Show when={tree().length > 0} fallback={<Empty message="No locations yet." />}>
+				<Show
+					when={!locations.loading}
+					fallback={<Loading message="Bereiche werden geladen…" />}
+				>
+					<Show
+						when={tree().length > 0}
+						fallback={<Empty message="Noch keine Bereiche vorhanden." />}
+					>
 						<ul>
 							<For each={tree()}>
 								{(node: TreeNode): JSX.Element => (
@@ -336,8 +342,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				title="Racks"
 				count={rackCount()}
 				loading={racks.loading}
-				loadingText="Loading racks…"
-				emptyText="No racks for this site yet."
+				loadingText="Racks werden geladen…"
+				emptyText="Für diesen Standort sind noch keine Racks vorhanden."
 				hasItems={rackCount() > 0}
 			>
 				<DataTable
@@ -371,8 +377,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				title="Devices"
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Loading devices…"
-				emptyText="No devices for this site yet."
+				loadingText="Geräte werden geladen…"
+				emptyText="Für diesen Standort sind noch keine Geräte vorhanden."
 				hasItems={deviceCount() > 0}
 			>
 				<DataTable

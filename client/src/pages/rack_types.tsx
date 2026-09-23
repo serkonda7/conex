@@ -87,28 +87,28 @@ export function RackTypesPage(): JSX.Element {
 	const columns: DataTableColumn<DeviceTypeRow>[] = [
 		{
 			key: 'model',
-			label: 'Model',
+			label: 'Modell',
 			sortable: true,
 			getValue: (t: DeviceTypeRow): string => t.model,
 		},
 		{
 			key: 'manufacturer',
-			label: 'Manufacturer',
+			label: 'Hersteller',
 			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
 		},
 		{
 			key: 'form_factor',
-			label: 'Form factor',
+			label: 'Bauform',
 			getValue: (t: DeviceTypeRow): string => t.form_factor ?? '—',
 		},
 		{
 			key: 'width',
-			label: 'Width',
+			label: 'Breite',
 			getValue: (t: DeviceTypeRow): string => (t.width === null ? '—' : `${t.width}″`),
 		},
 		{
 			key: 'u_height',
-			label: 'U height',
+			label: 'Höhe (U)',
 			getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
 		},
 	]
@@ -129,25 +129,25 @@ export function RackTypesPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Rack types" add_href="/rack-types/add" />
+			<ListPageHeader title="Racktypen" add_href="/rack-types/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search rack types"
-					placeholder="Search model…"
+					label="Racktypen suchen"
+					placeholder="Modell suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
 					<span class="visually-hidden">Filter by manufacturer</span>
 					<select
-						aria-label="Filter by manufacturer"
+						aria-label="Nach Hersteller filtern"
 						value={manufacturerFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setManufacturerFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Any manufacturer</option>
+						<option value="">Alle Hersteller</option>
 						<For each={manufacturers() ?? []}>
 							{(m: ManufacturerRow): JSX.Element => (
 								<option value={m.id}>{m.name}</option>
@@ -184,12 +184,12 @@ export function RackTypesPage(): JSX.Element {
 					/>
 				)}
 				loading={() => typesPage.loading}
-				loadingContent={<p class="skeleton">Loading rack types…</p>}
+				loadingContent={<p class="skeleton">Racktypen werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || manufacturerFilter()
-							? 'No rack types match the current filters.'
-							: 'No rack types yet. Add the first one above.'}
+							? 'Keine Racktypen für die aktuellen Filter gefunden.'
+							: 'Noch keine Racktypen vorhanden. Fügen Sie oben den ersten hinzu.'}
 					</p>
 				}
 			/>

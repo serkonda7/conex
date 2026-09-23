@@ -106,32 +106,32 @@ function LoginForm(props: {
 	return (
 		<form onSubmit={props.onLogin}>
 			<label class="visually-hidden" for="login-username">
-				Username
+				Benutzername
 			</label>
 			<input
 				id="login-username"
 				type="text"
-				placeholder="Username"
-				aria-label="Username"
+				placeholder="Benutzername"
+				aria-label="Benutzername"
 				required
 				value={props.username()}
 				onInput={(e: InputEventAndTarget) => props.setUsername(e.currentTarget.value)}
 				autocomplete="username"
 			/>
 			<label class="visually-hidden" for="login-password">
-				Password
+				Passwort
 			</label>
 			<input
 				id="login-password"
 				type="password"
-				placeholder="Password"
-				aria-label="Password"
+				placeholder="Passwort"
+				aria-label="Passwort"
 				required
 				value={props.password()}
 				onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
 				autocomplete="current-password"
 			/>
-			<button type="submit">Sign in</button>
+			<button type="submit">Anmelden</button>
 			<Show when={props.error()}>
 				<div class="app-inline-error" role="alert">
 					{props.error()}
@@ -152,50 +152,50 @@ function SetupForm(props: {
 	onSetup: (e: SubmitEvent) => void
 }): JSX.Element {
 	return (
-		<section aria-label="First-run setup">
-			<h2>Welcome to Conex</h2>
-			<p class="page-subtitle">Create the admin account to get started.</p>
+		<section aria-label="Ersteinrichtung">
+			<h2>Willkommen bei Conex</h2>
+			<p class="page-subtitle">Erstellen Sie ein Administratorkonto, um zu beginnen.</p>
 			<form onSubmit={props.onSetup}>
 				<label class="visually-hidden" for="setup-username">
-					Admin username
+					Administrator-Benutzername
 				</label>
 				<input
 					id="setup-username"
 					type="text"
-					placeholder="Admin username"
-					aria-label="Admin username"
+					placeholder="Administrator-Benutzername"
+					aria-label="Administrator-Benutzername"
 					required
 					value={props.username()}
 					onInput={(e: InputEventAndTarget) => props.setUsername(e.currentTarget.value)}
 					autocomplete="username"
 				/>
 				<label class="visually-hidden" for="setup-password">
-					Password
+					Passwort
 				</label>
 				<input
 					id="setup-password"
 					type="password"
-					placeholder="Password"
-					aria-label="Password"
+					placeholder="Passwort"
+					aria-label="Passwort"
 					required
 					value={props.password()}
 					onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
 					autocomplete="new-password"
 				/>
 				<label class="visually-hidden" for="setup-confirm">
-					Confirm password
+					Passwort bestätigen
 				</label>
 				<input
 					id="setup-confirm"
 					type="password"
-					placeholder="Confirm password"
-					aria-label="Confirm password"
+					placeholder="Passwort bestätigen"
+					aria-label="Passwort bestätigen"
 					required
 					value={props.confirm()}
 					onInput={(e: InputEventAndTarget) => props.setConfirm(e.currentTarget.value)}
 					autocomplete="new-password"
 				/>
-				<button type="submit">Create admin account</button>
+				<button type="submit">Administratorkonto erstellen</button>
 				<Show when={props.error()}>
 					<div class="app-inline-error" role="alert">
 						{props.error()}
@@ -251,8 +251,8 @@ function NavItem(props: {
 				<button
 					type="button"
 					class="app-nav-add"
-					aria-label={`Add ${props.label}`}
-					title={`Add ${props.label}`}
+					aria-label={`${props.label} hinzufügen`}
+					title={`${props.label} hinzufügen`}
 					onClick={goAdd}
 				>
 					<span aria-hidden="true" class="app-nav-add-icon">
@@ -264,8 +264,8 @@ function NavItem(props: {
 					type="button"
 					class="app-nav-add"
 					disabled
-					aria-label={`Add ${props.label} (coming soon)`}
-					title={`Add ${props.label} (coming soon)`}
+					aria-label={`${props.label} hinzufügen (demnächst verfügbar)`}
+					title={`${props.label} hinzufügen (demnächst verfügbar)`}
 				>
 					<span aria-hidden="true" class="app-nav-add-icon">
 						<IconPlus size={14} />
@@ -276,8 +276,8 @@ function NavItem(props: {
 				<button
 					type="button"
 					class="app-nav-add app-nav-import"
-					aria-label={`Import ${props.label}`}
-					title={`Import ${props.label}`}
+					aria-label={`${props.label} importieren`}
+					title={`${props.label} importieren`}
 					onClick={goImport}
 				>
 					<span aria-hidden="true" class="app-nav-add-icon">
@@ -499,7 +499,7 @@ function parseRoute(routePath: string, isAdmin: boolean): RouteInfo {
 function TabBar(): JSX.Element {
 	const TabContext = tabPathContext()
 	return (
-		<div class="tab-bar" role="tablist" aria-label="Open pages">
+		<div class="tab-bar" role="tablist" aria-label="Geöffnete Seiten">
 			<For each={tabs()}>
 				{(tab: TabState) => (
 					<div
@@ -530,8 +530,8 @@ function TabBar(): JSX.Element {
 							<button
 								type="button"
 								class="tab-close"
-								aria-label={`Close ${tabLabel(tab.id, tab.path)}`}
-								title={`Close ${tabLabel(tab.id, tab.path)}`}
+								aria-label={`${tabLabel(tab.id, tab.path)} schließen`}
+								title={`${tabLabel(tab.id, tab.path)} schließen`}
 								onClick={(e: MouseEvent): void => {
 									e.stopPropagation()
 									closeTab(tab.id)
@@ -724,7 +724,7 @@ function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolea
 					<UserEditPage id={info().userId as number} />
 				</Match>
 				<Match when={info().page === 'not-found'}>
-					<p>Not found.</p>
+					<p>Seite nicht gefunden.</p>
 				</Match>
 			</Switch>
 		</TabContext.Provider>
@@ -836,15 +836,15 @@ function App(): JSX.Element {
 
 		const trimmedUsername = setupUsername().trim()
 		if (!trimmedUsername) {
-			setSetupError('Username is required.')
+			setSetupError('Benutzername ist erforderlich.')
 			return
 		}
 		if (!setupPassword()) {
-			setSetupError('Password is required.')
+			setSetupError('Passwort ist erforderlich.')
 			return
 		}
 		if (setupPassword() !== setupConfirm()) {
-			setSetupError('Passwords do not match.')
+			setSetupError('Die Passwörter stimmen nicht überein.')
 			return
 		}
 
@@ -877,13 +877,13 @@ function App(): JSX.Element {
 	return (
 		<div class="app-shell">
 			<a class="skip-link" href="#main">
-				Skip to content
+				Zum Inhalt springen
 			</a>
 			<Show
 				when={isLoggedIn() !== null && needsSetup() !== null}
 				fallback={
 					<main class="app-content">
-						<p class="skeleton">Loading…</p>
+						<p class="skeleton">Wird geladen…</p>
 					</main>
 				}
 			>
@@ -940,7 +940,7 @@ function App(): JSX.Element {
 										class="app-user-button"
 										aria-haspopup="menu"
 										aria-expanded={userMenuOpen()}
-										aria-label={`Account: ${currentUser()?.username ?? '…'}`}
+										aria-label={`Konto: ${currentUser()?.username ?? '…'}`}
 										onClick={() => setUserMenuOpen(!userMenuOpen())}
 										onKeyDown={(e: KeyboardEvent): void => {
 											if (e.key === 'Escape') {
@@ -956,7 +956,7 @@ function App(): JSX.Element {
 										<div
 											class="app-user-dropdown"
 											role="menu"
-											aria-label="Account"
+											aria-label="Konto"
 										>
 											<button
 												type="button"
@@ -967,7 +967,7 @@ function App(): JSX.Element {
 												<span aria-hidden="true" class="app-nav-icon">
 													<IconLogout size={16} />
 												</span>
-												Log out
+												Abmelden
 											</button>
 										</div>
 									</Show>
@@ -975,35 +975,35 @@ function App(): JSX.Element {
 							</div>
 						</header>
 						<div class="app-body">
-							<aside class="app-sidebar" aria-label="Primary">
-								<p class="app-nav-label">Inventory</p>
+							<aside class="app-sidebar" aria-label="Hauptnavigation">
+								<p class="app-nav-label">Inventar</p>
 								<nav class="app-nav">
 									<NavItem
 										href="/tenants"
 										active={path().startsWith('/tenants') || path() === '/'}
 										icon={<IconUsers size={16} />}
-										label="Tenants"
+										label="Mandanten"
 										addHref="/tenants/add"
 									/>
 									<NavItem
 										href="/site-groups"
 										active={path().startsWith('/site-groups')}
 										icon={<IconFolder size={16} />}
-										label="Site Groups"
+										label="Standortgruppen"
 										addHref="/site-groups/add"
 									/>
 									<NavItem
 										href="/sites"
 										active={path().startsWith('/sites')}
 										icon={<IconMapPin size={16} />}
-										label="Sites"
+										label="Standorte"
 										addHref="/sites/add"
 									/>
 									<NavItem
 										href="/locations"
 										active={path().startsWith('/locations')}
 										icon={<IconLocation size={16} />}
-										label="Locations"
+										label="Bereiche"
 										addHref="/locations/add"
 									/>
 									<NavItem
@@ -1020,14 +1020,14 @@ function App(): JSX.Element {
 											path().startsWith('/templates')
 										}
 										icon={<IconTemplate size={16} />}
-										label="Rack types"
+										label="Racktypen"
 										addHref="/rack-types/add"
 									/>
 									<NavItem
 										href="/device-types"
 										active={path().startsWith('/device-types')}
 										icon={<IconCpu size={16} />}
-										label="Device types"
+										label="Gerätetypen"
 										addHref="/device-types/add"
 										importHref="/device-types/import"
 									/>
@@ -1035,21 +1035,21 @@ function App(): JSX.Element {
 										href="/manufacturers"
 										active={path().startsWith('/manufacturers')}
 										icon={<IconBuildingFactory size={16} />}
-										label="Manufacturers"
+										label="Hersteller"
 										addHref="/manufacturers/add"
 									/>
 									<NavItem
 										href="/devices"
 										active={path().startsWith('/devices')}
 										icon={<IconServer size={16} />}
-										label="Devices"
+										label="Geräte"
 										addHref="/devices/add"
 									/>
 									<NavItem
 										href="/interfaces"
 										active={path().startsWith('/interfaces')}
 										icon={<IconPlug size={16} />}
-										label="Interfaces"
+										label="Anschlüsse"
 									/>
 									<NavItem
 										href="/connections"
@@ -1058,20 +1058,20 @@ function App(): JSX.Element {
 											path().startsWith('/cables')
 										}
 										icon={<IconLink size={16} />}
-										label="Connections"
+										label="Verbindungen"
 									/>
 									<NavItem
 										href="/topology"
 										active={path().startsWith('/topology')}
 										icon={<IconNetwork size={16} />}
-										label="Topology"
+										label="Topologie"
 									/>
 									<Show when={currentUser()?.role === 'admin'}>
 										<NavItem
 											href="/users"
 											active={path().startsWith('/users')}
 											icon={<IconLock size={16} />}
-											label="Users"
+											label="Benutzer"
 											addHref="/users/add"
 										/>
 									</Show>

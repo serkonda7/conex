@@ -106,9 +106,9 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/site-groups"
-				backLabel="Site Groups"
+				backLabel="Standortgruppen"
 				loading={group.loading}
-				loadingText="Loading site group…"
+				loadingText="Standortgruppe wird geladen…"
 				record={group()}
 				emptyText="Site group not found."
 			>
@@ -127,12 +127,12 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle>{group()?.description || 'No description.'}</DetailSubtitle>
 
-				<DetailCard label="Site group details">
-					<dt>Slug</dt>
+				<DetailCard label="Details der Standortgruppe">
+					<dt>Kurzname</dt>
 					<dd>
 						<code>{group()?.slug}</code>
 					</dd>
-					<dt>Tenant</dt>
+					<dt>Mandant</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -141,7 +141,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Parent</dt>
+					<dt>Übergeordnete Gruppe</dt>
 					<dd>
 						<ForeignKeyLink
 							id={parentId()}
@@ -150,9 +150,9 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							href={`/site-groups/${parentId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Description</dt>
+					<dt>Beschreibung</dt>
 					<dd>{group()?.description || '—'}</dd>
-					<dt>Comments</dt>
+					<dt>Kommentare</dt>
 					<dd>{group()?.comments || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
@@ -162,8 +162,8 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 				title="Child groups"
 				count={childCount()}
 				loading={children.loading}
-				loadingText="Loading child groups…"
-				emptyText="No child groups yet."
+				loadingText="Untergruppen werden geladen…"
+				emptyText="Noch keine Untergruppen vorhanden."
 				hasItems={childCount() > 0}
 			>
 				<DataTable
@@ -197,8 +197,8 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 				title="Sites"
 				count={siteCount()}
 				loading={sites.loading}
-				loadingText="Loading sites…"
-				emptyText="No sites in this group yet."
+				loadingText="Standorte werden geladen…"
+				emptyText="Noch keine Standorte in dieser Gruppe vorhanden."
 				hasItems={siteCount() > 0}
 			>
 				<DataTable

@@ -13,7 +13,7 @@ import { go } from './list_page'
 
 /** Default hint under a slug input, where the slug is auto-filled from the name. */
 const SLUG_HINT =
-	'URL-safe identifier: lowercase letters, digits, single dashes. Auto-filled from the name.'
+	'URL-sicherer Bezeichner: Kleinbuchstaben, Ziffern und einzelne Bindestriche. Wird automatisch aus dem Namen ausgefüllt.'
 
 /** One `<select>` entry. */
 export interface FormOption {
@@ -239,7 +239,12 @@ export function SlugField(props: {
 	hint?: JSX.Element
 }): JSX.Element {
 	return (
-		<Field label="Slug" for={props.id} required hint={props.hint ?? <Hint>{SLUG_HINT}</Hint>}>
+		<Field
+			label="Kurzname"
+			for={props.id}
+			required
+			hint={props.hint ?? <Hint>{SLUG_HINT}</Hint>}
+		>
 			<input
 				id={props.id}
 				placeholder={props.placeholder}
@@ -274,13 +279,13 @@ export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.E
 				onClick={() => navigate(props.cancelTo, { refresh: false })}
 				disabled={props.saving}
 			>
-				Cancel
+				Abbrechen
 			</button>
 			<button type="submit" name="action" value="create" disabled={props.saving}>
-				{props.saving ? 'Creating…' : 'Create'}
+				{props.saving ? 'Wird erstellt…' : 'Erstellen'}
 			</button>
 			<button type="submit" name="action" value="add-another" disabled={props.saving}>
-				Create &amp; Add Another
+				Erstellen &amp; weiteres hinzufügen
 			</button>
 		</div>
 	)
@@ -318,10 +323,10 @@ export function EditActions(props: { saving: boolean; cancelTo: string }): JSX.E
 	return (
 		<div class="form-actions">
 			<button type="submit" disabled={props.saving}>
-				{props.saving ? 'Saving…' : 'Save'}
+				{props.saving ? 'Wird gespeichert…' : 'Speichern'}
 			</button>
 			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
-				Cancel
+				Abbrechen
 			</button>
 		</div>
 	)

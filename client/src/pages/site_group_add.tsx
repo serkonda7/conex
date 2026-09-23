@@ -57,34 +57,34 @@ export function SiteGroupAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/site-groups"
-			backLabel="Site Groups"
-			title="Add a new site group"
+			backLabel="Standortgruppen"
+			title="Neue Standortgruppe hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="site-group-name"
-				placeholder="US East"
+				placeholder="Norddeutschland"
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="site-group-slug"
-				placeholder="us-east"
+				placeholder="norddeutschland"
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="site-group-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 			/>
 			<SelectField
 				id="site-group-parent"
-				label="Parent"
+				label="Übergeordnete Gruppe"
 				value={parentId()}
 				onChange={setParentId}
 				options={row_options(groups() ?? [])}
@@ -92,16 +92,16 @@ export function SiteGroupAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="site-group-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="site-group-comments"
-				label="Comments"
-				placeholder="Additional notes (optional)"
+				label="Kommentare"
+				placeholder="Zusätzliche Notizen (optional)"
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

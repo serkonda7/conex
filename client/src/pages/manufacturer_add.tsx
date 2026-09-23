@@ -39,20 +39,20 @@ export function ManufacturerAddPage(): JSX.Element {
 		<FormPage
 			backTo="/manufacturers"
 			backLabel="Manufacturers"
-			title="Add a new manufacturer"
+			title="Neuen Hersteller hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="manufacturer-name"
-				placeholder="Acme"
+				placeholder="Musterhersteller"
 				value={name()}
 				onInput={setName}
 				autofocus
 			/>
 			<TextField
 				id="manufacturer-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}

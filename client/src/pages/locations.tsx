@@ -141,7 +141,7 @@ export function LocationsPage(): JSX.Element {
 	const columns: DataTableColumn<LocationRow>[] = [
 		{
 			key: 'name',
-			label: 'Location',
+			label: 'Bereich',
 			sortable: true,
 			getValue: (l: LocationRow): JSX.Element => (
 				<div
@@ -159,17 +159,17 @@ export function LocationsPage(): JSX.Element {
 		},
 		{
 			key: 'site',
-			label: 'Site',
+			label: 'Standort',
 			getValue: (l: LocationRow): string => siteNameOf(l.site_id),
 		},
 		{
 			key: 'parent',
-			label: 'Parent',
+			label: 'Übergeordneter Bereich',
 			getValue: (l: LocationRow): string => parentNameOf()(l.parent_id),
 		},
 		{
 			key: 'tenant',
-			label: 'Tenant',
+			label: 'Mandant',
 			getValue: (l: LocationRow): string => tenantNameOf(l.tenant_id),
 		},
 	]
@@ -191,25 +191,25 @@ export function LocationsPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Locations" add_href="/locations/add" />
+			<ListPageHeader title="Bereiche" add_href="/locations/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search locations"
-					placeholder="Search name, slug…"
+					label="Bereiche suchen"
+					placeholder="Name oder Kurzname suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
 					<span class="visually-hidden">Filter by site</span>
 					<select
-						aria-label="Filter by site"
+						aria-label="Nach Standort filtern"
 						value={filterSite()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterSite(e.currentTarget.value)
 						}
 					>
-						<option value="">All sites</option>
+						<option value="">Alle Standorte</option>
 						<For each={sites() ?? []}>
 							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
 						</For>
@@ -218,13 +218,13 @@ export function LocationsPage(): JSX.Element {
 				<label>
 					<span class="visually-hidden">Filter by tenant</span>
 					<select
-						aria-label="Filter by tenant"
+						aria-label="Nach Mandant filtern"
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterTenant(e.currentTarget.value)
 						}
 					>
-						<option value="">All tenants</option>
+						<option value="">Alle Mandanten</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
@@ -260,12 +260,12 @@ export function LocationsPage(): JSX.Element {
 					/>
 				)}
 				loading={() => locationsPage.loading}
-				loadingContent={<p class="skeleton">Loading locations…</p>}
+				loadingContent={<p class="skeleton">Bereiche werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterSite() || filterTenant()
-							? 'No locations match the current filters.'
-							: 'No locations yet. Add the first one above.'}
+							? 'Keine Bereiche für die aktuellen Filter gefunden.'
+							: 'Noch keine Bereiche vorhanden. Fügen Sie oben den ersten hinzu.'}
 					</p>
 				}
 			/>

@@ -159,17 +159,17 @@ export function RacksPage(): JSX.Element {
 		},
 		{
 			key: 'site',
-			label: 'Site',
+			label: 'Standort',
 			getValue: (r: RackRow): string => siteNameOf(r.site_id),
 		},
 		{
 			key: 'location',
-			label: 'Location',
+			label: 'Bereich',
 			getValue: (r: RackRow): string => locationNameOf(r.location_id),
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: 'Beschreibung',
 			class: 'cell-truncate',
 			getValue: (r: RackRow): JSX.Element => (
 				<span title={r.description ?? ''}>{r.description || '—'}</span>
@@ -177,12 +177,12 @@ export function RacksPage(): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: 'Type',
+			label: 'Typ',
 			getValue: (r: RackRow): string => rackTypeNameOf(r.rack_type_id),
 		},
 		{
 			key: 'tenant',
-			label: 'Tenant',
+			label: 'Mandant',
 			getValue: (r: RackRow): string => tenantNameOf(r.tenant_id),
 		},
 	]
@@ -207,21 +207,21 @@ export function RacksPage(): JSX.Element {
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search racks"
-					placeholder="Search name…"
+					label="Racks suchen"
+					placeholder="Namen suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
 					<span class="visually-hidden">Filter by site</span>
 					<select
-						aria-label="Filter by site"
+						aria-label="Nach Standort filtern"
 						value={filterSite()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							handleSiteFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">All sites</option>
+						<option value="">Alle Standorte</option>
 						<For each={sites() ?? []}>
 							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
 						</For>
@@ -230,13 +230,13 @@ export function RacksPage(): JSX.Element {
 				<label>
 					<span class="visually-hidden">Filter by location</span>
 					<select
-						aria-label="Filter by location"
+						aria-label="Nach Bereich filtern"
 						value={filterLocation()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterLocation(e.currentTarget.value)
 						}
 					>
-						<option value="">All locations</option>
+						<option value="">Alle Bereiche</option>
 						<For each={locations() ?? []}>
 							{(l: LocationRow): JSX.Element => (
 								<option value={l.id}>{l.name}</option>
@@ -247,13 +247,13 @@ export function RacksPage(): JSX.Element {
 				<label>
 					<span class="visually-hidden">Filter by tenant</span>
 					<select
-						aria-label="Filter by tenant"
+						aria-label="Nach Mandant filtern"
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterTenant(e.currentTarget.value)
 						}
 					>
-						<option value="">All tenants</option>
+						<option value="">Alle Mandanten</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
@@ -289,12 +289,12 @@ export function RacksPage(): JSX.Element {
 					/>
 				)}
 				loading={() => racksPage.loading}
-				loadingContent={<p class="skeleton">Loading racks…</p>}
+				loadingContent={<p class="skeleton">Racks werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterSite() || filterLocation() || filterTenant()
-							? 'No racks match the current filters.'
-							: 'No racks yet. Add the first one above.'}
+							? 'Keine Racks für die aktuellen Filter gefunden.'
+							: 'Noch keine Racks vorhanden. Fügen Sie oben das erste hinzu.'}
 					</p>
 				}
 			/>

@@ -106,13 +106,13 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/locations/${props.id}`}
 			backLabel={location()?.name ?? 'Location'}
-			title="Edit location"
+			title="Bereich bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading location…"
+			loadingText="Bereich wird geladen…"
 			onSubmit={handleSave}
 		>
 			<div class="field">
-				<label for="location-edit-site">Site</label>
+				<label for="location-edit-site">Standort</label>
 				<input
 					id="location-edit-site"
 					value={site()?.name ?? (siteId() ? String(siteId()) : '')}
@@ -146,16 +146,16 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 			/>
 			<SelectField
 				id="location-edit-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 			/>
 			<TextField
 				id="location-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}

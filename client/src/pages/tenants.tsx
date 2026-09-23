@@ -61,7 +61,7 @@ export function TenantsPage(): JSX.Element {
 	const columns: DataTableColumn<TenantWithCounts>[] = [
 		{
 			key: 'name',
-			label: 'Tenant',
+			label: 'Mandant',
 			sortable: true,
 			getValue: (t: TenantWithCounts): JSX.Element => (
 				<a
@@ -74,7 +74,7 @@ export function TenantsPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: 'Beschreibung',
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (t: TenantWithCounts): JSX.Element => (
@@ -99,12 +99,12 @@ export function TenantsPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Tenants" add_href="/tenants/add" />
+			<ListPageHeader title="Mandanten" add_href="/tenants/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search tenants"
-					placeholder="Search name, slug, description…"
+					label="Mandanten suchen"
+					placeholder="Name, Kurzname oder Beschreibung suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
@@ -138,12 +138,12 @@ export function TenantsPage(): JSX.Element {
 					/>
 				)}
 				loading={() => tenantsPage.loading}
-				loadingContent={<p class="skeleton">Loading tenants…</p>}
+				loadingContent={<p class="skeleton">Mandanten werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch()
-							? `No tenants match "${debouncedSearch()}".`
-							: 'No tenants yet. Add the first one above.'}
+							? `Keine Mandanten für „${debouncedSearch()}“ gefunden.`
+							: 'Noch keine Mandanten vorhanden. Fügen Sie oben den ersten hinzu.'}
 					</p>
 				}
 			/>

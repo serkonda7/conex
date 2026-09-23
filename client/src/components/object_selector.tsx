@@ -59,7 +59,7 @@ export function ObjectSelector<T extends { id: number }>(
 					<Show when={!objects.loading} fallback={<p class="skeleton">Loading…</p>}>
 						<Show
 							when={(objects() ?? []).length > 0}
-							fallback={<p class="empty">No matching objects.</p>}
+							fallback={<p class="empty">Keine passenden Einträge gefunden.</p>}
 						>
 							<ul>
 								<For each={objects() ?? []}>

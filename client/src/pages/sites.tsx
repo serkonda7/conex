@@ -109,7 +109,7 @@ export function SitesPage(): JSX.Element {
 	const columns: DataTableColumn<SiteRow>[] = [
 		{
 			key: 'name',
-			label: 'Site',
+			label: 'Standort',
 			sortable: true,
 			getValue: (s: SiteRow): JSX.Element => (
 				<a
@@ -122,7 +122,7 @@ export function SitesPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: 'Beschreibung',
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (s: SiteRow): JSX.Element => (
@@ -131,12 +131,12 @@ export function SitesPage(): JSX.Element {
 		},
 		{
 			key: 'tenant',
-			label: 'Tenant',
+			label: 'Mandant',
 			getValue: (s: SiteRow): string => tenantNameOf(s.tenant_id),
 		},
 		{
 			key: 'group',
-			label: 'Group',
+			label: 'Gruppe',
 			getValue: (s: SiteRow): string => groupNameOf(s),
 		},
 	]
@@ -157,25 +157,25 @@ export function SitesPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Sites" add_href="/sites/add" />
+			<ListPageHeader title="Standorte" add_href="/sites/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search sites"
-					placeholder="Search name, slug…"
+					label="Standorte suchen"
+					placeholder="Name oder Kurzname suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by tenant</span>
+					<span class="visually-hidden">Nach Mandant filtern</span>
 					<select
-						aria-label="Filter by tenant"
+						aria-label="Nach Mandant filtern"
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setFilterTenant(e.currentTarget.value)
 						}}
 					>
-						<option value="">All tenants</option>
+						<option value="">Alle Mandanten</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
@@ -211,12 +211,12 @@ export function SitesPage(): JSX.Element {
 					/>
 				)}
 				loading={() => sitesPage.loading}
-				loadingContent={<p class="skeleton">Loading sites…</p>}
+				loadingContent={<p class="skeleton">Standorte werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterTenant()
-							? 'No sites match the current filters.'
-							: 'No sites yet. Add the first one above.'}
+							? 'Keine Standorte für die aktuellen Filter gefunden.'
+							: 'Noch keine Standorte vorhanden. Fügen Sie oben den ersten hinzu.'}
 					</p>
 				}
 			/>

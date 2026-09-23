@@ -142,19 +142,19 @@ export function DeviceAddPage(): JSX.Element {
 		<FormPage
 			backTo="/devices"
 			backLabel="Devices"
-			title="Add a new device"
+			title="Neues Gerät hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="device-name"
-				placeholder="sw-access-01"
+				placeholder="sw-zugang-01"
 				value={name()}
 				onInput={setName}
 				autofocus
 			/>
 			<SelectField
 				id="device-type"
-				label="Device type"
+				label="Gerätetyp"
 				required
 				value={typeId()}
 				onChange={setTypeId}
@@ -167,8 +167,8 @@ export function DeviceAddPage(): JSX.Element {
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Add device type"
-						title="Add device type"
+						aria-label="Gerätetyp hinzufügen"
+						title="Gerätetyp hinzufügen"
 						onClick={() => navigate('/device-types/add')}
 					>
 						<IconPlus size={16} />
@@ -177,36 +177,36 @@ export function DeviceAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextField
 				id="device-serial"
-				label="Serial"
-				placeholder="Serial (optional)"
+				label="Seriennummer"
+				placeholder="Seriennummer (optional)"
 				maxLength={100}
 				value={serial()}
 				onInput={setSerial}
 			/>
 			<SelectField
 				id="device-site"
-				label="Site"
+				label="Standort"
 				value={siteId()}
 				onChange={handleSiteChange}
 				options={row_options(sites() ?? [])}
-				emptyLabel="No site"
+				emptyLabel="Kein Standort"
 			/>
 			<SelectField
 				id="device-location"
-				label="Location"
+				label="Bereich"
 				value={locationId()}
 				disabled={siteId() === ''}
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
-				emptyLabel="No location"
+				emptyLabel="Kein Bereich"
 				hint={
 					<Show when={siteId() === ''}>
 						<Hint>Pick a site first to choose a location.</Hint>
@@ -223,12 +223,12 @@ export function DeviceAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="device-face"
-				label="Face"
+				label="Seite"
 				value={face()}
 				disabled={rackId() === ''}
 				onChange={setFace}
 				options={FACE_OPTIONS}
-				emptyLabel="No face"
+				emptyLabel="Keine Seite"
 				hint={
 					<Show
 						when={rackId() === ''}
@@ -240,8 +240,8 @@ export function DeviceAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-position"
-				label="U position"
-				placeholder="U position (or empty)"
+				label="U-Position"
+				placeholder="U-Position (oder leer lassen)"
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
@@ -249,11 +249,11 @@ export function DeviceAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="device-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
 						<Hint>Defaults to the site's tenant.</Hint>

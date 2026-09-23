@@ -50,7 +50,9 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 		setFormError(null)
 		const tenant = tenantId() === '' ? null : Number(tenantId())
 		if (role() === 'admin' && tenant !== null) {
-			setFormError('Admin accounts are global and cannot be limited to a tenant.')
+			setFormError(
+				'Administratorkonten gelten global und können nicht auf einen Mandanten beschränkt werden.',
+			)
 			return
 		}
 		setSaving(true)
@@ -71,19 +73,22 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo="/users"
 			backLabel={user()?.username ?? 'User'}
-			title="Edit user"
+			title="Benutzer bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading user…"
+			loadingText="Benutzer wird geladen…"
 			onSubmit={handleSave}
 		>
 			<SelectField
 				id="user-edit-role"
-				label="Role"
+				label="Rolle"
 				value={role()}
 				onChange={(value: string): void => {
 					setRole(value as UserRole)
 				}}
-				options={ROLES.map((r) => ({ value: r, label: r }))}
+				options={ROLES.map((r) => ({
+					value: r,
+					label: { admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' }[r],
+				}))}
 				hint={
 					<Hint>
 						Admin manages users and everything; editor reads and writes inventory;
@@ -94,14 +99,14 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 			<Show when={role() !== 'admin'}>
 				<SelectField
 					id="user-edit-tenant"
-					label="Tenant scope"
+					label="Mandantenzuordnung"
 					value={tenantId()}
 					onChange={setTenantId}
 					options={(tenantsPage()?.items ?? []).map((t) => ({
 						value: String(t.id),
 						label: t.name,
 					}))}
-					emptyLabel="All tenants"
+					emptyLabel="Alle Mandanten"
 					hint={
 						<Hint>
 							Limit an editor or viewer to a single tenant. Empty means global.
@@ -113,7 +118,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				id="user-edit-password"
 				label="New password"
 				type="password"
-				placeholder="Leave empty to keep the current password"
+				placeholder="Leer lassen, um das aktuelle Passwort beizubehalten"
 				value={password()}
 				onInput={setPassword}
 				autocomplete="new-password"

@@ -136,9 +136,9 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/locations"
-				backLabel="Locations"
+				backLabel="Bereiche"
 				loading={location.loading}
-				loadingText="Loading location…"
+				loadingText="Bereich wird geladen…"
 				record={location()}
 				emptyText="Location not found."
 			>
@@ -157,12 +157,12 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle>{location()?.description || 'No description.'}</DetailSubtitle>
 
-				<DetailCard label="Location details">
-					<dt>Slug</dt>
+				<DetailCard label="Details des Bereichs">
+					<dt>Kurzname</dt>
 					<dd>
 						<code>{location()?.slug}</code>
 					</dd>
-					<dt>Site</dt>
+					<dt>Standort</dt>
 					<dd>
 						<ForeignKeyLink
 							id={siteId()}
@@ -171,7 +171,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							href={`/sites/${siteId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Parent</dt>
+					<dt>Übergeordneter Bereich</dt>
 					<dd>
 						<ForeignKeyLink
 							id={parentId()}
@@ -180,7 +180,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							href={`/locations/${parentId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Tenant</dt>
+					<dt>Mandant</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -189,7 +189,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Description</dt>
+					<dt>Beschreibung</dt>
 					<dd>{location()?.description || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
@@ -199,8 +199,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				title="Child locations"
 				count={childCount()}
 				loading={children.loading}
-				loadingText="Loading child locations…"
-				emptyText="No child locations yet."
+				loadingText="Unterbereiche werden geladen…"
+				emptyText="Noch keine Unterbereiche vorhanden."
 				hasItems={childCount() > 0}
 			>
 				<DataTable
@@ -234,8 +234,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				title="Racks"
 				count={rackCount()}
 				loading={racks.loading}
-				loadingText="Loading racks…"
-				emptyText="No racks here yet."
+				loadingText="Racks werden geladen…"
+				emptyText="Hier sind noch keine Racks vorhanden."
 				hasItems={rackCount() > 0}
 			>
 				<DataTable
@@ -269,8 +269,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				title="Devices"
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Loading devices…"
-				emptyText="No devices here yet."
+				loadingText="Geräte werden geladen…"
+				emptyText="Hier sind noch keine Geräte vorhanden."
 				hasItems={deviceCount() > 0}
 			>
 				<DataTable

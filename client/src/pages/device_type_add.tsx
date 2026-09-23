@@ -81,12 +81,12 @@ export function DeviceTypeAddPage(): JSX.Element {
 		<FormPage
 			backTo="/device-types"
 			backLabel="Device types"
-			title="Add a device type"
+			title="Neuen Gerätetyp hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<SelectField
 				id="device-type-manufacturer"
-				label="Manufacturer"
+				label="Hersteller"
 				required
 				autofocus
 				value={manufacturerId()}
@@ -97,8 +97,8 @@ export function DeviceTypeAddPage(): JSX.Element {
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Add manufacturer"
-						title="Add manufacturer"
+						aria-label="Hersteller hinzufügen"
+						title="Hersteller hinzufügen"
 						onClick={() => navigate('/manufacturers/add')}
 					>
 						<IconPlus size={16} />
@@ -107,15 +107,15 @@ export function DeviceTypeAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-type-model"
-				label="Model"
+				label="Modell"
 				required
 				value={model()}
 				onInput={setModel}
-				placeholder="Example Switch 48"
+				placeholder="Beispiel-Switch 48"
 			/>
 			<TextField
 				id="device-type-u-height"
-				label="Height (U)"
+				label="Höhe (U)"
 				type="number"
 				required
 				min={0}
@@ -141,15 +141,15 @@ export function DeviceTypeAddPage(): JSX.Element {
 			</div>
 			<TextField
 				id="device-type-description"
-				label="Description"
+				label="Beschreibung"
 				value={description()}
 				onInput={setDescription}
-				placeholder="Short summary (optional)"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 			/>
 			<TextAreaField
 				id="device-type-comments"
-				label="Comments"
+				label="Kommentare"
 				value={comments()}
 				onInput={setComments}
 				maxLength={2000}

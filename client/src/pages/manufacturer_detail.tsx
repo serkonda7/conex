@@ -66,7 +66,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 				backTo="/manufacturers"
 				backLabel="Manufacturers"
 				loading={manufacturer.loading}
-				loadingText="Loading manufacturer…"
+				loadingText="Hersteller wird geladen…"
 				record={manufacturer()}
 				emptyText="Manufacturer not found."
 			>
@@ -77,8 +77,8 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle>{manufacturer()?.description || 'No description.'}</DetailSubtitle>
 
-				<DetailCard label="Manufacturer details">
-					<dt>Description</dt>
+				<DetailCard label="Herstellerdetails">
+					<dt>Beschreibung</dt>
 					<dd>{manufacturer()?.description || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
@@ -88,8 +88,8 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 				title="Device types"
 				count={typeCount()}
 				loading={deviceTypes.loading}
-				loadingText="Loading device types…"
-				emptyText="No device types for this manufacturer yet."
+				loadingText="Gerätetypen werden geladen…"
+				emptyText="Für diesen Hersteller sind noch keine Gerätetypen vorhanden."
 				hasItems={typeCount() > 0}
 				viewAllHref={`/device-types?manufacturer=${props.id}`}
 				viewAllLabel="View in Device types →"

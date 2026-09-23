@@ -107,9 +107,9 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/tenants"
-				backLabel="Tenants"
+				backLabel="Mandanten"
 				loading={tenant.loading}
-				loadingText="Loading tenant…"
+				loadingText="Mandant wird geladen…"
 				record={tenant()}
 				emptyText="Tenant not found."
 			>
@@ -144,14 +144,14 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					</a>
 				</div>
 
-				<DetailCard label="Tenant details">
-					<dt>Slug</dt>
+				<DetailCard label="Mandantendetails">
+					<dt>Kurzname</dt>
 					<dd>
 						<code>{tenant()?.slug}</code>
 					</dd>
-					<dt>Description</dt>
+					<dt>Beschreibung</dt>
 					<dd>{tenant()?.description || '—'}</dd>
-					<dt>Comments</dt>
+					<dt>Kommentare</dt>
 					<dd>{tenant()?.comments || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
@@ -161,8 +161,8 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				title="Sites"
 				count={siteCount()}
 				loading={sites.loading}
-				loadingText="Loading sites…"
-				emptyText="No sites for this tenant yet."
+				loadingText="Standorte werden geladen…"
+				emptyText="Für diesen Mandanten sind noch keine Standorte vorhanden."
 				hasItems={siteCount() > 0}
 				viewAllHref={`/sites?tenant=${props.id}`}
 				viewAllLabel="View in Sites →"
@@ -198,8 +198,8 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				title="Site groups"
 				count={siteGroupCount()}
 				loading={siteGroups.loading}
-				loadingText="Loading site groups…"
-				emptyText="No site groups for this tenant yet."
+				loadingText="Standortgruppen werden geladen…"
+				emptyText="Für diesen Mandanten sind noch keine Standortgruppen vorhanden."
 				hasItems={siteGroupCount() > 0}
 				viewAllHref={`/site-groups?tenant=${props.id}`}
 				viewAllLabel="View in Site Groups →"
@@ -235,8 +235,8 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				title="Racks"
 				count={rackCount()}
 				loading={racks.loading}
-				loadingText="Loading racks…"
-				emptyText="No racks for this tenant yet."
+				loadingText="Racks werden geladen…"
+				emptyText="Für diesen Mandanten sind noch keine Racks vorhanden."
 				hasItems={rackCount() > 0}
 			>
 				<DataTable
@@ -270,8 +270,8 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				title="Devices"
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Loading devices…"
-				emptyText="No devices for this tenant yet."
+				loadingText="Geräte werden geladen…"
+				emptyText="Für diesen Mandanten sind noch keine Geräte vorhanden."
 				hasItems={deviceCount() > 0}
 				viewAllHref={`/devices?tenant=${props.id}`}
 				viewAllLabel="View in Devices →"

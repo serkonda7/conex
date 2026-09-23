@@ -228,8 +228,23 @@ export function useListDelete(opts: {
 	handleDelete: (id: number, name: string) => Promise<void>
 	handleBulkDelete: () => Promise<void>
 } {
+	const germanNouns: Record<string, { singular: string; plural: string }> = {
+		tenant: { singular: 'Mandant', plural: 'Mandanten' },
+		site: { singular: 'Standort', plural: 'Standorte' },
+		'site group': { singular: 'Standortgruppe', plural: 'Standortgruppen' },
+		location: { singular: 'Bereich', plural: 'Bereiche' },
+		rack: { singular: 'Rack', plural: 'Racks' },
+		'rack type': { singular: 'Racktyp', plural: 'Racktypen' },
+		'device type': { singular: 'Gerätetyp', plural: 'Gerätetypen' },
+		manufacturer: { singular: 'Hersteller', plural: 'Hersteller' },
+		device: { singular: 'Gerät', plural: 'Geräte' },
+		interface: { singular: 'Anschluss', plural: 'Anschlüsse' },
+		connection: { singular: 'Verbindung', plural: 'Verbindungen' },
+		user: { singular: 'Benutzer', plural: 'Benutzer' },
+	}
+	const noun = germanNouns[opts.noun] ?? { singular: opts.noun, plural: opts.noun }
 	async function handleDelete(id: number, name: string): Promise<void> {
-		if (!window.confirm(`Delete ${opts.noun} "${name}"?`)) {
+		if (!window.confirm(`${noun.singular} „${name}“ löschen?`)) {
 			return
 		}
 		opts.setError(null)
@@ -247,7 +262,7 @@ export function useListDelete(opts: {
 		if (ids.length === 0) {
 			return
 		}
-		if (!window.confirm(`Delete ${ids.length} ${opts.noun}${ids.length === 1 ? '' : 's'}?`)) {
+		if (!window.confirm(`${ids.length} ${noun.plural} löschen?`)) {
 			return
 		}
 		opts.setError(null)
@@ -260,7 +275,7 @@ export function useListDelete(opts: {
 		}
 		opts.setSelected([])
 		if (failures.length > 0) {
-			opts.setError(failures[0] ?? 'Bulk delete failed')
+			opts.setError(failures[0] ?? 'Massenlöschung fehlgeschlagen')
 		}
 		void opts.refetch()
 	}
@@ -280,7 +295,7 @@ export function ListPageHeader(props: {
 }): JSX.Element {
 	const addButton = (
 		<button type="button" class="btn-add" onClick={(): void => navigate(props.add_href)}>
-			+ Add
+			+ Hinzufügen
 		</button>
 	)
 	return (
@@ -323,7 +338,7 @@ export function BulkDeleteButton(props: { count: number; onClick: () => void }):
 	return (
 		<Show when={props.count > 0}>
 			<button type="button" class="btn-danger" onClick={props.onClick}>
-				Delete {props.count} selected
+				{props.count} ausgewählte löschen
 			</button>
 		</Show>
 	)
@@ -342,14 +357,16 @@ export function ListRowActions(props: {
 	onToggleMenu: (e: MouseEvent & { currentTarget: HTMLButtonElement }) => void
 	onCloseMenu: () => void
 }): JSX.Element {
+	const editTarget = (): string => props.edit_title.replace(/^Edit\s+/, '')
+	const menuTarget = (): string => props.menu_label.replace(/^More actions for\s+/, '')
 	return (
 		<div class="row-actions">
 			<Show when={props.edit_href !== undefined}>
 				<button
 					type="button"
 					class="icon-btn"
-					title={props.edit_title}
-					aria-label={props.edit_label}
+					title={`Bearbeiten: ${editTarget()}`}
+					aria-label={`Bearbeiten: ${editTarget()}`}
 					onClick={() => navigate(props.edit_href ?? '')}
 				>
 					<IconPencil size={16} />
@@ -359,7 +376,7 @@ export function ListRowActions(props: {
 				<button
 					type="button"
 					class="icon-btn"
-					aria-label={props.menu_label}
+					aria-label={`Weitere Aktionen für ${menuTarget()}`}
 					aria-haspopup="menu"
 					aria-expanded={props.menu_open}
 					onClick={props.onToggleMenu}
@@ -388,7 +405,7 @@ export function RowMenu(props: {
 				<div
 					class="row-menu"
 					role="menu"
-					aria-label={`Actions for ${props.menu()?.name ?? ''}`}
+					aria-label={`Aktionen für ${props.menu()?.name ?? ''}`}
 					style={{
 						top: props.menu()?.up ? undefined : `${props.menu()?.edge ?? 0}px`,
 						bottom: props.menu()?.up ? `${props.menu()?.edge ?? 0}px` : undefined,
@@ -413,7 +430,7 @@ export function RowMenu(props: {
 						}}
 					>
 						<IconTrash size={16} />
-						Delete
+						Löschen
 					</button>
 				</div>
 			</Portal>
@@ -425,7 +442,7 @@ export function RowMenu(props: {
 export function ListRangeStatus(props: { total: number }): JSX.Element {
 	return (
 		<p class="paginator-showing" role="status">
-			Showing {props.total === 0 ? 0 : 1}-{props.total} of {props.total}
+			Einträge {props.total === 0 ? 0 : 1}–{props.total} von {props.total}
 		</p>
 	)
 }

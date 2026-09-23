@@ -92,35 +92,35 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/site-groups/${props.id}`}
 			backLabel={group()?.name ?? 'Site group'}
-			title="Edit site group"
+			title="Standortgruppe bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading site group…"
+			loadingText="Standortgruppe wird geladen…"
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="site-group-edit-name"
-				placeholder="US East"
+				placeholder="Norddeutschland"
 				value={name()}
 				onInput={setName}
 			/>
 			<SlugField
 				id="site-group-edit-slug"
-				placeholder="us-east"
+				placeholder="norddeutschland"
 				value={slug()}
 				onInput={setSlug}
 				hint={<Hint>URL-safe identifier: lowercase letters, digits, single dashes.</Hint>}
 			/>
 			<SelectField
 				id="site-group-edit-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 			/>
 			<SelectField
 				id="site-group-edit-parent"
-				label="Parent"
+				label="Übergeordnete Gruppe"
 				value={parentId()}
 				onChange={setParentId}
 				options={row_options((groups() ?? []).filter((g) => g.id !== props.id))}
@@ -128,16 +128,16 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextField
 				id="site-group-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="site-group-edit-comments"
-				label="Comments"
-				placeholder="Additional notes (optional)"
+				label="Kommentare"
+				placeholder="Zusätzliche Notizen (optional)"
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

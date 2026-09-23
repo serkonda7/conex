@@ -62,7 +62,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 					← Device types
 				</a>
 			</p>
-			<h2>Import device types</h2>
+			<h2>Gerätetypen importieren</h2>
 			<p class="page-subtitle">
 				For prebuilt definitions see{' '}
 				<a
@@ -200,7 +200,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 							getValue: (r: ImportRowResult): string => r.error ?? '—',
 						},
 					]}
-					emptyContent={<p class="empty">No rows processed.</p>}
+					emptyContent={<p class="empty">Keine Zeilen verarbeitet.</p>}
 				/>
 			</Show>
 		</div>

@@ -45,21 +45,21 @@ export function ManufacturerEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/manufacturers/${props.id}`}
 			backLabel={manufacturer()?.name ?? 'Manufacturer'}
-			title="Edit manufacturer"
+			title="Hersteller bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading manufacturer…"
+			loadingText="Hersteller wird geladen…"
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="manufacturer-edit-name"
-				placeholder="Acme"
+				placeholder="Musterhersteller"
 				value={name()}
 				onInput={setName}
 			/>
 			<TextField
 				id="manufacturer-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}

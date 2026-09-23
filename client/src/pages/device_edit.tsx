@@ -142,9 +142,9 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/devices/${props.id}`}
 			backLabel={device()?.name ?? 'Device'}
-			title="Edit device"
+			title="Gerät bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading device…"
+			loadingText="Gerät wird geladen…"
 			onSubmit={handleSave}
 		>
 			<NameField
@@ -154,7 +154,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				onInput={setName}
 			/>
 			<div class="field">
-				<label for="device-edit-type">Device type</label>
+				<label for="device-edit-type">Gerätetyp</label>
 				<input id="device-edit-type" value={typeName()} disabled />
 				<p class="field-hint">
 					The device type is immutable after create: swapping the template would
@@ -163,35 +163,35 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			</div>
 			<TextField
 				id="device-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextField
 				id="device-edit-serial"
-				label="Serial"
-				placeholder="Serial (optional)"
+				label="Seriennummer"
+				placeholder="Seriennummer (optional)"
 				maxLength={100}
 				value={serial()}
 				onInput={setSerial}
 			/>
 			<SelectField
 				id="device-edit-site"
-				label="Site"
+				label="Standort"
 				value={siteId()}
 				onChange={handleSiteChange}
 				options={row_options(sites() ?? [])}
-				emptyLabel="No site"
+				emptyLabel="Kein Standort"
 			/>
 			<SelectField
 				id="device-edit-location"
-				label="Location"
+				label="Bereich"
 				value={locationId()}
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
-				emptyLabel="No location"
+				emptyLabel="Kein Bereich"
 				disabled={siteId() === ''}
 				hint={
 					<Show when={siteId() === ''}>
@@ -209,19 +209,19 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			/>
 			<SelectField
 				id="device-edit-face"
-				label="Face"
+				label="Seite"
 				value={face()}
 				onChange={setFace}
 				options={[
-					{ value: 'front', label: 'front' },
-					{ value: 'rear', label: 'rear' },
+					{ value: 'front', label: 'Vorderseite' },
+					{ value: 'rear', label: 'Rückseite' },
 				]}
-				emptyLabel="No face"
+				emptyLabel="Keine Seite"
 			/>
 			<TextField
 				id="device-edit-position"
-				label="U position"
-				placeholder="U position (empty clears)"
+				label="U-Position"
+				placeholder="U-Position (leer zum Entfernen)"
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
@@ -234,11 +234,11 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			/>
 			<SelectField
 				id="device-edit-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 			/>
 			<FormError message={formError} />
 			<EditActions saving={saving()} cancelTo={`/devices/${props.id}`} />

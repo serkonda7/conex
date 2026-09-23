@@ -110,10 +110,15 @@ export function RackAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage backTo="/racks" backLabel="Racks" title="Add a new rack" onSubmit={handleCreate}>
+		<FormPage
+			backTo="/racks"
+			backLabel="Racks"
+			title="Neues Rack hinzufügen"
+			onSubmit={handleCreate}
+		>
 			<SelectField
 				id="rack-site"
-				label="Site"
+				label="Standort"
 				required
 				value={siteId()}
 				onChange={handleSiteChange}
@@ -122,12 +127,12 @@ export function RackAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="rack-location"
-				label="Location"
+				label="Bereich"
 				value={locationId()}
 				disabled={siteId() === ''}
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
-				emptyLabel="No location"
+				emptyLabel="Kein Bereich"
 				hint={
 					<Show when={siteId() === ''}>
 						<Hint>Pick a site first to choose a location.</Hint>
@@ -137,7 +142,7 @@ export function RackAddPage(): JSX.Element {
 			<NameField id="rack-name" placeholder="A1" value={name()} onInput={setName} autofocus />
 			<SelectField
 				id="rack-type"
-				label="Rack type"
+				label="Racktyp"
 				value={rackTypeId()}
 				onChange={setRackTypeId}
 				options={(rackTypes() ?? []).map((type) => ({
@@ -151,8 +156,8 @@ export function RackAddPage(): JSX.Element {
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Add rack type"
-						title="Add rack type"
+						aria-label="Racktyp hinzufügen"
+						title="Racktyp hinzufügen"
 						onClick={() => navigate('/rack-types/add')}
 					>
 						<IconPlus size={16} />
@@ -161,19 +166,19 @@ export function RackAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="rack-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<SelectField
 				id="rack-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
 						<Hint>Defaults to the site's tenant.</Hint>

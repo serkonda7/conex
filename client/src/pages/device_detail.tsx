@@ -285,7 +285,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				backTo="/devices"
 				backLabel="Devices"
 				loading={device.loading}
-				loadingText="Loading device…"
+				loadingText="Gerät wird geladen…"
 				record={device()}
 				emptyText="Device not found."
 			>
@@ -315,14 +315,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</a>
 				</div>
 
-				<DetailCard label="Device details">
-					<dt>Type</dt>
+				<DetailCard label="Gerätedetails">
+					<dt>Typ</dt>
 					<dd>{typeNameOf(device()?.device_type_id)}</dd>
-					<dt>Description</dt>
+					<dt>Beschreibung</dt>
 					<dd>{device()?.description || '—'}</dd>
-					<dt>Serial</dt>
+					<dt>Seriennummer</dt>
 					<dd>{device()?.serial ?? '—'}</dd>
-					<dt>Site</dt>
+					<dt>Standort</dt>
 					<dd>
 						<ForeignKeyLink
 							id={siteId()}
@@ -331,7 +331,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							href={`/sites/${siteId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Location</dt>
+					<dt>Bereich</dt>
 					<dd>
 						<ForeignKeyLink
 							id={locationId()}
@@ -348,7 +348,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							href={`/racks/${rackId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Face</dt>
+					<dt>Seite</dt>
 					<dd>{device()?.face ?? '—'}</dd>
 					<dt>Position</dt>
 					<dd>
@@ -358,7 +358,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							<span>unracked</span>
 						)}
 					</dd>
-					<dt>Tenant</dt>
+					<dt>Mandant</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -377,7 +377,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					value={moveU()}
 					onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}
 				/>
-				<button type="submit">Move</button>
+				<button type="submit">Verschieben</button>
 			</form>
 			<h3 id="device-interfaces">Interfaces ({ifaces()?.length ?? 0})</h3>
 			<form onSubmit={handleAddIface}>
@@ -386,7 +386,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					value={ifaceName()}
 					onInput={(e: InputEventAndTarget) => setIfaceName(e.currentTarget.value)}
 				/>
-				<button type="submit">Add interface</button>
+				<button type="submit">Anschluss hinzufügen</button>
 			</form>
 			<DataTable
 				rows={() => ifaces() ?? []}
@@ -442,7 +442,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				)}
 				empty={false}
 			/>
-			<h3 id="device-connect">Connect a cable</h3>
+			<h3 id="device-connect">Kabel verbinden</h3>
 			<form onSubmit={handleConnect}>
 				<select
 					value={localIface()}
@@ -490,11 +490,11 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					value={cableLabel()}
 					onInput={(e: InputEventAndTarget) => setCableLabel(e.currentTarget.value)}
 				/>{' '}
-				<button type="submit">Connect</button>
+				<button type="submit">Verbinden</button>
 			</form>
-			<h3 id="device-trace">Trace ({trace()?.links.length ?? 0})</h3>
+			<h3 id="device-trace">Pfad ({trace()?.links.length ?? 0})</h3>
 			<label>
-				<span class="visually-hidden">Trace depth</span>
+				<span class="visually-hidden">Pfadtiefe</span>
 				<select
 					aria-label="Trace depth"
 					value={traceDepth()}
@@ -515,7 +515,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			</a>
 			<Show
 				when={(trace()?.links ?? []).length > 0}
-				fallback={<Empty message="No cable path yet. Connect the first cable below." />}
+				fallback={
+					<Empty message="Noch kein Kabelpfad vorhanden. Verbinden Sie unten das erste Kabel." />
+				}
 			>
 				<ul>
 					<For each={trace()?.links ?? []}>
@@ -607,7 +609,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						Disconnect
 					</button>
 				)}
-				emptyContent={<Empty message="No cables on this device yet." />}
+				emptyContent={<Empty message="Für dieses Gerät sind noch keine Kabel vorhanden." />}
 			/>
 			<InlineError message={error()} />
 		</div>

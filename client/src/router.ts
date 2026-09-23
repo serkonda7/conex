@@ -131,34 +131,34 @@ export function tabTitle(raw: string): string {
 	const base = (raw.split('?')[0] ?? '').replace(/\/+$/, '') || '/'
 	const segments = base.split('/').filter((p) => p.length > 0)
 	if (segments.length === 0) {
-		return 'Tenants'
+		return 'Mandanten'
 	}
 	const names: Record<string, string> = {
-		tenants: 'Tenants',
-		sites: 'Sites',
-		'site-groups': 'Site Groups',
-		locations: 'Locations',
+		tenants: 'Mandanten',
+		sites: 'Standorte',
+		'site-groups': 'Standortgruppen',
+		locations: 'Bereiche',
 		racks: 'Racks',
-		'rack-types': 'Rack Types',
-		templates: 'Rack Types',
-		'device-types': 'Device Types',
-		manufacturers: 'Manufacturers',
-		devices: 'Devices',
-		interfaces: 'Interfaces',
-		connections: 'Connections',
-		cables: 'Connections',
-		topology: 'Topology',
-		users: 'Users',
+		'rack-types': 'Racktypen',
+		templates: 'Racktypen',
+		'device-types': 'Gerätetypen',
+		manufacturers: 'Hersteller',
+		devices: 'Geräte',
+		interfaces: 'Anschlüsse',
+		connections: 'Verbindungen',
+		cables: 'Verbindungen',
+		topology: 'Topologie',
+		users: 'Benutzer',
 	}
 	const head = names[segments[0] ?? ''] ?? segments[0] ?? 'Page'
 	if (segments[1] === 'add') {
-		return `Add ${head.replace(/s$/, '')}`
+		return `${head.replace(/s$/, '')} hinzufügen`
 	}
 	if (segments[1] === 'import') {
-		return `Import ${head}`
+		return `${head} importieren`
 	}
 	if (segments[1] !== undefined && segments[2] === 'edit') {
-		return `Edit ${head.replace(/s$/, '')} ${segments[1]}`
+		return `${head.replace(/s$/, '')} ${segments[1]} bearbeiten`
 	}
 	if (segments[1] !== undefined) {
 		return `${head.replace(/s$/, '')} ${segments[1]}`

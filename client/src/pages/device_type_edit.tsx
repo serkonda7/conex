@@ -86,14 +86,14 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/device-types/${props.id}`}
 			backLabel={deviceType()?.model ?? 'Device type'}
-			title="Edit device type"
+			title="Gerätetyp bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading device type…"
+			loadingText="Gerätetyp wird geladen…"
 			onSubmit={handleSave}
 		>
 			<SelectField
 				id="device-type-edit-manufacturer"
-				label="Manufacturer"
+				label="Hersteller"
 				value={manufacturerId()}
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
@@ -102,8 +102,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextField
 				id="device-type-edit-model"
-				label="Model"
-				placeholder="Example Switch 48"
+				label="Modell"
+				placeholder="Beispiel-Switch 48"
 				maxLength={100}
 				required
 				value={model()}
@@ -111,7 +111,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextField
 				id="device-type-edit-u-height"
-				label="Height"
+				label="Höhe"
 				placeholder="1"
 				required
 				inputmode="numeric"
@@ -133,15 +133,15 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			</div>
 			<TextField
 				id="device-type-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="device-type-edit-comments"
-				label="Comments"
+				label="Kommentare"
 				rows={4}
 				maxLength={2000}
 				value={comments()}

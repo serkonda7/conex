@@ -117,13 +117,13 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/racks/${props.id}`}
 			backLabel={rack()?.name ?? 'Rack'}
-			title="Edit rack"
+			title="Rack bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading rack…"
+			loadingText="Rack wird geladen…"
 			onSubmit={handleSave}
 		>
 			<div class="field">
-				<label for="rack-edit-site">Site</label>
+				<label for="rack-edit-site">Standort</label>
 				<input
 					id="rack-edit-site"
 					value={site()?.name ?? (siteId() ? String(siteId()) : '')}
@@ -136,11 +136,11 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			</div>
 			<SelectField
 				id="rack-edit-location"
-				label="Location"
+				label="Bereich"
 				value={locationId()}
 				onChange={setLocationId}
 				options={row_options(siblings() ?? [])}
-				emptyLabel="No location"
+				emptyLabel="Kein Bereich"
 			>
 				<Show
 					when={
@@ -157,15 +157,15 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			<NameField id="rack-edit-name" placeholder="A1" value={name()} onInput={setName} />
 			<TextField
 				id="rack-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<SelectField
 				id="rack-edit-type"
-				label="Rack type"
+				label="Racktyp"
 				value={rackTypeId()}
 				onChange={setRackTypeId}
 				options={(rackTypes() ?? []).map((type: DeviceTypeRow) => ({
@@ -176,11 +176,11 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			/>
 			<SelectField
 				id="rack-edit-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 			/>
 			<FormError message={formError} />
 			<EditActions saving={saving()} cancelTo={`/racks/${props.id}`} />

@@ -142,7 +142,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				backTo="/device-types"
 				backLabel="Device types"
 				loading={deviceType.loading}
-				loadingText="Loading device type…"
+				loadingText="Gerätetyp wird geladen…"
 				record={deviceType()}
 				emptyText="Device type not found."
 			>
@@ -153,18 +153,18 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle>{deviceType()?.description || 'No description.'}</DetailSubtitle>
 
-				<DetailCard label="Device type details">
-					<dt>Manufacturer</dt>
+				<DetailCard label="Gerätetypdetails">
+					<dt>Hersteller</dt>
 					<dd>{mfrNameOf(deviceType()?.manufacturer_id)}</dd>
-					<dt>Model</dt>
+					<dt>Modell</dt>
 					<dd>{deviceType()?.model}</dd>
-					<dt>Description</dt>
+					<dt>Beschreibung</dt>
 					<dd>{deviceType()?.description || '—'}</dd>
-					<dt>Comments</dt>
+					<dt>Kommentare</dt>
 					<dd>{deviceType()?.comments || '—'}</dd>
-					<dt>U height</dt>
+					<dt>Höhe (U)</dt>
 					<dd>{deviceType()?.u_height}</dd>
-					<dt>Full depth</dt>
+					<dt>Volle Tiefe</dt>
 					<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>
 				</DetailCard>
 			</DetailShell>
@@ -184,7 +184,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					value={stubCount()}
 					onInput={(e: InputEventAndTarget) => setStubCount(e.currentTarget.value)}
 				/>
-				<button type="submit">Add stub</button>
+				<button type="submit">Platzhalter hinzufügen</button>
 			</form>
 			<DataTable
 				rows={() => stubs() ?? []}
@@ -197,16 +197,16 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					</button>
 				)}
 				loading={() => stubs.loading}
-				loadingContent={<Loading message="Loading stubs…" />}
-				emptyContent={<Empty message="No stubs yet." />}
+				loadingContent={<Loading message="Platzhalter werden geladen…" />}
+				emptyContent={<Empty message="Noch keine Platzhalter vorhanden." />}
 			/>
 			<RelatedSection
 				id="device-type-devices"
 				title="Devices"
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Loading devices…"
-				emptyText="No devices use this type yet."
+				loadingText="Geräte werden geladen…"
+				emptyText="Noch keine Geräte dieses Typs vorhanden."
 				hasItems={deviceCount() > 0}
 			>
 				<ul>

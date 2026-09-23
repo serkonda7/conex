@@ -77,7 +77,7 @@ export function ManufacturersPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: 'Beschreibung',
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (m: ManufacturerRow): JSX.Element => (
@@ -102,12 +102,12 @@ export function ManufacturersPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Manufacturers" add_href="/manufacturers/add" />
+			<ListPageHeader title="Hersteller" add_href="/manufacturers/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search manufacturers"
-					placeholder="Search name…"
+					label="Hersteller suchen"
+					placeholder="Namen suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
@@ -141,12 +141,12 @@ export function ManufacturersPage(): JSX.Element {
 					/>
 				)}
 				loading={() => manufacturersPage.loading}
-				loadingContent={<p class="skeleton">Loading manufacturers…</p>}
+				loadingContent={<p class="skeleton">Hersteller werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch()
-							? `No manufacturers match "${debouncedSearch()}".`
-							: 'No manufacturers yet. Add the first one above.'}
+							? `Keine Hersteller für „${debouncedSearch()}“ gefunden.`
+							: 'Noch keine Hersteller vorhanden. Fügen Sie oben den ersten hinzu.'}
 					</p>
 				}
 			/>

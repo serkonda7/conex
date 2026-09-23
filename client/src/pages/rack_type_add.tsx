@@ -88,12 +88,12 @@ export function RackTypeAddPage(): JSX.Element {
 		<FormPage
 			backTo="/rack-types"
 			backLabel="Rack types"
-			title="Add a rack type"
+			title="Neuen Racktyp hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<SelectField
 				id="rack-type-manufacturer"
-				label="Manufacturer"
+				label="Hersteller"
 				required
 				value={manufacturerId()}
 				onChange={setManufacturerId}
@@ -103,8 +103,8 @@ export function RackTypeAddPage(): JSX.Element {
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Add manufacturer"
-						title="Add manufacturer"
+						aria-label="Hersteller hinzufügen"
+						title="Hersteller hinzufügen"
 						onClick={() => navigate('/manufacturers/add')}
 					>
 						<IconPlus size={16} />
@@ -113,30 +113,30 @@ export function RackTypeAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="rack-type-model"
-				label="Model"
+				label="Modell"
 				required
 				value={model()}
 				onInput={setModel}
-				placeholder="Example Rack 42U"
+				placeholder="Beispielrack 42 HE"
 				autofocus
 			/>
 			<SelectField
 				id="rack-type-form-factor"
-				label="Form factor"
+				label="Bauform"
 				required
 				value={formFactor()}
 				onChange={setFormFactor}
 				options={FORM_FACTORS.map((value) => ({ value, label: value }))}
-				emptyLabel="Form factor…"
+				emptyLabel="Bauform…"
 			/>
-			<Field label="Width (inches)" for="rack-type-width" required>
+			<Field label="Breite (Zoll)" for="rack-type-width" required>
 				<span id="rack-type-width" class="rack-type-fixed-width">
 					19
 				</span>
 			</Field>
 			<TextField
 				id="rack-type-height"
-				label="Height (U)"
+				label="Höhe (U)"
 				required
 				inputmode="numeric"
 				value={height()}
@@ -145,10 +145,10 @@ export function RackTypeAddPage(): JSX.Element {
 			/>
 			<TextAreaField
 				id="rack-type-description"
-				label="Description"
+				label="Beschreibung"
 				value={description()}
 				onInput={setDescription}
-				placeholder="Short summary (optional)"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 			/>
 			<FormError message={error} />

@@ -88,12 +88,12 @@ export function DeviceTypesPage(): JSX.Element {
 	const columns: DataTableColumn<DeviceTypeRow>[] = [
 		{
 			key: 'manufacturer',
-			label: 'Manufacturer',
+			label: 'Hersteller',
 			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
 		},
 		{
 			key: 'model',
-			label: 'Model',
+			label: 'Modell',
 			sortable: true,
 			getValue: (t: DeviceTypeRow): JSX.Element => (
 				<a
@@ -106,22 +106,22 @@ export function DeviceTypesPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: 'Beschreibung',
 			getValue: (t: DeviceTypeRow): string => t.description ?? '—',
 		},
 		{
 			key: 'comments',
-			label: 'Comments',
+			label: 'Kommentare',
 			getValue: (t: DeviceTypeRow): string => t.comments ?? '—',
 		},
 		{
 			key: 'u_height',
-			label: 'U height',
+			label: 'Höhe (U)',
 			getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
 		},
 		{
 			key: 'is_full_depth',
-			label: 'Full depth',
+			label: 'Volle Tiefe',
 			getValue: (t: DeviceTypeRow): string => (t.is_full_depth ? 'Yes' : 'No'),
 		},
 	]
@@ -158,21 +158,21 @@ export function DeviceTypesPage(): JSX.Element {
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search device types"
-					placeholder="Search model…"
+					label="Gerätetypen suchen"
+					placeholder="Modell suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
 					<span class="visually-hidden">Filter by manufacturer</span>
 					<select
-						aria-label="Filter by manufacturer"
+						aria-label="Nach Hersteller filtern"
 						value={manufacturerFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setManufacturerFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Any manufacturer</option>
+						<option value="">Alle Hersteller</option>
 						<For each={manufacturers() ?? []}>
 							{(m: ManufacturerRow): JSX.Element => (
 								<option value={m.id}>{m.name}</option>
@@ -210,12 +210,12 @@ export function DeviceTypesPage(): JSX.Element {
 					/>
 				)}
 				loading={() => typesPage.loading}
-				loadingContent={<p class="skeleton">Loading device types…</p>}
+				loadingContent={<p class="skeleton">Gerätetypen werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || manufacturerFilter()
-							? 'No device types match the current filters.'
-							: 'No device types yet. Import the first batch above.'}
+							? 'Keine Gerätetypen für die aktuellen Filter gefunden.'
+							: 'Noch keine Gerätetypen vorhanden. Importieren Sie oben den ersten Datensatz.'}
 					</p>
 				}
 			/>

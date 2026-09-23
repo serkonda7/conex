@@ -55,7 +55,7 @@ export function UsersPage(): JSX.Element {
 		}
 		return (id: number | null): string => {
 			if (id === null) {
-				return 'All tenants'
+				return 'Alle Mandanten'
 			}
 			return map.get(id) ?? `#${id}`
 		}
@@ -67,23 +67,27 @@ export function UsersPage(): JSX.Element {
 	const columns: DataTableColumn<UserJson>[] = [
 		{
 			key: 'username',
-			label: 'Username',
+			label: 'Benutzername',
 			getValue: (u: UserJson): JSX.Element => <span>{u.username}</span>,
 		},
 		{
 			key: 'role',
-			label: 'Role',
-			getValue: (u: UserJson): JSX.Element => <span>{u.role}</span>,
+			label: 'Rolle',
+			getValue: (u: UserJson): JSX.Element => (
+				<span>
+					{{ admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' }[u.role]}
+				</span>
+			),
 		},
 		{
 			key: 'tenant',
-			label: 'Tenant scope',
+			label: 'Mandantenzuordnung',
 			getValue: (u: UserJson): string => tenantName()(u.tenant_id),
 		},
 	]
 
 	async function handleDelete(id: number, username: string): Promise<void> {
-		if (!window.confirm(`Delete user "${username}"?`)) {
+		if (!window.confirm(`Benutzer „${username}“ löschen?`)) {
 			return
 		}
 		setError(null)
@@ -98,20 +102,20 @@ export function UsersPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>Users</h2>
+				<h2>Benutzer</h2>
 				<button type="button" class="btn-add" onClick={() => navigate('/users/add')}>
-					+ Add
+					+ Hinzufügen
 				</button>
 			</div>
 
 			<div class="toolbar-row">
 				<label class="toolbar-search">
-					<span class="visually-hidden">Search users</span>
+					<span class="visually-hidden">Benutzer suchen</span>
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Search username…"
-						aria-label="Search users"
+						placeholder="Benutzername suchen…"
+						aria-label="Benutzer suchen"
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
@@ -127,8 +131,8 @@ export function UsersPage(): JSX.Element {
 						<button
 							type="button"
 							class="icon-btn"
-							title={`Edit ${u.username}`}
-							aria-label={`Edit user ${u.username}`}
+							title={`${u.username} bearbeiten`}
+							aria-label={`Benutzer ${u.username} bearbeiten`}
 							onClick={() => navigate(`/users/${u.id}/edit`)}
 						>
 							<IconPencil size={16} />
@@ -136,8 +140,8 @@ export function UsersPage(): JSX.Element {
 						<button
 							type="button"
 							class="icon-btn"
-							title={`Delete ${u.username}`}
-							aria-label={`Delete user ${u.username}`}
+							title={`${u.username} löschen`}
+							aria-label={`Benutzer ${u.username} löschen`}
 							onClick={() => void handleDelete(u.id, u.username)}
 						>
 							<IconTrash size={16} />
@@ -145,18 +149,18 @@ export function UsersPage(): JSX.Element {
 					</div>
 				)}
 				loading={() => usersPage.loading}
-				loadingContent={<p class="skeleton">Loading users…</p>}
+				loadingContent={<p class="skeleton">Benutzer werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch()
-							? `No users match "${debouncedSearch()}".`
-							: 'No users yet. Add the first one above.'}
+							? `Keine Benutzer für „${debouncedSearch()}“ gefunden.`
+							: 'Noch keine Benutzer vorhanden. Fügen Sie oben den ersten hinzu.'}
 					</p>
 				}
 			/>
 
 			<p class="paginator-showing" role="status">
-				Showing {total() === 0 ? 0 : 1}-{total()} of {total()}
+				Einträge {total() === 0 ? 0 : 1}–{total()} von {total()}
 			</p>
 
 			<Show when={error()}>

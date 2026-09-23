@@ -42,35 +42,35 @@ export function TenantAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/tenants"
-			backLabel="Tenants"
-			title="Add a new tenant"
+			backLabel="Mandanten"
+			title="Neuen Mandanten hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="tenant-name"
-				placeholder="Acme Corp"
+				placeholder="Musterfirma GmbH"
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="tenant-slug"
-				placeholder="acme-corp"
+				placeholder="musterfirma"
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<TextField
 				id="tenant-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="tenant-comments"
-				label="Comments"
-				placeholder="Additional notes (optional)"
+				label="Kommentare"
+				placeholder="Zusätzliche Notizen (optional)"
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

@@ -16,7 +16,15 @@ import { type FormValues, is_add_another_submit, load_rows, submit_form } from '
 
 const ROLES: UserRole[] = ['admin', 'editor', 'viewer']
 
-const ROLE_OPTIONS: FormOption[] = ROLES.map((role: UserRole) => ({ value: role, label: role }))
+const ROLE_LABELS: Record<UserRole, string> = {
+	admin: 'Administrator',
+	editor: 'Redakteur',
+	viewer: 'Betrachter',
+}
+const ROLE_OPTIONS: FormOption[] = ROLES.map((role: UserRole) => ({
+	value: role,
+	label: ROLE_LABELS[role],
+}))
 
 /** /users/add — admin-only account create form. */
 export function UserAddPage(): JSX.Element {
@@ -36,13 +44,13 @@ export function UserAddPage(): JSX.Element {
 		const tenant = tenantId() === '' ? null : Number(tenantId())
 		await submit_form({
 			name: username(),
-			nameError: 'Username is required.',
+			nameError: 'Benutzername ist erforderlich.',
 			validate: (): string | null => {
 				if (!password()) {
-					return 'Password is required.'
+					return 'Passwort ist erforderlich.'
 				}
 				if (role() === 'admin' && tenant !== null) {
-					return 'Admin accounts are global and cannot be limited to a tenant.'
+					return 'Administratorkonten gelten global und können nicht auf einen Mandanten beschränkt werden.'
 				}
 				return null
 			},
@@ -61,10 +69,15 @@ export function UserAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage backTo="/users" backLabel="Users" title="Add a new user" onSubmit={handleCreate}>
+		<FormPage
+			backTo="/users"
+			backLabel="Benutzer"
+			title="Neuen Benutzer hinzufügen"
+			onSubmit={handleCreate}
+		>
 			<TextField
 				id="user-username"
-				label="Username"
+				label="Benutzername"
 				required
 				placeholder="teammate"
 				maxLength={64}
@@ -75,38 +88,39 @@ export function UserAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="user-password"
-				label="Password"
+				label="Passwort"
 				required
 				type="password"
-				placeholder="Temporary password"
+				placeholder="Temporäres Passwort"
 				autocomplete="new-password"
 				value={password()}
 				onInput={setPassword}
 			/>
 			<SelectField
 				id="user-role"
-				label="Role"
+				label="Rolle"
 				value={role()}
 				onChange={(value: string) => setRole(value as UserRole)}
 				options={ROLE_OPTIONS}
 				hint={
 					<Hint>
-						Admin manages users and everything; editor reads and writes inventory;
-						viewer reads only.
+						Administratoren verwalten Benutzer und alle Einstellungen; Redakteure können
+						das Inventar lesen und bearbeiten; Betrachter haben nur Lesezugriff.
 					</Hint>
 				}
 			/>
 			<Show when={role() !== 'admin'}>
 				<SelectField
 					id="user-tenant"
-					label="Tenant scope"
+					label="Mandantenzuordnung"
 					value={tenantId()}
 					onChange={setTenantId}
 					options={row_options(tenants() ?? [])}
-					emptyLabel="All tenants"
+					emptyLabel="Alle Mandanten"
 					hint={
 						<Hint>
-							Limit an editor or viewer to a single tenant. Empty means global.
+							Beschränkt Redakteure oder Betrachter auf einen Mandanten. Ohne Auswahl
+							gilt der Zugriff global.
 						</Hint>
 					}
 				/>

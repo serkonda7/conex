@@ -72,13 +72,13 @@ export function DetailHeader(props: {
 					<span aria-hidden="true" class="app-nav-icon">
 						<IconPencil size={14} />
 					</span>{' '}
-					Edit
+					Bearbeiten
 				</button>
 				<button type="button" class="btn-danger" onClick={props.onDelete}>
 					<span aria-hidden="true" class="app-nav-icon">
 						<IconTrash size={14} />
 					</span>{' '}
-					Delete
+					Löschen
 				</button>
 			</div>
 		</div>
@@ -214,7 +214,7 @@ export function useDetailDelete(opts: {
 		if (!name) {
 			return
 		}
-		if (!window.confirm(`Delete ${opts.noun} "${name}"?`)) {
+		if (!window.confirm(`${opts.noun} „${name}“ löschen?`)) {
 			return
 		}
 		opts.setError(null)

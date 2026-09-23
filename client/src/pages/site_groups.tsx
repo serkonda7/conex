@@ -105,7 +105,7 @@ export function SiteGroupsPage(): JSX.Element {
 	const columns: DataTableColumn<SiteGroupRow>[] = [
 		{
 			key: 'name',
-			label: 'Group',
+			label: 'Gruppe',
 			sortable: true,
 			getValue: (g: SiteGroupRow): JSX.Element => (
 				<a
@@ -118,7 +118,7 @@ export function SiteGroupsPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Description',
+			label: 'Beschreibung',
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (g: SiteGroupRow): JSX.Element => (
@@ -127,12 +127,12 @@ export function SiteGroupsPage(): JSX.Element {
 		},
 		{
 			key: 'parent',
-			label: 'Parent',
+			label: 'Übergeordnete Gruppe',
 			getValue: (g: SiteGroupRow): string => parentNameOf()(g.parent_id),
 		},
 		{
 			key: 'tenant',
-			label: 'Tenant',
+			label: 'Mandant',
 			getValue: (g: SiteGroupRow): string => tenantNameOf(g.tenant_id),
 		},
 	]
@@ -151,25 +151,25 @@ export function SiteGroupsPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Site Groups" add_href="/site-groups/add" />
+			<ListPageHeader title="Standortgruppen" add_href="/site-groups/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search site groups"
-					placeholder="Search name, slug, description…"
+					label="Standortgruppen suchen"
+					placeholder="Name, Kurzname oder Beschreibung suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by tenant</span>
+					<span class="visually-hidden">Nach Mandant filtern</span>
 					<select
-						aria-label="Filter by tenant"
+						aria-label="Nach Mandant filtern"
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterTenant(e.currentTarget.value)
 						}
 					>
-						<option value="">All tenants</option>
+						<option value="">Alle Mandanten</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
@@ -205,12 +205,12 @@ export function SiteGroupsPage(): JSX.Element {
 					/>
 				)}
 				loading={() => groupsPage.loading}
-				loadingContent={<p class="skeleton">Loading site groups…</p>}
+				loadingContent={<p class="skeleton">Standortgruppen werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterTenant()
-							? 'No site groups match the current filters.'
-							: 'No site groups yet. Add the first one above.'}
+							? 'Keine Standortgruppen für die aktuellen Filter gefunden.'
+							: 'Noch keine Standortgruppen vorhanden. Fügen Sie oben die erste hinzu.'}
 					</p>
 				}
 			/>

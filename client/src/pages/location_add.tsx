@@ -163,26 +163,26 @@ export function LocationAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/locations"
-			backLabel="Locations"
-			title="Add a new location"
+			backLabel="Bereiche"
+			title="Neuen Bereich hinzufügen"
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="location-name"
-				placeholder="Floor 2"
+				placeholder="2. Etage"
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="location-slug"
-				placeholder="floor-2"
+				placeholder="etage-2"
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="location-site"
-				label="Site"
+				label="Standort"
 				required
 				value={siteId()}
 				onChange={handleSiteChange}
@@ -196,7 +196,7 @@ export function LocationAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="location-parent"
-				label="Parent"
+				label="Übergeordneter Bereich"
 				value={parentId()}
 				disabled={siteId() === ''}
 				onChange={setParentId}
@@ -210,11 +210,11 @@ export function LocationAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="location-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
 						<Hint>Defaults to the site's tenant.</Hint>
@@ -223,8 +223,8 @@ export function LocationAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="location-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}

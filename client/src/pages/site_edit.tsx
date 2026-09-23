@@ -95,60 +95,60 @@ export function SiteEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/sites/${props.id}`}
 			backLabel={site()?.name ?? 'Site'}
-			title="Edit site"
+			title="Standort bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading site…"
+			loadingText="Standort wird geladen…"
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="site-edit-name"
-				placeholder="New York DC"
+				placeholder="Rechenzentrum Berlin"
 				value={name()}
 				onInput={setName}
 			/>
 			<SlugField
 				id="site-edit-slug"
-				placeholder="new-york-dc"
+				placeholder="rechenzentrum-berlin"
 				value={slug()}
 				onInput={setSlug}
 				hint={<Hint>URL-safe identifier: lowercase letters, digits, single dashes.</Hint>}
 			/>
 			<SelectField
 				id="site-edit-tenant"
-				label="Tenant"
+				label="Mandant"
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="No tenant"
+				emptyLabel="Kein Mandant"
 			/>
 			<SelectField
 				id="site-edit-group"
-				label="Group"
+				label="Gruppe"
 				value={groupId()}
 				onChange={setGroupId}
 				options={row_options(groups() ?? [])}
-				emptyLabel="No group"
+				emptyLabel="Keine Gruppe"
 			/>
 			<TextField
 				id="site-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="site-edit-comments"
-				label="Comments"
-				placeholder="Additional notes (optional)"
+				label="Kommentare"
+				placeholder="Zusätzliche Notizen (optional)"
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}
 			/>
 			<TextAreaField
 				id="site-edit-physical-address"
-				label="Physical address"
-				placeholder="Street, city, … (optional)"
+				label="Standortadresse"
+				placeholder="Straße, Ort … (optional)"
 				rows={3}
 				maxLength={500}
 				value={physicalAddress()}
@@ -156,8 +156,8 @@ export function SiteEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextAreaField
 				id="site-edit-shipping-address"
-				label="Shipping address"
-				placeholder="Receiving dock, … (optional)"
+				label="Lieferadresse"
+				placeholder="Warenannahme … (optional)"
 				rows={3}
 				maxLength={500}
 				value={shippingAddress()}

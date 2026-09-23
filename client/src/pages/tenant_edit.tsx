@@ -61,36 +61,36 @@ export function TenantEditPage(props: { id: number }): JSX.Element {
 		<EditPageShell
 			backTo={`/tenants/${props.id}`}
 			backLabel={tenant()?.name ?? 'Tenant'}
-			title="Edit tenant"
+			title="Mandant bearbeiten"
 			loaded={loaded()}
-			loadingText="Loading tenant…"
+			loadingText="Mandant wird geladen…"
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="tenant-edit-name"
-				placeholder="Acme Corp"
+				placeholder="Musterfirma GmbH"
 				value={name()}
 				onInput={setName}
 			/>
 			<SlugField
 				id="tenant-edit-slug"
-				placeholder="acme-corp"
+				placeholder="musterfirma"
 				value={slug()}
 				onInput={setSlug}
 				hint={<Hint>URL-safe identifier: lowercase letters, digits, single dashes.</Hint>}
 			/>
 			<TextField
 				id="tenant-edit-description"
-				label="Description"
-				placeholder="Short summary (optional)"
+				label="Beschreibung"
+				placeholder="Kurze Zusammenfassung (optional)"
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="tenant-edit-comments"
-				label="Comments"
-				placeholder="Additional notes (optional)"
+				label="Kommentare"
+				placeholder="Zusätzliche Notizen (optional)"
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

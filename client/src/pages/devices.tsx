@@ -159,12 +159,12 @@ export function DevicesPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Devices" add_href="/devices/add" />
+			<ListPageHeader title="Geräte" add_href="/devices/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Search devices"
-					placeholder="Search name, serial…"
+					label="Geräte suchen"
+					placeholder="Name oder Seriennummer suchen…"
 					value={search()}
 					onInput={setSearch}
 				/>
@@ -177,7 +177,7 @@ export function DevicesPage(): JSX.Element {
 							setRackFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Any rack</option>
+						<option value="">Alle Racks</option>
 						<For each={racks() ?? []}>
 							{(r: RackRow): JSX.Element => <option value={r.id}>{r.name}</option>}
 						</For>
@@ -192,7 +192,7 @@ export function DevicesPage(): JSX.Element {
 							setTenantFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Any tenant</option>
+						<option value="">Alle Mandanten</option>
 						<For each={tenants() ?? []}>
 							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
 						</For>
@@ -228,12 +228,12 @@ export function DevicesPage(): JSX.Element {
 					/>
 				)}
 				loading={() => devicesPage.loading}
-				loadingContent={<p class="skeleton">Loading devices…</p>}
+				loadingContent={<p class="skeleton">Geräte werden geladen…</p>}
 				emptyContent={
 					<p class="empty">
 						{hasFilters()
-							? 'No devices match the current filters.'
-							: 'No devices yet. Add the first one above.'}
+							? 'Keine Geräte für die aktuellen Filter gefunden.'
+							: 'Noch keine Geräte vorhanden. Fügen Sie oben das erste hinzu.'}
 					</p>
 				}
 			/>
