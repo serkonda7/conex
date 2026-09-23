@@ -4,6 +4,7 @@ import { createSignal } from 'solid-js'
 import { create_manufacturer } from '../api_templates'
 import { FormActions, FormError, FormPage, NameField, TextField } from '../components/form'
 import { navigate } from '../router'
+import { is_add_another_submit } from '../util/form'
 
 /** /manufacturers/add — manufacturer create form. */
 export function ManufacturerAddPage(): JSX.Element {
@@ -24,6 +25,11 @@ export function ManufacturerAddPage(): JSX.Element {
 		setSaving(false)
 		if (Result.isError(res)) {
 			setFormError(res.error.message)
+			return
+		}
+		if (is_add_another_submit(e)) {
+			setName('')
+			setDescription('')
 			return
 		}
 		navigate('/manufacturers')

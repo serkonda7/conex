@@ -14,6 +14,7 @@ import {
 	TextField,
 } from '../components/form'
 import { navigate } from '../router'
+import { is_add_another_submit } from '../util/form'
 
 const FORM_FACTORS: RackFormFactor[] = [
 	'2-post frame',
@@ -71,6 +72,13 @@ export function RackTypeAddPage(): JSX.Element {
 		setSaving(false)
 		if (Result.isError(res)) {
 			setError(res.error.message)
+			return
+		}
+		if (is_add_another_submit(e)) {
+			setModel('')
+			setDescription('')
+			setFormFactor('')
+			setHeight('1')
 			return
 		}
 		navigate('/rack-types')

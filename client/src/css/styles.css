@@ -829,6 +829,12 @@ tbody tr:last-child td {
 	grid-column: 2;
 }
 
+.field-checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
 .rack-type-fixed-width {
 	padding: 0.36rem 0.5rem;
 }
@@ -854,6 +860,11 @@ tbody tr:last-child td {
 	flex: 1 1 auto;
 	width: auto;
 	min-width: 0;
+}
+
+.app-content .form-stacked .field .field-checkbox-label input {
+	flex: none;
+	width: auto;
 }
 
 @media (max-width: 36rem) {
@@ -1365,6 +1376,11 @@ tbody tr:last-child td {
 .rack-dev {
 	color: var(--text);
 	text-decoration: none;
+}
+
+.rack-dev,
+.rack-ghost {
+	justify-content: center;
 }
 
 .rack-dev-name {

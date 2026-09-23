@@ -77,8 +77,10 @@ export function TextField(props: {
 	value: string
 	onInput: (value: string) => void
 	placeholder?: string
-	type?: 'text' | 'password'
+	type?: 'text' | 'password' | 'number'
 	maxLength?: number
+	min?: number
+	step?: number
 	required?: boolean
 	inputmode?: 'numeric' | 'text'
 	autocomplete?: string
@@ -101,6 +103,8 @@ export function TextField(props: {
 				placeholder={props.placeholder}
 				required={props.required}
 				maxLength={props.maxLength}
+				min={props.min}
+				step={props.step}
 				inputmode={props.inputmode}
 				autocomplete={props.autocomplete}
 				value={props.value}

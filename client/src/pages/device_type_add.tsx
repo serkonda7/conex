@@ -1,9 +1,9 @@
+import { IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
 import { create_device_type, fetch_manufacturers } from '../api_templates'
 import {
-	Field,
 	FormActions,
 	FormError,
 	FormPage,
@@ -13,13 +13,14 @@ import {
 	TextField,
 } from '../components/form'
 import { navigate } from '../router'
+import { is_add_another_submit } from '../util/form'
 
 /** /device-types/add — device-type create form. */
 export function DeviceTypeAddPage(): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
 	const [model, setModel] = createSignal('')
 	const [uHeight, setUHeight] = createSignal('1')
-	const [fullDepth, setFullDepth] = createSignal(true)
+	const [fullDepth, setFullDepth] = createSignal(false)
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
@@ -65,6 +66,14 @@ export function DeviceTypeAddPage(): JSX.Element {
 			setError(res.error.message)
 			return
 		}
+		if (is_add_another_submit(e)) {
+			setModel('')
+			setUHeight('1')
+			setFullDepth(false)
+			setDescription('')
+			setComments('')
+			return
+		}
 		navigate('/device-types')
 	}
 
@@ -83,6 +92,17 @@ export function DeviceTypeAddPage(): JSX.Element {
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel="Manufacturer…"
+				action={
+					<button
+						type="button"
+						class="icon-btn btn-add"
+						aria-label="Add manufacturer"
+						title="Add manufacturer"
+						onClick={() => navigate('/manufacturers/add')}
+					>
+						<IconPlus size={16} />
+					</button>
+				}
 			/>
 			<TextField
 				id="device-type-model"
@@ -95,23 +115,30 @@ export function DeviceTypeAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-type-u-height"
-				label="Height"
+				label="Height (U)"
+				type="number"
 				required
-				inputmode="numeric"
+				min={0}
+				step={0.5}
 				value={uHeight()}
 				onInput={setUHeight}
 				placeholder="1"
 			/>
-			<Field label="Full depth" for="device-type-full-depth">
-				<input
-					id="device-type-full-depth"
-					type="checkbox"
-					checked={fullDepth()}
-					onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-						setFullDepth(e.currentTarget.checked)
-					}
-				/>
-			</Field>
+			<div class="field">
+				<div class="field-control">
+					<label class="field-checkbox-label">
+						<input
+							id="device-type-full-depth"
+							type="checkbox"
+							checked={fullDepth()}
+							onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+								setFullDepth(e.currentTarget.checked)
+							}
+						/>
+						Full depth
+					</label>
+				</div>
+			</div>
 			<TextField
 				id="device-type-description"
 				label="Description"
