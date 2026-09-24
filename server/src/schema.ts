@@ -187,7 +187,8 @@ export const device_types = sqliteTable(
 			.notNull()
 			.references(() => manufacturers.id),
 		model: text('model').notNull(),
-		// Rack units consumed on mount.
+		// Rack units consumed on mount (at least 1 U). Shelves are a
+		// separate table and never device types.
 		u_height: integer('u_height').notNull().default(1),
 		// NetBox `is_full_depth`: false = half-depth.
 		is_full_depth: integer('is_full_depth').notNull().default(1),
@@ -227,14 +228,19 @@ export const device_type_interfaces = sqliteTable(
 )
 
 // ---------------------------------------------------------------------------
-// P4: devices / interfaces. A mounted device consumes the template u_height
-// in U, validated against rack bounds and device overlap. Unmounted devices
-// leave position_u null; rack_id may still be set (rack-assigned but unracked)
-// or null (fully unracked).
-// Interface rows are expanded from template stubs at create time; P5 cables
-// flip `connected`. Deletes of racks/device-types are blocked while devices
-// reference them (service layer); device delete removes its
-// interfaces in the same transaction.
+// P4: devices / interfaces. Placement is exactly one of:
+// | unracked           | rack null | position null | any u_height |
+// | rack-assigned only | rack set  | position null | any          |
+// | U-mounted          | rack set  | position set  | >= 1         |
+// | on a shelf         | rack set  | position null | shelf set    |
+// Shelves are a separate table (`shelves`) and compete for U space:
+// a device mount overlapping a shelf's blocked span is rejected (service
+// layer), and vice versa. Devices placed on a shelf (`shelf_id`) consume no
+// U of their own; their rack is always the shelf's rack. Interface rows are
+// expanded from template stubs at create time; P5 cables flip `connected`.
+// Deletes of racks/device-types are blocked while devices reference them
+// (service layer); device delete removes its interfaces in the same
+// transaction.
 // ---------------------------------------------------------------------------
 
 export const devices = sqliteTable(
@@ -250,8 +256,11 @@ export const devices = sqliteTable(
 		// Rack face the device is mounted on (`front`/`rear`); only
 		// meaningful for rack-mounted devices, otherwise null.
 		face: text('face'),
-		// Bottom-U, 1-based. Occupies position_u..position_u+u_height-1.
+		// Bottom-U, 1-based. Occupies position_u..position_u+u_height-1 where
+		// the height comes from the device-type template.
 		position_u: integer('position_u'),
+		// Shelf the device sits on (never U-mounted at the same time).
+		shelf_id: integer('shelf_id').references((): AnySQLiteColumn => shelves.id),
 		status: text('status').notNull().default('active'),
 		name: text('name').notNull(),
 		serial: text('serial'),
@@ -263,9 +272,49 @@ export const devices = sqliteTable(
 		index('devices_type_id_idx').on(table.device_type_id),
 		index('devices_site_id_idx').on(table.site_id),
 		index('devices_rack_id_idx').on(table.rack_id),
+		index('devices_shelf_id_idx').on(table.shelf_id),
 		index('devices_tenant_id_idx').on(table.tenant_id),
 		index('devices_status_idx').on(table.status),
 		index('devices_name_idx').on(table.name),
+	],
+)
+
+// ---------------------------------------------------------------------------
+// Shelves: rack fixtures, fully separate from devices. A shelf mounts at
+// `position_u` with `mount_height` U of hardware plus `reserved_height` U of
+// clearance directly above the mount. The mount span blocks device mounts
+// unless `mount_usable` is set; the reserved span always blocks. Face and
+// full-depth behave like device mounts (half-depth shelves on opposite
+// faces may share U). Tenant scope is inherited from the rack.
+// ---------------------------------------------------------------------------
+
+export const shelves = sqliteTable(
+	'shelves',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		rack_id: integer('rack_id')
+			.notNull()
+			.references(() => racks.id),
+		name: text('name'),
+		// Rack face the shelf is mounted on (`front`/`rear`); null occupies
+		// both faces.
+		face: text('face'),
+		// Bottom-U of the mount hardware, 1-based.
+		position_u: integer('position_u').notNull(),
+		// U height of the mount hardware itself (>= 1).
+		mount_height: integer('mount_height').notNull().default(1),
+		// When set, the mount span stays usable for device mounts; only the
+		// reserved span blocks.
+		mount_usable: integer('mount_usable').notNull().default(0),
+		// Extra U reserved above the mount (always blocks device mounts).
+		reserved_height: integer('reserved_height').notNull().default(0),
+		// NetBox `is_full_depth`: false = half-depth.
+		is_full_depth: integer('is_full_depth').notNull().default(1),
+		description: text('description'),
+	},
+	(table) => [
+		index('shelves_rack_id_idx').on(table.rack_id),
+		index('shelves_name_idx').on(table.name),
 	],
 )
 

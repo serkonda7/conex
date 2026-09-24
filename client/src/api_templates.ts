@@ -116,7 +116,7 @@ export type RackWidth = NonNullable<DeviceTypeCreate['width']>
 /**
  * Device-type create body. `u_height` / `is_full_depth` stay optional here
  * even though the shared output type marks them required: the server
- * defaults them to 1 / true.
+ * defaults them.
  */
 export type DeviceTypeCreateInput = Omit<DeviceTypeCreate, 'u_height' | 'is_full_depth'> & {
 	u_height?: DeviceTypeCreate['u_height']

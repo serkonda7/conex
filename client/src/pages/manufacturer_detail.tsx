@@ -111,7 +111,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'is_full_depth',
-							label: 'Full depth',
+							label: 'Volle Tiefe',
 							getValue: (t: DeviceTypeRow): string =>
 								t.is_full_depth ? 'Yes' : 'No',
 						},

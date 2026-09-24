@@ -139,6 +139,7 @@ export function tabTitle(raw: string): string {
 		'site-groups': 'Standortgruppen',
 		locations: 'Bereiche',
 		racks: 'Racks',
+		shelves: 'Fachböden',
 		'rack-types': 'Racktypen',
 		templates: 'Racktypen',
 		'device-types': 'Gerätetypen',

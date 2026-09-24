@@ -88,6 +88,8 @@ export interface FormValues {
 export interface SubmitFormOptions<T> {
 	/** Raw name value; trimmed and required. */
 	name: string
+	/** Allow an empty name for entities that have a display fallback. */
+	optionalName?: boolean
 	/** Overrides the default "Name is required." message. */
 	nameError?: string
 	/** Raw slug value; omit on forms without a slug. */
@@ -112,7 +114,7 @@ export interface SubmitFormOptions<T> {
 export async function submit_form<T>(options: SubmitFormOptions<T>): Promise<void> {
 	options.setError(null)
 	const name = options.name.trim()
-	if (!name) {
+	if (!name && !options.optionalName) {
 		options.setError(options.nameError ?? 'Name ist erforderlich.')
 		return
 	}
@@ -166,6 +168,8 @@ export function useEditForm(): EditFormState {
 export interface SubmitEditOptions<T> {
 	/** Raw name value; trimmed and required. */
 	name: string
+	/** Allow an empty name for entities that have a display fallback. */
+	optionalName?: boolean
 	/** Overrides the default "Name is required." message. */
 	nameError?: string
 	/** Raw slug value; omit on forms without a slug. */
@@ -187,6 +191,7 @@ export interface SubmitEditOptions<T> {
 export async function submit_edit<T>(options: SubmitEditOptions<T>): Promise<void> {
 	await submit_form({
 		name: options.name,
+		optionalName: options.optionalName,
 		nameError: options.nameError,
 		slug: options.slug,
 		validate: options.validate,

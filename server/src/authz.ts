@@ -23,7 +23,7 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb } from './db/connection'
-import { type cables, devices, interfaces, racks } from './schema'
+import { type cables, devices, interfaces, racks, shelves } from './schema'
 import type { CurrentUser } from './types'
 import { jsonError } from './util/http'
 import { sendResult } from './util/result_response'
@@ -243,6 +243,19 @@ export function rackTenant(rackId: number): number | null | undefined {
 export function deviceTenant(deviceId: number): number | null | undefined {
 	const device = getDb().select().from(devices).where(eq(devices.id, deviceId)).get()
 	return device?.tenant_id
+}
+
+/**
+ * Tenant of a shelf, inherited from its rack; `undefined` when either is
+ * missing. `db/shelves.ts` owns the same lookup for service-layer paths.
+ */
+export function shelfTenant(shelfId: number): number | null | undefined {
+	const shelf = getDb().select().from(shelves).where(eq(shelves.id, shelfId)).get()
+	if (!shelf) {
+		return undefined
+	}
+	const rack = getDb().select().from(racks).where(eq(racks.id, shelf.rack_id)).get()
+	return rack?.tenant_id
 }
 
 /** Tenant of an interface's device, or `undefined` when either is missing. */

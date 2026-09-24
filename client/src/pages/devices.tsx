@@ -91,16 +91,15 @@ export function DevicesPage(): JSX.Element {
 		}
 		return res.value.items
 	})
-
-	function typeNameOf(id: number): string {
-		return types()?.find((t) => t.id === id)?.model ?? String(id)
-	}
-
 	function rackNameOf(id: number | null): string | null {
 		if (id === null) {
 			return null
 		}
 		return racks()?.find((r) => r.id === id)?.name ?? String(id)
+	}
+
+	function typeNameOf(id: number): string {
+		return types()?.find((t) => t.id === id)?.model ?? String(id)
 	}
 
 	const columns: DataTableColumn<DeviceRow>[] = [

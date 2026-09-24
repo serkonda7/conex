@@ -12,6 +12,7 @@ import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
 import { searchApp } from './routes/search'
+import { shelvesApp } from './routes/shelves'
 import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
 import { tenantsApp } from './routes/tenants'
@@ -65,6 +66,7 @@ export function createApp() {
 			.route('/site-groups', siteGroupsApp)
 			.route('/locations', locationsApp)
 			.route('/racks', racksApp)
+			.route('/shelves', shelvesApp)
 			.route('/manufacturers', manufacturersApp)
 			.route('/device-types', deviceTypesApp)
 			.route('/devices', devicesApp)

@@ -17,6 +17,7 @@ import {
 	update_interface,
 } from '../api_devices'
 import { fetch_rack } from '../api_racks'
+import { fetch_shelf } from '../api_shelves'
 import { fetch_device_types } from '../api_templates'
 import { fetch_locations, fetch_site, fetch_tenant } from '../api_tenancy'
 import {
@@ -118,6 +119,18 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
+	const shelfId = createMemo(() => device()?.shelf_id ?? null)
+	const [shelf] = createResource(shelfId, async (id: number | null) => {
+		if (!id) {
+			return null
+		}
+		const res = await fetch_shelf(id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
+	})
 	const locationId = createMemo(() => device()?.location_id ?? null)
 	const [locationName] = createResource(
 		() => ({ site: siteId(), location: locationId() }),
@@ -159,7 +172,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			return res.value
 		},
 	)
-
 	function refetchAll(): void {
 		void refetchIfaces()
 		void refetchTrace()
@@ -352,8 +364,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dd>{device()?.face ?? '—'}</dd>
 					<dt>Position</dt>
 					<dd>
-						{device()?.position_u !== null ? (
+						{device()?.position_u !== null && device()?.position_u !== undefined ? (
 							<code>HE{device()?.position_u}</code>
+						) : shelfId() !== null ? (
+							<ForeignKeyLink
+								id={shelfId()}
+								loading={shelf.loading}
+								name={`Fachboden ${shelf()?.name || `HE${shelf()?.position_u ?? ''}`}`}
+								href={`/shelves/${shelfId() ?? ''}/edit`}
+							/>
 						) : (
 							<span>unracked</span>
 						)}

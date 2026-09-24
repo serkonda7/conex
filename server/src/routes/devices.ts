@@ -70,6 +70,7 @@ export const devicesApp = new Hono()
 				site: query.site,
 				rack: query.rack,
 				status: query.status,
+				placed: query.placed,
 				sort: query.sort,
 				order: query.order,
 				...scope,
@@ -151,7 +152,8 @@ export const devicesApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			return sendRow(c, moveDevice(id, c.req.valid('json')))
+			const moveBody = c.req.valid('json')
+			return sendRow(c, moveDevice(id, moveBody))
 		},
 	)
 	// Interface sub-resource (name unique per device; `connected` is P5-owned).

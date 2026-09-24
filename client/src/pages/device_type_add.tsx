@@ -48,8 +48,8 @@ export function DeviceTypeAddPage(): JSX.Element {
 			setError('Model is required.')
 			return
 		}
-		if (!Number.isInteger(height) || height < 1 || height > 60) {
-			setError('Height (HE) must be an integer from 1 to 60.')
+		if (!Number.isInteger(height) || height < 0 || height > 60) {
+			setError('Height (HE) must be an integer from 0 to 60.')
 			return
 		}
 		setSaving(true)
@@ -118,7 +118,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 				label="Höhe (HE)"
 				type="number"
 				required
-				min={0}
+				min={1}
 				step={0.5}
 				value={uHeight()}
 				onInput={setUHeight}
@@ -135,7 +135,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 								setFullDepth(e.currentTarget.checked)
 							}
 						/>
-						Full depth
+						Volle Tiefe
 					</label>
 				</div>
 			</div>

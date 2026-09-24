@@ -1,9 +1,11 @@
 import { IconPlus } from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
 import type { DeviceFace } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import { create_device } from '../api_devices'
 import { fetch_racks } from '../api_racks'
+import { fetch_shelf } from '../api_shelves'
 import { fetch_device_types, fetch_manufacturers, type ManufacturerRow } from '../api_templates'
 import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../api_tenancy'
 import {
@@ -42,6 +44,20 @@ export function DeviceAddPage(): JSX.Element {
 		queryParam('face') === 'front' || queryParam('face') === 'rear' ? queryParam('face') : '',
 	)
 	const [positionU, setPositionU] = createSignal(queryParam('position_u'))
+	// Shelf deep link (`/devices/add?rack=<id>&shelf=<id>`) places the device
+	// on that shelf: the rack follows the shelf and there is no U position.
+	const shelfId = parseId(queryParam('shelf'))
+	const [shelf] = createResource(
+		() => shelfId,
+		async (id: number) => {
+			const res = await fetch_shelf(id)
+			if (Result.isError(res)) {
+				setFormError(res.error.message)
+				return null
+			}
+			return res.value
+		},
+	)
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [formError, setFormError] = createSignal<string | null>(null)
@@ -63,8 +79,8 @@ export function DeviceAddPage(): JSX.Element {
 	// Tenant defaults to the selected site's tenant until the user picks one
 	// explicitly (or `?tenant=` is present, which counts as explicit).
 	const siteTenantId = createMemo(() => {
-		const id = parseId(siteId())
-		if (id === null) {
+		const id = Number(siteId())
+		if (!siteId() || !Number.isInteger(id)) {
 			return null
 		}
 		return (sites() ?? []).find((site: SiteRow) => site.id === id)?.tenant_id ?? null
@@ -80,8 +96,8 @@ export function DeviceAddPage(): JSX.Element {
 
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createResource(siteId, async (site: string) => {
-		const id = parseId(site)
-		if (id === null) {
+		const id = Number(site)
+		if (!site || !Number.isInteger(id)) {
 			return []
 		}
 		return load_rows(() => fetch_locations({ site: id }), setFormError)
@@ -127,13 +143,16 @@ export function DeviceAddPage(): JSX.Element {
 					site_id: siteId() ? Number(siteId()) : null,
 					location_id: locationId() ? Number(locationId()) : null,
 					rack_id: rackId() ? Number(rackId()) : null,
-					face: (face() || null) as DeviceFace | null,
-					position_u: position,
+					face: shelfId === null ? ((face() || null) as DeviceFace | null) : null,
+					position_u: shelfId === null ? position : null,
+					shelf_id: shelfId,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
 				}),
 			setError: setFormError,
 			setSaving,
-			navigateTo: '/devices',
+			// Elevation deep links return to the rack they came from.
+			navigateTo:
+				rackId() && queryParam('rack') === rackId() ? `/racks/${rackId()}` : '/devices',
 			onSuccess: is_add_another_submit(e) ? () => setName('') : undefined,
 		})
 	}
@@ -217,6 +236,7 @@ export function DeviceAddPage(): JSX.Element {
 				id="device-rack"
 				label="Rack"
 				value={rackId()}
+				disabled={shelfId !== null}
 				onChange={handleRackChange}
 				options={row_options(racks() ?? [])}
 				emptyLabel="Unracked"
@@ -225,7 +245,7 @@ export function DeviceAddPage(): JSX.Element {
 				id="device-face"
 				label="Seite"
 				value={face()}
-				disabled={rackId() === ''}
+				disabled={rackId() === '' || shelfId !== null}
 				onChange={setFace}
 				options={FACE_OPTIONS}
 				emptyLabel="Keine Seite"
@@ -245,7 +265,21 @@ export function DeviceAddPage(): JSX.Element {
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
-				hint={<Hint>Optional, even with a rack: empty leaves the device unracked.</Hint>}
+				hint={
+					<Show
+						when={shelfId !== null}
+						fallback={
+							<Hint>
+								Optional, even with a rack: empty leaves the device unracked.
+							</Hint>
+						}
+					>
+						<Hint>
+							Steht auf Fachboden {shelf()?.name || `HE${shelf()?.position_u ?? ''}`}{' '}
+							(keine eigene HE).
+						</Hint>
+					</Show>
+				}
 			/>
 			<SelectField
 				id="device-tenant"

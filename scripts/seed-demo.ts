@@ -10,6 +10,7 @@ import {
 	locations,
 	manufacturers,
 	racks,
+	shelves,
 	site_groups,
 	sites,
 	tenants,
@@ -31,6 +32,7 @@ getSqliteHandle().transaction(() => {
 		DELETE FROM cables;
 		DELETE FROM interfaces;
 		DELETE FROM devices;
+		DELETE FROM shelves;
 		DELETE FROM racks;
 		DELETE FROM locations;
 		DELETE FROM sites;
@@ -157,7 +159,7 @@ const clientType = db
 	.values({
 		manufacturer_id: dell.id,
 		model: 'OptiPlex Micro',
-		u_height: 0,
+		u_height: 1,
 	})
 	.returning()
 	.get()
@@ -178,17 +180,17 @@ const cableOrganizerType = db
 	.get()
 const tiConnectorType = db
 	.insert(device_types)
-	.values({ manufacturer_id: generic.id, model: 'TI Connector', u_height: 0 })
+	.values({ manufacturer_id: generic.id, model: 'TI Connector', u_height: 1 })
 	.returning()
 	.get()
 const cloudKeyType = db
 	.insert(device_types)
-	.values({ manufacturer_id: ubiquiti.id, model: 'UniFi Cloud Key Gen2', u_height: 0 })
+	.values({ manufacturer_id: ubiquiti.id, model: 'UniFi Cloud Key Gen2', u_height: 1 })
 	.returning()
 	.get()
 const modemType = db
 	.insert(device_types)
-	.values({ manufacturer_id: generic.id, model: 'Cable Modem', u_height: 0 })
+	.values({ manufacturer_id: generic.id, model: 'Cable Modem', u_height: 1 })
 	.returning()
 	.get()
 
@@ -377,6 +379,21 @@ const dentistModem = addDevice(
 	'MODEM-DEMO-001',
 	null,
 )
+// Shelf demo: a separate shelf fixture at HE12 — 1 HE mount plus 3 HE
+// reserved clearance above, mount not usable, full depth.
+db.insert(shelves)
+	.values({
+		rack_id: dentistRack.id,
+		name: 'DENT-SHELF-01',
+		face: 'front',
+		position_u: 12,
+		mount_height: 1,
+		mount_usable: 0,
+		reserved_height: 3,
+		is_full_depth: 1,
+		description: 'Fachboden für Modem und Cloud Key.',
+	})
+	.run()
 function addInterfaces(deviceId: number, names: string[]): Array<typeof interfaces.$inferSelect> {
 	return names.map((name) =>
 		db
@@ -483,5 +500,5 @@ db.insert(users)
 console.log(`Demo database reset at ${dbPath}`)
 console.log('Login: demo / demo-password')
 console.log(
-	'Created 1 tenant, 1 site, 1 24U rack, 9 device models, 1 rack type, 11 devices, and 8 cables.',
+	'Created 1 tenant, 1 site, 1 24U rack, 10 device models, 1 rack type, 12 devices, and 8 cables.',
 )

@@ -74,14 +74,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 		return res.value.items
 	})
 
-	const typeName = (): string => {
-		const id = device()?.device_type_id
-		if (id === undefined) {
-			return ''
-		}
-		return types()?.find((t) => t.id === id)?.model ?? String(id)
-	}
-
 	const [device] = createResource(
 		() => props.id,
 		async (id: number) => {
@@ -103,6 +95,14 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			return res.value
 		},
 	)
+
+	const typeName = (): string => {
+		const id = device()?.device_type_id
+		if (id === undefined) {
+			return ''
+		}
+		return types()?.find((t) => t.id === id)?.model ?? String(id)
+	}
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)

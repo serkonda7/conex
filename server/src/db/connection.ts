@@ -70,10 +70,36 @@ export function initDb(options: InitDbOptions = {}): DbHandle {
 
 	const db = drizzle(sqlite)
 	migrate(db, { migrationsFolder })
+	ensureShelfMetadataColumns(sqlite)
 
 	dbInstance = db
 	sqliteInstance = sqlite
 	return db
+}
+
+/**
+ * Backfills shelf metadata for databases created by the earlier shelf table,
+ * which only stored rack placement. Current shelf APIs require both columns.
+ */
+function ensureShelfMetadataColumns(sqlite: Database): void {
+	const table = sqlite
+		.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'shelves'")
+		.get()
+	if (!table) {
+		return
+	}
+	const columns = new Set(
+		(sqlite.query('PRAGMA table_info(shelves)').all() as { name: string }[]).map(
+			(column) => column.name,
+		),
+	)
+	if (!columns.has('name')) {
+		sqlite.exec("ALTER TABLE shelves ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+		sqlite.exec("UPDATE shelves SET name = 'Fachboden HE' || position_u WHERE name = ''")
+	}
+	if (!columns.has('description')) {
+		sqlite.exec('ALTER TABLE shelves ADD COLUMN description TEXT')
+	}
 }
 
 // Precedence for DB path:

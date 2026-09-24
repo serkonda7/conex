@@ -111,7 +111,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextField
 				id="device-type-edit-u-height"
-				label="Höhe"
+				label="Höhe (HE)"
 				placeholder="1"
 				required
 				inputmode="numeric"
@@ -120,7 +120,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				hint={<Hint>Rack units consumed by this device (1–60).</Hint>}
 			/>
 			<div class="field">
-				<label for="device-type-edit-full-depth">Full depth</label>
+				<label for="device-type-edit-full-depth">Volle Tiefe</label>
 				<input
 					id="device-type-edit-full-depth"
 					type="checkbox"

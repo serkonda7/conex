@@ -21,7 +21,9 @@ test('rack type is saved, displayed, and drives elevation', async ({ page }) => 
 	await page.getByRole('button', { name: 'Erstellen', exact: true }).click()
 
 	await expect(page.getByRole('link', { name: 'Type display rack' })).toBeVisible()
-	await expect(page.getByText('E2E 42U Cabinet')).toBeVisible()
+	await expect(
+		page.getByRole('row', { name: /Type display rack/ }).getByText('E2E 42U Cabinet'),
+	).toBeVisible()
 	await page.getByRole('link', { name: 'Type display rack' }).click()
 
 	// The selected rack type supplies the height shown in the heading and elevation.

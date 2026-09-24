@@ -1319,18 +1319,21 @@ tbody tr:last-child td {
 	list-style: none;
 	margin: 0;
 	padding: 0;
+	width: 100%;
+	box-sizing: border-box;
 	background-color: var(--bg-surface);
 	border: 1px solid var(--border-strong);
 	border-radius: 0;
-	display: flex;
-	flex-direction: column;
+	display: grid;
+	grid-template-columns: 2rem minmax(0, 1fr);
+	grid-auto-rows: var(--rack-row-h);
 	gap: 0;
 }
 
 .rack-u {
 	display: flex;
 	align-items: stretch;
-	height: var(--rack-row-h);
+	min-height: var(--rack-row-h);
 	border: 0;
 	border-bottom: 1px solid var(--border);
 	margin: 0;
@@ -1341,6 +1344,29 @@ tbody tr:last-child td {
 
 .rack-u:last-child {
 	border-bottom: 0;
+}
+
+/* Gutter cell for one U (block layout keeps one label per U). */
+.rack-u-gutter-row {
+	display: flex;
+	align-items: stretch;
+	margin: 0;
+	background-color: var(--bg-raised);
+	border-bottom: 1px solid var(--border);
+	overflow: hidden;
+}
+
+/* Multi-U device/shelf blocks in the body column. */
+.rack-block {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: center;
+	margin: 0;
+	min-height: var(--rack-row-h);
+	border-bottom: 1px solid var(--border);
+	background-color: var(--bg-default);
+	overflow: hidden;
 }
 
 .rack-u-gutter {
@@ -1354,6 +1380,10 @@ tbody tr:last-child td {
 	font-variant-numeric: tabular-nums;
 	border-right: 1px solid var(--border);
 	padding: 0 0.25rem;
+}
+
+.rack-u-gutter-row .rack-u-gutter {
+	flex: 1 1 auto;
 }
 
 .rack-u-body {
@@ -1399,6 +1429,7 @@ tbody tr:last-child td {
 .rack-dev {
 	color: var(--text);
 	text-decoration: none;
+	white-space: nowrap;
 }
 
 .rack-dev,
@@ -1468,6 +1499,209 @@ tbody tr:last-child td {
 .rack-free-btn:focus-visible {
 	background: var(--primary);
 	color: var(--primary-contrast);
+}
+
+/* Shelf blocks: reserved area (hatched, dashed) with the shelf plate row. */
+.rack-u-shelf {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	background-color: var(--bg-raised);
+}
+
+.rack-shelf-clearance {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 0.2rem 0.4rem;
+	outline: 1px dashed var(--border-strong);
+	outline-offset: -1px;
+	background: repeating-linear-gradient(
+		-45deg,
+		transparent 0 6px,
+		var(--bg-hover) 6px 7px
+	);
+	overflow: hidden;
+}
+
+.rack-shelf-caption {
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+/* Usable mount row of a shelf (single U, stays device-mountable). */
+.rack-u-shelf-mount {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	background-color: var(--bg-default);
+	overflow: hidden;
+}
+
+.rack-mount-slot {
+	flex: 1 1 auto;
+	display: flex;
+	align-items: center;
+	padding: 0 0.6rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-style: italic;
+}
+
+.rack-u-shelf-mount:hover .rack-mount-slot,
+.rack-u-shelf-mount:focus-within .rack-mount-slot {
+	display: none;
+}
+
+.rack-shelf-clearance-link {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	justify-content: center;
+	padding-left: 0.6rem;
+	color: var(--text);
+	text-decoration: none;
+}
+
+a.rack-shelf-clearance-link:hover {
+	background-color: var(--bg-hover);
+}
+
+.rack-child-shelf {
+	flex-shrink: 0;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.2rem;
+	padding: 0 0.3rem;
+	white-space: nowrap;
+}
+
+.rack-mount-actions {
+	display: none;
+	gap: 0.35rem;
+	align-items: center;
+	flex: 1 1 auto;
+	padding: 0.15rem 0.15rem 0.15rem 0.4rem;
+}
+
+.rack-u-shelf-mount:hover .rack-mount-actions,
+.rack-u-shelf-mount:focus-within .rack-mount-actions {
+	display: flex;
+}
+
+.rack-shelf-plate {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	justify-content: center;
+	flex: 1 1 auto;
+	min-height: var(--rack-row-h);
+	padding: 0 0.4rem;
+	color: var(--text);
+	text-decoration: none;
+	overflow: hidden;
+}
+
+a.rack-shelf-plate:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Plate row: shelf label plus the devices on a shelf without reserve. */
+.rack-shelf-plate-row {
+	position: relative;
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+	min-height: var(--rack-row-h);
+	overflow: hidden;
+}
+
+/* Devices sitting on a shelf: removable chips plus hover actions. */
+.rack-shelf-devices {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rack-shelf-plate-row .rack-shelf-devices,
+.rack-u-shelf-mount .rack-shelf-devices {
+	flex-wrap: nowrap;
+	overflow: hidden;
+	padding-right: 0.25rem;
+}
+
+.rack-shelf-device {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.15rem;
+	max-width: 12rem;
+	padding: 0 0 0 0.4rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.2rem;
+	background-color: var(--bg-raised);
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+}
+
+.rack-shelf-device-link {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.rack-shelf-device-link:hover {
+	text-decoration: underline;
+}
+
+.rack-shelf-device-remove {
+	flex-shrink: 0;
+	padding: 0 0.35rem;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	line-height: 1.3;
+}
+
+.rack-shelf-device-remove:hover,
+.rack-shelf-device-remove:focus-visible {
+	color: var(--error);
+	background-color: var(--error-bg);
+}
+
+.rack-shelf-device-actions {
+	display: none;
+	position: absolute;
+	top: 0.2rem;
+	right: 0.25rem;
+	gap: 0.25rem;
+	height: 1.4rem;
+}
+
+.rack-shelf-device-actions {
+	max-width: calc(100% - 0.5rem);
+	background-color: var(--bg-raised);
+}
+
+.rack-shelf-device-actions .rack-free-btn {
+	flex: 0 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rack-u-shelf:hover .rack-shelf-device-actions,
+.rack-u-shelf:focus-within .rack-shelf-device-actions {
+	display: inline-flex;
 }
 
 /* Topology view: device graph in SVG. */

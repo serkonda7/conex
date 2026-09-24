@@ -14,6 +14,7 @@ import {
 	interfaces,
 	locations,
 	racks,
+	shelves,
 	sites,
 } from '../schema'
 import { checkBounds, checkOverlap } from '../services/occupancy'
@@ -23,7 +24,7 @@ import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import { checkTenantExists, errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
-import { deviceSpansOf, rackHeightOf } from './racks'
+import { rackHeightOf, rackSpansOf } from './racks'
 
 export type DeviceRow = typeof devices.$inferSelect
 export type InterfaceRow = typeof interfaces.$inferSelect
@@ -38,7 +39,7 @@ function toInterfaceJson(row: InterfaceRow): InterfaceJson {
 }
 
 // ---------------------------------------------------------------------------
-// Mount validation
+// Placement validation
 // ---------------------------------------------------------------------------
 
 export interface MountInput {
@@ -48,16 +49,30 @@ export interface MountInput {
 	is_full_depth: boolean
 }
 
+export interface PlacementTemplate {
+	u_height: number
+}
+
+function templateOf(row: { u_height: number }): PlacementTemplate {
+	return {
+		u_height: row.u_height,
+	}
+}
+
 /**
- * Mounted devices consume the template `u_height` in U (bounds + device
- * overlap checked); unmounted devices may remain assigned to a rack without
- * a U position. `excludeDeviceId` skips the device being moved so a no-op move is
- * not self-conflicting.
+ * Placement states (exactly one):
+ * | unracked           | rack null | position null | any u_height |
+ * | rack-assigned only | rack set  | position null | any          |
+ * | U-mounted          | rack set  | position set  | >= 1         |
+ *
+ * Shelves live in their own table and only compete for U space, so mounts
+ * validate against devices plus shelf blockers. `excludeDeviceId` skips
+ * the device being updated so a no-op move is not self-conflicting.
  */
-function checkMount(
+export function checkPlacement(
 	deviceName: string,
 	mount: MountInput,
-	uHeight: number,
+	template: PlacementTemplate,
 	excludeDeviceId?: number,
 ): Result<undefined, Error> {
 	const db = getDb()
@@ -76,14 +91,14 @@ function checkMount(
 		return Result.ok(undefined)
 	}
 	const positionU = mount.position_u as number
-	if (uHeight < 1) {
+	if (template.u_height < 1) {
 		return Result.err(new ConflictError('Device type must consume at least 1 U'))
 	}
 	const candidate = {
 		id: excludeDeviceId ?? 0,
 		name: deviceName,
 		position_u: positionU,
-		height_u: uHeight,
+		height_u: template.u_height,
 		face: mount.face,
 		is_full_depth: mount.is_full_depth,
 	}
@@ -93,7 +108,7 @@ function checkMount(
 	}
 	const overlap = checkOverlap(
 		candidate,
-		deviceSpansOf(mount.rack_id),
+		rackSpansOf(mount.rack_id),
 		`Device "${deviceName}"`,
 		excludeDeviceId,
 	)
@@ -102,6 +117,47 @@ function checkMount(
 	}
 	return Result.ok(undefined)
 }
+
+interface ShelfPlacementInput {
+	rack_id?: number | null
+	position_u?: number | null
+	face?: 'front' | 'rear' | null
+	shelf_id?: number | null
+}
+
+/**
+ * Normalizes the shelf half of a placement. Placing on a shelf pins the
+ * rack to the shelf's rack and clears U position and face; moving a shelved
+ * device to another rack or onto a U takes it off its shelf.
+ */
+function normalizeShelf<T extends ShelfPlacementInput>(
+	input: T,
+	current?: { rack_id: number | null; shelf_id: number | null },
+): Result<T, Error> {
+	if (input.shelf_id === undefined || input.shelf_id === null) {
+		const leavesShelf =
+			input.shelf_id === undefined &&
+			current?.shelf_id !== null &&
+			current?.shelf_id !== undefined &&
+			((input.rack_id !== undefined && input.rack_id !== current.rack_id) ||
+				(input.position_u !== undefined && input.position_u !== null))
+		return Result.ok(leavesShelf ? { ...input, shelf_id: null } : input)
+	}
+	const shelf = getDb().select().from(shelves).where(eq(shelves.id, input.shelf_id)).get()
+	if (!shelf) {
+		return Result.err(new NotFoundError('Shelf not found'))
+	}
+	if (input.rack_id !== undefined && input.rack_id !== null && input.rack_id !== shelf.rack_id) {
+		return Result.err(new ConflictError('Shelf is mounted in another rack'))
+	}
+	if (input.position_u !== undefined && input.position_u !== null) {
+		return Result.err(new ConflictError('A device on a shelf has no U position'))
+	}
+	return Result.ok({ ...input, rack_id: shelf.rack_id, position_u: null, face: null })
+}
+
+/** Backwards-compatible alias for the placement check. */
+export const checkMount: typeof checkPlacement = checkPlacement
 
 function checkSite(siteId: number | null | undefined): Result<undefined, Error> {
 	if (siteId === null || siteId === undefined) {
@@ -167,6 +223,8 @@ export interface DeviceListParams extends ListParams {
 	rack?: number
 	tenant?: number
 	status?: string
+	/** Placed = U-mounted; unplaced = position empty. */
+	placed?: boolean
 	sort: 'name' | 'status'
 	order: 'asc' | 'desc'
 	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
@@ -196,6 +254,13 @@ export function listDevices(params: DeviceListParams): Page<DeviceRow> {
 	}
 	if (params.status) {
 		conditions.push(eq(devices.status, params.status))
+	}
+	if (params.placed !== undefined) {
+		conditions.push(
+			params.placed
+				? sql`${devices.position_u} IS NOT NULL`
+				: sql`${devices.position_u} IS NULL`,
+		)
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn = params.sort === 'status' ? devices.status : devices.name
@@ -233,8 +298,13 @@ function mountOf(input: {
 	}
 }
 
-export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
+export function createDevice(rawInput: DeviceCreate): Result<DeviceRow, Error> {
 	const db = getDb()
+	const normalized = normalizeShelf(rawInput)
+	if (Result.isError(normalized)) {
+		return normalized
+	}
+	const input = normalized.value
 	const template = db
 		.select()
 		.from(device_types)
@@ -246,6 +316,7 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	const createMount = mountOf(input)
 	createMount.is_full_depth = template.is_full_depth !== 0
 	let deviceLocationId = input.location_id ?? null
+	const deviceSiteId = input.site_id ?? null
 	if (createMount.rack_id !== null) {
 		const rackLocation = rackLocationId(createMount.rack_id)
 		if (Result.isError(rackLocation)) {
@@ -254,11 +325,11 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 		deviceLocationId = rackLocation.value
 	}
 	for (const guard of [
-		checkSite(input.site_id),
-		checkLocation(deviceLocationId, input.site_id),
+		checkSite(deviceSiteId),
+		checkLocation(deviceLocationId, deviceSiteId),
 		checkTenantExists(input.tenant_id),
 		checkAssetTag(input.asset_tag),
-		checkMount(input.name, createMount, template.u_height),
+		checkPlacement(input.name, createMount, templateOf(template)),
 	]) {
 		if (Result.isError(guard)) {
 			return Result.err(guard.error)
@@ -285,11 +356,12 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	}
 	const values: Omit<DeviceRow, 'id'> = {
 		device_type_id: input.device_type_id,
-		site_id: input.site_id ?? null,
+		site_id: deviceSiteId,
 		location_id: deviceLocationId,
 		rack_id: input.rack_id ?? null,
 		face: input.face ?? null,
 		position_u: input.position_u ?? null,
+		shelf_id: input.shelf_id ?? null,
 		status: input.status ?? 'active',
 		name: input.name,
 		serial: input.serial ?? null,
@@ -329,12 +401,17 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 	return getDevice(deviceId)
 }
 
-export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow, Error> {
+export function updateDevice(id: number, rawInput: DeviceUpdate): Result<DeviceRow, Error> {
 	const current = getDevice(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const node = current.value
+	const normalized = normalizeShelf(rawInput, node)
+	if (Result.isError(normalized)) {
+		return normalized
+	}
+	const input = normalized.value
 	const template = getDb()
 		.select()
 		.from(device_types)
@@ -343,7 +420,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	if (!template) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
-	const effectiveSite = input.site_id !== undefined ? input.site_id : node.site_id
+	const placement = templateOf(template)
 	const effectiveRackId = input.rack_id !== undefined ? input.rack_id : node.rack_id
 	const mountChanged = input.rack_id !== undefined || input.position_u !== undefined
 	let deviceLocationId = input.location_id !== undefined ? input.location_id : node.location_id
@@ -356,10 +433,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	}
 	for (const guard of [
 		checkSite(input.site_id),
-		checkLocation(
-			deviceLocationId,
-			input.site_id !== undefined ? input.site_id : effectiveSite,
-		),
+		checkLocation(deviceLocationId, input.site_id !== undefined ? input.site_id : node.site_id),
 		checkTenantExists(input.tenant_id),
 		checkAssetTag(input.asset_tag, id),
 	]) {
@@ -367,19 +441,19 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 			return Result.err(guard.error)
 		}
 	}
-	if (mountChanged) {
-		const mount: MountInput = {
-			rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
-			position_u: input.position_u !== undefined ? input.position_u : node.position_u,
-			face:
-				input.face !== undefined
-					? input.face
-					: node.face === 'front' || node.face === 'rear'
-						? node.face
-						: null,
-			is_full_depth: template.is_full_depth !== 0,
-		}
-		const mountCheck = checkMount(input.name ?? node.name, mount, template.u_height, id)
+	const mount: MountInput = {
+		rack_id: effectiveRackId ?? null,
+		position_u: input.position_u !== undefined ? input.position_u : node.position_u,
+		face:
+			input.face !== undefined
+				? input.face
+				: node.face === 'front' || node.face === 'rear'
+					? node.face
+					: null,
+		is_full_depth: template.is_full_depth !== 0,
+	}
+	if (mountChanged || input.face !== undefined || input.name !== undefined) {
+		const mountCheck = checkPlacement(input.name ?? node.name, mount, placement, id)
 		if (Result.isError(mountCheck)) {
 			return Result.err(mountCheck.error)
 		}
@@ -405,6 +479,9 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	}
 	if (input.position_u !== undefined) {
 		patch.position_u = input.position_u
+	}
+	if (input.shelf_id !== undefined) {
+		patch.shelf_id = input.shelf_id
 	}
 	if (input.serial !== undefined) {
 		patch.serial = input.serial
@@ -449,19 +526,24 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 	if (!template) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
+	const placement = templateOf(template)
 	const mount: MountInput = {
 		rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 		position_u: input.position_u !== undefined ? input.position_u : node.position_u,
 		face: node.face === 'front' || node.face === 'rear' ? node.face : null,
 		is_full_depth: template.is_full_depth !== 0,
 	}
-	const mountCheck = checkMount(node.name, mount, template.u_height, id)
+	const mountCheck = checkPlacement(node.name, mount, placement, id)
 	if (Result.isError(mountCheck)) {
 		return Result.err(mountCheck.error)
 	}
 	const patch: Partial<DeviceRow> = {
 		rack_id: mount.rack_id,
 		position_u: mount.position_u,
+	}
+	// A remount (other rack or a U) takes the device off its shelf.
+	if (mount.rack_id !== node.rack_id || mount.position_u !== null) {
+		patch.shelf_id = null
 	}
 	if (mount.rack_id !== null) {
 		const rackLocation = rackLocationId(mount.rack_id)
@@ -470,7 +552,11 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 		}
 		patch.location_id = rackLocation.value
 	}
-	getDb().update(devices).set(patch).where(eq(devices.id, id)).run()
+	try {
+		getDb().update(devices).set(patch).where(eq(devices.id, id)).run()
+	} catch (err) {
+		return Result.err(err instanceof Error ? err : new Error(String(err)))
+	}
 	return getDevice(id)
 }
 

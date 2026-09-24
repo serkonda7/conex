@@ -7,6 +7,7 @@ import {
 	devices,
 	manufacturers,
 	racks,
+	shelves,
 	sites,
 	tenants,
 } from '../../server/src/schema'
@@ -153,6 +154,27 @@ const e2eSwitch = db
 	.from(device_types)
 	.all()
 	.find((row) => row.model === 'E2E 1U Switch')
+// Shelf coverage lives in the `shelves` table (rack fixtures, fully
+// separate from devices); the visual rack below mounts one.
+const e2eShelfFacing = db
+	.select()
+	.from(device_types)
+	.all()
+	.find((row) => row.model === 'E2E 1U Widget')
+if (!e2eShelfFacing) {
+	db.insert(device_types)
+		.values({ manufacturer_id: manufacturer.id, model: 'E2E 1U Widget', u_height: 1 })
+		.run()
+} else {
+	getSqliteHandle()
+		.query('UPDATE device_types SET u_height = 1 WHERE id = ?')
+		.run(e2eShelfFacing.id)
+}
+const e2eWidgetType = db
+	.select()
+	.from(device_types)
+	.all()
+	.find((row) => row.model === 'E2E 1U Widget')
 if (e2eSite && e2eRackType) {
 	let visualRack = db
 		.select()
@@ -238,6 +260,94 @@ if (e2eSite && e2eRackType) {
 			} else {
 				db.insert(devices).values(values).run()
 			}
+		}
+	}
+	if (e2eWidgetType) {
+		const widgetValues = {
+			device_type_id: e2eWidgetType.id,
+			site_id: e2eSite.id,
+			location_id: null,
+			rack_id: null,
+			face: null,
+			position_u: null,
+			status: 'active',
+			name: 'E2E Loose Widget',
+			serial: null,
+			asset_tag: null,
+			tenant_id: tenant.id,
+			description: null,
+		}
+		const existingWidget = db
+			.select()
+			.from(devices)
+			.all()
+			.find((row) => row.name === 'E2E Loose Widget')
+		if (existingWidget) {
+			getSqliteHandle()
+				.query(
+					`UPDATE devices SET device_type_id = ?, site_id = ?, location_id = ?, rack_id = ?,
+					face = ?, position_u = ?, status = ?, name = ?, serial = ?,
+					asset_tag = ?, tenant_id = ?, description = ? WHERE id = ?`,
+				)
+				.run(
+					widgetValues.device_type_id,
+					widgetValues.site_id,
+					widgetValues.location_id,
+					widgetValues.rack_id,
+					widgetValues.face,
+					widgetValues.position_u,
+					widgetValues.status,
+					widgetValues.name,
+					widgetValues.serial,
+					widgetValues.asset_tag,
+					widgetValues.tenant_id,
+					widgetValues.description,
+					existingWidget.id,
+				)
+		} else {
+			db.insert(devices).values(widgetValues).run()
+		}
+	}
+	// A shelf fixture on the visual rack: 1 HE mount at HE2 (not usable) plus
+	// 2 HE reserved clearance, full depth, front face.
+	if (visualRack) {
+		const shelfValues = {
+			rack_id: visualRack.id,
+			name: 'E2E Visual Shelf',
+			face: 'front',
+			position_u: 2,
+			mount_height: 1,
+			mount_usable: 0,
+			reserved_height: 2,
+			is_full_depth: 1,
+			description: 'Shelf for screenshot coverage.',
+		}
+		const existingShelf = db
+			.select()
+			.from(shelves)
+			.all()
+			.find((row) => row.name === 'E2E Visual Shelf')
+		if (existingShelf) {
+			getSqliteHandle()
+				.query(
+					`UPDATE shelves SET rack_id = ?, name = ?, face = ?, position_u = ?,
+					mount_height = ?, mount_usable = ?, reserved_height = ?, is_full_depth = ?,
+					description = ? WHERE id = ?`,
+				)
+				.run(
+					shelfValues.rack_id,
+					shelfValues.name,
+					shelfValues.face,
+					shelfValues.position_u,
+					shelfValues.mount_height,
+					shelfValues.mount_usable,
+					shelfValues.reserved_height,
+					shelfValues.is_full_depth,
+					shelfValues.description,
+					existingShelf.id,
+				)
+		} else {
+			db.insert(shelves).values(shelfValues).run()
 		}
 	}
 }

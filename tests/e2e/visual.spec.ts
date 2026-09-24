@@ -19,7 +19,7 @@ test('rack detail and elevation layout', async ({ page }) => {
 	await expect(page.getByRole('link', { name: 'E2E Edge Server' }).first()).toBeVisible()
 	await expect(page.getByRole('link', { name: 'E2E Rack Switch' }).first()).toBeVisible()
 	await expect(page.getByRole('link', { name: 'E2E Spare Device' })).toBeVisible()
-	await expect(page.getByRole('status', { name: '3 von 10 HE belegt' })).toBeVisible()
+	await expect(page.getByRole('status', { name: '6 von 10 HE belegt' })).toBeVisible()
 	await stabilizeForSnapshot(page)
 	await expect(page).toHaveScreenshot('rack-detail-and-elevation.png')
 })

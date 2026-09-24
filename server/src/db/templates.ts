@@ -9,12 +9,14 @@ import type {
 	StubUpdate,
 } from 'shared/src/schemas'
 import { slugify } from 'shared/src/slug'
-import { device_type_interfaces, device_types, devices, manufacturers } from '../schema'
+import { device_type_interfaces, device_types, devices, manufacturers, racks } from '../schema'
+import { checkBounds, checkOverlap } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import { errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
+import { deviceSpansOf, rackHeightOf } from './racks'
 
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
@@ -212,10 +214,11 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 	if (!db.select().from(manufacturers).where(eq(manufacturers.id, input.manufacturer_id)).get()) {
 		return Result.err(new NotFoundError('Manufacturer not found'))
 	}
+	const uHeight = input.u_height ?? 1
 	const row: Omit<DeviceTypeRow, 'id'> = {
 		manufacturer_id: input.manufacturer_id,
 		model: input.model,
-		u_height: input.u_height ?? 1,
+		u_height: uHeight,
 		is_full_depth: (input.is_full_depth ?? true) ? 1 : 0,
 		form_factor: input.form_factor ?? null,
 		// Rack types use the standard 19-inch mounting width. Keep the generic
@@ -269,8 +272,71 @@ export function updateDeviceType(
 	if (input.model !== undefined) {
 		patch.model = input.model
 	}
+	const effectiveUHeight = input.u_height !== undefined ? input.u_height : current.value.u_height
+	// Updating a type must not break devices that already exist.
+	if (
+		current.value.u_height >= 1 &&
+		effectiveUHeight === 0 &&
+		db
+			.select()
+			.from(devices)
+			.where(and(eq(devices.device_type_id, id), isNotNull(devices.position_u)))
+			.get()
+	) {
+		return Result.err(
+			new ConflictError(
+				'Gerätetyp hat noch eingebaute Geräte; Höhe kann nicht auf 0 gesetzt werden',
+			),
+		)
+	}
 	if (input.u_height !== undefined) {
 		patch.u_height = input.u_height
+	}
+	// Changing the height re-runs bounds and overlap checks for every
+	// mounted device of this type (same loop `updateRack` uses for shrinks).
+	if (effectiveUHeight !== current.value.u_height) {
+		const mounted = db
+			.select()
+			.from(devices)
+			.where(and(eq(devices.device_type_id, id), isNotNull(devices.position_u)))
+			.all()
+		for (const mountedDevice of mounted) {
+			if (mountedDevice.rack_id === null || mountedDevice.position_u === null) {
+				continue
+			}
+			const rackRow = db.select().from(racks).where(eq(racks.id, mountedDevice.rack_id)).get()
+			if (!rackRow) {
+				continue
+			}
+			const candidate = {
+				id: mountedDevice.id,
+				name: mountedDevice.name,
+				position_u: mountedDevice.position_u,
+				height_u: effectiveUHeight,
+				face:
+					mountedDevice.face === 'front' || mountedDevice.face === 'rear'
+						? mountedDevice.face
+						: null,
+				is_full_depth: current.value.is_full_depth !== 0,
+			} as const
+			const bounds = checkBounds(
+				candidate,
+				rackHeightOf(rackRow),
+				`Device "${mountedDevice.name}"`,
+			)
+			if (Result.isError(bounds)) {
+				return Result.err(bounds.error)
+			}
+			const overlap = checkOverlap(
+				candidate,
+				deviceSpansOf(mountedDevice.rack_id),
+				`Device "${mountedDevice.name}"`,
+				mountedDevice.id,
+			)
+			if (Result.isError(overlap)) {
+				return Result.err(overlap.error)
+			}
+		}
 	}
 	if (input.is_full_depth !== undefined) {
 		patch.is_full_depth = input.is_full_depth ? 1 : 0

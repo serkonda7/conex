@@ -37,6 +37,7 @@ export async function fetch_devices(
 				rack: filters?.rack,
 				tenant: filters?.tenant,
 				status: filters?.status,
+				placed: filters?.placed,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),

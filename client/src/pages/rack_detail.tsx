@@ -1,6 +1,7 @@
 import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import type { ElevationShelfDeviceRef, ElevationShelfRef } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices, update_device } from '../api_devices'
@@ -30,13 +31,15 @@ import { navigate } from '../router'
  * /racks/:id — rack detail: header with name/description, two-column
  * layout (details left, elevation right) with a utilization strip and the
  * NetBox-like visual elevation (front/rear faces, spanning multi-U blocks,
- * click-free-U to install).
+ * click-free-U to install devices or shelves).
  */
 export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [pendingU, setPendingU] = createSignal<number | null>(null)
 	const [face, setFace] = createSignal<RackFace>('front')
 	const [selectingDevice, setSelectingDevice] = createSignal(false)
+	/** Shelf the device selector places onto; null = the pending U. */
+	const [targetShelf, setTargetShelf] = createSignal<ElevationShelfRef | null>(null)
 
 	const [rack] = createResource(
 		() => props.id,
@@ -116,7 +119,9 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				setError(result.error.message)
 				return []
 			}
-			return result.value.items.filter((device) => device.position_u === null)
+			return result.value.items.filter(
+				(device) => device.position_u === null && device.shelf_id === null,
+			)
 		},
 	)
 	const [deviceTypes] = createResource(async () => {
@@ -173,8 +178,9 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	})
 
 	const occupiedU = createMemo(
-		() => elevation()?.units.filter((u) => u.device !== null).length ?? 0,
+		() => elevation()?.units.filter((u) => u.device !== null || u.shelf !== null).length ?? 0,
 	)
+	const reservedU = createMemo(() => elevation()?.reserved_u ?? 0)
 	/** Rack height is owned by the rack type; the stored rack row is only a fallback. */
 	const displayHeight = createMemo(
 		() => elevation()?.height_u ?? rackType()?.u_height ?? rack()?.height_u ?? 0,
@@ -201,12 +207,53 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		navigate(`/devices/add?rack=${props.id}&position_u=${u}&face=${targetFace}`)
 	}
 
+	function installShelf(u: number, targetFace: RackFace = face()): void {
+		navigate(`/shelves/add?rack=${props.id}&position_u=${u}&face=${targetFace}`)
+	}
+
 	function openDeviceSelector(u: number, targetFace: RackFace): void {
 		pickU(u, targetFace)
+		setTargetShelf(null)
 		setSelectingDevice(true)
 	}
 
+	function openShelfDeviceSelector(shelf: ElevationShelfRef): void {
+		setTargetShelf(shelf)
+		setSelectingDevice(true)
+	}
+
+	function installDeviceOnShelf(shelf: ElevationShelfRef): void {
+		navigate(`/devices/add?rack=${props.id}&shelf=${shelf.id}`)
+	}
+
+	function refreshPlacement(result: Result<DeviceRow, Error>): void {
+		if (Result.isError(result)) {
+			setError(result.error.message)
+			return
+		}
+		void refetch()
+		void refetchUnrackedDevices()
+	}
+
+	async function placeOnShelf(device: DeviceRow, shelf: ElevationShelfRef): Promise<void> {
+		setSelectingDevice(false)
+		setTargetShelf(null)
+		setError(null)
+		refreshPlacement(await update_device(device.id, { shelf_id: shelf.id }))
+	}
+
+	/** Takes a device off its shelf; it stays assigned to this rack. */
+	async function removeFromShelf(device: ElevationShelfDeviceRef): Promise<void> {
+		setError(null)
+		refreshPlacement(await update_device(device.id, { shelf_id: null }))
+	}
+
 	async function placeDevice(device: DeviceRow): Promise<void> {
+		const shelf = targetShelf()
+		if (shelf) {
+			await placeOnShelf(device, shelf)
+			return
+		}
 		const u = pendingU()
 		if (u === null) {
 			return
@@ -386,6 +433,9 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						>
 							<span>
 								{occupiedU()}/{totalU()} HE · {utilPct()} % belegt
+								<Show when={reservedU() > 0}>
+									<span> (davon {reservedU()} HE reserviert)</span>
+								</Show>
 							</span>
 							<span class="rack-util-bar" aria-hidden="true">
 								<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
@@ -397,16 +447,29 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						>
 							<RackElevation
 								units={elevation()?.units ?? []}
+								shelves={elevation()?.shelves ?? []}
 								selected_u={pendingU()}
 								selected_face={face()}
 								on_select_u={pickU}
 								on_select_device={openDeviceSelector}
 								on_add_device={installDevice}
+								on_add_shelf={installShelf}
+								shelf_actions={{
+									on_add_shelf_device: installDeviceOnShelf,
+									on_select_shelf_device: openShelfDeviceSelector,
+									on_remove_shelf_device: (
+										device: ElevationShelfDeviceRef,
+									): void => void removeFromShelf(device),
+								}}
 							/>
 						</Show>
 						<Show when={selectingDevice()}>
 							<ObjectSelector
-								label={`Gerät für HE${pendingU() ?? ''} auswählen (${face()})`}
+								label={
+									targetShelf()
+										? `Gerät für Fachboden ${targetShelf()?.name || `HE${targetShelf()?.position_u}`} auswählen`
+										: `Gerät für HE${pendingU() ?? ''} auswählen (${face()})`
+								}
 								placeholder="Geräte suchen…"
 								load={async (search: string) => {
 									const result = await fetch_devices({ search })
@@ -416,7 +479,10 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								}}
 								get_label={(device: DeviceRow) => device.name}
 								on_select={(device: DeviceRow) => void placeDevice(device)}
-								on_close={() => setSelectingDevice(false)}
+								on_close={() => {
+									setSelectingDevice(false)
+									setTargetShelf(null)
+								}}
 							/>
 						</Show>
 					</div>

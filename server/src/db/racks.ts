@@ -1,7 +1,14 @@
 import { Result } from 'better-result'
 import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
-import type { ElevationResponse, ElevationUnit, RackCreate, RackUpdate } from 'shared/src/schemas'
-import { device_types, devices, locations, racks, sites } from '../schema'
+import type {
+	ElevationResponse,
+	ElevationShelfDeviceRef,
+	ElevationShelfRef,
+	ElevationUnit,
+	RackCreate,
+	RackUpdate,
+} from 'shared/src/schemas'
+import { device_types, devices, locations, racks, shelves, sites } from '../schema'
 import { checkBounds, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -123,9 +130,10 @@ function checkLocation(
 }
 
 /**
- * U-consuming device spans of one rack. Joins the template for `u_height`, the footprint each span
- * occupies. Exported so `db/devices.ts` validates mounts against the same
- * rows the elevation renders.
+ * U-consuming device spans of one rack. Devices span their template
+ * `u_height`. Shelves contribute separately via `shelfSpansOf`. Exported so
+ * `db/devices.ts` and `db/shelves.ts` validate mounts against the same rows
+ * the elevation renders.
  */
 export function deviceSpansOf(rackId: number): OccupantSpan[] {
 	return deviceDetailsOf(rackId).map((d) => ({
@@ -195,6 +203,104 @@ export function deviceDetailsOf(rackId: number): {
 		})
 	}
 	return details
+}
+
+/** Full shelf mount details for one rack, ordered by bottom-U. */
+export function shelfDetailsOf(rackId: number): ElevationShelfRef[] {
+	const rows = getDb()
+		.select()
+		.from(shelves)
+		.where(eq(shelves.rack_id, rackId))
+		.orderBy(asc(shelves.position_u))
+		.all()
+	const onShelves = new Map<number, ElevationShelfDeviceRef[]>()
+	const shelved = getDb()
+		.select({
+			id: devices.id,
+			name: devices.name,
+			status: devices.status,
+			shelf_id: devices.shelf_id,
+			device_type_model: device_types.model,
+		})
+		.from(devices)
+		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
+		.where(and(eq(devices.rack_id, rackId), sql`${devices.shelf_id} IS NOT NULL`))
+		.orderBy(asc(devices.name))
+		.all()
+	for (const { shelf_id, ...device } of shelved) {
+		if (shelf_id === null) {
+			continue
+		}
+		const list = onShelves.get(shelf_id) ?? []
+		list.push(device)
+		onShelves.set(shelf_id, list)
+	}
+	return rows.map((row) => ({
+		id: row.id,
+		name: row.name,
+		face: row.face === 'front' || row.face === 'rear' ? row.face : null,
+		position_u: row.position_u,
+		mount_height: row.mount_height,
+		mount_usable: row.mount_usable !== 0,
+		reserved_height: row.reserved_height,
+		is_full_depth: row.is_full_depth !== 0,
+		devices: onShelves.get(row.id) ?? [],
+	}))
+}
+
+/**
+ * Blocked U range of a shelf: the mount span counts unless `mount_usable`
+ * is set; the reserved span always counts. Returns null when nothing is
+ * blocked (mount usable with no reserve).
+ */
+export function shelfBlockedRange(shelf: {
+	position_u: number
+	mount_height: number
+	mount_usable: boolean
+	reserved_height: number
+}): { position_u: number; height_u: number } | null {
+	const total = shelf.mount_height + shelf.reserved_height
+	if (shelf.mount_usable) {
+		if (shelf.reserved_height <= 0) {
+			return null
+		}
+		return {
+			position_u: shelf.position_u + shelf.mount_height,
+			height_u: shelf.reserved_height,
+		}
+	}
+	if (total <= 0) {
+		return null
+	}
+	return { position_u: shelf.position_u, height_u: total }
+}
+
+/**
+ * U-blocking shelf spans of one rack (at most one span per shelf).
+ * Exported so device and shelf validation share the elevation's rows.
+ */
+export function shelfSpansOf(rackId: number): OccupantSpan[] {
+	const spans: OccupantSpan[] = []
+	for (const s of shelfDetailsOf(rackId)) {
+		const blocked = shelfBlockedRange(s)
+		if (!blocked) {
+			continue
+		}
+		spans.push({
+			id: -s.id,
+			name: s.name ?? 'shelf',
+			position_u: blocked.position_u,
+			height_u: blocked.height_u,
+			face: s.face,
+			is_full_depth: s.is_full_depth,
+		})
+	}
+	return spans
+}
+
+/** All U-consuming spans of one rack: devices plus shelf blockers. */
+export function rackSpansOf(rackId: number): OccupantSpan[] {
+	return [...deviceSpansOf(rackId), ...shelfSpansOf(rackId)]
 }
 
 export function createRack(input: RackCreate): Result<RackRow, Error> {
@@ -278,8 +384,8 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 		// Shrinking below the topmost occupied U would strand devices outside
 		// the rack; reject with the same bounds error
 		// creation uses.
-		for (const device of deviceSpansOf(id)) {
-			const bounds = checkBounds(device, effectiveHeight, `Device "${device.name}"`)
+		for (const span of rackSpansOf(id)) {
+			const bounds = checkBounds(span, effectiveHeight, `Device "${span.name}"`)
 			if (Result.isError(bounds)) {
 				return Result.err(bounds.error)
 			}
@@ -323,6 +429,10 @@ export function deleteRack(id: number): Result<RackRow, Error> {
 	if (device) {
 		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
 	}
+	const shelf = getDb().select().from(shelves).where(eq(shelves.rack_id, id)).get()
+	if (shelf) {
+		return Result.err(new ConflictError('Rack still has shelves; move or delete them first'))
+	}
 	try {
 		getDb().delete(racks).where(eq(racks.id, id)).run()
 	} catch (e) {
@@ -340,9 +450,9 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 	const rack = current.value
 	const heightU = rackHeightOf(rack)
 	const details = deviceDetailsOf(id)
-	const occupancy = getOccupancy(
-		heightU,
-		details.map((d) => ({
+	const shelfDetails = shelfDetailsOf(id)
+	const occupancy = getOccupancy(heightU, [
+		...details.map((d) => ({
 			id: d.id,
 			name: d.name,
 			position_u: d.position_u,
@@ -350,30 +460,41 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 			face: d.face,
 			is_full_depth: d.is_full_depth,
 		})),
-	)
+		...shelfSpansOf(id),
+	])
 	if (Result.isError(occupancy)) {
 		return Result.err(occupancy.error)
 	}
+	const blockedU = shelfSpansOf(id).reduce((sum, s) => sum + s.height_u, 0)
 	const deviceById = new Map(details.map((d) => [d.id, d]))
+	const shelfAt = (u: number): ElevationShelfRef[] =>
+		shelfDetails.filter((s) => {
+			const blocked = shelfBlockedRange(s)
+			if (!blocked) {
+				return false
+			}
+			return u >= blocked.position_u && u < blocked.position_u + blocked.height_u
+		})
+	const toRef = (
+		deviceRow: (typeof details)[number],
+	): ElevationResponse['units'][number]['device'] => ({
+		id: deviceRow.id,
+		name: deviceRow.name,
+		face: deviceRow.face,
+		position_u: deviceRow.position_u,
+		u_height: deviceRow.u_height,
+		status: deviceRow.status,
+		device_type_id: deviceRow.device_type_id,
+		device_type_model: deviceRow.device_type_model,
+		is_full_depth: deviceRow.is_full_depth,
+	})
 	const units: ElevationUnit[] = [...occupancy.value.units].reverse().map((u) => {
 		const deviceId = u.device?.id ?? null
-		const deviceRow = deviceId !== null ? deviceById.get(deviceId) : undefined
+		const deviceRow = deviceId !== null && deviceId > 0 ? deviceById.get(deviceId) : undefined
+		const at = shelfAt(u.u)
 		return {
 			u: u.u,
-			device:
-				deviceRow === undefined
-					? null
-					: {
-							id: deviceRow.id,
-							name: deviceRow.name,
-							face: deviceRow.face,
-							position_u: deviceRow.position_u,
-							u_height: deviceRow.u_height,
-							status: deviceRow.status,
-							device_type_id: deviceRow.device_type_id,
-							device_type_model: deviceRow.device_type_model,
-							is_full_depth: deviceRow.is_full_depth,
-						},
+			device: deviceRow === undefined ? null : toRef(deviceRow),
 			devices: details
 				.filter((d) => d.position_u <= u.u && d.position_u + d.u_height > u.u)
 				.map((d) => ({
@@ -387,7 +508,15 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 					device_type_model: d.device_type_model,
 					is_full_depth: d.is_full_depth,
 				})),
+			shelf: at[0] ?? null,
+			shelves: at,
 		}
 	})
-	return Result.ok({ rack_id: rack.id, height_u: heightU, units })
+	return Result.ok({
+		rack_id: rack.id,
+		height_u: heightU,
+		units,
+		reserved_u: blockedU,
+		shelves: shelfDetails,
+	})
 }

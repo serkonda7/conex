@@ -57,6 +57,8 @@ import { RackEditPage } from './pages/rack_edit'
 import { RackTypeAddPage } from './pages/rack_type_add'
 import { RackTypesPage } from './pages/rack_types'
 import { RacksPage } from './pages/racks'
+import { ShelfAddPage } from './pages/shelf_add'
+import { ShelfEditPage } from './pages/shelf_edit'
 import { SiteAddPage } from './pages/site_add'
 import { SiteDetailPage } from './pages/site_detail'
 import { SiteEditPage } from './pages/site_edit'
@@ -296,6 +298,7 @@ interface RouteInfo {
 	siteGroupId: number | null
 	locationId: number | null
 	rackId: number | null
+	shelfId: number | null
 	deviceId: number | null
 	deviceTypeId: number | null
 	manufacturerId: number | null
@@ -310,6 +313,7 @@ function emptyRoute(page: string): RouteInfo {
 		siteGroupId: null,
 		locationId: null,
 		rackId: null,
+		shelfId: null,
 		deviceId: null,
 		deviceTypeId: null,
 		manufacturerId: null,
@@ -403,6 +407,22 @@ function parseRoute(routePath: string, isAdmin: boolean): RouteInfo {
 			return { ...emptyRoute('rack-detail'), rackId }
 		}
 		return emptyRoute('racks')
+	}
+	if (parts[0] === 'shelves') {
+		if (parts[1] === 'add') {
+			return emptyRoute('shelf-add')
+		}
+		if (parts[1]) {
+			const shelfId = parseId(parts[1])
+			if (shelfId === null) {
+				return emptyRoute('not-found')
+			}
+			if (parts[2] === 'edit') {
+				return { ...emptyRoute('shelf-edit'), shelfId }
+			}
+			return emptyRoute('not-found')
+		}
+		return emptyRoute('not-found')
 	}
 	if (parts[0] === 'rack-types' || parts[0] === 'templates') {
 		if (parts[1] === 'add') {
@@ -657,6 +677,12 @@ function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolea
 				</Match>
 				<Match when={info().page === 'rack-edit' && info().rackId !== null}>
 					<RackEditPage id={info().rackId as number} />
+				</Match>
+				<Match when={info().page === 'shelf-add'}>
+					<ShelfAddPage />
+				</Match>
+				<Match when={info().page === 'shelf-edit' && info().shelfId !== null}>
+					<ShelfEditPage id={info().shelfId as number} />
 				</Match>
 				<Match when={info().page === 'rack-types'}>
 					<RackTypesPage />

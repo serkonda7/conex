@@ -6,7 +6,7 @@
  * and the detail-page deep links address them directly.
  */
 import type { InputEventAndTarget } from 'shared/src/types'
-import { For, type JSX, onMount, Show } from 'solid-js'
+import { createEffect, For, type JSX, onMount, Show } from 'solid-js'
 import { navigate } from '../router'
 import { Loading } from './feedback'
 import { go } from './list_page'
@@ -80,6 +80,7 @@ export function TextField(props: {
 	type?: 'text' | 'password' | 'number'
 	maxLength?: number
 	min?: number
+	max?: number
 	step?: number
 	required?: boolean
 	inputmode?: 'numeric' | 'text'
@@ -104,6 +105,7 @@ export function TextField(props: {
 				required={props.required}
 				maxLength={props.maxLength}
 				min={props.min}
+				max={props.max}
 				step={props.step}
 				inputmode={props.inputmode}
 				autocomplete={props.autocomplete}
@@ -164,6 +166,16 @@ export function SelectField(props: {
 	onMount(() => {
 		if (props.autofocus ?? false) {
 			select?.focus()
+		}
+	})
+	createEffect(() => {
+		// Re-apply the value once async-loaded options arrive: the `value`
+		// binding only re-fires when the value itself changes, not when the
+		// `<For>` options resolve later (deep-linked forms open before their
+		// option lists finish loading).
+		void props.options
+		if (select && props.value !== '') {
+			select.value = props.value
 		}
 	})
 
@@ -319,7 +331,11 @@ export function FormPage(props: {
 
 /** Edit actions, disabled while the form is saving. Save navigates back to
  * the detail page; cancel returns without forcing a refresh. */
-export function EditActions(props: { saving: boolean; cancelTo: string }): JSX.Element {
+export function EditActions(props: {
+	saving: boolean
+	cancelTo: string
+	onDelete?: () => void
+}): JSX.Element {
 	return (
 		<div class="form-actions">
 			<button type="submit" disabled={props.saving}>
@@ -328,6 +344,16 @@ export function EditActions(props: { saving: boolean; cancelTo: string }): JSX.E
 			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
 				Abbrechen
 			</button>
+			<Show when={props.onDelete}>
+				<button
+					type="button"
+					class="btn-danger"
+					onClick={() => props.onDelete?.()}
+					disabled={props.saving}
+				>
+					Löschen
+				</button>
+			</Show>
 		</div>
 	)
 }

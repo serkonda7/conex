@@ -303,6 +303,34 @@ export const RackListQuerySchema = v.object({
 export type RackListQuery = v.InferOutput<typeof RackListQuerySchema>
 
 // Elevation response (server-built, read by the client elevation view).
+
+/** Device sitting on a shelf (consumes no U of its own). */
+export interface ElevationShelfDeviceRef {
+	id: number
+	name: string
+	status: string
+	device_type_model: string
+}
+
+export interface ElevationShelfRef {
+	id: number
+	name: string | null
+	/** Rack face the shelf is mounted on, if set. */
+	face: 'front' | 'rear' | null
+	/** Bottom-U of the shelf (1-based). */
+	position_u: number
+	/** U height of the shelf mount hardware. */
+	mount_height: number
+	/** When true, the mount span stays usable for device mounts. */
+	mount_usable: boolean
+	/** Extra U reserved above the mount (always blocks device mounts). */
+	reserved_height: number
+	/** NetBox `is_full_depth`: false renders ghosted on the opposite face. */
+	is_full_depth: boolean
+	/** Devices placed on this shelf, by name. */
+	devices: ElevationShelfDeviceRef[]
+}
+
 export interface ElevationDeviceRef {
 	id: number
 	name: string
@@ -324,6 +352,10 @@ export interface ElevationUnit {
 	device: ElevationDeviceRef | null
 	/** All devices sharing this U, including opposite-face half-depth mounts. */
 	devices?: ElevationDeviceRef[]
+	/** Shelf blocking this U, if any. */
+	shelf: ElevationShelfRef | null
+	/** All shelves sharing this U (opposite-face half-depth mounts). */
+	shelves?: ElevationShelfRef[]
 }
 
 export interface ElevationResponse {
@@ -331,6 +363,10 @@ export interface ElevationResponse {
 	height_u: number
 	/** Top-down: highest U first, so the client renders without re-sorting. */
 	units: ElevationUnit[]
+	/** U blocked by shelves (mount + reserved spans that are not mount-usable). */
+	reserved_u: number
+	/** All shelves mounted in this rack. */
+	shelves: ElevationShelfRef[]
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +389,8 @@ export const InterfacePrefixSchema = v.pipe(
 export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
 
 /**
- * Rack units a device type consumes on mount: 1..60.
+ * Rack units a device type consumes on mount: at least 1 U.
+ * Shelves live in their own table (`shelves`), never as device types.
  */
 export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
@@ -492,6 +529,8 @@ export const DeviceCreateSchema = v.strictObject({
 	// Unmounted devices leave position_u empty; rack_id may still be set
 	// (rack-assigned but unracked) or empty (fully unracked).
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
+	// Place on a shelf instead of a U: rack follows the shelf, no position.
+	shelf_id: NullableIdSchema,
 	serial: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: NullableIdSchema,
@@ -508,6 +547,7 @@ export const DeviceUpdateSchema = v.strictObject({
 	rack_id: v.optional(v.nullable(IdSchema), undefined),
 	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
+	shelf_id: v.optional(v.nullable(IdSchema), undefined),
 	serial: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
@@ -554,6 +594,8 @@ export const DeviceListQuerySchema = v.object({
 	rack: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
+	/** Placed = U-mounted; unplaced = neither mounted nor rack-assigned. */
+	placed: v.optional(looseBoolean(false), undefined),
 	sort: v.optional(v.picklist(['name', 'status']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
@@ -597,6 +639,59 @@ export const InterfaceListQuerySchema = v.object({
 
 export type DeviceListQuery = v.InferOutput<typeof DeviceListQuerySchema>
 export type InterfaceListQuery = v.InferOutput<typeof InterfaceListQuerySchema>
+
+// ---------------------------------------------------------------------------
+// Shelves (rack fixtures, fully separate from devices)
+// ---------------------------------------------------------------------------
+
+/** U height of the shelf mount hardware: at least 1 U. */
+export const ShelfMountHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+
+/** Extra U reserved above the mount: 0 = none. */
+export const ShelfReservedHeightSchema = v.pipe(
+	v.number(),
+	v.integer(),
+	v.minValue(0),
+	v.maxValue(60),
+)
+
+export const ShelfCreateSchema = v.strictObject({
+	name: v.optional(v.nullable(NameSchema), null),
+	rack_id: IdSchema,
+	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
+	position_u: PositionUSchema,
+	mount_height: v.optional(ShelfMountHeightSchema, 1),
+	/** When true, the mount span stays usable for device mounts. */
+	mount_usable: v.optional(v.boolean(), false),
+	reserved_height: v.optional(ShelfReservedHeightSchema, 0),
+	/** NetBox `is_full_depth`: false allows opposite-face half-depth sharing. */
+	is_full_depth: v.optional(v.boolean(), true),
+	description: DescriptionSchema,
+})
+
+export const ShelfUpdateSchema = v.strictObject({
+	name: v.optional(v.nullable(NameSchema), undefined),
+	rack_id: v.optional(IdSchema, undefined),
+	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
+	position_u: v.optional(PositionUSchema, undefined),
+	mount_height: v.optional(ShelfMountHeightSchema, undefined),
+	mount_usable: v.optional(v.boolean(), undefined),
+	reserved_height: v.optional(ShelfReservedHeightSchema, undefined),
+	is_full_depth: v.optional(v.boolean(), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export type ShelfCreate = v.InferOutput<typeof ShelfCreateSchema>
+export type ShelfUpdate = v.InferOutput<typeof ShelfUpdateSchema>
+
+export const ShelfListQuerySchema = v.object({
+	...ListQueryEntries,
+	rack: OptionalIdEntry,
+	sort: v.optional(v.picklist(['name']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export type ShelfListQuery = v.InferOutput<typeof ShelfListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P5: cables (L1)
@@ -903,7 +998,7 @@ export const DeviceTypeImportRowSchema = v.object({
 			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
 			v.number(),
 			v.integer(),
-			v.minValue(0),
+			v.minValue(1),
 			v.maxValue(60),
 		),
 		1,
