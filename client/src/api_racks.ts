@@ -1,21 +1,20 @@
 /**
- * Racks API wrappers: typed racks/shelves/elevation calls over the hono RPC
+ * Racks API wrappers: typed racks/elevation calls over the hono RPC
  * client. Errors surface as `Result.err` with the server's `{ error }`
  * message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
-import type { RackRow, ShelfRow } from 'server/src/db/racks'
+import type { RackRow } from 'server/src/db/racks'
 import type {
 	ElevationResponse,
 	Page,
 	RackCreate,
 	RackListQuery,
 	RackUpdate,
-	ShelfCreate,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 
-export type { ElevationResponse, RackRow, ShelfRow }
+export type { ElevationResponse, RackRow }
 
 // ---------------------------------------------------------------------------
 // Racks
@@ -85,40 +84,4 @@ export async function update_rack(
 export async function delete_rack(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.racks[':id'].$delete({ param: { id: String(id) } })
 	return to_result<unknown>(res, 'Failed to delete rack')
-}
-
-// ---------------------------------------------------------------------------
-// Shelves
-// ---------------------------------------------------------------------------
-
-export async function fetch_shelves(rack: number): Promise<Result<Page<ShelfRow>, Error>> {
-	return getPage<ShelfRow>(
-		client.shelves.$get({
-			query: to_query({
-				search: '',
-				page: 1,
-				limit: 200,
-				rack,
-			}),
-		}),
-		'Failed to load shelves',
-	)
-}
-
-/**
- * Shelf create body. `height_u` stays optional here even though the shared
- * output type marks it required: the server defaults it to 1.
- */
-export type ShelfCreateInput = Omit<ShelfCreate, 'height_u'> & {
-	height_u?: ShelfCreate['height_u']
-}
-
-export async function create_shelf(input: ShelfCreateInput): Promise<Result<ShelfRow, Error>> {
-	const res = await client.shelves.$post({ json: input })
-	return to_result<ShelfRow>(res, 'Failed to create shelf')
-}
-
-export async function delete_shelf(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.shelves[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete shelf')
 }

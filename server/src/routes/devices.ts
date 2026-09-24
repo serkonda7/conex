@@ -136,7 +136,7 @@ export const devicesApp = new Hono()
 		}
 		return sendRow(c, deleteDevice(id))
 	})
-	// Explicit remount: re-validates U/shelf exactly like creation.
+	// Explicit remount: re-validates U exactly like creation.
 	.post(
 		'/:id/move',
 		vValidator('param', EntityParamsSchema, onValidationError),

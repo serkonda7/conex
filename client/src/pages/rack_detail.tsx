@@ -1,11 +1,10 @@
 import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices, update_device } from '../api_devices'
-import { create_shelf, delete_rack, delete_shelf, fetch_elevation, fetch_rack } from '../api_racks'
+import { delete_rack, fetch_elevation, fetch_rack } from '../api_racks'
 import {
 	type DeviceTypeRow,
 	fetch_device_type,
@@ -31,13 +30,10 @@ import { navigate } from '../router'
  * /racks/:id — rack detail: header with name/description, two-column
  * layout (details left, elevation right) with a utilization strip and the
  * NetBox-like visual elevation (front/rear faces, spanning multi-U blocks,
- * click-free-U to install) with shelf management.
+ * click-free-U to install).
  */
 export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [shelfName, setShelfName] = createSignal('')
-	const [shelfU, setShelfU] = createSignal('')
-	const [shelfH, setShelfH] = createSignal('1')
 	const [pendingU, setPendingU] = createSignal<number | null>(null)
 	const [face, setFace] = createSignal<RackFace>('front')
 	const [selectingDevice, setSelectingDevice] = createSignal(false)
@@ -120,9 +116,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				setError(result.error.message)
 				return []
 			}
-			return result.value.items.filter(
-				(device) => device.position_u === null && device.shelf_id === null,
-			)
+			return result.value.items.filter((device) => device.position_u === null)
 		},
 	)
 	const [deviceTypes] = createResource(async () => {
@@ -179,7 +173,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	})
 
 	const occupiedU = createMemo(
-		() => elevation()?.units.filter((u) => u.shelf !== null || u.device !== null).length ?? 0,
+		() => elevation()?.units.filter((u) => u.device !== null).length ?? 0,
 	)
 	/** Rack height is owned by the rack type; the stored rack row is only a fallback. */
 	const displayHeight = createMemo(
@@ -198,50 +192,9 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/racks',
 	})
 
-	async function handleCreateShelf(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		const position = Number(shelfU())
-		if (!Number.isInteger(position) || position < 1) {
-			setError('Shelf position must be a positive integer')
-			return
-		}
-		const height = shelfH().trim() === '' ? 1 : Number(shelfH())
-		if (!Number.isInteger(height) || height < 1) {
-			setError('Shelf height must be a positive integer in HE')
-			return
-		}
-		const res = await create_shelf({
-			name: shelfName(),
-			rack_id: props.id,
-			position_u: position,
-			height_u: height,
-		})
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setShelfName('')
-		setShelfU('')
-		setShelfH('1')
-		setPendingU(null)
-		void refetch()
-	}
-
-	async function handleDeleteShelf(id: number): Promise<void> {
-		setError(null)
-		const res = await delete_shelf(id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		void refetch()
-	}
-
 	function pickU(u: number, pickedFace: RackFace): void {
 		setPendingU(u)
 		setFace(pickedFace)
-		setShelfU(String(u))
 	}
 
 	function installDevice(u: number, targetFace: RackFace = face()): void {
@@ -263,7 +216,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		const result = await update_device(device.id, {
 			rack_id: props.id,
 			position_u: u,
-			shelf_id: null,
 			face: face(),
 		})
 		if (Result.isError(result)) {
@@ -450,7 +402,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								on_select_u={pickU}
 								on_select_device={openDeviceSelector}
 								on_add_device={installDevice}
-								on_delete_shelf={(id: number) => void handleDeleteShelf(id)}
 							/>
 						</Show>
 						<Show when={selectingDevice()}>
@@ -468,37 +419,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								on_close={() => setSelectingDevice(false)}
 							/>
 						</Show>
-
-						<h3>Fachboden hinzufügen</h3>
-						<form onSubmit={handleCreateShelf}>
-							<input
-								placeholder="Name"
-								aria-label="Name des Fachbodens"
-								value={shelfName()}
-								onInput={(e: InputEventAndTarget) =>
-									setShelfName(e.currentTarget.value)
-								}
-							/>
-							<input
-								placeholder="Position"
-								aria-label="Position des Fachbodens"
-								inputmode="numeric"
-								value={shelfU()}
-								onInput={(e: InputEventAndTarget) =>
-									setShelfU(e.currentTarget.value)
-								}
-							/>
-							<input
-								placeholder="Höhe (HE)"
-								aria-label="Höhe des Fachbodens in HE"
-								inputmode="numeric"
-								value={shelfH()}
-								onInput={(e: InputEventAndTarget) =>
-									setShelfH(e.currentTarget.value)
-								}
-							/>
-							<button type="submit">Fachboden hinzufügen</button>
-						</form>
 					</div>
 				</div>
 			</DetailShell>

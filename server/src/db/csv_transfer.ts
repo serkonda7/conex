@@ -178,8 +178,8 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 			continue
 		}
 		const height = item.u_height === undefined ? 1 : Number(item.u_height)
-		if (!Number.isInteger(height) || height < 0 || height > 60) {
-			fail('u_height must be an integer between 0 and 60')
+		if (!Number.isInteger(height) || height < 1 || height > 60) {
+			fail('u_height must be an integer between 1 and 60')
 			continue
 		}
 		let fullDepth = true

@@ -31,7 +31,6 @@ getSqliteHandle().transaction(() => {
 		DELETE FROM cables;
 		DELETE FROM interfaces;
 		DELETE FROM devices;
-		DELETE FROM rack_shelves;
 		DELETE FROM racks;
 		DELETE FROM locations;
 		DELETE FROM sites;
@@ -238,7 +237,6 @@ function addDevice(
 	assetTag: string,
 	serial: string,
 	positionU: number | null,
-	shelfId: number | null = null,
 ): typeof devices.$inferSelect {
 	return db
 		.insert(devices)
@@ -248,7 +246,6 @@ function addDevice(
 			location_id: locationId,
 			rack_id: rackId,
 			position_u: positionU,
-			shelf_id: shelfId,
 			tenant_id: tenantId,
 			face: positionU === null ? null : 'front',
 			name,

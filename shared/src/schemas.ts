@@ -264,14 +264,11 @@ export type SiteGroupListQuery = v.InferOutput<typeof SiteGroupListQuerySchema>
 export type LocationListQuery = v.InferOutput<typeof LocationListQuerySchema>
 
 // ---------------------------------------------------------------------------
-// P2: racks / shelves
+// P2: racks
 // ---------------------------------------------------------------------------
 
 /** Bottom-U position, 1-based. Upper bound is rack-dependent, checked in the service layer. */
 export const PositionUSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
-
-/** U span of a shelf or device: at least 1 U. */
-export const SpanHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
 export const RackCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -285,40 +282,14 @@ export const RackCreateSchema = v.strictObject({
 export const RackUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	rack_type_id: v.optional(IdSchema, undefined),
-	// site_id is immutable after create: shelves reference rack-local U
-	// positions that are meaningless without the original rack height.
+	// site_id is immutable after create: rack placement depends on its site.
 	location_id: v.optional(v.nullable(IdSchema), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
-export const ShelfCreateSchema = v.strictObject({
-	name: NameSchema,
-	rack_id: IdSchema,
-	position_u: PositionUSchema,
-	height_u: v.optional(SpanHeightSchema, 1),
-	capacity_slots: v.optional(
-		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
-		undefined,
-	),
-})
-
-export const ShelfUpdateSchema = v.strictObject({
-	name: v.optional(NameSchema, undefined),
-	// rack_id is immutable after create: moving a shelf across racks would
-	// silently reinterpret its U position against another rack's height.
-	position_u: v.optional(PositionUSchema, undefined),
-	height_u: v.optional(SpanHeightSchema, undefined),
-	capacity_slots: v.optional(
-		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
-		undefined,
-	),
-})
-
 export type RackCreate = v.InferOutput<typeof RackCreateSchema>
 export type RackUpdate = v.InferOutput<typeof RackUpdateSchema>
-export type ShelfCreate = v.InferOutput<typeof ShelfCreateSchema>
-export type ShelfUpdate = v.InferOutput<typeof ShelfUpdateSchema>
 
 export const RackListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -329,24 +300,9 @@ export const RackListQuerySchema = v.object({
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
-export const ShelfListQuerySchema = v.object({
-	...ListQueryEntries,
-	rack: OptionalIdEntry,
-})
-
 export type RackListQuery = v.InferOutput<typeof RackListQuerySchema>
-export type ShelfListQuery = v.InferOutput<typeof ShelfListQuerySchema>
 
 // Elevation response (server-built, read by the client elevation view).
-export interface ElevationShelfRef {
-	id: number
-	name: string
-	/** Bottom-U of the shelf span (1-based). */
-	position_u: number
-	/** U height of the shelf span. */
-	height_u: number
-}
-
 export interface ElevationDeviceRef {
 	id: number
 	name: string
@@ -365,7 +321,6 @@ export interface ElevationDeviceRef {
 
 export interface ElevationUnit {
 	u: number
-	shelf: ElevationShelfRef | null
 	device: ElevationDeviceRef | null
 	/** All devices sharing this U, including opposite-face half-depth mounts. */
 	devices?: ElevationDeviceRef[]
@@ -398,10 +353,9 @@ export const InterfacePrefixSchema = v.pipe(
 export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
 
 /**
- * Rack units a device type consumes on mount: 0 = shelf-only
- * (P4 mounts those by shelf_id instead of position_u), otherwise 1..60.
+ * Rack units a device type consumes on mount: 1..60.
  */
-export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
+export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
 /** NetBox rack form-factor choices. */
 export const RackFormFactorSchema = v.picklist([
@@ -535,11 +489,9 @@ export const DeviceCreateSchema = v.strictObject({
 	location_id: NullableIdSchema,
 	rack_id: NullableIdSchema,
 	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
-	// Mount is XOR (service-enforced): position_u XOR shelf_id, never both.
-	// Unmounted devices leave position_u and shelf_id empty; rack_id may
-	// still be set (rack-assigned but unracked) or empty (fully unracked).
+	// Unmounted devices leave position_u empty; rack_id may still be set
+	// (rack-assigned but unracked) or empty (fully unracked).
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
-	shelf_id: NullableIdSchema,
 	serial: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: NullableIdSchema,
@@ -556,7 +508,6 @@ export const DeviceUpdateSchema = v.strictObject({
 	rack_id: v.optional(v.nullable(IdSchema), undefined),
 	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
-	shelf_id: v.optional(v.nullable(IdSchema), undefined),
 	serial: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
@@ -571,11 +522,10 @@ export const DeviceMoveSchema = v.pipe(
 	v.strictObject({
 		rack_id: OptionalNullableIdEntry,
 		position_u: OptionalNullablePositionEntry,
-		shelf_id: OptionalNullableIdEntry,
 	}),
 	v.check(
-		(m) => m.rack_id !== undefined || m.position_u !== undefined || m.shelf_id !== undefined,
-		'Provide at least one of rack_id, position_u, shelf_id',
+		(m) => m.rack_id !== undefined || m.position_u !== undefined,
+		'Provide at least one of rack_id or position_u',
 	),
 )
 

@@ -7,8 +7,7 @@ import { ConflictError } from '../db/errors'
  * loads the rows and delegates the math here.
  *
  * U positions are bottom-U, 1-based: a span occupies
- * `position_u..position_u+height_u-1`. Device spans are accepted by the same
- * helpers (P4 fills them); v1 callers pass shelves only.
+ * `position_u..position_u+height_u-1`.
  */
 
 export interface OccupantSpan {
@@ -23,7 +22,6 @@ export interface OccupantSpan {
 
 export interface ElevationUnit {
 	u: number
-	shelf: { id: number; name: string } | null
 	device: { id: number; name: string } | null
 }
 
@@ -99,20 +97,13 @@ export function checkOverlap(
 
 /**
  * Builds the per-U occupancy map of a rack. Errs on any out-of-bounds or
- * overlapping shelf/device span so a corrupt store can never render as a
+ * overlapping device span so a corrupt store can never render as a
  * silently overlapping elevation.
  */
 export function getOccupancy(
 	rackHeight: number,
-	shelves: OccupantSpan[],
-	devices: OccupantSpan[] = [],
+	devices: OccupantSpan[],
 ): Result<OccupancyMap, Error> {
-	for (const shelf of shelves) {
-		const bounds = checkBounds(shelf, rackHeight, `Shelf "${shelf.name}"`)
-		if (Result.isError(bounds)) {
-			return Result.err(bounds.error)
-		}
-	}
 	for (const device of devices) {
 		const bounds = checkBounds(device, rackHeight, `Device "${device.name}"`)
 		if (Result.isError(bounds)) {
@@ -120,13 +111,6 @@ export function getOccupancy(
 		}
 	}
 	const seen: OccupantSpan[] = []
-	for (const shelf of shelves) {
-		const overlap = checkOverlap(shelf, seen, `Shelf "${shelf.name}"`)
-		if (Result.isError(overlap)) {
-			return Result.err(overlap.error)
-		}
-		seen.push(shelf)
-	}
 	for (const device of devices) {
 		const overlap = checkOverlap(device, seen, `Device "${device.name}"`)
 		if (Result.isError(overlap)) {
@@ -135,13 +119,6 @@ export function getOccupancy(
 		seen.push(device)
 	}
 
-	const shelfByU = new Map<number, { id: number; name: string }>()
-	for (const shelf of shelves) {
-		const [first, last] = spanRange(shelf)
-		for (let u = first; u <= last; u += 1) {
-			shelfByU.set(u, { id: shelf.id, name: shelf.name })
-		}
-	}
 	const deviceByU = new Map<number, { id: number; name: string }>()
 	for (const device of devices) {
 		const [first, last] = spanRange(device)
@@ -152,7 +129,7 @@ export function getOccupancy(
 
 	const units: ElevationUnit[] = []
 	for (let u = 1; u <= rackHeight; u += 1) {
-		units.push({ u, shelf: shelfByU.get(u) ?? null, device: deviceByU.get(u) ?? null })
+		units.push({ u, device: deviceByU.get(u) ?? null })
 	}
 	return Result.ok({ height_u: rackHeight, units })
 }

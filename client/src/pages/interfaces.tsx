@@ -202,8 +202,8 @@ export function InterfacesPage(): JSX.Element {
 				emptyContent={
 					<p class="empty">
 						{hasFilters()
-						? 'Keine Anschlüsse für die aktuellen Filter gefunden.'
-						: 'Noch keine Anschlüsse vorhanden. Fügen Sie ein Gerät hinzu, um seine Ports anzuzeigen.'}
+							? 'Keine Anschlüsse für die aktuellen Filter gefunden.'
+							: 'Noch keine Anschlüsse vorhanden. Fügen Sie ein Gerät hinzu, um seine Ports anzuzeigen.'}
 					</p>
 				}
 			/>

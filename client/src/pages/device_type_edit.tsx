@@ -62,8 +62,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 					return 'Select a manufacturer.'
 				}
 				const height = Number(uHeight())
-				if (!Number.isInteger(height) || height < 0 || height > 60) {
-					return 'Height (HE) must be an integer from 0 to 60.'
+				if (!Number.isInteger(height) || height < 1 || height > 60) {
+					return 'Height (HE) must be an integer from 1 to 60.'
 				}
 				return null
 			},
@@ -117,7 +117,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				inputmode="numeric"
 				value={uHeight()}
 				onInput={setUHeight}
-				hint={<Hint>0 = shelf-only, otherwise 1–60.</Hint>}
+				hint={<Hint>Rack units consumed by this device (1–60).</Hint>}
 			/>
 			<div class="field">
 				<label for="device-type-edit-full-depth">Full depth</label>
@@ -129,7 +129,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 						setFullDepth(e.currentTarget.checked)
 					}
 				/>
-				<p class="field-hint">Off for half-depth or shelf-only devices.</p>
+				<p class="field-hint">Off for half-depth devices.</p>
 			</div>
 			<TextField
 				id="device-type-edit-description"

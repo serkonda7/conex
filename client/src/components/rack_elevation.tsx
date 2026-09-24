@@ -11,7 +11,7 @@ function go(e: MouseEvent, to: string): void {
 	navigate(to)
 }
 
-type RowKind = 'free' | 'shelf' | 'device' | 'ghost'
+type RowKind = 'free' | 'device' | 'ghost'
 
 function device_for_face(unit: ElevationUnit, face: RackFace): ElevationDeviceRef | undefined {
 	const devices = unit.devices ?? (unit.device ? [unit.device] : [])
@@ -19,24 +19,17 @@ function device_for_face(unit: ElevationUnit, face: RackFace): ElevationDeviceRe
 }
 
 function row_kind(unit: ElevationUnit, face: RackFace): RowKind {
-	if (unit.shelf) {
-		return 'shelf'
-	}
 	const device = device_for_face(unit, face)
-	if (device) {
-		return device.face === null || device.face === face || device.is_full_depth
-			? 'device'
-			: 'free'
+	if (!device) {
+		return 'free'
 	}
-	return 'free'
+	return device.face === null || device.face === face || device.is_full_depth ? 'device' : 'ghost'
 }
 
 /**
  * NetBox-like visual rack elevation with front and rear side by side.
- * Every U is its own single-line row, top-down. Free rows install (select a
- * U, then add a device or shelf); device rows link to the device; shelf rows
- * offer delete. A device mounted on the opposite face renders ghosted, since
- * mount overlap is face-agnostic and the U is not installable from here.
+ * Every U is its own single-line row, top-down. Free rows install devices;
+ * mounted devices link to their detail page.
  */
 export function RackElevation(props: {
 	units: ElevationUnit[]
@@ -45,7 +38,6 @@ export function RackElevation(props: {
 	on_select_u: (u: number, face: RackFace) => void
 	on_select_device: (u: number, face: RackFace) => void
 	on_add_device: (u: number, face: RackFace) => void
-	on_delete_shelf: (id: number) => void
 }): JSX.Element {
 	return (
 		<div class="rack-elev-dual">
@@ -56,7 +48,7 @@ export function RackElevation(props: {
 						<ol class="rack-elev">
 							<For each={props.units}>
 								{(unit: ElevationUnit): JSX.Element => {
-									const kind: RowKind = row_kind(unit, face)
+									const kind = row_kind(unit, face)
 									const device = device_for_face(unit, face)
 									return (
 										<li
@@ -72,117 +64,88 @@ export function RackElevation(props: {
 											</span>
 											<span class="rack-u-body">
 												<Show
-													when={kind === 'shelf'}
+													when={kind === 'device'}
 													fallback={
 														<Show
-															when={kind === 'device'}
+															when={kind === 'ghost'}
 															fallback={
-																<Show
-																	when={kind === 'ghost'}
-																	fallback={
-																		<div class="rack-free-actions">
-																			<button
-																				type="button"
-																				class="rack-free-btn"
-																				aria-label="Select device"
-																				title={`Select device at HE${unit.u} (${face} face)`}
-																				onClick={() => {
-																					props.on_select_u(
-																						unit.u,
-																						face,
-																					)
-																					props.on_select_device(
-																						unit.u,
-																						face,
-																					)
-																				}}
-																			>
-																				Select device
-																			</button>
-																			<button
-																				type="button"
-																				class="rack-free-btn"
-																				aria-label="Add device"
-																				title={`Add device at HE${unit.u} (${face} face)`}
-																				onClick={() =>
-																					props.on_add_device(
-																						unit.u,
-																						face,
-																					)
-																				}
-																			>
-																				Add device
-																			</button>
-																		</div>
-																	}
-																>
-																	<span
-																		class="rack-ghost"
-																		title="Occupied on the opposite face"
+																<div class="rack-free-actions">
+																	<button
+																		type="button"
+																		class="rack-free-btn"
+																		aria-label="Select device"
+																		title={`Select device at HE${unit.u} (${face} face)`}
+																		onClick={() => {
+																			props.on_select_u(
+																				unit.u,
+																				face,
+																			)
+																			props.on_select_device(
+																				unit.u,
+																				face,
+																			)
+																		}}
 																	>
-																		<span class="rack-dev-name">
-																			◧ {device?.name}
-																		</span>
-																		<span class="rack-dev-meta">
-																			opposite face
-																		</span>
-																	</span>
-																</Show>
+																		Select device
+																	</button>
+																	<button
+																		type="button"
+																		class="rack-free-btn"
+																		aria-label="Add device"
+																		title={`Add device at HE${unit.u} (${face} face)`}
+																		onClick={() =>
+																			props.on_add_device(
+																				unit.u,
+																				face,
+																			)
+																		}
+																	>
+																		Add device
+																	</button>
+																</div>
 															}
 														>
-															<a
-																href={`/devices/${device?.id ?? ''}`}
-																class="rack-dev"
-																onClick={(e: MouseEvent): void =>
-																	go(
-																		e,
-																		`/devices/${device?.id ?? ''}`,
-																	)
-																}
-																title={`${device?.name ?? ''} (${device?.device_type_model ?? ''}, ${device?.u_height ?? 1} HE)`}
+															<span
+																class="rack-ghost"
+																title="Occupied on the opposite face"
 															>
 																<span class="rack-dev-name">
-																	{device?.name}
+																	◧ {device?.name}
 																</span>
 																<span class="rack-dev-meta">
-																	{device?.device_type_model}
+																	opposite face
 																</span>
-																<Show
-																	when={
-																		(device?.status ??
-																			'active') !== 'active'
-																	}
-																>
-																	<span
-																		class={`badge badge-${device?.status}`}
-																	>
-																		{device?.status}
-																	</span>
-																</Show>
-															</a>
+															</span>
 														</Show>
 													}
 												>
-													<span class="rack-shelf">
+													<a
+														href={`/devices/${device?.id ?? ''}`}
+														class="rack-dev"
+														onClick={(e: MouseEvent): void =>
+															go(e, `/devices/${device?.id ?? ''}`)
+														}
+														title={`${device?.name ?? ''} (${device?.device_type_model ?? ''}, ${device?.u_height ?? 1} HE)`}
+													>
 														<span class="rack-dev-name">
-															▤ {unit.shelf?.name}
+															{device?.name}
 														</span>
-														<span class="rack-dev-meta">shelf</span>
-														<button
-															type="button"
-															class="btn-danger rack-shelf-del"
-															aria-label={`Delete shelf ${unit.shelf?.name ?? ''}`}
-															onClick={() => {
-																if (unit.shelf) {
-																	props.on_delete_shelf(
-																		unit.shelf.id,
-																	)
-																}
-															}}
+														<span class="rack-dev-meta">
+															{device?.device_type_model}
+														</span>
+														<Show
+															when={
+																(device?.status ?? 'active') !==
+																'active'
+															}
 														>
-															Delete
-														</button>
-													</span>
+															<span
+																class={`badge badge-${device?.status}`}
+															>
+																{device?.status}
+															</span>
+														</Show>
+													</a>
 												</Show>
 											</span>
 										</li>

@@ -13,7 +13,6 @@ import {
 	devices,
 	interfaces,
 	locations,
-	rack_shelves,
 	racks,
 	sites,
 } from '../schema'
@@ -45,19 +44,14 @@ function toInterfaceJson(row: InterfaceRow): InterfaceJson {
 export interface MountInput {
 	rack_id: number | null
 	position_u: number | null
-	shelf_id: number | null
 	face: 'front' | 'rear' | null
 	is_full_depth: boolean
 }
 
 /**
- * Enforces the mount XOR: position_u XOR shelf_id, never both. Mounted
- * devices carry exactly one; unmounted devices carry neither — including
- * devices assigned to a rack but with no U position or shelf (rack_id set,
- * mount empty, displays as unracked). Position mounts
- * consume the template `u_height` in U (bounds + shelf/device overlap
- * checked); shelf mounts consume 0 U but the shelf must sit in the same
- * rack. `excludeDeviceId` skips the device being moved so a no-op move is
+ * Mounted devices consume the template `u_height` in U (bounds + device
+ * overlap checked); unmounted devices may remain assigned to a rack without
+ * a U position. `excludeDeviceId` skips the device being moved so a no-op move is
  * not self-conflicting.
  */
 function checkMount(
@@ -67,16 +61,9 @@ function checkMount(
 	excludeDeviceId?: number,
 ): Result<undefined, Error> {
 	const db = getDb()
-	if (mount.position_u !== null && mount.shelf_id !== null) {
-		return Result.err(
-			new ConflictError('Device mount is either a rack position or a shelf, never both'),
-		)
-	}
 	if (mount.rack_id === null) {
-		if (mount.position_u !== null || mount.shelf_id !== null) {
-			return Result.err(
-				new ConflictError('Unracked device cannot have a rack position or a shelf'),
-			)
+		if (mount.position_u !== null) {
+			return Result.err(new ConflictError('Unracked device cannot have a rack position'))
 		}
 		return Result.ok(undefined)
 	}
@@ -84,31 +71,13 @@ function checkMount(
 	if (!rack) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
-	if (mount.position_u === null && mount.shelf_id === null) {
-		// Rack-assigned but unmounted: displays as unracked, needs no U or shelf.
+	if (mount.position_u === null) {
+		// Rack-assigned but unmounted: displays as unracked, needs no U.
 		return Result.ok(undefined)
 	}
-	if (mount.shelf_id !== null) {
-		const shelf = db
-			.select()
-			.from(rack_shelves)
-			.where(eq(rack_shelves.id, mount.shelf_id))
-			.get()
-		if (!shelf || shelf.rack_id !== mount.rack_id) {
-			return Result.err(new NotFoundError('Shelf not found in this rack'))
-		}
-		// Shelf-sitters consume 0 U regardless of template height, so no
-		// bounds/overlap check applies here.
-		return Result.ok(undefined)
-	}
-	// Position mount from here on (`position_u` is non-null).
 	const positionU = mount.position_u as number
 	if (uHeight < 1) {
-		return Result.err(
-			new ConflictError(
-				'This device type consumes 0 U; mount it on a shelf instead of a rack position',
-			),
-		)
+		return Result.err(new ConflictError('Device type must consume at least 1 U'))
 	}
 	const candidate = {
 		id: excludeDeviceId ?? 0,
@@ -122,15 +91,9 @@ function checkMount(
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
-	const shelfSpans = db
-		.select()
-		.from(rack_shelves)
-		.where(eq(rack_shelves.rack_id, mount.rack_id))
-		.all()
-		.map((s) => ({ id: s.id, name: s.name, position_u: s.position_u, height_u: s.height_u }))
 	const overlap = checkOverlap(
 		candidate,
-		[...shelfSpans, ...deviceSpansOf(mount.rack_id)],
+		deviceSpansOf(mount.rack_id),
 		`Device "${deviceName}"`,
 		excludeDeviceId,
 	)
@@ -259,14 +222,12 @@ export function getDevice(id: number): Result<DeviceRow, Error> {
 function mountOf(input: {
 	rack_id?: number | null
 	position_u?: number | null
-	shelf_id?: number | null
 	face?: 'front' | 'rear' | null
 	is_full_depth?: boolean
 }): MountInput {
 	return {
 		rack_id: input.rack_id ?? null,
 		position_u: input.position_u ?? null,
-		shelf_id: input.shelf_id ?? null,
 		face: input.face ?? null,
 		is_full_depth: input.is_full_depth ?? true,
 	}
@@ -329,7 +290,6 @@ export function createDevice(input: DeviceCreate): Result<DeviceRow, Error> {
 		rack_id: input.rack_id ?? null,
 		face: input.face ?? null,
 		position_u: input.position_u ?? null,
-		shelf_id: input.shelf_id ?? null,
 		status: input.status ?? 'active',
 		name: input.name,
 		serial: input.serial ?? null,
@@ -385,10 +345,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	}
 	const effectiveSite = input.site_id !== undefined ? input.site_id : node.site_id
 	const effectiveRackId = input.rack_id !== undefined ? input.rack_id : node.rack_id
-	const mountChanged =
-		input.rack_id !== undefined ||
-		input.position_u !== undefined ||
-		input.shelf_id !== undefined
+	const mountChanged = input.rack_id !== undefined || input.position_u !== undefined
 	let deviceLocationId = input.location_id !== undefined ? input.location_id : node.location_id
 	if (mountChanged && effectiveRackId !== null && effectiveRackId !== undefined) {
 		const rackLocation = rackLocationId(effectiveRackId)
@@ -414,7 +371,6 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 		const mount: MountInput = {
 			rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 			position_u: input.position_u !== undefined ? input.position_u : node.position_u,
-			shelf_id: input.shelf_id !== undefined ? input.shelf_id : node.shelf_id,
 			face:
 				input.face !== undefined
 					? input.face
@@ -450,9 +406,6 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 	if (input.position_u !== undefined) {
 		patch.position_u = input.position_u
 	}
-	if (input.shelf_id !== undefined) {
-		patch.shelf_id = input.shelf_id
-	}
 	if (input.serial !== undefined) {
 		patch.serial = input.serial
 	}
@@ -480,7 +433,7 @@ export function updateDevice(id: number, input: DeviceUpdate): Result<DeviceRow,
 
 /**
  * Explicit remount: `undefined` keeps the current mount value, `null` clears
- * it. The effective mount re-validates U/shelf exactly like creation.
+ * it. The effective mount re-validates U exactly like creation.
  */
 export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Error> {
 	const current = getDevice(id)
@@ -499,7 +452,6 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 	const mount: MountInput = {
 		rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 		position_u: input.position_u !== undefined ? input.position_u : node.position_u,
-		shelf_id: input.shelf_id !== undefined ? input.shelf_id : node.shelf_id,
 		face: node.face === 'front' || node.face === 'rear' ? node.face : null,
 		is_full_depth: template.is_full_depth !== 0,
 	}
@@ -510,7 +462,6 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 	const patch: Partial<DeviceRow> = {
 		rack_id: mount.rack_id,
 		position_u: mount.position_u,
-		shelf_id: mount.shelf_id,
 	}
 	if (mount.rack_id !== null) {
 		const rackLocation = rackLocationId(mount.rack_id)

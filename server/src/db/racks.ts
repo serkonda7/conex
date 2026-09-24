@@ -1,15 +1,8 @@
 import { Result } from 'better-result'
 import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
-import type {
-	ElevationResponse,
-	ElevationUnit,
-	RackCreate,
-	RackUpdate,
-	ShelfCreate,
-	ShelfUpdate,
-} from 'shared/src/schemas'
-import { device_types, devices, locations, rack_shelves, racks, sites } from '../schema'
-import { checkBounds, checkOverlap, getOccupancy, type OccupantSpan } from '../services/occupancy'
+import type { ElevationResponse, ElevationUnit, RackCreate, RackUpdate } from 'shared/src/schemas'
+import { device_types, devices, locations, racks, sites } from '../schema'
+import { checkBounds, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
@@ -18,7 +11,6 @@ import { checkTenantExists, errOf, isPatchEmpty, offsetOf, pageOf, searchPattern
 type RackRecord = typeof racks.$inferSelect
 /** Rack height is computed from the linked rack type, not stored on racks. */
 export type RackRow = Omit<RackRecord, 'height_u'> & { height_u: number }
-export type ShelfRow = typeof rack_shelves.$inferSelect
 
 function withRackHeights(rows: RackRecord[]): RackRow[] {
 	const typeIds = [...new Set(rows.map((r) => r.rack_type_id).filter((id) => id !== null))]
@@ -40,10 +32,6 @@ function withRackHeights(rows: RackRecord[]): RackRow[] {
 
 function withRackHeight(row: RackRecord): RackRow {
 	return withRackHeights([row])[0] as RackRow
-}
-
-function shelfSpanOf(row: ShelfRow): OccupantSpan {
-	return { id: row.id, name: row.name, position_u: row.position_u, height_u: row.height_u }
 }
 
 // ---------------------------------------------------------------------------
@@ -134,19 +122,8 @@ function checkLocation(
 	return Result.ok(undefined)
 }
 
-/** Shelves of one rack, bottom-up. */
-function shelvesOf(rackId: number): ShelfRow[] {
-	return getDb()
-		.select()
-		.from(rack_shelves)
-		.where(eq(rack_shelves.rack_id, rackId))
-		.orderBy(asc(rack_shelves.position_u))
-		.all()
-}
-
 /**
- * U-consuming device spans of one rack (position-mounted only; shelf-sitters
- * consume 0 U). Joins the template for `u_height`, the footprint each span
+ * U-consuming device spans of one rack. Joins the template for `u_height`, the footprint each span
  * occupies. Exported so `db/devices.ts` validates mounts against the same
  * rows the elevation renders.
  */
@@ -218,11 +195,6 @@ export function deviceDetailsOf(rackId: number): {
 		})
 	}
 	return details
-}
-
-/** Every U-consuming span of a rack: shelves plus position-mounted devices. */
-function allSpansOf(rackId: number): OccupantSpan[] {
-	return [...shelvesOf(rackId).map(shelfSpanOf), ...deviceSpansOf(rackId)]
 }
 
 export function createRack(input: RackCreate): Result<RackRow, Error> {
@@ -303,15 +275,9 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	const storedHeight = rackHeightOf(node)
 	const effectiveHeight = newTypeHeight ?? storedHeight
 	if (effectiveHeight !== storedHeight) {
-		// Shrinking below the topmost occupied U would strand shelves or
-		// devices outside the rack; reject with the same bounds error
+		// Shrinking below the topmost occupied U would strand devices outside
+		// the rack; reject with the same bounds error
 		// creation uses.
-		for (const shelf of shelvesOf(id)) {
-			const bounds = checkBounds(shelfSpanOf(shelf), effectiveHeight, `Shelf "${shelf.name}"`)
-			if (Result.isError(bounds)) {
-				return Result.err(bounds.error)
-			}
-		}
 		for (const device of deviceSpansOf(id)) {
 			const bounds = checkBounds(device, effectiveHeight, `Device "${device.name}"`)
 			if (Result.isError(bounds)) {
@@ -353,10 +319,6 @@ export function deleteRack(id: number): Result<RackRow, Error> {
 	if (Result.isError(current)) {
 		return current
 	}
-	const shelf = getDb().select().from(rack_shelves).where(eq(rack_shelves.rack_id, id)).get()
-	if (shelf) {
-		return Result.err(new ConflictError('Rack still has shelves; delete them first'))
-	}
 	const device = getDb().select().from(devices).where(eq(devices.rack_id, id)).get()
 	if (device) {
 		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
@@ -369,7 +331,7 @@ export function deleteRack(id: number): Result<RackRow, Error> {
 	return Result.ok(current.value)
 }
 
-/** Ordered U map of a rack, top-down (highest U first), shelves plus devices. */
+/** Ordered U map of a rack, top-down (highest U first). */
 export function getElevation(id: number): Result<ElevationResponse, Error> {
 	const current = getRack(id)
 	if (Result.isError(current)) {
@@ -377,11 +339,9 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 	}
 	const rack = current.value
 	const heightU = rackHeightOf(rack)
-	const shelves = shelvesOf(id)
 	const details = deviceDetailsOf(id)
 	const occupancy = getOccupancy(
 		heightU,
-		shelves.map(shelfSpanOf),
 		details.map((d) => ({
 			id: d.id,
 			name: d.name,
@@ -394,24 +354,12 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 	if (Result.isError(occupancy)) {
 		return Result.err(occupancy.error)
 	}
-	const shelfById = new Map(shelves.map((s) => [s.id, s]))
 	const deviceById = new Map(details.map((d) => [d.id, d]))
 	const units: ElevationUnit[] = [...occupancy.value.units].reverse().map((u) => {
-		const shelfId = u.shelf?.id ?? null
-		const shelfRow = shelfId !== null ? shelfById.get(shelfId) : undefined
 		const deviceId = u.device?.id ?? null
 		const deviceRow = deviceId !== null ? deviceById.get(deviceId) : undefined
 		return {
 			u: u.u,
-			shelf:
-				shelfRow === undefined
-					? null
-					: {
-							id: shelfRow.id,
-							name: shelfRow.name,
-							position_u: shelfRow.position_u,
-							height_u: shelfRow.height_u,
-						},
 			device:
 				deviceRow === undefined
 					? null
@@ -442,158 +390,4 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 		}
 	})
 	return Result.ok({ rack_id: rack.id, height_u: heightU, units })
-}
-
-// ---------------------------------------------------------------------------
-// Shelves
-// ---------------------------------------------------------------------------
-
-export interface ShelfListParams extends ListParams {
-	rack?: number
-	/**
-	 * Tenant scope for scoped editors/viewers: restricts the list to shelves
-	 * whose rack sits in the scope tenant (strict — shared racks excluded).
-	 * `undefined` means unconstrained.
-	 */
-	scopeTenantId?: number
-}
-
-export function listShelves(params: ShelfListParams): Page<ShelfRow> {
-	const db = getDb()
-	const pattern = searchPattern(params.search)
-	const conditions: SQL[] = []
-	if (params.search) {
-		conditions.push(sql`(${rack_shelves.name} LIKE ${pattern} ESCAPE '\\')`)
-	}
-	if (params.rack) {
-		conditions.push(eq(rack_shelves.rack_id, params.rack))
-	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(
-			sql`EXISTS (SELECT 1 FROM ${racks} AS scope_rack WHERE scope_rack.id = ${rack_shelves.rack_id} AND scope_rack.tenant_id = ${params.scopeTenantId})`,
-		)
-	}
-	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const items = db
-		.select()
-		.from(rack_shelves)
-		.where(where)
-		.orderBy(asc(rack_shelves.position_u))
-		.limit(params.limit)
-		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(rack_shelves).where(where).get()
-	return pageOf(items, totalRow?.n ?? 0, params)
-}
-
-export function getShelf(id: number): Result<ShelfRow, Error> {
-	const row = getDb().select().from(rack_shelves).where(eq(rack_shelves.id, id)).get()
-	if (!row) {
-		return Result.err(new NotFoundError('Shelf not found'))
-	}
-	return Result.ok(row)
-}
-
-export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
-	const rack = getRack(input.rack_id)
-	if (Result.isError(rack)) {
-		return Result.err(rack.error)
-	}
-	const candidate: OccupantSpan = {
-		id: 0,
-		name: input.name,
-		position_u: input.position_u,
-		height_u: input.height_u ?? 1,
-	}
-	const bounds = checkBounds(candidate, rackHeightOf(rack.value), `Shelf "${input.name}"`)
-	if (Result.isError(bounds)) {
-		return Result.err(bounds.error)
-	}
-	const siblings = allSpansOf(input.rack_id)
-	const overlap = checkOverlap(candidate, siblings, `Shelf "${input.name}"`)
-	if (Result.isError(overlap)) {
-		return Result.err(overlap.error)
-	}
-	const row: Omit<ShelfRow, 'id'> = {
-		rack_id: input.rack_id,
-		name: input.name,
-		position_u: input.position_u,
-		height_u: input.height_u ?? 1,
-		capacity_slots: input.capacity_slots ?? null,
-	}
-	try {
-		const inserted = getDb()
-			.insert(rack_shelves)
-			.values(row)
-			.returning({ id: rack_shelves.id })
-			.get()
-		if (!inserted) {
-			return Result.err(new Error('Shelf insert did not return an id'))
-		}
-		return getShelf(inserted.id)
-	} catch (err) {
-		return Result.err(err instanceof Error ? err : new Error(String(err)))
-	}
-}
-
-export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Error> {
-	const current = getShelf(id)
-	if (Result.isError(current)) {
-		return current
-	}
-	const node = current.value
-	const rack = getRack(node.rack_id)
-	if (Result.isError(rack)) {
-		return Result.err(rack.error)
-	}
-	const effectiveName = input.name ?? node.name
-	const effective: OccupantSpan = {
-		id,
-		name: effectiveName,
-		position_u: input.position_u ?? node.position_u,
-		height_u: input.height_u ?? node.height_u,
-	}
-	const bounds = checkBounds(effective, rackHeightOf(rack.value), `Shelf "${effectiveName}"`)
-	if (Result.isError(bounds)) {
-		return Result.err(bounds.error)
-	}
-	const siblings = allSpansOf(node.rack_id)
-	const overlap = checkOverlap(effective, siblings, `Shelf "${effectiveName}"`, id)
-	if (Result.isError(overlap)) {
-		return Result.err(overlap.error)
-	}
-	const patch: Partial<ShelfRow> = {}
-	if (input.name !== undefined) {
-		patch.name = input.name
-	}
-	if (input.position_u !== undefined) {
-		patch.position_u = input.position_u
-	}
-	if (input.height_u !== undefined) {
-		patch.height_u = input.height_u
-	}
-	if (input.capacity_slots !== undefined) {
-		patch.capacity_slots = input.capacity_slots
-	}
-	if (!isPatchEmpty(patch)) {
-		getDb().update(rack_shelves).set(patch).where(eq(rack_shelves.id, id)).run()
-	}
-	return getShelf(id)
-}
-
-export function deleteShelf(id: number): Result<ShelfRow, Error> {
-	const current = getShelf(id)
-	if (Result.isError(current)) {
-		return current
-	}
-	const sitter = getDb().select().from(devices).where(eq(devices.shelf_id, id)).get()
-	if (sitter) {
-		return Result.err(new ConflictError('Shelf still has devices; move or delete them first'))
-	}
-	try {
-		getDb().delete(rack_shelves).where(eq(rack_shelves.id, id)).run()
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
-	return Result.ok(current.value)
 }

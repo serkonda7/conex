@@ -225,12 +225,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
-				hint={
-					<Hint>
-						Either a rack position or a shelf, never both. Empty both to leave the
-						device unracked (a rack may stay assigned).
-					</Hint>
-				}
+				hint={<Hint>Leave empty to unmount the device (a rack may stay assigned).</Hint>}
 			/>
 			<SelectField
 				id="device-edit-tenant"

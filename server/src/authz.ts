@@ -14,8 +14,8 @@
  *   rows are invisible to scoped users — there is no shared visibility.
  * - Tenant-less catalog data (manufacturers, device types + stubs) is
  *   readable by everyone but writable only by global editors/admins.
- * - Tenant-less child rows inherit their parent's tenant: shelves follow
- *   their rack, interfaces follow their device, cables follow both endpoint
+ * - Tenant-less child rows inherit their parent's tenant: interfaces follow
+ *   their device, cables follow both endpoint
  *   devices (both endpoints must sit in the scoped tenant).
  */
 
@@ -23,7 +23,7 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb } from './db/connection'
-import { type cables, devices, interfaces, rack_shelves, racks } from './schema'
+import { type cables, devices, interfaces, racks } from './schema'
 import type { CurrentUser } from './types'
 import { jsonError } from './util/http'
 import { sendResult } from './util/result_response'
@@ -237,15 +237,6 @@ export function guardWrite(c: Context, currentTenant: number | null): Response |
 export function rackTenant(rackId: number): number | null | undefined {
 	const rack = getDb().select().from(racks).where(eq(racks.id, rackId)).get()
 	return rack?.tenant_id
-}
-
-/** Tenant of a shelf's rack, or `undefined` when shelf/rack is missing. */
-export function shelfTenant(shelfId: number): number | null | undefined {
-	const shelf = getDb().select().from(rack_shelves).where(eq(rack_shelves.id, shelfId)).get()
-	if (!shelf) {
-		return undefined
-	}
-	return rackTenant(shelf.rack_id)
 }
 
 /** Tenant of a device, or `undefined` when the device is missing. */

@@ -135,11 +135,8 @@ export const locations = sqliteTable(
 )
 
 // ---------------------------------------------------------------------------
-// P2: racks / shelves. A shelf occupies position_u..position_u+height_u-1
-// (bottom-U, 1-based); bounds and overlap are enforced in the service layer
-// (`services/occupancy.ts` + `db/racks.ts`) so the math stays unit-testable
-// without a database. Deletes are blocked while dependents exist (service
-// layer), so FKs carry no cascade.
+// P2: racks. Occupancy is enforced in the service layer so the math stays
+// unit-testable without a database.
 // ---------------------------------------------------------------------------
 
 export const racks = sqliteTable(
@@ -160,25 +157,6 @@ export const racks = sqliteTable(
 		index('racks_location_id_idx').on(table.location_id),
 		index('racks_tenant_id_idx').on(table.tenant_id),
 		index('racks_name_idx').on(table.name),
-	],
-)
-
-export const rack_shelves = sqliteTable(
-	'rack_shelves',
-	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
-		rack_id: integer('rack_id')
-			.notNull()
-			.references(() => racks.id),
-		name: text('name').notNull(),
-		// Bottom-U, 1-based. Occupies position_u..position_u+height_u-1.
-		position_u: integer('position_u').notNull(),
-		height_u: integer('height_u').notNull().default(1),
-		capacity_slots: integer('capacity_slots'),
-	},
-	(table) => [
-		index('rack_shelves_rack_id_idx').on(table.rack_id),
-		index('rack_shelves_position_idx').on(table.rack_id, table.position_u),
 	],
 )
 
@@ -209,10 +187,9 @@ export const device_types = sqliteTable(
 			.notNull()
 			.references(() => manufacturers.id),
 		model: text('model').notNull(),
-		// Rack units consumed on mount. 0 = shelf-only (P4 mounts
-		// those by shelf_id instead of position_u).
+		// Rack units consumed on mount.
 		u_height: integer('u_height').notNull().default(1),
-		// NetBox `is_full_depth`: false = half-depth / shelf-only.
+		// NetBox `is_full_depth`: false = half-depth.
 		is_full_depth: integer('is_full_depth').notNull().default(1),
 		// Rack-template dimensions. Null keeps existing non-rack templates valid.
 		form_factor: text('form_factor'),
@@ -250,14 +227,13 @@ export const device_type_interfaces = sqliteTable(
 )
 
 // ---------------------------------------------------------------------------
-// P4: devices / interfaces. A device mounts XOR: either position_u (consumes
-// the template u_height in U, validated against rack bounds plus shelf/device
-// overlap) or shelf_id (consumes 0 U, shelf must sit in the same rack), never
-// both. Unmounted devices leave position_u and shelf_id null; rack_id may
-// still be set (rack-assigned but unracked) or null (fully unracked).
+// P4: devices / interfaces. A mounted device consumes the template u_height
+// in U, validated against rack bounds and device overlap. Unmounted devices
+// leave position_u null; rack_id may still be set (rack-assigned but unracked)
+// or null (fully unracked).
 // Interface rows are expanded from template stubs at create time; P5 cables
-// flip `connected`. Deletes of racks/shelves/device-types are blocked while
-// devices reference them (service layer); device delete removes its
+// flip `connected`. Deletes of racks/device-types are blocked while devices
+// reference them (service layer); device delete removes its
 // interfaces in the same transaction.
 // ---------------------------------------------------------------------------
 
@@ -276,7 +252,6 @@ export const devices = sqliteTable(
 		face: text('face'),
 		// Bottom-U, 1-based. Occupies position_u..position_u+u_height-1.
 		position_u: integer('position_u'),
-		shelf_id: integer('shelf_id').references(() => rack_shelves.id),
 		status: text('status').notNull().default('active'),
 		name: text('name').notNull(),
 		serial: text('serial'),
@@ -288,7 +263,6 @@ export const devices = sqliteTable(
 		index('devices_type_id_idx').on(table.device_type_id),
 		index('devices_site_id_idx').on(table.site_id),
 		index('devices_rack_id_idx').on(table.rack_id),
-		index('devices_shelf_id_idx').on(table.shelf_id),
 		index('devices_tenant_id_idx').on(table.tenant_id),
 		index('devices_status_idx').on(table.status),
 		index('devices_name_idx').on(table.name),

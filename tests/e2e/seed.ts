@@ -172,7 +172,6 @@ if (e2eSite && e2eRackType) {
 			.returning()
 			.get()
 	}
-	getSqliteHandle().query('DELETE FROM rack_shelves WHERE rack_id = ?').run(visualRack.id)
 	if (e2eServer && e2eSwitch) {
 		const visualDevices = [
 			{
@@ -202,7 +201,6 @@ if (e2eSite && e2eRackType) {
 				rack_id: visualRack.id,
 				face: device.face,
 				position_u: device.position_u,
-				shelf_id: null,
 				status: 'active',
 				name: device.name,
 				serial: null,
@@ -219,7 +217,7 @@ if (e2eSite && e2eRackType) {
 				getSqliteHandle()
 					.query(
 						`UPDATE devices SET device_type_id = ?, site_id = ?, location_id = ?, rack_id = ?,
-						face = ?, position_u = ?, shelf_id = ?, status = ?, name = ?, serial = ?,
+						face = ?, position_u = ?, status = ?, name = ?, serial = ?,
 						asset_tag = ?, tenant_id = ?, description = ? WHERE id = ?`,
 					)
 					.run(
@@ -229,7 +227,6 @@ if (e2eSite && e2eRackType) {
 						values.rack_id,
 						values.face,
 						values.position_u,
-						values.shelf_id,
 						values.status,
 						values.name,
 						values.serial,
