@@ -267,6 +267,7 @@ function BlockGutters(props: { topU: number; row: number; rows: number }): JSX.E
 
 /** Callbacks for placing devices on / taking them off a shelf. */
 export interface ShelfDeviceActions {
+	on_add_shelf_device: (shelf: ElevationShelfRef) => void
 	on_select_shelf_device: (shelf: ElevationShelfRef) => void
 	on_remove_shelf_device: (device: ElevationShelfDeviceRef, shelf: ElevationShelfRef) => void
 }
@@ -318,6 +319,15 @@ function ShelfDevices(props: {
 			</For>
 			<Show when={!props.chips_only}>
 				<li class="rack-shelf-device-actions">
+					<button
+						type="button"
+						class="rack-free-btn"
+						aria-label={t('elevation.addDeviceToShelf')}
+						title={t('elevation.addDeviceToShelfTitle', { name: label() })}
+						onClick={() => props.actions.on_add_shelf_device(props.shelf)}
+					>
+						{t('elevation.addDeviceShort')}
+					</button>
 					<button
 						type="button"
 						class="rack-free-btn"

@@ -86,6 +86,7 @@ export function DeviceTypesPage(): JSX.Element {
 		{
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
+			sortable: true,
 			getValue: (dt: DeviceTypeRow): string => mfrNameOf(dt.manufacturer_id),
 		},
 		{

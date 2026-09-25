@@ -234,6 +234,21 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		setSelectingDevice(true)
 	}
 
+	function addShelfDevice(shelf: ElevationShelfRef): void {
+		const params = new URLSearchParams({ rack: String(props.id), shelf: String(shelf.id) })
+		const currentRack = rack()
+		if (currentRack?.tenant_id !== null && currentRack?.tenant_id !== undefined) {
+			params.set('tenant', String(currentRack.tenant_id))
+		}
+		if (currentRack?.site_id !== null && currentRack?.site_id !== undefined) {
+			params.set('site', String(currentRack.site_id))
+		}
+		if (currentRack?.location_id !== null && currentRack?.location_id !== undefined) {
+			params.set('location', String(currentRack.location_id))
+		}
+		navigate(`/devices/add?${params.toString()}`)
+	}
+
 	function refreshPlacement(result: Result<DeviceRow, Error>): void {
 		if (Result.isError(result)) {
 			setError(result.error.message)
@@ -462,6 +477,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								on_add_device={installDevice}
 								on_add_shelf={installShelf}
 								shelf_actions={{
+									on_add_shelf_device: addShelfDevice,
 									on_select_shelf_device: openShelfDeviceSelector,
 									on_remove_shelf_device: (
 										device: ElevationShelfDeviceRef,

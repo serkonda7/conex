@@ -992,6 +992,23 @@ tbody tr:last-child td {
 	color: var(--text);
 }
 
+/* Keep sortable headers the same width when the active sort moves. The
+   component appends an arrow to the active header and conditionally renders
+   its clear button, so reserve both indicators on every sortable header. */
+.data-table-sort::after {
+	content: " ▲×";
+	visibility: hidden;
+}
+
+th[aria-sort="ascending"] .data-table-sort::after,
+th[aria-sort="descending"] .data-table-sort::after {
+	content: none;
+}
+
+.data-table-sort-clear {
+	margin-left: 0;
+}
+
 /* Table cell helpers. */
 .cell-checkbox {
 	width: 2rem;

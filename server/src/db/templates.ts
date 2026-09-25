@@ -161,7 +161,7 @@ export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
 export interface DeviceTypeListParams extends ListParams {
 	manufacturer?: number
 	kind: 'device' | 'rack'
-	sort: 'model'
+	sort: 'model' | 'manufacturer' | 'form_factor'
 	order: 'asc' | 'desc'
 }
 
@@ -188,7 +188,12 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 			: isNull(device_types.form_factor),
 	)
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn = device_types.model
+	const orderColumn =
+		params.sort === 'manufacturer'
+			? sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`
+			: params.sort === 'form_factor' && params.kind === 'rack'
+				? device_types.form_factor
+				: device_types.model
 	const items = db
 		.select()
 		.from(device_types)

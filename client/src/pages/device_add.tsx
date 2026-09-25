@@ -30,7 +30,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
-	const [locationId, setLocationId] = createSignal('')
+	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
 	// from the rack elevation pre-fills the mount so the U picker flows
 	// straight into instantiation.

@@ -93,11 +93,13 @@ export function RackTypesPage(): JSX.Element {
 		{
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
+			sortable: true,
 			getValue: (dt: DeviceTypeRow): string => mfrNameOf(dt.manufacturer_id),
 		},
 		{
 			key: 'form_factor',
 			label: t('rackType.formFactor'),
+			sortable: true,
 			getValue: (dt: DeviceTypeRow): string =>
 				dt.form_factor ? formFactorLabel(dt.form_factor) : '—',
 		},
