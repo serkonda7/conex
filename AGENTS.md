@@ -1,5 +1,7 @@
 ## Conventions
-
+- Tests:
+  - Update existing tests to reflect behavior changes.
+  - Add tests only when explicitly requested; otherwise, ask for confirmation.
 - Errors: use `better-result` Result, not throw (request-path and service code
   must return `Result<T, Error>`; only process-startup getters like
   `getConfig()`/`getDb()` throw on missing initialization).
