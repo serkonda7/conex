@@ -215,8 +215,24 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		setFace(pickedFace)
 	}
 
+	/** Device-add deep link carrying the rack's tenant, site and location. */
+	function deviceAddRoute(extra: Record<string, string>): string {
+		const params = new URLSearchParams({ rack: String(props.id), ...extra })
+		const currentRack = rack()
+		if (currentRack?.tenant_id !== null && currentRack?.tenant_id !== undefined) {
+			params.set('tenant', String(currentRack.tenant_id))
+		}
+		if (currentRack?.site_id !== null && currentRack?.site_id !== undefined) {
+			params.set('site', String(currentRack.site_id))
+		}
+		if (currentRack?.location_id !== null && currentRack?.location_id !== undefined) {
+			params.set('location', String(currentRack.location_id))
+		}
+		return `/devices/add?${params.toString()}`
+	}
+
 	function installDevice(u: number, targetFace: RackFace = face()): void {
-		navigate(`/devices/add?rack=${props.id}&position_u=${u}&face=${targetFace}`)
+		navigate(deviceAddRoute({ position_u: String(u), face: targetFace }))
 	}
 
 	function installShelf(u: number, targetFace: RackFace = face()): void {
@@ -235,18 +251,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	}
 
 	function addShelfDevice(shelf: ElevationShelfRef): void {
-		const params = new URLSearchParams({ rack: String(props.id), shelf: String(shelf.id) })
-		const currentRack = rack()
-		if (currentRack?.tenant_id !== null && currentRack?.tenant_id !== undefined) {
-			params.set('tenant', String(currentRack.tenant_id))
-		}
-		if (currentRack?.site_id !== null && currentRack?.site_id !== undefined) {
-			params.set('site', String(currentRack.site_id))
-		}
-		if (currentRack?.location_id !== null && currentRack?.location_id !== undefined) {
-			params.set('location', String(currentRack.location_id))
-		}
-		navigate(`/devices/add?${params.toString()}`)
+		navigate(deviceAddRoute({ shelf: String(shelf.id) }))
 	}
 
 	function refreshPlacement(result: Result<DeviceRow, Error>): void {
