@@ -168,6 +168,15 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 					<dt>{t('location.type')}</dt>
 					<dd>{locationTypeLabel(location()?.type ?? 'other')}</dd>
+					<dt>{tp('entity.tenant', 1)}</dt>
+					<dd>
+						<ForeignKeyLink
+							id={tenantId()}
+							loading={tenant.loading}
+							name={tenant()?.name}
+							href={`/tenants/${tenantId() ?? ''}`}
+						/>
+					</dd>
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
@@ -184,15 +193,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							loading={parent.loading}
 							name={parent()?.name}
 							href={`/locations/${parentId() ?? ''}`}
-						/>
-					</dd>
-					<dt>{tp('entity.tenant', 1)}</dt>
-					<dd>
-						<ForeignKeyLink
-							id={tenantId()}
-							loading={tenant.loading}
-							name={tenant()?.name}
-							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
 					<dt>{t('common.description')}</dt>

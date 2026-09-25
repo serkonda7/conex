@@ -357,7 +357,7 @@ export function RackElevation(props: {
 }): JSX.Element {
 	const topU = (): number => (props.units.length > 0 ? (props.units[0] as ElevationUnit).u : 0)
 	return (
-		<div class="rack-elev-dual">
+		<div class="rack-elev-dual" data-testid="rack-elevation">
 			<For each={FACES}>
 				{(face: RackFace): JSX.Element => {
 					const placed = (): { segment: Segment; row: number }[] => {
@@ -766,15 +766,6 @@ export function RackElevation(props: {
 																			<span class="rack-dev-meta">
 																				{t(
 																					'shelf.mountUsable',
-																				)}
-																			</span>
-																		</Show>
-																		<Show
-																			when={!s.is_full_depth}
-																		>
-																			<span class="rack-dev-meta">
-																				{t(
-																					'elevation.halfDepth',
 																				)}
 																			</span>
 																		</Show>

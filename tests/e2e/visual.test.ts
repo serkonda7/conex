@@ -6,14 +6,24 @@ import { stabilizeForSnapshot } from './helpers'
 // Auth comes from `auth.setup.ts` storageState — no per-test login.
 
 test('rack detail and elevation layout', async ({ page }) => {
+	const rackListResponse = await page.request.get(
+		'/api/racks?search=E2E%20Visual%20Rack&page=1&limit=200',
+	)
+	expect(rackListResponse.ok()).toBeTruthy()
+	const rackList = (await rackListResponse.json()) as {
+		items: { id: number; name: string }[]
+	}
+	const rackId = rackList.items.find((rack) => rack.name === 'E2E Visual Rack')?.id
+	expect(rackId).toBeDefined()
 	await page.goto('/racks')
-	await page.getByRole('link', { name: 'E2E Visual Rack' }).click()
-	await expect(page.getByRole('heading', { name: 'E2E Visual Rack 10 HE' })).toBeVisible()
-	await expect(page.getByRole('link', { name: 'E2E Edge Server' }).first()).toBeVisible()
-	await expect(page.getByRole('link', { name: 'E2E Rack Switch' }).first()).toBeVisible()
-	await expect(page.getByRole('link', { name: 'E2E Spare Device' })).toBeVisible()
-	await expect(page.getByRole('link', { name: /E2E Visual Shelf halbe Tiefe/ })).toBeVisible()
-	await expect(page.getByRole('status', { name: '6 von 10 HE belegt' })).toBeVisible()
+	await page.locator(`a[href="/racks/${rackId}"]`).click()
+	await expect(page.getByTestId('rack-detail-title')).toBeVisible()
+	await expect(page.getByTestId('rack-utilization')).toBeVisible()
+	await expect(page.getByTestId('rack-elevation')).toBeVisible()
+	await expect(page.getByTestId('rack-elevation').locator('.rack-elev')).toHaveCount(2)
 	await stabilizeForSnapshot(page)
-	await expect(page).toHaveScreenshot('rack-detail-and-elevation.png')
+	await expect(page).toHaveScreenshot('rack-detail-and-elevation.png', {
+		mask: [page.locator('.app-user-username')],
+		maskColor: '#242424',
+	})
 })

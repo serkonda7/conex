@@ -345,6 +345,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dd>{device()?.description || '—'}</dd>
 					<dt>{t('device.serial')}</dt>
 					<dd>{device()?.serial ?? '—'}</dd>
+					<dt>{tp('entity.tenant', 1)}</dt>
+					<dd>
+						<ForeignKeyLink
+							id={tenantId()}
+							loading={tenant.loading}
+							name={tenant()?.name}
+							href={`/tenants/${tenantId() ?? ''}`}
+						/>
+					</dd>
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
@@ -393,15 +402,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						) : (
 							<span>{t('device.unracked')}</span>
 						)}
-					</dd>
-					<dt>{tp('entity.tenant', 1)}</dt>
-					<dd>
-						<ForeignKeyLink
-							id={tenantId()}
-							loading={tenant.loading}
-							name={tenant()?.name}
-							href={`/tenants/${tenantId() ?? ''}`}
-						/>
 					</dd>
 				</DetailCard>
 			</DetailShell>

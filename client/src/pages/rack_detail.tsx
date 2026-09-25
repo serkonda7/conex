@@ -182,7 +182,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const occupiedU = createMemo(
 		() => elevation()?.units.filter((u) => u.device !== null || u.shelf !== null).length ?? 0,
 	)
-	const reservedU = createMemo(() => elevation()?.reserved_u ?? 0)
 	/** Rack height is owned by the rack type; the stored rack row is only a fallback. */
 	const displayHeight = createMemo(
 		() => elevation()?.height_u ?? rackType()?.u_height ?? rack()?.height_u ?? 0,
@@ -282,7 +281,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				emptyText={t('rack.notFound')}
 			>
 				<div class="page-header">
-					<h2>
+					<h2 data-testid="rack-detail-title">
 						{rack()?.name}{' '}
 						<span>{t('common.heightUnits', { count: displayHeight() })}</span>
 					</h2>
@@ -306,6 +305,15 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 				<div class="detail-columns">
 					<div>
 						<DetailCard label={t('rack.details')}>
+							<dt>{tp('entity.tenant', 1)}</dt>
+							<dd>
+								<ForeignKeyLink
+									id={tenantId()}
+									loading={tenant.loading}
+									name={tenant()?.name}
+									href={`/tenants/${tenantId() ?? ''}`}
+								/>
+							</dd>
 							<dt>{tp('entity.site', 1)}</dt>
 							<dd>
 								<ForeignKeyLink
@@ -342,15 +350,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									loading={rackType.loading}
 									name={rackType()?.model}
 									href={`/device-types/${rackTypeId() ?? ''}`}
-								/>
-							</dd>
-							<dt>{tp('entity.tenant', 1)}</dt>
-							<dd>
-								<ForeignKeyLink
-									id={tenantId()}
-									loading={tenant.loading}
-									name={tenant()?.name}
-									href={`/tenants/${tenantId() ?? ''}`}
 								/>
 							</dd>
 						</DetailCard>
@@ -423,6 +422,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 					<div>
 						<div
 							class="rack-util"
+							data-testid="rack-utilization"
 							role="status"
 							aria-label={t('rack.utilLabel', { used: occupiedU(), total: totalU() })}
 						>
@@ -432,9 +432,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									total: totalU(),
 									pct: utilPct(),
 								})}
-								<Show when={reservedU() > 0}>
-									<span>{t('rack.reserved', { count: reservedU() })}</span>
-								</Show>
 							</span>
 							<span class="rack-util-bar" aria-hidden="true">
 								<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
@@ -450,11 +447,11 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								selected_u={pendingU()}
 								selected_face={face()}
 								on_select_u={pickU}
-					on_select_device={openDeviceSelector}
-					on_add_device={installDevice}
-					on_add_shelf={installShelf}
-					shelf_actions={{
-						on_select_shelf_device: openShelfDeviceSelector,
+								on_select_device={openDeviceSelector}
+								on_add_device={installDevice}
+								on_add_shelf={installShelf}
+								shelf_actions={{
+									on_select_shelf_device: openShelfDeviceSelector,
 									on_remove_shelf_device: (
 										device: ElevationShelfDeviceRef,
 									): void => void removeFromShelf(device),

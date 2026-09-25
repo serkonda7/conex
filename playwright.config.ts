@@ -60,7 +60,11 @@ export default defineConfig({
 		{ name: 'setup', testMatch: /.*\.setup\.ts/ },
 		{
 			name: 'chromium',
-			use: { ...devices['Desktop Chrome'], storageState: e2eAuthFile },
+			use: {
+				...devices['Desktop Chrome'],
+				viewport: { width: 1920, height: 1080 },
+				storageState: e2eAuthFile,
+			},
 			dependencies: ['setup'],
 		},
 	],
