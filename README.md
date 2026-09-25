@@ -1,5 +1,5 @@
 # conex
-Network inventory for MSPs (tenants, sites, racks, devices, L1 cabling).
+Network inventory for MSPs.
 
 
 ## Run
@@ -32,4 +32,16 @@ bun run dev
 bun run check
 bun run build
 bun run lint:ci
+```
+
+
+## Development
+Use worktrees to work on parallel branches without disturbing the current checkout:
+```sh
+git worktree add ../conex-feature -b feature/my-change
+cd ../conex-feature
+# work, test, and commit as usual
+cd ../conex
+git worktree remove ../conex-feature
+git branch -d feature/my-change
 ```
