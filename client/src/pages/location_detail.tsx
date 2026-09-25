@@ -23,9 +23,9 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
-import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { locationTypeLabel } from '../i18n/labels'
+import { goTo } from '../router'
 
 /**
  * /locations/:id — location detail: header with slug, parent breadcrumb,
@@ -220,7 +220,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							getValue: (l: LocationRow): JSX.Element => (
 								<a
 									href={`/locations/${l.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/locations/${l.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/locations/${l.id}`)}
 								>
 									{l.name}
 								</a>
@@ -255,7 +255,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							getValue: (r: RackRow): JSX.Element => (
 								<a
 									href={`/racks/${r.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/racks/${r.id}`)}
 								>
 									{r.name}
 								</a>
@@ -291,7 +291,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							getValue: (d: DeviceRow): JSX.Element => (
 								<a
 									href={`/devices/${d.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/devices/${d.id}`)}
 								>
 									{d.name}
 								</a>

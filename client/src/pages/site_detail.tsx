@@ -27,8 +27,8 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
-import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { goTo } from '../router'
 
 interface TreeNode {
 	row: LocationRow
@@ -358,7 +358,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 							getValue: (r: RackRow): JSX.Element => (
 								<a
 									href={`/racks/${r.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/racks/${r.id}`)}
 								>
 									{r.name}
 								</a>
@@ -394,7 +394,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 							getValue: (d: DeviceRow): JSX.Element => (
 								<a
 									href={`/devices/${d.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/devices/${d.id}`)}
 								>
 									{d.name}
 								</a>

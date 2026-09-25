@@ -22,8 +22,8 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
-import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { goTo } from '../router'
 
 /**
  * /site-groups/:id — site group detail: header with slug, parent
@@ -178,7 +178,9 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							getValue: (g: SiteGroupRow): JSX.Element => (
 								<a
 									href={`/site-groups/${g.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/site-groups/${g.id}`)}
+									onClick={(e: MouseEvent): void =>
+										goTo(e, `/site-groups/${g.id}`)
+									}
 								>
 									{g.name}
 								</a>
@@ -213,7 +215,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							getValue: (s: SiteRow): JSX.Element => (
 								<a
 									href={`/sites/${s.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/sites/${s.id}`)}
 								>
 									{s.name}
 								</a>

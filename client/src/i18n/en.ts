@@ -547,7 +547,6 @@ export const en = {
 	'elevation.reserved': 'Reserved · {count} U',
 	'elevation.plateTitle': 'Shelf {mount} ({mountHeight} U mount)',
 	'elevation.plateTitleReserved': 'Shelf {mount} ({mountHeight} U mount, {reserved} U reserved)',
-	'elevation.occupiedOpposite': 'Occupied on the opposite face',
 	'elevation.deviceTitle': '{name} ({model}, {height} U)',
 	'elevation.onShelfTitle': 'On shelf {name} ({unit})',
 	'elevation.shelfUnit': 'Shelf {unit}',

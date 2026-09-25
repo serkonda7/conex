@@ -1,13 +1,20 @@
-/** Smart tab navigation: object pages and add/edit/import routes open as
- * new tabs so the underlying list/detail keeps its state. List-to-list
- * browsing reuses the active tab; switching tabs keeps every page mounted
- * (keep-alive in App.tsx).
+/** In-app tab navigation. Every tab keeps its own back/forward history and
+ * stays mounted in the background (keep-alive in App.tsx). Plain link clicks
+ * navigate inside the active tab; Ctrl/Cmd/Shift or middle click opens a new
+ * tab. Add/edit/import forms always open as their own tab and close again
+ * on save or cancel.
+ *
+ * Browser Back/Forward step through the active tab's history. Switching
+ * tabs replaces the current browser history entry instead of pushing one.
  */
 import { createContext, createSignal, useContext } from 'solid-js'
-import * as i18n from './i18n'
 
 export interface TabState {
 	id: number
+	/** Visited paths, oldest first; `index` points at the shown one. */
+	entries: readonly string[]
+	index: number
+	/** Shown path, always `entries[index]`. */
 	path: string
 	openerId: number | null
 	/** Bumped to force a remount (fresh fetch) of the tab's page. */
@@ -17,7 +24,7 @@ export interface TabState {
 export interface NavigateOptions {
 	/** Force opening `to` in a new tab (e.g. Ctrl/Cmd+click). */
 	openInTab?: boolean
-	/** Replace history entry instead of pushing. */
+	/** Replace the tab's current history entry instead of pushing. */
 	replace?: boolean
 	/**
 	 * When closing a form tab into `to`, remount the target so it refetches.
@@ -27,55 +34,72 @@ export interface NavigateOptions {
 	refresh?: boolean
 }
 
+const DEFAULT_PATH = '/tenants'
+
 let nextTabId = 1
+
+function makeTab(
+	id: number,
+	entries: readonly string[],
+	index: number,
+	openerId: number | null,
+	gen = 0,
+): TabState {
+	return { id, entries, index, path: entries[index] ?? DEFAULT_PATH, openerId, gen }
+}
+
+function currentUrl(): string {
+	return window.location.pathname + window.location.search
+}
 
 function initialPath(): string {
 	if (typeof window === 'undefined') {
-		return '/tenants'
+		return DEFAULT_PATH
 	}
-	return window.location.pathname + window.location.search || '/tenants'
+	return currentUrl() || DEFAULT_PATH
 }
 
-const [tabs, setTabs] = createSignal<TabState[]>([
-	{ id: nextTabId++, path: initialPath(), openerId: null, gen: 0 },
-])
+const [tabs, setTabs] = createSignal<TabState[]>([makeTab(nextTabId++, [initialPath()], 0, null)])
 const [activeTabId, setActiveTabId] = createSignal<number>(tabs()[0]?.id ?? 1)
-const [tabLabels, setTabLabels] = createSignal<Record<number, string>>({})
+/** Names reported by loaded pages, tied to the path they were read from. */
+const [tabLabels, setTabLabels] = createSignal<Record<number, { path: string; label: string }>>({})
 
 /** Set when tags are created or deleted so the home view can refresh entries. */
 const [tagsChanged, setTagsChanged] = createSignal(false)
 
-/** Per-tab scroll positions so switching tabs restores where you were. */
-const scrollByTab = new Map<number, number>()
+/** Per-tab scroll positions, indexed like the tab's history entries. */
+const scrollByTab = new Map<number, number[]>()
 
-function syncUrl(to: string, replace?: boolean): void {
-	if (typeof window === 'undefined') {
-		return
+/**
+ * Position of the current browser history entry. Stored in `history.state`
+ * so popstate can tell Back (lower) from Forward (higher).
+ */
+let historySeq = 0
+
+function readSeq(state: unknown): number | null {
+	if (typeof state !== 'object' || state === null || !('seq' in state)) {
+		return null
 	}
-	const current = window.location.pathname + window.location.search
-	if (current === to) {
-		return
-	}
-	if (replace) {
-		window.history.replaceState(null, '', to)
-	} else {
-		window.history.pushState(null, '', to)
-	}
+	return typeof state.seq === 'number' ? state.seq : null
 }
 
-function rememberScroll(id: number): void {
-	if (typeof window === 'undefined') {
-		return
-	}
-	scrollByTab.set(id, window.scrollY)
+function pushUrl(to: string): void {
+	historySeq += 1
+	window.history.pushState({ seq: historySeq }, '', to)
 }
 
-function restoreScroll(id: number): void {
-	if (typeof window === 'undefined') {
-		return
-	}
-	const y = scrollByTab.get(id) ?? 0
-	window.scrollTo(0, y)
+function replaceUrl(to: string): void {
+	window.history.replaceState({ seq: historySeq }, '', to)
+}
+
+function rememberScroll(tab: TabState): void {
+	const list = scrollByTab.get(tab.id) ?? []
+	list[tab.index] = window.scrollY
+	scrollByTab.set(tab.id, list)
+}
+
+function restoreScroll(tab: TabState): void {
+	window.scrollTo(0, scrollByTab.get(tab.id)?.[tab.index] ?? 0)
 }
 
 /** Active tab record (null only before init). A plain function (not a memo)
@@ -85,283 +109,216 @@ export function activeTab(): TabState | null {
 	return tabs().find((t) => t.id === id) ?? null
 }
 
-/** Current route path: the active tab's path. Kept as a function so all
- * existing `path()` call sites keep working. */
+/** Current route path: the active tab's path. */
 export function path(): string {
-	return activeTab()?.path ?? '/tenants'
+	return activeTab()?.path ?? DEFAULT_PATH
 }
 
-/** Last path segment is add/edit/import (query strings ignored). */
-export function isOverlayRoute(raw: string): boolean {
-	const base = (raw.split('?')[0] ?? '').replace(/\/+$/, '') || '/'
-	const segments = base.split('/').filter((p) => p.length > 0)
-	const last = segments[segments.length - 1] ?? ''
+/** Path segments of a route, ignoring the query string and trailing slashes. */
+export function routeSegments(raw: string): string[] {
+	return (raw.split('?')[0] ?? '').split('/').filter((p) => p.length > 0)
+}
+
+/** Last path segment is add/edit/import: the route opens as a form tab. */
+function isFormRoute(raw: string): boolean {
+	const last = routeSegments(raw).at(-1)
 	return last === 'add' || last === 'edit' || last === 'import'
 }
 
-/** Object detail pages (`/tenants/5`, `/devices/3`, …) keep their own tab
- * so following an object link never discards the page behind it. */
-const DETAIL_SECTIONS = new Set([
-	'tenants',
-	'sites',
-	'site-groups',
-	'locations',
-	'racks',
-	'device-types',
-	'manufacturers',
-	'devices',
-])
-
-export function isDetailRoute(raw: string): boolean {
-	const base = (raw.split('?')[0] ?? '').replace(/\/+$/, '') || '/'
-	const segments = base.split('/').filter((p) => p.length > 0)
-	return (
-		segments.length === 2 &&
-		DETAIL_SECTIONS.has(segments[0] ?? '') &&
-		parseId(segments[1]) !== null
-	)
+/** Name the tab's loaded page reported, if the tab still shows that page. */
+export function tabPageLabel(tab: TabState): string | undefined {
+	const entry = tabLabels()[tab.id]
+	return entry?.path === tab.path ? entry.label : undefined
 }
 
-/** Routes that open in a new tab: object details plus add/edit/import forms. */
-export function isNewTabRoute(raw: string): boolean {
-	return isOverlayRoute(raw) || isDetailRoute(raw)
-}
-
-/** Entity name key for each top-level route section. */
-const SECTION_ENTITIES: Record<string, i18n.PluralKey> = {
-	tenants: 'entity.tenant',
-	sites: 'entity.site',
-	'site-groups': 'entity.siteGroup',
-	locations: 'entity.location',
-	racks: 'entity.rack',
-	shelves: 'entity.shelf',
-	'rack-types': 'entity.rackType',
-	templates: 'entity.rackType',
-	'device-types': 'entity.deviceType',
-	manufacturers: 'entity.manufacturer',
-	devices: 'entity.device',
-	interfaces: 'entity.interface',
-	connections: 'entity.connection',
-	cables: 'entity.connection',
-	users: 'entity.user',
-}
-
-/** Short human label for a tab button, derived from the route. */
-export function tabTitle(raw: string): string {
-	const base = (raw.split('?')[0] ?? '').replace(/\/+$/, '') || '/'
-	const segments = base.split('/').filter((p) => p.length > 0)
-	const section = segments[0] ?? 'tenants'
-	if (section === 'topology') {
-		return i18n.t('entity.topology')
-	}
-	const key = SECTION_ENTITIES[section]
-	const plural = key ? i18n.tp(key, 2) : (segments[0] ?? i18n.t('tab.page'))
-	const singular = key ? i18n.tp(key, 1) : plural
-	const id = segments[1]
-	if (id === 'add') {
-		return i18n.t('tab.add', { entity: singular })
-	}
-	if (id === 'import') {
-		return i18n.t('tab.import', { entities: plural })
-	}
-	if (id !== undefined && segments[2] === 'edit') {
-		return i18n.t('tab.edit', { entity: singular, id })
-	}
-	if (id !== undefined) {
-		return i18n.t('tab.detail', { entity: singular, id })
-	}
-	return plural
-}
-
-/** Label populated from the loaded detail page when an object name is known. */
-export function tabLabel(id: number, raw: string): string {
-	return tabLabels()[id] ?? tabTitle(raw)
-}
-
-export function setTabLabel(id: number, label: string): void {
-	if (!label || tabLabels()[id] === label) {
+export function setTabLabel(id: number, forPath: string, label: string): void {
+	const entry = tabLabels()[id]
+	if (!label || (entry?.path === forPath && entry.label === label)) {
 		return
 	}
-	setTabLabels((current) => ({ ...current, [id]: label }))
+	setTabLabels((current) => ({ ...current, [id]: { path: forPath, label } }))
 }
 
-function findTabByPath(to: string): TabState | null {
-	return tabs().find((t) => t.path === to) ?? null
+function updateTab(next: TabState): void {
+	setTabs((prev) => prev.map((t) => (t.id === next.id ? next : t)))
 }
 
-function pushTab(to: string, openerId: number | null): TabState {
-	const tab: TabState = { id: nextTabId++, path: to, openerId, gen: 0 }
-	setTabs((prev) => [...prev, tab])
+function removeTab(id: number): void {
+	setTabs((prev) => prev.filter((t) => t.id !== id))
+	scrollByTab.delete(id)
+	setTabLabels(({ [id]: _, ...rest }) => rest)
+}
+
+/** Makes `tab` the visible one and mirrors its path in the address bar. */
+function show(tab: TabState, url: 'push' | 'replace' = 'replace'): void {
 	setActiveTabId(tab.id)
-	syncUrl(to)
-	restoreScroll(tab.id)
-	return tab
+	if (url === 'push') {
+		pushUrl(tab.path)
+	} else {
+		replaceUrl(tab.path)
+	}
+	restoreScroll(tab)
+}
+
+/** Adds `to` to the tab's history, dropping any forward entries. */
+function visit(tab: TabState, to: string, replace = false): TabState {
+	const kept = tab.entries.slice(0, replace ? tab.index : tab.index + 1)
+	const next = makeTab(tab.id, [...kept, to], kept.length, tab.openerId, tab.gen)
+	scrollByTab.get(tab.id)?.splice(next.index)
+	updateTab(next)
+	return next
+}
+
+function openTab(to: string, openerId: number | null): void {
+	const tab = makeTab(nextTabId++, [to], 0, openerId)
+	setTabs((prev) => [...prev, tab])
+	show(tab)
 }
 
 /** Switch to an existing tab, preserving every tab's mounted state. */
 export function activateTab(id: number): void {
 	const tab = tabs().find((t) => t.id === id)
-	if (!tab || tab.id === activeTabId()) {
-		if (tab) {
-			syncUrl(tab.path)
-		}
+	if (!tab) {
 		return
 	}
-	rememberScroll(activeTabId())
-	setActiveTabId(tab.id)
-	syncUrl(tab.path)
-	restoreScroll(tab.id)
+	const active = activeTab()
+	if (active?.id === id) {
+		return
+	}
+	if (active) {
+		rememberScroll(active)
+	}
+	show(tab)
 }
 
 /** Close a tab and focus its opener (or the nearest neighbor). */
 export function closeTab(id: number): void {
 	const list = tabs()
 	const closing = list.find((t) => t.id === id)
-	if (!closing) {
+	if (!closing || list.length === 1) {
 		return
 	}
-	if (list.length === 1) {
-		return
-	}
-	rememberScroll(id)
 	const remaining = list.filter((t) => t.id !== id)
-	setTabs(remaining)
-	scrollByTab.delete(id)
-	if (activeTabId() === id) {
-		const opener =
-			closing.openerId !== null ? remaining.find((t) => t.id === closing.openerId) : undefined
-		const index = list.findIndex((t) => t.id === id)
-		const fallback = opener ?? remaining[Math.min(index, remaining.length - 1)] ?? remaining[0]
-		if (fallback) {
-			setActiveTabId(fallback.id)
-			syncUrl(fallback.path)
-			restoreScroll(fallback.id)
-		}
+	removeTab(id)
+	if (activeTabId() !== id) {
+		return
+	}
+	const opener =
+		closing.openerId !== null ? remaining.find((t) => t.id === closing.openerId) : undefined
+	const index = list.findIndex((t) => t.id === id)
+	const fallback = opener ?? remaining[Math.min(index, remaining.length - 1)]
+	if (fallback) {
+		show(fallback)
 	}
 }
 
 /**
- * Smart navigate:
- * - same path: no-op
- * - existing tab with `to`: activate it (no duplicate, state preserved)
- * - object/add/edit/import route: open a new tab, keeping the current page
- * - from a form tab to a list/detail route: close the form (dialog-like)
- *   and activate/refresh the target instead of morphing the form tab
- * - from an object tab elsewhere: open a new tab so the object is kept
- * - otherwise (list to list): update the active tab in place.
+ * Leaves a form tab for `to` (save, cancel, back link): the form closes
+ * like a dialog and the target shows in an existing tab, else in the
+ * opener's history, else in place of the form.
  */
-export function navigate(to: string, opts?: NavigateOptions): void {
+function closeForm(form: TabState, to: string, refresh: boolean): void {
+	const others = tabs().filter((t) => t.id !== form.id)
+	const shown = others.find((t) => t.path === to)
+	if (shown) {
+		removeTab(form.id)
+		const next = refresh ? { ...shown, gen: shown.gen + 1 } : shown
+		updateTab(next)
+		show(next)
+		return
+	}
+	const opener = others.find((t) => t.id === form.openerId)
+	if (opener && !isFormRoute(opener.path)) {
+		removeTab(form.id)
+		show(visit(opener, to), 'push')
+		return
+	}
+	// Direct URL entry, or the opener is gone or is itself a form: turn the
+	// form tab into the target.
+	scrollByTab.delete(form.id)
+	const next = makeTab(form.id, [to], 0, form.openerId, form.gen)
+	updateTab(next)
+	show(next)
+}
+
+/**
+ * Navigate:
+ * - form route (add/edit/import): focus the tab already showing it, else
+ *   open a new tab
+ * - `openInTab`: open a new tab
+ * - from a form tab: close the form and show the target (see `closeForm`)
+ * - otherwise: push `to` onto the active tab's history.
+ */
+export function navigate(to: string, opts: NavigateOptions = {}): void {
 	const active = activeTab()
 	if (!active) {
-		pushTab(to, null)
+		openTab(to, null)
+		return
+	}
+	rememberScroll(active)
+	if (isFormRoute(to)) {
+		const open = tabs().find((t) => t.path === to)
+		if (open) {
+			show(open)
+		} else {
+			openTab(to, active.id)
+		}
+		return
+	}
+	if (opts.openInTab === true) {
+		openTab(to, active.id)
+		return
+	}
+	if (isFormRoute(active.path)) {
+		closeForm(active, to, opts.refresh ?? true)
 		return
 	}
 	if (to === active.path) {
-		syncUrl(to, opts?.replace)
-		return
-	}
-	if (opts?.openInTab === true) {
-		const existing = findTabByPath(to)
-		if (existing) {
-			activateTab(existing.id)
-			return
-		}
-		rememberScroll(active.id)
-		pushTab(to, active.id)
-		return
-	}
-	const target = findTabByPath(to)
-	const activeIsOverlay = isOverlayRoute(active.path)
-	const activeIsLeaf = activeIsOverlay || isDetailRoute(active.path)
-	const targetIsLeaf = isNewTabRoute(to)
-
-	// Closing a form tab (save/cancel/back): never morph it into the target
-	// and duplicate the opener — close it and show the target instead.
-	if (activeIsOverlay && !isOverlayRoute(to)) {
-		const refresh = opts?.refresh ?? true
-		const openerId = active.openerId
-		if (tabs().length === 1) {
-			// Direct URL entry with no background tab: reuse the single tab.
-			setTabs((prev) =>
-				prev.map((t) =>
-					t.id === active.id ? { ...t, path: to, gen: t.gen + (refresh ? 1 : 0) } : t,
-				),
-			)
-			syncUrl(to, opts?.replace)
-			return
-		}
-		// Drop the form tab first so `to` cannot match itself.
-		const remaining = tabs().filter((t) => t.id !== active.id)
-		scrollByTab.delete(active.id)
-		if (target && target.id !== active.id) {
-			const updated = refresh
-				? remaining.map((t) => (t.id === target.id ? { ...t, gen: t.gen + 1 } : t))
-				: remaining
-			setTabs(updated)
-			rememberScroll(active.id)
-			setActiveTabId(target.id)
-			syncUrl(to, opts?.replace)
-			restoreScroll(target.id)
-			return
-		}
-		// No tab shows the target yet: open it fresh and keep the opener
-		// untouched so its list/detail state is preserved.
-		setTabs(remaining)
-		pushTab(to, openerId)
-		return
-	}
-
-	if (target) {
-		activateTab(target.id)
-		if (opts?.refresh === true) {
-			setTabs((prev) => prev.map((t) => (t.id === target.id ? { ...t, gen: t.gen + 1 } : t)))
+		if (opts.refresh === true) {
+			updateTab({ ...active, gen: active.gen + 1 })
 		}
 		return
 	}
-
-	// Object pages and forms keep their own tab; navigating away from an
-	// object tab also opens a new tab so the object is never morphed away.
-	if (targetIsLeaf || activeIsLeaf) {
-		rememberScroll(active.id)
-		pushTab(to, active.id)
-		return
-	}
-
-	// List-to-list browsing reuses the active tab so the tab strip stays tidy.
-	rememberScroll(active.id)
-	setTabs((prev) => prev.map((t) => (t.id === active.id ? { ...t, path: to } : t)))
-	syncUrl(to, opts?.replace)
-	restoreScroll(active.id)
-}
-
-/** Explicit "open in new tab" for Ctrl/Cmd+click and nav "+" shortcuts. */
-export function openInNewTab(to: string): void {
-	navigate(to, { openInTab: true })
+	show(visit(active, to, opts.replace), opts.replace === true ? 'replace' : 'push')
 }
 
 /**
- * Anchor helper honoring modifier keys: plain click follows the smart
- * rules, Ctrl/Cmd/Shift/middle-click forces a background-style new tab.
+ * Click handler for in-app links: a plain click follows `navigate`,
+ * Ctrl/Cmd/Shift or middle click opens the target in a new tab.
  */
-export function goTo(e: MouseEvent, to: string): void {
-	if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
-		e.preventDefault()
-		openInNewTab(to)
-		return
-	}
+export function goTo(e: MouseEvent, to: string, opts?: NavigateOptions): void {
 	e.preventDefault()
-	navigate(to)
+	const newTab = e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1
+	navigate(to, newTab ? { ...opts, openInTab: true } : opts)
 }
 
 if (typeof window !== 'undefined') {
-	window.addEventListener('popstate', () => {
-		const url = window.location.pathname + window.location.search
+	historySeq = readSeq(window.history.state) ?? 0
+	replaceUrl(initialPath())
+
+	window.addEventListener('popstate', (e: PopStateEvent) => {
+		const seq = readSeq(e.state)
+		// Entries without a seq are in-page `#anchor` jumps: leave them alone.
+		if (seq === null) {
+			return
+		}
+		const step = seq - historySeq
+		historySeq = seq
 		const active = activeTab()
 		if (!active) {
 			return
 		}
-		if (active.path !== url) {
-			setTabs((prev) => prev.map((t) => (t.id === active.id ? { ...t, path: url } : t)))
+		const index = Math.max(0, Math.min(active.entries.length - 1, active.index + step))
+		if (index !== active.index) {
+			rememberScroll(active)
+			const next = makeTab(active.id, active.entries, index, active.openerId, active.gen)
+			updateTab(next)
+			show(next)
+			return
+		}
+		// The tab has no history left in that direction: keep showing it.
+		if (currentUrl() !== active.path) {
+			replaceUrl(active.path)
 		}
 	})
 }

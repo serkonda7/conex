@@ -14,7 +14,6 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -31,7 +30,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { locationTypeLabel } from '../i18n/labels'
-import { parseId, queryParam } from '../router'
+import { goTo, parseId, queryParam } from '../router'
 
 /**
  * /locations — NetBox-style location list: search, sortable columns, site +
@@ -149,7 +148,7 @@ export function LocationsPage(): JSX.Element {
 				>
 					<a
 						href={`/locations/${l.id}`}
-						onClick={(e: MouseEvent): void => go(e, `/locations/${l.id}`)}
+						onClick={(e: MouseEvent): void => goTo(e, `/locations/${l.id}`)}
 					>
 						{l.name}
 					</a>

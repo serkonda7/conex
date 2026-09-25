@@ -23,13 +23,8 @@ import { DataTable, type DataTableColumn } from '../components/data_table'
 import { ListRangeStatus } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { cableStatusLabel } from '../i18n/labels'
-import { navigate, parseId, queryParam } from '../router'
+import { goTo, navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
 
 const CABLE_CSV_COLUMNS = 'a_device,a_interface,b_device,b_interface,label,kind,status'
 
@@ -184,7 +179,7 @@ export function ConnectionsPage(): JSX.Element {
 				) : (
 					<a
 						href={`/devices/${end.deviceId}`}
-						onClick={(e: MouseEvent): void => go(e, `/devices/${end.deviceId ?? ''}`)}
+						onClick={(e: MouseEvent): void => goTo(e, `/devices/${end.deviceId ?? ''}`)}
 					>
 						<code>{end.text}</code>
 					</a>
@@ -201,7 +196,7 @@ export function ConnectionsPage(): JSX.Element {
 				) : (
 					<a
 						href={`/devices/${end.deviceId}`}
-						onClick={(e: MouseEvent): void => go(e, `/devices/${end.deviceId ?? ''}`)}
+						onClick={(e: MouseEvent): void => goTo(e, `/devices/${end.deviceId ?? ''}`)}
 					>
 						<code>{end.text}</code>
 					</a>

@@ -8,7 +8,7 @@ import type {
 import { For, type JSX, Show } from 'solid-js'
 import { t } from '../i18n'
 import { deviceStatusLabel, faceLabel } from '../i18n/labels'
-import { navigate } from '../router'
+import { goTo } from '../router'
 
 export type RackFace = DeviceFace
 
@@ -22,11 +22,6 @@ function u_label(u: number | undefined): string {
 /** Display name of a shelf, falling back to the generic noun. */
 function shelf_name(shelf: ElevationShelfRef | undefined): string {
 	return shelf?.name || t('elevation.unnamedShelf')
-}
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
 }
 
 /** Inclusive U span helper. */
@@ -303,7 +298,7 @@ function ShelfDevices(props: {
 						<a
 							href={`/devices/${device.id}`}
 							class="rack-shelf-device-link"
-							onClick={(e: MouseEvent): void => go(e, `/devices/${device.id}`)}
+							onClick={(e: MouseEvent): void => goTo(e, `/devices/${device.id}`)}
 						>
 							{device.name}
 						</a>
@@ -535,7 +530,7 @@ export function RackElevation(props: {
 																href={`/shelves/${s.id}/edit`}
 																class="rack-shelf-plate"
 																onClick={(e: MouseEvent): void =>
-																	go(e, `/shelves/${s.id}/edit`)
+																	goTo(e, `/shelves/${s.id}/edit`)
 																}
 															>
 																<span class="rack-dev-name">
@@ -675,7 +670,7 @@ export function RackElevation(props: {
 																			onClick={(
 																				e: MouseEvent,
 																			): void =>
-																				go(
+																				goTo(
 																					e,
 																					`/shelves/${s.id}/edit`,
 																				)
@@ -739,7 +734,7 @@ export function RackElevation(props: {
 																		onClick={(
 																			e: MouseEvent,
 																		): void =>
-																			go(
+																			goTo(
 																				e,
 																				`/shelves/${s.id}/edit`,
 																			)
@@ -803,7 +798,6 @@ export function RackElevation(props: {
 															'grid-row': `${row} / span ${segment.rows}`,
 															'grid-column': '2',
 														}}
-														title={t('elevation.occupiedOpposite')}
 													>
 														<span class="rack-ghost">
 															<span class="rack-dev-name">
@@ -835,7 +829,7 @@ export function RackElevation(props: {
 														href={`/devices/${segment.device.id}`}
 														class="rack-dev"
 														onClick={(e: MouseEvent): void =>
-															go(e, `/devices/${segment.device.id}`)
+															goTo(e, `/devices/${segment.device.id}`)
 														}
 														title={t('elevation.deviceTitle', {
 															name: segment.device.name,

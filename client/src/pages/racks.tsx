@@ -14,7 +14,6 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -30,7 +29,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
-import { parseId, queryParam } from '../router'
+import { goTo, parseId, queryParam } from '../router'
 
 /**
  * /racks — NetBox-style rack list: search, sortable columns, site /
@@ -152,7 +151,7 @@ export function RacksPage(): JSX.Element {
 			getValue: (r: RackRow): JSX.Element => (
 				<a
 					href={`/racks/${r.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/racks/${r.id}`)}
 				>
 					{r.name}
 				</a>

@@ -30,9 +30,9 @@ import {
 	InlineError,
 	useDetailDelete,
 } from '../components/detail_page'
-import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { cableStatusLabel, faceLabel } from '../i18n/labels'
+import { goTo } from '../router'
 
 /** Selectable trace depths for the path view. */
 const TRACE_DEPTHS = [1, 2, 3, 4, 6, 10]
@@ -551,7 +551,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</For>
 				</select>
 			</label>{' '}
-			<a href="/topology" onClick={(e: MouseEvent): void => go(e, '/topology')}>
+			<a href="/topology" onClick={(e: MouseEvent): void => goTo(e, '/topology')}>
 				{t('device.openInTopology')}
 			</a>
 			<Show
@@ -597,7 +597,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 								<a
 									href={`/devices/${path.end_device.id}`}
 									onClick={(e: MouseEvent): void =>
-										go(e, `/devices/${path.end_device.id}`)
+										goTo(e, `/devices/${path.end_device.id}`)
 									}
 								>
 									{path.end_device.name}
@@ -611,7 +611,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				{t('device.cablesCount', { count: cables()?.length ?? 0 })}{' '}
 				<a
 					href={`/connections?device=${props.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/connections?device=${props.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/connections?device=${props.id}`)}
 				>
 					{t('device.viewAllShort')}
 				</a>

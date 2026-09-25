@@ -12,7 +12,6 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -28,7 +27,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
-import { parseId, queryParam } from '../router'
+import { goTo, parseId, queryParam } from '../router'
 
 /**
  * /site-groups — NetBox-style site group list: search, sortable columns,
@@ -108,7 +107,7 @@ export function SiteGroupsPage(): JSX.Element {
 			getValue: (g: SiteGroupRow): JSX.Element => (
 				<a
 					href={`/site-groups/${g.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/site-groups/${g.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/site-groups/${g.id}`)}
 				>
 					{g.name}
 				</a>

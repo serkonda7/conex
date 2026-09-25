@@ -21,8 +21,8 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
-import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { goTo } from '../router'
 
 /**
  * /tenants/:id — tenant detail: header with slug/description/comments,
@@ -179,7 +179,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							getValue: (s: SiteRow): JSX.Element => (
 								<a
 									href={`/sites/${s.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/sites/${s.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/sites/${s.id}`)}
 								>
 									{s.name}
 								</a>
@@ -216,7 +216,9 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							getValue: (g: SiteGroupRow): JSX.Element => (
 								<a
 									href={`/site-groups/${g.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/site-groups/${g.id}`)}
+									onClick={(e: MouseEvent): void =>
+										goTo(e, `/site-groups/${g.id}`)
+									}
 								>
 									{g.name}
 								</a>
@@ -251,7 +253,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							getValue: (r: RackRow): JSX.Element => (
 								<a
 									href={`/racks/${r.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/racks/${r.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/racks/${r.id}`)}
 								>
 									{r.name}
 								</a>
@@ -289,7 +291,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							getValue: (d: DeviceRow): JSX.Element => (
 								<a
 									href={`/devices/${d.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/devices/${d.id}`)}
 								>
 									{d.name}
 								</a>

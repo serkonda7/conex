@@ -8,9 +8,8 @@
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createEffect, For, type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
-import { navigate } from '../router'
+import { goTo, navigate } from '../router'
 import { Loading } from './feedback'
-import { go } from './list_page'
 
 /** One `<select>` entry. */
 export interface FormOption {
@@ -21,13 +20,6 @@ export interface FormOption {
 /** Maps list rows (`{ id, name }`) to `<select>` options. */
 export function row_options(rows: { id: number; name: string }[]): FormOption[] {
 	return rows.map((row) => ({ value: row.id, label: row.name }))
-}
-
-/** Wraps a plain anchor so cancel/back closes the form tab without
- * refreshing, keeping the underlying list's exact contents. */
-function goNoRefresh(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to, { refresh: false })
 }
 
 /** Muted helper text below a field control. */
@@ -314,7 +306,7 @@ export function FormPage(props: {
 			<p>
 				<a
 					href={props.backTo}
-					onClick={(e: MouseEvent): void => goNoRefresh(e, props.backTo)}
+					onClick={(e: MouseEvent): void => goTo(e, props.backTo, { refresh: false })}
 				>
 					← {props.backLabel}
 				</a>
@@ -374,7 +366,7 @@ export function EditPageShell(props: {
 	return (
 		<div class="form-page">
 			<p>
-				<a href={props.backTo} onClick={(e: MouseEvent): void => go(e, props.backTo)}>
+				<a href={props.backTo} onClick={(e: MouseEvent): void => goTo(e, props.backTo)}>
 					← {props.backLabel}
 				</a>
 			</p>

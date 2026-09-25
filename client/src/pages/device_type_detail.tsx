@@ -24,8 +24,8 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
-import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { goTo } from '../router'
 
 /**
  * /device-types/:id — device-type detail: header with model and details
@@ -222,7 +222,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							<li>
 								<a
 									href={`/devices/${d.id}`}
-									onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+									onClick={(e: MouseEvent): void => goTo(e, `/devices/${d.id}`)}
 								>
 									{d.name}
 								</a>

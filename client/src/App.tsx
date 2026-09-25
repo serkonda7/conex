@@ -1,26 +1,9 @@
-import {
-	IconBox,
-	IconBuildingFactory,
-	IconCpu,
-	IconDownload,
-	IconFolder,
-	IconLink,
-	IconLocation,
-	IconLock,
-	IconLogout,
-	IconMapPin,
-	IconNetwork,
-	IconPlug,
-	IconPlus,
-	IconServer,
-	IconTemplate,
-	IconUsers,
-	IconX,
-} from '@tabler/icons-solidjs'
+import { IconDownload, IconLogout, IconPlus, IconX } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import {
 	createEffect,
+	createMemo,
 	createSignal,
 	For,
 	type JSX,
@@ -30,73 +13,33 @@ import {
 	Show,
 	Switch,
 } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
-import { t, tp } from './i18n'
-import { ConnectionsPage } from './pages/connections'
-import { DeviceAddPage } from './pages/device_add'
-import { DeviceDetailPage } from './pages/device_detail'
-import { DeviceEditPage } from './pages/device_edit'
-import { DeviceTypeAddPage } from './pages/device_type_add'
-import { DeviceTypeDetailPage } from './pages/device_type_detail'
-import { DeviceTypeEditPage } from './pages/device_type_edit'
-import { DeviceTypeImportPage } from './pages/device_type_import'
-import { DeviceTypesPage } from './pages/device_types'
-import { DevicesPage } from './pages/devices'
-import { InterfacesPage } from './pages/interfaces'
-import { LocationAddPage } from './pages/location_add'
-import { LocationDetailPage } from './pages/location_detail'
-import { LocationEditPage } from './pages/location_edit'
-import { LocationsPage } from './pages/locations'
-import { ManufacturerAddPage } from './pages/manufacturer_add'
-import { ManufacturerDetailPage } from './pages/manufacturer_detail'
-import { ManufacturerEditPage } from './pages/manufacturer_edit'
-import { ManufacturersPage } from './pages/manufacturers'
-import { RackAddPage } from './pages/rack_add'
-import { RackDetailPage } from './pages/rack_detail'
-import { RackEditPage } from './pages/rack_edit'
-import { RackTypeAddPage } from './pages/rack_type_add'
-import { RackTypesPage } from './pages/rack_types'
-import { RacksPage } from './pages/racks'
-import { ShelfAddPage } from './pages/shelf_add'
-import { ShelfEditPage } from './pages/shelf_edit'
-import { SiteAddPage } from './pages/site_add'
-import { SiteDetailPage } from './pages/site_detail'
-import { SiteEditPage } from './pages/site_edit'
-import { SiteGroupAddPage } from './pages/site_group_add'
-import { SiteGroupDetailPage } from './pages/site_group_detail'
-import { SiteGroupEditPage } from './pages/site_group_edit'
-import { SiteGroupsPage } from './pages/site_groups'
-import { SitesPage } from './pages/sites'
-import { TenantAddPage } from './pages/tenant_add'
-import { TenantDetailPage } from './pages/tenant_detail'
-import { TenantEditPage } from './pages/tenant_edit'
-import { TenantsPage } from './pages/tenants'
-import { TopologyPage } from './pages/topology'
-import { UserAddPage } from './pages/user_add'
-import { UserEditPage } from './pages/user_edit'
-import { UsersPage } from './pages/users'
+import { t } from './i18n'
 import {
 	activateTab,
 	activeTabId,
 	closeTab,
 	goTo,
-	isDetailRoute,
-	openInNewTab,
-	parseId,
 	path,
 	setTabLabel,
 	type TabState,
-	tabLabel,
+	tabPageLabel,
 	tabPathContext,
 	tabs,
 } from './router'
+import {
+	isDetailRoute,
+	matchRoute,
+	type RouteMatch,
+	routeSection,
+	SECTIONS,
+	type Section,
+	tabTitle,
+} from './routes'
 
 const APP_TITLE = 'CoNetBox'
-
-function go(e: MouseEvent, to: string): void {
-	goTo(e, to)
-}
 
 function LoginForm(props: {
 	username: () => string
@@ -292,225 +235,9 @@ function NavItem(props: {
 	)
 }
 
-interface RouteInfo {
-	page: string
-	tenantId: number | null
-	siteId: number | null
-	siteGroupId: number | null
-	locationId: number | null
-	rackId: number | null
-	shelfId: number | null
-	deviceId: number | null
-	deviceTypeId: number | null
-	manufacturerId: number | null
-	userId: number | null
-}
-
-function emptyRoute(page: string): RouteInfo {
-	return {
-		page,
-		tenantId: null,
-		siteId: null,
-		siteGroupId: null,
-		locationId: null,
-		rackId: null,
-		shelfId: null,
-		deviceId: null,
-		deviceTypeId: null,
-		manufacturerId: null,
-		userId: null,
-	}
-}
-
-/** Pure route parser so every background tab can resolve its own path. */
-function parseRoute(routePath: string, isAdmin: boolean): RouteInfo {
-	const parts =
-		routePath
-			.split('?')[0]
-			?.split('/')
-			.filter((p) => p.length > 0) ?? []
-	if (parts.length === 0 || parts[0] === 'tenants') {
-		if (parts[1] === 'add') {
-			return emptyRoute('tenant-add')
-		}
-		if (parts[1]) {
-			const tenantId = parseId(parts[1])
-			if (tenantId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('tenant-edit'), tenantId }
-			}
-			return { ...emptyRoute('tenant-detail'), tenantId }
-		}
-		return emptyRoute('tenants')
-	}
-	if (parts[0] === 'sites') {
-		if (parts[1] === 'add') {
-			return emptyRoute('site-add')
-		}
-		if (parts[1]) {
-			const siteId = parseId(parts[1])
-			if (siteId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('site-edit'), siteId }
-			}
-			return { ...emptyRoute('site-detail'), siteId }
-		}
-		return emptyRoute('sites')
-	}
-	if (parts[0] === 'site-groups') {
-		if (parts[1] === 'add') {
-			return emptyRoute('site-group-add')
-		}
-		if (parts[1]) {
-			const siteGroupId = parseId(parts[1])
-			if (siteGroupId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('site-group-edit'), siteGroupId }
-			}
-			return { ...emptyRoute('site-group-detail'), siteGroupId }
-		}
-		return emptyRoute('site-groups')
-	}
-	if (parts[0] === 'locations') {
-		if (parts[1] === 'add') {
-			return emptyRoute('location-add')
-		}
-		if (parts[1]) {
-			const locationId = parseId(parts[1])
-			if (locationId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('location-edit'), locationId }
-			}
-			return { ...emptyRoute('location-detail'), locationId }
-		}
-		return emptyRoute('locations')
-	}
-	if (parts[0] === 'racks') {
-		if (parts[1] === 'add') {
-			return emptyRoute('rack-add')
-		}
-		if (parts[1]) {
-			const rackId = parseId(parts[1])
-			if (rackId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('rack-edit'), rackId }
-			}
-			return { ...emptyRoute('rack-detail'), rackId }
-		}
-		return emptyRoute('racks')
-	}
-	if (parts[0] === 'shelves') {
-		if (parts[1] === 'add') {
-			return emptyRoute('shelf-add')
-		}
-		if (parts[1]) {
-			const shelfId = parseId(parts[1])
-			if (shelfId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('shelf-edit'), shelfId }
-			}
-			return emptyRoute('not-found')
-		}
-		return emptyRoute('not-found')
-	}
-	if (parts[0] === 'rack-types' || parts[0] === 'templates') {
-		if (parts[1] === 'add') {
-			return emptyRoute('rack-type-add')
-		}
-		return emptyRoute('rack-types')
-	}
-	if (parts[0] === 'device-types') {
-		if (parts[1] === 'add') {
-			return emptyRoute('device-type-add')
-		}
-		if (parts[1] === 'import') {
-			return emptyRoute('device-type-import')
-		}
-		if (parts[1]) {
-			const deviceTypeId = parseId(parts[1])
-			if (deviceTypeId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('device-type-edit'), deviceTypeId }
-			}
-			return { ...emptyRoute('device-type-detail'), deviceTypeId }
-		}
-		return emptyRoute('device-types')
-	}
-	if (parts[0] === 'manufacturers') {
-		if (parts[1] === 'add') {
-			return emptyRoute('manufacturer-add')
-		}
-		if (parts[1]) {
-			const manufacturerId = parseId(parts[1])
-			if (manufacturerId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('manufacturer-edit'), manufacturerId }
-			}
-			return { ...emptyRoute('manufacturer-detail'), manufacturerId }
-		}
-		return emptyRoute('manufacturers')
-	}
-	if (parts[0] === 'devices') {
-		if (parts[1] === 'add') {
-			return emptyRoute('device-add')
-		}
-		if (parts[1]) {
-			const deviceId = parseId(parts[1])
-			if (deviceId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('device-edit'), deviceId }
-			}
-			return { ...emptyRoute('device-detail'), deviceId }
-		}
-		return emptyRoute('devices')
-	}
-	if (parts[0] === 'interfaces') {
-		return emptyRoute('interfaces')
-	}
-	if (parts[0] === 'connections' || parts[0] === 'cables') {
-		return emptyRoute('connections')
-	}
-	if (parts[0] === 'topology') {
-		return emptyRoute('topology')
-	}
-	if (parts[0] === 'users') {
-		if (!isAdmin) {
-			return emptyRoute('not-found')
-		}
-		if (parts[1] === 'add') {
-			return emptyRoute('user-add')
-		}
-		if (parts[1]) {
-			const userId = parseId(parts[1])
-			if (userId === null) {
-				return emptyRoute('not-found')
-			}
-			if (parts[2] === 'edit') {
-				return { ...emptyRoute('user-edit'), userId }
-			}
-			return emptyRoute('not-found')
-		}
-		return emptyRoute('users')
-	}
-	return emptyRoute('not-found')
+/** Tab button text: the loaded page's name, else a title from the route. */
+function tabLabel(tab: TabState): string {
+	return tabPageLabel(tab) ?? tabTitle(tab.path)
 }
 
 /**
@@ -526,7 +253,7 @@ function TabBar(): JSX.Element {
 					<div
 						role="tab"
 						aria-selected={tab.id === activeTabId()}
-						aria-label={tabLabel(tab.id, tab.path)}
+						aria-label={tabLabel(tab)}
 						title={tab.path}
 						tabIndex={0}
 						class={tab.id === activeTabId() ? 'tab-item active' : 'tab-item'}
@@ -545,16 +272,16 @@ function TabBar(): JSX.Element {
 						}}
 					>
 						<TabContext.Provider value={tab.path}>
-							<span class="tab-title">{tabLabel(tab.id, tab.path)}</span>
+							<span class="tab-title">{tabLabel(tab)}</span>
 						</TabContext.Provider>
 						<Show when={tabs().length > 1}>
 							<button
 								type="button"
 								class="tab-close"
 								aria-label={t('app.closeTab', {
-									title: tabLabel(tab.id, tab.path),
+									title: tabLabel(tab),
 								})}
-								title={t('app.closeTab', { title: tabLabel(tab.id, tab.path) })}
+								title={t('app.closeTab', { title: tabLabel(tab) })}
 								onClick={(e: MouseEvent): void => {
 									e.stopPropagation()
 									closeTab(tab.id)
@@ -575,7 +302,16 @@ function TabBar(): JSX.Element {
 /** Page content for one tab; `routePath` is that tab's own path. */
 function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolean }): JSX.Element {
 	const TabContext = tabPathContext()
-	const info = (): RouteInfo => parseRoute(props.routePath, props.isAdmin)
+	// A pane remounts whenever its tab's path changes, so only an admin-role
+	// change can re-resolve the route: keep the page mounted unless the
+	// resolved page itself differs.
+	const match = createMemo(
+		(): RouteMatch | null => matchRoute(props.routePath, props.isAdmin),
+		undefined,
+		{
+			equals: (a: RouteMatch | null, b: RouteMatch | null): boolean => a?.page === b?.page,
+		},
+	)
 	// Tabs stay mounted in the background, so autofocus-on-mount only fires
 	// on first visit. Refocus the page's autofocus target on activation, but
 	// leave focus alone when it is already inside this tab (e.g. switching
@@ -610,7 +346,7 @@ function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolea
 						.find((text) => text.length > 0) || heading.textContent?.trim()
 				: undefined
 			if (label) {
-				setTabLabel(props.tabId, label)
+				setTabLabel(props.tabId, props.routePath, label)
 			}
 		}
 		const observer = new MutationObserver(updateLabel)
@@ -620,142 +356,15 @@ function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolea
 	})
 	return (
 		<TabContext.Provider value={props.routePath}>
-			<Switch>
-				<Match when={info().page === 'tenants'}>
-					<TenantsPage />
-				</Match>
-				<Match when={info().page === 'tenant-add'}>
-					<TenantAddPage />
-				</Match>
-				<Match when={info().page === 'tenant-detail' && info().tenantId !== null}>
-					<TenantDetailPage id={info().tenantId as number} />
-				</Match>
-				<Match when={info().page === 'tenant-edit' && info().tenantId !== null}>
-					<TenantEditPage id={info().tenantId as number} />
-				</Match>
-				<Match when={info().page === 'sites'}>
-					<SitesPage />
-				</Match>
-				<Match when={info().page === 'site-add'}>
-					<SiteAddPage />
-				</Match>
-				<Match when={info().page === 'site-detail' && info().siteId !== null}>
-					<SiteDetailPage id={info().siteId as number} />
-				</Match>
-				<Match when={info().page === 'site-edit' && info().siteId !== null}>
-					<SiteEditPage id={info().siteId as number} />
-				</Match>
-				<Match when={info().page === 'locations'}>
-					<LocationsPage />
-				</Match>
-				<Match when={info().page === 'location-add'}>
-					<LocationAddPage />
-				</Match>
-				<Match when={info().page === 'location-detail' && info().locationId !== null}>
-					<LocationDetailPage id={info().locationId as number} />
-				</Match>
-				<Match when={info().page === 'location-edit' && info().locationId !== null}>
-					<LocationEditPage id={info().locationId as number} />
-				</Match>
-				<Match when={info().page === 'site-groups'}>
-					<SiteGroupsPage />
-				</Match>
-				<Match when={info().page === 'site-group-add'}>
-					<SiteGroupAddPage />
-				</Match>
-				<Match when={info().page === 'site-group-detail' && info().siteGroupId !== null}>
-					<SiteGroupDetailPage id={info().siteGroupId as number} />
-				</Match>
-				<Match when={info().page === 'site-group-edit' && info().siteGroupId !== null}>
-					<SiteGroupEditPage id={info().siteGroupId as number} />
-				</Match>
-				<Match when={info().page === 'racks'}>
-					<RacksPage />
-				</Match>
-				<Match when={info().page === 'rack-add'}>
-					<RackAddPage />
-				</Match>
-				<Match when={info().page === 'rack-detail' && info().rackId !== null}>
-					<RackDetailPage id={info().rackId as number} />
-				</Match>
-				<Match when={info().page === 'rack-edit' && info().rackId !== null}>
-					<RackEditPage id={info().rackId as number} />
-				</Match>
-				<Match when={info().page === 'shelf-add'}>
-					<ShelfAddPage />
-				</Match>
-				<Match when={info().page === 'shelf-edit' && info().shelfId !== null}>
-					<ShelfEditPage id={info().shelfId as number} />
-				</Match>
-				<Match when={info().page === 'rack-types'}>
-					<RackTypesPage />
-				</Match>
-				<Match when={info().page === 'rack-type-add'}>
-					<RackTypeAddPage />
-				</Match>
-				<Match when={info().page === 'device-types'}>
-					<DeviceTypesPage />
-				</Match>
-				<Match when={info().page === 'device-type-add'}>
-					<DeviceTypeAddPage />
-				</Match>
-				<Match when={info().page === 'device-type-import'}>
-					<DeviceTypeImportPage />
-				</Match>
-				<Match when={info().page === 'device-type-detail' && info().deviceTypeId !== null}>
-					<DeviceTypeDetailPage id={info().deviceTypeId as number} />
-				</Match>
-				<Match when={info().page === 'device-type-edit' && info().deviceTypeId !== null}>
-					<DeviceTypeEditPage id={info().deviceTypeId as number} />
-				</Match>
-				<Match when={info().page === 'manufacturers'}>
-					<ManufacturersPage />
-				</Match>
-				<Match when={info().page === 'manufacturer-add'}>
-					<ManufacturerAddPage />
-				</Match>
-				<Match
-					when={info().page === 'manufacturer-detail' && info().manufacturerId !== null}
-				>
-					<ManufacturerDetailPage id={info().manufacturerId as number} />
-				</Match>
-				<Match when={info().page === 'manufacturer-edit' && info().manufacturerId !== null}>
-					<ManufacturerEditPage id={info().manufacturerId as number} />
-				</Match>
-				<Match when={info().page === 'devices'}>
-					<DevicesPage />
-				</Match>
-				<Match when={info().page === 'device-add'}>
-					<DeviceAddPage />
-				</Match>
-				<Match when={info().page === 'device-detail' && info().deviceId !== null}>
-					<DeviceDetailPage id={info().deviceId as number} />
-				</Match>
-				<Match when={info().page === 'device-edit' && info().deviceId !== null}>
-					<DeviceEditPage id={info().deviceId as number} />
-				</Match>
-				<Match when={info().page === 'interfaces'}>
-					<InterfacesPage />
-				</Match>
-				<Match when={info().page === 'connections'}>
-					<ConnectionsPage />
-				</Match>
-				<Match when={info().page === 'topology'}>
-					<TopologyPage />
-				</Match>
-				<Match when={info().page === 'users'}>
-					<UsersPage />
-				</Match>
-				<Match when={info().page === 'user-add'}>
-					<UserAddPage />
-				</Match>
-				<Match when={info().page === 'user-edit' && info().userId !== null}>
-					<UserEditPage id={info().userId as number} />
-				</Match>
-				<Match when={info().page === 'not-found'}>
-					<p>{t('app.pageNotFound')}</p>
-				</Match>
-			</Switch>
+			<Show when={match()} keyed fallback={<p>{t('app.pageNotFound')}</p>}>
+				{(m: RouteMatch) =>
+					m.kind === 'detail' || m.kind === 'edit' ? (
+						<Dynamic component={m.page} id={m.id} />
+					) : (
+						<Dynamic component={m.page} />
+					)
+				}
+			</Show>
 		</TabContext.Provider>
 	)
 }
@@ -777,12 +386,6 @@ function App(): JSX.Element {
 
 	onMount(async () => {
 		document.title = APP_TITLE
-		const [me, setupNeeded] = await Promise.all([fetchMe(), fetchSetupStatus()])
-		// A fresh database reports needsSetup; an unreachable setup endpoint
-		// (null) falls back to the login form.
-		setNeedsSetup(setupNeeded ?? false)
-		setCurrentUser(me)
-		setIsLoggedIn(setupNeeded === true ? false : me !== null)
 
 		const onDocClick = (e: MouseEvent): void => {
 			if (!(e.target instanceof Element)) {
@@ -792,48 +395,42 @@ function App(): JSX.Element {
 				setUserMenuOpen(false)
 			}
 		}
-		// Smart tabs: Ctrl/Cmd/Shift-click or middle-click on any in-app link
-		// opens it in a new tab instead of replacing the current page.
+		// Routes in-app anchors that have no click handler of their own
+		// through `goTo`, and middle clicks (which never fire `click`) to a
+		// new tab. Anchors whose handler already called `goTo` are skipped.
 		const onLinkClick = (e: MouseEvent): void => {
-			if (!(e.target instanceof Element)) {
+			if (e.defaultPrevented || e.button > 1 || !(e.target instanceof Element)) {
 				return
 			}
 			const anchor = e.target.closest('a[href]')
-			if (!anchor || !(anchor instanceof HTMLAnchorElement)) {
+			if (
+				!(anchor instanceof HTMLAnchorElement) ||
+				anchor.target !== '' ||
+				anchor.hasAttribute('download')
+			) {
 				return
 			}
 			const href = anchor.getAttribute('href') ?? ''
 			if (!href.startsWith('/') || href.startsWith('//')) {
 				return
 			}
-			if (e.ctrlKey || e.metaKey || e.shiftKey) {
-				e.preventDefault()
-				openInNewTab(href)
-			}
-		}
-		const onAuxClick = (e: MouseEvent): void => {
-			if (e.button !== 1 || !(e.target instanceof Element)) {
-				return
-			}
-			const anchor = e.target.closest('a[href]')
-			if (!anchor || !(anchor instanceof HTMLAnchorElement)) {
-				return
-			}
-			const href = anchor.getAttribute('href') ?? ''
-			if (!href.startsWith('/') || href.startsWith('//')) {
-				return
-			}
-			e.preventDefault()
-			openInNewTab(href)
+			goTo(e, href)
 		}
 		document.addEventListener('click', onDocClick)
 		document.addEventListener('click', onLinkClick)
-		document.addEventListener('auxclick', onAuxClick)
+		document.addEventListener('auxclick', onLinkClick)
 		onCleanup(() => {
 			document.removeEventListener('click', onDocClick)
 			document.removeEventListener('click', onLinkClick)
-			document.removeEventListener('auxclick', onAuxClick)
+			document.removeEventListener('auxclick', onLinkClick)
 		})
+
+		const [me, setupNeeded] = await Promise.all([fetchMe(), fetchSetupStatus()])
+		// A fresh database reports needsSetup; an unreachable setup endpoint
+		// (null) falls back to the login form.
+		setNeedsSetup(setupNeeded ?? false)
+		setCurrentUser(me)
+		setIsLoggedIn(setupNeeded === true ? false : me !== null)
 	})
 
 	// A 401 can answer any request once the server session timed out
@@ -958,7 +555,7 @@ function App(): JSX.Element {
 							<a
 								href="/tenants"
 								class="app-topbar-brand"
-								onClick={(e: MouseEvent): void => go(e, '/tenants')}
+								onClick={(e: MouseEvent): void => goTo(e, '/tenants')}
 							>
 								{APP_TITLE}
 							</a>
@@ -1009,103 +606,34 @@ function App(): JSX.Element {
 							<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
 								<p class="app-nav-label">{t('app.inventory')}</p>
 								<nav class="app-nav">
-									<NavItem
-										href="/tenants"
-										active={path().startsWith('/tenants') || path() === '/'}
-										icon={<IconUsers size={16} />}
-										label={tp('entity.tenant', 2)}
-										addHref="/tenants/add"
-									/>
-									<NavItem
-										href="/site-groups"
-										active={path().startsWith('/site-groups')}
-										icon={<IconFolder size={16} />}
-										label={tp('entity.siteGroup', 2)}
-										addHref="/site-groups/add"
-									/>
-									<NavItem
-										href="/sites"
-										active={path().startsWith('/sites')}
-										icon={<IconMapPin size={16} />}
-										label={tp('entity.site', 2)}
-										addHref="/sites/add"
-									/>
-									<NavItem
-										href="/locations"
-										active={path().startsWith('/locations')}
-										icon={<IconLocation size={16} />}
-										label={tp('entity.location', 2)}
-										addHref="/locations/add"
-									/>
-									<NavItem
-										href="/racks"
-										active={path().startsWith('/racks')}
-										icon={<IconBox size={16} />}
-										label={tp('entity.rack', 2)}
-										addHref="/racks/add"
-									/>
-									<NavItem
-										href="/rack-types"
-										active={
-											path().startsWith('/rack-types') ||
-											path().startsWith('/templates')
-										}
-										icon={<IconTemplate size={16} />}
-										label={tp('entity.rackType', 2)}
-										addHref="/rack-types/add"
-									/>
-									<NavItem
-										href="/device-types"
-										active={path().startsWith('/device-types')}
-										icon={<IconCpu size={16} />}
-										label={tp('entity.deviceType', 2)}
-										addHref="/device-types/add"
-										importHref="/device-types/import"
-									/>
-									<NavItem
-										href="/manufacturers"
-										active={path().startsWith('/manufacturers')}
-										icon={<IconBuildingFactory size={16} />}
-										label={tp('entity.manufacturer', 2)}
-										addHref="/manufacturers/add"
-									/>
-									<NavItem
-										href="/devices"
-										active={path().startsWith('/devices')}
-										icon={<IconServer size={16} />}
-										label={tp('entity.device', 2)}
-										addHref="/devices/add"
-									/>
-									<NavItem
-										href="/interfaces"
-										active={path().startsWith('/interfaces')}
-										icon={<IconPlug size={16} />}
-										label={tp('entity.interface', 2)}
-									/>
-									<NavItem
-										href="/connections"
-										active={
-											path().startsWith('/connections') ||
-											path().startsWith('/cables')
-										}
-										icon={<IconLink size={16} />}
-										label={tp('entity.connection', 2)}
-									/>
-									<NavItem
-										href="/topology"
-										active={path().startsWith('/topology')}
-										icon={<IconNetwork size={16} />}
-										label={t('entity.topology')}
-									/>
-									<Show when={currentUser()?.role === 'admin'}>
-										<NavItem
-											href="/users"
-											active={path().startsWith('/users')}
-											icon={<IconLock size={16} />}
-											label={tp('entity.user', 2)}
-											addHref="/users/add"
-										/>
-									</Show>
+									<For
+										each={SECTIONS.filter(
+											(section) =>
+												section.icon !== undefined &&
+												section.list !== undefined &&
+												(section.adminOnly !== true ||
+													currentUser()?.role === 'admin'),
+										)}
+									>
+										{(section: Section): JSX.Element => (
+											<NavItem
+												href={`/${section.path}`}
+												active={routeSection(path()) === section}
+												icon={
+													<Dynamic component={section.icon} size={16} />
+												}
+												label={section.noun(2)}
+												addHref={
+													section.add ? `/${section.path}/add` : undefined
+												}
+												importHref={
+													section.import
+														? `/${section.path}/import`
+														: undefined
+												}
+											/>
+										)}
+									</For>
 								</nav>
 							</aside>
 							<div class="app-main">

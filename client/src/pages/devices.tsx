@@ -8,7 +8,6 @@ import { fetch_tenants, type TenantRow } from '../api_tenancy'
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -24,7 +23,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
-import { parseId, queryParam } from '../router'
+import { goTo, parseId, queryParam } from '../router'
 
 /**
  * /devices — NetBox-style device list: search, sortable columns, rack / tenant
@@ -111,7 +110,7 @@ export function DevicesPage(): JSX.Element {
 			getValue: (d: DeviceRow): JSX.Element => (
 				<a
 					href={`/devices/${d.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/devices/${d.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/devices/${d.id}`)}
 				>
 					{d.name}
 				</a>

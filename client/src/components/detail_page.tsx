@@ -11,9 +11,8 @@ import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
-import { navigate } from '../router'
+import { goTo, navigate } from '../router'
 import { Empty, InlineError, Loading } from './feedback'
-import { go } from './list_page'
 
 export { Empty, InlineError, Loading }
 
@@ -21,7 +20,7 @@ export { Empty, InlineError, Loading }
 export function DetailBackLink(props: { href: string; label: string }): JSX.Element {
 	return (
 		<p>
-			<a href={props.href} onClick={(e: MouseEvent): void => go(e, props.href)}>
+			<a href={props.href} onClick={(e: MouseEvent): void => goTo(e, props.href)}>
 				← {props.label}
 			</a>
 		</p>
@@ -114,7 +113,7 @@ export function ParentBreadcrumb(props: {
 	return (
 		<Show when={props.parentId !== null}>
 			<p class="page-subtitle">
-				<a href={props.href} onClick={(e: MouseEvent): void => go(e, props.href)}>
+				<a href={props.href} onClick={(e: MouseEvent): void => goTo(e, props.href)}>
 					{props.parentName ?? props.parentFallback}
 				</a>{' '}
 				/ {props.childName}
@@ -143,7 +142,7 @@ export function ForeignKeyLink(props: {
 						props.href !== undefined ? (
 							<a
 								href={props.href}
-								onClick={(e: MouseEvent): void => go(e, props.href ?? '')}
+								onClick={(e: MouseEvent): void => goTo(e, props.href ?? '')}
 							>
 								{resolved()}
 							</a>
@@ -187,7 +186,7 @@ export function RelatedSection(props: {
 				<p>
 					<a
 						href={props.viewAllHref ?? ''}
-						onClick={(e: MouseEvent): void => go(e, props.viewAllHref ?? '')}
+						onClick={(e: MouseEvent): void => goTo(e, props.viewAllHref ?? '')}
 					>
 						{props.viewAllLabel ?? t('common.viewAll')}
 					</a>

@@ -6,12 +6,7 @@ import { createSignal, Show } from 'solid-js'
 import { upload_yaml } from '../api_transfer'
 import { DataTable } from '../components/data_table'
 import { t, tp } from '../i18n'
-import { navigate } from '../router'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to, { refresh: false })
-}
+import { goTo, navigate } from '../router'
 
 const SAMPLE_YAML = `manufacturer: Acme
 model: Example Switch 48
@@ -59,7 +54,10 @@ export function DeviceTypeImportPage(): JSX.Element {
 	return (
 		<div class="form-page device-type-import-page">
 			<p>
-				<a href="/device-types" onClick={(e: MouseEvent): void => go(e, '/device-types')}>
+				<a
+					href="/device-types"
+					onClick={(e: MouseEvent): void => goTo(e, '/device-types', { refresh: false })}
+				>
 					← {tp('entity.deviceType', 2)}
 				</a>
 			</p>

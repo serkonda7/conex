@@ -27,12 +27,6 @@ import { type PluralKey, t, tp } from '../i18n'
 import { navigate } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 
-/** Wraps a plain anchor so in-page links use the history router. */
-export function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
-
 /** Search text plus its debounced (trimmed) projection for list queries. */
 export function useDebouncedSearch(delay = 250): {
 	search: Accessor<string>

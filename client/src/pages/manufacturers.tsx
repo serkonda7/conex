@@ -10,7 +10,6 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -26,6 +25,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { goTo } from '../router'
 
 /**
  * /manufacturers — manufacturer list: search, sortable columns, row
@@ -67,7 +67,7 @@ export function ManufacturersPage(): JSX.Element {
 			getValue: (m: ManufacturerRow): JSX.Element => (
 				<a
 					href={`/manufacturers/${m.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/manufacturers/${m.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/manufacturers/${m.id}`)}
 				>
 					{m.name}
 				</a>

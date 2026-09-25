@@ -17,7 +17,7 @@ import { fetch_site_groups, fetch_sites, type SiteGroupRow, type SiteRow } from 
 import { fetch_cable_trace, fetch_topology } from '../api_topology'
 import { t } from '../i18n'
 import { cableStatusLabel, deviceStatusLabel } from '../i18n/labels'
-import { navigate, parseId, queryParam } from '../router'
+import { goTo, parseId, queryParam } from '../router'
 
 const SVG_W: number = 560
 const SVG_H: number = 360
@@ -380,11 +380,6 @@ export function TopologyPage(): JSX.Element {
 
 	const zoomPct = createMemo(() => Math.round((SVG_W / view().w) * 100))
 
-	function go(e: MouseEvent, to: string): void {
-		e.preventDefault()
-		navigate(to)
-	}
-
 	return (
 		<div>
 			<div class="page-header">
@@ -649,7 +644,7 @@ export function TopologyPage(): JSX.Element {
 											<a
 												href={`/devices/${p.end_device.id}`}
 												onClick={(e: MouseEvent) =>
-													go(e, `/devices/${p.end_device.id}`)
+													goTo(e, `/devices/${p.end_device.id}`)
 												}
 											>
 												{p.end_device.name}

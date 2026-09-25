@@ -554,14 +554,12 @@ export const de: Messages = {
 	'elevation.selectChildDeviceTitle': 'Untergerät für Fachboden bei {unit} auswählen ({face})',
 	'elevation.onShelf': 'Auf Fachboden',
 	'elevation.shelfBlock': 'Fachboden {mount}, {first}-{last}',
-	'elevation.oppositeFace': 'gegenüberliegende Seite',
 	'elevation.clearanceTitle':
 		'Fachboden {mount} ({mountHeight} HE Montage nutzbar, {reserved} HE reserviert)',
 	'elevation.reserved': 'Reserviert · {count} HE',
 	'elevation.plateTitle': 'Fachboden {mount} ({mountHeight} HE Montage)',
 	'elevation.plateTitleReserved':
 		'Fachboden {mount} ({mountHeight} HE Montage, {reserved} HE reserviert)',
-	'elevation.occupiedOpposite': 'Auf der gegenüberliegenden Seite belegt',
 	'elevation.deviceTitle': '{name} ({model}, {height} HE)',
 	'elevation.onShelfTitle': 'Auf Fachboden {name} ({unit})',
 	'elevation.shelfUnit': 'Fachboden {unit}',

@@ -10,7 +10,6 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -26,6 +25,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { goTo } from '../router'
 
 /**
  * /tenants — NetBox-style tenant list: search, sortable columns, row
@@ -67,7 +67,7 @@ export function TenantsPage(): JSX.Element {
 			getValue: (row: TenantWithCounts): JSX.Element => (
 				<a
 					href={`/tenants/${row.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/tenants/${row.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/tenants/${row.id}`)}
 				>
 					{row.name}
 				</a>

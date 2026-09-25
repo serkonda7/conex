@@ -19,13 +19,8 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import { ListRangeStatus } from '../components/list_page'
 import { t, tp } from '../i18n'
-import { navigate, parseId, queryParam } from '../router'
+import { goTo, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
-
-function go(e: MouseEvent, to: string): void {
-	e.preventDefault()
-	navigate(to)
-}
 
 /**
  * /interfaces — NetBox-style global interface list across devices: search
@@ -99,7 +94,7 @@ export function InterfacesPage(): JSX.Element {
 			getValue: (i: InterfaceListItem): JSX.Element => (
 				<a
 					href={`/devices/${i.device_id}`}
-					onClick={(e: MouseEvent): void => go(e, `/devices/${i.device_id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/devices/${i.device_id}`)}
 				>
 					{i.device_name}
 				</a>

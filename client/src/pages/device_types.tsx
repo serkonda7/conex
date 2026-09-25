@@ -12,7 +12,6 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
-	go,
 	ListError,
 	ListPageHeader,
 	ListRangeStatus,
@@ -28,7 +27,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
-import { navigate, parseId, queryParam } from '../router'
+import { goTo, navigate, parseId, queryParam } from '../router'
 
 /**
  * /device-types — device-type list: search, sortable columns, manufacturer
@@ -96,7 +95,7 @@ export function DeviceTypesPage(): JSX.Element {
 			getValue: (dt: DeviceTypeRow): JSX.Element => (
 				<a
 					href={`/device-types/${dt.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/device-types/${dt.id}`)}
+					onClick={(e: MouseEvent): void => goTo(e, `/device-types/${dt.id}`)}
 				>
 					{dt.model}
 				</a>
