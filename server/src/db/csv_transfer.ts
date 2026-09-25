@@ -131,11 +131,18 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 	return Result.ok(importResult(rows))
 }
 
+/** Thrown inside the import transaction to roll back after a failed row. */
+class ImportRollback extends Error {}
+
 /**
  * Imports the device-type YAML used by NetBox's device-type library. NetBox
  * uses manufacturer names (rather than Conex manufacturer slugs), and one
  * YAML document represents one device type. A YAML sequence is accepted too,
  * which makes pasting a collection of library definitions convenient.
+ *
+ * All-or-nothing: every row is validated and reported, but if any row fails
+ * the whole import is rolled back and the rows that would have succeeded come
+ * back as `ok: false` with no error.
  */
 export function importDeviceTypesYaml(text: string): Result<ImportResponse, Error> {
 	let parsed: unknown
@@ -148,135 +155,123 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 	}
 	const definitions = Array.isArray(parsed) ? parsed : [parsed]
 	const rows: ImportRowResult[] = []
-	for (const [index, definition] of definitions.entries()) {
-		const rowNumber = index + 1
-		const fail = (error: string): void => {
-			rows.push({ row: rowNumber, ok: false, id: null, error })
-		}
-		if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
-			fail('Each YAML document must be a mapping')
-			continue
-		}
-		const item = definition as Record<string, unknown>
-		const manufacturer = typeof item.manufacturer === 'string' ? item.manufacturer.trim() : ''
-		const model = typeof item.model === 'string' ? item.model.trim() : ''
-		if (!manufacturer || !model) {
-			fail('manufacturer and model are required by NetBox YAML')
-			continue
-		}
-		const mfr = getDb()
-			.select()
-			.from(manufacturers)
-			.all()
-			.find(
-				(row) =>
-					row.name.toLowerCase() === manufacturer.toLowerCase() ||
-					row.slug === manufacturer,
-			)
-		if (!mfr) {
-			fail(`Unknown manufacturer "${manufacturer}"`)
-			continue
-		}
-		const height = item.u_height === undefined ? 1 : Number(item.u_height)
-		if (!Number.isInteger(height) || height < 0 || height > 60) {
-			fail('u_height must be an integer between 0 and 60')
-			continue
-		}
-		let fullDepth = true
-		if (item.is_full_depth !== undefined) {
-			if (typeof item.is_full_depth === 'boolean') {
-				fullDepth = item.is_full_depth
-			} else if (typeof item.is_full_depth === 'number') {
-				fullDepth = item.is_full_depth !== 0
-			} else if (typeof item.is_full_depth === 'string') {
-				const s = item.is_full_depth.trim().toLowerCase()
-				if (s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === '') {
-					fullDepth = true
-				} else if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
-					fullDepth = false
-				} else {
-					fail('is_full_depth must be a boolean (true/false)')
-					continue
-				}
-			} else {
-				fail('is_full_depth must be a boolean (true/false)')
-				continue
+	try {
+		getDb().transaction(() => {
+			for (const [index, definition] of definitions.entries()) {
+				rows.push({ row: index + 1, ...importDeviceTypeDefinition(definition) })
 			}
-		}
-		const created = createDeviceType({
-			manufacturer_id: mfr.id,
-			model,
-			u_height: height,
-			is_full_depth: fullDepth,
-			description: typeof item.description === 'string' ? item.description : undefined,
-			comments: typeof item.comments === 'string' ? item.comments : undefined,
+			if (rows.some((r) => !r.ok)) {
+				throw new ImportRollback()
+			}
 		})
-		if (Result.isError(created)) {
-			fail(created.error.message)
-			continue
+	} catch (err) {
+		if (!(err instanceof ImportRollback)) {
+			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
-		const components = item.interfaces
-		if (Array.isArray(components)) {
-			for (const component of components) {
-				if (!component || typeof component !== 'object' || Array.isArray(component)) {
-					continue
-				}
-				const port = component as Record<string, unknown>
-				const name = typeof port.name === 'string' ? port.name.trim() : ''
-				if (!name) {
-					continue
-				}
-				const kind = Array.isArray(port.type)
-					? String(port.type[0] ?? 'ethernet')
-					: String(port.type ?? 'ethernet')
-				const stub = createStub(created.value.id, {
-					prefix: name,
-					count: 1,
-					kind,
-					label: typeof port.label === 'string' ? port.label : undefined,
-					description:
-						typeof port.description === 'string' ? port.description : undefined,
-				})
-				if (Result.isError(stub)) {
-					fail(`Interface "${name}": ${stub.error.message}`)
-					break
-				}
+		for (const r of rows) {
+			if (r.ok) {
+				r.ok = false
+				r.id = null
 			}
 		}
-		for (const [key, defaultKind] of [
-			['console-ports', 'console'],
-			['power-ports', 'power'],
-		] as const) {
-			const ports = item[key]
-			if (!Array.isArray(ports)) {
-				continue
-			}
-			for (const component of ports) {
-				if (!component || typeof component !== 'object' || Array.isArray(component)) {
-					continue
-				}
-				const port = component as Record<string, unknown>
-				const name = typeof port.name === 'string' ? port.name.trim() : ''
-				if (!name) {
-					continue
-				}
-				const type = typeof port.type === 'string' ? port.type : defaultKind
-				const stub = createStub(created.value.id, {
-					prefix: name,
-					count: 1,
-					kind: type,
-					description:
-						typeof port.description === 'string' ? port.description : undefined,
-				})
-				if (Result.isError(stub)) {
-					fail(`${key} "${name}": ${stub.error.message}`)
-					break
-				}
-			}
-		}
-		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
 	}
 	return Result.ok(importResult(rows))
+}
+
+/** Creates one NetBox device-type definition with its ports. */
+function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 'row'> {
+	const fail = (error: string): Omit<ImportRowResult, 'row'> => ({ ok: false, id: null, error })
+	if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+		return fail('Each YAML document must be a mapping')
+	}
+	const item = definition as Record<string, unknown>
+	const manufacturer = typeof item.manufacturer === 'string' ? item.manufacturer.trim() : ''
+	const model = typeof item.model === 'string' ? item.model.trim() : ''
+	if (!manufacturer || !model) {
+		return fail('manufacturer and model are required by NetBox YAML')
+	}
+	const mfr = getDb()
+		.select()
+		.from(manufacturers)
+		.all()
+		.find(
+			(row) =>
+				row.name.toLowerCase() === manufacturer.toLowerCase() || row.slug === manufacturer,
+		)
+	if (!mfr) {
+		return {
+			...fail(`Unknown manufacturer "${manufacturer}"`),
+			unknown_manufacturer: manufacturer,
+		}
+	}
+	const height = item.u_height === undefined ? 1 : Number(item.u_height)
+	if (!Number.isInteger(height) || height < 0 || height > 60) {
+		return fail('u_height must be an integer between 0 and 60')
+	}
+	let fullDepth = true
+	if (item.is_full_depth !== undefined) {
+		if (typeof item.is_full_depth === 'boolean') {
+			fullDepth = item.is_full_depth
+		} else if (typeof item.is_full_depth === 'number') {
+			fullDepth = item.is_full_depth !== 0
+		} else if (typeof item.is_full_depth === 'string') {
+			const s = item.is_full_depth.trim().toLowerCase()
+			if (s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === '') {
+				fullDepth = true
+			} else if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
+				fullDepth = false
+			} else {
+				return fail('is_full_depth must be a boolean (true/false)')
+			}
+		} else {
+			return fail('is_full_depth must be a boolean (true/false)')
+		}
+	}
+	const created = createDeviceType({
+		manufacturer_id: mfr.id,
+		model,
+		u_height: height,
+		is_full_depth: fullDepth,
+		description: typeof item.description === 'string' ? item.description : undefined,
+		comments: typeof item.comments === 'string' ? item.comments : undefined,
+	})
+	if (Result.isError(created)) {
+		return fail(created.error.message)
+	}
+	for (const [key, defaultKind] of [
+		['interfaces', 'ethernet'],
+		['console-ports', 'console'],
+		['power-ports', 'power'],
+	] as const) {
+		const ports = item[key]
+		if (!Array.isArray(ports)) {
+			continue
+		}
+		for (const component of ports) {
+			if (!component || typeof component !== 'object' || Array.isArray(component)) {
+				continue
+			}
+			const port = component as Record<string, unknown>
+			const name = typeof port.name === 'string' ? port.name.trim() : ''
+			if (!name) {
+				continue
+			}
+			// NetBox interface types may be a list; the first entry wins.
+			const type = Array.isArray(port.type) ? port.type[0] : port.type
+			const stub = createStub(created.value.id, {
+				prefix: name,
+				count: 1,
+				kind: type === undefined || type === null ? defaultKind : String(type),
+				label:
+					key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined,
+				description: typeof port.description === 'string' ? port.description : undefined,
+			})
+			if (Result.isError(stub)) {
+				return fail(`${key} "${name}": ${stub.error.message}`)
+			}
+		}
+	}
+	return { ok: true, id: created.value.id, error: null }
 }
 
 /** Devices export: one row per device, slugs for the FK columns. */
@@ -372,7 +367,7 @@ export function exportCablesCsv(scopeTenantId?: number): string {
 function importResult(rows: ImportRowResult[]): ImportResponse {
 	return {
 		created: rows.filter((r) => r.ok).length,
-		failed: rows.filter((r) => !r.ok).length,
+		failed: rows.filter((r) => r.error !== null).length,
 		rows,
 	}
 }

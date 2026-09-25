@@ -1036,6 +1036,8 @@ export interface ImportRowResult {
 	ok: boolean
 	id: number | null
 	error: string | null
+	/** Set when the row failed only because this manufacturer does not exist. */
+	unknown_manufacturer?: string
 }
 
 export interface ImportResponse {

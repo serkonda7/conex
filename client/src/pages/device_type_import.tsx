@@ -2,7 +2,8 @@ import { IconExternalLink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
+import { create_manufacturer } from '../api_templates'
 import { upload_yaml } from '../api_transfer'
 import { DataTable } from '../components/data_table'
 import { t } from '../i18n'
@@ -17,10 +18,35 @@ interfaces:
     type: 1000base-t
 `
 
+/** Field-options description for a NetBox port list (`interfaces`, …). */
+function PortsDescription(props: { optional: string[]; defaultType: string }): JSX.Element {
+	return (
+		<>
+			{t('import.fieldPortsPrefix')} <code>name</code>
+			{t('import.fieldPortsOptional')}{' '}
+			<For each={props.optional}>
+				{(field: string, i: () => number): JSX.Element => (
+					<>
+						<Show when={i() > 0}>
+							{i() === props.optional.length - 1
+								? ` ${t('import.fieldPortsAnd')} `
+								: ', '}
+						</Show>
+						<code>{field}</code>
+					</>
+				)}
+			</For>
+			. {t('import.fieldPortsDefault', { type: props.defaultType })}
+		</>
+	)
+}
+
 /**
  * /device-types/import — NetBox YAML import for device types (no manual add form).
- * Posts the file text as `{ yaml }` JSON; one bad document fails only itself and
- * the response reports per-row errors below.
+ * Posts the file text as `{ yaml }` JSON. The import is all-or-nothing: if any
+ * document fails, nothing is created and the response reports per-row errors
+ * below. The pasted text is kept on failure; rows failing on an unknown
+ * manufacturer offer to create it.
  */
 export function DeviceTypeImportPage(): JSX.Element {
 	const [yamlText, setYamlText] = createSignal('')
@@ -29,11 +55,26 @@ export function DeviceTypeImportPage(): JSX.Element {
 	const [results, setResults] = createSignal<ImportRowResult[] | null>(null)
 	const [created, setCreated] = createSignal(0)
 	const [failed, setFailed] = createSignal(0)
+	const [createdManufacturers, setCreatedManufacturers] = createSignal<string[]>([])
+	const [creatingManufacturer, setCreatingManufacturer] = createSignal<string | null>(null)
+
+	async function handleCreateManufacturer(name: string): Promise<void> {
+		setError(null)
+		setCreatingManufacturer(name)
+		const res = await create_manufacturer(name)
+		setCreatingManufacturer(null)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		setCreatedManufacturers((prev) => [...prev, name])
+	}
 
 	async function handleImport(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
 		setResults(null)
+		setCreatedManufacturers([])
 		if (!yamlText().trim()) {
 			setError(t('import.pasteFirst'))
 			return
@@ -48,7 +89,9 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setCreated(res.value.created)
 		setFailed(res.value.failed)
 		setResults(res.value.rows)
-		setYamlText('')
+		if (res.value.failed === 0) {
+			setYamlText('')
+		}
 	}
 
 	return (
@@ -124,9 +167,30 @@ export function DeviceTypeImportPage(): JSX.Element {
 								<td>interfaces</td>
 								<td>—</td>
 								<td>
-									{t('import.fieldInterfacesPrefix')} <code>name</code>
-									{t('import.fieldInterfacesOptional')} <code>type</code>{' '}
-									{t('import.fieldInterfacesAnd')} <code>label</code>.
+									<PortsDescription
+										optional={['type', 'label', 'description']}
+										defaultType="ethernet"
+									/>
+								</td>
+							</tr>
+							<tr>
+								<td>console-ports</td>
+								<td>—</td>
+								<td>
+									<PortsDescription
+										optional={['type', 'description']}
+										defaultType="console"
+									/>
+								</td>
+							</tr>
+							<tr>
+								<td>power-ports</td>
+								<td>—</td>
+								<td>
+									<PortsDescription
+										optional={['type', 'description']}
+										defaultType="power"
+									/>
 								</td>
 							</tr>
 						</tbody>
@@ -153,10 +217,14 @@ export function DeviceTypeImportPage(): JSX.Element {
 
 			<Show when={results() !== null}>
 				<h3>{t('import.result', { created: created(), failed: failed() })}</h3>
+				<Show when={failed() > 0}>
+					<p class="app-inline-error" role="alert">
+						{t('import.rolledBack')}
+					</p>
+				</Show>
 				<DataTable
 					rows={() => results() ?? []}
 					getRowId={(r: ImportRowResult): number => r.row}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'row',
@@ -166,11 +234,28 @@ export function DeviceTypeImportPage(): JSX.Element {
 						{
 							key: 'status',
 							label: t('common.status'),
-							getValue: (r: ImportRowResult): JSX.Element => (
-								<span class={`badge badge-${r.ok ? 'active' : 'decommissioned'}`}>
-									{r.ok ? t('import.created') : t('import.failed')}
-								</span>
-							),
+							getValue: (r: ImportRowResult): JSX.Element => {
+								if (r.ok) {
+									return (
+										<span class="badge badge-active">
+											{t('import.created')}
+										</span>
+									)
+								}
+								// Valid rows rolled back because another row failed.
+								if (r.error === null) {
+									return (
+										<span class="badge badge-planned">
+											{t('import.notImported')}
+										</span>
+									)
+								}
+								return (
+									<span class="badge badge-decommissioned">
+										{t('import.failed')}
+									</span>
+								)
+							},
 						},
 						{
 							key: 'id',
@@ -181,7 +266,29 @@ export function DeviceTypeImportPage(): JSX.Element {
 						{
 							key: 'error',
 							label: t('import.error'),
-							getValue: (r: ImportRowResult): string => r.error ?? '—',
+							getValue: (r: ImportRowResult): JSX.Element => {
+								const name = r.unknown_manufacturer
+								if (name === undefined) {
+									return r.error ?? '—'
+								}
+								return (
+									<span>
+										{r.error}{' '}
+										<Show
+											when={!createdManufacturers().includes(name)}
+											fallback={t('import.manufacturerCreated', { name })}
+										>
+											<button
+												type="button"
+												disabled={creatingManufacturer() !== null}
+												onClick={() => void handleCreateManufacturer(name)}
+											>
+												{t('import.createManufacturer', { name })}
+											</button>
+										</Show>
+									</span>
+								)
+							},
 						},
 					]}
 					emptyContent={<p class="empty">{t('import.noRows')}</p>}
