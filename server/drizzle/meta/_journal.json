@@ -148,6 +148,20 @@
       "when": 1790252325125,
       "tag": "0020_device_shelf",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1790325706510,
+      "tag": "0021_location_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1790330000000,
+      "tag": "0022_remove_building_and_cage_location_types",
+      "breakpoints": true
     }
   ]
 }

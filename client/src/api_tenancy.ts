@@ -8,6 +8,7 @@ import type { LocationRow, SiteRow, TenantListItem, TenantRow } from 'server/src
 import type {
 	LocationCreate,
 	LocationListQuery,
+	LocationType,
 	LocationUpdate,
 	Page,
 	SiteCreate,
@@ -175,9 +176,12 @@ export type LocationSort = LocationListQuery['sort']
 
 export type LocationFilters = Partial<LocationListQuery>
 
-export type LocationCreateInput = LocationCreate
+/** `type` defaults to `other` server-side. */
+export type LocationCreateInput = Omit<LocationCreate, 'type'> & { type?: LocationType }
 
 export type LocationUpdateInput = LocationUpdate
+
+export type { LocationType }
 
 export async function fetch_locations(
 	filters?: LocationFilters | number,
@@ -212,6 +216,7 @@ export async function create_location(
 		json: {
 			name: input.name,
 			slug: input.slug,
+			type: input.type,
 			site_id: input.site_id,
 			parent_id: input.parent_id,
 			tenant_id: input.tenant_id ?? null,

@@ -240,11 +240,15 @@ export const de: Messages = {
 	'location.notFound': 'Bereich nicht gefunden.',
 	'location.parentFallback': 'Bereich {id}',
 	'location.details': 'Details des Bereichs',
+	'location.type': 'Typ',
 	'location.children': 'Unterbereiche',
 	'location.loadingChildren': 'Unterbereiche werden geladen…',
 	'location.noChildren': 'Noch keine Unterbereiche vorhanden.',
 	'location.noRacks': 'Hier sind noch keine Racks vorhanden.',
 	'location.noDevices': 'Hier sind noch keine Geräte vorhanden.',
+	'locationType.floor': 'Etage',
+	'locationType.room': 'Raum',
+	'locationType.other': 'Sonstiges',
 
 	// manufacturer
 	'manufacturer.searchPlaceholder': 'Namen suchen…',

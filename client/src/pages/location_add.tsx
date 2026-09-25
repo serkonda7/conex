@@ -5,6 +5,7 @@ import {
 	fetch_locations,
 	fetch_sites,
 	fetch_tenants,
+	type LocationType,
 	type SiteRow,
 } from '../api_tenancy'
 import {
@@ -19,6 +20,7 @@ import {
 	TextField,
 } from '../components/form'
 import { t, tp } from '../i18n'
+import { locationTypeOptions } from '../i18n/labels'
 import { parseId, queryParam } from '../router'
 import {
 	type FormValues,
@@ -32,6 +34,7 @@ import {
 export function LocationAddPage(): JSX.Element {
 	const slugFields = use_slug_fields()
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
+	const [locationType, setLocationType] = createSignal<LocationType>('other')
 	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
@@ -149,6 +152,7 @@ export function LocationAddPage(): JSX.Element {
 				create_location({
 					name: values.name,
 					slug: values.slug,
+					type: locationType(),
 					site_id: Number(siteId()),
 					parent_id: parentId() ? Number(parentId()) : null,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
@@ -180,6 +184,16 @@ export function LocationAddPage(): JSX.Element {
 				placeholder={t('location.slugPlaceholder')}
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
+			/>
+			<SelectField
+				id="location-type"
+				label={t('location.type')}
+				required
+				value={locationType()}
+				onChange={(value: string): void => {
+					setLocationType(value as LocationType)
+				}}
+				options={locationTypeOptions()}
 			/>
 			<SelectField
 				id="location-site"

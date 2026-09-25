@@ -30,6 +30,7 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { locationTypeLabel } from '../i18n/labels'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -156,6 +157,11 @@ export function LocationsPage(): JSX.Element {
 			),
 		},
 		{
+			key: 'type',
+			label: t('location.type'),
+			getValue: (l: LocationRow): string => locationTypeLabel(l.type),
+		},
+		{
 			key: 'site',
 			label: tp('entity.site', 1),
 			getValue: (l: LocationRow): string => siteNameOf(l.site_id),
@@ -175,7 +181,7 @@ export function LocationsPage(): JSX.Element {
 	const [visibleColumns, setVisibleColumns] = useTableColumns(
 		'locations',
 		columns.map((c) => c.key),
-		['name', 'site', 'tenant'],
+		['name', 'type', 'site', 'tenant'],
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({

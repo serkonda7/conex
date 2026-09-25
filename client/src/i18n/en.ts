@@ -236,11 +236,15 @@ export const en = {
 	'location.notFound': 'Location not found.',
 	'location.parentFallback': 'Location {id}',
 	'location.details': 'Location details',
+	'location.type': 'Type',
 	'location.children': 'Child locations',
 	'location.loadingChildren': 'Loading child locations…',
 	'location.noChildren': 'No child locations yet.',
 	'location.noRacks': 'No racks here yet.',
 	'location.noDevices': 'No devices here yet.',
+	'locationType.floor': 'Floor',
+	'locationType.room': 'Room',
+	'locationType.other': 'Other',
 
 	// manufacturer
 	'manufacturer.searchPlaceholder': 'Search name…',

@@ -16,6 +16,7 @@ import {
 	tenants,
 	users,
 } from '../server/src/schema'
+import type { LocationType } from '../shared/src/schemas'
 
 const repoRoot = path.resolve(import.meta.dir, '..')
 const dataDir = path.join(repoRoot, 'server', 'data')
@@ -81,10 +82,12 @@ function addLocation(
 	name: string,
 	slug: string,
 	tenantId: number | null,
+	type: LocationType,
+	parentId: number | null = null,
 ): typeof locations.$inferSelect {
 	return db
 		.insert(locations)
-		.values({ site_id: siteId, tenant_id: tenantId, name, slug })
+		.values({ site_id: siteId, tenant_id: tenantId, type, parent_id: parentId, name, slug })
 		.returning()
 		.get()
 }
@@ -108,10 +111,45 @@ function addRack(
 		.get()
 }
 
-const dentistRoom = addLocation(dentistSite.id, 'IT Closet', 'it-closet', dentist.id)
-const dentistBackoffice = addLocation(dentistSite.id, 'Backoffice', 'backoffice', dentist.id)
-const dentistEmpfang = addLocation(dentistSite.id, 'Empfang', 'empfang', dentist.id)
-const dentistBehandlung1 = addLocation(dentistSite.id, 'Behandlung 1', 'behandlung-1', dentist.id)
+const dentistFloor = addLocation(
+	dentistSite.id,
+	'Ground Floor',
+	'ground-floor',
+	dentist.id,
+	'floor',
+)
+const dentistRoom = addLocation(
+	dentistSite.id,
+	'IT Closet',
+	'it-closet',
+	dentist.id,
+	'room',
+	dentistFloor.id,
+)
+const dentistBackoffice = addLocation(
+	dentistSite.id,
+	'Backoffice',
+	'backoffice',
+	dentist.id,
+	'room',
+	dentistFloor.id,
+)
+const dentistEmpfang = addLocation(
+	dentistSite.id,
+	'Empfang',
+	'empfang',
+	dentist.id,
+	'room',
+	dentistFloor.id,
+)
+const dentistBehandlung1 = addLocation(
+	dentistSite.id,
+	'Behandlung 1',
+	'behandlung-1',
+	dentist.id,
+	'room',
+	dentistFloor.id,
+)
 
 const ubiquiti = db
 	.insert(manufacturers)

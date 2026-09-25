@@ -6,6 +6,7 @@ import {
 	text,
 	uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+import { LOCATION_TYPES } from 'shared/src/schemas'
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
@@ -125,6 +126,7 @@ export const locations = sqliteTable(
 		// Slug is unique per parent (service-enforced; SQLite treats NULL
 		// parents as distinct so a composite unique index cannot cover roots).
 		slug: text('slug').notNull(),
+		type: text('type', { enum: LOCATION_TYPES }).notNull().default('other'),
 		description: text('description'),
 	},
 	(table) => [
