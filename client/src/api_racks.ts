@@ -13,6 +13,7 @@ import type {
 	RackUpdate,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 export type { ElevationResponse, RackRow }
 
@@ -42,18 +43,18 @@ export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<Ra
 				order: filters?.order ?? 'asc',
 			}),
 		}),
-		'Failed to load racks',
+		tp('api.loadFailed', 2, { noun: tp('noun.rack', 2) }),
 	)
 }
 
 export async function fetch_rack(id: number): Promise<Result<RackRow, Error>> {
 	const res = await client.racks[':id'].$get({ param: { id: String(id) } })
-	return to_result<RackRow>(res, 'Failed to load rack')
+	return to_result<RackRow>(res, tp('api.loadFailed', 1, { noun: tp('noun.rack', 1) }))
 }
 
 export async function fetch_elevation(id: number): Promise<Result<ElevationResponse, Error>> {
 	const res = await client.racks[':id'].elevation.$get({ param: { id: String(id) } })
-	return to_result<ElevationResponse>(res, 'Failed to load rack elevation')
+	return to_result<ElevationResponse>(res, t('api.loadElevationFailed'))
 }
 
 export async function create_rack(input: RackCreateInput): Promise<Result<RackRow, Error>> {
@@ -67,7 +68,7 @@ export async function create_rack(input: RackCreateInput): Promise<Result<RackRo
 			description: input.description || undefined,
 		},
 	})
-	return to_result<RackRow>(res, 'Failed to create rack')
+	return to_result<RackRow>(res, t('api.createFailed', { noun: tp('noun.rack', 1) }))
 }
 
 export async function update_rack(
@@ -78,10 +79,10 @@ export async function update_rack(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<RackRow>(res, 'Failed to update rack')
+	return to_result<RackRow>(res, t('api.updateFailed', { noun: tp('noun.rack', 1) }))
 }
 
 export async function delete_rack(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.racks[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete rack')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.rack', 1) }))
 }

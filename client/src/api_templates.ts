@@ -16,6 +16,7 @@ import type {
 	StubCreate,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 export type { DeviceTypeRow, ManufacturerRow, StubRow }
 
@@ -41,7 +42,7 @@ export async function fetch_manufacturers(
 				order: f.order ?? 'asc',
 			}),
 		}),
-		'Failed to load manufacturers',
+		tp('api.loadFailed', 2, { noun: tp('noun.manufacturer', 2) }),
 	)
 }
 
@@ -52,12 +53,18 @@ export async function create_manufacturer(
 	const res = await client.manufacturers.$post({
 		json: { name, description: description || undefined },
 	})
-	return to_result<ManufacturerRow>(res, 'Failed to create manufacturer')
+	return to_result<ManufacturerRow>(
+		res,
+		t('api.createFailed', { noun: tp('noun.manufacturer', 1) }),
+	)
 }
 
 export async function fetch_manufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
 	const res = await client.manufacturers[':id'].$get({ param: { id: String(id) } })
-	return to_result<ManufacturerRow>(res, 'Failed to load manufacturer')
+	return to_result<ManufacturerRow>(
+		res,
+		tp('api.loadFailed', 1, { noun: tp('noun.manufacturer', 1) }),
+	)
 }
 
 export type ManufacturerUpdateInput = ManufacturerUpdate
@@ -70,12 +77,15 @@ export async function update_manufacturer(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<ManufacturerRow>(res, 'Failed to update manufacturer')
+	return to_result<ManufacturerRow>(
+		res,
+		t('api.updateFailed', { noun: tp('noun.manufacturer', 1) }),
+	)
 }
 
 export async function delete_manufacturer(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.manufacturers[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete manufacturer')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.manufacturer', 1) }))
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +113,7 @@ export async function fetch_device_types(
 				order: f.order ?? 'asc',
 			}),
 		}),
-		'Failed to load device types',
+		tp('api.loadFailed', 2, { noun: tp('noun.deviceType', 2) }),
 	)
 }
 
@@ -127,17 +137,20 @@ export async function create_device_type(
 	input: DeviceTypeCreateInput,
 ): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'].$post({ json: input })
-	return to_result<DeviceTypeRow>(res, 'Failed to create device type')
+	return to_result<DeviceTypeRow>(res, t('api.createFailed', { noun: tp('noun.deviceType', 1) }))
 }
 
 export async function delete_device_type(id: number): Promise<Result<unknown, Error>> {
 	const res = await client['device-types'][':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete device type')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.deviceType', 1) }))
 }
 
 export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'][':id'].$get({ param: { id: String(id) } })
-	return to_result<DeviceTypeRow>(res, 'Failed to load device type')
+	return to_result<DeviceTypeRow>(
+		res,
+		tp('api.loadFailed', 1, { noun: tp('noun.deviceType', 1) }),
+	)
 }
 
 export type DeviceTypeUpdateInput = DeviceTypeUpdate
@@ -150,7 +163,7 @@ export async function update_device_type(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<DeviceTypeRow>(res, 'Failed to update device type')
+	return to_result<DeviceTypeRow>(res, t('api.updateFailed', { noun: tp('noun.deviceType', 1) }))
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +174,7 @@ export async function fetch_stubs(deviceTypeId: number): Promise<Result<StubRow[
 	const res = await client['device-types'][':id'].stubs.$get({
 		param: { id: String(deviceTypeId) },
 	})
-	return to_result<StubRow[]>(res, 'Failed to load interface stubs')
+	return to_result<StubRow[]>(res, t('api.loadStubsFailed'))
 }
 
 /**
@@ -182,7 +195,7 @@ export async function create_stub(
 		param: { id: String(deviceTypeId) },
 		json: input,
 	})
-	return to_result<StubRow>(res, 'Failed to create interface stub')
+	return to_result<StubRow>(res, t('api.createStubFailed'))
 }
 
 export async function delete_stub(
@@ -192,5 +205,5 @@ export async function delete_stub(
 	const res = await client['device-types'][':id'].stubs[':stubId'].$delete({
 		param: { id: String(deviceTypeId), stubId: String(stubId) },
 	})
-	return to_result<unknown>(res, 'Failed to delete interface stub')
+	return to_result<unknown>(res, t('api.deleteStubFailed'))
 }

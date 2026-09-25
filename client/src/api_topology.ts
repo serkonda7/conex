@@ -11,6 +11,7 @@ import type {
 	TopologyResponse,
 } from 'shared/src/types'
 import { client, to_query, to_result } from './api'
+import { t } from './i18n'
 
 export type { CableTraceResponse, InterfaceTraceResponse, TopologyResponse }
 
@@ -26,7 +27,7 @@ export async function fetch_topology(
 			device: filters?.device,
 		}),
 	})
-	return to_result<TopologyResponse>(res, 'Failed to load topology')
+	return to_result<TopologyResponse>(res, t('api.loadTopologyFailed'))
 }
 
 export async function fetch_interface_trace(
@@ -38,7 +39,7 @@ export async function fetch_interface_trace(
 		param: { id: String(deviceId), ifaceId: String(ifaceId) },
 		query: to_query({ depth }),
 	})
-	return to_result<InterfaceTraceResponse>(res, 'Failed to load interface trace')
+	return to_result<InterfaceTraceResponse>(res, t('api.loadInterfaceTraceFailed'))
 }
 
 export async function fetch_cable_trace(
@@ -49,5 +50,5 @@ export async function fetch_cable_trace(
 		param: { id: String(cableId) },
 		query: to_query({ depth }),
 	})
-	return to_result<CableTraceResponse>(res, 'Failed to load cable trace')
+	return to_result<CableTraceResponse>(res, t('api.loadCableTraceFailed'))
 }

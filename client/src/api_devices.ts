@@ -17,6 +17,7 @@ import type {
 	Page,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 export type { DeviceRow, InterfaceJson }
 
@@ -42,13 +43,13 @@ export async function fetch_devices(
 				order: filters?.order ?? 'asc',
 			}),
 		}),
-		'Failed to load devices',
+		tp('api.loadFailed', 2, { noun: tp('noun.device', 2) }),
 	)
 }
 
 export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices[':id'].$get({ param: { id: String(id) } })
-	return to_result<DeviceRow>(res, 'Failed to load device')
+	return to_result<DeviceRow>(res, tp('api.loadFailed', 1, { noun: tp('noun.device', 1) }))
 }
 
 /**
@@ -61,7 +62,7 @@ export type DeviceCreateInput = Omit<DeviceCreate, 'status'> & {
 
 export async function create_device(input: DeviceCreateInput): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices.$post({ json: input })
-	return to_result<DeviceRow>(res, 'Failed to create device')
+	return to_result<DeviceRow>(res, t('api.createFailed', { noun: tp('noun.device', 1) }))
 }
 
 export type DeviceUpdateInput = DeviceUpdate
@@ -74,7 +75,7 @@ export async function update_device(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<DeviceRow>(res, 'Failed to update device')
+	return to_result<DeviceRow>(res, t('api.updateFailed', { noun: tp('noun.device', 1) }))
 }
 
 export async function move_device(
@@ -82,12 +83,12 @@ export async function move_device(
 	input: DeviceMove,
 ): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices[':id'].move.$post({ param: { id: String(id) }, json: input })
-	return to_result<DeviceRow>(res, 'Failed to move device')
+	return to_result<DeviceRow>(res, t('api.moveDeviceFailed'))
 }
 
 export async function delete_device(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.devices[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete device')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.device', 1) }))
 }
 
 // ---------------------------------------------------------------------------
@@ -113,13 +114,16 @@ export async function fetch_all_interfaces(
 				connected: filters?.connected,
 			}),
 		}),
-		'Failed to load interfaces',
+		tp('api.loadFailed', 2, { noun: tp('noun.interface', 2) }),
 	)
 }
 
 export async function fetch_interfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
 	const res = await client.devices[':id'].interfaces.$get({ param: { id: String(deviceId) } })
-	return to_result<InterfaceJson[]>(res, 'Failed to load interfaces')
+	return to_result<InterfaceJson[]>(
+		res,
+		tp('api.loadFailed', 2, { noun: tp('noun.interface', 2) }),
+	)
 }
 
 /**
@@ -138,7 +142,7 @@ export async function add_interface(
 		param: { id: String(deviceId) },
 		json: input,
 	})
-	return to_result<InterfaceJson>(res, 'Failed to add interface')
+	return to_result<InterfaceJson>(res, t('api.addInterfaceFailed'))
 }
 
 export async function update_interface(
@@ -150,5 +154,5 @@ export async function update_interface(
 		param: { id: String(deviceId), ifaceId: String(ifaceId) },
 		json: input,
 	})
-	return to_result<InterfaceJson>(res, 'Failed to update interface')
+	return to_result<InterfaceJson>(res, t('api.updateFailed', { noun: tp('noun.interface', 1) }))
 }

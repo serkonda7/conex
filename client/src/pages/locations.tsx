@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -12,6 +11,7 @@ import {
 	type SiteRow,
 	type TenantRow,
 } from '../api_tenancy'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -29,6 +29,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -77,10 +78,7 @@ export function LocationsPage(): JSX.Element {
 		order: order(),
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(
-		listSource,
-		'Select all locations',
-	)
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.location')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [locationsPage, { refetch }] = createResource(listSource, async (s) => {
@@ -135,13 +133,13 @@ export function LocationsPage(): JSX.Element {
 		if (!id) {
 			return '—'
 		}
-		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
+		return tenants()?.find((row: TenantRow) => row.id === id)?.name ?? String(id)
 	}
 
 	const columns: DataTableColumn<LocationRow>[] = [
 		{
 			key: 'name',
-			label: 'Bereich',
+			label: tp('entity.location', 1),
 			sortable: true,
 			getValue: (l: LocationRow): JSX.Element => (
 				<div
@@ -159,17 +157,17 @@ export function LocationsPage(): JSX.Element {
 		},
 		{
 			key: 'site',
-			label: 'Standort',
+			label: tp('entity.site', 1),
 			getValue: (l: LocationRow): string => siteNameOf(l.site_id),
 		},
 		{
 			key: 'parent',
-			label: 'Übergeordneter Bereich',
+			label: t('site.parentLocation'),
 			getValue: (l: LocationRow): string => parentNameOf()(l.parent_id),
 		},
 		{
 			key: 'tenant',
-			label: 'Mandant',
+			label: tp('entity.tenant', 1),
 			getValue: (l: LocationRow): string => tenantNameOf(l.tenant_id),
 		},
 	]
@@ -181,7 +179,7 @@ export function LocationsPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'location',
+		noun: 'noun.location',
 		remove: delete_location,
 		setError,
 		refetch,
@@ -191,42 +189,44 @@ export function LocationsPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Bereiche" add_href="/locations/add" />
+			<ListPageHeader title={tp('entity.location', 2)} add_href="/locations/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Bereiche suchen"
-					placeholder="Name oder Kurzname suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.location', 2) })}
+					placeholder={t('site.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by site</span>
+					<span class="visually-hidden">{t('location.filterBySite')}</span>
 					<select
-						aria-label="Nach Standort filtern"
+						aria-label={t('location.filterBySite')}
 						value={filterSite()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterSite(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Standorte</option>
+						<option value="">{t('location.allSites')}</option>
 						<For each={sites() ?? []}>
 							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
 						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Filter by tenant</span>
+					<span class="visually-hidden">{t('common.filterByTenant')}</span>
 					<select
-						aria-label="Nach Mandant filtern"
+						aria-label={t('common.filterByTenant')}
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterTenant(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Mandanten</option>
+						<option value="">{t('common.allTenants')}</option>
 						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+							{(row: TenantRow): JSX.Element => (
+								<option value={row.id}>{row.name}</option>
+							)}
 						</For>
 					</select>
 				</label>
@@ -249,9 +249,7 @@ export function LocationsPage(): JSX.Element {
 				rowActions={(l: LocationRow): JSX.Element => (
 					<ListRowActions
 						edit_href={`/locations/${l.id}/edit`}
-						edit_title={`Edit ${l.name}`}
-						edit_label={`Edit location ${l.name}`}
-						menu_label={`More actions for ${l.name}`}
+						name={l.name}
 						menu_open={openMenu()?.id === l.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
@@ -260,12 +258,14 @@ export function LocationsPage(): JSX.Element {
 					/>
 				)}
 				loading={() => locationsPage.loading}
-				loadingContent={<p class="skeleton">Bereiche werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.location', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterSite() || filterTenant()
-							? 'Keine Bereiche für die aktuellen Filter gefunden.'
-							: 'Noch keine Bereiche vorhanden. Fügen Sie oben den ersten hinzu.'}
+							? t('list.noMatchFilters', { noun: tp('noun.location', 2) })
+							: t('location.empty')}
 					</p>
 				}
 			/>

@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -13,6 +12,7 @@ import {
 	type SiteWithExtras,
 	type TenantRow,
 } from '../api_tenancy'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -30,6 +30,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -76,7 +77,7 @@ export function SitesPage(): JSX.Element {
 		tenant: parseId(filterTenant()) ?? undefined,
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(listSource, 'Select all sites')
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.site')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [sitesPage, { refetch }] = createResource(listSource, async (s) => {
@@ -95,7 +96,7 @@ export function SitesPage(): JSX.Element {
 		if (!id) {
 			return '—'
 		}
-		return tenants()?.find((t) => t.id === id)?.name ?? String(id)
+		return tenants()?.find((row) => row.id === id)?.name ?? String(id)
 	}
 
 	function groupNameOf(row: SiteRow): string {
@@ -109,7 +110,7 @@ export function SitesPage(): JSX.Element {
 	const columns: DataTableColumn<SiteRow>[] = [
 		{
 			key: 'name',
-			label: 'Standort',
+			label: tp('entity.site', 1),
 			sortable: true,
 			getValue: (s: SiteRow): JSX.Element => (
 				<a
@@ -122,7 +123,7 @@ export function SitesPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
+			label: t('common.description'),
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (s: SiteRow): JSX.Element => (
@@ -131,12 +132,12 @@ export function SitesPage(): JSX.Element {
 		},
 		{
 			key: 'tenant',
-			label: 'Mandant',
+			label: tp('entity.tenant', 1),
 			getValue: (s: SiteRow): string => tenantNameOf(s.tenant_id),
 		},
 		{
 			key: 'group',
-			label: 'Gruppe',
+			label: t('common.group'),
 			getValue: (s: SiteRow): string => groupNameOf(s),
 		},
 	]
@@ -147,7 +148,7 @@ export function SitesPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'site',
+		noun: 'noun.site',
 		remove: delete_site,
 		setError,
 		refetch,
@@ -157,27 +158,29 @@ export function SitesPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Standorte" add_href="/sites/add" />
+			<ListPageHeader title={tp('entity.site', 2)} add_href="/sites/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Standorte suchen"
-					placeholder="Name oder Kurzname suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.site', 2) })}
+					placeholder={t('site.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Nach Mandant filtern</span>
+					<span class="visually-hidden">{t('common.filterByTenant')}</span>
 					<select
-						aria-label="Nach Mandant filtern"
+						aria-label={t('common.filterByTenant')}
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setFilterTenant(e.currentTarget.value)
 						}}
 					>
-						<option value="">Alle Mandanten</option>
+						<option value="">{t('common.allTenants')}</option>
 						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+							{(row: TenantRow): JSX.Element => (
+								<option value={row.id}>{row.name}</option>
+							)}
 						</For>
 					</select>
 				</label>
@@ -200,9 +203,7 @@ export function SitesPage(): JSX.Element {
 				rowActions={(s: SiteRow): JSX.Element => (
 					<ListRowActions
 						edit_href={`/sites/${s.id}/edit`}
-						edit_title={`Edit ${s.name}`}
-						edit_label={`Edit site ${s.name}`}
-						menu_label={`More actions for ${s.name}`}
+						name={s.name}
 						menu_open={openMenu()?.id === s.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
@@ -211,12 +212,14 @@ export function SitesPage(): JSX.Element {
 					/>
 				)}
 				loading={() => sitesPage.loading}
-				loadingContent={<p class="skeleton">Standorte werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.site', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterTenant()
-							? 'Keine Standorte für die aktuellen Filter gefunden.'
-							: 'Noch keine Standorte vorhanden. Fügen Sie oben den ersten hinzu.'}
+							? t('list.noMatchFilters', { noun: tp('noun.site', 2) })
+							: t('site.empty')}
 					</p>
 				}
 			/>

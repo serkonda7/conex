@@ -6,9 +6,22 @@
 import { Result } from 'better-result'
 import type { ImportResponse } from 'shared/src/types'
 import { post_json } from './api'
+import { type PluralKey, t, tp } from './i18n'
 import { read_api_error } from './util/api_error'
 
 export type { ImportResponse }
+
+type TransferKind = 'devices' | 'cables' | 'device-types'
+
+const TRANSFER_NOUNS: Record<TransferKind, PluralKey> = {
+	devices: 'noun.device',
+	cables: 'noun.cable',
+	'device-types': 'noun.deviceType',
+}
+
+function transferNoun(kind: TransferKind): string {
+	return tp(TRANSFER_NOUNS[kind], 2)
+}
 
 /** Downloads a CSV export (`devices`, `cables`, or `device-types`) as a browser file save. */
 export async function download_csv(
@@ -17,7 +30,11 @@ export async function download_csv(
 	try {
 		const res = await fetch(`/api/${kind}/export`)
 		if (!res.ok) {
-			return Result.err(new Error(await read_api_error(res, `Failed to export ${kind}`)))
+			return Result.err(
+				new Error(
+					await read_api_error(res, t('api.exportFailed', { noun: transferNoun(kind) })),
+				),
+			)
 		}
 		const blob = await res.blob()
 		const url = URL.createObjectURL(blob)
@@ -30,7 +47,7 @@ export async function download_csv(
 		URL.revokeObjectURL(url)
 		return Result.ok(undefined)
 	} catch {
-		return Result.err(new Error(`Failed to export ${kind}`))
+		return Result.err(new Error(t('api.exportFailed', { noun: transferNoun(kind) })))
 	}
 }
 
@@ -39,7 +56,11 @@ export async function upload_csv(
 	kind: 'devices' | 'cables' | 'device-types',
 	csv: string,
 ): Promise<Result<ImportResponse, Error>> {
-	return post_json<ImportResponse>(`/api/${kind}/import`, { csv }, `Failed to import ${kind}`)
+	return post_json<ImportResponse>(
+		`/api/${kind}/import`,
+		{ csv },
+		t('api.importFailed', { noun: transferNoun(kind) }),
+	)
 }
 
 /** Uploads a NetBox device-type YAML document or collection. */
@@ -47,6 +68,6 @@ export async function upload_yaml(yaml: string): Promise<Result<ImportResponse, 
 	return post_json<ImportResponse>(
 		'/api/device-types/import',
 		{ yaml },
-		'Failed to import device types',
+		t('api.importFailed', { noun: tp('noun.deviceType', 2) }),
 	)
 }

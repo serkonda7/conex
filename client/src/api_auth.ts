@@ -8,6 +8,7 @@
 import type { Result } from 'better-result'
 import type { Role } from 'shared/src/types'
 import { post_json } from './api'
+import { t } from './i18n'
 
 export type AuthProviders = { local: boolean; microsoft: boolean }
 
@@ -42,8 +43,8 @@ export async function setupAdmin(username: string, password: string): Promise<Re
 	const res = await post_json<unknown>(
 		'/api/auth/setup',
 		{ username, password },
-		'Setup failed.',
-		'A network error occurred. Please try again.',
+		t('api.setupFailed'),
+		t('api.networkError'),
 	)
 	return res.map(() => undefined)
 }
@@ -84,8 +85,8 @@ export async function login(username: string, password: string): Promise<Result<
 	const res = await post_json<unknown>(
 		'/api/auth/login',
 		{ username, password },
-		'Sign-in failed.',
-		'A network error occurred. Please try again.',
+		t('api.signInFailed'),
+		t('api.networkError'),
 	)
 	return res.map(() => undefined)
 }

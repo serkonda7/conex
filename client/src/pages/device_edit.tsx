@@ -15,6 +15,8 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
+import { faceOptions } from '../i18n/labels'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /devices/:id/edit — device edit form. Saves back to the detail page. */
@@ -101,7 +103,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 		if (id === undefined) {
 			return ''
 		}
-		return types()?.find((t) => t.id === id)?.model ?? String(id)
+		return types()?.find((type) => type.id === id)?.model ?? String(id)
 	}
 
 	function handleSiteChange(value: string): void {
@@ -116,7 +118,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			validate: () => {
 				const position = positionU().trim() === '' ? null : Number(positionU())
 				if (position !== null && (!Number.isInteger(position) || position < 1)) {
-					return 'Rack position must be a positive integer or empty.'
+					return t('device.positionInvalid')
 				}
 				return null
 			},
@@ -141,99 +143,93 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo={`/devices/${props.id}`}
-			backLabel={device()?.name ?? 'Device'}
-			title="Gerät bearbeiten"
+			backLabel={device()?.name ?? tp('entity.device', 1)}
+			title={t('device.editTitle')}
 			loaded={loaded()}
-			loadingText="Gerät wird geladen…"
+			loadingText={t('device.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="device-edit-name"
-				placeholder="sw-access-01"
+				placeholder={t('device.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 			/>
 			<div class="field">
-				<label for="device-edit-type">Gerätetyp</label>
+				<label for="device-edit-type">{tp('entity.deviceType', 1)}</label>
 				<input id="device-edit-type" value={typeName()} disabled />
-				<p class="field-hint">
-					The device type is immutable after create: swapping the template would
-					invalidate the interfaces and the U footprint.
-				</p>
+				<p class="field-hint">{t('device.typeImmutable')}</p>
 			</div>
 			<TextField
 				id="device-edit-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextField
 				id="device-edit-serial"
-				label="Seriennummer"
-				placeholder="Seriennummer (optional)"
+				label={t('device.serial')}
+				placeholder={t('device.serialPlaceholder')}
 				maxLength={100}
 				value={serial()}
 				onInput={setSerial}
 			/>
 			<SelectField
 				id="device-edit-site"
-				label="Standort"
+				label={tp('entity.site', 1)}
 				value={siteId()}
 				onChange={handleSiteChange}
 				options={row_options(sites() ?? [])}
-				emptyLabel="Kein Standort"
+				emptyLabel={t('device.noSite')}
 			/>
 			<SelectField
 				id="device-edit-location"
-				label="Bereich"
+				label={tp('entity.location', 1)}
 				value={locationId()}
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
-				emptyLabel="Kein Bereich"
+				emptyLabel={t('rack.noLocation')}
 				disabled={siteId() === ''}
 				hint={
 					<Show when={siteId() === ''}>
-						<Hint>Pick a site first to choose a location.</Hint>
+						<Hint>{t('rack.pickSiteForLocation')}</Hint>
 					</Show>
 				}
 			/>
 			<SelectField
 				id="device-edit-rack"
-				label="Rack"
+				label={tp('entity.rack', 1)}
 				value={rackId()}
 				onChange={setRackId}
 				options={row_options(racks() ?? [])}
-				emptyLabel="Unracked"
+				emptyLabel={t('device.unrackedOption')}
 			/>
 			<SelectField
 				id="device-edit-face"
-				label="Seite"
+				label={t('shelf.face')}
 				value={face()}
 				onChange={setFace}
-				options={[
-					{ value: 'front', label: 'Vorderseite' },
-					{ value: 'rear', label: 'Rückseite' },
-				]}
-				emptyLabel="Keine Seite"
+				options={faceOptions()}
+				emptyLabel={t('device.noFace')}
 			/>
 			<TextField
 				id="device-edit-position"
-				label="Position"
-				placeholder="Position (leer zum Entfernen)"
+				label={t('common.position')}
+				placeholder={t('device.positionEditPlaceholder')}
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
-				hint={<Hint>Leave empty to unmount the device (a rack may stay assigned).</Hint>}
+				hint={<Hint>{t('device.positionEditHint')}</Hint>}
 			/>
 			<SelectField
 				id="device-edit-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 			/>
 			<FormError message={formError} />
 			<EditActions saving={saving()} cancelTo={`/devices/${props.id}`} />

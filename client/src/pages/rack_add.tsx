@@ -14,6 +14,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { navigate, parseId, queryParam } from '../router'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
@@ -89,9 +90,9 @@ export function RackAddPage(): JSX.Element {
 			name: name(),
 			validate: () =>
 				parseId(siteId()) === null
-					? 'Select a site first.'
+					? t('location.selectSiteFirst')
 					: parseId(rackTypeId()) === null
-						? 'Select a rack type.'
+						? t('rack.selectRackType')
 						: null,
 			save: (values: FormValues) =>
 				create_rack({
@@ -112,52 +113,52 @@ export function RackAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/racks"
-			backLabel="Racks"
-			title="Neues Rack hinzufügen"
+			backLabel={tp('entity.rack', 2)}
+			title={t('rack.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<SelectField
 				id="rack-site"
-				label="Standort"
+				label={tp('entity.site', 1)}
 				required
 				value={siteId()}
 				onChange={handleSiteChange}
 				options={row_options(sites() ?? [])}
-				emptyLabel="Site…"
+				emptyLabel={t('location.sitePlaceholder')}
 			/>
 			<SelectField
 				id="rack-location"
-				label="Bereich"
+				label={tp('entity.location', 1)}
 				value={locationId()}
 				disabled={siteId() === ''}
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
-				emptyLabel="Kein Bereich"
+				emptyLabel={t('rack.noLocation')}
 				hint={
 					<Show when={siteId() === ''}>
-						<Hint>Pick a site first to choose a location.</Hint>
+						<Hint>{t('rack.pickSiteForLocation')}</Hint>
 					</Show>
 				}
 			/>
 			<NameField id="rack-name" placeholder="A1" value={name()} onInput={setName} autofocus />
 			<SelectField
 				id="rack-type"
-				label="Racktyp"
+				label={tp('entity.rackType', 1)}
 				value={rackTypeId()}
 				onChange={setRackTypeId}
 				options={(rackTypes() ?? []).map((type) => ({
 					value: type.id,
 					label: `${type.model} (${manufacturerName(type.manufacturer_id)})`,
 				}))}
-				emptyLabel="Rack type…"
+				emptyLabel={t('rack.rackTypePlaceholder')}
 				required
 				describedBy={RACK_TYPE_HINT_ID}
 				action={
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Racktyp hinzufügen"
-						title="Racktyp hinzufügen"
+						aria-label={t('app.navAdd', { label: tp('entity.rackType', 1) })}
+						title={t('app.navAdd', { label: tp('entity.rackType', 1) })}
 						onClick={() => navigate('/rack-types/add')}
 					>
 						<IconPlus size={16} />
@@ -166,22 +167,22 @@ export function RackAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="rack-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<SelectField
 				id="rack-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
-						<Hint>Defaults to the site's tenant.</Hint>
+						<Hint>{t('location.tenantFromSite')}</Hint>
 					</Show>
 				}
 			/>

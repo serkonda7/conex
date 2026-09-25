@@ -31,13 +31,13 @@ test('rack type is saved, displayed, and drives elevation', async ({ page }) => 
 	await expect(page.getByText('0/42 HE · 0 % belegt')).toBeVisible()
 	await expect(page.getByRole('status', { name: '0 von 42 HE belegt' })).toBeVisible()
 	await expect(
-		page.locator('section[aria-label="Rack elevation (front face)"] li.rack-u'),
+		page.locator('section[aria-label="Rackansicht (Vorderseite)"] li.rack-u'),
 	).toHaveCount(42)
 	await expect(
-		page.locator('section[aria-label="Rack elevation (rear face)"] li.rack-u'),
+		page.locator('section[aria-label="Rackansicht (Rückseite)"] li.rack-u'),
 	).toHaveCount(42)
 	const frontUnits = page.locator(
-		'section[aria-label="Rack elevation (front face)"] li.rack-u .rack-u-gutter',
+		'section[aria-label="Rackansicht (Vorderseite)"] li.rack-u .rack-u-gutter',
 	)
 	await expect(frontUnits.first()).toHaveText('42')
 	await expect(frontUnits.last()).toHaveText('1')

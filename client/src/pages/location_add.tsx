@@ -18,6 +18,7 @@ import {
 	SlugField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 import {
 	type FormValues,
@@ -143,7 +144,7 @@ export function LocationAddPage(): JSX.Element {
 		await submit_form({
 			name: slugFields.name(),
 			slug: slugFields.slug(),
-			validate: () => (parseId(siteId()) === null ? 'Select a site first.' : null),
+			validate: () => (parseId(siteId()) === null ? t('location.selectSiteFirst') : null),
 			save: (values: FormValues) =>
 				create_location({
 					name: values.name,
@@ -163,68 +164,68 @@ export function LocationAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/locations"
-			backLabel="Bereiche"
-			title="Neuen Bereich hinzufügen"
+			backLabel={tp('entity.location', 2)}
+			title={t('location.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="location-name"
-				placeholder="2. Etage"
+				placeholder={t('location.namePlaceholder')}
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="location-slug"
-				placeholder="etage-2"
+				placeholder={t('location.slugPlaceholder')}
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="location-site"
-				label="Standort"
+				label={tp('entity.site', 1)}
 				required
 				value={siteId()}
 				onChange={handleSiteChange}
 				options={row_options(filteredSites())}
-				emptyLabel="Site…"
+				emptyLabel={t('location.sitePlaceholder')}
 				hint={
 					<Show when={parseId(tenantId()) !== null}>
-						<Hint>Showing only sites for the selected tenant.</Hint>
+						<Hint>{t('location.sitesForTenant')}</Hint>
 					</Show>
 				}
 			/>
 			<SelectField
 				id="location-parent"
-				label="Übergeordneter Bereich"
+				label={t('site.parentLocation')}
 				value={parentId()}
 				disabled={siteId() === ''}
 				onChange={setParentId}
 				options={row_options(parentOptions())}
-				emptyLabel="Top level"
+				emptyLabel={t('site.topLevel')}
 				hint={
 					<Show when={siteId() === ''}>
-						<Hint>Pick a site first to choose a parent.</Hint>
+						<Hint>{t('location.pickSiteForParent')}</Hint>
 					</Show>
 				}
 			/>
 			<SelectField
 				id="location-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
-						<Hint>Defaults to the site's tenant.</Hint>
+						<Hint>{t('location.tenantFromSite')}</Hint>
 					</Show>
 				}
 			/>
 			<TextField
 				id="location-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}

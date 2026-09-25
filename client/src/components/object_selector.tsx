@@ -2,6 +2,7 @@ import { Result, type Result as ResultType } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
+import { t } from '../i18n'
 
 export interface ObjectSelectorProps<T extends { id: number }> {
 	label: string
@@ -27,7 +28,7 @@ export function ObjectSelector<T extends { id: number }>(
 			<button
 				type="button"
 				class="modal-backdrop"
-				aria-label="Close"
+				aria-label={t('common.close')}
 				onClick={props.on_close}
 			/>
 			<section
@@ -41,7 +42,7 @@ export function ObjectSelector<T extends { id: number }>(
 					<button
 						type="button"
 						class="icon-btn"
-						aria-label="Close"
+						aria-label={t('common.close')}
 						onClick={props.on_close}
 					>
 						×
@@ -50,16 +51,19 @@ export function ObjectSelector<T extends { id: number }>(
 				<input
 					autofocus
 					class="object-selector-search"
-					placeholder={props.placeholder ?? 'Search…'}
-					aria-label="Search objects"
+					placeholder={props.placeholder ?? t('common.search')}
+					aria-label={t('common.searchObjects')}
 					value={search()}
 					onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 				/>
 				<div class="object-selector-results">
-					<Show when={!objects.loading} fallback={<p class="skeleton">Loading…</p>}>
+					<Show
+						when={!objects.loading}
+						fallback={<p class="skeleton">{t('common.loading')}</p>}
+					>
 						<Show
 							when={(objects() ?? []).length > 0}
-							fallback={<p class="empty">Keine passenden Einträge gefunden.</p>}
+							fallback={<p class="empty">{t('common.noMatchingObjects')}</p>}
 						>
 							<ul>
 								<For each={objects() ?? []}>

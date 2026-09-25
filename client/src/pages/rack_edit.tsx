@@ -12,6 +12,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /racks/:id/edit — rack edit form. Saves back to the detail page. */
@@ -116,14 +117,14 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo={`/racks/${props.id}`}
-			backLabel={rack()?.name ?? 'Rack'}
-			title="Rack bearbeiten"
+			backLabel={rack()?.name ?? tp('entity.rack', 1)}
+			title={t('rack.editTitle')}
 			loaded={loaded()}
-			loadingText="Rack wird geladen…"
+			loadingText={t('rack.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<div class="field">
-				<label for="rack-edit-site">Standort</label>
+				<label for="rack-edit-site">{tp('entity.site', 1)}</label>
 				<input
 					id="rack-edit-site"
 					value={site()?.name ?? (siteId() ? String(siteId()) : '')}
@@ -131,16 +132,16 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 					aria-describedby="rack-edit-site-hint"
 				/>
 				<p class="field-hint" id="rack-edit-site-hint">
-					Site cannot be changed after creation.
+					{t('location.siteImmutable')}
 				</p>
 			</div>
 			<SelectField
 				id="rack-edit-location"
-				label="Bereich"
+				label={tp('entity.location', 1)}
 				value={locationId()}
 				onChange={setLocationId}
 				options={row_options(siblings() ?? [])}
-				emptyLabel="Kein Bereich"
+				emptyLabel={t('rack.noLocation')}
 			>
 				<Show
 					when={
@@ -157,15 +158,15 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			<NameField id="rack-edit-name" placeholder="A1" value={name()} onInput={setName} />
 			<TextField
 				id="rack-edit-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<SelectField
 				id="rack-edit-type"
-				label="Racktyp"
+				label={tp('entity.rackType', 1)}
 				value={rackTypeId()}
 				onChange={setRackTypeId}
 				options={(rackTypes() ?? []).map((type: DeviceTypeRow) => ({
@@ -176,11 +177,11 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			/>
 			<SelectField
 				id="rack-edit-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 			/>
 			<FormError message={formError} />
 			<EditActions saving={saving()} cancelTo={`/racks/${props.id}`} />

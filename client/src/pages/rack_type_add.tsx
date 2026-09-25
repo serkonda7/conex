@@ -13,6 +13,8 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
+import { formFactorLabel } from '../i18n/labels'
 import { navigate } from '../router'
 import { is_add_another_submit } from '../util/form'
 
@@ -49,15 +51,15 @@ export function RackTypeAddPage(): JSX.Element {
 		const manufacturer = Number(manufacturerId())
 		const rackHeight = Number(height())
 		if (!Number.isInteger(manufacturer) || manufacturer < 1) {
-			setError('Select a manufacturer.')
+			setError(t('deviceType.selectManufacturer'))
 			return
 		}
 		if (!formFactor()) {
-			setError('Select a form factor.')
+			setError(t('rackType.selectFormFactor'))
 			return
 		}
 		if (!Number.isInteger(rackHeight) || rackHeight < 1 || rackHeight > 60) {
-			setError('Height must be an integer from 1 to 60 HE.')
+			setError(t('rackType.heightRange'))
 			return
 		}
 		setSaving(true)
@@ -87,24 +89,24 @@ export function RackTypeAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/rack-types"
-			backLabel="Rack types"
-			title="Neuen Racktyp hinzufügen"
+			backLabel={tp('entity.rackType', 2)}
+			title={t('rackType.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<SelectField
 				id="rack-type-manufacturer"
-				label="Hersteller"
+				label={tp('entity.manufacturer', 1)}
 				required
 				value={manufacturerId()}
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
-				emptyLabel="Manufacturer…"
+				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				action={
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Hersteller hinzufügen"
-						title="Hersteller hinzufügen"
+						aria-label={t('app.navAdd', { label: tp('entity.manufacturer', 1) })}
+						title={t('app.navAdd', { label: tp('entity.manufacturer', 1) })}
 						onClick={() => navigate('/manufacturers/add')}
 					>
 						<IconPlus size={16} />
@@ -113,30 +115,30 @@ export function RackTypeAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="rack-type-model"
-				label="Modell"
+				label={t('common.model')}
 				required
 				value={model()}
 				onInput={setModel}
-				placeholder="Beispielrack 42 HE"
+				placeholder={t('rackType.modelPlaceholder')}
 				autofocus
 			/>
 			<SelectField
 				id="rack-type-form-factor"
-				label="Bauform"
+				label={t('rackType.formFactor')}
 				required
 				value={formFactor()}
 				onChange={setFormFactor}
-				options={FORM_FACTORS.map((value) => ({ value, label: value }))}
-				emptyLabel="Bauform…"
+				options={FORM_FACTORS.map((value) => ({ value, label: formFactorLabel(value) }))}
+				emptyLabel={t('rackType.formFactorPlaceholder')}
 			/>
-			<Field label="Breite (Zoll)" for="rack-type-width" required>
+			<Field label={t('rackType.widthInches')} for="rack-type-width" required>
 				<span id="rack-type-width" class="rack-type-fixed-width">
 					19
 				</span>
 			</Field>
 			<TextField
 				id="rack-type-height"
-				label="Höhe (HE)"
+				label={t('common.heightU')}
 				required
 				inputmode="numeric"
 				value={height()}
@@ -145,10 +147,10 @@ export function RackTypeAddPage(): JSX.Element {
 			/>
 			<TextAreaField
 				id="rack-type-description"
-				label="Beschreibung"
+				label={t('common.description')}
 				value={description()}
 				onInput={setDescription}
-				placeholder="Kurze Zusammenfassung (optional)"
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 			/>
 			<FormError message={error} />

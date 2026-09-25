@@ -7,6 +7,7 @@ import type { Result } from 'better-result'
 import type { ShelfRow } from 'server/src/db/shelves'
 import type { Page, ShelfCreate, ShelfListQuery, ShelfUpdate } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 /**
  * Wire shape of a shelf: the SQLite flags read as booleans, mirroring
@@ -47,7 +48,7 @@ export async function fetch_shelves(
 				order: filters?.order ?? 'asc',
 			}),
 		}),
-		'Failed to load shelves',
+		tp('api.loadFailed', 2, { noun: tp('noun.shelf', 2) }),
 	)
 	return page.map((p) => ({
 		...p,
@@ -57,7 +58,10 @@ export async function fetch_shelves(
 
 export async function fetch_shelf(id: number): Promise<Result<ShelfRowJson, Error>> {
 	const res = await client.shelves[':id'].$get({ param: { id: String(id) } })
-	const row = await to_result<ShelfRow>(res, 'Failed to load shelf')
+	const row = await to_result<ShelfRow>(
+		res,
+		tp('api.loadFailed', 1, { noun: tp('noun.shelf', 1) }),
+	)
 	return row.map(to_shelf_json)
 }
 
@@ -75,7 +79,7 @@ export async function create_shelf(input: ShelfCreateInput): Promise<Result<Shel
 			description: input.description || undefined,
 		},
 	})
-	const row = await to_result<ShelfRow>(res, 'Failed to create shelf')
+	const row = await to_result<ShelfRow>(res, t('api.createFailed', { noun: tp('noun.shelf', 1) }))
 	return row.map(to_shelf_json)
 }
 
@@ -87,11 +91,11 @@ export async function update_shelf(
 		param: { id: String(id) },
 		json: patch,
 	})
-	const row = await to_result<ShelfRow>(res, 'Failed to update shelf')
+	const row = await to_result<ShelfRow>(res, t('api.updateFailed', { noun: tp('noun.shelf', 1) }))
 	return row.map(to_shelf_json)
 }
 
 export async function delete_shelf(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.shelves[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete shelf')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.shelf', 1) }))
 }

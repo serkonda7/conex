@@ -3,6 +3,7 @@ import { Result } from 'better-result'
 import { hc } from 'hono/client'
 import type { AppType } from 'server/src/index'
 import type { HealthInfo, Page } from 'shared/src/types'
+import { t } from './i18n'
 import { type ApiResponse, read_api_error } from './util/api_error'
 
 /** RPC client */
@@ -11,7 +12,7 @@ export const client = hc<AppType>('/api')
 /** Signals that the server rejected a request because the session is gone. */
 export class UnauthorizedError extends Error {
 	constructor() {
-		super('Not signed in')
+		super(t('api.notSignedIn'))
 		this.name = 'UnauthorizedError'
 	}
 }
@@ -122,5 +123,5 @@ export async function post_json<T>(
 /** Fetches the server health status (P0 scaffold smoke check). */
 export async function fetch_health(): Promise<Result<HealthInfo, Error>> {
 	const res = await client.health.$get()
-	return to_result<HealthInfo>(res, 'Failed to load server health')
+	return to_result<HealthInfo>(res, t('api.loadHealthFailed'))
 }

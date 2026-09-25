@@ -19,13 +19,15 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 	await test.step('add a shelf from the rack elevation free-U button', async () => {
 		await page.goto('/racks')
 		await page.getByRole('link', { name: rackName }).click()
-		const front = 'section[aria-label="Rack elevation (front face)"]'
+		const front = 'section[aria-label="Rackansicht (Vorderseite)"]'
 		// Free-U actions only appear on hover; the Add shelf button sits
 		// next to Select/Add device.
 		const row10 = page.locator(`${front} li.rack-u-free[data-u="10"]`)
 		await row10.hover()
-		await expect(row10.getByRole('button', { name: 'Add shelf', exact: true })).toBeVisible()
-		await row10.getByRole('button', { name: 'Add shelf', exact: true }).click()
+		await expect(
+			row10.getByRole('button', { name: 'Fachboden hinzufügen', exact: true }),
+		).toBeVisible()
+		await row10.getByRole('button', { name: 'Fachboden hinzufügen', exact: true }).click()
 
 		// The shelf add form is pre-filled with rack, position and face.
 		await expect(page.locator('#shelf-position')).toHaveValue('10')
@@ -40,11 +42,11 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 	await test.step('the elevation shows the shelf block with its reserve', async () => {
 		await page.goto('/racks')
 		await page.getByRole('link', { name: rackName }).click()
-		const front = 'section[aria-label="Rack elevation (front face)"]'
+		const front = 'section[aria-label="Rackansicht (Vorderseite)"]'
 		// The shelf spans HE10 (mount) plus HE11–12 (reserve); the reserved
 		// rows have no free-U actions.
 		await expect(page.getByLabel('Fachboden HE10, HE10–HE12').first()).toBeVisible()
-		await expect(page.locator(`${front} .rack-shelf-plate`).first()).toContainText('shelf')
+		await expect(page.locator(`${front} .rack-shelf-plate`).first()).toContainText('Fachboden')
 		await expect(page.getByText('Reserviert · 2 HE').first()).toBeVisible()
 		await expect(page.getByRole('status', { name: '3 von 42 HE belegt' })).toBeVisible()
 		await expect(page.locator(`${front} li.rack-u`)).toHaveCount(39)
@@ -79,10 +81,12 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 		await page.getByRole('link', { name: rackName }).click()
 		await expect(page.getByLabel('Fachboden HE20, HE20–HE22').first()).toBeVisible()
 		// The old rows are free again.
-		const front = 'section[aria-label="Rack elevation (front face)"]'
+		const front = 'section[aria-label="Rackansicht (Vorderseite)"]'
 		const row11 = page.locator(`${front} li.rack-u-free[data-u="11"]`)
 		await row11.hover()
-		await expect(row11.getByRole('button', { name: 'Add device', exact: true })).toBeVisible()
+		await expect(
+			row11.getByRole('button', { name: 'Gerät hinzufügen', exact: true }),
+		).toBeVisible()
 	})
 
 	await test.step('put devices on a shelf and take them off again', async () => {
@@ -92,7 +96,7 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 
 		// New device straight onto the shelf: no U of its own.
 		await shelfBlock.hover()
-		await shelfBlock.getByRole('button', { name: 'Add device to shelf' }).click()
+		await shelfBlock.getByRole('button', { name: 'Gerät auf Fachboden hinzufügen' }).click()
 		await expect(page).toHaveURL(/\/devices\/add\?.*shelf=\d+/)
 		await page.locator('#device-name').fill(onShelf)
 		await page.locator('#device-type').selectOption({ label: 'E2E 1U Switch (E2E Maker)' })
@@ -102,16 +106,16 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 		await expect(page.getByRole('status', { name: '3 von 42 HE belegt' })).toBeVisible()
 
 		// Taking it off keeps it in the rack, just unplaced.
-		await shelfBlock.getByRole('button', { name: `Remove ${onShelf} from shelf` }).click()
+		await shelfBlock.getByRole('button', { name: `${onShelf} vom Fachboden entfernen` }).click()
 		await expect(shelfBlock.getByRole('link', { name: onShelf })).toHaveCount(0)
 		const unracked = page.getByRole('region', { name: 'Nicht eingebaute Geräte' })
 		await expect(unracked.getByRole('link', { name: onShelf })).toBeVisible()
 
 		// An existing device can be picked back onto the shelf.
 		await shelfBlock.hover()
-		await shelfBlock.getByRole('button', { name: 'Select device for shelf' }).click()
+		await shelfBlock.getByRole('button', { name: 'Gerät für Fachboden auswählen' }).click()
 		const selector = page.getByRole('dialog')
-		await selector.getByRole('textbox', { name: 'Search objects' }).fill(onShelf)
+		await selector.getByRole('textbox', { name: 'Einträge durchsuchen' }).fill(onShelf)
 		await selector.getByRole('button', { name: onShelf }).click()
 		await expect(shelfBlock.getByRole('link', { name: onShelf })).toBeVisible()
 		await expect(unracked.getByRole('link', { name: onShelf })).toHaveCount(0)
@@ -128,7 +132,7 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 		await page.getByRole('button', { name: 'Erstellen', exact: true }).click()
 		await expect(page).toHaveURL(new RegExp(`/racks/${rackId}$`))
 
-		const front = 'section[aria-label="Rack elevation (front face)"]'
+		const front = 'section[aria-label="Rackansicht (Vorderseite)"]'
 		// An usable mount renders like any other shelf block (plate over the
 		// mount rows) and offers U-mounting on hover.
 		const shelfBlock = page.locator(`${front} li.rack-u-shelf`).filter({ hasText: 'Storage' })
@@ -136,7 +140,7 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 		await expect(shelfBlock).toHaveAttribute('aria-label', 'Fachboden HE30, HE30–HE30')
 		const shelfEditHref = await shelfBlock.locator('a.rack-shelf-plate').getAttribute('href')
 		await shelfBlock.hover()
-		await shelfBlock.getByRole('button', { name: 'Add child device' }).click()
+		await shelfBlock.getByRole('button', { name: 'Untergerät hinzufügen' }).click()
 		await expect(page.locator('#device-rack')).toHaveValue(rackId)
 		await expect(page.locator('#device-position')).toHaveValue('30')
 		const childName = `Shelf child ${stamp}`
@@ -145,7 +149,7 @@ test('shelves are separate rack fixtures', async ({ page }) => {
 		await page.getByRole('button', { name: 'Erstellen', exact: true }).click()
 		await expect(page).toHaveURL(new RegExp(`/racks/${rackId}$`))
 		const childDevice = page.locator(`${front} li.rack-u-device`).filter({ hasText: childName })
-		await expect(childDevice).toContainText('Shelf HE30')
+		await expect(childDevice).toContainText('Fachboden HE30')
 		const freeRow = page.locator(`${front} li.rack-u-free[data-u="29"]`)
 		const [deviceBounds, freeBounds] = await Promise.all([
 			childDevice.boundingBox(),

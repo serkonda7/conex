@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -10,6 +9,7 @@ import {
 	fetch_manufacturers,
 	type ManufacturerRow,
 } from '../api_templates'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -27,6 +27,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { navigate, parseId, queryParam } from '../router'
 
 /**
@@ -54,10 +55,7 @@ export function DeviceTypesPage(): JSX.Element {
 		order: order(),
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(
-		listSource,
-		'Select all device types',
-	)
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.deviceType')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [typesPage, { refetch }] = createResource(listSource, async (s) => {
@@ -88,41 +86,42 @@ export function DeviceTypesPage(): JSX.Element {
 	const columns: DataTableColumn<DeviceTypeRow>[] = [
 		{
 			key: 'manufacturer',
-			label: 'Hersteller',
-			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
+			label: tp('entity.manufacturer', 1),
+			getValue: (dt: DeviceTypeRow): string => mfrNameOf(dt.manufacturer_id),
 		},
 		{
 			key: 'model',
-			label: 'Modell',
+			label: t('common.model'),
 			sortable: true,
-			getValue: (t: DeviceTypeRow): JSX.Element => (
+			getValue: (dt: DeviceTypeRow): JSX.Element => (
 				<a
-					href={`/device-types/${t.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/device-types/${t.id}`)}
+					href={`/device-types/${dt.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/device-types/${dt.id}`)}
 				>
-					{t.model}
+					{dt.model}
 				</a>
 			),
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
-			getValue: (t: DeviceTypeRow): string => t.description ?? '—',
+			label: t('common.description'),
+			getValue: (dt: DeviceTypeRow): string => dt.description ?? '—',
 		},
 		{
 			key: 'comments',
-			label: 'Kommentare',
-			getValue: (t: DeviceTypeRow): string => t.comments ?? '—',
+			label: t('common.comments'),
+			getValue: (dt: DeviceTypeRow): string => dt.comments ?? '—',
 		},
 		{
 			key: 'u_height',
-			label: 'Höhe (HE)',
-			getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
+			label: t('common.heightU'),
+			getValue: (dt: DeviceTypeRow): string => `${dt.u_height}`,
 		},
 		{
 			key: 'is_full_depth',
-			label: 'Volle Tiefe',
-			getValue: (t: DeviceTypeRow): string => (t.is_full_depth ? 'Yes' : 'No'),
+			label: t('common.fullDepth'),
+			getValue: (dt: DeviceTypeRow): string =>
+				dt.is_full_depth ? t('common.yes') : t('common.no'),
 		},
 	]
 
@@ -132,7 +131,7 @@ export function DeviceTypesPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'device type',
+		noun: 'noun.deviceType',
 		remove: delete_device_type,
 		setError,
 		refetch,
@@ -143,7 +142,7 @@ export function DeviceTypesPage(): JSX.Element {
 	return (
 		<div>
 			<ListPageHeader
-				title="Device types"
+				title={tp('entity.deviceType', 2)}
 				add_href="/device-types/add"
 				actions={
 					<button
@@ -151,28 +150,28 @@ export function DeviceTypesPage(): JSX.Element {
 						class="btn-add"
 						onClick={() => navigate('/device-types/import')}
 					>
-						⭳ Import
+						{t('deviceType.import')}
 					</button>
 				}
 			/>
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Gerätetypen suchen"
-					placeholder="Modell suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.deviceType', 2) })}
+					placeholder={t('deviceType.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by manufacturer</span>
+					<span class="visually-hidden">{t('deviceType.filterByManufacturer')}</span>
 					<select
-						aria-label="Nach Hersteller filtern"
+						aria-label={t('deviceType.filterByManufacturer')}
 						value={manufacturerFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setManufacturerFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Alle Hersteller</option>
+						<option value="">{t('deviceType.allManufacturers')}</option>
 						<For each={manufacturers() ?? []}>
 							{(m: ManufacturerRow): JSX.Element => (
 								<option value={m.id}>{m.name}</option>
@@ -186,7 +185,7 @@ export function DeviceTypesPage(): JSX.Element {
 
 			<DataTable
 				rows={rows}
-				getRowId={(t: DeviceTypeRow): number => t.id}
+				getRowId={(dt: DeviceTypeRow): number => dt.id}
 				columns={columns}
 				sortKey={sort}
 				sortDirection={order}
@@ -196,26 +195,26 @@ export function DeviceTypesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(t: DeviceTypeRow): JSX.Element => (
+				rowActions={(dt: DeviceTypeRow): JSX.Element => (
 					<ListRowActions
-						edit_href={`/device-types/${t.id}/edit`}
-						edit_title={`Edit ${t.model}`}
-						edit_label={`Edit device type ${t.model}`}
-						menu_label={`More actions for ${t.model}`}
-						menu_open={openMenu()?.id === t.id}
+						edit_href={`/device-types/${dt.id}/edit`}
+						name={dt.model}
+						menu_open={openMenu()?.id === dt.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, t.id, t.model)}
+						): void => toggleMenu(e, dt.id, dt.model)}
 						onCloseMenu={closeMenu}
 					/>
 				)}
 				loading={() => typesPage.loading}
-				loadingContent={<p class="skeleton">Gerätetypen werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.deviceType', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || manufacturerFilter()
-							? 'Keine Gerätetypen für die aktuellen Filter gefunden.'
-							: 'Noch keine Gerätetypen vorhanden. Importieren Sie oben den ersten Datensatz.'}
+							? t('list.noMatchFilters', { noun: tp('noun.deviceType', 2) })
+							: t('deviceType.empty')}
 					</p>
 				}
 			/>

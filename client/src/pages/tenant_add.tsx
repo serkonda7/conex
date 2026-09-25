@@ -10,6 +10,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { type FormValues, is_add_another_submit, submit_form, use_slug_fields } from '../util/form'
 
 /** /tenants/add — NetBox-style tenant create form. */
@@ -42,35 +43,35 @@ export function TenantAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/tenants"
-			backLabel="Mandanten"
-			title="Neuen Mandanten hinzufügen"
+			backLabel={tp('entity.tenant', 2)}
+			title={t('tenant.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="tenant-name"
-				placeholder="Musterfirma GmbH"
+				placeholder={t('tenant.namePlaceholder')}
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="tenant-slug"
-				placeholder="musterfirma"
+				placeholder={t('tenant.slugPlaceholder')}
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<TextField
 				id="tenant-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="tenant-comments"
-				label="Kommentare"
-				placeholder="Zusätzliche Notizen (optional)"
+				label={t('common.comments')}
+				placeholder={t('common.commentsPlaceholder')}
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

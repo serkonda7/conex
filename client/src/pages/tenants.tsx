@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal } from 'solid-js'
@@ -8,6 +7,7 @@ import {
 	type TenantSort,
 	type TenantWithCounts,
 } from '../api_tenancy'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -25,6 +25,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 
 /**
  * /tenants — NetBox-style tenant list: search, sortable columns, row
@@ -43,7 +44,7 @@ export function TenantsPage(): JSX.Element {
 		order: order(),
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(listSource, 'Select all tenants')
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.tenant')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [tenantsPage, { refetch }] = createResource(listSource, async (s) => {
@@ -61,24 +62,24 @@ export function TenantsPage(): JSX.Element {
 	const columns: DataTableColumn<TenantWithCounts>[] = [
 		{
 			key: 'name',
-			label: 'Mandant',
+			label: tp('entity.tenant', 1),
 			sortable: true,
-			getValue: (t: TenantWithCounts): JSX.Element => (
+			getValue: (row: TenantWithCounts): JSX.Element => (
 				<a
-					href={`/tenants/${t.id}`}
-					onClick={(e: MouseEvent): void => go(e, `/tenants/${t.id}`)}
+					href={`/tenants/${row.id}`}
+					onClick={(e: MouseEvent): void => go(e, `/tenants/${row.id}`)}
 				>
-					{t.name}
+					{row.name}
 				</a>
 			),
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
+			label: t('common.description'),
 			sortable: true,
 			class: 'cell-truncate',
-			getValue: (t: TenantWithCounts): JSX.Element => (
-				<span title={t.description ?? ''}>{t.description || '—'}</span>
+			getValue: (row: TenantWithCounts): JSX.Element => (
+				<span title={row.description ?? ''}>{row.description || '—'}</span>
 			),
 		},
 	]
@@ -89,7 +90,7 @@ export function TenantsPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'tenant',
+		noun: 'noun.tenant',
 		remove: delete_tenant,
 		setError,
 		refetch,
@@ -99,12 +100,12 @@ export function TenantsPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Mandanten" add_href="/tenants/add" />
+			<ListPageHeader title={tp('entity.tenant', 2)} add_href="/tenants/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Mandanten suchen"
-					placeholder="Name, Kurzname oder Beschreibung suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.tenant', 2) })}
+					placeholder={t('tenant.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
@@ -114,7 +115,7 @@ export function TenantsPage(): JSX.Element {
 
 			<DataTable
 				rows={rows}
-				getRowId={(t: TenantWithCounts): number => t.id}
+				getRowId={(row: TenantWithCounts): number => row.id}
 				columns={columns}
 				sortKey={sort}
 				sortDirection={order}
@@ -124,26 +125,29 @@ export function TenantsPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(t: TenantWithCounts): JSX.Element => (
+				rowActions={(row: TenantWithCounts): JSX.Element => (
 					<ListRowActions
-						edit_href={`/tenants/${t.id}/edit`}
-						edit_title={`Edit ${t.name}`}
-						edit_label={`Edit tenant ${t.name}`}
-						menu_label={`More actions for ${t.name}`}
-						menu_open={openMenu()?.id === t.id}
+						edit_href={`/tenants/${row.id}/edit`}
+						name={row.name}
+						menu_open={openMenu()?.id === row.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, t.id, t.name)}
+						): void => toggleMenu(e, row.id, row.name)}
 						onCloseMenu={closeMenu}
 					/>
 				)}
 				loading={() => tenantsPage.loading}
-				loadingContent={<p class="skeleton">Mandanten werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.tenant', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch()
-							? `Keine Mandanten für „${debouncedSearch()}“ gefunden.`
-							: 'Noch keine Mandanten vorhanden. Fügen Sie oben den ersten hinzu.'}
+							? t('list.noMatch', {
+									noun: tp('noun.tenant', 2),
+									search: debouncedSearch(),
+								})
+							: t('tenant.empty')}
 					</p>
 				}
 			/>

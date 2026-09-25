@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -6,6 +5,7 @@ import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '.
 import { fetch_racks, type RackRow } from '../api_racks'
 import { fetch_device_types } from '../api_templates'
 import { fetch_tenants, type TenantRow } from '../api_tenancy'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -23,6 +23,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -52,7 +53,7 @@ export function DevicesPage(): JSX.Element {
 		tenant: parseId(tenantFilter()) ?? undefined,
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(listSource, 'Select all devices')
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.device')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [devicesPage, { refetch }] = createResource(listSource, async (s) => {
@@ -99,13 +100,13 @@ export function DevicesPage(): JSX.Element {
 	}
 
 	function typeNameOf(id: number): string {
-		return types()?.find((t) => t.id === id)?.model ?? String(id)
+		return types()?.find((type) => type.id === id)?.model ?? String(id)
 	}
 
 	const columns: DataTableColumn<DeviceRow>[] = [
 		{
 			key: 'name',
-			label: 'Device',
+			label: tp('entity.device', 1),
 			sortable: true,
 			getValue: (d: DeviceRow): JSX.Element => (
 				<a
@@ -118,20 +119,23 @@ export function DevicesPage(): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: 'Type',
+			label: t('common.type'),
 			getValue: (d: DeviceRow): string => typeNameOf(d.device_type_id),
 		},
 		{
 			key: 'mount',
-			label: 'Mount',
+			label: t('device.mount'),
 			getValue: (d: DeviceRow): JSX.Element => (
 				<span>
 					{d.position_u !== null ? (
 						<code>
-							{rackNameOf(d.rack_id) ?? 'rack'} HE{d.position_u}
+							{t('device.mountPosition', {
+								rack: rackNameOf(d.rack_id) ?? tp('noun.rack', 1),
+								u: d.position_u,
+							})}
 						</code>
 					) : (
-						<span>unracked</span>
+						<span>{t('device.unracked')}</span>
 					)}
 				</span>
 			),
@@ -144,7 +148,7 @@ export function DevicesPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'device',
+		noun: 'noun.device',
 		remove: delete_device,
 		setError,
 		refetch,
@@ -158,42 +162,44 @@ export function DevicesPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Geräte" add_href="/devices/add" />
+			<ListPageHeader title={tp('entity.device', 2)} add_href="/devices/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Geräte suchen"
-					placeholder="Name oder Seriennummer suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.device', 2) })}
+					placeholder={t('device.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by rack</span>
+					<span class="visually-hidden">{t('device.filterByRack')}</span>
 					<select
-						aria-label="Filter by rack"
+						aria-label={t('device.filterByRack')}
 						value={rackFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setRackFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Alle Racks</option>
+						<option value="">{t('device.allRacks')}</option>
 						<For each={racks() ?? []}>
 							{(r: RackRow): JSX.Element => <option value={r.id}>{r.name}</option>}
 						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Filter by tenant</span>
+					<span class="visually-hidden">{t('common.filterByTenant')}</span>
 					<select
-						aria-label="Filter by tenant"
+						aria-label={t('common.filterByTenant')}
 						value={tenantFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setTenantFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Alle Mandanten</option>
+						<option value="">{t('common.allTenants')}</option>
 						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+							{(row: TenantRow): JSX.Element => (
+								<option value={row.id}>{row.name}</option>
+							)}
 						</For>
 					</select>
 				</label>
@@ -216,9 +222,7 @@ export function DevicesPage(): JSX.Element {
 				rowActions={(d: DeviceRow): JSX.Element => (
 					<ListRowActions
 						edit_href={`/devices/${d.id}/edit`}
-						edit_title={`Edit ${d.name}`}
-						edit_label={`Edit device ${d.name}`}
-						menu_label={`More actions for ${d.name}`}
+						name={d.name}
 						menu_open={openMenu()?.id === d.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
@@ -227,12 +231,14 @@ export function DevicesPage(): JSX.Element {
 					/>
 				)}
 				loading={() => devicesPage.loading}
-				loadingContent={<p class="skeleton">Geräte werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.device', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{hasFilters()
-							? 'Keine Geräte für die aktuellen Filter gefunden.'
-							: 'Noch keine Geräte vorhanden. Fügen Sie oben das erste hinzu.'}
+							? t('list.noMatchFilters', { noun: tp('noun.device', 2) })
+							: t('device.empty')}
 					</p>
 				}
 			/>

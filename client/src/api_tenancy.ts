@@ -21,6 +21,7 @@ import type {
 	TenantUpdate,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 export type { LocationRow, SiteRow, TenantRow }
 
@@ -44,7 +45,7 @@ export async function fetch_tenants(
 				order: filters?.order ?? 'asc',
 			}),
 		}),
-		'Failed to load tenants',
+		tp('api.loadFailed', 2, { noun: tp('noun.tenant', 2) }),
 	)
 }
 
@@ -63,17 +64,17 @@ export async function create_tenant(input: TenantCreateInput): Promise<Result<Te
 			comments: input.comments || undefined,
 		},
 	})
-	return to_result<TenantRow>(res, 'Failed to create tenant')
+	return to_result<TenantRow>(res, t('api.createFailed', { noun: tp('noun.tenant', 1) }))
 }
 
 export async function fetch_tenant(id: number): Promise<Result<TenantRow, Error>> {
 	const res = await client.tenants[':id'].$get({ param: { id: String(id) } })
-	return to_result<TenantRow>(res, 'Failed to load tenant')
+	return to_result<TenantRow>(res, tp('api.loadFailed', 1, { noun: tp('noun.tenant', 1) }))
 }
 
 export async function delete_tenant(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.tenants[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete tenant')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.tenant', 1) }))
 }
 
 export type TenantUpdateInput = TenantUpdate
@@ -83,7 +84,7 @@ export async function update_tenant(
 	patch: TenantUpdateInput,
 ): Promise<Result<TenantRow, Error>> {
 	const res = await client.tenants[':id'].$patch({ param: { id: String(id) }, json: patch })
-	return to_result<TenantRow>(res, 'Failed to update tenant')
+	return to_result<TenantRow>(res, t('api.updateFailed', { noun: tp('noun.tenant', 1) }))
 }
 
 // ---------------------------------------------------------------------------
@@ -125,13 +126,13 @@ export async function fetch_sites(filters?: SiteFilters): Promise<Result<Page<Si
 				order: filters?.order ?? 'asc',
 			}),
 		}),
-		'Failed to load sites',
+		tp('api.loadFailed', 2, { noun: tp('noun.site', 2) }),
 	)
 }
 
 export async function fetch_site(id: number): Promise<Result<SiteWithExtras, Error>> {
 	const res = await client.sites[':id'].$get({ param: { id: String(id) } })
-	return to_result<SiteWithExtras>(res, 'Failed to load site')
+	return to_result<SiteWithExtras>(res, tp('api.loadFailed', 1, { noun: tp('noun.site', 1) }))
 }
 
 export async function create_site(input: SiteCreateInput): Promise<Result<SiteRow, Error>> {
@@ -147,7 +148,7 @@ export async function create_site(input: SiteCreateInput): Promise<Result<SiteRo
 			shipping_address: input.shipping_address || undefined,
 		},
 	})
-	return to_result<SiteRow>(res, 'Failed to create site')
+	return to_result<SiteRow>(res, t('api.createFailed', { noun: tp('noun.site', 1) }))
 }
 
 export async function update_site(
@@ -158,12 +159,12 @@ export async function update_site(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<SiteRow>(res, 'Failed to update site')
+	return to_result<SiteRow>(res, t('api.updateFailed', { noun: tp('noun.site', 1) }))
 }
 
 export async function delete_site(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.sites[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete site')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.site', 1) }))
 }
 
 // ---------------------------------------------------------------------------
@@ -195,13 +196,13 @@ export async function fetch_locations(
 				order: f.order ?? 'asc',
 			}),
 		}),
-		'Failed to load locations',
+		tp('api.loadFailed', 2, { noun: tp('noun.location', 2) }),
 	)
 }
 
 export async function fetch_location(id: number): Promise<Result<LocationRow, Error>> {
 	const res = await client.locations[':id'].$get({ param: { id: String(id) } })
-	return to_result<LocationRow>(res, 'Failed to load location')
+	return to_result<LocationRow>(res, tp('api.loadFailed', 1, { noun: tp('noun.location', 1) }))
 }
 
 export async function create_location(
@@ -217,7 +218,7 @@ export async function create_location(
 			description: input.description || undefined,
 		},
 	})
-	return to_result<LocationRow>(res, 'Failed to create location')
+	return to_result<LocationRow>(res, t('api.createFailed', { noun: tp('noun.location', 1) }))
 }
 
 export async function update_location(
@@ -228,12 +229,12 @@ export async function update_location(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<LocationRow>(res, 'Failed to update location')
+	return to_result<LocationRow>(res, t('api.updateFailed', { noun: tp('noun.location', 1) }))
 }
 
 export async function delete_location(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.locations[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete location')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.location', 1) }))
 }
 
 // ---------------------------------------------------------------------------
@@ -273,13 +274,13 @@ export async function fetch_site_groups(
 				order: filters?.order ?? 'asc',
 			}),
 		}),
-		'Failed to load site groups',
+		tp('api.loadFailed', 2, { noun: tp('noun.siteGroup', 2) }),
 	)
 }
 
 export async function fetch_site_group(id: number): Promise<Result<SiteGroupRow, Error>> {
 	const res = await client['site-groups'][':id'].$get({ param: { id: String(id) } })
-	return to_result<SiteGroupRow>(res, 'Failed to load site group')
+	return to_result<SiteGroupRow>(res, tp('api.loadFailed', 1, { noun: tp('noun.siteGroup', 1) }))
 }
 
 export async function create_site_group(
@@ -295,7 +296,7 @@ export async function create_site_group(
 			comments: input.comments || undefined,
 		},
 	})
-	return to_result<SiteGroupRow>(res, 'Failed to create site group')
+	return to_result<SiteGroupRow>(res, t('api.createFailed', { noun: tp('noun.siteGroup', 1) }))
 }
 
 export async function update_site_group(
@@ -306,10 +307,10 @@ export async function update_site_group(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<SiteGroupRow>(res, 'Failed to update site group')
+	return to_result<SiteGroupRow>(res, t('api.updateFailed', { noun: tp('noun.siteGroup', 1) }))
 }
 
 export async function delete_site_group(id: number): Promise<Result<unknown, Error>> {
 	const res = await client['site-groups'][':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete site group')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.siteGroup', 1) }))
 }

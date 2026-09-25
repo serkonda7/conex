@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
 import { fetch_manufacturer, update_manufacturer } from '../api_templates'
 import { EditActions, EditPageShell, FormError, NameField, TextField } from '../components/form'
+import { t, tp } from '../i18n'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /manufacturers/:id/edit — manufacturer edit form. Saves back to the detail page. */
@@ -44,22 +45,22 @@ export function ManufacturerEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo={`/manufacturers/${props.id}`}
-			backLabel={manufacturer()?.name ?? 'Manufacturer'}
-			title="Hersteller bearbeiten"
+			backLabel={manufacturer()?.name ?? tp('entity.manufacturer', 1)}
+			title={t('manufacturer.editTitle')}
 			loaded={loaded()}
-			loadingText="Hersteller wird geladen…"
+			loadingText={t('manufacturer.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="manufacturer-edit-name"
-				placeholder="Musterhersteller"
+				placeholder={t('manufacturer.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 			/>
 			<TextField
 				id="manufacturer-edit-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}

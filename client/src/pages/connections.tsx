@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { CableStatus, ImportRowResult, InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -20,6 +19,10 @@ import {
 	type InterfaceJson,
 } from '../api_devices'
 import { download_csv, upload_csv } from '../api_transfer'
+import { DataTable, type DataTableColumn } from '../components/data_table'
+import { ListRangeStatus } from '../components/list_page'
+import { t, tp } from '../i18n'
+import { cableStatusLabel } from '../i18n/labels'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 
@@ -29,6 +32,8 @@ function go(e: MouseEvent, to: string): void {
 }
 
 const CABLE_CSV_COLUMNS = 'a_device,a_interface,b_device,b_interface,label,kind,status'
+
+const CABLE_STATUSES: CableStatus[] = ['connected', 'planned', 'decommissioned']
 
 /**
  * /connections — global cable list (NetBox-style cable connections):
@@ -96,8 +101,6 @@ export function ConnectionsPage(): JSX.Element {
 
 	const rows = createMemo(() => cablesPage()?.items ?? [])
 	const total = createMemo(() => cablesPage()?.total ?? 0)
-	const rangeStart = createMemo(() => (total() === 0 ? 0 : 1))
-	const rangeEnd = createMemo(() => total())
 
 	// A new result set invalidates the checkbox selection.
 	createEffect(() => {
@@ -173,7 +176,7 @@ export function ConnectionsPage(): JSX.Element {
 	const columns: DataTableColumn<CableRow>[] = [
 		{
 			key: 'a',
-			label: 'Endpunkt A',
+			label: t('connection.endpointA'),
 			getValue: (c: CableRow): JSX.Element => {
 				const end = endpointLabel(c.a_interface_id)
 				return end.deviceId === null ? (
@@ -190,7 +193,7 @@ export function ConnectionsPage(): JSX.Element {
 		},
 		{
 			key: 'b',
-			label: 'Endpunkt B',
+			label: t('connection.endpointB'),
 			getValue: (c: CableRow): JSX.Element => {
 				const end = endpointLabel(c.b_interface_id)
 				return end.deviceId === null ? (
@@ -207,19 +210,19 @@ export function ConnectionsPage(): JSX.Element {
 		},
 		{
 			key: 'label',
-			label: 'Bezeichnung',
+			label: t('connection.label'),
 			getValue: (c: CableRow): string => c.label ?? '—',
 		},
 		{
 			key: 'status',
-			label: 'Status',
+			label: t('common.status'),
 			getValue: (c: CableRow): JSX.Element => (
-				<span class={`badge badge-${c.status}`}>{c.status}</span>
+				<span class={`badge badge-${c.status}`}>{cableStatusLabel(c.status)}</span>
 			),
 		},
 		{
 			key: 'kind',
-			label: 'Typ',
+			label: t('common.type'),
 			getValue: (c: CableRow): string => c.kind ?? '—',
 		},
 	]
@@ -248,7 +251,7 @@ export function ConnectionsPage(): JSX.Element {
 		e.preventDefault()
 		setError(null)
 		if (!aIface() || !bIface()) {
-			setError('Wählen Sie zuerst an beiden Enden einen freien Port aus.')
+			setError(t('connection.pickBothPorts'))
 			return
 		}
 		const res = await create_cable({
@@ -282,7 +285,7 @@ export function ConnectionsPage(): JSX.Element {
 		if (ids.length === 0) {
 			return
 		}
-		if (!window.confirm(`${ids.length} Kabelverbindungen trennen?`)) {
+		if (!window.confirm(tp('connection.confirmBulkDisconnect', ids.length))) {
 			return
 		}
 		setError(null)
@@ -295,7 +298,7 @@ export function ConnectionsPage(): JSX.Element {
 		}
 		setSelected([])
 		if (failures.length > 0) {
-			setError(failures[0] ?? 'Trennen mehrerer Kabelverbindungen fehlgeschlagen.')
+			setError(failures[0] ?? t('connection.bulkDisconnectFailed'))
 		}
 		void refetch()
 	}
@@ -323,7 +326,7 @@ export function ConnectionsPage(): JSX.Element {
 			text = await file.text()
 		} catch {
 			setImporting(false)
-			setError('Die ausgewählte Datei konnte nicht gelesen werden.')
+			setError(t('connection.fileReadFailed'))
 			return
 		}
 		const res = await upload_csv('cables', text)
@@ -332,7 +335,12 @@ export function ConnectionsPage(): JSX.Element {
 			setError(res.error.message)
 			return
 		}
-		setImportSummary(`${res.value.created} erstellt, ${res.value.failed} fehlgeschlagen`)
+		setImportSummary(
+			t('connection.importSummary', {
+				created: res.value.created,
+				failed: res.value.failed,
+			}),
+		)
 		setImportRows(res.value.rows)
 		void refetch()
 	}
@@ -340,46 +348,50 @@ export function ConnectionsPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>Verbindungen</h2>
+				<h2>{tp('entity.connection', 2)}</h2>
 			</div>
 
 			<div class="toolbar-row">
 				<label class="toolbar-search">
-					<span class="visually-hidden">Verbindungen suchen</span>
+					<span class="visually-hidden">
+						{t('list.searchLabel', { noun: tp('noun.connection', 2) })}
+					</span>
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Bezeichnung oder Typ suchen…"
-						aria-label="Verbindungen suchen"
+						placeholder={t('connection.searchPlaceholder')}
+						aria-label={t('list.searchLabel', { noun: tp('noun.connection', 2) })}
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
 				</label>
 				<label>
-					<span class="visually-hidden">Nach Status filtern</span>
+					<span class="visually-hidden">{t('interface.filterByStatus')}</span>
 					<select
-						aria-label="Nach Status filtern"
+						aria-label={t('interface.filterByStatus')}
 						value={statusFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setStatusFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Jeder Status</option>
-						<option value="connected">Verbunden</option>
-						<option value="planned">Geplant</option>
-						<option value="decommissioned">Außer Betrieb</option>
+						<option value="">{t('connection.anyStatus')}</option>
+						<For each={CABLE_STATUSES}>
+							{(status: CableStatus): JSX.Element => (
+								<option value={status}>{cableStatusLabel(status)}</option>
+							)}
+						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Nach Gerät filtern</span>
+					<span class="visually-hidden">{t('interface.filterByDevice')}</span>
 					<select
-						aria-label="Nach Gerät filtern"
+						aria-label={t('interface.filterByDevice')}
 						value={deviceFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setDeviceFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Geräte</option>
+						<option value="">{t('interface.allDevices')}</option>
 						<For each={devices() ?? []}>
 							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 						</For>
@@ -387,28 +399,28 @@ export function ConnectionsPage(): JSX.Element {
 				</label>
 				<span class="toolbar-spacer" />
 				<button type="button" onClick={handleExport}>
-					CSV exportieren
+					{t('connection.exportCsv')}
 				</button>
 				<label>
-					<span class="visually-hidden">Verbindungen aus CSV importieren</span>
+					<span class="visually-hidden">{t('connection.importCsv')}</span>
 					<input
 						type="file"
 						accept=".csv,text/csv"
-						aria-label="Verbindungen aus CSV importieren"
+						aria-label={t('connection.importCsv')}
 						disabled={importing()}
 						onChange={handleImportFile}
 					/>
 				</label>
 				<Show when={selected().length > 0}>
 					<button type="button" class="btn-danger" onClick={handleBulkDisconnect}>
-						{selected().length} ausgewählte Verbindungen trennen
+						{t('connection.disconnectSelected', { count: selected().length })}
 					</button>
 				</Show>
 			</div>
-			<p class="field-hint">CSV-Spalten: {CABLE_CSV_COLUMNS}</p>
+			<p class="field-hint">{t('connection.csvColumns', { columns: CABLE_CSV_COLUMNS })}</p>
 
-			<section class="card" aria-label="Zwei Ports verbinden">
-				<h3>Zwei Ports verbinden</h3>
+			<section class="card" aria-label={t('connection.connectTwoPorts')}>
+				<h3>{t('connection.connectTwoPorts')}</h3>
 				<form onSubmit={handleConnect}>
 					<select
 						value={aDevice()}
@@ -416,9 +428,9 @@ export function ConnectionsPage(): JSX.Element {
 							setADevice(e.currentTarget.value)
 							setAIface('')
 						}}
-						aria-label="Gerät A"
+						aria-label={t('connection.deviceA')}
 					>
-						<option value="">Gerät A…</option>
+						<option value="">{t('connection.deviceAPlaceholder')}</option>
 						<For each={devices() ?? []}>
 							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 						</For>
@@ -428,9 +440,9 @@ export function ConnectionsPage(): JSX.Element {
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setAIface(e.currentTarget.value)
 						}
-						aria-label="Freier Port A"
+						aria-label={t('connection.freePortA')}
 					>
-						<option value="">Freier Port A…</option>
+						<option value="">{t('connection.freePortAPlaceholder')}</option>
 						<For each={freeA()}>
 							{(i: InterfaceJson): JSX.Element => (
 								<option value={i.id}>{i.name}</option>
@@ -443,9 +455,9 @@ export function ConnectionsPage(): JSX.Element {
 							setBDevice(e.currentTarget.value)
 							setBIface('')
 						}}
-						aria-label="Gerät B"
+						aria-label={t('connection.deviceB')}
 					>
-						<option value="">Gerät B…</option>
+						<option value="">{t('connection.deviceBPlaceholder')}</option>
 						<For each={devices() ?? []}>
 							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 						</For>
@@ -455,9 +467,9 @@ export function ConnectionsPage(): JSX.Element {
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setBIface(e.currentTarget.value)
 						}
-						aria-label="Freier Port B"
+						aria-label={t('connection.freePortB')}
 					>
-						<option value="">Freier Port B…</option>
+						<option value="">{t('connection.freePortBPlaceholder')}</option>
 						<For each={freeB()}>
 							{(i: InterfaceJson): JSX.Element => (
 								<option value={i.id}>{i.name}</option>
@@ -465,14 +477,14 @@ export function ConnectionsPage(): JSX.Element {
 						</For>
 					</select>{' '}
 					<input
-						placeholder="Bezeichnung (optional)"
-						aria-label="Kabelbezeichnung"
+						placeholder={t('connection.labelPlaceholder')}
+						aria-label={t('connection.cableLabel')}
 						value={cableLabel()}
 						onInput={(e: InputEventAndTarget) => setCableLabel(e.currentTarget.value)}
 					/>{' '}
 					<input
-						placeholder="Typ (optional)"
-						aria-label="Kabeltyp"
+						placeholder={t('connection.typePlaceholder')}
+						aria-label={t('connection.cableType')}
 						value={cableKind()}
 						onInput={(e: InputEventAndTarget) => setCableKind(e.currentTarget.value)}
 					/>{' '}
@@ -481,13 +493,15 @@ export function ConnectionsPage(): JSX.Element {
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setCableStatus(e.currentTarget.value)
 						}
-						aria-label="Kabelstatus"
+						aria-label={t('connection.cableStatus')}
 					>
-						<option value="connected">connected</option>
-						<option value="planned">planned</option>
-						<option value="decommissioned">decommissioned</option>
+						<For each={CABLE_STATUSES}>
+							{(status: CableStatus): JSX.Element => (
+								<option value={status}>{cableStatusLabel(status)}</option>
+							)}
+						</For>
 					</select>{' '}
-					<button type="submit">Verbinden</button>
+					<button type="submit">{t('device.connect')}</button>
 				</form>
 			</section>
 
@@ -502,39 +516,39 @@ export function ConnectionsPage(): JSX.Element {
 				onSelectionChange={(ids: (string | number)[]): void => {
 					setSelected(ids.map((id) => Number(id)))
 				}}
-				selectionLabel="Alle Verbindungen auswählen"
+				selectionLabel={t('list.selectAll', { noun: tp('noun.connection', 2) })}
 				rowActions={(c: CableRow): JSX.Element => (
 					<span class="row-actions">
 						<button type="button" onClick={() => navigate(`/topology?cable=${c.id}`)}>
-							Anzeigen
+							{t('connection.show')}
 						</button>
 						<button
 							type="button"
 							class="btn-danger"
 							onClick={() => handleDisconnect(c.id)}
 						>
-							Trennen
+							{t('device.disconnect')}
 						</button>
 					</span>
 				)}
 				loading={() => cablesPage.loading}
-				loadingContent={<p class="skeleton">Verbindungen werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.connection', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{hasFilters()
-							? 'Keine Verbindungen für die aktuellen Filter gefunden.'
-							: 'Noch keine Verbindungen vorhanden. Verbinden Sie oben zwei freie Ports.'}
+							? t('list.noMatchFilters', { noun: tp('noun.connection', 2) })
+							: t('connection.empty')}
 					</p>
 				}
 			/>
 
-			<p class="paginator-showing" role="status">
-				Einträge {rangeStart()}–{rangeEnd()} von {total()}
-			</p>
+			<ListRangeStatus total={total()} />
 
 			<Show when={importSummary() !== null}>
 				<p class="page-subtitle" role="status">
-					Importergebnis: {importSummary()}
+					{t('connection.importResult', { summary: importSummary() ?? '' })}
 				</p>
 			</Show>
 			<Show when={(importRows() ?? []).length > 0}>
@@ -545,27 +559,27 @@ export function ConnectionsPage(): JSX.Element {
 					columns={[
 						{
 							key: 'row',
-							label: 'Row',
+							label: t('import.row'),
 							getValue: (r: ImportRowResult): number => r.row,
 						},
 						{
 							key: 'status',
-							label: 'Status',
+							label: t('common.status'),
 							getValue: (r: ImportRowResult): JSX.Element => (
 								<span class={`badge badge-${r.ok ? 'active' : 'decommissioned'}`}>
-									{r.ok ? 'created' : 'failed'}
+									{r.ok ? t('import.created') : t('import.failed')}
 								</span>
 							),
 						},
 						{
 							key: 'id',
-							label: 'Id',
+							label: t('import.id'),
 							getValue: (r: ImportRowResult): string =>
 								r.id === null ? '—' : String(r.id),
 						},
 						{
 							key: 'error',
-							label: 'Error',
+							label: t('import.error'),
 							getValue: (r: ImportRowResult): string => r.error ?? '—',
 						},
 					]}

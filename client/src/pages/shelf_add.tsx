@@ -6,21 +6,16 @@ import { create_shelf } from '../api_shelves'
 import {
 	FormActions,
 	FormError,
-	type FormOption,
 	FormPage,
 	Hint,
 	row_options,
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
+import { faceOptions } from '../i18n/labels'
 import { parseId, queryParam } from '../router'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
-
-/** Rack faces a shelf can be mounted on. */
-const FACE_OPTIONS: FormOption[] = [
-	{ value: 'front', label: 'front' },
-	{ value: 'rear', label: 'rear' },
-]
 
 /** /shelves/add — shelf create form (rack fixture, separate from devices). */
 export function ShelfAddPage(): JSX.Element {
@@ -55,16 +50,16 @@ export function ShelfAddPage(): JSX.Element {
 			optionalName: true,
 			validate: (): string | null => {
 				if (parseId(rackId()) === null) {
-					return 'Select a rack first.'
+					return t('shelf.selectRackFirst')
 				}
 				if (!Number.isInteger(position) || position < 1) {
-					return 'Position must be a positive integer.'
+					return t('shelf.positionInvalid')
 				}
 				if (!Number.isInteger(mount) || mount < 1) {
-					return 'Mount height must be an integer of at least 1 U.'
+					return t('shelf.mountHeightInvalid')
 				}
 				if (!Number.isInteger(reserved) || reserved < 0) {
-					return 'Reserved height must be an integer of 0 or more.'
+					return t('shelf.reservedHeightInvalid')
 				}
 				return null
 			},
@@ -89,61 +84,58 @@ export function ShelfAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo={rackRoute()}
-			backLabel="Racks"
-			title="Neuen Fachboden hinzufügen"
+			backLabel={tp('entity.rack', 2)}
+			title={t('shelf.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<SelectField
 				id="shelf-rack"
-				label="Rack"
+				label={tp('entity.rack', 1)}
 				required
 				value={rackId()}
 				onChange={setRackId}
 				options={row_options(racks() ?? [])}
-				emptyLabel="Rack…"
+				emptyLabel={t('shelf.rackPlaceholder')}
 			/>
 			<TextField
 				id="shelf-name"
-				label="Name (optional)"
-				placeholder="shelf"
+				label={t('shelf.nameOptional')}
+				placeholder={t('shelf.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 			/>
 			<SelectField
 				id="shelf-face"
-				label="Seite"
+				label={t('shelf.face')}
 				value={face()}
 				disabled={rackId() === ''}
 				onChange={setFace}
-				options={FACE_OPTIONS}
-				emptyLabel="Beide Seiten"
+				options={faceOptions()}
+				emptyLabel={t('shelf.bothFaces')}
 				hint={
-					<Show
-						when={rackId() === ''}
-						fallback={<Hint>Which rack face the shelf is mounted on.</Hint>}
-					>
-						<Hint>Pick a rack first to choose a face.</Hint>
+					<Show when={rackId() === ''} fallback={<Hint>{t('shelf.faceHint')}</Hint>}>
+						<Hint>{t('shelf.pickRackForFace')}</Hint>
 					</Show>
 				}
 			/>
 			<TextField
 				id="shelf-position"
-				label="Position (HE)"
+				label={t('shelf.position')}
 				placeholder="10"
 				inputmode="numeric"
 				required
 				value={positionU()}
 				onInput={setPositionU}
-				hint={<Hint>Unterste HE der Montage (1-basiert).</Hint>}
+				hint={<Hint>{t('shelf.positionHint')}</Hint>}
 			/>
 			<TextField
 				id="shelf-mount-height"
-				label="Montagehöhe (HE)"
+				label={t('shelf.mountHeight')}
 				type="number"
 				min={1}
 				value={mountHeight()}
 				onInput={setMountHeight}
-				hint={<Hint>Höhe des Montagebands selbst (mind. 1 HE).</Hint>}
+				hint={<Hint>{t('shelf.mountHeightHint')}</Hint>}
 			/>
 			<div class="field">
 				<div class="field-control">
@@ -156,18 +148,18 @@ export function ShelfAddPage(): JSX.Element {
 								setMountUsable(e.currentTarget.checked)
 							}
 						/>
-						Montage nutzbar
+						{t('shelf.mountUsable')}
 					</label>
 				</div>
 			</div>
 			<TextField
 				id="shelf-reserved-height"
-				label="Reservierte Höhe (HE)"
+				label={t('shelf.reservedHeight')}
 				type="number"
 				min={0}
 				value={reservedHeight()}
 				onInput={setReservedHeight}
-				hint={<Hint>Zusätzliche HE über der Montage, immer blockiert (0 = keine).</Hint>}
+				hint={<Hint>{t('shelf.reservedHeightHint')}</Hint>}
 			/>
 			<div class="field">
 				<div class="field-control">
@@ -180,7 +172,7 @@ export function ShelfAddPage(): JSX.Element {
 								setFullDepth(e.currentTarget.checked)
 							}
 						/>
-						Volle Tiefe
+						{t('common.fullDepth')}
 					</label>
 				</div>
 			</div>

@@ -12,6 +12,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -57,51 +58,51 @@ export function SiteGroupAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/site-groups"
-			backLabel="Standortgruppen"
-			title="Neue Standortgruppe hinzufügen"
+			backLabel={tp('entity.siteGroup', 2)}
+			title={t('siteGroup.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="site-group-name"
-				placeholder="Norddeutschland"
+				placeholder={t('siteGroup.namePlaceholder')}
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="site-group-slug"
-				placeholder="norddeutschland"
+				placeholder={t('siteGroup.slugPlaceholder')}
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="site-group-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 			/>
 			<SelectField
 				id="site-group-parent"
-				label="Übergeordnete Gruppe"
+				label={t('siteGroup.parent')}
 				value={parentId()}
 				onChange={setParentId}
 				options={row_options(groups() ?? [])}
-				emptyLabel="Top level"
+				emptyLabel={t('site.topLevel')}
 			/>
 			<TextField
 				id="site-group-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="site-group-comments"
-				label="Kommentare"
-				placeholder="Zusätzliche Notizen (optional)"
+				label={t('common.comments')}
+				placeholder={t('common.commentsPlaceholder')}
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

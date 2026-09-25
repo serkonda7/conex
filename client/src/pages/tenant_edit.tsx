@@ -12,6 +12,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /tenants/:id/edit — tenant edit form. Saves back to the detail page. */
@@ -60,37 +61,37 @@ export function TenantEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo={`/tenants/${props.id}`}
-			backLabel={tenant()?.name ?? 'Tenant'}
-			title="Mandant bearbeiten"
+			backLabel={tenant()?.name ?? tp('entity.tenant', 1)}
+			title={t('tenant.editTitle')}
 			loaded={loaded()}
-			loadingText="Mandant wird geladen…"
+			loadingText={t('tenant.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<NameField
 				id="tenant-edit-name"
-				placeholder="Musterfirma GmbH"
+				placeholder={t('tenant.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 			/>
 			<SlugField
 				id="tenant-edit-slug"
-				placeholder="musterfirma"
+				placeholder={t('tenant.slugPlaceholder')}
 				value={slug()}
 				onInput={setSlug}
-				hint={<Hint>URL-safe identifier: lowercase letters, digits, single dashes.</Hint>}
+				hint={<Hint>{t('form.slugHintEdit')}</Hint>}
 			/>
 			<TextField
 				id="tenant-edit-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="tenant-edit-comments"
-				label="Kommentare"
-				placeholder="Zusätzliche Notizen (optional)"
+				label={t('common.comments')}
+				placeholder={t('common.commentsPlaceholder')}
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}

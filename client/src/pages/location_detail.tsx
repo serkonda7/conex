@@ -1,4 +1,3 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal } from 'solid-js'
@@ -12,6 +11,7 @@ import {
 	fetch_tenant,
 	type LocationRow,
 } from '../api_tenancy'
+import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
@@ -24,6 +24,7 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { go } from '../components/list_page'
+import { t, tp } from '../i18n'
 
 /**
  * /locations/:id — location detail: header with slug, parent breadcrumb,
@@ -120,7 +121,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 	)
 
 	const { handleDelete } = useDetailDelete({
-		noun: 'location',
+		noun: 'noun.location',
 		name: () => location()?.name,
 		id: props.id,
 		remove: delete_location,
@@ -136,16 +137,16 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/locations"
-				backLabel="Bereiche"
+				backLabel={tp('entity.location', 2)}
 				loading={location.loading}
-				loadingText="Bereich wird geladen…"
+				loadingText={t('location.loadingOne')}
 				record={location()}
-				emptyText="Location not found."
+				emptyText={t('location.notFound')}
 			>
 				<ParentBreadcrumb
 					parentId={parentId()}
 					parentName={parent()?.name}
-					parentFallback={`Location ${parentId() ?? ''}`}
+					parentFallback={t('location.parentFallback', { id: parentId() ?? '' })}
 					href={`/locations/${parentId() ?? ''}`}
 					childName={location()?.name}
 				/>
@@ -155,14 +156,16 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/locations/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle>{location()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>
+					{location()?.description || t('common.noDescription')}
+				</DetailSubtitle>
 
-				<DetailCard label="Details des Bereichs">
-					<dt>Kurzname</dt>
+				<DetailCard label={t('location.details')}>
+					<dt>{t('common.slug')}</dt>
 					<dd>
 						<code>{location()?.slug}</code>
 					</dd>
-					<dt>Standort</dt>
+					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={siteId()}
@@ -171,7 +174,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							href={`/sites/${siteId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Übergeordneter Bereich</dt>
+					<dt>{t('site.parentLocation')}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={parentId()}
@@ -180,7 +183,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							href={`/locations/${parentId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Mandant</dt>
+					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -189,18 +192,18 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Beschreibung</dt>
+					<dt>{t('common.description')}</dt>
 					<dd>{location()?.description || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 
 			<RelatedSection
 				id="location-children"
-				title="Child locations"
+				title={t('location.children')}
 				count={childCount()}
 				loading={children.loading}
-				loadingText="Unterbereiche werden geladen…"
-				emptyText="Noch keine Unterbereiche vorhanden."
+				loadingText={t('location.loadingChildren')}
+				emptyText={t('location.noChildren')}
 				hasItems={childCount() > 0}
 			>
 				<DataTable
@@ -210,7 +213,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (l: LocationRow): JSX.Element => (
 								<a
 									href={`/locations/${l.id}`}
@@ -222,7 +225,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'slug',
-							label: 'Slug',
+							label: t('common.slug'),
 							getValue: (l: LocationRow): JSX.Element => <code>{l.slug}</code>,
 						},
 					]}
@@ -231,11 +234,11 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 
 			<RelatedSection
 				id="location-racks"
-				title="Racks"
+				title={tp('entity.rack', 2)}
 				count={rackCount()}
 				loading={racks.loading}
-				loadingText="Racks werden geladen…"
-				emptyText="Hier sind noch keine Racks vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.rack', 2) })}
+				emptyText={t('location.noRacks')}
 				hasItems={rackCount() > 0}
 			>
 				<DataTable
@@ -245,7 +248,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (r: RackRow): JSX.Element => (
 								<a
 									href={`/racks/${r.id}`}
@@ -257,8 +260,9 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'height',
-							label: 'Height',
-							getValue: (r: RackRow): string => `${r.height_u} HE`,
+							label: t('common.height'),
+							getValue: (r: RackRow): string =>
+								t('common.heightUnits', { count: r.height_u }),
 						},
 					]}
 				/>
@@ -266,11 +270,11 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 
 			<RelatedSection
 				id="location-devices"
-				title="Devices"
+				title={tp('entity.device', 2)}
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Geräte werden geladen…"
-				emptyText="Hier sind noch keine Geräte vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.device', 2) })}
+				emptyText={t('location.noDevices')}
 				hasItems={deviceCount() > 0}
 			>
 				<DataTable
@@ -280,7 +284,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (d: DeviceRow): JSX.Element => (
 								<a
 									href={`/devices/${d.id}`}

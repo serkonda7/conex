@@ -1,4 +1,3 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal } from 'solid-js'
@@ -11,6 +10,7 @@ import {
 	type SiteGroupRow,
 	type SiteRow,
 } from '../api_tenancy'
+import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
@@ -23,6 +23,7 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { go } from '../components/list_page'
+import { t, tp } from '../i18n'
 
 /**
  * /site-groups/:id — site group detail: header with slug, parent
@@ -91,7 +92,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 	)
 
 	const { handleDelete } = useDetailDelete({
-		noun: 'site group',
+		noun: 'noun.siteGroup',
 		name: () => group()?.name,
 		id: props.id,
 		remove: delete_site_group,
@@ -106,16 +107,16 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/site-groups"
-				backLabel="Standortgruppen"
+				backLabel={tp('entity.siteGroup', 2)}
 				loading={group.loading}
-				loadingText="Standortgruppe wird geladen…"
+				loadingText={t('siteGroup.loadingOne')}
 				record={group()}
-				emptyText="Site group not found."
+				emptyText={t('siteGroup.notFound')}
 			>
 				<ParentBreadcrumb
 					parentId={parentId()}
 					parentName={parent()?.name}
-					parentFallback={`Group ${parentId() ?? ''}`}
+					parentFallback={t('siteGroup.parentFallback', { id: parentId() ?? '' })}
 					href={`/site-groups/${parentId() ?? ''}`}
 					childName={group()?.name}
 				/>
@@ -125,14 +126,14 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/site-groups/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle>{group()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>{group()?.description || t('common.noDescription')}</DetailSubtitle>
 
-				<DetailCard label="Details der Standortgruppe">
-					<dt>Kurzname</dt>
+				<DetailCard label={t('siteGroup.details')}>
+					<dt>{t('common.slug')}</dt>
 					<dd>
 						<code>{group()?.slug}</code>
 					</dd>
-					<dt>Mandant</dt>
+					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -141,7 +142,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Übergeordnete Gruppe</dt>
+					<dt>{t('siteGroup.parent')}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={parentId()}
@@ -150,20 +151,20 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							href={`/site-groups/${parentId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Beschreibung</dt>
+					<dt>{t('common.description')}</dt>
 					<dd>{group()?.description || '—'}</dd>
-					<dt>Kommentare</dt>
+					<dt>{t('common.comments')}</dt>
 					<dd>{group()?.comments || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 
 			<RelatedSection
 				id="site-group-children"
-				title="Child groups"
+				title={t('siteGroup.children')}
 				count={childCount()}
 				loading={children.loading}
-				loadingText="Untergruppen werden geladen…"
-				emptyText="Noch keine Untergruppen vorhanden."
+				loadingText={t('siteGroup.loadingChildren')}
+				emptyText={t('siteGroup.noChildren')}
 				hasItems={childCount() > 0}
 			>
 				<DataTable
@@ -173,7 +174,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (g: SiteGroupRow): JSX.Element => (
 								<a
 									href={`/site-groups/${g.id}`}
@@ -185,7 +186,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'slug',
-							label: 'Slug',
+							label: t('common.slug'),
 							getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
 						},
 					]}
@@ -194,11 +195,11 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 
 			<RelatedSection
 				id="site-group-sites"
-				title="Sites"
+				title={tp('entity.site', 2)}
 				count={siteCount()}
 				loading={sites.loading}
-				loadingText="Standorte werden geladen…"
-				emptyText="Noch keine Standorte in dieser Gruppe vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.site', 2) })}
+				emptyText={t('siteGroup.noSites')}
 				hasItems={siteCount() > 0}
 			>
 				<DataTable
@@ -208,7 +209,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (s: SiteRow): JSX.Element => (
 								<a
 									href={`/sites/${s.id}`}
@@ -220,7 +221,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'slug',
-							label: 'Slug',
+							label: t('common.slug'),
 							getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
 						},
 					]}

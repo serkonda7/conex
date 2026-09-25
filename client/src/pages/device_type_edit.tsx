@@ -11,6 +11,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /device-types/:id/edit — device-type edit form. Saves back to the detail page. */
@@ -55,15 +56,15 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 		e.preventDefault()
 		await submit_edit({
 			name: model(),
-			nameError: 'Model is required.',
+			nameError: t('deviceType.modelRequired'),
 			validate: () => {
 				const manufacturer = Number(manufacturerId())
 				if (!Number.isInteger(manufacturer) || manufacturer < 1) {
-					return 'Select a manufacturer.'
+					return t('deviceType.selectManufacturer')
 				}
 				const height = Number(uHeight())
 				if (!Number.isInteger(height) || height < 1 || height > 60) {
-					return 'Height (HE) must be an integer from 1 to 60.'
+					return t('deviceType.heightRange', { min: 1, max: 60 })
 				}
 				return null
 			},
@@ -85,25 +86,25 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo={`/device-types/${props.id}`}
-			backLabel={deviceType()?.model ?? 'Device type'}
-			title="Gerätetyp bearbeiten"
+			backLabel={deviceType()?.model ?? tp('entity.deviceType', 1)}
+			title={t('deviceType.editTitle')}
 			loaded={loaded()}
-			loadingText="Gerätetyp wird geladen…"
+			loadingText={t('deviceType.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<SelectField
 				id="device-type-edit-manufacturer"
-				label="Hersteller"
+				label={tp('entity.manufacturer', 1)}
 				value={manufacturerId()}
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
-				emptyLabel="Manufacturer…"
+				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				required
 			/>
 			<TextField
 				id="device-type-edit-model"
-				label="Modell"
-				placeholder="Beispiel-Switch 48"
+				label={t('common.model')}
+				placeholder={t('deviceType.modelPlaceholder')}
 				maxLength={100}
 				required
 				value={model()}
@@ -111,16 +112,16 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			/>
 			<TextField
 				id="device-type-edit-u-height"
-				label="Höhe (HE)"
+				label={t('common.heightU')}
 				placeholder="1"
 				required
 				inputmode="numeric"
 				value={uHeight()}
 				onInput={setUHeight}
-				hint={<Hint>Rack units consumed by this device (1–60).</Hint>}
+				hint={<Hint>{t('deviceType.heightHint')}</Hint>}
 			/>
 			<div class="field">
-				<label for="device-type-edit-full-depth">Volle Tiefe</label>
+				<label for="device-type-edit-full-depth">{t('common.fullDepth')}</label>
 				<input
 					id="device-type-edit-full-depth"
 					type="checkbox"
@@ -129,19 +130,19 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 						setFullDepth(e.currentTarget.checked)
 					}
 				/>
-				<p class="field-hint">Off for half-depth devices.</p>
+				<p class="field-hint">{t('deviceType.fullDepthHint')}</p>
 			</div>
 			<TextField
 				id="device-type-edit-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="device-type-edit-comments"
-				label="Kommentare"
+				label={t('common.comments')}
 				rows={4}
 				maxLength={2000}
 				value={comments()}

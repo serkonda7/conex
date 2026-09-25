@@ -4,6 +4,7 @@
  * (keep-alive in App.tsx).
  */
 import { createContext, createSignal, useContext } from 'solid-js'
+import * as i18n from './i18n'
 
 export interface TabState {
 	id: number
@@ -126,45 +127,50 @@ export function isNewTabRoute(raw: string): boolean {
 	return isOverlayRoute(raw) || isDetailRoute(raw)
 }
 
+/** Entity name key for each top-level route section. */
+const SECTION_ENTITIES: Record<string, i18n.PluralKey> = {
+	tenants: 'entity.tenant',
+	sites: 'entity.site',
+	'site-groups': 'entity.siteGroup',
+	locations: 'entity.location',
+	racks: 'entity.rack',
+	shelves: 'entity.shelf',
+	'rack-types': 'entity.rackType',
+	templates: 'entity.rackType',
+	'device-types': 'entity.deviceType',
+	manufacturers: 'entity.manufacturer',
+	devices: 'entity.device',
+	interfaces: 'entity.interface',
+	connections: 'entity.connection',
+	cables: 'entity.connection',
+	users: 'entity.user',
+}
+
 /** Short human label for a tab button, derived from the route. */
 export function tabTitle(raw: string): string {
 	const base = (raw.split('?')[0] ?? '').replace(/\/+$/, '') || '/'
 	const segments = base.split('/').filter((p) => p.length > 0)
-	if (segments.length === 0) {
-		return 'Mandanten'
+	const section = segments[0] ?? 'tenants'
+	if (section === 'topology') {
+		return i18n.t('entity.topology')
 	}
-	const names: Record<string, string> = {
-		tenants: 'Mandanten',
-		sites: 'Standorte',
-		'site-groups': 'Standortgruppen',
-		locations: 'Bereiche',
-		racks: 'Racks',
-		shelves: 'Fachböden',
-		'rack-types': 'Racktypen',
-		templates: 'Racktypen',
-		'device-types': 'Gerätetypen',
-		manufacturers: 'Hersteller',
-		devices: 'Geräte',
-		interfaces: 'Anschlüsse',
-		connections: 'Verbindungen',
-		cables: 'Verbindungen',
-		topology: 'Topologie',
-		users: 'Benutzer',
+	const key = SECTION_ENTITIES[section]
+	const plural = key ? i18n.tp(key, 2) : (segments[0] ?? i18n.t('tab.page'))
+	const singular = key ? i18n.tp(key, 1) : plural
+	const id = segments[1]
+	if (id === 'add') {
+		return i18n.t('tab.add', { entity: singular })
 	}
-	const head = names[segments[0] ?? ''] ?? segments[0] ?? 'Page'
-	if (segments[1] === 'add') {
-		return `${head.replace(/s$/, '')} hinzufügen`
+	if (id === 'import') {
+		return i18n.t('tab.import', { entities: plural })
 	}
-	if (segments[1] === 'import') {
-		return `${head} importieren`
+	if (id !== undefined && segments[2] === 'edit') {
+		return i18n.t('tab.edit', { entity: singular, id })
 	}
-	if (segments[1] !== undefined && segments[2] === 'edit') {
-		return `${head.replace(/s$/, '')} ${segments[1]} bearbeiten`
+	if (id !== undefined) {
+		return i18n.t('tab.detail', { entity: singular, id })
 	}
-	if (segments[1] !== undefined) {
-		return `${head.replace(/s$/, '')} ${segments[1]}`
-	}
-	return head
+	return plural
 }
 
 /** Label populated from the loaded detail page when an object name is known. */

@@ -4,12 +4,13 @@
  * edit/delete actions, the detail card grid, the foreign-key link pattern,
  * the related-object sections, and the confirm-then-delete flow.
  *
- * Every piece preserves the exact DOM, strings, and classes the pages
- * rendered before, so e2e selectors keep working.
+ * Every piece preserves the exact DOM and classes the pages rendered
+ * before, so e2e selectors keep working.
  */
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Setter, Show } from 'solid-js'
+import { type PluralKey, t, tp } from '../i18n'
 import { navigate } from '../router'
 import { Empty, InlineError, Loading } from './feedback'
 import { go } from './list_page'
@@ -72,13 +73,13 @@ export function DetailHeader(props: {
 					<span aria-hidden="true" class="app-nav-icon">
 						<IconPencil size={14} />
 					</span>{' '}
-					Bearbeiten
+					{t('common.edit')}
 				</button>
 				<button type="button" class="btn-danger" onClick={props.onDelete}>
 					<span aria-hidden="true" class="app-nav-icon">
 						<IconTrash size={14} />
 					</span>{' '}
-					Löschen
+					{t('common.delete')}
 				</button>
 			</div>
 		</div>
@@ -188,7 +189,7 @@ export function RelatedSection(props: {
 						href={props.viewAllHref ?? ''}
 						onClick={(e: MouseEvent): void => go(e, props.viewAllHref ?? '')}
 					>
-						{props.viewAllLabel ?? 'View all →'}
+						{props.viewAllLabel ?? t('common.viewAll')}
 					</a>
 				</p>
 			</Show>
@@ -198,11 +199,11 @@ export function RelatedSection(props: {
 
 /**
  * Confirm-then-delete flow shared by every detail page: confirms with the
- * entity noun/name, reports through `setError`, and navigates back to the
- * list with a refresh.
+ * entity noun (a `noun.<entity>` plural key) and name, reports through
+ * `setError`, and navigates back to the list with a refresh.
  */
 export function useDetailDelete(opts: {
-	noun: string
+	noun: PluralKey
 	name: () => string | undefined
 	id: number
 	remove: (id: number) => Promise<Result<unknown, Error>>
@@ -214,7 +215,7 @@ export function useDetailDelete(opts: {
 		if (!name) {
 			return
 		}
-		if (!window.confirm(`${opts.noun} „${name}“ löschen?`)) {
+		if (!window.confirm(t('list.confirmDelete', { noun: tp(opts.noun, 1), name }))) {
 			return
 		}
 		opts.setError(null)

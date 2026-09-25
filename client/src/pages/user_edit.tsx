@@ -10,10 +10,10 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
+import { roleOptions } from '../i18n/labels'
 import { navigate } from '../router'
 import { useEditForm } from '../util/form'
-
-const ROLES: UserRole[] = ['admin', 'editor', 'viewer']
 
 /** /users/:id/edit — admin-only role, tenant-scope, and password form. */
 export function UserEditPage(props: { id: number }): JSX.Element {
@@ -50,9 +50,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 		setFormError(null)
 		const tenant = tenantId() === '' ? null : Number(tenantId())
 		if (role() === 'admin' && tenant !== null) {
-			setFormError(
-				'Administratorkonten gelten global und können nicht auf einen Mandanten beschränkt werden.',
-			)
+			setFormError(t('user.adminGlobal'))
 			return
 		}
 		setSaving(true)
@@ -72,53 +70,45 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo="/users"
-			backLabel={user()?.username ?? 'User'}
-			title="Benutzer bearbeiten"
+			backLabel={user()?.username ?? tp('entity.user', 1)}
+			title={t('user.editTitle')}
 			loaded={loaded()}
-			loadingText="Benutzer wird geladen…"
+			loadingText={t('user.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<SelectField
 				id="user-edit-role"
-				label="Rolle"
+				label={t('user.role')}
 				value={role()}
 				onChange={(value: string): void => {
 					setRole(value as UserRole)
 				}}
-				options={ROLES.map((r) => ({
-					value: r,
-					label: { admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' }[r],
-				}))}
+				options={roleOptions()}
 				hint={
 					<Hint>
-						Admin manages users and everything; editor reads and writes inventory;
-						viewer reads only. The last admin cannot be demoted.
+						{t('user.roleHint')} {t('user.roleHintLastAdmin')}
 					</Hint>
 				}
 			/>
 			<Show when={role() !== 'admin'}>
 				<SelectField
 					id="user-edit-tenant"
-					label="Mandantenzuordnung"
+					label={t('user.tenantScope')}
 					value={tenantId()}
 					onChange={setTenantId}
-					options={(tenantsPage()?.items ?? []).map((t) => ({
-						value: String(t.id),
-						label: t.name,
+					options={(tenantsPage()?.items ?? []).map((tenant) => ({
+						value: String(tenant.id),
+						label: tenant.name,
 					}))}
-					emptyLabel="Alle Mandanten"
-					hint={
-						<Hint>
-							Limit an editor or viewer to a single tenant. Empty means global.
-						</Hint>
-					}
+					emptyLabel={t('common.allTenants')}
+					hint={<Hint>{t('user.tenantHint')}</Hint>}
 				/>
 			</Show>
 			<TextField
 				id="user-edit-password"
-				label="New password"
+				label={t('user.newPassword')}
 				type="password"
-				placeholder="Leer lassen, um das aktuelle Passwort beizubehalten"
+				placeholder={t('user.keepPassword')}
 				value={password()}
 				onInput={setPassword}
 				autocomplete="new-password"

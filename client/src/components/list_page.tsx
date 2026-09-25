@@ -4,8 +4,9 @@
  * viewport-anchored row menu, single/bulk delete flows, and the
  * header/toolbar/row-action/status/error shells.
  *
- * Every piece preserves the exact DOM, strings, and aria labels the pages
- * rendered before, so e2e selectors keep working.
+ * Every piece preserves the exact DOM and aria structure the pages rendered
+ * before, so e2e selectors keep working. `noun` options take a
+ * `noun.<entity>` plural key used to build localized confirm/aria text.
  */
 
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
@@ -22,6 +23,7 @@ import {
 	Show,
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { type PluralKey, t, tp } from '../i18n'
 import { navigate } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 
@@ -94,7 +96,7 @@ export function useSort<T extends string>(
  */
 export function useListSelection(
 	track: () => unknown,
-	selectionLabel: string,
+	noun: PluralKey,
 ): {
 	selected: Accessor<number[]>
 	setSelected: Setter<number[]>
@@ -116,6 +118,7 @@ export function useListSelection(
 		setSelected(ids.map((id) => Number(id)))
 	}
 
+	const selectionLabel = t('list.selectAll', { noun: tp(noun, 2) })
 	return { selected, setSelected, selection: { selected, onSelectionChange, selectionLabel } }
 }
 
@@ -218,7 +221,7 @@ export function useRowMenu(): {
  * report through `setError` and refresh through `refetch`.
  */
 export function useListDelete(opts: {
-	noun: string
+	noun: PluralKey
 	remove: (id: number) => Promise<Result<unknown, Error>>
 	setError: Setter<string | null>
 	refetch: () => void
@@ -228,23 +231,8 @@ export function useListDelete(opts: {
 	handleDelete: (id: number, name: string) => Promise<void>
 	handleBulkDelete: () => Promise<void>
 } {
-	const germanNouns: Record<string, { singular: string; plural: string }> = {
-		tenant: { singular: 'Mandant', plural: 'Mandanten' },
-		site: { singular: 'Standort', plural: 'Standorte' },
-		'site group': { singular: 'Standortgruppe', plural: 'Standortgruppen' },
-		location: { singular: 'Bereich', plural: 'Bereiche' },
-		rack: { singular: 'Rack', plural: 'Racks' },
-		'rack type': { singular: 'Racktyp', plural: 'Racktypen' },
-		'device type': { singular: 'Gerätetyp', plural: 'Gerätetypen' },
-		manufacturer: { singular: 'Hersteller', plural: 'Hersteller' },
-		device: { singular: 'Gerät', plural: 'Geräte' },
-		interface: { singular: 'Anschluss', plural: 'Anschlüsse' },
-		connection: { singular: 'Verbindung', plural: 'Verbindungen' },
-		user: { singular: 'Benutzer', plural: 'Benutzer' },
-	}
-	const noun = germanNouns[opts.noun] ?? { singular: opts.noun, plural: opts.noun }
 	async function handleDelete(id: number, name: string): Promise<void> {
-		if (!window.confirm(`${noun.singular} „${name}“ löschen?`)) {
+		if (!window.confirm(t('list.confirmDelete', { noun: tp(opts.noun, 1), name }))) {
 			return
 		}
 		opts.setError(null)
@@ -262,7 +250,8 @@ export function useListDelete(opts: {
 		if (ids.length === 0) {
 			return
 		}
-		if (!window.confirm(`${ids.length} ${noun.plural} löschen?`)) {
+		const noun = tp(opts.noun, ids.length)
+		if (!window.confirm(t('list.confirmBulkDelete', { count: ids.length, noun }))) {
 			return
 		}
 		opts.setError(null)
@@ -275,7 +264,7 @@ export function useListDelete(opts: {
 		}
 		opts.setSelected([])
 		if (failures.length > 0) {
-			opts.setError(failures[0] ?? 'Massenlöschung fehlgeschlagen')
+			opts.setError(failures[0] ?? t('list.bulkDeleteFailed'))
 		}
 		void opts.refetch()
 	}
@@ -295,7 +284,7 @@ export function ListPageHeader(props: {
 }): JSX.Element {
 	const addButton = (
 		<button type="button" class="btn-add" onClick={(): void => navigate(props.add_href)}>
-			+ Hinzufügen
+			{t('common.add')}
 		</button>
 	)
 	return (
@@ -338,7 +327,7 @@ export function BulkDeleteButton(props: { count: number; onClick: () => void }):
 	return (
 		<Show when={props.count > 0}>
 			<button type="button" class="btn-danger" onClick={props.onClick}>
-				{props.count} ausgewählte löschen
+				{t('list.deleteSelected', { count: props.count })}
 			</button>
 		</Show>
 	)
@@ -347,26 +336,23 @@ export function BulkDeleteButton(props: { count: number; onClick: () => void }):
 /**
  * Per-row edit button plus the row-menu toggle. `edit_href` is optional:
  * lists without an edit page (rack types) render the menu toggle only.
+ * `name` is the row's display name used in the button labels.
  */
 export function ListRowActions(props: {
 	edit_href?: string
-	edit_title: string
-	edit_label: string
-	menu_label: string
+	name: string
 	menu_open: boolean
 	onToggleMenu: (e: MouseEvent & { currentTarget: HTMLButtonElement }) => void
 	onCloseMenu: () => void
 }): JSX.Element {
-	const editTarget = (): string => props.edit_title.replace(/^Edit\s+/, '')
-	const menuTarget = (): string => props.menu_label.replace(/^More actions for\s+/, '')
 	return (
 		<div class="row-actions">
 			<Show when={props.edit_href !== undefined}>
 				<button
 					type="button"
 					class="icon-btn"
-					title={`Bearbeiten: ${editTarget()}`}
-					aria-label={`Bearbeiten: ${editTarget()}`}
+					title={t('common.editNamed', { name: props.name })}
+					aria-label={t('common.editNamed', { name: props.name })}
 					onClick={() => navigate(props.edit_href ?? '')}
 				>
 					<IconPencil size={16} />
@@ -376,7 +362,7 @@ export function ListRowActions(props: {
 				<button
 					type="button"
 					class="icon-btn"
-					aria-label={`Weitere Aktionen für ${menuTarget()}`}
+					aria-label={t('common.moreActionsFor', { name: props.name })}
 					aria-haspopup="menu"
 					aria-expanded={props.menu_open}
 					onClick={props.onToggleMenu}
@@ -405,7 +391,7 @@ export function RowMenu(props: {
 				<div
 					class="row-menu"
 					role="menu"
-					aria-label={`Aktionen für ${props.menu()?.name ?? ''}`}
+					aria-label={t('common.actionsFor', { name: props.menu()?.name ?? '' })}
 					style={{
 						top: props.menu()?.up ? undefined : `${props.menu()?.edge ?? 0}px`,
 						bottom: props.menu()?.up ? `${props.menu()?.edge ?? 0}px` : undefined,
@@ -430,7 +416,7 @@ export function RowMenu(props: {
 						}}
 					>
 						<IconTrash size={16} />
-						Löschen
+						{t('common.delete')}
 					</button>
 				</div>
 			</Portal>
@@ -442,7 +428,11 @@ export function RowMenu(props: {
 export function ListRangeStatus(props: { total: number }): JSX.Element {
 	return (
 		<p class="paginator-showing" role="status">
-			Einträge {props.total === 0 ? 0 : 1}–{props.total} von {props.total}
+			{t('list.range', {
+				from: props.total === 0 ? 0 : 1,
+				to: props.total,
+				total: props.total,
+			})}
 		</p>
 	)
 }

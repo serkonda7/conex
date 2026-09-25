@@ -7,13 +7,10 @@
  */
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createEffect, For, type JSX, onMount, Show } from 'solid-js'
+import { t } from '../i18n'
 import { navigate } from '../router'
 import { Loading } from './feedback'
 import { go } from './list_page'
-
-/** Default hint under a slug input, where the slug is auto-filled from the name. */
-const SLUG_HINT =
-	'URL-sicherer Bezeichner: Kleinbuchstaben, Ziffern und einzelne Bindestriche. Wird automatisch aus dem Namen ausgefüllt.'
 
 /** One `<select>` entry. */
 export interface FormOption {
@@ -226,7 +223,7 @@ export function NameField(props: {
 	})
 
 	return (
-		<Field label="Name" for={props.id} required>
+		<Field label={t('common.name')} for={props.id} required>
 			<input
 				id={props.id}
 				ref={input}
@@ -241,7 +238,8 @@ export function NameField(props: {
 	)
 }
 
-/** Required URL slug input, pattern-checked against `SlugSchema`. */
+/** Required URL slug input, pattern-checked against `SlugSchema`. The default
+ * hint notes the slug is auto-filled from the name. */
 export function SlugField(props: {
 	id: string
 	placeholder: string
@@ -252,10 +250,10 @@ export function SlugField(props: {
 }): JSX.Element {
 	return (
 		<Field
-			label="Kurzname"
+			label={t('common.slug')}
 			for={props.id}
 			required
-			hint={props.hint ?? <Hint>{SLUG_HINT}</Hint>}
+			hint={props.hint ?? <Hint>{t('form.slugHint')}</Hint>}
 		>
 			<input
 				id={props.id}
@@ -291,13 +289,13 @@ export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.E
 				onClick={() => navigate(props.cancelTo, { refresh: false })}
 				disabled={props.saving}
 			>
-				Abbrechen
+				{t('common.cancel')}
 			</button>
 			<button type="submit" name="action" value="create" disabled={props.saving}>
-				{props.saving ? 'Wird erstellt…' : 'Erstellen'}
+				{props.saving ? t('common.creating') : t('common.create')}
 			</button>
 			<button type="submit" name="action" value="add-another" disabled={props.saving}>
-				Erstellen &amp; weiteres hinzufügen
+				{t('common.createAndAddAnother')}
 			</button>
 		</div>
 	)
@@ -339,10 +337,10 @@ export function EditActions(props: {
 	return (
 		<div class="form-actions">
 			<button type="submit" disabled={props.saving}>
-				{props.saving ? 'Wird gespeichert…' : 'Speichern'}
+				{props.saving ? t('common.saving') : t('common.save')}
 			</button>
 			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
-				Abbrechen
+				{t('common.cancel')}
 			</button>
 			<Show when={props.onDelete}>
 				<button
@@ -351,7 +349,7 @@ export function EditActions(props: {
 					onClick={() => props.onDelete?.()}
 					disabled={props.saving}
 				>
-					Löschen
+					{t('common.delete')}
 				</button>
 			</Show>
 		</div>

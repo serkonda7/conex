@@ -1,4 +1,3 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
@@ -12,6 +11,7 @@ import {
 	type SiteGroupRow,
 	type SiteRow,
 } from '../api_tenancy'
+import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
@@ -22,6 +22,7 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { go } from '../components/list_page'
+import { t, tp } from '../i18n'
 
 /**
  * /tenants/:id — tenant detail: header with slug/description/comments,
@@ -90,7 +91,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	)
 
 	const { handleDelete } = useDetailDelete({
-		noun: 'tenant',
+		noun: 'noun.tenant',
 		name: () => tenant()?.name,
 		id: props.id,
 		remove: delete_tenant,
@@ -107,11 +108,11 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/tenants"
-				backLabel="Mandanten"
+				backLabel={tp('entity.tenant', 2)}
 				loading={tenant.loading}
-				loadingText="Mandant wird geladen…"
+				loadingText={t('tenant.loadingOne')}
 				record={tenant()}
-				emptyText="Tenant not found."
+				emptyText={t('tenant.notFound')}
 			>
 				<DetailHeader
 					name={tenant()?.name}
@@ -119,53 +120,53 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/tenants/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle>{tenant()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>
+					{tenant()?.description || t('common.noDescription')}
+				</DetailSubtitle>
 
 				<div class="detail-stats">
 					<a class="detail-stat" href="#tenant-sites">
 						<span class="detail-stat-value">{siteCount()}</span>{' '}
-						<span class="detail-stat-label">Site{siteCount() === 1 ? '' : 's'}</span>
+						<span class="detail-stat-label">{tp('entity.site', siteCount())}</span>
 					</a>
 					<a class="detail-stat" href="#tenant-site-groups">
 						<span class="detail-stat-value">{siteGroupCount()}</span>{' '}
 						<span class="detail-stat-label">
-							Site group{siteGroupCount() === 1 ? '' : 's'}
+							{tp('entity.siteGroup', siteGroupCount())}
 						</span>
 					</a>
 					<a class="detail-stat" href="#tenant-racks">
 						<span class="detail-stat-value">{rackCount()}</span>{' '}
-						<span class="detail-stat-label">Rack{rackCount() === 1 ? '' : 's'}</span>
+						<span class="detail-stat-label">{tp('entity.rack', rackCount())}</span>
 					</a>
 					<a class="detail-stat" href="#tenant-devices">
 						<span class="detail-stat-value">{deviceCount()}</span>{' '}
-						<span class="detail-stat-label">
-							Device{deviceCount() === 1 ? '' : 's'}
-						</span>
+						<span class="detail-stat-label">{tp('entity.device', deviceCount())}</span>
 					</a>
 				</div>
 
-				<DetailCard label="Mandantendetails">
-					<dt>Kurzname</dt>
+				<DetailCard label={t('tenant.details')}>
+					<dt>{t('common.slug')}</dt>
 					<dd>
 						<code>{tenant()?.slug}</code>
 					</dd>
-					<dt>Beschreibung</dt>
+					<dt>{t('common.description')}</dt>
 					<dd>{tenant()?.description || '—'}</dd>
-					<dt>Kommentare</dt>
+					<dt>{t('common.comments')}</dt>
 					<dd>{tenant()?.comments || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 
 			<RelatedSection
 				id="tenant-sites"
-				title="Sites"
+				title={tp('entity.site', 2)}
 				count={siteCount()}
 				loading={sites.loading}
-				loadingText="Standorte werden geladen…"
-				emptyText="Für diesen Mandanten sind noch keine Standorte vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.site', 2) })}
+				emptyText={t('tenant.noSites')}
 				hasItems={siteCount() > 0}
 				viewAllHref={`/sites?tenant=${props.id}`}
-				viewAllLabel="View in Sites →"
+				viewAllLabel={t('common.viewIn', { target: tp('entity.site', 2) })}
 			>
 				<DataTable
 					rows={() => sites() ?? []}
@@ -174,7 +175,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (s: SiteRow): JSX.Element => (
 								<a
 									href={`/sites/${s.id}`}
@@ -186,7 +187,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'slug',
-							label: 'Slug',
+							label: t('common.slug'),
 							getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
 						},
 					]}
@@ -195,14 +196,14 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 
 			<RelatedSection
 				id="tenant-site-groups"
-				title="Site groups"
+				title={tp('entity.siteGroup', 2)}
 				count={siteGroupCount()}
 				loading={siteGroups.loading}
-				loadingText="Standortgruppen werden geladen…"
-				emptyText="Für diesen Mandanten sind noch keine Standortgruppen vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.siteGroup', 2) })}
+				emptyText={t('tenant.noSiteGroups')}
 				hasItems={siteGroupCount() > 0}
 				viewAllHref={`/site-groups?tenant=${props.id}`}
-				viewAllLabel="View in Site Groups →"
+				viewAllLabel={t('common.viewIn', { target: tp('entity.siteGroup', 2) })}
 			>
 				<DataTable
 					rows={() => siteGroups() ?? []}
@@ -211,7 +212,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (g: SiteGroupRow): JSX.Element => (
 								<a
 									href={`/site-groups/${g.id}`}
@@ -223,7 +224,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'slug',
-							label: 'Slug',
+							label: t('common.slug'),
 							getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
 						},
 					]}
@@ -232,11 +233,11 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 
 			<RelatedSection
 				id="tenant-racks"
-				title="Racks"
+				title={tp('entity.rack', 2)}
 				count={rackCount()}
 				loading={racks.loading}
-				loadingText="Racks werden geladen…"
-				emptyText="Für diesen Mandanten sind noch keine Racks vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.rack', 2) })}
+				emptyText={t('tenant.noRacks')}
 				hasItems={rackCount() > 0}
 			>
 				<DataTable
@@ -246,7 +247,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (r: RackRow): JSX.Element => (
 								<a
 									href={`/racks/${r.id}`}
@@ -258,8 +259,9 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 						},
 						{
 							key: 'height',
-							label: 'Height',
-							getValue: (r: RackRow): string => `${r.height_u} HE`,
+							label: t('common.height'),
+							getValue: (r: RackRow): string =>
+								t('common.heightUnits', { count: r.height_u }),
 						},
 					]}
 				/>
@@ -267,14 +269,14 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 
 			<RelatedSection
 				id="tenant-devices"
-				title="Devices"
+				title={tp('entity.device', 2)}
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Geräte werden geladen…"
-				emptyText="Für diesen Mandanten sind noch keine Geräte vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.device', 2) })}
+				emptyText={t('tenant.noDevices')}
 				hasItems={deviceCount() > 0}
 				viewAllHref={`/devices?tenant=${props.id}`}
-				viewAllLabel="View in Devices →"
+				viewAllLabel={t('common.viewIn', { target: tp('entity.device', 2) })}
 			>
 				<DataTable
 					rows={() => devices() ?? []}
@@ -283,7 +285,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					columns={[
 						{
 							key: 'name',
-							label: 'Name',
+							label: t('common.name'),
 							getValue: (d: DeviceRow): JSX.Element => (
 								<a
 									href={`/devices/${d.id}`}

@@ -6,6 +6,7 @@
 import type { Result } from 'better-result'
 import type { Page, UserCreate, UserJson, UserListQuery, UserUpdate } from 'shared/src/types'
 import { client, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 export type { UserJson }
 export type UserRole = UserJson['role']
@@ -22,12 +23,12 @@ export async function fetch_users(filters?: UserFilters): Promise<Result<Page<Us
 			tenant: filters?.tenant,
 		}),
 	})
-	return to_result<Page<UserJson>>(res, 'Failed to load users')
+	return to_result<Page<UserJson>>(res, tp('api.loadFailed', 2, { noun: tp('noun.user', 2) }))
 }
 
 export async function fetch_user(id: number): Promise<Result<UserJson, Error>> {
 	const res = await client.users[':id'].$get({ param: { id: String(id) } })
-	return to_result<UserJson>(res, 'Failed to load user')
+	return to_result<UserJson>(res, tp('api.loadFailed', 1, { noun: tp('noun.user', 1) }))
 }
 
 /**
@@ -47,7 +48,7 @@ export async function create_user(input: UserCreateInput): Promise<Result<UserJs
 			tenant_id: input.tenant_id,
 		},
 	})
-	return to_result<UserJson>(res, 'Failed to create user')
+	return to_result<UserJson>(res, t('api.createFailed', { noun: tp('noun.user', 1) }))
 }
 
 export type UserUpdateInput = UserUpdate
@@ -60,10 +61,10 @@ export async function update_user(
 		param: { id: String(id) },
 		json: patch,
 	})
-	return to_result<UserJson>(res, 'Failed to update user')
+	return to_result<UserJson>(res, t('api.updateFailed', { noun: tp('noun.user', 1) }))
 }
 
 export async function delete_user(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.users[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete user')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.user', 1) }))
 }

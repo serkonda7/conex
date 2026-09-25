@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -12,6 +11,7 @@ import {
 	type SiteRow,
 	type TenantRow,
 } from '../api_tenancy'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -29,6 +29,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -93,7 +94,7 @@ export function RacksPage(): JSX.Element {
 		order: order(),
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(listSource, 'Select all racks')
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.rack')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [racksPage, { refetch }] = createResource(listSource, async (s) => {
@@ -133,7 +134,7 @@ export function RacksPage(): JSX.Element {
 		if (!id) {
 			return '—'
 		}
-		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
+		return tenants()?.find((row: TenantRow) => row.id === id)?.name ?? String(id)
 	}
 
 	function rackTypeNameOf(id: number | null): string {
@@ -146,7 +147,7 @@ export function RacksPage(): JSX.Element {
 	const columns: DataTableColumn<RackRow>[] = [
 		{
 			key: 'name',
-			label: 'Rack',
+			label: tp('entity.rack', 1),
 			sortable: true,
 			getValue: (r: RackRow): JSX.Element => (
 				<a
@@ -159,17 +160,17 @@ export function RacksPage(): JSX.Element {
 		},
 		{
 			key: 'site',
-			label: 'Standort',
+			label: tp('entity.site', 1),
 			getValue: (r: RackRow): string => siteNameOf(r.site_id),
 		},
 		{
 			key: 'location',
-			label: 'Bereich',
+			label: tp('entity.location', 1),
 			getValue: (r: RackRow): string => locationNameOf(r.location_id),
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
+			label: t('common.description'),
 			class: 'cell-truncate',
 			getValue: (r: RackRow): JSX.Element => (
 				<span title={r.description ?? ''}>{r.description || '—'}</span>
@@ -177,12 +178,12 @@ export function RacksPage(): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: 'Typ',
+			label: t('common.type'),
 			getValue: (r: RackRow): string => rackTypeNameOf(r.rack_type_id),
 		},
 		{
 			key: 'tenant',
-			label: 'Mandant',
+			label: tp('entity.tenant', 1),
 			getValue: (r: RackRow): string => tenantNameOf(r.tenant_id),
 		},
 	]
@@ -193,7 +194,7 @@ export function RacksPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'rack',
+		noun: 'noun.rack',
 		remove: delete_rack,
 		setError,
 		refetch,
@@ -203,40 +204,40 @@ export function RacksPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Racks" add_href="/racks/add" />
+			<ListPageHeader title={tp('entity.rack', 2)} add_href="/racks/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Racks suchen"
-					placeholder="Namen suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.rack', 2) })}
+					placeholder={t('manufacturer.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by site</span>
+					<span class="visually-hidden">{t('location.filterBySite')}</span>
 					<select
-						aria-label="Nach Standort filtern"
+						aria-label={t('location.filterBySite')}
 						value={filterSite()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							handleSiteFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Standorte</option>
+						<option value="">{t('location.allSites')}</option>
 						<For each={sites() ?? []}>
 							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
 						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Filter by location</span>
+					<span class="visually-hidden">{t('rack.filterByLocation')}</span>
 					<select
-						aria-label="Nach Bereich filtern"
+						aria-label={t('rack.filterByLocation')}
 						value={filterLocation()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterLocation(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Bereiche</option>
+						<option value="">{t('rack.allLocations')}</option>
 						<For each={locations() ?? []}>
 							{(l: LocationRow): JSX.Element => (
 								<option value={l.id}>{l.name}</option>
@@ -245,17 +246,19 @@ export function RacksPage(): JSX.Element {
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Filter by tenant</span>
+					<span class="visually-hidden">{t('common.filterByTenant')}</span>
 					<select
-						aria-label="Nach Mandant filtern"
+						aria-label={t('common.filterByTenant')}
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterTenant(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Mandanten</option>
+						<option value="">{t('common.allTenants')}</option>
 						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+							{(row: TenantRow): JSX.Element => (
+								<option value={row.id}>{row.name}</option>
+							)}
 						</For>
 					</select>
 				</label>
@@ -278,9 +281,7 @@ export function RacksPage(): JSX.Element {
 				rowActions={(r: RackRow): JSX.Element => (
 					<ListRowActions
 						edit_href={`/racks/${r.id}/edit`}
-						edit_title={`Edit ${r.name}`}
-						edit_label={`Edit rack ${r.name}`}
-						menu_label={`More actions for ${r.name}`}
+						name={r.name}
 						menu_open={openMenu()?.id === r.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
@@ -289,12 +290,14 @@ export function RacksPage(): JSX.Element {
 					/>
 				)}
 				loading={() => racksPage.loading}
-				loadingContent={<p class="skeleton">Racks werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.rack', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterSite() || filterLocation() || filterTenant()
-							? 'Keine Racks für die aktuellen Filter gefunden.'
-							: 'Noch keine Racks vorhanden. Fügen Sie oben das erste hinzu.'}
+							? t('list.noMatchFilters', { noun: tp('noun.rack', 2) })
+							: t('rack.empty')}
 					</p>
 				}
 			/>

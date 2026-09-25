@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -13,6 +12,7 @@ import {
 	fetch_stubs,
 	type StubRow,
 } from '../api_templates'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
@@ -25,6 +25,7 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { go } from '../components/list_page'
+import { t, tp } from '../i18n'
 
 /**
  * /device-types/:id — device-type detail: header with model and details
@@ -91,7 +92,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		setError(null)
 		const count = Number(stubCount())
 		if (!Number.isInteger(count) || count < 1) {
-			setError('Stub count must be an integer of at least 1')
+			setError(t('deviceType.stubCountInvalid'))
 			return
 		}
 		const res = await create_stub(props.id, { prefix: stubPrefix(), count })
@@ -115,7 +116,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	}
 
 	const { handleDelete } = useDetailDelete({
-		noun: 'device type',
+		noun: 'noun.deviceType',
 		name: () => deviceType()?.model,
 		id: props.id,
 		remove: delete_device_type,
@@ -126,11 +127,15 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const stubColumns: DataTableColumn<StubRow>[] = [
 		{
 			key: 'prefix',
-			label: 'Prefix',
+			label: t('deviceType.stubPrefix'),
 			getValue: (s: StubRow): JSX.Element => <code>{s.prefix}</code>,
 		},
-		{ key: 'count', label: 'Count', getValue: (s: StubRow): number => s.count },
-		{ key: 'kind', label: 'Kind', getValue: (s: StubRow): string => s.kind },
+		{
+			key: 'count',
+			label: t('deviceType.stubCount'),
+			getValue: (s: StubRow): number => s.count,
+		},
+		{ key: 'kind', label: t('deviceType.stubKind'), getValue: (s: StubRow): string => s.kind },
 	]
 
 	const stubCountText = (): number => stubs()?.length ?? 0
@@ -140,51 +145,53 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/device-types"
-				backLabel="Device types"
+				backLabel={tp('entity.deviceType', 2)}
 				loading={deviceType.loading}
-				loadingText="Gerätetyp wird geladen…"
+				loadingText={t('deviceType.loadingOne')}
 				record={deviceType()}
-				emptyText="Device type not found."
+				emptyText={t('deviceType.notFound')}
 			>
 				<DetailHeader
 					name={deviceType()?.model}
 					editHref={`/device-types/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle>{deviceType()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>
+					{deviceType()?.description || t('common.noDescription')}
+				</DetailSubtitle>
 
-				<DetailCard label="Gerätetypdetails">
-					<dt>Hersteller</dt>
+				<DetailCard label={t('deviceType.details')}>
+					<dt>{tp('entity.manufacturer', 1)}</dt>
 					<dd>{mfrNameOf(deviceType()?.manufacturer_id)}</dd>
-					<dt>Modell</dt>
+					<dt>{t('common.model')}</dt>
 					<dd>{deviceType()?.model}</dd>
-					<dt>Beschreibung</dt>
+					<dt>{t('common.description')}</dt>
 					<dd>{deviceType()?.description || '—'}</dd>
-					<dt>Kommentare</dt>
+					<dt>{t('common.comments')}</dt>
 					<dd>{deviceType()?.comments || '—'}</dd>
-					<dt>Höhe (HE)</dt>
+					<dt>{t('common.heightU')}</dt>
 					<dd>{deviceType()?.u_height}</dd>
-					<dt>Volle Tiefe</dt>
-					<dd>{deviceType()?.is_full_depth ? 'Yes' : 'No'}</dd>
+					<dt>{t('common.fullDepth')}</dt>
+					<dd>{deviceType()?.is_full_depth ? t('common.yes') : t('common.no')}</dd>
 				</DetailCard>
 			</DetailShell>
 
-			<h3 id="device-type-stubs">Interface stubs ({stubCountText()})</h3>
+			<h3 id="device-type-stubs">{t('deviceType.stubs', { count: stubCountText() })}</h3>
 			<form onSubmit={handleCreateStub}>
 				<input
-					placeholder="Prefix (e.g. eth)"
-					aria-label="Stub prefix"
+					placeholder={t('deviceType.stubPrefixPlaceholder')}
+					aria-label={t('deviceType.stubPrefixLabel')}
 					value={stubPrefix()}
 					onInput={(e: InputEventAndTarget) => setStubPrefix(e.currentTarget.value)}
 				/>
 				<input
-					placeholder="Count"
-					aria-label="Stub count"
+					placeholder={t('deviceType.stubCount')}
+					aria-label={t('deviceType.stubCountLabel')}
 					inputmode="numeric"
 					value={stubCount()}
 					onInput={(e: InputEventAndTarget) => setStubCount(e.currentTarget.value)}
 				/>
-				<button type="submit">Platzhalter hinzufügen</button>
+				<button type="submit">{t('deviceType.addStub')}</button>
 			</form>
 			<DataTable
 				rows={() => stubs() ?? []}
@@ -193,20 +200,20 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				showColumnCustomizer
 				rowActions={(s: StubRow): JSX.Element => (
 					<button type="button" class="btn-danger" onClick={() => handleDeleteStub(s.id)}>
-						Delete
+						{t('common.delete')}
 					</button>
 				)}
 				loading={() => stubs.loading}
-				loadingContent={<Loading message="Platzhalter werden geladen…" />}
-				emptyContent={<Empty message="Noch keine Platzhalter vorhanden." />}
+				loadingContent={<Loading message={t('deviceType.loadingStubs')} />}
+				emptyContent={<Empty message={t('deviceType.noStubs')} />}
 			/>
 			<RelatedSection
 				id="device-type-devices"
-				title="Devices"
+				title={tp('entity.device', 2)}
 				count={deviceCount()}
 				loading={devices.loading}
-				loadingText="Geräte werden geladen…"
-				emptyText="Noch keine Geräte dieses Typs vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.device', 2) })}
+				emptyText={t('deviceType.noDevices')}
 				hasItems={deviceCount() > 0}
 			>
 				<ul>

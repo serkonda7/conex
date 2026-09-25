@@ -1,4 +1,3 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ElevationShelfDeviceRef, ElevationShelfRef } from 'shared/src/types'
@@ -13,6 +12,7 @@ import {
 	fetch_manufacturers,
 } from '../api_templates'
 import { fetch_location, fetch_site, fetch_tenant } from '../api_tenancy'
+import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
 	DetailShell,
@@ -25,6 +25,8 @@ import {
 import { useSort } from '../components/list_page'
 import { ObjectSelector } from '../components/object_selector'
 import { RackElevation, type RackFace } from '../components/rack_elevation'
+import { t, tp } from '../i18n'
+import { faceLabel } from '../i18n/labels'
 import { navigate } from '../router'
 
 /**
@@ -190,7 +192,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		totalU() > 0 ? Math.round((occupiedU() / totalU()) * 100) : 0,
 	)
 	const { handleDelete } = useDetailDelete({
-		noun: 'rack',
+		noun: 'noun.rack',
 		name: () => rack()?.name,
 		id: props.id,
 		remove: delete_rack,
@@ -277,37 +279,38 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/racks"
-				backLabel="Racks"
+				backLabel={tp('entity.rack', 2)}
 				loading={rack.loading}
-				loadingText="Rack wird geladen…"
+				loadingText={t('rack.loadingOne')}
 				record={rack()}
-				emptyText="Rack not found."
+				emptyText={t('rack.notFound')}
 			>
 				<div class="page-header">
 					<h2>
-						{rack()?.name} <span>{displayHeight()} HE</span>
+						{rack()?.name}{' '}
+						<span>{t('common.heightUnits', { count: displayHeight() })}</span>
 					</h2>
 					<div class="form-actions">
 						<button type="button" onClick={() => navigate(`/racks/${props.id}/edit`)}>
 							<span aria-hidden="true" class="app-nav-icon">
 								<IconPencil size={14} />
 							</span>{' '}
-							Bearbeiten
+							{t('common.edit')}
 						</button>
 						<button type="button" class="btn-danger" onClick={handleDelete}>
 							<span aria-hidden="true" class="app-nav-icon">
 								<IconTrash size={14} />
 							</span>{' '}
-							Löschen
+							{t('common.delete')}
 						</button>
 					</div>
 				</div>
-				<DetailSubtitle>{rack()?.description || 'Keine Beschreibung.'}</DetailSubtitle>
+				<DetailSubtitle>{rack()?.description || t('common.noDescription')}</DetailSubtitle>
 
 				<div class="detail-columns">
 					<div>
-						<DetailCard label="Rackdetails">
-							<dt>Standort</dt>
+						<DetailCard label={t('rack.details')}>
+							<dt>{tp('entity.site', 1)}</dt>
 							<dd>
 								<ForeignKeyLink
 									id={siteId()}
@@ -316,7 +319,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/sites/${siteId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Bereich</dt>
+							<dt>{tp('entity.location', 1)}</dt>
 							<dd>
 								<ForeignKeyLink
 									id={locationId()}
@@ -325,7 +328,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/locations/${locationId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Racktyp</dt>
+							<dt>{tp('entity.rackType', 1)}</dt>
 							<dd>
 								<ForeignKeyLink
 									id={rackType()?.manufacturer_id ?? null}
@@ -345,7 +348,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/device-types/${rackTypeId() ?? ''}`}
 								/>
 							</dd>
-							<dt>Mandant</dt>
+							<dt>{tp('entity.tenant', 1)}</dt>
 							<dd>
 								<ForeignKeyLink
 									id={tenantId()}
@@ -356,9 +359,9 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 						</DetailCard>
 
-						<section class="rack-unracked" aria-label="Nicht eingebaute Geräte">
+						<section class="rack-unracked" aria-label={t('rack.unracked')}>
 							<h3>
-								Nicht eingebaute Geräte{' '}
+								{t('rack.unracked')}{' '}
 								<span class="badge">{unrackedDevices()?.length ?? 0}</span>
 							</h3>
 							<Show
@@ -367,16 +370,12 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									!deviceTypes.loading &&
 									!manufacturers.loading
 								}
-								fallback={
-									<Loading message="Nicht eingebaute Geräte werden geladen…" />
-								}
+								fallback={<Loading message={t('rack.loadingUnracked')} />}
 							>
 								<Show
 									when={(unrackedDevices()?.length ?? 0) > 0}
 									fallback={
-										<p class="rack-unracked-empty">
-											Diesem Rack sind keine unverbauten Geräte zugeordnet.
-										</p>
+										<p class="rack-unracked-empty">{t('rack.noUnracked')}</p>
 									}
 								>
 									<DataTable
@@ -389,7 +388,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 										columns={[
 											{
 												key: 'name',
-												label: 'Name',
+												label: t('common.name'),
 												sortable: true,
 												getValue: (device: DeviceRow): JSX.Element => (
 													<a
@@ -405,7 +404,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 											},
 											{
 												key: 'type',
-												label: 'Typ',
+												label: t('common.type'),
 												sortable: true,
 												getValue: (device: DeviceRow): string =>
 													deviceTypeOf(device.device_type_id)?.model ??
@@ -413,7 +412,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 											},
 											{
 												key: 'manufacturer',
-												label: 'Hersteller',
+												label: tp('entity.manufacturer', 1),
 												sortable: true,
 												getValue: (device: DeviceRow): string =>
 													manufacturerNameOf(device.device_type_id),
@@ -429,12 +428,16 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						<div
 							class="rack-util"
 							role="status"
-							aria-label={`${occupiedU()} von ${totalU()} HE belegt`}
+							aria-label={t('rack.utilLabel', { used: occupiedU(), total: totalU() })}
 						>
 							<span>
-								{occupiedU()}/{totalU()} HE · {utilPct()} % belegt
+								{t('rack.util', {
+									used: occupiedU(),
+									total: totalU(),
+									pct: utilPct(),
+								})}
 								<Show when={reservedU() > 0}>
-									<span> (davon {reservedU()} HE reserviert)</span>
+									<span>{t('rack.reserved', { count: reservedU() })}</span>
 								</Show>
 							</span>
 							<span class="rack-util-bar" aria-hidden="true">
@@ -443,7 +446,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						</div>
 						<Show
 							when={elevation()}
-							fallback={<Loading message="Rackansicht wird geladen…" />}
+							fallback={<Loading message={t('rack.loadingElevation')} />}
 						>
 							<RackElevation
 								units={elevation()?.units ?? []}
@@ -467,10 +470,21 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							<ObjectSelector
 								label={
 									targetShelf()
-										? `Gerät für Fachboden ${targetShelf()?.name || `HE${targetShelf()?.position_u}`} auswählen`
-										: `Gerät für HE${pendingU() ?? ''} auswählen (${face()})`
+										? t('rack.selectDeviceForShelf', {
+												name:
+													targetShelf()?.name ||
+													t('common.unitPosition', {
+														u: targetShelf()?.position_u ?? '',
+													}),
+											})
+										: t('rack.selectDeviceForU', {
+												unit: t('common.unitPosition', {
+													u: pendingU() ?? '',
+												}),
+												face: faceLabel(face()),
+											})
 								}
-								placeholder="Geräte suchen…"
+								placeholder={t('rack.searchDevices')}
 								load={async (search: string) => {
 									const result = await fetch_devices({ search })
 									return Result.isError(result)

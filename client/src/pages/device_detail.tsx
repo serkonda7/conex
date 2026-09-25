@@ -1,4 +1,3 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { IconLinkPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget, TraceLink, TracePath } from 'shared/src/types'
@@ -20,6 +19,7 @@ import { fetch_rack } from '../api_racks'
 import { fetch_shelf } from '../api_shelves'
 import { fetch_device_types } from '../api_templates'
 import { fetch_locations, fetch_site, fetch_tenant } from '../api_tenancy'
+import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
@@ -31,6 +31,15 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { go } from '../components/list_page'
+import { t, tp } from '../i18n'
+import { cableStatusLabel, faceLabel } from '../i18n/labels'
+
+/** Selectable trace depths for the path view. */
+const TRACE_DEPTHS = [1, 2, 3, 4, 6, 10]
+
+function faceLabelOrDash(face: string | null | undefined): string {
+	return face ? faceLabel(face) : '—'
+}
 
 /**
  * /devices/:id — detail with the interface list (port status dots), a manual
@@ -203,7 +212,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		setError(null)
 		const position = moveU().trim() === '' ? undefined : Number(moveU().trim())
 		if (position !== undefined && (!Number.isInteger(position) || position < 1)) {
-			setError('Rack position must be a positive integer or empty')
+			setError(t('device.moveInvalid'))
 			return
 		}
 		const res = await move_device(props.id, {
@@ -221,7 +230,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		e.preventDefault()
 		setError(null)
 		if (!localIface() || !peerIface()) {
-			setError('Pick a free port on both ends first')
+			setError(t('device.pickBothPorts'))
 			return
 		}
 		const res = await create_cable({
@@ -250,7 +259,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	}
 
 	const { handleDelete } = useDetailDelete({
-		noun: 'device',
+		noun: 'noun.device',
 		name: () => device()?.name,
 		id: props.id,
 		remove: delete_device,
@@ -262,12 +271,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		if (id === undefined) {
 			return '—'
 		}
-		return types()?.find((t) => t.id === id)?.model ?? String(id)
+		return types()?.find((type) => type.id === id)?.model ?? String(id)
 	}
 
 	async function handleRename(iface: InterfaceJson): Promise<void> {
 		setError(null)
-		const renamed = window.prompt('Rename interface', iface.name)
+		const renamed = window.prompt(t('device.renamePrompt'), iface.name)
 		if (!renamed || renamed === iface.name) {
 			return
 		}
@@ -295,46 +304,48 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/devices"
-				backLabel="Devices"
+				backLabel={tp('entity.device', 2)}
 				loading={device.loading}
-				loadingText="Gerät wird geladen…"
+				loadingText={t('device.loadingOne')}
 				record={device()}
-				emptyText="Device not found."
+				emptyText={t('device.notFound')}
 			>
 				<DetailHeader
 					name={device()?.name}
 					editHref={`/devices/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle>{device()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>
+					{device()?.description || t('common.noDescription')}
+				</DetailSubtitle>
 
 				<div class="detail-stats">
 					<a class="detail-stat" href="#device-interfaces">
 						<span class="detail-stat-value">{ifaceCount()}</span>{' '}
 						<span class="detail-stat-label">
-							Interface{ifaceCount() === 1 ? '' : 's'}
+							{tp('entity.interface', ifaceCount())}
 						</span>
 					</a>
 					<a class="detail-stat" href="#device-trace">
 						<span class="detail-stat-value">{traceCount()}</span>{' '}
 						<span class="detail-stat-label">
-							Trace link{traceCount() === 1 ? '' : 's'}
+							{tp('device.traceLink', traceCount())}
 						</span>
 					</a>
 					<a class="detail-stat" href="#device-cables">
 						<span class="detail-stat-value">{cableCount()}</span>{' '}
-						<span class="detail-stat-label">Cable{cableCount() === 1 ? '' : 's'}</span>
+						<span class="detail-stat-label">{tp('device.cable', cableCount())}</span>
 					</a>
 				</div>
 
-				<DetailCard label="Gerätedetails">
-					<dt>Typ</dt>
+				<DetailCard label={t('device.details')}>
+					<dt>{t('common.type')}</dt>
 					<dd>{typeNameOf(device()?.device_type_id)}</dd>
-					<dt>Beschreibung</dt>
+					<dt>{t('common.description')}</dt>
 					<dd>{device()?.description || '—'}</dd>
-					<dt>Seriennummer</dt>
+					<dt>{t('device.serial')}</dt>
 					<dd>{device()?.serial ?? '—'}</dd>
-					<dt>Standort</dt>
+					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={siteId()}
@@ -343,7 +354,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							href={`/sites/${siteId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Bereich</dt>
+					<dt>{tp('entity.location', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={locationId()}
@@ -351,7 +362,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							name={locationName()}
 						/>
 					</dd>
-					<dt>Rack</dt>
+					<dt>{tp('entity.rack', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={rackId()}
@@ -360,24 +371,30 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							href={`/racks/${rackId() ?? ''}`}
 						/>
 					</dd>
-					<dt>Seite</dt>
-					<dd>{device()?.face ?? '—'}</dd>
-					<dt>Position</dt>
+					<dt>{t('shelf.face')}</dt>
+					<dd>{faceLabelOrDash(device()?.face)}</dd>
+					<dt>{t('common.position')}</dt>
 					<dd>
 						{device()?.position_u !== null && device()?.position_u !== undefined ? (
-							<code>HE{device()?.position_u}</code>
+							<code>
+								{t('common.unitPosition', { u: device()?.position_u ?? '' })}
+							</code>
 						) : shelfId() !== null ? (
 							<ForeignKeyLink
 								id={shelfId()}
 								loading={shelf.loading}
-								name={`Fachboden ${shelf()?.name || `HE${shelf()?.position_u ?? ''}`}`}
+								name={t('device.onShelf', {
+									name:
+										shelf()?.name ||
+										t('common.unitPosition', { u: shelf()?.position_u ?? '' }),
+								})}
 								href={`/shelves/${shelfId() ?? ''}/edit`}
 							/>
 						) : (
-							<span>unracked</span>
+							<span>{t('device.unracked')}</span>
 						)}
 					</dd>
-					<dt>Mandant</dt>
+					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
 							id={tenantId()}
@@ -388,24 +405,26 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 				</DetailCard>
 			</DetailShell>
-			<h3>Move</h3>
+			<h3>{t('device.move')}</h3>
 			<form onSubmit={handleMove}>
 				<input
-					placeholder="Position (empty clears)"
+					placeholder={t('device.movePlaceholder')}
 					inputmode="numeric"
 					value={moveU()}
 					onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}
 				/>
-				<button type="submit">Verschieben</button>
+				<button type="submit">{t('device.move')}</button>
 			</form>
-			<h3 id="device-interfaces">Interfaces ({ifaces()?.length ?? 0})</h3>
+			<h3 id="device-interfaces">
+				{t('device.interfacesCount', { count: ifaces()?.length ?? 0 })}
+			</h3>
 			<form onSubmit={handleAddIface}>
 				<input
-					placeholder="Interface name (e.g. mgmt1)"
+					placeholder={t('device.interfaceNamePlaceholder')}
 					value={ifaceName()}
 					onInput={(e: InputEventAndTarget) => setIfaceName(e.currentTarget.value)}
 				/>
-				<button type="submit">Anschluss hinzufügen</button>
+				<button type="submit">{t('device.addInterface')}</button>
 			</form>
 			<DataTable
 				rows={() => ifaces() ?? []}
@@ -414,9 +433,11 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				columns={[
 					{
 						key: 'status',
-						label: 'Status',
+						label: t('common.status'),
 						getValue: (iface: InterfaceJson): JSX.Element => (
-							<span title={iface.connected ? 'connected' : 'free'}>
+							<span
+								title={iface.connected ? t('device.connected') : t('device.free')}
+							>
 								<span
 									class={
 										iface.connected ? 'status-dot-connected' : 'status-dot-free'
@@ -429,12 +450,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					},
 					{
 						key: 'name',
-						label: 'Name',
+						label: t('common.name'),
 						getValue: (iface: InterfaceJson): JSX.Element => <code>{iface.name}</code>,
 					},
 					{
 						key: 'kind',
-						label: 'Kind',
+						label: t('device.kind'),
 						getValue: (iface: InterfaceJson): string => iface.kind,
 					},
 				]}
@@ -446,31 +467,31 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							disabled={iface.connected}
 							title={
 								iface.connected
-									? 'Already connected'
-									: `Connect ${iface.name} to a peer port`
+									? t('device.alreadyConnected')
+									: t('device.connectToPeer', { name: iface.name })
 							}
-							aria-label={`Connect cable for ${iface.name}`}
+							aria-label={t('device.connectCableFor', { name: iface.name })}
 							onClick={() => handleConnectCable(iface)}
 						>
 							<IconLinkPlus size={20} />
 						</button>
 						<button type="button" onClick={() => handleRename(iface)}>
-							Rename
+							{t('device.rename')}
 						</button>
 					</span>
 				)}
 				empty={false}
 			/>
-			<h3 id="device-connect">Kabel verbinden</h3>
+			<h3 id="device-connect">{t('device.connectCable')}</h3>
 			<form onSubmit={handleConnect}>
 				<select
 					value={localIface()}
 					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 						setLocalIface(e.currentTarget.value)
 					}
-					aria-label="Local free port"
+					aria-label={t('device.localFreePort')}
 				>
-					<option value="">Local free port…</option>
+					<option value="">{t('device.localFreePortPlaceholder')}</option>
 					<For each={freeLocal()}>
 						{(iface: InterfaceJson): JSX.Element => (
 							<option value={iface.id}>{iface.name}</option>
@@ -483,9 +504,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						setPeerDevice(e.currentTarget.value)
 						setPeerIface('')
 					}}
-					aria-label="Peer device"
+					aria-label={t('device.peerDevice')}
 				>
-					<option value="">Peer device…</option>
+					<option value="">{t('device.peerDevicePlaceholder')}</option>
 					<For each={devices() ?? []}>
 						{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 					</For>
@@ -495,9 +516,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 						setPeerIface(e.currentTarget.value)
 					}
-					aria-label="Peer free port"
+					aria-label={t('device.peerFreePort')}
 				>
-					<option value="">Peer free port…</option>
+					<option value="">{t('device.peerFreePortPlaceholder')}</option>
 					<For each={freePeer()}>
 						{(iface: InterfaceJson): JSX.Element => (
 							<option value={iface.id}>{iface.name}</option>
@@ -505,38 +526,37 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</For>
 				</select>{' '}
 				<input
-					placeholder="Label (optional)"
+					placeholder={t('device.labelPlaceholder')}
 					value={cableLabel()}
 					onInput={(e: InputEventAndTarget) => setCableLabel(e.currentTarget.value)}
 				/>{' '}
-				<button type="submit">Verbinden</button>
+				<button type="submit">{t('device.connect')}</button>
 			</form>
-			<h3 id="device-trace">Pfad ({trace()?.links.length ?? 0})</h3>
+			<h3 id="device-trace">
+				{t('device.traceCount', { count: trace()?.links.length ?? 0 })}
+			</h3>
 			<label>
-				<span class="visually-hidden">Pfadtiefe</span>
+				<span class="visually-hidden">{t('device.traceDepth')}</span>
 				<select
-					aria-label="Trace depth"
+					aria-label={t('device.traceDepth')}
 					value={traceDepth()}
 					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 						setTraceDepth(e.currentTarget.value)
 					}
 				>
-					<option value="1">Depth 1</option>
-					<option value="2">Depth 2</option>
-					<option value="3">Depth 3</option>
-					<option value="4">Depth 4</option>
-					<option value="6">Depth 6</option>
-					<option value="10">Depth 10</option>
+					<For each={TRACE_DEPTHS}>
+						{(depth: number): JSX.Element => (
+							<option value={depth}>{t('device.depth', { count: depth })}</option>
+						)}
+					</For>
 				</select>
 			</label>{' '}
 			<a href="/topology" onClick={(e: MouseEvent): void => go(e, '/topology')}>
-				Open in topology
+				{t('device.openInTopology')}
 			</a>
 			<Show
 				when={(trace()?.links ?? []).length > 0}
-				fallback={
-					<Empty message="Noch kein Kabelpfad vorhanden. Verbinden Sie unten das erste Kabel." />
-				}
+				fallback={<Empty message={t('device.noTrace')} />}
 			>
 				<ul>
 					<For each={trace()?.links ?? []}>
@@ -552,7 +572,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 									class="btn-danger"
 									onClick={() => handleDisconnect(link.cable_id)}
 								>
-									Disconnect
+									{t('device.disconnect')}
 								</button>
 							</li>
 						)}
@@ -560,7 +580,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</ul>
 			</Show>
 			<Show when={(trace()?.paths ?? []).length > 0}>
-				<h4>Multi-hop paths ({trace()?.paths.length ?? 0})</h4>
+				<h4>{t('device.multiHopPaths', { count: trace()?.paths.length ?? 0 })}</h4>
 				<ul>
 					<For each={trace()?.paths ?? []}>
 						{(path: TracePath): JSX.Element => (
@@ -588,12 +608,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</ul>
 			</Show>
 			<h3 id="device-cables">
-				Cables ({cables()?.length ?? 0}){' '}
+				{t('device.cablesCount', { count: cables()?.length ?? 0 })}{' '}
 				<a
 					href={`/connections?device=${props.id}`}
 					onClick={(e: MouseEvent): void => go(e, `/connections?device=${props.id}`)}
 				>
-					View all
+					{t('device.viewAllShort')}
 				</a>
 			</h3>
 			<DataTable
@@ -603,19 +623,19 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				columns={[
 					{
 						key: 'label',
-						label: 'Label',
+						label: t('device.label'),
 						getValue: (cable: CableRow): string => cable.label ?? '—',
 					},
 					{
 						key: 'status',
-						label: 'Status',
+						label: t('common.status'),
 						getValue: (cable: CableRow): JSX.Element => (
-							<span class="badge">{cable.status}</span>
+							<span class="badge">{cableStatusLabel(cable.status)}</span>
 						),
 					},
 					{
 						key: 'kind',
-						label: 'Kind',
+						label: t('device.kind'),
 						getValue: (cable: CableRow): string => cable.kind ?? '—',
 					},
 				]}
@@ -625,10 +645,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						class="btn-danger"
 						onClick={() => handleDisconnect(cable.id)}
 					>
-						Disconnect
+						{t('device.disconnect')}
 					</button>
 				)}
-				emptyContent={<Empty message="Für dieses Gerät sind noch keine Kabel vorhanden." />}
+				emptyContent={<Empty message={t('device.noCables')} />}
 			/>
 			<InlineError message={error()} />
 		</div>

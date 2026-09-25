@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -17,6 +16,9 @@ import {
 	fetch_devices,
 	type InterfaceListItem,
 } from '../api_devices'
+import { DataTable, type DataTableColumn } from '../components/data_table'
+import { ListRangeStatus } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { navigate, parseId, queryParam } from '../router'
 import { use_visible_columns } from '../util/column_visibility'
 
@@ -80,8 +82,6 @@ export function InterfacesPage(): JSX.Element {
 
 	const rows = createMemo(() => ifacesPage()?.items ?? [])
 	const total = createMemo(() => ifacesPage()?.total ?? 0)
-	const rangeStart = createMemo(() => (total() === 0 ? 0 : 1))
-	const rangeEnd = createMemo(() => total())
 
 	const [devices] = createResource(async () => {
 		const res = await fetch_devices()
@@ -95,7 +95,7 @@ export function InterfacesPage(): JSX.Element {
 	const columns: DataTableColumn<InterfaceListItem>[] = [
 		{
 			key: 'device',
-			label: 'Device',
+			label: tp('entity.device', 1),
 			getValue: (i: InterfaceListItem): JSX.Element => (
 				<a
 					href={`/devices/${i.device_id}`}
@@ -107,26 +107,26 @@ export function InterfacesPage(): JSX.Element {
 		},
 		{
 			key: 'name',
-			label: 'Anschluss',
+			label: tp('entity.interface', 1),
 			getValue: (i: InterfaceListItem): JSX.Element => <code>{i.name}</code>,
 		},
 		{
 			key: 'kind',
-			label: 'Typ',
+			label: t('common.type'),
 			getValue: (i: InterfaceListItem): string => i.kind,
 		},
 		{
 			key: 'status',
-			label: 'Status',
+			label: t('common.status'),
 			getValue: (i: InterfaceListItem): JSX.Element => (
-				<span title={i.connected ? 'verbunden' : 'frei'}>
+				<span title={i.connected ? t('device.connected') : t('device.free')}>
 					<span class={i.connected ? 'status-dot-connected' : 'status-dot-free'}>●</span>
 				</span>
 			),
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
+			label: t('common.description'),
 			getValue: (i: InterfaceListItem): string => i.description ?? '—',
 		},
 	]
@@ -144,48 +144,50 @@ export function InterfacesPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>Anschlüsse</h2>
+				<h2>{tp('entity.interface', 2)}</h2>
 			</div>
 
 			<div class="toolbar-row">
 				<label class="toolbar-search">
-					<span class="visually-hidden">Anschlüsse suchen</span>
+					<span class="visually-hidden">
+						{t('list.searchLabel', { noun: tp('noun.interface', 2) })}
+					</span>
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Anschluss, Typ oder Gerät suchen…"
-						aria-label="Anschlüsse suchen"
+						placeholder={t('interface.searchPlaceholder')}
+						aria-label={t('list.searchLabel', { noun: tp('noun.interface', 2) })}
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
 				</label>
 				<label>
-					<span class="visually-hidden">Nach Gerät filtern</span>
+					<span class="visually-hidden">{t('interface.filterByDevice')}</span>
 					<select
-						aria-label="Nach Gerät filtern"
+						aria-label={t('interface.filterByDevice')}
 						value={deviceFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setDeviceFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Geräte</option>
+						<option value="">{t('interface.allDevices')}</option>
 						<For each={devices() ?? []}>
 							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Nach Status filtern</span>
+					<span class="visually-hidden">{t('interface.filterByStatus')}</span>
 					<select
-						aria-label="Nach Status filtern"
+						aria-label={t('interface.filterByStatus')}
 						value={connectedFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setConnectedFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Frei oder verbunden</option>
-						<option value="free">Frei</option>
-						<option value="connected">Verbunden</option>
+						<option value="">{t('interface.freeOrConnected')}</option>
+						<option value="free">{t('interface.free')}</option>
+						<option value="connected">{t('interface.connected')}</option>
 					</select>
 				</label>
 			</div>
@@ -198,19 +200,19 @@ export function InterfacesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				loading={() => ifacesPage.loading}
-				loadingContent={<p class="skeleton">Anschlüsse werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.interface', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{hasFilters()
-							? 'Keine Anschlüsse für die aktuellen Filter gefunden.'
-							: 'Noch keine Anschlüsse vorhanden. Fügen Sie ein Gerät hinzu, um seine Ports anzuzeigen.'}
+							? t('list.noMatchFilters', { noun: tp('noun.interface', 2) })
+							: t('interface.empty')}
 					</p>
 				}
 			/>
 
-			<p class="paginator-showing" role="status">
-				Showing {rangeStart()}-{rangeEnd()} of {total()}
-			</p>
+			<ListRangeStatus total={total()} />
 
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>

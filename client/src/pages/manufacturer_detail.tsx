@@ -1,4 +1,3 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
@@ -8,6 +7,7 @@ import {
 	fetch_device_types,
 	fetch_manufacturer,
 } from '../api_templates'
+import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
@@ -17,6 +17,7 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
+import { t, tp } from '../i18n'
 
 /**
  * /manufacturers/:id — manufacturer detail: header with description
@@ -50,7 +51,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 	)
 
 	const { handleDelete } = useDetailDelete({
-		noun: 'manufacturer',
+		noun: 'noun.manufacturer',
 		name: () => manufacturer()?.name,
 		id: props.id,
 		remove: delete_manufacturer,
@@ -64,56 +65,58 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				backTo="/manufacturers"
-				backLabel="Manufacturers"
+				backLabel={tp('entity.manufacturer', 2)}
 				loading={manufacturer.loading}
-				loadingText="Hersteller wird geladen…"
+				loadingText={t('manufacturer.loadingOne')}
 				record={manufacturer()}
-				emptyText="Manufacturer not found."
+				emptyText={t('manufacturer.notFound')}
 			>
 				<DetailHeader
 					name={manufacturer()?.name}
 					editHref={`/manufacturers/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle>{manufacturer()?.description || 'No description.'}</DetailSubtitle>
+				<DetailSubtitle>
+					{manufacturer()?.description || t('common.noDescription')}
+				</DetailSubtitle>
 
-				<DetailCard label="Herstellerdetails">
-					<dt>Beschreibung</dt>
+				<DetailCard label={t('manufacturer.details')}>
+					<dt>{t('common.description')}</dt>
 					<dd>{manufacturer()?.description || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 
 			<RelatedSection
 				id="manufacturer-device-types"
-				title="Device types"
+				title={tp('entity.deviceType', 2)}
 				count={typeCount()}
 				loading={deviceTypes.loading}
-				loadingText="Gerätetypen werden geladen…"
-				emptyText="Für diesen Hersteller sind noch keine Gerätetypen vorhanden."
+				loadingText={t('list.loading', { noun: tp('noun.deviceType', 2) })}
+				emptyText={t('manufacturer.noDeviceTypes')}
 				hasItems={typeCount() > 0}
 				viewAllHref={`/device-types?manufacturer=${props.id}`}
-				viewAllLabel="View in Device types →"
+				viewAllLabel={t('common.viewIn', { target: tp('entity.deviceType', 2) })}
 			>
 				<DataTable
 					rows={() => deviceTypes() ?? []}
-					getRowId={(t: DeviceTypeRow): number => t.id}
+					getRowId={(dt: DeviceTypeRow): number => dt.id}
 					showColumnCustomizer
 					columns={[
 						{
 							key: 'model',
-							label: 'Model',
-							getValue: (t: DeviceTypeRow): string => t.model,
+							label: t('common.model'),
+							getValue: (dt: DeviceTypeRow): string => dt.model,
 						},
 						{
 							key: 'u_height',
-							label: 'Height (HE)',
-							getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
+							label: t('common.heightU'),
+							getValue: (dt: DeviceTypeRow): string => `${dt.u_height}`,
 						},
 						{
 							key: 'is_full_depth',
-							label: 'Volle Tiefe',
-							getValue: (t: DeviceTypeRow): string =>
-								t.is_full_depth ? 'Yes' : 'No',
+							label: t('common.fullDepth'),
+							getValue: (dt: DeviceTypeRow): string =>
+								dt.is_full_depth ? t('common.yes') : t('common.no'),
 						},
 					]}
 				/>

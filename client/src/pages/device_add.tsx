@@ -11,7 +11,6 @@ import { fetch_locations, fetch_sites, fetch_tenants, type SiteRow } from '../ap
 import {
 	FormActions,
 	FormError,
-	type FormOption,
 	FormPage,
 	Hint,
 	NameField,
@@ -19,14 +18,10 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
+import { faceOptions } from '../i18n/labels'
 import { navigate, parseId, queryParam } from '../router'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
-
-/** Rack faces a device can be mounted on. */
-const FACE_OPTIONS: FormOption[] = [
-	{ value: 'front', label: 'front' },
-	{ value: 'rear', label: 'rear' },
-]
 
 /** /devices/add — NetBox-style device instantiate form. */
 export function DeviceAddPage(): JSX.Element {
@@ -127,10 +122,10 @@ export function DeviceAddPage(): JSX.Element {
 			name: name(),
 			validate: (): string | null => {
 				if (!typeId()) {
-					return 'Select a device type first.'
+					return t('device.selectTypeFirst')
 				}
 				if (position !== null && (!Number.isInteger(position) || position < 1)) {
-					return 'Rack position must be a positive integer or empty.'
+					return t('device.positionInvalid')
 				}
 				return null
 			},
@@ -160,34 +155,34 @@ export function DeviceAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/devices"
-			backLabel="Devices"
-			title="Neues Gerät hinzufügen"
+			backLabel={tp('entity.device', 2)}
+			title={t('device.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="device-name"
-				placeholder="sw-zugang-01"
+				placeholder={t('device.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 				autofocus
 			/>
 			<SelectField
 				id="device-type"
-				label="Gerätetyp"
+				label={tp('entity.deviceType', 1)}
 				required
 				value={typeId()}
 				onChange={setTypeId}
-				options={(types() ?? []).map((t) => ({
-					value: t.id,
-					label: `${t.model} (${manufacturerName(t.manufacturer_id)})`,
+				options={(types() ?? []).map((type) => ({
+					value: type.id,
+					label: `${type.model} (${manufacturerName(type.manufacturer_id)})`,
 				}))}
-				emptyLabel="Device type…"
+				emptyLabel={t('device.deviceTypePlaceholder')}
 				action={
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Gerätetyp hinzufügen"
-						title="Gerätetyp hinzufügen"
+						aria-label={t('app.navAdd', { label: tp('entity.deviceType', 1) })}
+						title={t('app.navAdd', { label: tp('entity.deviceType', 1) })}
 						onClick={() => navigate('/device-types/add')}
 					>
 						<IconPlus size={16} />
@@ -196,101 +191,97 @@ export function DeviceAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextField
 				id="device-serial"
-				label="Seriennummer"
-				placeholder="Seriennummer (optional)"
+				label={t('device.serial')}
+				placeholder={t('device.serialPlaceholder')}
 				maxLength={100}
 				value={serial()}
 				onInput={setSerial}
 			/>
 			<SelectField
 				id="device-site"
-				label="Standort"
+				label={tp('entity.site', 1)}
 				value={siteId()}
 				onChange={handleSiteChange}
 				options={row_options(sites() ?? [])}
-				emptyLabel="Kein Standort"
+				emptyLabel={t('device.noSite')}
 			/>
 			<SelectField
 				id="device-location"
-				label="Bereich"
+				label={tp('entity.location', 1)}
 				value={locationId()}
 				disabled={siteId() === ''}
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
-				emptyLabel="Kein Bereich"
+				emptyLabel={t('rack.noLocation')}
 				hint={
 					<Show when={siteId() === ''}>
-						<Hint>Pick a site first to choose a location.</Hint>
+						<Hint>{t('rack.pickSiteForLocation')}</Hint>
 					</Show>
 				}
 			/>
 			<SelectField
 				id="device-rack"
-				label="Rack"
+				label={tp('entity.rack', 1)}
 				value={rackId()}
 				disabled={shelfId !== null}
 				onChange={handleRackChange}
 				options={row_options(racks() ?? [])}
-				emptyLabel="Unracked"
+				emptyLabel={t('device.unrackedOption')}
 			/>
 			<SelectField
 				id="device-face"
-				label="Seite"
+				label={t('shelf.face')}
 				value={face()}
 				disabled={rackId() === '' || shelfId !== null}
 				onChange={setFace}
-				options={FACE_OPTIONS}
-				emptyLabel="Keine Seite"
+				options={faceOptions()}
+				emptyLabel={t('device.noFace')}
 				hint={
-					<Show
-						when={rackId() === ''}
-						fallback={<Hint>Which rack face the device is mounted on.</Hint>}
-					>
-						<Hint>Pick a rack first to choose a face.</Hint>
+					<Show when={rackId() === ''} fallback={<Hint>{t('device.faceHint')}</Hint>}>
+						<Hint>{t('shelf.pickRackForFace')}</Hint>
 					</Show>
 				}
 			/>
 			<TextField
 				id="device-position"
-				label="Position"
-				placeholder="Position (oder leer lassen)"
+				label={t('common.position')}
+				placeholder={t('device.positionPlaceholder')}
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
 				hint={
 					<Show
 						when={shelfId !== null}
-						fallback={
-							<Hint>
-								Optional, even with a rack: empty leaves the device unracked.
-							</Hint>
-						}
+						fallback={<Hint>{t('device.positionHint')}</Hint>}
 					>
 						<Hint>
-							Steht auf Fachboden {shelf()?.name || `HE${shelf()?.position_u ?? ''}`}{' '}
-							(keine eigene HE).
+							{t('device.onShelfHint', {
+								name:
+									shelf()?.name ||
+									t('common.unitPosition', { u: shelf()?.position_u ?? '' }),
+							})}
 						</Hint>
 					</Show>
 				}
 			/>
 			<SelectField
 				id="device-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={handleTenantChange}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 				hint={
 					<Show when={!tenantTouched() && siteTenantId() !== null}>
-						<Hint>Defaults to the site's tenant.</Hint>
+						<Hint>{t('location.tenantFromSite')}</Hint>
 					</Show>
 				}
 			/>

@@ -15,6 +15,8 @@ import { fetch_trace } from '../api_cables'
 import { type DeviceRow, fetch_devices } from '../api_devices'
 import { fetch_site_groups, fetch_sites, type SiteGroupRow, type SiteRow } from '../api_tenancy'
 import { fetch_cable_trace, fetch_topology } from '../api_topology'
+import { t } from '../i18n'
+import { cableStatusLabel, deviceStatusLabel } from '../i18n/labels'
 import { navigate, parseId, queryParam } from '../router'
 
 const SVG_W: number = 560
@@ -386,27 +388,24 @@ export function TopologyPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>Topologie</h2>
+				<h2>{t('entity.topology')}</h2>
 				<button type="button" onClick={() => refetch()}>
-					Aktualisieren
+					{t('topology.refresh')}
 				</button>
 			</div>
-			<p class="page-subtitle">
-				Geräte werden als Knoten und Kabel als Kanten dargestellt. Wählen Sie einen Knoten
-				oder ein Kabel, um den Pfad anzuzeigen.
-			</p>
+			<p class="page-subtitle">{t('topology.intro')}</p>
 
 			<div class="toolbar-row">
 				<label>
-					<span class="visually-hidden">Nach Standortgruppe filtern</span>
+					<span class="visually-hidden">{t('topology.filterBySiteGroup')}</span>
 					<select
-						aria-label="Nach Standortgruppe filtern"
+						aria-label={t('topology.filterBySiteGroup')}
 						value={groupFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setGroupFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Gruppen</option>
+						<option value="">{t('topology.allGroups')}</option>
 						<For each={siteGroups() ?? []}>
 							{(g: SiteGroupRow): JSX.Element => (
 								<option value={g.id}>{g.name}</option>
@@ -415,85 +414,87 @@ export function TopologyPage(): JSX.Element {
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Nach Standort filtern</span>
+					<span class="visually-hidden">{t('location.filterBySite')}</span>
 					<select
-						aria-label="Nach Standort filtern"
+						aria-label={t('location.filterBySite')}
 						value={siteFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setSiteFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Standorte</option>
+						<option value="">{t('location.allSites')}</option>
 						<For each={groupSites()}>
 							{(s: SiteRow): JSX.Element => <option value={s.id}>{s.name}</option>}
 						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Gerät fokussieren</span>
+					<span class="visually-hidden">{t('topology.focusDevice')}</span>
 					<select
-						aria-label="Gerät fokussieren"
+						aria-label={t('topology.focusDevice')}
 						value={focusFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFocusFilter(e.currentTarget.value)
 						}
 					>
-						<option value="">Gesamter Graph</option>
+						<option value="">{t('topology.wholeGraph')}</option>
 						<For each={filteredDevices()}>
 							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
 						</For>
 					</select>
 				</label>
 				<label>
-					<span class="visually-hidden">Pfadtiefe</span>
+					<span class="visually-hidden">{t('device.traceDepth')}</span>
 					<select
-						aria-label="Pfadtiefe"
+						aria-label={t('device.traceDepth')}
 						value={traceDepth()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setTraceDepth(e.currentTarget.value)
 						}
 					>
 						<For each={['1', '2', '3', '4', '6', '10']}>
-							{(d: string): JSX.Element => <option value={d}>Tiefe {d}</option>}
+							{(d: string): JSX.Element => (
+								<option value={d}>{t('device.depth', { count: d })}</option>
+							)}
 						</For>
 					</select>
 				</label>
 				<span class="toolbar-count" role="status">
-					{nodes().length} Geräte · {edges().length} Kabel · {zoomPct()}%
+					{t('topology.count', {
+						devices: nodes().length,
+						cables: edges().length,
+						zoom: zoomPct(),
+					})}
 				</span>
 			</div>
 
-			<div class="topo-controls" role="toolbar" aria-label="Graph-Ansicht steuern">
+			<div class="topo-controls" role="toolbar" aria-label={t('topology.controls')}>
 				<button
 					type="button"
 					onClick={() => zoomCenter(1 / ZOOM_FACTOR)}
-					aria-label="Vergrößern"
+					aria-label={t('topology.zoomIn')}
 				>
 					+
 				</button>
 				<button
 					type="button"
 					onClick={() => zoomCenter(ZOOM_FACTOR)}
-					aria-label="Verkleinern"
+					aria-label={t('topology.zoomOut')}
 				>
 					−
 				</button>
 				<button type="button" onClick={resetView}>
-					Ansicht zurücksetzen
+					{t('topology.resetView')}
 				</button>
-				<span class="topo-hint">Ziehen zum Verschieben · Scrollen zum Zoomen</span>
+				<span class="topo-hint">{t('topology.hint')}</span>
 			</div>
 			<Show
 				when={!topology.loading}
-				fallback={<p class="skeleton">Topologie wird geladen…</p>}
+				fallback={<p class="skeleton">{t('topology.loading')}</p>}
 			>
 				<Show
 					when={nodes().length > 0}
-					fallback={
-						<p class="empty">
-							Keine Geräte in dieser Ansicht. Passen Sie den Standortfilter an.
-						</p>
-					}
+					fallback={<p class="empty">{t('topology.empty')}</p>}
 				>
 					<div class="topo-wrap">
 						<svg
@@ -501,7 +502,10 @@ export function TopologyPage(): JSX.Element {
 							class="topo-svg topo-pannable"
 							viewBox={`${view().x} ${view().y} ${view().w} ${view().h}`}
 							role="img"
-							aria-label={`Topology graph with ${nodes().length} devices and ${edges().length} cables. Drag to pan, scroll to zoom.`}
+							aria-label={t('topology.graphLabel', {
+								devices: nodes().length,
+								cables: edges().length,
+							})}
 							onPointerDown={onPointerDown}
 							onPointerMove={onPointerMove}
 							onPointerUp={onPointerUp}
@@ -538,7 +542,10 @@ export function TopologyPage(): JSX.Element {
 										<g
 											role="button"
 											tabindex={0}
-											aria-label={`Trace cable ${e.a.device.name}:${e.a.iface.name} to ${e.b.device.name}:${e.b.iface.name}`}
+											aria-label={t('topology.traceCable', {
+												a: `${e.a.device.name}:${e.a.iface.name}`,
+												b: `${e.b.device.name}:${e.b.iface.name}`,
+											})}
 											onClick={() => toggleEdge(e.cable_id)}
 											onKeyDown={(ev: KeyboardEvent) => {
 												if (ev.key === 'Enter' || ev.key === ' ') {
@@ -587,9 +594,11 @@ export function TopologyPage(): JSX.Element {
 											}}
 											tabindex={0}
 											role="button"
-											aria-label={`Trace from device ${n.name}`}
+											aria-label={t('topology.traceFromDevice', {
+												name: n.name,
+											})}
 										>
-											<title>{`${n.name} (${n.status})`}</title>
+											<title>{`${n.name} (${deviceStatusLabel(n.status)})`}</title>
 											<circle
 												cx={p.x}
 												cy={p.y}
@@ -614,24 +623,23 @@ export function TopologyPage(): JSX.Element {
 			</Show>
 
 			<Show when={selectedNode() !== null}>
-				<section class="card" aria-label="Gerätepfad">
+				<section class="card" aria-label={t('topology.devicePath')}>
 					<h3>
-						Pfad ab{' '}
-						{nodes().find((n) => n.id === selectedNode())?.name ?? selectedNode()} (
-						{deviceTrace()?.paths.length ?? 0} Pfade)
+						{t('topology.pathFrom', {
+							name:
+								nodes().find((n) => n.id === selectedNode())?.name ??
+								selectedNode() ??
+								'',
+							count: deviceTrace()?.paths.length ?? 0,
+						})}
 					</h3>
 					<Show
 						when={!deviceTrace.loading}
-						fallback={<p class="skeleton">Pfad wird geladen…</p>}
+						fallback={<p class="skeleton">{t('topology.loadingPath')}</p>}
 					>
 						<Show
 							when={(deviceTrace()?.paths ?? []).length > 0}
-							fallback={
-								<p class="empty">
-									Keine Kabelverbindungen jenseits dieses Geräts innerhalb der
-									ausgewählten Tiefe.
-								</p>
-							}
+							fallback={<p class="empty">{t('topology.noPaths')}</p>}
 						>
 							<ul>
 								<For each={deviceTrace()?.paths ?? []}>
@@ -653,7 +661,7 @@ export function TopologyPage(): JSX.Element {
 						</Show>
 					</Show>
 					<Show when={nodeEdges().length > 0}>
-						<h4>Direkte Kabelverbindungen ({nodeEdges().length})</h4>
+						<h4>{t('topology.directCables', { count: nodeEdges().length })}</h4>
 						<ul>
 							<For each={nodeEdges()}>
 								{(e: TopologyEdge): JSX.Element => (
@@ -672,15 +680,15 @@ export function TopologyPage(): JSX.Element {
 			</Show>
 
 			<Show when={selectedEdge() !== null}>
-				<section class="card" aria-label="Kabelpfad">
-					<h3>Kabelpfad</h3>
+				<section class="card" aria-label={t('topology.cablePath')}>
+					<h3>{t('topology.cablePath')}</h3>
 					<Show
 						when={!cableTrace.loading}
-						fallback={<p class="skeleton">Kabelpfad wird geladen…</p>}
+						fallback={<p class="skeleton">{t('topology.loadingCablePath')}</p>}
 					>
 						<Show
 							when={cableTrace()}
-							fallback={<p class="empty">Kabel nicht gefunden.</p>}
+							fallback={<p class="empty">{t('topology.cableNotFound')}</p>}
 						>
 							<p>
 								<code>
@@ -692,12 +700,14 @@ export function TopologyPage(): JSX.Element {
 								) : null}
 							</p>
 							<h4>
-								Pfade ab {cableTrace()?.a_device.name} (
-								{cableTrace()?.paths_from_a.length ?? 0})
+								{t('topology.pathsFrom', {
+									name: cableTrace()?.a_device.name ?? '',
+									count: cableTrace()?.paths_from_a.length ?? 0,
+								})}
 							</h4>
 							<Show
 								when={(cableTrace()?.paths_from_a ?? []).length > 0}
-								fallback={<p class="empty">Sackgasse auf dieser Seite.</p>}
+								fallback={<p class="empty">{t('topology.deadEnd')}</p>}
 							>
 								<ul>
 									<For each={cableTrace()?.paths_from_a ?? []}>
@@ -710,12 +720,14 @@ export function TopologyPage(): JSX.Element {
 								</ul>
 							</Show>
 							<h4>
-								Pfade ab {cableTrace()?.b_device.name} (
-								{cableTrace()?.paths_from_b.length ?? 0})
+								{t('topology.pathsFrom', {
+									name: cableTrace()?.b_device.name ?? '',
+									count: cableTrace()?.paths_from_b.length ?? 0,
+								})}
 							</h4>
 							<Show
 								when={(cableTrace()?.paths_from_b ?? []).length > 0}
-								fallback={<p class="empty">Sackgasse auf dieser Seite.</p>}
+								fallback={<p class="empty">{t('topology.deadEnd')}</p>}
 							>
 								<ul>
 									<For each={cableTrace()?.paths_from_b ?? []}>
@@ -733,15 +745,15 @@ export function TopologyPage(): JSX.Element {
 			</Show>
 
 			<Show when={edges().length > 0}>
-				<h3>Kabel ({edges().length})</h3>
+				<h3>{t('topology.cables', { count: edges().length })}</h3>
 				<table>
 					<thead>
 						<tr>
-							<th>Endpunkt A</th>
-							<th>Endpunkt B</th>
-							<th>Bezeichnung</th>
-							<th>Status</th>
-							<th>Pfad</th>
+							<th>{t('connection.endpointA')}</th>
+							<th>{t('connection.endpointB')}</th>
+							<th>{t('connection.label')}</th>
+							<th>{t('common.status')}</th>
+							<th>{t('topology.path')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -761,7 +773,7 @@ export function TopologyPage(): JSX.Element {
 									<td>{e.cable_label ?? '—'}</td>
 									<td>
 										<span class={`badge badge-${e.cable_status}`}>
-											{e.cable_status}
+											{cableStatusLabel(e.cable_status)}
 										</span>
 									</td>
 									<td>
@@ -769,7 +781,7 @@ export function TopologyPage(): JSX.Element {
 											type="button"
 											onClick={() => toggleEdge(e.cable_id)}
 										>
-											Anzeigen
+											{t('connection.show')}
 										</button>
 									</td>
 								</tr>

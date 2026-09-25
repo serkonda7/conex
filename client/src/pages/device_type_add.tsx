@@ -12,6 +12,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { navigate } from '../router'
 import { is_add_another_submit } from '../util/form'
 
@@ -41,15 +42,15 @@ export function DeviceTypeAddPage(): JSX.Element {
 		const manufacturer = Number(manufacturerId())
 		const height = Number(uHeight())
 		if (!Number.isInteger(manufacturer) || manufacturer < 1) {
-			setError('Select a manufacturer.')
+			setError(t('deviceType.selectManufacturer'))
 			return
 		}
 		if (!model().trim()) {
-			setError('Model is required.')
+			setError(t('deviceType.modelRequired'))
 			return
 		}
 		if (!Number.isInteger(height) || height < 0 || height > 60) {
-			setError('Height (HE) must be an integer from 0 to 60.')
+			setError(t('deviceType.heightRange', { min: 0, max: 60 }))
 			return
 		}
 		setSaving(true)
@@ -80,25 +81,25 @@ export function DeviceTypeAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/device-types"
-			backLabel="Device types"
-			title="Neuen Gerätetyp hinzufügen"
+			backLabel={tp('entity.deviceType', 2)}
+			title={t('deviceType.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<SelectField
 				id="device-type-manufacturer"
-				label="Hersteller"
+				label={tp('entity.manufacturer', 1)}
 				required
 				autofocus
 				value={manufacturerId()}
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
-				emptyLabel="Manufacturer…"
+				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				action={
 					<button
 						type="button"
 						class="icon-btn btn-add"
-						aria-label="Hersteller hinzufügen"
-						title="Hersteller hinzufügen"
+						aria-label={t('app.navAdd', { label: tp('entity.manufacturer', 1) })}
+						title={t('app.navAdd', { label: tp('entity.manufacturer', 1) })}
 						onClick={() => navigate('/manufacturers/add')}
 					>
 						<IconPlus size={16} />
@@ -107,15 +108,15 @@ export function DeviceTypeAddPage(): JSX.Element {
 			/>
 			<TextField
 				id="device-type-model"
-				label="Modell"
+				label={t('common.model')}
 				required
 				value={model()}
 				onInput={setModel}
-				placeholder="Beispiel-Switch 48"
+				placeholder={t('deviceType.modelPlaceholder')}
 			/>
 			<TextField
 				id="device-type-u-height"
-				label="Höhe (HE)"
+				label={t('common.heightU')}
 				type="number"
 				required
 				min={1}
@@ -135,21 +136,21 @@ export function DeviceTypeAddPage(): JSX.Element {
 								setFullDepth(e.currentTarget.checked)
 							}
 						/>
-						Volle Tiefe
+						{t('common.fullDepth')}
 					</label>
 				</div>
 			</div>
 			<TextField
 				id="device-type-description"
-				label="Beschreibung"
+				label={t('common.description')}
 				value={description()}
 				onInput={setDescription}
-				placeholder="Kurze Zusammenfassung (optional)"
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 			/>
 			<TextAreaField
 				id="device-type-comments"
-				label="Kommentare"
+				label={t('common.comments')}
 				value={comments()}
 				onInput={setComments}
 				maxLength={2000}

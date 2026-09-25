@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -6,6 +5,10 @@ import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, onCleanup, Show } from 'solid-js'
 import { fetch_tenants } from '../api_tenancy'
 import { delete_user, fetch_users, type UserJson } from '../api_users'
+import { DataTable, type DataTableColumn } from '../components/data_table'
+import { ListRangeStatus } from '../components/list_page'
+import { t, tp } from '../i18n'
+import { roleLabel } from '../i18n/labels'
 import { navigate } from '../router'
 
 /**
@@ -50,12 +53,12 @@ export function UsersPage(): JSX.Element {
 	})
 	const tenantName = createMemo(() => {
 		const map = new Map<number, string>()
-		for (const t of tenantsPage()?.items ?? []) {
-			map.set(t.id, t.name)
+		for (const tenant of tenantsPage()?.items ?? []) {
+			map.set(tenant.id, tenant.name)
 		}
 		return (id: number | null): string => {
 			if (id === null) {
-				return 'Alle Mandanten'
+				return t('common.allTenants')
 			}
 			return map.get(id) ?? `#${id}`
 		}
@@ -67,27 +70,25 @@ export function UsersPage(): JSX.Element {
 	const columns: DataTableColumn<UserJson>[] = [
 		{
 			key: 'username',
-			label: 'Benutzername',
+			label: t('auth.username'),
 			getValue: (u: UserJson): JSX.Element => <span>{u.username}</span>,
 		},
 		{
 			key: 'role',
-			label: 'Rolle',
-			getValue: (u: UserJson): JSX.Element => (
-				<span>
-					{{ admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' }[u.role]}
-				</span>
-			),
+			label: t('user.role'),
+			getValue: (u: UserJson): JSX.Element => <span>{roleLabel(u.role)}</span>,
 		},
 		{
 			key: 'tenant',
-			label: 'Mandantenzuordnung',
+			label: t('user.tenantScope'),
 			getValue: (u: UserJson): string => tenantName()(u.tenant_id),
 		},
 	]
 
 	async function handleDelete(id: number, username: string): Promise<void> {
-		if (!window.confirm(`Benutzer „${username}“ löschen?`)) {
+		if (
+			!window.confirm(t('list.confirmDelete', { noun: tp('noun.user', 1), name: username }))
+		) {
 			return
 		}
 		setError(null)
@@ -102,20 +103,22 @@ export function UsersPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>Benutzer</h2>
+				<h2>{tp('entity.user', 2)}</h2>
 				<button type="button" class="btn-add" onClick={() => navigate('/users/add')}>
-					+ Hinzufügen
+					{t('common.add')}
 				</button>
 			</div>
 
 			<div class="toolbar-row">
 				<label class="toolbar-search">
-					<span class="visually-hidden">Benutzer suchen</span>
+					<span class="visually-hidden">
+						{t('list.searchLabel', { noun: tp('noun.user', 2) })}
+					</span>
 					<input
 						type="search"
 						class="toolbar-search-input"
-						placeholder="Benutzername suchen…"
-						aria-label="Benutzer suchen"
+						placeholder={t('user.searchPlaceholder')}
+						aria-label={t('list.searchLabel', { noun: tp('noun.user', 2) })}
 						value={search()}
 						onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 					/>
@@ -131,8 +134,8 @@ export function UsersPage(): JSX.Element {
 						<button
 							type="button"
 							class="icon-btn"
-							title={`${u.username} bearbeiten`}
-							aria-label={`Benutzer ${u.username} bearbeiten`}
+							title={t('user.editNamed', { name: u.username })}
+							aria-label={t('user.editUserNamed', { name: u.username })}
 							onClick={() => navigate(`/users/${u.id}/edit`)}
 						>
 							<IconPencil size={16} />
@@ -140,8 +143,8 @@ export function UsersPage(): JSX.Element {
 						<button
 							type="button"
 							class="icon-btn"
-							title={`${u.username} löschen`}
-							aria-label={`Benutzer ${u.username} löschen`}
+							title={t('common.deleteNamed', { name: u.username })}
+							aria-label={t('user.deleteUserNamed', { name: u.username })}
 							onClick={() => void handleDelete(u.id, u.username)}
 						>
 							<IconTrash size={16} />
@@ -149,19 +152,22 @@ export function UsersPage(): JSX.Element {
 					</div>
 				)}
 				loading={() => usersPage.loading}
-				loadingContent={<p class="skeleton">Benutzer werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.user', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch()
-							? `Keine Benutzer für „${debouncedSearch()}“ gefunden.`
-							: 'Noch keine Benutzer vorhanden. Fügen Sie oben den ersten hinzu.'}
+							? t('list.noMatch', {
+									noun: tp('noun.user', 2),
+									search: debouncedSearch(),
+								})
+							: t('user.empty')}
 					</p>
 				}
 			/>
 
-			<p class="paginator-showing" role="status">
-				Einträge {total() === 0 ? 0 : 1}–{total()} von {total()}
-			</p>
+			<ListRangeStatus total={total()} />
 
 			<Show when={error()}>
 				<div class="app-inline-error">{error()}</div>

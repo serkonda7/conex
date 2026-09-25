@@ -32,6 +32,7 @@ import {
 } from 'solid-js'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
+import { t, tp } from './i18n'
 import { ConnectionsPage } from './pages/connections'
 import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
@@ -108,32 +109,32 @@ function LoginForm(props: {
 	return (
 		<form onSubmit={props.onLogin}>
 			<label class="visually-hidden" for="login-username">
-				Benutzername
+				{t('auth.username')}
 			</label>
 			<input
 				id="login-username"
 				type="text"
-				placeholder="Benutzername"
-				aria-label="Benutzername"
+				placeholder={t('auth.username')}
+				aria-label={t('auth.username')}
 				required
 				value={props.username()}
 				onInput={(e: InputEventAndTarget) => props.setUsername(e.currentTarget.value)}
 				autocomplete="username"
 			/>
 			<label class="visually-hidden" for="login-password">
-				Passwort
+				{t('auth.password')}
 			</label>
 			<input
 				id="login-password"
 				type="password"
-				placeholder="Passwort"
-				aria-label="Passwort"
+				placeholder={t('auth.password')}
+				aria-label={t('auth.password')}
 				required
 				value={props.password()}
 				onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
 				autocomplete="current-password"
 			/>
-			<button type="submit">Anmelden</button>
+			<button type="submit">{t('auth.login')}</button>
 			<Show when={props.error()}>
 				<div class="app-inline-error" role="alert">
 					{props.error()}
@@ -154,50 +155,50 @@ function SetupForm(props: {
 	onSetup: (e: SubmitEvent) => void
 }): JSX.Element {
 	return (
-		<section aria-label="Ersteinrichtung">
-			<h2>Willkommen bei Conex</h2>
-			<p class="page-subtitle">Erstellen Sie ein Administratorkonto, um zu beginnen.</p>
+		<section aria-label={t('auth.setup')}>
+			<h2>{t('auth.welcome')}</h2>
+			<p class="page-subtitle">{t('auth.setupIntro')}</p>
 			<form onSubmit={props.onSetup}>
 				<label class="visually-hidden" for="setup-username">
-					Administrator-Benutzername
+					{t('auth.adminUsername')}
 				</label>
 				<input
 					id="setup-username"
 					type="text"
-					placeholder="Administrator-Benutzername"
-					aria-label="Administrator-Benutzername"
+					placeholder={t('auth.adminUsername')}
+					aria-label={t('auth.adminUsername')}
 					required
 					value={props.username()}
 					onInput={(e: InputEventAndTarget) => props.setUsername(e.currentTarget.value)}
 					autocomplete="username"
 				/>
 				<label class="visually-hidden" for="setup-password">
-					Passwort
+					{t('auth.password')}
 				</label>
 				<input
 					id="setup-password"
 					type="password"
-					placeholder="Passwort"
-					aria-label="Passwort"
+					placeholder={t('auth.password')}
+					aria-label={t('auth.password')}
 					required
 					value={props.password()}
 					onInput={(e: InputEventAndTarget) => props.setPassword(e.currentTarget.value)}
 					autocomplete="new-password"
 				/>
 				<label class="visually-hidden" for="setup-confirm">
-					Passwort bestätigen
+					{t('auth.confirmPassword')}
 				</label>
 				<input
 					id="setup-confirm"
 					type="password"
-					placeholder="Passwort bestätigen"
-					aria-label="Passwort bestätigen"
+					placeholder={t('auth.confirmPassword')}
+					aria-label={t('auth.confirmPassword')}
 					required
 					value={props.confirm()}
 					onInput={(e: InputEventAndTarget) => props.setConfirm(e.currentTarget.value)}
 					autocomplete="new-password"
 				/>
-				<button type="submit">Administratorkonto erstellen</button>
+				<button type="submit">{t('auth.createAdmin')}</button>
 				<Show when={props.error()}>
 					<div class="app-inline-error" role="alert">
 						{props.error()}
@@ -253,8 +254,8 @@ function NavItem(props: {
 				<button
 					type="button"
 					class="app-nav-add"
-					aria-label={`${props.label} hinzufügen`}
-					title={`${props.label} hinzufügen`}
+					aria-label={t('app.navAdd', { label: props.label })}
+					title={t('app.navAdd', { label: props.label })}
 					onClick={goAdd}
 				>
 					<span aria-hidden="true" class="app-nav-add-icon">
@@ -266,8 +267,8 @@ function NavItem(props: {
 					type="button"
 					class="app-nav-add"
 					disabled
-					aria-label={`${props.label} hinzufügen (demnächst verfügbar)`}
-					title={`${props.label} hinzufügen (demnächst verfügbar)`}
+					aria-label={t('app.navAddSoon', { label: props.label })}
+					title={t('app.navAddSoon', { label: props.label })}
 				>
 					<span aria-hidden="true" class="app-nav-add-icon">
 						<IconPlus size={14} />
@@ -278,8 +279,8 @@ function NavItem(props: {
 				<button
 					type="button"
 					class="app-nav-add app-nav-import"
-					aria-label={`${props.label} importieren`}
-					title={`${props.label} importieren`}
+					aria-label={t('app.navImport', { label: props.label })}
+					title={t('app.navImport', { label: props.label })}
 					onClick={goImport}
 				>
 					<span aria-hidden="true" class="app-nav-add-icon">
@@ -519,7 +520,7 @@ function parseRoute(routePath: string, isAdmin: boolean): RouteInfo {
 function TabBar(): JSX.Element {
 	const TabContext = tabPathContext()
 	return (
-		<div class="tab-bar" role="tablist" aria-label="Geöffnete Seiten">
+		<div class="tab-bar" role="tablist" aria-label={t('app.openPages')}>
 			<For each={tabs()}>
 				{(tab: TabState) => (
 					<div
@@ -550,8 +551,10 @@ function TabBar(): JSX.Element {
 							<button
 								type="button"
 								class="tab-close"
-								aria-label={`${tabLabel(tab.id, tab.path)} schließen`}
-								title={`${tabLabel(tab.id, tab.path)} schließen`}
+								aria-label={t('app.closeTab', {
+									title: tabLabel(tab.id, tab.path),
+								})}
+								title={t('app.closeTab', { title: tabLabel(tab.id, tab.path) })}
 								onClick={(e: MouseEvent): void => {
 									e.stopPropagation()
 									closeTab(tab.id)
@@ -750,7 +753,7 @@ function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolea
 					<UserEditPage id={info().userId as number} />
 				</Match>
 				<Match when={info().page === 'not-found'}>
-					<p>Seite nicht gefunden.</p>
+					<p>{t('app.pageNotFound')}</p>
 				</Match>
 			</Switch>
 		</TabContext.Provider>
@@ -862,15 +865,15 @@ function App(): JSX.Element {
 
 		const trimmedUsername = setupUsername().trim()
 		if (!trimmedUsername) {
-			setSetupError('Benutzername ist erforderlich.')
+			setSetupError(t('auth.usernameRequired'))
 			return
 		}
 		if (!setupPassword()) {
-			setSetupError('Passwort ist erforderlich.')
+			setSetupError(t('auth.passwordRequired'))
 			return
 		}
 		if (setupPassword() !== setupConfirm()) {
-			setSetupError('Die Passwörter stimmen nicht überein.')
+			setSetupError(t('auth.passwordMismatch'))
 			return
 		}
 
@@ -903,13 +906,13 @@ function App(): JSX.Element {
 	return (
 		<div class="app-shell">
 			<a class="skip-link" href="#main">
-				Zum Inhalt springen
+				{t('app.skipToContent')}
 			</a>
 			<Show
 				when={isLoggedIn() !== null && needsSetup() !== null}
 				fallback={
 					<main class="app-content">
-						<p class="skeleton">Wird geladen…</p>
+						<p class="skeleton">{t('common.loading')}</p>
 					</main>
 				}
 			>
@@ -966,7 +969,9 @@ function App(): JSX.Element {
 										class="app-user-button"
 										aria-haspopup="menu"
 										aria-expanded={userMenuOpen()}
-										aria-label={`Konto: ${currentUser()?.username ?? '…'}`}
+										aria-label={t('app.accountNamed', {
+											name: currentUser()?.username ?? '…',
+										})}
 										onClick={() => setUserMenuOpen(!userMenuOpen())}
 										onKeyDown={(e: KeyboardEvent): void => {
 											if (e.key === 'Escape') {
@@ -982,7 +987,7 @@ function App(): JSX.Element {
 										<div
 											class="app-user-dropdown"
 											role="menu"
-											aria-label="Konto"
+											aria-label={t('app.account')}
 										>
 											<button
 												type="button"
@@ -993,7 +998,7 @@ function App(): JSX.Element {
 												<span aria-hidden="true" class="app-nav-icon">
 													<IconLogout size={16} />
 												</span>
-												Abmelden
+												{t('app.logout')}
 											</button>
 										</div>
 									</Show>
@@ -1001,42 +1006,42 @@ function App(): JSX.Element {
 							</div>
 						</header>
 						<div class="app-body">
-							<aside class="app-sidebar" aria-label="Hauptnavigation">
-								<p class="app-nav-label">Inventar</p>
+							<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
+								<p class="app-nav-label">{t('app.inventory')}</p>
 								<nav class="app-nav">
 									<NavItem
 										href="/tenants"
 										active={path().startsWith('/tenants') || path() === '/'}
 										icon={<IconUsers size={16} />}
-										label="Mandanten"
+										label={tp('entity.tenant', 2)}
 										addHref="/tenants/add"
 									/>
 									<NavItem
 										href="/site-groups"
 										active={path().startsWith('/site-groups')}
 										icon={<IconFolder size={16} />}
-										label="Standortgruppen"
+										label={tp('entity.siteGroup', 2)}
 										addHref="/site-groups/add"
 									/>
 									<NavItem
 										href="/sites"
 										active={path().startsWith('/sites')}
 										icon={<IconMapPin size={16} />}
-										label="Standorte"
+										label={tp('entity.site', 2)}
 										addHref="/sites/add"
 									/>
 									<NavItem
 										href="/locations"
 										active={path().startsWith('/locations')}
 										icon={<IconLocation size={16} />}
-										label="Bereiche"
+										label={tp('entity.location', 2)}
 										addHref="/locations/add"
 									/>
 									<NavItem
 										href="/racks"
 										active={path().startsWith('/racks')}
 										icon={<IconBox size={16} />}
-										label="Racks"
+										label={tp('entity.rack', 2)}
 										addHref="/racks/add"
 									/>
 									<NavItem
@@ -1046,14 +1051,14 @@ function App(): JSX.Element {
 											path().startsWith('/templates')
 										}
 										icon={<IconTemplate size={16} />}
-										label="Racktypen"
+										label={tp('entity.rackType', 2)}
 										addHref="/rack-types/add"
 									/>
 									<NavItem
 										href="/device-types"
 										active={path().startsWith('/device-types')}
 										icon={<IconCpu size={16} />}
-										label="Gerätetypen"
+										label={tp('entity.deviceType', 2)}
 										addHref="/device-types/add"
 										importHref="/device-types/import"
 									/>
@@ -1061,21 +1066,21 @@ function App(): JSX.Element {
 										href="/manufacturers"
 										active={path().startsWith('/manufacturers')}
 										icon={<IconBuildingFactory size={16} />}
-										label="Hersteller"
+										label={tp('entity.manufacturer', 2)}
 										addHref="/manufacturers/add"
 									/>
 									<NavItem
 										href="/devices"
 										active={path().startsWith('/devices')}
 										icon={<IconServer size={16} />}
-										label="Geräte"
+										label={tp('entity.device', 2)}
 										addHref="/devices/add"
 									/>
 									<NavItem
 										href="/interfaces"
 										active={path().startsWith('/interfaces')}
 										icon={<IconPlug size={16} />}
-										label="Anschlüsse"
+										label={tp('entity.interface', 2)}
 									/>
 									<NavItem
 										href="/connections"
@@ -1084,20 +1089,20 @@ function App(): JSX.Element {
 											path().startsWith('/cables')
 										}
 										icon={<IconLink size={16} />}
-										label="Verbindungen"
+										label={tp('entity.connection', 2)}
 									/>
 									<NavItem
 										href="/topology"
 										active={path().startsWith('/topology')}
 										icon={<IconNetwork size={16} />}
-										label="Topologie"
+										label={t('entity.topology')}
 									/>
 									<Show when={currentUser()?.role === 'admin'}>
 										<NavItem
 											href="/users"
 											active={path().startsWith('/users')}
 											icon={<IconLock size={16} />}
-											label="Benutzer"
+											label={tp('entity.user', 2)}
 											addHref="/users/add"
 										/>
 									</Show>

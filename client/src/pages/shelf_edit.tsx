@@ -13,13 +13,10 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
+import { faceOptions } from '../i18n/labels'
 import { navigate } from '../router'
 import { submit_edit, useEditForm } from '../util/form'
-
-const FACE_OPTIONS = [
-	{ value: 'front', label: 'front' },
-	{ value: 'rear', label: 'rear' },
-]
 
 /** /shelves/:id/edit — shelf edit form. Saves back to its rack. */
 export function ShelfEditPage(props: { id: number }): JSX.Element {
@@ -73,13 +70,13 @@ export function ShelfEditPage(props: { id: number }): JSX.Element {
 				const mount = mountHeight().trim() === '' ? 1 : Number(mountHeight())
 				const reserved = reservedHeight().trim() === '' ? 0 : Number(reservedHeight())
 				if (!Number.isInteger(position) || position < 1) {
-					return 'Position must be a positive integer.'
+					return t('shelf.positionInvalid')
 				}
 				if (!Number.isInteger(mount) || mount < 1) {
-					return 'Mount height must be an integer of at least 1 U.'
+					return t('shelf.mountHeightInvalid')
 				}
 				if (!Number.isInteger(reserved) || reserved < 0) {
-					return 'Reserved height must be an integer of 0 or more.'
+					return t('shelf.reservedHeightInvalid')
 				}
 				return null
 			},
@@ -102,7 +99,11 @@ export function ShelfEditPage(props: { id: number }): JSX.Element {
 
 	async function handleDelete(): Promise<void> {
 		const current = shelf()
-		if (!current || !window.confirm(`Fachboden „${current.name ?? 'shelf'}“ löschen?`)) {
+		const confirmText = t('list.confirmDelete', {
+			noun: tp('noun.shelf', 1),
+			name: current?.name ?? t('shelf.namePlaceholder'),
+		})
+		if (!current || !window.confirm(confirmText)) {
 			return
 		}
 		setFormError(null)
@@ -119,55 +120,55 @@ export function ShelfEditPage(props: { id: number }): JSX.Element {
 	return (
 		<EditPageShell
 			backTo={`/racks/${shelf()?.rack_id ?? rackId()}`}
-			backLabel="Rack"
-			title="Fachboden bearbeiten"
+			backLabel={tp('entity.rack', 1)}
+			title={t('shelf.editTitle')}
 			loaded={loaded()}
-			loadingText="Fachboden wird geladen…"
+			loadingText={t('shelf.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<SelectField
 				id="shelf-edit-rack"
-				label="Rack"
+				label={tp('entity.rack', 1)}
 				required
 				value={rackId()}
 				onChange={setRackId}
 				options={row_options(racks() ?? [])}
-				emptyLabel="Rack…"
+				emptyLabel={t('shelf.rackPlaceholder')}
 			/>
 			<TextField
 				id="shelf-edit-name"
-				label="Name (optional)"
-				placeholder="shelf"
+				label={t('shelf.nameOptional')}
+				placeholder={t('shelf.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 			/>
 			<SelectField
 				id="shelf-edit-face"
-				label="Seite"
+				label={t('shelf.face')}
 				value={face()}
 				disabled={rackId() === ''}
 				onChange={setFace}
-				options={FACE_OPTIONS}
-				emptyLabel="Beide Seiten"
-				hint={<Hint>Which rack face the shelf is mounted on.</Hint>}
+				options={faceOptions()}
+				emptyLabel={t('shelf.bothFaces')}
+				hint={<Hint>{t('shelf.faceHint')}</Hint>}
 			/>
 			<TextField
 				id="shelf-edit-position"
-				label="Position (HE)"
+				label={t('shelf.position')}
 				inputmode="numeric"
 				required
 				value={positionU()}
 				onInput={setPositionU}
-				hint={<Hint>Unterste HE der Montage (1-basiert).</Hint>}
+				hint={<Hint>{t('shelf.positionHint')}</Hint>}
 			/>
 			<TextField
 				id="shelf-edit-mount-height"
-				label="Montagehöhe (HE)"
+				label={t('shelf.mountHeight')}
 				type="number"
 				min={1}
 				value={mountHeight()}
 				onInput={setMountHeight}
-				hint={<Hint>Höhe des Montagebands selbst (mind. 1 HE).</Hint>}
+				hint={<Hint>{t('shelf.mountHeightHint')}</Hint>}
 			/>
 			<div class="field">
 				<div class="field-control">
@@ -180,18 +181,18 @@ export function ShelfEditPage(props: { id: number }): JSX.Element {
 								setMountUsable(e.currentTarget.checked)
 							}
 						/>
-						Montage nutzbar
+						{t('shelf.mountUsable')}
 					</label>
 				</div>
 			</div>
 			<TextField
 				id="shelf-edit-reserved-height"
-				label="Reservierte Höhe (HE)"
+				label={t('shelf.reservedHeight')}
 				type="number"
 				min={0}
 				value={reservedHeight()}
 				onInput={setReservedHeight}
-				hint={<Hint>Zusätzliche HE über der Montage, immer blockiert (0 = keine).</Hint>}
+				hint={<Hint>{t('shelf.reservedHeightHint')}</Hint>}
 			/>
 			<div class="field">
 				<div class="field-control">
@@ -204,7 +205,7 @@ export function ShelfEditPage(props: { id: number }): JSX.Element {
 								setFullDepth(e.currentTarget.checked)
 							}
 						/>
-						Volle Tiefe
+						{t('common.fullDepth')}
 					</label>
 				</div>
 			</div>

@@ -6,11 +6,23 @@ import type {
 	ElevationUnit,
 } from 'shared/src/types'
 import { For, type JSX, Show } from 'solid-js'
+import { t } from '../i18n'
+import { deviceStatusLabel, faceLabel } from '../i18n/labels'
 import { navigate } from '../router'
 
 export type RackFace = DeviceFace
 
 const FACES: RackFace[] = ['front', 'rear']
+
+/** `HE12` / `U12` style unit reference. */
+function u_label(u: number | undefined): string {
+	return t('common.unitPosition', { u: u ?? '' })
+}
+
+/** Display name of a shelf, falling back to the generic noun. */
+function shelf_name(shelf: ElevationShelfRef | undefined): string {
+	return shelf?.name || t('elevation.unnamedShelf')
+}
 
 function go(e: MouseEvent, to: string): void {
 	e.preventDefault()
@@ -274,9 +286,12 @@ function ShelfDevices(props: {
 	/** Extra hover actions (U-mounting into an usable mount). */
 	mount_actions?: JSX.Element
 }): JSX.Element {
-	const label = (): string => props.shelf.name || 'shelf'
+	const label = (): string => shelf_name(props.shelf)
 	return (
-		<ul class="rack-shelf-devices" aria-label={`Geräte auf Fachboden ${label()}`}>
+		<ul
+			class="rack-shelf-devices"
+			aria-label={t('elevation.devicesOnShelf', { name: label() })}
+		>
 			<For each={props.shelf.devices}>
 				{(device: ElevationShelfDeviceRef): JSX.Element => (
 					<li
@@ -293,8 +308,8 @@ function ShelfDevices(props: {
 						<button
 							type="button"
 							class="rack-shelf-device-remove"
-							aria-label={`Remove ${device.name} from shelf`}
-							title={`${device.name} vom Fachboden nehmen`}
+							aria-label={t('elevation.removeFromShelf', { name: device.name })}
+							title={t('elevation.removeFromShelfTitle', { name: device.name })}
 							onClick={() =>
 								props.actions.on_remove_shelf_device(device, props.shelf)
 							}
@@ -309,20 +324,20 @@ function ShelfDevices(props: {
 					<button
 						type="button"
 						class="rack-free-btn"
-						aria-label="Add device to shelf"
-						title={`Neues Gerät auf Fachboden ${label()} anlegen`}
+						aria-label={t('elevation.addDeviceToShelf')}
+						title={t('elevation.addDeviceToShelfTitle', { name: label() })}
 						onClick={() => props.actions.on_add_shelf_device(props.shelf)}
 					>
-						+ Gerät
+						{t('elevation.addDeviceShort')}
 					</button>
 					<button
 						type="button"
 						class="rack-free-btn"
-						aria-label="Select device for shelf"
-						title={`Vorhandenes Gerät auf Fachboden ${label()} stellen`}
+						aria-label={t('elevation.selectDeviceForShelf')}
+						title={t('elevation.selectDeviceForShelfTitle', { name: label() })}
 						onClick={() => props.actions.on_select_shelf_device(props.shelf)}
 					>
-						Auswählen
+						{t('elevation.select')}
 					</button>
 					{props.mount_actions}
 				</li>
@@ -366,8 +381,8 @@ export function RackElevation(props: {
 						)
 					}
 					return (
-						<section aria-label={`Rack elevation (${face} face)`}>
-							<h4 class="rack-face-title">{face === 'front' ? 'Front' : 'Rear'}</h4>
+						<section aria-label={t('elevation.section', { face: faceLabel(face) })}>
+							<h4 class="rack-face-title">{faceLabel(face)}</h4>
 							<ol
 								class="rack-elev"
 								style={{
@@ -415,8 +430,18 @@ export function RackElevation(props: {
 																<button
 																	type="button"
 																	class="rack-free-btn"
-																	aria-label="Select device"
-																	title={`Select device at HE${segment.u} (${face} face)`}
+																	aria-label={t(
+																		'elevation.selectDevice',
+																	)}
+																	title={t(
+																		'elevation.selectDeviceAt',
+																		{
+																			unit: u_label(
+																				segment.u,
+																			),
+																			face: faceLabel(face),
+																		},
+																	)}
 																	onClick={() => {
 																		props.on_select_u(
 																			segment.u,
@@ -428,13 +453,23 @@ export function RackElevation(props: {
 																		)
 																	}}
 																>
-																	Select device
+																	{t('elevation.selectDevice')}
 																</button>
 																<button
 																	type="button"
 																	class="rack-free-btn"
-																	aria-label="Add device"
-																	title={`Add device at HE${segment.u} (${face} face)`}
+																	aria-label={t(
+																		'elevation.addDevice',
+																	)}
+																	title={t(
+																		'elevation.addDeviceAt',
+																		{
+																			unit: u_label(
+																				segment.u,
+																			),
+																			face: faceLabel(face),
+																		},
+																	)}
 																	onClick={() =>
 																		props.on_add_device(
 																			segment.u,
@@ -442,13 +477,23 @@ export function RackElevation(props: {
 																		)
 																	}
 																>
-																	Add device
+																	{t('elevation.addDevice')}
 																</button>
 																<button
 																	type="button"
 																	class="rack-free-btn"
-																	aria-label="Add shelf"
-																	title={`Add shelf at HE${segment.u} (${face} face)`}
+																	aria-label={t(
+																		'elevation.addShelf',
+																	)}
+																	title={t(
+																		'elevation.addShelfAt',
+																		{
+																			unit: u_label(
+																				segment.u,
+																			),
+																			face: faceLabel(face),
+																		},
+																	)}
 																	onClick={() =>
 																		props.on_add_shelf(
 																			segment.u,
@@ -456,7 +501,7 @@ export function RackElevation(props: {
 																		)
 																	}
 																>
-																	Add shelf
+																	{t('elevation.addShelf')}
 																</button>
 															</div>
 														</span>
@@ -480,13 +525,16 @@ export function RackElevation(props: {
 															'grid-row': `${row}`,
 															'grid-column': '2',
 														}}
-														title={`Fachboden HE${s.position_u} · HE${segment.u} frei (Montage nutzbar)`}
+														title={t('elevation.mountFreeTitle', {
+															mount: u_label(s.position_u),
+															unit: u_label(segment.u),
+														})}
 													>
 														<Show
 															when={segment.label}
 															fallback={
 																<span class="rack-mount-slot">
-																	Montage frei
+																	{t('elevation.mountFree')}
 																</span>
 															}
 														>
@@ -498,10 +546,10 @@ export function RackElevation(props: {
 																}
 															>
 																<span class="rack-dev-name">
-																	▤ {s.name || 'shelf'}
+																	▤ {shelf_name(s)}
 																</span>
 																<span class="rack-dev-meta">
-																	Montage nutzbar
+																	{t('shelf.mountUsable')}
 																</span>
 															</a>
 															<ShelfDevices
@@ -514,8 +562,16 @@ export function RackElevation(props: {
 															<button
 																type="button"
 																class="rack-free-btn"
-																aria-label="Add child device"
-																title={`Add child device to shelf at HE${segment.u} (${face} face)`}
+																aria-label={t(
+																	'elevation.addChildDevice',
+																)}
+																title={t(
+																	'elevation.addChildDeviceTitle',
+																	{
+																		unit: u_label(segment.u),
+																		face: faceLabel(face),
+																	},
+																)}
 																onClick={() =>
 																	props.on_add_device(
 																		segment.u,
@@ -523,13 +579,21 @@ export function RackElevation(props: {
 																	)
 																}
 															>
-																Add device
+																{t('elevation.addDevice')}
 															</button>
 															<button
 																type="button"
 																class="rack-free-btn"
-																aria-label="Select child device"
-																title={`Select child device for shelf at HE${segment.u} (${face} face)`}
+																aria-label={t(
+																	'elevation.selectChildDevice',
+																)}
+																title={t(
+																	'elevation.selectChildDeviceTitle',
+																	{
+																		unit: u_label(segment.u),
+																		face: faceLabel(face),
+																	},
+																)}
 																onClick={() =>
 																	props.on_select_device(
 																		segment.u,
@@ -537,20 +601,27 @@ export function RackElevation(props: {
 																	)
 																}
 															>
-																Select device
+																{t('elevation.selectDevice')}
 															</button>
 															<button
 																type="button"
 																class="rack-free-btn"
-																aria-label="Select device for shelf"
-																title={`Vorhandenes Gerät auf Fachboden ${s.name || 'shelf'} stellen`}
+																aria-label={t(
+																	'elevation.selectDeviceForShelf',
+																)}
+																title={t(
+																	'elevation.selectDeviceForShelfTitle',
+																	{
+																		name: shelf_name(s),
+																	},
+																)}
 																onClick={() =>
 																	props.shelf_actions.on_select_shelf_device(
 																		s,
 																	)
 																}
 															>
-																Auf Fachboden
+																{t('elevation.onShelf')}
 															</button>
 														</div>
 													</li>
@@ -565,19 +636,27 @@ export function RackElevation(props: {
 													<button
 														type="button"
 														class="rack-free-btn"
-														aria-label="Add child device"
-														title={`Neues Gerät in HE${s.position_u} einbauen (Montage nutzbar, ${face})`}
+														aria-label={t('elevation.addChildDevice')}
+														title={t('elevation.mountNewTitle', {
+															unit: u_label(s.position_u),
+															face: faceLabel(face),
+														})}
 														onClick={() =>
 															props.on_add_device(s.position_u, face)
 														}
 													>
-														+ Einbau
+														{t('elevation.mountNew')}
 													</button>
 													<button
 														type="button"
 														class="rack-free-btn"
-														aria-label="Select child device"
-														title={`Vorhandenes Gerät in HE${s.position_u} einbauen (Montage nutzbar, ${face})`}
+														aria-label={t(
+															'elevation.selectChildDevice',
+														)}
+														title={t('elevation.mountExistingTitle', {
+															unit: u_label(s.position_u),
+															face: faceLabel(face),
+														})}
 														onClick={() =>
 															props.on_select_device(
 																s.position_u,
@@ -585,7 +664,7 @@ export function RackElevation(props: {
 															)
 														}
 													>
-														Einbau…
+														{t('elevation.mountExisting')}
 													</button>
 												</Show>
 											)
@@ -610,17 +689,23 @@ export function RackElevation(props: {
 																	segment.plate,
 																),
 														}}
-														aria-label={`Fachboden HE${s.position_u}, HE${segment.first_u}–HE${segment.last_u}`}
+														aria-label={t('elevation.shelfBlock', {
+															mount: u_label(s.position_u),
+															first: u_label(segment.first_u),
+															last: u_label(segment.last_u),
+														})}
 													>
 														<Show
 															when={!segment.ghost}
 															fallback={
 																<span class="rack-ghost">
 																	<span class="rack-dev-name">
-																		◧ {s.name || 'shelf'}
+																		◧ {shelf_name(s)}
 																	</span>
 																	<span class="rack-dev-meta">
-																		opposite face
+																		{t(
+																			'elevation.oppositeFace',
+																		)}
 																	</span>
 																</span>
 															}
@@ -640,16 +725,29 @@ export function RackElevation(props: {
 																					`/shelves/${s.id}/edit`,
 																				)
 																			}
-																			title={`Fachboden HE${s.position_u} (${s.mount_height} HE Montage nutzbar, ${s.reserved_height} HE reserviert)`}
+																			title={t(
+																				'elevation.clearanceTitle',
+																				{
+																					mount: u_label(
+																						s.position_u,
+																					),
+																					mountHeight:
+																						s.mount_height,
+																					reserved:
+																						s.reserved_height,
+																				},
+																			)}
 																		>
 																			<span class="rack-dev-name">
-																				▤{' '}
-																				{s.name || 'shelf'}
+																				▤ {shelf_name(s)}
 																			</span>
 																			<span class="rack-shelf-caption">
-																				Reserviert ·{' '}
-																				{s.reserved_height}{' '}
-																				HE
+																				{t(
+																					'elevation.reserved',
+																					{
+																						count: s.reserved_height,
+																					},
+																				)}
 																			</span>
 																		</a>
 																		<ShelfDevices
@@ -664,8 +762,12 @@ export function RackElevation(props: {
 																<Show when={s.reserved_height > 0}>
 																	<div class="rack-shelf-clearance">
 																		<span class="rack-shelf-caption">
-																			Reserviert ·{' '}
-																			{s.reserved_height} HE
+																			{t(
+																				'elevation.reserved',
+																				{
+																					count: s.reserved_height,
+																				},
+																			)}
 																		</span>
 																		<ShelfDevices
 																			shelf={s}
@@ -688,21 +790,38 @@ export function RackElevation(props: {
 																				`/shelves/${s.id}/edit`,
 																			)
 																		}
-																		title={`Fachboden HE${s.position_u} (${s.mount_height} HE Montage${s.reserved_height > 0 ? `, ${s.reserved_height} HE reserviert` : ''})`}
+																		title={t(
+																			s.reserved_height > 0
+																				? 'elevation.plateTitleReserved'
+																				: 'elevation.plateTitle',
+																			{
+																				mount: u_label(
+																					s.position_u,
+																				),
+																				mountHeight:
+																					s.mount_height,
+																				reserved:
+																					s.reserved_height,
+																			},
+																		)}
 																	>
 																		<span class="rack-dev-name">
-																			▤ {s.name || 'shelf'}
+																			▤ {shelf_name(s)}
 																		</span>
 																		<Show when={s.mount_usable}>
 																			<span class="rack-dev-meta">
-																				Montage nutzbar
+																				{t(
+																					'shelf.mountUsable',
+																				)}
 																			</span>
 																		</Show>
 																		<Show
 																			when={!s.is_full_depth}
 																		>
 																			<span class="rack-dev-meta">
-																				halbe Tiefe
+																				{t(
+																					'elevation.halfDepth',
+																				)}
 																			</span>
 																		</Show>
 																	</a>
@@ -740,14 +859,14 @@ export function RackElevation(props: {
 															'grid-row': `${row} / span ${segment.rows}`,
 															'grid-column': '2',
 														}}
-														title="Occupied on the opposite face"
+														title={t('elevation.occupiedOpposite')}
 													>
 														<span class="rack-ghost">
 															<span class="rack-dev-name">
 																◧ {segment.device.name}
 															</span>
 															<span class="rack-dev-meta">
-																opposite face
+																{t('elevation.oppositeFace')}
 															</span>
 														</span>
 													</li>
@@ -774,7 +893,11 @@ export function RackElevation(props: {
 														onClick={(e: MouseEvent): void =>
 															go(e, `/devices/${segment.device.id}`)
 														}
-														title={`${segment.device.name} (${segment.device.device_type_model}, ${segment.device.u_height} HE)`}
+														title={t('elevation.deviceTitle', {
+															name: segment.device.name,
+															model: segment.device.device_type_model,
+															height: segment.device.u_height,
+														})}
 													>
 														<span class="rack-dev-name">
 															{segment.device.name}
@@ -785,12 +908,21 @@ export function RackElevation(props: {
 														<Show when={segment.shelf}>
 															<span
 																class="rack-child-shelf"
-																title={`Auf Fachboden ${segment.shelf?.name || ''} (HE${segment.shelf?.position_u})`}
+																title={t('elevation.onShelfTitle', {
+																	name: segment.shelf?.name || '',
+																	unit: u_label(
+																		segment.shelf?.position_u,
+																	),
+																})}
 															>
 																▤
 																<span class="visually-hidden">
-																	Shelf HE
-																	{segment.shelf?.position_u}
+																	{t('elevation.shelfUnit', {
+																		unit: u_label(
+																			segment.shelf
+																				?.position_u,
+																		),
+																	})}
 																</span>
 															</span>
 														</Show>
@@ -803,7 +935,10 @@ export function RackElevation(props: {
 															<span
 																class={`badge badge-${segment.device.status}`}
 															>
-																{segment.device.status}
+																{deviceStatusLabel(
+																	segment.device.status ??
+																		'active',
+																)}
 															</span>
 														</Show>
 													</a>

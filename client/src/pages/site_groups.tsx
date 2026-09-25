@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -10,6 +9,7 @@ import {
 	type SiteGroupSort,
 	type TenantRow,
 } from '../api_tenancy'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -27,6 +27,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -54,10 +55,7 @@ export function SiteGroupsPage(): JSX.Element {
 		tenant: parseId(filterTenant()) ?? undefined,
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(
-		listSource,
-		'Select all site groups',
-	)
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.siteGroup')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [groupsPage, { refetch }] = createResource(listSource, async (s) => {
@@ -85,7 +83,7 @@ export function SiteGroupsPage(): JSX.Element {
 		if (!id) {
 			return '—'
 		}
-		return tenants()?.find((t: TenantRow) => t.id === id)?.name ?? String(id)
+		return tenants()?.find((row: TenantRow) => row.id === id)?.name ?? String(id)
 	}
 
 	// Id → name map for the Parent column, resolved from the same result set.
@@ -105,7 +103,7 @@ export function SiteGroupsPage(): JSX.Element {
 	const columns: DataTableColumn<SiteGroupRow>[] = [
 		{
 			key: 'name',
-			label: 'Gruppe',
+			label: t('common.group'),
 			sortable: true,
 			getValue: (g: SiteGroupRow): JSX.Element => (
 				<a
@@ -118,7 +116,7 @@ export function SiteGroupsPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
+			label: t('common.description'),
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (g: SiteGroupRow): JSX.Element => (
@@ -127,12 +125,12 @@ export function SiteGroupsPage(): JSX.Element {
 		},
 		{
 			key: 'parent',
-			label: 'Übergeordnete Gruppe',
+			label: t('siteGroup.parent'),
 			getValue: (g: SiteGroupRow): string => parentNameOf()(g.parent_id),
 		},
 		{
 			key: 'tenant',
-			label: 'Mandant',
+			label: tp('entity.tenant', 1),
 			getValue: (g: SiteGroupRow): string => tenantNameOf(g.tenant_id),
 		},
 	]
@@ -141,7 +139,7 @@ export function SiteGroupsPage(): JSX.Element {
 	const [visibleColumns, setVisibleColumns] = useTableColumns('site-groups', group_column_keys)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'site group',
+		noun: 'noun.siteGroup',
 		remove: delete_site_group,
 		setError,
 		refetch,
@@ -151,27 +149,29 @@ export function SiteGroupsPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Standortgruppen" add_href="/site-groups/add" />
+			<ListPageHeader title={tp('entity.siteGroup', 2)} add_href="/site-groups/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Standortgruppen suchen"
-					placeholder="Name, Kurzname oder Beschreibung suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.siteGroup', 2) })}
+					placeholder={t('tenant.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Nach Mandant filtern</span>
+					<span class="visually-hidden">{t('common.filterByTenant')}</span>
 					<select
-						aria-label="Nach Mandant filtern"
+						aria-label={t('common.filterByTenant')}
 						value={filterTenant()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
 							setFilterTenant(e.currentTarget.value)
 						}
 					>
-						<option value="">Alle Mandanten</option>
+						<option value="">{t('common.allTenants')}</option>
 						<For each={tenants() ?? []}>
-							{(t: TenantRow): JSX.Element => <option value={t.id}>{t.name}</option>}
+							{(row: TenantRow): JSX.Element => (
+								<option value={row.id}>{row.name}</option>
+							)}
 						</For>
 					</select>
 				</label>
@@ -194,9 +194,7 @@ export function SiteGroupsPage(): JSX.Element {
 				rowActions={(g: SiteGroupRow): JSX.Element => (
 					<ListRowActions
 						edit_href={`/site-groups/${g.id}/edit`}
-						edit_title={`Edit ${g.name}`}
-						edit_label={`Edit site group ${g.name}`}
-						menu_label={`More actions for ${g.name}`}
+						name={g.name}
 						menu_open={openMenu()?.id === g.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
@@ -205,12 +203,14 @@ export function SiteGroupsPage(): JSX.Element {
 					/>
 				)}
 				loading={() => groupsPage.loading}
-				loadingContent={<p class="skeleton">Standortgruppen werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.siteGroup', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || filterTenant()
-							? 'Keine Standortgruppen für die aktuellen Filter gefunden.'
-							: 'Noch keine Standortgruppen vorhanden. Fügen Sie oben die erste hinzu.'}
+							? t('list.noMatchFilters', { noun: tp('noun.siteGroup', 2) })
+							: t('siteGroup.empty')}
 					</p>
 				}
 			/>

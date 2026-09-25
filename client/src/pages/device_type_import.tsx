@@ -1,10 +1,11 @@
-import { DataTable } from '@serkonda7/solid-components'
 import { IconExternalLink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
 import { upload_yaml } from '../api_transfer'
+import { DataTable } from '../components/data_table'
+import { t, tp } from '../i18n'
 import { navigate } from '../router'
 
 function go(e: MouseEvent, to: string): void {
@@ -39,7 +40,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setError(null)
 		setResults(null)
 		if (!yamlText().trim()) {
-			setError('Paste NetBox YAML first.')
+			setError(t('import.pasteFirst'))
 			return
 		}
 		setImporting(true)
@@ -59,23 +60,23 @@ export function DeviceTypeImportPage(): JSX.Element {
 		<div class="form-page device-type-import-page">
 			<p>
 				<a href="/device-types" onClick={(e: MouseEvent): void => go(e, '/device-types')}>
-					← Device types
+					← {tp('entity.deviceType', 2)}
 				</a>
 			</p>
-			<h2>Gerätetypen importieren</h2>
+			<h2>{t('import.title')}</h2>
 			<p class="page-subtitle">
-				For prebuilt definitions see{' '}
+				{t('import.libraryIntro')}{' '}
 				<a
 					href="https://github.com/netbox-community/devicetype-library"
 					target="_blank"
 					rel="noreferrer"
 				>
-					NetBox device-type library <IconExternalLink size={14} aria-hidden="true" />
+					{t('import.libraryLink')} <IconExternalLink size={14} aria-hidden="true" />
 				</a>
 			</p>
 			<form class="form-stacked" onSubmit={handleImport}>
 				<div class="field">
-					<label for="device-type-import-text">Data</label>
+					<label for="device-type-import-text">{t('import.data')}</label>
 					<textarea
 						id="device-type-import-text"
 						class="import-data"
@@ -88,59 +89,54 @@ export function DeviceTypeImportPage(): JSX.Element {
 					/>
 				</div>
 				<section class="import-field-options" aria-labelledby="device-type-import-fields">
-					<h3 id="device-type-import-fields">Field options</h3>
-					<p class="field-hint">
-						Use these NetBox YAML fields in each device-type definition. Required fields
-						are marked.
-					</p>
+					<h3 id="device-type-import-fields">{t('import.fieldOptions')}</h3>
+					<p class="field-hint">{t('import.fieldOptionsHint')}</p>
 					<table class="import-field-options-table">
 						<thead>
 							<tr>
-								<th scope="col">Field</th>
-								<th scope="col">Required</th>
-								<th scope="col">Description</th>
+								<th scope="col">{t('import.field')}</th>
+								<th scope="col">{t('import.required')}</th>
+								<th scope="col">{t('common.description')}</th>
 							</tr>
 						</thead>
 						<tbody>
 							<tr>
 								<td>manufacturer</td>
-								<td>Yes</td>
-								<td>
-									Manufacturer name or slug; device type model identifies the
-									type.
-								</td>
+								<td>{t('common.yes')}</td>
+								<td>{t('import.fieldManufacturer')}</td>
 							</tr>
 							<tr>
 								<td>model</td>
-								<td>Yes</td>
-								<td>Device model name.</td>
+								<td>{t('common.yes')}</td>
+								<td>{t('import.fieldModel')}</td>
 							</tr>
 							<tr>
 								<td>u_height</td>
 								<td>—</td>
-								<td>Rack height from 0 to 60; defaults to 1.</td>
+								<td>{t('import.fieldUHeight')}</td>
 							</tr>
 							<tr>
 								<td>is_full_depth</td>
 								<td>—</td>
-								<td>Full-depth device (true/false, defaults to true).</td>
+								<td>{t('import.fieldFullDepth')}</td>
 							</tr>
 							<tr>
 								<td>description</td>
 								<td>—</td>
-								<td>Optional short device-type summary.</td>
+								<td>{t('import.fieldDescription')}</td>
 							</tr>
 							<tr>
 								<td>comments</td>
 								<td>—</td>
-								<td>Optional longer device-type notes.</td>
+								<td>{t('import.fieldComments')}</td>
 							</tr>
 							<tr>
 								<td>interfaces</td>
 								<td>—</td>
 								<td>
-									List of ports with <code>name</code>, optional <code>type</code>{' '}
-									and <code>label</code>.
+									{t('import.fieldInterfacesPrefix')} <code>name</code>
+									{t('import.fieldInterfacesOptional')} <code>type</code>{' '}
+									{t('import.fieldInterfacesAnd')} <code>label</code>.
 								</td>
 							</tr>
 						</tbody>
@@ -157,18 +153,16 @@ export function DeviceTypeImportPage(): JSX.Element {
 						onClick={() => navigate('/device-types', { refresh: false })}
 						disabled={importing()}
 					>
-						Cancel
+						{t('common.cancel')}
 					</button>
 					<button type="submit" disabled={importing()}>
-						{importing() ? 'Importing…' : 'Import'}
+						{importing() ? t('import.importing') : t('import.import')}
 					</button>
 				</div>
 			</form>
 
 			<Show when={results() !== null}>
-				<h3>
-					Result: {created()} created, {failed()} failed
-				</h3>
+				<h3>{t('import.result', { created: created(), failed: failed() })}</h3>
 				<DataTable
 					rows={() => results() ?? []}
 					getRowId={(r: ImportRowResult): number => r.row}
@@ -176,31 +170,31 @@ export function DeviceTypeImportPage(): JSX.Element {
 					columns={[
 						{
 							key: 'row',
-							label: 'Row',
+							label: t('import.row'),
 							getValue: (r: ImportRowResult): number => r.row,
 						},
 						{
 							key: 'status',
-							label: 'Status',
+							label: t('common.status'),
 							getValue: (r: ImportRowResult): JSX.Element => (
 								<span class={`badge badge-${r.ok ? 'active' : 'decommissioned'}`}>
-									{r.ok ? 'created' : 'failed'}
+									{r.ok ? t('import.created') : t('import.failed')}
 								</span>
 							),
 						},
 						{
 							key: 'id',
-							label: 'Id',
+							label: t('import.id'),
 							getValue: (r: ImportRowResult): string =>
 								r.id === null ? '—' : String(r.id),
 						},
 						{
 							key: 'error',
-							label: 'Error',
+							label: t('import.error'),
 							getValue: (r: ImportRowResult): string => r.error ?? '—',
 						},
 					]}
-					emptyContent={<p class="empty">Keine Zeilen verarbeitet.</p>}
+					emptyContent={<p class="empty">{t('import.noRows')}</p>}
 				/>
 			</Show>
 		</div>

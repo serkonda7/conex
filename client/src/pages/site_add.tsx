@@ -13,6 +13,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
+import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 import {
 	type FormValues,
@@ -85,67 +86,67 @@ export function SiteAddPage(): JSX.Element {
 	return (
 		<FormPage
 			backTo="/sites"
-			backLabel="Standorte"
-			title="Neuen Standort hinzufügen"
+			backLabel={tp('entity.site', 2)}
+			title={t('site.addTitle')}
 			onSubmit={handleCreate}
 		>
 			<NameField
 				id="site-name"
-				placeholder="Rechenzentrum Berlin"
+				placeholder={t('site.namePlaceholder')}
 				value={slugFields.name()}
 				onInput={slugFields.handleNameInput}
 				autofocus
 			/>
 			<SlugField
 				id="site-slug"
-				placeholder="rechenzentrum-berlin"
+				placeholder={t('site.slugPlaceholder')}
 				value={slugFields.slug()}
 				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="site-tenant"
-				label="Mandant"
+				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={(value: string): void => {
 					setTenantTouched(true)
 					setTenantId(value)
 				}}
 				options={row_options(tenants() ?? [])}
-				emptyLabel="Kein Mandant"
+				emptyLabel={t('common.noTenant')}
 				hint={
 					<Show when={!tenantTouched() && groupTenantId() !== null}>
-						<Hint>Standardmäßig wird der Mandant der Gruppe verwendet.</Hint>
+						<Hint>{t('site.tenantFromGroup')}</Hint>
 					</Show>
 				}
 			/>
 			<SelectField
 				id="site-group"
-				label="Gruppe"
+				label={t('common.group')}
 				value={groupId()}
 				onChange={setGroupId}
 				options={row_options(groups() ?? [])}
-				emptyLabel="Keine Gruppe"
+				emptyLabel={t('common.noGroup')}
 			/>
 			<TextField
 				id="site-description"
-				label="Beschreibung"
-				placeholder="Kurze Zusammenfassung (optional)"
+				label={t('common.description')}
+				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 				value={description()}
 				onInput={setDescription}
 			/>
 			<TextAreaField
 				id="site-comments"
-				label="Kommentare"
-				placeholder="Zusätzliche Notizen (optional)"
+				label={t('common.comments')}
+				placeholder={t('common.commentsPlaceholder')}
 				maxLength={2000}
 				value={comments()}
 				onInput={setComments}
 			/>
 			<TextAreaField
 				id="site-physical-address"
-				label="Standortadresse"
-				placeholder="Straße, Ort … (optional)"
+				label={t('site.physicalAddress')}
+				placeholder={t('site.physicalAddressPlaceholder')}
 				rows={3}
 				maxLength={500}
 				value={physicalAddress()}
@@ -153,8 +154,8 @@ export function SiteAddPage(): JSX.Element {
 			/>
 			<TextAreaField
 				id="site-shipping-address"
-				label="Lieferadresse"
-				placeholder="Warenannahme … (optional)"
+				label={t('site.shippingAddress')}
+				placeholder={t('site.shippingAddressPlaceholder')}
 				rows={3}
 				maxLength={500}
 				value={shippingAddress()}

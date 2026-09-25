@@ -13,6 +13,7 @@ import type {
 	Page,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
+import { t, tp } from './i18n'
 
 export type { CableRow, DeviceTraceResponse }
 
@@ -30,7 +31,7 @@ export async function fetch_cables(filters?: CableFilters): Promise<Result<Page<
 				device: filters?.device,
 			}),
 		}),
-		'Failed to load cables',
+		tp('api.loadFailed', 2, { noun: tp('noun.cable', 2) }),
 	)
 }
 
@@ -44,12 +45,12 @@ export type CableCreateInput = Omit<CableCreate, 'status'> & {
 
 export async function create_cable(input: CableCreateInput): Promise<Result<CableRow, Error>> {
 	const res = await client.cables.$post({ json: input })
-	return to_result<CableRow>(res, 'Failed to create cable')
+	return to_result<CableRow>(res, t('api.createFailed', { noun: tp('noun.cable', 1) }))
 }
 
 export async function delete_cable(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.cables[':id'].$delete({ param: { id: String(id) } })
-	return to_result<unknown>(res, 'Failed to delete cable')
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.cable', 1) }))
 }
 
 export async function connect_interface(
@@ -61,7 +62,7 @@ export async function connect_interface(
 		param: { id: String(deviceId), ifaceId: String(ifaceId) },
 		json: { peer_interface_id: peerInterfaceId },
 	})
-	return to_result<CableRow>(res, 'Failed to connect interface')
+	return to_result<CableRow>(res, t('api.connectInterfaceFailed'))
 }
 
 export async function fetch_trace(
@@ -72,5 +73,5 @@ export async function fetch_trace(
 		param: { id: String(deviceId) },
 		query: to_query({ depth }),
 	})
-	return to_result<DeviceTraceResponse>(res, 'Failed to load trace')
+	return to_result<DeviceTraceResponse>(res, t('api.loadTraceFailed'))
 }

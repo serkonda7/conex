@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal } from 'solid-js'
@@ -8,6 +7,7 @@ import {
 	type ManufacturerRow,
 	type ManufacturerSort,
 } from '../api_templates'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	go,
@@ -25,6 +25,7 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
 
 /**
  * /manufacturers — manufacturer list: search, sortable columns, row
@@ -43,10 +44,7 @@ export function ManufacturersPage(): JSX.Element {
 		order: order(),
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(
-		listSource,
-		'Select all manufacturers',
-	)
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.manufacturer')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [manufacturersPage, { refetch }] = createResource(listSource, async (s) => {
@@ -64,7 +62,7 @@ export function ManufacturersPage(): JSX.Element {
 	const columns: DataTableColumn<ManufacturerRow>[] = [
 		{
 			key: 'name',
-			label: 'Name',
+			label: t('common.name'),
 			sortable: true,
 			getValue: (m: ManufacturerRow): JSX.Element => (
 				<a
@@ -77,7 +75,7 @@ export function ManufacturersPage(): JSX.Element {
 		},
 		{
 			key: 'description',
-			label: 'Beschreibung',
+			label: t('common.description'),
 			sortable: true,
 			class: 'cell-truncate',
 			getValue: (m: ManufacturerRow): JSX.Element => (
@@ -92,7 +90,7 @@ export function ManufacturersPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'manufacturer',
+		noun: 'noun.manufacturer',
 		remove: delete_manufacturer,
 		setError,
 		refetch,
@@ -102,12 +100,12 @@ export function ManufacturersPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Hersteller" add_href="/manufacturers/add" />
+			<ListPageHeader title={tp('entity.manufacturer', 2)} add_href="/manufacturers/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Hersteller suchen"
-					placeholder="Namen suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.manufacturer', 2) })}
+					placeholder={t('manufacturer.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
@@ -130,9 +128,7 @@ export function ManufacturersPage(): JSX.Element {
 				rowActions={(m: ManufacturerRow): JSX.Element => (
 					<ListRowActions
 						edit_href={`/manufacturers/${m.id}/edit`}
-						edit_title={`Edit ${m.name}`}
-						edit_label={`Edit manufacturer ${m.name}`}
-						menu_label={`More actions for ${m.name}`}
+						name={m.name}
 						menu_open={openMenu()?.id === m.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
@@ -141,12 +137,19 @@ export function ManufacturersPage(): JSX.Element {
 					/>
 				)}
 				loading={() => manufacturersPage.loading}
-				loadingContent={<p class="skeleton">Hersteller werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">
+						{t('list.loading', { noun: tp('noun.manufacturer', 2) })}
+					</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch()
-							? `Keine Hersteller für „${debouncedSearch()}“ gefunden.`
-							: 'Noch keine Hersteller vorhanden. Fügen Sie oben den ersten hinzu.'}
+							? t('list.noMatch', {
+									noun: tp('noun.manufacturer', 2),
+									search: debouncedSearch(),
+								})
+							: t('manufacturer.empty')}
 					</p>
 				}
 			/>

@@ -10,6 +10,7 @@
 import { Result } from 'better-result'
 import { slugify } from 'shared/src/slug'
 import { createSignal, type Setter } from 'solid-js'
+import { t } from '../i18n'
 import { navigate } from '../router'
 
 /** Whether a form was submitted with the Create & Add Another action. */
@@ -115,14 +116,14 @@ export async function submit_form<T>(options: SubmitFormOptions<T>): Promise<voi
 	options.setError(null)
 	const name = options.name.trim()
 	if (!name && !options.optionalName) {
-		options.setError(options.nameError ?? 'Name ist erforderlich.')
+		options.setError(options.nameError ?? t('form.nameRequired'))
 		return
 	}
 	let slug = ''
 	if (options.slug !== undefined) {
 		slug = options.slug.trim()
 		if (!slug) {
-			options.setError('Kurzname ist erforderlich.')
+			options.setError(t('form.slugRequired'))
 			return
 		}
 	}

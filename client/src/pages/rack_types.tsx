@@ -1,4 +1,3 @@
-import { DataTable, type DataTableColumn } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
@@ -10,6 +9,7 @@ import {
 	fetch_manufacturers,
 	type ManufacturerRow,
 } from '../api_templates'
+import { DataTable, type DataTableColumn } from '../components/data_table'
 import {
 	BulkDeleteButton,
 	ListError,
@@ -26,6 +26,8 @@ import {
 	useSort,
 	useTableColumns,
 } from '../components/list_page'
+import { t, tp } from '../i18n'
+import { formFactorLabel } from '../i18n/labels'
 import { parseId, queryParam } from '../router'
 
 /**
@@ -53,10 +55,7 @@ export function RackTypesPage(): JSX.Element {
 		order: order(),
 	}))
 
-	const { selected, setSelected, selection } = useListSelection(
-		listSource,
-		'Select all rack types',
-	)
+	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.rackType')
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 
 	const [typesPage, { refetch }] = createResource(listSource, async (s) => {
@@ -87,29 +86,30 @@ export function RackTypesPage(): JSX.Element {
 	const columns: DataTableColumn<DeviceTypeRow>[] = [
 		{
 			key: 'model',
-			label: 'Modell',
+			label: t('common.model'),
 			sortable: true,
-			getValue: (t: DeviceTypeRow): string => t.model,
+			getValue: (dt: DeviceTypeRow): string => dt.model,
 		},
 		{
 			key: 'manufacturer',
-			label: 'Hersteller',
-			getValue: (t: DeviceTypeRow): string => mfrNameOf(t.manufacturer_id),
+			label: tp('entity.manufacturer', 1),
+			getValue: (dt: DeviceTypeRow): string => mfrNameOf(dt.manufacturer_id),
 		},
 		{
 			key: 'form_factor',
-			label: 'Bauform',
-			getValue: (t: DeviceTypeRow): string => t.form_factor ?? '—',
+			label: t('rackType.formFactor'),
+			getValue: (dt: DeviceTypeRow): string =>
+				dt.form_factor ? formFactorLabel(dt.form_factor) : '—',
 		},
 		{
 			key: 'width',
-			label: 'Breite',
-			getValue: (t: DeviceTypeRow): string => (t.width === null ? '—' : `${t.width}″`),
+			label: t('rackType.width'),
+			getValue: (dt: DeviceTypeRow): string => (dt.width === null ? '—' : `${dt.width}″`),
 		},
 		{
 			key: 'u_height',
-			label: 'Höhe (HE)',
-			getValue: (t: DeviceTypeRow): string => `${t.u_height}`,
+			label: t('common.heightU'),
+			getValue: (dt: DeviceTypeRow): string => `${dt.u_height}`,
 		},
 	]
 
@@ -119,7 +119,7 @@ export function RackTypesPage(): JSX.Element {
 	)
 
 	const { handleDelete, handleBulkDelete } = useListDelete({
-		noun: 'rack type',
+		noun: 'noun.rackType',
 		remove: delete_device_type,
 		setError,
 		refetch,
@@ -129,25 +129,25 @@ export function RackTypesPage(): JSX.Element {
 
 	return (
 		<div>
-			<ListPageHeader title="Racktypen" add_href="/rack-types/add" />
+			<ListPageHeader title={tp('entity.rackType', 2)} add_href="/rack-types/add" />
 
 			<div class="toolbar-row">
 				<ListSearchField
-					label="Racktypen suchen"
-					placeholder="Modell suchen…"
+					label={t('list.searchLabel', { noun: tp('noun.rackType', 2) })}
+					placeholder={t('deviceType.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>
 				<label>
-					<span class="visually-hidden">Filter by manufacturer</span>
+					<span class="visually-hidden">{t('deviceType.filterByManufacturer')}</span>
 					<select
-						aria-label="Nach Hersteller filtern"
+						aria-label={t('deviceType.filterByManufacturer')}
 						value={manufacturerFilter()}
 						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
 							setManufacturerFilter(e.currentTarget.value)
 						}}
 					>
-						<option value="">Alle Hersteller</option>
+						<option value="">{t('deviceType.allManufacturers')}</option>
 						<For each={manufacturers() ?? []}>
 							{(m: ManufacturerRow): JSX.Element => (
 								<option value={m.id}>{m.name}</option>
@@ -161,7 +161,7 @@ export function RackTypesPage(): JSX.Element {
 
 			<DataTable
 				rows={rows}
-				getRowId={(t: DeviceTypeRow): number => t.id}
+				getRowId={(dt: DeviceTypeRow): number => dt.id}
 				columns={columns}
 				sortKey={sort}
 				sortDirection={order}
@@ -171,25 +171,25 @@ export function RackTypesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(t: DeviceTypeRow): JSX.Element => (
+				rowActions={(dt: DeviceTypeRow): JSX.Element => (
 					<ListRowActions
-						edit_title={`Edit ${t.model}`}
-						edit_label={`Edit rack type ${t.model}`}
-						menu_label={`More actions for ${t.model}`}
-						menu_open={openMenu()?.id === t.id}
+						name={dt.model}
+						menu_open={openMenu()?.id === dt.id}
 						onToggleMenu={(
 							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, t.id, t.model)}
+						): void => toggleMenu(e, dt.id, dt.model)}
 						onCloseMenu={closeMenu}
 					/>
 				)}
 				loading={() => typesPage.loading}
-				loadingContent={<p class="skeleton">Racktypen werden geladen…</p>}
+				loadingContent={
+					<p class="skeleton">{t('list.loading', { noun: tp('noun.rackType', 2) })}</p>
+				}
 				emptyContent={
 					<p class="empty">
 						{debouncedSearch() || manufacturerFilter()
-							? 'Keine Racktypen für die aktuellen Filter gefunden.'
-							: 'Noch keine Racktypen vorhanden. Fügen Sie oben den ersten hinzu.'}
+							? t('list.noMatchFilters', { noun: tp('noun.rackType', 2) })
+							: t('rackType.empty')}
 					</p>
 				}
 			/>
