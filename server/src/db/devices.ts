@@ -29,13 +29,17 @@ import { rackHeightOf, rackSpansOf } from './racks'
 export type DeviceRow = typeof devices.$inferSelect
 export type InterfaceRow = typeof interfaces.$inferSelect
 
-/** Wire shape of an interface: `connected` reads as a boolean (P5 flips it). */
-export interface InterfaceJson extends Omit<InterfaceRow, 'connected'> {
+/**
+ * Wire shape of an interface: `connected` (P5 flips it) and `enabled` read
+ * as booleans.
+ */
+export interface InterfaceJson extends Omit<InterfaceRow, 'connected' | 'enabled'> {
 	connected: boolean
+	enabled: boolean
 }
 
 function toInterfaceJson(row: InterfaceRow): InterfaceJson {
-	return { ...row, connected: row.connected !== 0 }
+	return { ...row, connected: row.connected !== 0, enabled: row.enabled !== 0 }
 }
 
 // ---------------------------------------------------------------------------
@@ -696,6 +700,7 @@ export function addInterface(
 		name: input.name,
 		kind: input.kind ?? 'ethernet',
 		connected: 0,
+		enabled: input.enabled === false ? 0 : 1,
 		description: input.description ?? null,
 	}
 	try {
@@ -748,6 +753,9 @@ export function updateInterface(
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
+	}
+	if (input.enabled !== undefined) {
+		patch.enabled = input.enabled ? 1 : 0
 	}
 	if (!isPatchEmpty(patch)) {
 		try {

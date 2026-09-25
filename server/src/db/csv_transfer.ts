@@ -257,11 +257,16 @@ function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 
 				continue
 			}
 			// NetBox interface types may be a list; the first entry wins.
+			// Console/power ports keep their class as kind (the device detail
+			// page splits ports on it), dropping the connector type.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
 			const stub = createStub(created.value.id, {
 				prefix: name,
 				count: 1,
-				kind: type === undefined || type === null ? defaultKind : String(type),
+				kind:
+					key !== 'interfaces' || type === undefined || type === null
+						? defaultKind
+						: String(type),
 				label:
 					key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined,
 				description: typeof port.description === 'string' ? port.description : undefined,

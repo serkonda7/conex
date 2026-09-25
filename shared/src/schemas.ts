@@ -581,6 +581,7 @@ export const DeviceMoveSchema = v.pipe(
 export const InterfaceCreateSchema = v.strictObject({
 	name: InterfaceNameSchema,
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+	enabled: v.optional(v.boolean(), undefined),
 	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
 })
 
@@ -588,6 +589,7 @@ export const InterfaceUpdateSchema = v.strictObject({
 	// `connected` is owned by P5 cables, never edited directly.
 	name: v.optional(InterfaceNameSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
+	enabled: v.optional(v.boolean(), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 

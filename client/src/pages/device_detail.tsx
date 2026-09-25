@@ -38,9 +38,8 @@ import { locationTrail } from '../trails'
 /** Selectable trace depths for the path view. */
 const TRACE_DEPTHS = [1, 2, 3, 4, 6, 10]
 
-function faceLabelOrDash(face: string | null | undefined): string {
-	return face ? faceLabel(face) : '—'
-}
+/** Interface kinds listed under "other ports" instead of network ports. */
+const OTHER_PORT_KINDS = new Set(['console', 'power'])
 
 /**
  * /devices/:id — detail with the interface list (port status dots), a manual
@@ -279,13 +278,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/devices',
 	})
 
-	function typeNameOf(id: number | undefined): string {
-		if (id === undefined) {
-			return '—'
-		}
-		return types()?.find((type) => type.id === id)?.model ?? String(id)
-	}
-
 	async function handleRename(iface: InterfaceJson): Promise<void> {
 		setError(null)
 		const renamed = window.prompt(t('device.renamePrompt'), iface.name)
@@ -306,6 +298,141 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		setError(null)
 		setLocalIface(String(iface.id))
 		document.querySelector('#device-connect')?.scrollIntoView({ behavior: 'smooth' })
+	}
+
+	async function handleToggleEnabled(iface: InterfaceJson): Promise<void> {
+		setError(null)
+		const res = await update_interface(props.id, iface.id, { enabled: !iface.enabled })
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		void refetchIfaces()
+	}
+
+	/** Console and power ports; everything else is a network port. */
+	const isOtherPort = (iface: InterfaceJson): boolean => OTHER_PORT_KINDS.has(iface.kind)
+	const networkPorts = createMemo(() => (ifaces() ?? []).filter((i) => !isOtherPort(i)))
+	const otherPorts = createMemo(() => (ifaces() ?? []).filter(isOtherPort))
+	/** 1-based network port number: position in creation order (eth1..ethN). */
+	const portNumbers = createMemo(
+		() => new Map(networkPorts().map((iface, index) => [iface.id, index + 1])),
+	)
+	/** Direct cable peer per local interface, from the trace links. */
+	const linksByIface = createMemo(
+		() => new Map((trace()?.links ?? []).map((link) => [link.local_interface.id, link])),
+	)
+
+	/**
+	 * Port table; network ports get the enabled state and port number, other
+	 * (console/power) ports their kind instead.
+	 */
+	function portTable(rows: () => InterfaceJson[], other: boolean): JSX.Element {
+		return (
+			<DataTable
+				rows={rows}
+				getRowId={(iface: InterfaceJson): number => iface.id}
+				showColumnCustomizer
+				columns={[
+					...(other
+						? []
+						: [
+								{
+									key: 'enabled',
+									label: t('device.enabled'),
+									getValue: (iface: InterfaceJson): string =>
+										iface.enabled ? t('common.yes') : t('common.no'),
+								},
+								{
+									key: 'port',
+									label: t('device.portNumber'),
+									getValue: (iface: InterfaceJson): string =>
+										String(portNumbers().get(iface.id) ?? '—'),
+								},
+							]),
+					{
+						key: 'name',
+						label: t('common.name'),
+						getValue: (iface: InterfaceJson): JSX.Element => <code>{iface.name}</code>,
+					},
+					...(other
+						? [
+								{
+									key: 'kind',
+									label: t('device.kind'),
+									getValue: (iface: InterfaceJson): string => iface.kind,
+								},
+							]
+						: []),
+					{
+						key: 'connection',
+						label: t('device.connection'),
+						getValue: (iface: InterfaceJson): JSX.Element => {
+							const link = linksByIface().get(iface.id)
+							if (!link) {
+								return <span>—</span>
+							}
+							return (
+								<span>
+									<a
+										href={`/devices/${link.peer_device.id}`}
+										onClick={(e: MouseEvent): void =>
+											goTo(e, `/devices/${link.peer_device.id}`)
+										}
+									>
+										{link.peer_device.name}
+									</a>
+									: <code>{link.peer_interface.name}</code>
+								</span>
+							)
+						},
+					},
+				]}
+				rowActions={(iface: InterfaceJson): JSX.Element => {
+					const link = linksByIface().get(iface.id)
+					return (
+						<span class="row-actions">
+							<Show
+								when={link}
+								fallback={
+									<button
+										type="button"
+										class="icon-btn icon-btn-connect"
+										disabled={iface.connected}
+										title={t('device.connectToPeer', { name: iface.name })}
+										aria-label={t('device.connectCableFor', {
+											name: iface.name,
+										})}
+										onClick={() => handleConnectCable(iface)}
+									>
+										<IconLinkPlus size={20} />
+									</button>
+								}
+							>
+								{(l: () => TraceLink): JSX.Element => (
+									<button
+										type="button"
+										class="btn-danger"
+										onClick={() => handleDisconnect(l().cable_id)}
+									>
+										{t('device.disconnect')}
+									</button>
+								)}
+							</Show>
+							<Show when={!other}>
+								<button type="button" onClick={() => handleToggleEnabled(iface)}>
+									{iface.enabled ? t('device.disable') : t('device.enable')}
+								</button>
+							</Show>
+							<button type="button" onClick={() => handleRename(iface)}>
+								{t('device.rename')}
+							</button>
+						</span>
+					)
+				}}
+				empty={false}
+			/>
+		)
 	}
 
 	const ifaceCount = (): number => ifaces()?.length ?? 0
@@ -331,30 +458,18 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					{device()?.description || t('common.noDescription')}
 				</DetailSubtitle>
 
-				<div class="detail-stats">
-					<a class="detail-stat" href="#device-interfaces">
-						<span class="detail-stat-value">{ifaceCount()}</span>{' '}
-						<span class="detail-stat-label">
-							{tp('entity.interface', ifaceCount())}
-						</span>
-					</a>
-					<a class="detail-stat" href="#device-trace">
-						<span class="detail-stat-value">{traceCount()}</span>{' '}
-						<span class="detail-stat-label">
-							{tp('device.traceLink', traceCount())}
-						</span>
-					</a>
-					<a class="detail-stat" href="#device-cables">
-						<span class="detail-stat-value">{cableCount()}</span>{' '}
-						<span class="detail-stat-label">{tp('device.cable', cableCount())}</span>
-					</a>
-				</div>
-
 				<DetailCard label={t('device.details')}>
 					<dt>{t('common.type')}</dt>
-					<dd>{typeNameOf(device()?.device_type_id)}</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{device()?.description || '—'}</dd>
+					<dd>
+						<ForeignKeyLink
+							id={device()?.device_type_id ?? null}
+							loading={types.loading}
+							name={
+								types()?.find((type) => type.id === device()?.device_type_id)?.model
+							}
+							href={`/device-types/${device()?.device_type_id ?? ''}`}
+						/>
+					</dd>
 					<dt>{t('device.serial')}</dt>
 					<dd>{device()?.serial ?? '—'}</dd>
 					<dt>{tp('entity.tenant', 1)}</dt>
@@ -381,6 +496,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							id={locationId()}
 							loading={locationName.loading}
 							name={locationName()}
+							href={`/locations/${locationId() ?? ''}`}
 						/>
 					</dd>
 					<dt>{tp('entity.rack', 1)}</dt>
@@ -391,16 +507,19 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							name={rack()?.name}
 							href={`/racks/${rackId() ?? ''}`}
 						/>
-					</dd>
-					<dt>{t('shelf.face')}</dt>
-					<dd>{faceLabelOrDash(device()?.face)}</dd>
-					<dt>{t('common.position')}</dt>
-					<dd>
-						{device()?.position_u !== null && device()?.position_u !== undefined ? (
-							<code>
-								{t('common.unitPosition', { u: device()?.position_u ?? '' })}
-							</code>
-						) : shelfId() !== null ? (
+						<Show
+							when={
+								device()?.position_u !== null && device()?.position_u !== undefined
+							}
+						>
+							{' ('}
+							{t('common.unitPosition', { u: device()?.position_u ?? '' })}
+							{' / '}
+							{device()?.face ? faceLabel(device()?.face ?? '') : '—'}
+							{')'}
+						</Show>
+						<Show when={device()?.position_u == null && shelfId() !== null}>
+							{' ('}
 							<ForeignKeyLink
 								id={shelfId()}
 								loading={shelf.loading}
@@ -411,257 +530,26 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 								})}
 								href={`/shelves/${shelfId() ?? ''}/edit`}
 							/>
-						) : (
+							{')'}
+						</Show>
+						<Show when={device()?.position_u == null && shelfId() === null}>
+							{' ('}
 							<span>{t('device.unracked')}</span>
-						)}
+							{')'}
+						</Show>
 					</dd>
 				</DetailCard>
 			</DetailShell>
-			<h3>{t('device.move')}</h3>
-			<form onSubmit={handleMove}>
-				<input
-					placeholder={t('device.movePlaceholder')}
-					inputmode="numeric"
-					value={moveU()}
-					onInput={(e: InputEventAndTarget) => setMoveU(e.currentTarget.value)}
-				/>
-				<button type="submit">{t('device.move')}</button>
-			</form>
 			<h3 id="device-interfaces">
-				{t('device.interfacesCount', { count: ifaces()?.length ?? 0 })}
+				{t('device.networkPortsCount', { count: networkPorts().length })}
 			</h3>
-			<form onSubmit={handleAddIface}>
-				<input
-					placeholder={t('device.interfaceNamePlaceholder')}
-					value={ifaceName()}
-					onInput={(e: InputEventAndTarget) => setIfaceName(e.currentTarget.value)}
-				/>
-				<button type="submit">{t('device.addInterface')}</button>
-			</form>
-			<DataTable
-				rows={() => ifaces() ?? []}
-				getRowId={(iface: InterfaceJson): number => iface.id}
-				showColumnCustomizer
-				columns={[
-					{
-						key: 'status',
-						label: t('common.status'),
-						getValue: (iface: InterfaceJson): JSX.Element => (
-							<span
-								title={iface.connected ? t('device.connected') : t('device.free')}
-							>
-								<span
-									class={
-										iface.connected ? 'status-dot-connected' : 'status-dot-free'
-									}
-								>
-									●
-								</span>
-							</span>
-						),
-					},
-					{
-						key: 'name',
-						label: t('common.name'),
-						getValue: (iface: InterfaceJson): JSX.Element => <code>{iface.name}</code>,
-					},
-					{
-						key: 'kind',
-						label: t('device.kind'),
-						getValue: (iface: InterfaceJson): string => iface.kind,
-					},
-				]}
-				rowActions={(iface: InterfaceJson): JSX.Element => (
-					<span class="row-actions">
-						<button
-							type="button"
-							class="icon-btn icon-btn-connect"
-							disabled={iface.connected}
-							title={
-								iface.connected
-									? t('device.alreadyConnected')
-									: t('device.connectToPeer', { name: iface.name })
-							}
-							aria-label={t('device.connectCableFor', { name: iface.name })}
-							onClick={() => handleConnectCable(iface)}
-						>
-							<IconLinkPlus size={20} />
-						</button>
-						<button type="button" onClick={() => handleRename(iface)}>
-							{t('device.rename')}
-						</button>
-					</span>
-				)}
-				empty={false}
-			/>
-			<h3 id="device-connect">{t('device.connectCable')}</h3>
-			<form onSubmit={handleConnect}>
-				<select
-					value={localIface()}
-					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-						setLocalIface(e.currentTarget.value)
-					}
-					aria-label={t('device.localFreePort')}
-				>
-					<option value="">{t('device.localFreePortPlaceholder')}</option>
-					<For each={freeLocal()}>
-						{(iface: InterfaceJson): JSX.Element => (
-							<option value={iface.id}>{iface.name}</option>
-						)}
-					</For>
-				</select>{' '}
-				<select
-					value={peerDevice()}
-					onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
-						setPeerDevice(e.currentTarget.value)
-						setPeerIface('')
-					}}
-					aria-label={t('device.peerDevice')}
-				>
-					<option value="">{t('device.peerDevicePlaceholder')}</option>
-					<For each={devices() ?? []}>
-						{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
-					</For>
-				</select>{' '}
-				<select
-					value={peerIface()}
-					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-						setPeerIface(e.currentTarget.value)
-					}
-					aria-label={t('device.peerFreePort')}
-				>
-					<option value="">{t('device.peerFreePortPlaceholder')}</option>
-					<For each={freePeer()}>
-						{(iface: InterfaceJson): JSX.Element => (
-							<option value={iface.id}>{iface.name}</option>
-						)}
-					</For>
-				</select>{' '}
-				<input
-					placeholder={t('device.labelPlaceholder')}
-					value={cableLabel()}
-					onInput={(e: InputEventAndTarget) => setCableLabel(e.currentTarget.value)}
-				/>{' '}
-				<button type="submit">{t('device.connect')}</button>
-			</form>
-			<h3 id="device-trace">
-				{t('device.traceCount', { count: trace()?.links.length ?? 0 })}
-			</h3>
-			<label>
-				<span class="visually-hidden">{t('device.traceDepth')}</span>
-				<select
-					aria-label={t('device.traceDepth')}
-					value={traceDepth()}
-					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-						setTraceDepth(e.currentTarget.value)
-					}
-				>
-					<For each={TRACE_DEPTHS}>
-						{(depth: number): JSX.Element => (
-							<option value={depth}>{t('device.depth', { count: depth })}</option>
-						)}
-					</For>
-				</select>
-			</label>{' '}
-			<a href="/topology" onClick={(e: MouseEvent): void => goTo(e, '/topology')}>
-				{t('device.openInTopology')}
-			</a>
-			<Show
-				when={(trace()?.links ?? []).length > 0}
-				fallback={<Empty message={t('device.noTrace')} />}
-			>
-				<ul>
-					<For each={trace()?.links ?? []}>
-						{(link: TraceLink): JSX.Element => (
-							<li>
-								<code>
-									{device()?.name}:{link.local_interface.name} ↔{' '}
-									{link.peer_device.name}:{link.peer_interface.name}
-								</code>{' '}
-								{link.cable_label ? <span>({link.cable_label})</span> : null}{' '}
-								<button
-									type="button"
-									class="btn-danger"
-									onClick={() => handleDisconnect(link.cable_id)}
-								>
-									{t('device.disconnect')}
-								</button>
-							</li>
-						)}
-					</For>
-				</ul>
+			{portTable(networkPorts, false)}
+			<Show when={otherPorts().length > 0}>
+				<h3 id="device-other-ports">
+					{t('device.otherPortsCount', { count: otherPorts().length })}
+				</h3>
+				{portTable(otherPorts, true)}
 			</Show>
-			<Show when={(trace()?.paths ?? []).length > 0}>
-				<h4>{t('device.multiHopPaths', { count: trace()?.paths.length ?? 0 })}</h4>
-				<ul>
-					<For each={trace()?.paths ?? []}>
-						{(path: TracePath): JSX.Element => (
-							<li>
-								<code>
-									{path.hops
-										.map(
-											(h) =>
-												`${h.from_device.name}:${h.from_interface.name} → ${h.to_device.name}:${h.to_interface.name}`,
-										)
-										.join(' · ')}
-								</code>{' '}
-								→{' '}
-								<a
-									href={`/devices/${path.end_device.id}`}
-									onClick={(e: MouseEvent): void =>
-										goTo(e, `/devices/${path.end_device.id}`)
-									}
-								>
-									{path.end_device.name}
-								</a>
-							</li>
-						)}
-					</For>
-				</ul>
-			</Show>
-			<h3 id="device-cables">
-				{t('device.cablesCount', { count: cables()?.length ?? 0 })}{' '}
-				<a
-					href={`/connections?device=${props.id}`}
-					onClick={(e: MouseEvent): void => goTo(e, `/connections?device=${props.id}`)}
-				>
-					{t('device.viewAllShort')}
-				</a>
-			</h3>
-			<DataTable
-				rows={() => cables() ?? []}
-				getRowId={(cable: CableRow): number => cable.id}
-				showColumnCustomizer
-				columns={[
-					{
-						key: 'label',
-						label: t('device.label'),
-						getValue: (cable: CableRow): string => cable.label ?? '—',
-					},
-					{
-						key: 'status',
-						label: t('common.status'),
-						getValue: (cable: CableRow): JSX.Element => (
-							<span class="badge">{cableStatusLabel(cable.status)}</span>
-						),
-					},
-					{
-						key: 'kind',
-						label: t('device.kind'),
-						getValue: (cable: CableRow): string => cable.kind ?? '—',
-					},
-				]}
-				rowActions={(cable: CableRow): JSX.Element => (
-					<button
-						type="button"
-						class="btn-danger"
-						onClick={() => handleDisconnect(cable.id)}
-					>
-						{t('device.disconnect')}
-					</button>
-				)}
-				emptyContent={<Empty message={t('device.noCables')} />}
-			/>
 			<InlineError message={error()} />
 		</div>
 	)

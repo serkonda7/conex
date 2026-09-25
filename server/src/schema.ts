@@ -330,6 +330,7 @@ export const interfaces = sqliteTable(
 		name: text('name').notNull(),
 		kind: text('kind').notNull().default('ethernet'),
 		connected: integer('connected').notNull().default(0),
+		enabled: integer('enabled').notNull().default(1),
 		description: text('description'),
 	},
 	(table) => [

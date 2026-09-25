@@ -162,6 +162,20 @@
       "when": 1790330000000,
       "tag": "0022_remove_building_and_cage_location_types",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1790348803065,
+      "tag": "0023_curly_leper_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1790349596008,
+      "tag": "0024_console_power_port_kinds",
+      "breakpoints": true
     }
   ]
 }
