@@ -85,10 +85,15 @@ function shelf_display_rows(shelf: ElevationShelfRef, plate: boolean): string {
 	return `minmax(0, ${shelf.mount_height}fr)`
 }
 
-type RowKind = 'free' | 'device' | 'ghost'
+type RowKind = 'free' | 'device'
+
+/** Devices occupying a unit on either face. */
+function unit_devices(unit: ElevationUnit): ElevationDeviceRef[] {
+	return unit.devices ?? (unit.device ? [unit.device] : [])
+}
 
 function device_for_face(unit: ElevationUnit, face: RackFace): ElevationDeviceRef | undefined {
-	const devices = unit.devices ?? (unit.device ? [unit.device] : [])
+	const devices = unit_devices(unit)
 	return devices.find((device) => device.face === face || device.face === null) ?? devices[0]
 }
 
@@ -97,7 +102,12 @@ function row_kind(unit: ElevationUnit, face: RackFace): RowKind {
 	if (!device) {
 		return 'free'
 	}
-	return device.face === null || device.face === face || device.is_full_depth ? 'device' : 'ghost'
+	return device.face === null || device.face === face || device.is_full_depth ? 'device' : 'free'
+}
+
+/** True when `face` shows the back side of a full-depth device. */
+function is_rear_view(device: ElevationDeviceRef, face: RackFace): boolean {
+	return device.face !== null && device.face !== face
 }
 
 /** First shelf blocking this unit on the given face. */
@@ -124,21 +134,26 @@ function shelf_block_span(
 	const mount = shelf_mount(shelf)
 	const mount_taken =
 		!shelf_on_face(shelf, face) ||
-		units.some((unit) => covers(mount, unit.u) && row_kind(unit, face) !== 'free')
+		units.some((unit) => covers(mount, unit.u) && unit_devices(unit).length > 0)
 	return mount_taken ? shelf_blocked(shelf) : shelf_footprint(shelf)
 }
 
 type Segment =
 	| { kind: 'free'; u: number }
-	| { kind: 'device'; device: ElevationDeviceRef; rows: number; shelf?: ElevationShelfRef }
-	| { kind: 'ghost'; device: ElevationDeviceRef; rows: number }
+	| {
+			kind: 'device'
+			device: ElevationDeviceRef
+			rows: number
+			shelf?: ElevationShelfRef
+			/** Back side of a full-depth device mounted on the other face. */
+			rear: boolean
+	  }
 	| {
 			kind: 'shelf'
 			shelf: ElevationShelfRef
 			first_u: number
 			last_u: number
 			rows: number
-			ghost: boolean
 			/** True when the block covers the mount hardware (plate row shown). */
 			plate: boolean
 	  }
@@ -195,7 +210,6 @@ function segments_for_face(
 				first_u: blocked.first,
 				last_u: blocked.last,
 				rows,
-				ghost: !(shelf.face === null || shelf.face === face || shelf.is_full_depth),
 				plate: blocked.first === shelf.position_u,
 			})
 			i += rows
@@ -222,27 +236,19 @@ function segments_for_face(
 			i += 1
 			continue
 		}
-		if (kind === 'ghost') {
-			// Consecutive ghost rows of the same device form one block.
-			let rows = 1
-			while (
-				i + rows < units.length &&
-				row_kind(units[i + rows] as ElevationUnit, face) === 'ghost' &&
-				device_for_face(units[i + rows] as ElevationUnit, face)?.id === device.id
-			) {
-				rows += 1
-			}
-			segments.push({ kind: 'ghost', device, rows })
-			i += rows
-			continue
-		}
 		const deviceShelf = shelves.find(
 			(s) =>
 				s.mount_usable &&
 				shelf_on_face(s, face) &&
 				covers(shelf_mount(s), device.position_u),
 		)
-		segments.push({ kind: 'device', device, rows: device.u_height, shelf: deviceShelf })
+		segments.push({
+			kind: 'device',
+			device,
+			rows: device.u_height,
+			shelf: deviceShelf,
+			rear: is_rear_view(device, face),
+		})
 		i += device.u_height
 	}
 	return segments
@@ -637,9 +643,6 @@ export function RackElevation(props: {
 													/>
 													<li
 														class="rack-block rack-u-shelf"
-														classList={{
-															'rack-u-ghost': segment.ghost,
-														}}
 														style={{
 															'grid-row': `${row} / span ${segment.rows}`,
 															'grid-column': '2',
@@ -656,91 +659,12 @@ export function RackElevation(props: {
 														})}
 													>
 														<Show
-															when={!segment.ghost}
+															when={segment.plate}
 															fallback={
-																<span class="rack-ghost">
-																	<span class="rack-dev-name">
-																		◧ {shelf_name(s)}
-																	</span>
-																	<span class="rack-dev-meta">
-																		{t(
-																			'elevation.oppositeFace',
-																		)}
-																	</span>
-																</span>
-															}
-														>
-															<Show
-																when={segment.plate}
-																fallback={
-																	<div class="rack-shelf-clearance">
-																		<a
-																			href={`/shelves/${s.id}/edit`}
-																			class="rack-shelf-clearance-link"
-																			onClick={(
-																				e: MouseEvent,
-																			): void =>
-																				goTo(
-																					e,
-																					`/shelves/${s.id}/edit`,
-																				)
-																			}
-																			title={t(
-																				'elevation.clearanceTitle',
-																				{
-																					mount: u_label(
-																						s.position_u,
-																					),
-																					mountHeight:
-																						s.mount_height,
-																					reserved:
-																						s.reserved_height,
-																				},
-																			)}
-																		>
-																			<span class="rack-dev-name">
-																				▤ {shelf_name(s)}
-																			</span>
-																			<span class="rack-shelf-caption">
-																				{t(
-																					'elevation.reserved',
-																					{
-																						count: s.reserved_height,
-																					},
-																				)}
-																			</span>
-																		</a>
-																		<ShelfDevices
-																			shelf={s}
-																			actions={
-																				props.shelf_actions
-																			}
-																		/>
-																	</div>
-																}
-															>
-																<Show when={s.reserved_height > 0}>
-																	<div class="rack-shelf-clearance">
-																		<span class="rack-shelf-caption">
-																			{t(
-																				'elevation.reserved',
-																				{
-																					count: s.reserved_height,
-																				},
-																			)}
-																		</span>
-																		<ShelfDevices
-																			shelf={s}
-																			actions={
-																				props.shelf_actions
-																			}
-																		/>
-																	</div>
-																</Show>
-																<div class="rack-shelf-plate-row">
+																<div class="rack-shelf-clearance">
 																	<a
 																		href={`/shelves/${s.id}/edit`}
-																		class="rack-shelf-plate"
+																		class="rack-shelf-clearance-link"
 																		onClick={(
 																			e: MouseEvent,
 																		): void =>
@@ -750,9 +674,7 @@ export function RackElevation(props: {
 																			)
 																		}
 																		title={t(
-																			s.reserved_height > 0
-																				? 'elevation.plateTitleReserved'
-																				: 'elevation.plateTitle',
+																			'elevation.clearanceTitle',
 																			{
 																				mount: u_label(
 																					s.position_u,
@@ -767,56 +689,87 @@ export function RackElevation(props: {
 																		<span class="rack-dev-name">
 																			▤ {shelf_name(s)}
 																		</span>
-																		<Show when={s.mount_usable}>
-																			<span class="rack-dev-meta">
-																				{t(
-																					'shelf.mountUsable',
-																				)}
-																			</span>
-																		</Show>
+																		<span class="rack-shelf-caption">
+																			{t(
+																				'elevation.reserved',
+																				{
+																					count: s.reserved_height,
+																				},
+																			)}
+																		</span>
 																	</a>
-																	<Show
-																		when={
-																			s.reserved_height === 0
+																	<ShelfDevices
+																		shelf={s}
+																		actions={
+																			props.shelf_actions
 																		}
-																	>
-																		<ShelfDevices
-																			shelf={s}
-																			actions={
-																				props.shelf_actions
-																			}
-																		/>
-																	</Show>
+																	/>
+																</div>
+															}
+														>
+															<Show when={s.reserved_height > 0}>
+																<div class="rack-shelf-clearance">
+																	<span class="rack-shelf-caption">
+																		{t('elevation.reserved', {
+																			count: s.reserved_height,
+																		})}
+																	</span>
+																	<ShelfDevices
+																		shelf={s}
+																		actions={
+																			props.shelf_actions
+																		}
+																	/>
 																</div>
 															</Show>
+															<div class="rack-shelf-plate-row">
+																<a
+																	href={`/shelves/${s.id}/edit`}
+																	class="rack-shelf-plate"
+																	onClick={(
+																		e: MouseEvent,
+																	): void =>
+																		goTo(
+																			e,
+																			`/shelves/${s.id}/edit`,
+																		)
+																	}
+																	title={t(
+																		s.reserved_height > 0
+																			? 'elevation.plateTitleReserved'
+																			: 'elevation.plateTitle',
+																		{
+																			mount: u_label(
+																				s.position_u,
+																			),
+																			mountHeight:
+																				s.mount_height,
+																			reserved:
+																				s.reserved_height,
+																		},
+																	)}
+																>
+																	<span class="rack-dev-name">
+																		▤ {shelf_name(s)}
+																	</span>
+																	<Show when={s.mount_usable}>
+																		<span class="rack-dev-meta">
+																			{t('shelf.mountUsable')}
+																		</span>
+																	</Show>
+																</a>
+																<Show
+																	when={s.reserved_height === 0}
+																>
+																	<ShelfDevices
+																		shelf={s}
+																		actions={
+																			props.shelf_actions
+																		}
+																	/>
+																</Show>
+															</div>
 														</Show>
-													</li>
-												</>
-											)
-										}
-										if (segment.kind === 'ghost') {
-											return (
-												<>
-													<BlockGutters
-														topU={topU() - (row - 1)}
-														row={row}
-														rows={segment.rows}
-													/>
-													<li
-														class="rack-block rack-u-ghost"
-														style={{
-															'grid-row': `${row} / span ${segment.rows}`,
-															'grid-column': '2',
-														}}
-													>
-														<span class="rack-ghost">
-															<span class="rack-dev-name">
-																◧ {segment.device.name}
-															</span>
-															<span class="rack-dev-meta">
-																{t('elevation.oppositeFace')}
-															</span>
-														</span>
 													</li>
 												</>
 											)
@@ -830,6 +783,9 @@ export function RackElevation(props: {
 												/>
 												<li
 													class="rack-block rack-u-device"
+													classList={{
+														'rack-u-device-rear': segment.rear,
+													}}
 													style={{
 														'grid-row': `${row} / span ${segment.rows}`,
 														'grid-column': '2',
@@ -853,6 +809,11 @@ export function RackElevation(props: {
 														<span class="rack-dev-meta">
 															{segment.device.device_type_model}
 														</span>
+														<Show when={segment.rear}>
+															<span class="visually-hidden">
+																{t('elevation.rearSide')}
+															</span>
+														</Show>
 														<Show when={segment.shelf}>
 															<span
 																class="rack-child-shelf"

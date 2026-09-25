@@ -334,7 +334,7 @@ export interface ElevationShelfRef {
 	mount_usable: boolean
 	/** Extra U reserved above the mount (always blocks device mounts). */
 	reserved_height: number
-	/** NetBox `is_full_depth`: false renders ghosted on the opposite face. */
+	/** NetBox `is_full_depth`: true renders striped on the opposite face, false leaves it free. */
 	is_full_depth: boolean
 	/** Devices placed on this shelf, by name. */
 	devices: ElevationShelfDeviceRef[]
@@ -352,7 +352,7 @@ export interface ElevationDeviceRef {
 	status: string
 	device_type_id: number
 	device_type_model: string
-	/** NetBox `is_full_depth`: false renders ghosted on the opposite face. */
+	/** NetBox `is_full_depth`: true renders striped on the opposite face, false leaves it free. */
 	is_full_depth: boolean
 }
 

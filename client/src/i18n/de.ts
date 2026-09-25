@@ -562,7 +562,7 @@ export const de: Messages = {
 	'elevation.selectChildDeviceTitle': 'Untergerät für Fachboden bei {unit} auswählen ({face})',
 	'elevation.onShelf': 'Auf Fachboden',
 	'elevation.shelfBlock': 'Fachboden {mount}, {first}-{last}',
-	'elevation.oppositeFace': 'Gegenseite',
+	'elevation.rearSide': '(Rückseite eines Geräts mit voller Tiefe)',
 	'elevation.clearanceTitle':
 		'Fachboden {mount} ({mountHeight} HE Montage nutzbar, {reserved} HE reserviert)',
 	'elevation.reserved': 'Reserviert · {count} HE',

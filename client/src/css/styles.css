@@ -1423,8 +1423,14 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background-color: var(--bg-hover);
 }
 
-.rack-u-ghost {
-	opacity: 0.65;
+/* Back side of a full-depth device (NetBox-style diagonal stripes). */
+.rack-u-device-rear,
+.rack-u-device-rear:hover {
+	background-image: repeating-linear-gradient(
+		-45deg,
+		transparent 0 5px,
+		rgba(225, 71, 71, 0.35) 5px 7px
+	);
 }
 
 .rack-u-free {
@@ -1435,8 +1441,7 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background-color: var(--bg-raised);
 }
 
-.rack-dev,
-.rack-ghost {
+.rack-dev {
 	display: flex;
 	align-items: center;
 	gap: 0.35rem;
@@ -1451,8 +1456,7 @@ th[aria-sort="descending"] .data-table-sort::after {
 	white-space: nowrap;
 }
 
-.rack-dev,
-.rack-ghost {
+.rack-dev {
 	justify-content: center;
 }
 
@@ -1471,6 +1475,17 @@ th[aria-sort="descending"] .data-table-sort::after {
 	text-overflow: ellipsis;
 	flex-shrink: 2;
 	min-width: 0;
+}
+
+.rack-u-device-rear .rack-dev-name {
+	padding: 0 0.3rem;
+	border-radius: 3px;
+	background-color: var(--bg-raised);
+	font-weight: 500;
+}
+
+.rack-u-device-rear .rack-dev-meta {
+	display: none;
 }
 
 .rack-dev-face {
