@@ -10,7 +10,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
-import { t, tp } from '../i18n'
+import { t } from '../i18n'
 import { type FormValues, is_add_another_submit, submit_form, use_slug_fields } from '../util/form'
 
 /** /tenants/add — NetBox-style tenant create form. */
@@ -41,12 +41,7 @@ export function TenantAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/tenants"
-			backLabel={tp('entity.tenant', 2)}
-			title={t('tenant.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('tenant.addTitle')} onSubmit={handleCreate}>
 			<NameField
 				id="tenant-name"
 				placeholder={t('tenant.namePlaceholder')}

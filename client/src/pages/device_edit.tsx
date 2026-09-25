@@ -142,8 +142,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo={`/devices/${props.id}`}
-			backLabel={device()?.name ?? tp('entity.device', 1)}
+			name={device()?.name}
 			title={t('device.editTitle')}
 			loaded={loaded()}
 			loadingText={t('device.loadingOne')}

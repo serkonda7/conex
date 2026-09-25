@@ -87,12 +87,7 @@ export function RackTypeAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/rack-types"
-			backLabel={tp('entity.rackType', 2)}
-			title={t('rackType.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('rackType.addTitle')} onSubmit={handleCreate}>
 			<SelectField
 				id="rack-type-manufacturer"
 				label={tp('entity.manufacturer', 1)}

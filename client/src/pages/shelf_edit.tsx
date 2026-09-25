@@ -15,7 +15,7 @@ import {
 } from '../components/form'
 import { t, tp } from '../i18n'
 import { faceOptions } from '../i18n/labels'
-import { navigate } from '../router'
+import { type Crumb, navigate, parseId } from '../router'
 import { submit_edit, useEditForm } from '../util/form'
 
 /** /shelves/:id/edit — shelf edit form. Saves back to its rack. */
@@ -117,10 +117,22 @@ export function ShelfEditPage(props: { id: number }): JSX.Element {
 		navigate(`/racks/${current.rack_id}`, { refresh: true })
 	}
 
+	const rackCrumbs = (): Crumb[] => {
+		const id = parseId(String(shelf()?.rack_id ?? rackId()))
+		const rack = racks()?.find((r) => r.id === id)
+		return [
+			{ label: tp('entity.rack', 2), href: '/racks' },
+			...(rack ? [{ label: rack.name, href: `/racks/${rack.id}` }] : []),
+		]
+	}
+
 	return (
 		<EditPageShell
-			backTo={`/racks/${shelf()?.rack_id ?? rackId()}`}
-			backLabel={tp('entity.rack', 1)}
+			name={
+				shelf()?.name ||
+				(shelf() ? t('common.unitPosition', { u: shelf()?.position_u ?? '' }) : undefined)
+			}
+			crumbs={rackCrumbs()}
 			title={t('shelf.editTitle')}
 			loaded={loaded()}
 			loadingText={t('shelf.loadingOne')}

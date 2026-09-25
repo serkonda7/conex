@@ -64,8 +64,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/manufacturers"
-				backLabel={tp('entity.manufacturer', 2)}
+				name={manufacturer()?.name}
 				loading={manufacturer.loading}
 				loadingText={t('manufacturer.loadingOne')}
 				record={manufacturer()}

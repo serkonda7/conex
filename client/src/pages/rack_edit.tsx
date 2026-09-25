@@ -116,8 +116,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo={`/racks/${props.id}`}
-			backLabel={rack()?.name ?? tp('entity.rack', 1)}
+			name={rack()?.name}
 			title={t('rack.editTitle')}
 			loaded={loaded()}
 			loadingText={t('rack.loadingOne')}

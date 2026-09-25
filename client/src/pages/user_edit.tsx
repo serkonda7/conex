@@ -10,7 +10,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
-import { t, tp } from '../i18n'
+import { t } from '../i18n'
 import { roleOptions } from '../i18n/labels'
 import { navigate } from '../router'
 import { useEditForm } from '../util/form'
@@ -69,8 +69,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo="/users"
-			backLabel={user()?.username ?? tp('entity.user', 1)}
+			name={user()?.username}
 			title={t('user.editTitle')}
 			loaded={loaded()}
 			loadingText={t('user.loadingOne')}

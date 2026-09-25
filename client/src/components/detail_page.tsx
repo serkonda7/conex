@@ -1,6 +1,6 @@
 /**
  * Shared building blocks for the entity detail pages (tenant, site,
- * location, …): the back link, the loading/empty gate, the header with
+ * location, …): the tab title and breadcrumb report, the loading/empty gate, the header with
  * edit/delete actions, the detail card grid, the foreign-key link pattern,
  * the related-object sections, and the confirm-then-delete flow.
  *
@@ -11,45 +11,33 @@ import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
-import { goTo, navigate } from '../router'
+import { type Crumb, forgetDeleted, goTo, navigate, usePageMeta } from '../router'
 import { Empty, InlineError, Loading } from './feedback'
 
 export { Empty, InlineError, Loading }
 
-/** Back link above the detail header (`← Tenants`, …). */
-export function DetailBackLink(props: { href: string; label: string }): JSX.Element {
-	return (
-		<p>
-			<a href={props.href} onClick={(e: MouseEvent): void => goTo(e, props.href)}>
-				← {props.label}
-			</a>
-		</p>
-	)
-}
-
 /**
- * Detail page shell: back link plus the loading/empty gate around the
- * header block. Related sections and the terminal error render after the
- * shell, outside the gate, exactly as the hand-rolled pages did.
+ * Detail page shell: reports the object's name and ancestors to the tab
+ * title and breadcrumb bar, and gates the header block on loading/empty.
+ * Related sections and the terminal error render after the shell, outside
+ * the gate, exactly as the hand-rolled pages did.
  */
 export function DetailShell(props: {
-	backTo: string
-	backLabel: string
+	name: string | undefined
+	crumbs?: readonly Crumb[]
 	loading: boolean
 	loadingText: string
 	record: unknown
 	emptyText: string
 	children: JSX.Element
 }): JSX.Element {
+	usePageMeta(() => ({ name: props.name, crumbs: props.crumbs }))
 	return (
-		<>
-			<DetailBackLink href={props.backTo} label={props.backLabel} />
-			<Show when={!props.loading} fallback={<Loading message={props.loadingText} />}>
-				<Show when={props.record} fallback={<Empty message={props.emptyText} />}>
-					{props.children}
-				</Show>
+		<Show when={!props.loading} fallback={<Loading message={props.loadingText} />}>
+			<Show when={props.record} fallback={<Empty message={props.emptyText} />}>
+				{props.children}
 			</Show>
-		</>
+		</Show>
 	)
 }
 
@@ -96,29 +84,6 @@ export function DetailCard(props: { label: string; children: JSX.Element }): JSX
 		<section class="card" aria-label={props.label}>
 			<dl class="detail-grid">{props.children}</dl>
 		</section>
-	)
-}
-
-/**
- * Parent breadcrumb rendered above the header on nested details
- * (`parent / child`).
- */
-export function ParentBreadcrumb(props: {
-	parentId: number | null
-	parentName: string | null | undefined
-	parentFallback: string
-	href: string
-	childName: string | undefined
-}): JSX.Element {
-	return (
-		<Show when={props.parentId !== null}>
-			<p class="page-subtitle">
-				<a href={props.href} onClick={(e: MouseEvent): void => goTo(e, props.href)}>
-					{props.parentName ?? props.parentFallback}
-				</a>{' '}
-				/ {props.childName}
-			</p>
-		</Show>
 	)
 }
 
@@ -199,7 +164,8 @@ export function RelatedSection(props: {
 /**
  * Confirm-then-delete flow shared by every detail page: confirms with the
  * entity noun (a `noun.<entity>` plural key) and name, reports through
- * `setError`, and navigates back to the list with a refresh.
+ * `setError`, then drops the object from the open tabs and shows the
+ * previous page or the refreshed list.
  */
 export function useDetailDelete(opts: {
 	noun: PluralKey
@@ -223,7 +189,7 @@ export function useDetailDelete(opts: {
 			opts.setError(res.error.message)
 			return
 		}
-		navigate(opts.listRoute, { refresh: true })
+		forgetDeleted(`${opts.listRoute}/${opts.id}`, opts.listRoute)
 	}
 
 	return { handleDelete }

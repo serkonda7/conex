@@ -25,7 +25,7 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
-import { goTo } from '../router'
+import { type Crumb, goTo } from '../router'
 
 /**
  * /device-types/:id — device-type detail: header with model and details
@@ -79,6 +79,14 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			return res.value.items.filter((d) => d.device_type_id === id)
 		},
 	)
+
+	function manufacturerCrumbs(): Crumb[] {
+		const id = deviceType()?.manufacturer_id
+		const name = manufacturers()?.find((m) => m.id === id)?.name
+		return id !== undefined && name !== undefined
+			? [{ label: name, href: `/manufacturers/${id}` }]
+			: []
+	}
 
 	function mfrNameOf(id: number | undefined): string {
 		if (id === undefined) {
@@ -144,8 +152,8 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/device-types"
-				backLabel={tp('entity.deviceType', 2)}
+				name={deviceType()?.model}
+				crumbs={manufacturerCrumbs()}
 				loading={deviceType.loading}
 				loadingText={t('deviceType.loadingOne')}
 				record={deviceType()}

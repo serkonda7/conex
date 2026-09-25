@@ -110,8 +110,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo={`/locations/${props.id}`}
-			backLabel={location()?.name ?? tp('entity.location', 1)}
+			name={location()?.name}
 			title={t('location.editTitle')}
 			loaded={loaded()}
 			loadingText={t('location.loadingOne')}

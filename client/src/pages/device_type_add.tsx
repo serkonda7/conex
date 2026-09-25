@@ -79,12 +79,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/device-types"
-			backLabel={tp('entity.deviceType', 2)}
-			title={t('deviceType.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('deviceType.addTitle')} onSubmit={handleCreate}>
 			<SelectField
 				id="device-type-manufacturer"
 				label={tp('entity.manufacturer', 1)}

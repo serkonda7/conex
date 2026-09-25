@@ -1,4 +1,4 @@
-import { IconDownload, IconLogout, IconPlus, IconX } from '@tabler/icons-solidjs'
+import { IconChevronDown, IconDownload, IconLogout, IconPlus, IconX } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import {
@@ -16,23 +16,25 @@ import {
 import { Dynamic } from 'solid-js/web'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
+import { Breadcrumbs } from './components/breadcrumbs'
 import { t } from './i18n'
 import {
 	activateTab,
 	activeTabId,
+	closeOtherTabs,
 	closeTab,
+	closeTabsToRight,
+	duplicateTab,
 	goTo,
 	path,
-	setTabLabel,
 	type TabState,
-	tabPageLabel,
 	tabPathContext,
 	tabs,
 } from './router'
 import {
-	isDetailRoute,
 	matchRoute,
 	type RouteMatch,
+	routeCrumbs,
 	routeSection,
 	SECTIONS,
 	type Section,
@@ -235,66 +237,246 @@ function NavItem(props: {
 	)
 }
 
-/** Tab button text: the loaded page's name, else a title from the route. */
-function tabLabel(tab: TabState): string {
-	return tabPageLabel(tab) ?? tabTitle(tab.path)
+/** Tab tooltip: the page's full breadcrumb trail, else its title. */
+function tabTooltip(tab: TabState): string {
+	const match = matchRoute(tab.path, true)
+	const crumbs = match ? routeCrumbs(tab.path, match) : []
+	return crumbs.length > 0 ? crumbs.map((c) => c.label).join(' › ') : tabTitle(tab.path)
+}
+
+/** Icon of the tab's section from the route table, if it has one. */
+function TabIcon(props: { path: string }): JSX.Element {
+	return (
+		<Show when={routeSection(props.path)?.icon}>
+			{(icon: () => NonNullable<Section['icon']>) => (
+				<span aria-hidden="true" class="tab-icon">
+					<Dynamic component={icon()} size={14} />
+				</span>
+			)}
+		</Show>
+	)
+}
+
+/** Right-click menu of one tab. */
+function TabMenu(props: { tabId: number; x: number; y: number; onClose: () => void }): JSX.Element {
+	const index = (): number => tabs().findIndex((tab) => tab.id === props.tabId)
+	function run(action: (id: number) => void): void {
+		action(props.tabId)
+		props.onClose()
+	}
+	return (
+		<div
+			class="tab-menu tab-context-menu"
+			role="menu"
+			style={{ left: `${props.x}px`, top: `${props.y}px` }}
+		>
+			<button
+				type="button"
+				role="menuitem"
+				class="tab-menu-item"
+				onClick={() => run(duplicateTab)}
+			>
+				{t('tab.duplicate')}
+			</button>
+			<Show when={tabs().length > 1}>
+				<button
+					type="button"
+					role="menuitem"
+					class="tab-menu-item"
+					onClick={() => run(closeTab)}
+				>
+					{t('common.close')}
+				</button>
+				<button
+					type="button"
+					role="menuitem"
+					class="tab-menu-item"
+					onClick={() => run(closeOtherTabs)}
+				>
+					{t('tab.closeOthers')}
+				</button>
+			</Show>
+			<Show when={index() < tabs().length - 1}>
+				<button
+					type="button"
+					role="menuitem"
+					class="tab-menu-item"
+					onClick={() => run(closeTabsToRight)}
+				>
+					{t('tab.closeToRight')}
+				</button>
+			</Show>
+		</div>
+	)
 }
 
 /**
  * In-app tab strip: each entry keeps its page mounted in the background so
- * opening an add/edit form never discards the list/detail behind it.
+ * opening an add/edit form never discards the list/detail behind it. When
+ * the tabs no longer fit, a dropdown at the end lists all of them.
  */
 function TabBar(): JSX.Element {
-	const TabContext = tabPathContext()
+	const [menu, setMenu] = createSignal<{ tabId: number; x: number; y: number } | null>(null)
+	const [listOpen, setListOpen] = createSignal(false)
+	const [overflowing, setOverflowing] = createSignal(false)
+	let strip: HTMLDivElement | undefined
+
+	function measure(): void {
+		if (strip) {
+			setOverflowing(strip.scrollWidth > strip.clientWidth)
+		}
+	}
+
+	onMount(() => {
+		const observer = new ResizeObserver(measure)
+		if (strip) {
+			observer.observe(strip)
+		}
+		const onPointerDown = (e: PointerEvent): void => {
+			if (
+				e.target instanceof Element &&
+				e.target.closest('.tab-menu, .tab-list-toggle') === null
+			) {
+				setMenu(null)
+				setListOpen(false)
+			}
+		}
+		const onKeyDown = (e: KeyboardEvent): void => {
+			if (e.key === 'Escape') {
+				setMenu(null)
+				setListOpen(false)
+			}
+		}
+		document.addEventListener('pointerdown', onPointerDown)
+		document.addEventListener('keydown', onKeyDown)
+		onCleanup(() => {
+			observer.disconnect()
+			document.removeEventListener('pointerdown', onPointerDown)
+			document.removeEventListener('keydown', onKeyDown)
+		})
+	})
+
+	// Titles change as pages load, so re-measure whenever they do, and keep
+	// the active tab scrolled into view.
+	createEffect(() => {
+		for (const tab of tabs()) {
+			tabTitle(tab.path)
+		}
+		const id = activeTabId()
+		requestAnimationFrame(() => {
+			measure()
+			strip
+				?.querySelector(`[data-tab-button="${id}"]`)
+				?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+		})
+	})
+
 	return (
-		<div class="tab-bar" role="tablist" aria-label={t('app.openPages')}>
-			<For each={tabs()}>
-				{(tab: TabState) => (
-					<div
-						role="tab"
-						aria-selected={tab.id === activeTabId()}
-						aria-label={tabLabel(tab)}
-						title={tab.path}
-						tabIndex={0}
-						class={tab.id === activeTabId() ? 'tab-item active' : 'tab-item'}
-						onClick={() => activateTab(tab.id)}
-						onKeyDown={(e: KeyboardEvent): void => {
-							if (e.key === 'Enter' || e.key === ' ') {
+		<div class="tab-bar-wrap">
+			<div class="tab-bar" role="tablist" aria-label={t('app.openPages')} ref={strip}>
+				<For each={tabs()}>
+					{(tab: TabState) => (
+						<div
+							role="tab"
+							data-tab-button={tab.id}
+							aria-selected={tab.id === activeTabId()}
+							aria-label={tabTitle(tab.path)}
+							title={tabTooltip(tab)}
+							tabIndex={0}
+							class={tab.id === activeTabId() ? 'tab-item active' : 'tab-item'}
+							onClick={() => activateTab(tab.id)}
+							onKeyDown={(e: KeyboardEvent): void => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault()
+									activateTab(tab.id)
+								}
+							}}
+							onAuxClick={(e: MouseEvent): void => {
+								if (e.button === 1) {
+									e.preventDefault()
+									closeTab(tab.id)
+								}
+							}}
+							onContextMenu={(e: MouseEvent): void => {
 								e.preventDefault()
-								activateTab(tab.id)
-							}
-						}}
-						onAuxClick={(e: MouseEvent): void => {
-							if (e.button === 1) {
-								e.preventDefault()
-								closeTab(tab.id)
-							}
+								setListOpen(false)
+								// Keep the menu (about 14rem wide) inside the viewport.
+								const x = Math.min(e.clientX, window.innerWidth - 240)
+								setMenu({ tabId: tab.id, x: Math.max(0, x), y: e.clientY })
+							}}
+						>
+							<TabIcon path={tab.path} />
+							<span class="tab-title">{tabTitle(tab.path)}</span>
+							<Show when={tabs().length > 1}>
+								<button
+									type="button"
+									class="tab-close"
+									aria-label={t('app.closeTab', { title: tabTitle(tab.path) })}
+									title={t('app.closeTab', { title: tabTitle(tab.path) })}
+									onClick={(e: MouseEvent): void => {
+										e.stopPropagation()
+										closeTab(tab.id)
+									}}
+								>
+									<span aria-hidden="true" class="tab-close-icon">
+										<IconX size={12} />
+									</span>
+								</button>
+							</Show>
+						</div>
+					)}
+				</For>
+			</div>
+			<Show when={overflowing()}>
+				<div class="tab-list">
+					<button
+						type="button"
+						class="tab-list-toggle"
+						aria-haspopup="menu"
+						aria-expanded={listOpen()}
+						aria-label={t('app.allTabs')}
+						title={t('app.allTabs')}
+						onClick={() => {
+							setMenu(null)
+							setListOpen(!listOpen())
 						}}
 					>
-						<TabContext.Provider value={tab.path}>
-							<span class="tab-title">{tabLabel(tab)}</span>
-						</TabContext.Provider>
-						<Show when={tabs().length > 1}>
-							<button
-								type="button"
-								class="tab-close"
-								aria-label={t('app.closeTab', {
-									title: tabLabel(tab),
-								})}
-								title={t('app.closeTab', { title: tabLabel(tab) })}
-								onClick={(e: MouseEvent): void => {
-									e.stopPropagation()
-									closeTab(tab.id)
-								}}
-							>
-								<span aria-hidden="true" class="tab-close-icon">
-									<IconX size={12} />
-								</span>
-							</button>
-						</Show>
-					</div>
+						<span aria-hidden="true" class="tab-close-icon">
+							<IconChevronDown size={14} />
+						</span>
+					</button>
+					<Show when={listOpen()}>
+						<div class="tab-menu tab-list-menu" role="menu">
+							<For each={tabs()}>
+								{(tab: TabState) => (
+									<button
+										type="button"
+										role="menuitem"
+										class={
+											tab.id === activeTabId()
+												? 'tab-menu-item active'
+												: 'tab-menu-item'
+										}
+										title={tabTooltip(tab)}
+										onClick={() => {
+											setListOpen(false)
+											activateTab(tab.id)
+										}}
+									>
+										<TabIcon path={tab.path} />
+										<span class="tab-title">{tabTitle(tab.path)}</span>
+									</button>
+								)}
+							</For>
+						</div>
+					</Show>
+				</div>
+			</Show>
+			<Show when={menu()}>
+				{(m: () => { tabId: number; x: number; y: number }) => (
+					<TabMenu tabId={m().tabId} x={m().x} y={m().y} onClose={() => setMenu(null)} />
 				)}
-			</For>
+			</Show>
 		</div>
 	)
 }
@@ -330,40 +512,19 @@ function RouteContent(props: { routePath: string; tabId: number; isAdmin: boolea
 		}
 		pane.querySelector<HTMLElement>('[data-autofocus]')?.focus()
 	})
-	onMount(() => {
-		if (!isDetailRoute(props.routePath)) {
-			return
-		}
-		const pageRoot = document.querySelector<HTMLElement>(`[data-tab-id="${props.tabId}"]`)
-		if (!pageRoot) {
-			return
-		}
-		const updateLabel = (): void => {
-			const heading = pageRoot.querySelector('h2')
-			const label = heading
-				? Array.from(heading.childNodes)
-						.map((node) => node.textContent?.trim() ?? '')
-						.find((text) => text.length > 0) || heading.textContent?.trim()
-				: undefined
-			if (label) {
-				setTabLabel(props.tabId, props.routePath, label)
-			}
-		}
-		const observer = new MutationObserver(updateLabel)
-		observer.observe(pageRoot, { childList: true, subtree: true, characterData: true })
-		updateLabel()
-		onCleanup(() => observer.disconnect())
-	})
 	return (
 		<TabContext.Provider value={props.routePath}>
 			<Show when={match()} keyed fallback={<p>{t('app.pageNotFound')}</p>}>
-				{(m: RouteMatch) =>
-					m.kind === 'detail' || m.kind === 'edit' ? (
-						<Dynamic component={m.page} id={m.id} />
-					) : (
-						<Dynamic component={m.page} />
-					)
-				}
+				{(m: RouteMatch) => (
+					<>
+						<Breadcrumbs crumbs={routeCrumbs(props.routePath, m)} />
+						{m.kind === 'detail' || m.kind === 'edit' ? (
+							<Dynamic component={m.page} id={m.id} />
+						) : (
+							<Dynamic component={m.page} />
+						)}
+					</>
+				)}
 			</Show>
 		</TabContext.Provider>
 	)

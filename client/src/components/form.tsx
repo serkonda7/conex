@@ -8,7 +8,7 @@
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createEffect, For, type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
-import { goTo, navigate } from '../router'
+import { type Crumb, navigate, usePageMeta } from '../router'
 import { Loading } from './feedback'
 
 /** One `<select>` entry. */
@@ -293,24 +293,20 @@ export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.E
 	)
 }
 
-/** Create-page shell: back link, heading, and the stacked form. */
+/**
+ * Create-page shell: heading and the stacked form. `crumbs` are the
+ * ancestors for the breadcrumb bar when the form belongs to another object
+ * (e.g. the rack a shelf is added to).
+ */
 export function FormPage(props: {
-	backTo: string
-	backLabel: string
+	crumbs?: readonly Crumb[]
 	title: string
 	onSubmit: (e: SubmitEvent) => void
 	children: JSX.Element
 }): JSX.Element {
+	usePageMeta(() => ({ crumbs: props.crumbs }))
 	return (
 		<div class="form-page">
-			<p>
-				<a
-					href={props.backTo}
-					onClick={(e: MouseEvent): void => goTo(e, props.backTo, { refresh: false })}
-				>
-					← {props.backLabel}
-				</a>
-			</p>
 			<h2>{props.title}</h2>
 			<form class="form-stacked" onSubmit={props.onSubmit}>
 				{props.children}
@@ -349,27 +345,23 @@ export function EditActions(props: {
 }
 
 /**
- * Edit-page shell: back link to the detail page, heading, and the stacked
- * form gated on the loaded flag. `backLabel` is the entity name once loaded
- * (callers pass `entity()?.name ?? 'Fallback'`); `loadingText` preserves
- * each page's exact skeleton string.
+ * Edit-page shell: heading and the stacked form gated on the loaded flag.
+ * `name` is the entity name once loaded, for the tab title and breadcrumb
+ * bar; `crumbs` its ancestors when the page has no detail page to borrow
+ * them from. `loadingText` preserves each page's exact skeleton string.
  */
 export function EditPageShell(props: {
-	backTo: string
-	backLabel: string
+	name: string | undefined
+	crumbs?: readonly Crumb[]
 	title: string
 	loaded: boolean
 	loadingText: string
 	onSubmit: (e: SubmitEvent) => void
 	children: JSX.Element
 }): JSX.Element {
+	usePageMeta(() => ({ name: props.name, crumbs: props.crumbs }))
 	return (
 		<div class="form-page">
-			<p>
-				<a href={props.backTo} onClick={(e: MouseEvent): void => goTo(e, props.backTo)}>
-					← {props.backLabel}
-				</a>
-			</p>
 			<h2>{props.title}</h2>
 			<Show when={props.loaded} fallback={<Loading message={props.loadingText} />}>
 				<form class="form-stacked" onSubmit={props.onSubmit}>

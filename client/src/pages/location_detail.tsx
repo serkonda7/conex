@@ -19,13 +19,13 @@ import {
 	DetailSubtitle,
 	ForeignKeyLink,
 	InlineError,
-	ParentBreadcrumb,
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
 import { locationTypeLabel } from '../i18n/labels'
-import { goTo } from '../router'
+import { type Crumb, goTo } from '../router'
+import { locationTrail } from '../trails'
 
 /**
  * /locations/:id — location detail: header with slug, parent breadcrumb,
@@ -70,6 +70,16 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
+	const [trail] = createResource(
+		() => ({ site: site(), parent: parentId() }),
+		async ({ site: siteRow, parent: parentKey }): Promise<Crumb[]> => {
+			if (!siteRow) {
+				return []
+			}
+			const locations = await locationTrail(siteRow.id, parentKey)
+			return [{ label: siteRow.name, href: `/sites/${siteRow.id}` }, ...locations]
+		},
+	)
 	const tenantId = createMemo(() => location()?.tenant_id ?? null)
 	const [tenant] = createResource(tenantId, async (id: number | null) => {
 		if (!id) {
@@ -137,20 +147,13 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/locations"
-				backLabel={tp('entity.location', 2)}
+				name={location()?.name}
+				crumbs={trail()}
 				loading={location.loading}
 				loadingText={t('location.loadingOne')}
 				record={location()}
 				emptyText={t('location.notFound')}
 			>
-				<ParentBreadcrumb
-					parentId={parentId()}
-					parentName={parent()?.name}
-					parentFallback={t('location.parentFallback', { id: parentId() ?? '' })}
-					href={`/locations/${parentId() ?? ''}`}
-					childName={location()?.name}
-				/>
 				<DetailHeader
 					name={location()?.name}
 					slug={location()?.slug}

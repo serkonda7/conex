@@ -153,12 +153,7 @@ export function DeviceAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/devices"
-			backLabel={tp('entity.device', 2)}
-			title={t('device.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('device.addTitle')} onSubmit={handleCreate}>
 			<NameField
 				id="device-name"
 				placeholder={t('device.namePlaceholder')}

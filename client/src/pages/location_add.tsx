@@ -166,12 +166,7 @@ export function LocationAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/locations"
-			backLabel={tp('entity.location', 2)}
-			title={t('location.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('location.addTitle')} onSubmit={handleCreate}>
 			<NameField
 				id="location-name"
 				placeholder={t('location.namePlaceholder')}

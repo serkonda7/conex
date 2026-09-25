@@ -138,6 +138,8 @@ export const de: Messages = {
 	'app.inventory': 'Inventar',
 	'app.openPages': 'Geöffnete Seiten',
 	'app.closeTab': '{title} schließen',
+	'app.breadcrumb': 'Brotkrümelnavigation',
+	'app.allTabs': 'Alle geöffneten Seiten',
 	'app.navAdd': '{label} hinzufügen',
 	'app.navAddSoon': '{label} hinzufügen (demnächst verfügbar)',
 	'app.navImport': '{label} importieren',
@@ -157,6 +159,10 @@ export const de: Messages = {
 	'tab.add': '{entity} hinzufügen',
 	'tab.import': '{entities} importieren',
 	'tab.edit': '{entity} {id} bearbeiten',
+	'tab.editNamed': '{name} bearbeiten',
+	'tab.duplicate': 'Duplizieren',
+	'tab.closeOthers': 'Andere schließen',
+	'tab.closeToRight': 'Tabs rechts schließen',
 	'tab.detail': '{entity} {id}',
 
 	// list
@@ -214,7 +220,6 @@ export const de: Messages = {
 	'siteGroup.namePlaceholder': 'Norddeutschland',
 	'siteGroup.slugPlaceholder': 'norddeutschland',
 	'siteGroup.notFound': 'Standortgruppe nicht gefunden.',
-	'siteGroup.parentFallback': 'Gruppe {id}',
 	'siteGroup.details': 'Details der Standortgruppe',
 	'siteGroup.children': 'Untergruppen',
 	'siteGroup.loadingChildren': 'Untergruppen werden geladen…',
@@ -238,7 +243,6 @@ export const de: Messages = {
 	'location.tenantFromSite': 'Standardmäßig wird der Mandant des Standorts verwendet.',
 	'location.siteImmutable': 'Der Standort kann nach dem Anlegen nicht mehr geändert werden.',
 	'location.notFound': 'Bereich nicht gefunden.',
-	'location.parentFallback': 'Bereich {id}',
 	'location.details': 'Details des Bereichs',
 	'location.type': 'Typ',
 	'location.children': 'Unterbereiche',
@@ -552,6 +556,7 @@ export const de: Messages = {
 	'elevation.selectChildDeviceTitle': 'Untergerät für Fachboden bei {unit} auswählen ({face})',
 	'elevation.onShelf': 'Auf Fachboden',
 	'elevation.shelfBlock': 'Fachboden {mount}, {first}-{last}',
+	'elevation.oppositeFace': 'Gegenseite',
 	'elevation.clearanceTitle':
 		'Fachboden {mount} ({mountHeight} HE Montage nutzbar, {reserved} HE reserviert)',
 	'elevation.reserved': 'Reserviert · {count} HE',

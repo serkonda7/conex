@@ -29,6 +29,7 @@ import {
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
 import { goTo } from '../router'
+import { siteGroupTrail } from '../trails'
 
 interface TreeNode {
 	row: LocationRow
@@ -133,6 +134,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
+	const [trail] = createResource(groupId, siteGroupTrail)
 	const [locations, { refetch }] = createResource(
 		() => props.id,
 		async (id: number) => {
@@ -214,8 +216,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/sites"
-				backLabel={tp('entity.site', 2)}
+				name={site()?.name}
+				crumbs={trail()}
 				loading={site.loading}
 				loadingText={t('site.loadingOne')}
 				record={site()}

@@ -6,8 +6,17 @@
  *
  * Browser Back/Forward step through the active tab's history. Switching
  * tabs replaces the current browser history entry instead of pushing one.
+ * Tabs are saved in `sessionStorage`, so a reload brings them back.
  */
-import { createContext, createSignal, useContext } from 'solid-js'
+import { Result } from 'better-result'
+import {
+	createContext,
+	createEffect,
+	createRoot,
+	createSignal,
+	untrack,
+	useContext,
+} from 'solid-js'
 
 export interface TabState {
 	id: number
@@ -34,7 +43,22 @@ export interface NavigateOptions {
 	refresh?: boolean
 }
 
+/** One breadcrumb link; the last crumb of a trail has no `href`. */
+export interface Crumb {
+	label: string
+	href?: string
+}
+
+/** What a loaded page reports about itself for tab titles and breadcrumbs. */
+export interface PageMeta {
+	/** Display name of the shown object. */
+	name?: string
+	/** Ancestors of the object, outermost first (e.g. site › location › rack). */
+	crumbs?: readonly Crumb[]
+}
+
 const DEFAULT_PATH = '/tenants'
+const STORAGE_KEY = 'conex:tabs'
 
 let nextTabId = 1
 
@@ -59,10 +83,99 @@ function initialPath(): string {
 	return currentUrl() || DEFAULT_PATH
 }
 
-const [tabs, setTabs] = createSignal<TabState[]>([makeTab(nextTabId++, [initialPath()], 0, null)])
-const [activeTabId, setActiveTabId] = createSignal<number>(tabs()[0]?.id ?? 1)
-/** Names reported by loaded pages, tied to the path they were read from. */
-const [tabLabels, setTabLabels] = createSignal<Record<number, { path: string; label: string }>>({})
+interface SavedTabs {
+	tabs: TabState[]
+	activeId: number
+}
+
+function isStringArray(value: unknown): value is string[] {
+	return Array.isArray(value) && value.every((v) => typeof v === 'string')
+}
+
+/** Rebuilds a saved tab, or null when the stored shape is off. */
+function reviveTab(raw: unknown): TabState | null {
+	if (typeof raw !== 'object' || raw === null) {
+		return null
+	}
+	const { id, entries, index, openerId } = raw as Record<string, unknown>
+	if (
+		typeof id !== 'number' ||
+		!isStringArray(entries) ||
+		entries.length === 0 ||
+		typeof index !== 'number' ||
+		index < 0 ||
+		index >= entries.length ||
+		(openerId !== null && typeof openerId !== 'number')
+	) {
+		return null
+	}
+	return makeTab(id, entries, index, openerId)
+}
+
+function loadSavedTabs(): SavedTabs | null {
+	const raw = Result.try(() => window.sessionStorage.getItem(STORAGE_KEY))
+	if (Result.isError(raw) || raw.value === null) {
+		return null
+	}
+	const stored = raw.value
+	const parsed = Result.try((): unknown => JSON.parse(stored))
+	if (Result.isError(parsed) || typeof parsed.value !== 'object' || parsed.value === null) {
+		return null
+	}
+	const { tabs: rawTabs, activeId } = parsed.value as Record<string, unknown>
+	if (!Array.isArray(rawTabs) || typeof activeId !== 'number') {
+		return null
+	}
+	const revived = rawTabs.map(reviveTab)
+	const valid = revived.filter((t): t is TabState => t !== null)
+	if (valid.length === 0 || valid.length !== revived.length) {
+		return null
+	}
+	return { tabs: valid, activeId }
+}
+
+/**
+ * Tabs to start with: the saved ones when the reloaded URL is still shown
+ * by one of them, else the saved ones plus a new tab for the URL.
+ */
+function initialTabs(): SavedTabs {
+	const url = initialPath()
+	const saved = typeof window === 'undefined' ? null : loadSavedTabs()
+	if (!saved) {
+		const tab = makeTab(nextTabId++, [url], 0, null)
+		return { tabs: [tab], activeId: tab.id }
+	}
+	nextTabId = Math.max(...saved.tabs.map((t) => t.id)) + 1
+	const active = saved.tabs.find((t) => t.id === saved.activeId)
+	if (active?.path === url) {
+		return saved
+	}
+	const showing = saved.tabs.find((t) => t.path === url)
+	if (showing) {
+		return { tabs: saved.tabs, activeId: showing.id }
+	}
+	const tab = makeTab(nextTabId++, [url], 0, active?.id ?? null)
+	return { tabs: [...saved.tabs, tab], activeId: tab.id }
+}
+
+const initial = initialTabs()
+const [tabs, setTabs] = createSignal<TabState[]>(initial.tabs)
+const [activeTabId, setActiveTabId] = createSignal<number>(initial.activeId)
+/** Metadata reported by loaded pages, keyed by route path. */
+const [pageMeta, setPageMeta] = createSignal<Record<string, PageMeta>>({})
+
+if (typeof window !== 'undefined') {
+	createRoot(() => {
+		createEffect(() => {
+			const saved: SavedTabs = {
+				tabs: tabs().map((t) => ({ ...t, gen: 0 })),
+				activeId: activeTabId(),
+			}
+			// Storage can be full or disabled; tabs then just don't survive a reload.
+			Result.try(() => window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved)))
+		})
+	})
+}
 
 /** Set when tags are created or deleted so the home view can refresh entries. */
 const [tagsChanged, setTagsChanged] = createSignal(false)
@@ -125,18 +238,26 @@ function isFormRoute(raw: string): boolean {
 	return last === 'add' || last === 'edit' || last === 'import'
 }
 
-/** Name the tab's loaded page reported, if the tab still shows that page. */
-export function tabPageLabel(tab: TabState): string | undefined {
-	const entry = tabLabels()[tab.id]
-	return entry?.path === tab.path ? entry.label : undefined
+/** Metadata the page at `forPath` last reported, if it has loaded. */
+export function pageMetaFor(forPath: string): PageMeta | undefined {
+	return pageMeta()[forPath]
 }
 
-export function setTabLabel(id: number, forPath: string, label: string): void {
-	const entry = tabLabels()[id]
-	if (!label || (entry?.path === forPath && entry.label === label)) {
-		return
-	}
-	setTabLabels((current) => ({ ...current, [id]: { path: forPath, label } }))
+/**
+ * Lets a page report its object's name and ancestors for the tab title and
+ * the breadcrumb bar. Kept after the page unmounts, so edit forms and
+ * history entries can reuse it.
+ */
+export function usePageMeta(meta: () => PageMeta): void {
+	const forPath = useTabPath()
+	createEffect(() => {
+		const next = meta()
+		const current = untrack(() => pageMeta()[forPath])
+		if (JSON.stringify(current) === JSON.stringify(next)) {
+			return
+		}
+		setPageMeta((all) => ({ ...all, [forPath]: next }))
+	})
 }
 
 function updateTab(next: TabState): void {
@@ -146,7 +267,6 @@ function updateTab(next: TabState): void {
 function removeTab(id: number): void {
 	setTabs((prev) => prev.filter((t) => t.id !== id))
 	scrollByTab.delete(id)
-	setTabLabels(({ [id]: _, ...rest }) => rest)
 }
 
 /** Makes `tab` the visible one and mirrors its path in the address bar. */
@@ -173,6 +293,22 @@ function openTab(to: string, openerId: number | null): void {
 	const tab = makeTab(nextTabId++, [to], 0, openerId)
 	setTabs((prev) => [...prev, tab])
 	show(tab)
+}
+
+/** Opens a copy of a tab, history included, right after it. */
+export function duplicateTab(id: number): void {
+	const source = tabs().find((t) => t.id === id)
+	const active = activeTab()
+	if (!source) {
+		return
+	}
+	if (active) {
+		rememberScroll(active)
+	}
+	const copy = makeTab(nextTabId++, source.entries, source.index, source.id)
+	scrollByTab.set(copy.id, [...(scrollByTab.get(source.id) ?? [])])
+	setTabs((prev) => prev.flatMap((t) => (t.id === id ? [t, copy] : [t])))
+	show(copy)
 }
 
 /** Switch to an existing tab, preserving every tab's mounted state. */
@@ -210,6 +346,117 @@ export function closeTab(id: number): void {
 	if (fallback) {
 		show(fallback)
 	}
+}
+
+/** Closes every tab except `id` and shows it. */
+export function closeOtherTabs(id: number): void {
+	const keep = tabs().find((t) => t.id === id)
+	if (!keep) {
+		return
+	}
+	for (const tab of tabs()) {
+		if (tab.id !== id) {
+			scrollByTab.delete(tab.id)
+		}
+	}
+	setTabs([keep])
+	if (activeTabId() !== id) {
+		show(keep)
+	}
+}
+
+/** Closes the tabs after `id`; shows `id` if the active tab was among them. */
+export function closeTabsToRight(id: number): void {
+	const list = tabs()
+	const index = list.findIndex((t) => t.id === id)
+	const keep = list[index]
+	if (!keep) {
+		return
+	}
+	const closing = list.slice(index + 1)
+	for (const tab of closing) {
+		scrollByTab.delete(tab.id)
+	}
+	setTabs(list.slice(0, index + 1))
+	if (closing.some((t) => t.id === activeTabId())) {
+		show(keep)
+	}
+}
+
+/** The route shows the object at `objectPath` or one of its sub-pages. */
+function showsObject(route: string, objectPath: string): boolean {
+	const bare = route.split('?')[0] ?? ''
+	return bare === objectPath || bare.startsWith(`${objectPath}/`)
+}
+
+/**
+ * After the object at `objectPath` (e.g. `/devices/12`) was deleted: drop
+ * it and its edit page from every tab's history and close tabs left with
+ * nothing. The active tab falls back to its previous entry, else the list
+ * tab at `listRoute` or its opener; tabs showing the list are refreshed.
+ */
+export function forgetDeleted(objectPath: string, listRoute: string): void {
+	const list = tabs()
+	const activeId = activeTabId()
+	const next: TabState[] = []
+	for (const tab of list) {
+		const kept = tab.entries.flatMap((entry, i) => (showsObject(entry, objectPath) ? [] : [i]))
+		if (kept.length === tab.entries.length) {
+			const isList = (tab.path.split('?')[0] ?? '') === listRoute
+			next.push(isList ? { ...tab, gen: tab.gen + 1 } : tab)
+			continue
+		}
+		if (kept.length === 0) {
+			continue
+		}
+		// Stay on the current entry if it survived, else step back to the
+		// nearest earlier one.
+		const before = kept.filter((i) => i <= tab.index)
+		const index = before.length > 0 ? before.length - 1 : 0
+		const scroll = scrollByTab.get(tab.id)
+		if (scroll) {
+			scrollByTab.set(
+				tab.id,
+				kept.map((i) => scroll[i] ?? 0),
+			)
+		}
+		next.push(
+			makeTab(
+				tab.id,
+				kept.map((i) => tab.entries[i] ?? listRoute),
+				index,
+				tab.openerId,
+				tab.gen + 1,
+			),
+		)
+	}
+	for (const tab of list) {
+		if (!next.some((t) => t.id === tab.id)) {
+			scrollByTab.delete(tab.id)
+		}
+	}
+	const survivor = next.find((t) => t.id === activeId)
+	if (survivor) {
+		setTabs(next)
+		show(survivor)
+		return
+	}
+	const closed = list.find((t) => t.id === activeId)
+	const target =
+		next.find((t) => (t.path.split('?')[0] ?? '') === listRoute) ??
+		next.find((t) => t.id === closed?.openerId)
+	if (target) {
+		setTabs(next)
+		show(target)
+		return
+	}
+	// Nothing to fall back to: the tab stays and shows the list instead.
+	const replacement = makeTab(activeId, [listRoute], 0, closed?.openerId ?? null)
+	const at = list.findIndex((t) => t.id === activeId)
+	const withReplacement = [...next]
+	withReplacement.splice(Math.min(at, withReplacement.length), 0, replacement)
+	setTabs(withReplacement)
+	show(replacement)
 }
 
 /**
@@ -294,7 +541,7 @@ export function goTo(e: MouseEvent, to: string, opts?: NavigateOptions): void {
 
 if (typeof window !== 'undefined') {
 	historySeq = readSeq(window.history.state) ?? 0
-	replaceUrl(initialPath())
+	replaceUrl(path())
 
 	window.addEventListener('popstate', (e: PopStateEvent) => {
 		const seq = readSeq(e.state)

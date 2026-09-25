@@ -56,12 +56,7 @@ export function SiteGroupAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/site-groups"
-			backLabel={tp('entity.siteGroup', 2)}
-			title={t('siteGroup.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('siteGroup.addTitle')} onSubmit={handleCreate}>
 			<NameField
 				id="site-group-name"
 				placeholder={t('siteGroup.namePlaceholder')}

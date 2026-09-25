@@ -84,12 +84,7 @@ export function SiteAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/sites"
-			backLabel={tp('entity.site', 2)}
-			title={t('site.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('site.addTitle')} onSubmit={handleCreate}>
 			<NameField
 				id="site-name"
 				placeholder={t('site.namePlaceholder')}

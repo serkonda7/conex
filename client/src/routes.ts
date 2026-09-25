@@ -67,7 +67,7 @@ import { TopologyPage } from './pages/topology'
 import { UserAddPage } from './pages/user_add'
 import { UserEditPage } from './pages/user_edit'
 import { UsersPage } from './pages/users'
-import { parseId, routeSegments } from './router'
+import { type Crumb, pageMetaFor, parseId, routeSegments } from './router'
 
 export interface Section {
 	/** First URL segment (`/devices/…`). */
@@ -252,10 +252,14 @@ export function isDetailRoute(raw: string): boolean {
 	return matchRoute(raw, true)?.kind === 'detail'
 }
 
-/** Short human label for a tab button, derived from the route. */
+/**
+ * Short human label for a tab button, derived from the route and the name
+ * its page reported once loaded.
+ */
 export function tabTitle(raw: string): string {
 	const section = routeSection(raw)
 	const [first, second, third] = routeSegments(raw)
+	const name = pageMetaFor(raw)?.name
 	if (!section) {
 		return first ?? t('tab.page')
 	}
@@ -266,10 +270,41 @@ export function tabTitle(raw: string): string {
 		return t('tab.import', { entities: section.noun(2) })
 	}
 	if (second !== undefined && third === 'edit') {
-		return t('tab.edit', { entity: section.noun(1), id: second })
+		return name !== undefined
+			? t('tab.editNamed', { name })
+			: t('tab.edit', { entity: section.noun(1), id: second })
 	}
 	if (second !== undefined) {
-		return t('tab.detail', { entity: section.noun(1), id: second })
+		return name ?? t('tab.detail', { entity: section.noun(1), id: second })
 	}
 	return section.noun(2)
+}
+
+/**
+ * Breadcrumb trail for a routed page: the section list, the ancestors the
+ * page reported, then the page itself (`Devices › DC1 › Rack 03 ›
+ * sw-core-01`). Edit forms end in `› name › Edit` and reuse the detail
+ * page's ancestors when they were seen. Lists get no trail.
+ */
+export function routeCrumbs(raw: string, match: RouteMatch): Crumb[] {
+	const { section } = match
+	if (match.kind === 'list') {
+		return []
+	}
+	const meta = pageMetaFor(raw)
+	const trail: Crumb[] = section.list
+		? [{ label: section.noun(2), href: `/${section.path}` }]
+		: []
+	if (match.kind === 'edit') {
+		const detailPath = `/${section.path}/${match.id}`
+		const detail = pageMetaFor(detailPath)
+		const name = meta?.name ?? detail?.name ?? tabTitle(detailPath)
+		return [
+			...trail,
+			...(meta?.crumbs ?? detail?.crumbs ?? []),
+			{ label: name, href: section.detail ? detailPath : undefined },
+			{ label: t('common.edit') },
+		]
+	}
+	return [...trail, ...(meta?.crumbs ?? []), { label: tabTitle(raw) }]
 }

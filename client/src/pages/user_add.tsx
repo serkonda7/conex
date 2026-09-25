@@ -11,7 +11,7 @@ import {
 	SelectField,
 	TextField,
 } from '../components/form'
-import { t, tp } from '../i18n'
+import { t } from '../i18n'
 import { roleOptions } from '../i18n/labels'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
@@ -58,12 +58,7 @@ export function UserAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo="/users"
-			backLabel={tp('entity.user', 2)}
-			title={t('user.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage title={t('user.addTitle')} onSubmit={handleCreate}>
 			<TextField
 				id="user-username"
 				label={t('auth.username')}

@@ -107,8 +107,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/tenants"
-				backLabel={tp('entity.tenant', 2)}
+				name={tenant()?.name}
 				loading={tenant.loading}
 				loadingText={t('tenant.loadingOne')}
 				record={tenant()}

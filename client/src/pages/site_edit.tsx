@@ -94,8 +94,7 @@ export function SiteEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo={`/sites/${props.id}`}
-			backLabel={site()?.name ?? tp('entity.site', 1)}
+			name={site()?.name}
 			title={t('site.editTitle')}
 			loaded={loaded()}
 			loadingText={t('site.loadingOne')}

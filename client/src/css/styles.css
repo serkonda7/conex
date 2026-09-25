@@ -1805,14 +1805,21 @@ a.rack-shelf-plate:hover {
 
 /* Smart tabs: add/edit forms open as new tabs so the page behind keeps its
    state. Only the active pane is visible; the rest stay mounted. */
+.tab-bar-wrap {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--border);
+}
+
 .tab-bar {
 	display: flex;
+	flex: 1;
+	min-width: 0;
 	align-items: stretch;
 	gap: 0;
 	overflow-x: auto;
 	padding: 0;
 	margin: 0;
-	border-bottom: 1px solid var(--border);
 	scrollbar-width: thin;
 }
 
@@ -1875,4 +1882,109 @@ a.rack-shelf-plate:hover {
 
 .tab-pane[hidden] {
 	display: none;
+}
+
+.tab-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.tab-item.active .tab-icon {
+	color: var(--text-secondary);
+}
+
+/* Dropdown of all tabs, shown once they overflow the strip. */
+.tab-list {
+	position: relative;
+	display: flex;
+	flex-shrink: 0;
+}
+
+.tab-list-toggle {
+	display: inline-flex;
+	align-items: center;
+	padding: 0 0.45rem;
+	border: 1px solid var(--border);
+	border-radius: 0;
+	background-color: var(--bg-surface);
+	color: var(--text-secondary);
+}
+
+.tab-list-toggle:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.tab-menu {
+	display: flex;
+	flex-direction: column;
+	min-width: 12rem;
+	max-width: 22rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+	padding: 0.25rem;
+	z-index: 20;
+}
+
+.tab-list-menu {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 0.2rem);
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.tab-context-menu {
+	position: fixed;
+}
+
+.tab-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	border: none;
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	white-space: nowrap;
+}
+
+.tab-menu-item:hover,
+.tab-menu-item.active {
+	background-color: var(--bg-hover);
+}
+
+.tab-menu .tab-title {
+	max-width: none;
+}
+
+/* Path to the shown object above detail and form pages. */
+.breadcrumbs {
+	margin: 0 0 0.75rem;
+	font-size: var(--font-size-base);
+}
+
+.breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.breadcrumbs li + li::before {
+	content: "›";
+	margin-right: 0.35rem;
+	color: var(--text-muted);
+}
+
+.breadcrumbs [aria-current="page"] {
+	color: var(--text-secondary);
 }

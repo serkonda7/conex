@@ -18,12 +18,12 @@ import {
 	DetailSubtitle,
 	ForeignKeyLink,
 	InlineError,
-	ParentBreadcrumb,
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
 import { goTo } from '../router'
+import { siteGroupTrail } from '../trails'
 
 /**
  * /site-groups/:id — site group detail: header with slug, parent
@@ -57,6 +57,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
+	const [trail] = createResource(parentId, siteGroupTrail)
 	const [parent] = createResource(parentId, async (id: number | null) => {
 		if (!id) {
 			return null
@@ -106,20 +107,13 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/site-groups"
-				backLabel={tp('entity.siteGroup', 2)}
+				name={group()?.name}
+				crumbs={trail()}
 				loading={group.loading}
 				loadingText={t('siteGroup.loadingOne')}
 				record={group()}
 				emptyText={t('siteGroup.notFound')}
 			>
-				<ParentBreadcrumb
-					parentId={parentId()}
-					parentName={parent()?.name}
-					parentFallback={t('siteGroup.parentFallback', { id: parentId() ?? '' })}
-					href={`/site-groups/${parentId() ?? ''}`}
-					childName={group()?.name}
-				/>
 				<DetailHeader
 					name={group()?.name}
 					slug={group()?.slug}

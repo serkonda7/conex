@@ -12,7 +12,7 @@ import {
 	TextAreaField,
 	TextField,
 } from '../components/form'
-import { t, tp } from '../i18n'
+import { t } from '../i18n'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /tenants/:id/edit — tenant edit form. Saves back to the detail page. */
@@ -60,8 +60,7 @@ export function TenantEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo={`/tenants/${props.id}`}
-			backLabel={tenant()?.name ?? tp('entity.tenant', 1)}
+			name={tenant()?.name}
 			title={t('tenant.editTitle')}
 			loaded={loaded()}
 			loadingText={t('tenant.loadingOne')}

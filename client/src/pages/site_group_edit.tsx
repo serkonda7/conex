@@ -91,8 +91,7 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 
 	return (
 		<EditPageShell
-			backTo={`/site-groups/${props.id}`}
-			backLabel={group()?.name ?? tp('entity.siteGroup', 1)}
+			name={group()?.name}
 			title={t('siteGroup.editTitle')}
 			loaded={loaded()}
 			loadingText={t('siteGroup.loadingOne')}

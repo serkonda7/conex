@@ -32,7 +32,8 @@ import {
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
 import { cableStatusLabel, faceLabel } from '../i18n/labels'
-import { goTo } from '../router'
+import { type Crumb, goTo } from '../router'
+import { locationTrail } from '../trails'
 
 /** Selectable trace depths for the path view. */
 const TRACE_DEPTHS = [1, 2, 3, 4, 6, 10]
@@ -153,6 +154,17 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				return null
 			}
 			return res.value.items.find((l) => l.id === locationKey)?.name ?? null
+		},
+	)
+	const [trail] = createResource(
+		() => ({ site: site(), location: locationId(), rack: rack() }),
+		async ({ site: siteRow, location: locationKey, rack: rackRow }): Promise<Crumb[]> => {
+			const locations = siteRow ? await locationTrail(siteRow.id, locationKey) : []
+			return [
+				...(siteRow ? [{ label: siteRow.name, href: `/sites/${siteRow.id}` }] : []),
+				...locations,
+				...(rackRow ? [{ label: rackRow.name, href: `/racks/${rackRow.id}` }] : []),
+			]
 		},
 	)
 	const tenantId = createMemo(() => device()?.tenant_id ?? null)
@@ -303,8 +315,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/devices"
-				backLabel={tp('entity.device', 2)}
+				name={device()?.name}
+				crumbs={trail()}
 				loading={device.loading}
 				loadingText={t('device.loadingOne')}
 				record={device()}

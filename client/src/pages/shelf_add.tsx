@@ -14,7 +14,7 @@ import {
 } from '../components/form'
 import { t, tp } from '../i18n'
 import { faceOptions } from '../i18n/labels'
-import { parseId, queryParam } from '../router'
+import { type Crumb, parseId, queryParam } from '../router'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** /shelves/add — shelf create form (rack fixture, separate from devices). */
@@ -35,6 +35,14 @@ export function ShelfAddPage(): JSX.Element {
 	const [saving, setSaving] = createSignal(false)
 
 	const [racks] = createResource(() => load_rows(fetch_racks, setFormError))
+	const rackCrumbs = (): Crumb[] => {
+		const id = parseId(rackId())
+		const rack = racks()?.find((r) => r.id === id)
+		return [
+			{ label: tp('entity.rack', 2), href: '/racks' },
+			...(rack ? [{ label: rack.name, href: `/racks/${rack.id}` }] : []),
+		]
+	}
 	const rackRoute = (): string => {
 		const id = parseId(rackId())
 		return id === null ? '/racks' : `/racks/${id}`
@@ -82,12 +90,7 @@ export function ShelfAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage
-			backTo={rackRoute()}
-			backLabel={tp('entity.rack', 2)}
-			title={t('shelf.addTitle')}
-			onSubmit={handleCreate}
-		>
+		<FormPage crumbs={rackCrumbs()} title={t('shelf.addTitle')} onSubmit={handleCreate}>
 			<SelectField
 				id="shelf-rack"
 				label={tp('entity.rack', 1)}

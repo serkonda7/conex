@@ -27,7 +27,8 @@ import { ObjectSelector } from '../components/object_selector'
 import { RackElevation, type RackFace } from '../components/rack_elevation'
 import { t, tp } from '../i18n'
 import { faceLabel } from '../i18n/labels'
-import { navigate } from '../router'
+import { type Crumb, navigate } from '../router'
+import { locationTrail } from '../trails'
 
 /**
  * /racks/:id — rack detail: header with name/description, two-column
@@ -78,6 +79,16 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
+	const [trail] = createResource(
+		() => ({ site: site(), location: locationId() }),
+		async ({ site: siteRow, location: locationKey }): Promise<Crumb[]> => {
+			if (!siteRow) {
+				return []
+			}
+			const locations = await locationTrail(siteRow.id, locationKey)
+			return [{ label: siteRow.name, href: `/sites/${siteRow.id}` }, ...locations]
+		},
+	)
 	const tenantId = createMemo(() => rack()?.tenant_id ?? null)
 	const [tenant] = createResource(tenantId, async (id: number | null) => {
 		if (!id) {
@@ -273,8 +284,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				backTo="/racks"
-				backLabel={tp('entity.rack', 2)}
+				name={rack()?.name}
+				crumbs={trail()}
 				loading={rack.loading}
 				loadingText={t('rack.loadingOne')}
 				record={rack()}
