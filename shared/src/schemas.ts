@@ -146,9 +146,17 @@ export const SiteUpdateSchema = v.strictObject({
 	),
 })
 
+/** Built-in location kinds; `other` covers anything not listed. */
+export const LOCATION_TYPES = ['floor', 'room', 'other'] as const
+
+export const LocationTypeSchema = v.picklist(LOCATION_TYPES)
+
+export type LocationType = v.InferOutput<typeof LocationTypeSchema>
+
 export const LocationCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
+	type: v.optional(LocationTypeSchema, 'other'),
 	site_id: IdSchema,
 	parent_id: NullableIdSchema,
 	tenant_id: NullableIdSchema,
@@ -176,6 +184,7 @@ export const SiteGroupUpdateSchema = v.strictObject({
 export const LocationUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
+	type: v.optional(LocationTypeSchema, undefined),
 	// site_id is immutable after create: moving a subtree across sites
 	// would silently re-parent every descendant.
 	parent_id: v.optional(v.nullable(IdSchema), undefined),

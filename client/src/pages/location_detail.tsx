@@ -25,6 +25,7 @@ import {
 } from '../components/detail_page'
 import { go } from '../components/list_page'
 import { t, tp } from '../i18n'
+import { locationTypeLabel } from '../i18n/labels'
 
 /**
  * /locations/:id — location detail: header with slug, parent breadcrumb,
@@ -165,6 +166,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<code>{location()?.slug}</code>
 					</dd>
+					<dt>{t('location.type')}</dt>
+					<dd>{locationTypeLabel(location()?.type ?? 'other')}</dd>
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<ForeignKeyLink

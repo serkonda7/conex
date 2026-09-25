@@ -6,6 +6,7 @@ import {
 	fetch_locations,
 	fetch_site,
 	fetch_tenants,
+	type LocationType,
 	update_location,
 } from '../api_tenancy'
 import {
@@ -20,12 +21,14 @@ import {
 	TextField,
 } from '../components/form'
 import { t, tp } from '../i18n'
+import { locationTypeOptions } from '../i18n/labels'
 import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
 /** /locations/:id/edit — location edit form. Saves back to the detail page. */
 export function LocationEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
+	const [locationType, setLocationType] = createSignal<LocationType>('other')
 	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
@@ -51,6 +54,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 			}
 			setName(res.value.name)
 			setSlug(res.value.slug)
+			setLocationType(res.value.type)
 			setParentId(res.value.parent_id ? String(res.value.parent_id) : '')
 			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
 			setDescription(res.value.description ?? '')
@@ -93,6 +97,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 				update_location(props.id, {
 					name: values.name,
 					slug: values.slug,
+					type: locationType(),
 					parent_id: parentId() ? Number(parentId()) : null,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
 					description: description().trim() === '' ? null : description().trim(),
@@ -136,6 +141,16 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 				value={slug()}
 				onInput={setSlug}
 				hint={<Hint>{t('form.slugHintEdit')}</Hint>}
+			/>
+			<SelectField
+				id="location-edit-type"
+				label={t('location.type')}
+				required
+				value={locationType()}
+				onChange={(value: string): void => {
+					setLocationType(value as LocationType)
+				}}
+				options={locationTypeOptions()}
 			/>
 			<SelectField
 				id="location-edit-parent"

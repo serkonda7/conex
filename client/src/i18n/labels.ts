@@ -4,6 +4,7 @@
  * Row types carry most enums as plain strings, so every label helper
  * accepts any string and falls back to the raw value for unknown ones.
  */
+import { LOCATION_TYPES, type LocationType } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api_templates'
 import type { UserRole } from '../api_users'
 import { type MessageKey, t } from '.'
@@ -84,4 +85,20 @@ export function roleOptions(): { value: UserRole; label: string }[] {
 		value,
 		label: roleLabel(value),
 	}))
+}
+
+const LOCATION_TYPE_KEYS: Record<LocationType, MessageKey> = {
+	floor: 'locationType.floor',
+	room: 'locationType.room',
+	other: 'locationType.other',
+}
+
+/** Location type (`floor` / `room` / `other`). */
+export function locationTypeLabel(value: string): string {
+	return lookup(LOCATION_TYPE_KEYS, value)
+}
+
+/** `<select>` options for built-in location types. */
+export function locationTypeOptions(): { value: LocationType; label: string }[] {
+	return LOCATION_TYPES.map((value) => ({ value, label: locationTypeLabel(value) }))
 }

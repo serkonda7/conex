@@ -889,6 +889,7 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 		tenant_id: input.tenant_id ?? null,
 		name: input.name,
 		slug: input.slug,
+		type: input.type,
 		description: input.description ?? null,
 	}
 	try {
@@ -955,6 +956,9 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 	}
 	if (input.slug !== undefined) {
 		patch.slug = input.slug
+	}
+	if (input.type !== undefined) {
+		patch.type = input.type
 	}
 	if (input.parent_id !== undefined) {
 		patch.parent_id = input.parent_id
