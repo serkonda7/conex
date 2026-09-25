@@ -276,8 +276,6 @@ export const de: Messages = {
 	'deviceType.selectManufacturer': 'Bitte einen Hersteller auswählen.',
 	'deviceType.modelRequired': 'Modell ist erforderlich.',
 	'deviceType.heightRange': 'Höhe (HE) muss eine ganze Zahl von {min} bis {max} sein.',
-	'deviceType.heightHint': 'Von diesem Gerät belegte Höheneinheiten (1–60).',
-	'deviceType.fullDepthHint': 'Für Geräte mit halber Tiefe deaktivieren.',
 	'deviceType.stubCountInvalid':
 		'Die Anzahl der Platzhalter muss eine ganze Zahl von mindestens 1 sein',
 	'deviceType.stubPrefix': 'Präfix',
@@ -376,7 +374,7 @@ export const de: Messages = {
 	'shelf.position': 'Position (HE)',
 	'shelf.positionHint': 'Unterste HE der Montage (1-basiert).',
 	'shelf.mountHeight': 'Montagehöhe (HE)',
-	'shelf.mountHeightHint': 'Höhe des Montagebands selbst (mind. 1 HE).',
+	'shelf.mountHeightHint': 'Höhe des Montagebands selbst (min. 1 HE).',
 	'shelf.mountUsable': 'Montage nutzbar',
 	'shelf.reservedHeight': 'Reservierte Höhe (HE)',
 	'shelf.reservedHeightHint': 'Zusätzliche HE über der Montage, immer blockiert (0 = keine).',

@@ -215,6 +215,9 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		return Result.err(new NotFoundError('Manufacturer not found'))
 	}
 	const uHeight = input.u_height ?? 1
+	if (input.form_factor !== undefined && uHeight < 1) {
+		return Result.err(new ConflictError('Rack type must have a height of at least 1 U'))
+	}
 	const row: Omit<DeviceTypeRow, 'id'> = {
 		manufacturer_id: input.manufacturer_id,
 		model: input.model,
@@ -273,6 +276,11 @@ export function updateDeviceType(
 		patch.model = input.model
 	}
 	const effectiveUHeight = input.u_height !== undefined ? input.u_height : current.value.u_height
+	const effectiveFormFactor =
+		input.form_factor !== undefined ? input.form_factor : current.value.form_factor
+	if (effectiveFormFactor !== null && effectiveUHeight < 1) {
+		return Result.err(new ConflictError('Rack type must have a height of at least 1 U'))
+	}
 	// Updating a type must not break devices that already exist.
 	if (
 		current.value.u_height >= 1 &&

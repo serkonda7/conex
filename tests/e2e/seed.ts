@@ -81,8 +81,10 @@ if (
 		.run()
 } else {
 	getSqliteHandle()
-		.query('UPDATE device_types SET u_height = 42, form_factor = ?, width = 19 WHERE model = ?')
-		.run('4-post cabinet', 'E2E 42U Cabinet')
+		.query(
+			'UPDATE device_types SET manufacturer_id = ?, u_height = 42, is_full_depth = 1, form_factor = ?, width = 19, description = NULL, comments = NULL WHERE model = ?',
+		)
+		.run(manufacturer.id, '4-post cabinet', 'E2E 42U Cabinet')
 }
 if (
 	!db

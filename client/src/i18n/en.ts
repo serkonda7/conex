@@ -271,8 +271,6 @@ export const en = {
 	'deviceType.selectManufacturer': 'Select a manufacturer.',
 	'deviceType.modelRequired': 'Model is required.',
 	'deviceType.heightRange': 'Height (U) must be an integer from {min} to {max}.',
-	'deviceType.heightHint': 'Rack units consumed by this device (1–60).',
-	'deviceType.fullDepthHint': 'Off for half-depth devices.',
 	'deviceType.stubCountInvalid': 'Stub count must be an integer of at least 1',
 	'deviceType.stubPrefix': 'Prefix',
 	'deviceType.stubCount': 'Count',

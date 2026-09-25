@@ -5,7 +5,6 @@ import {
 	EditActions,
 	EditPageShell,
 	FormError,
-	Hint,
 	row_options,
 	SelectField,
 	TextAreaField,
@@ -63,8 +62,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 					return t('deviceType.selectManufacturer')
 				}
 				const height = Number(uHeight())
-				if (!Number.isInteger(height) || height < 1 || height > 60) {
-					return t('deviceType.heightRange', { min: 1, max: 60 })
+				if (!Number.isInteger(height) || height < 0 || height > 60) {
+					return t('deviceType.heightRange', { min: 0, max: 60 })
 				}
 				return null
 			},
@@ -113,24 +112,30 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			<TextField
 				id="device-type-edit-u-height"
 				label={t('common.heightU')}
+				type="number"
 				placeholder="1"
 				required
+				min={0}
+				max={60}
+				step={1}
 				inputmode="numeric"
 				value={uHeight()}
 				onInput={setUHeight}
-				hint={<Hint>{t('deviceType.heightHint')}</Hint>}
 			/>
 			<div class="field">
-				<label for="device-type-edit-full-depth">{t('common.fullDepth')}</label>
-				<input
-					id="device-type-edit-full-depth"
-					type="checkbox"
-					checked={fullDepth()}
-					onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-						setFullDepth(e.currentTarget.checked)
-					}
-				/>
-				<p class="field-hint">{t('deviceType.fullDepthHint')}</p>
+				<div class="field-control">
+					<label class="field-checkbox-label">
+						<input
+							id="device-type-edit-full-depth"
+							type="checkbox"
+							checked={fullDepth()}
+							onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+								setFullDepth(e.currentTarget.checked)
+							}
+						/>
+						{t('common.fullDepth')}
+					</label>
+				</div>
 			</div>
 			<TextField
 				id="device-type-edit-description"

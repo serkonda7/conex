@@ -398,10 +398,10 @@ export const InterfacePrefixSchema = v.pipe(
 export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
 
 /**
- * Rack units a device type consumes on mount: at least 1 U.
- * Shelves live in their own table (`shelves`), never as device types.
+ * Rack units a device type consumes on mount: 0-60 U. A zero-height device
+ * cannot be mounted at a rack position. Shelves live in their own table.
  */
-export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
 
 /** NetBox rack form-factor choices. */
 export const RackFormFactorSchema = v.picklist([
@@ -1007,7 +1007,7 @@ export const DeviceTypeImportRowSchema = v.object({
 			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
 			v.number(),
 			v.integer(),
-			v.minValue(1),
+			v.minValue(0),
 			v.maxValue(60),
 		),
 		1,

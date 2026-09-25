@@ -119,8 +119,9 @@ export function DeviceTypeAddPage(): JSX.Element {
 				label={t('common.heightU')}
 				type="number"
 				required
-				min={1}
-				step={0.5}
+				min={0}
+				max={60}
+				step={1}
 				value={uHeight()}
 				onInput={setUHeight}
 				placeholder="1"
