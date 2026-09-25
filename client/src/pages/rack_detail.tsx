@@ -224,10 +224,6 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		setSelectingDevice(true)
 	}
 
-	function installDeviceOnShelf(shelf: ElevationShelfRef): void {
-		navigate(`/devices/add?rack=${props.id}&shelf=${shelf.id}`)
-	}
-
 	function refreshPlacement(result: Result<DeviceRow, Error>): void {
 		if (Result.isError(result)) {
 			setError(result.error.message)
@@ -454,12 +450,11 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								selected_u={pendingU()}
 								selected_face={face()}
 								on_select_u={pickU}
-								on_select_device={openDeviceSelector}
-								on_add_device={installDevice}
-								on_add_shelf={installShelf}
-								shelf_actions={{
-									on_add_shelf_device: installDeviceOnShelf,
-									on_select_shelf_device: openShelfDeviceSelector,
+					on_select_device={openDeviceSelector}
+					on_add_device={installDevice}
+					on_add_shelf={installShelf}
+					shelf_actions={{
+						on_select_shelf_device: openShelfDeviceSelector,
 									on_remove_shelf_device: (
 										device: ElevationShelfDeviceRef,
 									): void => void removeFromShelf(device),

@@ -7,6 +7,7 @@ import {
 	devices,
 	manufacturers,
 	racks,
+	shelves,
 	sites,
 	tenants,
 } from '../../server/src/schema'
@@ -239,6 +240,44 @@ if (e2eSite && e2eRackType) {
 				db.insert(devices).values(values).run()
 			}
 		}
+	}
+	const shelfValues = {
+		rack_id: visualRack.id,
+		name: 'E2E Visual Shelf',
+		face: 'front',
+		position_u: 2,
+		mount_height: 1,
+		mount_usable: 0,
+		reserved_height: 2,
+		is_full_depth: 0,
+		description: 'Half-depth shelf for screenshot coverage.',
+	}
+	const existingShelf = db
+		.select()
+		.from(shelves)
+		.all()
+		.find((row) => row.name === shelfValues.name)
+	if (existingShelf) {
+		getSqliteHandle()
+			.query(
+				`UPDATE shelves SET rack_id = ?, name = ?, face = ?, position_u = ?,
+				mount_height = ?, mount_usable = ?, reserved_height = ?, is_full_depth = ?,
+				description = ? WHERE id = ?`,
+			)
+			.run(
+				shelfValues.rack_id,
+				shelfValues.name,
+				shelfValues.face,
+				shelfValues.position_u,
+				shelfValues.mount_height,
+				shelfValues.mount_usable,
+				shelfValues.reserved_height,
+				shelfValues.is_full_depth,
+				shelfValues.description,
+				existingShelf.id,
+			)
+	} else {
+		db.insert(shelves).values(shelfValues).run()
 	}
 }
 

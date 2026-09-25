@@ -17,8 +17,8 @@
     "db:seed:demo": "bun scripts/seed-demo.ts",
     "test:e2e": "playwright test",
     "test:e2e:reuse": "CONEX_E2E_REUSE_SERVERS=1 playwright test",
-    "test:visual": "playwright test tests/e2e/visual.spec.ts --project=chromium",
-    "test:visual:update": "playwright test tests/e2e/visual.spec.ts --project=chromium --update-snapshots"
+    "test:visual": "playwright test tests/e2e/visual.test.ts --project=chromium",
+    "test:visual:update": "playwright test tests/e2e/visual.test.ts --project=chromium --update-snapshots"
   },
   "packageManager": "bun@1.4.2",
   "catalog": {

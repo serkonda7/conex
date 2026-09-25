@@ -105,10 +105,10 @@ function row_kind(unit: ElevationUnit, face: RackFace): RowKind {
 	return device.face === null || device.face === face || device.is_full_depth ? 'device' : 'ghost'
 }
 
-/** First shelf blocking this unit (the elevation emits at most one per U). */
-function shelf_for_face(unit: ElevationUnit): ElevationShelfRef | undefined {
+/** First shelf blocking this unit on the given face. */
+function shelf_for_face(unit: ElevationUnit, face: RackFace): ElevationShelfRef | undefined {
 	const shelves = unit.shelves ?? (unit.shelf ? [unit.shelf] : [])
-	return shelves[0]
+	return shelves.find((shelf) => shelf_on_face(shelf, face))
 }
 
 /**
@@ -170,7 +170,10 @@ function segments_for_face(
 	let i = 0
 	while (i < units.length) {
 		const unit = units[i] as ElevationUnit
-		const candidates = [shelf_for_face(unit), ...shelves.filter((s) => s.mount_usable)]
+		const candidates = [
+			shelf_for_face(unit, face),
+			...shelves.filter((s) => s.mount_usable && shelf_on_face(s, face)),
+		]
 		let shelf: ElevationShelfRef | undefined
 		let blocked: USpan | null = null
 		for (const candidate of candidates) {
@@ -269,14 +272,13 @@ function BlockGutters(props: { topU: number; row: number; rows: number }): JSX.E
 
 /** Callbacks for placing devices on / taking them off a shelf. */
 export interface ShelfDeviceActions {
-	on_add_shelf_device: (shelf: ElevationShelfRef) => void
 	on_select_shelf_device: (shelf: ElevationShelfRef) => void
 	on_remove_shelf_device: (device: ElevationShelfDeviceRef, shelf: ElevationShelfRef) => void
 }
 
 /**
- * Devices sitting on a shelf as removable chips, plus hover actions to put
- * another device on it (new or existing).
+ * Devices sitting on a shelf as removable chips, plus a hover action to select
+ * an existing device to put on it.
  */
 function ShelfDevices(props: {
 	shelf: ElevationShelfRef
@@ -321,15 +323,6 @@ function ShelfDevices(props: {
 			</For>
 			<Show when={!props.chips_only}>
 				<li class="rack-shelf-device-actions">
-					<button
-						type="button"
-						class="rack-free-btn"
-						aria-label={t('elevation.addDeviceToShelf')}
-						title={t('elevation.addDeviceToShelfTitle', { name: label() })}
-						onClick={() => props.actions.on_add_shelf_device(props.shelf)}
-					>
-						{t('elevation.addDeviceShort')}
-					</button>
 					<button
 						type="button"
 						class="rack-free-btn"
@@ -630,44 +623,6 @@ export function RackElevation(props: {
 										}
 										if (segment.kind === 'shelf') {
 											const s = segment.shelf
-											// Usable mount: U-mount a device into the free mount rows.
-											const mountActions = (): JSX.Element => (
-												<Show when={s.mount_usable && segment.plate}>
-													<button
-														type="button"
-														class="rack-free-btn"
-														aria-label={t('elevation.addChildDevice')}
-														title={t('elevation.mountNewTitle', {
-															unit: u_label(s.position_u),
-															face: faceLabel(face),
-														})}
-														onClick={() =>
-															props.on_add_device(s.position_u, face)
-														}
-													>
-														{t('elevation.mountNew')}
-													</button>
-													<button
-														type="button"
-														class="rack-free-btn"
-														aria-label={t(
-															'elevation.selectChildDevice',
-														)}
-														title={t('elevation.mountExistingTitle', {
-															unit: u_label(s.position_u),
-															face: faceLabel(face),
-														})}
-														onClick={() =>
-															props.on_select_device(
-																s.position_u,
-																face,
-															)
-														}
-													>
-														{t('elevation.mountExisting')}
-													</button>
-												</Show>
-											)
 											return (
 												<>
 													<BlockGutters
@@ -774,7 +729,6 @@ export function RackElevation(props: {
 																			actions={
 																				props.shelf_actions
 																			}
-																			mount_actions={mountActions()}
 																		/>
 																	</div>
 																</Show>
@@ -835,7 +789,6 @@ export function RackElevation(props: {
 																			actions={
 																				props.shelf_actions
 																			}
-																			mount_actions={mountActions()}
 																		/>
 																	</Show>
 																</div>

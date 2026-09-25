@@ -541,11 +541,7 @@ export const en = {
 	'elevation.selectChildDevice': 'Select child device',
 	'elevation.selectChildDeviceTitle': 'Select child device for shelf at {unit} ({face})',
 	'elevation.onShelf': 'On shelf',
-	'elevation.mountNewTitle': 'Install a new device at {unit} (mount usable, {face})',
-	'elevation.mountNew': '+ Install',
-	'elevation.mountExistingTitle': 'Install an existing device at {unit} (mount usable, {face})',
-	'elevation.mountExisting': 'Install…',
-	'elevation.shelfBlock': 'Shelf {mount}, {first}–{last}',
+	'elevation.shelfBlock': 'Shelf {mount}, {first}-{last}',
 	'elevation.oppositeFace': 'opposite face',
 	'elevation.clearanceTitle':
 		'Shelf {mount} ({mountHeight} U mount usable, {reserved} U reserved)',

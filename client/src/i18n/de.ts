@@ -554,12 +554,7 @@ export const de: Messages = {
 	'elevation.selectChildDevice': 'Untergerät auswählen',
 	'elevation.selectChildDeviceTitle': 'Untergerät für Fachboden bei {unit} auswählen ({face})',
 	'elevation.onShelf': 'Auf Fachboden',
-	'elevation.mountNewTitle': 'Neues Gerät in {unit} einbauen (Montage nutzbar, {face})',
-	'elevation.mountNew': '+ Einbau',
-	'elevation.mountExistingTitle':
-		'Vorhandenes Gerät in {unit} einbauen (Montage nutzbar, {face})',
-	'elevation.mountExisting': 'Einbau…',
-	'elevation.shelfBlock': 'Fachboden {mount}, {first}–{last}',
+	'elevation.shelfBlock': 'Fachboden {mount}, {first}-{last}',
 	'elevation.oppositeFace': 'gegenüberliegende Seite',
 	'elevation.clearanceTitle':
 		'Fachboden {mount} ({mountHeight} HE Montage nutzbar, {reserved} HE reserviert)',

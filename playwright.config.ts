@@ -1,10 +1,11 @@
 import path from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 
+// Keep E2E services separate from the normal client (5371) and API (3000).
 const clientPort: number = Number(process.env.CONEX_CLIENT_PORT ?? 5372)
 const dataDir: string = path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
-const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3000'
-const apiPort: number = Number(new URL(apiUrl).port || 3000)
+const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3300'
+const apiPort: number = Number(new URL(apiUrl).port || 3300)
 const reuse: boolean = (process.env.CONEX_E2E_REUSE_SERVERS ?? '') !== ''
 export const e2eAuthFile: string = path.resolve('./test-results/.auth/user.json')
 

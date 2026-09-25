@@ -14,3 +14,28 @@ export async function loginAsE2E(page: Page): Promise<void> {
 	await page.getByRole('button', { name: 'Anmelden' }).click()
 	await expect(page.getByRole('link', { name: 'Mandanten' })).toBeVisible()
 }
+
+/**
+ * Settle the page before a screenshot: DOM ready, fonts loaded, CSS
+ * motion frozen, text caret hidden. Keeps baselines deterministic.
+ * Avoids `networkidle` (waits for 500ms of zero requests) — callers
+ * already assert visibility of the screenshotted content first.
+ */
+export async function stabilizeForSnapshot(page: Page): Promise<void> {
+	await page.waitForLoadState('domcontentloaded')
+	await page.evaluate(async () => {
+		try {
+			await Promise.race([
+				document.fonts.ready,
+				new Promise((resolve) => setTimeout(resolve, 2000)),
+			])
+		} catch {
+			// Fonts API unavailable — fall through to the screenshot anyway.
+		}
+		const style = document.createElement('style')
+		style.setAttribute('data-visual-freeze', '')
+		style.textContent =
+			'*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}'
+		document.head.appendChild(style)
+	})
+}
