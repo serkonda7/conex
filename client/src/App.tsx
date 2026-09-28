@@ -823,7 +823,7 @@ function App(): JSX.Element {
 															{currentUser()?.username ?? '…'}
 														</span>
 														<Show when={currentUser()}>
-															{(user) => (
+															{(user: () => SessionUser) => (
 																<span class="app-user-role">
 																	{roleLabel(user().role)}
 																</span>

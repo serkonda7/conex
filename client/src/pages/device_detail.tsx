@@ -1,17 +1,10 @@
 import { IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { InputEventAndTarget, TraceLink, TracePath } from 'shared/src/types'
+import type { TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import { delete_cable, fetch_cables, fetch_trace } from '../api_cables'
-import {
-	add_interface,
-	delete_device,
-	fetch_device,
-	fetch_interfaces,
-	type InterfaceJson,
-	move_device,
-} from '../api_devices'
+import { createMemo, createResource, createSignal, Show } from 'solid-js'
+import { delete_cable, fetch_trace } from '../api_cables'
+import { delete_device, fetch_device, fetch_interfaces, type InterfaceJson } from '../api_devices'
 import { fetch_rack } from '../api_racks'
 import { fetch_shelf } from '../api_shelves'
 import { fetch_device_types } from '../api_templates'
@@ -23,35 +16,26 @@ import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
-	Empty,
 	ForeignKeyLink,
 	InlineError,
 	useDetailDelete,
 } from '../components/detail_page'
 import { EditPortDialog } from '../components/edit_port_dialog'
 import { t, tp } from '../i18n'
-import { cableStatusLabel, faceLabel } from '../i18n/labels'
+import { faceLabel } from '../i18n/labels'
 import { type Crumb, goTo } from '../router'
 import { locationTrail } from '../trails'
 
-/** Selectable trace depths for the path view. */
-const TRACE_DEPTHS = [1, 2, 3, 4, 6, 10]
-
 /**
- * /devices/:id — detail with the interface list (port status dots), a manual
- * interface add/rename form, a rack remount form, the P5 cable connect
- * dialog (peer device first, then its free port), the per-device trace peer links
- * (`dev:port <-> dev:port`), and the cable list with disconnect.
+ * /devices/:id — detail with network and other interfaces, plus the per-port
+ * cable connect/disconnect and edit dialogs.
  */
 export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [ifaceName, setIfaceName] = createSignal('')
-	const [moveU, setMoveU] = createSignal('')
 	const [connectingIface, setConnectingIface] = createSignal<InterfaceJson | null>(null)
 	const [editingIface, setEditingIface] = createSignal<InterfaceJson | null>(null)
-	const [traceDepth, setTraceDepth] = createSignal('4')
 
-	const [device, { refetch: refetchDevice }] = createResource(async () => {
+	const [device] = createResource(async () => {
 		const res = await fetch_device(props.id)
 		if (Result.isError(res)) {
 			setError(res.error.message)
@@ -67,22 +51,13 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
-	const traceSource = createMemo(() => ({ id: props.id, depth: Number(traceDepth()) || 4 }))
-	const [trace, { refetch: refetchTrace }] = createResource(traceSource, async (s) => {
-		const res = await fetch_trace(s.id, s.depth)
+	const [trace, { refetch: refetchTrace }] = createResource(async () => {
+		const res = await fetch_trace(props.id, 4)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return null
 		}
 		return res.value
-	})
-	const [cables, { refetch: refetchCables }] = createResource(async () => {
-		const res = await fetch_cables({ device: props.id })
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return []
-		}
-		return res.value.items
 	})
 	const [types] = createResource(async () => {
 		const res = await fetch_device_types()
@@ -168,38 +143,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	function refetchAll(): void {
 		void refetchIfaces()
 		void refetchTrace()
-		void refetchCables()
-	}
-
-	async function handleAddIface(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		const res = await add_interface(props.id, { name: ifaceName() })
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setIfaceName('')
-		void refetchIfaces()
-	}
-
-	async function handleMove(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		const position = moveU().trim() === '' ? undefined : Number(moveU().trim())
-		if (position !== undefined && (!Number.isInteger(position) || position < 1)) {
-			setError(t('device.moveInvalid'))
-			return
-		}
-		const res = await move_device(props.id, {
-			position_u: position ?? null,
-		})
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setMoveU('')
-		void refetchDevice()
 	}
 
 	async function handleDisconnect(cableId: number): Promise<void> {
@@ -360,10 +303,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			/>
 		)
 	}
-
-	const ifaceCount = (): number => ifaces()?.length ?? 0
-	const traceCount = (): number => trace()?.links.length ?? 0
-	const cableCount = (): number => cables()?.length ?? 0
 
 	return (
 		<div>
