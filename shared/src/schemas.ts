@@ -97,16 +97,31 @@ export const MAX_LOCATION_DEPTH = 5
 /** Maximum nesting depth of the site-group tree (root counts as depth 1). */
 export const MAX_SITE_GROUP_DEPTH = 5
 
-export const TenantCreateSchema = v.strictObject({
+/** Tenant groups are flat: a named bundle of tenants, no parent. */
+export const TenantGroupCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
 
-export const TenantUpdateSchema = v.strictObject({
+export const TenantGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
+})
+
+export const TenantCreateSchema = v.strictObject({
+	name: NameSchema,
+	tenant_group_id: NullableIdSchema,
+	description: DescriptionSchema,
+	comments: CommentsSchema,
+})
+
+export const TenantUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	tenant_group_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -192,6 +207,8 @@ export const LocationUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
+export type TenantGroupCreate = v.InferOutput<typeof TenantGroupCreateSchema>
+export type TenantGroupUpdate = v.InferOutput<typeof TenantGroupUpdateSchema>
 export type TenantCreate = v.InferOutput<typeof TenantCreateSchema>
 export type TenantUpdate = v.InferOutput<typeof TenantUpdateSchema>
 export type SiteCreate = v.InferOutput<typeof SiteCreateSchema>
@@ -232,15 +249,24 @@ const ListQueryEntries = {
 
 const OptionalIdEntry = v.optional(IdSchema, undefined)
 
-export const TenantListQuerySchema = v.object({
+export const TenantGroupListQuerySchema = v.object({
 	...ListQueryEntries,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export const TenantListQuerySchema = v.object({
+	...ListQueryEntries,
+	/** Only tenants of this tenant group. */
+	group: OptionalIdEntry,
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export const SiteListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
 	group: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
@@ -249,6 +275,7 @@ export const SiteListQuerySchema = v.object({
 export const SiteGroupListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
 	parent: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
@@ -258,6 +285,7 @@ export const LocationListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdEntry,
 	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
 	parent: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
@@ -267,6 +295,7 @@ export const EntityParamsSchema = v.object({ id: IdSchema })
 export const DeviceIfaceParamsSchema = v.object({ id: IdSchema, ifaceId: IdSchema })
 export const StubIdParamsSchema = v.object({ id: IdSchema, stubId: IdSchema })
 
+export type TenantGroupListQuery = v.InferOutput<typeof TenantGroupListQuerySchema>
 export type TenantListQuery = v.InferOutput<typeof TenantListQuerySchema>
 export type SiteListQuery = v.InferOutput<typeof SiteListQuerySchema>
 export type SiteGroupListQuery = v.InferOutput<typeof SiteGroupListQuerySchema>
@@ -305,6 +334,7 @@ export const RackListQuerySchema = v.object({
 	site: OptionalIdEntry,
 	location: OptionalIdEntry,
 	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
@@ -604,6 +634,7 @@ export const DeviceListQuerySchema = v.object({
 	site: OptionalIdEntry,
 	rack: OptionalIdEntry,
 	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
 	/** Placed = U-mounted; unplaced = neither mounted nor rack-assigned. */
 	placed: v.optional(looseBoolean(false), undefined),
@@ -869,6 +900,7 @@ export const TopologyQuerySchema = v.object({
 	site: OptionalIdEntry,
 	device: OptionalIdEntry,
 	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
 	group: OptionalIdEntry,
 })
 

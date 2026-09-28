@@ -58,7 +58,7 @@ export const devicesApp = new Hono()
 	.use(authMiddleware)
 	.get('/', vValidator('query', DeviceListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
-		const scope = listTenantScope(c, query.tenant)
+		const scope = await listTenantScope(c, query.tenant, query.tenant_group)
 		if (scope instanceof Response) {
 			return scope
 		}

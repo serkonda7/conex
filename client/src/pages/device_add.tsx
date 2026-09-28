@@ -21,6 +21,7 @@ import {
 import { t, tp } from '../i18n'
 import { faceOptions } from '../i18n/labels'
 import { navigate, parseId, queryParam } from '../router'
+import { contextTenantValue } from '../tenant_context'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** /devices/add — NetBox-style device instantiate form. */
@@ -53,7 +54,8 @@ export function DeviceAddPage(): JSX.Element {
 			return res.value
 		},
 	)
-	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	// Explicit `?tenant=` wins; else a single-tenant context preselects it.
+	const [tenantId, setTenantId] = createSignal(queryParam('tenant') || contextTenantValue())
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
@@ -86,7 +88,7 @@ export function DeviceAddPage(): JSX.Element {
 			return
 		}
 		const tenant = siteTenantId()
-		setTenantId(tenant ? String(tenant) : '')
+		setTenantId(tenant ? String(tenant) : contextTenantValue())
 	})
 
 	// Locations belong to a site, so the options follow the site picker.

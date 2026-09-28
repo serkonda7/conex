@@ -23,6 +23,8 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb } from './db/connection'
+import type { TenantFilterParams } from './db/list'
+import { resolveTenantGroupIds } from './db/tenancy'
 import { type cables, devices, interfaces, racks, shelves } from './schema'
 import type { CurrentUser } from './types'
 import { jsonError } from './util/http'
@@ -161,29 +163,43 @@ export function checkUpdateTenant(
 }
 
 /**
- * List-query tenant plumbing for `?tenant=` endpoints. Validates an explicit
- * param against the requester's scope (403 on mismatch) and returns the
- * `{ tenant, scopeTenantId }` overrides to spread into the db list call:
- * scoped requesters get `{ scopeTenantId: scope }` (own tenant only),
- * global requesters keep their explicit `?tenant=` when given.
- * Returns a 403 response when the param names another tenant.
+ * List-query tenant plumbing for `?tenant=` / `?tenant_group=` endpoints.
+ * Validates explicit params against the requester's scope (403 on
+ * mismatch) and returns the `TenantFilterParams` to spread into the db
+ * list call: scoped requesters get `{ scopeTenantId: scope }` (own tenant
+ * only), global requesters keep their explicit `?tenant=` and get
+ * `?tenant_group=` resolved to its member ids (`tenantIds`).
+ * Returns a 403 response when a param names another tenant or a group
+ * without the requester's tenant, 404 when the group does not exist.
  */
-export function listTenantScope(
+export async function listTenantScope(
 	c: Context,
 	queryTenant: number | undefined,
-): { tenant?: number; scopeTenantId?: number } | Response {
+	queryTenantGroup?: number,
+): Promise<TenantFilterParams | Response> {
 	const denied = checkListTenantParam(c, queryTenant)
 	if (denied) {
 		return denied
 	}
+	let tenantIds: number[] | undefined
+	if (queryTenantGroup !== undefined) {
+		const ids = await resolveTenantGroupIds(queryTenantGroup)
+		if (Result.isError(ids)) {
+			return sendResult(c, ids)
+		}
+		tenantIds = ids.value
+	}
 	const scope = scopeTenantId(requestUser(c))
 	if (scope !== null) {
+		if (tenantIds !== undefined && !tenantIds.includes(scope)) {
+			return jsonError(c, 'Forbidden: outside your tenant scope', 403)
+		}
 		return { scopeTenantId: scope }
 	}
-	if (queryTenant !== undefined) {
-		return { tenant: queryTenant }
+	return {
+		...(queryTenant !== undefined ? { tenant: queryTenant } : {}),
+		...(tenantIds !== undefined ? { tenantIds } : {}),
 	}
-	return {}
 }
 
 /** Sends a single tenant-bearing row: 404 when missing, 403 when out of scope. */

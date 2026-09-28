@@ -4,7 +4,14 @@
  * `{ error }` message, matching the auth wrappers in `api_auth.ts`.
  */
 import type { Result } from 'better-result'
-import type { LocationRow, SiteRow, TenantListItem, TenantRow } from 'server/src/db/tenancy'
+import type {
+	LocationRow,
+	SiteRow,
+	TenantGroupListItem,
+	TenantGroupRow,
+	TenantListItem,
+	TenantRow,
+} from 'server/src/db/tenancy'
 import type {
 	LocationCreate,
 	LocationListQuery,
@@ -18,16 +25,88 @@ import type {
 	SiteListQuery,
 	SiteUpdate,
 	TenantCreate,
+	TenantGroupCreate,
+	TenantGroupListQuery,
+	TenantGroupUpdate,
 	TenantListQuery,
 	TenantUpdate,
 } from 'shared/src/types'
 import { client, getPage, to_query, to_result } from './api'
 import { t, tp } from './i18n'
 
-export type { LocationRow, SiteRow, TenantRow }
+export type { LocationRow, SiteRow, TenantGroupListItem, TenantGroupRow, TenantRow }
 
 /** Tenant row for the list view, with NetBox-style related-object counts. */
 export type TenantWithCounts = TenantListItem
+
+// ---------------------------------------------------------------------------
+// Tenant groups
+// ---------------------------------------------------------------------------
+
+export type TenantGroupSort = TenantGroupListQuery['sort']
+
+export type TenantGroupFilters = Partial<TenantGroupListQuery>
+
+export async function fetch_tenant_groups(
+	filters?: TenantGroupFilters,
+): Promise<Result<Page<TenantGroupListItem>, Error>> {
+	return getPage<TenantGroupListItem>(
+		client['tenant-groups'].$get({
+			query: to_query({
+				search: filters?.search ?? '',
+				page: filters?.page ?? 1,
+				limit: filters?.limit ?? 200,
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
+			}),
+		}),
+		tp('api.loadFailed', 2, { noun: tp('noun.tenantGroup', 2) }),
+	)
+}
+
+export async function fetch_tenant_group(id: number): Promise<Result<TenantGroupRow, Error>> {
+	const res = await client['tenant-groups'][':id'].$get({ param: { id: String(id) } })
+	return to_result<TenantGroupRow>(
+		res,
+		tp('api.loadFailed', 1, { noun: tp('noun.tenantGroup', 1) }),
+	)
+}
+
+export async function create_tenant_group(
+	input: TenantGroupCreate,
+): Promise<Result<TenantGroupRow, Error>> {
+	const res = await client['tenant-groups'].$post({
+		json: {
+			name: input.name,
+			slug: input.slug,
+			description: input.description || undefined,
+			comments: input.comments || undefined,
+		},
+	})
+	return to_result<TenantGroupRow>(
+		res,
+		t('api.createFailed', { noun: tp('noun.tenantGroup', 1) }),
+	)
+}
+
+export async function update_tenant_group(
+	id: number,
+	patch: TenantGroupUpdate,
+): Promise<Result<TenantGroupRow, Error>> {
+	const res = await client['tenant-groups'][':id'].$patch({
+		param: { id: String(id) },
+		json: patch,
+	})
+	return to_result<TenantGroupRow>(
+		res,
+		t('api.updateFailed', { noun: tp('noun.tenantGroup', 1) }),
+	)
+}
+
+export async function delete_tenant_group(id: number): Promise<Result<unknown, Error>> {
+	const res = await client['tenant-groups'][':id'].$delete({ param: { id: String(id) } })
+	return to_result<unknown>(res, t('api.deleteFailed', { noun: tp('noun.tenantGroup', 1) }))
+}
 
 // ---------------------------------------------------------------------------
 // Tenants
@@ -42,6 +121,7 @@ export async function fetch_tenants(
 				search: filters?.search ?? '',
 				page: filters?.page ?? 1,
 				limit: filters?.limit ?? 200,
+				group: filters?.group,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),
@@ -60,7 +140,7 @@ export async function create_tenant(input: TenantCreateInput): Promise<Result<Te
 	const res = await client.tenants.$post({
 		json: {
 			name: input.name,
-			slug: input.slug,
+			tenant_group_id: input.tenant_group_id,
 			description: input.description || undefined,
 			comments: input.comments || undefined,
 		},
@@ -122,6 +202,7 @@ export async function fetch_sites(filters?: SiteFilters): Promise<Result<Page<Si
 				page: filters?.page ?? 1,
 				limit: filters?.limit ?? 200,
 				tenant: filters?.tenant,
+				tenant_group: filters?.tenant_group,
 				group: filters?.group,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
@@ -195,6 +276,7 @@ export async function fetch_locations(
 				limit: f.limit ?? 200,
 				site: f.site,
 				tenant: f.tenant,
+				tenant_group: f.tenant_group,
 				parent: f.parent,
 				sort: f.sort ?? 'name',
 				order: f.order ?? 'asc',
@@ -274,6 +356,7 @@ export async function fetch_site_groups(
 				page: filters?.page ?? 1,
 				limit: filters?.limit ?? 200,
 				tenant: filters?.tenant,
+				tenant_group: filters?.tenant_group,
 				parent: filters?.parent,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',

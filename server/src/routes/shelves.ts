@@ -26,7 +26,7 @@ export const shelvesApp = new Hono()
 		const query = c.req.valid('query')
 		// Shelves have no `?tenant=` param of their own; the scope still
 		// applies through the rack.
-		const scope = listTenantScope(c, undefined)
+		const scope = await listTenantScope(c, undefined)
 		if (scope instanceof Response) {
 			return scope
 		}

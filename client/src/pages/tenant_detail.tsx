@@ -8,6 +8,7 @@ import {
 	fetch_site_groups,
 	fetch_sites,
 	fetch_tenant,
+	fetch_tenant_group,
 	type SiteGroupRow,
 	type SiteRow,
 } from '../api_tenancy'
@@ -25,8 +26,8 @@ import { t, tp } from '../i18n'
 import { goTo } from '../router'
 
 /**
- * /tenants/:id — tenant detail: header with slug/description/comments,
- * related-object counts, and the related sites/racks/devices tables.
+ * /tenants/:id — tenant detail: header with description/comments,
+ * and the related sites/racks/devices tables.
  * Tenant name links elsewhere navigate here; the edit dialog stays inline
  * so the list page keeps its quick-edit affordance.
  */
@@ -43,6 +44,13 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				return null
 			}
 			return res.value
+		},
+	)
+	const [group] = createResource(
+		() => tenant()?.tenant_group_id ?? undefined,
+		async (id: number) => {
+			const res = await fetch_tenant_group(id)
+			return Result.isError(res) ? null : res.value
 		},
 	)
 	const [sites] = createResource(
@@ -115,7 +123,6 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={tenant()?.name}
-					slug={tenant()?.slug}
 					editHref={`/tenants/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
@@ -123,34 +130,22 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					{tenant()?.description || t('common.noDescription')}
 				</DetailSubtitle>
 
-				<div class="detail-stats">
-					<a class="detail-stat" href="#tenant-sites">
-						<span class="detail-stat-value">{siteCount()}</span>{' '}
-						<span class="detail-stat-label">{tp('entity.site', siteCount())}</span>
-					</a>
-					<a class="detail-stat" href="#tenant-site-groups">
-						<span class="detail-stat-value">{siteGroupCount()}</span>{' '}
-						<span class="detail-stat-label">
-							{tp('entity.siteGroup', siteGroupCount())}
-						</span>
-					</a>
-					<a class="detail-stat" href="#tenant-racks">
-						<span class="detail-stat-value">{rackCount()}</span>{' '}
-						<span class="detail-stat-label">{tp('entity.rack', rackCount())}</span>
-					</a>
-					<a class="detail-stat" href="#tenant-devices">
-						<span class="detail-stat-value">{deviceCount()}</span>{' '}
-						<span class="detail-stat-label">{tp('entity.device', deviceCount())}</span>
-					</a>
-				</div>
-
 				<DetailCard label={t('tenant.details')}>
-					<dt>{t('common.slug')}</dt>
+					<dt>{tp('entity.tenantGroup', 1)}</dt>
 					<dd>
-						<code>{tenant()?.slug}</code>
+						{group() ? (
+							<a
+								href={`/tenant-groups/${group()?.id}`}
+								onClick={(e: MouseEvent): void =>
+									goTo(e, `/tenant-groups/${group()?.id}`)
+								}
+							>
+								{group()?.name}
+							</a>
+						) : (
+							'—'
+						)}
 					</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{tenant()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>{tenant()?.comments || '—'}</dd>
 				</DetailCard>
@@ -170,7 +165,6 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => sites() ?? []}
 					getRowId={(s: SiteRow): number => s.id}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'name',
@@ -207,7 +201,6 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => siteGroups() ?? []}
 					getRowId={(g: SiteGroupRow): number => g.id}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'name',
@@ -244,7 +237,6 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => racks() ?? []}
 					getRowId={(r: RackRow): number => r.id}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'name',
@@ -282,7 +274,6 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => devices() ?? []}
 					getRowId={(d: DeviceRow): number => d.id}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'name',

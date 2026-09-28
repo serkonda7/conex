@@ -15,6 +15,7 @@ import {
 } from '../components/form'
 import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
+import { contextTenantValue } from '../tenant_context'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -26,7 +27,8 @@ import {
 /** /sites/add — NetBox-style site create form. */
 export function SiteAddPage(): JSX.Element {
 	const slugFields = use_slug_fields()
-	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	// Explicit `?tenant=` wins; else a single-tenant context preselects it.
+	const [tenantId, setTenantId] = createSignal(queryParam('tenant') || contextTenantValue())
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [groupId, setGroupId] = createSignal(queryParam('group'))
 	const [description, setDescription] = createSignal('')
@@ -57,7 +59,7 @@ export function SiteAddPage(): JSX.Element {
 			return
 		}
 		const tenant = groupTenantId()
-		setTenantId(tenant ? String(tenant) : '')
+		setTenantId(tenant ? String(tenant) : contextTenantValue())
 	})
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {

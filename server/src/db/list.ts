@@ -1,5 +1,6 @@
 import { Result } from 'better-result'
-import { eq } from 'drizzle-orm'
+import { eq, inArray, type SQL, sql } from 'drizzle-orm'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 import { tenants } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
@@ -54,4 +55,35 @@ export async function checkTenantExists(
 		return Result.err(new NotFoundError('Tenant not found'))
 	}
 	return Result.ok(undefined)
+}
+
+/**
+ * Tenant filters shared by every tenant-bearing list. All present filters
+ * intersect: an explicit `?tenant=`, a `?tenant_group=` resolved to its
+ * member tenant ids, and the requester's scope (strict — shared `NULL`
+ * rows are excluded).
+ */
+export interface TenantFilterParams {
+	tenant?: number
+	/** Member tenants of the requested tenant group; empty matches nothing. */
+	tenantIds?: number[]
+	/** Tenant scope of a scoped editor/viewer; `undefined` = unconstrained. */
+	scopeTenantId?: number
+}
+
+/** WHERE conditions for `TenantFilterParams` on a row's `tenant_id` column. */
+export function tenantConditions(column: PgColumn, params: TenantFilterParams): SQL[] {
+	const conditions: SQL[] = []
+	if (params.tenant !== undefined) {
+		conditions.push(eq(column, params.tenant))
+	}
+	if (params.tenantIds !== undefined) {
+		conditions.push(
+			params.tenantIds.length > 0 ? inArray(column, params.tenantIds) : sql`false`,
+		)
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(eq(column, params.scopeTenantId))
+	}
+	return conditions
 }

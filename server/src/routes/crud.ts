@@ -48,8 +48,9 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 				sort: string
 				order: 'asc' | 'desc'
 				tenant?: number
+				tenant_group?: number
 			}
-			const scope = listTenantScope(c, query.tenant)
+			const scope = await listTenantScope(c, query.tenant, query.tenant_group)
 			if (scope instanceof Response) {
 				return scope
 			}

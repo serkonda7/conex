@@ -15,6 +15,7 @@ import { searchApp } from './routes/search'
 import { shelvesApp } from './routes/shelves'
 import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
+import { tenantGroupsApp } from './routes/tenant_groups'
 import { tenantsApp } from './routes/tenants'
 import { topologyApp } from './routes/topology'
 import { usersApp } from './routes/users'
@@ -62,6 +63,7 @@ export function createApp() {
 			.route('/auth', authApp)
 			.route('/users', usersApp)
 			.route('/tenants', tenantsApp)
+			.route('/tenant-groups', tenantGroupsApp)
 			.route('/sites', sitesApp)
 			.route('/site-groups', siteGroupsApp)
 			.route('/locations', locationsApp)

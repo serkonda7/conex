@@ -1,9 +1,11 @@
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For } from 'solid-js'
 import {
 	delete_tenant,
+	fetch_tenant_groups,
 	fetch_tenants,
+	type TenantGroupListItem,
 	type TenantSort,
 	type TenantWithCounts,
 } from '../api_tenancy'
@@ -25,11 +27,14 @@ import {
 	useTableColumns,
 } from '../components/list_page'
 import { t, tp } from '../i18n'
-import { goTo } from '../router'
+import { goTo, parseId, queryParam } from '../router'
+import { contextGroupId } from '../tenant_context'
 
 /**
- * /tenants — NetBox-style tenant list: search, sortable columns, row
- * selection with bulk delete, and icon actions with delete in a row menu.
+ * /tenants — NetBox-style tenant list: search, sortable columns, tenant
+ * group filter (deep-linkable via `?group=<id>`, else the top-bar group
+ * context), row selection with bulk delete, and icon actions with delete
+ * in a row menu.
  * Editing lives on the dedicated /tenants/:id/edit page. The whole result
  * set renders at once (API cap: 200).
  */
@@ -37,11 +42,27 @@ export function TenantsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 	const { sort, order, handleSort, clearSort } = useSort<TenantSort>('name')
+	const [filterGroup, setFilterGroup] = createSignal(queryParam('group'))
+
+	// Follow group links from the tenant group pages (`/tenants?group=<id>`).
+	createEffect((): void => {
+		setFilterGroup(queryParam('group'))
+	})
+
+	const [groups] = createResource(async () => {
+		const res = await fetch_tenant_groups()
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return []
+		}
+		return res.value.items
+	})
 
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
 		sort: sort() ?? 'name',
 		order: order(),
+		group: parseId(filterGroup()) ?? contextGroupId(),
 	}))
 
 	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.tenant')
@@ -58,6 +79,13 @@ export function TenantsPage(): JSX.Element {
 
 	const rows = createMemo(() => tenantsPage()?.items ?? [])
 	const total = createMemo(() => tenantsPage()?.total ?? 0)
+
+	function groupNameOf(id: number | null): string {
+		if (id === null) {
+			return '—'
+		}
+		return groups()?.find((g: TenantGroupListItem) => g.id === id)?.name ?? String(id)
+	}
 
 	const columns: DataTableColumn<TenantWithCounts>[] = [
 		{
@@ -81,6 +109,11 @@ export function TenantsPage(): JSX.Element {
 			getValue: (row: TenantWithCounts): JSX.Element => (
 				<span title={row.description ?? ''}>{row.description || '—'}</span>
 			),
+		},
+		{
+			key: 'group',
+			label: tp('entity.tenantGroup', 1),
+			getValue: (row: TenantWithCounts): string => groupNameOf(row.tenant_group_id),
 		},
 	]
 
@@ -109,6 +142,23 @@ export function TenantsPage(): JSX.Element {
 					value={search()}
 					onInput={setSearch}
 				/>
+				<label>
+					<span class="visually-hidden">{t('tenant.filterByGroup')}</span>
+					<select
+						aria-label={t('tenant.filterByGroup')}
+						value={filterGroup() || String(contextGroupId() ?? '')}
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
+							setFilterGroup(e.currentTarget.value)
+						}}
+					>
+						<option value="">{t('tenant.allGroups')}</option>
+						<For each={groups() ?? []}>
+							{(row: TenantGroupListItem): JSX.Element => (
+								<option value={row.id}>{row.name}</option>
+							)}
+						</For>
+					</select>
+				</label>
 				<span class="toolbar-spacer" />
 				<BulkDeleteButton count={selected().length} onClick={handleBulkDelete} />
 			</div>
@@ -142,12 +192,14 @@ export function TenantsPage(): JSX.Element {
 				}
 				emptyContent={
 					<p class="empty">
-						{debouncedSearch()
-							? t('list.noMatch', {
-									noun: tp('noun.tenant', 2),
-									search: debouncedSearch(),
-								})
-							: t('tenant.empty')}
+						{listSource().group !== undefined
+							? t('list.noMatchFilters', { noun: tp('noun.tenant', 2) })
+							: debouncedSearch()
+								? t('list.noMatch', {
+										noun: tp('noun.tenant', 2),
+										search: debouncedSearch(),
+									})
+								: t('tenant.empty')}
 					</p>
 				}
 			/>

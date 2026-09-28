@@ -35,7 +35,8 @@ async function one<T>(query: PromiseLike<T[]>): Promise<T> {
 // Ids restart at 1 so demo URLs stay stable across resets.
 await getSqlClient().unsafe(`
 	TRUNCATE cables, interfaces, devices, shelves, racks, locations, sites, site_groups,
-		device_type_interfaces, device_types, manufacturers, sessions, auth_states, users, tenants
+		device_type_interfaces, device_types, manufacturers, sessions, auth_states, users, tenants,
+		tenant_groups
 	RESTART IDENTITY
 `)
 
@@ -44,7 +45,6 @@ const dentist: typeof tenants.$inferSelect = await one(
 		.insert(tenants)
 		.values({
 			name: 'Bright Smile Dental',
-			slug: 'bright-smile-dental',
 			description: 'Small dental practice.',
 		})
 		.returning(),

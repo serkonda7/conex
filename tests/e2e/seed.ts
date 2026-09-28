@@ -32,11 +32,9 @@ await initDb({
 })
 
 const db = getDb()
-let tenant = (await db.select().from(tenants)).find((row) => row.slug === 'e2e-tenant')
+let tenant = (await db.select().from(tenants)).find((row) => row.name === 'E2E Tenant')
 if (!tenant) {
-	tenant = (
-		await db.insert(tenants).values({ name: 'E2E Tenant', slug: 'e2e-tenant' }).returning()
-	)[0]
+	tenant = (await db.insert(tenants).values({ name: 'E2E Tenant' }).returning())[0]
 }
 
 const site = (await db.select().from(sites)).find((row) => row.slug === 'e2e-site')

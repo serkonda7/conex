@@ -28,6 +28,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
  * /site-groups — NetBox-style site group list: search, sortable columns,
@@ -51,7 +52,7 @@ export function SiteGroupsPage(): JSX.Element {
 		search: debouncedSearch(),
 		sort: sort() ?? 'name',
 		order: order(),
-		tenant: parseId(filterTenant()) ?? undefined,
+		...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 	}))
 
 	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.siteGroup')
@@ -167,7 +168,7 @@ export function SiteGroupsPage(): JSX.Element {
 						}
 					>
 						<option value="">{t('common.allTenants')}</option>
-						<For each={tenants() ?? []}>
+						<For each={(tenants() ?? []).filter(inTenantContext)}>
 							{(row: TenantRow): JSX.Element => (
 								<option value={row.id}>{row.name}</option>
 							)}
@@ -207,7 +208,7 @@ export function SiteGroupsPage(): JSX.Element {
 				}
 				emptyContent={
 					<p class="empty">
-						{debouncedSearch() || filterTenant()
+						{debouncedSearch() || filterTenant() || tenantContext().kind !== 'all'
 							? t('list.noMatchFilters', { noun: tp('noun.siteGroup', 2) })
 							: t('siteGroup.empty')}
 					</p>

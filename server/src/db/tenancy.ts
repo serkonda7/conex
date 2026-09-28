@@ -10,9 +10,20 @@ import {
 	type SiteGroupUpdate,
 	type SiteUpdate,
 	type TenantCreate,
+	type TenantGroupCreate,
+	type TenantGroupUpdate,
 	type TenantUpdate,
 } from 'shared/src/schemas'
-import { devices, locations, racks, site_groups, sites, tenants, users } from '../schema'
+import {
+	devices,
+	locations,
+	racks,
+	site_groups,
+	sites,
+	tenant_groups,
+	tenants,
+	users,
+} from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -31,16 +42,21 @@ import {
 	type Page,
 	pageOf,
 	searchPattern,
+	type TenantFilterParams,
+	tenantConditions,
 } from './list'
 
 export type { ListParams, Page } from './list'
+export type TenantGroupRow = typeof tenant_groups.$inferSelect
 export type TenantRow = typeof tenants.$inferSelect
 export type SiteRow = typeof sites.$inferSelect
 export type SiteGroupRow = typeof site_groups.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
 
 export interface TenantListParams extends ListParams {
-	sort: 'name' | 'slug' | 'description'
+	/** Only tenants of this tenant group. */
+	group?: number
+	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to this
@@ -58,6 +74,203 @@ export interface TenantListItem extends TenantRow {
 }
 
 // ---------------------------------------------------------------------------
+// Tenant groups (flat, no nesting; they bundle tenants but own no inventory)
+// ---------------------------------------------------------------------------
+
+export interface TenantGroupListParams extends ListParams {
+	sort: 'name' | 'slug' | 'description'
+	order: 'asc' | 'desc'
+	/**
+	 * Tenant scope for scoped editors/viewers: restricts the list to the
+	 * group containing this tenant. `undefined` means unconstrained.
+	 */
+	scopeTenantId?: number
+}
+
+/** One tenant group row for the list view, with its member count. */
+export interface TenantGroupListItem extends TenantGroupRow {
+	tenant_count: number
+}
+
+export async function listTenantGroups(
+	params: TenantGroupListParams,
+): Promise<Page<TenantGroupListItem>> {
+	const db = getDb()
+	const pattern = searchPattern(params.search)
+	const conditions: SQL[] = []
+	if (params.search) {
+		conditions.push(
+			sql`(${tenant_groups.name} ILIKE ${pattern} ESCAPE '\\' OR ${tenant_groups.slug} ILIKE ${pattern} ESCAPE '\\' OR ${tenant_groups.description} ILIKE ${pattern} ESCAPE '\\')`,
+		)
+	}
+	if (params.scopeTenantId !== undefined) {
+		conditions.push(
+			sql`${tenant_groups.id} IN (SELECT ${tenants.tenant_group_id} FROM ${tenants} WHERE ${tenants.id} = ${params.scopeTenantId})`,
+		)
+	}
+	const where = conditions.length > 0 ? and(...conditions) : undefined
+	const orderColumn =
+		params.sort === 'slug'
+			? tenant_groups.slug
+			: params.sort === 'description'
+				? tenant_groups.description
+				: tenant_groups.name
+	const items = await db
+		.select()
+		.from(tenant_groups)
+		.where(where)
+		.orderBy(
+			params.order === 'desc' ? desc(orderColumn) : asc(orderColumn),
+			asc(tenant_groups.id),
+		)
+		.limit(params.limit)
+		.offset(offsetOf(params))
+	const totalRow = (await db.select({ n: count() }).from(tenant_groups).where(where).limit(1))[0]
+
+	const counts = new Map<number, number>()
+	if (items.length > 0) {
+		for (const row of await db
+			.select({ group: tenants.tenant_group_id, n: count() })
+			.from(tenants)
+			.where(
+				inArray(
+					tenants.tenant_group_id,
+					items.map((g) => g.id),
+				),
+			)
+			.groupBy(tenants.tenant_group_id)) {
+			if (row.group !== null) {
+				counts.set(row.group, row.n)
+			}
+		}
+	}
+	return pageOf(
+		items.map((g) => ({ ...g, tenant_count: counts.get(g.id) ?? 0 })),
+		totalRow?.n ?? 0,
+		params,
+	)
+}
+
+export async function getTenantGroup(id: number): Promise<Result<TenantGroupRow, Error>> {
+	const row = (
+		await getDb().select().from(tenant_groups).where(eq(tenant_groups.id, id)).limit(1)
+	)[0]
+	if (!row) {
+		return Result.err(new NotFoundError('Tenant group not found'))
+	}
+	return Result.ok(row)
+}
+
+/** Ids of the tenants in a group; 404 when the group does not exist. */
+export async function resolveTenantGroupIds(groupId: number): Promise<Result<number[], Error>> {
+	const group = await getTenantGroup(groupId)
+	if (Result.isError(group)) {
+		return group
+	}
+	const rows = await getDb()
+		.select({ id: tenants.id })
+		.from(tenants)
+		.where(eq(tenants.tenant_group_id, groupId))
+	return Result.ok(rows.map((r) => r.id))
+}
+
+/** Tenant group FK guard: null/undefined passes, missing id is 404. */
+async function checkTenantGroupExists(
+	groupId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
+	if (groupId === null || groupId === undefined) {
+		return Result.ok(undefined)
+	}
+	const group = await getTenantGroup(groupId)
+	if (Result.isError(group)) {
+		return group
+	}
+	return Result.ok(undefined)
+}
+
+export async function createTenantGroup(
+	input: TenantGroupCreate,
+): Promise<Result<TenantGroupRow, Error>> {
+	const db = getDb()
+	const row: Omit<TenantGroupRow, 'id'> = {
+		name: input.name,
+		slug: input.slug,
+		description: input.description ?? null,
+		comments: input.comments ?? null,
+	}
+	try {
+		const inserted = (
+			await db.insert(tenant_groups).values(row).returning({ id: tenant_groups.id })
+		)[0]
+		if (!inserted) {
+			return Result.err(new Error('Tenant group insert did not return an id'))
+		}
+		return await getTenantGroup(inserted.id)
+	} catch (err) {
+		if (isUniqueViolation(err)) {
+			return Result.err(new DuplicateError('Tenant group slug is already in use'))
+		}
+		return Result.err(errOf(err))
+	}
+}
+
+export async function updateTenantGroup(
+	id: number,
+	input: TenantGroupUpdate,
+): Promise<Result<TenantGroupRow, Error>> {
+	const current = await getTenantGroup(id)
+	if (Result.isError(current)) {
+		return current
+	}
+	const patch: Partial<TenantGroupRow> = {}
+	if (input.name !== undefined) {
+		patch.name = input.name
+	}
+	if (input.slug !== undefined) {
+		patch.slug = input.slug
+	}
+	if (input.description !== undefined) {
+		patch.description = input.description
+	}
+	if (input.comments !== undefined) {
+		patch.comments = input.comments
+	}
+	if (!isPatchEmpty(patch)) {
+		try {
+			await getDb().update(tenant_groups).set(patch).where(eq(tenant_groups.id, id))
+		} catch (err) {
+			if (isUniqueViolation(err)) {
+				return Result.err(new DuplicateError('Tenant group slug is already in use'))
+			}
+			return Result.err(errOf(err))
+		}
+	}
+	return await getTenantGroup(id)
+}
+
+export async function deleteTenantGroup(id: number): Promise<Result<TenantGroupRow, Error>> {
+	const current = await getTenantGroup(id)
+	if (Result.isError(current)) {
+		return current
+	}
+	const db = getDb()
+	const member = (
+		await db.select().from(tenants).where(eq(tenants.tenant_group_id, id)).limit(1)
+	)[0]
+	if (member) {
+		return Result.err(
+			new ConflictError('Tenant group still has tenants; move or delete them first'),
+		)
+	}
+	try {
+		await db.delete(tenant_groups).where(eq(tenant_groups.id, id))
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
+	return Result.ok(current.value)
+}
+
+// ---------------------------------------------------------------------------
 // Tenants
 // ---------------------------------------------------------------------------
 
@@ -67,19 +280,17 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${tenants.name} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.description} ILIKE ${pattern} ESCAPE '\\')`,
+			sql`(${tenants.name} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
+	}
+	if (params.group !== undefined) {
+		conditions.push(eq(tenants.tenant_group_id, params.group))
 	}
 	if (params.scopeTenantId !== undefined) {
 		conditions.push(eq(tenants.id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn =
-		params.sort === 'slug'
-			? tenants.slug
-			: params.sort === 'description'
-				? tenants.description
-				: tenants.name
+	const orderColumn = params.sort === 'description' ? tenants.description : tenants.name
 	const items = await db
 		.select()
 		.from(tenants)
@@ -156,13 +367,13 @@ export async function getTenant(id: number): Promise<Result<TenantRow, Error>> {
 
 export async function createTenant(input: TenantCreate): Promise<Result<TenantRow, Error>> {
 	const db = getDb()
-	const clash = (await db.select().from(tenants).where(eq(tenants.slug, input.slug)).limit(1))[0]
-	if (clash) {
-		return Result.err(new DuplicateError('Tenant slug is already in use'))
+	const groupExists = await checkTenantGroupExists(input.tenant_group_id)
+	if (Result.isError(groupExists)) {
+		return groupExists
 	}
 	const row: Omit<TenantRow, 'id'> = {
+		tenant_group_id: input.tenant_group_id ?? null,
 		name: input.name,
-		slug: input.slug,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
@@ -173,9 +384,6 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantRo
 		}
 		return await getTenant(inserted.id)
 	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Tenant slug is already in use'))
-		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
 }
@@ -189,20 +397,16 @@ export async function updateTenant(
 		return current
 	}
 	const db = getDb()
-	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		const clash = (
-			await db.select().from(tenants).where(eq(tenants.slug, input.slug)).limit(1)
-		)[0]
-		if (clash) {
-			return Result.err(new DuplicateError('Tenant slug is already in use'))
-		}
+	const groupExists = await checkTenantGroupExists(input.tenant_group_id)
+	if (Result.isError(groupExists)) {
+		return groupExists
 	}
 	const patch: Partial<TenantRow> = {}
+	if (input.tenant_group_id !== undefined) {
+		patch.tenant_group_id = input.tenant_group_id
+	}
 	if (input.name !== undefined) {
 		patch.name = input.name
-	}
-	if (input.slug !== undefined) {
-		patch.slug = input.slug
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
@@ -214,9 +418,6 @@ export async function updateTenant(
 		try {
 			await db.update(tenants).set(patch).where(eq(tenants.id, id))
 		} catch (err) {
-			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Tenant slug is already in use'))
-			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
@@ -269,19 +470,10 @@ export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>
 // Sites
 // ---------------------------------------------------------------------------
 
-export interface SiteListParams extends ListParams {
-	tenant?: number
+export interface SiteListParams extends ListParams, TenantFilterParams {
 	group?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
-	/**
-	 * Tenant scope for scoped editors/viewers: restricts the list to this
-	 * tenant only (strict — shared `NULL` rows are excluded).
-	 * `undefined` means unconstrained (admin or global user). The route
-	 * rejects an explicit `?tenant=` naming any other tenant before this is
-	 * applied.
-	 */
-	scopeTenantId?: number
 }
 
 export async function listSites(params: SiteListParams): Promise<Page<SiteRow>> {
@@ -293,15 +485,10 @@ export async function listSites(params: SiteListParams): Promise<Page<SiteRow>> 
 			sql`(${sites.name} ILIKE ${pattern} ESCAPE '\\' OR ${sites.slug} ILIKE ${pattern} ESCAPE '\\' OR ${sites.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
-	if (params.tenant) {
-		conditions.push(eq(sites.tenant_id, params.tenant))
-	}
 	if (params.group) {
 		conditions.push(eq(sites.site_group_id, params.group))
 	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(sites.tenant_id, params.scopeTenantId))
-	}
+	conditions.push(...tenantConditions(sites.tenant_id, params))
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =
 		params.sort === 'slug'
@@ -470,13 +657,10 @@ export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
 // Site groups (global nestable tree, no site scoping)
 // ---------------------------------------------------------------------------
 
-export interface SiteGroupListParams extends ListParams {
-	tenant?: number
+export interface SiteGroupListParams extends ListParams, TenantFilterParams {
 	parent?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
-	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
-	scopeTenantId?: number
 }
 
 export async function listSiteGroups(params: SiteGroupListParams): Promise<Page<SiteGroupRow>> {
@@ -488,15 +672,10 @@ export async function listSiteGroups(params: SiteGroupListParams): Promise<Page<
 			sql`(${site_groups.name} ILIKE ${pattern} ESCAPE '\\' OR ${site_groups.slug} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
-	if (params.tenant) {
-		conditions.push(eq(site_groups.tenant_id, params.tenant))
-	}
 	if (params.parent) {
 		conditions.push(eq(site_groups.parent_id, params.parent))
 	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(site_groups.tenant_id, params.scopeTenantId))
-	}
+	conditions.push(...tenantConditions(site_groups.tenant_id, params))
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn =
 		params.sort === 'slug'
@@ -738,14 +917,11 @@ export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, 
 // Locations
 // ---------------------------------------------------------------------------
 
-export interface LocationListParams extends ListParams {
+export interface LocationListParams extends ListParams, TenantFilterParams {
 	site?: number
-	tenant?: number
 	parent?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
-	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
-	scopeTenantId?: number
 }
 
 /**
@@ -823,15 +999,10 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 	if (params.site) {
 		conditions.push(eq(locations.site_id, params.site))
 	}
-	if (params.tenant) {
-		conditions.push(eq(locations.tenant_id, params.tenant))
-	}
 	if (params.parent) {
 		conditions.push(eq(locations.parent_id, params.parent))
 	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(locations.tenant_id, params.scopeTenantId))
-	}
+	conditions.push(...tenantConditions(locations.tenant_id, params))
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const matching = await db.select().from(locations).where(where)
 	const ordered = sortLocationsHierarchically(matching, params.sort, params.order)

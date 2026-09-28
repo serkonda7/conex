@@ -14,6 +14,7 @@ import type {
 import { cables, devices, interfaces, sites } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
+import type { TenantFilterParams } from './list'
 
 type DeviceRow = typeof devices.$inferSelect
 type InterfaceRow = typeof interfaces.$inferSelect
@@ -230,18 +231,16 @@ export function bfsInterfacePaths(
 	return paths
 }
 
-export interface TopologyParams {
+export interface TopologyParams extends TenantFilterParams {
 	site?: number
 	device?: number
-	tenant?: number
 	group?: number
-	scopeTenantId?: number
 }
 
 /**
  * Device-graph snapshot for the topology view: every visible device is a
  * node, every visible cable an edge. `tenant` keeps only that tenant's
- * nodes, `group` keeps only nodes whose site sits in that site group,
+ * nodes, `tenantIds` only nodes of those tenants (a tenant group), `group` keeps only nodes whose site sits in that site group,
  * `site` keeps only that site's nodes (edges need both ends inside);
  * `device` keeps the connected component containing that device (after
  * the other filters). Filters intersect — each narrows the previous set.
@@ -252,6 +251,15 @@ export async function getTopology(params: TopologyParams): Promise<TopologyRespo
 	if (params.tenant !== undefined) {
 		nodeIds = new Set(
 			[...nodeIds].filter((id) => graph.deviceById.get(id)?.tenant_id === params.tenant),
+		)
+	}
+	if (params.tenantIds !== undefined) {
+		const tenantIds = new Set(params.tenantIds)
+		nodeIds = new Set(
+			[...nodeIds].filter((id) => {
+				const tenantId = graph.deviceById.get(id)?.tenant_id
+				return tenantId !== null && tenantId !== undefined && tenantIds.has(tenantId)
+			}),
 		)
 	}
 	if (params.group !== undefined) {

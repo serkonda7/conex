@@ -37,6 +37,7 @@ export async function fetch_devices(
 				site: filters?.site,
 				rack: filters?.rack,
 				tenant: filters?.tenant,
+				tenant_group: filters?.tenant_group,
 				status: filters?.status,
 				placed: filters?.placed,
 				sort: filters?.sort ?? 'name',

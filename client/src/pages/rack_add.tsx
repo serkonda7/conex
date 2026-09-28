@@ -16,6 +16,7 @@ import {
 } from '../components/form'
 import { t, tp } from '../i18n'
 import { navigate, parseId, queryParam } from '../router'
+import { contextTenantValue } from '../tenant_context'
 import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** Id of the hint under the rack-type select. */
@@ -26,7 +27,8 @@ export function RackAddPage(): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
-	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	// Explicit `?tenant=` wins; else a single-tenant context preselects it.
+	const [tenantId, setTenantId] = createSignal(queryParam('tenant') || contextTenantValue())
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [description, setDescription] = createSignal('')
 	const [rackTypeId, setRackTypeId] = createSignal('')
@@ -62,7 +64,7 @@ export function RackAddPage(): JSX.Element {
 			return
 		}
 		const tenant = siteTenantId()
-		setTenantId(tenant ? String(tenant) : '')
+		setTenantId(tenant ? String(tenant) : contextTenantValue())
 	})
 
 	// Location options belong to a site, so they follow the site picker.

@@ -13,6 +13,7 @@ import {
 	TextField,
 } from '../components/form'
 import { t, tp } from '../i18n'
+import { contextTenantValue } from '../tenant_context'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -25,7 +26,8 @@ import {
 export function SiteGroupAddPage(): JSX.Element {
 	const slugFields = use_slug_fields()
 	const [parentId, setParentId] = createSignal('')
-	const [tenantId, setTenantId] = createSignal('')
+	// A single-tenant context preselects that tenant.
+	const [tenantId, setTenantId] = createSignal(contextTenantValue())
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)

@@ -10,21 +10,19 @@
 import {
 	IconBox,
 	IconBuildingFactory,
+	IconBuildingSkyscraper,
 	IconCpu,
 	IconFolder,
-	IconLink,
 	IconLocation,
 	IconLock,
 	IconMapPin,
 	IconNetwork,
-	IconPlug,
 	IconServer,
 	IconTemplate,
 	IconUsers,
 } from '@tabler/icons-solidjs'
 import type { Component } from 'solid-js'
 import { t, tp } from './i18n'
-import { ConnectionsPage } from './pages/connections'
 import { DeviceAddPage } from './pages/device_add'
 import { DeviceDetailPage } from './pages/device_detail'
 import { DeviceEditPage } from './pages/device_edit'
@@ -34,7 +32,6 @@ import { DeviceTypeEditPage } from './pages/device_type_edit'
 import { DeviceTypeImportPage } from './pages/device_type_import'
 import { DeviceTypesPage } from './pages/device_types'
 import { DevicesPage } from './pages/devices'
-import { InterfacesPage } from './pages/interfaces'
 import { LocationAddPage } from './pages/location_add'
 import { LocationDetailPage } from './pages/location_detail'
 import { LocationEditPage } from './pages/location_edit'
@@ -62,6 +59,10 @@ import { SitesPage } from './pages/sites'
 import { TenantAddPage } from './pages/tenant_add'
 import { TenantDetailPage } from './pages/tenant_detail'
 import { TenantEditPage } from './pages/tenant_edit'
+import { TenantGroupAddPage } from './pages/tenant_group_add'
+import { TenantGroupDetailPage } from './pages/tenant_group_detail'
+import { TenantGroupEditPage } from './pages/tenant_group_edit'
+import { TenantGroupsPage } from './pages/tenant_groups'
 import { TenantsPage } from './pages/tenants'
 import { TopologyPage } from './pages/topology'
 import { UserAddPage } from './pages/user_add'
@@ -79,6 +80,8 @@ export interface Section {
 	/** Sidebar icon; sections without one (or without a list) stay hidden. */
 	icon?: Component<{ size?: number }>
 	adminOnly?: boolean
+	/** Routed but left out of the sidebar (reached another way). */
+	hideInNav?: boolean
 	list?: Component
 	add?: Component
 	import?: Component
@@ -92,19 +95,12 @@ export const SECTIONS: readonly Section[] = [
 		path: 'tenants',
 		noun: (n: number): string => tp('entity.tenant', n),
 		icon: IconUsers,
+		// Picked and added through the top-bar tenant selector instead.
+		hideInNav: true,
 		list: TenantsPage,
 		add: TenantAddPage,
 		detail: TenantDetailPage,
 		edit: TenantEditPage,
-	},
-	{
-		path: 'site-groups',
-		noun: (n: number): string => tp('entity.siteGroup', n),
-		icon: IconFolder,
-		list: SiteGroupsPage,
-		add: SiteGroupAddPage,
-		detail: SiteGroupDetailPage,
-		edit: SiteGroupEditPage,
 	},
 	{
 		path: 'sites',
@@ -134,10 +130,13 @@ export const SECTIONS: readonly Section[] = [
 		edit: RackEditPage,
 	},
 	{
-		path: 'shelves',
-		noun: (n: number): string => tp('entity.shelf', n),
-		add: ShelfAddPage,
-		edit: ShelfEditPage,
+		path: 'devices',
+		noun: (n: number): string => tp('entity.device', n),
+		icon: IconServer,
+		list: DevicesPage,
+		add: DeviceAddPage,
+		detail: DeviceDetailPage,
+		edit: DeviceEditPage,
 	},
 	{
 		path: 'rack-types',
@@ -167,26 +166,28 @@ export const SECTIONS: readonly Section[] = [
 		edit: ManufacturerEditPage,
 	},
 	{
-		path: 'devices',
-		noun: (n: number): string => tp('entity.device', n),
-		icon: IconServer,
-		list: DevicesPage,
-		add: DeviceAddPage,
-		detail: DeviceDetailPage,
-		edit: DeviceEditPage,
+		path: 'tenant-groups',
+		noun: (n: number): string => tp('entity.tenantGroup', n),
+		icon: IconBuildingSkyscraper,
+		list: TenantGroupsPage,
+		add: TenantGroupAddPage,
+		detail: TenantGroupDetailPage,
+		edit: TenantGroupEditPage,
 	},
 	{
-		path: 'interfaces',
-		noun: (n: number): string => tp('entity.interface', n),
-		icon: IconPlug,
-		list: InterfacesPage,
+		path: 'site-groups',
+		noun: (n: number): string => tp('entity.siteGroup', n),
+		icon: IconFolder,
+		list: SiteGroupsPage,
+		add: SiteGroupAddPage,
+		detail: SiteGroupDetailPage,
+		edit: SiteGroupEditPage,
 	},
 	{
-		path: 'connections',
-		aliases: ['cables'],
-		noun: (n: number): string => tp('entity.connection', n),
-		icon: IconLink,
-		list: ConnectionsPage,
+		path: 'shelves',
+		noun: (n: number): string => tp('entity.shelf', n),
+		add: ShelfAddPage,
+		edit: ShelfEditPage,
 	},
 	{
 		path: 'topology',

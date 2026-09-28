@@ -22,6 +22,7 @@ import {
 import { t, tp } from '../i18n'
 import { locationTypeOptions } from '../i18n/labels'
 import { parseId, queryParam } from '../router'
+import { contextTenantValue } from '../tenant_context'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -36,7 +37,8 @@ export function LocationAddPage(): JSX.Element {
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationType, setLocationType] = createSignal<LocationType>('other')
 	const [parentId, setParentId] = createSignal('')
-	const [tenantId, setTenantId] = createSignal(queryParam('tenant'))
+	// Explicit `?tenant=` wins; else a single-tenant context preselects it.
+	const [tenantId, setTenantId] = createSignal(queryParam('tenant') || contextTenantValue())
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
 	const [description, setDescription] = createSignal('')
 	const [formError, setFormError] = createSignal<string | null>(null)
@@ -90,7 +92,7 @@ export function LocationAddPage(): JSX.Element {
 			return
 		}
 		const tenant = siteTenantId()
-		setTenantId(tenant ? String(tenant) : '')
+		setTenantId(tenant ? String(tenant) : contextTenantValue())
 	})
 
 	// Enforce the tenant → sites filter for explicit tenant choices (including

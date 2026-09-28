@@ -12,8 +12,16 @@ import { device_types, devices, locations, racks, shelves, sites } from '../sche
 import { checkBounds, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
-import type { ListParams, Page } from './list'
-import { checkTenantExists, errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
+import type { ListParams, Page, TenantFilterParams } from './list'
+import {
+	checkTenantExists,
+	errOf,
+	isPatchEmpty,
+	offsetOf,
+	pageOf,
+	searchPattern,
+	tenantConditions,
+} from './list'
 
 type RackRecord = typeof racks.$inferSelect
 /** Rack height is computed from the linked rack type, not stored on racks. */
@@ -44,14 +52,11 @@ async function withRackHeight(row: RackRecord): Promise<RackRow> {
 // Racks
 // ---------------------------------------------------------------------------
 
-export interface RackListParams extends ListParams {
+export interface RackListParams extends ListParams, TenantFilterParams {
 	site?: number
 	location?: number
-	tenant?: number
 	sort: 'name'
 	order: 'asc' | 'desc'
-	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
-	scopeTenantId?: number
 }
 
 export async function listRacks(params: RackListParams): Promise<Page<RackRow>> {
@@ -69,12 +74,7 @@ export async function listRacks(params: RackListParams): Promise<Page<RackRow>> 
 	if (params.location) {
 		conditions.push(eq(racks.location_id, params.location))
 	}
-	if (params.tenant) {
-		conditions.push(eq(racks.tenant_id, params.tenant))
-	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(racks.tenant_id, params.scopeTenantId))
-	}
+	conditions.push(...tenantConditions(racks.tenant_id, params))
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const rows = await db
 		.select()

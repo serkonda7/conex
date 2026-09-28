@@ -22,8 +22,16 @@ import { expandStubs } from '../services/templates'
 import { deviceHasCables } from './cables'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
-import type { ListParams, Page } from './list'
-import { checkTenantExists, errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
+import type { ListParams, Page, TenantFilterParams } from './list'
+import {
+	checkTenantExists,
+	errOf,
+	isPatchEmpty,
+	offsetOf,
+	pageOf,
+	searchPattern,
+	tenantConditions,
+} from './list'
 import { rackHeightOf, rackSpansOf } from './racks'
 
 export type DeviceRow = typeof devices.$inferSelect
@@ -230,17 +238,14 @@ async function checkAssetTag(
 // Devices
 // ---------------------------------------------------------------------------
 
-export interface DeviceListParams extends ListParams {
+export interface DeviceListParams extends ListParams, TenantFilterParams {
 	site?: number
 	rack?: number
-	tenant?: number
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
 	sort: 'name' | 'status'
 	order: 'asc' | 'desc'
-	/** Tenant scope (own tenant only, strict); `undefined` = unconstrained. */
-	scopeTenantId?: number
 }
 
 export async function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> {
@@ -258,12 +263,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 	if (params.rack) {
 		conditions.push(eq(devices.rack_id, params.rack))
 	}
-	if (params.tenant) {
-		conditions.push(eq(devices.tenant_id, params.tenant))
-	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(devices.tenant_id, params.scopeTenantId))
-	}
+	conditions.push(...tenantConditions(devices.tenant_id, params))
 	if (params.status) {
 		conditions.push(eq(devices.status, params.status))
 	}

@@ -9,7 +9,7 @@ export interface SearchGroup<T> {
 
 export interface GlobalSearchResponse {
 	q: string
-	tenants: SearchGroup<{ id: number; name: string; slug: string }>
+	tenants: SearchGroup<{ id: number; name: string }>
 	sites: SearchGroup<{ id: number; name: string; slug: string }>
 	racks: SearchGroup<{ id: number; name: string }>
 	devices: SearchGroup<{ id: number; name: string; asset_tag: string | null }>
@@ -51,12 +51,12 @@ export async function globalSearch(
 	const scope = scopeTenantId
 
 	const tenantRows = await db
-		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
+		.select({ id: sql<number>`id`, name: sql<string>`name` })
 		.from(sql`tenants`)
 		.where(
 			scope === undefined
-				? sql`(name ILIKE ${pattern} ESCAPE '\\' OR slug ILIKE ${pattern} ESCAPE '\\')`
-				: sql`(name ILIKE ${pattern} ESCAPE '\\' OR slug ILIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
+				? sql`(name ILIKE ${pattern} ESCAPE '\\')`
+				: sql`(name ILIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
 		)
 		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)

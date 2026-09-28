@@ -25,6 +25,8 @@ export async function fetch_topology(
 			group: filters?.group,
 			site: filters?.site,
 			device: filters?.device,
+			tenant: filters?.tenant,
+			tenant_group: filters?.tenant_group,
 		}),
 	})
 	return to_result<TopologyResponse>(res, t('api.loadTopologyFailed'))

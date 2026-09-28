@@ -299,6 +299,121 @@ tbody tr:last-child td {
 	max-width: 8rem;
 }
 
+.app-tenant-context {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.app-tenant-context-fixed {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.app-tenant-context-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	max-width: 18rem;
+	padding: 0.3rem 0.5rem;
+	background-color: var(--bg-input);
+	border: 1px solid var(--border-strong);
+}
+
+.app-tenant-context-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.app-tenant-context-chevron {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+
+.app-tenant-context-popover {
+	position: absolute;
+	left: 0;
+	top: calc(100% + 0.3rem);
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	width: 18rem;
+	padding: 0.35rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+}
+
+.app-tenant-context-search {
+	width: 100%;
+}
+
+.app-tenant-context-options {
+	max-height: 20rem;
+	overflow-y: auto;
+}
+
+.app-tenant-context-option {
+	display: block;
+	width: 100%;
+	padding: 0.3rem 0.5rem;
+	border: none;
+	background: transparent;
+	text-align: left;
+	border-radius: 0.25rem;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.app-tenant-context-option.group {
+	font-weight: 600;
+}
+
+.app-tenant-context-option.nested {
+	padding-left: 1.4rem;
+}
+
+.app-tenant-context-option.active {
+	background-color: var(--bg-hover);
+}
+
+.app-tenant-context-option.selected {
+	color: var(--primary);
+}
+
+.app-tenant-context-empty {
+	margin: 0;
+	padding: 0.3rem 0.5rem;
+	color: var(--text-muted);
+}
+
+.app-tenant-context-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	width: 100%;
+	border: none;
+	border-top: 1px solid var(--border);
+	border-radius: 0;
+	background: transparent;
+	text-align: left;
+}
+
+.app-tenant-context-add:hover {
+	background-color: var(--bg-hover);
+}
+
+.app-tenant-context-add.primary {
+	color: var(--primary);
+	font-weight: 600;
+}
+
 .app-user-menu {
 	position: relative;
 }
@@ -339,8 +454,8 @@ tbody tr:last-child td {
 
 .app-user-dropdown {
 	position: absolute;
-	right: 0;
-	top: calc(100% + 0.3rem);
+	left: 0;
+	bottom: calc(100% + 0.3rem);
 	min-width: 10rem;
 	background-color: var(--bg-raised);
 	border: 1px solid var(--border);
@@ -374,6 +489,18 @@ tbody tr:last-child td {
 
 .app-user-logout:hover {
 	background-color: var(--bg-hover);
+}
+
+/* Account menu pinned to the bottom of the sidebar. */
+.app-sidebar-user {
+	margin-top: auto;
+	padding-top: 0.5rem;
+	border-top: 1px solid var(--border);
+}
+
+.app-sidebar-user .app-user-button {
+	width: 100%;
+	max-width: none;
 }
 
 .app-body {

@@ -24,6 +24,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
  * /devices — NetBox-style device list: search, sortable columns, rack / tenant
@@ -49,7 +50,7 @@ export function DevicesPage(): JSX.Element {
 		sort: sort() ?? 'name',
 		order: order(),
 		rack: parseId(rackFilter()) ?? undefined,
-		tenant: parseId(tenantFilter()) ?? undefined,
+		...tenantContextFilters(parseId(tenantFilter()) ?? undefined),
 	}))
 
 	const { selected, setSelected, selection } = useListSelection(listSource, 'noun.device')
@@ -156,7 +157,11 @@ export function DevicesPage(): JSX.Element {
 	})
 
 	const hasFilters = createMemo(
-		() => debouncedSearch() !== '' || rackFilter() !== '' || tenantFilter() !== '',
+		() =>
+			debouncedSearch() !== '' ||
+			rackFilter() !== '' ||
+			tenantFilter() !== '' ||
+			tenantContext().kind !== 'all',
 	)
 
 	return (
@@ -195,7 +200,7 @@ export function DevicesPage(): JSX.Element {
 						}}
 					>
 						<option value="">{t('common.allTenants')}</option>
-						<For each={tenants() ?? []}>
+						<For each={(tenants() ?? []).filter(inTenantContext)}>
 							{(row: TenantRow): JSX.Element => (
 								<option value={row.id}>{row.name}</option>
 							)}

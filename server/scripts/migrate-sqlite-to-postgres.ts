@@ -45,6 +45,14 @@ const TABLES: { table: PgTable; parentKey?: string }[] = [
 	{ table: schema.cables },
 ]
 
+/**
+ * Nullable columns added after the SQLite era: absent in the snapshot and
+ * left NULL in Postgres.
+ */
+const POSTGRES_ONLY_COLUMNS: Record<string, readonly string[]> = {
+	tenants: ['tenant_group_id'],
+}
+
 type Row = Record<string, unknown>
 
 /** Expected abort; thrown inside the transaction so Postgres rolls back. */
@@ -100,7 +108,12 @@ try {
 	const plan = TABLES.map(({ table, parentKey }) => {
 		const name = getTableName(table)
 		const columns = getTableColumns(table)
-		const expected = new Set(Object.values(columns).map((c) => c.name))
+		const postgresOnly = new Set(POSTGRES_ONLY_COLUMNS[name] ?? [])
+		const expected = new Set(
+			Object.values(columns)
+				.map((c) => c.name)
+				.filter((c) => !postgresOnly.has(c)),
+		)
 		const present = new Set(
 			(sqlite.query(`PRAGMA table_info("${name}")`).all() as { name: string }[]).map(
 				(c) => c.name,

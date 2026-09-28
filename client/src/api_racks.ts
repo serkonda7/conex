@@ -39,6 +39,7 @@ export async function fetch_racks(filters?: RackFilters): Promise<Result<Page<Ra
 				site: filters?.site,
 				location: filters?.location,
 				tenant: filters?.tenant,
+				tenant_group: filters?.tenant_group,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),

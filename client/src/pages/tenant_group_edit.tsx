@@ -1,40 +1,38 @@
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
-import { fetch_tenant, fetch_tenant_groups, update_tenant } from '../api_tenancy'
+import { fetch_tenant_group, update_tenant_group } from '../api_tenancy'
 import {
 	EditActions,
 	EditPageShell,
 	FormError,
 	Hint,
 	NameField,
-	row_options,
-	SelectField,
+	SlugField,
 	TextAreaField,
 	TextField,
 } from '../components/form'
-import { t, tp } from '../i18n'
-import { type FormValues, load_rows, submit_edit, useEditForm } from '../util/form'
+import { t } from '../i18n'
+import { type FormValues, submit_edit, useEditForm } from '../util/form'
 
-/** /tenants/:id/edit — tenant edit form. Saves back to the detail page. */
-export function TenantEditPage(props: { id: number }): JSX.Element {
+/** /tenant-groups/:id/edit — tenant group edit form. Saves back to the detail page. */
+export function TenantGroupEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
-	const [groupId, setGroupId] = createSignal('')
+	const [slug, setSlug] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const { formError, setFormError, saving, setSaving, loaded, setLoaded } = useEditForm()
-	const [groups] = createResource(() => load_rows(() => fetch_tenant_groups(), setFormError))
 
-	const [tenant] = createResource(
+	const [group] = createResource(
 		() => props.id,
 		async (id: number) => {
-			const res = await fetch_tenant(id)
+			const res = await fetch_tenant_group(id)
 			if (Result.isError(res)) {
 				setFormError(res.error.message)
 				return null
 			}
 			setName(res.value.name)
-			setGroupId(res.value.tenant_group_id === null ? '' : String(res.value.tenant_group_id))
+			setSlug(res.value.slug)
 			setDescription(res.value.description ?? '')
 			setComments(res.value.comments ?? '')
 			setLoaded(true)
@@ -46,44 +44,43 @@ export function TenantEditPage(props: { id: number }): JSX.Element {
 		e.preventDefault()
 		await submit_edit({
 			name: name(),
+			slug: slug(),
 			save: (values: FormValues) =>
-				update_tenant(props.id, {
+				update_tenant_group(props.id, {
 					name: values.name,
-					tenant_group_id: groupId() === '' ? null : Number(groupId()),
+					slug: values.slug,
 					description: description().trim() === '' ? null : description().trim(),
 					comments: comments().trim() === '' ? null : comments().trim(),
 				}),
 			setError: setFormError,
 			setSaving,
-			navigateTo: `/tenants/${props.id}`,
+			navigateTo: `/tenant-groups/${props.id}`,
 		})
 	}
 
 	return (
 		<EditPageShell
-			name={tenant()?.name}
-			title={t('tenant.editTitle')}
+			name={group()?.name}
+			title={t('tenantGroup.editTitle')}
 			loaded={loaded()}
-			loadingText={t('tenant.loadingOne')}
+			loadingText={t('tenantGroup.loadingOne')}
 			onSubmit={handleSave}
 		>
 			<NameField
-				id="tenant-edit-name"
-				placeholder={t('tenant.namePlaceholder')}
+				id="tenant-group-edit-name"
+				placeholder={t('tenantGroup.namePlaceholder')}
 				value={name()}
 				onInput={setName}
 			/>
-			<SelectField
-				id="tenant-edit-group"
-				label={tp('entity.tenantGroup', 1)}
-				value={groupId()}
-				onChange={setGroupId}
-				options={row_options(groups() ?? [])}
-				emptyLabel={t('common.noGroup')}
-				hint={<Hint>{t('tenantGroup.hint')}</Hint>}
+			<SlugField
+				id="tenant-group-edit-slug"
+				placeholder={t('tenantGroup.slugPlaceholder')}
+				value={slug()}
+				onInput={setSlug}
+				hint={<Hint>{t('form.slugHintEdit')}</Hint>}
 			/>
 			<TextField
-				id="tenant-edit-description"
+				id="tenant-group-edit-description"
 				label={t('common.description')}
 				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
@@ -91,7 +88,7 @@ export function TenantEditPage(props: { id: number }): JSX.Element {
 				onInput={setDescription}
 			/>
 			<TextAreaField
-				id="tenant-edit-comments"
+				id="tenant-group-edit-comments"
 				label={t('common.comments')}
 				placeholder={t('common.commentsPlaceholder')}
 				maxLength={2000}
@@ -99,7 +96,7 @@ export function TenantEditPage(props: { id: number }): JSX.Element {
 				onInput={setComments}
 			/>
 			<FormError message={formError} />
-			<EditActions saving={saving()} cancelTo={`/tenants/${props.id}`} />
+			<EditActions saving={saving()} cancelTo={`/tenant-groups/${props.id}`} />
 		</EditPageShell>
 	)
 }

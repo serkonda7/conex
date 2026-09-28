@@ -18,6 +18,7 @@ import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
 import { Breadcrumbs } from './components/breadcrumbs'
 import { LanguageSwitcher } from './components/language_switcher'
+import { TenantContextSelector } from './components/tenant_context_selector'
 import { type Locale, locale, t } from './i18n'
 import { roleLabel } from './i18n/labels'
 import {
@@ -42,6 +43,7 @@ import {
 	type Section,
 	tabTitle,
 } from './routes'
+import { refreshTenantContext, setTenantContextScoped, tenantContext } from './tenant_context'
 
 const APP_TITLE = 'CoNetBox'
 
@@ -546,6 +548,34 @@ function App(): JSX.Element {
 	const [setupError, setSetupError] = createSignal<string | null>(null)
 	const [currentUser, setCurrentUser] = createSignal<SessionUser | null>(null)
 	const [userMenuOpen, setUserMenuOpen] = createSignal(false)
+	// Editors/viewers limited to one tenant: the context selector is fixed.
+	const isScoped = (): boolean => {
+		const user = currentUser()
+		return user !== null && user.role !== 'admin' && user.tenant_id !== null
+	}
+
+	// Tenant create is limited to global editors and admins (server-enforced).
+	const canAddTenants = (): boolean => {
+		const role = currentUser()?.role
+		return role === 'admin' || (role === 'editor' && !isScoped())
+	}
+	const tenantHomePath = (): string => {
+		const context = tenantContext()
+		if (context.kind === 'tenant') {
+			return `/tenants/${context.id}`
+		}
+		const scopedTenantId = currentUser()?.tenant_id
+		return scopedTenantId !== null && scopedTenantId !== undefined
+			? `/tenants/${scopedTenantId}`
+			: '/tenants'
+	}
+
+	createEffect(() => {
+		setTenantContextScoped(isScoped())
+		if (isLoggedIn() === true) {
+			void refreshTenantContext()
+		}
+	})
 
 	onMount(async () => {
 		document.title = APP_TITLE
@@ -717,80 +747,31 @@ function App(): JSX.Element {
 							</Match>
 							<Match when={isLoggedIn()}>
 								<header class="app-topbar">
-									<a
-										href="/tenants"
-										class="app-topbar-brand"
-										onClick={(e: MouseEvent): void => goTo(e, '/tenants')}
-									>
-										{APP_TITLE}
-									</a>
+									<TenantContextSelector
+										scoped={isScoped()}
+										canAdd={canAddTenants()}
+									/>
 									<div class="app-topbar-actions">
-										<div class="app-user-menu">
-											<button
-												type="button"
-												class="app-user-button"
-												aria-haspopup="menu"
-												aria-expanded={userMenuOpen()}
-												aria-label={t('app.accountNamed', {
-													name: currentUser()?.username ?? '…',
-												})}
-												onClick={() => setUserMenuOpen(!userMenuOpen())}
-												onKeyDown={(e: KeyboardEvent): void => {
-													if (e.key === 'Escape') {
-														setUserMenuOpen(false)
-													}
-												}}
-											>
-												<span class="app-user-info">
-													<span class="app-user-username">
-														{currentUser()?.username ?? '…'}
-													</span>
-													<Show when={currentUser()}>
-														{(user) => (
-															<span class="app-user-role">
-																{roleLabel(user().role)}
-															</span>
-														)}
-													</Show>
-												</span>
-											</button>
-											<Show when={userMenuOpen()}>
-												<div
-													class="app-user-dropdown"
-													role="menu"
-													aria-label={t('app.account')}
-												>
-													<div class="app-user-language">
-														<LanguageSwitcher />
-													</div>
-													<button
-														type="button"
-														role="menuitem"
-														class="app-user-logout"
-														onClick={handleLogout}
-													>
-														<span
-															aria-hidden="true"
-															class="app-nav-icon"
-														>
-															<IconLogout size={16} />
-														</span>
-														{t('app.logout')}
-													</button>
-												</div>
-											</Show>
-										</div>
+										<a
+											href={tenantHomePath()}
+											class="app-topbar-brand"
+											onClick={(e: MouseEvent): void =>
+												goTo(e, tenantHomePath())
+											}
+										>
+											{APP_TITLE}
+										</a>
 									</div>
 								</header>
 								<div class="app-body">
 									<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
-										<p class="app-nav-label">{t('app.inventory')}</p>
 										<nav class="app-nav">
 											<For
 												each={SECTIONS.filter(
 													(section) =>
 														section.icon !== undefined &&
 														section.list !== undefined &&
+														section.hideInNav !== true &&
 														(section.adminOnly !== true ||
 															currentUser()?.role === 'admin'),
 												)}
@@ -820,6 +801,63 @@ function App(): JSX.Element {
 												)}
 											</For>
 										</nav>
+										<div class="app-sidebar-user">
+											<div class="app-user-menu">
+												<button
+													type="button"
+													class="app-user-button"
+													aria-haspopup="menu"
+													aria-expanded={userMenuOpen()}
+													aria-label={t('app.accountNamed', {
+														name: currentUser()?.username ?? '…',
+													})}
+													onClick={() => setUserMenuOpen(!userMenuOpen())}
+													onKeyDown={(e: KeyboardEvent): void => {
+														if (e.key === 'Escape') {
+															setUserMenuOpen(false)
+														}
+													}}
+												>
+													<span class="app-user-info">
+														<span class="app-user-username">
+															{currentUser()?.username ?? '…'}
+														</span>
+														<Show when={currentUser()}>
+															{(user) => (
+																<span class="app-user-role">
+																	{roleLabel(user().role)}
+																</span>
+															)}
+														</Show>
+													</span>
+												</button>
+												<Show when={userMenuOpen()}>
+													<div
+														class="app-user-dropdown"
+														role="menu"
+														aria-label={t('app.account')}
+													>
+														<div class="app-user-language">
+															<LanguageSwitcher />
+														</div>
+														<button
+															type="button"
+															role="menuitem"
+															class="app-user-logout"
+															onClick={handleLogout}
+														>
+															<span
+																aria-hidden="true"
+																class="app-nav-icon"
+															>
+																<IconLogout size={16} />
+															</span>
+															{t('app.logout')}
+														</button>
+													</div>
+												</Show>
+											</div>
+										</div>
 									</aside>
 									<div class="app-main">
 										<TabBar />

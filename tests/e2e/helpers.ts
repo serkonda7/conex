@@ -12,7 +12,7 @@ export async function loginAsE2E(page: Page): Promise<void> {
 	await page.getByLabel('Benutzername').fill(e2eUsername)
 	await page.locator('input[type="password"]').fill(e2ePassword)
 	await page.getByRole('button', { name: 'Anmelden' }).click()
-	await expect(page.getByRole('link', { name: 'Mandanten' })).toBeVisible()
+	await expect(page.getByRole('link', { name: 'Standorte', exact: true })).toBeVisible()
 }
 
 /**

@@ -18,6 +18,7 @@ import { fetch_cable_trace, fetch_topology } from '../api_topology'
 import { t } from '../i18n'
 import { cableStatusLabel, deviceStatusLabel } from '../i18n/labels'
 import { goTo, parseId, queryParam } from '../router'
+import { tenantContextFilters } from '../tenant_context'
 
 const SVG_W: number = 560
 const SVG_H: number = 360
@@ -80,7 +81,11 @@ export function TopologyPage(): JSX.Element {
 		moved: boolean
 	} | null = null
 
+	// The top-bar tenant context narrows the snapshot and the filter options.
+	const contextFilters = createMemo(() => tenantContextFilters())
+
 	const topoSource = createMemo(() => ({
+		...contextFilters(),
 		group: parseId(groupFilter()) ?? undefined,
 		site: parseId(siteFilter()) ?? undefined,
 		device: parseId(focusFilter()) ?? undefined,
@@ -96,22 +101,22 @@ export function TopologyPage(): JSX.Element {
 		setView({ x: 0, y: 0, w: SVG_W, h: SVG_H })
 	})
 
-	const [siteGroups] = createResource(async () => {
-		const res = await fetch_site_groups({ limit: 200 })
+	const [siteGroups] = createResource(contextFilters, async (ctx) => {
+		const res = await fetch_site_groups({ ...ctx, limit: 200 })
 		if (Result.isError(res)) {
 			return []
 		}
 		return res.value.items
 	})
-	const [sites] = createResource(async () => {
-		const res = await fetch_sites({ limit: 200 })
+	const [sites] = createResource(contextFilters, async (ctx) => {
+		const res = await fetch_sites({ ...ctx, limit: 200 })
 		if (Result.isError(res)) {
 			return []
 		}
 		return res.value.items
 	})
-	const [devices] = createResource(async () => {
-		const res = await fetch_devices()
+	const [devices] = createResource(contextFilters, async (ctx) => {
+		const res = await fetch_devices(ctx)
 		if (Result.isError(res)) {
 			return []
 		}

@@ -31,6 +31,7 @@ import {
 import { t, tp } from '../i18n'
 import { locationTypeLabel } from '../i18n/labels'
 import { goTo, parseId, queryParam } from '../router'
+import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
  * /locations — NetBox-style location list: search, sortable columns, site +
@@ -73,7 +74,7 @@ export function LocationsPage(): JSX.Element {
 	const listSource = createMemo(() => ({
 		search: debouncedSearch(),
 		site: parseId(filterSite()) ?? undefined,
-		tenant: parseId(filterTenant()) ?? undefined,
+		...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		sort: sort() ?? 'name',
 		order: order(),
 	}))
@@ -228,7 +229,7 @@ export function LocationsPage(): JSX.Element {
 						}
 					>
 						<option value="">{t('common.allTenants')}</option>
-						<For each={tenants() ?? []}>
+						<For each={(tenants() ?? []).filter(inTenantContext)}>
 							{(row: TenantRow): JSX.Element => (
 								<option value={row.id}>{row.name}</option>
 							)}
@@ -268,7 +269,10 @@ export function LocationsPage(): JSX.Element {
 				}
 				emptyContent={
 					<p class="empty">
-						{debouncedSearch() || filterSite() || filterTenant()
+						{debouncedSearch() ||
+						filterSite() ||
+						filterTenant() ||
+						tenantContext().kind !== 'all'
 							? t('list.noMatchFilters', { noun: tp('noun.location', 2) })
 							: t('location.empty')}
 					</p>

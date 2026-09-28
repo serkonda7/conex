@@ -30,6 +30,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
  * /racks — NetBox-style rack list: search, sortable columns, site /
@@ -88,7 +89,7 @@ export function RacksPage(): JSX.Element {
 		search: debouncedSearch(),
 		site: parseId(filterSite()) ?? undefined,
 		location: parseId(filterLocation()) ?? undefined,
-		tenant: parseId(filterTenant()) ?? undefined,
+		...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		sort: sort() ?? 'name',
 		order: order(),
 	}))
@@ -254,7 +255,7 @@ export function RacksPage(): JSX.Element {
 						}
 					>
 						<option value="">{t('common.allTenants')}</option>
-						<For each={tenants() ?? []}>
+						<For each={(tenants() ?? []).filter(inTenantContext)}>
 							{(row: TenantRow): JSX.Element => (
 								<option value={row.id}>{row.name}</option>
 							)}
@@ -294,7 +295,11 @@ export function RacksPage(): JSX.Element {
 				}
 				emptyContent={
 					<p class="empty">
-						{debouncedSearch() || filterSite() || filterLocation() || filterTenant()
+						{debouncedSearch() ||
+						filterSite() ||
+						filterLocation() ||
+						filterTenant() ||
+						tenantContext().kind !== 'all'
 							? t('list.noMatchFilters', { noun: tp('noun.rack', 2) })
 							: t('rack.empty')}
 					</p>

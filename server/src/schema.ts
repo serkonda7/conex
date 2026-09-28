@@ -63,8 +63,11 @@ export const auth_states = pgTable(
 // children exist (enforced in the service layer, not by FK cascade).
 // ---------------------------------------------------------------------------
 
-export const tenants = pgTable(
-	'tenants',
+// Tenant groups are flat (no nesting) and own no inventory: they only
+// bundle tenants so several can be selected at once. A tenant sits in at
+// most one group; group delete is blocked while tenants reference it.
+export const tenant_groups = pgTable(
+	'tenant_groups',
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull(),
@@ -72,7 +75,22 @@ export const tenants = pgTable(
 		description: text('description'),
 		comments: text('comments'),
 	},
-	(table) => [index('tenants_name_idx').on(table.name)],
+	(table) => [index('tenant_groups_name_idx').on(table.name)],
+)
+
+export const tenants = pgTable(
+	'tenants',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		tenant_group_id: integer('tenant_group_id').references(() => tenant_groups.id),
+		name: text('name').notNull(),
+		description: text('description'),
+		comments: text('comments'),
+	},
+	(table) => [
+		index('tenants_name_idx').on(table.name),
+		index('tenants_tenant_group_id_idx').on(table.tenant_group_id),
+	],
 )
 
 export const site_groups = pgTable(
