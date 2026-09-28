@@ -121,7 +121,6 @@ export const sites = pgTable(
 		tenant_id: integer('tenant_id').references(() => tenants.id),
 		site_group_id: integer('site_group_id').references(() => site_groups.id),
 		name: text('name').notNull(),
-		slug: text('slug').notNull().unique(),
 		description: text('description'),
 		comments: text('comments'),
 		physical_address: text('physical_address'),

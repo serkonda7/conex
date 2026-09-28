@@ -1,12 +1,9 @@
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../api_devices'
 import { fetch_racks, type RackRow } from '../api_racks'
 import {
-	create_location,
-	delete_location,
 	delete_site,
 	fetch_locations,
 	fetch_site,
@@ -20,14 +17,13 @@ import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
-	Empty,
 	ForeignKeyLink,
 	InlineError,
-	Loading,
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
+import { locationTypeLabel } from '../i18n/labels'
 import { goTo } from '../router'
 import { siteGroupTrail } from '../trails'
 
@@ -59,44 +55,27 @@ function buildTree(rows: LocationRow[]): TreeNode[] {
 	return roots
 }
 
-function LocationBranch(props: {
-	node: TreeNode
-	trail: string[]
-	onDelete: (id: number) => void
-}): JSX.Element {
-	const trail = [...props.trail, props.node.row.name]
-	return (
-		<li>
-			<code>{trail.join(' > ')}</code>{' '}
-			<button
-				type="button"
-				class="btn-danger"
-				onClick={() => props.onDelete(props.node.row.id)}
-			>
-				{t('common.delete')}
-			</button>
-			<Show when={props.node.children.length > 0}>
-				<ul>
-					<For each={props.node.children}>
-						{(child: TreeNode): JSX.Element => (
-							<LocationBranch node={child} trail={trail} onDelete={props.onDelete} />
-						)}
-					</For>
-				</ul>
-			</Show>
-		</li>
-	)
+/** Flattens the location forest into preorder rows with nesting depth. */
+function flattenTree(nodes: TreeNode[]): { row: LocationRow; depth: number }[] {
+	const flat: { row: LocationRow; depth: number }[] = []
+	const visit = (node: TreeNode, depth: number): void => {
+		flat.push({ row: node.row, depth })
+		for (const child of node.children) {
+			visit(child, depth + 1)
+		}
+	}
+	for (const node of nodes) {
+		visit(node, 0)
+	}
+	return flat
 }
 
 /**
- * /sites/:id — site detail: header with slug/description, related-object
- * counts, and the related locations/racks/devices sections.
+ * /sites/:id — site detail: header with description, the detail grid,
+ * and the related locations/racks/devices sections.
  */
 export function SiteDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
-	const [parentId, setParentId] = createSignal('')
 
 	const [site] = createResource(
 		() => props.id,
@@ -135,7 +114,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		return res.value
 	})
 	const [trail] = createResource(groupId, siteGroupTrail)
-	const [locations, { refetch }] = createResource(
+	const [locations] = createResource(
 		() => props.id,
 		async (id: number) => {
 			const res = await fetch_locations(id)
@@ -169,36 +148,14 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		},
 	)
 	const tree = createMemo(() => buildTree(locations() ?? []))
-
-	async function handleCreate(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		const res = await create_location({
-			name: name(),
-			slug: slug(),
-			site_id: props.id,
-			parent_id: parentId() ? Number(parentId()) : null,
-			tenant_id: site()?.tenant_id ?? null,
-		})
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+	const flatLocations = createMemo(() => flattenTree(tree()))
+	const locationDepthOf = createMemo(() => {
+		const byId = new Map<number, number>()
+		for (const entry of flatLocations()) {
+			byId.set(entry.row.id, entry.depth)
 		}
-		setName('')
-		setSlug('')
-		setParentId('')
-		void refetch()
-	}
-
-	async function handleLocationDelete(id: number): Promise<void> {
-		setError(null)
-		const res = await delete_location(id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		void refetch()
-	}
+		return (id: number): number => byId.get(id) ?? 0
+	})
 
 	const { handleDelete } = useDetailDelete({
 		noun: 'noun.site',
@@ -225,34 +182,12 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={site()?.name}
-					slug={site()?.slug}
 					editHref={`/sites/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
 				<DetailSubtitle>{site()?.description || t('common.noDescription')}</DetailSubtitle>
 
-				<div class="detail-stats">
-					<a class="detail-stat" href="#site-locations">
-						<span class="detail-stat-value">{locationCount()}</span>{' '}
-						<span class="detail-stat-label">
-							{tp('entity.location', locationCount())}
-						</span>
-					</a>
-					<a class="detail-stat" href="#site-racks">
-						<span class="detail-stat-value">{rackCount()}</span>{' '}
-						<span class="detail-stat-label">{tp('entity.rack', rackCount())}</span>
-					</a>
-					<a class="detail-stat" href="#site-devices">
-						<span class="detail-stat-value">{deviceCount()}</span>{' '}
-						<span class="detail-stat-label">{tp('entity.device', deviceCount())}</span>
-					</a>
-				</div>
-
 				<DetailCard label={t('site.details')}>
-					<dt>{t('common.slug')}</dt>
-					<dd>
-						<code>{site()?.slug}</code>
-					</dd>
 					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<ForeignKeyLink
@@ -271,8 +206,6 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 							href={`/site-groups/${groupId() ?? ''}`}
 						/>
 					</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{site()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>{(site()?.comments ?? '') || '—'}</dd>
 					<dt>{t('site.physicalAddress')}</dt>
@@ -282,63 +215,51 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 			</DetailShell>
 
-			<section aria-label={tp('entity.location', 2)}>
-				<h3 id="site-locations">
-					{tp('entity.location', 2)} <span class="badge">{locationCount()}</span>
-				</h3>
-				<form onSubmit={handleCreate}>
-					<input
-						placeholder={t('common.name')}
-						aria-label={t('site.locationName')}
-						value={name()}
-						onInput={(e: InputEventAndTarget) => setName(e.currentTarget.value)}
-					/>
-					<input
-						placeholder={t('site.slugPlaceholderShort')}
-						aria-label={t('site.locationSlug')}
-						value={slug()}
-						onInput={(e: InputEventAndTarget) => setSlug(e.currentTarget.value)}
-					/>
-					<select
-						aria-label={t('site.parentLocation')}
-						value={parentId()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setParentId(e.currentTarget.value)
-						}
-					>
-						<option value="">{t('site.topLevel')}</option>
-						<For each={locations() ?? []}>
-							{(l: LocationRow): JSX.Element => (
-								<option value={l.id}>{l.name}</option>
-							)}
-						</For>
-					</select>
-					<button type="submit">{t('site.addLocation')}</button>
-				</form>
-				<Show
-					when={!locations.loading}
-					fallback={
-						<Loading message={t('list.loading', { noun: tp('noun.location', 2) })} />
-					}
-				>
-					<Show
-						when={tree().length > 0}
-						fallback={<Empty message={t('site.noLocations')} />}
-					>
-						<ul>
-							<For each={tree()}>
-								{(node: TreeNode): JSX.Element => (
-									<LocationBranch
-										node={node}
-										trail={[site()?.name ?? tp('noun.site', 1)]}
-										onDelete={handleLocationDelete}
-									/>
-								)}
-							</For>
-						</ul>
-					</Show>
-				</Show>
-			</section>
+			<RelatedSection
+				id="site-locations"
+				title={tp('entity.location', 2)}
+				count={locationCount()}
+				loading={locations.loading}
+				loadingText={t('list.loading', { noun: tp('noun.location', 2) })}
+				emptyText={t('site.noLocations')}
+				hasItems={locationCount() > 0}
+				viewAllHref={`/locations?site=${props.id}`}
+				viewAllLabel={t('common.viewIn', { target: tp('entity.location', 2) })}
+			>
+				<DataTable
+					rows={() => flatLocations().map((entry) => entry.row)}
+					getRowId={(l: LocationRow): number => l.id}
+					columns={[
+						{
+							key: 'name',
+							label: tp('entity.location', 1),
+							getValue: (l: LocationRow): JSX.Element => {
+								const depth = locationDepthOf()(l.id)
+								return (
+									<div
+										class={`location-tree-name${depth > 0 ? ' location-tree-child' : ''}`}
+										style={{ '--location-depth': depth }}
+									>
+										<a
+											href={`/locations/${l.id}`}
+											onClick={(e: MouseEvent): void =>
+												goTo(e, `/locations/${l.id}`)
+											}
+										>
+											{l.name}
+										</a>
+									</div>
+								)
+							},
+						},
+						{
+							key: 'type',
+							label: t('location.type'),
+							getValue: (l: LocationRow): string => locationTypeLabel(l.type),
+						},
+					]}
+				/>
+			</RelatedSection>
 
 			<RelatedSection
 				id="site-racks"
@@ -352,7 +273,6 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => racks() ?? []}
 					getRowId={(r: RackRow): number => r.id}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'name',
@@ -388,7 +308,6 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				<DataTable
 					rows={() => devices() ?? []}
 					getRowId={(d: DeviceRow): number => d.id}
-					showColumnCustomizer
 					columns={[
 						{
 							key: 'name',

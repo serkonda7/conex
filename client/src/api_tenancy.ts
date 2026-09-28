@@ -221,7 +221,6 @@ export async function create_site(input: SiteCreateInput): Promise<Result<SiteRo
 	const res = await client.sites.$post({
 		json: {
 			name: input.name,
-			slug: input.slug,
 			tenant_id: input.tenant_id,
 			site_group_id: input.site_group_id,
 			description: input.description || undefined,

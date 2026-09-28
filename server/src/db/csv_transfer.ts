@@ -20,7 +20,7 @@ export const DEVICE_CSV_HEADER = [
 	'name',
 	'asset_tag',
 	'device_type_model',
-	'site_slug',
+	'site_name',
 	'rack_name',
 	'position_u',
 	'status',
@@ -300,7 +300,7 @@ async function importDeviceTypeDefinition(
 	return { ok: true, id: created.value.id, error: null }
 }
 
-/** Devices export: one row per device, slugs for the FK columns. */
+/** Devices export: one row per device, names for the FK columns. */
 export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> {
 	const db = getDb()
 	const scopeCond = scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId)
@@ -309,7 +309,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 			name: devices.name,
 			asset_tag: devices.asset_tag,
 			type_model: device_types.model,
-			site_slug: sites.slug,
+			site_name: sites.name,
 			rack_name: racks.name,
 			position_u: devices.position_u,
 			status: devices.status,
@@ -326,7 +326,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 			r.name,
 			r.asset_tag,
 			r.type_model,
-			r.site_slug,
+			r.site_name,
 			r.rack_name,
 			r.position_u === null ? null : String(r.position_u),
 			r.status,
@@ -402,7 +402,7 @@ function inScope(tenant: number | null | undefined, scope: number): boolean {
 
 /**
  * Devices import: validates each row with `DeviceImportRowSchema`, resolves
- * slugs to ids, and creates the device (stub expansion included). One bad
+ * names to ids, and creates the device (stub expansion included). One bad
  * row fails only itself; the response reports per-row errors.
  *
  * `scopeTenantId` serves scoped editors: rows referencing a site/rack
@@ -419,8 +419,8 @@ export async function importDevicesCsv(
 	}
 	const db = getDb()
 	const typeByModel = new Map((await db.select().from(device_types)).map((r) => [r.model, r.id]))
-	const siteBySlug = new Map(
-		(await db.select().from(sites)).map((r) => [r.slug, { id: r.id, tenant_id: r.tenant_id }]),
+	const siteByName = new Map(
+		(await db.select().from(sites)).map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
 	)
 	const rackByName = new Map(
 		(await db.select().from(racks)).map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
@@ -443,15 +443,15 @@ export async function importDevicesCsv(
 			continue
 		}
 		let foundSiteId: number | undefined
-		if (input.site_slug) {
-			const site = siteBySlug.get(input.site_slug)
+		if (input.site_name) {
+			const site = siteByName.get(input.site_name)
 			if (!site) {
-				fail(`Unknown site_slug "${input.site_slug}"`)
+				fail(`Unknown site_name "${input.site_name}"`)
 				continue
 			}
 			foundSiteId = site.id
 			if (scopeTenantId !== undefined && !inScope(site.tenant_id, scopeTenantId)) {
-				fail(`Site "${input.site_slug}" is outside your tenant scope`)
+				fail(`Site "${input.site_name}" is outside your tenant scope`)
 				continue
 			}
 		}

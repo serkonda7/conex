@@ -37,9 +37,9 @@ if (!tenant) {
 	tenant = (await db.insert(tenants).values({ name: 'E2E Tenant' }).returning())[0]
 }
 
-const site = (await db.select().from(sites)).find((row) => row.slug === 'e2e-site')
+const site = (await db.select().from(sites)).find((row) => row.name === 'E2E Site')
 if (!site) {
-	await db.insert(sites).values({ name: 'E2E Site', slug: 'e2e-site', tenant_id: tenant.id })
+	await db.insert(sites).values({ name: 'E2E Site', tenant_id: tenant.id })
 }
 
 let manufacturer = (await db.select().from(manufacturers)).find((row) => row.slug === 'e2e-maker')
@@ -74,7 +74,7 @@ if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 10U
 		WHERE model = 'E2E 10U Cabinet'`
 }
 
-const e2eSite = (await db.select().from(sites)).find((row) => row.slug === 'e2e-site')
+const e2eSite = (await db.select().from(sites)).find((row) => row.name === 'E2E Site')
 const e2eRackType = (await db.select().from(device_types)).find(
 	(row) => row.model === 'E2E 10U Cabinet',
 )

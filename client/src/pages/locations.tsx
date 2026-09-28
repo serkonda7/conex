@@ -200,7 +200,7 @@ export function LocationsPage(): JSX.Element {
 			<div class="toolbar-row">
 				<ListSearchField
 					label={t('list.searchLabel', { noun: tp('noun.location', 2) })}
-					placeholder={t('site.searchPlaceholder')}
+					placeholder={t('location.searchPlaceholder')}
 					value={search()}
 					onInput={setSearch}
 				/>

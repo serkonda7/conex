@@ -214,13 +214,12 @@ export const de: Messages = {
 	'tenantGroup.hint': 'Ein Mandant gehört zu höchstens einer Gruppe.',
 
 	// site
-	'site.searchPlaceholder': 'Name oder Kurzname suchen…',
+	'site.searchPlaceholder': 'Name oder Beschreibung suchen…',
 	'site.empty': 'Noch keine Standorte vorhanden. Fügen Sie oben den ersten hinzu.',
 	'site.addTitle': 'Neuen Standort hinzufügen',
 	'site.editTitle': 'Standort bearbeiten',
 	'site.loadingOne': 'Standort wird geladen…',
 	'site.namePlaceholder': 'Rechenzentrum Berlin',
-	'site.slugPlaceholder': 'rechenzentrum-berlin',
 	'site.tenantFromGroup': 'Standardmäßig wird der Mandant der Gruppe verwendet.',
 	'site.physicalAddress': 'Standortadresse',
 	'site.physicalAddressPlaceholder': 'Straße, Ort … (optional)',
@@ -228,12 +227,8 @@ export const de: Messages = {
 	'site.shippingAddressPlaceholder': 'Warenannahme … (optional)',
 	'site.notFound': 'Standort nicht gefunden.',
 	'site.details': 'Standortdetails',
-	'site.locationName': 'Bereichsname',
-	'site.locationSlug': 'Kurzname des Bereichs',
-	'site.slugPlaceholderShort': 'kurzname',
 	'site.parentLocation': 'Übergeordneter Bereich',
 	'site.topLevel': 'Oberste Ebene',
-	'site.addLocation': 'Bereich hinzufügen',
 	'site.noLocations': 'Noch keine Bereiche vorhanden.',
 	'site.noRacks': 'Für diesen Standort sind noch keine Racks vorhanden.',
 	'site.noDevices': 'Für diesen Standort sind noch keine Geräte vorhanden.',
@@ -254,6 +249,7 @@ export const de: Messages = {
 	'siteGroup.noSites': 'Noch keine Standorte in dieser Gruppe vorhanden.',
 
 	// location
+	'location.searchPlaceholder': 'Name oder Kurzname suchen…',
 	'location.empty': 'Noch keine Bereiche vorhanden. Fügen Sie oben den ersten hinzu.',
 	'location.filterBySite': 'Nach Standort filtern',
 	'location.allSites': 'Alle Standorte',

@@ -6,11 +6,9 @@ import {
 	EditActions,
 	EditPageShell,
 	FormError,
-	Hint,
 	NameField,
 	row_options,
 	SelectField,
-	SlugField,
 	TextAreaField,
 	TextField,
 } from '../components/form'
@@ -20,7 +18,6 @@ import { type FormValues, submit_edit, useEditForm } from '../util/form'
 /** /sites/:id/edit — site edit form. Saves back to the detail page. */
 export function SiteEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [groupId, setGroupId] = createSignal('')
 	const [description, setDescription] = createSignal('')
@@ -56,7 +53,6 @@ export function SiteEditPage(props: { id: number }): JSX.Element {
 				return null
 			}
 			setName(res.value.name)
-			setSlug(res.value.slug)
 			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
 			setGroupId(res.value.site_group_id ? String(res.value.site_group_id) : '')
 			setDescription(res.value.description ?? '')
@@ -72,11 +68,9 @@ export function SiteEditPage(props: { id: number }): JSX.Element {
 		e.preventDefault()
 		await submit_edit({
 			name: name(),
-			slug: slug(),
 			save: (values: FormValues) =>
 				update_site(props.id, {
 					name: values.name,
-					slug: values.slug,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
 					site_group_id: groupId() ? Number(groupId()) : null,
 					description: description().trim() === '' ? null : description().trim(),
@@ -105,13 +99,6 @@ export function SiteEditPage(props: { id: number }): JSX.Element {
 				placeholder={t('site.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-			/>
-			<SlugField
-				id="site-edit-slug"
-				placeholder={t('site.slugPlaceholder')}
-				value={slug()}
-				onInput={setSlug}
-				hint={<Hint>{t('form.slugHintEdit')}</Hint>}
 			/>
 			<SelectField
 				id="site-edit-tenant"

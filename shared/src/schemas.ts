@@ -135,7 +135,6 @@ export const SiteCommentsSchema = v.optional(
 
 export const SiteCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: SlugSchema,
 	tenant_id: NullableIdSchema,
 	site_group_id: NullableIdSchema,
 	description: DescriptionSchema,
@@ -146,7 +145,6 @@ export const SiteCreateSchema = v.strictObject({
 
 export const SiteUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	site_group_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
@@ -268,7 +266,7 @@ export const SiteListQuerySchema = v.object({
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -978,14 +976,15 @@ export const YamlImportBodySchema = v.strictObject({
 export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
 
 /**
- * One device CSV row (minimal columns). Device type models and rack names resolve to ids server-side;
- * `position_u` arrives as text and coerces through Number.
+ * One device CSV row (minimal columns). Device type models and rack/site
+ * names resolve to ids server-side; `position_u` arrives as text and
+ * coerces through Number.
  */
 export const DeviceImportRowSchema = v.object({
 	name: NameSchema,
 	asset_tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	device_type_model: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
-	site_slug: v.optional(
+	site_name: v.optional(
 		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 		undefined,
 	),

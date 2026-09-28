@@ -64,7 +64,6 @@ const dentistSite: typeof sites.$inferSelect = await one(
 			tenant_id: dentist.id,
 			site_group_id: dentistGroup.id,
 			name: 'Bright Smile Main Office',
-			slug: 'bright-smile-main-office',
 			description: 'Single-location dental practice.',
 			physical_address: '14 Oak Avenue, Brookfield, NY',
 		})

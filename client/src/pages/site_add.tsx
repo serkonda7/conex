@@ -9,24 +9,17 @@ import {
 	NameField,
 	row_options,
 	SelectField,
-	SlugField,
 	TextAreaField,
 	TextField,
 } from '../components/form'
 import { t, tp } from '../i18n'
 import { parseId, queryParam } from '../router'
 import { contextTenantValue } from '../tenant_context'
-import {
-	type FormValues,
-	is_add_another_submit,
-	load_rows,
-	submit_form,
-	use_slug_fields,
-} from '../util/form'
+import { type FormValues, is_add_another_submit, load_rows, submit_form } from '../util/form'
 
 /** /sites/add — NetBox-style site create form. */
 export function SiteAddPage(): JSX.Element {
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	// Explicit `?tenant=` wins; else a single-tenant context preselects it.
 	const [tenantId, setTenantId] = createSignal(queryParam('tenant') || contextTenantValue())
 	const [tenantTouched, setTenantTouched] = createSignal(queryParam('tenant') !== '')
@@ -65,12 +58,10 @@ export function SiteAddPage(): JSX.Element {
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_form({
-			name: slugFields.name(),
-			slug: slugFields.slug(),
+			name: name(),
 			save: (values: FormValues) =>
 				create_site({
 					name: values.name,
-					slug: values.slug,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
 					site_group_id: groupId() ? Number(groupId()) : null,
 					description: description().trim() || undefined,
@@ -81,7 +72,7 @@ export function SiteAddPage(): JSX.Element {
 			setError: setFormError,
 			setSaving,
 			navigateTo: '/sites',
-			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
+			onSuccess: is_add_another_submit(e) ? () => setName('') : undefined,
 		})
 	}
 
@@ -90,15 +81,9 @@ export function SiteAddPage(): JSX.Element {
 			<NameField
 				id="site-name"
 				placeholder={t('site.namePlaceholder')}
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
+				value={name()}
+				onInput={setName}
 				autofocus
-			/>
-			<SlugField
-				id="site-slug"
-				placeholder={t('site.slugPlaceholder')}
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="site-tenant"

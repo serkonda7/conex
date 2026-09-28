@@ -472,7 +472,7 @@ export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>
 
 export interface SiteListParams extends ListParams, TenantFilterParams {
 	group?: number
-	sort: 'name' | 'slug' | 'description'
+	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 }
 
@@ -482,7 +482,7 @@ export async function listSites(params: SiteListParams): Promise<Page<SiteRow>> 
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${sites.name} ILIKE ${pattern} ESCAPE '\\' OR ${sites.slug} ILIKE ${pattern} ESCAPE '\\' OR ${sites.description} ILIKE ${pattern} ESCAPE '\\')`,
+			sql`(${sites.name} ILIKE ${pattern} ESCAPE '\\' OR ${sites.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.group) {
@@ -490,12 +490,7 @@ export async function listSites(params: SiteListParams): Promise<Page<SiteRow>> 
 	}
 	conditions.push(...tenantConditions(sites.tenant_id, params))
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn =
-		params.sort === 'slug'
-			? sites.slug
-			: params.sort === 'description'
-				? sites.description
-				: sites.name
+	const orderColumn = params.sort === 'description' ? sites.description : sites.name
 	const items = await db
 		.select()
 		.from(sites)
@@ -540,15 +535,10 @@ export async function createSite(input: SiteCreate): Promise<Result<SiteRow, Err
 		return Result.err(groupCheck.error)
 	}
 	const db = getDb()
-	const clash = (await db.select().from(sites).where(eq(sites.slug, input.slug)).limit(1))[0]
-	if (clash) {
-		return Result.err(new DuplicateError('Site slug is already in use'))
-	}
 	const row: Omit<SiteRow, 'id'> = {
 		tenant_id: input.tenant_id ?? null,
 		site_group_id: input.site_group_id ?? null,
 		name: input.name,
-		slug: input.slug,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 		physical_address: input.physical_address ?? null,
@@ -561,9 +551,6 @@ export async function createSite(input: SiteCreate): Promise<Result<SiteRow, Err
 		}
 		return await getSite(inserted.id)
 	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Site slug is already in use'))
-		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
 }
@@ -586,18 +573,9 @@ export async function updateSite(id: number, input: SiteUpdate): Promise<Result<
 		}
 	}
 	const db = getDb()
-	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		const clash = (await db.select().from(sites).where(eq(sites.slug, input.slug)).limit(1))[0]
-		if (clash) {
-			return Result.err(new DuplicateError('Site slug is already in use'))
-		}
-	}
 	const patch: Partial<SiteRow> = {}
 	if (input.name !== undefined) {
 		patch.name = input.name
-	}
-	if (input.slug !== undefined) {
-		patch.slug = input.slug
 	}
 	if (input.tenant_id !== undefined) {
 		patch.tenant_id = input.tenant_id
@@ -621,9 +599,6 @@ export async function updateSite(id: number, input: SiteUpdate): Promise<Result<
 		try {
 			await db.update(sites).set(patch).where(eq(sites.id, id))
 		} catch (err) {
-			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Site slug is already in use'))
-			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}

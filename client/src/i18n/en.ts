@@ -210,13 +210,12 @@ export const en = {
 	'tenantGroup.hint': 'A tenant belongs to at most one group.',
 
 	// site
-	'site.searchPlaceholder': 'Search name or slug…',
+	'site.searchPlaceholder': 'Search name or description…',
 	'site.empty': 'No sites yet. Add the first one above.',
 	'site.addTitle': 'Add a new site',
 	'site.editTitle': 'Edit site',
 	'site.loadingOne': 'Loading site…',
 	'site.namePlaceholder': 'Datacenter Berlin',
-	'site.slugPlaceholder': 'datacenter-berlin',
 	'site.tenantFromGroup': "Defaults to the group's tenant.",
 	'site.physicalAddress': 'Physical address',
 	'site.physicalAddressPlaceholder': 'Street, city … (optional)',
@@ -224,12 +223,8 @@ export const en = {
 	'site.shippingAddressPlaceholder': 'Receiving dock … (optional)',
 	'site.notFound': 'Site not found.',
 	'site.details': 'Site details',
-	'site.locationName': 'Location name',
-	'site.locationSlug': 'Location slug',
-	'site.slugPlaceholderShort': 'slug',
 	'site.parentLocation': 'Parent location',
 	'site.topLevel': 'Top level',
-	'site.addLocation': 'Add location',
 	'site.noLocations': 'No locations yet.',
 	'site.noRacks': 'No racks at this site yet.',
 	'site.noDevices': 'No devices at this site yet.',
@@ -250,6 +245,7 @@ export const en = {
 	'siteGroup.noSites': 'No sites in this group yet.',
 
 	// location
+	'location.searchPlaceholder': 'Search name or slug…',
 	'location.empty': 'No locations yet. Add the first one above.',
 	'location.filterBySite': 'Filter by site',
 	'location.allSites': 'All sites',

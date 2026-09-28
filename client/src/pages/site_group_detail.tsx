@@ -215,11 +215,6 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 								</a>
 							),
 						},
-						{
-							key: 'slug',
-							label: t('common.slug'),
-							getValue: (s: SiteRow): JSX.Element => <code>{s.slug}</code>,
-						},
 					]}
 				/>
 			</RelatedSection>
