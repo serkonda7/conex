@@ -1,24 +1,22 @@
-import { IconLinkPlus } from '@tabler/icons-solidjs'
+import { IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { InputEventAndTarget, TraceLink, TracePath } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import { type CableRow, create_cable, delete_cable, fetch_cables, fetch_trace } from '../api_cables'
+import { delete_cable, fetch_cables, fetch_trace } from '../api_cables'
 import {
 	add_interface,
-	type DeviceRow,
 	delete_device,
 	fetch_device,
-	fetch_devices,
 	fetch_interfaces,
 	type InterfaceJson,
 	move_device,
-	update_interface,
 } from '../api_devices'
 import { fetch_rack } from '../api_racks'
 import { fetch_shelf } from '../api_shelves'
 import { fetch_device_types } from '../api_templates'
 import { fetch_locations, fetch_site, fetch_tenant } from '../api_tenancy'
+import { ConnectPortDialog, OTHER_PORT_KINDS } from '../components/connect_port_dialog'
 import { DataTable } from '../components/data_table'
 import {
 	DetailCard,
@@ -30,6 +28,7 @@ import {
 	InlineError,
 	useDetailDelete,
 } from '../components/detail_page'
+import { EditPortDialog } from '../components/edit_port_dialog'
 import { t, tp } from '../i18n'
 import { cableStatusLabel, faceLabel } from '../i18n/labels'
 import { type Crumb, goTo } from '../router'
@@ -38,23 +37,18 @@ import { locationTrail } from '../trails'
 /** Selectable trace depths for the path view. */
 const TRACE_DEPTHS = [1, 2, 3, 4, 6, 10]
 
-/** Interface kinds listed under "other ports" instead of network ports. */
-const OTHER_PORT_KINDS = new Set(['console', 'power'])
-
 /**
  * /devices/:id — detail with the interface list (port status dots), a manual
  * interface add/rename form, a rack remount form, the P5 cable connect
- * dialog (free-port pickers on both ends), the per-device trace peer links
+ * dialog (peer device first, then its free port), the per-device trace peer links
  * (`dev:port <-> dev:port`), and the cable list with disconnect.
  */
 export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [ifaceName, setIfaceName] = createSignal('')
 	const [moveU, setMoveU] = createSignal('')
-	const [localIface, setLocalIface] = createSignal('')
-	const [peerDevice, setPeerDevice] = createSignal('')
-	const [peerIface, setPeerIface] = createSignal('')
-	const [cableLabel, setCableLabel] = createSignal('')
+	const [connectingIface, setConnectingIface] = createSignal<InterfaceJson | null>(null)
+	const [editingIface, setEditingIface] = createSignal<InterfaceJson | null>(null)
 	const [traceDepth, setTraceDepth] = createSignal('4')
 
 	const [device, { refetch: refetchDevice }] = createResource(async () => {
@@ -89,13 +83,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			return []
 		}
 		return res.value.items
-	})
-	const [devices] = createResource(async () => {
-		const res = await fetch_devices()
-		if (Result.isError(res)) {
-			return []
-		}
-		return res.value.items.filter((d) => d.id !== props.id)
 	})
 	const [types] = createResource(async () => {
 		const res = await fetch_device_types()
@@ -178,32 +165,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
-	const [peerIfaces] = createResource(
-		() => peerDevice(),
-		async (peerId: string) => {
-			if (!peerId) {
-				return []
-			}
-			const res = await fetch_interfaces(Number(peerId))
-			if (Result.isError(res)) {
-				setError(res.error.message)
-				return []
-			}
-			return res.value
-		},
-	)
 	function refetchAll(): void {
 		void refetchIfaces()
 		void refetchTrace()
 		void refetchCables()
-	}
-
-	function freeLocal(): InterfaceJson[] {
-		return (ifaces() ?? []).filter((i) => !i.connected)
-	}
-
-	function freePeer(): InterfaceJson[] {
-		return (peerIfaces() ?? []).filter((i) => !i.connected)
 	}
 
 	async function handleAddIface(e: SubmitEvent): Promise<void> {
@@ -237,28 +202,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		void refetchDevice()
 	}
 
-	async function handleConnect(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		setError(null)
-		if (!localIface() || !peerIface()) {
-			setError(t('device.pickBothPorts'))
-			return
-		}
-		const res = await create_cable({
-			a_interface_id: Number(localIface()),
-			b_interface_id: Number(peerIface()),
-			label: cableLabel().trim() === '' ? undefined : cableLabel().trim(),
-		})
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setLocalIface('')
-		setPeerIface('')
-		setCableLabel('')
-		refetchAll()
-	}
-
 	async function handleDisconnect(cableId: number): Promise<void> {
 		setError(null)
 		const res = await delete_cable(cableId)
@@ -278,36 +221,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/devices',
 	})
 
-	async function handleRename(iface: InterfaceJson): Promise<void> {
-		setError(null)
-		const renamed = window.prompt(t('device.renamePrompt'), iface.name)
-		if (!renamed || renamed === iface.name) {
-			return
-		}
-		const res = await update_interface(props.id, iface.id, {
-			name: renamed,
-		})
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		void refetchIfaces()
-	}
-
 	function handleConnectCable(iface: InterfaceJson): void {
 		setError(null)
-		setLocalIface(String(iface.id))
-		document.querySelector('#device-connect')?.scrollIntoView({ behavior: 'smooth' })
+		setConnectingIface(iface)
 	}
 
-	async function handleToggleEnabled(iface: InterfaceJson): Promise<void> {
+	function handleEdit(iface: InterfaceJson): void {
 		setError(null)
-		const res = await update_interface(props.id, iface.id, { enabled: !iface.enabled })
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		void refetchIfaces()
+		setEditingIface(iface)
 	}
 
 	/** Console and power ports; everything else is a network port. */
@@ -412,20 +333,25 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 								{(l: () => TraceLink): JSX.Element => (
 									<button
 										type="button"
-										class="btn-danger"
+										class="icon-btn icon-btn-danger"
+										title={t('device.disconnectPort', { name: iface.name })}
+										aria-label={t('device.disconnectPort', {
+											name: iface.name,
+										})}
 										onClick={() => handleDisconnect(l().cable_id)}
 									>
-										{t('device.disconnect')}
+										<IconUnlink size={20} />
 									</button>
 								)}
 							</Show>
-							<Show when={!other}>
-								<button type="button" onClick={() => handleToggleEnabled(iface)}>
-									{iface.enabled ? t('device.disable') : t('device.enable')}
-								</button>
-							</Show>
-							<button type="button" onClick={() => handleRename(iface)}>
-								{t('device.rename')}
+							<button
+								type="button"
+								class="icon-btn"
+								title={t('device.editPort', { name: iface.name })}
+								aria-label={t('device.editPort', { name: iface.name })}
+								onClick={() => handleEdit(iface)}
+							>
+								<IconPencil size={20} />
 							</button>
 						</span>
 					)
@@ -549,6 +475,32 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					{t('device.otherPortsCount', { count: otherPorts().length })}
 				</h3>
 				{portTable(otherPorts, true)}
+			</Show>
+			<Show when={connectingIface()}>
+				{(iface: () => InterfaceJson): JSX.Element => (
+					<ConnectPortDialog
+						iface={iface()}
+						on_connected={() => {
+							setConnectingIface(null)
+							refetchAll()
+						}}
+						on_close={() => setConnectingIface(null)}
+					/>
+				)}
+			</Show>
+			<Show when={editingIface()}>
+				{(iface: () => InterfaceJson): JSX.Element => (
+					<EditPortDialog
+						device_id={props.id}
+						iface={iface()}
+						show_enabled={!isOtherPort(iface())}
+						on_saved={() => {
+							setEditingIface(null)
+							void refetchIfaces()
+						}}
+						on_close={() => setEditingIface(null)}
+					/>
+				)}
 			</Show>
 			<InlineError message={error()} />
 		</div>

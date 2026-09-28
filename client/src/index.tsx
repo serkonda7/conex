@@ -1,11 +1,8 @@
 import { render } from 'solid-js/web'
 
 import App from './App'
-import { LOCALE } from './i18n'
 import '@serkonda7/solid-components/styles.css'
 import './css/styles.css'
-
-document.documentElement.lang = LOCALE
 
 const root = document.querySelector('#root')
 

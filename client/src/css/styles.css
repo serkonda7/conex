@@ -34,6 +34,8 @@
 	--font-size-lg: 1rem;
 	--font-size-xl: 1.15rem;
 	--font-size-2xl: 1.3rem;
+	/* Fixed top bar height; the sticky sidebar sizes itself against it. */
+	--topbar-height: 3.5rem;
 }
 
 html {
@@ -264,7 +266,7 @@ tbody tr:last-child td {
 	background-color: var(--bg-surface);
 	border-bottom: 1px solid var(--border);
 	padding: 0.35rem 0.75rem;
-	min-height: 2.5rem;
+	height: var(--topbar-height);
 }
 
 .app-topbar-brand {
@@ -287,6 +289,22 @@ tbody tr:last-child td {
 	flex-shrink: 0;
 }
 
+.app-language-switcher {
+	display: inline-flex;
+	align-items: center;
+}
+
+.app-language-select {
+	padding: 0.25rem 0.4rem;
+	max-width: 8rem;
+}
+
+.app-auth-language {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 0.75rem;
+}
+
 .app-user-menu {
 	position: relative;
 }
@@ -305,7 +323,21 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 }
 
+.app-user-info {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	min-width: 0;
+	line-height: 1.2;
+}
+
+.app-user-role {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
 .app-user-username {
+	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -322,6 +354,18 @@ tbody tr:last-child td {
 	box-shadow: var(--shadow);
 	padding: 0.25rem;
 	z-index: 10;
+}
+
+.app-user-language {
+	padding: 0.25rem;
+	border-bottom: 1px solid var(--border);
+	margin-bottom: 0.25rem;
+}
+
+.app-user-language .app-language-switcher,
+.app-user-language .app-language-select {
+	width: 100%;
+	max-width: none;
 }
 
 .app-user-logout {
@@ -358,8 +402,8 @@ tbody tr:last-child td {
 	width: 13rem;
 	flex-shrink: 0;
 	position: sticky;
-	top: 2.5rem;
-	height: calc(100vh - 2.5rem);
+	top: var(--topbar-height);
+	height: calc(100vh - var(--topbar-height));
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
@@ -680,6 +724,8 @@ tbody tr:last-child td {
 @media (max-width: 48rem) {
 	.app-topbar {
 		flex-wrap: wrap;
+		height: auto;
+		min-height: var(--topbar-height);
 	}
 
 	.app-body {
@@ -1062,6 +1108,11 @@ th[aria-sort="descending"] .data-table-sort::after {
 	cursor: not-allowed;
 }
 
+.icon-btn-danger {
+	color: var(--error);
+	padding: 0.45rem;
+}
+
 .row-menu-wrap {
 	position: relative;
 	display: inline-flex;
@@ -1150,13 +1201,13 @@ th[aria-sort="descending"] .data-table-sort::after {
 	max-width: 34rem;
 }
 
-.object-selector-header {
+.modal-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 }
 
-.object-selector-header h3 {
+.modal-header h3 {
 	margin-bottom: 0.75rem;
 }
 
@@ -1187,6 +1238,188 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .object-selector-option small {
 	color: var(--text-muted);
+}
+
+/* Cable connect dialog: step indicator, peer card, port tile grid. */
+.app-content .modal.connect-dialog {
+	max-width: 40rem;
+}
+
+.connect-steps {
+	display: flex;
+	gap: 1.25rem;
+	list-style: none;
+	padding: 0 0 0.75rem;
+	margin: 0 0 0.75rem;
+	border-bottom: 1px solid var(--border);
+	font-size: var(--font-size-base);
+	color: var(--text-muted);
+}
+
+.connect-steps li {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.connect-steps li.active {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.connect-step-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.35rem;
+	height: 1.35rem;
+	border-radius: 50%;
+	border: 1px solid var(--border-strong);
+	font-size: var(--font-size-sm);
+}
+
+.connect-steps li.active .connect-step-num {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.connect-steps li.done .connect-step-num {
+	border-color: var(--primary);
+	color: var(--primary);
+}
+
+.app-content .connect-dialog form.connect-port-form {
+	flex-direction: column;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	gap: 0.75rem;
+}
+
+.app-content .connect-port-form .object-selector-search {
+	flex: none;
+}
+
+.connect-peer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.5rem 0.75rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+}
+
+.connect-peer-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.connect-peer-info strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.connect-peer-info small {
+	color: var(--text-muted);
+}
+
+.port-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+	gap: 0.4rem;
+	max-height: 18rem;
+	overflow-y: auto;
+	padding: 0.1rem;
+}
+
+.app-content .port-grid .port-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.1rem;
+	min-width: 0;
+	padding: 0.4rem 0.55rem;
+	text-align: left;
+	background-color: var(--bg-input);
+	border-color: var(--border);
+}
+
+.app-content .port-grid .port-tile:hover:not(:disabled) {
+	border-color: var(--border-strong);
+	background-color: var(--bg-hover);
+}
+
+.app-content .port-grid .port-tile.selected,
+.app-content .port-grid .port-tile.selected:hover {
+	border-color: var(--primary);
+	background-color: rgba(8, 191, 8, 0.14);
+	box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.app-content .port-grid .port-tile:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.port-tile-name {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		"Liberation Mono", "Courier New", monospace;
+}
+
+.port-tile small {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.connect-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
+.connect-summary {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0;
+	min-width: 0;
+	white-space: nowrap;
+}
+
+.connect-summary-peer {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.connect-summary-hint {
+	color: var(--text-muted);
+}
+
+.modal-actions {
+	display: flex;
+	gap: 0.4rem;
+	margin-left: auto;
+}
+
+.modal-actions button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
 }
 
 /* Detail page: stat strip linking to each related-object section. */

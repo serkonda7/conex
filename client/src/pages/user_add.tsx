@@ -86,7 +86,15 @@ export function UserAddPage(): JSX.Element {
 				value={role()}
 				onChange={(value: string) => setRole(value as UserRole)}
 				options={roleOptions()}
-				hint={<Hint>{t('user.roleHint')}</Hint>}
+				hint={
+					<Hint>
+						{t('user.roleHint', {
+							admin: t('role.admin'),
+							editor: t('role.editor'),
+							viewer: t('role.viewer'),
+						})}
+					</Hint>
+				}
 			/>
 			<Show when={role() !== 'admin'}>
 				<SelectField

@@ -85,7 +85,12 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				options={roleOptions()}
 				hint={
 					<Hint>
-						{t('user.roleHint')} {t('user.roleHintLastAdmin')}
+						{t('user.roleHint', {
+							admin: t('role.admin'),
+							editor: t('role.editor'),
+							viewer: t('role.viewer'),
+						})}{' '}
+						{t('user.roleHintLastAdmin', { admin: t('role.admin') })}
 					</Hint>
 				}
 			/>

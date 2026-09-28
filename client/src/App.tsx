@@ -17,7 +17,9 @@ import { Dynamic } from 'solid-js/web'
 import { set_unauthorized_handler } from './api'
 import { fetchMe, fetchSetupStatus, login, logout, type SessionUser, setupAdmin } from './api_auth'
 import { Breadcrumbs } from './components/breadcrumbs'
-import { t } from './i18n'
+import { LanguageSwitcher } from './components/language_switcher'
+import { type Locale, locale, t } from './i18n'
+import { roleLabel } from './i18n/labels'
 import {
 	activateTab,
 	activeTabId,
@@ -666,161 +668,193 @@ function App(): JSX.Element {
 			<a class="skip-link" href="#main">
 				{t('app.skipToContent')}
 			</a>
-			<Show
-				when={isLoggedIn() !== null && needsSetup() !== null}
-				fallback={
-					<main class="app-content">
-						<p class="skeleton">{t('common.loading')}</p>
-					</main>
-				}
-			>
-				<Switch>
-					<Match when={needsSetup()}>
-						<main class="app-content app-content--centered">
-							<div class="app-auth">
-								<div class="app-header">
-									<h1>{APP_TITLE}</h1>
-								</div>
-								<SetupForm
-									username={setupUsername}
-									setUsername={setSetupUsername}
-									password={setupPassword}
-									setPassword={setSetupPassword}
-									confirm={setupConfirm}
-									setConfirm={setSetupConfirm}
-									error={setupError}
-									onSetup={handleSetup}
-								/>
-							</div>
-						</main>
-					</Match>
-					<Match when={!isLoggedIn()}>
-						<main class="app-content app-content--centered">
-							<div class="app-auth">
-								<div class="app-header">
-									<h1>{APP_TITLE}</h1>
-								</div>
-								<LoginForm
-									username={username}
-									setUsername={setUsername}
-									password={password}
-									setPassword={setPassword}
-									error={error}
-									onLogin={handleLogin}
-								/>
-							</div>
-						</main>
-					</Match>
-					<Match when={isLoggedIn()}>
-						<header class="app-topbar">
-							<a
-								href="/tenants"
-								class="app-topbar-brand"
-								onClick={(e: MouseEvent): void => goTo(e, '/tenants')}
-							>
-								{APP_TITLE}
-							</a>
-							<div class="app-topbar-actions">
-								<div class="app-user-menu">
-									<button
-										type="button"
-										class="app-user-button"
-										aria-haspopup="menu"
-										aria-expanded={userMenuOpen()}
-										aria-label={t('app.accountNamed', {
-											name: currentUser()?.username ?? '…',
-										})}
-										onClick={() => setUserMenuOpen(!userMenuOpen())}
-										onKeyDown={(e: KeyboardEvent): void => {
-											if (e.key === 'Escape') {
-												setUserMenuOpen(false)
-											}
-										}}
+			<Show when={locale() as Locale | null} keyed>
+				{(_loc: Locale) => (
+					<Show
+						when={isLoggedIn() !== null && needsSetup() !== null}
+						fallback={
+							<main class="app-content">
+								<p class="skeleton">{t('common.loading')}</p>
+							</main>
+						}
+					>
+						<Switch>
+							<Match when={needsSetup()}>
+								<main class="app-content app-content--centered">
+									<div class="app-auth">
+										<div class="app-header">
+											<h1>{APP_TITLE}</h1>
+										</div>
+										<SetupForm
+											username={setupUsername}
+											setUsername={setSetupUsername}
+											password={setupPassword}
+											setPassword={setSetupPassword}
+											confirm={setupConfirm}
+											setConfirm={setSetupConfirm}
+											error={setupError}
+											onSetup={handleSetup}
+										/>
+										<div class="app-auth-language">
+											<LanguageSwitcher />
+										</div>
+									</div>
+								</main>
+							</Match>
+							<Match when={!isLoggedIn()}>
+								<main class="app-content app-content--centered">
+									<div class="app-auth">
+										<div class="app-header">
+											<h1>{APP_TITLE}</h1>
+										</div>
+										<LoginForm
+											username={username}
+											setUsername={setUsername}
+											password={password}
+											setPassword={setPassword}
+											error={error}
+											onLogin={handleLogin}
+										/>
+										<div class="app-auth-language">
+											<LanguageSwitcher />
+										</div>
+									</div>
+								</main>
+							</Match>
+							<Match when={isLoggedIn()}>
+								<header class="app-topbar">
+									<a
+										href="/tenants"
+										class="app-topbar-brand"
+										onClick={(e: MouseEvent): void => goTo(e, '/tenants')}
 									>
-										<span class="app-user-username">
-											{currentUser()?.username ?? '…'}
-										</span>
-									</button>
-									<Show when={userMenuOpen()}>
-										<div
-											class="app-user-dropdown"
-											role="menu"
-											aria-label={t('app.account')}
-										>
+										{APP_TITLE}
+									</a>
+									<div class="app-topbar-actions">
+										<div class="app-user-menu">
 											<button
 												type="button"
-												role="menuitem"
-												class="app-user-logout"
-												onClick={handleLogout}
+												class="app-user-button"
+												aria-haspopup="menu"
+												aria-expanded={userMenuOpen()}
+												aria-label={t('app.accountNamed', {
+													name: currentUser()?.username ?? '…',
+												})}
+												onClick={() => setUserMenuOpen(!userMenuOpen())}
+												onKeyDown={(e: KeyboardEvent): void => {
+													if (e.key === 'Escape') {
+														setUserMenuOpen(false)
+													}
+												}}
 											>
-												<span aria-hidden="true" class="app-nav-icon">
-													<IconLogout size={16} />
+												<span class="app-user-info">
+													<span class="app-user-username">
+														{currentUser()?.username ?? '…'}
+													</span>
+													<Show when={currentUser()}>
+														{(user) => (
+															<span class="app-user-role">
+																{roleLabel(user().role)}
+															</span>
+														)}
+													</Show>
 												</span>
-												{t('app.logout')}
 											</button>
+											<Show when={userMenuOpen()}>
+												<div
+													class="app-user-dropdown"
+													role="menu"
+													aria-label={t('app.account')}
+												>
+													<div class="app-user-language">
+														<LanguageSwitcher />
+													</div>
+													<button
+														type="button"
+														role="menuitem"
+														class="app-user-logout"
+														onClick={handleLogout}
+													>
+														<span
+															aria-hidden="true"
+															class="app-nav-icon"
+														>
+															<IconLogout size={16} />
+														</span>
+														{t('app.logout')}
+													</button>
+												</div>
+											</Show>
 										</div>
-									</Show>
-								</div>
-							</div>
-						</header>
-						<div class="app-body">
-							<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
-								<p class="app-nav-label">{t('app.inventory')}</p>
-								<nav class="app-nav">
-									<For
-										each={SECTIONS.filter(
-											(section) =>
-												section.icon !== undefined &&
-												section.list !== undefined &&
-												(section.adminOnly !== true ||
-													currentUser()?.role === 'admin'),
-										)}
-									>
-										{(section: Section): JSX.Element => (
-											<NavItem
-												href={`/${section.path}`}
-												active={routeSection(path()) === section}
-												icon={
-													<Dynamic component={section.icon} size={16} />
-												}
-												label={section.noun(2)}
-												addHref={
-													section.add ? `/${section.path}/add` : undefined
-												}
-												importHref={
-													section.import
-														? `/${section.path}/import`
-														: undefined
-												}
-											/>
-										)}
-									</For>
-								</nav>
-							</aside>
-							<div class="app-main">
-								<TabBar />
-								<main class="app-content" id="main">
-									<For each={tabs()}>
-										{(tab: TabState) => (
-											<div
-												class="tab-pane"
-												data-tab-id={tab.id}
-												hidden={tab.id !== activeTabId()}
-												aria-hidden={tab.id !== activeTabId()}
+									</div>
+								</header>
+								<div class="app-body">
+									<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
+										<p class="app-nav-label">{t('app.inventory')}</p>
+										<nav class="app-nav">
+											<For
+												each={SECTIONS.filter(
+													(section) =>
+														section.icon !== undefined &&
+														section.list !== undefined &&
+														(section.adminOnly !== true ||
+															currentUser()?.role === 'admin'),
+												)}
 											>
-												<RouteContent
-													routePath={tab.path}
-													tabId={tab.id}
-													isAdmin={currentUser()?.role === 'admin'}
-												/>
-											</div>
-										)}
-									</For>
-								</main>
-							</div>
-						</div>
-					</Match>
-				</Switch>
+												{(section: Section): JSX.Element => (
+													<NavItem
+														href={`/${section.path}`}
+														active={routeSection(path()) === section}
+														icon={
+															<Dynamic
+																component={section.icon}
+																size={16}
+															/>
+														}
+														label={section.noun(2)}
+														addHref={
+															section.add
+																? `/${section.path}/add`
+																: undefined
+														}
+														importHref={
+															section.import
+																? `/${section.path}/import`
+																: undefined
+														}
+													/>
+												)}
+											</For>
+										</nav>
+									</aside>
+									<div class="app-main">
+										<TabBar />
+										<main class="app-content" id="main">
+											<For each={tabs()}>
+												{(tab: TabState) => (
+													<div
+														class="tab-pane"
+														data-tab-id={tab.id}
+														hidden={tab.id !== activeTabId()}
+														aria-hidden={tab.id !== activeTabId()}
+													>
+														<RouteContent
+															routePath={tab.path}
+															tabId={tab.id}
+															isAdmin={
+																currentUser()?.role === 'admin'
+															}
+														/>
+													</div>
+												)}
+											</For>
+										</main>
+									</div>
+								</div>
+							</Match>
+						</Switch>
+					</Show>
+				)}
 			</Show>
 		</div>
 	)
