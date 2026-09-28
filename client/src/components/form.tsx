@@ -5,19 +5,21 @@
  * Field ids stay page-specific (`#site-name`, …) because the e2e smoke test
  * and the detail-page deep links address them directly.
  */
+
+import { IconChevronDown } from '@tabler/icons-solidjs'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { createEffect, For, type JSX, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import { type Crumb, navigate, usePageMeta } from '../router'
 import { Loading } from './feedback'
 
-/** One `<select>` entry. */
+/** One `SelectField` entry. */
 export interface FormOption {
 	value: number | string
 	label: string
 }
 
-/** Maps list rows (`{ id, name }`) to `<select>` options. */
+/** Maps list rows (`{ id, name }`) to `SelectField` options. */
 export function row_options(rows: { id: number; name: string }[]): FormOption[] {
 	return rows.map((row) => ({ value: row.id, label: row.name }))
 }
@@ -132,7 +134,10 @@ export function TextAreaField(props: {
 	)
 }
 
-/** Dropdown of `options`, with an optional leading empty choice. */
+/** Searchable dropdown of `options`, with an optional leading empty choice.
+ * A text combobox: typing filters the options by label, arrow keys move the
+ * highlight, Enter picks it. The input shows the selected label while closed;
+ * the numeric value sits in `data-value` for e2e tests. */
 export function SelectField(props: {
 	id: string
 	label: string
@@ -140,7 +145,7 @@ export function SelectField(props: {
 	/** Omitted on read-only selects (e.g. placeholders for unbuilt features). */
 	onChange?: (value: string) => void
 	options: FormOption[]
-	/** Label of the `<option value="">` first entry; omit for no empty choice. */
+	/** Label of the empty (`''`) first entry; omit for no empty choice. */
 	emptyLabel?: string
 	required?: boolean
 	disabled?: boolean
@@ -148,51 +153,163 @@ export function SelectField(props: {
 	describedBy?: string
 	hint?: JSX.Element
 	action?: JSX.Element
-	/** Extra `<option>` entries after the generated ones (e.g. a stale value). */
-	children?: JSX.Element
 }): JSX.Element {
-	let select: HTMLSelectElement | undefined
+	let input: HTMLInputElement | undefined
+	let list: HTMLDivElement | undefined
+	const listId = `${props.id}-listbox`
+	const [open, setOpen] = createSignal(false)
+	const [query, setQuery] = createSignal('')
+	const [active, setActive] = createSignal(0)
+
 	onMount(() => {
 		if (props.autofocus ?? false) {
-			select?.focus()
+			input?.focus()
 		}
 	})
+
+	const choices = createMemo((): FormOption[] =>
+		props.emptyLabel === undefined
+			? props.options
+			: [{ value: '', label: props.emptyLabel }, ...props.options],
+	)
+	const selected = createMemo(() =>
+		props.value === '' ? undefined : choices().find((o) => String(o.value) === props.value),
+	)
+	const filtered = createMemo((): FormOption[] => {
+		const needle = query().trim().toLowerCase()
+		return needle === ''
+			? choices()
+			: choices().filter((o) => o.label.toLowerCase().includes(needle))
+	})
+	const editable = (): boolean => !props.disabled && props.onChange !== undefined
+
 	createEffect(() => {
-		// Re-apply the value once async-loaded options arrive: the `value`
-		// binding only re-fires when the value itself changes, not when the
-		// `<For>` options resolve later (deep-linked forms open before their
-		// option lists finish loading).
-		void props.options
-		if (select && props.value !== '') {
-			select.value = props.value
+		// Keep the highlighted option visible while arrowing through a long list.
+		if (open()) {
+			list?.querySelector(`[data-index="${active()}"]`)?.scrollIntoView({ block: 'nearest' })
 		}
 	})
+
+	function show(): void {
+		if (open() || !editable()) {
+			return
+		}
+		setQuery('')
+		const index = choices().findIndex((o) => String(o.value) === props.value)
+		setActive(Math.max(index, 0))
+		setOpen(true)
+	}
+
+	function pick(option: FormOption | undefined): void {
+		setOpen(false)
+		if (option && String(option.value) !== props.value) {
+			props.onChange?.(String(option.value))
+		}
+	}
+
+	function onKeyDown(e: KeyboardEvent): void {
+		const count = filtered().length
+		switch (e.key) {
+			case 'ArrowDown':
+			case 'ArrowUp':
+				e.preventDefault()
+				if (!open()) {
+					show()
+				} else if (count > 0) {
+					const step = e.key === 'ArrowDown' ? 1 : -1
+					setActive((active() + step + count) % count)
+				}
+				break
+			case 'Enter':
+				if (open()) {
+					e.preventDefault()
+					pick(filtered()[active()])
+				}
+				break
+			case 'Escape':
+				if (open()) {
+					e.preventDefault()
+					e.stopPropagation()
+					setOpen(false)
+				}
+				break
+		}
+	}
 
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
 			<div class="field-inline-actions">
-				<select
-					id={props.id}
-					ref={select}
-					required={props.required}
-					disabled={props.disabled}
-					data-autofocus={props.autofocus || undefined}
-					aria-describedby={props.describedBy}
-					value={props.value}
-					onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-						props.onChange?.(e.currentTarget.value)
-					}
-				>
-					<Show when={props.emptyLabel}>
-						<option value="">{props.emptyLabel}</option>
+				<div class="combobox" classList={{ 'combobox-open': open() }}>
+					<input
+						id={props.id}
+						ref={input}
+						role="combobox"
+						aria-expanded={open()}
+						aria-controls={listId}
+						aria-autocomplete="list"
+						aria-activedescendant={
+							open() && filtered().length > 0
+								? `${props.id}-option-${active()}`
+								: undefined
+						}
+						aria-describedby={props.describedBy}
+						autocomplete="off"
+						required={props.required}
+						disabled={props.disabled}
+						readOnly={props.onChange === undefined}
+						data-autofocus={props.autofocus || undefined}
+						data-value={props.value}
+						placeholder={
+							open()
+								? (selected()?.label ?? props.emptyLabel ?? t('common.search'))
+								: props.emptyLabel
+						}
+						value={open() ? query() : (selected()?.label ?? '')}
+						onClick={show}
+						onInput={(e: InputEventAndTarget) => {
+							show()
+							setQuery(e.currentTarget.value)
+							setActive(0)
+						}}
+						onKeyDown={onKeyDown}
+						onBlur={() => setOpen(false)}
+					/>
+					<IconChevronDown class="combobox-chevron" size={16} aria-hidden="true" />
+					<Show when={open()}>
+						<div class="combobox-list" id={listId} ref={list} role="listbox">
+							<For
+								each={filtered()}
+								fallback={
+									<div class="combobox-empty">
+										{t('common.noMatchingObjects')}
+									</div>
+								}
+							>
+								{(option: FormOption, index: () => number): JSX.Element => (
+									// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection runs through the combobox input (aria-activedescendant)
+									// biome-ignore lint/a11y/useFocusableInteractive: focus stays in the combobox input
+									<div
+										id={`${props.id}-option-${index()}`}
+										data-index={index()}
+										role="option"
+										aria-selected={String(option.value) === props.value}
+										classList={{
+											'combobox-option': true,
+											'combobox-option-active': index() === active(),
+											'combobox-option-empty': option.value === '',
+										}}
+										// Keep focus in the input so blur doesn't close the list first.
+										onMouseDown={(e: MouseEvent) => e.preventDefault()}
+										onMouseMove={() => setActive(index())}
+										onClick={() => pick(option)}
+									>
+										{option.label}
+									</div>
+								)}
+							</For>
+						</div>
 					</Show>
-					<For each={props.options}>
-						{(option: FormOption): JSX.Element => (
-							<option value={option.value}>{option.label}</option>
-						)}
-					</For>
-					{props.children}
-				</select>
+				</div>
 				{props.action}
 			</div>
 		</Field>

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { SQL } from 'bun'
 import { closeDb, getDb, getSqlClient, initDb } from '../../server/src/db/connection'
 import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 import {
@@ -25,6 +26,17 @@ if (!fs.existsSync(configPath)) {
 		'[auth]\nappKey = "e2e-app-key-0123456789abcdef-0123456789abcdef"\nsecureCookies = false\n',
 	)
 }
+
+// Create the dedicated e2e database on first run (via the maintenance db).
+const dbUrl = new URL(process.env.CONEX_DATABASE_URL ?? '')
+const dbName = decodeURIComponent(dbUrl.pathname.replace(/^\//, ''))
+const adminUrl = new URL(dbUrl)
+adminUrl.pathname = '/postgres'
+const admin = new SQL(adminUrl.toString())
+if ((await admin`SELECT 1 FROM pg_database WHERE datname = ${dbName}`).length === 0) {
+	await admin.unsafe(`CREATE DATABASE "${dbName.replaceAll('"', '""')}"`)
+}
+await admin.close()
 
 await initDb({
 	migrationsFolder: path.join(repoRoot, 'server/drizzle'),

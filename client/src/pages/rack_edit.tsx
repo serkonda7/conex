@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { createResource, createSignal, type JSX, Show } from 'solid-js'
+import { createResource, createSignal, type JSX } from 'solid-js'
 import { fetch_rack, update_rack } from '../api_racks'
 import { type DeviceTypeRow, fetch_device_types } from '../api_templates'
 import { fetch_location, fetch_locations, fetch_site, fetch_tenants } from '../api_tenancy'
@@ -7,6 +7,7 @@ import {
 	EditActions,
 	EditPageShell,
 	FormError,
+	type FormOption,
 	NameField,
 	row_options,
 	SelectField,
@@ -96,6 +97,21 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 		return res.value
 	})
 
+	// Keep a current location that falls outside the sibling list selectable
+	// so the combobox can still show it.
+	function locationOptions(): FormOption[] {
+		const options = row_options(siblings() ?? [])
+		const current = currentLocation()
+		if (
+			locationId() !== '' &&
+			options.every((o) => String(o.value) !== locationId()) &&
+			current
+		) {
+			options.push({ value: current.id, label: current.name })
+		}
+		return options
+	}
+
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_edit({
@@ -139,21 +155,9 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 				label={tp('entity.location', 1)}
 				value={locationId()}
 				onChange={setLocationId}
-				options={row_options(siblings() ?? [])}
+				options={locationOptions()}
 				emptyLabel={t('rack.noLocation')}
-			>
-				<Show
-					when={
-						locationId() !== '' &&
-						(siblings() ?? []).every((l) => String(l.id) !== locationId()) &&
-						currentLocation()
-					}
-				>
-					<option value={currentLocation()?.id ?? locationId()}>
-						{currentLocation()?.name ?? locationId()}
-					</option>
-				</Show>
-			</SelectField>
+			/>
 			<NameField id="rack-edit-name" placeholder="A1" value={name()} onInput={setName} />
 			<TextField
 				id="rack-edit-description"

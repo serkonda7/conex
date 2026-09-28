@@ -9,6 +9,24 @@ const apiPort: number = Number(new URL(apiUrl).port || 3300)
 const reuse: boolean = (process.env.CONEX_E2E_REUSE_SERVERS ?? '') !== ''
 export const e2eAuthFile: string = path.resolve('./test-results/.auth/user.json')
 
+// Dedicated database: the seed writes fixtures into it. Defaults to
+// `<CONEX_DATABASE_URL db>_e2e` on the same server; the seed creates it if missing.
+function resolve_e2e_db_url(): string {
+	const explicit = process.env.CONEX_E2E_DATABASE_URL?.trim()
+	if (explicit) {
+		return explicit
+	}
+	const base = process.env.CONEX_DATABASE_URL?.trim()
+	if (!base) {
+		throw new Error(
+			'Set CONEX_E2E_DATABASE_URL or CONEX_DATABASE_URL (e.g. postgres://user:pass@host:5432/conex) to run e2e tests.',
+		)
+	}
+	const url = new URL(base)
+	url.pathname = `${url.pathname.replace(/^\//, '') || 'conex'}_e2e`
+	return url.toString()
+}
+
 export default defineConfig({
 	testDir: './tests/e2e',
 	timeout: 60_000,
@@ -41,8 +59,7 @@ export default defineConfig({
 					env: {
 						CONEX_E2E_DATA_DIR: dataDir,
 						CONEX_CONFIG_PATH: path.join(dataDir, 'config.toml'),
-						// Dedicated database: the seed writes fixtures into it.
-						CONEX_DATABASE_URL: process.env.CONEX_E2E_DATABASE_URL ?? '',
+						CONEX_DATABASE_URL: resolve_e2e_db_url(),
 						CONEX_SERVER_PORT: String(apiPort),
 					},
 					url: `${apiUrl}/health`,

@@ -37,7 +37,7 @@ bun run dev
 | ------------------------ | -------------------------------------------------- | ------------- |
 | `CONEX_DATABASE_URL`     | Postgres connection string (required)              | –             |
 | `CONEX_CONFIG_PATH`      | Relative to `server/data` or absolute              | `config.toml` |
-| `CONEX_E2E_DATABASE_URL` | Separate Postgres database for `bun run test:e2e`  | –             |
+| `CONEX_E2E_DATABASE_URL` | Separate Postgres database for `bun run test:e2e`  | `CONEX_DATABASE_URL` + `_e2e` (auto-created) |
 
 
 ### Migrating from SQLite

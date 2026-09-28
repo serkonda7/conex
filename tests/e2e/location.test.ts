@@ -4,13 +4,14 @@ import { expect, test } from '@playwright/test'
 
 test('selecting a site keeps the tenant selected and site present', async ({ page }) => {
 	await page.goto('/locations/add')
-	await expect(page.locator('#location-site option', { hasText: 'E2E Site' })).toHaveCount(1)
 	await page.locator('#location-name').fill('E2E Location')
-	await page.locator('#location-site').selectOption({ label: 'E2E Site' })
+	await page.locator('#location-site').fill('E2E Site')
+	await page.getByRole('option', { name: 'E2E Site', exact: true }).click()
 
-	await expect(page.locator('#location-tenant')).toHaveValue(/\d+/)
-	await expect(page.locator('#location-tenant option:checked')).toHaveText('E2E Tenant')
-	await expect(page.locator('#location-site')).toHaveValue(/\d+/)
-	await expect(page.locator('#location-site option:checked')).toHaveText('E2E Site')
-	await expect(page.locator('#location-site option', { hasText: 'E2E Site' })).toHaveCount(1)
+	await expect(page.locator('#location-tenant')).toHaveAttribute('data-value', /\d+/)
+	await expect(page.locator('#location-tenant')).toHaveValue('E2E Tenant')
+	await expect(page.locator('#location-site')).toHaveAttribute('data-value', /\d+/)
+	await expect(page.locator('#location-site')).toHaveValue('E2E Site')
+	await page.locator('#location-site').fill('E2E Site')
+	await expect(page.getByRole('option', { name: 'E2E Site', exact: true })).toHaveCount(1)
 })
