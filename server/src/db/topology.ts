@@ -60,17 +60,17 @@ interface Graph {
  * Scoped editors/viewers see only cables with both endpoint devices in
  * their tenant, so no peer name from another tenant leaks into traces.
  */
-function loadGraph(scopeTenantId?: number): Graph {
+async function loadGraph(scopeTenantId?: number): Promise<Graph> {
 	const db = getDb()
 	const deviceById = new Map<number, DeviceRow>()
-	for (const d of db.select().from(devices).all()) {
+	for (const d of await db.select().from(devices)) {
 		if (scopeTenantId !== undefined && d.tenant_id !== scopeTenantId) {
 			continue
 		}
 		deviceById.set(d.id, d)
 	}
 	const ifaceById = new Map<number, InterfaceRow>()
-	for (const i of db.select().from(interfaces).all()) {
+	for (const i of await db.select().from(interfaces)) {
 		if (!deviceById.has(i.device_id)) {
 			continue
 		}
@@ -86,7 +86,7 @@ function loadGraph(scopeTenantId?: number): Graph {
 			adj.set(deviceId, [entry])
 		}
 	}
-	for (const cable of db.select().from(cables).all()) {
+	for (const cable of await db.select().from(cables)) {
 		const a = ifaceById.get(cable.a_interface_id)
 		const b = ifaceById.get(cable.b_interface_id)
 		if (!a || !b) {
@@ -246,8 +246,8 @@ export interface TopologyParams {
  * `device` keeps the connected component containing that device (after
  * the other filters). Filters intersect — each narrows the previous set.
  */
-export function getTopology(params: TopologyParams): TopologyResponse {
-	const graph = loadGraph(params.scopeTenantId)
+export async function getTopology(params: TopologyParams): Promise<TopologyResponse> {
+	const graph = await loadGraph(params.scopeTenantId)
 	let nodeIds = new Set(graph.deviceById.keys())
 	if (params.tenant !== undefined) {
 		nodeIds = new Set(
@@ -256,10 +256,7 @@ export function getTopology(params: TopologyParams): TopologyResponse {
 	}
 	if (params.group !== undefined) {
 		const siteIds = new Set(
-			getDb()
-				.select()
-				.from(sites)
-				.all()
+			(await getDb().select().from(sites))
 				.filter((s) => s.site_group_id === params.group)
 				.map((s) => s.id),
 		)
@@ -334,14 +331,16 @@ export function getTopology(params: TopologyParams): TopologyResponse {
 	return { nodes, edges }
 }
 
-export function getDevicePaths(
+export async function getDevicePaths(
 	deviceId: number,
 	depth: number,
 	scopeTenantId?: number,
-): Result<TracePath[], Error> {
-	const graph = loadGraph(scopeTenantId)
+): Promise<Result<TracePath[], Error>> {
+	const graph = await loadGraph(scopeTenantId)
 	if (!graph.deviceById.has(deviceId)) {
-		const exists = getDb().select().from(devices).where(eq(devices.id, deviceId)).get()
+		const exists = (
+			await getDb().select().from(devices).where(eq(devices.id, deviceId)).limit(1)
+		)[0]
 		return Result.err(
 			new NotFoundError(exists ? 'Device is outside your tenant scope' : 'Device not found'),
 		)
@@ -349,16 +348,18 @@ export function getDevicePaths(
 	return Result.ok(bfsDevicePaths(graph, deviceId, depth))
 }
 
-export function getInterfaceTrace(
+export async function getInterfaceTrace(
 	deviceId: number,
 	ifaceId: number,
 	depth: number,
 	scopeTenantId?: number,
-): Result<InterfaceTraceResponse, Error> {
-	const graph = loadGraph(scopeTenantId)
+): Promise<Result<InterfaceTraceResponse, Error>> {
+	const graph = await loadGraph(scopeTenantId)
 	const device = graph.deviceById.get(deviceId)
 	if (!device) {
-		const exists = getDb().select().from(devices).where(eq(devices.id, deviceId)).get()
+		const exists = (
+			await getDb().select().from(devices).where(eq(devices.id, deviceId)).limit(1)
+		)[0]
 		return Result.err(
 			new NotFoundError(exists ? 'Device is outside your tenant scope' : 'Device not found'),
 		)
@@ -374,15 +375,17 @@ export function getInterfaceTrace(
 	})
 }
 
-export function getCableTrace(
+export async function getCableTrace(
 	cableId: number,
 	depth: number,
 	scopeTenantId?: number,
-): Result<CableTraceResponse, Error> {
-	const graph = loadGraph(scopeTenantId)
+): Promise<Result<CableTraceResponse, Error>> {
+	const graph = await loadGraph(scopeTenantId)
 	const cable = graph.cableById.get(cableId)
 	if (!cable) {
-		const exists = getDb().select().from(cables).where(eq(cables.id, cableId)).get()
+		const exists = (
+			await getDb().select().from(cables).where(eq(cables.id, cableId)).limit(1)
+		)[0]
 		return Result.err(
 			new NotFoundError(
 				exists ? 'Cable endpoints are outside your tenant scope' : 'Cable not found',

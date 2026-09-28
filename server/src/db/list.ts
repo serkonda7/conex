@@ -41,11 +41,15 @@ export function errOf(e: unknown): Error {
 }
 
 /** Shared tenant FK guard: null/undefined passes, missing id is 404. */
-export function checkTenantExists(tenantId: number | null | undefined): Result<undefined, Error> {
+export async function checkTenantExists(
+	tenantId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
 	if (tenantId === null || tenantId === undefined) {
 		return Result.ok(undefined)
 	}
-	const tenant = getDb().select().from(tenants).where(eq(tenants.id, tenantId)).get()
+	const tenant = (
+		await getDb().select().from(tenants).where(eq(tenants.id, tenantId)).limit(1)
+	)[0]
 	if (!tenant) {
 		return Result.err(new NotFoundError('Tenant not found'))
 	}

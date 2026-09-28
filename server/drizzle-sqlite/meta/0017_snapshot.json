@@ -1,8 +1,8 @@
 {
-  "id": "693bf1bc-80fc-48de-944d-309387a3e5f8",
-  "prevId": "84f94b14-abf5-4d35-a0af-ec30a67e9734",
   "version": "6",
   "dialect": "sqlite",
+  "id": "d1e64c40-e3dd-4ada-b210-210d474c2791",
+  "prevId": "5c956273-2359-4685-a594-0eafa6cf729d",
   "tables": {
     "auth_states": {
       "name": "auth_states",
@@ -32,9 +32,7 @@
       "indexes": {
         "auth_states_expires_at_idx": {
           "name": "auth_states_expires_at_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         }
       },
@@ -100,37 +98,27 @@
       "indexes": {
         "cables_a_interface_id_unique": {
           "name": "cables_a_interface_id_unique",
-          "columns": [
-            "a_interface_id"
-          ],
+          "columns": ["a_interface_id"],
           "isUnique": true
         },
         "cables_b_interface_id_unique": {
           "name": "cables_b_interface_id_unique",
-          "columns": [
-            "b_interface_id"
-          ],
+          "columns": ["b_interface_id"],
           "isUnique": true
         },
         "cables_a_interface_id_idx": {
           "name": "cables_a_interface_id_idx",
-          "columns": [
-            "a_interface_id"
-          ],
+          "columns": ["a_interface_id"],
           "isUnique": false
         },
         "cables_b_interface_id_idx": {
           "name": "cables_b_interface_id_idx",
-          "columns": [
-            "b_interface_id"
-          ],
+          "columns": ["b_interface_id"],
           "isUnique": false
         },
         "cables_status_idx": {
           "name": "cables_status_idx",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         }
       },
@@ -138,28 +126,20 @@
         "cables_a_interface_id_interfaces_id_fk": {
           "name": "cables_a_interface_id_interfaces_id_fk",
           "tableFrom": "cables",
-          "columnsFrom": [
-            "a_interface_id"
-          ],
           "tableTo": "interfaces",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["a_interface_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "cables_b_interface_id_interfaces_id_fk": {
           "name": "cables_b_interface_id_interfaces_id_fk",
           "tableFrom": "cables",
-          "columnsFrom": [
-            "b_interface_id"
-          ],
           "tableTo": "interfaces",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["b_interface_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -224,18 +204,12 @@
       "indexes": {
         "device_type_interfaces_type_id_idx": {
           "name": "device_type_interfaces_type_id_idx",
-          "columns": [
-            "device_type_id"
-          ],
+          "columns": ["device_type_id"],
           "isUnique": false
         },
         "device_type_interfaces_prefix_kind_idx": {
           "name": "device_type_interfaces_prefix_kind_idx",
-          "columns": [
-            "device_type_id",
-            "prefix",
-            "kind"
-          ],
+          "columns": ["device_type_id", "prefix", "kind"],
           "isUnique": true
         }
       },
@@ -243,15 +217,11 @@
         "device_type_interfaces_device_type_id_device_types_id_fk": {
           "name": "device_type_interfaces_device_type_id_device_types_id_fk",
           "tableFrom": "device_type_interfaces",
-          "columnsFrom": [
-            "device_type_id"
-          ],
           "tableTo": "device_types",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["device_type_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -330,16 +300,12 @@
       "indexes": {
         "device_types_manufacturer_id_idx": {
           "name": "device_types_manufacturer_id_idx",
-          "columns": [
-            "manufacturer_id"
-          ],
+          "columns": ["manufacturer_id"],
           "isUnique": false
         },
         "device_types_model_idx": {
           "name": "device_types_model_idx",
-          "columns": [
-            "model"
-          ],
+          "columns": ["model"],
           "isUnique": false
         }
       },
@@ -347,15 +313,11 @@
         "device_types_manufacturer_id_manufacturers_id_fk": {
           "name": "device_types_manufacturer_id_manufacturers_id_fk",
           "tableFrom": "device_types",
-          "columnsFrom": [
-            "manufacturer_id"
-          ],
           "tableTo": "manufacturers",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["manufacturer_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -414,13 +376,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "shelf_id": {
-          "name": "shelf_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -468,58 +423,37 @@
       "indexes": {
         "devices_asset_tag_unique": {
           "name": "devices_asset_tag_unique",
-          "columns": [
-            "asset_tag"
-          ],
+          "columns": ["asset_tag"],
           "isUnique": true
         },
         "devices_type_id_idx": {
           "name": "devices_type_id_idx",
-          "columns": [
-            "device_type_id"
-          ],
+          "columns": ["device_type_id"],
           "isUnique": false
         },
         "devices_site_id_idx": {
           "name": "devices_site_id_idx",
-          "columns": [
-            "site_id"
-          ],
+          "columns": ["site_id"],
           "isUnique": false
         },
         "devices_rack_id_idx": {
           "name": "devices_rack_id_idx",
-          "columns": [
-            "rack_id"
-          ],
-          "isUnique": false
-        },
-        "devices_shelf_id_idx": {
-          "name": "devices_shelf_id_idx",
-          "columns": [
-            "shelf_id"
-          ],
+          "columns": ["rack_id"],
           "isUnique": false
         },
         "devices_tenant_id_idx": {
           "name": "devices_tenant_id_idx",
-          "columns": [
-            "tenant_id"
-          ],
+          "columns": ["tenant_id"],
           "isUnique": false
         },
         "devices_status_idx": {
           "name": "devices_status_idx",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "devices_name_idx": {
           "name": "devices_name_idx",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         }
       },
@@ -527,80 +461,47 @@
         "devices_device_type_id_device_types_id_fk": {
           "name": "devices_device_type_id_device_types_id_fk",
           "tableFrom": "devices",
-          "columnsFrom": [
-            "device_type_id"
-          ],
           "tableTo": "device_types",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["device_type_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "devices_site_id_sites_id_fk": {
           "name": "devices_site_id_sites_id_fk",
           "tableFrom": "devices",
-          "columnsFrom": [
-            "site_id"
-          ],
           "tableTo": "sites",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "devices_location_id_locations_id_fk": {
           "name": "devices_location_id_locations_id_fk",
           "tableFrom": "devices",
-          "columnsFrom": [
-            "location_id"
-          ],
           "tableTo": "locations",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "devices_rack_id_racks_id_fk": {
           "name": "devices_rack_id_racks_id_fk",
           "tableFrom": "devices",
-          "columnsFrom": [
-            "rack_id"
-          ],
           "tableTo": "racks",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "devices_shelf_id_shelves_id_fk": {
-          "name": "devices_shelf_id_shelves_id_fk",
-          "tableFrom": "devices",
-          "columnsFrom": [
-            "shelf_id"
-          ],
-          "tableTo": "shelves",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["rack_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "devices_tenant_id_tenants_id_fk": {
           "name": "devices_tenant_id_tenants_id_fk",
           "tableFrom": "devices",
-          "columnsFrom": [
-            "tenant_id"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -647,14 +548,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "enabled": {
-          "name": "enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
         "description": {
           "name": "description",
           "type": "text",
@@ -666,17 +559,12 @@
       "indexes": {
         "interfaces_device_id_idx": {
           "name": "interfaces_device_id_idx",
-          "columns": [
-            "device_id"
-          ],
+          "columns": ["device_id"],
           "isUnique": false
         },
         "interfaces_device_name_idx": {
           "name": "interfaces_device_name_idx",
-          "columns": [
-            "device_id",
-            "name"
-          ],
+          "columns": ["device_id", "name"],
           "isUnique": true
         }
       },
@@ -684,15 +572,11 @@
         "interfaces_device_id_devices_id_fk": {
           "name": "interfaces_device_id_devices_id_fk",
           "tableFrom": "interfaces",
-          "columnsFrom": [
-            "device_id"
-          ],
           "tableTo": "devices",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["device_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -744,14 +628,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'other'"
-        },
         "description": {
           "name": "description",
           "type": "text",
@@ -763,25 +639,17 @@
       "indexes": {
         "locations_site_id_idx": {
           "name": "locations_site_id_idx",
-          "columns": [
-            "site_id"
-          ],
+          "columns": ["site_id"],
           "isUnique": false
         },
         "locations_parent_id_idx": {
           "name": "locations_parent_id_idx",
-          "columns": [
-            "parent_id"
-          ],
+          "columns": ["parent_id"],
           "isUnique": false
         },
         "locations_sibling_slug_idx": {
           "name": "locations_sibling_slug_idx",
-          "columns": [
-            "site_id",
-            "parent_id",
-            "slug"
-          ],
+          "columns": ["site_id", "parent_id", "slug"],
           "isUnique": true
         }
       },
@@ -789,41 +657,29 @@
         "locations_site_id_sites_id_fk": {
           "name": "locations_site_id_sites_id_fk",
           "tableFrom": "locations",
-          "columnsFrom": [
-            "site_id"
-          ],
           "tableTo": "sites",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "locations_parent_id_locations_id_fk": {
           "name": "locations_parent_id_locations_id_fk",
           "tableFrom": "locations",
-          "columnsFrom": [
-            "parent_id"
-          ],
           "tableTo": "locations",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "locations_tenant_id_tenants_id_fk": {
           "name": "locations_tenant_id_tenants_id_fk",
           "tableFrom": "locations",
-          "columnsFrom": [
-            "tenant_id"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -865,23 +721,17 @@
       "indexes": {
         "manufacturers_name_unique": {
           "name": "manufacturers_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         },
         "manufacturers_slug_unique": {
           "name": "manufacturers_slug_unique",
-          "columns": [
-            "slug"
-          ],
+          "columns": ["slug"],
           "isUnique": true
         },
         "manufacturers_name_idx": {
           "name": "manufacturers_name_idx",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         }
       },
@@ -946,30 +796,22 @@
       "indexes": {
         "racks_site_id_idx": {
           "name": "racks_site_id_idx",
-          "columns": [
-            "site_id"
-          ],
+          "columns": ["site_id"],
           "isUnique": false
         },
         "racks_location_id_idx": {
           "name": "racks_location_id_idx",
-          "columns": [
-            "location_id"
-          ],
+          "columns": ["location_id"],
           "isUnique": false
         },
         "racks_tenant_id_idx": {
           "name": "racks_tenant_id_idx",
-          "columns": [
-            "tenant_id"
-          ],
+          "columns": ["tenant_id"],
           "isUnique": false
         },
         "racks_name_idx": {
           "name": "racks_name_idx",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         }
       },
@@ -977,54 +819,38 @@
         "racks_site_id_sites_id_fk": {
           "name": "racks_site_id_sites_id_fk",
           "tableFrom": "racks",
-          "columnsFrom": [
-            "site_id"
-          ],
           "tableTo": "sites",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "racks_location_id_locations_id_fk": {
           "name": "racks_location_id_locations_id_fk",
           "tableFrom": "racks",
-          "columnsFrom": [
-            "location_id"
-          ],
           "tableTo": "locations",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["location_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "racks_tenant_id_tenants_id_fk": {
           "name": "racks_tenant_id_tenants_id_fk",
           "tableFrom": "racks",
-          "columnsFrom": [
-            "tenant_id"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "racks_rack_type_id_device_types_id_fk": {
           "name": "racks_rack_type_id_device_types_id_fk",
           "tableFrom": "racks",
-          "columnsFrom": [
-            "rack_type_id"
-          ],
           "tableTo": "device_types",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["rack_type_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1073,9 +899,7 @@
       "indexes": {
         "sessions_expires_at_idx": {
           "name": "sessions_expires_at_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         }
       },
@@ -1083,128 +907,11 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
-          "columnsFrom": [
-            "user_id"
-          ],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "shelves": {
-      "name": "shelves",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "rack_id": {
-          "name": "rack_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "face": {
-          "name": "face",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "position_u": {
-          "name": "position_u",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mount_height": {
-          "name": "mount_height",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "mount_usable": {
-          "name": "mount_usable",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "reserved_height": {
-          "name": "reserved_height",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "is_full_depth": {
-          "name": "is_full_depth",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "shelves_rack_id_idx": {
-          "name": "shelves_rack_id_idx",
-          "columns": [
-            "rack_id"
-          ],
-          "isUnique": false
-        },
-        "shelves_name_idx": {
-          "name": "shelves_name_idx",
-          "columns": [
-            "name"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "shelves_rack_id_racks_id_fk": {
-          "name": "shelves_rack_id_racks_id_fk",
-          "tableFrom": "shelves",
-          "columnsFrom": [
-            "rack_id"
-          ],
-          "tableTo": "racks",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1267,31 +974,22 @@
       "indexes": {
         "site_groups_tenant_id_idx": {
           "name": "site_groups_tenant_id_idx",
-          "columns": [
-            "tenant_id"
-          ],
+          "columns": ["tenant_id"],
           "isUnique": false
         },
         "site_groups_parent_id_idx": {
           "name": "site_groups_parent_id_idx",
-          "columns": [
-            "parent_id"
-          ],
+          "columns": ["parent_id"],
           "isUnique": false
         },
         "site_groups_name_idx": {
           "name": "site_groups_name_idx",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         },
         "site_groups_sibling_slug_idx": {
           "name": "site_groups_sibling_slug_idx",
-          "columns": [
-            "parent_id",
-            "slug"
-          ],
+          "columns": ["parent_id", "slug"],
           "isUnique": true
         }
       },
@@ -1299,28 +997,20 @@
         "site_groups_tenant_id_tenants_id_fk": {
           "name": "site_groups_tenant_id_tenants_id_fk",
           "tableFrom": "site_groups",
-          "columnsFrom": [
-            "tenant_id"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "site_groups_parent_id_site_groups_id_fk": {
           "name": "site_groups_parent_id_site_groups_id_fk",
           "tableFrom": "site_groups",
-          "columnsFrom": [
-            "parent_id"
-          ],
           "tableTo": "site_groups",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1397,30 +1087,22 @@
       "indexes": {
         "sites_slug_unique": {
           "name": "sites_slug_unique",
-          "columns": [
-            "slug"
-          ],
+          "columns": ["slug"],
           "isUnique": true
         },
         "sites_tenant_id_idx": {
           "name": "sites_tenant_id_idx",
-          "columns": [
-            "tenant_id"
-          ],
+          "columns": ["tenant_id"],
           "isUnique": false
         },
         "sites_site_group_id_idx": {
           "name": "sites_site_group_id_idx",
-          "columns": [
-            "site_group_id"
-          ],
+          "columns": ["site_group_id"],
           "isUnique": false
         },
         "sites_name_idx": {
           "name": "sites_name_idx",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         }
       },
@@ -1428,28 +1110,20 @@
         "sites_tenant_id_tenants_id_fk": {
           "name": "sites_tenant_id_tenants_id_fk",
           "tableFrom": "sites",
-          "columnsFrom": [
-            "tenant_id"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "sites_site_group_id_site_groups_id_fk": {
           "name": "sites_site_group_id_site_groups_id_fk",
           "tableFrom": "sites",
-          "columnsFrom": [
-            "site_group_id"
-          ],
           "tableTo": "site_groups",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["site_group_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1498,16 +1172,12 @@
       "indexes": {
         "tenants_slug_unique": {
           "name": "tenants_slug_unique",
-          "columns": [
-            "slug"
-          ],
+          "columns": ["slug"],
           "isUnique": true
         },
         "tenants_name_idx": {
           "name": "tenants_name_idx",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         }
       },
@@ -1574,16 +1244,12 @@
       "indexes": {
         "users_username_unique": {
           "name": "users_username_unique",
-          "columns": [
-            "username"
-          ],
+          "columns": ["username"],
           "isUnique": true
         },
         "users_provider_id_unique": {
           "name": "users_provider_id_unique",
-          "columns": [
-            "provider_id"
-          ],
+          "columns": ["provider_id"],
           "isUnique": true
         }
       },
@@ -1591,15 +1257,11 @@
         "users_tenant_id_tenants_id_fk": {
           "name": "users_tenant_id_tenants_id_fk",
           "tableFrom": "users",
-          "columnsFrom": [
-            "tenant_id"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1610,9 +1272,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

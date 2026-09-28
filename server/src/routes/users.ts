@@ -23,10 +23,10 @@ import { sendCreated, sendRow } from './helpers'
 export const usersApp = new Hono()
 	.use(authMiddleware)
 	.use(requireAdminMiddleware)
-	.get('/', vValidator('query', UserListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', UserListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(
-			listUsers({
+			await listUsers({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -38,8 +38,8 @@ export const usersApp = new Hono()
 	.post('/', vValidator('json', UserCreateSchema, onValidationError), async (c) => {
 		return sendCreated(c, await createUser(c.req.valid('json')))
 	})
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendRow(c, getUserResult(c.req.valid('param').id))
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendRow(c, await getUserResult(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
@@ -49,6 +49,6 @@ export const usersApp = new Hono()
 			return sendRow(c, await updateUser(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendRow(c, deleteUser(c.req.valid('param').id, requestUser(c).id))
+	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendRow(c, await deleteUser(c.req.valid('param').id, requestUser(c).id))
 	})

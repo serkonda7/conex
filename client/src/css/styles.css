@@ -299,12 +299,6 @@ tbody tr:last-child td {
 	max-width: 8rem;
 }
 
-.app-auth-language {
-	display: flex;
-	justify-content: flex-end;
-	margin-top: 0.75rem;
-}
-
 .app-user-menu {
 	position: relative;
 }

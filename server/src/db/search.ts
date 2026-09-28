@@ -30,7 +30,10 @@ const GROUP_LIMIT = 10
  * cables group returns only cables whose both endpoint devices sit in the
  * scope (so no peer name from another tenant leaks).
  */
-export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchResponse {
+export async function globalSearch(
+	q: string,
+	scopeTenantId?: number,
+): Promise<GlobalSearchResponse> {
 	const db = getDb()
 	const query = q.trim()
 	const empty = <T>(): SearchGroup<T> => ({ items: [], total: 0 })
@@ -47,35 +50,32 @@ export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchRes
 	const pattern = searchPattern(query)
 	const scope = scopeTenantId
 
-	const tenantRows = db
+	const tenantRows = await db
 		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
 		.from(sql`tenants`)
 		.where(
 			scope === undefined
-				? sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\')`
-				: sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
+				? sql`(name ILIKE ${pattern} ESCAPE '\\' OR slug ILIKE ${pattern} ESCAPE '\\')`
+				: sql`(name ILIKE ${pattern} ESCAPE '\\' OR slug ILIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
 		)
-		.orderBy(asc(sql`name`))
+		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)
-		.all()
 	const tenantScope = scope === undefined ? sql`` : sql` AND (tenant_id = ${scope})`
-	const siteRows = db
+	const siteRows = await db
 		.select({ id: sql<number>`id`, name: sql<string>`name`, slug: sql<string>`slug` })
 		.from(sql`sites`)
 		.where(
-			sql`(name LIKE ${pattern} ESCAPE '\\' OR slug LIKE ${pattern} ESCAPE '\\')${tenantScope}`,
+			sql`(name ILIKE ${pattern} ESCAPE '\\' OR slug ILIKE ${pattern} ESCAPE '\\')${tenantScope}`,
 		)
-		.orderBy(asc(sql`name`))
+		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)
-		.all()
-	const rackRows = db
+	const rackRows = await db
 		.select({ id: sql<number>`id`, name: sql<string>`name` })
 		.from(sql`racks`)
-		.where(sql`name LIKE ${pattern} ESCAPE '\\'${tenantScope}`)
-		.orderBy(asc(sql`name`))
+		.where(sql`name ILIKE ${pattern} ESCAPE '\\'${tenantScope}`)
+		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)
-		.all()
-	const deviceRows = db
+	const deviceRows = await db
 		.select({
 			id: sql<number>`id`,
 			name: sql<string>`name`,
@@ -83,14 +83,13 @@ export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchRes
 		})
 		.from(sql`devices`)
 		.where(
-			sql`(name LIKE ${pattern} ESCAPE '\\' OR asset_tag LIKE ${pattern} ESCAPE '\\' OR serial LIKE ${pattern} ESCAPE '\\')${tenantScope}`,
+			sql`(name ILIKE ${pattern} ESCAPE '\\' OR asset_tag ILIKE ${pattern} ESCAPE '\\' OR serial ILIKE ${pattern} ESCAPE '\\')${tenantScope}`,
 		)
-		.orderBy(asc(sql`name`))
+		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)
-		.all()
 	const cableRows =
 		scope === undefined
-			? db
+			? await db
 					.select({
 						id: sql<number>`id`,
 						label: sql<string | null>`label`,
@@ -98,12 +97,11 @@ export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchRes
 					})
 					.from(sql`cables`)
 					.where(
-						sql`(label LIKE ${pattern} ESCAPE '\\' OR kind LIKE ${pattern} ESCAPE '\\')`,
+						sql`(label ILIKE ${pattern} ESCAPE '\\' OR kind ILIKE ${pattern} ESCAPE '\\')`,
 					)
-					.orderBy(sql`rowid`)
+					.orderBy(asc(sql`id`))
 					.limit(GROUP_LIMIT)
-					.all()
-			: db
+			: await db
 					.select({
 						id: sql<number>`cables.id`,
 						label: sql<string | null>`cables.label`,
@@ -111,11 +109,10 @@ export function globalSearch(q: string, scopeTenantId?: number): GlobalSearchRes
 					})
 					.from(sql`cables`)
 					.where(
-						sql`(cables.label LIKE ${pattern} ESCAPE '\\' OR cables.kind LIKE ${pattern} ESCAPE '\\') AND EXISTS (SELECT 1 FROM interfaces AS search_ia JOIN devices AS search_da ON search_da.id = search_ia.device_id WHERE search_ia.id = cables.a_interface_id AND search_da.tenant_id = ${scope}) AND EXISTS (SELECT 1 FROM interfaces AS search_ib JOIN devices AS search_db ON search_db.id = search_ib.device_id WHERE search_ib.id = cables.b_interface_id AND search_db.tenant_id = ${scope})`,
+						sql`(cables.label ILIKE ${pattern} ESCAPE '\\' OR cables.kind ILIKE ${pattern} ESCAPE '\\') AND EXISTS (SELECT 1 FROM interfaces AS search_ia JOIN devices AS search_da ON search_da.id = search_ia.device_id WHERE search_ia.id = cables.a_interface_id AND search_da.tenant_id = ${scope}) AND EXISTS (SELECT 1 FROM interfaces AS search_ib JOIN devices AS search_db ON search_db.id = search_ib.device_id WHERE search_ib.id = cables.b_interface_id AND search_db.tenant_id = ${scope})`,
 					)
-					.orderBy(sql`cables.rowid`)
+					.orderBy(asc(sql`cables.id`))
 					.limit(GROUP_LIMIT)
-					.all()
 
 	return {
 		q: query,

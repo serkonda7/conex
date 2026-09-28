@@ -31,10 +31,10 @@ import { sendCreated, sendCsv, sendRow } from './helpers'
 
 export const deviceTypesApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', DeviceTypeListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', DeviceTypeListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(
-			listDeviceTypes({
+			await listDeviceTypes({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -49,53 +49,53 @@ export const deviceTypesApp = new Hono()
 		'/',
 		requireGlobalWriteMiddleware,
 		vValidator('json', DeviceTypeCreateSchema, onValidationError),
-		(c) => {
-			return sendCreated(c, createDeviceType(c.req.valid('json')))
+		async (c) => {
+			return sendCreated(c, await createDeviceType(c.req.valid('json')))
 		},
 	)
 	// Transfer (registered before `/:id` so the literal paths win).
-	.get('/export', (c) => {
-		return sendCsv(c, exportDeviceTypesCsv(), 'device-types.csv')
+	.get('/export', async (c) => {
+		return sendCsv(c, await exportDeviceTypesCsv(), 'device-types.csv')
 	})
 	.post(
 		'/import',
 		requireGlobalWriteMiddleware,
 		vValidator('json', YamlImportBodySchema, onValidationError),
-		(c) => {
-			return sendCreated(c, importDeviceTypesYaml(c.req.valid('json').yaml))
+		async (c) => {
+			return sendCreated(c, await importDeviceTypesYaml(c.req.valid('json').yaml))
 		},
 	)
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendResult(c, getDeviceType(c.req.valid('param').id))
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendResult(c, await getDeviceType(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceTypeUpdateSchema, onValidationError),
-		(c) => {
-			return sendRow(c, updateDeviceType(c.req.valid('param').id, c.req.valid('json')))
+		async (c) => {
+			return sendRow(c, await updateDeviceType(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.delete(
 		'/:id',
 		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
-		(c) => {
-			return sendRow(c, deleteDeviceType(c.req.valid('param').id))
+		async (c) => {
+			return sendRow(c, await deleteDeviceType(c.req.valid('param').id))
 		},
 	)
 	// Stub sub-resource.
-	.get('/:id/stubs', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendResult(c, listStubs(c.req.valid('param').id))
+	.get('/:id/stubs', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendResult(c, await listStubs(c.req.valid('param').id))
 	})
 	.post(
 		'/:id/stubs',
 		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', StubCreateSchema, onValidationError),
-		(c) => {
-			return sendCreated(c, createStub(c.req.valid('param').id, c.req.valid('json')))
+		async (c) => {
+			return sendCreated(c, await createStub(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.patch(
@@ -103,20 +103,24 @@ export const deviceTypesApp = new Hono()
 		requireGlobalWriteMiddleware,
 		vValidator('param', StubIdParamsSchema, onValidationError),
 		vValidator('json', StubUpdateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			// The `:id` segment is validated as an id; ownership is enforced by
 			// loading the stub itself.
-			return sendRow(c, updateStub(c.req.valid('param').stubId, c.req.valid('json')))
+			return sendRow(c, await updateStub(c.req.valid('param').stubId, c.req.valid('json')))
 		},
 	)
 	.delete(
 		'/:id/stubs/:stubId',
 		requireGlobalWriteMiddleware,
 		vValidator('param', StubIdParamsSchema, onValidationError),
-		(c) => {
-			return sendRow(c, deleteStub(c.req.valid('param').stubId))
+		async (c) => {
+			return sendRow(c, await deleteStub(c.req.valid('param').stubId))
 		},
 	)
-	.get('/:id/stubs/:stubId', vValidator('param', StubIdParamsSchema, onValidationError), (c) => {
-		return sendResult(c, getStub(c.req.valid('param').stubId))
-	})
+	.get(
+		'/:id/stubs/:stubId',
+		vValidator('param', StubIdParamsSchema, onValidationError),
+		async (c) => {
+			return sendResult(c, await getStub(c.req.valid('param').stubId))
+		},
+	)

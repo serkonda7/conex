@@ -24,11 +24,11 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const tenantsApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', TenantListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', TenantListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		const scope = scopeTenantId(requestUser(c))
 		return c.json(
-			listTenants({
+			await listTenants({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -42,18 +42,18 @@ export const tenantsApp = new Hono()
 		'/',
 		requireWriteMiddleware,
 		vValidator('json', TenantCreateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			if (scopeTenantId(requestUser(c)) !== null) {
 				return sendResult(
 					c,
 					Result.err(new ForbiddenError('Tenant-scoped users cannot create tenants')),
 				)
 			}
-			return sendCreated(c, createTenant(c.req.valid('json')))
+			return sendCreated(c, await createTenant(c.req.valid('json')))
 		},
 	)
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const result = getTenant(c.req.valid('param').id)
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const result = await getTenant(c.req.valid('param').id)
 		if (Result.isError(result)) {
 			return sendResult(c, result)
 		}
@@ -69,27 +69,27 @@ export const tenantsApp = new Hono()
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', TenantUpdateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			if (scopeTenantId(requestUser(c)) !== null) {
 				return sendResult(
 					c,
 					Result.err(new ForbiddenError('Tenant-scoped users cannot rename tenants')),
 				)
 			}
-			return sendRow(c, updateTenant(c.req.valid('param').id, c.req.valid('json')))
+			return sendRow(c, await updateTenant(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.delete(
 		'/:id',
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			if (scopeTenantId(requestUser(c)) !== null) {
 				return sendResult(
 					c,
 					Result.err(new ForbiddenError('Tenant-scoped users cannot delete tenants')),
 				)
 			}
-			return sendRow(c, deleteTenant(c.req.valid('param').id))
+			return sendRow(c, await deleteTenant(c.req.valid('param').id))
 		},
 	)

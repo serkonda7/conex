@@ -31,39 +31,53 @@ export interface ManufacturerListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
-export function listManufacturers(params: ManufacturerListParams): Page<ManufacturerRow> {
+export async function listManufacturers(
+	params: ManufacturerListParams,
+): Promise<Page<ManufacturerRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
-	const where = params.search ? sql`${manufacturers.name} LIKE ${pattern} ESCAPE '\\'` : undefined
+	const where = params.search
+		? sql`${manufacturers.name} ILIKE ${pattern} ESCAPE '\\'`
+		: undefined
 	const orderColumn =
 		params.sort === 'description' ? manufacturers.description : manufacturers.name
-	const items = db
+	const items = await db
 		.select()
 		.from(manufacturers)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(
+			params.order === 'desc' ? desc(orderColumn) : asc(orderColumn),
+			asc(manufacturers.id),
+		)
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(manufacturers).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(manufacturers).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getManufacturer(id: number): Result<ManufacturerRow, Error> {
-	const row = getDb().select().from(manufacturers).where(eq(manufacturers.id, id)).get()
+export async function getManufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
+	const row = (
+		await getDb().select().from(manufacturers).where(eq(manufacturers.id, id)).limit(1)
+	)[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Manufacturer not found'))
 	}
 	return Result.ok(row)
 }
 
-export function createManufacturer(input: ManufacturerCreate): Result<ManufacturerRow, Error> {
+export async function createManufacturer(
+	input: ManufacturerCreate,
+): Promise<Result<ManufacturerRow, Error>> {
 	const db = getDb()
 	const slug = input.slug ?? slugify(input.name)
-	if (db.select().from(manufacturers).where(eq(manufacturers.slug, slug)).get()) {
+	if ((await db.select().from(manufacturers).where(eq(manufacturers.slug, slug)).limit(1))[0]) {
 		return Result.err(new DuplicateError('Manufacturer slug is already in use'))
 	}
-	if (db.select().from(manufacturers).where(eq(manufacturers.name, input.name)).get()) {
+	if (
+		(
+			await db.select().from(manufacturers).where(eq(manufacturers.name, input.name)).limit(1)
+		)[0]
+	) {
 		return Result.err(new DuplicateError('Manufacturer name is already in use'))
 	}
 	const row: Omit<ManufacturerRow, 'id'> = {
@@ -72,15 +86,13 @@ export function createManufacturer(input: ManufacturerCreate): Result<Manufactur
 		description: input.description ?? null,
 	}
 	try {
-		const inserted = db
-			.insert(manufacturers)
-			.values(row)
-			.returning({ id: manufacturers.id })
-			.get()
+		const inserted = (
+			await db.insert(manufacturers).values(row).returning({ id: manufacturers.id })
+		)[0]
 		if (!inserted) {
 			return Result.err(new Error('Manufacturer insert did not return an id'))
 		}
-		return getManufacturer(inserted.id)
+		return await getManufacturer(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Manufacturer slug or name is already in use'))
@@ -89,22 +101,38 @@ export function createManufacturer(input: ManufacturerCreate): Result<Manufactur
 	}
 }
 
-export function updateManufacturer(
+export async function updateManufacturer(
 	id: number,
 	input: ManufacturerUpdate,
-): Result<ManufacturerRow, Error> {
-	const current = getManufacturer(id)
+): Promise<Result<ManufacturerRow, Error>> {
+	const current = await getManufacturer(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const db = getDb()
 	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		if (db.select().from(manufacturers).where(eq(manufacturers.slug, input.slug)).get()) {
+		if (
+			(
+				await db
+					.select()
+					.from(manufacturers)
+					.where(eq(manufacturers.slug, input.slug))
+					.limit(1)
+			)[0]
+		) {
 			return Result.err(new DuplicateError('Manufacturer slug is already in use'))
 		}
 	}
 	if (input.name !== undefined && input.name !== current.value.name) {
-		if (db.select().from(manufacturers).where(eq(manufacturers.name, input.name)).get()) {
+		if (
+			(
+				await db
+					.select()
+					.from(manufacturers)
+					.where(eq(manufacturers.name, input.name))
+					.limit(1)
+			)[0]
+		) {
 			return Result.err(new DuplicateError('Manufacturer name is already in use'))
 		}
 	}
@@ -120,7 +148,7 @@ export function updateManufacturer(
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			db.update(manufacturers).set(patch).where(eq(manufacturers.id, id)).run()
+			await db.update(manufacturers).set(patch).where(eq(manufacturers.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('Manufacturer slug or name is already in use'))
@@ -128,26 +156,28 @@ export function updateManufacturer(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getManufacturer(id)
+	return await getManufacturer(id)
 }
 
-export function deleteManufacturer(id: number): Result<ManufacturerRow, Error> {
-	const current = getManufacturer(id)
+export async function deleteManufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
+	const current = await getManufacturer(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	const child = getDb()
-		.select()
-		.from(device_types)
-		.where(eq(device_types.manufacturer_id, id))
-		.get()
+	const child = (
+		await getDb()
+			.select()
+			.from(device_types)
+			.where(eq(device_types.manufacturer_id, id))
+			.limit(1)
+	)[0]
 	if (child) {
 		return Result.err(
 			new ConflictError('Manufacturer still has device types; move or delete them first'),
 		)
 	}
 	try {
-		getDb().delete(manufacturers).where(eq(manufacturers.id, id)).run()
+		await getDb().delete(manufacturers).where(eq(manufacturers.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
@@ -165,15 +195,15 @@ export interface DeviceTypeListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
-export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRow> {
+export async function listDeviceTypes(params: DeviceTypeListParams): Promise<Page<DeviceTypeRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
 			params.kind === 'rack'
-				? sql`${device_types.model} LIKE ${pattern} ESCAPE '\\'`
-				: sql`${device_types.model} LIKE ${pattern} ESCAPE '\\'`,
+				? sql`${device_types.model} ILIKE ${pattern} ESCAPE '\\'`
+				: sql`${device_types.model} ILIKE ${pattern} ESCAPE '\\'`,
 		)
 	}
 	if (params.manufacturer) {
@@ -194,29 +224,43 @@ export function listDeviceTypes(params: DeviceTypeListParams): Page<DeviceTypeRo
 			: params.sort === 'form_factor' && params.kind === 'rack'
 				? device_types.form_factor
 				: device_types.model
-	const items = db
+	const items = await db
 		.select()
 		.from(device_types)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(
+			params.order === 'desc' ? desc(orderColumn) : asc(orderColumn),
+			asc(device_types.id),
+		)
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(device_types).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(device_types).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getDeviceType(id: number): Result<DeviceTypeRow, Error> {
-	const row = getDb().select().from(device_types).where(eq(device_types.id, id)).get()
+export async function getDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>> {
+	const row = (
+		await getDb().select().from(device_types).where(eq(device_types.id, id)).limit(1)
+	)[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
 	return Result.ok(row)
 }
 
-export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow, Error> {
+export async function createDeviceType(
+	input: DeviceTypeCreate,
+): Promise<Result<DeviceTypeRow, Error>> {
 	const db = getDb()
-	if (!db.select().from(manufacturers).where(eq(manufacturers.id, input.manufacturer_id)).get()) {
+	if (
+		!(
+			await db
+				.select()
+				.from(manufacturers)
+				.where(eq(manufacturers.id, input.manufacturer_id))
+				.limit(1)
+		)[0]
+	) {
 		return Result.err(new NotFoundError('Manufacturer not found'))
 	}
 	const uHeight = input.u_height ?? 1
@@ -236,15 +280,13 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 		comments: input.comments ?? null,
 	}
 	try {
-		const inserted = db
-			.insert(device_types)
-			.values(row)
-			.returning({ id: device_types.id })
-			.get()
+		const inserted = (
+			await db.insert(device_types).values(row).returning({ id: device_types.id })
+		)[0]
 		if (!inserted) {
 			return Result.err(new Error('Device type insert did not return an id'))
 		}
-		return getDeviceType(inserted.id)
+		return await getDeviceType(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Device type already exists'))
@@ -253,22 +295,24 @@ export function createDeviceType(input: DeviceTypeCreate): Result<DeviceTypeRow,
 	}
 }
 
-export function updateDeviceType(
+export async function updateDeviceType(
 	id: number,
 	input: DeviceTypeUpdate,
-): Result<DeviceTypeRow, Error> {
-	const current = getDeviceType(id)
+): Promise<Result<DeviceTypeRow, Error>> {
+	const current = await getDeviceType(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const db = getDb()
 	if (input.manufacturer_id !== undefined) {
 		if (
-			!db
-				.select()
-				.from(manufacturers)
-				.where(eq(manufacturers.id, input.manufacturer_id))
-				.get()
+			!(
+				await db
+					.select()
+					.from(manufacturers)
+					.where(eq(manufacturers.id, input.manufacturer_id))
+					.limit(1)
+			)[0]
 		) {
 			return Result.err(new NotFoundError('Manufacturer not found'))
 		}
@@ -290,11 +334,13 @@ export function updateDeviceType(
 	if (
 		current.value.u_height >= 1 &&
 		effectiveUHeight === 0 &&
-		db
-			.select()
-			.from(devices)
-			.where(and(eq(devices.device_type_id, id), isNotNull(devices.position_u)))
-			.get()
+		(
+			await db
+				.select()
+				.from(devices)
+				.where(and(eq(devices.device_type_id, id), isNotNull(devices.position_u)))
+				.limit(1)
+		)[0]
 	) {
 		return Result.err(
 			new ConflictError(
@@ -308,16 +354,17 @@ export function updateDeviceType(
 	// Changing the height re-runs bounds and overlap checks for every
 	// mounted device of this type (same loop `updateRack` uses for shrinks).
 	if (effectiveUHeight !== current.value.u_height) {
-		const mounted = db
+		const mounted = await db
 			.select()
 			.from(devices)
 			.where(and(eq(devices.device_type_id, id), isNotNull(devices.position_u)))
-			.all()
 		for (const mountedDevice of mounted) {
 			if (mountedDevice.rack_id === null || mountedDevice.position_u === null) {
 				continue
 			}
-			const rackRow = db.select().from(racks).where(eq(racks.id, mountedDevice.rack_id)).get()
+			const rackRow = (
+				await db.select().from(racks).where(eq(racks.id, mountedDevice.rack_id)).limit(1)
+			)[0]
 			if (!rackRow) {
 				continue
 			}
@@ -334,7 +381,7 @@ export function updateDeviceType(
 			} as const
 			const bounds = checkBounds(
 				candidate,
-				rackHeightOf(rackRow),
+				await rackHeightOf(rackRow),
 				`Device "${mountedDevice.name}"`,
 			)
 			if (Result.isError(bounds)) {
@@ -342,7 +389,7 @@ export function updateDeviceType(
 			}
 			const overlap = checkOverlap(
 				candidate,
-				deviceSpansOf(mountedDevice.rack_id),
+				await deviceSpansOf(mountedDevice.rack_id),
 				`Device "${mountedDevice.name}"`,
 				mountedDevice.id,
 			)
@@ -372,7 +419,7 @@ export function updateDeviceType(
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			db.update(device_types).set(patch).where(eq(device_types.id, id)).run()
+			await db.update(device_types).set(patch).where(eq(device_types.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('Device type already exists'))
@@ -380,26 +427,28 @@ export function updateDeviceType(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getDeviceType(id)
+	return await getDeviceType(id)
 }
 
-export function deleteDeviceType(id: number): Result<DeviceTypeRow, Error> {
-	const current = getDeviceType(id)
+export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>> {
+	const current = await getDeviceType(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	const device = getDb().select().from(devices).where(eq(devices.device_type_id, id)).get()
+	const device = (
+		await getDb().select().from(devices).where(eq(devices.device_type_id, id)).limit(1)
+	)[0]
 	if (device) {
 		return Result.err(
 			new ConflictError('Device type still has devices; move or delete them first'),
 		)
 	}
 	try {
-		getDb().transaction((tx) => {
-			tx.delete(device_type_interfaces)
+		await getDb().transaction(async (tx) => {
+			await tx
+				.delete(device_type_interfaces)
 				.where(eq(device_type_interfaces.device_type_id, id))
-				.run()
-			tx.delete(device_types).where(eq(device_types.id, id)).run()
+			await tx.delete(device_types).where(eq(device_types.id, id))
 		})
 	} catch (e) {
 		return Result.err(errOf(e))
@@ -411,26 +460,27 @@ export function deleteDeviceType(id: number): Result<DeviceTypeRow, Error> {
 // Stub rows
 // ---------------------------------------------------------------------------
 
-export function listStubs(deviceTypeId: number): Result<StubRow[], Error> {
-	const current = getDeviceType(deviceTypeId)
+export async function listStubs(deviceTypeId: number): Promise<Result<StubRow[], Error>> {
+	const current = await getDeviceType(deviceTypeId)
 	if (Result.isError(current)) {
 		return Result.err(current.error)
 	}
-	const rows = getDb()
+	const rows = await getDb()
 		.select()
 		.from(device_type_interfaces)
 		.where(eq(device_type_interfaces.device_type_id, deviceTypeId))
 		.orderBy(asc(device_type_interfaces.prefix), asc(device_type_interfaces.kind))
-		.all()
 	return Result.ok(rows)
 }
 
-export function getStub(id: number): Result<StubRow, Error> {
-	const row = getDb()
-		.select()
-		.from(device_type_interfaces)
-		.where(eq(device_type_interfaces.id, id))
-		.get()
+export async function getStub(id: number): Promise<Result<StubRow, Error>> {
+	const row = (
+		await getDb()
+			.select()
+			.from(device_type_interfaces)
+			.where(eq(device_type_interfaces.id, id))
+			.limit(1)
+	)[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Interface stub not found'))
 	}
@@ -441,7 +491,7 @@ export function getStub(id: number): Result<StubRow, Error> {
  * Rejects a candidate stub whose expansion collides with the sibling stubs
  * of the same device type. `excludeId` skips the row being updated.
  */
-function checkStubExpansion(
+async function checkStubExpansion(
 	deviceTypeId: number,
 	candidate: {
 		prefix: string
@@ -451,14 +501,14 @@ function checkStubExpansion(
 		description?: string | null
 	},
 	excludeId?: number,
-): Result<undefined, Error> {
+): Promise<Result<undefined, Error>> {
 	const db = getDb()
-	const siblings = db
-		.select()
-		.from(device_type_interfaces)
-		.where(eq(device_type_interfaces.device_type_id, deviceTypeId))
-		.all()
-		.filter((s) => s.id !== excludeId)
+	const siblings = (
+		await db
+			.select()
+			.from(device_type_interfaces)
+			.where(eq(device_type_interfaces.device_type_id, deviceTypeId))
+	).filter((s) => s.id !== excludeId)
 	const expanded = expandStubs([
 		...siblings.map((s) => ({
 			prefix: s.prefix,
@@ -475,8 +525,11 @@ function checkStubExpansion(
 	return Result.ok(undefined)
 }
 
-export function createStub(deviceTypeId: number, input: StubCreate): Result<StubRow, Error> {
-	const current = getDeviceType(deviceTypeId)
+export async function createStub(
+	deviceTypeId: number,
+	input: StubCreate,
+): Promise<Result<StubRow, Error>> {
+	const current = await getDeviceType(deviceTypeId)
 	if (Result.isError(current)) {
 		return Result.err(current.error)
 	}
@@ -487,7 +540,7 @@ export function createStub(deviceTypeId: number, input: StubCreate): Result<Stub
 		label: input.label ?? null,
 		description: input.description ?? null,
 	}
-	const clash = checkStubExpansion(deviceTypeId, candidate)
+	const clash = await checkStubExpansion(deviceTypeId, candidate)
 	if (Result.isError(clash)) {
 		return Result.err(clash.error)
 	}
@@ -500,15 +553,16 @@ export function createStub(deviceTypeId: number, input: StubCreate): Result<Stub
 		description: candidate.description,
 	}
 	try {
-		const inserted = getDb()
-			.insert(device_type_interfaces)
-			.values(row)
-			.returning({ id: device_type_interfaces.id })
-			.get()
+		const inserted = (
+			await getDb()
+				.insert(device_type_interfaces)
+				.values(row)
+				.returning({ id: device_type_interfaces.id })
+		)[0]
 		if (!inserted) {
 			return Result.err(new Error('Stub insert did not return an id'))
 		}
-		return getStub(inserted.id)
+		return await getStub(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -519,8 +573,8 @@ export function createStub(deviceTypeId: number, input: StubCreate): Result<Stub
 	}
 }
 
-export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error> {
-	const current = getStub(id)
+export async function updateStub(id: number, input: StubUpdate): Promise<Result<StubRow, Error>> {
+	const current = await getStub(id)
 	if (Result.isError(current)) {
 		return current
 	}
@@ -532,7 +586,7 @@ export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error
 		label: input.label !== undefined ? input.label : node.label,
 		description: input.description !== undefined ? input.description : node.description,
 	}
-	const clash = checkStubExpansion(node.device_type_id, candidate, id)
+	const clash = await checkStubExpansion(node.device_type_id, candidate, id)
 	if (Result.isError(clash)) {
 		return Result.err(clash.error)
 	}
@@ -554,11 +608,10 @@ export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb()
+			await getDb()
 				.update(device_type_interfaces)
 				.set(patch)
 				.where(eq(device_type_interfaces.id, id))
-				.run()
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(
@@ -570,16 +623,16 @@ export function updateStub(id: number, input: StubUpdate): Result<StubRow, Error
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getStub(id)
+	return await getStub(id)
 }
 
-export function deleteStub(id: number): Result<StubRow, Error> {
-	const current = getStub(id)
+export async function deleteStub(id: number): Promise<Result<StubRow, Error>> {
+	const current = await getStub(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	try {
-		getDb().delete(device_type_interfaces).where(eq(device_type_interfaces.id, id)).run()
+		await getDb().delete(device_type_interfaces).where(eq(device_type_interfaces.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}

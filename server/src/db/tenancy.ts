@@ -61,13 +61,13 @@ export interface TenantListItem extends TenantRow {
 // Tenants
 // ---------------------------------------------------------------------------
 
-export function listTenants(params: TenantListParams): Page<TenantListItem> {
+export async function listTenants(params: TenantListParams): Promise<Page<TenantListItem>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${tenants.name} LIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} LIKE ${pattern} ESCAPE '\\' OR ${tenants.description} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${tenants.name} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.slug} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.scopeTenantId !== undefined) {
@@ -80,15 +80,14 @@ export function listTenants(params: TenantListParams): Page<TenantListItem> {
 			: params.sort === 'description'
 				? tenants.description
 				: tenants.name
-	const items = db
+	const items = await db
 		.select()
 		.from(tenants)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn), asc(tenants.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(tenants).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(tenants).where(where).limit(1))[0]
 	const total = totalRow?.n ?? 0
 
 	// NetBox-style related-object counts for the list view. One grouped
@@ -112,28 +111,25 @@ export function listTenants(params: TenantListParams): Page<TenantListItem> {
 				entry[key] = n
 			}
 		}
-		for (const row of db
+		for (const row of await db
 			.select({ tenant_id: sites.tenant_id, n: count() })
 			.from(sites)
 			.where(inArray(sites.tenant_id, ids))
-			.groupBy(sites.tenant_id)
-			.all()) {
+			.groupBy(sites.tenant_id)) {
 			apply(row.tenant_id, 'sites', row.n)
 		}
-		for (const row of db
+		for (const row of await db
 			.select({ tenant_id: racks.tenant_id, n: count() })
 			.from(racks)
 			.where(inArray(racks.tenant_id, ids))
-			.groupBy(racks.tenant_id)
-			.all()) {
+			.groupBy(racks.tenant_id)) {
 			apply(row.tenant_id, 'racks', row.n)
 		}
-		for (const row of db
+		for (const row of await db
 			.select({ tenant_id: devices.tenant_id, n: count() })
 			.from(devices)
 			.where(inArray(devices.tenant_id, ids))
-			.groupBy(devices.tenant_id)
-			.all()) {
+			.groupBy(devices.tenant_id)) {
 			apply(row.tenant_id, 'devices', row.n)
 		}
 	}
@@ -150,17 +146,17 @@ export function listTenants(params: TenantListParams): Page<TenantListItem> {
 	)
 }
 
-export function getTenant(id: number): Result<TenantRow, Error> {
-	const row = getDb().select().from(tenants).where(eq(tenants.id, id)).get()
+export async function getTenant(id: number): Promise<Result<TenantRow, Error>> {
+	const row = (await getDb().select().from(tenants).where(eq(tenants.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Tenant not found'))
 	}
 	return Result.ok(row)
 }
 
-export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
+export async function createTenant(input: TenantCreate): Promise<Result<TenantRow, Error>> {
 	const db = getDb()
-	const clash = db.select().from(tenants).where(eq(tenants.slug, input.slug)).get()
+	const clash = (await db.select().from(tenants).where(eq(tenants.slug, input.slug)).limit(1))[0]
 	if (clash) {
 		return Result.err(new DuplicateError('Tenant slug is already in use'))
 	}
@@ -171,11 +167,11 @@ export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
 		comments: input.comments ?? null,
 	}
 	try {
-		const inserted = db.insert(tenants).values(row).returning({ id: tenants.id }).get()
+		const inserted = (await db.insert(tenants).values(row).returning({ id: tenants.id }))[0]
 		if (!inserted) {
 			return Result.err(new Error('Tenant insert did not return an id'))
 		}
-		return getTenant(inserted.id)
+		return await getTenant(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Tenant slug is already in use'))
@@ -184,14 +180,19 @@ export function createTenant(input: TenantCreate): Result<TenantRow, Error> {
 	}
 }
 
-export function updateTenant(id: number, input: TenantUpdate): Result<TenantRow, Error> {
-	const current = getTenant(id)
+export async function updateTenant(
+	id: number,
+	input: TenantUpdate,
+): Promise<Result<TenantRow, Error>> {
+	const current = await getTenant(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const db = getDb()
 	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		const clash = db.select().from(tenants).where(eq(tenants.slug, input.slug)).get()
+		const clash = (
+			await db.select().from(tenants).where(eq(tenants.slug, input.slug)).limit(1)
+		)[0]
 		if (clash) {
 			return Result.err(new DuplicateError('Tenant slug is already in use'))
 		}
@@ -211,7 +212,7 @@ export function updateTenant(id: number, input: TenantUpdate): Result<TenantRow,
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			db.update(tenants).set(patch).where(eq(tenants.id, id)).run()
+			await db.update(tenants).set(patch).where(eq(tenants.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('Tenant slug is already in use'))
@@ -219,41 +220,45 @@ export function updateTenant(id: number, input: TenantUpdate): Result<TenantRow,
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getTenant(id)
+	return await getTenant(id)
 }
 
-export function deleteTenant(id: number): Result<TenantRow, Error> {
-	const current = getTenant(id)
+export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>> {
+	const current = await getTenant(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const db = getDb()
-	const siteChild = db.select().from(sites).where(eq(sites.tenant_id, id)).get()
+	const siteChild = (await db.select().from(sites).where(eq(sites.tenant_id, id)).limit(1))[0]
 	if (siteChild) {
 		return Result.err(new ConflictError('Tenant still has sites; move or delete them first'))
 	}
-	const groupChild = db.select().from(site_groups).where(eq(site_groups.tenant_id, id)).get()
+	const groupChild = (
+		await db.select().from(site_groups).where(eq(site_groups.tenant_id, id)).limit(1)
+	)[0]
 	if (groupChild) {
 		return Result.err(
 			new ConflictError('Tenant still has site groups; move or delete them first'),
 		)
 	}
-	const rackChild = db.select().from(racks).where(eq(racks.tenant_id, id)).get()
+	const rackChild = (await db.select().from(racks).where(eq(racks.tenant_id, id)).limit(1))[0]
 	if (rackChild) {
 		return Result.err(new ConflictError('Tenant still has racks; move or delete them first'))
 	}
-	const deviceChild = db.select().from(devices).where(eq(devices.tenant_id, id)).get()
+	const deviceChild = (
+		await db.select().from(devices).where(eq(devices.tenant_id, id)).limit(1)
+	)[0]
 	if (deviceChild) {
 		return Result.err(new ConflictError('Tenant still has devices; move or delete them first'))
 	}
-	const userChild = db.select().from(users).where(eq(users.tenant_id, id)).get()
+	const userChild = (await db.select().from(users).where(eq(users.tenant_id, id)).limit(1))[0]
 	if (userChild) {
 		return Result.err(
 			new ConflictError('Tenant still has users; reassign them before deleting'),
 		)
 	}
 	try {
-		db.delete(tenants).where(eq(tenants.id, id)).run()
+		await db.delete(tenants).where(eq(tenants.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
@@ -279,13 +284,13 @@ export interface SiteListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export function listSites(params: SiteListParams): Page<SiteRow> {
+export async function listSites(params: SiteListParams): Promise<Page<SiteRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${sites.name} LIKE ${pattern} ESCAPE '\\' OR ${sites.slug} LIKE ${pattern} ESCAPE '\\' OR ${sites.description} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${sites.name} ILIKE ${pattern} ESCAPE '\\' OR ${sites.slug} ILIKE ${pattern} ESCAPE '\\' OR ${sites.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.tenant) {
@@ -304,48 +309,51 @@ export function listSites(params: SiteListParams): Page<SiteRow> {
 			: params.sort === 'description'
 				? sites.description
 				: sites.name
-	const items = db
+	const items = await db
 		.select()
 		.from(sites)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn), asc(sites.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(sites).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(sites).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getSite(id: number): Result<SiteRow, Error> {
-	const row = getDb().select().from(sites).where(eq(sites.id, id)).get()
+export async function getSite(id: number): Promise<Result<SiteRow, Error>> {
+	const row = (await getDb().select().from(sites).where(eq(sites.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Site not found'))
 	}
 	return Result.ok(row)
 }
 
-function checkSiteGroup(groupId: number | null | undefined): Result<undefined, Error> {
+async function checkSiteGroup(
+	groupId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
 	if (groupId === null || groupId === undefined) {
 		return Result.ok(undefined)
 	}
-	const group = getDb().select().from(site_groups).where(eq(site_groups.id, groupId)).get()
+	const group = (
+		await getDb().select().from(site_groups).where(eq(site_groups.id, groupId)).limit(1)
+	)[0]
 	if (!group) {
 		return Result.err(new NotFoundError('Site group not found'))
 	}
 	return Result.ok(undefined)
 }
 
-export function createSite(input: SiteCreate): Result<SiteRow, Error> {
-	const tenantCheck = checkTenantExists(input.tenant_id)
+export async function createSite(input: SiteCreate): Promise<Result<SiteRow, Error>> {
+	const tenantCheck = await checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
-	const groupCheck = checkSiteGroup(input.site_group_id)
+	const groupCheck = await checkSiteGroup(input.site_group_id)
 	if (Result.isError(groupCheck)) {
 		return Result.err(groupCheck.error)
 	}
 	const db = getDb()
-	const clash = db.select().from(sites).where(eq(sites.slug, input.slug)).get()
+	const clash = (await db.select().from(sites).where(eq(sites.slug, input.slug)).limit(1))[0]
 	if (clash) {
 		return Result.err(new DuplicateError('Site slug is already in use'))
 	}
@@ -360,11 +368,11 @@ export function createSite(input: SiteCreate): Result<SiteRow, Error> {
 		shipping_address: input.shipping_address ?? null,
 	}
 	try {
-		const inserted = db.insert(sites).values(row).returning({ id: sites.id }).get()
+		const inserted = (await db.insert(sites).values(row).returning({ id: sites.id }))[0]
 		if (!inserted) {
 			return Result.err(new Error('Site insert did not return an id'))
 		}
-		return getSite(inserted.id)
+		return await getSite(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Site slug is already in use'))
@@ -373,26 +381,26 @@ export function createSite(input: SiteCreate): Result<SiteRow, Error> {
 	}
 }
 
-export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error> {
-	const current = getSite(id)
+export async function updateSite(id: number, input: SiteUpdate): Promise<Result<SiteRow, Error>> {
+	const current = await getSite(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenantExists(input.tenant_id)
+		const tenantCheck = await checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
 	}
 	if (input.site_group_id !== undefined) {
-		const groupCheck = checkSiteGroup(input.site_group_id)
+		const groupCheck = await checkSiteGroup(input.site_group_id)
 		if (Result.isError(groupCheck)) {
 			return Result.err(groupCheck.error)
 		}
 	}
 	const db = getDb()
 	if (input.slug !== undefined && input.slug !== current.value.slug) {
-		const clash = db.select().from(sites).where(eq(sites.slug, input.slug)).get()
+		const clash = (await db.select().from(sites).where(eq(sites.slug, input.slug)).limit(1))[0]
 		if (clash) {
 			return Result.err(new DuplicateError('Site slug is already in use'))
 		}
@@ -424,7 +432,7 @@ export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			db.update(sites).set(patch).where(eq(sites.id, id)).run()
+			await db.update(sites).set(patch).where(eq(sites.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('Site slug is already in use'))
@@ -432,24 +440,26 @@ export function updateSite(id: number, input: SiteUpdate): Result<SiteRow, Error
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getSite(id)
+	return await getSite(id)
 }
 
-export function deleteSite(id: number): Result<SiteRow, Error> {
-	const current = getSite(id)
+export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
+	const current = await getSite(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	const child = getDb().select().from(locations).where(eq(locations.site_id, id)).get()
+	const child = (
+		await getDb().select().from(locations).where(eq(locations.site_id, id)).limit(1)
+	)[0]
 	if (child) {
 		return Result.err(new ConflictError('Site still has locations; move or delete them first'))
 	}
-	const rackChild = getDb().select().from(racks).where(eq(racks.site_id, id)).get()
+	const rackChild = (await getDb().select().from(racks).where(eq(racks.site_id, id)).limit(1))[0]
 	if (rackChild) {
 		return Result.err(new ConflictError('Site still has racks; move or delete them first'))
 	}
 	try {
-		getDb().delete(sites).where(eq(sites.id, id)).run()
+		await getDb().delete(sites).where(eq(sites.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
@@ -469,13 +479,13 @@ export interface SiteGroupListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export function listSiteGroups(params: SiteGroupListParams): Page<SiteGroupRow> {
+export async function listSiteGroups(params: SiteGroupListParams): Promise<Page<SiteGroupRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${site_groups.name} LIKE ${pattern} ESCAPE '\\' OR ${site_groups.slug} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${site_groups.name} ILIKE ${pattern} ESCAPE '\\' OR ${site_groups.slug} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.tenant) {
@@ -494,27 +504,29 @@ export function listSiteGroups(params: SiteGroupListParams): Page<SiteGroupRow> 
 			: params.sort === 'description'
 				? site_groups.description
 				: site_groups.name
-	const items = db
+	const items = await db
 		.select()
 		.from(site_groups)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(
+			params.order === 'desc' ? desc(orderColumn) : asc(orderColumn),
+			asc(site_groups.id),
+		)
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(site_groups).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(site_groups).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getSiteGroup(id: number): Result<SiteGroupRow, Error> {
-	const row = getDb().select().from(site_groups).where(eq(site_groups.id, id)).get()
+export async function getSiteGroup(id: number): Promise<Result<SiteGroupRow, Error>> {
+	const row = (await getDb().select().from(site_groups).where(eq(site_groups.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Site group not found'))
 	}
 	return Result.ok(row)
 }
 
-function slugUnderParentClash(
+async function slugUnderParentClash(
 	table: typeof site_groups | typeof locations,
 	parentCol: typeof site_groups.parent_id | typeof locations.parent_id,
 	slugCol: typeof site_groups.slug | typeof locations.slug,
@@ -522,20 +534,26 @@ function slugUnderParentClash(
 	slug: string,
 	excludeId?: number,
 	extra?: SQL,
-): boolean {
+): Promise<boolean> {
 	const parentCond = parentId === null ? isNull(parentCol) : eq(parentCol, parentId)
 	const conds = extra ? [parentCond, eq(slugCol, slug), extra] : [parentCond, eq(slugCol, slug)]
-	const clash = getDb()
-		.select()
-		// biome-ignore lint/suspicious/noExplicitAny: generic over two tables with identical columns
-		.from(table as any)
-		.where(and(...conds))
-		.get() as { id: number } | undefined
+	const clash = (
+		await getDb()
+			.select()
+			// biome-ignore lint/suspicious/noExplicitAny: generic over two tables with identical columns
+			.from(table as any)
+			.where(and(...conds))
+			.limit(1)
+	)[0] as { id: number } | undefined
 	return !!clash && clash.id !== excludeId
 }
 
-function groupSlugClash(parentId: number | null, slug: string, excludeId?: number): boolean {
-	return slugUnderParentClash(
+async function groupSlugClash(
+	parentId: number | null,
+	slug: string,
+	excludeId?: number,
+): Promise<boolean> {
+	return await slugUnderParentClash(
 		site_groups,
 		site_groups.parent_id,
 		site_groups.slug,
@@ -546,21 +564,22 @@ function groupSlugClash(parentId: number | null, slug: string, excludeId?: numbe
 }
 
 /** Parent links of every site group, for depth/cycle checks. */
-function groupParentMap(): Map<number, number | null> {
-	const rows = getDb()
+async function groupParentMap(): Promise<Map<number, number | null>> {
+	const rows = await getDb()
 		.select({ id: site_groups.id, parent_id: site_groups.parent_id })
 		.from(site_groups)
-		.all()
 	return buildParentMap(rows)
 }
 
-export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Error> {
-	const tenantCheck = checkTenantExists(input.tenant_id)
+export async function createSiteGroup(
+	input: SiteGroupCreate,
+): Promise<Result<SiteGroupRow, Error>> {
+	const tenantCheck = await checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
 	const parentId = input.parent_id ?? null
-	const parents = groupParentMap()
+	const parents = await groupParentMap()
 	if (parentId !== null) {
 		if (!parents.has(parentId)) {
 			return Result.err(new NotFoundError('Parent site group not found'))
@@ -577,7 +596,7 @@ export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Er
 			)
 		}
 	}
-	if (groupSlugClash(parentId, input.slug)) {
+	if (await groupSlugClash(parentId, input.slug)) {
 		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
 	}
 	const row: Omit<SiteGroupRow, 'id'> = {
@@ -589,15 +608,13 @@ export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Er
 		comments: input.comments ?? null,
 	}
 	try {
-		const inserted = getDb()
-			.insert(site_groups)
-			.values(row)
-			.returning({ id: site_groups.id })
-			.get()
+		const inserted = (
+			await getDb().insert(site_groups).values(row).returning({ id: site_groups.id })
+		)[0]
 		if (!inserted) {
 			return Result.err(new Error('Site group insert did not return an id'))
 		}
-		return getSiteGroup(inserted.id)
+		return await getSiteGroup(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -608,13 +625,16 @@ export function createSiteGroup(input: SiteGroupCreate): Result<SiteGroupRow, Er
 	}
 }
 
-export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<SiteGroupRow, Error> {
-	const current = getSiteGroup(id)
+export async function updateSiteGroup(
+	id: number,
+	input: SiteGroupUpdate,
+): Promise<Result<SiteGroupRow, Error>> {
+	const current = await getSiteGroup(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenantExists(input.tenant_id)
+		const tenantCheck = await checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
@@ -624,7 +644,7 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 	const effectiveSlug = input.slug !== undefined ? input.slug : node.slug
 
 	if (effectiveParent !== undefined && effectiveParent !== null) {
-		const parents = groupParentMap()
+		const parents = await groupParentMap()
 		if (!parents.has(effectiveParent)) {
 			return Result.err(new NotFoundError('Parent site group not found'))
 		}
@@ -637,10 +657,9 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 		if (Result.isError(parentDepth)) {
 			return Result.err(new ConflictError(parentDepth.error.message))
 		}
-		const rows = getDb()
+		const rows = await getDb()
 			.select({ id: site_groups.id, parent_id: site_groups.parent_id })
 			.from(site_groups)
-			.all()
 		const subtreeGrowth = maxDescendantOffset(id, buildChildrenMap(rows))
 		if (parentDepth.value + 1 + subtreeGrowth > MAX_SITE_GROUP_DEPTH) {
 			return Result.err(
@@ -650,7 +669,7 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 			)
 		}
 	}
-	if (groupSlugClash(effectiveParent ?? null, effectiveSlug, id)) {
+	if (await groupSlugClash(effectiveParent ?? null, effectiveSlug, id)) {
 		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
 	}
 	const patch: Partial<SiteGroupRow> = {}
@@ -674,7 +693,7 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb().update(site_groups).set(patch).where(eq(site_groups.id, id)).run()
+			await getDb().update(site_groups).set(patch).where(eq(site_groups.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(
@@ -684,29 +703,31 @@ export function updateSiteGroup(id: number, input: SiteGroupUpdate): Result<Site
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getSiteGroup(id)
+	return await getSiteGroup(id)
 }
 
-export function deleteSiteGroup(id: number): Result<SiteGroupRow, Error> {
-	const current = getSiteGroup(id)
+export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, Error>> {
+	const current = await getSiteGroup(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const db = getDb()
-	const child = db.select().from(site_groups).where(eq(site_groups.parent_id, id)).get()
+	const child = (
+		await db.select().from(site_groups).where(eq(site_groups.parent_id, id)).limit(1)
+	)[0]
 	if (child) {
 		return Result.err(
 			new ConflictError('Site group still has child groups; move or delete them first'),
 		)
 	}
-	const siteChild = db.select().from(sites).where(eq(sites.site_group_id, id)).get()
+	const siteChild = (await db.select().from(sites).where(eq(sites.site_group_id, id)).limit(1))[0]
 	if (siteChild) {
 		return Result.err(
 			new ConflictError('Site group still has sites; move or delete them first'),
 		)
 	}
 	try {
-		db.delete(site_groups).where(eq(site_groups.id, id)).run()
+		await db.delete(site_groups).where(eq(site_groups.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
@@ -790,13 +811,13 @@ function sortLocationsHierarchically(
 	return sorted
 }
 
-export function listLocations(params: LocationListParams): Page<LocationRow> {
+export async function listLocations(params: LocationListParams): Promise<Page<LocationRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${locations.name} LIKE ${pattern} ESCAPE '\\' OR ${locations.slug} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${locations.name} ILIKE ${pattern} ESCAPE '\\' OR ${locations.slug} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.site) {
@@ -812,28 +833,28 @@ export function listLocations(params: LocationListParams): Page<LocationRow> {
 		conditions.push(eq(locations.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const matching = db.select().from(locations).where(where).all()
+	const matching = await db.select().from(locations).where(where)
 	const ordered = sortLocationsHierarchically(matching, params.sort, params.order)
 	const items = ordered.slice(offsetOf(params), offsetOf(params) + params.limit)
-	const totalRow = db.select({ n: count() }).from(locations).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(locations).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getLocation(id: number): Result<LocationRow, Error> {
-	const row = getDb().select().from(locations).where(eq(locations.id, id)).get()
+export async function getLocation(id: number): Promise<Result<LocationRow, Error>> {
+	const row = (await getDb().select().from(locations).where(eq(locations.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Location not found'))
 	}
 	return Result.ok(row)
 }
 
-function siblingSlugClash(
+async function siblingSlugClash(
 	siteId: number,
 	parentId: number | null,
 	slug: string,
 	excludeId?: number,
-): boolean {
-	return slugUnderParentClash(
+): Promise<boolean> {
+	return await slugUnderParentClash(
 		locations,
 		locations.parent_id,
 		locations.slug,
@@ -845,27 +866,26 @@ function siblingSlugClash(
 }
 
 /** Parent links of every location in a site, for depth/cycle checks. */
-function siteParentMap(siteId: number): Map<number, number | null> {
-	const rows = getDb()
+async function siteParentMap(siteId: number): Promise<Map<number, number | null>> {
+	const rows = await getDb()
 		.select({ id: locations.id, parent_id: locations.parent_id })
 		.from(locations)
 		.where(eq(locations.site_id, siteId))
-		.all()
 	return buildParentMap(rows)
 }
 
-export function createLocation(input: LocationCreate): Result<LocationRow, Error> {
+export async function createLocation(input: LocationCreate): Promise<Result<LocationRow, Error>> {
 	const db = getDb()
-	const site = db.select().from(sites).where(eq(sites.id, input.site_id)).get()
+	const site = (await db.select().from(sites).where(eq(sites.id, input.site_id)).limit(1))[0]
 	if (!site) {
 		return Result.err(new NotFoundError('Site not found'))
 	}
-	const tenantCheck = checkTenantExists(input.tenant_id)
+	const tenantCheck = await checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
 	const parentId = input.parent_id ?? null
-	const parents = siteParentMap(input.site_id)
+	const parents = await siteParentMap(input.site_id)
 	if (parentId !== null) {
 		if (!parents.has(parentId)) {
 			return Result.err(new NotFoundError('Parent location not found in this site'))
@@ -880,7 +900,7 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 			)
 		}
 	}
-	if (siblingSlugClash(input.site_id, parentId, input.slug)) {
+	if (await siblingSlugClash(input.site_id, parentId, input.slug)) {
 		return Result.err(new DuplicateError('Location slug is already used under this parent'))
 	}
 	const row: Omit<LocationRow, 'id'> = {
@@ -893,11 +913,11 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 		description: input.description ?? null,
 	}
 	try {
-		const inserted = db.insert(locations).values(row).returning({ id: locations.id }).get()
+		const inserted = (await db.insert(locations).values(row).returning({ id: locations.id }))[0]
 		if (!inserted) {
 			return Result.err(new Error('Location insert did not return an id'))
 		}
-		return getLocation(inserted.id)
+		return await getLocation(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Location slug is already used under this parent'))
@@ -906,14 +926,17 @@ export function createLocation(input: LocationCreate): Result<LocationRow, Error
 	}
 }
 
-export function updateLocation(id: number, input: LocationUpdate): Result<LocationRow, Error> {
-	const current = getLocation(id)
+export async function updateLocation(
+	id: number,
+	input: LocationUpdate,
+): Promise<Result<LocationRow, Error>> {
+	const current = await getLocation(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const node = current.value
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenantExists(input.tenant_id)
+		const tenantCheck = await checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
@@ -922,7 +945,7 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 	const effectiveSlug = input.slug !== undefined ? input.slug : node.slug
 
 	if (effectiveParent !== undefined && effectiveParent !== null) {
-		const parents = siteParentMap(node.site_id)
+		const parents = await siteParentMap(node.site_id)
 		if (!parents.has(effectiveParent)) {
 			return Result.err(new NotFoundError('Parent location not found in this site'))
 		}
@@ -935,11 +958,10 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 		if (Result.isError(parentDepth)) {
 			return Result.err(new ConflictError(parentDepth.error.message))
 		}
-		const rows = getDb()
+		const rows = await getDb()
 			.select({ id: locations.id, parent_id: locations.parent_id })
 			.from(locations)
 			.where(eq(locations.site_id, node.site_id))
-			.all()
 		const subtreeGrowth = maxDescendantOffset(id, buildChildrenMap(rows))
 		if (parentDepth.value + 1 + subtreeGrowth > MAX_LOCATION_DEPTH) {
 			return Result.err(
@@ -947,7 +969,7 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 			)
 		}
 	}
-	if (siblingSlugClash(node.site_id, effectiveParent ?? null, effectiveSlug, id)) {
+	if (await siblingSlugClash(node.site_id, effectiveParent ?? null, effectiveSlug, id)) {
 		return Result.err(new DuplicateError('Location slug is already used under this parent'))
 	}
 	const patch: Partial<LocationRow> = {}
@@ -971,7 +993,7 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb().update(locations).set(patch).where(eq(locations.id, id)).run()
+			await getDb().update(locations).set(patch).where(eq(locations.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(
@@ -981,26 +1003,30 @@ export function updateLocation(id: number, input: LocationUpdate): Result<Locati
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getLocation(id)
+	return await getLocation(id)
 }
 
-export function deleteLocation(id: number): Result<LocationRow, Error> {
-	const current = getLocation(id)
+export async function deleteLocation(id: number): Promise<Result<LocationRow, Error>> {
+	const current = await getLocation(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	const child = getDb().select().from(locations).where(eq(locations.parent_id, id)).get()
+	const child = (
+		await getDb().select().from(locations).where(eq(locations.parent_id, id)).limit(1)
+	)[0]
 	if (child) {
 		return Result.err(
 			new ConflictError('Location still has child locations; move or delete them first'),
 		)
 	}
-	const rackChild = getDb().select().from(racks).where(eq(racks.location_id, id)).get()
+	const rackChild = (
+		await getDb().select().from(racks).where(eq(racks.location_id, id)).limit(1)
+	)[0]
 	if (rackChild) {
 		return Result.err(new ConflictError('Location still has racks; move or delete them first'))
 	}
 	try {
-		getDb().delete(locations).where(eq(locations.id, id)).run()
+		await getDb().delete(locations).where(eq(locations.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}

@@ -41,7 +41,8 @@ export default defineConfig({
 					env: {
 						CONEX_E2E_DATA_DIR: dataDir,
 						CONEX_CONFIG_PATH: path.join(dataDir, 'config.toml'),
-						CONEX_DB_PATH: path.join(dataDir, 'e2e.db'),
+						// Dedicated database: the seed writes fixtures into it.
+						CONEX_DATABASE_URL: process.env.CONEX_E2E_DATABASE_URL ?? '',
 						CONEX_SERVER_PORT: String(apiPort),
 					},
 					url: `${apiUrl}/health`,

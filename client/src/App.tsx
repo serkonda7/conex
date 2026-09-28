@@ -695,9 +695,6 @@ function App(): JSX.Element {
 											error={setupError}
 											onSetup={handleSetup}
 										/>
-										<div class="app-auth-language">
-											<LanguageSwitcher />
-										</div>
 									</div>
 								</main>
 							</Match>
@@ -715,9 +712,6 @@ function App(): JSX.Element {
 											error={error}
 											onLogin={handleLogin}
 										/>
-										<div class="app-auth-language">
-											<LanguageSwitcher />
-										</div>
 									</div>
 								</main>
 							</Match>

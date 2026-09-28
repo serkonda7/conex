@@ -13,10 +13,10 @@ import { onValidationError } from '../middleware/validation'
  */
 export const interfacesApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', InterfaceListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', InterfaceListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {
-			const tenant = deviceTenant(query.device)
+			const tenant = await deviceTenant(query.device)
 			if (tenant !== undefined) {
 				const denied = checkRead(c, tenant)
 				if (denied) {
@@ -26,7 +26,7 @@ export const interfacesApp = new Hono()
 		}
 		const scope = scopeTenantId(requestUser(c))
 		return c.json(
-			listAllInterfaces({
+			await listAllInterfaces({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,

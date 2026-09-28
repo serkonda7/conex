@@ -99,7 +99,7 @@ if (import.meta.main) {
 	}
 
 	try {
-		initDb({ serverRoot })
+		await initDb({ serverRoot })
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err)
 		console.error(`Failed to start server: ${msg}`)
@@ -110,7 +110,7 @@ if (import.meta.main) {
 
 	// Drop timed out sessions even while nobody tries to use them.
 	// Scheduled here and not at module scope, so it never keeps a test process alive.
-	sweepExpired()
+	await sweepExpired()
 	start_sweep(sweepExpired, SESSION_SWEEP_INTERVAL_MS)
 
 	const server = Bun.serve({

@@ -73,12 +73,12 @@ function templateOf(row: { u_height: number }): PlacementTemplate {
  * validate against devices plus shelf blockers. `excludeDeviceId` skips
  * the device being updated so a no-op move is not self-conflicting.
  */
-export function checkPlacement(
+export async function checkPlacement(
 	deviceName: string,
 	mount: MountInput,
 	template: PlacementTemplate,
 	excludeDeviceId?: number,
-): Result<undefined, Error> {
+): Promise<Result<undefined, Error>> {
 	const db = getDb()
 	if (mount.rack_id === null) {
 		if (mount.position_u !== null) {
@@ -86,7 +86,7 @@ export function checkPlacement(
 		}
 		return Result.ok(undefined)
 	}
-	const rack = db.select().from(racks).where(eq(racks.id, mount.rack_id)).get()
+	const rack = (await db.select().from(racks).where(eq(racks.id, mount.rack_id)).limit(1))[0]
 	if (!rack) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
@@ -106,13 +106,13 @@ export function checkPlacement(
 		face: mount.face,
 		is_full_depth: mount.is_full_depth,
 	}
-	const bounds = checkBounds(candidate, rackHeightOf(rack), `Device "${deviceName}"`)
+	const bounds = checkBounds(candidate, await rackHeightOf(rack), `Device "${deviceName}"`)
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
 	const overlap = checkOverlap(
 		candidate,
-		rackSpansOf(mount.rack_id),
+		await rackSpansOf(mount.rack_id),
 		`Device "${deviceName}"`,
 		excludeDeviceId,
 	)
@@ -134,10 +134,10 @@ interface ShelfPlacementInput {
  * rack to the shelf's rack and clears U position and face; moving a shelved
  * device to another rack or onto a U takes it off its shelf.
  */
-function normalizeShelf<T extends ShelfPlacementInput>(
+async function normalizeShelf<T extends ShelfPlacementInput>(
 	input: T,
 	current?: { rack_id: number | null; shelf_id: number | null },
-): Result<T, Error> {
+): Promise<Result<T, Error>> {
 	if (input.shelf_id === undefined || input.shelf_id === null) {
 		const leavesShelf =
 			input.shelf_id === undefined &&
@@ -147,7 +147,9 @@ function normalizeShelf<T extends ShelfPlacementInput>(
 				(input.position_u !== undefined && input.position_u !== null))
 		return Result.ok(leavesShelf ? { ...input, shelf_id: null } : input)
 	}
-	const shelf = getDb().select().from(shelves).where(eq(shelves.id, input.shelf_id)).get()
+	const shelf = (
+		await getDb().select().from(shelves).where(eq(shelves.id, input.shelf_id)).limit(1)
+	)[0]
 	if (!shelf) {
 		return Result.err(new NotFoundError('Shelf not found'))
 	}
@@ -163,25 +165,27 @@ function normalizeShelf<T extends ShelfPlacementInput>(
 /** Backwards-compatible alias for the placement check. */
 export const checkMount: typeof checkPlacement = checkPlacement
 
-function checkSite(siteId: number | null | undefined): Result<undefined, Error> {
+async function checkSite(siteId: number | null | undefined): Promise<Result<undefined, Error>> {
 	if (siteId === null || siteId === undefined) {
 		return Result.ok(undefined)
 	}
-	if (!getDb().select().from(sites).where(eq(sites.id, siteId)).get()) {
+	if (!(await getDb().select().from(sites).where(eq(sites.id, siteId)).limit(1))[0]) {
 		return Result.err(new NotFoundError('Site not found'))
 	}
 	return Result.ok(undefined)
 }
 
 /** Location must exist; when a site is also given it must belong to that site. */
-function checkLocation(
+async function checkLocation(
 	locationId: number | null | undefined,
 	siteId: number | null | undefined,
-): Result<undefined, Error> {
+): Promise<Result<undefined, Error>> {
 	if (locationId === null || locationId === undefined) {
 		return Result.ok(undefined)
 	}
-	const location = getDb().select().from(locations).where(eq(locations.id, locationId)).get()
+	const location = (
+		await getDb().select().from(locations).where(eq(locations.id, locationId)).limit(1)
+	)[0]
 	if (!location) {
 		return Result.err(new NotFoundError('Location not found'))
 	}
@@ -192,26 +196,30 @@ function checkLocation(
 }
 
 /** The rack location is authoritative for a rack-mounted device. */
-function rackLocationId(rackId: number): Result<number | null, Error> {
-	const rack = getDb()
-		.select({ location_id: racks.location_id })
-		.from(racks)
-		.where(eq(racks.id, rackId))
-		.get()
+async function rackLocationId(rackId: number): Promise<Result<number | null, Error>> {
+	const rack = (
+		await getDb()
+			.select({ location_id: racks.location_id })
+			.from(racks)
+			.where(eq(racks.id, rackId))
+			.limit(1)
+	)[0]
 	if (!rack) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
 	return Result.ok(rack.location_id)
 }
 
-function checkAssetTag(
+async function checkAssetTag(
 	assetTag: string | null | undefined,
 	excludeDeviceId?: number,
-): Result<undefined, Error> {
+): Promise<Result<undefined, Error>> {
 	if (assetTag === null || assetTag === undefined) {
 		return Result.ok(undefined)
 	}
-	const clash = getDb().select().from(devices).where(eq(devices.asset_tag, assetTag)).get()
+	const clash = (
+		await getDb().select().from(devices).where(eq(devices.asset_tag, assetTag)).limit(1)
+	)[0]
 	if (clash && clash.id !== excludeDeviceId) {
 		return Result.err(new DuplicateError('Asset tag is already in use'))
 	}
@@ -235,13 +243,13 @@ export interface DeviceListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export function listDevices(params: DeviceListParams): Page<DeviceRow> {
+export async function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${devices.name} LIKE ${pattern} ESCAPE '\\' OR ${devices.asset_tag} LIKE ${pattern} ESCAPE '\\' OR ${devices.serial} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${devices.name} ILIKE ${pattern} ESCAPE '\\' OR ${devices.asset_tag} ILIKE ${pattern} ESCAPE '\\' OR ${devices.serial} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.site) {
@@ -268,20 +276,19 @@ export function listDevices(params: DeviceListParams): Page<DeviceRow> {
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
 	const orderColumn = params.sort === 'status' ? devices.status : devices.name
-	const items = db
+	const items = await db
 		.select()
 		.from(devices)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn))
+		.orderBy(params.order === 'desc' ? desc(orderColumn) : asc(orderColumn), asc(devices.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(devices).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(devices).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getDevice(id: number): Result<DeviceRow, Error> {
-	const row = getDb().select().from(devices).where(eq(devices.id, id)).get()
+export async function getDevice(id: number): Promise<Result<DeviceRow, Error>> {
+	const row = (await getDb().select().from(devices).where(eq(devices.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Device not found'))
 	}
@@ -302,18 +309,20 @@ function mountOf(input: {
 	}
 }
 
-export function createDevice(rawInput: DeviceCreate): Result<DeviceRow, Error> {
+export async function createDevice(rawInput: DeviceCreate): Promise<Result<DeviceRow, Error>> {
 	const db = getDb()
-	const normalized = normalizeShelf(rawInput)
+	const normalized = await normalizeShelf(rawInput)
 	if (Result.isError(normalized)) {
 		return normalized
 	}
 	const input = normalized.value
-	const template = db
-		.select()
-		.from(device_types)
-		.where(eq(device_types.id, input.device_type_id))
-		.get()
+	const template = (
+		await db
+			.select()
+			.from(device_types)
+			.where(eq(device_types.id, input.device_type_id))
+			.limit(1)
+	)[0]
 	if (!template) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
@@ -322,18 +331,18 @@ export function createDevice(rawInput: DeviceCreate): Result<DeviceRow, Error> {
 	let deviceLocationId = input.location_id ?? null
 	const deviceSiteId = input.site_id ?? null
 	if (createMount.rack_id !== null) {
-		const rackLocation = rackLocationId(createMount.rack_id)
+		const rackLocation = await rackLocationId(createMount.rack_id)
 		if (Result.isError(rackLocation)) {
 			return Result.err(rackLocation.error)
 		}
 		deviceLocationId = rackLocation.value
 	}
 	for (const guard of [
-		checkSite(deviceSiteId),
-		checkLocation(deviceLocationId, deviceSiteId),
-		checkTenantExists(input.tenant_id),
-		checkAssetTag(input.asset_tag),
-		checkPlacement(input.name, createMount, templateOf(template)),
+		await checkSite(deviceSiteId),
+		await checkLocation(deviceLocationId, deviceSiteId),
+		await checkTenantExists(input.tenant_id),
+		await checkAssetTag(input.asset_tag),
+		await checkPlacement(input.name, createMount, templateOf(template)),
 	]) {
 		if (Result.isError(guard)) {
 			return Result.err(guard.error)
@@ -341,11 +350,10 @@ export function createDevice(rawInput: DeviceCreate): Result<DeviceRow, Error> {
 	}
 	// Stub rows are loaded before the transaction so a duplicate expansion
 	// (e.g. from a concurrent stub edit) fails before anything is inserted.
-	const stubs = db
+	const stubs = await db
 		.select()
 		.from(device_type_interfaces)
 		.where(eq(device_type_interfaces.device_type_id, input.device_type_id))
-		.all()
 	const expanded = expandStubs(
 		stubs.map((s) => ({
 			prefix: s.prefix,
@@ -375,22 +383,22 @@ export function createDevice(rawInput: DeviceCreate): Result<DeviceRow, Error> {
 	}
 	let deviceId: number | undefined
 	try {
-		db.transaction((tx) => {
-			const inserted = tx.insert(devices).values(values).returning({ id: devices.id }).get()
+		await db.transaction(async (tx) => {
+			const inserted = (
+				await tx.insert(devices).values(values).returning({ id: devices.id })
+			)[0]
 			if (!inserted) {
 				throw new Error('Device insert did not return an id')
 			}
 			deviceId = inserted.id
 			for (const iface of expanded.value) {
-				tx.insert(interfaces)
-					.values({
-						device_id: inserted.id,
-						name: iface.name,
-						kind: iface.kind,
-						connected: 0,
-						description: iface.description ?? iface.label,
-					})
-					.run()
+				await tx.insert(interfaces).values({
+					device_id: inserted.id,
+					name: iface.name,
+					kind: iface.kind,
+					connected: 0,
+					description: iface.description ?? iface.label,
+				})
 			}
 		})
 	} catch (err) {
@@ -402,25 +410,30 @@ export function createDevice(rawInput: DeviceCreate): Result<DeviceRow, Error> {
 	if (deviceId === undefined) {
 		return Result.err(new Error('Device insert did not return an id'))
 	}
-	return getDevice(deviceId)
+	return await getDevice(deviceId)
 }
 
-export function updateDevice(id: number, rawInput: DeviceUpdate): Result<DeviceRow, Error> {
-	const current = getDevice(id)
+export async function updateDevice(
+	id: number,
+	rawInput: DeviceUpdate,
+): Promise<Result<DeviceRow, Error>> {
+	const current = await getDevice(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const node = current.value
-	const normalized = normalizeShelf(rawInput, node)
+	const normalized = await normalizeShelf(rawInput, node)
 	if (Result.isError(normalized)) {
 		return normalized
 	}
 	const input = normalized.value
-	const template = getDb()
-		.select()
-		.from(device_types)
-		.where(eq(device_types.id, node.device_type_id))
-		.get()
+	const template = (
+		await getDb()
+			.select()
+			.from(device_types)
+			.where(eq(device_types.id, node.device_type_id))
+			.limit(1)
+	)[0]
 	if (!template) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
@@ -429,17 +442,20 @@ export function updateDevice(id: number, rawInput: DeviceUpdate): Result<DeviceR
 	const mountChanged = input.rack_id !== undefined || input.position_u !== undefined
 	let deviceLocationId = input.location_id !== undefined ? input.location_id : node.location_id
 	if (mountChanged && effectiveRackId !== null && effectiveRackId !== undefined) {
-		const rackLocation = rackLocationId(effectiveRackId)
+		const rackLocation = await rackLocationId(effectiveRackId)
 		if (Result.isError(rackLocation)) {
 			return Result.err(rackLocation.error)
 		}
 		deviceLocationId = rackLocation.value
 	}
 	for (const guard of [
-		checkSite(input.site_id),
-		checkLocation(deviceLocationId, input.site_id !== undefined ? input.site_id : node.site_id),
-		checkTenantExists(input.tenant_id),
-		checkAssetTag(input.asset_tag, id),
+		await checkSite(input.site_id),
+		await checkLocation(
+			deviceLocationId,
+			input.site_id !== undefined ? input.site_id : node.site_id,
+		),
+		await checkTenantExists(input.tenant_id),
+		await checkAssetTag(input.asset_tag, id),
 	]) {
 		if (Result.isError(guard)) {
 			return Result.err(guard.error)
@@ -457,7 +473,7 @@ export function updateDevice(id: number, rawInput: DeviceUpdate): Result<DeviceR
 		is_full_depth: template.is_full_depth !== 0,
 	}
 	if (mountChanged || input.face !== undefined || input.name !== undefined) {
-		const mountCheck = checkPlacement(input.name ?? node.name, mount, placement, id)
+		const mountCheck = await checkPlacement(input.name ?? node.name, mount, placement, id)
 		if (Result.isError(mountCheck)) {
 			return Result.err(mountCheck.error)
 		}
@@ -501,7 +517,7 @@ export function updateDevice(id: number, rawInput: DeviceUpdate): Result<DeviceR
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb().update(devices).set(patch).where(eq(devices.id, id)).run()
+			await getDb().update(devices).set(patch).where(eq(devices.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('Asset tag is already in use'))
@@ -509,24 +525,26 @@ export function updateDevice(id: number, rawInput: DeviceUpdate): Result<DeviceR
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getDevice(id)
+	return await getDevice(id)
 }
 
 /**
  * Explicit remount: `undefined` keeps the current mount value, `null` clears
  * it. The effective mount re-validates U exactly like creation.
  */
-export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Error> {
-	const current = getDevice(id)
+export async function moveDevice(id: number, input: DeviceMove): Promise<Result<DeviceRow, Error>> {
+	const current = await getDevice(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const node = current.value
-	const template = getDb()
-		.select()
-		.from(device_types)
-		.where(eq(device_types.id, node.device_type_id))
-		.get()
+	const template = (
+		await getDb()
+			.select()
+			.from(device_types)
+			.where(eq(device_types.id, node.device_type_id))
+			.limit(1)
+	)[0]
 	if (!template) {
 		return Result.err(new NotFoundError('Device type not found'))
 	}
@@ -537,7 +555,7 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 		face: node.face === 'front' || node.face === 'rear' ? node.face : null,
 		is_full_depth: template.is_full_depth !== 0,
 	}
-	const mountCheck = checkPlacement(node.name, mount, placement, id)
+	const mountCheck = await checkPlacement(node.name, mount, placement, id)
 	if (Result.isError(mountCheck)) {
 		return Result.err(mountCheck.error)
 	}
@@ -550,36 +568,36 @@ export function moveDevice(id: number, input: DeviceMove): Result<DeviceRow, Err
 		patch.shelf_id = null
 	}
 	if (mount.rack_id !== null) {
-		const rackLocation = rackLocationId(mount.rack_id)
+		const rackLocation = await rackLocationId(mount.rack_id)
 		if (Result.isError(rackLocation)) {
 			return Result.err(rackLocation.error)
 		}
 		patch.location_id = rackLocation.value
 	}
 	try {
-		getDb().update(devices).set(patch).where(eq(devices.id, id)).run()
+		await getDb().update(devices).set(patch).where(eq(devices.id, id))
 	} catch (err) {
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return getDevice(id)
+	return await getDevice(id)
 }
 
-export function deleteDevice(id: number): Result<DeviceRow, Error> {
-	const current = getDevice(id)
+export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>> {
+	const current = await getDevice(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	// Cabled ports stay consistent: remove cables first so no peer is left
 	// pointing at a deleted interface (FK + connected flag both matter).
-	if (deviceHasCables(id)) {
+	if (await deviceHasCables(id)) {
 		return Result.err(
 			new ConflictError('Device still has connected cables; disconnect them first'),
 		)
 	}
 	try {
-		getDb().transaction((tx) => {
-			tx.delete(interfaces).where(eq(interfaces.device_id, id)).run()
-			tx.delete(devices).where(eq(devices.id, id)).run()
+		await getDb().transaction(async (tx) => {
+			await tx.delete(interfaces).where(eq(interfaces.device_id, id))
+			await tx.delete(devices).where(eq(devices.id, id))
 		})
 	} catch (e) {
 		return Result.err(errOf(e))
@@ -591,20 +609,19 @@ export function deleteDevice(id: number): Result<DeviceRow, Error> {
 // Interfaces
 // ---------------------------------------------------------------------------
 
-export function listInterfaces(deviceId: number): Result<InterfaceJson[], Error> {
-	const device = getDevice(deviceId)
+export async function listInterfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
+	const device = await getDevice(deviceId)
 	if (Result.isError(device)) {
 		return Result.err(device.error)
 	}
-	const rows = getDb()
+	const rows = await getDb()
 		.select()
 		.from(interfaces)
 		.where(eq(interfaces.device_id, deviceId))
 		// Creation order, not name order: stub expansion inserts eth1..eth24
 		// sequentially, so the list reads back in natural port order
 		// (lexicographic name order would put eth10 before eth2).
-		.orderBy(sql`"interfaces"."rowid"`)
-		.all()
+		.orderBy(asc(interfaces.id))
 	return Result.ok(rows.map(toInterfaceJson))
 }
 
@@ -630,13 +647,15 @@ export interface InterfaceListItem extends InterfaceJson {
  * device's ports read back in natural order — lexicographic name order
  * would put eth10 before eth2).
  */
-export function listAllInterfaces(params: InterfaceListParams): Page<InterfaceListItem> {
+export async function listAllInterfaces(
+	params: InterfaceListParams,
+): Promise<Page<InterfaceListItem>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${interfaces.name} LIKE ${pattern} ESCAPE '\\' OR ${interfaces.kind} LIKE ${pattern} ESCAPE '\\' OR ${devices.name} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${interfaces.name} ILIKE ${pattern} ESCAPE '\\' OR ${interfaces.kind} ILIKE ${pattern} ESCAPE '\\' OR ${devices.name} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.device !== undefined) {
@@ -649,21 +668,22 @@ export function listAllInterfaces(params: InterfaceListParams): Page<InterfaceLi
 		conditions.push(eq(devices.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const rows = db
+	const rows = await db
 		.select({ iface: interfaces, device_name: devices.name })
 		.from(interfaces)
 		.innerJoin(devices, eq(interfaces.device_id, devices.id))
 		.where(where)
-		.orderBy(sql`${devices.name}`, sql`"interfaces"."rowid"`)
+		.orderBy(asc(devices.name), asc(interfaces.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db
-		.select({ n: count() })
-		.from(interfaces)
-		.innerJoin(devices, eq(interfaces.device_id, devices.id))
-		.where(where)
-		.get()
+	const totalRow = (
+		await db
+			.select({ n: count() })
+			.from(interfaces)
+			.innerJoin(devices, eq(interfaces.device_id, devices.id))
+			.where(where)
+			.limit(1)
+	)[0]
 	return pageOf(
 		rows.map((r) => ({ ...toInterfaceJson(r.iface), device_name: r.device_name })),
 		totalRow?.n ?? 0,
@@ -671,27 +691,34 @@ export function listAllInterfaces(params: InterfaceListParams): Page<InterfaceLi
 	)
 }
 
-export function getInterface(deviceId: number, ifaceId: number): Result<InterfaceJson, Error> {
-	const row = getDb().select().from(interfaces).where(eq(interfaces.id, ifaceId)).get()
+export async function getInterface(
+	deviceId: number,
+	ifaceId: number,
+): Promise<Result<InterfaceJson, Error>> {
+	const row = (
+		await getDb().select().from(interfaces).where(eq(interfaces.id, ifaceId)).limit(1)
+	)[0]
 	if (!row || row.device_id !== deviceId) {
 		return Result.err(new NotFoundError('Interface not found on this device'))
 	}
 	return Result.ok(toInterfaceJson(row))
 }
 
-export function addInterface(
+export async function addInterface(
 	deviceId: number,
 	input: InterfaceCreate,
-): Result<InterfaceJson, Error> {
-	const device = getDevice(deviceId)
+): Promise<Result<InterfaceJson, Error>> {
+	const device = await getDevice(deviceId)
 	if (Result.isError(device)) {
 		return Result.err(device.error)
 	}
-	const clash = getDb()
-		.select()
-		.from(interfaces)
-		.where(and(eq(interfaces.device_id, deviceId), eq(interfaces.name, input.name)))
-		.get()
+	const clash = (
+		await getDb()
+			.select()
+			.from(interfaces)
+			.where(and(eq(interfaces.device_id, deviceId), eq(interfaces.name, input.name)))
+			.limit(1)
+	)[0]
 	if (clash) {
 		return Result.err(new DuplicateError('This device already has an interface with this name'))
 	}
@@ -704,15 +731,13 @@ export function addInterface(
 		description: input.description ?? null,
 	}
 	try {
-		const inserted = getDb()
-			.insert(interfaces)
-			.values(row)
-			.returning({ id: interfaces.id })
-			.get()
+		const inserted = (
+			await getDb().insert(interfaces).values(row).returning({ id: interfaces.id })
+		)[0]
 		if (!inserted) {
 			return Result.err(new Error('Interface insert did not return an id'))
 		}
-		return getInterface(deviceId, inserted.id)
+		return await getInterface(deviceId, inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -723,21 +748,23 @@ export function addInterface(
 	}
 }
 
-export function updateInterface(
+export async function updateInterface(
 	deviceId: number,
 	ifaceId: number,
 	input: InterfaceUpdate,
-): Result<InterfaceJson, Error> {
-	const current = getInterface(deviceId, ifaceId)
+): Promise<Result<InterfaceJson, Error>> {
+	const current = await getInterface(deviceId, ifaceId)
 	if (Result.isError(current)) {
 		return current
 	}
 	if (input.name !== undefined && input.name !== current.value.name) {
-		const clash = getDb()
-			.select()
-			.from(interfaces)
-			.where(and(eq(interfaces.device_id, deviceId), eq(interfaces.name, input.name)))
-			.get()
+		const clash = (
+			await getDb()
+				.select()
+				.from(interfaces)
+				.where(and(eq(interfaces.device_id, deviceId), eq(interfaces.name, input.name)))
+				.limit(1)
+		)[0]
 		if (clash) {
 			return Result.err(
 				new DuplicateError('This device already has an interface with this name'),
@@ -759,7 +786,7 @@ export function updateInterface(
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId)).run()
+			await getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(
@@ -769,5 +796,5 @@ export function updateInterface(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getInterface(deviceId, ifaceId)
+	return await getInterface(deviceId, ifaceId)
 }

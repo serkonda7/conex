@@ -234,14 +234,16 @@ export function guardWrite(c: Context, currentTenant: number | null): Response |
 // ---------------------------------------------------------------------------
 
 /** Tenant of a rack, or `undefined` when the rack is missing. */
-export function rackTenant(rackId: number): number | null | undefined {
-	const rack = getDb().select().from(racks).where(eq(racks.id, rackId)).get()
+export async function rackTenant(rackId: number): Promise<number | null | undefined> {
+	const rack = (await getDb().select().from(racks).where(eq(racks.id, rackId)).limit(1))[0]
 	return rack?.tenant_id
 }
 
 /** Tenant of a device, or `undefined` when the device is missing. */
-export function deviceTenant(deviceId: number): number | null | undefined {
-	const device = getDb().select().from(devices).where(eq(devices.id, deviceId)).get()
+export async function deviceTenant(deviceId: number): Promise<number | null | undefined> {
+	const device = (
+		await getDb().select().from(devices).where(eq(devices.id, deviceId)).limit(1)
+	)[0]
 	return device?.tenant_id
 }
 
@@ -249,36 +251,44 @@ export function deviceTenant(deviceId: number): number | null | undefined {
  * Tenant of a shelf, inherited from its rack; `undefined` when either is
  * missing. `db/shelves.ts` owns the same lookup for service-layer paths.
  */
-export function shelfTenant(shelfId: number): number | null | undefined {
-	const shelf = getDb().select().from(shelves).where(eq(shelves.id, shelfId)).get()
+export async function shelfTenant(shelfId: number): Promise<number | null | undefined> {
+	const shelf = (await getDb().select().from(shelves).where(eq(shelves.id, shelfId)).limit(1))[0]
 	if (!shelf) {
 		return undefined
 	}
-	const rack = getDb().select().from(racks).where(eq(racks.id, shelf.rack_id)).get()
+	const rack = (await getDb().select().from(racks).where(eq(racks.id, shelf.rack_id)).limit(1))[0]
 	return rack?.tenant_id
 }
 
 /** Tenant of an interface's device, or `undefined` when either is missing. */
-export function interfaceTenant(interfaceId: number): number | null | undefined {
-	const iface = getDb().select().from(interfaces).where(eq(interfaces.id, interfaceId)).get()
+export async function interfaceTenant(interfaceId: number): Promise<number | null | undefined> {
+	const iface = (
+		await getDb().select().from(interfaces).where(eq(interfaces.id, interfaceId)).limit(1)
+	)[0]
 	if (!iface) {
 		return undefined
 	}
-	return deviceTenant(iface.device_id)
+	return await deviceTenant(iface.device_id)
 }
 
 /** Tenants of both endpoint devices of a cable row. */
-export function cableTenants(cable: typeof cables.$inferSelect): [number | null, number | null] {
+export async function cableTenants(
+	cable: typeof cables.$inferSelect,
+): Promise<[number | null, number | null]> {
 	const db = getDb()
-	const tenantOf = (interfaceId: number): number | null => {
-		const iface = db.select().from(interfaces).where(eq(interfaces.id, interfaceId)).get()
+	const tenantOf = async (interfaceId: number): Promise<number | null> => {
+		const iface = (
+			await db.select().from(interfaces).where(eq(interfaces.id, interfaceId)).limit(1)
+		)[0]
 		if (!iface) {
 			return null
 		}
-		const device = db.select().from(devices).where(eq(devices.id, iface.device_id)).get()
+		const device = (
+			await db.select().from(devices).where(eq(devices.id, iface.device_id)).limit(1)
+		)[0]
 		return device?.tenant_id ?? null
 	}
-	return [tenantOf(cable.a_interface_id), tenantOf(cable.b_interface_id)]
+	return [await tenantOf(cable.a_interface_id), await tenantOf(cable.b_interface_id)]
 }
 
 /** Cable read rule: both endpoints must sit in the scoped tenant. */

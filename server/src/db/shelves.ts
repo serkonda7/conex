@@ -19,13 +19,13 @@ export interface ShelfListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export function listShelves(params: ShelfListParams): Page<ShelfRow> {
+export async function listShelves(params: ShelfListParams): Promise<Page<ShelfRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${shelves.name} LIKE ${pattern} ESCAPE '\\' OR ${shelves.description} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${shelves.name} ILIKE ${pattern} ESCAPE '\\' OR ${shelves.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.rack) {
@@ -37,39 +37,38 @@ export function listShelves(params: ShelfListParams): Page<ShelfRow> {
 		)
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const items = db
+	const items = await db
 		.select()
 		.from(shelves)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(shelves.name) : asc(shelves.name))
+		.orderBy(params.order === 'desc' ? desc(shelves.name) : asc(shelves.name), asc(shelves.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(shelves).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(shelves).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getShelf(id: number): Result<ShelfRow, Error> {
-	const row = getDb().select().from(shelves).where(eq(shelves.id, id)).get()
+export async function getShelf(id: number): Promise<Result<ShelfRow, Error>> {
+	const row = (await getDb().select().from(shelves).where(eq(shelves.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Shelf not found'))
 	}
 	return Result.ok(row)
 }
 
-function checkShelfBounds(
+async function checkShelfBounds(
 	name: string,
 	rackId: number,
 	positionU: number,
 	mountHeight: number,
 	mountUsable: boolean,
 	reservedHeight: number,
-): Result<undefined, Error> {
-	const rack = getDb().select().from(racks).where(eq(racks.id, rackId)).get()
+): Promise<Result<undefined, Error>> {
+	const rack = (await getDb().select().from(racks).where(eq(racks.id, rackId)).limit(1))[0]
 	if (!rack) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
-	const height = rackHeightOf(rack)
+	const height = await rackHeightOf(rack)
 	const blocked = shelfBlockedRange({
 		position_u: positionU,
 		mount_height: mountHeight,
@@ -104,7 +103,7 @@ function checkShelfBounds(
  * Validates a shelf mount with its real face/depth against all other
  * occupants. Split from `checkShelfBounds` so face/depth flow explicitly.
  */
-function checkShelfOverlap(
+async function checkShelfOverlap(
 	name: string,
 	rackId: number,
 	face: 'front' | 'rear' | null,
@@ -114,7 +113,7 @@ function checkShelfOverlap(
 	mountUsable: boolean,
 	reservedHeight: number,
 	excludeShelfId?: number,
-): Result<undefined, Error> {
+): Promise<Result<undefined, Error>> {
 	const blocked = shelfBlockedRange({
 		position_u: positionU,
 		mount_height: mountHeight,
@@ -133,7 +132,7 @@ function checkShelfOverlap(
 			face,
 			is_full_depth: isFullDepth,
 		},
-		rackSpansOf(rackId),
+		await rackSpansOf(rackId),
 		`Shelf "${name}"`,
 		excludeShelfId === undefined ? undefined : -excludeShelfId,
 	)
@@ -143,12 +142,12 @@ function checkShelfOverlap(
 	return Result.ok(undefined)
 }
 
-export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
+export async function createShelf(input: ShelfCreate): Promise<Result<ShelfRow, Error>> {
 	const name = input.name ?? 'shelf'
 	const mountHeight = input.mount_height ?? 1
 	const mountUsable = input.mount_usable ?? false
 	const reservedHeight = input.reserved_height ?? 0
-	const bounds = checkShelfBounds(
+	const bounds = await checkShelfBounds(
 		name,
 		input.rack_id,
 		input.position_u,
@@ -159,7 +158,7 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 	if (Result.isError(bounds)) {
 		return Result.err(bounds.error)
 	}
-	const overlap = checkShelfOverlap(
+	const overlap = await checkShelfOverlap(
 		name,
 		input.rack_id,
 		input.face ?? null,
@@ -184,11 +183,13 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 		description: input.description ?? null,
 	}
 	try {
-		const inserted = getDb().insert(shelves).values(row).returning({ id: shelves.id }).get()
+		const inserted = (
+			await getDb().insert(shelves).values(row).returning({ id: shelves.id })
+		)[0]
 		if (!inserted) {
 			return Result.err(new Error('Shelf insert did not return an id'))
 		}
-		return getShelf(inserted.id)
+		return await getShelf(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new ConflictError('Shelf name is already in use'))
@@ -197,8 +198,11 @@ export function createShelf(input: ShelfCreate): Result<ShelfRow, Error> {
 	}
 }
 
-export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Error> {
-	const current = getShelf(id)
+export async function updateShelf(
+	id: number,
+	input: ShelfUpdate,
+): Promise<Result<ShelfRow, Error>> {
+	const current = await getShelf(id)
 	if (Result.isError(current)) {
 		return current
 	}
@@ -217,7 +221,9 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 	const isFullDepth = input.is_full_depth ?? node.is_full_depth !== 0
 	// Devices on the shelf share its rack; moving it would strand them.
 	if (input.rack_id !== undefined && input.rack_id !== node.rack_id) {
-		const occupant = getDb().select().from(devices).where(eq(devices.shelf_id, id)).get()
+		const occupant = (
+			await getDb().select().from(devices).where(eq(devices.shelf_id, id)).limit(1)
+		)[0]
 		if (occupant) {
 			return Result.err(
 				new ConflictError('Shelf still has devices; remove them before moving racks'),
@@ -233,7 +239,7 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 		input.face !== undefined ||
 		input.is_full_depth !== undefined
 	if (mountChanged || input.name !== undefined) {
-		const bounds = checkShelfBounds(
+		const bounds = await checkShelfBounds(
 			input.name ?? node.name ?? 'shelf',
 			rackId,
 			positionU,
@@ -244,7 +250,7 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 		if (Result.isError(bounds)) {
 			return Result.err(bounds.error)
 		}
-		const overlap = checkShelfOverlap(
+		const overlap = await checkShelfOverlap(
 			input.name ?? node.name ?? 'shelf',
 			rackId,
 			face,
@@ -289,7 +295,7 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb().update(shelves).set(patch).where(eq(shelves.id, id)).run()
+			await getDb().update(shelves).set(patch).where(eq(shelves.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new ConflictError('Shelf name is already in use'))
@@ -297,19 +303,19 @@ export function updateShelf(id: number, input: ShelfUpdate): Result<ShelfRow, Er
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getShelf(id)
+	return await getShelf(id)
 }
 
-export function deleteShelf(id: number): Result<ShelfRow, Error> {
-	const current = getShelf(id)
+export async function deleteShelf(id: number): Promise<Result<ShelfRow, Error>> {
+	const current = await getShelf(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	// Devices on the shelf stay assigned to the rack, just unplaced.
 	try {
-		getDb().transaction((tx) => {
-			tx.update(devices).set({ shelf_id: null }).where(eq(devices.shelf_id, id)).run()
-			tx.delete(shelves).where(eq(shelves.id, id)).run()
+		await getDb().transaction(async (tx) => {
+			await tx.update(devices).set({ shelf_id: null }).where(eq(devices.shelf_id, id))
+			await tx.delete(shelves).where(eq(shelves.id, id))
 		})
 	} catch (e) {
 		return Result.err(errOf(e))

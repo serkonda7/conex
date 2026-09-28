@@ -10,7 +10,7 @@ import { client, getPage, to_query, to_result } from './api'
 import { t, tp } from './i18n'
 
 /**
- * Wire shape of a shelf: the SQLite flags read as booleans, mirroring
+ * Wire shape of a shelf: the 0/1 DB flags read as booleans, mirroring
  * `InterfaceJson` in `api_devices.ts`.
  */
 export type ShelfRowJson = Omit<ShelfRow, 'mount_usable' | 'is_full_depth'> & {

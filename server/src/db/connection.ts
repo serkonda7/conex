@@ -1,49 +1,68 @@
-import { Database } from 'bun:sqlite'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Result } from 'better-result'
-import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
-import { get_server_root, getTrimmedEnv, resolveInDataDir } from '../util/server_root'
+import { SQL } from 'bun'
+import { type BunSQLQueryResultHKT, drizzle } from 'drizzle-orm/bun-sql'
+import { migrate } from 'drizzle-orm/bun-sql/migrator'
+import type { PgDatabase } from 'drizzle-orm/pg-core'
+import { get_server_root, getTrimmedEnv } from '../util/server_root'
 
-export type DbHandle = ReturnType<typeof drizzle>
+/** Root handle or an open transaction; both run the same query builders. */
+export type DbHandle = PgDatabase<BunSQLQueryResultHKT, Record<string, unknown>>
 
-let dbInstance: DbHandle | null = null
-let sqliteInstance: Database | null = null
+let dbInstance: ReturnType<typeof drizzle> | null = null
+let clientInstance: SQL | null = null
+
+/** Transaction opened by `withTransaction`, picked up by `getDb` in nested calls. */
+const txStore = new AsyncLocalStorage<DbHandle>()
 
 /**
- * Returns the initialized drizzle handle. Throws a clear error when `initDb`
- * was not called — the same shape as `getConfig`, so a missing startup step
- * is obvious instead of a `Cannot read properties of null`.
+ * Returns the initialized drizzle handle (or the surrounding
+ * `withTransaction` transaction). Throws a clear error when `initDb` was
+ * not called — the same shape as `getConfig`, so a missing startup step is
+ * obvious instead of a `Cannot read properties of null`.
  */
 export function getDb(): DbHandle {
+	const tx = txStore.getStore()
+	if (tx) {
+		return tx
+	}
 	if (!dbInstance) {
 		throw new Error('Database has not been initialized. Call initDb() during startup.')
 	}
 	return dbInstance
 }
 
-/** Raw Bun SQLite handle for scripts/tests needing `.exec`/`.query` (server code uses `getDb`). */
-export function getSqliteHandle(): Database {
-	if (!sqliteInstance) {
+/**
+ * Runs `fn` in one transaction. Service functions called inside keep using
+ * `getDb()` and transparently join the transaction; a throw rolls back.
+ */
+export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+	return getDb().transaction((tx) => txStore.run(tx, fn))
+}
+
+/** Raw Bun SQL client for scripts/tests needing plain SQL (server code uses `getDb`). */
+export function getSqlClient(): SQL {
+	if (!clientInstance) {
 		throw new Error('Database has not been initialized. Call initDb() during startup.')
 	}
-	return sqliteInstance
+	return clientInstance
 }
 
 export interface InitDbOptions {
-	dbPath?: string
+	url?: string
 	migrationsFolder?: string
 	serverRoot?: string
 }
 
 /**
- * Opens the database file and runs migrations. Must be called once during
+ * Connects to Postgres and runs migrations. Must be awaited once during
  * startup (or test setup) — importing this module alone opens nothing.
  * Idempotent: repeated calls return the existing handle.
  */
-export function initDb(options: InitDbOptions = {}): DbHandle {
-	if (dbInstance && sqliteInstance) {
+export async function initDb(options: InitDbOptions = {}): Promise<DbHandle> {
+	if (dbInstance) {
 		return dbInstance
 	}
 
@@ -61,59 +80,36 @@ export function initDb(options: InitDbOptions = {}): DbHandle {
 		throw new Error(`Drizzle migrations not found at ${migrationsFolder}.`)
 	}
 
-	const dbPath = options.dbPath ?? resolve_db_path(serverRoot)
-	if (dbPath !== ':memory:') {
-		fs.mkdirSync(path.dirname(dbPath), { recursive: true })
+	const url = options.url ?? resolve_db_url()
+	const client = new SQL(url)
+	const db = drizzle({ client })
+	try {
+		await migrate(db, { migrationsFolder })
+	} catch (err) {
+		await client.close()
+		throw err
 	}
-	const sqlite = new Database(dbPath, { create: true, strict: true })
-	sqlite.exec('PRAGMA foreign_keys = ON')
-
-	const db = drizzle(sqlite)
-	migrate(db, { migrationsFolder })
-	ensureShelfMetadataColumns(sqlite)
 
 	dbInstance = db
-	sqliteInstance = sqlite
+	clientInstance = client
 	return db
 }
 
-/**
- * Backfills shelf metadata for databases created by the earlier shelf table,
- * which only stored rack placement. Current shelf APIs require both columns.
- */
-function ensureShelfMetadataColumns(sqlite: Database): void {
-	const table = sqlite
-		.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'shelves'")
-		.get()
-	if (!table) {
-		return
-	}
-	const columns = new Set(
-		(sqlite.query('PRAGMA table_info(shelves)').all() as { name: string }[]).map(
-			(column) => column.name,
-		),
-	)
-	if (!columns.has('name')) {
-		sqlite.exec("ALTER TABLE shelves ADD COLUMN name TEXT NOT NULL DEFAULT ''")
-		sqlite.exec("UPDATE shelves SET name = 'Fachboden HE' || position_u WHERE name = ''")
-	}
-	if (!columns.has('description')) {
-		sqlite.exec('ALTER TABLE shelves ADD COLUMN description TEXT')
-	}
+/** Closes the pool (scripts only; the server keeps it for its lifetime). */
+export async function closeDb(): Promise<void> {
+	await clientInstance?.close()
+	clientInstance = null
+	dbInstance = null
 }
 
-// Precedence for DB path:
-// 1. CONEX_DB_PATH env var (`:memory:` for an in-memory DB)
-// 2. conex.db
-function resolve_db_path(serverRoot: string): string {
-	const configured_path = getTrimmedEnv('CONEX_DB_PATH')
-	if (!configured_path) {
-		return path.join(serverRoot, 'data', 'conex.db')
+// Connection string from CONEX_DATABASE_URL, e.g.
+// postgres://conex:secret@localhost:5432/conex
+function resolve_db_url(): string {
+	const url = getTrimmedEnv('CONEX_DATABASE_URL')
+	if (!url) {
+		throw new Error(
+			'CONEX_DATABASE_URL is not set (e.g. postgres://user:pass@host:5432/conex).',
+		)
 	}
-
-	if (configured_path === ':memory:') {
-		return configured_path
-	}
-
-	return resolveInDataDir(serverRoot, configured_path)
+	return url
 }

@@ -56,14 +56,14 @@ import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
  */
 export const devicesApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', DeviceListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', DeviceListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		const scope = listTenantScope(c, query.tenant)
 		if (scope instanceof Response) {
 			return scope
 		}
 		return c.json(
-			listDevices({
+			await listDevices({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -81,40 +81,43 @@ export const devicesApp = new Hono()
 		'/',
 		requireWriteMiddleware,
 		vValidator('json', DeviceCreateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const body = c.req.valid('json')
 			const tenant = resolveCreateTenant(c, body.tenant_id)
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			return sendCreated(c, createDevice({ ...body, tenant_id: tenant }))
+			return sendCreated(c, await createDevice({ ...body, tenant_id: tenant }))
 		},
 	)
 	// CSV transfer (registered before `/:id` so the literal paths win).
-	.get('/export', (c) => {
+	.get('/export', async (c) => {
 		const scope = scopeTenantId(requestUser(c))
-		return sendCsv(c, exportDevicesCsv(scope ?? undefined), 'devices.csv')
+		return sendCsv(c, await exportDevicesCsv(scope ?? undefined), 'devices.csv')
 	})
 	.post(
 		'/import',
 		requireWriteMiddleware,
 		vValidator('json', CsvImportBodySchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const scope = scopeTenantId(requestUser(c))
-			return sendCreated(c, importDevicesCsv(c.req.valid('json').csv, scope ?? undefined))
+			return sendCreated(
+				c,
+				await importDevicesCsv(c.req.valid('json').csv, scope ?? undefined),
+			)
 		},
 	)
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendTenantRow(c, getDevice(c.req.valid('param').id))
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendTenantRow(c, await getDevice(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceUpdateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
 			const body = c.req.valid('json')
-			const current = getDevice(id)
+			const current = await getDevice(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
@@ -122,12 +125,12 @@ export const devicesApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			return sendRow(c, updateDevice(id, body))
+			return sendRow(c, await updateDevice(id, body))
 		},
 	)
-	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
 		const id = c.req.valid('param').id
-		const current = getDevice(id)
+		const current = await getDevice(id)
 		if (Result.isError(current)) {
 			return sendResult(c, current)
 		}
@@ -135,16 +138,16 @@ export const devicesApp = new Hono()
 		if (denied) {
 			return denied
 		}
-		return sendRow(c, deleteDevice(id))
+		return sendRow(c, await deleteDevice(id))
 	})
 	// Explicit remount: re-validates U exactly like creation.
 	.post(
 		'/:id/move',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceMoveSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
-			const current = getDevice(id)
+			const current = await getDevice(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
@@ -153,49 +156,53 @@ export const devicesApp = new Hono()
 				return denied
 			}
 			const moveBody = c.req.valid('json')
-			return sendRow(c, moveDevice(id, moveBody))
+			return sendRow(c, await moveDevice(id, moveBody))
 		},
 	)
 	// Interface sub-resource (name unique per device; `connected` is P5-owned).
-	.get('/:id/interfaces', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const id = c.req.valid('param').id
-		const tenant = deviceTenant(id)
-		if (tenant === undefined) {
-			return sendResult(c, listInterfaces(id))
-		}
-		const denied = checkRead(c, tenant)
-		if (denied) {
-			return denied
-		}
-		return sendResult(c, listInterfaces(id))
-	})
+	.get(
+		'/:id/interfaces',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const tenant = await deviceTenant(id)
+			if (tenant === undefined) {
+				return sendResult(c, await listInterfaces(id))
+			}
+			const denied = checkRead(c, tenant)
+			if (denied) {
+				return denied
+			}
+			return sendResult(c, await listInterfaces(id))
+		},
+	)
 	.post(
 		'/:id/interfaces',
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', InterfaceCreateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
-			const tenant = deviceTenant(id)
+			const tenant = await deviceTenant(id)
 			if (tenant !== undefined) {
 				const scopeDenied = checkWrite(c, tenant)
 				if (scopeDenied) {
 					return scopeDenied
 				}
 			}
-			return sendCreated(c, addInterface(id, c.req.valid('json')))
+			return sendCreated(c, await addInterface(id, c.req.valid('json')))
 		},
 	)
 	.get(
 		'/:id/interfaces/:ifaceId',
 		vValidator('param', DeviceIfaceParamsSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const param = c.req.valid('param')
-			const local = getInterface(param.id, param.ifaceId)
+			const local = await getInterface(param.id, param.ifaceId)
 			if (Result.isError(local)) {
 				return sendResult(c, local)
 			}
-			const tenant = deviceTenant(param.id)
+			const tenant = await deviceTenant(param.id)
 			if (tenant !== undefined) {
 				const denied = checkRead(c, tenant)
 				if (denied) {
@@ -210,16 +217,16 @@ export const devicesApp = new Hono()
 		requireWriteMiddleware,
 		vValidator('param', DeviceIfaceParamsSchema, onValidationError),
 		vValidator('json', InterfaceUpdateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const param = c.req.valid('param')
-			const tenant = deviceTenant(param.id)
+			const tenant = await deviceTenant(param.id)
 			if (tenant !== undefined) {
 				const scopeDenied = checkWrite(c, tenant)
 				if (scopeDenied) {
 					return scopeDenied
 				}
 			}
-			return sendRow(c, updateInterface(param.id, param.ifaceId, c.req.valid('json')))
+			return sendRow(c, await updateInterface(param.id, param.ifaceId, c.req.valid('json')))
 		},
 	)
 	// Convenience connect: one end in the path, the peer in the body.
@@ -228,25 +235,25 @@ export const devicesApp = new Hono()
 		requireWriteMiddleware,
 		vValidator('param', DeviceIfaceParamsSchema, onValidationError),
 		vValidator('json', InterfaceConnectSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const param = c.req.valid('param')
-			const local = getInterface(param.id, param.ifaceId)
+			const local = await getInterface(param.id, param.ifaceId)
 			if (Result.isError(local)) {
 				return sendResult(c, local)
 			}
-			const peerTenant = interfaceTenant(c.req.valid('json').peer_interface_id)
+			const peerTenant = await interfaceTenant(c.req.valid('json').peer_interface_id)
 			if (peerTenant === undefined) {
 				// Unknown peer: let the service answer 404.
 				return sendCreated(
 					c,
-					connectCable({
+					await connectCable({
 						a_interface_id: param.ifaceId,
 						b_interface_id: c.req.valid('json').peer_interface_id,
 						status: 'connected',
 					}),
 				)
 			}
-			const localTenant = deviceTenant(param.id)
+			const localTenant = await deviceTenant(param.id)
 			if (
 				localTenant !== undefined &&
 				!canWriteCable(requestUser(c), [localTenant, peerTenant])
@@ -255,7 +262,7 @@ export const devicesApp = new Hono()
 			}
 			return sendCreated(
 				c,
-				connectCable({
+				await connectCable({
 					a_interface_id: param.ifaceId,
 					b_interface_id: c.req.valid('json').peer_interface_id,
 					status: 'connected',
@@ -270,19 +277,19 @@ export const devicesApp = new Hono()
 		'/:id/trace',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('query', TraceQuerySchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
 			const depth = c.req.valid('query').depth
-			const tenant = deviceTenant(id)
+			const tenant = await deviceTenant(id)
 			const scope = scopeTenantId(requestUser(c))
 			if (tenant === undefined) {
-				return sendResult(c, getDeviceTrace(id, depth, scope ?? undefined))
+				return sendResult(c, await getDeviceTrace(id, depth, scope ?? undefined))
 			}
 			const denied = checkRead(c, tenant)
 			if (denied) {
 				return denied
 			}
-			return sendResult(c, getDeviceTrace(id, depth, scope ?? undefined))
+			return sendResult(c, await getDeviceTrace(id, depth, scope ?? undefined))
 		},
 	)
 	// Per-interface cable trace: all shortest paths starting at one port.
@@ -290,15 +297,15 @@ export const devicesApp = new Hono()
 		'/:id/interfaces/:ifaceId/trace',
 		vValidator('param', DeviceIfaceParamsSchema, onValidationError),
 		vValidator('query', TraceQuerySchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const param = c.req.valid('param')
 			const depth = c.req.valid('query').depth
-			const tenant = deviceTenant(param.id)
+			const tenant = await deviceTenant(param.id)
 			const scope = scopeTenantId(requestUser(c))
 			if (tenant === undefined) {
 				return sendResult(
 					c,
-					getInterfaceTrace(param.id, param.ifaceId, depth, scope ?? undefined),
+					await getInterfaceTrace(param.id, param.ifaceId, depth, scope ?? undefined),
 				)
 			}
 			const denied = checkRead(c, tenant)
@@ -307,7 +314,7 @@ export const devicesApp = new Hono()
 			}
 			return sendResult(
 				c,
-				getInterfaceTrace(param.id, param.ifaceId, depth, scope ?? undefined),
+				await getInterfaceTrace(param.id, param.ifaceId, depth, scope ?? undefined),
 			)
 		},
 	)

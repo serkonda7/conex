@@ -20,13 +20,15 @@ interface TenantCrudOptions {
 	updateSchema: v.GenericSchema
 	paramSchema: v.GenericSchema
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
-	list: (params: any) => unknown
+	list: (params: any) => Promise<unknown>
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
-	create: (input: any) => Result<unknown, Error>
-	get: (id: number) => Result<{ tenant_id: number | null } & Record<string, unknown>, Error>
+	create: (input: any) => Promise<Result<unknown, Error>>
+	get: (
+		id: number,
+	) => Promise<Result<{ tenant_id: number | null } & Record<string, unknown>, Error>>
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
-	update: (id: number, input: any) => Result<unknown, Error>
-	remove: (id: number) => Result<unknown, Error>
+	update: (id: number, input: any) => Promise<Result<unknown, Error>>
+	remove: (id: number) => Promise<Result<unknown, Error>>
 	/** Extra list filters picked from the validated query, e.g. `(q) => ({ group: q.group })`. */
 	// biome-ignore lint/suspicious/noExplicitAny: validated query shapes vary per entity
 	filters?: (query: any) => Record<string, unknown>
@@ -38,7 +40,7 @@ interface TenantCrudOptions {
 export function makeTenantApp(opts: TenantCrudOptions) {
 	return new Hono()
 		.use(authMiddleware)
-		.get('/', vValidator('query', opts.listQuerySchema, onValidationError), (c) => {
+		.get('/', vValidator('query', opts.listQuerySchema, onValidationError), async (c) => {
 			const query = c.req.valid('query') as Record<string, unknown> & {
 				search: string
 				page: number
@@ -52,7 +54,7 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 				return scope
 			}
 			return c.json(
-				opts.list({
+				(await opts.list({
 					search: query.search,
 					page: query.page,
 					limit: query.limit,
@@ -60,14 +62,14 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 					order: query.order,
 					...(opts.filters?.(query) ?? {}),
 					...scope,
-				}) as object,
+				})) as object,
 			)
 		})
 		.post(
 			'/',
 			requireWriteMiddleware,
 			vValidator('json', opts.createSchema, onValidationError),
-			(c) => {
+			async (c) => {
 				const body = c.req.valid('json') as Record<string, unknown> & {
 					tenant_id?: number | null
 				}
@@ -77,25 +79,25 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 				}
 				return sendCreated(
 					c,
-					opts.create({ ...body, tenant_id: tenant }) as Result<never, Error>,
+					(await opts.create({ ...body, tenant_id: tenant })) as Result<never, Error>,
 				)
 			},
 		)
-		.get('/:id', vValidator('param', opts.paramSchema, onValidationError), (c) => {
+		.get('/:id', vValidator('param', opts.paramSchema, onValidationError), async (c) => {
 			const { id } = c.req.valid('param') as { id: number }
-			return sendTenantRow(c, opts.get(id) as Result<never, Error>)
+			return sendTenantRow(c, (await opts.get(id)) as Result<never, Error>)
 		})
 		.patch(
 			'/:id',
 			requireWriteMiddleware,
 			vValidator('param', opts.paramSchema, onValidationError),
 			vValidator('json', opts.updateSchema, onValidationError),
-			(c) => {
+			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
 				const body = c.req.valid('json') as Record<string, unknown> & {
 					tenant_id?: number | null
 				}
-				const current = opts.get(id) as Result<{ tenant_id: number | null }, Error>
+				const current = (await opts.get(id)) as Result<{ tenant_id: number | null }, Error>
 				if (Result.isError(current)) {
 					return sendRow(c, current as Result<never, Error>)
 				}
@@ -103,16 +105,16 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 				if (denied) {
 					return denied
 				}
-				return sendRow(c, opts.update(id, body) as Result<never, Error>)
+				return sendRow(c, (await opts.update(id, body)) as Result<never, Error>)
 			},
 		)
 		.delete(
 			'/:id',
 			requireWriteMiddleware,
 			vValidator('param', opts.paramSchema, onValidationError),
-			(c) => {
+			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
-				const current = opts.get(id) as Result<{ tenant_id: number | null }, Error>
+				const current = (await opts.get(id)) as Result<{ tenant_id: number | null }, Error>
 				if (Result.isError(current)) {
 					return sendRow(c, current as Result<never, Error>)
 				}
@@ -120,7 +122,7 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 				if (denied) {
 					return denied
 				}
-				return sendRow(c, opts.remove(id) as Result<never, Error>)
+				return sendRow(c, (await opts.remove(id)) as Result<never, Error>)
 			},
 		)
 }
@@ -131,13 +133,13 @@ interface CatalogCrudOptions {
 	updateSchema: v.GenericSchema
 	paramSchema: v.GenericSchema
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
-	list: (params: any) => unknown
+	list: (params: any) => Promise<unknown>
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
-	create: (input: any) => Result<unknown, Error>
-	get: (id: number) => Result<unknown, Error>
+	create: (input: any) => Promise<Result<unknown, Error>>
+	get: (id: number) => Promise<Result<unknown, Error>>
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
-	update: (id: number, input: any) => Result<unknown, Error>
-	remove: (id: number) => Result<unknown, Error>
+	update: (id: number, input: any) => Promise<Result<unknown, Error>>
+	remove: (id: number) => Promise<Result<unknown, Error>>
 	// biome-ignore lint/suspicious/noExplicitAny: validated query shapes vary per entity
 	filters?: (query: any) => Record<string, unknown>
 }
@@ -148,7 +150,7 @@ interface CatalogCrudOptions {
 export function makeCatalogApp(opts: CatalogCrudOptions) {
 	return new Hono()
 		.use(authMiddleware)
-		.get('/', vValidator('query', opts.listQuerySchema, onValidationError), (c) => {
+		.get('/', vValidator('query', opts.listQuerySchema, onValidationError), async (c) => {
 			const query = c.req.valid('query') as Record<string, unknown> & {
 				search: string
 				page: number
@@ -157,47 +159,47 @@ export function makeCatalogApp(opts: CatalogCrudOptions) {
 				order: 'asc' | 'desc'
 			}
 			return c.json(
-				opts.list({
+				(await opts.list({
 					search: query.search,
 					page: query.page,
 					limit: query.limit,
 					sort: query.sort,
 					order: query.order,
 					...(opts.filters?.(query) ?? {}),
-				}) as object,
+				})) as object,
 			)
 		})
 		.post(
 			'/',
 			requireGlobalWriteMiddleware,
 			vValidator('json', opts.createSchema, onValidationError),
-			(c) => {
+			async (c) => {
 				return sendCreated(
 					c,
-					opts.create(c.req.valid('json') as Record<string, unknown>) as Result<
+					(await opts.create(c.req.valid('json') as Record<string, unknown>)) as Result<
 						never,
 						Error
 					>,
 				)
 			},
 		)
-		.get('/:id', vValidator('param', opts.paramSchema, onValidationError), (c) => {
+		.get('/:id', vValidator('param', opts.paramSchema, onValidationError), async (c) => {
 			const { id } = c.req.valid('param') as { id: number }
-			return sendRow(c, opts.get(id) as Result<never, Error>)
+			return sendRow(c, (await opts.get(id)) as Result<never, Error>)
 		})
 		.patch(
 			'/:id',
 			requireGlobalWriteMiddleware,
 			vValidator('param', opts.paramSchema, onValidationError),
 			vValidator('json', opts.updateSchema, onValidationError),
-			(c) => {
+			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
 				return sendRow(
 					c,
-					opts.update(id, c.req.valid('json') as Record<string, unknown>) as Result<
-						never,
-						Error
-					>,
+					(await opts.update(
+						id,
+						c.req.valid('json') as Record<string, unknown>,
+					)) as Result<never, Error>,
 				)
 			},
 		)
@@ -205,9 +207,9 @@ export function makeCatalogApp(opts: CatalogCrudOptions) {
 			'/:id',
 			requireGlobalWriteMiddleware,
 			vValidator('param', opts.paramSchema, onValidationError),
-			(c) => {
+			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
-				return sendRow(c, opts.remove(id) as Result<never, Error>)
+				return sendRow(c, (await opts.remove(id)) as Result<never, Error>)
 			},
 		)
 }

@@ -22,7 +22,7 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const shelvesApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', ShelfListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', ShelfListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		// Shelves have no `?tenant=` param of their own; the scope still
 		// applies through the rack.
@@ -31,7 +31,7 @@ export const shelvesApp = new Hono()
 			return scope
 		}
 		return c.json(
-			listShelves({
+			await listShelves({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -46,27 +46,27 @@ export const shelvesApp = new Hono()
 		'/',
 		requireWriteMiddleware,
 		vValidator('json', ShelfCreateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const body = c.req.valid('json')
 			// A missing rack answers 404 from the service; an out-of-scope rack
 			// answers 403 here before anything is written.
-			const tenant = rackTenant(body.rack_id)
+			const tenant = await rackTenant(body.rack_id)
 			if (tenant !== undefined) {
 				const denied = checkWrite(c, tenant)
 				if (denied) {
 					return denied
 				}
 			}
-			return sendCreated(c, createShelf(body))
+			return sendCreated(c, await createShelf(body))
 		},
 	)
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
 		const id = c.req.valid('param').id
-		const row = getShelf(id)
+		const row = await getShelf(id)
 		if (Result.isError(row)) {
 			return sendResult(c, row)
 		}
-		const denied = checkRead(c, shelfTenant(id) ?? null)
+		const denied = checkRead(c, (await shelfTenant(id)) ?? null)
 		if (denied) {
 			return denied
 		}
@@ -77,20 +77,20 @@ export const shelvesApp = new Hono()
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ShelfUpdateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
 			const body = c.req.valid('json')
-			const current = getShelf(id)
+			const current = await getShelf(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			const denied = checkWrite(c, shelfTenant(id) ?? null)
+			const denied = checkWrite(c, (await shelfTenant(id)) ?? null)
 			if (denied) {
 				return denied
 			}
 			// Moving to another rack must not smuggle the shelf out of scope.
 			if (body.rack_id !== undefined && body.rack_id !== current.value.rack_id) {
-				const targetTenant = rackTenant(body.rack_id)
+				const targetTenant = await rackTenant(body.rack_id)
 				if (targetTenant !== undefined) {
 					const targetDenied = checkWrite(c, targetTenant)
 					if (targetDenied) {
@@ -98,23 +98,23 @@ export const shelvesApp = new Hono()
 					}
 				}
 			}
-			return sendRow(c, updateShelf(id, body))
+			return sendRow(c, await updateShelf(id, body))
 		},
 	)
 	.delete(
 		'/:id',
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
-			const current = getShelf(id)
+			const current = await getShelf(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			const denied = checkWrite(c, shelfTenant(id) ?? null)
+			const denied = checkWrite(c, (await shelfTenant(id)) ?? null)
 			if (denied) {
 				return denied
 			}
-			return sendRow(c, deleteShelf(id))
+			return sendRow(c, await deleteShelf(id))
 		},
 	)

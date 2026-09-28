@@ -5,6 +5,7 @@
     "CONEX_E2E_API_URL",
     "CONEX_E2E_BASE_URL",
     "CONEX_E2E_DATA_DIR",
+    "CONEX_E2E_DATABASE_URL",
     "CONEX_E2E_PASSWORD",
     "CONEX_E2E_REUSE_SERVERS",
     "CONEX_E2E_USERNAME"
@@ -13,7 +14,7 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["CONEX_DB_PATH"]
+      "env": ["CONEX_DATABASE_URL"]
     },
     "build": {
       "outputs": ["dist/**"]

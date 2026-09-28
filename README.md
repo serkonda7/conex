@@ -2,9 +2,21 @@
 Network inventory for MSPs.
 
 
-## Run
+## Getting Started
+```sh
+docker start conex-db
+export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
+bun run dev
+```
+
+### Initial Setup
 ```sh
 bun install
+
+# Create postgres DB
+docker run -d --name conex-db -p 5432:5432 \
+  -e POSTGRES_USER=conex -e POSTGRES_PASSWORD=conex -e POSTGRES_DB=conex postgres:16
+export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
 ```
 
 Create config file at `server/data/config.toml`:
@@ -21,10 +33,22 @@ bun run dev
 
 
 ### Environment Variables
-| Variable            | Description                                         | Default       |
-| ------------------- | --------------------------------------------------- | ------------- |
-| `CONEX_DB_PATH`     | Relative to `server/data` or absolute or `:memory:` | `conex.db`    |
-| `CONEX_CONFIG_PATH` | Relative to `server/data` or absolute               | `config.toml` |
+| Variable                 | Description                                        | Default       |
+| ------------------------ | -------------------------------------------------- | ------------- |
+| `CONEX_DATABASE_URL`     | Postgres connection string (required)              | –             |
+| `CONEX_CONFIG_PATH`      | Relative to `server/data` or absolute              | `config.toml` |
+| `CONEX_E2E_DATABASE_URL` | Separate Postgres database for `bun run test:e2e`  | –             |
+
+
+### Migrating from SQLite
+Older installs stored data in `server/data/conex.db`. Stop the server, then copy
+everything into an empty Postgres database (the SQLite file is only read):
+```sh
+CONEX_DATABASE_URL=postgres://... bun run --cwd server db:migrate-sqlite /abs/path/to/conex.db
+```
+The script first upgrades a snapshot of the file to the final SQLite schema, so
+older schema versions work too. It copies all rows in one transaction, keeps ids, and
+verifies row counts; on any error Postgres is left untouched.
 
 
 ## Checks

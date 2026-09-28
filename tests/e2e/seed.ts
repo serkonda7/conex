@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { getDb, getSqliteHandle, initDb } from '../../server/src/db/connection'
+import { closeDb, getDb, getSqlClient, initDb } from '../../server/src/db/connection'
 import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 import {
 	device_types,
@@ -26,154 +26,101 @@ if (!fs.existsSync(configPath)) {
 	)
 }
 
-initDb({
-	dbPath: path.join(dataDir, 'e2e.db'),
+await initDb({
 	migrationsFolder: path.join(repoRoot, 'server/drizzle'),
 	serverRoot: path.join(repoRoot, 'server'),
 })
 
 const db = getDb()
-let tenant = db
-	.select()
-	.from(tenants)
-	.all()
-	.find((row) => row.slug === 'e2e-tenant')
+let tenant = (await db.select().from(tenants)).find((row) => row.slug === 'e2e-tenant')
 if (!tenant) {
-	tenant = db.insert(tenants).values({ name: 'E2E Tenant', slug: 'e2e-tenant' }).returning().get()
+	tenant = (
+		await db.insert(tenants).values({ name: 'E2E Tenant', slug: 'e2e-tenant' }).returning()
+	)[0]
 }
 
-const site = db
-	.select()
-	.from(sites)
-	.all()
-	.find((row) => row.slug === 'e2e-site')
+const site = (await db.select().from(sites)).find((row) => row.slug === 'e2e-site')
 if (!site) {
-	db.insert(sites).values({ name: 'E2E Site', slug: 'e2e-site', tenant_id: tenant.id }).run()
+	await db.insert(sites).values({ name: 'E2E Site', slug: 'e2e-site', tenant_id: tenant.id })
 }
 
-let manufacturer = db
-	.select()
-	.from(manufacturers)
-	.all()
-	.find((row) => row.slug === 'e2e-maker')
+let manufacturer = (await db.select().from(manufacturers)).find((row) => row.slug === 'e2e-maker')
 if (!manufacturer) {
-	manufacturer = db
-		.insert(manufacturers)
-		.values({ name: 'E2E Maker', slug: 'e2e-maker' })
-		.returning()
-		.get()
+	manufacturer = (
+		await db.insert(manufacturers).values({ name: 'E2E Maker', slug: 'e2e-maker' }).returning()
+	)[0]
 }
-if (
-	!db
-		.select()
-		.from(device_types)
-		.all()
-		.some((row) => row.model === 'E2E 42U Cabinet')
-) {
-	db.insert(device_types)
-		.values({
-			manufacturer_id: manufacturer.id,
-			model: 'E2E 42U Cabinet',
-			form_factor: '4-post cabinet',
-			width: 19,
-			u_height: 42,
-		})
-		.run()
+if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 42U Cabinet')) {
+	await db.insert(device_types).values({
+		manufacturer_id: manufacturer.id,
+		model: 'E2E 42U Cabinet',
+		form_factor: '4-post cabinet',
+		width: 19,
+		u_height: 42,
+	})
 } else {
-	getSqliteHandle()
-		.query(
-			'UPDATE device_types SET manufacturer_id = ?, u_height = 42, is_full_depth = 1, form_factor = ?, width = 19, description = NULL, comments = NULL WHERE model = ?',
-		)
-		.run(manufacturer.id, '4-post cabinet', 'E2E 42U Cabinet')
+	await getSqlClient()`UPDATE device_types SET manufacturer_id = ${manufacturer.id}, u_height = 42,
+		is_full_depth = 1, form_factor = '4-post cabinet', width = 19, description = NULL, comments = NULL
+		WHERE model = 'E2E 42U Cabinet'`
 }
-if (
-	!db
-		.select()
-		.from(device_types)
-		.all()
-		.some((row) => row.model === 'E2E 10U Cabinet')
-) {
-	db.insert(device_types)
-		.values({
-			manufacturer_id: manufacturer.id,
-			model: 'E2E 10U Cabinet',
-			form_factor: '4-post cabinet',
-			width: 19,
-			u_height: 10,
-		})
-		.run()
+if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 10U Cabinet')) {
+	await db.insert(device_types).values({
+		manufacturer_id: manufacturer.id,
+		model: 'E2E 10U Cabinet',
+		form_factor: '4-post cabinet',
+		width: 19,
+		u_height: 10,
+	})
 } else {
-	getSqliteHandle()
-		.query('UPDATE device_types SET u_height = 10, form_factor = ?, width = 19 WHERE model = ?')
-		.run('4-post cabinet', 'E2E 10U Cabinet')
+	await getSqlClient()`UPDATE device_types SET u_height = 10, form_factor = '4-post cabinet', width = 19
+		WHERE model = 'E2E 10U Cabinet'`
 }
 
-const e2eSite = db
-	.select()
-	.from(sites)
-	.all()
-	.find((row) => row.slug === 'e2e-site')
-const e2eRackType = db
-	.select()
-	.from(device_types)
-	.all()
-	.find((row) => row.model === 'E2E 10U Cabinet')
-const e2eServerType = db
-	.select()
-	.from(device_types)
-	.all()
-	.find((row) => row.model === 'E2E 2U Server')
+const e2eSite = (await db.select().from(sites)).find((row) => row.slug === 'e2e-site')
+const e2eRackType = (await db.select().from(device_types)).find(
+	(row) => row.model === 'E2E 10U Cabinet',
+)
+const e2eServerType = (await db.select().from(device_types)).find(
+	(row) => row.model === 'E2E 2U Server',
+)
 if (!e2eServerType) {
-	db.insert(device_types)
+	await db
+		.insert(device_types)
 		.values({ manufacturer_id: manufacturer.id, model: 'E2E 2U Server', u_height: 2 })
-		.run()
 } else {
-	getSqliteHandle()
-		.query('UPDATE device_types SET u_height = ? WHERE id = ?')
-		.run(2, e2eServerType.id)
+	await getSqlClient()`UPDATE device_types SET u_height = 2 WHERE id = ${e2eServerType.id}`
 }
-const e2eServer = db
-	.select()
-	.from(device_types)
-	.all()
-	.find((row) => row.model === 'E2E 2U Server')
-const e2eSwitchType = db
-	.select()
-	.from(device_types)
-	.all()
-	.find((row) => row.model === 'E2E 1U Switch')
+const e2eServer = (await db.select().from(device_types)).find(
+	(row) => row.model === 'E2E 2U Server',
+)
+const e2eSwitchType = (await db.select().from(device_types)).find(
+	(row) => row.model === 'E2E 1U Switch',
+)
 if (!e2eSwitchType) {
-	db.insert(device_types)
+	await db
+		.insert(device_types)
 		.values({ manufacturer_id: manufacturer.id, model: 'E2E 1U Switch', u_height: 1 })
-		.run()
 } else {
-	getSqliteHandle()
-		.query('UPDATE device_types SET u_height = ? WHERE id = ?')
-		.run(1, e2eSwitchType.id)
+	await getSqlClient()`UPDATE device_types SET u_height = 1 WHERE id = ${e2eSwitchType.id}`
 }
-const e2eSwitch = db
-	.select()
-	.from(device_types)
-	.all()
-	.find((row) => row.model === 'E2E 1U Switch')
+const e2eSwitch = (await db.select().from(device_types)).find(
+	(row) => row.model === 'E2E 1U Switch',
+)
 if (e2eSite && e2eRackType) {
-	let visualRack = db
-		.select()
-		.from(racks)
-		.all()
-		.find((row) => row.name === 'E2E Visual Rack')
+	let visualRack = (await db.select().from(racks)).find((row) => row.name === 'E2E Visual Rack')
 	if (!visualRack) {
-		visualRack = db
-			.insert(racks)
-			.values({
-				site_id: e2eSite.id,
-				tenant_id: tenant.id,
-				rack_type_id: e2eRackType.id,
-				name: 'E2E Visual Rack',
-				description: 'Rack for screenshot coverage.',
-			})
-			.returning()
-			.get()
+		visualRack = (
+			await db
+				.insert(racks)
+				.values({
+					site_id: e2eSite.id,
+					tenant_id: tenant.id,
+					rack_type_id: e2eRackType.id,
+					name: 'E2E Visual Rack',
+					description: 'Rack for screenshot coverage.',
+				})
+				.returning()
+		)[0]
 	}
 	if (e2eServer && e2eSwitch) {
 		const visualDevices = [
@@ -211,35 +158,13 @@ if (e2eSite && e2eRackType) {
 				tenant_id: tenant.id,
 				description: null,
 			}
-			const existing = db
-				.select()
-				.from(devices)
-				.all()
-				.find((row) => row.name === device.name)
+			const existing = (await db.select().from(devices)).find(
+				(row) => row.name === device.name,
+			)
 			if (existing) {
-				getSqliteHandle()
-					.query(
-						`UPDATE devices SET device_type_id = ?, site_id = ?, location_id = ?, rack_id = ?,
-						face = ?, position_u = ?, status = ?, name = ?, serial = ?,
-						asset_tag = ?, tenant_id = ?, description = ? WHERE id = ?`,
-					)
-					.run(
-						values.device_type_id,
-						values.site_id,
-						values.location_id,
-						values.rack_id,
-						values.face,
-						values.position_u,
-						values.status,
-						values.name,
-						values.serial,
-						values.asset_tag,
-						values.tenant_id,
-						values.description,
-						existing.id,
-					)
+				await getSqlClient()`UPDATE devices SET ${getSqlClient()(values)} WHERE id = ${existing.id}`
 			} else {
-				db.insert(devices).values(values).run()
+				await db.insert(devices).values(values)
 			}
 		}
 	}
@@ -254,35 +179,18 @@ if (e2eSite && e2eRackType) {
 		is_full_depth: 0,
 		description: 'Half-depth shelf for screenshot coverage.',
 	}
-	const existingShelf = db
-		.select()
-		.from(shelves)
-		.all()
-		.find((row) => row.name === shelfValues.name)
+	const existingShelf = (await db.select().from(shelves)).find(
+		(row) => row.name === shelfValues.name,
+	)
 	if (existingShelf) {
-		getSqliteHandle()
-			.query(
-				`UPDATE shelves SET rack_id = ?, name = ?, face = ?, position_u = ?,
-				mount_height = ?, mount_usable = ?, reserved_height = ?, is_full_depth = ?,
-				description = ? WHERE id = ?`,
-			)
-			.run(
-				shelfValues.rack_id,
-				shelfValues.name,
-				shelfValues.face,
-				shelfValues.position_u,
-				shelfValues.mount_height,
-				shelfValues.mount_usable,
-				shelfValues.reserved_height,
-				shelfValues.is_full_depth,
-				shelfValues.description,
-				existingShelf.id,
-			)
+		await getSqlClient()`UPDATE shelves SET ${getSqlClient()(shelfValues)} WHERE id = ${existingShelf.id}`
 	} else {
-		db.insert(shelves).values(shelfValues).run()
+		await db.insert(shelves).values(shelfValues)
 	}
 }
 
-if (!getUserByUsername(username)) {
-	createLocalUser(username, await Bun.password.hash(password))
+if (!(await getUserByUsername(username))) {
+	await createLocalUser(username, await Bun.password.hash(password))
 }
+
+await closeDb()

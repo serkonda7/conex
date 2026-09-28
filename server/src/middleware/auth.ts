@@ -30,14 +30,14 @@ export const authMiddleware = createMiddleware<{
 	try {
 		const payload = (await verify(token, secret, JWT_ALGO)) as JwtPayload
 
-		if (!touchSession(payload.jti)) {
+		if (!(await touchSession(payload.jti))) {
 			return jsonError(c, 'Unauthorized: Session invalidated', 401)
 		}
 
 		// Role checks run per request against the live row (not a JWT claim)
 		// so admin demotions and tenant re-scopes take effect immediately.
 		// Usernames are immutable, so the `sub` lookup cannot go stale.
-		const user = getUserByUsername(payload.sub)
+		const user = await getUserByUsername(payload.sub)
 		if (!user) {
 			return jsonError(c, 'Unauthorized', 401)
 		}

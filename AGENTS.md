@@ -7,8 +7,10 @@
   `getConfig()`/`getDb()` throw on missing initialization).
 - Shared contracts: Valibot schemas live in `shared/src/schemas.ts`; server
   validates with `@hono/valibot-validator`, client uses the same types.
-- DB: `drizzle-orm` + SQLite, migrations in `server/drizzle/`, auto-run on
-  startup; DB path via `CONEX_DB_PATH` env pattern (see `server/src/db/connection.ts`).
+- DB: `drizzle-orm` + Postgres (Bun's built-in `bun:sql` driver), migrations in
+  `server/drizzle/`, auto-run on startup; connection via `CONEX_DATABASE_URL`
+  (see `server/src/db/connection.ts`). `server/drizzle-sqlite/` is the frozen
+  legacy SQLite history, only used by `server/scripts/migrate-sqlite-to-postgres.ts`.
 - UI strings: never hardcode user-visible text in the client; add a key to
   `client/src/i18n/en.ts` and matching entry to `de.ts`,
   then use `t('key', { param })` / `tp('plural.key', count)`.

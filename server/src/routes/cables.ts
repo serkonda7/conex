@@ -36,10 +36,10 @@ import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
  */
 export const cablesApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', CableListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', CableListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {
-			const tenant = deviceTenant(query.device)
+			const tenant = await deviceTenant(query.device)
 			if (tenant !== undefined) {
 				const denied = checkRead(c, tenant)
 				if (denied) {
@@ -48,7 +48,7 @@ export const cablesApp = new Hono()
 			}
 		}
 		if (query.interface !== undefined) {
-			const tenant = interfaceTenant(query.interface)
+			const tenant = await interfaceTenant(query.interface)
 			if (tenant !== undefined) {
 				const denied = checkRead(c, tenant)
 				if (denied) {
@@ -58,7 +58,7 @@ export const cablesApp = new Hono()
 		}
 		const scope = scopeTenantId(requestUser(c))
 		return c.json(
-			listCables({
+			await listCables({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -73,56 +73,59 @@ export const cablesApp = new Hono()
 		'/',
 		requireWriteMiddleware,
 		vValidator('json', CableCreateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const body = c.req.valid('json')
-			const tenantA = interfaceTenant(body.a_interface_id)
-			const tenantB = interfaceTenant(body.b_interface_id)
+			const tenantA = await interfaceTenant(body.a_interface_id)
+			const tenantB = await interfaceTenant(body.b_interface_id)
 			if (tenantA !== undefined && tenantB !== undefined) {
 				if (!canWriteCable(requestUser(c), [tenantA, tenantB])) {
 					return sendResult(c, cableScopeDenied())
 				}
 			}
-			return sendCreated(c, connectCable(body))
+			return sendCreated(c, await connectCable(body))
 		},
 	)
 	// CSV transfer (registered before `/:id` so the literal paths win).
-	.get('/export', (c) => {
+	.get('/export', async (c) => {
 		const scope = scopeTenantId(requestUser(c))
-		return sendCsv(c, exportCablesCsv(scope ?? undefined), 'cables.csv')
+		return sendCsv(c, await exportCablesCsv(scope ?? undefined), 'cables.csv')
 	})
 	.post(
 		'/import',
 		requireWriteMiddleware,
 		vValidator('json', CsvImportBodySchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const scope = scopeTenantId(requestUser(c))
-			return sendCreated(c, importCablesCsv(c.req.valid('json').csv, scope ?? undefined))
+			return sendCreated(
+				c,
+				await importCablesCsv(c.req.valid('json').csv, scope ?? undefined),
+			)
 		},
 	)
 	.get(
 		'/:id/trace',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('query', TraceQuerySchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
 			const depth = c.req.valid('query').depth
-			const result = getCable(id)
+			const result = await getCable(id)
 			if (Result.isError(result)) {
 				return sendResult(c, result)
 			}
-			if (!canReadCable(requestUser(c), cableTenants(result.value))) {
+			if (!canReadCable(requestUser(c), await cableTenants(result.value))) {
 				return sendResult(c, cableScopeDenied())
 			}
 			const scope = scopeTenantId(requestUser(c))
-			return sendResult(c, getCableTrace(id, depth, scope ?? undefined))
+			return sendResult(c, await getCableTrace(id, depth, scope ?? undefined))
 		},
 	)
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		const result = getCable(c.req.valid('param').id)
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const result = await getCable(c.req.valid('param').id)
 		if (Result.isError(result)) {
 			return sendResult(c, result)
 		}
-		if (!canReadCable(requestUser(c), cableTenants(result.value))) {
+		if (!canReadCable(requestUser(c), await cableTenants(result.value))) {
 			return sendResult(c, cableScopeDenied())
 		}
 		return c.json(result.value)
@@ -132,31 +135,31 @@ export const cablesApp = new Hono()
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', CableUpdateSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
-			const current = getCable(id)
+			const current = await getCable(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			if (!canWriteCable(requestUser(c), cableTenants(current.value))) {
+			if (!canWriteCable(requestUser(c), await cableTenants(current.value))) {
 				return sendResult(c, cableScopeDenied())
 			}
-			return sendRow(c, updateCable(id, c.req.valid('json')))
+			return sendRow(c, await updateCable(id, c.req.valid('json')))
 		},
 	)
 	.delete(
 		'/:id',
 		requireWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
-		(c) => {
+		async (c) => {
 			const id = c.req.valid('param').id
-			const current = getCable(id)
+			const current = await getCable(id)
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			if (!canWriteCable(requestUser(c), cableTenants(current.value))) {
+			if (!canWriteCable(requestUser(c), await cableTenants(current.value))) {
 				return sendResult(c, cableScopeDenied())
 			}
-			return sendRow(c, deleteCable(id))
+			return sendRow(c, await deleteCable(id))
 		},
 	)

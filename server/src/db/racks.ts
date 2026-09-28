@@ -19,15 +19,14 @@ type RackRecord = typeof racks.$inferSelect
 /** Rack height is computed from the linked rack type, not stored on racks. */
 export type RackRow = Omit<RackRecord, 'height_u'> & { height_u: number }
 
-function withRackHeights(rows: RackRecord[]): RackRow[] {
+async function withRackHeights(rows: RackRecord[]): Promise<RackRow[]> {
 	const typeIds = [...new Set(rows.map((r) => r.rack_type_id).filter((id) => id !== null))]
 	const heights = new Map<number, number>()
 	if (typeIds.length > 0) {
-		for (const row of getDb()
+		for (const row of await getDb()
 			.select({ id: device_types.id, u_height: device_types.u_height })
 			.from(device_types)
-			.where(inArray(device_types.id, typeIds as number[]))
-			.all()) {
+			.where(inArray(device_types.id, typeIds as number[]))) {
 			heights.set(row.id, row.u_height)
 		}
 	}
@@ -37,8 +36,8 @@ function withRackHeights(rows: RackRecord[]): RackRow[] {
 	}))
 }
 
-function withRackHeight(row: RackRecord): RackRow {
-	return withRackHeights([row])[0] as RackRow
+async function withRackHeight(row: RackRecord): Promise<RackRow> {
+	return (await withRackHeights([row]))[0] as RackRow
 }
 
 // ---------------------------------------------------------------------------
@@ -55,13 +54,13 @@ export interface RackListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export function listRacks(params: RackListParams): Page<RackRow> {
+export async function listRacks(params: RackListParams): Promise<Page<RackRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${racks.name} LIKE ${pattern} ESCAPE '\\' OR ${racks.description} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${racks.name} ILIKE ${pattern} ESCAPE '\\' OR ${racks.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.site) {
@@ -77,52 +76,55 @@ export function listRacks(params: RackListParams): Page<RackRow> {
 		conditions.push(eq(racks.tenant_id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const rows = db
+	const rows = await db
 		.select()
 		.from(racks)
 		.where(where)
-		.orderBy(params.order === 'desc' ? desc(racks.name) : asc(racks.name))
+		.orderBy(params.order === 'desc' ? desc(racks.name) : asc(racks.name), asc(racks.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const items = withRackHeights(rows)
-	const totalRow = db.select({ n: count() }).from(racks).where(where).get()
+	const items = await withRackHeights(rows)
+	const totalRow = (await db.select({ n: count() }).from(racks).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getRack(id: number): Result<RackRow, Error> {
-	const row = getDb().select().from(racks).where(eq(racks.id, id)).get()
+export async function getRack(id: number): Promise<Result<RackRow, Error>> {
+	const row = (await getDb().select().from(racks).where(eq(racks.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
-	return Result.ok(withRackHeight(row))
+	return Result.ok(await withRackHeight(row))
 }
 
 /**
  * Authoritative rack height in U, supplied by the rack type.
  */
-export function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): number {
+export async function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): Promise<number> {
 	if (rack.rack_type_id === null) {
 		return 0
 	}
 	return (
-		getDb()
-			.select({ u_height: device_types.u_height })
-			.from(device_types)
-			.where(eq(device_types.id, rack.rack_type_id))
-			.get()?.u_height ?? 0
+		(
+			await getDb()
+				.select({ u_height: device_types.u_height })
+				.from(device_types)
+				.where(eq(device_types.id, rack.rack_type_id))
+				.limit(1)
+		)[0]?.u_height ?? 0
 	)
 }
 
 /** Location must exist and belong to the rack's site; null clears the link. */
-function checkLocation(
+async function checkLocation(
 	locationId: number | null | undefined,
 	siteId: number,
-): Result<undefined, Error> {
+): Promise<Result<undefined, Error>> {
 	if (locationId === null || locationId === undefined) {
 		return Result.ok(undefined)
 	}
-	const location = getDb().select().from(locations).where(eq(locations.id, locationId)).get()
+	const location = (
+		await getDb().select().from(locations).where(eq(locations.id, locationId)).limit(1)
+	)[0]
 	if (!location || location.site_id !== siteId) {
 		return Result.err(new NotFoundError('Location not found in this site'))
 	}
@@ -135,8 +137,8 @@ function checkLocation(
  * `db/devices.ts` and `db/shelves.ts` validate mounts against the same rows
  * the elevation renders.
  */
-export function deviceSpansOf(rackId: number): OccupantSpan[] {
-	return deviceDetailsOf(rackId).map((d) => ({
+export async function deviceSpansOf(rackId: number): Promise<OccupantSpan[]> {
+	return (await deviceDetailsOf(rackId)).map((d) => ({
 		id: d.id,
 		name: d.name,
 		position_u: d.position_u,
@@ -147,18 +149,20 @@ export function deviceSpansOf(rackId: number): OccupantSpan[] {
 }
 
 /** Full device mount details behind each span, for the enriched elevation. */
-export function deviceDetailsOf(rackId: number): {
-	id: number
-	name: string
-	position_u: number
-	u_height: number
-	face: 'front' | 'rear' | null
-	status: string
-	device_type_id: number
-	device_type_model: string
-	is_full_depth: boolean
-}[] {
-	const rows = getDb()
+export async function deviceDetailsOf(rackId: number): Promise<
+	{
+		id: number
+		name: string
+		position_u: number
+		u_height: number
+		face: 'front' | 'rear' | null
+		status: string
+		device_type_id: number
+		device_type_model: string
+		is_full_depth: boolean
+	}[]
+> {
+	const rows = await getDb()
 		.select({
 			id: devices.id,
 			name: devices.name,
@@ -174,7 +178,6 @@ export function deviceDetailsOf(rackId: number): {
 		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
 		.where(eq(devices.rack_id, rackId))
 		.orderBy(asc(devices.position_u))
-		.all()
 	const details: {
 		id: number
 		name: string
@@ -206,15 +209,14 @@ export function deviceDetailsOf(rackId: number): {
 }
 
 /** Full shelf mount details for one rack, ordered by bottom-U. */
-export function shelfDetailsOf(rackId: number): ElevationShelfRef[] {
-	const rows = getDb()
+export async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
+	const rows = await getDb()
 		.select()
 		.from(shelves)
 		.where(eq(shelves.rack_id, rackId))
 		.orderBy(asc(shelves.position_u))
-		.all()
 	const onShelves = new Map<number, ElevationShelfDeviceRef[]>()
-	const shelved = getDb()
+	const shelved = await getDb()
 		.select({
 			id: devices.id,
 			name: devices.name,
@@ -225,8 +227,7 @@ export function shelfDetailsOf(rackId: number): ElevationShelfRef[] {
 		.from(devices)
 		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
 		.where(and(eq(devices.rack_id, rackId), sql`${devices.shelf_id} IS NOT NULL`))
-		.orderBy(asc(devices.name))
-		.all()
+		.orderBy(asc(devices.name), asc(devices.id))
 	for (const { shelf_id, ...device } of shelved) {
 		if (shelf_id === null) {
 			continue
@@ -279,9 +280,9 @@ export function shelfBlockedRange(shelf: {
  * U-blocking shelf spans of one rack (at most one span per shelf).
  * Exported so device and shelf validation share the elevation's rows.
  */
-export function shelfSpansOf(rackId: number): OccupantSpan[] {
+export async function shelfSpansOf(rackId: number): Promise<OccupantSpan[]> {
 	const spans: OccupantSpan[] = []
-	for (const s of shelfDetailsOf(rackId)) {
+	for (const s of await shelfDetailsOf(rackId)) {
 		const blocked = shelfBlockedRange(s)
 		if (!blocked) {
 			continue
@@ -299,29 +300,27 @@ export function shelfSpansOf(rackId: number): OccupantSpan[] {
 }
 
 /** All U-consuming spans of one rack: devices plus shelf blockers. */
-export function rackSpansOf(rackId: number): OccupantSpan[] {
-	return [...deviceSpansOf(rackId), ...shelfSpansOf(rackId)]
+export async function rackSpansOf(rackId: number): Promise<OccupantSpan[]> {
+	return [...(await deviceSpansOf(rackId)), ...(await shelfSpansOf(rackId))]
 }
 
-export function createRack(input: RackCreate): Result<RackRow, Error> {
+export async function createRack(input: RackCreate): Promise<Result<RackRow, Error>> {
 	const db = getDb()
-	const site = db.select().from(sites).where(eq(sites.id, input.site_id)).get()
+	const site = (await db.select().from(sites).where(eq(sites.id, input.site_id)).limit(1))[0]
 	if (!site) {
 		return Result.err(new NotFoundError('Site not found'))
 	}
-	const rackType = db
-		.select()
-		.from(device_types)
-		.where(eq(device_types.id, input.rack_type_id))
-		.get()
+	const rackType = (
+		await db.select().from(device_types).where(eq(device_types.id, input.rack_type_id)).limit(1)
+	)[0]
 	if (!rackType || rackType.form_factor === null) {
 		return Result.err(new NotFoundError('Rack type not found'))
 	}
-	const tenantCheck = checkTenantExists(input.tenant_id)
+	const tenantCheck = await checkTenantExists(input.tenant_id)
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
-	const locationCheck = checkLocation(input.location_id, input.site_id)
+	const locationCheck = await checkLocation(input.location_id, input.site_id)
 	if (Result.isError(locationCheck)) {
 		return Result.err(locationCheck.error)
 	}
@@ -334,11 +333,11 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 		description: input.description ?? null,
 	}
 	try {
-		const inserted = db.insert(racks).values(row).returning({ id: racks.id }).get()
+		const inserted = (await db.insert(racks).values(row).returning({ id: racks.id }))[0]
 		if (!inserted) {
 			return Result.err(new Error('Rack insert did not return an id'))
 		}
-		return getRack(inserted.id)
+		return await getRack(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Rack name is already in use'))
@@ -347,20 +346,20 @@ export function createRack(input: RackCreate): Result<RackRow, Error> {
 	}
 }
 
-export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error> {
-	const current = getRack(id)
+export async function updateRack(id: number, input: RackUpdate): Promise<Result<RackRow, Error>> {
+	const current = await getRack(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const node = current.value
 	if (input.tenant_id !== undefined) {
-		const tenantCheck = checkTenantExists(input.tenant_id)
+		const tenantCheck = await checkTenantExists(input.tenant_id)
 		if (Result.isError(tenantCheck)) {
 			return Result.err(tenantCheck.error)
 		}
 	}
 	if (input.location_id !== undefined) {
-		const locationCheck = checkLocation(input.location_id, node.site_id)
+		const locationCheck = await checkLocation(input.location_id, node.site_id)
 		if (Result.isError(locationCheck)) {
 			return Result.err(locationCheck.error)
 		}
@@ -368,23 +367,25 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	const db = getDb()
 	let newTypeHeight: number | null = null
 	if (input.rack_type_id !== undefined) {
-		const rackType = db
-			.select()
-			.from(device_types)
-			.where(eq(device_types.id, input.rack_type_id))
-			.get()
+		const rackType = (
+			await db
+				.select()
+				.from(device_types)
+				.where(eq(device_types.id, input.rack_type_id))
+				.limit(1)
+		)[0]
 		if (!rackType || rackType.form_factor === null) {
 			return Result.err(new NotFoundError('Rack type not found'))
 		}
 		newTypeHeight = rackType.u_height
 	}
-	const storedHeight = rackHeightOf(node)
+	const storedHeight = await rackHeightOf(node)
 	const effectiveHeight = newTypeHeight ?? storedHeight
 	if (effectiveHeight !== storedHeight) {
 		// Shrinking below the topmost occupied U would strand devices outside
 		// the rack; reject with the same bounds error
 		// creation uses.
-		for (const span of rackSpansOf(id)) {
+		for (const span of await rackSpansOf(id)) {
 			const bounds = checkBounds(span, effectiveHeight, `Device "${span.name}"`)
 			if (Result.isError(bounds)) {
 				return Result.err(bounds.error)
@@ -409,7 +410,7 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			db.update(racks).set(patch).where(eq(racks.id, id)).run()
+			await db.update(racks).set(patch).where(eq(racks.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('Rack name is already in use'))
@@ -417,24 +418,24 @@ export function updateRack(id: number, input: RackUpdate): Result<RackRow, Error
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getRack(id)
+	return await getRack(id)
 }
 
-export function deleteRack(id: number): Result<RackRow, Error> {
-	const current = getRack(id)
+export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
+	const current = await getRack(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	const device = getDb().select().from(devices).where(eq(devices.rack_id, id)).get()
+	const device = (await getDb().select().from(devices).where(eq(devices.rack_id, id)).limit(1))[0]
 	if (device) {
 		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
 	}
-	const shelf = getDb().select().from(shelves).where(eq(shelves.rack_id, id)).get()
+	const shelf = (await getDb().select().from(shelves).where(eq(shelves.rack_id, id)).limit(1))[0]
 	if (shelf) {
 		return Result.err(new ConflictError('Rack still has shelves; move or delete them first'))
 	}
 	try {
-		getDb().delete(racks).where(eq(racks.id, id)).run()
+		await getDb().delete(racks).where(eq(racks.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
@@ -442,15 +443,15 @@ export function deleteRack(id: number): Result<RackRow, Error> {
 }
 
 /** Ordered U map of a rack, top-down (highest U first). */
-export function getElevation(id: number): Result<ElevationResponse, Error> {
-	const current = getRack(id)
+export async function getElevation(id: number): Promise<Result<ElevationResponse, Error>> {
+	const current = await getRack(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const rack = current.value
-	const heightU = rackHeightOf(rack)
-	const details = deviceDetailsOf(id)
-	const shelfDetails = shelfDetailsOf(id)
+	const heightU = await rackHeightOf(rack)
+	const details = await deviceDetailsOf(id)
+	const shelfDetails = await shelfDetailsOf(id)
 	const occupancy = getOccupancy(heightU, [
 		...details.map((d) => ({
 			id: d.id,
@@ -460,12 +461,12 @@ export function getElevation(id: number): Result<ElevationResponse, Error> {
 			face: d.face,
 			is_full_depth: d.is_full_depth,
 		})),
-		...shelfSpansOf(id),
+		...(await shelfSpansOf(id)),
 	])
 	if (Result.isError(occupancy)) {
 		return Result.err(occupancy.error)
 	}
-	const blockedU = shelfSpansOf(id).reduce((sum, s) => sum + s.height_u, 0)
+	const blockedU = (await shelfSpansOf(id)).reduce((sum, s) => sum + s.height_u, 0)
 	const deviceById = new Map(details.map((d) => [d.id, d]))
 	const shelfAt = (u: number): ElevationShelfRef[] =>
 		shelfDetails.filter((s) => {

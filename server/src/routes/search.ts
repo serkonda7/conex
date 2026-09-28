@@ -9,7 +9,7 @@ import { onValidationError } from '../middleware/validation'
 /** Global search across tenants/sites/racks/devices/cables (grouped hits). */
 export const searchApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', SearchQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', SearchQuerySchema, onValidationError), async (c) => {
 		const scope = scopeTenantId(requestUser(c))
-		return c.json(globalSearch(c.req.valid('query').q, scope ?? undefined))
+		return c.json(await globalSearch(c.req.valid('query').q, scope ?? undefined))
 	})

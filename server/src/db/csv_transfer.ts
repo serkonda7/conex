@@ -12,7 +12,7 @@ import { cables, device_types, devices, interfaces, manufacturers, racks, sites 
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
 import { connectCable } from './cables'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { createDevice } from './devices'
 import { createDeviceType, createStub } from './templates'
 
@@ -47,9 +47,9 @@ export const DEVICE_TYPE_CSV_HEADER = [
 ]
 
 /** Device-type export: one row per type, manufacturer as slug for re-import. */
-export function exportDeviceTypesCsv(): string {
+export async function exportDeviceTypesCsv(): Promise<string> {
 	const db = getDb()
-	const rows = db
+	const rows = await db
 		.select({
 			manufacturer_slug: manufacturers.slug,
 			model: device_types.model,
@@ -63,7 +63,6 @@ export function exportDeviceTypesCsv(): string {
 		.from(device_types)
 		.leftJoin(manufacturers, eq(device_types.manufacturer_id, manufacturers.id))
 		.orderBy(device_types.model)
-		.all()
 	return toCsv(
 		DEVICE_TYPE_CSV_HEADER,
 		rows.map((r) => [
@@ -83,17 +82,13 @@ export function exportDeviceTypesCsv(): string {
  * resolves `manufacturer_slug` to an id, and creates the type. One bad row
  * fails only itself; the response reports per-row errors.
  */
-export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error> {
+export async function importDeviceTypesCsv(text: string): Promise<Result<ImportResponse, Error>> {
 	const parsed = parseCsv(text)
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
 	}
 	const mfrBySlug = new Map(
-		getDb()
-			.select()
-			.from(manufacturers)
-			.all()
-			.map((r) => [r.slug, r.id]),
+		(await getDb().select().from(manufacturers)).map((r) => [r.slug, r.id]),
 	)
 	const rows: ImportRowResult[] = []
 	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
@@ -112,7 +107,7 @@ export function importDeviceTypesCsv(text: string): Result<ImportResponse, Error
 			fail(`Unknown manufacturer_slug "${input.manufacturer_slug}"`)
 			continue
 		}
-		const created = createDeviceType({
+		const created = await createDeviceType({
 			manufacturer_id: mfrId,
 			model: input.model,
 			u_height: input.u_height ?? 1,
@@ -144,7 +139,7 @@ class ImportRollback extends Error {}
  * the whole import is rolled back and the rows that would have succeeded come
  * back as `ok: false` with no error.
  */
-export function importDeviceTypesYaml(text: string): Result<ImportResponse, Error> {
+export async function importDeviceTypesYaml(text: string): Promise<Result<ImportResponse, Error>> {
 	let parsed: unknown
 	try {
 		parsed = Bun.YAML.parse(text)
@@ -156,9 +151,9 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 	const definitions = Array.isArray(parsed) ? parsed : [parsed]
 	const rows: ImportRowResult[] = []
 	try {
-		getDb().transaction(() => {
+		await withTransaction(async () => {
 			for (const [index, definition] of definitions.entries()) {
-				rows.push({ row: index + 1, ...importDeviceTypeDefinition(definition) })
+				rows.push({ row: index + 1, ...(await importDeviceTypeRow(definition)) })
 			}
 			if (rows.some((r) => !r.ok)) {
 				throw new ImportRollback()
@@ -178,8 +173,39 @@ export function importDeviceTypesYaml(text: string): Result<ImportResponse, Erro
 	return Result.ok(importResult(rows))
 }
 
+/** Thrown inside a row savepoint to undo a partially created definition. */
+class RowRollback extends Error {
+	constructor(readonly result: Omit<ImportRowResult, 'row'>) {
+		super(result.error ?? 'Row failed')
+	}
+}
+
+/**
+ * One definition in its own savepoint: Postgres aborts the transaction on a
+ * failed statement, so without it every later row would only report
+ * "current transaction is aborted" instead of its own validation result.
+ */
+async function importDeviceTypeRow(definition: unknown): Promise<Omit<ImportRowResult, 'row'>> {
+	try {
+		return await withTransaction(async () => {
+			const result = await importDeviceTypeDefinition(definition)
+			if (!result.ok) {
+				throw new RowRollback(result)
+			}
+			return result
+		})
+	} catch (err) {
+		if (err instanceof RowRollback) {
+			return err.result
+		}
+		throw err
+	}
+}
+
 /** Creates one NetBox device-type definition with its ports. */
-function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 'row'> {
+async function importDeviceTypeDefinition(
+	definition: unknown,
+): Promise<Omit<ImportRowResult, 'row'>> {
 	const fail = (error: string): Omit<ImportRowResult, 'row'> => ({ ok: false, id: null, error })
 	if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
 		return fail('Each YAML document must be a mapping')
@@ -190,14 +216,9 @@ function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 
 	if (!manufacturer || !model) {
 		return fail('manufacturer and model are required by NetBox YAML')
 	}
-	const mfr = getDb()
-		.select()
-		.from(manufacturers)
-		.all()
-		.find(
-			(row) =>
-				row.name.toLowerCase() === manufacturer.toLowerCase() || row.slug === manufacturer,
-		)
+	const mfr = (await getDb().select().from(manufacturers)).find(
+		(row) => row.name.toLowerCase() === manufacturer.toLowerCase() || row.slug === manufacturer,
+	)
 	if (!mfr) {
 		return {
 			...fail(`Unknown manufacturer "${manufacturer}"`),
@@ -227,7 +248,7 @@ function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 
 			return fail('is_full_depth must be a boolean (true/false)')
 		}
 	}
-	const created = createDeviceType({
+	const created = await createDeviceType({
 		manufacturer_id: mfr.id,
 		model,
 		u_height: height,
@@ -260,7 +281,7 @@ function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 
 			// Console/power ports keep their class as kind (the device detail
 			// page splits ports on it), dropping the connector type.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
-			const stub = createStub(created.value.id, {
+			const stub = await createStub(created.value.id, {
 				prefix: name,
 				count: 1,
 				kind:
@@ -280,10 +301,10 @@ function importDeviceTypeDefinition(definition: unknown): Omit<ImportRowResult, 
 }
 
 /** Devices export: one row per device, slugs for the FK columns. */
-export function exportDevicesCsv(scopeTenantId?: number): string {
+export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> {
 	const db = getDb()
 	const scopeCond = scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId)
-	const rows = db
+	const rows = await db
 		.select({
 			name: devices.name,
 			asset_tag: devices.asset_tag,
@@ -299,7 +320,6 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 		.leftJoin(racks, eq(devices.rack_id, racks.id))
 		.where(scopeCond)
 		.orderBy(devices.name)
-		.all()
 	return toCsv(
 		DEVICE_CSV_HEADER,
 		rows.map((r) => [
@@ -315,12 +335,12 @@ export function exportDevicesCsv(scopeTenantId?: number): string {
 }
 
 /** Cables export: endpoint device/interface names plus label/kind/status. */
-export function exportCablesCsv(scopeTenantId?: number): string {
+export async function exportCablesCsv(scopeTenantId?: number): Promise<string> {
 	const db = getDb()
 	// All cables (no 200-row cap); scope filter is an EXISTS on both ends so
 	// no peer name from another tenant leaks. Batched iface/device loads keep
 	// this O(1) queries instead of O(cables).
-	const items = db
+	const items = await db
 		.select()
 		.from(cables)
 		.where(
@@ -332,22 +352,20 @@ export function exportCablesCsv(scopeTenantId?: number): string {
 					),
 		)
 		.orderBy(cables.id)
-		.all()
 	const ifaceIds = [...new Set(items.flatMap((c) => [c.a_interface_id, c.b_interface_id]))]
 	const ifacesById = new Map<number, typeof interfaces.$inferSelect>()
 	if (ifaceIds.length > 0) {
-		for (const row of db
+		for (const row of await db
 			.select()
 			.from(interfaces)
-			.where(inArray(interfaces.id, ifaceIds))
-			.all()) {
+			.where(inArray(interfaces.id, ifaceIds))) {
 			ifacesById.set(row.id, row)
 		}
 	}
 	const deviceIds = [...new Set([...ifacesById.values()].map((r) => r.device_id))]
 	const devicesById = new Map<number, typeof devices.$inferSelect>()
 	if (deviceIds.length > 0) {
-		for (const row of db.select().from(devices).where(inArray(devices.id, deviceIds)).all()) {
+		for (const row of await db.select().from(devices).where(inArray(devices.id, deviceIds))) {
 			devicesById.set(row.id, row)
 		}
 	}
@@ -391,35 +409,21 @@ function inScope(tenant: number | null | undefined, scope: number): boolean {
  * outside the scope (or shared rows they may not claim) fail per-row, and
  * created devices are forced into the scope tenant.
  */
-export function importDevicesCsv(
+export async function importDevicesCsv(
 	text: string,
 	scopeTenantId?: number,
-): Result<ImportResponse, Error> {
+): Promise<Result<ImportResponse, Error>> {
 	const parsed = parseCsv(text)
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
 	}
 	const db = getDb()
-	const typeByModel = new Map(
-		db
-			.select()
-			.from(device_types)
-			.all()
-			.map((r) => [r.model, r.id]),
-	)
+	const typeByModel = new Map((await db.select().from(device_types)).map((r) => [r.model, r.id]))
 	const siteBySlug = new Map(
-		db
-			.select()
-			.from(sites)
-			.all()
-			.map((r) => [r.slug, { id: r.id, tenant_id: r.tenant_id }]),
+		(await db.select().from(sites)).map((r) => [r.slug, { id: r.id, tenant_id: r.tenant_id }]),
 	)
 	const rackByName = new Map(
-		db
-			.select()
-			.from(racks)
-			.all()
-			.map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
+		(await db.select().from(racks)).map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
 	)
 	const rows: ImportRowResult[] = []
 	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
@@ -464,7 +468,7 @@ export function importDevicesCsv(
 				continue
 			}
 		}
-		const created = createDevice({
+		const created = await createDevice({
 			device_type_id: typeId,
 			name: input.name,
 			status: input.status,
@@ -492,28 +496,23 @@ export function importDevicesCsv(
  * not both in the scope tenant fail per-row, mirroring the cable write
  * rule in `authz.ts`.
  */
-export function importCablesCsv(
+export async function importCablesCsv(
 	text: string,
 	scopeTenantId?: number,
-): Result<ImportResponse, Error> {
+): Promise<Result<ImportResponse, Error>> {
 	const parsed = parseCsv(text)
 	if (Result.isError(parsed)) {
 		return Result.err(parsed.error)
 	}
 	const db = getDb()
 	const deviceByName = new Map(
-		db
-			.select()
-			.from(devices)
-			.all()
-			.map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
+		(await db.select().from(devices)).map((r) => [
+			r.name,
+			{ id: r.id, tenant_id: r.tenant_id },
+		]),
 	)
 	const ifaceByKey = new Map(
-		db
-			.select()
-			.from(interfaces)
-			.all()
-			.map((r) => [`${r.device_id}:${r.name}`, r.id]),
+		(await db.select().from(interfaces)).map((r) => [`${r.device_id}:${r.name}`, r.id]),
 	)
 	const rows: ImportRowResult[] = []
 	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
@@ -556,7 +555,7 @@ export function importCablesCsv(
 				continue
 			}
 		}
-		const created = connectCable({
+		const created = await connectCable({
 			a_interface_id: aIfaceId,
 			b_interface_id: bIfaceId,
 			status: input.status,

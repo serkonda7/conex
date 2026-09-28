@@ -1,14 +1,23 @@
-/** Shared SQLite error predicates. Drizzle rethrows the raw Bun SQLiteError. */
+/**
+ * Shared Postgres error predicates. Drizzle wraps driver errors in a
+ * `DrizzleQueryError` whose `cause` is the Bun `PostgresError`.
+ */
+
+const PG_UNIQUE_VIOLATION = '23505'
 
 export function isUniqueViolation(err: unknown): boolean {
-	if (!(err instanceof Error)) {
-		return false
+	let current: unknown = err
+	for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
+		const { errno, code } = current as Error & { errno?: unknown; code?: unknown }
+		if (errno === PG_UNIQUE_VIOLATION || code === PG_UNIQUE_VIOLATION) {
+			return true
+		}
+		if (current.message.includes('duplicate key value violates unique constraint')) {
+			return true
+		}
+		current = current.cause
 	}
-	const code = (err as Error & { code?: unknown }).code
-	if (code === 'SQLITE_CONSTRAINT_UNIQUE') {
-		return true
-	}
-	return err.message.includes('UNIQUE constraint failed')
+	return false
 }
 
 /** Wrapped in a `Result.err` when a unique row collides under concurrency. */

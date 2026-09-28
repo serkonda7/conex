@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 import type { CableCreate, CableUpdate, DeviceTraceResponse, TraceLink } from 'shared/src/schemas'
 import { cables, devices, interfaces } from '../schema'
 import { getDb } from './connection'
@@ -28,13 +28,13 @@ export interface CableListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export function listCables(params: CableListParams): Page<CableRow> {
+export async function listCables(params: CableListParams): Promise<Page<CableRow>> {
 	const db = getDb()
 	const pattern = searchPattern(params.search)
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${cables.label} LIKE ${pattern} ESCAPE '\\' OR ${cables.kind} LIKE ${pattern} ESCAPE '\\')`,
+			sql`(${cables.label} ILIKE ${pattern} ESCAPE '\\' OR ${cables.kind} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.status) {
@@ -50,12 +50,12 @@ export function listCables(params: CableListParams): Page<CableRow> {
 		}
 	}
 	if (params.device) {
-		const deviceIfaces = db
-			.select({ id: interfaces.id })
-			.from(interfaces)
-			.where(eq(interfaces.device_id, params.device))
-			.all()
-			.map((r) => r.id)
+		const deviceIfaces = (
+			await db
+				.select({ id: interfaces.id })
+				.from(interfaces)
+				.where(eq(interfaces.device_id, params.device))
+		).map((r) => r.id)
 		if (deviceIfaces.length === 0) {
 			return pageOf([], 0, params)
 		}
@@ -77,36 +77,39 @@ export function listCables(params: CableListParams): Page<CableRow> {
 		)
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const items = db
+	const items = await db
 		.select()
 		.from(cables)
 		.where(where)
-		.orderBy(sql`"cables"."rowid"`)
+		.orderBy(asc(cables.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-		.all()
-	const totalRow = db.select({ n: count() }).from(cables).where(where).get()
+	const totalRow = (await db.select({ n: count() }).from(cables).where(where).limit(1))[0]
 	return pageOf(items, totalRow?.n ?? 0, params)
 }
 
-export function getCable(id: number): Result<CableRow, Error> {
-	const row = getDb().select().from(cables).where(eq(cables.id, id)).get()
+export async function getCable(id: number): Promise<Result<CableRow, Error>> {
+	const row = (await getDb().select().from(cables).where(eq(cables.id, id)).limit(1))[0]
 	if (!row) {
 		return Result.err(new NotFoundError('Cable not found'))
 	}
 	return Result.ok(row)
 }
 
-export function getCableForInterface(interfaceId: number): CableRow | undefined {
-	return getDb()
-		.select()
-		.from(cables)
-		.where(or(eq(cables.a_interface_id, interfaceId), eq(cables.b_interface_id, interfaceId)))
-		.get()
+export async function getCableForInterface(interfaceId: number): Promise<CableRow | undefined> {
+	return (
+		await getDb()
+			.select()
+			.from(cables)
+			.where(
+				or(eq(cables.a_interface_id, interfaceId), eq(cables.b_interface_id, interfaceId)),
+			)
+			.limit(1)
+	)[0]
 }
 
-function getInterfaceRow(id: number): InterfaceRow | undefined {
-	return getDb().select().from(interfaces).where(eq(interfaces.id, id)).get()
+async function getInterfaceRow(id: number): Promise<InterfaceRow | undefined> {
+	return (await getDb().select().from(interfaces).where(eq(interfaces.id, id)).limit(1))[0]
 }
 
 /**
@@ -118,22 +121,22 @@ function getInterfaceRow(id: number): InterfaceRow | undefined {
  * The insert plus both `connected=true` flips run in one transaction.
  * Same-device links are allowed when the interfaces differ (v1).
  */
-export function connectCable(input: CableCreate): Result<CableRow, Error> {
+export async function connectCable(input: CableCreate): Promise<Result<CableRow, Error>> {
 	if (input.a_interface_id === input.b_interface_id) {
 		return Result.err(new ConflictError('Cannot connect an interface to itself'))
 	}
-	const a = getInterfaceRow(input.a_interface_id)
+	const a = await getInterfaceRow(input.a_interface_id)
 	if (!a) {
 		return Result.err(new NotFoundError('Interface a_interface_id not found'))
 	}
-	const b = getInterfaceRow(input.b_interface_id)
+	const b = await getInterfaceRow(input.b_interface_id)
 	if (!b) {
 		return Result.err(new NotFoundError('Interface b_interface_id not found'))
 	}
-	if (a.connected !== 0 || getCableForInterface(a.id)) {
+	if (a.connected !== 0 || (await getCableForInterface(a.id))) {
 		return Result.err(new ConflictError(`Interface ${a.name} is already connected`))
 	}
-	if (b.connected !== 0 || getCableForInterface(b.id)) {
+	if (b.connected !== 0 || (await getCableForInterface(b.id))) {
 		return Result.err(new ConflictError(`Interface ${b.name} is already connected`))
 	}
 	const row: Omit<CableRow, 'id'> = {
@@ -146,14 +149,14 @@ export function connectCable(input: CableCreate): Result<CableRow, Error> {
 	}
 	let cableId: number | undefined
 	try {
-		getDb().transaction((tx) => {
-			const inserted = tx.insert(cables).values(row).returning({ id: cables.id }).get()
+		await getDb().transaction(async (tx) => {
+			const inserted = (await tx.insert(cables).values(row).returning({ id: cables.id }))[0]
 			if (!inserted) {
 				throw new Error('Cable insert did not return an id')
 			}
 			cableId = inserted.id
-			tx.update(interfaces).set({ connected: 1 }).where(eq(interfaces.id, a.id)).run()
-			tx.update(interfaces).set({ connected: 1 }).where(eq(interfaces.id, b.id)).run()
+			await tx.update(interfaces).set({ connected: 1 }).where(eq(interfaces.id, a.id))
+			await tx.update(interfaces).set({ connected: 1 }).where(eq(interfaces.id, b.id))
 		})
 	} catch (err) {
 		if (isUniqueViolation(err)) {
@@ -164,11 +167,14 @@ export function connectCable(input: CableCreate): Result<CableRow, Error> {
 	if (cableId === undefined) {
 		return Result.err(new Error('Cable insert did not return an id'))
 	}
-	return getCable(cableId)
+	return await getCable(cableId)
 }
 
-export function updateCable(id: number, input: CableUpdate): Result<CableRow, Error> {
-	const current = getCable(id)
+export async function updateCable(
+	id: number,
+	input: CableUpdate,
+): Promise<Result<CableRow, Error>> {
+	const current = await getCable(id)
 	if (Result.isError(current)) {
 		return current
 	}
@@ -187,7 +193,7 @@ export function updateCable(id: number, input: CableUpdate): Result<CableRow, Er
 	}
 	if (!isPatchEmpty(patch)) {
 		try {
-			getDb().update(cables).set(patch).where(eq(cables.id, id)).run()
+			await getDb().update(cables).set(patch).where(eq(cables.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
 				return Result.err(new DuplicateError('A record with these values already exists'))
@@ -195,7 +201,7 @@ export function updateCable(id: number, input: CableUpdate): Result<CableRow, Er
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return getCable(id)
+	return await getCable(id)
 }
 
 /**
@@ -203,23 +209,23 @@ export function updateCable(id: number, input: CableUpdate): Result<CableRow, Er
  * interface rows (e.g. after a forced cleanup) are tolerated: the flags that
  * can be cleared are cleared and the cable row is always removed.
  */
-export function deleteCable(id: number): Result<CableRow, Error> {
-	const current = getCable(id)
+export async function deleteCable(id: number): Promise<Result<CableRow, Error>> {
+	const current = await getCable(id)
 	if (Result.isError(current)) {
 		return current
 	}
 	const cable = current.value
 	try {
-		getDb().transaction((tx) => {
-			tx.delete(cables).where(eq(cables.id, id)).run()
-			tx.update(interfaces)
+		await getDb().transaction(async (tx) => {
+			await tx.delete(cables).where(eq(cables.id, id))
+			await tx
+				.update(interfaces)
 				.set({ connected: 0 })
 				.where(eq(interfaces.id, cable.a_interface_id))
-				.run()
-			tx.update(interfaces)
+			await tx
+				.update(interfaces)
 				.set({ connected: 0 })
 				.where(eq(interfaces.id, cable.b_interface_id))
-				.run()
 		})
 	} catch (e) {
 		return Result.err(errOf(e))
@@ -228,15 +234,16 @@ export function deleteCable(id: number): Result<CableRow, Error> {
 }
 
 /** True when any cable touches an interface of the device (blocks device delete). */
-export function deviceHasCables(deviceId: number): boolean {
-	const row = getDb()
-		.select({ id: cables.id })
-		.from(cables)
-		.where(
-			sql`EXISTS (SELECT 1 FROM ${interfaces} WHERE ${interfaces.device_id} = ${deviceId} AND (${interfaces.id} = ${cables.a_interface_id} OR ${interfaces.id} = ${cables.b_interface_id}))`,
-		)
-		.limit(1)
-		.get()
+export async function deviceHasCables(deviceId: number): Promise<boolean> {
+	const row = (
+		await getDb()
+			.select({ id: cables.id })
+			.from(cables)
+			.where(
+				sql`EXISTS (SELECT 1 FROM ${interfaces} WHERE ${interfaces.device_id} = ${deviceId} AND (${interfaces.id} = ${cables.a_interface_id} OR ${interfaces.id} = ${cables.b_interface_id}))`,
+			)
+			.limit(1)
+	)[0]
 	return row !== undefined
 }
 
@@ -247,21 +254,21 @@ export function deviceHasCables(deviceId: number): boolean {
  * cable graph) so callers can render full cable traces, not just direct
  * peers. Scoped callers only traverse cables with both ends in their tenant.
  */
-export function getDeviceTrace(
+export async function getDeviceTrace(
 	deviceId: number,
 	depth = 4,
 	scopeTenantId?: number,
-): Result<DeviceTraceResponse, Error> {
+): Promise<Result<DeviceTraceResponse, Error>> {
 	const db = getDb()
-	const device = db.select().from(devices).where(eq(devices.id, deviceId)).get()
+	const device = (await db.select().from(devices).where(eq(devices.id, deviceId)).limit(1))[0]
 	if (!device) {
 		return Result.err(new NotFoundError('Device not found'))
 	}
-	const local = db.select().from(interfaces).where(eq(interfaces.device_id, deviceId)).all()
+	const local = await db.select().from(interfaces).where(eq(interfaces.device_id, deviceId))
 	const localIds = local.map((i) => i.id)
 	const cablesByIface = new Map<number, typeof cables.$inferSelect>()
 	if (localIds.length > 0) {
-		for (const cable of db
+		for (const cable of await db
 			.select()
 			.from(cables)
 			.where(
@@ -269,8 +276,7 @@ export function getDeviceTrace(
 					inArray(cables.a_interface_id, localIds),
 					inArray(cables.b_interface_id, localIds),
 				),
-			)
-			.all()) {
+			)) {
 			cablesByIface.set(cable.a_interface_id, cable)
 			cablesByIface.set(cable.b_interface_id, cable)
 		}
@@ -278,22 +284,20 @@ export function getDeviceTrace(
 	const peerIds = [...cablesByIface.values()].flatMap((c) => [c.a_interface_id, c.b_interface_id])
 	const ifacesById = new Map<number, InterfaceRow>()
 	if (peerIds.length > 0) {
-		for (const row of db
+		for (const row of await db
 			.select()
 			.from(interfaces)
-			.where(inArray(interfaces.id, [...new Set(peerIds)]))
-			.all()) {
+			.where(inArray(interfaces.id, [...new Set(peerIds)]))) {
 			ifacesById.set(row.id, row)
 		}
 	}
 	const peerDeviceIds = [...new Set([...ifacesById.values()].map((r) => r.device_id))]
 	const devicesById = new Map<number, typeof devices.$inferSelect>()
 	if (peerDeviceIds.length > 0) {
-		for (const row of db
+		for (const row of await db
 			.select()
 			.from(devices)
-			.where(inArray(devices.id, peerDeviceIds))
-			.all()) {
+			.where(inArray(devices.id, peerDeviceIds))) {
 			devicesById.set(row.id, row)
 		}
 	}
@@ -330,7 +334,7 @@ export function getDeviceTrace(
 		})
 	}
 	const boundedDepth = Math.min(Math.max(Math.floor(depth), 1), 10)
-	const pathsResult = getDevicePaths(deviceId, boundedDepth, scopeTenantId)
+	const pathsResult = await getDevicePaths(deviceId, boundedDepth, scopeTenantId)
 	if (Result.isError(pathsResult)) {
 		// The device exists (checked above); a scope miss here just means no
 		// visible paths, so fall back to an empty set instead of a 404.

@@ -17,10 +17,10 @@ import { onValidationError } from '../middleware/validation'
  */
 export const topologyApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', TopologyQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', TopologyQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {
-			const tenant = deviceTenant(query.device)
+			const tenant = await deviceTenant(query.device)
 			if (tenant !== undefined) {
 				const denied = checkRead(c, tenant)
 				if (denied) {
@@ -34,7 +34,7 @@ export const topologyApp = new Hono()
 		}
 		const scope = scopeTenantId(requestUser(c))
 		return c.json(
-			getTopology({
+			await getTopology({
 				site: query.site,
 				device: query.device,
 				tenant: query.tenant,

@@ -1,28 +1,31 @@
 import {
-	type AnySQLiteColumn,
+	type AnyPgColumn,
+	bigint,
 	index,
 	integer,
-	sqliteTable,
+	pgTable,
 	text,
 	uniqueIndex,
-} from 'drizzle-orm/sqlite-core'
+} from 'drizzle-orm/pg-core'
 import { LOCATION_TYPES } from 'shared/src/schemas'
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
 //
-// Ids are SQLite autoincrement integers (human readable in URLs and UIs).
+// Ids are Postgres identity integers (human readable in URLs and UIs).
+// Flags (`is_full_depth`, `connected`, ...) stay 0/1 integers so the wire
+// shapes did not change with the move from SQLite.
 // Session ids and auth-state values stay opaque random strings: they are
 // credentials, not entity references.
-export const users = sqliteTable('users', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const users = pgTable('users', {
+	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 	username: text('username').notNull().unique(),
 	password_hash: text('password_hash'),
 	provider: text('provider').notNull().default('local'),
 	provider_id: text('provider_id').unique(),
 	// RBAC role (`admin` | `editor` | `viewer`, default `viewer`; the
 	// first-run setup account is created as `admin`). Service-enforced enum:
-	// SQLite has no native enum, so writes go through `RoleSchema`.
+	// no DB enum, so writes go through `RoleSchema`.
 	role: text('role').notNull().default('viewer'),
 	// Tenant scope for editors/viewers (`NULL` = global, all tenants).
 	// Admins ignore this column. Delete-blocked while referenced (service
@@ -30,26 +33,26 @@ export const users = sqliteTable('users', {
 	tenant_id: integer('tenant_id').references(() => tenants.id),
 })
 
-export const sessions = sqliteTable(
+export const sessions = pgTable(
 	'sessions',
 	{
 		id: text('id').primaryKey(),
 		user_id: integer('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		created_at: integer('created_at').notNull(),
-		last_seen_at: integer('last_seen_at').notNull(),
-		expires_at: integer('expires_at').notNull(),
+		created_at: bigint('created_at', { mode: 'number' }).notNull(),
+		last_seen_at: bigint('last_seen_at', { mode: 'number' }).notNull(),
+		expires_at: bigint('expires_at', { mode: 'number' }).notNull(),
 	},
 	(table) => [index('sessions_expires_at_idx').on(table.expires_at)],
 )
 
-export const auth_states = sqliteTable(
+export const auth_states = pgTable(
 	'auth_states',
 	{
 		state: text('state').primaryKey(),
 		verifier: text('verifier').notNull(),
-		expires_at: integer('expires_at').notNull(),
+		expires_at: bigint('expires_at', { mode: 'number' }).notNull(),
 	},
 	(table) => [index('auth_states_expires_at_idx').on(table.expires_at)],
 )
@@ -60,10 +63,10 @@ export const auth_states = sqliteTable(
 // children exist (enforced in the service layer, not by FK cascade).
 // ---------------------------------------------------------------------------
 
-export const tenants = sqliteTable(
+export const tenants = pgTable(
 	'tenants',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull(),
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
@@ -72,14 +75,14 @@ export const tenants = sqliteTable(
 	(table) => [index('tenants_name_idx').on(table.name)],
 )
 
-export const site_groups = sqliteTable(
+export const site_groups = pgTable(
 	'site_groups',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
-		parent_id: integer('parent_id').references((): AnySQLiteColumn => site_groups.id),
+		parent_id: integer('parent_id').references((): AnyPgColumn => site_groups.id),
 		name: text('name').notNull(),
-		// Slug is unique per parent (service-enforced; SQLite treats NULL
+		// Slug is unique per parent (service-enforced; Postgres treats NULL
 		// parents as distinct so a composite unique index cannot cover roots).
 		slug: text('slug').notNull(),
 		description: text('description'),
@@ -93,10 +96,10 @@ export const site_groups = sqliteTable(
 	],
 )
 
-export const sites = sqliteTable(
+export const sites = pgTable(
 	'sites',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
 		site_group_id: integer('site_group_id').references(() => site_groups.id),
 		name: text('name').notNull(),
@@ -113,17 +116,17 @@ export const sites = sqliteTable(
 	],
 )
 
-export const locations = sqliteTable(
+export const locations = pgTable(
 	'locations',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		site_id: integer('site_id')
 			.notNull()
 			.references(() => sites.id),
-		parent_id: integer('parent_id').references((): AnySQLiteColumn => locations.id),
+		parent_id: integer('parent_id').references((): AnyPgColumn => locations.id),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
 		name: text('name').notNull(),
-		// Slug is unique per parent (service-enforced; SQLite treats NULL
+		// Slug is unique per parent (service-enforced; Postgres treats NULL
 		// parents as distinct so a composite unique index cannot cover roots).
 		slug: text('slug').notNull(),
 		type: text('type', { enum: LOCATION_TYPES }).notNull().default('other'),
@@ -141,10 +144,10 @@ export const locations = sqliteTable(
 // unit-testable without a database.
 // ---------------------------------------------------------------------------
 
-export const racks = sqliteTable(
+export const racks = pgTable(
 	'racks',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		site_id: integer('site_id')
 			.notNull()
 			.references(() => sites.id),
@@ -170,10 +173,10 @@ export const racks = sqliteTable(
 // carry no cascade.
 // ---------------------------------------------------------------------------
 
-export const manufacturers = sqliteTable(
+export const manufacturers = pgTable(
 	'manufacturers',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		slug: text('slug').notNull().unique(),
 		description: text('description'),
@@ -181,10 +184,10 @@ export const manufacturers = sqliteTable(
 	(table) => [index('manufacturers_name_idx').on(table.name)],
 )
 
-export const device_types = sqliteTable(
+export const device_types = pgTable(
 	'device_types',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		manufacturer_id: integer('manufacturer_id')
 			.notNull()
 			.references(() => manufacturers.id),
@@ -206,10 +209,10 @@ export const device_types = sqliteTable(
 	],
 )
 
-export const device_type_interfaces = sqliteTable(
+export const device_type_interfaces = pgTable(
 	'device_type_interfaces',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		device_type_id: integer('device_type_id')
 			.notNull()
 			.references(() => device_types.id),
@@ -245,10 +248,10 @@ export const device_type_interfaces = sqliteTable(
 // transaction.
 // ---------------------------------------------------------------------------
 
-export const devices = sqliteTable(
+export const devices = pgTable(
 	'devices',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		device_type_id: integer('device_type_id')
 			.notNull()
 			.references(() => device_types.id),
@@ -262,7 +265,7 @@ export const devices = sqliteTable(
 		// the height comes from the device-type template.
 		position_u: integer('position_u'),
 		// Shelf the device sits on (never U-mounted at the same time).
-		shelf_id: integer('shelf_id').references((): AnySQLiteColumn => shelves.id),
+		shelf_id: integer('shelf_id').references((): AnyPgColumn => shelves.id),
 		status: text('status').notNull().default('active'),
 		name: text('name').notNull(),
 		serial: text('serial'),
@@ -290,10 +293,10 @@ export const devices = sqliteTable(
 // faces may share U). Tenant scope is inherited from the rack.
 // ---------------------------------------------------------------------------
 
-export const shelves = sqliteTable(
+export const shelves = pgTable(
 	'shelves',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		rack_id: integer('rack_id')
 			.notNull()
 			.references(() => racks.id),
@@ -320,10 +323,10 @@ export const shelves = sqliteTable(
 	],
 )
 
-export const interfaces = sqliteTable(
+export const interfaces = pgTable(
 	'interfaces',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		device_id: integer('device_id')
 			.notNull()
 			.references(() => devices.id),
@@ -348,10 +351,10 @@ export const interfaces = sqliteTable(
 // same interface twice is rejected.
 // ---------------------------------------------------------------------------
 
-export const cables = sqliteTable(
+export const cables = pgTable(
 	'cables',
 	{
-		id: integer('id').primaryKey({ autoIncrement: true }),
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		a_interface_id: integer('a_interface_id')
 			.notNull()
 			.unique()

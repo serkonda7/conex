@@ -25,10 +25,10 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const manufacturersApp = new Hono()
 	.use(authMiddleware)
-	.get('/', vValidator('query', ManufacturerListQuerySchema, onValidationError), (c) => {
+	.get('/', vValidator('query', ManufacturerListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(
-			listManufacturers({
+			await listManufacturers({
 				search: query.search,
 				page: query.page,
 				limit: query.limit,
@@ -41,27 +41,30 @@ export const manufacturersApp = new Hono()
 		'/',
 		requireGlobalWriteMiddleware,
 		vValidator('json', ManufacturerCreateSchema, onValidationError),
-		(c) => {
-			return sendCreated(c, createManufacturer(c.req.valid('json')))
+		async (c) => {
+			return sendCreated(c, await createManufacturer(c.req.valid('json')))
 		},
 	)
-	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), (c) => {
-		return sendRow(c, getManufacturer(c.req.valid('param').id))
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendRow(c, await getManufacturer(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ManufacturerUpdateSchema, onValidationError),
-		(c) => {
-			return sendRow(c, updateManufacturer(c.req.valid('param').id, c.req.valid('json')))
+		async (c) => {
+			return sendRow(
+				c,
+				await updateManufacturer(c.req.valid('param').id, c.req.valid('json')),
+			)
 		},
 	)
 	.delete(
 		'/:id',
 		requireGlobalWriteMiddleware,
 		vValidator('param', EntityParamsSchema, onValidationError),
-		(c) => {
-			return sendRow(c, deleteManufacturer(c.req.valid('param').id))
+		async (c) => {
+			return sendRow(c, await deleteManufacturer(c.req.valid('param').id))
 		},
 	)

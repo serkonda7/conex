@@ -32,8 +32,8 @@ authApp.get('/providers', (c) => {
 // dialog; `POST /setup` only succeeds while the users table is empty.
 // ---------------------------------------------------------------------------
 
-authApp.get('/setup-status', (c) => {
-	return c.json({ needsSetup: !hasAnyUser() })
+authApp.get('/setup-status', async (c) => {
+	return c.json({ needsSetup: !(await hasAnyUser()) })
 })
 
 authApp.post(
@@ -41,7 +41,7 @@ authApp.post(
 	rate_limit(),
 	vValidator('json', SetupSchema, onValidationError),
 	async (c) => {
-		if (hasAnyUser()) {
+		if (await hasAnyUser()) {
 			return jsonError(c, 'Setup already completed', 409)
 		}
 
@@ -51,7 +51,7 @@ authApp.post(
 			return jsonError(c, 'Username and password are required.', 400)
 		}
 
-		if (getUserByUsername(username)) {
+		if (await getUserByUsername(username)) {
 			return jsonError(c, 'Setup already completed', 409)
 		}
 
@@ -60,7 +60,7 @@ authApp.post(
 			// First account owns the instance: always an admin (createLocalUser
 			// defaults to `admin`; passed explicitly so the role survives any
 			// future default change).
-			const user = createLocalUser(username, password_hash, 'admin', null)
+			const user = await createLocalUser(username, password_hash, 'admin', null)
 			const token = await get_signed_jwt(user)
 			setCookie(c, 'auth_token', token, getSessionCookieOpts())
 			return c.json({ success: true }, 201)
@@ -80,7 +80,7 @@ authApp.post(
 	async (c) => {
 		const body = c.req.valid('json')
 
-		const user = getUserByUsername(body.username)
+		const user = await getUserByUsername(body.username)
 		if (!user) {
 			return jsonError(c, 'Invalid username or password', 401)
 		}
@@ -102,7 +102,7 @@ authApp.post(
 
 authApp.post('/logout', authMiddleware, async (c) => {
 	const payload = c.get('jwtPayload')
-	invalidateSession(payload.jti)
+	await invalidateSession(payload.jti)
 
 	deleteCookie(c, 'auth_token', {
 		path: '/',

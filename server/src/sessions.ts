@@ -38,12 +38,12 @@ export function getStateCookieOpts(maxAgeSeconds: number): CookieOptions {
 
 export const SESSION_SWEEP_INTERVAL_MS = 60 * 60 * 1000
 
-export function createSession(userId: number): string {
+export async function createSession(userId: number): Promise<string> {
 	// Opaque v7 token (not an entity id): time-ordered, so recent sessions
 	// sort without a secondary index.
 	const id = Bun.randomUUIDv7()
 	const now = nowSeconds()
-	getDb()
+	await getDb()
 		.insert(sessions)
 		.values({
 			id,
@@ -52,19 +52,18 @@ export function createSession(userId: number): string {
 			last_seen_at: now,
 			expires_at: now + SESSION_ABSOLUTE_TIMEOUT_S,
 		})
-		.run()
 	return id
 }
 
-export function isValidSession(sid: string): boolean {
-	const session = getDb().select().from(sessions).where(eq(sessions.id, sid)).get()
+export async function isValidSession(sid: string): Promise<boolean> {
+	const session = (await getDb().select().from(sessions).where(eq(sessions.id, sid)).limit(1))[0]
 	if (!session) {
 		return false
 	}
 
 	const now = nowSeconds()
 	if (session.expires_at <= now || session.last_seen_at + SESSION_IDLE_TIMEOUT_S <= now) {
-		getDb().delete(sessions).where(eq(sessions.id, sid)).run()
+		await getDb().delete(sessions).where(eq(sessions.id, sid))
 		return false
 	}
 	return true
@@ -76,43 +75,42 @@ export function isValidSession(sid: string): boolean {
  * removed as a side effect). Callers must not check `isValidSession()` first —
  * that would query the same row twice per request.
  */
-export function touchSession(sid: string): boolean {
-	if (!isValidSession(sid)) {
+export async function touchSession(sid: string): Promise<boolean> {
+	if (!(await isValidSession(sid))) {
 		return false
 	}
-	getDb().update(sessions).set({ last_seen_at: nowSeconds() }).where(eq(sessions.id, sid)).run()
+	await getDb().update(sessions).set({ last_seen_at: nowSeconds() }).where(eq(sessions.id, sid))
 	return true
 }
 
-export function invalidateSession(sid: string): void {
-	getDb().delete(sessions).where(eq(sessions.id, sid)).run()
+export async function invalidateSession(sid: string): Promise<void> {
+	await getDb().delete(sessions).where(eq(sessions.id, sid))
 }
 
 /** Removes expired sessions and PKCE states in one scheduled sweep. */
-export function sweepExpired(): number {
+export async function sweepExpired(): Promise<number> {
 	const now = nowSeconds()
 	const expiredSessions = or(
 		lte(sessions.expires_at, now),
 		lte(sessions.last_seen_at, now - SESSION_IDLE_TIMEOUT_S),
 	)
-	return getDb().transaction((tx) => {
-		const sessionsRemoved = tx
-			.delete(sessions)
-			.where(expiredSessions)
-			.returning({ id: sessions.id })
-			.all().length
-		const statesRemoved = tx
-			.delete(auth_states)
-			.where(lte(auth_states.expires_at, now))
-			.returning({ state: auth_states.state })
-			.all().length
+	return await getDb().transaction(async (tx) => {
+		const sessionsRemoved = (
+			await tx.delete(sessions).where(expiredSessions).returning({ id: sessions.id })
+		).length
+		const statesRemoved = (
+			await tx
+				.delete(auth_states)
+				.where(lte(auth_states.expires_at, now))
+				.returning({ state: auth_states.state })
+		).length
 		return sessionsRemoved + statesRemoved
 	})
 }
 
 export async function get_signed_jwt(user: User): Promise<string> {
 	const now = nowSeconds()
-	const sid = createSession(user.id)
+	const sid = await createSession(user.id)
 	const payload: JwtPayload = {
 		sub: user.username,
 		jti: sid,
