@@ -26,6 +26,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo } from '../router'
+import { canWrite } from '../session'
 
 /**
  * /tenant-groups — flat tenant group list: search, sortable columns,
@@ -136,17 +137,21 @@ export function TenantGroupsPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(row: TenantGroupListItem): JSX.Element => (
-					<ListRowActions
-						edit_href={`/tenant-groups/${row.id}/edit`}
-						name={row.name}
-						menu_open={openMenu()?.id === row.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, row.id, row.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (row: TenantGroupListItem): JSX.Element => (
+								<ListRowActions
+									edit_href={`/tenant-groups/${row.id}/edit`}
+									name={row.name}
+									menu_open={openMenu()?.id === row.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, row.id, row.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => groupsPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.tenantGroup', 2) })}</p>

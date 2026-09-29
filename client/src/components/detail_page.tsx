@@ -12,6 +12,7 @@ import { Result } from 'better-result'
 import { type JSX, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
 import { type Crumb, forgetDeleted, goTo, navigate, usePageMeta } from '../router'
+import { canWrite } from '../session'
 import { Empty, InlineError, Loading } from './feedback'
 
 export { Empty, InlineError, Loading }
@@ -41,7 +42,7 @@ export function DetailShell(props: {
 	)
 }
 
-/** Title header with the Edit / Delete action pair. */
+/** Title header with the Edit / Delete action pair (hidden when read-only). */
 export function DetailHeader(props: {
 	name: string | undefined
 	slug?: string
@@ -55,20 +56,22 @@ export function DetailHeader(props: {
 					{props.name} <code>{props.slug}</code>
 				</Show>
 			</h2>
-			<div class="form-actions">
-				<button type="button" onClick={() => navigate(props.editHref)}>
-					<span aria-hidden="true" class="app-nav-icon">
-						<IconPencil size={14} />
-					</span>{' '}
-					{t('common.edit')}
-				</button>
-				<button type="button" class="btn-danger" onClick={props.onDelete}>
-					<span aria-hidden="true" class="app-nav-icon">
-						<IconTrash size={14} />
-					</span>{' '}
-					{t('common.delete')}
-				</button>
-			</div>
+			<Show when={canWrite()}>
+				<div class="form-actions">
+					<button type="button" onClick={() => navigate(props.editHref)}>
+						<span aria-hidden="true" class="app-nav-icon">
+							<IconPencil size={14} />
+						</span>{' '}
+						{t('common.edit')}
+					</button>
+					<button type="button" class="btn-danger" onClick={props.onDelete}>
+						<span aria-hidden="true" class="app-nav-icon">
+							<IconTrash size={14} />
+						</span>{' '}
+						{t('common.delete')}
+					</button>
+				</div>
+			</Show>
 		</div>
 	)
 }

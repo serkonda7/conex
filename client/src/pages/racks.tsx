@@ -30,6 +30,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
@@ -278,17 +279,21 @@ export function RacksPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(r: RackRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/racks/${r.id}/edit`}
-						name={r.name}
-						menu_open={openMenu()?.id === r.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, r.id, r.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (r: RackRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/racks/${r.id}/edit`}
+									name={r.name}
+									menu_open={openMenu()?.id === r.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, r.id, r.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => racksPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.rack', 2) })}</p>

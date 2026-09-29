@@ -24,6 +24,7 @@ import { ListRangeStatus } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { cableStatusLabel } from '../i18n/labels'
 import { goTo, navigate, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { use_visible_columns } from '../util/column_visibility'
 
 const CABLE_CSV_COLUMNS = 'a_device,a_interface,b_device,b_interface,label,kind,status'
@@ -396,17 +397,19 @@ export function ConnectionsPage(): JSX.Element {
 				<button type="button" onClick={handleExport}>
 					{t('connection.exportCsv')}
 				</button>
-				<label>
-					<span class="visually-hidden">{t('connection.importCsv')}</span>
-					<input
-						type="file"
-						accept=".csv,text/csv"
-						aria-label={t('connection.importCsv')}
-						disabled={importing()}
-						onChange={handleImportFile}
-					/>
-				</label>
-				<Show when={selected().length > 0}>
+				<Show when={canWrite()}>
+					<label>
+						<span class="visually-hidden">{t('connection.importCsv')}</span>
+						<input
+							type="file"
+							accept=".csv,text/csv"
+							aria-label={t('connection.importCsv')}
+							disabled={importing()}
+							onChange={handleImportFile}
+						/>
+					</label>
+				</Show>
+				<Show when={selected().length > 0 && canWrite()}>
 					<button type="button" class="btn-danger" onClick={handleBulkDisconnect}>
 						{t('connection.disconnectSelected', { count: selected().length })}
 					</button>
@@ -414,91 +417,101 @@ export function ConnectionsPage(): JSX.Element {
 			</div>
 			<p class="field-hint">{t('connection.csvColumns', { columns: CABLE_CSV_COLUMNS })}</p>
 
-			<section class="card" aria-label={t('connection.connectTwoPorts')}>
-				<h3>{t('connection.connectTwoPorts')}</h3>
-				<form onSubmit={handleConnect}>
-					<select
-						value={aDevice()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
-							setADevice(e.currentTarget.value)
-							setAIface('')
-						}}
-						aria-label={t('connection.deviceA')}
-					>
-						<option value="">{t('connection.deviceAPlaceholder')}</option>
-						<For each={devices() ?? []}>
-							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
-						</For>
-					</select>{' '}
-					<select
-						value={aIface()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setAIface(e.currentTarget.value)
-						}
-						aria-label={t('connection.freePortA')}
-					>
-						<option value="">{t('connection.freePortAPlaceholder')}</option>
-						<For each={freeA()}>
-							{(i: InterfaceJson): JSX.Element => (
-								<option value={i.id}>{i.name}</option>
-							)}
-						</For>
-					</select>{' '}
-					<select
-						value={bDevice()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
-							setBDevice(e.currentTarget.value)
-							setBIface('')
-						}}
-						aria-label={t('connection.deviceB')}
-					>
-						<option value="">{t('connection.deviceBPlaceholder')}</option>
-						<For each={devices() ?? []}>
-							{(d: DeviceRow): JSX.Element => <option value={d.id}>{d.name}</option>}
-						</For>
-					</select>{' '}
-					<select
-						value={bIface()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setBIface(e.currentTarget.value)
-						}
-						aria-label={t('connection.freePortB')}
-					>
-						<option value="">{t('connection.freePortBPlaceholder')}</option>
-						<For each={freeB()}>
-							{(i: InterfaceJson): JSX.Element => (
-								<option value={i.id}>{i.name}</option>
-							)}
-						</For>
-					</select>{' '}
-					<input
-						placeholder={t('connection.labelPlaceholder')}
-						aria-label={t('connection.cableLabel')}
-						value={cableLabel()}
-						onInput={(e: InputEventAndTarget) => setCableLabel(e.currentTarget.value)}
-					/>{' '}
-					<input
-						placeholder={t('connection.typePlaceholder')}
-						aria-label={t('connection.cableType')}
-						value={cableKind()}
-						onInput={(e: InputEventAndTarget) => setCableKind(e.currentTarget.value)}
-					/>{' '}
-					<select
-						value={cableStatus()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
-							setCableStatus(e.currentTarget.value)
-						}
-						aria-label={t('connection.cableStatus')}
-					>
-						<For each={CABLE_STATUSES}>
-							{(status: CableStatus): JSX.Element => (
-								<option value={status}>{cableStatusLabel(status)}</option>
-							)}
-						</For>
-					</select>{' '}
-					<button type="submit">{t('device.connect')}</button>
-				</form>
-			</section>
+			<Show when={canWrite()}>
+				<section class="card" aria-label={t('connection.connectTwoPorts')}>
+					<h3>{t('connection.connectTwoPorts')}</h3>
+					<form onSubmit={handleConnect}>
+						<select
+							value={aDevice()}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
+								setADevice(e.currentTarget.value)
+								setAIface('')
+							}}
+							aria-label={t('connection.deviceA')}
+						>
+							<option value="">{t('connection.deviceAPlaceholder')}</option>
+							<For each={devices() ?? []}>
+								{(d: DeviceRow): JSX.Element => (
+									<option value={d.id}>{d.name}</option>
+								)}
+							</For>
+						</select>{' '}
+						<select
+							value={aIface()}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+								setAIface(e.currentTarget.value)
+							}
+							aria-label={t('connection.freePortA')}
+						>
+							<option value="">{t('connection.freePortAPlaceholder')}</option>
+							<For each={freeA()}>
+								{(i: InterfaceJson): JSX.Element => (
+									<option value={i.id}>{i.name}</option>
+								)}
+							</For>
+						</select>{' '}
+						<select
+							value={bDevice()}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
+								setBDevice(e.currentTarget.value)
+								setBIface('')
+							}}
+							aria-label={t('connection.deviceB')}
+						>
+							<option value="">{t('connection.deviceBPlaceholder')}</option>
+							<For each={devices() ?? []}>
+								{(d: DeviceRow): JSX.Element => (
+									<option value={d.id}>{d.name}</option>
+								)}
+							</For>
+						</select>{' '}
+						<select
+							value={bIface()}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+								setBIface(e.currentTarget.value)
+							}
+							aria-label={t('connection.freePortB')}
+						>
+							<option value="">{t('connection.freePortBPlaceholder')}</option>
+							<For each={freeB()}>
+								{(i: InterfaceJson): JSX.Element => (
+									<option value={i.id}>{i.name}</option>
+								)}
+							</For>
+						</select>{' '}
+						<input
+							placeholder={t('connection.labelPlaceholder')}
+							aria-label={t('connection.cableLabel')}
+							value={cableLabel()}
+							onInput={(e: InputEventAndTarget) =>
+								setCableLabel(e.currentTarget.value)
+							}
+						/>{' '}
+						<input
+							placeholder={t('connection.typePlaceholder')}
+							aria-label={t('connection.cableType')}
+							value={cableKind()}
+							onInput={(e: InputEventAndTarget) =>
+								setCableKind(e.currentTarget.value)
+							}
+						/>{' '}
+						<select
+							value={cableStatus()}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+								setCableStatus(e.currentTarget.value)
+							}
+							aria-label={t('connection.cableStatus')}
+						>
+							<For each={CABLE_STATUSES}>
+								{(status: CableStatus): JSX.Element => (
+									<option value={status}>{cableStatusLabel(status)}</option>
+								)}
+							</For>
+						</select>{' '}
+						<button type="submit">{t('device.connect')}</button>
+					</form>
+				</section>
+			</Show>
 
 			<DataTable
 				rows={rows}
@@ -507,23 +520,29 @@ export function ConnectionsPage(): JSX.Element {
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
-				selected={selected}
-				onSelectionChange={(ids: (string | number)[]): void => {
-					setSelected(ids.map((id) => Number(id)))
-				}}
+				selected={canWrite() ? selected : undefined}
+				onSelectionChange={
+					canWrite()
+						? (ids: (string | number)[]): void => {
+								setSelected(ids.map((id) => Number(id)))
+							}
+						: undefined
+				}
 				selectionLabel={t('list.selectAll', { noun: tp('noun.connection', 2) })}
 				rowActions={(c: CableRow): JSX.Element => (
 					<span class="row-actions">
 						<button type="button" onClick={() => navigate(`/topology?cable=${c.id}`)}>
 							{t('connection.show')}
 						</button>
-						<button
-							type="button"
-							class="btn-danger"
-							onClick={() => handleDisconnect(c.id)}
-						>
-							{t('device.disconnect')}
-						</button>
+						<Show when={canWrite()}>
+							<button
+								type="button"
+								class="btn-danger"
+								onClick={() => handleDisconnect(c.id)}
+							>
+								{t('device.disconnect')}
+							</button>
+						</Show>
 					</span>
 				)}
 				loading={() => cablesPage.loading}

@@ -24,6 +24,7 @@ import { EditPortDialog } from '../components/edit_port_dialog'
 import { t, tp } from '../i18n'
 import { faceLabel } from '../i18n/labels'
 import { type Crumb, goTo } from '../router'
+import { canWrite } from '../session'
 import { locationTrail } from '../trails'
 
 /**
@@ -252,53 +253,61 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						},
 					},
 				]}
-				rowActions={(iface: InterfaceJson): JSX.Element => {
-					const link = linksByIface().get(iface.id)
-					return (
-						<span class="row-actions">
-							<Show
-								when={link}
-								fallback={
-									<button
-										type="button"
-										class="icon-btn icon-btn-connect"
-										disabled={iface.connected}
-										title={t('device.connectToPeer', { name: iface.name })}
-										aria-label={t('device.connectCableFor', {
-											name: iface.name,
-										})}
-										onClick={() => handleConnectCable(iface)}
-									>
-										<IconLinkPlus size={20} />
-									</button>
-								}
-							>
-								{(l: () => TraceLink): JSX.Element => (
-									<button
-										type="button"
-										class="icon-btn icon-btn-danger"
-										title={t('device.disconnectPort', { name: iface.name })}
-										aria-label={t('device.disconnectPort', {
-											name: iface.name,
-										})}
-										onClick={() => handleDisconnect(l().cable_id)}
-									>
-										<IconUnlink size={20} />
-									</button>
-								)}
-							</Show>
-							<button
-								type="button"
-								class="icon-btn"
-								title={t('device.editPort', { name: iface.name })}
-								aria-label={t('device.editPort', { name: iface.name })}
-								onClick={() => handleEdit(iface)}
-							>
-								<IconPencil size={20} />
-							</button>
-						</span>
-					)
-				}}
+				rowActions={
+					canWrite()
+						? (iface: InterfaceJson): JSX.Element => {
+								const link = linksByIface().get(iface.id)
+								return (
+									<span class="row-actions">
+										<Show
+											when={link}
+											fallback={
+												<button
+													type="button"
+													class="icon-btn icon-btn-connect"
+													disabled={iface.connected}
+													title={t('device.connectToPeer', {
+														name: iface.name,
+													})}
+													aria-label={t('device.connectCableFor', {
+														name: iface.name,
+													})}
+													onClick={() => handleConnectCable(iface)}
+												>
+													<IconLinkPlus size={20} />
+												</button>
+											}
+										>
+											{(l: () => TraceLink): JSX.Element => (
+												<button
+													type="button"
+													class="icon-btn icon-btn-danger"
+													title={t('device.disconnectPort', {
+														name: iface.name,
+													})}
+													aria-label={t('device.disconnectPort', {
+														name: iface.name,
+													})}
+													onClick={() => handleDisconnect(l().cable_id)}
+												>
+													<IconUnlink size={20} />
+												</button>
+											)}
+										</Show>
+										<button
+											type="button"
+											class="icon-btn"
+											title={t('device.editPort', { name: iface.name })}
+											aria-label={t('device.editPort', { name: iface.name })}
+											onClick={() => handleEdit(iface)}
+										>
+											<IconPencil size={20} />
+										</button>
+									</span>
+								)
+							}
+						: undefined
+				}
 				empty={false}
 			/>
 		)

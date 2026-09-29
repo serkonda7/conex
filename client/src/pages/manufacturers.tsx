@@ -26,6 +26,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo } from '../router'
+import { canWrite } from '../session'
 
 /**
  * /manufacturers — manufacturer list: search, sortable columns, row
@@ -125,17 +126,21 @@ export function ManufacturersPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(m: ManufacturerRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/manufacturers/${m.id}/edit`}
-						name={m.name}
-						menu_open={openMenu()?.id === m.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, m.id, m.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (m: ManufacturerRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/manufacturers/${m.id}/edit`}
+									name={m.name}
+									menu_open={openMenu()?.id === m.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, m.id, m.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => manufacturersPage.loading}
 				loadingContent={
 					<p class="skeleton">

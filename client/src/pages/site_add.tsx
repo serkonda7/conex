@@ -95,11 +95,6 @@ export function SiteAddPage(): JSX.Element {
 				}}
 				options={row_options(tenants() ?? [])}
 				emptyLabel={t('common.noTenant')}
-				hint={
-					<Show when={!tenantTouched() && groupTenantId() !== null}>
-						<Hint>{t('site.tenantFromGroup')}</Hint>
-					</Show>
-				}
 			/>
 			<SelectField
 				id="site-group"

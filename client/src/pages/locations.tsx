@@ -31,6 +31,7 @@ import {
 import { t, tp } from '../i18n'
 import { locationTypeLabel } from '../i18n/labels'
 import { goTo, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
@@ -252,17 +253,21 @@ export function LocationsPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(l: LocationRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/locations/${l.id}/edit`}
-						name={l.name}
-						menu_open={openMenu()?.id === l.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, l.id, l.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (l: LocationRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/locations/${l.id}/edit`}
+									name={l.name}
+									menu_open={openMenu()?.id === l.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, l.id, l.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => locationsPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.location', 2) })}</p>

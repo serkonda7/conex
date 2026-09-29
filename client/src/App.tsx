@@ -43,6 +43,7 @@ import {
 	type Section,
 	tabTitle,
 } from './routes'
+import { canWrite, setSessionRole } from './session'
 import { refreshTenantContext, setTenantContextScoped, tenantContext } from './tenant_context'
 
 const APP_TITLE = 'CoNetBox'
@@ -167,6 +168,8 @@ function NavItem(props: {
 	label: string
 	addHref?: string
 	importHref?: string
+	/** Viewers: no add / import buttons. */
+	readOnly?: boolean
 }): JSX.Element {
 	function goLink(e: MouseEvent): void {
 		goTo(e, props.href)
@@ -199,44 +202,46 @@ function NavItem(props: {
 				</span>
 				{props.label}
 			</a>
-			{props.addHref ? (
-				<button
-					type="button"
-					class="app-nav-add"
-					aria-label={t('app.navAdd', { label: props.label })}
-					title={t('app.navAdd', { label: props.label })}
-					onClick={goAdd}
-				>
-					<span aria-hidden="true" class="app-nav-add-icon">
-						<IconPlus size={14} />
-					</span>
-				</button>
-			) : (
-				<button
-					type="button"
-					class="app-nav-add"
-					disabled
-					aria-label={t('app.navAddSoon', { label: props.label })}
-					title={t('app.navAddSoon', { label: props.label })}
-				>
-					<span aria-hidden="true" class="app-nav-add-icon">
-						<IconPlus size={14} />
-					</span>
-				</button>
-			)}
-			{props.importHref ? (
-				<button
-					type="button"
-					class="app-nav-add app-nav-import"
-					aria-label={t('app.navImport', { label: props.label })}
-					title={t('app.navImport', { label: props.label })}
-					onClick={goImport}
-				>
-					<span aria-hidden="true" class="app-nav-add-icon">
-						<IconDownload size={14} />
-					</span>
-				</button>
-			) : null}
+			<Show when={props.readOnly !== true}>
+				{props.addHref ? (
+					<button
+						type="button"
+						class="app-nav-add"
+						aria-label={t('app.navAdd', { label: props.label })}
+						title={t('app.navAdd', { label: props.label })}
+						onClick={goAdd}
+					>
+						<span aria-hidden="true" class="app-nav-add-icon">
+							<IconPlus size={14} />
+						</span>
+					</button>
+				) : (
+					<button
+						type="button"
+						class="app-nav-add"
+						disabled
+						aria-label={t('app.navAddSoon', { label: props.label })}
+						title={t('app.navAddSoon', { label: props.label })}
+					>
+						<span aria-hidden="true" class="app-nav-add-icon">
+							<IconPlus size={14} />
+						</span>
+					</button>
+				)}
+				{props.importHref ? (
+					<button
+						type="button"
+						class="app-nav-add app-nav-import"
+						aria-label={t('app.navImport', { label: props.label })}
+						title={t('app.navImport', { label: props.label })}
+						onClick={goImport}
+					>
+						<span aria-hidden="true" class="app-nav-add-icon">
+							<IconDownload size={14} />
+						</span>
+					</button>
+				) : null}
+			</Show>
 		</div>
 	)
 }
@@ -571,6 +576,10 @@ function App(): JSX.Element {
 	}
 
 	createEffect(() => {
+		setSessionRole(currentUser()?.role ?? null)
+	})
+
+	createEffect(() => {
 		setTenantContextScoped(isScoped())
 		if (isLoggedIn() === true) {
 			void refreshTenantContext()
@@ -797,6 +806,7 @@ function App(): JSX.Element {
 																? `/${section.path}/import`
 																: undefined
 														}
+														readOnly={!canWrite()}
 													/>
 												)}
 											</For>

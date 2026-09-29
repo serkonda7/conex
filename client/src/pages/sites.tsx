@@ -31,6 +31,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
@@ -200,17 +201,21 @@ export function SitesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(s: SiteRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/sites/${s.id}/edit`}
-						name={s.name}
-						menu_open={openMenu()?.id === s.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, s.id, s.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (s: SiteRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/sites/${s.id}/edit`}
+									name={s.name}
+									menu_open={openMenu()?.id === s.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, s.id, s.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => sitesPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.site', 2) })}</p>

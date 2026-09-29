@@ -28,6 +28,7 @@ import { RackElevation, type RackFace } from '../components/rack_elevation'
 import { t, tp } from '../i18n'
 import { faceLabel } from '../i18n/labels'
 import { type Crumb, navigate } from '../router'
+import { canWrite } from '../session'
 import { locationTrail } from '../trails'
 
 /**
@@ -316,20 +317,25 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 						{rack()?.name}{' '}
 						<span>{t('common.heightUnits', { count: displayHeight() })}</span>
 					</h2>
-					<div class="form-actions">
-						<button type="button" onClick={() => navigate(`/racks/${props.id}/edit`)}>
-							<span aria-hidden="true" class="app-nav-icon">
-								<IconPencil size={14} />
-							</span>{' '}
-							{t('common.edit')}
-						</button>
-						<button type="button" class="btn-danger" onClick={handleDelete}>
-							<span aria-hidden="true" class="app-nav-icon">
-								<IconTrash size={14} />
-							</span>{' '}
-							{t('common.delete')}
-						</button>
-					</div>
+					<Show when={canWrite()}>
+						<div class="form-actions">
+							<button
+								type="button"
+								onClick={() => navigate(`/racks/${props.id}/edit`)}
+							>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconPencil size={14} />
+								</span>{' '}
+								{t('common.edit')}
+							</button>
+							<button type="button" class="btn-danger" onClick={handleDelete}>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconTrash size={14} />
+								</span>{' '}
+								{t('common.delete')}
+							</button>
+						</div>
+					</Show>
 				</div>
 				<DetailSubtitle>{rack()?.description || t('common.noDescription')}</DetailSubtitle>
 
@@ -481,6 +487,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								on_select_device={openDeviceSelector}
 								on_add_device={installDevice}
 								on_add_shelf={installShelf}
+								readonly={!canWrite()}
 								shelf_actions={{
 									on_add_shelf_device: addShelfDevice,
 									on_select_shelf_device: openShelfDeviceSelector,

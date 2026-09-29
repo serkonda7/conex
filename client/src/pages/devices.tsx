@@ -24,6 +24,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
@@ -223,17 +224,21 @@ export function DevicesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(d: DeviceRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/devices/${d.id}/edit`}
-						name={d.name}
-						menu_open={openMenu()?.id === d.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, d.id, d.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (d: DeviceRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/devices/${d.id}/edit`}
+									name={d.name}
+									menu_open={openMenu()?.id === d.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, d.id, d.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => devicesPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.device', 2) })}</p>

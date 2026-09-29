@@ -29,6 +29,7 @@ import {
 import { t, tp } from '../i18n'
 import { formFactorLabel } from '../i18n/labels'
 import { parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 
 /**
  * /rack-types — rack-type catalog: search, sortable columns, manufacturer
@@ -173,16 +174,20 @@ export function RackTypesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(dt: DeviceTypeRow): JSX.Element => (
-					<ListRowActions
-						name={dt.model}
-						menu_open={openMenu()?.id === dt.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, dt.id, dt.model)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (dt: DeviceTypeRow): JSX.Element => (
+								<ListRowActions
+									name={dt.model}
+									menu_open={openMenu()?.id === dt.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, dt.id, dt.model)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => typesPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.rackType', 2) })}</p>

@@ -5,7 +5,8 @@
  * header/toolbar/row-action/status/error shells.
  *
  * Every piece preserves the exact DOM and aria structure the pages rendered
- * before, so e2e selectors keep working. `noun` options take a
+ * before, so e2e selectors keep working. Write actions (add, edit, delete,
+ * bulk selection) render only when the session can write. `noun` options take a
  * `noun.<entity>` plural key used to build localized confirm/aria text.
  */
 
@@ -25,6 +26,7 @@ import {
 import { Portal } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
 import { navigate } from '../router'
+import { canWrite } from '../session'
 import { use_visible_columns } from '../util/column_visibility'
 
 /** Search text plus its debounced (trimmed) projection for list queries. */
@@ -86,7 +88,7 @@ export function useSort<T extends string>(
 /**
  * Checkbox selection for a DataTable. `track` is the list-query memo: a new
  * result set invalidates the selection. `selection` spreads straight into
- * the DataTable's selection props.
+ * the DataTable's selection props; read-only sessions get no checkboxes.
  */
 export function useListSelection(
 	track: () => unknown,
@@ -95,8 +97,8 @@ export function useListSelection(
 	selected: Accessor<number[]>
 	setSelected: Setter<number[]>
 	selection: {
-		selected: Accessor<number[]>
-		onSelectionChange: (ids: (string | number)[]) => void
+		selected: Accessor<number[]> | undefined
+		onSelectionChange: ((ids: (string | number)[]) => void) | undefined
 		selectionLabel: string
 	}
 } {
@@ -113,7 +115,19 @@ export function useListSelection(
 	}
 
 	const selectionLabel = t('list.selectAll', { noun: tp(noun, 2) })
-	return { selected, setSelected, selection: { selected, onSelectionChange, selectionLabel } }
+	return {
+		selected,
+		setSelected,
+		selection: {
+			get selected(): Accessor<number[]> | undefined {
+				return canWrite() ? selected : undefined
+			},
+			get onSelectionChange(): ((ids: (string | number)[]) => void) | undefined {
+				return canWrite() ? onSelectionChange : undefined
+			},
+			selectionLabel,
+		},
+	}
 }
 
 /** Persisted visible-column state for a DataTable column customizer. */
@@ -269,7 +283,8 @@ export function useListDelete(opts: {
 /**
  * List title plus the "+ Add" button. `actions` renders extra header buttons
  * (e.g. the device-type Import button) beside "+ Add" inside the same
- * `page-header-actions` wrapper the hand-rolled page used.
+ * `page-header-actions` wrapper the hand-rolled page used. Both are write
+ * actions, hidden for read-only sessions.
  */
 export function ListPageHeader(props: {
 	title: string
@@ -284,11 +299,13 @@ export function ListPageHeader(props: {
 	return (
 		<div class="page-header">
 			<h2>{props.title}</h2>
-			<Show when={props.actions !== undefined} fallback={addButton}>
-				<div class="page-header-actions">
-					{addButton}
-					{props.actions}
-				</div>
+			<Show when={canWrite()}>
+				<Show when={props.actions !== undefined} fallback={addButton}>
+					<div class="page-header-actions">
+						{addButton}
+						{props.actions}
+					</div>
+				</Show>
 			</Show>
 		</div>
 	)
@@ -319,7 +336,7 @@ export function ListSearchField(props: {
 /** "Delete N selected" toolbar button, visible only with a selection. */
 export function BulkDeleteButton(props: { count: number; onClick: () => void }): JSX.Element {
 	return (
-		<Show when={props.count > 0}>
+		<Show when={props.count > 0 && canWrite()}>
 			<button type="button" class="btn-danger" onClick={props.onClick}>
 				{t('list.deleteSelected', { count: props.count })}
 			</button>

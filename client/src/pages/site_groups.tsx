@@ -28,6 +28,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
@@ -191,17 +192,21 @@ export function SiteGroupsPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(g: SiteGroupRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/site-groups/${g.id}/edit`}
-						name={g.name}
-						menu_open={openMenu()?.id === g.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, g.id, g.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (g: SiteGroupRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/site-groups/${g.id}/edit`}
+									name={g.name}
+									menu_open={openMenu()?.id === g.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, g.id, g.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => groupsPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.siteGroup', 2) })}</p>

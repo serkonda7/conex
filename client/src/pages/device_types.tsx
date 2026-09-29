@@ -28,6 +28,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, navigate, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 
 /**
  * /device-types — device-type list: search, sortable columns, manufacturer
@@ -195,17 +196,21 @@ export function DeviceTypesPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(dt: DeviceTypeRow): JSX.Element => (
-					<ListRowActions
-						edit_href={`/device-types/${dt.id}/edit`}
-						name={dt.model}
-						menu_open={openMenu()?.id === dt.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, dt.id, dt.model)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (dt: DeviceTypeRow): JSX.Element => (
+								<ListRowActions
+									edit_href={`/device-types/${dt.id}/edit`}
+									name={dt.model}
+									menu_open={openMenu()?.id === dt.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, dt.id, dt.model)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => typesPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.deviceType', 2) })}</p>

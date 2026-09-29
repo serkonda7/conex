@@ -28,6 +28,7 @@ import {
 } from '../components/list_page'
 import { t, tp } from '../i18n'
 import { goTo, parseId, queryParam } from '../router'
+import { canWrite } from '../session'
 import { contextGroupId } from '../tenant_context'
 
 /**
@@ -175,17 +176,21 @@ export function TenantsPage(): JSX.Element {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				{...selection}
-				rowActions={(row: TenantWithCounts): JSX.Element => (
-					<ListRowActions
-						edit_href={`/tenants/${row.id}/edit`}
-						name={row.name}
-						menu_open={openMenu()?.id === row.id}
-						onToggleMenu={(
-							e: MouseEvent & { currentTarget: HTMLButtonElement },
-						): void => toggleMenu(e, row.id, row.name)}
-						onCloseMenu={closeMenu}
-					/>
-				)}
+				rowActions={
+					canWrite()
+						? (row: TenantWithCounts): JSX.Element => (
+								<ListRowActions
+									edit_href={`/tenants/${row.id}/edit`}
+									name={row.name}
+									menu_open={openMenu()?.id === row.id}
+									onToggleMenu={(
+										e: MouseEvent & { currentTarget: HTMLButtonElement },
+									): void => toggleMenu(e, row.id, row.name)}
+									onCloseMenu={closeMenu}
+								/>
+							)
+						: undefined
+				}
 				loading={() => tenantsPage.loading}
 				loadingContent={
 					<p class="skeleton">{t('list.loading', { noun: tp('noun.tenant', 2) })}</p>

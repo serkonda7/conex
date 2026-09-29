@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createResource, createSignal, For } from 'solid-js'
+import { createResource, createSignal, For, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../api_devices'
 import {
 	create_stub,
@@ -26,6 +26,7 @@ import {
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
 import { type Crumb, goTo } from '../router'
+import { canWrite } from '../session'
 
 /**
  * /device-types/:id — device-type detail: header with model and details
@@ -185,32 +186,42 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			</DetailShell>
 
 			<h3 id="device-type-stubs">{t('deviceType.stubs', { count: stubCountText() })}</h3>
-			<form onSubmit={handleCreateStub}>
-				<input
-					placeholder={t('deviceType.stubPrefixPlaceholder')}
-					aria-label={t('deviceType.stubPrefixLabel')}
-					value={stubPrefix()}
-					onInput={(e: InputEventAndTarget) => setStubPrefix(e.currentTarget.value)}
-				/>
-				<input
-					placeholder={t('deviceType.stubCount')}
-					aria-label={t('deviceType.stubCountLabel')}
-					inputmode="numeric"
-					value={stubCount()}
-					onInput={(e: InputEventAndTarget) => setStubCount(e.currentTarget.value)}
-				/>
-				<button type="submit">{t('deviceType.addStub')}</button>
-			</form>
+			<Show when={canWrite()}>
+				<form onSubmit={handleCreateStub}>
+					<input
+						placeholder={t('deviceType.stubPrefixPlaceholder')}
+						aria-label={t('deviceType.stubPrefixLabel')}
+						value={stubPrefix()}
+						onInput={(e: InputEventAndTarget) => setStubPrefix(e.currentTarget.value)}
+					/>
+					<input
+						placeholder={t('deviceType.stubCount')}
+						aria-label={t('deviceType.stubCountLabel')}
+						inputmode="numeric"
+						value={stubCount()}
+						onInput={(e: InputEventAndTarget) => setStubCount(e.currentTarget.value)}
+					/>
+					<button type="submit">{t('deviceType.addStub')}</button>
+				</form>
+			</Show>
 			<DataTable
 				rows={() => stubs() ?? []}
 				getRowId={(s: StubRow): number => s.id}
 				columns={stubColumns}
 				showColumnCustomizer
-				rowActions={(s: StubRow): JSX.Element => (
-					<button type="button" class="btn-danger" onClick={() => handleDeleteStub(s.id)}>
-						{t('common.delete')}
-					</button>
-				)}
+				rowActions={
+					canWrite()
+						? (s: StubRow): JSX.Element => (
+								<button
+									type="button"
+									class="btn-danger"
+									onClick={() => handleDeleteStub(s.id)}
+								>
+									{t('common.delete')}
+								</button>
+							)
+						: undefined
+				}
 				loading={() => stubs.loading}
 				loadingContent={<Loading message={t('deviceType.loadingStubs')} />}
 				emptyContent={<Empty message={t('deviceType.noStubs')} />}

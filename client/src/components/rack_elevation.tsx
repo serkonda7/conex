@@ -289,6 +289,8 @@ function ShelfDevices(props: {
 	chips_only?: boolean
 	/** Extra hover actions (U-mounting into an usable mount). */
 	mount_actions?: JSX.Element
+	/** Hide the remove / add / select actions. */
+	readonly?: boolean
 }): JSX.Element {
 	const label = (): string => shelf_name(props.shelf)
 	return (
@@ -309,21 +311,23 @@ function ShelfDevices(props: {
 						>
 							{device.name}
 						</a>
-						<button
-							type="button"
-							class="rack-shelf-device-remove"
-							aria-label={t('elevation.removeFromShelf', { name: device.name })}
-							title={t('elevation.removeFromShelfTitle', { name: device.name })}
-							onClick={() =>
-								props.actions.on_remove_shelf_device(device, props.shelf)
-							}
-						>
-							×
-						</button>
+						<Show when={props.readonly !== true}>
+							<button
+								type="button"
+								class="rack-shelf-device-remove"
+								aria-label={t('elevation.removeFromShelf', { name: device.name })}
+								title={t('elevation.removeFromShelfTitle', { name: device.name })}
+								onClick={() =>
+									props.actions.on_remove_shelf_device(device, props.shelf)
+								}
+							>
+								×
+							</button>
+						</Show>
 					</li>
 				)}
 			</For>
-			<Show when={!props.chips_only}>
+			<Show when={!props.chips_only && props.readonly !== true}>
 				<li class="rack-shelf-device-actions">
 					<button
 						type="button"
@@ -365,6 +369,8 @@ export function RackElevation(props: {
 	on_add_device: (u: number, face: RackFace) => void
 	on_add_shelf: (u: number, face: RackFace) => void
 	shelf_actions: ShelfDeviceActions
+	/** Read-only session: no add / select / remove actions. */
+	readonly?: boolean
 }): JSX.Element {
 	const topU = (): number => (props.units.length > 0 ? (props.units[0] as ElevationUnit).u : 0)
 	return (
@@ -430,84 +436,94 @@ export function RackElevation(props: {
 														}}
 													>
 														<span class="rack-u-body">
-															<div class="rack-free-actions">
-																<button
-																	type="button"
-																	class="rack-free-btn"
-																	aria-label={t(
-																		'elevation.selectDevice',
-																	)}
-																	title={t(
-																		'elevation.selectDeviceAt',
-																		{
-																			unit: u_label(
+															<Show when={props.readonly !== true}>
+																<div class="rack-free-actions">
+																	<button
+																		type="button"
+																		class="rack-free-btn"
+																		aria-label={t(
+																			'elevation.selectDevice',
+																		)}
+																		title={t(
+																			'elevation.selectDeviceAt',
+																			{
+																				unit: u_label(
+																					segment.u,
+																				),
+																				face: faceLabel(
+																					face,
+																				),
+																			},
+																		)}
+																		onClick={() => {
+																			props.on_select_u(
 																				segment.u,
-																			),
-																			face: faceLabel(face),
-																		},
-																	)}
-																	onClick={() => {
-																		props.on_select_u(
-																			segment.u,
-																			face,
-																		)
-																		props.on_select_device(
-																			segment.u,
-																			face,
-																		)
-																	}}
-																>
-																	{t('elevation.selectDevice')}
-																</button>
-																<button
-																	type="button"
-																	class="rack-free-btn"
-																	aria-label={t(
-																		'elevation.addDevice',
-																	)}
-																	title={t(
-																		'elevation.addDeviceAt',
-																		{
-																			unit: u_label(
+																				face,
+																			)
+																			props.on_select_device(
 																				segment.u,
-																			),
-																			face: faceLabel(face),
-																		},
-																	)}
-																	onClick={() =>
-																		props.on_add_device(
-																			segment.u,
-																			face,
-																		)
-																	}
-																>
-																	{t('elevation.addDevice')}
-																</button>
-																<button
-																	type="button"
-																	class="rack-free-btn"
-																	aria-label={t(
-																		'elevation.addShelf',
-																	)}
-																	title={t(
-																		'elevation.addShelfAt',
-																		{
-																			unit: u_label(
+																				face,
+																			)
+																		}}
+																	>
+																		{t(
+																			'elevation.selectDevice',
+																		)}
+																	</button>
+																	<button
+																		type="button"
+																		class="rack-free-btn"
+																		aria-label={t(
+																			'elevation.addDevice',
+																		)}
+																		title={t(
+																			'elevation.addDeviceAt',
+																			{
+																				unit: u_label(
+																					segment.u,
+																				),
+																				face: faceLabel(
+																					face,
+																				),
+																			},
+																		)}
+																		onClick={() =>
+																			props.on_add_device(
 																				segment.u,
-																			),
-																			face: faceLabel(face),
-																		},
-																	)}
-																	onClick={() =>
-																		props.on_add_shelf(
-																			segment.u,
-																			face,
-																		)
-																	}
-																>
-																	{t('elevation.addShelf')}
-																</button>
-															</div>
+																				face,
+																			)
+																		}
+																	>
+																		{t('elevation.addDevice')}
+																	</button>
+																	<button
+																		type="button"
+																		class="rack-free-btn"
+																		aria-label={t(
+																			'elevation.addShelf',
+																		)}
+																		title={t(
+																			'elevation.addShelfAt',
+																			{
+																				unit: u_label(
+																					segment.u,
+																				),
+																				face: faceLabel(
+																					face,
+																				),
+																			},
+																		)}
+																		onClick={() =>
+																			props.on_add_shelf(
+																				segment.u,
+																				face,
+																			)
+																		}
+																	>
+																		{t('elevation.addShelf')}
+																	</button>
+																</div>
+															</Show>
 														</span>
 													</li>
 												</>
@@ -558,76 +574,83 @@ export function RackElevation(props: {
 															</a>
 															<ShelfDevices
 																shelf={s}
+																readonly={props.readonly}
 																actions={props.shelf_actions}
 																chips_only
 															/>
 														</Show>
-														<div class="rack-mount-actions">
-															<button
-																type="button"
-																class="rack-free-btn"
-																aria-label={t(
-																	'elevation.addChildDevice',
-																)}
-																title={t(
-																	'elevation.addChildDeviceTitle',
-																	{
-																		unit: u_label(segment.u),
-																		face: faceLabel(face),
-																	},
-																)}
-																onClick={() =>
-																	props.on_add_device(
-																		segment.u,
-																		face,
-																	)
-																}
-															>
-																{t('elevation.addDevice')}
-															</button>
-															<button
-																type="button"
-																class="rack-free-btn"
-																aria-label={t(
-																	'elevation.selectChildDevice',
-																)}
-																title={t(
-																	'elevation.selectChildDeviceTitle',
-																	{
-																		unit: u_label(segment.u),
-																		face: faceLabel(face),
-																	},
-																)}
-																onClick={() =>
-																	props.on_select_device(
-																		segment.u,
-																		face,
-																	)
-																}
-															>
-																{t('elevation.selectDevice')}
-															</button>
-															<button
-																type="button"
-																class="rack-free-btn"
-																aria-label={t(
-																	'elevation.selectDeviceForShelf',
-																)}
-																title={t(
-																	'elevation.selectDeviceForShelfTitle',
-																	{
-																		name: shelf_name(s),
-																	},
-																)}
-																onClick={() =>
-																	props.shelf_actions.on_select_shelf_device(
-																		s,
-																	)
-																}
-															>
-																{t('elevation.onShelf')}
-															</button>
-														</div>
+														<Show when={props.readonly !== true}>
+															<div class="rack-mount-actions">
+																<button
+																	type="button"
+																	class="rack-free-btn"
+																	aria-label={t(
+																		'elevation.addChildDevice',
+																	)}
+																	title={t(
+																		'elevation.addChildDeviceTitle',
+																		{
+																			unit: u_label(
+																				segment.u,
+																			),
+																			face: faceLabel(face),
+																		},
+																	)}
+																	onClick={() =>
+																		props.on_add_device(
+																			segment.u,
+																			face,
+																		)
+																	}
+																>
+																	{t('elevation.addDevice')}
+																</button>
+																<button
+																	type="button"
+																	class="rack-free-btn"
+																	aria-label={t(
+																		'elevation.selectChildDevice',
+																	)}
+																	title={t(
+																		'elevation.selectChildDeviceTitle',
+																		{
+																			unit: u_label(
+																				segment.u,
+																			),
+																			face: faceLabel(face),
+																		},
+																	)}
+																	onClick={() =>
+																		props.on_select_device(
+																			segment.u,
+																			face,
+																		)
+																	}
+																>
+																	{t('elevation.selectDevice')}
+																</button>
+																<button
+																	type="button"
+																	class="rack-free-btn"
+																	aria-label={t(
+																		'elevation.selectDeviceForShelf',
+																	)}
+																	title={t(
+																		'elevation.selectDeviceForShelfTitle',
+																		{
+																			name: shelf_name(s),
+																		},
+																	)}
+																	onClick={() =>
+																		props.shelf_actions.on_select_shelf_device(
+																			s,
+																		)
+																	}
+																>
+																	{t('elevation.onShelf')}
+																</button>
+															</div>
+														</Show>
 													</li>
 												</>
 											)
@@ -700,6 +723,7 @@ export function RackElevation(props: {
 																	</a>
 																	<ShelfDevices
 																		shelf={s}
+																		readonly={props.readonly}
 																		actions={
 																			props.shelf_actions
 																		}
@@ -716,6 +740,7 @@ export function RackElevation(props: {
 																	</span>
 																	<ShelfDevices
 																		shelf={s}
+																		readonly={props.readonly}
 																		actions={
 																			props.shelf_actions
 																		}
@@ -763,6 +788,7 @@ export function RackElevation(props: {
 																>
 																	<ShelfDevices
 																		shelf={s}
+																		readonly={props.readonly}
 																		actions={
 																			props.shelf_actions
 																		}
