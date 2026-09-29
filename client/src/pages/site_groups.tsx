@@ -32,8 +32,8 @@ import { canWrite } from '../session'
 import { inTenantContext, tenantContext, tenantContextFilters } from '../tenant_context'
 
 /**
- * /site-groups — NetBox-style site group list: search, sortable columns,
- * parent column, row selection with bulk delete, and icon actions with
+ * /site-groups — flat site group list: search, sortable columns,
+ * row selection with bulk delete, and icon actions with
  * delete in a row menu. Editing lives on the dedicated
  * /site-groups/:id/edit page. The whole result set renders at once
  * (API cap: 200).
@@ -87,20 +87,6 @@ export function SiteGroupsPage(): JSX.Element {
 		return tenants()?.find((row: TenantRow) => row.id === id)?.name ?? String(id)
 	}
 
-	// Id → name map for the Parent column, resolved from the same result set.
-	const parentNameOf = createMemo(() => {
-		const byId = new Map<number, string>()
-		for (const g of rows()) {
-			byId.set(g.id, g.name)
-		}
-		return (id: number | null): string => {
-			if (id === null || id === undefined) {
-				return '—'
-			}
-			return byId.get(id) ?? String(id)
-		}
-	})
-
 	const columns: DataTableColumn<SiteGroupRow>[] = [
 		{
 			key: 'name',
@@ -123,11 +109,6 @@ export function SiteGroupsPage(): JSX.Element {
 			getValue: (g: SiteGroupRow): JSX.Element => (
 				<span title={g.description ?? ''}>{g.description || '—'}</span>
 			),
-		},
-		{
-			key: 'parent',
-			label: t('siteGroup.parent'),
-			getValue: (g: SiteGroupRow): string => parentNameOf()(g.parent_id),
 		},
 		{
 			key: 'tenant',

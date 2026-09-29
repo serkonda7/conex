@@ -23,5 +23,4 @@ export const siteGroupsApp = makeTenantApp({
 	get: getSiteGroup,
 	update: updateSiteGroup,
 	remove: deleteSiteGroup,
-	filters: (q: { parent?: number }) => ({ parent: q.parent }),
 })

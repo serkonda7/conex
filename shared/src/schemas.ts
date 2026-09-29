@@ -94,9 +94,6 @@ const NullableIdSchema = v.optional(v.nullable(IdSchema), undefined)
 /** Maximum nesting depth of the location tree (root counts as depth 1). */
 export const MAX_LOCATION_DEPTH = 5
 
-/** Maximum nesting depth of the site-group tree (root counts as depth 1). */
-export const MAX_SITE_GROUP_DEPTH = 5
-
 /** Tenant groups are flat: a named bundle of tenants, no parent. */
 export const TenantGroupCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -180,7 +177,6 @@ export const SiteGroupCreateSchema = v.strictObject({
 	name: NameSchema,
 	slug: SlugSchema,
 	tenant_id: NullableIdSchema,
-	parent_id: NullableIdSchema,
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
@@ -189,7 +185,6 @@ export const SiteGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	slug: v.optional(SlugSchema, undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	parent_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -274,7 +269,6 @@ export const SiteGroupListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
-	parent: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

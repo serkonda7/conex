@@ -32,7 +32,7 @@ const TABLES: { table: PgTable; parentKey?: string }[] = [
 	{ table: schema.users },
 	{ table: schema.sessions },
 	{ table: schema.auth_states },
-	{ table: schema.site_groups, parentKey: 'parent_id' },
+	{ table: schema.site_groups },
 	{ table: schema.sites },
 	{ table: schema.locations, parentKey: 'parent_id' },
 	{ table: schema.manufacturers },
@@ -51,6 +51,16 @@ const TABLES: { table: PgTable; parentKey?: string }[] = [
  */
 const POSTGRES_ONLY_COLUMNS: Record<string, readonly string[]> = {
 	tenants: ['tenant_group_id'],
+}
+
+/**
+ * Columns dropped after the SQLite era: present in the snapshot but absent
+ * in Postgres, skipped on copy. `site_groups.parent_id` flattening turns
+ * nested groups into top-level groups; globally duplicate slugs then abort
+ * the migration with a unique violation instead of silently renaming.
+ */
+const SQLITE_ONLY_COLUMNS: Record<string, readonly string[]> = {
+	site_groups: ['parent_id'],
 }
 
 type Row = Record<string, unknown>
@@ -109,6 +119,7 @@ try {
 		const name = getTableName(table)
 		const columns = getTableColumns(table)
 		const postgresOnly = new Set(POSTGRES_ONLY_COLUMNS[name] ?? [])
+		const sqliteOnly = new Set(SQLITE_ONLY_COLUMNS[name] ?? [])
 		const expected = new Set(
 			Object.values(columns)
 				.map((c) => c.name)
@@ -123,7 +134,7 @@ try {
 			fail(`table "${name}" is missing in SQLite`)
 		}
 		const missing = [...expected].filter((c) => !present.has(c))
-		const extra = [...present].filter((c) => !expected.has(c))
+		const extra = [...present].filter((c) => !expected.has(c) && !sqliteOnly.has(c))
 		if (missing.length > 0 || extra.length > 0) {
 			fail(
 				`column mismatch in "${name}" (missing: ${missing.join(', ') || '-'}, extra: ${extra.join(', ') || '-'})`,
@@ -139,6 +150,9 @@ try {
 		const values = rows.map((row) => {
 			const out: Row = {}
 			for (const [column, value] of Object.entries(row)) {
+				if (sqliteOnly.has(column)) {
+					continue
+				}
 				out[keyByColumn.get(column) as string] = value
 			}
 			return out

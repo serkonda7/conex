@@ -4,7 +4,6 @@ import {
 	type LocationCreate,
 	type LocationUpdate,
 	MAX_LOCATION_DEPTH,
-	MAX_SITE_GROUP_DEPTH,
 	type SiteCreate,
 	type SiteGroupCreate,
 	type SiteGroupUpdate,
@@ -637,11 +636,10 @@ export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
 }
 
 // ---------------------------------------------------------------------------
-// Site groups (global nestable tree, no site scoping)
+// Site groups (flat, no nesting; they bundle sites but own no inventory)
 // ---------------------------------------------------------------------------
 
 export interface SiteGroupListParams extends ListParams, TenantFilterParams {
-	parent?: number
 	sort: 'name' | 'slug' | 'description'
 	order: 'asc' | 'desc'
 }
@@ -654,9 +652,6 @@ export async function listSiteGroups(params: SiteGroupListParams): Promise<Page<
 		conditions.push(
 			sql`(${site_groups.name} ILIKE ${pattern} ESCAPE '\\' OR ${site_groups.slug} ILIKE ${pattern} ESCAPE '\\')`,
 		)
-	}
-	if (params.parent) {
-		conditions.push(eq(site_groups.parent_id, params.parent))
 	}
 	conditions.push(...tenantConditions(site_groups.tenant_id, params))
 	const where = conditions.length > 0 ? and(...conditions) : undefined
@@ -689,9 +684,9 @@ export async function getSiteGroup(id: number): Promise<Result<SiteGroupRow, Err
 }
 
 async function slugUnderParentClash(
-	table: typeof site_groups | typeof locations,
-	parentCol: typeof site_groups.parent_id | typeof locations.parent_id,
-	slugCol: typeof site_groups.slug | typeof locations.slug,
+	table: typeof locations,
+	parentCol: typeof locations.parent_id,
+	slugCol: typeof locations.slug,
 	parentId: number | null,
 	slug: string,
 	excludeId?: number,
@@ -710,29 +705,6 @@ async function slugUnderParentClash(
 	return !!clash && clash.id !== excludeId
 }
 
-async function groupSlugClash(
-	parentId: number | null,
-	slug: string,
-	excludeId?: number,
-): Promise<boolean> {
-	return await slugUnderParentClash(
-		site_groups,
-		site_groups.parent_id,
-		site_groups.slug,
-		parentId,
-		slug,
-		excludeId,
-	)
-}
-
-/** Parent links of every site group, for depth/cycle checks. */
-async function groupParentMap(): Promise<Map<number, number | null>> {
-	const rows = await getDb()
-		.select({ id: site_groups.id, parent_id: site_groups.parent_id })
-		.from(site_groups)
-	return buildParentMap(rows)
-}
-
 export async function createSiteGroup(
 	input: SiteGroupCreate,
 ): Promise<Result<SiteGroupRow, Error>> {
@@ -740,30 +712,8 @@ export async function createSiteGroup(
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
-	const parentId = input.parent_id ?? null
-	const parents = await groupParentMap()
-	if (parentId !== null) {
-		if (!parents.has(parentId)) {
-			return Result.err(new NotFoundError('Parent site group not found'))
-		}
-		const parentDepth = depthOf(parentId, parents)
-		if (Result.isError(parentDepth)) {
-			return Result.err(new ConflictError(parentDepth.error.message))
-		}
-		if (parentDepth.value + 1 > MAX_SITE_GROUP_DEPTH) {
-			return Result.err(
-				new ConflictError(
-					`Site group hierarchy is limited to ${MAX_SITE_GROUP_DEPTH} levels`,
-				),
-			)
-		}
-	}
-	if (await groupSlugClash(parentId, input.slug)) {
-		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
-	}
 	const row: Omit<SiteGroupRow, 'id'> = {
 		tenant_id: input.tenant_id ?? null,
-		parent_id: parentId,
 		name: input.name,
 		slug: input.slug,
 		description: input.description ?? null,
@@ -779,9 +729,7 @@ export async function createSiteGroup(
 		return await getSiteGroup(inserted.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
-			return Result.err(
-				new DuplicateError('Site group slug is already used under this parent'),
-			)
+			return Result.err(new DuplicateError('Site group slug is already in use'))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
@@ -801,48 +749,12 @@ export async function updateSiteGroup(
 			return Result.err(tenantCheck.error)
 		}
 	}
-	const node = current.value
-	const effectiveParent = input.parent_id !== undefined ? input.parent_id : node.parent_id
-	const effectiveSlug = input.slug !== undefined ? input.slug : node.slug
-
-	if (effectiveParent !== undefined && effectiveParent !== null) {
-		const parents = await groupParentMap()
-		if (!parents.has(effectiveParent)) {
-			return Result.err(new NotFoundError('Parent site group not found'))
-		}
-		if (effectiveParent === id || createsCycle(id, effectiveParent, parents)) {
-			return Result.err(
-				new ConflictError('Cannot set a site group as its own parent or descendant'),
-			)
-		}
-		const parentDepth = depthOf(effectiveParent, parents)
-		if (Result.isError(parentDepth)) {
-			return Result.err(new ConflictError(parentDepth.error.message))
-		}
-		const rows = await getDb()
-			.select({ id: site_groups.id, parent_id: site_groups.parent_id })
-			.from(site_groups)
-		const subtreeGrowth = maxDescendantOffset(id, buildChildrenMap(rows))
-		if (parentDepth.value + 1 + subtreeGrowth > MAX_SITE_GROUP_DEPTH) {
-			return Result.err(
-				new ConflictError(
-					`Site group hierarchy is limited to ${MAX_SITE_GROUP_DEPTH} levels`,
-				),
-			)
-		}
-	}
-	if (await groupSlugClash(effectiveParent ?? null, effectiveSlug, id)) {
-		return Result.err(new DuplicateError('Site group slug is already used under this parent'))
-	}
 	const patch: Partial<SiteGroupRow> = {}
 	if (input.name !== undefined) {
 		patch.name = input.name
 	}
 	if (input.slug !== undefined) {
 		patch.slug = input.slug
-	}
-	if (input.parent_id !== undefined) {
-		patch.parent_id = input.parent_id
 	}
 	if (input.tenant_id !== undefined) {
 		patch.tenant_id = input.tenant_id
@@ -858,9 +770,7 @@ export async function updateSiteGroup(
 			await getDb().update(site_groups).set(patch).where(eq(site_groups.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
-				return Result.err(
-					new DuplicateError('Site group slug is already used under this parent'),
-				)
+				return Result.err(new DuplicateError('Site group slug is already in use'))
 			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
@@ -874,14 +784,6 @@ export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, 
 		return current
 	}
 	const db = getDb()
-	const child = (
-		await db.select().from(site_groups).where(eq(site_groups.parent_id, id)).limit(1)
-	)[0]
-	if (child) {
-		return Result.err(
-			new ConflictError('Site group still has child groups; move or delete them first'),
-		)
-	}
 	const siteChild = (await db.select().from(sites).where(eq(sites.site_group_id, id)).limit(1))[0]
 	if (siteChild) {
 		return Result.err(

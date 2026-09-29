@@ -9,21 +9,16 @@ import type { Crumb } from './router'
 /** Guards the parent walks against cycles in bad data. */
 const MAX_DEPTH = 32
 
-/** The site group `id` and its ancestors, outermost first. */
+/** The site group `id` as a single crumb (site groups are flat). */
 export async function siteGroupTrail(id: number | null): Promise<Crumb[]> {
-	const trail: Crumb[] = []
-	const seen = new Set<number>()
-	let next = id
-	while (next !== null && !seen.has(next) && seen.size < MAX_DEPTH) {
-		seen.add(next)
-		const res = await fetch_site_group(next)
-		if (Result.isError(res)) {
-			break
-		}
-		trail.unshift({ label: res.value.name, href: `/site-groups/${res.value.id}` })
-		next = res.value.parent_id
+	if (id === null) {
+		return []
 	}
-	return trail
+	const res = await fetch_site_group(id)
+	if (Result.isError(res)) {
+		return []
+	}
+	return [{ label: res.value.name, href: `/site-groups/${res.value.id}` }]
 }
 
 /** The location `id` and its ancestors within the site, outermost first. */

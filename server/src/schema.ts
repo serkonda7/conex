@@ -95,24 +95,21 @@ export const tenants = pgTable(
 	],
 )
 
+// Site groups are flat (no nesting): a named bundle of sites. Slug is
+// globally unique, like tenant groups.
 export const site_groups = pgTable(
 	'site_groups',
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
-		parent_id: integer('parent_id').references((): AnyPgColumn => site_groups.id),
 		name: text('name').notNull(),
-		// Slug is unique per parent (service-enforced; Postgres treats NULL
-		// parents as distinct so a composite unique index cannot cover roots).
-		slug: text('slug').notNull(),
+		slug: text('slug').notNull().unique(),
 		description: text('description'),
 		comments: text('comments'),
 	},
 	(table) => [
 		index('site_groups_tenant_id_idx').on(table.tenant_id),
-		index('site_groups_parent_id_idx').on(table.parent_id),
 		index('site_groups_name_idx').on(table.name),
-		uniqueIndex('site_groups_sibling_slug_idx').on(table.parent_id, table.slug),
 	],
 )
 

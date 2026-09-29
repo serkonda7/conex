@@ -330,7 +330,6 @@ export async function delete_location(id: number): Promise<Result<unknown, Error
 export interface SiteGroupRow {
 	id: number
 	tenant_id: number | null
-	parent_id: number | null
 	name: string
 	slug: string
 	description: string | null
@@ -356,7 +355,6 @@ export async function fetch_site_groups(
 				limit: filters?.limit ?? 200,
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
-				parent: filters?.parent,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),
@@ -378,7 +376,6 @@ export async function create_site_group(
 			name: input.name,
 			slug: input.slug,
 			tenant_id: input.tenant_id,
-			parent_id: input.parent_id,
 			description: input.description || undefined,
 			comments: input.comments || undefined,
 		},

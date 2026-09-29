@@ -4,10 +4,8 @@ import { createMemo, createResource, createSignal } from 'solid-js'
 import {
 	delete_site_group,
 	fetch_site_group,
-	fetch_site_groups,
 	fetch_sites,
 	fetch_tenant,
-	type SiteGroupRow,
 	type SiteRow,
 } from '../api_tenancy'
 import { DataTable } from '../components/data_table'
@@ -23,11 +21,10 @@ import {
 } from '../components/detail_page'
 import { t, tp } from '../i18n'
 import { goTo } from '../router'
-import { siteGroupTrail } from '../trails'
 
 /**
- * /site-groups/:id — site group detail: header with slug, parent
- * breadcrumb, detail grid, and the child-groups / sites-in-group tables.
+ * /site-groups/:id — flat site group detail: header with slug,
+ * detail grid, and the sites-in-group table.
  */
 export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -44,7 +41,6 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 			return res.value
 		},
 	)
-	const parentId = createMemo(() => group()?.parent_id ?? null)
 	const tenantId = createMemo(() => group()?.tenant_id ?? null)
 	const [tenant] = createResource(tenantId, async (id: number | null) => {
 		if (!id) {
@@ -57,29 +53,6 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 		}
 		return res.value
 	})
-	const [trail] = createResource(parentId, siteGroupTrail)
-	const [parent] = createResource(parentId, async (id: number | null) => {
-		if (!id) {
-			return null
-		}
-		const res = await fetch_site_group(id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return null
-		}
-		return res.value
-	})
-	const [children] = createResource(
-		() => props.id,
-		async (id: number) => {
-			const res = await fetch_site_groups({ parent: id })
-			if (Result.isError(res)) {
-				setError(res.error.message)
-				return []
-			}
-			return res.value.items
-		},
-	)
 	const [sites] = createResource(
 		() => props.id,
 		async (id: number) => {
@@ -101,14 +74,12 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/site-groups',
 	})
 
-	const childCount = (): number => children()?.length ?? 0
 	const siteCount = (): number => sites()?.length ?? 0
 
 	return (
 		<div>
 			<DetailShell
 				name={group()?.name}
-				crumbs={trail()}
 				loading={group.loading}
 				loadingText={t('siteGroup.loadingOne')}
 				record={group()}
@@ -136,58 +107,12 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 							href={`/tenants/${tenantId() ?? ''}`}
 						/>
 					</dd>
-					<dt>{t('siteGroup.parent')}</dt>
-					<dd>
-						<ForeignKeyLink
-							id={parentId()}
-							loading={parent.loading}
-							name={parent()?.name}
-							href={`/site-groups/${parentId() ?? ''}`}
-						/>
-					</dd>
 					<dt>{t('common.description')}</dt>
 					<dd>{group()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>{group()?.comments || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
-
-			<RelatedSection
-				id="site-group-children"
-				title={t('siteGroup.children')}
-				count={childCount()}
-				loading={children.loading}
-				loadingText={t('siteGroup.loadingChildren')}
-				emptyText={t('siteGroup.noChildren')}
-				hasItems={childCount() > 0}
-			>
-				<DataTable
-					rows={() => children() ?? []}
-					getRowId={(g: SiteGroupRow): number => g.id}
-					showColumnCustomizer
-					columns={[
-						{
-							key: 'name',
-							label: t('common.name'),
-							getValue: (g: SiteGroupRow): JSX.Element => (
-								<a
-									href={`/site-groups/${g.id}`}
-									onClick={(e: MouseEvent): void =>
-										goTo(e, `/site-groups/${g.id}`)
-									}
-								>
-									{g.name}
-								</a>
-							),
-						},
-						{
-							key: 'slug',
-							label: t('common.slug'),
-							getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
-						},
-					]}
-				/>
-			</RelatedSection>
 
 			<RelatedSection
 				id="site-group-sites"

@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
-import { create_site_group, fetch_site_groups, fetch_tenants } from '../api_tenancy'
+import { create_site_group, fetch_tenants } from '../api_tenancy'
 import {
 	FormActions,
 	FormError,
@@ -22,10 +22,9 @@ import {
 	use_slug_fields,
 } from '../util/form'
 
-/** /site-groups/add — NetBox-style site group create form. */
+/** /site-groups/add — flat site group create form. */
 export function SiteGroupAddPage(): JSX.Element {
 	const slugFields = use_slug_fields()
-	const [parentId, setParentId] = createSignal('')
 	// A single-tenant context preselects that tenant.
 	const [tenantId, setTenantId] = createSignal(contextTenantValue())
 	const [description, setDescription] = createSignal('')
@@ -33,7 +32,6 @@ export function SiteGroupAddPage(): JSX.Element {
 	const [formError, setFormError] = createSignal<string | null>(null)
 	const [saving, setSaving] = createSignal(false)
 
-	const [groups] = createResource(() => load_rows(fetch_site_groups, setFormError))
 	const [tenants] = createResource(() => load_rows(fetch_tenants, setFormError))
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -46,7 +44,6 @@ export function SiteGroupAddPage(): JSX.Element {
 					name: values.name,
 					slug: values.slug,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
-					parent_id: parentId() ? Number(parentId()) : null,
 					description: description().trim() || undefined,
 					comments: comments().trim() || undefined,
 				}),
@@ -79,14 +76,6 @@ export function SiteGroupAddPage(): JSX.Element {
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
 				emptyLabel={t('common.noTenant')}
-			/>
-			<SelectField
-				id="site-group-parent"
-				label={t('siteGroup.parent')}
-				value={parentId()}
-				onChange={setParentId}
-				options={row_options(groups() ?? [])}
-				emptyLabel={t('site.topLevel')}
 			/>
 			<TextField
 				id="site-group-description"

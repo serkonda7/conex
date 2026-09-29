@@ -43,6 +43,13 @@
       "when": 1790677247069,
       "tag": "0005_drop_integration_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790681073884,
+      "tag": "0006_flat_site_groups",
+      "breakpoints": true
     }
   ]
 }

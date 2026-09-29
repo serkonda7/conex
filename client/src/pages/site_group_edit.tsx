@@ -1,12 +1,7 @@
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal } from 'solid-js'
-import {
-	fetch_site_group,
-	fetch_site_groups,
-	fetch_tenants,
-	update_site_group,
-} from '../api_tenancy'
+import { fetch_site_group, fetch_tenants, update_site_group } from '../api_tenancy'
 import {
 	EditActions,
 	EditPageShell,
@@ -26,20 +21,10 @@ import { type FormValues, submit_edit, useEditForm } from '../util/form'
 export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [slug, setSlug] = createSignal('')
-	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const { formError, setFormError, saving, setSaving, loaded, setLoaded } = useEditForm()
-
-	const [groups] = createResource(async () => {
-		const res = await fetch_site_groups()
-		if (Result.isError(res)) {
-			setFormError(res.error.message)
-			return []
-		}
-		return res.value.items
-	})
 
 	const [tenants] = createResource(async () => {
 		const res = await fetch_tenants()
@@ -61,7 +46,6 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 			setName(res.value.name)
 			setSlug(res.value.slug)
 			setTenantId(res.value.tenant_id ? String(res.value.tenant_id) : '')
-			setParentId(res.value.parent_id ? String(res.value.parent_id) : '')
 			setDescription(res.value.description ?? '')
 			setComments(res.value.comments ?? '')
 			setLoaded(true)
@@ -79,7 +63,6 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 					name: values.name,
 					slug: values.slug,
 					tenant_id: tenantId() ? Number(tenantId()) : null,
-					parent_id: parentId() ? Number(parentId()) : null,
 					description: description().trim() === '' ? null : description().trim(),
 					comments: comments().trim() === '' ? null : comments().trim(),
 				}),
@@ -117,14 +100,6 @@ export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 				onChange={setTenantId}
 				options={row_options(tenants() ?? [])}
 				emptyLabel={t('common.noTenant')}
-			/>
-			<SelectField
-				id="site-group-edit-parent"
-				label={t('siteGroup.parent')}
-				value={parentId()}
-				onChange={setParentId}
-				options={row_options((groups() ?? []).filter((g) => g.id !== props.id))}
-				emptyLabel={t('site.topLevel')}
 			/>
 			<TextField
 				id="site-group-edit-description"

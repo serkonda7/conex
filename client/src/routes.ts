@@ -102,8 +102,6 @@ export const SECTIONS: readonly Section[] = [
 		path: 'tenants',
 		noun: (n: number): string => tp('entity.tenant', n),
 		icon: IconUsers,
-		// Picked and added through the top-bar tenant selector instead.
-		hideInNav: true,
 		list: TenantsPage,
 		add: TenantAddPage,
 		detail: TenantDetailPage,

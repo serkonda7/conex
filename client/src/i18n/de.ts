@@ -240,7 +240,6 @@ export const de: Messages = {
 	'site.noDevices': 'Für diesen Standort sind noch keine Geräte vorhanden.',
 
 	// siteGroup
-	'siteGroup.parent': 'Übergeordnete Gruppe',
 	'siteGroup.empty': 'Noch keine Standortgruppen vorhanden. Fügen Sie oben die erste hinzu.',
 	'siteGroup.addTitle': 'Neue Standortgruppe hinzufügen',
 	'siteGroup.editTitle': 'Standortgruppe bearbeiten',
@@ -249,9 +248,6 @@ export const de: Messages = {
 	'siteGroup.slugPlaceholder': 'norddeutschland',
 	'siteGroup.notFound': 'Standortgruppe nicht gefunden.',
 	'siteGroup.details': 'Details der Standortgruppe',
-	'siteGroup.children': 'Untergruppen',
-	'siteGroup.loadingChildren': 'Untergruppen werden geladen…',
-	'siteGroup.noChildren': 'Noch keine Untergruppen vorhanden.',
 	'siteGroup.noSites': 'Noch keine Standorte in dieser Gruppe vorhanden.',
 
 	// location

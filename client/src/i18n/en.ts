@@ -236,7 +236,6 @@ export const en = {
 	'site.noDevices': 'No devices at this site yet.',
 
 	// siteGroup
-	'siteGroup.parent': 'Parent group',
 	'siteGroup.empty': 'No site groups yet. Add the first one above.',
 	'siteGroup.addTitle': 'Add a new site group',
 	'siteGroup.editTitle': 'Edit site group',
@@ -245,9 +244,6 @@ export const en = {
 	'siteGroup.slugPlaceholder': 'northern-germany',
 	'siteGroup.notFound': 'Site group not found.',
 	'siteGroup.details': 'Site group details',
-	'siteGroup.children': 'Child groups',
-	'siteGroup.loadingChildren': 'Loading child groups…',
-	'siteGroup.noChildren': 'No child groups yet.',
 	'siteGroup.noSites': 'No sites in this group yet.',
 
 	// location
