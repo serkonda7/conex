@@ -1,11 +1,10 @@
 import type { JSX } from 'solid-js'
-import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal } from 'solid-js'
 import { create_site, fetch_site_groups, fetch_tenants, type SiteGroupRow } from '../api_tenancy'
 import {
 	FormActions,
 	FormError,
 	FormPage,
-	Hint,
 	NameField,
 	row_options,
 	SelectField,

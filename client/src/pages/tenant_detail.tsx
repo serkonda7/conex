@@ -22,6 +22,7 @@ import {
 	RelatedSection,
 	useDetailDelete,
 } from '../components/detail_page'
+import { TenantIntegrationCards } from '../components/integration_cards'
 import { t, tp } from '../i18n'
 import { goTo } from '../router'
 
@@ -149,6 +150,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					<dt>{t('common.comments')}</dt>
 					<dd>{tenant()?.comments || '—'}</dd>
 				</DetailCard>
+				<TenantIntegrationCards tenantId={props.id} />
 			</DetailShell>
 
 			<RelatedSection

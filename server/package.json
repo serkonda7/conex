@@ -10,11 +10,12 @@
     "db:migrate-sqlite": "bun scripts/migrate-sqlite-to-postgres.ts"
   },
   "dependencies": {
-    "shared": "workspace:*",
+    "@hono/valibot-validator": "catalog:",
     "better-result": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "@hono/valibot-validator": "catalog:",
+    "shared": "workspace:*",
+    "tanss-api": "^0.2.1",
     "valibot": "catalog:"
   },
   "devDependencies": {

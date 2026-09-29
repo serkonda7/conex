@@ -29,6 +29,20 @@
       "when": 1790606436150,
       "tag": "0003_remove_site_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790675481503,
+      "tag": "0004_integrations",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790677247069,
+      "tag": "0005_drop_integration_settings",
+      "breakpoints": true
     }
   ]
 }

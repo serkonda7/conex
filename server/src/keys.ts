@@ -14,3 +14,11 @@ export function getSigningKey(): string {
 	const version = getConfig().auth.jwtKeyVersion
 	return derive(`conex:jwt:v${version}`, 32).toString('base64')
 }
+
+/**
+ * Encrypts stored integration secrets (`integrations/secrets.ts`). Changing
+ * `auth.appKey` makes stored secrets unreadable; admins re-enter them.
+ */
+export function getIntegrationKey(): Buffer {
+	return derive('conex:integrations:v1', 32)
+}

@@ -43,7 +43,7 @@ import {
 	type Section,
 	tabTitle,
 } from './routes'
-import { canWrite, setSessionRole } from './session'
+import { canWrite, setSessionRole, setSessionScoped } from './session'
 import { refreshTenantContext, setTenantContextScoped, tenantContext } from './tenant_context'
 
 const APP_TITLE = 'CoNetBox'
@@ -577,6 +577,7 @@ function App(): JSX.Element {
 
 	createEffect(() => {
 		setSessionRole(currentUser()?.role ?? null)
+		setSessionScoped(isScoped())
 	})
 
 	createEffect(() => {
@@ -797,7 +798,8 @@ function App(): JSX.Element {
 														}
 														label={section.noun(2)}
 														addHref={
-															section.add
+															section.add &&
+															section.hideAddInNav !== true
 																? `/${section.path}/add`
 																: undefined
 														}

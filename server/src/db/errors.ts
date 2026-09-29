@@ -54,3 +54,22 @@ export class ForbiddenError extends Error {
 		this.name = 'ForbiddenError'
 	}
 }
+
+/**
+ * Wrapped in a `Result.err` when input is well-formed but rejected, e.g.
+ * integration credentials the external system refused. Mapped to 422.
+ */
+export class ValidationError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = 'ValidationError'
+	}
+}
+
+/** Wrapped in a `Result.err` when an external system fails. Mapped to 502. */
+export class ExternalServiceError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = 'ExternalServiceError'
+	}
+}

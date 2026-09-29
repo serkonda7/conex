@@ -17,6 +17,7 @@ import {
 	IconLock,
 	IconMapPin,
 	IconNetwork,
+	IconPlugConnected,
 	IconServer,
 	IconTemplate,
 	IconUsers,
@@ -32,6 +33,10 @@ import { DeviceTypeEditPage } from './pages/device_type_edit'
 import { DeviceTypeImportPage } from './pages/device_type_import'
 import { DeviceTypesPage } from './pages/device_types'
 import { DevicesPage } from './pages/devices'
+import { IntegrationAddPage } from './pages/integration_add'
+import { IntegrationEditPage } from './pages/integration_edit'
+import { IntegrationReportPage } from './pages/integration_report'
+import { IntegrationsPage } from './pages/integrations'
 import { LocationAddPage } from './pages/location_add'
 import { LocationDetailPage } from './pages/location_detail'
 import { LocationEditPage } from './pages/location_edit'
@@ -82,6 +87,8 @@ export interface Section {
 	adminOnly?: boolean
 	/** Routed but left out of the sidebar (reached another way). */
 	hideInNav?: boolean
+	/** No sidebar "+" shortcut (the add page is reached from the list). */
+	hideAddInNav?: boolean
 	list?: Component
 	add?: Component
 	import?: Component
@@ -194,6 +201,17 @@ export const SECTIONS: readonly Section[] = [
 		noun: (): string => t('entity.topology'),
 		icon: IconNetwork,
 		list: TopologyPage,
+	},
+	{
+		path: 'integrations',
+		noun: (n: number): string => tp('entity.integration', n),
+		icon: IconPlugConnected,
+		// Admin-only setup, one integration per provider.
+		hideAddInNav: true,
+		list: IntegrationsPage,
+		add: IntegrationAddPage,
+		detail: IntegrationReportPage,
+		edit: IntegrationEditPage,
 	},
 	{
 		path: 'users',

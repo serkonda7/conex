@@ -729,6 +729,15 @@ tbody tr:last-child td {
 	border-color: var(--error);
 }
 
+/* Inline state text (integration connection errors, field mismatches). */
+.text-danger {
+	color: var(--error);
+}
+
+.text-success {
+	color: var(--success);
+}
+
 .btn-danger:hover {
 	background-color: var(--error-bg);
 	border-color: var(--error);

@@ -1,9 +1,11 @@
 import {
 	type AnyPgColumn,
 	bigint,
+	customType,
 	index,
 	integer,
 	pgTable,
+	primaryKey,
 	text,
 	uniqueIndex,
 } from 'drizzle-orm/pg-core'
@@ -390,4 +392,105 @@ export const cables = pgTable(
 		index('cables_b_interface_id_idx').on(table.b_interface_id),
 		index('cables_status_idx').on(table.status),
 	],
+)
+
+// ---------------------------------------------------------------------------
+// Integrations: read-only links to external systems (TANSS; UniFi and
+// servereye later). One row per provider in `integrations`; secrets are
+// AES-GCM encrypted with a key derived from `auth.appKey` (`keys.ts`) and
+// never leave the server. `external_links` maps conex tenants/devices to
+// external ids for every provider; `entity_id` is polymorphic (no FK), so
+// tenant/device deletes remove their links in the service layer.
+// `external_objects` is the last fetched snapshot the report runs against.
+// ---------------------------------------------------------------------------
+
+/**
+ * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
+ * stringifies first, and Bun's SQL driver then stores that string as a JSON
+ * string instead of an object.
+ */
+const jsonb = customType<{ data: unknown; driverData: unknown }>({
+	dataType: () => 'jsonb',
+	toDriver: (value: unknown): unknown => value,
+})
+
+export const integrations = pgTable('integrations', {
+	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+	provider: text('provider').notNull().unique(),
+	base_url: text('base_url').notNull(),
+	username: text('username').notNull(),
+	// `v1.<iv>.<ciphertext+tag>` (base64) of the JSON secrets object.
+	secrets: text('secrets').notNull(),
+	enabled: integer('enabled').notNull().default(1),
+	created_by: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+	created_at: bigint('created_at', { mode: 'number' }).notNull(),
+	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+	last_login_ok_at: bigint('last_login_ok_at', { mode: 'number' }),
+	last_error: text('last_error'),
+})
+
+export const external_links = pgTable(
+	'external_links',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		provider: text('provider').notNull(),
+		// `tenant` | `device` (service-enforced).
+		entity_type: text('entity_type').notNull(),
+		// conex id; NULL when `state = 'ignored'`.
+		entity_id: integer('entity_id'),
+		external_id: text('external_id').notNull(),
+		external_tenant_id: text('external_tenant_id'),
+		// `linked` | `ignored`; `method` is `manual` | `auto`.
+		state: text('state').notNull().default('linked'),
+		method: text('method').notNull().default('manual'),
+		created_by: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+		created_at: bigint('created_at', { mode: 'number' }).notNull(),
+	},
+	(table) => [
+		uniqueIndex('external_links_external_idx').on(
+			table.provider,
+			table.entity_type,
+			table.external_id,
+		),
+		index('external_links_entity_idx').on(table.entity_type, table.entity_id),
+	],
+)
+
+export const external_objects = pgTable(
+	'external_objects',
+	{
+		provider: text('provider').notNull(),
+		// `tenant` | `device`.
+		object_type: text('object_type').notNull(),
+		external_id: text('external_id').notNull(),
+		external_tenant_id: text('external_tenant_id'),
+		// Normalized record (`ExternalTenantJson` / `ExternalDeviceJson`).
+		data: jsonb('data').notNull(),
+		fetched_at: bigint('fetched_at', { mode: 'number' }).notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.provider, table.object_type, table.external_id] }),
+		index('external_objects_tenant_idx').on(
+			table.provider,
+			table.object_type,
+			table.external_tenant_id,
+		),
+	],
+)
+
+export const sync_runs = pgTable(
+	'sync_runs',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		provider: text('provider').notNull(),
+		// NULL = all linked tenants.
+		tenant_id: integer('tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
+		started_at: bigint('started_at', { mode: 'number' }).notNull(),
+		finished_at: bigint('finished_at', { mode: 'number' }),
+		// `running` | `ok` | `error`.
+		state: text('state').notNull(),
+		error: text('error'),
+		counts: jsonb('counts'),
+	},
+	(table) => [index('sync_runs_provider_idx').on(table.provider, table.started_at)],
 )

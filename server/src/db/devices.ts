@@ -11,6 +11,7 @@ import {
 	device_type_interfaces,
 	device_types,
 	devices,
+	external_links,
 	interfaces,
 	locations,
 	racks,
@@ -597,6 +598,11 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 	try {
 		await getDb().transaction(async (tx) => {
 			await tx.delete(interfaces).where(eq(interfaces.device_id, id))
+			await tx
+				.delete(external_links)
+				.where(
+					and(eq(external_links.entity_type, 'device'), eq(external_links.entity_id, id)),
+				)
 			await tx.delete(devices).where(eq(devices.id, id))
 		})
 	} catch (e) {

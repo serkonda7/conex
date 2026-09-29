@@ -3,10 +3,12 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { type AppConfig, initConfig, load_config_file } from './config'
 import { initDb } from './db'
+import { failInterruptedSyncs } from './integrations/sync'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
+import { integrationsApp } from './routes/integrations'
 import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
@@ -76,6 +78,7 @@ export function createApp() {
 			.route('/cables', cablesApp)
 			.route('/topology', topologyApp)
 			.route('/search', searchApp)
+			.route('/integrations', integrationsApp)
 	)
 }
 
@@ -114,6 +117,7 @@ if (import.meta.main) {
 	// Scheduled here and not at module scope, so it never keeps a test process alive.
 	await sweepExpired()
 	start_sweep(sweepExpired, SESSION_SWEEP_INTERVAL_MS)
+	await failInterruptedSyncs()
 
 	const server = Bun.serve({
 		hostname: '0.0.0.0',

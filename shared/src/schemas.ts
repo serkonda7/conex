@@ -1078,3 +1078,263 @@ export interface ImportResponse {
 	failed: number
 	rows: ImportRowResult[]
 }
+
+// ---------------------------------------------------------------------------
+// Integrations (TANSS; UniFi and servereye later). External systems are
+// read-only sources: conex links its tenants/devices to external objects and
+// reports where the data disagrees. See `docs/integrations.md`.
+// ---------------------------------------------------------------------------
+
+export const INTEGRATION_PROVIDERS = ['tanss'] as const
+
+export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
+
+export type IntegrationProvider = v.InferOutput<typeof IntegrationProviderSchema>
+
+const BaseUrlSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.url('Must be a URL'),
+	v.regex(/^https?:\/\//, 'Must start with http:// or https://'),
+	v.maxLength(500),
+	v.transform((raw) => raw.replace(/\/+$/, '')),
+)
+
+const IntegrationUsernameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+
+const SecretSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(4096))
+
+/**
+ * Integration create body. Saving logs in to the external system first; the
+ * row is only stored when the credentials work.
+ */
+export const IntegrationCreateSchema = v.strictObject({
+	provider: IntegrationProviderSchema,
+	base_url: BaseUrlSchema,
+	username: IntegrationUsernameSchema,
+	password: SecretSchema,
+	erp_token: SecretSchema,
+})
+
+/** Integration patch: omitted secrets keep the stored ones. */
+export const IntegrationUpdateSchema = v.strictObject({
+	base_url: v.optional(BaseUrlSchema, undefined),
+	username: v.optional(IntegrationUsernameSchema, undefined),
+	password: v.optional(SecretSchema, undefined),
+	erp_token: v.optional(SecretSchema, undefined),
+	enabled: v.optional(v.boolean(), undefined),
+})
+
+/**
+ * "Test connection" body: the unsaved form values. Missing secrets fall back
+ * to the stored ones of an existing integration.
+ */
+export const IntegrationTestSchema = v.strictObject({
+	base_url: BaseUrlSchema,
+	username: IntegrationUsernameSchema,
+	password: v.optional(SecretSchema, undefined),
+	erp_token: v.optional(SecretSchema, undefined),
+})
+
+export type IntegrationCreate = v.InferOutput<typeof IntegrationCreateSchema>
+export type IntegrationUpdate = v.InferOutput<typeof IntegrationUpdateSchema>
+export type IntegrationTest = v.InferOutput<typeof IntegrationTestSchema>
+
+export const IntegrationParamsSchema = v.object({ provider: IntegrationProviderSchema })
+
+export const IntegrationEntityParamsSchema = v.object({
+	provider: IntegrationProviderSchema,
+	id: IdSchema,
+})
+
+export const LinkEntityTypeSchema = v.picklist(['tenant', 'device'])
+
+export type LinkEntityType = v.InferOutput<typeof LinkEntityTypeSchema>
+
+const ExternalIdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+
+/** Links a conex tenant/device to an external object (replaces its old link). */
+export const ExternalLinkCreateSchema = v.strictObject({
+	entity_type: LinkEntityTypeSchema,
+	entity_id: IdSchema,
+	external_id: ExternalIdSchema,
+})
+
+/** Marks an external object as intentionally absent from conex. */
+export const ExternalIgnoreSchema = v.strictObject({
+	entity_type: LinkEntityTypeSchema,
+	external_id: ExternalIdSchema,
+})
+
+export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
+export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
+
+export const IntegrationSyncQuerySchema = v.object({
+	/** Sync only this tenant's company; omitted = all linked tenants. */
+	tenant: OptionalIdEntry,
+})
+
+export const ExternalTenantQuerySchema = v.object({
+	search: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ''),
+})
+
+export const IntegrationReportQuerySchema = v.object({
+	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
+})
+
+export type IntegrationReportQuery = v.InferOutput<typeof IntegrationReportQuerySchema>
+
+export type SyncRunState = 'running' | 'ok' | 'error'
+
+export interface SyncRunJson {
+	id: number
+	provider: IntegrationProvider
+	tenant_id: number | null
+	/** Unix seconds. */
+	started_at: number
+	finished_at: number | null
+	state: SyncRunState
+	error: string | null
+	counts: { tenants: number; devices: number; auto_linked: number }
+}
+
+/** Integration without secrets: only whether they are set. */
+export interface IntegrationJson {
+	id: number
+	provider: IntegrationProvider
+	base_url: string
+	username: string
+	has_password: boolean
+	has_erp_token: boolean
+	enabled: boolean
+	created_at: number
+	updated_at: number
+	last_login_ok_at: number | null
+	last_error: string | null
+	last_sync: SyncRunJson | null
+}
+
+/** Normalized external tenant (TANSS company). */
+export interface ExternalTenantJson {
+	external_id: string
+	/** TANSS customer number. */
+	display_id: string | null
+	name: string
+	active: boolean
+	/** Headquarter company of a branch. */
+	headquarter_id: string | null
+}
+
+/** External tenant plus the conex tenant it is linked to (picker rows). */
+export interface ExternalTenantListItem extends ExternalTenantJson {
+	linked_tenant_id: number | null
+	ignored: boolean
+}
+
+/** Normalized external device (TANSS PC/server). */
+export interface ExternalDeviceJson {
+	/** Type-prefixed, e.g. `pc:123`. */
+	external_id: string
+	external_tenant_id: string
+	kind: string
+	name: string
+	serial: string | null
+	asset_tag: string | null
+	manufacturer: string | null
+	model: string | null
+	macs: string[]
+	ips: string[]
+	active: boolean
+}
+
+export type ExternalLinkState = 'linked' | 'ignored'
+
+export interface ExternalLinkJson {
+	id: number
+	provider: IntegrationProvider
+	entity_type: LinkEntityType
+	entity_id: number | null
+	external_id: string
+	external_tenant_id: string | null
+	state: ExternalLinkState
+	method: 'manual' | 'auto'
+	created_by: number | null
+	created_at: number
+}
+
+export const DEVICE_COMPARE_FIELDS = [
+	'name',
+	'serial',
+	'asset_tag',
+	'manufacturer',
+	'model',
+] as const
+
+export type DeviceCompareField = (typeof DEVICE_COMPARE_FIELDS)[number]
+
+export const FINDING_KINDS = [
+	'tenant_unlinked',
+	'tenant_missing_in_conex',
+	'tenant_stale',
+	'tenant_inactive',
+	'tenant_name_mismatch',
+	'device_missing_in_conex',
+	'device_missing_in_external',
+	'device_suggestion',
+	'device_stale',
+	'device_tenant_mismatch',
+	'device_field_mismatch',
+	'device_status_mismatch',
+] as const
+
+export type FindingKind = (typeof FINDING_KINDS)[number]
+
+/** One consistency finding. Unused fields are null. */
+export interface IntegrationFinding {
+	kind: FindingKind
+	tenant_id: number | null
+	tenant_name: string | null
+	device_id: number | null
+	device_name: string | null
+	link_id: number | null
+	external_id: string | null
+	external_name: string | null
+	external_tenant_id: string | null
+	field: DeviceCompareField | null
+	local: string | null
+	remote: string | null
+}
+
+export interface IntegrationReport {
+	provider: IntegrationProvider
+	/** Finish time of the last successful sync (unix seconds), null = never. */
+	synced_at: number | null
+	findings: IntegrationFinding[]
+}
+
+/** Side-by-side value of one compared device field. */
+export interface FieldComparison {
+	field: DeviceCompareField
+	local: string | null
+	remote: string | null
+	equal: boolean
+}
+
+/** Integration card on the tenant detail page. */
+export interface TenantIntegrationStatus {
+	link: ExternalLinkJson | null
+	external: ExternalTenantJson | null
+	finding_counts: Partial<Record<FindingKind, number>>
+}
+
+/** Integration card on the device detail page. */
+export interface DeviceIntegrationStatus {
+	link: ExternalLinkJson | null
+	external: ExternalDeviceJson | null
+	fields: FieldComparison[]
+	/** Company linked to the device's tenant, if any. */
+	external_tenant: ExternalTenantJson | null
+	/** Unlinked, not ignored external devices of that company (link picker). */
+	candidates: ExternalDeviceJson[]
+}

@@ -4,7 +4,14 @@
  * Row types carry most enums as plain strings, so every label helper
  * accepts any string and falls back to the raw value for unknown ones.
  */
-import { LOCATION_TYPES, type LocationType } from 'shared/src/schemas'
+import {
+	type DeviceCompareField,
+	type FindingKind,
+	type IntegrationProvider,
+	LOCATION_TYPES,
+	type LocationType,
+	type SyncRunState,
+} from 'shared/src/schemas'
 import type { RackFormFactor } from '../api_templates'
 import type { UserRole } from '../api_users'
 import { type MessageKey, t } from '.'
@@ -101,4 +108,57 @@ export function locationTypeLabel(value: string): string {
 /** `<select>` options for built-in location types. */
 export function locationTypeOptions(): { value: LocationType; label: string }[] {
 	return LOCATION_TYPES.map((value) => ({ value, label: locationTypeLabel(value) }))
+}
+
+const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {
+	tanss: 'provider.tanss',
+}
+
+/** Integration provider name (`tanss` → TANSS). */
+export function providerLabel(value: string): string {
+	return lookup(PROVIDER_KEYS, value)
+}
+
+const SYNC_STATE_KEYS: Record<SyncRunState, MessageKey> = {
+	running: 'syncState.running',
+	ok: 'syncState.ok',
+	error: 'syncState.error',
+}
+
+/** Sync run state (`running` / `ok` / `error`). */
+export function syncStateLabel(value: string): string {
+	return lookup(SYNC_STATE_KEYS, value)
+}
+
+const FINDING_KEYS: Record<FindingKind, MessageKey> = {
+	tenant_unlinked: 'finding.tenant_unlinked',
+	tenant_missing_in_conex: 'finding.tenant_missing_in_conex',
+	tenant_stale: 'finding.tenant_stale',
+	tenant_inactive: 'finding.tenant_inactive',
+	tenant_name_mismatch: 'finding.tenant_name_mismatch',
+	device_missing_in_conex: 'finding.device_missing_in_conex',
+	device_missing_in_external: 'finding.device_missing_in_external',
+	device_suggestion: 'finding.device_suggestion',
+	device_stale: 'finding.device_stale',
+	device_tenant_mismatch: 'finding.device_tenant_mismatch',
+	device_field_mismatch: 'finding.device_field_mismatch',
+	device_status_mismatch: 'finding.device_status_mismatch',
+}
+
+/** Consistency finding kind (`device_missing_in_conex`, …). */
+export function findingKindLabel(value: string): string {
+	return lookup(FINDING_KEYS, value)
+}
+
+const COMPARE_FIELD_KEYS: Record<DeviceCompareField, MessageKey> = {
+	name: 'compareField.name',
+	serial: 'compareField.serial',
+	asset_tag: 'compareField.asset_tag',
+	manufacturer: 'compareField.manufacturer',
+	model: 'compareField.model',
+}
+
+/** Compared device field (`serial`, `asset_tag`, …). */
+export function compareFieldLabel(value: string): string {
+	return lookup(COMPARE_FIELD_KEYS, value)
 }

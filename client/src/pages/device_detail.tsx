@@ -21,6 +21,7 @@ import {
 	useDetailDelete,
 } from '../components/detail_page'
 import { EditPortDialog } from '../components/edit_port_dialog'
+import { DeviceIntegrationCards } from '../components/integration_cards'
 import { t, tp } from '../i18n'
 import { faceLabel } from '../i18n/labels'
 import { type Crumb, goTo } from '../router'
@@ -413,6 +414,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 					</dd>
 				</DetailCard>
+				<DeviceIntegrationCards deviceId={props.id} />
 			</DetailShell>
 			<h3 id="device-interfaces">
 				{t('device.networkPortsCount', { count: networkPorts().length })}

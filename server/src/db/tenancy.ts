@@ -16,6 +16,7 @@ import {
 } from 'shared/src/schemas'
 import {
 	devices,
+	external_links,
 	locations,
 	racks,
 	site_groups,
@@ -459,7 +460,14 @@ export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>
 		)
 	}
 	try {
-		await db.delete(tenants).where(eq(tenants.id, id))
+		await db.transaction(async (tx) => {
+			await tx
+				.delete(external_links)
+				.where(
+					and(eq(external_links.entity_type, 'tenant'), eq(external_links.entity_id, id)),
+				)
+			await tx.delete(tenants).where(eq(tenants.id, id))
+		})
 	} catch (e) {
 		return Result.err(errOf(e))
 	}

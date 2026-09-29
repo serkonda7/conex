@@ -389,8 +389,13 @@ export function FormError(props: { message: () => string | null }): JSX.Element 
 }
 
 /** Create actions, disabled while the form is saving. Cancel closes the tab
- * without refreshing so the underlying list keeps its exact contents. */
-export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.Element {
+ * without refreshing so the underlying list keeps its exact contents.
+ * `singleton` drops "Create & Add Another" for one-of-a-kind objects. */
+export function FormActions(props: {
+	saving: boolean
+	cancelTo: string
+	singleton?: boolean
+}): JSX.Element {
 	return (
 		<div class="form-actions">
 			<button
@@ -403,9 +408,11 @@ export function FormActions(props: { saving: boolean; cancelTo: string }): JSX.E
 			<button type="submit" name="action" value="create" disabled={props.saving}>
 				{props.saving ? t('common.creating') : t('common.create')}
 			</button>
-			<button type="submit" name="action" value="add-another" disabled={props.saving}>
-				{t('common.createAndAddAnother')}
-			</button>
+			<Show when={props.singleton !== true}>
+				<button type="submit" name="action" value="add-another" disabled={props.saving}>
+					{t('common.createAndAddAnother')}
+				</button>
+			</Show>
 		</div>
 	)
 }

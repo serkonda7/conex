@@ -41,6 +41,7 @@
         "drizzle-orm": "catalog:",
         "hono": "catalog:",
         "shared": "workspace:*",
+        "tanss-api": "^0.2.1",
         "valibot": "catalog:",
       },
       "devDependencies": {
@@ -573,6 +574,8 @@
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
 
     "source-map-support": ["source-map-support@0.5.21", "", { "dependencies": { "buffer-from": "^1.0.0", "source-map": "^0.6.0" } }, "sha512-uBHU3L3czsIyYXKX88fdrGovxdSCoTGDRZ6SYXtSRxLZUzHg5P/66Ht6uoUlHu9EZod+inXhKo3qQgwXUT/y1w=="],
+
+    "tanss-api": ["tanss-api@0.2.1", "", {}, "sha512-EHQxy0bkisburIo7MzS7RXKegoP+tyh2PYg93LA/udrzotxpvqRotm8SdHV3QD16G3DqeLSqWs21lvokWJFPrw=="],
 
     "tinyglobby": ["tinyglobby@0.2.17", "", { "dependencies": { "fdir": "^6.5.0", "picomatch": "^4.0.4" } }, "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g=="],
 

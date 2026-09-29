@@ -1,12 +1,19 @@
 import { Result } from 'better-result'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { ConflictError, DuplicateError, ForbiddenError, NotFoundError } from '../db/errors'
+import {
+	ConflictError,
+	DuplicateError,
+	ExternalServiceError,
+	ForbiddenError,
+	NotFoundError,
+	ValidationError,
+} from '../db/errors'
 import { jsonError } from './http'
 
 /**
  * Sends a service `Result` as JSON. Success serializes the value; known
- * domain errors map to 404/409 through the shared `{ error }` shape and
+ * domain errors map to 404/409/422/502 through the shared `{ error }` shape and
  * unexpected failures stay a 500 (logged server-side).
  */
 export function sendResult<T>(
@@ -26,6 +33,12 @@ export function sendResult<T>(
 	}
 	if (err instanceof DuplicateError || err instanceof ConflictError) {
 		return jsonError(c, err.message, 409)
+	}
+	if (err instanceof ValidationError) {
+		return jsonError(c, err.message, 422)
+	}
+	if (err instanceof ExternalServiceError) {
+		return jsonError(c, err.message, 502)
 	}
 	console.error(err)
 	return jsonError(c, 'Internal server error', 500)
