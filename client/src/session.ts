@@ -27,6 +27,11 @@ export function setSessionScoped(next: boolean): void {
 	setScoped(next)
 }
 
+/** True when the user is limited to one tenant. */
+export function isScoped(): boolean {
+	return scoped()
+}
+
 export function isAdmin(): boolean {
 	return role() === 'admin'
 }

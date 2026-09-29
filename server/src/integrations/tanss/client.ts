@@ -11,10 +11,13 @@
  * `createErpClient(...).instance` is an isolated hey-api client with exactly
  * that auth, so it is reused for the user API with the login JWT.
  */
+
+import { randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { Result } from 'better-result'
 import {
 	createErpClient,
-	getApiErpV1Customers,
 	getApiV1Manufacturers,
 	postApiV1Login,
 	putApiV1Pcs,
@@ -36,6 +39,8 @@ export interface TanssCompany {
 	displayId: string | null
 	inactive: boolean
 	lockout: boolean
+	/** Private person, not a business customer. */
+	private: boolean
 	headquarterId: number | null
 }
 
@@ -63,6 +68,31 @@ const LoginResponseSchema = v.object({
 })
 
 const ContentListSchema = v.object({ content: v.optional(v.nullable(v.array(v.unknown()))) })
+
+/** Saves successful, unmodified API response bodies outside the database. */
+async function saveRawResponse(endpoint: string, payload: unknown): Promise<Result<void, Error>> {
+	const outputDir = resolve(process.env.CONEX_TANSS_DUMP_DIR ?? 'data/inegrations')
+	const timestamp = new Date().toISOString().replaceAll(':', '-')
+	const filename = `${timestamp}-${endpoint}-${randomUUID()}.json`
+	const saved = await Result.tryPromise({
+		try: async () => {
+			await mkdir(outputDir, { recursive: true, mode: 0o700 })
+			await writeFile(
+				resolve(outputDir, filename),
+				`${JSON.stringify(payload, null, 2) ?? 'null'}\n`,
+				{
+					encoding: 'utf8',
+					mode: 0o600,
+				},
+			)
+		},
+		catch: (e: unknown) =>
+			new Error(
+				`Failed to save TANSS ${endpoint} response: ${e instanceof Error ? e.message : String(e)}`,
+			),
+	})
+	return saved.map(() => undefined)
+}
 
 /** TANSS answers errors as `{ error: { text } }` or `{ meta: { text } }`. */
 function errorText(error: unknown): string | null {
@@ -156,9 +186,10 @@ function num(value: unknown): number | null {
 }
 
 /**
- * The ERP customer list is untyped in the OpenAPI spec. Accept the
- * `CompanyDetail` field names plus the obvious variants, skip rows without
- * id or name.
+ * The ERP customer list is untyped in the OpenAPI spec. Real installations
+ * answer `{ customers: [{ id, customer_number, name, headquarters, active,
+ * … }], employees: [...] }`; the `CompanyDetail` field names are accepted as
+ * well. Rows without id or name are skipped.
  */
 function toCompany(raw: unknown): TanssCompany | null {
 	if (typeof raw !== 'object' || raw === null) {
@@ -173,11 +204,18 @@ function toCompany(raw: unknown): TanssCompany | null {
 	return {
 		id,
 		name,
-		displayId: str(r.displayId ?? r.customerNumber ?? r.number),
-		inactive: r.inactive === true,
+		displayId: str(r.customer_number ?? r.displayId ?? r.customerNumber ?? r.number),
+		inactive: r.inactive === true || r.active === false,
 		lockout: r.lockout === true,
-		headquarterId: num(r.headquarterId),
+		private: r.private === true,
+		headquarterId: num(r.headquarters ?? r.headquarterId),
 	}
+}
+
+/** Rows of the ERP customer list: `customers`, else a generic list. */
+function customerRows(data: unknown): unknown[] {
+	const customers = (data as { customers?: unknown } | null)?.customers
+	return Array.isArray(customers) ? customers : listContent(data)
 }
 
 function listContent(data: unknown): unknown[] {
@@ -246,16 +284,28 @@ export class TanssSession {
 		return Result.err(new TanssApiError(`TANSS ${what} failed: unauthorized`, 401))
 	}
 
-	/** All companies incl. branches (ERP token). */
-	async listCompanies(): Promise<Result<TanssCompany[], Error>> {
-		const res = await call('company list', () =>
-			getApiErpV1Customers({ client: this.erp.instance }),
-		)
+	/** All companies on the first sync; changed companies on later syncs. */
+	async listCompanies(modifiedSince?: number): Promise<Result<TanssCompany[], Error>> {
+		const res = await call('customer list', async () => ({
+			data:
+				modifiedSince === undefined
+					? await this.erp.customers.listAll()
+					: await this.erp.customers.listModified(modifiedSince),
+		}))
 		if (Result.isError(res)) {
 			return res
 		}
+		const dump = await saveRawResponse(
+			modifiedSince === undefined
+				? 'customers-listAll'
+				: `customers-listModified-${modifiedSince}`,
+			res.value,
+		)
+		if (Result.isError(dump)) {
+			return dump
+		}
 		const companies: TanssCompany[] = []
-		for (const raw of listContent(res.value)) {
+		for (const raw of customerRows(res.value)) {
 			const company = toCompany(raw)
 			if (company) {
 				companies.push(company)
@@ -272,6 +322,13 @@ export class TanssSession {
 				body: { companyId, branches: 'COMPANY_ONLY', active: 'ACTIVE_AND_INACTIVE' },
 			}),
 		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const dump = await saveRawResponse(`pcs-company-${companyId}`, res.value)
+		if (Result.isError(dump)) {
+			return dump
+		}
 		return res.map((data) => listContent(data) as TanssPc[])
 	}
 
@@ -280,6 +337,13 @@ export class TanssSession {
 		const res = await this.userCall('manufacturer list', (client) =>
 			getApiV1Manufacturers({ client }),
 		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const dump = await saveRawResponse('manufacturers', res.value)
+		if (Result.isError(dump)) {
+			return dump
+		}
 		return res.map((data) => {
 			const names = new Map<number, string>()
 			for (const raw of listContent(data)) {

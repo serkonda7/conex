@@ -7,6 +7,7 @@ import { Result } from 'better-result'
 import type {
 	DeviceIntegrationStatus,
 	ExternalLinkJson,
+	ExternalTenantJson,
 	ExternalTenantListItem,
 	IntegrationCreate,
 	IntegrationJson,
@@ -14,6 +15,9 @@ import type {
 	IntegrationReport,
 	IntegrationTest,
 	IntegrationUpdate,
+	LinkBoard,
+	LinkBoardExternal,
+	LinkBoardLocal,
 	LinkEntityType,
 	SyncRunJson,
 	TenantIntegrationStatus,
@@ -24,10 +28,14 @@ import { t, tp } from './i18n'
 export type {
 	DeviceIntegrationStatus,
 	ExternalLinkJson,
+	ExternalTenantJson,
 	ExternalTenantListItem,
 	IntegrationJson,
 	IntegrationProvider,
 	IntegrationReport,
+	LinkBoard,
+	LinkBoardExternal,
+	LinkBoardLocal,
 	SyncRunJson,
 	TenantIntegrationStatus,
 }
@@ -78,10 +86,11 @@ export async function test_integration(
 export async function start_sync(
 	provider: IntegrationProvider,
 	tenant?: number,
+	clean = false,
 ): Promise<Result<SyncRunJson, Error>> {
 	const res = await client.integrations[':provider'].sync.$post({
 		param: { provider },
-		query: to_query({ tenant }),
+		query: { ...to_query({ tenant }), clean: clean ? 'true' : undefined },
 	})
 	return to_result<SyncRunJson>(res, t('integration.syncFailed'))
 }
@@ -136,6 +145,19 @@ export async function fetch_integration_report(
 		query: to_query({ tenant: filters.tenant, tenant_group: filters.tenant_group }),
 	})
 	return to_result<IntegrationReport>(res, t('integration.reportFailed'))
+}
+
+/** Link board of tenants, or of one tenant's devices. */
+export async function fetch_link_board(
+	provider: IntegrationProvider,
+	entity_type: LinkEntityType,
+	tenant?: number,
+): Promise<Result<LinkBoard, Error>> {
+	const res = await client.integrations[':provider'].board.$get({
+		param: { provider },
+		query: { entity_type, ...to_query({ tenant }) },
+	})
+	return to_result<LinkBoard>(res, t('integration.boardFailed'))
 }
 
 export async function fetch_tenant_integration(

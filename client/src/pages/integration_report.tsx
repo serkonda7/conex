@@ -2,13 +2,17 @@ import { IconRefresh } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { FINDING_KINDS, type FindingKind, type IntegrationFinding } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
-import { createMemo, createResource, createSignal, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import {
+	type ExternalTenantJson,
 	type ExternalTenantListItem,
 	fetch_integration_report,
 	fetch_integrations,
+	fetch_link_board,
 	type IntegrationJson,
+	type IntegrationProvider,
 	ignore_external,
+	type LinkBoard,
 	link_external,
 	start_sync,
 	unlink_external,
@@ -17,7 +21,8 @@ import {
 import { DataTable, type DataTableColumn } from '../components/data_table'
 import { ExternalTenantPicker } from '../components/external_tenant_picker'
 import { Empty, InlineError, Loading } from '../components/feedback'
-import { SelectField } from '../components/form'
+import { row_options, SelectField } from '../components/form'
+import { LinkBoardView } from '../components/link_board'
 import { t, tp } from '../i18n'
 import {
 	compareFieldLabel,
@@ -26,8 +31,8 @@ import {
 	providerLabel,
 } from '../i18n/labels'
 import { goTo, parseId, queryParam, usePageMeta } from '../router'
-import { canWrite, canWriteGlobal } from '../session'
-import { tenantContextFilters } from '../tenant_context'
+import { canWrite, canWriteGlobal, isScoped } from '../session'
+import { contextTenantRows, tenantContextFilters } from '../tenant_context'
 import { formatTime } from '../util/time'
 
 function findingKey(f: IntegrationFinding): string {
@@ -54,16 +59,191 @@ function detailText(f: IntegrationFinding): string {
 	}
 }
 
+type View = 'report' | 'tenants' | 'devices'
+
+function parseView(raw: string): View {
+	return raw === 'tenants' || raw === 'devices' ? raw : 'report'
+}
+
 /**
- * /integrations/:id — consistency report of one provider. Honors the tenant
- * selector (or `?tenant=`); rows offer the fitting fix: link, confirm a
- * suggestion, ignore, or unlink.
+ * Link board of tenants, or of the devices of one tenant (picked here;
+ * defaults to `?tenant=` or the tenant context).
+ */
+function LinkBoardPanel(props: {
+	provider: IntegrationProvider
+	entity_type: 'tenant' | 'device'
+	reload: number
+	on_error: (message: string | null) => void
+}): JSX.Element {
+	const initialTenant = parseId(queryParam('tenant')) ?? tenantContextFilters().tenant ?? null
+	const [tenant, setTenant] = createSignal<number | null>(initialTenant)
+	const [syncing, setSyncing] = createSignal(false)
+
+	// Scoped users only see their own tenant: preselect it.
+	const tenantOptions = createMemo(() => row_options(contextTenantRows()))
+	const effectiveTenant = createMemo((): number | null => {
+		const rows = contextTenantRows()
+		return tenant() ?? (isScoped() && rows.length === 1 ? (rows[0]?.id ?? null) : null)
+	})
+
+	const source = createMemo(() =>
+		props.entity_type === 'tenant'
+			? { entity_type: props.entity_type, tenant: undefined, reload: props.reload }
+			: effectiveTenant() !== null
+				? {
+						entity_type: props.entity_type,
+						tenant: effectiveTenant() ?? undefined,
+						reload: props.reload,
+					}
+				: null,
+	)
+	const [board, { refetch }] = createResource(source, async (s) => {
+		const res = await fetch_link_board(props.provider, s.entity_type, s.tenant)
+		if (Result.isError(res)) {
+			props.on_error(res.error.message)
+			return null
+		}
+		return res.value
+	})
+
+	function handleTenantsLinked(tenantIds: number[]): void {
+		// Fetch the companies' devices right away (one tenant, or all linked
+		// ones after a bulk link). A run already in progress answers 409; the
+		// next "Sync now" covers these tenants then.
+		void start_sync(props.provider, tenantIds.length === 1 ? tenantIds[0] : undefined)
+	}
+
+	async function handleSyncTenant(): Promise<void> {
+		const id = effectiveTenant()
+		if (id === null) {
+			return
+		}
+		props.on_error(null)
+		setSyncing(true)
+		const started = await start_sync(props.provider, id)
+		if (Result.isError(started)) {
+			setSyncing(false)
+			props.on_error(started.error.message)
+			return
+		}
+		const done = await wait_for_sync(props.provider, started.value)
+		setSyncing(false)
+		if (Result.isError(done)) {
+			props.on_error(done.error.message)
+		} else if (done.value.state === 'error') {
+			props.on_error(done.value.error)
+		}
+		void refetch()
+	}
+
+	const editable = (): boolean => (props.entity_type === 'tenant' ? canWriteGlobal() : canWrite())
+
+	return (
+		<div>
+			<Show when={props.entity_type === 'device'}>
+				<div class="toolbar-row">
+					<Show when={!isScoped()}>
+						<SelectField
+							id="link-board-tenant"
+							label={tp('entity.tenant', 1)}
+							value={String(effectiveTenant() ?? '')}
+							onChange={(v: string) => setTenant(parseId(v))}
+							emptyLabel={t('integration.pickBoardTenant')}
+							options={tenantOptions()}
+						/>
+					</Show>
+					<Show when={canWrite() && board()?.external_tenant}>
+						<button
+							type="button"
+							disabled={syncing()}
+							onClick={() => void handleSyncTenant()}
+						>
+							<span aria-hidden="true" class="app-nav-icon">
+								<IconRefresh size={14} />
+							</span>{' '}
+							{syncing() ? t('integration.syncing') : t('integration.syncTenant')}
+						</button>
+					</Show>
+				</div>
+			</Show>
+			<Show
+				when={source() !== null}
+				fallback={<Empty message={t('integration.pickBoardTenant')} />}
+			>
+				<Show
+					when={board()}
+					fallback={
+						<Show when={board.loading}>
+							<Loading message={t('integration.loadingBoard')} />
+						</Show>
+					}
+				>
+					{(current: () => LinkBoard): JSX.Element => (
+						<>
+							<Show
+								when={
+									current().entity_type === 'tenant' ||
+									current().external_tenant !== null
+								}
+								fallback={
+									<Empty
+										message={t('integration.boardTenantNotLinked', {
+											provider: providerLabel(props.provider),
+										})}
+									/>
+								}
+							>
+								<Show when={current().external_tenant}>
+									{(company: () => ExternalTenantJson): JSX.Element => (
+										<p class="page-subtitle">
+											{t('integration.linkedTo')}: {company().name}
+											{company().display_id !== null
+												? ` (${company().display_id})`
+												: ''}
+										</p>
+									)}
+								</Show>
+								<LinkBoardView
+									provider={props.provider}
+									board={current()}
+									editable={editable()}
+									on_error={props.on_error}
+									on_changed={() => void refetch()}
+									on_linked={
+										props.entity_type === 'tenant'
+											? handleTenantsLinked
+											: undefined
+									}
+								/>
+							</Show>
+						</>
+					)}
+				</Show>
+			</Show>
+		</div>
+	)
+}
+
+/**
+ * /integrations/:id — consistency report of one provider, plus link boards
+ * (`?view=tenants|devices`) for side-by-side linking. The report honors the
+ * tenant selector (or `?tenant=`); rows offer the fitting fix: link, confirm
+ * a suggestion, ignore, or unlink.
  */
 export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [kindFilter, setKindFilter] = createSignal('')
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
 	const [syncing, setSyncing] = createSignal(false)
+	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
+	// Bumped after a full sync so an open link board reloads too.
+	const [boardReload, setBoardReload] = createSignal(0)
+	const views = (): { id: View; label: string }[] => [
+		{ id: 'report', label: t('integration.viewReport') },
+		// The tenant board lists every external company: global users only.
+		...(isScoped() ? [] : [{ id: 'tenants' as const, label: t('integration.viewTenants') }]),
+		{ id: 'devices', label: t('integration.viewDevices') },
+	]
 
 	const [integration] = createResource(
 		() => props.id,
@@ -126,14 +306,20 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		void refetch()
 	}
 
-	async function handleSync(): Promise<void> {
+	async function handleSync(clean = false): Promise<void> {
 		const row = integration()
 		if (!row) {
 			return
 		}
+		if (
+			clean &&
+			!window.confirm(t('integration.confirmFullSync', { name: providerLabel(row.provider) }))
+		) {
+			return
+		}
 		setError(null)
 		setSyncing(true)
-		const started = await start_sync(row.provider)
+		const started = await start_sync(row.provider, undefined, clean)
 		if (Result.isError(started)) {
 			setSyncing(false)
 			setError(started.error.message)
@@ -147,6 +333,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			setError(done.value.error)
 		}
 		void refetch()
+		setBoardReload((n) => n + 1)
 	}
 
 	function handleLinkTenant(item: ExternalTenantListItem): void {
@@ -329,6 +516,20 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							</span>{' '}
 							{syncing() ? t('integration.syncing') : t('integration.syncNow')}
 						</button>
+						<Show when={canWriteGlobal()}>
+							<button
+								type="button"
+								disabled={syncing()}
+								onClick={() => void handleSync(true)}
+							>
+								<span aria-hidden="true" class="app-nav-icon">
+									<IconRefresh size={14} />
+								</span>{' '}
+								{syncing()
+									? t('integration.syncing')
+									: t('integration.forceFullSync')}
+							</button>
+						</Show>
 					</div>
 				</Show>
 			</div>
@@ -343,39 +544,74 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				fallback={<Loading message={t('integration.loadingOne')} />}
 			>
 				<Show when={integration()} fallback={<Empty message={t('integration.notFound')} />}>
-					<div class="toolbar-row">
-						<SelectField
-							id="integration-finding-filter"
-							label={t('integration.finding')}
-							value={kindFilter()}
-							onChange={setKindFilter}
-							emptyLabel={t('integration.allFindings', {
-								count: report()?.findings.length ?? 0,
-							})}
-							options={FINDING_KINDS.filter((kind) => counts().has(kind)).map(
-								(kind) => ({
-									value: kind,
-									label: `${findingKindLabel(kind)} (${counts().get(kind) ?? 0})`,
-								}),
+					<div class="view-switch">
+						<For each={views()}>
+							{(item: { id: View; label: string }): JSX.Element => (
+								<button
+									type="button"
+									aria-pressed={view() === item.id}
+									onClick={() => {
+										setError(null)
+										setView(item.id)
+									}}
+								>
+									{item.label}
+								</button>
 							)}
-						/>
+						</For>
 					</div>
-					<Show
-						when={!report.loading}
-						fallback={<Loading message={t('integration.loadingReport')} />}
-					>
-						<Show
-							when={rows().length > 0}
-							fallback={<Empty message={t('integration.noFindings')} />}
-						>
-							<DataTable
-								rows={rows}
-								getRowId={findingKey}
-								columns={columns}
-								rowActions={(f: IntegrationFinding): JSX.Element => (
-									<div class="row-actions">{actions(f)}</div>
+					{/* Separate instances: selections must not carry over between levels. */}
+					<Show when={view() === 'tenants'}>
+						<LinkBoardPanel
+							provider={integration()?.provider ?? 'tanss'}
+							entity_type="tenant"
+							reload={boardReload()}
+							on_error={setError}
+						/>
+					</Show>
+					<Show when={view() === 'devices'}>
+						<LinkBoardPanel
+							provider={integration()?.provider ?? 'tanss'}
+							entity_type="device"
+							reload={boardReload()}
+							on_error={setError}
+						/>
+					</Show>
+					<Show when={view() === 'report'}>
+						<div class="toolbar-row">
+							<SelectField
+								id="integration-finding-filter"
+								label={t('integration.finding')}
+								value={kindFilter()}
+								onChange={setKindFilter}
+								emptyLabel={t('integration.allFindings', {
+									count: report()?.findings.length ?? 0,
+								})}
+								options={FINDING_KINDS.filter((kind) => counts().has(kind)).map(
+									(kind) => ({
+										value: kind,
+										label: `${findingKindLabel(kind)} (${counts().get(kind) ?? 0})`,
+									}),
 								)}
 							/>
+						</div>
+						<Show
+							when={!report.loading}
+							fallback={<Loading message={t('integration.loadingReport')} />}
+						>
+							<Show
+								when={rows().length > 0}
+								fallback={<Empty message={t('integration.noFindings')} />}
+							>
+								<DataTable
+									rows={rows}
+									getRowId={findingKey}
+									columns={columns}
+									rowActions={(f: IntegrationFinding): JSX.Element => (
+										<div class="row-actions">{actions(f)}</div>
+									)}
+								/>
+							</Show>
 						</Show>
 					</Show>
 				</Show>

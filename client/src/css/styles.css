@@ -738,6 +738,10 @@ tbody tr:last-child td {
 	color: var(--success);
 }
 
+.text-muted {
+	color: var(--text-muted);
+}
+
 .btn-danger:hover {
 	background-color: var(--error-bg);
 	border-color: var(--error);
@@ -2454,4 +2458,116 @@ a.rack-shelf-plate:hover {
 
 .breadcrumbs [aria-current="page"] {
 	color: var(--text-secondary);
+}
+
+/* Integration view switch: report / link tenants / link devices. */
+.view-switch {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+	margin: 0.5rem 0;
+}
+
+.view-switch [aria-pressed="true"] {
+	border-color: var(--primary);
+	background-color: var(--bg-hover);
+}
+
+/* Link board: conex table | actions | external table. */
+.link-board {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 12rem minmax(0, 1fr);
+	gap: 0.75rem;
+	align-items: start;
+}
+
+.link-board h3 {
+	margin: 0.25rem 0 0.4rem;
+}
+
+.link-board .toolbar-search-input {
+	margin-bottom: 0.25rem;
+}
+
+.app-content .link-board-scroll {
+	max-height: 70vh;
+	overflow: auto;
+}
+
+.link-board-row {
+	cursor: pointer;
+}
+
+.link-board-row:hover td {
+	background-color: var(--bg-raised);
+}
+
+.link-board-row.inactive td {
+	color: var(--text-muted);
+}
+
+.link-board-row.highlighted td {
+	background-color: rgba(116, 202, 255, 0.12);
+}
+
+.link-board-row.selected td {
+	background-color: rgba(8, 191, 8, 0.18);
+}
+
+.link-board-row.drop-target td {
+	background-color: rgba(8, 191, 8, 0.32);
+}
+
+.link-board-detail {
+	display: block;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.link-board-state {
+	text-align: right;
+	white-space: nowrap;
+}
+
+.link-board-state > * + * {
+	margin-left: 0.35rem;
+}
+
+.link-board-suggestion {
+	color: var(--link);
+}
+
+.link-board-middle {
+	position: sticky;
+	top: calc(var(--topbar-height) + 0.5rem);
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	padding-top: 2.1rem;
+}
+
+.link-board-hint {
+	margin: 0;
+	color: var(--text-secondary);
+	font-size: var(--font-size-sm);
+}
+
+.link-board-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+	.link-board {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.link-board-middle {
+		position: static;
+		padding-top: 0;
+	}
 }

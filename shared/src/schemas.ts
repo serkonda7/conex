@@ -1166,6 +1166,8 @@ export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */
 	tenant: OptionalIdEntry,
+	/** Bypass the incremental cursor and fetch the complete external list. */
+	clean: v.optional(v.literal('true'), undefined),
 })
 
 export const ExternalTenantQuerySchema = v.object({
@@ -1178,6 +1180,15 @@ export const IntegrationReportQuerySchema = v.object({
 })
 
 export type IntegrationReportQuery = v.InferOutput<typeof IntegrationReportQuerySchema>
+
+/** Link board: tenants, or the devices of one conex tenant. */
+export const LinkBoardQuerySchema = v.object({
+	entity_type: LinkEntityTypeSchema,
+	/** Device board only: the conex tenant whose devices are shown. */
+	tenant: OptionalIdEntry,
+})
+
+export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
 
 export type SyncRunState = 'running' | 'ok' | 'error'
 
@@ -1216,6 +1227,8 @@ export interface ExternalTenantJson {
 	display_id: string | null
 	name: string
 	active: boolean
+	/** Private person, not a business customer (never offered for linking). */
+	private: boolean
 	/** Headquarter company of a branch. */
 	headquarter_id: string | null
 }
@@ -1313,6 +1326,49 @@ export interface FieldComparison {
 	local: string | null
 	remote: string | null
 	equal: boolean
+}
+
+/** conex side of the link board. */
+export interface LinkBoardLocal {
+	id: number
+	name: string
+	/** Tenant group, or device manufacturer + model. */
+	detail: string | null
+	serial: string | null
+	active: boolean
+	link_id: number | null
+	external_id: string | null
+	/** Name of the linked external object; null when it no longer exists. */
+	external_name: string | null
+	/** Unambiguous match candidate among the free external objects. */
+	suggestion: { external_id: string; via: 'name' | 'serial' | 'asset_tag' } | null
+}
+
+/** External side of the link board. */
+export interface LinkBoardExternal {
+	external_id: string
+	name: string
+	/** Customer number, or device manufacturer + model. */
+	detail: string | null
+	serial: string | null
+	active: boolean
+	link_id: number | null
+	state: ExternalLinkState | null
+	entity_id: number | null
+	/** Name of the linked conex object (may lie outside the board). */
+	entity_name: string | null
+}
+
+/** Both sides of one link level, for side-by-side linking. */
+export interface LinkBoard {
+	provider: IntegrationProvider
+	entity_type: LinkEntityType
+	/** Finish time of the last successful sync (unix seconds), null = never. */
+	synced_at: number | null
+	/** Device board: company linked to the tenant (null = not linked). */
+	external_tenant: ExternalTenantJson | null
+	local: LinkBoardLocal[]
+	external: LinkBoardExternal[]
 }
 
 /** Integration card on the tenant detail page. */

@@ -14,6 +14,7 @@ import {
 	IntegrationSyncQuerySchema,
 	IntegrationTestSchema,
 	IntegrationUpdateSchema,
+	LinkBoardQuerySchema,
 	type IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
 import {
@@ -28,6 +29,7 @@ import {
 } from '../authz'
 import { getDb } from '../db/connection'
 import { ForbiddenError, NotFoundError } from '../db/errors'
+import { deviceBoard, tenantBoard } from '../integrations/board'
 import {
 	deleteLink,
 	getLink,
@@ -146,14 +148,25 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
+			const query = c.req.valid('query')
+			if (query.clean === 'true') {
+				const globalDenied = requireGlobalWrite(c)
+				if (globalDenied) {
+					return globalDenied
+				}
+			}
 			// Scoped editors may only sync their own tenant.
 			const scope = scopeTenantId(requestUser(c))
-			const queryTenant = c.req.valid('query').tenant
+			const queryTenant = query.tenant
 			if (scope !== null && queryTenant !== undefined && queryTenant !== scope) {
 				return jsonError(c, 'Forbidden: outside your tenant scope', 403)
 			}
 			const tenant = scope ?? queryTenant ?? null
-			return sendResult(c, await startSync(c.req.valid('param').provider, tenant), 202)
+			return sendResult(
+				c,
+				await startSync(c.req.valid('param').provider, tenant, query.clean === 'true'),
+				202,
+			)
 		},
 	)
 	.get(
@@ -193,6 +206,12 @@ export const integrationsApp = new Hono()
 				})
 			}
 			const items: ExternalTenantListItem[] = [...(await readTenants(provider)).values()]
+				// Inactive and private customers are not offered, except linked ones.
+				.filter(
+					(t) =>
+						(t.active && t.private !== true) ||
+						(rows.get(t.external_id)?.tenant ?? null) !== null,
+				)
 				.filter(
 					(t) =>
 						needle === '' ||
@@ -229,6 +248,48 @@ export const integrationsApp = new Hono()
 				query.tenant === undefined &&
 				query.tenant_group === undefined
 			return c.json(await buildReport(provider, filter, unfiltered))
+		},
+	)
+	.get(
+		'/:provider/board',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('query', LinkBoardQuerySchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const missing = await requireConfigured(c, provider)
+			if (missing) {
+				return missing
+			}
+			const query = c.req.valid('query')
+			if (query.entity_type === 'tenant') {
+				// Lists every external company: global users only.
+				if (scopeTenantId(requestUser(c)) !== null) {
+					return sendResult(
+						c,
+						Result.err(
+							new ForbiddenError(
+								'Forbidden: tenant-scoped users cannot list external tenants',
+							),
+						),
+					)
+				}
+				return c.json(await tenantBoard(provider))
+			}
+			const tenantId = query.tenant ?? scopeTenantId(requestUser(c))
+			if (tenantId === null) {
+				return jsonError(c, 'tenant is required for the device board', 400)
+			}
+			const tenant = (
+				await getDb().select().from(tenants).where(eq(tenants.id, tenantId)).limit(1)
+			)[0]
+			if (!tenant) {
+				return sendResult(c, Result.err(new NotFoundError('Tenant not found')))
+			}
+			const denied = checkRead(c, tenantId)
+			if (denied) {
+				return denied
+			}
+			return c.json(await deviceBoard(provider, tenantId))
 		},
 	)
 	.get(

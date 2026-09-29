@@ -16,8 +16,14 @@ import { devices, sync_runs, tenants } from '../schema'
 import { nowSeconds } from '../util/time'
 import { listLinks, setLink } from './links'
 import { matchDevices } from './match'
-import { pruneDevices, replaceDevices, replaceTenants } from './snapshot'
-import { getIntegrationRow, providerFor, recordConnection, syncRunJson } from './store'
+import { mergeTenants, pruneDevices, replaceDevices, replaceTenants } from './snapshot'
+import {
+	getIntegrationRow,
+	lastSuccessfulSyncStartedAt,
+	providerFor,
+	recordConnection,
+	syncRunJson,
+} from './store'
 import type { ExternalDevice, IntegrationProvider } from './types'
 
 const running = new Set<ProviderId>()
@@ -81,14 +87,21 @@ async function execute(
 	provider: ProviderId,
 	instance: IntegrationProvider,
 	tenantId: number | null,
+	clean: boolean,
 ): Promise<Result<Counts, Error>> {
 	const now = nowSeconds()
-	const externalTenants = await instance.listTenants()
+	const modifiedSince = clean ? null : await lastSuccessfulSyncStartedAt(provider)
+	const externalTenants = await instance.listTenants(modifiedSince ?? undefined)
 	if (Result.isError(externalTenants)) {
 		return externalTenants
 	}
-	await replaceTenants(provider, externalTenants.value, now)
-	const known = new Set(externalTenants.value.map((t) => t.external_id))
+	let tenantSnapshot = externalTenants.value
+	if (modifiedSince === null) {
+		await replaceTenants(provider, tenantSnapshot, now)
+	} else {
+		tenantSnapshot = await mergeTenants(provider, tenantSnapshot, now)
+	}
+	const known = new Set(tenantSnapshot.map((t) => t.external_id))
 
 	const tenantLinks = (await listLinks(provider, 'tenant')).filter(
 		(link) =>
@@ -96,7 +109,7 @@ async function execute(
 			link.entity_id !== null &&
 			(tenantId === null || link.entity_id === tenantId),
 	)
-	const counts: Counts = { tenants: externalTenants.value.length, devices: 0, auto_linked: 0 }
+	const counts: Counts = { tenants: tenantSnapshot.length, devices: 0, auto_linked: 0 }
 	for (const link of tenantLinks) {
 		// Stale links (company gone) are reported, not fetched.
 		if (link.entity_id === null || !known.has(link.external_id)) {
@@ -118,7 +131,9 @@ async function execute(
 	if (tenantId === null) {
 		await pruneDevices(
 			provider,
-			tenantLinks.map((link) => link.external_id),
+			tenantLinks
+				.filter((link) => known.has(link.external_id))
+				.map((link) => link.external_id),
 		)
 	}
 	return Result.ok(counts)
@@ -151,6 +166,7 @@ async function finish(
 export async function startSync(
 	provider: ProviderId,
 	tenantId: number | null,
+	clean = false,
 ): Promise<Result<SyncRunJson, Error>> {
 	const row = await getIntegrationRow(provider)
 	if (Result.isError(row)) {
@@ -199,7 +215,7 @@ export async function startSync(
 		try {
 			result = Result.isError(instance)
 				? instance
-				: await execute(provider, instance.value, tenantId)
+				: await execute(provider, instance.value, tenantId, clean)
 		} catch (e) {
 			result = Result.err(errOf(e))
 		}

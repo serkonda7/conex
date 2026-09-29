@@ -15,7 +15,7 @@ import { InlineError, Loading } from '../components/feedback'
 import { t, tp } from '../i18n'
 import { providerLabel, syncStateLabel } from '../i18n/labels'
 import { goTo, navigate } from '../router'
-import { canWrite, isAdmin } from '../session'
+import { canWrite, canWriteGlobal, isAdmin } from '../session'
 import { formatTime } from '../util/time'
 
 /**
@@ -38,10 +38,16 @@ export function IntegrationsPage(): JSX.Element {
 	const configured = (provider: IntegrationProvider): IntegrationJson | undefined =>
 		integrations()?.find((i) => i.provider === provider)
 
-	async function handleSync(provider: IntegrationProvider): Promise<void> {
+	async function handleSync(provider: IntegrationProvider, clean = false): Promise<void> {
+		if (
+			clean &&
+			!window.confirm(t('integration.confirmFullSync', { name: providerLabel(provider) }))
+		) {
+			return
+		}
 		setError(null)
 		setSyncing(provider)
-		const started = await start_sync(provider)
+		const started = await start_sync(provider, undefined, clean)
 		if (Result.isError(started)) {
 			setSyncing(null)
 			setError(started.error.message)
@@ -120,6 +126,30 @@ export function IntegrationsPage(): JSX.Element {
 														? t('integration.syncing')
 														: t('integration.syncNow')}
 												</button>
+												<Show when={canWriteGlobal()}>
+													<button
+														type="button"
+														disabled={
+															syncing() !== null ||
+															integration().last_sync?.state ===
+																'running'
+														}
+														onClick={() =>
+															void handleSync(provider, true)
+														}
+													>
+														<span
+															aria-hidden="true"
+															class="app-nav-icon"
+														>
+															<IconRefresh size={14} />
+														</span>{' '}
+														{syncing() === provider ||
+														integration().last_sync?.state === 'running'
+															? t('integration.syncing')
+															: t('integration.forceFullSync')}
+													</button>
+												</Show>
 											</Show>
 											<Show when={isAdmin()}>
 												<button

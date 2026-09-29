@@ -18,6 +18,6 @@ export interface IntegrationProvider {
 	tenantCardinality: 'one' | 'many'
 	/** Logs in with every stored credential; used before saving. */
 	verify(): Promise<Result<void, Error>>
-	listTenants(): Promise<Result<ExternalTenantJson[], Error>>
+	listTenants(modifiedSince?: number): Promise<Result<ExternalTenantJson[], Error>>
 	fetchDevices(externalTenantId: string): Promise<Result<ExternalDeviceJson[], Error>>
 }

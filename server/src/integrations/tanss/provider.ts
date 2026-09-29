@@ -8,6 +8,7 @@ function toTenant(company: TanssCompany): ExternalTenant {
 		display_id: company.displayId,
 		name: company.name,
 		active: !company.inactive && !company.lockout,
+		private: company.private,
 		headquarter_id: company.headquarterId === null ? null : String(company.headquarterId),
 	}
 }
@@ -74,8 +75,8 @@ export class TanssProvider implements IntegrationProvider {
 		return Result.ok(undefined)
 	}
 
-	async listTenants(): Promise<Result<ExternalTenant[], Error>> {
-		const res = await this.session.listCompanies()
+	async listTenants(modifiedSince?: number): Promise<Result<ExternalTenant[], Error>> {
+		const res = await this.session.listCompanies(modifiedSince)
 		return res.map((companies) => companies.map(toTenant))
 	}
 

@@ -27,7 +27,7 @@ import { matchDevices, normalizeName, normalizeSerial, normalizeTag } from './ma
 import { readDevice, readDevices, readTenant, readTenants } from './snapshot'
 import type { ExternalDevice } from './types'
 
-interface LocalDeviceRow {
+export interface LocalDeviceRow {
 	id: number
 	name: string
 	serial: string | null
@@ -38,7 +38,7 @@ interface LocalDeviceRow {
 	model: string
 }
 
-async function localDevices(where: SQL | undefined): Promise<LocalDeviceRow[]> {
+export async function localDevices(where: SQL | undefined): Promise<LocalDeviceRow[]> {
 	return getDb()
 		.select({
 			id: devices.id,
@@ -123,7 +123,7 @@ function tenantConditionsById(params: TenantFilterParams): SQL[] {
 	return conditions
 }
 
-async function lastSyncedAt(provider: ProviderId): Promise<number | null> {
+export async function lastSyncedAt(provider: ProviderId): Promise<number | null> {
 	const row = (
 		await getDb()
 			.select({ finished_at: sync_runs.finished_at })
@@ -198,7 +198,11 @@ export async function buildReport(
 	}
 	if (includeUnmapped) {
 		for (const external of externalTenants.values()) {
-			if (external.active && !tenantRowByExternal.has(external.external_id)) {
+			if (
+				external.active &&
+				external.private !== true &&
+				!tenantRowByExternal.has(external.external_id)
+			) {
 				findings.push(
 					finding('tenant_missing_in_conex', {
 						external_id: external.external_id,

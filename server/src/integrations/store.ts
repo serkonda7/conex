@@ -4,7 +4,7 @@
  * returned: the JSON shape only says whether they are set.
  */
 import { Result } from 'better-result'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import type {
 	IntegrationCreate,
 	IntegrationJson,
@@ -94,6 +94,19 @@ export async function getIntegrationRow(
 		return Result.err(new NotFoundError('Integration not configured'))
 	}
 	return Result.ok(row)
+}
+
+/** Start time of the last successful run; reused as the incremental cursor. */
+export async function lastSuccessfulSyncStartedAt(provider: ProviderId): Promise<number | null> {
+	const row = (
+		await getDb()
+			.select({ started_at: sync_runs.started_at })
+			.from(sync_runs)
+			.where(and(eq(sync_runs.provider, provider), eq(sync_runs.state, 'ok')))
+			.orderBy(desc(sync_runs.started_at), desc(sync_runs.id))
+			.limit(1)
+	)[0]
+	return row?.started_at ?? null
 }
 
 export async function getIntegration(

@@ -3,7 +3,7 @@
  * device. The report and the link pickers read from here, so they work
  * without calling the external system on every page load.
  */
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { external_objects } from '../schema'
@@ -44,6 +44,40 @@ export async function replaceTenants(
 			fetched_at: now,
 		})),
 	)
+}
+
+/** Applies a partial tenant update without dropping unchanged snapshot rows. */
+export async function mergeTenants(
+	provider: ProviderId,
+	changedTenants: ExternalTenant[],
+	now: number,
+): Promise<ExternalTenant[]> {
+	const rows = changedTenants.map((tenant) => ({
+		provider,
+		object_type: 'tenant',
+		external_id: tenant.external_id,
+		external_tenant_id: tenant.external_id,
+		data: tenant,
+		fetched_at: now,
+	}))
+	for (let i = 0; i < rows.length; i += CHUNK) {
+		await getDb()
+			.insert(external_objects)
+			.values(rows.slice(i, i + CHUNK))
+			.onConflictDoUpdate({
+				target: [
+					external_objects.provider,
+					external_objects.object_type,
+					external_objects.external_id,
+				],
+				set: {
+					external_tenant_id: sql`excluded.external_tenant_id`,
+					data: sql`excluded.data`,
+					fetched_at: sql`excluded.fetched_at`,
+				},
+			})
+	}
+	return [...(await readTenants(provider)).values()]
 }
 
 /** Replaces the device snapshot of one external tenant. */
