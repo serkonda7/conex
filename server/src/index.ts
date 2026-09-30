@@ -6,6 +6,7 @@ import { initDb } from './db'
 import { failInterruptedSyncs } from './integrations/sync'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
+import { deviceRolesApp } from './routes/device_roles'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
 import { integrationsApp } from './routes/integrations'
@@ -73,6 +74,7 @@ export function createApp() {
 			.route('/shelves', shelvesApp)
 			.route('/manufacturers', manufacturersApp)
 			.route('/device-types', deviceTypesApp)
+			.route('/device-roles', deviceRolesApp)
 			.route('/devices', devicesApp)
 			.route('/interfaces', interfacesApp)
 			.route('/cables', cablesApp)

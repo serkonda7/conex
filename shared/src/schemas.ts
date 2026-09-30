@@ -520,6 +520,32 @@ export interface ExpandedInterface {
 }
 
 // ---------------------------------------------------------------------------
+// P3b: device roles (NetBox-style functional roles: `Server`, `Switch`, …).
+// Shared catalog data (no tenant column): every device carries exactly one.
+// ---------------------------------------------------------------------------
+
+export const DeviceRoleCreateSchema = v.strictObject({
+	name: NameSchema,
+	description: DescriptionSchema,
+})
+
+export const DeviceRoleUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export type DeviceRoleCreate = v.InferOutput<typeof DeviceRoleCreateSchema>
+export type DeviceRoleUpdate = v.InferOutput<typeof DeviceRoleUpdateSchema>
+
+export const DeviceRoleListQuerySchema = v.object({
+	...ListQueryEntries,
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export type DeviceRoleListQuery = v.InferOutput<typeof DeviceRoleListQuerySchema>
+
+// ---------------------------------------------------------------------------
 // P4: devices / interfaces
 // ---------------------------------------------------------------------------
 
@@ -551,6 +577,7 @@ export type DeviceFace = v.InferOutput<typeof DeviceFaceSchema>
 
 export const DeviceCreateSchema = v.strictObject({
 	device_type_id: IdSchema,
+	device_role_id: IdSchema,
 	name: NameSchema,
 	status: v.optional(DeviceStatusSchema, 'active'),
 	site_id: NullableIdSchema,
@@ -571,6 +598,7 @@ export const DeviceCreateSchema = v.strictObject({
 export const DeviceUpdateSchema = v.strictObject({
 	// device_type_id is immutable after create: swapping the template would
 	// silently invalidate the expanded interface set and the U footprint.
+	device_role_id: v.optional(IdSchema, undefined),
 	name: v.optional(NameSchema, undefined),
 	status: v.optional(DeviceStatusSchema, undefined),
 	site_id: v.optional(v.nullable(IdSchema), undefined),
@@ -625,6 +653,7 @@ export const DeviceListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdEntry,
 	rack: OptionalIdEntry,
+	role: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
@@ -978,6 +1007,7 @@ export const DeviceImportRowSchema = v.object({
 	name: NameSchema,
 	asset_tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	device_type_model: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	device_role_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	site_name: v.optional(
 		v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 		undefined,

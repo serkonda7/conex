@@ -28,6 +28,7 @@ export async function fetch_devices(
 				...paging(filters),
 				site: filters?.site,
 				rack: filters?.rack,
+				role: filters?.role,
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
 				status: filters?.status,

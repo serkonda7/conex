@@ -22,6 +22,7 @@ import { checkBounds, checkOverlap } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
 import { deviceHasCables } from './cables'
 import { getDb } from './connection'
+import { checkDeviceRoleExists } from './device_roles'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
@@ -242,6 +243,7 @@ async function checkAssetTag(
 export interface DeviceListParams extends ListParams, TenantFilterParams {
 	site?: number
 	rack?: number
+	role?: number
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
@@ -263,6 +265,9 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 	}
 	if (params.rack) {
 		conditions.push(eq(devices.rack_id, params.rack))
+	}
+	if (params.role) {
+		conditions.push(eq(devices.device_role_id, params.role))
 	}
 	conditions.push(...tenantConditions(devices.tenant_id, params))
 	if (params.status) {
@@ -342,6 +347,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		await checkSite(deviceSiteId),
 		await checkLocation(deviceLocationId, deviceSiteId),
 		await checkTenantExists(input.tenant_id),
+		await checkDeviceRoleExists(input.device_role_id),
 		await checkAssetTag(input.asset_tag),
 		await checkPlacement(input.name, createMount, templateOf(template)),
 	]) {
@@ -369,6 +375,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 	}
 	const values: Omit<DeviceRow, 'id'> = {
 		device_type_id: input.device_type_id,
+		device_role_id: input.device_role_id,
 		site_id: deviceSiteId,
 		location_id: deviceLocationId,
 		rack_id: input.rack_id ?? null,
@@ -462,6 +469,12 @@ export async function updateDevice(
 			return Result.err(guard.error)
 		}
 	}
+	if (input.device_role_id !== undefined) {
+		const roleCheck = await checkDeviceRoleExists(input.device_role_id)
+		if (Result.isError(roleCheck)) {
+			return Result.err(roleCheck.error)
+		}
+	}
 	const mount: MountInput = {
 		rack_id: effectiveRackId ?? null,
 		position_u: input.position_u !== undefined ? input.position_u : node.position_u,
@@ -480,6 +493,9 @@ export async function updateDevice(
 		}
 	}
 	const patch: Partial<DeviceRow> = {}
+	if (input.device_role_id !== undefined) {
+		patch.device_role_id = input.device_role_id
+	}
 	if (input.name !== undefined) {
 		patch.name = input.name
 	}

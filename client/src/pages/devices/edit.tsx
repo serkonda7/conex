@@ -1,10 +1,12 @@
 import type { DeviceFace } from 'shared/src/types'
 import { createSignal, type JSX, Show } from 'solid-js'
+import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, fetch_device, update_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import {
+	AddOptionButton,
 	DescriptionField,
 	FormPage,
 	Hint,
@@ -27,6 +29,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
+	const [roleId, setRoleId] = createSignal('')
 	const [siteId, setSiteId] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
 	const [rackId, setRackId] = createSignal('')
@@ -40,6 +43,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setName(row.name)
 			setDescription(row.description ?? '')
 			setSerial(row.serial ?? '')
+			setRoleId(id_value(row.device_role_id))
 			setSiteId(id_value(row.site_id))
 			setLocationId(id_value(row.location_id))
 			setRackId(id_value(row.rack_id))
@@ -50,6 +54,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	})
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [racks] = createRows(fetch_racks, form.setError)
+	const [roles] = createRows(fetch_device_roles, form.setError)
 	const [tenants] = createRows(fetch_tenants, form.setError)
 	const [types] = createRows(fetch_device_types)
 	// Locations belong to a site, so the options follow the site picker.
@@ -70,13 +75,20 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 		await submit_form({
 			form,
 			name: name(),
-			validate: () =>
-				validPosition(parsePosition(positionU())) ? null : t('device.positionInvalid'),
+			validate: () => {
+				if (!roleId()) {
+					return t('device.selectRole')
+				}
+				return validPosition(parsePosition(positionU()))
+					? null
+					: t('device.positionInvalid')
+			},
 			save: (values: FormValues) =>
 				update_device(props.id, {
 					name: values.name,
 					description: text(description()) ?? null,
 					serial: text(serial()) ?? null,
+					device_role_id: Number(roleId()),
 					site_id: parseId(siteId()),
 					location_id: parseId(locationId()),
 					rack_id: parseId(rackId()),
@@ -108,6 +120,18 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				label={tp('entity.deviceType', 1)}
 				value={form.record() ? typeName(form.record()?.device_type_id) : ''}
 				hint={t('device.typeImmutable')}
+			/>
+			<SelectField
+				id="device-edit-role"
+				label={tp('entity.deviceRole', 1)}
+				required
+				value={roleId()}
+				onChange={setRoleId}
+				options={row_options(roles() ?? [])}
+				emptyLabel={t('device.rolePlaceholder')}
+				action={
+					<AddOptionButton label={tp('entity.deviceRole', 1)} href="/device-roles/add" />
+				}
 			/>
 			<DescriptionField
 				id="device-edit-description"

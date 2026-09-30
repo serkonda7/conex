@@ -50,6 +50,17 @@ older schema versions work too. It copies all rows in one transaction, keeps ids
 verifies row counts; on any error Postgres is left untouched.
 
 
+### Backing up Postgres
+Backup:
+```sh
+docker exec conex-db pg_dump -U conex conex > conex-$(date +%F).sql
+```
+Restore:
+```sh
+pg_restore -d "$CONEX_DATABASE_URL" conex-2026-09-30.dump
+```
+
+
 ## Checks
 ```sh
 bun run check

@@ -3,6 +3,7 @@ import { Result } from 'better-result'
 import type { TraceLink } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import { delete_cable, fetch_trace } from '../../api/cables'
+import { fetch_device_role } from '../../api/device_roles'
 import {
 	delete_device,
 	fetch_device,
@@ -105,12 +106,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		setError,
 	)
 	const typeId = (): number | undefined => device()?.device_type_id
+	const roleId = (): number | undefined => device()?.device_role_id
 	const siteId = (): number | null | undefined => device()?.site_id
 	const locationId = (): number | null | undefined => device()?.location_id
 	const rackId = (): number | null | undefined => device()?.rack_id
 	const shelfId = (): number | null | undefined => device()?.shelf_id
 	const tenantId = (): number | null | undefined => device()?.tenant_id
 	const [deviceType] = createRecord(typeId, fetch_device_type)
+	const [deviceRole] = createRecord(roleId, fetch_device_role, setError)
 	const [site] = createRecord(siteId, fetch_site, setError)
 	const [location] = createRecord(locationId, fetch_location, setError)
 	const [rack] = createRecord(rackId, fetch_rack, setError)
@@ -293,6 +296,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							loading={deviceType.loading}
 							name={deviceType()?.model}
 							href={`/device-types/${typeId() ?? ''}`}
+						/>
+					</dd>
+					<dt>{tp('entity.deviceRole', 1)}</dt>
+					<dd>
+						<ForeignKeyLink
+							id={roleId()}
+							loading={deviceRole.loading}
+							name={deviceRole()?.name}
+							href={`/device-roles/${roleId() ?? ''}`}
 						/>
 					</dd>
 					<dt>{t('device.serial')}</dt>

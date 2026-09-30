@@ -8,7 +8,16 @@ import {
 	type ImportRowResult,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { cables, device_types, devices, interfaces, manufacturers, racks, sites } from '../schema'
+import {
+	cables,
+	device_roles,
+	device_types,
+	devices,
+	interfaces,
+	manufacturers,
+	racks,
+	sites,
+} from '../schema'
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
 import { connectCable } from './cables'
@@ -20,6 +29,7 @@ export const DEVICE_CSV_HEADER = [
 	'name',
 	'asset_tag',
 	'device_type_model',
+	'device_role_name',
 	'site_name',
 	'rack_name',
 	'position_u',
@@ -309,6 +319,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 			name: devices.name,
 			asset_tag: devices.asset_tag,
 			type_model: device_types.model,
+			role_name: device_roles.name,
 			site_name: sites.name,
 			rack_name: racks.name,
 			position_u: devices.position_u,
@@ -316,6 +327,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 		})
 		.from(devices)
 		.leftJoin(device_types, eq(devices.device_type_id, device_types.id))
+		.leftJoin(device_roles, eq(devices.device_role_id, device_roles.id))
 		.leftJoin(sites, eq(devices.site_id, sites.id))
 		.leftJoin(racks, eq(devices.rack_id, racks.id))
 		.where(scopeCond)
@@ -326,6 +338,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 			r.name,
 			r.asset_tag,
 			r.type_model,
+			r.role_name,
 			r.site_name,
 			r.rack_name,
 			r.position_u === null ? null : String(r.position_u),
@@ -419,6 +432,7 @@ export async function importDevicesCsv(
 	}
 	const db = getDb()
 	const typeByModel = new Map((await db.select().from(device_types)).map((r) => [r.model, r.id]))
+	const roleByName = new Map((await db.select().from(device_roles)).map((r) => [r.name, r.id]))
 	const siteByName = new Map(
 		(await db.select().from(sites)).map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
 	)
@@ -440,6 +454,11 @@ export async function importDevicesCsv(
 		const typeId = typeByModel.get(input.device_type_model)
 		if (!typeId) {
 			fail(`Unknown device_type_model "${input.device_type_model}"`)
+			continue
+		}
+		const roleId = roleByName.get(input.device_role_name)
+		if (!roleId) {
+			fail(`Unknown device_role_name "${input.device_role_name}"`)
 			continue
 		}
 		let foundSiteId: number | undefined
@@ -470,6 +489,7 @@ export async function importDevicesCsv(
 		}
 		const created = await createDevice({
 			device_type_id: typeId,
+			device_role_id: roleId,
 			name: input.name,
 			status: input.status,
 			site_id: foundSiteId,

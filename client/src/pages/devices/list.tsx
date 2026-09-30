@@ -1,4 +1,5 @@
 import { createSignal, type JSX } from 'solid-js'
+import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
@@ -17,29 +18,39 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 
 /**
  * /devices — NetBox-style device list: search, sortable columns, rack /
- * tenant filters (tenant deep-linkable via `?tenant=<id>`), row selection
- * with bulk delete, and icon actions with delete in a row menu.
+ * role / tenant filters (tenant and role deep-linkable via `?tenant=<id>`
+ * and `?role=<id>`), row selection with bulk delete, and icon actions with
+ * delete in a row menu.
  */
 export function DevicesPage(): JSX.Element {
 	const [filterRack, setFilterRack] = createSignal('')
+	const [filterRole, setFilterRole] = useQueryFilter('role')
 	const [filterTenant] = useQueryFilter('tenant')
 	const list = useEntityList({
 		noun: 'noun.device',
 		sort: 'name' as DeviceSort,
 		filters: () => ({
 			rack: parseId(filterRack()) ?? undefined,
+			role: parseId(filterRole()) ?? undefined,
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_devices,
 		remove: delete_device,
 	})
 	const [types] = createRows(fetch_device_types, list.setError)
+	const [roles] = createRows(fetch_device_roles, list.setError)
 	const [racks] = createRows(fetch_racks, list.setError)
 	const typeName = useNameOf(types, (type) => type.model)
+	const roleName = useNameOf(roles)
 	const rackName = useNameOf(racks)
 
 	const columns: DataTableColumn<DeviceRow>[] = [
 		nameColumn(tp('entity.device', 1), '/devices', { sortable: true }),
+		{
+			key: 'role',
+			label: tp('entity.deviceRole', 1),
+			getValue: (d: DeviceRow): string => roleName(d.device_role_id),
+		},
 		{
 			key: 'type',
 			label: t('common.type'),
@@ -72,16 +83,28 @@ export function DevicesPage(): JSX.Element {
 			addHref="/devices/add"
 			searchPlaceholder={t('device.searchPlaceholder')}
 			filters={
-				<FilterSelect
-					label={t('device.filterByRack')}
-					allLabel={t('device.allRacks')}
-					value={filterRack()}
-					onChange={setFilterRack}
-					rows={racks() ?? []}
-				/>
+				<>
+					<FilterSelect
+						label={t('device.filterByRack')}
+						allLabel={t('device.allRacks')}
+						value={filterRack()}
+						onChange={setFilterRack}
+						rows={racks() ?? []}
+					/>
+					<FilterSelect
+						label={t('device.filterByRole')}
+						allLabel={t('device.allRoles')}
+						value={filterRole()}
+						onChange={setFilterRole}
+						rows={roles() ?? []}
+					/>
+				</>
 			}
 			filtered={
-				filterRack() !== '' || filterTenant() !== '' || tenantContext().kind !== 'all'
+				filterRack() !== '' ||
+				filterRole() !== '' ||
+				filterTenant() !== '' ||
+				tenantContext().kind !== 'all'
 			}
 			columns={columns}
 			columnsKey="devices"

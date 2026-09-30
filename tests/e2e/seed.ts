@@ -4,6 +4,7 @@ import { SQL } from 'bun'
 import { closeDb, getDb, getSqlClient, initDb } from '../../server/src/db/connection'
 import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 import {
+	device_roles,
 	device_types,
 	devices,
 	locations,
@@ -151,6 +152,15 @@ if (e2eSite) {
 }
 
 if (e2eSite && e2eRackType) {
+	let e2eRole = (await db.select().from(device_roles)).find((row) => row.name === 'E2E Role')
+	if (!e2eRole) {
+		e2eRole = (
+			await db
+				.insert(device_roles)
+				.values({ name: 'E2E Role', description: 'Role for screenshot coverage.' })
+				.returning()
+		)[0]
+	}
 	let visualRack = (await db.select().from(racks)).find((row) => row.name === 'E2E Visual Rack')
 	if (!visualRack) {
 		visualRack = (
@@ -190,6 +200,7 @@ if (e2eSite && e2eRackType) {
 		for (const device of visualDevices) {
 			const values = {
 				device_type_id: device.device_type_id,
+				device_role_id: e2eRole.id,
 				site_id: e2eSite.id,
 				location_id: null,
 				rack_id: visualRack.id,

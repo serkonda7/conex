@@ -249,6 +249,23 @@ export const device_type_interfaces = pgTable(
 )
 
 // ---------------------------------------------------------------------------
+// P3b: device roles (NetBox-style functional roles: `Server`, `Switch`, …).
+// Shared catalog data (no tenant column): every device carries exactly one;
+// role delete is blocked while devices reference it (service layer), so the
+// FK carries no cascade.
+// ---------------------------------------------------------------------------
+
+export const device_roles = pgTable(
+	'device_roles',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		name: text('name').notNull().unique(),
+		description: text('description'),
+	},
+	(table) => [index('device_roles_name_idx').on(table.name)],
+)
+
+// ---------------------------------------------------------------------------
 // P4: devices / interfaces. Placement is exactly one of:
 // | unracked           | rack null | position null | any u_height |
 // | rack-assigned only | rack set  | position null | any          |
@@ -271,6 +288,12 @@ export const devices = pgTable(
 		device_type_id: integer('device_type_id')
 			.notNull()
 			.references(() => device_types.id),
+		// NetBox-style functional role (`Server`, `Switch`, …). Required:
+		// every device carries exactly one. Delete-blocked while referenced
+		// (service layer in `db/device_roles.ts`), so the FK carries no cascade.
+		device_role_id: integer('device_role_id')
+			.notNull()
+			.references(() => device_roles.id),
 		site_id: integer('site_id').references(() => sites.id),
 		location_id: integer('location_id').references(() => locations.id),
 		rack_id: integer('rack_id').references(() => racks.id),
@@ -291,6 +314,7 @@ export const devices = pgTable(
 	},
 	(table) => [
 		index('devices_type_id_idx').on(table.device_type_id),
+		index('devices_device_role_id_idx').on(table.device_role_id),
 		index('devices_site_id_idx').on(table.site_id),
 		index('devices_rack_id_idx').on(table.rack_id),
 		index('devices_shelf_id_idx').on(table.shelf_id),

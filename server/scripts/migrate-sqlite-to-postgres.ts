@@ -16,7 +16,7 @@ import { Database } from 'bun:sqlite'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getTableColumns, getTableName, sql } from 'drizzle-orm'
+import { eq, getTableColumns, getTableName, sql } from 'drizzle-orm'
 import { drizzle as drizzleSqlite } from 'drizzle-orm/bun-sqlite'
 import { migrate as migrateSqlite } from 'drizzle-orm/bun-sqlite/migrator'
 import type { PgTable } from 'drizzle-orm/pg-core'
@@ -38,6 +38,7 @@ const TABLES: { table: PgTable; parentKey?: string }[] = [
 	{ table: schema.manufacturers },
 	{ table: schema.device_types },
 	{ table: schema.device_type_interfaces },
+	{ table: schema.device_roles },
 	{ table: schema.racks },
 	{ table: schema.shelves },
 	{ table: schema.devices },
@@ -47,10 +48,13 @@ const TABLES: { table: PgTable; parentKey?: string }[] = [
 
 /**
  * Nullable columns added after the SQLite era: absent in the snapshot and
- * left NULL in Postgres.
+ * left NULL in Postgres. `devices.device_role_id` is required in Postgres,
+ * so device rows are backfilled to a seeded `Unknown` role instead (see the
+ * copy step below).
  */
 const POSTGRES_ONLY_COLUMNS: Record<string, readonly string[]> = {
 	tenants: ['tenant_group_id'],
+	devices: ['device_role_id'],
 }
 
 /**
@@ -130,6 +134,11 @@ try {
 				(c) => c.name,
 			),
 		)
+		// `device_roles` postdates the SQLite era: seed it from scratch in
+		// the copy step instead of reading it from the snapshot.
+		if (name === 'device_roles' && present.size === 0) {
+			return { table, name, values: [], hasId: columns.id?.dataType === 'number' }
+		}
 		if (present.size === 0) {
 			fail(`table "${name}" is missing in SQLite`)
 		}
@@ -175,10 +184,52 @@ try {
 	}
 
 	await db.transaction(async (tx) => {
+		// Roles are required on every device but postdate the SQLite era:
+		// seed the `Unknown` placeholder up front and point all copied
+		// devices at it (they had no role before).
+		let unknownRoleId: number | null = null
 		for (const { table, name, values, hasId } of plan) {
-			for (let i = 0; i < values.length; i += BATCH_SIZE) {
+			let rows = values
+			if (name === 'device_roles' && values.length === 0) {
+				const inserted = (
+					await tx
+						.insert(schema.device_roles)
+						.values({
+							name: 'Unknown',
+							description:
+								'Placeholder role for devices created before device roles existed.',
+						})
+						.returning({ id: schema.device_roles.id })
+				)[0]
+				if (!inserted) {
+					fail('seeding the Unknown device role did not return an id')
+				}
+				unknownRoleId = (inserted as { id: number }).id
+				console.log(`  ${name.padEnd(24)} 1 row (seeded)`)
+				// The identity sequence already advanced past the seeded id.
+				continue
+			} else if (name === 'devices') {
+				if (unknownRoleId === null) {
+					const existing = (
+						await tx
+							.select({ id: schema.device_roles.id })
+							.from(schema.device_roles)
+							.where(eq(schema.device_roles.name, 'Unknown'))
+							.limit(1)
+					)[0]
+					if (!existing) {
+						fail('device_roles has no Unknown role to backfill devices with')
+					}
+					unknownRoleId = (existing as { id: number }).id
+				}
+				rows = values.map((deviceRow) => ({
+					...deviceRow,
+					device_role_id: unknownRoleId as number,
+				}))
+			}
+			for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 				try {
-					await tx.insert(table).values(values.slice(i, i + BATCH_SIZE))
+					await tx.insert(table).values(rows.slice(i, i + BATCH_SIZE))
 				} catch (err) {
 					const cause =
 						err instanceof Error && err.cause instanceof Error ? err.cause : err
@@ -196,10 +247,10 @@ try {
 				)
 			}
 			const [row] = await tx.select({ n: sql<number>`count(*)::int` }).from(table)
-			if (row?.n !== values.length) {
-				fail(`row count mismatch in "${name}": SQLite ${values.length}, Postgres ${row?.n}`)
+			if (row?.n !== rows.length) {
+				fail(`row count mismatch in "${name}": SQLite ${rows.length}, Postgres ${row?.n}`)
 			}
-			console.log(`  ${name.padEnd(24)} ${values.length} rows`)
+			console.log(`  ${name.padEnd(24)} ${rows.length} rows`)
 		}
 	})
 	console.log('Migration complete.')

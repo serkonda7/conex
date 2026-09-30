@@ -19,6 +19,7 @@ import {
 	IconNetwork,
 	IconPlugConnected,
 	IconServer,
+	IconTag,
 	IconTemplate,
 	IconUsers,
 } from '@tabler/icons-solidjs'
@@ -29,6 +30,9 @@ import { DeviceTypeDetailPage } from '../pages/device_types/detail'
 import { DeviceTypeAddPage, DeviceTypeEditPage } from '../pages/device_types/form'
 import { DeviceTypeImportPage } from '../pages/device_types/import'
 import { DeviceTypesPage } from '../pages/device_types/list'
+import { DeviceRoleDetailPage } from '../pages/device-roles/detail'
+import { DeviceRoleAddPage, DeviceRoleEditPage } from '../pages/device-roles/form'
+import { DeviceRolesPage } from '../pages/device-roles/list'
 import { DeviceAddPage } from '../pages/devices/add'
 import { DeviceDetailPage } from '../pages/devices/detail'
 import { DeviceEditPage } from '../pages/devices/edit'
@@ -135,6 +139,15 @@ export const SECTIONS: readonly Section[] = [
 		add: DeviceAddPage,
 		detail: DeviceDetailPage,
 		edit: DeviceEditPage,
+	},
+	{
+		path: 'device-roles',
+		noun: (n: number): string => tp('entity.deviceRole', n),
+		icon: IconTag,
+		list: DeviceRolesPage,
+		add: DeviceRoleAddPage,
+		detail: DeviceRoleDetailPage,
+		edit: DeviceRoleEditPage,
 	},
 	{
 		path: 'rack-types',

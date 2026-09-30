@@ -1,5 +1,6 @@
 import type { DeviceFace } from 'shared/src/types'
 import { createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { fetch_device_roles } from '../../api/device_roles'
 import { create_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
@@ -50,6 +51,7 @@ export function DeviceAddPage(): JSX.Element {
 	const form = useFormState()
 	const [name, setName] = createSignal('')
 	const [typeId, setTypeId] = createSignal('')
+	const [roleId, setRoleId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
@@ -66,6 +68,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [shelf] = createRecord(() => shelfId, fetch_shelf, form.setError)
 
 	const [types] = createRows(fetch_device_types, form.setError)
+	const [roles] = createRows(fetch_device_roles, form.setError)
 	const [manufacturers] = createRows(fetch_manufacturers, form.setError)
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [racks] = createRows(fetch_racks, form.setError)
@@ -101,6 +104,9 @@ export function DeviceAddPage(): JSX.Element {
 		if (!typeId()) {
 			return t('device.selectTypeFirst')
 		}
+		if (!roleId()) {
+			return t('device.selectRole')
+		}
 		return validPosition(parsePosition(positionU())) ? null : t('device.positionInvalid')
 	}
 
@@ -114,6 +120,7 @@ export function DeviceAddPage(): JSX.Element {
 			save: (values: FormValues) =>
 				create_device({
 					device_type_id: Number(typeId()),
+					device_role_id: Number(roleId()),
 					name: values.name,
 					description: text(description()),
 					serial: text(serial()),
@@ -162,6 +169,18 @@ export function DeviceAddPage(): JSX.Element {
 				emptyLabel={t('device.deviceTypePlaceholder')}
 				action={
 					<AddOptionButton label={tp('entity.deviceType', 1)} href="/device-types/add" />
+				}
+			/>
+			<SelectField
+				id="device-role"
+				label={tp('entity.deviceRole', 1)}
+				required
+				value={roleId()}
+				onChange={setRoleId}
+				options={row_options(roles() ?? [])}
+				emptyLabel={t('device.rolePlaceholder')}
+				action={
+					<AddOptionButton label={tp('entity.deviceRole', 1)} href="/device-roles/add" />
 				}
 			/>
 			<DescriptionField
