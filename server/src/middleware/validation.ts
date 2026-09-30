@@ -7,7 +7,7 @@ import { formatValibotIssues } from '../util/valibot'
 /**
  * Error hook for `vValidator`. Replaces valibot's default issue array with the
  * `{ error: string }` shape every other endpoint returns, which is what
- * `client/src/util/api_error.ts` reads.
+ * `client/src/api/client.ts` reads.
  */
 export function onValidationError<T extends v.GenericSchema>(
 	result: v.SafeParseResult<T>,

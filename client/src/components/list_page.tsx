@@ -1,33 +1,40 @@
 /**
  * Shared building blocks for the entity list pages (tenants, sites,
- * devices, …): debounced search, sort state, checkbox selection, the
- * viewport-anchored row menu, single/bulk delete flows, and the
- * header/toolbar/row-action/status/error shells.
+ * devices, …). `useEntityList` owns the list state (debounced search, sort,
+ * the fetched page, checkbox selection, single/bulk delete) and
+ * `EntityListPage` renders the standard page around it: header with
+ * "+ Add", search/filter toolbar, table with row actions and row menu,
+ * range status and error line.
  *
- * Every piece preserves the exact DOM and aria structure the pages rendered
- * before, so e2e selectors keep working. Write actions (add, edit, delete,
- * bulk selection) render only when the session can write. `noun` options take a
- * `noun.<entity>` plural key used to build localized confirm/aria text.
+ * Write actions (add, edit, delete, bulk selection) render only when the
+ * session can write. `noun` options take a `noun.<entity>` plural key used
+ * to build localized confirm/aria/status text.
  */
 
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { InputEventAndTarget } from 'shared/src/types'
+import type { InputEventAndTarget, Page } from 'shared/src/types'
 import {
 	type Accessor,
 	createEffect,
+	createMemo,
+	createResource,
 	createSignal,
+	For,
 	type JSX,
 	onCleanup,
 	onMount,
+	type Resource,
 	type Setter,
 	Show,
 } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
-import { navigate } from '../router'
-import { canWrite } from '../session'
-import { use_visible_columns } from '../util/column_visibility'
+import { use_visible_columns } from '../lib/column_visibility'
+import { navigate, queryParam } from '../lib/router'
+import { canWrite } from '../lib/session'
+import { DataTable, type DataTableColumn } from './data_table'
+import { Empty, InlineError, Loading } from './feedback'
 
 /** Search text plus its debounced (trimmed) projection for list queries. */
 export function useDebouncedSearch(delay = 250): {
@@ -58,9 +65,7 @@ export function useSort<T extends string>(
 	initial: T | undefined,
 ): {
 	sort: Accessor<T | undefined>
-	setSort: Setter<T | undefined>
 	order: Accessor<'asc' | 'desc'>
-	setOrder: Setter<'asc' | 'desc'>
 	handleSort: (key: string) => void
 	clearSort: () => void
 } {
@@ -82,52 +87,15 @@ export function useSort<T extends string>(
 		setOrder('asc')
 	}
 
-	return { sort, setSort, order, setOrder, handleSort, clearSort }
+	return { sort, order, handleSort, clearSort }
 }
 
 /**
- * Checkbox selection for a DataTable. `track` is the list-query memo: a new
- * result set invalidates the selection. `selection` spreads straight into
- * the DataTable's selection props; read-only sessions get no checkboxes.
+ * Filter value seeded from the tab's `?<key>=` query (deep links such as
+ * `/sites?tenant=<id>` from detail pages); the toolbar changes it from there.
  */
-export function useListSelection(
-	track: () => unknown,
-	noun: PluralKey,
-): {
-	selected: Accessor<number[]>
-	setSelected: Setter<number[]>
-	selection: {
-		selected: Accessor<number[]> | undefined
-		onSelectionChange: ((ids: (string | number)[]) => void) | undefined
-		selectionLabel: string
-	}
-} {
-	const [selected, setSelected] = createSignal<number[]>([])
-
-	// A new result set invalidates the checkbox selection.
-	createEffect(() => {
-		track()
-		setSelected([])
-	})
-
-	function onSelectionChange(ids: (string | number)[]): void {
-		setSelected(ids.map((id) => Number(id)))
-	}
-
-	const selectionLabel = t('list.selectAll', { noun: tp(noun, 2) })
-	return {
-		selected,
-		setSelected,
-		selection: {
-			get selected(): Accessor<number[]> | undefined {
-				return canWrite() ? selected : undefined
-			},
-			get onSelectionChange(): ((ids: (string | number)[]) => void) | undefined {
-				return canWrite() ? onSelectionChange : undefined
-			},
-			selectionLabel,
-		},
-	}
+export function useQueryFilter(key: string): [Accessor<string>, Setter<string>] {
+	return createSignal(queryParam(key))
 }
 
 /** Persisted visible-column state for a DataTable column customizer. */
@@ -152,6 +120,28 @@ export interface RowMenuAnchor {
 	up: boolean
 }
 
+/** Single-item menu height estimate; only the upward flip depends on it. */
+const ROW_MENU_HEIGHT = 64
+const ROW_MENU_GAP = 4
+
+/**
+ * Anchors the row menu to its toggle button in viewport coordinates,
+ * flipped upward when there is no room below (e.g. the last table row).
+ */
+function anchorBelow(button: HTMLElement, id: number, name: string): RowMenuAnchor {
+	const rect = button.getBoundingClientRect()
+	const spaceBelow = window.innerHeight - rect.bottom - ROW_MENU_GAP
+	const spaceAbove = rect.top - ROW_MENU_GAP
+	const up = spaceBelow < ROW_MENU_HEIGHT && spaceAbove >= ROW_MENU_HEIGHT
+	return {
+		id,
+		name,
+		edge: up ? window.innerHeight - rect.top + ROW_MENU_GAP : rect.bottom + ROW_MENU_GAP,
+		right: Math.max(0, window.innerWidth - rect.right),
+		up,
+	}
+}
+
 /** Viewport-anchored single-item row menu with outside/scroll/resize dismiss. */
 export function useRowMenu(): {
 	openMenu: Accessor<RowMenuAnchor | null>
@@ -163,21 +153,16 @@ export function useRowMenu(): {
 	) => void
 } {
 	const [openMenu, setOpenMenu] = createSignal<RowMenuAnchor | null>(null)
-
 	function closeMenu(): void {
 		setOpenMenu(null)
 	}
 
 	onMount(() => {
-		// Dismiss an open row menu on outside click (same pattern as the
-		// account menu in App.tsx). The menu is viewport-anchored, so any
-		// scroll or resize dismisses it too instead of leaving it adrift.
+		// The menu is viewport-anchored, so any scroll or resize dismisses it
+		// too instead of leaving it adrift.
 		const onDocClick = (e: MouseEvent): void => {
-			if (!(e.target instanceof Element)) {
-				return
-			}
-			if (e.target.closest('.row-menu-wrap') === null) {
-				setOpenMenu(null)
+			if (e.target instanceof Element && e.target.closest('.row-menu-wrap') === null) {
+				closeMenu()
 			}
 		}
 		document.addEventListener('click', onDocClick)
@@ -190,79 +175,115 @@ export function useRowMenu(): {
 		})
 	})
 
-	/**
-	 * Anchors the row menu to the toggle button in viewport coordinates.
-	 * Flips upward when there is no room below (e.g. the last table row).
-	 */
 	function toggleMenu(
 		e: MouseEvent & { currentTarget: HTMLButtonElement },
 		id: number,
 		name: string,
 	): void {
-		if (openMenu()?.id === id) {
-			setOpenMenu(null)
-			return
-		}
-		const rect = e.currentTarget.getBoundingClientRect()
-		const gap = 4
-		// Single-item menu height estimate; the upward anchor uses `bottom`
-		// so only this flip decision depends on it.
-		const menuHeight = 64
-		const spaceBelow = window.innerHeight - rect.bottom - gap
-		const spaceAbove = rect.top - gap
-		const up = spaceBelow < menuHeight && spaceAbove >= menuHeight
-		setOpenMenu({
-			id,
-			name,
-			edge: up ? window.innerHeight - rect.top + gap : rect.bottom + gap,
-			right: Math.max(0, window.innerWidth - rect.right),
-			up,
-		})
+		setOpenMenu(openMenu()?.id === id ? null : anchorBelow(e.currentTarget, id, name))
 	}
 
 	return { openMenu, closeMenu, toggleMenu }
 }
 
-/**
- * Confirm-then-delete flows shared by every deletable list: a single-row
- * delete (by menu) and a bulk delete over the checkbox selection. Both
- * report through `setError` and refresh through `refetch`.
- */
-export function useListDelete(opts: {
+/** DataTable selection props; read-only sessions get no checkboxes. */
+export interface SelectionProps {
+	selected: Accessor<number[]> | undefined
+	onSelectionChange: ((ids: (string | number)[]) => void) | undefined
+	selectionLabel: string
+}
+
+/** Everything `EntityListPage` needs from {@link useEntityList}. */
+export interface EntityList<Row> {
 	noun: PluralKey
-	remove: (id: number) => Promise<Result<unknown, Error>>
+	search: Accessor<string>
+	setSearch: Setter<string>
+	debouncedSearch: Accessor<string>
+	sort: Accessor<string | undefined>
+	order: Accessor<'asc' | 'desc'>
+	handleSort: (key: string) => void
+	clearSort: () => void
+	page: Resource<Page<Row> | null>
+	rows: Accessor<Row[]>
+	total: Accessor<number>
+	error: Accessor<string | null>
 	setError: Setter<string | null>
-	refetch: () => void
 	selected: Accessor<number[]>
-	setSelected: Setter<number[]>
-}): {
+	selection: SelectionProps
 	handleDelete: (id: number, name: string) => Promise<void>
 	handleBulkDelete: () => Promise<void>
-} {
+}
+
+/**
+ * State of a standard list page: search, sort and the page-specific
+ * `filters` form the query for `fetch`; a new result set clears the
+ * checkbox selection. Deletes confirm first, report through `error` and
+ * refetch.
+ */
+export function useEntityList<
+	Row extends { id: number },
+	Sort extends string,
+	F extends object,
+>(opts: {
+	noun: PluralKey
+	sort: Sort
+	filters?: () => F
+	fetch: (
+		query: { search: string; sort: Sort; order: 'asc' | 'desc' } & F,
+	) => Promise<Result<Page<Row>, Error>>
+	remove: (id: number) => Promise<Result<unknown, Error>>
+}): EntityList<Row> {
+	const [error, setError] = createSignal<string | null>(null)
+	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+	const { sort, order, handleSort, clearSort } = useSort<Sort>(opts.sort)
+	const [selected, setSelected] = createSignal<number[]>([])
+
+	const query = createMemo(() => ({
+		search: debouncedSearch(),
+		sort: sort() ?? opts.sort,
+		order: order(),
+		...(opts.filters?.() ?? ({} as F)),
+	}))
+
+	const [page, { refetch }] = createResource(query, async (q) => {
+		const res = await opts.fetch(q)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return null
+		}
+		return res.value
+	})
+
+	// A new result set invalidates the checkbox selection.
+	createEffect(() => {
+		query()
+		setSelected([])
+	})
+
 	async function handleDelete(id: number, name: string): Promise<void> {
 		if (!window.confirm(t('list.confirmDelete', { noun: tp(opts.noun, 1), name }))) {
 			return
 		}
-		opts.setError(null)
+		setError(null)
 		const res = await opts.remove(id)
 		if (Result.isError(res)) {
-			opts.setError(res.error.message)
+			setError(res.error.message)
 			return
 		}
-		opts.setSelected((prev) => prev.filter((s) => s !== id))
-		void opts.refetch()
+		setSelected((prev) => prev.filter((s) => s !== id))
+		void refetch()
 	}
 
 	async function handleBulkDelete(): Promise<void> {
-		const ids = opts.selected()
-		if (ids.length === 0) {
-			return
-		}
+		const ids = selected()
 		const noun = tp(opts.noun, ids.length)
-		if (!window.confirm(t('list.confirmBulkDelete', { count: ids.length, noun }))) {
+		if (
+			ids.length === 0 ||
+			!window.confirm(t('list.confirmBulkDelete', { count: ids.length, noun }))
+		) {
 			return
 		}
-		opts.setError(null)
+		setError(null)
 		const failures: string[] = []
 		for (const id of ids) {
 			const res = await opts.remove(id)
@@ -270,21 +291,199 @@ export function useListDelete(opts: {
 				failures.push(res.error.message)
 			}
 		}
-		opts.setSelected([])
+		setSelected([])
 		if (failures.length > 0) {
-			opts.setError(failures[0] ?? t('list.bulkDeleteFailed'))
+			setError(failures[0] ?? t('list.bulkDeleteFailed'))
 		}
-		void opts.refetch()
+		void refetch()
 	}
 
-	return { handleDelete, handleBulkDelete }
+	return {
+		noun: opts.noun,
+		search,
+		setSearch,
+		debouncedSearch,
+		sort,
+		order,
+		handleSort,
+		clearSort,
+		page,
+		rows: () => page()?.items ?? [],
+		total: () => page()?.total ?? 0,
+		error,
+		setError,
+		selected,
+		selection: {
+			get selected(): Accessor<number[]> | undefined {
+				return canWrite() ? selected : undefined
+			},
+			get onSelectionChange(): ((ids: (string | number)[]) => void) | undefined {
+				return canWrite()
+					? (ids: (string | number)[]): void => {
+							setSelected(ids.map(Number))
+						}
+					: undefined
+			},
+			selectionLabel: t('list.selectAll', { noun: tp(opts.noun, 2) }),
+		},
+		handleDelete,
+		handleBulkDelete,
+	}
+}
+
+/**
+ * Standard list page around {@link useEntityList}. `filters` are extra
+ * toolbar controls; `filtered` tells the empty message whether they (or
+ * the tenant context) narrow the list. Without `editHref` the rows only get
+ * the menu toggle.
+ */
+export function EntityListPage<Row extends { id: number }>(props: {
+	list: EntityList<Row>
+	title: string
+	addHref: string
+	/** Extra header buttons beside "+ Add" (e.g. Import). */
+	headerActions?: JSX.Element
+	searchPlaceholder: string
+	filters?: JSX.Element
+	filtered?: boolean
+	/** Defaults to true; false drops the checkboxes and "Delete selected". */
+	bulkDelete?: boolean
+	columns: DataTableColumn<Row>[]
+	/** Storage key of the persisted column choice. */
+	columnsKey: string
+	defaultColumns?: string[]
+	rowName: (row: Row) => string
+	editHref?: (row: Row) => string
+	emptyText: string
+}): JSX.Element {
+	const list = props.list
+	const nouns = (): string => tp(list.noun, 2)
+	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
+	const [visibleColumns, setVisibleColumns] = useTableColumns(
+		props.columnsKey,
+		props.columns.map((c) => c.key),
+		props.defaultColumns,
+	)
+	const bulk = (): boolean => props.bulkDelete !== false
+
+	function emptyMessage(): string {
+		if (props.filtered === true) {
+			return t('list.noMatchFilters', { noun: nouns() })
+		}
+		const search = list.debouncedSearch()
+		return search ? t('list.noMatch', { noun: nouns(), search }) : props.emptyText
+	}
+
+	function rowActions(row: Row): JSX.Element {
+		const name = props.rowName(row)
+		return (
+			<ListRowActions
+				edit_href={props.editHref?.(row)}
+				name={name}
+				menu_open={openMenu()?.id === row.id}
+				onToggleMenu={(e: MouseEvent & { currentTarget: HTMLButtonElement }): void =>
+					toggleMenu(e, row.id, name)
+				}
+				onCloseMenu={closeMenu}
+			/>
+		)
+	}
+
+	return (
+		<div>
+			<ListPageHeader
+				title={props.title}
+				add_href={props.addHref}
+				actions={props.headerActions}
+			/>
+
+			<div class="toolbar-row">
+				<ListSearchField
+					label={t('list.searchLabel', { noun: nouns() })}
+					placeholder={props.searchPlaceholder}
+					value={list.search()}
+					onInput={list.setSearch}
+				/>
+				{props.filters}
+				<span class="toolbar-spacer" />
+				<Show when={bulk()}>
+					<BulkDeleteButton
+						count={list.selected().length}
+						onClick={list.handleBulkDelete}
+					/>
+				</Show>
+			</div>
+
+			<DataTable
+				rows={list.rows}
+				getRowId={(row: Row): number => row.id}
+				columns={props.columns}
+				sortKey={list.sort}
+				sortDirection={list.order}
+				onSort={list.handleSort}
+				onSortClear={list.clearSort}
+				showColumnCustomizer
+				visibleColumns={visibleColumns}
+				onVisibleColumnsChange={setVisibleColumns}
+				selected={bulk() ? list.selection.selected : undefined}
+				onSelectionChange={bulk() ? list.selection.onSelectionChange : undefined}
+				selectionLabel={list.selection.selectionLabel}
+				rowActions={canWrite() ? rowActions : undefined}
+				loading={() => list.page.loading}
+				loadingContent={<Loading message={t('list.loading', { noun: nouns() })} />}
+				emptyContent={<Empty message={emptyMessage()} />}
+			/>
+
+			<ListRangeStatus total={list.total()} />
+
+			<RowMenu
+				menu={openMenu}
+				onClose={closeMenu}
+				onDelete={(menu: RowMenuAnchor): void => void list.handleDelete(menu.id, menu.name)}
+			/>
+
+			<InlineError message={list.error()} />
+		</div>
+	)
+}
+
+/**
+ * Toolbar `<select>` narrowing a list: an "all" entry followed by `rows`.
+ * The value is the chosen row id as a string (`''` = all).
+ */
+export function FilterSelect(props: {
+	label: string
+	allLabel: string
+	value: string
+	onChange: (value: string) => void
+	rows: readonly { id: number; name: string }[]
+}): JSX.Element {
+	return (
+		<label>
+			<span class="visually-hidden">{props.label}</span>
+			<select
+				aria-label={props.label}
+				value={props.value}
+				onChange={(e: Event & { currentTarget: HTMLSelectElement }): void =>
+					props.onChange(e.currentTarget.value)
+				}
+			>
+				<option value="">{props.allLabel}</option>
+				<For each={props.rows}>
+					{(row: { id: number; name: string }): JSX.Element => (
+						<option value={row.id}>{row.name}</option>
+					)}
+				</For>
+			</select>
+		</label>
+	)
 }
 
 /**
  * List title plus the "+ Add" button. `actions` renders extra header buttons
- * (e.g. the device-type Import button) beside "+ Add" inside the same
- * `page-header-actions` wrapper the hand-rolled page used. Both are write
- * actions, hidden for read-only sessions.
+ * (e.g. the device-type Import button) beside "+ Add" inside a
+ * `page-header-actions` wrapper. Both are write actions, hidden for
+ * read-only sessions.
  */
 export function ListPageHeader(props: {
 	title: string
@@ -358,16 +557,18 @@ export function ListRowActions(props: {
 }): JSX.Element {
 	return (
 		<div class="row-actions">
-			<Show when={props.edit_href !== undefined}>
-				<button
-					type="button"
-					class="icon-btn"
-					title={t('common.editNamed', { name: props.name })}
-					aria-label={t('common.editNamed', { name: props.name })}
-					onClick={() => navigate(props.edit_href ?? '')}
-				>
-					<IconPencil size={16} />
-				</button>
+			<Show when={props.edit_href}>
+				{(href: () => string) => (
+					<button
+						type="button"
+						class="icon-btn"
+						title={t('common.editNamed', { name: props.name })}
+						aria-label={t('common.editNamed', { name: props.name })}
+						onClick={() => navigate(href())}
+					>
+						<IconPencil size={16} />
+					</button>
+				)}
 			</Show>
 			<div class="row-menu-wrap">
 				<button
@@ -397,40 +598,40 @@ export function RowMenu(props: {
 	onDelete: (menu: RowMenuAnchor) => void
 }): JSX.Element {
 	return (
-		<Show when={props.menu() !== null}>
-			<Portal>
-				<div
-					class="row-menu"
-					role="menu"
-					aria-label={t('common.actionsFor', { name: props.menu()?.name ?? '' })}
-					style={{
-						top: props.menu()?.up ? undefined : `${props.menu()?.edge ?? 0}px`,
-						bottom: props.menu()?.up ? `${props.menu()?.edge ?? 0}px` : undefined,
-						right: `${props.menu()?.right ?? 0}px`,
-					}}
-				>
-					<button
-						type="button"
-						role="menuitem"
-						class="row-menu-danger"
-						onClick={() => {
-							const menu = props.menu()
-							props.onClose()
-							if (menu) {
-								props.onDelete(menu)
-							}
-						}}
-						onKeyDown={(e: KeyboardEvent): void => {
-							if (e.key === 'Escape') {
-								props.onClose()
-							}
+		<Show when={props.menu()}>
+			{(menu: () => RowMenuAnchor) => (
+				<Portal>
+					<div
+						class="row-menu"
+						role="menu"
+						aria-label={t('common.actionsFor', { name: menu().name })}
+						style={{
+							top: menu().up ? undefined : `${menu().edge}px`,
+							bottom: menu().up ? `${menu().edge}px` : undefined,
+							right: `${menu().right}px`,
 						}}
 					>
-						<IconTrash size={16} />
-						{t('common.delete')}
-					</button>
-				</div>
-			</Portal>
+						<button
+							type="button"
+							role="menuitem"
+							class="row-menu-danger"
+							onClick={() => {
+								const current = menu()
+								props.onClose()
+								props.onDelete(current)
+							}}
+							onKeyDown={(e: KeyboardEvent): void => {
+								if (e.key === 'Escape') {
+									props.onClose()
+								}
+							}}
+						>
+							<IconTrash size={16} />
+							{t('common.delete')}
+						</button>
+					</div>
+				</Portal>
+			)}
 		</Show>
 	)
 }
@@ -445,14 +646,5 @@ export function ListRangeStatus(props: { total: number }): JSX.Element {
 				total: props.total,
 			})}
 		</p>
-	)
-}
-
-/** Terminal list error line. */
-export function ListError(props: { message: string | null }): JSX.Element {
-	return (
-		<Show when={props.message}>
-			<div class="app-inline-error">{props.message}</div>
-		</Show>
 	)
 }

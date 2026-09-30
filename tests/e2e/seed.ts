@@ -6,6 +6,7 @@ import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 import {
 	device_types,
 	devices,
+	locations,
 	manufacturers,
 	racks,
 	shelves,
@@ -116,6 +117,39 @@ if (!e2eSwitchType) {
 const e2eSwitch = (await db.select().from(device_types)).find(
 	(row) => row.model === 'E2E 1U Switch',
 )
+// Nested location tree for the locations list snapshot; parents come first.
+if (e2eSite) {
+	const locationTree = [
+		{ name: 'E2E Floor 1', slug: 'e2e-floor-1', type: 'floor', parent: null },
+		{ name: 'E2E Server Room', slug: 'e2e-server-room', type: 'room', parent: 'E2E Floor 1' },
+		{ name: 'E2E Cage A', slug: 'e2e-cage-a', type: 'other', parent: 'E2E Server Room' },
+		{ name: 'E2E Storage Room', slug: 'e2e-storage-room', type: 'room', parent: 'E2E Floor 1' },
+		{ name: 'E2E Floor 2', slug: 'e2e-floor-2', type: 'floor', parent: null },
+	] as const
+	const locationIds = new Map<string, number>()
+	for (const location of locationTree) {
+		const values = {
+			site_id: e2eSite.id,
+			parent_id: location.parent ? (locationIds.get(location.parent) ?? null) : null,
+			tenant_id: tenant.id,
+			name: location.name,
+			slug: location.slug,
+			type: location.type,
+			description: null,
+		}
+		const existing = (await db.select().from(locations)).find(
+			(row) => row.name === location.name,
+		)
+		if (existing) {
+			await getSqlClient()`UPDATE locations SET ${getSqlClient()(values)} WHERE id = ${existing.id}`
+			locationIds.set(location.name, existing.id)
+		} else {
+			const inserted = (await db.insert(locations).values(values).returning())[0]
+			locationIds.set(location.name, inserted.id)
+		}
+	}
+}
+
 if (e2eSite && e2eRackType) {
 	let visualRack = (await db.select().from(racks)).find((row) => row.name === 'E2E Visual Rack')
 	if (!visualRack) {

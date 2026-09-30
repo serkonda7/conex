@@ -22,10 +22,7 @@ test('rack detail and elevation layout', async ({ page }) => {
 	await expect(page.getByTestId('rack-elevation')).toBeVisible()
 	await expect(page.getByTestId('rack-elevation').locator('.rack-elev')).toHaveCount(2)
 	await stabilizeForSnapshot(page)
-	await expect(page).toHaveScreenshot('rack-detail-and-elevation.png', {
-		mask: [page.locator('.app-user-username')],
-		maskColor: '#242424',
-	})
+	await expect(page.locator('main.app-content')).toHaveScreenshot('rack-detail-and-elevation.png')
 })
 
 test('device type edit form layout', async ({ page }) => {
@@ -45,7 +42,16 @@ test('device type edit form layout', async ({ page }) => {
 	await expect(page.locator('#device-type-edit-full-depth')).toBeVisible()
 	await expect(page.locator('#device-type-edit-model')).toHaveValue('E2E 42U Cabinet')
 	await stabilizeForSnapshot(page)
-	await expect(page).toHaveScreenshot('device-type-edit-form.png', {
+	await expect(page.locator('main.app-content')).toHaveScreenshot('device-type-edit-form.png')
+})
+
+test('locations list layout', async ({ page }) => {
+	await page.goto('/locations')
+	await expect(page.locator('main.app-content h2')).toBeVisible()
+	await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
+	await stabilizeForSnapshot(page)
+	await expect(page).toHaveScreenshot('locations-list.png', {
+		fullPage: true,
 		mask: [page.locator('.app-user-username')],
 		maskColor: '#242424',
 	})

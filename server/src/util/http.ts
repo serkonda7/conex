@@ -2,7 +2,7 @@
  * Shared `{ error }` response contract.
  *
  * Every failure response uses the `{ error: string }` shape, which is the
- * only field the client reads (`client/src/util/api_error.ts`). Build them
+ * only field the client reads (`client/src/api/client.ts`). Build them
  * through this helper so producers cannot drift (different key, extra
  * fields, missing status).
  */

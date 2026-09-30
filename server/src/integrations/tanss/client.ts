@@ -185,11 +185,28 @@ function num(value: unknown): number | null {
 	return null
 }
 
+/** Customer category that marks suppliers; they are never tenants. */
+const SUPPLIER_CATEGORY = 'Lieferant'
+
+/** `categories: [{ id, name, section }]` contains the supplier category. */
+function isSupplier(categories: unknown): boolean {
+	return (
+		Array.isArray(categories) &&
+		categories.some(
+			(c: unknown) =>
+				typeof c === 'object' &&
+				c !== null &&
+				str((c as { name?: unknown }).name) === SUPPLIER_CATEGORY,
+		)
+	)
+}
+
 /**
  * The ERP customer list is untyped in the OpenAPI spec. Real installations
  * answer `{ customers: [{ id, customer_number, name, headquarters, active,
  * … }], employees: [...] }`; the `CompanyDetail` field names are accepted as
- * well. Rows without id or name are skipped.
+ * well. Rows without id or name are skipped, as are suppliers (see
+ * `isSupplier`).
  */
 function toCompany(raw: unknown): TanssCompany | null {
 	if (typeof raw !== 'object' || raw === null) {
@@ -198,7 +215,7 @@ function toCompany(raw: unknown): TanssCompany | null {
 	const r = raw as Record<string, unknown>
 	const id = num(r.id ?? r.companyId)
 	const name = str(r.name ?? r.companyName)
-	if (id === null || name === null) {
+	if (id === null || name === null || isSupplier(r.categories)) {
 		return null
 	}
 	return {

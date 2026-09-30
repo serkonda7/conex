@@ -12,8 +12,8 @@ import {
 	type LocationType,
 	type SyncRunState,
 } from 'shared/src/schemas'
-import type { RackFormFactor } from '../api_templates'
-import type { UserRole } from '../api_users'
+import type { RackFormFactor } from '../api/templates'
+import type { UserRole } from '../api/users'
 import { type MessageKey, t } from '.'
 
 function lookup(keys: Record<string, MessageKey>, value: string): string {

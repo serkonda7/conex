@@ -8,7 +8,7 @@
  * (`conex:locale`), defaulting to German. `t`/`tp` read the signal, so JSX
  * expressions using them update on switch; labels computed once in page
  * bodies (table columns, …) refresh through the locale-keyed remount in
- * `App.tsx`.
+ * `app/App.tsx`.
  */
 import { createSignal } from 'solid-js'
 import { de } from './de'

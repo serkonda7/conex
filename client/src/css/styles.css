@@ -1031,17 +1031,6 @@ tbody tr:last-child td {
 	gap: 0.4rem;
 }
 
-/* Legacy edit-page rows render the control and hint as direct `.field`
-   children (no `.field-control` wrapper); pin them to the right column so
-   they share the same two-column layout. */
-.app-content .form-stacked .field > input,
-.app-content .form-stacked .field > select,
-.app-content .form-stacked .field > textarea,
-.field > .field-hint {
-	grid-column: 2;
-	min-width: 0;
-}
-
 /* Searchable `SelectField`: text input plus an absolutely positioned
    listbox below it. */
 .combobox {
