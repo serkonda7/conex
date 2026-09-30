@@ -130,7 +130,7 @@ export function LocationsPage(): JSX.Element {
 			}
 			columns={columns}
 			columnsKey="locations"
-			defaultColumns={['name', 'type', 'site', 'tenant']}
+			defaultColumns={['name', 'type', 'site']}
 			rowName={(l: LocationRow): string => l.name}
 			editHref={(l: LocationRow): string => `/locations/${l.id}/edit`}
 			emptyText={t('location.empty')}

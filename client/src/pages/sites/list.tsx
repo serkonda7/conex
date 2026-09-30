@@ -59,6 +59,7 @@ export function SitesPage(): JSX.Element {
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="sites"
+			defaultColumns={['name', 'description', 'group']}
 			rowName={(s: SiteRow): string => s.name}
 			editHref={(s: SiteRow): string => `/sites/${s.id}/edit`}
 			emptyText={t('site.empty')}

@@ -5,8 +5,7 @@ Network inventory for MSPs.
 ## Getting Started
 ```sh
 docker start conex-db
-export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
-bun run dev
+CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex bun run dev
 ```
 
 ### Initial Setup

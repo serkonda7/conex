@@ -48,6 +48,7 @@ export function SiteGroupsPage(): JSX.Element {
 				},
 			]}
 			columnsKey="site-groups"
+			defaultColumns={['name', 'description']}
 			rowName={(g: SiteGroupRow): string => g.name}
 			editHref={(g: SiteGroupRow): string => `/site-groups/${g.id}/edit`}
 			emptyText={t('siteGroup.empty')}

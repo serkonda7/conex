@@ -114,6 +114,7 @@ export function RacksPage(): JSX.Element {
 			}
 			columns={columns}
 			columnsKey="racks"
+			defaultColumns={['name', 'site', 'location', 'description', 'type']}
 			rowName={(r: RackRow): string => r.name}
 			editHref={(r: RackRow): string => `/racks/${r.id}/edit`}
 			emptyText={t('rack.empty')}
