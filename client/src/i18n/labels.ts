@@ -5,6 +5,8 @@
  * accepts any string and falls back to the raw value for unknown ones.
  */
 import {
+	AUDIT_EVENTS,
+	type AuditEvent,
 	type DeviceCompareField,
 	type FindingKind,
 	type IntegrationProvider,
@@ -73,6 +75,21 @@ const DEVICE_STATUS_KEYS: Record<string, MessageKey> = {
 /** Device status (`active` / `planned` / `staged` / `decommissioned`). */
 export function deviceStatusLabel(value: string): string {
 	return lookup(DEVICE_STATUS_KEYS, value)
+}
+
+const AUDIT_EVENT_KEYS: Record<AuditEvent, MessageKey> = {
+	'login.success': 'auditEvent.loginSuccess',
+	'login.failure': 'auditEvent.loginFailure',
+}
+
+/** Audit log event (`login.success` / `login.failure`). */
+export function auditEventLabel(value: string): string {
+	return lookup(AUDIT_EVENT_KEYS, value)
+}
+
+/** `<select>` options for every audit log event. */
+export function auditEventOptions(): { value: AuditEvent; label: string }[] {
+	return AUDIT_EVENTS.map((value) => ({ value, label: auditEventLabel(value) }))
 }
 
 const ROLE_KEYS: Record<UserRole, MessageKey> = {

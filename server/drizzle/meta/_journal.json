@@ -64,6 +64,13 @@
       "when": 1790844262684,
       "tag": "0008_graceful_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790846061030,
+      "tag": "0009_audit_log",
+      "breakpoints": true
     }
   ]
 }

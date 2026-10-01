@@ -4,6 +4,7 @@ import type { CookieOptions } from 'hono/utils/cookie'
 import { SESSION_ABSOLUTE_TIMEOUT_S, SESSION_IDLE_TIMEOUT_S } from 'shared/src/session'
 import { getConfig } from './config'
 import { getDb } from './db'
+import { pruneAuditLog } from './db/audit'
 import { getSigningKey } from './keys'
 import { JWT_ALGO, type JwtPayload } from './middleware/auth'
 import { auth_states, sessions } from './schema'
@@ -87,14 +88,17 @@ export async function invalidateSession(sid: string): Promise<void> {
 	await getDb().delete(sessions).where(eq(sessions.id, sid))
 }
 
-/** Removes expired sessions and PKCE states in one scheduled sweep. */
+/**
+ * Removes expired sessions and PKCE states in one scheduled sweep, plus
+ * audit log entries past their retention.
+ */
 export async function sweepExpired(): Promise<number> {
 	const now = nowSeconds()
 	const expiredSessions = or(
 		lte(sessions.expires_at, now),
 		lte(sessions.last_seen_at, now - SESSION_IDLE_TIMEOUT_S),
 	)
-	return await getDb().transaction(async (tx) => {
+	const removed = await getDb().transaction(async (tx) => {
 		const sessionsRemoved = (
 			await tx.delete(sessions).where(expiredSessions).returning({ id: sessions.id })
 		).length
@@ -106,6 +110,8 @@ export async function sweepExpired(): Promise<number> {
 		).length
 		return sessionsRemoved + statesRemoved
 	})
+	const auditRemoved = await pruneAuditLog(now)
+	return removed + auditRemoved
 }
 
 export async function get_signed_jwt(user: User): Promise<string> {

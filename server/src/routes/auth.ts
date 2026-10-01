@@ -1,15 +1,18 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Hono } from 'hono'
+import { Result } from 'better-result'
+import { type Context, Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
-import { LoginSchema, SetupSchema } from 'shared/src/schemas'
+import { type AuditEvent, LoginSchema, SetupSchema } from 'shared/src/schemas'
 import { requestUser } from '../authz'
 import { getConfig } from '../config'
+import { recordAudit } from '../db/audit'
 import { isUniqueViolation } from '../db/errors'
 import { createLocalUser, getUserByUsername, hasAnyUser } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
 import { onValidationError } from '../middleware/validation'
 import { get_signed_jwt, getSessionCookieOpts, invalidateSession } from '../sessions'
+import { forwarded_for, peer_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
 import { normalize_username } from '../util/username'
 
@@ -73,28 +76,54 @@ authApp.post(
 	},
 )
 
+/**
+ * Appends a login attempt to the audit log. A failed write is logged but
+ * never changes the login outcome.
+ */
+async function auditLogin(
+	c: Context,
+	ip: string,
+	event: AuditEvent,
+	username: string,
+	userId: number | null,
+): Promise<void> {
+	const res = await recordAudit({
+		event,
+		username,
+		user_id: userId,
+		ip,
+		forwarded_for: forwarded_for(c),
+		user_agent: c.req.header('user-agent') ?? null,
+	})
+	if (Result.isError(res)) {
+		console.error('Failed to write audit log entry:', res.error)
+	}
+}
+
 authApp.post(
 	'/login',
 	rate_limit(),
 	vValidator('json', LoginSchema, onValidationError),
 	async (c) => {
 		const body = c.req.valid('json')
+		// Read the peer before the slow password check: Bun no longer knows the
+		// address once the client has dropped the connection.
+		const ip = peer_ip(c)
 
 		const user = await getUserByUsername(body.username)
-		if (!user) {
-			return jsonError(c, 'Invalid username or password', 401)
-		}
-
-		if (!user.password_hash) {
+		if (!user?.password_hash) {
+			await auditLogin(c, ip, 'login.failure', body.username, user?.id ?? null)
 			return jsonError(c, 'Invalid username or password', 401)
 		}
 
 		const isMatch = await Bun.password.verify(body.password, user.password_hash)
 		if (!isMatch) {
+			await auditLogin(c, ip, 'login.failure', user.username, user.id)
 			return jsonError(c, 'Invalid username or password', 401)
 		}
 		const token = await get_signed_jwt(user)
 		setCookie(c, 'auth_token', token, getSessionCookieOpts())
+		await auditLogin(c, ip, 'login.success', user.username, user.id)
 
 		return c.json({ success: true })
 	},

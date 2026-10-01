@@ -992,6 +992,38 @@ export type UserUpdate = v.InferOutput<typeof UserUpdateSchema>
 export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 
 // ---------------------------------------------------------------------------
+// Audit log (admin-only, read-only)
+// ---------------------------------------------------------------------------
+
+export const AUDIT_EVENTS = ['login.success', 'login.failure'] as const
+
+export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
+
+export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
+
+/** `search` matches username, peer IP or forwarded-for; newest entries first. */
+export const AuditLogListQuerySchema = v.object({
+	...ListQueryEntries,
+	event: v.optional(AuditEventSchema, undefined),
+})
+
+export type AuditLogListQuery = v.InferOutput<typeof AuditLogListQuerySchema>
+
+export interface AuditLogEntryJson {
+	id: number
+	/** Unix seconds. */
+	created_at: number
+	event: AuditEvent
+	username: string
+	user_id: number | null
+	/** Socket peer address. */
+	ip: string
+	/** Raw `X-Forwarded-For` header, if sent (client-controlled). */
+	forwarded_for: string | null
+	user_agent: string | null
+}
+
+// ---------------------------------------------------------------------------
 // P6: global search / CSV import
 // ---------------------------------------------------------------------------
 

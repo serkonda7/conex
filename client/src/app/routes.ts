@@ -13,6 +13,7 @@ import {
 	IconBuildingSkyscraper,
 	IconCpu,
 	IconFolder,
+	IconHistory,
 	IconLocation,
 	IconLock,
 	IconMapPin,
@@ -26,6 +27,7 @@ import {
 import type { Component } from 'solid-js'
 import { t, tp } from '../i18n'
 import { type Crumb, pageMetaFor, parseId, routeSegments } from '../lib/router'
+import { AuditLogPage } from '../pages/audit_log/list'
 import { DeviceTypeDetailPage } from '../pages/device_types/detail'
 import { DeviceTypeAddPage, DeviceTypeEditPage } from '../pages/device_types/form'
 import { DeviceTypeImportPage } from '../pages/device_types/import'
@@ -229,6 +231,14 @@ export const SECTIONS: readonly Section[] = [
 		list: UsersPage,
 		add: UserAddPage,
 		edit: UserEditPage,
+	},
+	{
+		path: 'audit-log',
+		noun: (n: number): string => tp('entity.auditLog', n),
+		icon: IconHistory,
+		adminOnly: true,
+		hideAddInNav: true,
+		list: AuditLogPage,
 	},
 ]
 

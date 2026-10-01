@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler, Next } from 'hono'
 import { getConfig } from '../config'
+import { client_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
 
 /**
@@ -16,21 +17,6 @@ const MAX_BUCKETS = 10_000
 
 type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
-
-/**
- * Direct connections only — no trusted reverse proxy sits in front of the
- * server, so `x-forwarded-for` is client-controlled and used purely as a
- * best-effort hint. Take the first header entry and fall back to the socket
- * address.
- */
-function client_ip(c: Context): string {
-	const xff = c.req.header('x-forwarded-for')
-	if (xff) {
-		return xff.split(',')[0].trim()
-	}
-	const ip = (c.req.raw as Request & { ip?: string }).ip
-	return ip || 'unknown'
-}
 
 /** Test helper: clears all counters. */
 export function reset_rate_limits(): void {

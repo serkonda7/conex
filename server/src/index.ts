@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { type AppConfig, initConfig, load_config_file } from './config'
 import { initDb } from './db'
 import { failInterruptedSyncs } from './integrations/sync'
+import { auditLogApp } from './routes/audit_log'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
 import { deviceRolesApp } from './routes/device_roles'
@@ -65,6 +66,7 @@ export function createApp() {
 			})
 			.route('/auth', authApp)
 			.route('/users', usersApp)
+			.route('/audit-log', auditLogApp)
 			.route('/tenants', tenantsApp)
 			.route('/tenant-groups', tenantGroupsApp)
 			.route('/sites', sitesApp)

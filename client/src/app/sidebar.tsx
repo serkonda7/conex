@@ -186,7 +186,11 @@ const NAV_GROUPS: readonly NavGroup[] = [
 		icon: IconBook,
 		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types'],
 	},
-	{ label: 'app.navGroup.administration', icon: IconSettings, paths: ['integrations', 'users'] },
+	{
+		label: 'app.navGroup.administration',
+		icon: IconSettings,
+		paths: ['integrations', 'users', 'audit-log'],
+	},
 ]
 
 /** Hidden group routes mapped to the parent nav entry they highlight. */

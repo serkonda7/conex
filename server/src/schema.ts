@@ -59,6 +59,28 @@ export const auth_states = pgTable(
 	(table) => [index('auth_states_expires_at_idx').on(table.expires_at)],
 )
 
+// Security audit trail (admin-only view). `event` is service-enforced
+// (`AuditEventSchema`). `username` keeps the name as typed, so failed
+// attempts against unknown accounts stay visible; `user_id` is set only
+// when it resolved to an account and survives its deletion as NULL.
+// `ip` is the socket peer; `forwarded_for` the raw, client-controlled
+// `X-Forwarded-For` header, kept separately so a spoofed header never
+// replaces the address the connection actually came from.
+export const audit_log = pgTable(
+	'audit_log',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		created_at: bigint('created_at', { mode: 'number' }).notNull(),
+		event: text('event').notNull(),
+		username: text('username').notNull(),
+		user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+		ip: text('ip').notNull(),
+		forwarded_for: text('forwarded_for'),
+		user_agent: text('user_agent'),
+	},
+	(table) => [index('audit_log_created_at_idx').on(table.created_at)],
+)
+
 // ---------------------------------------------------------------------------
 // P1: tenants / sites / locations. Tenants are documentation labels only —
 // no row-level isolation; grouping is by nullable FK, delete-blocked when
