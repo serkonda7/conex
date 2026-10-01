@@ -585,6 +585,19 @@ export function useTabPath(): string {
 	return useContext(TabPathContext) ?? path()
 }
 
+/**
+ * Path the tab that opened the current form tab now shows, or null when
+ * the form was entered directly or its opener is gone.
+ */
+export function useOpenerPath(): () => string | null {
+	const formPath = useTabPath()
+	return () => {
+		const all = tabs()
+		const form = all.find((t) => t.path === formPath)
+		return all.find((t) => t.id === form?.openerId)?.path ?? null
+	}
+}
+
 /** Reads one query param from the current tab's route (e.g. `?tenant=<id>`). */
 export function queryParam(key: string, fromPath?: string): string {
 	const current = fromPath ?? useTabPath()

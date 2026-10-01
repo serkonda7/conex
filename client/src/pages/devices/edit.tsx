@@ -21,10 +21,13 @@ import { faceOptions } from '../../i18n/labels'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, routeSegments, useOpenerPath } from '../../lib/router'
 import { parsePosition, validPosition } from './add'
 
-/** /devices/:id/edit — device edit form. Saves back to the detail page. */
+/**
+ * /devices/:id/edit — device edit form. Saves back to the device list when
+ * opened from it, else to the detail page.
+ */
 export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
@@ -66,6 +69,13 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 		form.setError,
 	)
 	const typeName = useNameOf(types, (type) => type.model)
+	const openerPath = useOpenerPath()
+	function backTo(): string {
+		const opener = openerPath()
+		return opener !== null && routeSegments(opener).join('/') === 'devices'
+			? opener
+			: `/devices/${props.id}`
+	}
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -99,7 +109,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					position_u: parsePosition(positionU()),
 					tenant_id: parseId(tenantId()),
 				}),
-			navigateTo: `/devices/${props.id}`,
+			navigateTo: backTo(),
 		})
 	}
 
@@ -109,7 +119,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			title={t('device.editTitle')}
 			name={form.record()?.name}
 			loadingText={t('device.loadingOne')}
-			cancelTo={`/devices/${props.id}`}
+			cancelTo={backTo()}
 			onSubmit={handleSave}
 		>
 			<NameField
