@@ -1,12 +1,21 @@
 /**
- * Main navigation: one row per routed section (NetBox-style, with quick
- * add/import buttons for writers) and the account menu at the bottom.
+ * Main navigation: routed sections in labeled groups (NetBox-style, with
+ * quick add/import buttons for writers) and the account menu at the bottom.
  */
-import { IconDownload, IconLogout, IconPlus } from '@tabler/icons-solidjs'
-import { createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import {
+	IconBook,
+	IconBuilding,
+	IconChevronDown,
+	IconDownload,
+	IconLogout,
+	IconPlus,
+	IconServer,
+	IconSettings,
+} from '@tabler/icons-solidjs'
+import type { Component } from 'solid-js'
+import { createEffect, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
 import type { SessionUser } from '../api/auth'
-import { t } from '../i18n'
+import { type MessageKey, t } from '../i18n'
 import { roleLabel } from '../i18n/labels'
 import { goTo, path } from '../lib/router'
 import { canWrite } from '../lib/session'
@@ -46,8 +55,7 @@ function NavItem(props: { section: Section }): JSX.Element {
 	const href = (): string => `/${props.section.path}`
 	const active = (): boolean => routeSection(path()) === props.section
 	const label = (): string => props.section.noun(2)
-	const addHref = (): string | undefined =>
-		props.section.add && props.section.hideAddInNav !== true ? `${href()}/add` : undefined
+	const addHref = (): string | undefined => (props.section.add ? `${href()}/add` : undefined)
 	return (
 		<div class={active() ? 'app-nav-item active' : 'app-nav-item'}>
 			<a
@@ -55,21 +63,20 @@ function NavItem(props: { section: Section }): JSX.Element {
 				class={active() ? 'active' : ''}
 				aria-current={active() ? 'page' : undefined}
 			>
-				<span aria-hidden="true" class="app-nav-icon">
-					<Dynamic component={props.section.icon} size={16} />
-				</span>
 				{label()}
 			</a>
 			<Show when={canWrite()}>
-				<NavShortcut
-					href={addHref()}
-					icon={IconPlus}
-					label={
-						addHref()
-							? t('app.navAdd', { label: label() })
-							: t('app.navAddSoon', { label: label() })
-					}
-				/>
+				<Show when={props.section.hideAddInNav !== true}>
+					<NavShortcut
+						href={addHref()}
+						icon={IconPlus}
+						label={
+							addHref()
+								? t('app.navAdd', { label: label() })
+								: t('app.navAddSoon', { label: label() })
+						}
+					/>
+				</Show>
 				<Show when={props.section.import}>
 					<NavShortcut
 						href={`${href()}/import`}
@@ -147,14 +154,80 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 	)
 }
 
-/** Sections shown in the sidebar: routed lists with an icon. */
-function navSections(isAdmin: boolean): Section[] {
-	return SECTIONS.filter(
-		(section) =>
-			section.icon !== undefined &&
-			section.list !== undefined &&
-			section.hideInNav !== true &&
-			(section.adminOnly !== true || isAdmin),
+interface NavGroup {
+	label: MessageKey
+	icon: Component<{ size?: number }>
+	paths: readonly string[]
+}
+
+/** Sidebar groups in display order, listing section paths. */
+const NAV_GROUPS: readonly NavGroup[] = [
+	{
+		label: 'app.navGroup.organization',
+		icon: IconBuilding,
+		paths: ['tenants', 'tenant-groups', 'site-groups', 'sites', 'locations'],
+	},
+	{ label: 'app.navGroup.devices', icon: IconServer, paths: ['racks', 'devices', 'topology'] },
+	{
+		label: 'app.navGroup.catalog',
+		icon: IconBook,
+		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types'],
+	},
+	{ label: 'app.navGroup.administration', icon: IconSettings, paths: ['integrations', 'users'] },
+]
+
+/** Sections shown in a sidebar group: routed lists with an icon. */
+function navSections(paths: readonly string[], isAdmin: boolean): Section[] {
+	return paths
+		.map((p) => SECTIONS.find((section) => section.path === p))
+		.filter(
+			(section): section is Section =>
+				section !== undefined &&
+				section.icon !== undefined &&
+				section.list !== undefined &&
+				section.hideInNav !== true &&
+				(section.adminOnly !== true || isAdmin),
+		)
+}
+
+/**
+ * Collapsible group (NetBox-style): starts open when it holds the current
+ * page and opens itself when navigation lands in it; otherwise the header
+ * toggles it.
+ */
+function NavGroupSection(props: { group: NavGroup; sections: Section[] }): JSX.Element {
+	const holdsActive = (): boolean => {
+		const current = routeSection(path())
+		return current !== null && props.sections.includes(current)
+	}
+	const [open, setOpen] = createSignal(holdsActive())
+	createEffect(() => {
+		if (holdsActive()) {
+			setOpen(true)
+		}
+	})
+	return (
+		<div class={open() ? 'app-nav-group open' : 'app-nav-group'}>
+			<button
+				type="button"
+				class="app-nav-label"
+				aria-expanded={open()}
+				onClick={() => setOpen(!open())}
+			>
+				<span aria-hidden="true" class="app-nav-icon">
+					<props.group.icon size={16} />
+				</span>
+				<span class="app-nav-label-text">{t(props.group.label)}</span>
+				<span aria-hidden="true" class="app-nav-chevron">
+					<IconChevronDown size={14} />
+				</span>
+			</button>
+			<Show when={open()}>
+				<For each={props.sections}>
+					{(section: Section): JSX.Element => <NavItem section={section} />}
+				</For>
+			</Show>
+		</div>
 	)
 }
 
@@ -162,8 +235,16 @@ export function Sidebar(props: { user: SessionUser | null; onLogout: () => void 
 	return (
 		<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
 			<nav class="app-nav">
-				<For each={navSections(props.user?.role === 'admin')}>
-					{(section: Section): JSX.Element => <NavItem section={section} />}
+				<For each={NAV_GROUPS}>
+					{(group: NavGroup): JSX.Element => {
+						const sections = (): Section[] =>
+							navSections(group.paths, props.user?.role === 'admin')
+						return (
+							<Show when={sections().length > 0}>
+								<NavGroupSection group={group} sections={sections()} />
+							</Show>
+						)
+					}}
 				</For>
 			</nav>
 			<div class="app-sidebar-user">

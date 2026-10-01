@@ -87,15 +87,15 @@ async function checkExternalDeviceWrite(
 }
 
 /**
- * Integrations: admins configure providers (credentials verified before
- * saving, secrets never returned). Links of tenants are global-write like
+ * Integrations: admins configure and list providers (credentials verified
+ * before saving, secrets never returned). Links of tenants are global-write like
  * tenants themselves; device links follow the device's tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers.
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
-	.get('/', async (c) => c.json(await listIntegrations()))
+	.get('/', requireAdminMiddleware, async (c) => c.json(await listIntegrations()))
 	.post(
 		'/',
 		requireAdminMiddleware,
@@ -109,8 +109,11 @@ export const integrationsApp = new Hono()
 			return sendCreated(c, created)
 		},
 	)
-	.get('/:provider', vValidator('param', IntegrationParamsSchema, onValidationError), async (c) =>
-		sendRow(c, await getIntegration(c.req.valid('param').provider)),
+	.get(
+		'/:provider',
+		requireAdminMiddleware,
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		async (c) => sendRow(c, await getIntegration(c.req.valid('param').provider)),
 	)
 	.patch(
 		'/:provider',

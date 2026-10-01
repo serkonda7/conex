@@ -21,13 +21,16 @@ import { InlineError } from '../../components/feedback'
 import { SelectField } from '../../components/form'
 import { t } from '../../i18n'
 import { compareFieldLabel, findingKindLabel, providerLabel } from '../../i18n/labels'
-import { createRecord, createRows } from '../../lib/resource'
-import { canWrite, canWriteGlobal } from '../../lib/session'
+import { createRecord, createRowsFor } from '../../lib/resource'
+import { canWrite, canWriteGlobal, isAdmin } from '../../lib/session'
 import { ExternalTenantPicker } from './external_tenant_picker'
 
-/** Configured, enabled integrations (empty on error: the cards just hide). */
+/**
+ * Configured, enabled integrations (empty on error: the cards just hide).
+ * The list is admin-only, so other users never load (or see) cards.
+ */
 function useIntegrations(): () => IntegrationJson[] {
-	const [integrations] = createRows(fetch_integrations)
+	const [integrations] = createRowsFor(isAdmin, fetch_integrations)
 	return () => (integrations() ?? []).filter((i) => i.enabled)
 }
 

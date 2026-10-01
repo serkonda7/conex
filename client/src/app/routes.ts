@@ -93,7 +93,7 @@ export interface Section {
 	edit?: Component<{ id: number }>
 }
 
-/** Every routed section in sidebar order; the first one is the home page. */
+/** Every routed section; the first one is the home page. Sidebar grouping lives in `sidebar.tsx`. */
 export const SECTIONS: readonly Section[] = [
 	{
 		path: 'tenants',
@@ -204,6 +204,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'topology',
 		noun: (): string => t('entity.topology'),
 		icon: IconNetwork,
+		hideAddInNav: true,
 		list: TopologyPage,
 	},
 	{
@@ -211,6 +212,7 @@ export const SECTIONS: readonly Section[] = [
 		noun: (n: number): string => tp('entity.integration', n),
 		icon: IconPlugConnected,
 		// Admin-only setup, one integration per provider.
+		adminOnly: true,
 		hideAddInNav: true,
 		list: IntegrationsPage,
 		add: IntegrationAddPage,

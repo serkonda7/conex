@@ -244,31 +244,28 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			name: shelf()?.name || t('common.unitPosition', { u: shelf()?.position_u ?? '' }),
 		})
 
-	/** Where in the rack the device sits: U and face, its shelf, or `—`. */
+	/** Where in the rack the device sits: U and face, or its shelf (hidden when unracked). */
 	function Mount(): JSX.Element {
-		const position = (): number | null | undefined => device()?.position_u
 		return (
-			<>
+			<Show when={device()?.position_u != null || shelfId() != null}>
 				{' ('}
 				<Show
-					when={position() !== null && position() !== undefined}
+					when={device()?.position_u != null}
 					fallback={
-						<Show when={shelfId()} fallback={<span>—</span>}>
-							<ForeignKeyLink
-								id={shelfId()}
-								loading={shelf.loading}
-								name={shelfLabel()}
-								href={`/shelves/${shelfId() ?? ''}/edit`}
-							/>
-						</Show>
+						<ForeignKeyLink
+							id={shelfId()}
+							loading={shelf.loading}
+							name={shelfLabel()}
+							href={`/shelves/${shelfId() ?? ''}/edit`}
+						/>
 					}
 				>
-					{t('common.unitPosition', { u: position() ?? '' })}
+					{t('common.unitPosition', { u: device()?.position_u ?? '' })}
 					{' / '}
 					{device()?.face ? faceLabel(device()?.face ?? '') : '—'}
 				</Show>
 				{')'}
-			</>
+			</Show>
 		)
 	}
 

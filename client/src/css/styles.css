@@ -537,16 +537,52 @@ tbody tr:last-child td {
 .app-nav {
 	display: flex;
 	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.app-nav-group {
+	display: flex;
+	flex-direction: column;
 	gap: 0.15rem;
 }
 
 .app-nav-label {
-	margin: 0.2rem 0.25rem 0.15rem;
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	margin: 0;
+	padding: 0.3rem 0.5rem;
+	border: none;
+	border-radius: 0.3rem;
+	background: transparent;
+	font: inherit;
 	font-size: var(--font-size-sm);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.app-nav-label:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.app-nav-label-text {
+	flex: 1;
+	text-align: left;
+}
+
+.app-nav-chevron {
+	display: inline-flex;
+	transform: rotate(-90deg);
+	transition: transform 120ms ease;
+}
+
+.app-nav-group.open .app-nav-chevron {
+	transform: none;
 }
 
 .app-nav a,
@@ -592,6 +628,8 @@ tbody tr:last-child td {
 .app-nav-item > a {
 	flex: 1;
 	min-width: 0;
+	/* Aligned with the group label (past the group icon). */
+	padding: 0.25rem 0.5rem 0.25rem calc(0.5rem + 16px + 0.45rem);
 	border: none;
 	background: transparent;
 }
