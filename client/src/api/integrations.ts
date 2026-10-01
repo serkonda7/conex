@@ -21,6 +21,8 @@ import type {
 	LinkEntityType,
 	SyncRunJson,
 	TenantIntegrationStatus,
+	TicketCreate,
+	TicketCreated,
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { client, failed, to_query, to_result } from './client'
@@ -98,6 +100,17 @@ export async function start_sync(
 		query: { ...to_query({ tenant }), clean: clean ? 'true' : undefined },
 	})
 	return to_result<SyncRunJson>(res, t('integration.syncFailed'))
+}
+
+export async function create_ticket(
+	provider: IntegrationProvider,
+	input: TicketCreate,
+): Promise<Result<TicketCreated, Error>> {
+	const res = await client.integrations[':provider'].tickets.$post({
+		param: { provider },
+		json: input,
+	})
+	return to_result<TicketCreated>(res, t('ticket.createFailed'))
 }
 
 export async function fetch_sync_run(

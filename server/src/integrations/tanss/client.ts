@@ -20,6 +20,7 @@ import {
 	createErpClient,
 	getApiV1Manufacturers,
 	postApiV1Login,
+	postApiV1Tickets,
 	putApiV1Pcs,
 	type TnsPersonalComputerWithDetails,
 } from 'tanss-api'
@@ -66,6 +67,21 @@ interface HeyApiResult {
 const LoginResponseSchema = v.object({
 	content: v.object({ apiKey: v.pipe(v.string(), v.minLength(1)) }),
 })
+
+const TicketResponseSchema = v.object({
+	content: v.object({ id: v.pipe(v.number(), v.integer()) }),
+})
+
+/** TANSS link type of a PC/server (`linkTypeId` of tickets and assignments). */
+const PC_LINK_TYPE = 1
+
+export interface TanssTicketInput {
+	companyId: number
+	/** PC/server the ticket is about. */
+	pcId?: number
+	title: string
+	content: string
+}
 
 const ContentListSchema = v.object({ content: v.optional(v.nullable(v.array(v.unknown()))) })
 
@@ -373,5 +389,32 @@ export class TanssSession {
 			}
 			return names
 		})
+	}
+
+	/** Creates a ticket and returns its TANSS id. */
+	async createTicket(input: TanssTicketInput): Promise<Result<number, Error>> {
+		const res = await this.userCall('ticket create', (client) =>
+			postApiV1Tickets({
+				client,
+				// No remitter: tickets are opened by the integration user.
+				query: { remitterCheck: false },
+				body: {
+					companyId: input.companyId,
+					title: input.title,
+					content: input.content,
+					...(input.pcId !== undefined
+						? { linkTypeId: PC_LINK_TYPE, linkId: input.pcId }
+						: {}),
+				},
+			}),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const parsed = v.safeParse(TicketResponseSchema, res.value)
+		if (!parsed.success) {
+			return Result.err(new TanssApiError('TANSS ticket create returned no ticket id', null))
+		}
+		return Result.ok(parsed.output.content.id)
 	}
 }

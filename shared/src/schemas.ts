@@ -953,7 +953,8 @@ export type TopologyQuery = v.InferOutput<typeof TopologyQuerySchema>
  * Permissions a role can grant. `view` / `edit` / `delete` cover every
  * inventory and catalog resource at once (`edit` = create + update,
  * including CSV import). The rest gate the admin areas; `integrations.manage`
- * covers both configuring providers and running syncs / links.
+ * covers both configuring providers and running syncs / links;
+ * `tickets.create` opens tickets in the external ticket system (TANSS).
  */
 export const PERMISSIONS = [
 	'view',
@@ -963,6 +964,7 @@ export const PERMISSIONS = [
 	'changelog.view',
 	'audit_log.view',
 	'integrations.manage',
+	'tickets.create',
 ] as const
 
 export const PermissionSchema = v.picklist(PERMISSIONS)
@@ -1386,6 +1388,24 @@ export const LinkBoardQuerySchema = v.object({
 })
 
 export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
+
+/**
+ * New ticket in the external system for a linked tenant (company), optionally
+ * attached to one of its linked devices.
+ */
+export const TicketCreateSchema = v.strictObject({
+	tenant_id: IdSchema,
+	device_id: v.optional(IdSchema, undefined),
+	title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+	content: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(10000)), ''),
+})
+
+export type TicketCreate = v.InferOutput<typeof TicketCreateSchema>
+
+/** Created external ticket. */
+export interface TicketCreated {
+	id: number
+}
 
 export type SyncRunState = 'running' | 'ok' | 'error'
 

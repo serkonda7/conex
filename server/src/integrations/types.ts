@@ -20,4 +20,13 @@ export interface IntegrationProvider {
 	verify(): Promise<Result<void, Error>>
 	listTenants(modifiedSince?: number): Promise<Result<ExternalTenantJson[], Error>>
 	fetchDevices(externalTenantId: string): Promise<Result<ExternalDeviceJson[], Error>>
+	/** Opens a ticket and returns its external id; absent without a ticket system. */
+	createTicket?(input: TicketInput): Promise<Result<number, Error>>
+}
+
+export interface TicketInput {
+	externalTenantId: string
+	externalDeviceId?: string
+	title: string
+	content: string
 }

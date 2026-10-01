@@ -150,6 +150,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'changelog.view': 'permission.changelogView',
 	'audit_log.view': 'permission.auditLogView',
 	'integrations.manage': 'permission.integrationsManage',
+	'tickets.create': 'permission.ticketsCreate',
 }
 
 /** Role permission (`view`, `users.manage`, …). */

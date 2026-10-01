@@ -79,6 +79,7 @@ import { TenantGroupsPage } from '../pages/tenant_groups/list'
 import { TenantDetailPage } from '../pages/tenants/detail'
 import { TenantAddPage, TenantEditPage } from '../pages/tenants/form'
 import { TenantsPage } from '../pages/tenants/list'
+import { TicketAddPage } from '../pages/tickets/add'
 import { TopologyPage } from '../pages/topology/view'
 import { UserAddPage } from '../pages/users/add'
 import { UserEditPage } from '../pages/users/edit'
@@ -254,6 +255,14 @@ export const SECTIONS: readonly Section[] = [
 		add: IntegrationAddPage,
 		detail: IntegrationReportPage,
 		edit: IntegrationEditPage,
+	},
+	{
+		// Reached from the top-bar ticket button.
+		path: 'tickets',
+		noun: (n: number): string => tp('entity.ticket', n),
+		permission: 'tickets.create',
+		hideInNav: true,
+		add: TicketAddPage,
 	},
 	{
 		path: 'users',

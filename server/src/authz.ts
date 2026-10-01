@@ -4,7 +4,8 @@
  * Permissions (`shared/src/schemas.ts` `PERMISSIONS`) come from the user's
  * role: `view` / `edit` / `delete` cover all inventory and catalog
  * resources; `users.manage`, `changelog.view`, `audit_log.view` and
- * `integrations.manage` gate the admin areas.
+ * `integrations.manage` gate the admin areas; `tickets.create` allows
+ * opening external tickets.
  *
  * Tenant scope (`users.tenant_id`):
  * - `NULL` = global, unconstrained. Always the case for `users.manage`

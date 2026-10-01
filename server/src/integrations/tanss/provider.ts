@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import type { ExternalDevice, ExternalTenant, IntegrationProvider } from '../types'
+import type { ExternalDevice, ExternalTenant, IntegrationProvider, TicketInput } from '../types'
 import { type TanssCompany, type TanssCredentials, type TanssPc, TanssSession } from './client'
 
 function toTenant(company: TanssCompany): ExternalTenant {
@@ -99,5 +99,27 @@ export class TanssProvider implements IntegrationProvider {
 				.filter((pc) => pc.id !== undefined)
 				.map((pc) => toDevice(pc, externalTenantId, manufacturers)),
 		)
+	}
+
+	async createTicket(input: TicketInput): Promise<Result<number, Error>> {
+		const companyId = Number(input.externalTenantId)
+		if (!Number.isInteger(companyId)) {
+			return Result.err(new Error(`Invalid TANSS company id ${input.externalTenantId}`))
+		}
+		let pcId: number | undefined
+		if (input.externalDeviceId !== undefined) {
+			// Device links are `pc:<id>` (see `toDevice`).
+			const match = /^pc:(\d+)$/.exec(input.externalDeviceId)
+			if (!match) {
+				return Result.err(new Error(`Invalid TANSS device id ${input.externalDeviceId}`))
+			}
+			pcId = Number(match[1])
+		}
+		return this.session.createTicket({
+			companyId,
+			...(pcId !== undefined ? { pcId } : {}),
+			title: input.title,
+			content: input.content,
+		})
 	}
 }

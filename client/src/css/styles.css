@@ -281,6 +281,21 @@ tbody tr:last-child td {
 	color: var(--text);
 }
 
+/* Top-bar "Ticket" action: highlighted, compact. */
+.app-topbar-ticket {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+	font-weight: 600;
+	padding: 0.25rem 0.6rem;
+	flex-shrink: 0;
+}
+
+.app-topbar-ticket:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
 .app-topbar-actions {
 	display: flex;
 	align-items: center;
