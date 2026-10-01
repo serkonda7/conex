@@ -188,6 +188,66 @@ export async function ignoreExternal(
 	}
 }
 
+/**
+ * Synthetic `external_id` for a conex entity ignored as missing in the
+ * external system. Real device ids are `pc:<n>` and tenant ids are numeric
+ * company ids, so the `conex:` prefix cannot collide. The unique index on
+ * `(provider, entity_type, external_id)` stays satisfied (one row per
+ * ignored entity), and `setLink`/`deleteLink` keep working: linking the
+ * entity deletes this row by `entity_id`, deleting the entity deletes it in
+ * the service layer.
+ */
+export function localIgnoreExternalId(entityType: LinkEntityType, entityId: number): string {
+	return `conex:${entityType}:${entityId}`
+}
+
+/**
+ * Marks a conex entity as intentionally absent from the external system
+ * (suppresses its `device_missing_in_external` finding). Replaces any
+ * previous link row of that entity.
+ */
+export async function ignoreLocal(
+	provider: ProviderId,
+	entityType: LinkEntityType,
+	entityId: number,
+	externalTenantId: string | null,
+	userId: number,
+): Promise<Result<ExternalLinkRow, Error>> {
+	try {
+		const row = await withTransaction(async () => {
+			const db = getDb()
+			await db
+				.delete(external_links)
+				.where(
+					and(
+						eq(external_links.provider, provider),
+						eq(external_links.entity_type, entityType),
+						eq(external_links.entity_id, entityId),
+					),
+				)
+			return (
+				await db
+					.insert(external_links)
+					.values({
+						provider,
+						entity_type: entityType,
+						entity_id: entityId,
+						external_id: localIgnoreExternalId(entityType, entityId),
+						external_tenant_id: externalTenantId,
+						state: 'ignored',
+						method: 'manual',
+						created_by: userId,
+						created_at: nowSeconds(),
+					})
+					.returning()
+			)[0]
+		})
+		return row ? Result.ok(row) : Result.err(new Error('Link insert returned no row'))
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
+}
+
 export async function deleteLink(
 	provider: ProviderId,
 	id: number,

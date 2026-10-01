@@ -11,6 +11,7 @@ import {
 	fetch_link_board,
 	type IntegrationProvider,
 	ignore_external,
+	ignore_local_device,
 	type LinkBoard,
 	link_external,
 	run_sync,
@@ -396,6 +397,20 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 								void run(() =>
 									ignore_external(provider, 'device', f.external_id ?? ''),
 								)
+							}
+						>
+							{t('integration.ignore')}
+						</button>
+					</Show>
+				)
+			case 'device_missing_in_external':
+				return (
+					<Show when={can('integrations.manage')}>
+						<button
+							type="button"
+							class="btn-small"
+							onClick={() =>
+								void run(() => ignore_local_device(provider, f.device_id ?? 0))
 							}
 						>
 							{t('integration.ignore')}

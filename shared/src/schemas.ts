@@ -1355,8 +1355,20 @@ export const ExternalIgnoreSchema = v.strictObject({
 	external_id: ExternalIdSchema,
 })
 
+/**
+ * Marks a conex device as intentionally absent from the external system
+ * (suppresses its `device_missing_in_external` finding). Stored as an
+ * `ignored` link row keyed by the conex entity; see `ignoreLocal` in
+ * `server/src/integrations/links.ts` for the synthetic `external_id`.
+ */
+export const ExternalIgnoreLocalSchema = v.strictObject({
+	entity_type: v.literal('device'),
+	entity_id: IdSchema,
+})
+
 export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
+export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */
@@ -1553,6 +1565,8 @@ export interface LinkBoardLocal {
 	external_id: string | null
 	/** Name of the linked external object; null when it no longer exists. */
 	external_name: string | null
+	/** True when the conex object is ignored as missing in the external system. */
+	ignored: boolean
 	/** Unambiguous match candidate among the free external objects. */
 	suggestion: { external_id: string; via: 'name' | 'serial' | 'asset_tag' } | null
 }

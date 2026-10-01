@@ -3,6 +3,7 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import { type Context, Hono } from 'hono'
 import {
+	ExternalIgnoreLocalSchema,
 	ExternalIgnoreSchema,
 	ExternalLinkCreateSchema,
 	type ExternalTenantListItem,
@@ -34,6 +35,7 @@ import {
 	deleteLink,
 	getLink,
 	ignoreExternal,
+	ignoreLocal,
 	linkJson,
 	linkOf,
 	listLinks,
@@ -481,6 +483,48 @@ export const integrationsApp = new Hono()
 				'device',
 				external.external_id,
 				external.external_tenant_id,
+				userId,
+			)
+			return sendResult(c, res.map(linkJson))
+		},
+	)
+	.put(
+		'/:provider/links/ignore-local',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalIgnoreLocalSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const input = c.req.valid('json')
+			const userId = requestUser(c).id
+			const denied = requirePermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const tenant = await deviceTenant(input.entity_id)
+			if (tenant === undefined) {
+				return sendResult(c, Result.err(new NotFoundError('Device not found')))
+			}
+			const scopeDenied = checkTenant(c, tenant)
+			if (scopeDenied) {
+				return scopeDenied
+			}
+			const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
+			if (!tenantLink) {
+				return jsonError(c, "The device's tenant is not linked yet", 400)
+			}
+			const externalDenied = await checkExternalDeviceWrite(
+				c,
+				provider,
+				tenantLink.external_id,
+			)
+			if (externalDenied) {
+				return externalDenied
+			}
+			const res = await ignoreLocal(
+				provider,
+				'device',
+				input.entity_id,
+				tenantLink.external_id,
 				userId,
 			)
 			return sendResult(c, res.map(linkJson))

@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
 	type IntegrationProvider,
 	ignore_external,
+	ignore_local_device,
 	type LinkBoard,
 	type LinkBoardExternal,
 	type LinkBoardLocal,
@@ -88,7 +89,9 @@ export function LinkBoardView(props: {
 	// Optimistic changes, dropped whenever a fresh board arrives.
 	const [linked, setLinked] = createSignal(new Map<number, string>())
 	const [ignored, setIgnored] = createSignal(new Set<string>())
+	const [ignoredLocal, setIgnoredLocal] = createSignal(new Set<number>())
 	const [released, setReleased] = createSignal(new Set<string>())
+	const [releasedLocal, setReleasedLocal] = createSignal(new Set<number>())
 
 	createEffect(
 		on(
@@ -96,7 +99,9 @@ export function LinkBoardView(props: {
 			() => {
 				setLinked(new Map<number, string>())
 				setIgnored(new Set<string>())
+				setIgnoredLocal(new Set<number>())
 				setReleased(new Set<string>())
+				setReleasedLocal(new Set<number>())
 			},
 			{ defer: true },
 		),
@@ -124,8 +129,11 @@ export function LinkBoardView(props: {
 		// Moved to another conex row in this session.
 		return pendingExternal().has(row.external_id) ? null : row.external_id
 	}
+	function localIgnored(row: LinkBoardLocal): boolean {
+		return (row.ignored && !releasedLocal().has(row.id)) || ignoredLocal().has(row.id)
+	}
 	function localOpen(row: LinkBoardLocal): boolean {
-		return localLink(row) === null
+		return localLink(row) === null && !localIgnored(row)
 	}
 	function externalOpen(row: LinkBoardExternal): boolean {
 		return (
@@ -240,10 +248,34 @@ export function LinkBoardView(props: {
 		props.on_changed()
 	}
 
+	async function ignoreLocal(deviceId: number): Promise<void> {
+		props.on_error(null)
+		setPicked(null)
+		setIgnoredLocal((prev) => new Set(prev).add(deviceId))
+		const res = await ignore_local_device(props.provider, deviceId)
+		if (Result.isError(res)) {
+			props.on_error(res.error.message)
+		}
+		props.on_changed()
+	}
+
 	async function unlink(linkId: number, externalId: string): Promise<void> {
 		props.on_error(null)
 		setReleased((prev) => new Set(prev).add(externalId))
 		const res = await unlink_external(props.provider, linkId)
+		if (Result.isError(res)) {
+			props.on_error(res.error.message)
+		}
+		props.on_changed()
+	}
+
+	async function restoreLocal(row: LinkBoardLocal): Promise<void> {
+		if (row.link_id === null) {
+			return
+		}
+		props.on_error(null)
+		setReleasedLocal((prev) => new Set(prev).add(row.id))
+		const res = await unlink_external(props.provider, row.link_id)
 		if (Result.isError(res)) {
 			props.on_error(res.error.message)
 		}
@@ -340,6 +372,22 @@ export function LinkBoardView(props: {
 
 	// Cells -----------------------------------------------------------------------
 	function localState(row: LinkBoardLocal): JSX.Element {
+		if (localIgnored(row)) {
+			return (
+				<>
+					<span class="badge">{t('integration.ignored')}</span>
+					<Show when={props.editable && row.link_id !== null}>
+						<button
+							type="button"
+							class="btn-small"
+							onClick={inRow(() => void restoreLocal(row))}
+						>
+							{t('integration.restore')}
+						</button>
+					</Show>
+				</>
+			)
+		}
 		const externalId = localLink(row)
 		if (externalId !== null) {
 			const name =
@@ -366,7 +414,17 @@ export function LinkBoardView(props: {
 		}
 		const suggested = suggestionOf().get(row.id)
 		if (suggested === undefined) {
-			return null
+			return (
+				<Show when={props.editable && isDevice()}>
+					<button
+						type="button"
+						class="btn-small"
+						onClick={inRow(() => void ignoreLocal(row.id))}
+					>
+						{t('integration.ignore')}
+					</button>
+				</Show>
+			)
 		}
 		return (
 			<>
@@ -380,6 +438,15 @@ export function LinkBoardView(props: {
 						onClick={inRow(() => void linkPairs([[row.id, suggested]]))}
 					>
 						{t('integration.confirmLink')}
+					</button>
+				</Show>
+				<Show when={props.editable && isDevice()}>
+					<button
+						type="button"
+						class="btn-small"
+						onClick={inRow(() => void ignoreLocal(row.id))}
+					>
+						{t('integration.ignore')}
 					</button>
 				</Show>
 			</>

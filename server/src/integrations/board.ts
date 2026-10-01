@@ -115,6 +115,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 			link_id: link?.id ?? null,
 			external_id: link?.external_id ?? null,
 			external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
+			ignored: false,
 			suggestion: suggested ? { external_id: suggested.external_id, via: 'name' } : null,
 		}
 	})
@@ -155,9 +156,12 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 	const links = await listLinks(provider, 'device')
 	const linkByExternal = new Map(links.map((l) => [l.external_id, l]))
 	const linkByDevice = new Map<number, ExternalLinkRow>()
+	const ignoredByDevice = new Map<number, ExternalLinkRow>()
 	for (const link of links) {
 		if (link.state === 'linked' && link.entity_id !== null) {
 			linkByDevice.set(link.entity_id, link)
+		} else if (link.state === 'ignored' && link.entity_id !== null) {
+			ignoredByDevice.set(link.entity_id, link)
 		}
 	}
 
@@ -187,7 +191,7 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 	}
 
 	const { auto, suggestions } = matchDevices(
-		locals.filter((d) => !linkByDevice.has(d.id)),
+		locals.filter((d) => !linkByDevice.has(d.id) && !ignoredByDevice.has(d.id)),
 		externals.filter((e) => !linkByExternal.has(e.external_id)),
 	)
 	// Only offer a suggestion when the device has exactly one candidate.
@@ -198,17 +202,19 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 
 	const local: LinkBoardLocal[] = locals.map((d) => {
 		const link = linkByDevice.get(d.id)
+		const ignored = ignoredByDevice.get(d.id)
 		const pairs = candidates.get(d.id) ?? []
-		const pair = pairs.length === 1 ? pairs[0] : undefined
+		const pair = pairs.length === 1 && !ignored ? pairs[0] : undefined
 		return {
 			id: d.id,
 			name: d.name,
 			detail: joinDetail(d.manufacturer, d.model),
 			serial: d.serial,
 			active: d.status === 'active',
-			link_id: link?.id ?? null,
+			link_id: link?.id ?? ignored?.id ?? null,
 			external_id: link?.external_id ?? null,
 			external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
+			ignored: ignored !== undefined,
 			suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
 		}
 	})

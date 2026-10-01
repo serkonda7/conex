@@ -237,6 +237,18 @@ export async function ignore_external(
 	return to_result<ExternalLinkJson>(res, t('integration.linkFailed'))
 }
 
+/** Marks a conex device as intentionally absent from the external system. */
+export async function ignore_local_device(
+	provider: IntegrationProvider,
+	entity_id: number,
+): Promise<Result<ExternalLinkJson, Error>> {
+	const res = await client.integrations[':provider'].links['ignore-local'].$put({
+		param: { provider },
+		json: { entity_type: 'device', entity_id },
+	})
+	return to_result<ExternalLinkJson>(res, t('integration.linkFailed'))
+}
+
 export async function unlink_external(
 	provider: IntegrationProvider,
 	linkId: number,

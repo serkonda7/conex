@@ -220,11 +220,14 @@ export async function buildReport(
 		tenantIds.length > 0 ? await localDevices(inArray(devices.tenant_id, tenantIds)) : []
 	const deviceLinks = await listLinks(provider, 'device')
 	const linkByDevice = new Map<number, ExternalLinkRow>()
+	const ignoredLocalDevices = new Set<number>()
 	const takenExternal = new Set<string>()
 	for (const link of deviceLinks) {
 		takenExternal.add(link.external_id)
 		if (link.state === 'linked' && link.entity_id !== null) {
 			linkByDevice.set(link.entity_id, link)
+		} else if (link.state === 'ignored' && link.entity_id !== null) {
+			ignoredLocalDevices.add(link.entity_id)
 		}
 	}
 	const externalDevices = await readDevices(provider)
@@ -241,7 +244,11 @@ export async function buildReport(
 		}
 		const link = linkByDevice.get(device.id)
 		if (!link) {
-			if (tenantId !== null && liveCompany.has(tenantId)) {
+			if (
+				tenantId !== null &&
+				liveCompany.has(tenantId) &&
+				!ignoredLocalDevices.has(device.id)
+			) {
 				const list = unlinkedByTenant.get(tenantId) ?? []
 				list.push(device)
 				unlinkedByTenant.set(tenantId, list)
