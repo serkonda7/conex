@@ -1164,7 +1164,8 @@ tbody tr:last-child td {
 	cursor: text;
 }
 
-.app-content .form-stacked .field .combobox input:disabled {
+.app-content .form-stacked .field input:disabled,
+.app-content .form-stacked .field textarea:disabled {
 	cursor: not-allowed;
 	opacity: 0.6;
 }

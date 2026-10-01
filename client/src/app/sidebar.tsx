@@ -71,8 +71,11 @@ function NavItem(props: { section: Section; topLevel?: boolean }): JSX.Element {
 	const addHref = (): string | undefined => (props.section.add ? `${href()}/add` : undefined)
 	return (
 		<div
-			class={active() ? 'app-nav-item active' : 'app-nav-item'}
-			classList={{ 'app-nav-top': props.topLevel === true }}
+			classList={{
+				'app-nav-item': true,
+				active: active(),
+				'app-nav-top': props.topLevel === true,
+			}}
 		>
 			<a
 				href={href()}

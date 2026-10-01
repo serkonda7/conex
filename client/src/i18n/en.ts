@@ -273,7 +273,6 @@ export const en = {
 	'location.selectSiteFirst': 'Select a site first.',
 	'location.sitePlaceholder': 'Site…',
 	'location.sitesForTenant': 'Showing only sites for the selected tenant.',
-	'location.pickSiteForParent': 'Pick a site first to choose a parent.',
 	'location.tenantFromSite': "Defaults to the site's tenant.",
 	'location.siteImmutable': 'Site cannot be changed after creation.',
 	'location.notFound': 'Location not found.',
@@ -397,7 +396,6 @@ export const en = {
 	'rack.editTitle': 'Edit rack',
 	'rack.loadingOne': 'Loading rack…',
 	'rack.noLocation': 'No location',
-	'rack.pickSiteForLocation': 'Pick a site first to choose a location.',
 	'rack.rackTypePlaceholder': 'Rack type…',
 	'rack.selectRackType': 'Select a rack type.',
 	'rack.notFound': 'Rack not found.',
@@ -422,7 +420,6 @@ export const en = {
 	'shelf.face': 'Face',
 	'shelf.bothFaces': 'Both faces',
 	'shelf.faceHint': 'Which rack face the shelf is mounted on.',
-	'shelf.pickRackForFace': 'Pick a rack first to choose a face.',
 	'shelf.position': 'Position (U)',
 	'shelf.positionHint': 'Lowest U of the mount (1-based).',
 	'shelf.mountHeight': 'Mount height (U)',
@@ -461,7 +458,6 @@ export const en = {
 	'device.noFace': 'No face',
 	'device.faceHint': 'Which rack face the device is mounted on.',
 	'device.positionPlaceholder': 'Position (or leave empty)',
-	'device.positionHint': 'Optional, even with a rack: empty leaves the device unracked.',
 	'device.onShelfHint': 'Sits on shelf {name} (no U of its own).',
 	'device.typeImmutable':
 		'The device type is immutable after create: swapping the template would invalidate the interfaces and the U footprint.',
@@ -752,7 +748,7 @@ export const en = {
 	'integration.openCount': '{count} open',
 	'integration.linkSuggestions.one': 'Link {count} suggestion',
 	'integration.linkSuggestions.other': 'Link all {count} suggestions',
-	'integration.showDone': 'Show linked and ignored',
+	'integration.showIgnored': 'Show ignored',
 	'integration.noRows': 'No entries.',
 
 	// tickets

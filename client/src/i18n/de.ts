@@ -276,8 +276,6 @@ export const de: Messages = {
 	'location.selectSiteFirst': 'Bitte zuerst einen Standort auswählen.',
 	'location.sitePlaceholder': 'Standort…',
 	'location.sitesForTenant': 'Es werden nur Standorte des ausgewählten Mandanten angezeigt.',
-	'location.pickSiteForParent':
-		'Wählen Sie zuerst einen Standort, um einen übergeordneten Bereich festzulegen.',
 	'location.tenantFromSite': 'Standardmäßig wird der Mandant des Standorts verwendet.',
 	'location.siteImmutable': 'Der Standort kann nach dem Anlegen nicht mehr geändert werden.',
 	'location.notFound': 'Bereich nicht gefunden.',
@@ -404,7 +402,6 @@ export const de: Messages = {
 	'rack.editTitle': 'Rack bearbeiten',
 	'rack.loadingOne': 'Rack wird geladen…',
 	'rack.noLocation': 'Kein Bereich',
-	'rack.pickSiteForLocation': 'Wählen Sie zuerst einen Standort, um einen Bereich festzulegen.',
 	'rack.rackTypePlaceholder': 'Racktyp…',
 	'rack.selectRackType': 'Bitte einen Racktyp auswählen.',
 	'rack.notFound': 'Rack nicht gefunden.',
@@ -429,7 +426,6 @@ export const de: Messages = {
 	'shelf.face': 'Seite',
 	'shelf.bothFaces': 'Beide Seiten',
 	'shelf.faceHint': 'An welcher Rackseite der Fachboden montiert ist.',
-	'shelf.pickRackForFace': 'Wählen Sie zuerst ein Rack, um eine Seite festzulegen.',
 	'shelf.position': 'Position (HE)',
 	'shelf.positionHint': 'Unterste HE der Montage (1-basiert).',
 	'shelf.mountHeight': 'Montagehöhe (HE)',
@@ -470,7 +466,6 @@ export const de: Messages = {
 	'device.noFace': 'Keine Seite',
 	'device.faceHint': 'An welcher Rackseite das Gerät montiert ist.',
 	'device.positionPlaceholder': 'Position (oder leer lassen)',
-	'device.positionHint': 'Optional, auch mit Rack: Leer lassen, um das Gerät nicht einzubauen.',
 	'device.onShelfHint': 'Steht auf Fachboden {name} (keine eigene HE).',
 	'device.typeImmutable':
 		'Der Gerätetyp kann nach dem Anlegen nicht geändert werden: Ein Wechsel der Vorlage würde die Anschlüsse und die belegten HE ungültig machen.',
@@ -765,7 +760,7 @@ export const de: Messages = {
 	'integration.openCount': '{count} offen',
 	'integration.linkSuggestions.one': '{count} Vorschlag verknüpfen',
 	'integration.linkSuggestions.other': 'Alle {count} Vorschläge verknüpfen',
-	'integration.showDone': 'Verknüpfte und ignorierte anzeigen',
+	'integration.showIgnored': 'Ignorierte anzeigen',
 	'integration.noRows': 'Keine Einträge.',
 
 	// tickets

@@ -106,11 +106,6 @@ export function RackAddPage(): JSX.Element {
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
 				emptyLabel={t('rack.noLocation')}
-				hint={
-					<Show when={siteId() === ''}>
-						<Hint>{t('rack.pickSiteForLocation')}</Hint>
-					</Show>
-				}
 			/>
 			<NameField id="rack-name" placeholder="A1" value={name()} onInput={setName} autofocus />
 			<SelectField

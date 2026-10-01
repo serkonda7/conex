@@ -98,6 +98,7 @@ export function DeviceAddPage(): JSX.Element {
 		setRackId(value)
 		if (value === '') {
 			setFace('')
+			setPositionU('')
 		}
 	}
 
@@ -222,11 +223,6 @@ export function DeviceAddPage(): JSX.Element {
 				onChange={setLocationId}
 				options={row_options(locations() ?? [])}
 				emptyLabel={t('rack.noLocation')}
-				hint={
-					<Show when={siteId() === ''}>
-						<Hint>{t('rack.pickSiteForLocation')}</Hint>
-					</Show>
-				}
 			/>
 			<SelectField
 				id="device-rack"
@@ -245,11 +241,7 @@ export function DeviceAddPage(): JSX.Element {
 				onChange={setFace}
 				options={faceOptions()}
 				emptyLabel={t('device.noFace')}
-				hint={
-					<Hint>
-						{rackId() === '' ? t('shelf.pickRackForFace') : t('device.faceHint')}
-					</Hint>
-				}
+				hint={<Hint>{rackId() === '' ? '' : t('device.faceHint')}</Hint>}
 			/>
 			<TextField
 				id="device-position"
@@ -257,12 +249,11 @@ export function DeviceAddPage(): JSX.Element {
 				placeholder={t('device.positionPlaceholder')}
 				inputmode="numeric"
 				value={positionU()}
+				disabled={rackId() === '' || shelfId !== null}
 				onInput={setPositionU}
 				hint={
 					<Hint>
-						{shelfId === null
-							? t('device.positionHint')
-							: t('device.onShelfHint', { name: shelfName() })}
+						{shelfId === null ? '' : t('device.onShelfHint', { name: shelfName() })}
 					</Hint>
 				}
 			/>

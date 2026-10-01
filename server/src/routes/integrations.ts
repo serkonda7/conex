@@ -248,7 +248,13 @@ export const integrationsApp = new Hono()
 						t.name.toLowerCase().includes(needle) ||
 						(t.display_id ?? '').toLowerCase().includes(needle),
 				)
-				.sort((a, b) => a.name.localeCompare(b.name))
+				.sort((a, b) => {
+					const ra = rows.get(a.external_id)
+					const rb = rows.get(b.external_id)
+					const oa = ra?.ignored ? 2 : ra?.tenant != null ? 1 : 0
+					const ob = rb?.ignored ? 2 : rb?.tenant != null ? 1 : 0
+					return oa - ob || a.name.localeCompare(b.name)
+				})
 				.slice(0, 100)
 				.map((t) => ({
 					...t,

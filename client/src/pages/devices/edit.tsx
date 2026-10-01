@@ -183,11 +183,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				options={row_options(locations() ?? [])}
 				emptyLabel={t('rack.noLocation')}
 				disabled={siteId() === ''}
-				hint={
-					<Show when={siteId() === ''}>
-						<Hint>{t('rack.pickSiteForLocation')}</Hint>
-					</Show>
-				}
 			/>
 			<SelectField
 				id="device-edit-rack"

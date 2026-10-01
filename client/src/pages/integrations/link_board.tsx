@@ -48,14 +48,6 @@ function similarity(words: Set<string>, name: string): number {
 	return score
 }
 
-/** Stable sort by descending score (ties keep the server order). */
-function rank<T>(rows: T[], score: (row: T) => number): T[] {
-	return rows
-		.map((row, index) => ({ row, index, score: score(row) }))
-		.sort((a, b) => b.score - a.score || a.index - b.index)
-		.map((entry) => entry.row)
-}
-
 function detailText(...values: (string | null)[]): string {
 	return values.filter((v) => v !== null && v !== '').join(' · ')
 }
@@ -65,9 +57,9 @@ function detailText(...values: (string | null)[]): string {
  * by side. Click a row on each side (either order) or drop a row onto a row
  * of the other table to link them; "Link all suggestions" takes every
  * unambiguous match at once. Picking a row ranks likely partners first on
- * the other side. Linked and ignored rows are hidden unless toggled on, so
- * both lists shrink while working. Changes show immediately and are
- * reconciled with the server's board afterwards.
+ * the other side. Linked rows stay visible after unlinked ones; ignored rows
+ * are hidden unless toggled on, so both lists shrink while working. Changes
+ * show immediately and are reconciled with the server's board afterwards.
  */
 export function LinkBoardView(props: {
 	provider: IntegrationProvider
@@ -79,7 +71,7 @@ export function LinkBoardView(props: {
 	/** Called with the conex ids linked by one user action. */
 	on_linked?: (ids: number[]) => void
 }): JSX.Element {
-	const [showDone, setShowDone] = createSignal(false)
+	const [showIgnored, setShowIgnored] = createSignal(false)
 	const [localSearch, setLocalSearch] = createSignal('')
 	const [externalSearch, setExternalSearch] = createSignal('')
 	const [picked, setPicked] = createSignal<Picked | null>(null)
@@ -132,8 +124,41 @@ export function LinkBoardView(props: {
 	function localIgnored(row: LinkBoardLocal): boolean {
 		return (row.ignored && !releasedLocal().has(row.id)) || ignoredLocal().has(row.id)
 	}
+	function externalIgnored(row: LinkBoardExternal): boolean {
+		return (
+			ignored().has(row.external_id) ||
+			(row.state === 'ignored' && !released().has(row.external_id))
+		)
+	}
 	function localOpen(row: LinkBoardLocal): boolean {
 		return localLink(row) === null && !localIgnored(row)
+	}
+	/** Linked rows stay visible; only ignored rows are hidden by the toggle. */
+	function localVisible(row: LinkBoardLocal): boolean {
+		return showIgnored() || !localIgnored(row)
+	}
+	function externalVisible(row: LinkBoardExternal): boolean {
+		return showIgnored() || !externalIgnored(row)
+	}
+	/** Open rows first, linked rows after, ignored rows last. */
+	function localOrder(row: LinkBoardLocal): number {
+		if (localIgnored(row)) {
+			return 2
+		}
+		return localLink(row) === null ? 0 : 1
+	}
+	function externalOrder(row: LinkBoardExternal): number {
+		if (externalIgnored(row)) {
+			return 2
+		}
+		return externalOpen(row) ? 0 : 1
+	}
+	/** Stable sort by status, then descending score (ties keep server order). */
+	function rankBy<T>(rows: T[], order: (row: T) => number, score: (row: T) => number): T[] {
+		return rows
+			.map((row, index) => ({ row, index, order: order(row), score: score(row) }))
+			.sort((a, b) => a.order - b.order || b.score - a.score || a.index - b.index)
+			.map((entry) => entry.row)
 	}
 	function externalOpen(row: LinkBoardExternal): boolean {
 		return (
@@ -174,30 +199,32 @@ export function LinkBoardView(props: {
 
 	const localRows = createMemo(() => {
 		const needle = localSearch().trim().toLowerCase()
-		const rows = (showDone() ? props.board.local : openLocal()).filter((r) =>
-			matches(needle, r.name, r.detail, r.serial),
+		const rows = props.board.local.filter(
+			(r) => localVisible(r) && matches(needle, r.name, r.detail, r.serial),
 		)
 		const partner = pickedExternal()
-		if (!partner) {
-			return rows
-		}
-		const words = tokens(partner.name)
-		return rank(rows, (r) =>
-			r.suggestion?.external_id === partner.external_id ? 100 : similarity(words, r.name),
+		const words = partner ? tokens(partner.name) : null
+		return rankBy(rows, localOrder, (r) =>
+			words === null
+				? 0
+				: r.suggestion?.external_id === partner?.external_id
+					? 100
+					: similarity(words, r.name),
 		)
 	})
 	const externalRows = createMemo(() => {
 		const needle = externalSearch().trim().toLowerCase()
-		const rows = (showDone() ? props.board.external : openExternal()).filter((r) =>
-			matches(needle, r.name, r.detail, r.serial),
+		const rows = props.board.external.filter(
+			(r) => externalVisible(r) && matches(needle, r.name, r.detail, r.serial),
 		)
 		const partner = pickedLocal()
-		if (!partner) {
-			return rows
-		}
-		const words = tokens(partner.name)
-		return rank(rows, (r) =>
-			partner.suggestion?.external_id === r.external_id ? 100 : similarity(words, r.name),
+		const words = partner ? tokens(partner.name) : null
+		return rankBy(rows, externalOrder, (r) =>
+			words === null
+				? 0
+				: partner?.suggestion?.external_id === r.external_id
+					? 100
+					: similarity(words, r.name),
 		)
 	})
 
@@ -467,7 +494,7 @@ export function LinkBoardView(props: {
 				</Show>
 			)
 		}
-		if (row.state === 'ignored' || ignored().has(row.external_id)) {
+		if (externalIgnored(row)) {
 			return (
 				<>
 					<span class="badge">{t('integration.ignored')}</span>
@@ -596,12 +623,12 @@ export function LinkBoardView(props: {
 				<label class="link-board-toggle">
 					<input
 						type="checkbox"
-						checked={showDone()}
+						checked={showIgnored()}
 						onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-							setShowDone(e.currentTarget.checked)
+							setShowIgnored(e.currentTarget.checked)
 						}
 					/>
-					{t('integration.showDone')}
+					{t('integration.showIgnored')}
 				</label>
 			</section>
 

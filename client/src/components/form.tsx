@@ -88,6 +88,7 @@ export function TextField(props: {
 	max?: number
 	step?: number
 	required?: boolean
+	disabled?: boolean
 	inputmode?: 'numeric' | 'text'
 	autocomplete?: string
 	autofocus?: boolean
@@ -103,6 +104,7 @@ export function TextField(props: {
 				type={props.type}
 				placeholder={props.placeholder}
 				required={props.required}
+				disabled={props.disabled}
 				maxLength={props.maxLength}
 				min={props.min}
 				max={props.max}

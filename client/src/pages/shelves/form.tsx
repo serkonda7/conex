@@ -178,11 +178,6 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 				onChange={setFace}
 				options={faceOptions()}
 				emptyLabel={t('shelf.bothFaces')}
-				hint={
-					<Show when={rackId() === ''} fallback={<Hint>{t('shelf.faceHint')}</Hint>}>
-						<Hint>{t('shelf.pickRackForFace')}</Hint>
-					</Show>
-				}
 			/>
 			<TextField
 				id={`${prefix}-position`}

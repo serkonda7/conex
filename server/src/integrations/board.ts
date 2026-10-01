@@ -3,6 +3,8 @@
  * side, with their link state and unambiguous match suggestions. Tenants are
  * listed in full (global users only; inactive and private customers only when linked);
  * devices per conex tenant, against the devices of the company linked to it.
+ * Inactive devices are ignored by default (hidden unless toggled on, never
+ * suggested); linked ones stay visible as linked.
  */
 import { eq, inArray } from 'drizzle-orm'
 import type {
@@ -103,35 +105,49 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 		(e) => e.name,
 	)
 
-	const local: LinkBoardLocal[] = rows.map((row) => {
-		const link = linkByTenant.get(row.id)
-		const suggested = suggestions.get(row)
-		return {
-			id: row.id,
-			name: row.name,
-			detail: row.group,
-			serial: null,
-			active: true,
-			link_id: link?.id ?? null,
-			external_id: link?.external_id ?? null,
-			external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
-			ignored: false,
-			suggestion: suggested ? { external_id: suggested.external_id, via: 'name' } : null,
-		}
-	})
-	const external = externals.map((e) =>
-		externalRow(
-			{
-				external_id: e.external_id,
-				name: e.name,
-				detail: e.display_id,
+	const local: LinkBoardLocal[] = rows
+		.map((row): LinkBoardLocal => {
+			const link = linkByTenant.get(row.id)
+			const suggested = suggestions.get(row)
+			return {
+				id: row.id,
+				name: row.name,
+				detail: row.group,
 				serial: null,
-				active: e.active,
-			},
-			linkByExternal.get(e.external_id),
-			(id) => tenantName.get(id) ?? null,
-		),
-	)
+				active: true,
+				link_id: link?.id ?? null,
+				external_id: link?.external_id ?? null,
+				external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
+				ignored: false,
+				suggestion: suggested ? { external_id: suggested.external_id, via: 'name' } : null,
+			}
+		})
+		.sort(
+			(a, b) =>
+				(a.external_id === null ? 0 : 1) - (b.external_id === null ? 0 : 1) ||
+				a.name.localeCompare(b.name),
+		)
+	const externalStateOrder = (state: LinkBoardExternal['state']): number =>
+		state === 'ignored' ? 2 : state === 'linked' ? 1 : 0
+	const external = externals
+		.map((e) =>
+			externalRow(
+				{
+					external_id: e.external_id,
+					name: e.name,
+					detail: e.display_id,
+					serial: null,
+					active: e.active,
+				},
+				linkByExternal.get(e.external_id),
+				(id) => tenantName.get(id) ?? null,
+			),
+		)
+		.sort(
+			(a, b) =>
+				externalStateOrder(a.state) - externalStateOrder(b.state) ||
+				a.name.localeCompare(b.name),
+		)
 	return {
 		provider,
 		entity_type: 'tenant',
@@ -190,9 +206,12 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 		}
 	}
 
+	// Inactive devices are ignored by default: never suggested or auto-linked.
 	const { auto, suggestions } = matchDevices(
-		locals.filter((d) => !linkByDevice.has(d.id) && !ignoredByDevice.has(d.id)),
-		externals.filter((e) => !linkByExternal.has(e.external_id)),
+		locals.filter(
+			(d) => d.status === 'active' && !linkByDevice.has(d.id) && !ignoredByDevice.has(d.id),
+		),
+		externals.filter((e) => e.active && !linkByExternal.has(e.external_id)),
 	)
 	// Only offer a suggestion when the device has exactly one candidate.
 	const candidates = new Map<number, typeof auto>()
@@ -200,37 +219,59 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 		candidates.set(pair.device_id, [...(candidates.get(pair.device_id) ?? []), pair])
 	}
 
-	const local: LinkBoardLocal[] = locals.map((d) => {
-		const link = linkByDevice.get(d.id)
-		const ignored = ignoredByDevice.get(d.id)
-		const pairs = candidates.get(d.id) ?? []
-		const pair = pairs.length === 1 && !ignored ? pairs[0] : undefined
-		return {
-			id: d.id,
-			name: d.name,
-			detail: joinDetail(d.manufacturer, d.model),
-			serial: d.serial,
-			active: d.status === 'active',
-			link_id: link?.id ?? ignored?.id ?? null,
-			external_id: link?.external_id ?? null,
-			external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
-			ignored: ignored !== undefined,
-			suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
-		}
-	})
-	const external = externals.map((e) =>
-		externalRow(
-			{
-				external_id: e.external_id,
-				name: e.name,
-				detail: joinDetail(e.manufacturer, e.model),
-				serial: e.serial,
-				active: e.active,
-			},
-			linkByExternal.get(e.external_id),
-			(id) => localName.get(id) ?? null,
-		),
-	)
+	const local: LinkBoardLocal[] = locals
+		.map((d): LinkBoardLocal => {
+			const link = linkByDevice.get(d.id)
+			const ignored = ignoredByDevice.get(d.id)
+			// Inactive devices are ignored by default (no link row, so no
+			// restore button); linking one still works via pick/drop.
+			const defaultIgnored =
+				d.status !== 'active' && link === undefined && ignored === undefined
+			const pairs = candidates.get(d.id) ?? []
+			const pair = pairs.length === 1 && !ignored && !defaultIgnored ? pairs[0] : undefined
+			return {
+				id: d.id,
+				name: d.name,
+				detail: joinDetail(d.manufacturer, d.model),
+				serial: d.serial,
+				active: d.status === 'active',
+				link_id: link?.id ?? ignored?.id ?? null,
+				external_id: link?.external_id ?? null,
+				external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
+				ignored: ignored !== undefined || defaultIgnored,
+				suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
+			}
+		})
+		.sort(
+			(a, b) =>
+				(a.ignored ? 2 : a.external_id === null ? 0 : 1) -
+					(b.ignored ? 2 : b.external_id === null ? 0 : 1) ||
+				a.name.localeCompare(b.name),
+		)
+	const externalStateOrder = (state: LinkBoardExternal['state']): number =>
+		state === 'ignored' ? 2 : state === 'linked' ? 1 : 0
+	const external = externals
+		.map((e) => {
+			const row = externalRow(
+				{
+					external_id: e.external_id,
+					name: e.name,
+					detail: joinDetail(e.manufacturer, e.model),
+					serial: e.serial,
+					active: e.active,
+				},
+				linkByExternal.get(e.external_id),
+				(id) => localName.get(id) ?? null,
+			)
+			// Inactive devices are ignored by default (no link row, so no
+			// restore button); linked ones stay visible as linked.
+			return row.state === null && !e.active ? { ...row, state: 'ignored' as const } : row
+		})
+		.sort(
+			(a, b) =>
+				externalStateOrder(a.state) - externalStateOrder(b.state) ||
+				a.name.localeCompare(b.name),
+		)
 	return {
 		provider,
 		entity_type: 'device',

@@ -165,11 +165,6 @@ export function LocationAddPage(): JSX.Element {
 				onChange={setParentId}
 				options={row_options(parents() ?? [])}
 				emptyLabel={t('site.topLevel')}
-				hint={
-					<Show when={siteId() === ''}>
-						<Hint>{t('location.pickSiteForParent')}</Hint>
-					</Show>
-				}
 			/>
 			<SelectField
 				id="location-tenant"
