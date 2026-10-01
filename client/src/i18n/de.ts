@@ -151,7 +151,7 @@ export const de: Messages = {
 	'app.navAdd': '{label} hinzufügen',
 	'app.navAddSoon': '{label} hinzufügen (demnächst verfügbar)',
 	'app.navImport': '{label} importieren',
-	'app.navGroup.organization': 'Organisation',
+	'app.navGroup.organization': 'Firma',
 	'app.navGroup.devices': 'Geräte',
 	'app.navGroup.catalog': 'Katalog',
 	'app.navGroup.administration': 'Administration',

@@ -964,6 +964,39 @@ tbody tr:last-child td {
 	border-bottom: none;
 }
 
+/* Sibling-list tabs (tenants ↔ tenant groups, sites ↔ site groups) in
+   place of the list title: compact links whose active underline
+   sits on the page-header rule, so they cost no extra row. */
+.list-tabs {
+	display: flex;
+	align-self: stretch;
+	align-items: flex-end;
+	gap: 1rem;
+	min-width: 0;
+}
+
+.list-tabs a {
+	margin-bottom: calc(-0.4rem - 1px);
+	padding-bottom: 0.4rem;
+	border-bottom: 2px solid transparent;
+	font-size: var(--font-size-lg);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--text-muted);
+	white-space: nowrap;
+	text-decoration: none;
+}
+
+.list-tabs a:hover {
+	color: var(--text);
+	text-decoration: none;
+}
+
+.list-tabs a[aria-current="page"] {
+	color: var(--text);
+	border-bottom-color: var(--primary);
+}
+
 .page-header-actions {
 	display: flex;
 	align-items: center;

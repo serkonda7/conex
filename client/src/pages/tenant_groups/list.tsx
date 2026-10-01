@@ -25,6 +25,10 @@ export function TenantGroupsPage(): JSX.Element {
 		<EntityListPage
 			list={list}
 			title={tp('entity.tenantGroup', 2)}
+			tabs={[
+				{ label: tp('entity.tenant', 2), href: '/tenants', active: false },
+				{ label: tp('entity.tenantGroup', 2), href: '/tenant-groups', active: true },
+			]}
 			addHref="/tenant-groups/add"
 			searchPlaceholder={t('tenantGroup.searchPlaceholder')}
 			columns={[

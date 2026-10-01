@@ -53,7 +53,19 @@ function NavShortcut(props: {
 /** One section row: its list link plus the add/import shortcuts. */
 function NavItem(props: { section: Section }): JSX.Element {
 	const href = (): string => `/${props.section.path}`
-	const active = (): boolean => routeSection(path()) === props.section
+	const active = (): boolean => {
+		const current = routeSection(path())
+		if (!current) {
+			return false
+		}
+		if (current === props.section) {
+			return true
+		}
+		// Group lists live as tabs of their parent page but keep their own
+		// route: highlight the parent nav entry while on them.
+		const parent = NAV_PARENT[current.path]
+		return parent !== undefined && parent === props.section.path
+	}
 	const label = (): string => props.section.noun(2)
 	const addHref = (): string | undefined => (props.section.add ? `${href()}/add` : undefined)
 	return (
@@ -160,12 +172,13 @@ interface NavGroup {
 	paths: readonly string[]
 }
 
-/** Sidebar groups in display order, listing section paths. */
+/** Sidebar groups in display order, listing section paths. Group lists are
+ * tabs of their parent page, so only the parents appear here. */
 const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.organization',
 		icon: IconBuilding,
-		paths: ['tenants', 'tenant-groups', 'site-groups', 'sites', 'locations'],
+		paths: ['tenants', 'sites', 'locations'],
 	},
 	{ label: 'app.navGroup.devices', icon: IconServer, paths: ['racks', 'devices', 'topology'] },
 	{
@@ -175,6 +188,12 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	},
 	{ label: 'app.navGroup.administration', icon: IconSettings, paths: ['integrations', 'users'] },
 ]
+
+/** Hidden group routes mapped to the parent nav entry they highlight. */
+const NAV_PARENT: Record<string, string> = {
+	'tenant-groups': 'tenants',
+	'site-groups': 'sites',
+}
 
 /** Sections shown in a sidebar group: routed lists with an icon. */
 function navSections(paths: readonly string[], isAdmin: boolean): Section[] {
@@ -198,7 +217,14 @@ function navSections(paths: readonly string[], isAdmin: boolean): Section[] {
 function NavGroupSection(props: { group: NavGroup; sections: Section[] }): JSX.Element {
 	const holdsActive = (): boolean => {
 		const current = routeSection(path())
-		return current !== null && props.sections.includes(current)
+		if (current === null) {
+			return false
+		}
+		if (props.sections.includes(current)) {
+			return true
+		}
+		const parent = NAV_PARENT[current.path]
+		return parent !== undefined && props.sections.some((section) => section.path === parent)
 	}
 	const [open, setOpen] = createSignal(holdsActive())
 	createEffect(() => {

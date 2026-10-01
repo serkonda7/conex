@@ -49,11 +49,22 @@ export function SitesPage(): JSX.Element {
 			getValue: (s: SiteRow): string => groupName(s.site_group_id),
 		},
 	]
+	/** Carries the tenant filter across the sites ↔ site groups tabs. */
+	const tenantSuffix = (): string =>
+		filterTenant() === '' ? '' : `?tenant=${encodeURIComponent(filterTenant())}`
 
 	return (
 		<EntityListPage
 			list={list}
 			title={tp('entity.site', 2)}
+			tabs={[
+				{ label: tp('entity.site', 2), href: `/sites${tenantSuffix()}`, active: true },
+				{
+					label: tp('entity.siteGroup', 2),
+					href: `/site-groups${tenantSuffix()}`,
+					active: false,
+				},
+			]}
 			addHref="/sites/add"
 			searchPlaceholder={t('site.searchPlaceholder')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}

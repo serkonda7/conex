@@ -331,6 +331,34 @@ export function useEntityList<
 	}
 }
 
+/** One entry of {@link ListTabs}. */
+export interface ListTab {
+	label: string
+	href: string
+	active: boolean
+}
+
+/**
+ * Sibling-list navigation (tenants ↔ tenant groups, sites ↔ site groups)
+ * rendered in place of the list title, so switching costs no extra row.
+ * Anchors keep the tabs deep-linkable; the active one gets
+ * `aria-current="page"`.
+ */
+function ListTabs(props: { title: string; tabs: readonly ListTab[] }): JSX.Element {
+	return (
+		<nav class="list-tabs" aria-label={props.title}>
+			<h2 class="visually-hidden">{props.title}</h2>
+			<For each={props.tabs}>
+				{(tab: ListTab): JSX.Element => (
+					<a href={tab.href} aria-current={tab.active ? 'page' : undefined}>
+						{tab.label}
+					</a>
+				)}
+			</For>
+		</nav>
+	)
+}
+
 /**
  * Standard list page around {@link useEntityList}. `filters` are extra
  * toolbar controls; `filtered` tells the empty message whether they (or
@@ -340,6 +368,8 @@ export function useEntityList<
 export function EntityListPage<Row extends { id: number }>(props: {
 	list: EntityList<Row>
 	title: string
+	/** Sibling-list tabs shown instead of the title. */
+	tabs?: readonly ListTab[]
 	addHref: string
 	/** Extra header buttons beside "+ Add" (e.g. Import). */
 	headerActions?: JSX.Element
@@ -393,6 +423,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		<div>
 			<ListPageHeader
 				title={props.title}
+				tabs={props.tabs}
 				add_href={props.addHref}
 				actions={props.headerActions}
 			/>
@@ -480,13 +511,14 @@ export function FilterSelect(props: {
 }
 
 /**
- * List title plus the "+ Add" button. `actions` renders extra header buttons
+ * List title (or sibling-list `tabs`) plus the "+ Add" button. `actions` renders extra header buttons
  * (e.g. the device-type Import button) beside "+ Add" inside a
  * `page-header-actions` wrapper. Both are write actions, hidden for
  * read-only sessions.
  */
 export function ListPageHeader(props: {
 	title: string
+	tabs?: readonly ListTab[]
 	add_href: string
 	actions?: JSX.Element
 }): JSX.Element {
@@ -497,7 +529,11 @@ export function ListPageHeader(props: {
 	)
 	return (
 		<div class="page-header">
-			<h2>{props.title}</h2>
+			<Show when={props.tabs} fallback={<h2>{props.title}</h2>}>
+				{(tabs: () => readonly ListTab[]): JSX.Element => (
+					<ListTabs title={props.title} tabs={tabs()} />
+				)}
+			</Show>
 			<Show when={canWrite()}>
 				<Show when={props.actions !== undefined} fallback={addButton}>
 					<div class="page-header-actions">

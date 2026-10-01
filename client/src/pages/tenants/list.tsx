@@ -41,11 +41,17 @@ export function TenantsPage(): JSX.Element {
 			getValue: (row: TenantWithCounts): string => groupName(row.tenant_group_id),
 		},
 	]
+	const tenantsHref = (): string =>
+		filterGroup() === '' ? '/tenants' : `/tenants?group=${encodeURIComponent(filterGroup())}`
 
 	return (
 		<EntityListPage
 			list={list}
 			title={tp('entity.tenant', 2)}
+			tabs={[
+				{ label: tp('entity.tenant', 2), href: tenantsHref(), active: true },
+				{ label: tp('entity.tenantGroup', 2), href: '/tenant-groups', active: false },
+			]}
 			addHref="/tenants/add"
 			searchPlaceholder={t('tenant.searchPlaceholder')}
 			filtered={group() !== undefined}
