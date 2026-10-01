@@ -1,1 +1,0 @@
-ALTER TABLE `racks` ADD `description` text;

@@ -88,8 +88,6 @@ import { UsersPage } from '../pages/users/list'
 export interface Section {
 	/** First URL segment (`/devices/…`). */
 	path: string
-	/** Legacy segments resolving to the same section. */
-	aliases?: readonly string[]
 	/** Localized entity name for tab titles and the sidebar. */
 	noun: (count: number) => string
 	/** Sidebar icon; sections without one (or without a list) stay hidden. */
@@ -179,7 +177,6 @@ export const SECTIONS: readonly Section[] = [
 	},
 	{
 		path: 'rack-types',
-		aliases: ['templates'],
 		noun: (n: number): string => tp('entity.rackType', n),
 		permission: 'view',
 		icon: IconTemplate,
@@ -307,7 +304,7 @@ export function routeSection(raw: string): Section | null {
 	if (first === undefined) {
 		return SECTIONS[0] ?? null
 	}
-	return SECTIONS.find((s) => s.path === first || s.aliases?.includes(first)) ?? null
+	return SECTIONS.find((s) => s.path === first) ?? null
 }
 
 export type RouteMatch =

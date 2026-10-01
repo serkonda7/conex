@@ -39,22 +39,10 @@ bun run dev
 | `CONEX_CONFIG_PATH`      | Relative to `server/data` or absolute              | `config.toml` |
 | `CONEX_E2E_DATABASE_URL` | Separate Postgres database for `bun run test:e2e`  | `CONEX_DATABASE_URL` + `_e2e` (auto-created) |
 
-
-### Migrating from SQLite
-Older installs stored data in `server/data/conex.db`. Stop the server, then copy
-everything into an empty Postgres database (the SQLite file is only read):
-```sh
-CONEX_DATABASE_URL=postgres://... bun run --cwd server db:migrate-sqlite /abs/path/to/conex.db
-```
-The script first upgrades a snapshot of the file to the final SQLite schema, so
-older schema versions work too. It copies all rows in one transaction, keeps ids, and
-verifies row counts; on any error Postgres is left untouched.
-
-
 ### Backing up Postgres
 Backup:
 ```sh
-docker exec conex-db pg_dump -U conex conex > conex-$(date +%F).sql
+docker exec conex-db pg_dump -U conex conex > backups/conex-$(date +%F).sql
 ```
 Restore:
 ```sh

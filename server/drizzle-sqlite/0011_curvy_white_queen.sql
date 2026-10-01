@@ -1,1 +1,0 @@
-ALTER TABLE `racks` ADD `rack_type_id` integer REFERENCES device_types(id);

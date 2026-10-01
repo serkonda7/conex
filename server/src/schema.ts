@@ -15,8 +15,7 @@ import { LOCATION_TYPES } from 'shared/src/schemas'
 // devices, cables) are added in P1-P5.
 //
 // Ids are Postgres identity integers (human readable in URLs and UIs).
-// Flags (`is_full_depth`, `connected`, ...) stay 0/1 integers so the wire
-// shapes did not change with the move from SQLite.
+// Flags (`is_full_depth`, `connected`, ...) are 0/1 integers.
 // Session ids and auth-state values stay opaque random strings: they are
 // credentials, not entity references.
 // Roles bundle permissions (`shared/src/schemas.ts` `PERMISSIONS`); every

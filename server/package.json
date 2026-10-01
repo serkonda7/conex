@@ -6,8 +6,7 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "compile": "bun build ./src/index.ts --compile --outfile ./dist/backend.bin",
     "check": "tsc",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate-sqlite": "bun scripts/migrate-sqlite-to-postgres.ts"
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "@hono/valibot-validator": "catalog:",

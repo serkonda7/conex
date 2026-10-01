@@ -173,9 +173,6 @@ async function normalizeShelf<T extends ShelfPlacementInput>(
 	return Result.ok({ ...input, rack_id: shelf.rack_id, position_u: null, face: null })
 }
 
-/** Backwards-compatible alias for the placement check. */
-export const checkMount: typeof checkPlacement = checkPlacement
-
 async function checkSite(siteId: number | null | undefined): Promise<Result<undefined, Error>> {
 	if (siteId === null || siteId === undefined) {
 		return Result.ok(undefined)

@@ -668,10 +668,6 @@ tbody tr:last-child td {
 	border-color: var(--border);
 }
 
-.app-nav-item.active > a {
-	font-weight: 600;
-}
-
 .app-nav-add {
 	display: inline-flex;
 	align-items: center;
@@ -1022,6 +1018,10 @@ tbody tr:last-child td {
 	border-bottom-color: var(--primary);
 }
 
+.app-nav-item.active > a {
+	font-weight: 600;
+}
+
 .page-header-actions {
 	display: flex;
 	align-items: center;
@@ -1098,6 +1098,12 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+.field-group-label {
+	font-size: var(--font-size-base);
+	font-weight: 600;
+	color: var(--text);
+}
+
 .field > label,
 .field > .field-group-label {
 	padding-top: 0.35rem;
@@ -1109,12 +1115,6 @@ tbody tr:last-child td {
 	margin: 0;
 	padding: 0;
 	border: 0;
-}
-
-.field-group-label {
-	font-size: var(--font-size-base);
-	font-weight: 600;
-	color: var(--text);
 }
 
 .field-control {

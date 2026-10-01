@@ -1,1 +1,0 @@
-ALTER TABLE `device_types` ADD `is_full_depth` integer DEFAULT 1 NOT NULL;

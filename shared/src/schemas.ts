@@ -23,19 +23,15 @@ export const UsernameSchema = v.pipe(
 // Local-login credentials. strictObject so unknown keys fail loudly instead
 // of being stripped; the route validator reports them through the shared
 // onValidationError hook.
-// `username` stays permissive (max 320, no charset check) so installs
-// created before the email→username migration can still log in with their
-// existing `admin@example.com`-style identity; new accounts are restricted
-// by UsernameSchema in SetupSchema/UserCreateSchema.
 export const LoginSchema = v.strictObject({
-	username: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(320)),
+	username: UsernameSchema,
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 })
 
 export type Login = v.InferOutput<typeof LoginSchema>
 
-// First-run admin provisioning. Same username/password contract as login;
-// new usernames must satisfy UsernameSchema (no minimum password length).
+// First-run admin provisioning. Same username/password contract as login
+// (no minimum password length).
 export const SetupSchema = v.strictObject({
 	username: UsernameSchema,
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),

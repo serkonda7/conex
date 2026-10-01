@@ -1,1 +1,0 @@
-ALTER TABLE `device_type_interfaces` ADD `description` text;
