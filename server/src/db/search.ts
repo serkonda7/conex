@@ -55,8 +55,8 @@ export async function globalSearch(
 		.from(sql`tenants`)
 		.where(
 			scope === undefined
-				? sql`(name ILIKE ${pattern} ESCAPE '\\')`
-				: sql`(name ILIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
+				? sql`(name ILIKE ${pattern} ESCAPE '\\' OR customer_number ILIKE ${pattern} ESCAPE '\\')`
+				: sql`(name ILIKE ${pattern} ESCAPE '\\' OR customer_number ILIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
 		)
 		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)
@@ -81,7 +81,7 @@ export async function globalSearch(
 		})
 		.from(sql`devices`)
 		.where(
-			sql`(name ILIKE ${pattern} ESCAPE '\\' OR asset_tag ILIKE ${pattern} ESCAPE '\\' OR serial ILIKE ${pattern} ESCAPE '\\')${tenantScope}`,
+			sql`(name ILIKE ${pattern} ESCAPE '\\' OR asset_tag ILIKE ${pattern} ESCAPE '\\' OR device_id ILIKE ${pattern} ESCAPE '\\' OR serial ILIKE ${pattern} ESCAPE '\\')${tenantScope}`,
 		)
 		.orderBy(asc(sql`name`), asc(sql`id`))
 		.limit(GROUP_LIMIT)

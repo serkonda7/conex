@@ -47,6 +47,11 @@ export function DevicesPage(): JSX.Element {
 	const columns: DataTableColumn<DeviceRow>[] = [
 		nameColumn(tp('entity.device', 1), '/devices', { sortable: true }),
 		{
+			key: 'device_id',
+			label: t('device.deviceId'),
+			getValue: (d: DeviceRow): string => d.device_id ?? '—',
+		},
+		{
 			key: 'role',
 			label: tp('entity.deviceRole', 1),
 			getValue: (d: DeviceRow): string => roleName(d.device_role_id),

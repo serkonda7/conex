@@ -28,6 +28,7 @@ import { createDeviceType, createStub } from './templates'
 export const DEVICE_CSV_HEADER = [
 	'name',
 	'asset_tag',
+	'device_id',
 	'device_type_model',
 	'device_role_name',
 	'site_name',
@@ -318,6 +319,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 		.select({
 			name: devices.name,
 			asset_tag: devices.asset_tag,
+			device_id: devices.device_id,
 			type_model: device_types.model,
 			role_name: device_roles.name,
 			site_name: sites.name,
@@ -337,6 +339,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 		rows.map((r) => [
 			r.name,
 			r.asset_tag,
+			r.device_id,
 			r.type_model,
 			r.role_name,
 			r.site_name,
@@ -496,6 +499,7 @@ export async function importDevicesCsv(
 			rack_id: foundRackId,
 			position_u: input.position_u,
 			asset_tag: input.asset_tag,
+			device_id: input.device_id,
 			...(scopeTenantId !== undefined ? { tenant_id: scopeTenantId } : {}),
 		})
 		if (Result.isError(created)) {

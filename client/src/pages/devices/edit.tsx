@@ -29,6 +29,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
+	const [deviceId, setDeviceId] = createSignal('')
 	const [roleId, setRoleId] = createSignal('')
 	const [siteId, setSiteId] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
@@ -43,6 +44,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setName(row.name)
 			setDescription(row.description ?? '')
 			setSerial(row.serial ?? '')
+			setDeviceId(row.device_id ?? '')
 			setRoleId(id_value(row.device_role_id))
 			setSiteId(id_value(row.site_id))
 			setLocationId(id_value(row.location_id))
@@ -88,6 +90,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					name: values.name,
 					description: text(description()) ?? null,
 					serial: text(serial()) ?? null,
+					device_id: text(deviceId()) ?? null,
 					device_role_id: Number(roleId()),
 					site_id: parseId(siteId()),
 					location_id: parseId(locationId()),
@@ -145,6 +148,14 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				maxLength={100}
 				value={serial()}
 				onInput={setSerial}
+			/>
+			<TextField
+				id="device-edit-device-id"
+				label={t('device.deviceId')}
+				placeholder={t('device.deviceIdPlaceholder')}
+				maxLength={100}
+				value={deviceId()}
+				onInput={setDeviceId}
 			/>
 			<SelectField
 				id="device-edit-site"

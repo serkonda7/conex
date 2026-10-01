@@ -16,6 +16,7 @@ import {
 	NameField,
 	row_options,
 	SelectField,
+	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import {
@@ -39,6 +40,7 @@ function TenantForm(props: { id?: number }): JSX.Element {
 	const selectAfterCreate = queryParam('select') === '1'
 	// A selected tenant-group context preselects that group.
 	const [groupId, setGroupId] = createSignal(id_value(contextGroupId()))
+	const [customerNumber, setCustomerNumber] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
@@ -47,6 +49,7 @@ function TenantForm(props: { id?: number }): JSX.Element {
 		fill: (row: TenantRow) => {
 			setName(row.name)
 			setGroupId(id_value(row.tenant_group_id))
+			setCustomerNumber(row.customer_number ?? '')
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
@@ -58,6 +61,7 @@ function TenantForm(props: { id?: number }): JSX.Element {
 	const body = (values: FormValues): TenantCreate => ({
 		name: values.name,
 		tenant_group_id: parseId(groupId()),
+		customer_number: text(customerNumber()),
 		description: text(description()),
 		comments: text(comments()),
 	})
@@ -108,6 +112,14 @@ function TenantForm(props: { id?: number }): JSX.Element {
 				options={row_options(groups() ?? [])}
 				emptyLabel={t('common.noGroup')}
 				hint={<Hint>{t('tenantGroup.hint')}</Hint>}
+			/>
+			<TextField
+				id={`${prefix}-customer-number`}
+				label={t('tenant.customerNumber')}
+				placeholder={t('tenant.customerNumberPlaceholder')}
+				maxLength={100}
+				value={customerNumber()}
+				onInput={setCustomerNumber}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

@@ -56,7 +56,7 @@ export type LocationRow = typeof locations.$inferSelect
 export interface TenantListParams extends ListParams {
 	/** Only tenants of this tenant group. */
 	group?: number
-	sort: 'name' | 'description'
+	sort: 'name' | 'customer_number' | 'description'
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to this
@@ -174,6 +174,36 @@ export async function resolveTenantGroupIds(groupId: number): Promise<Result<num
 	return Result.ok(rows.map((r) => r.id))
 }
 
+/** Customer number guard: null/undefined passes, missing id is 404. */
+async function checkCustomerNumber(
+	customerNumber: string | null | undefined,
+	excludeTenantId?: number,
+): Promise<Result<undefined, Error>> {
+	if (customerNumber === null || customerNumber === undefined) {
+		return Result.ok(undefined)
+	}
+	const clash = (
+		await getDb()
+			.select()
+			.from(tenants)
+			.where(eq(tenants.customer_number, customerNumber))
+			.limit(1)
+	)[0]
+	if (clash && clash.id !== excludeTenantId) {
+		return Result.err(new DuplicateError('Customer number is already in use'))
+	}
+	return Result.ok(undefined)
+}
+
+/** Maps a tenant unique violation to the colliding field (customer number). */
+function duplicateTenantError(err: unknown): Error {
+	const message = err instanceof Error ? err.message : String(err)
+	if (message.includes('customer_number')) {
+		return new DuplicateError('Customer number is already in use')
+	}
+	return err instanceof Error ? err : new Error(String(err))
+}
+
 /** Tenant group FK guard: null/undefined passes, missing id is 404. */
 async function checkTenantGroupExists(
 	groupId: number | null | undefined,
@@ -280,7 +310,7 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${tenants.name} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.description} ILIKE ${pattern} ESCAPE '\\')`,
+			sql`(${tenants.name} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.customer_number} ILIKE ${pattern} ESCAPE '\\' OR ${tenants.description} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.group !== undefined) {
@@ -290,7 +320,12 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 		conditions.push(eq(tenants.id, params.scopeTenantId))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const orderColumn = params.sort === 'description' ? tenants.description : tenants.name
+	const orderColumn =
+		params.sort === 'customer_number'
+			? tenants.customer_number
+			: params.sort === 'description'
+				? tenants.description
+				: tenants.name
 	const items = await db
 		.select()
 		.from(tenants)
@@ -371,9 +406,14 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantRo
 	if (Result.isError(groupExists)) {
 		return groupExists
 	}
+	const numberCheck = await checkCustomerNumber(input.customer_number)
+	if (Result.isError(numberCheck)) {
+		return numberCheck
+	}
 	const row: Omit<TenantRow, 'id'> = {
 		tenant_group_id: input.tenant_group_id ?? null,
 		name: input.name,
+		customer_number: input.customer_number ?? null,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
@@ -384,6 +424,9 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantRo
 		}
 		return await getTenant(inserted.id)
 	} catch (err) {
+		if (isUniqueViolation(err)) {
+			return Result.err(duplicateTenantError(err))
+		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
 }
@@ -401,12 +444,19 @@ export async function updateTenant(
 	if (Result.isError(groupExists)) {
 		return groupExists
 	}
+	const numberCheck = await checkCustomerNumber(input.customer_number, id)
+	if (Result.isError(numberCheck)) {
+		return numberCheck
+	}
 	const patch: Partial<TenantRow> = {}
 	if (input.tenant_group_id !== undefined) {
 		patch.tenant_group_id = input.tenant_group_id
 	}
 	if (input.name !== undefined) {
 		patch.name = input.name
+	}
+	if (input.customer_number !== undefined) {
+		patch.customer_number = input.customer_number
 	}
 	if (input.description !== undefined) {
 		patch.description = input.description
@@ -418,6 +468,9 @@ export async function updateTenant(
 		try {
 			await db.update(tenants).set(patch).where(eq(tenants.id, id))
 		} catch (err) {
+			if (isUniqueViolation(err)) {
+				return Result.err(duplicateTenantError(err))
+			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}

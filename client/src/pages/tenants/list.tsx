@@ -34,6 +34,12 @@ export function TenantsPage(): JSX.Element {
 
 	const columns: DataTableColumn<TenantWithCounts>[] = [
 		nameColumn(tp('entity.tenant', 1), '/tenants', { sortable: true }),
+		{
+			key: 'customer_number',
+			label: t('tenant.customerNumber'),
+			sortable: true,
+			getValue: (row: TenantWithCounts): string => row.customer_number ?? '—',
+		},
 		descriptionColumn({ sortable: true }),
 		{
 			key: 'group',

@@ -109,9 +109,21 @@ export const TenantGroupUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
+/** Optional customer number / device ID: free text, unique when set. */
+export const CustomerNumberSchema = v.optional(
+	v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))),
+	undefined,
+)
+
+export const DeviceIdSchema = v.optional(
+	v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))),
+	undefined,
+)
+
 export const TenantCreateSchema = v.strictObject({
 	name: NameSchema,
 	tenant_group_id: NullableIdSchema,
+	customer_number: CustomerNumberSchema,
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
@@ -119,6 +131,10 @@ export const TenantCreateSchema = v.strictObject({
 export const TenantUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	tenant_group_id: v.optional(v.nullable(IdSchema), undefined),
+	customer_number: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))),
+		undefined,
+	),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -252,7 +268,7 @@ export const TenantListQuerySchema = v.object({
 	...ListQueryEntries,
 	/** Only tenants of this tenant group. */
 	group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'customer_number', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -591,6 +607,7 @@ export const DeviceCreateSchema = v.strictObject({
 	shelf_id: NullableIdSchema,
 	serial: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	device_id: DeviceIdSchema,
 	tenant_id: NullableIdSchema,
 	description: DescriptionSchema,
 })
@@ -609,6 +626,7 @@ export const DeviceUpdateSchema = v.strictObject({
 	shelf_id: v.optional(v.nullable(IdSchema), undefined),
 	serial: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	device_id: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
@@ -1006,6 +1024,7 @@ export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
 export const DeviceImportRowSchema = v.object({
 	name: NameSchema,
 	asset_tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	device_id: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	device_type_model: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	device_role_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	site_name: v.optional(

@@ -54,6 +54,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [roleId, setRoleId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
+	const [deviceId, setDeviceId] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
@@ -124,6 +125,7 @@ export function DeviceAddPage(): JSX.Element {
 					name: values.name,
 					description: text(description()),
 					serial: text(serial()),
+					device_id: text(deviceId()),
 					site_id: parseId(siteId()),
 					location_id: parseId(locationId()),
 					rack_id: parseId(rackId()),
@@ -195,6 +197,14 @@ export function DeviceAddPage(): JSX.Element {
 				maxLength={100}
 				value={serial()}
 				onInput={setSerial}
+			/>
+			<TextField
+				id="device-device-id"
+				label={t('device.deviceId')}
+				placeholder={t('device.deviceIdPlaceholder')}
+				maxLength={100}
+				value={deviceId()}
+				onInput={setDeviceId}
 			/>
 			<SelectField
 				id="device-site"

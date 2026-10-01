@@ -306,6 +306,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 					<dt>{t('device.serial')}</dt>
 					<dd>{device()?.serial ?? '—'}</dd>
+					<dt>{t('device.deviceId')}</dt>
+					<dd>{device()?.device_id ?? '—'}</dd>
 					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<RecordLink id={tenantId()} record={tenant} base="/tenants" />

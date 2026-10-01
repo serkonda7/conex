@@ -75,6 +75,8 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={groupId()} record={group} base="/tenant-groups" />
 					</dd>
+					<dt>{t('tenant.customerNumber')}</dt>
+					<dd>{tenant()?.customer_number || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>{tenant()?.comments || '—'}</dd>
 				</DetailCard>

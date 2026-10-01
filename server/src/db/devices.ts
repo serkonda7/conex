@@ -236,6 +236,34 @@ async function checkAssetTag(
 	return Result.ok(undefined)
 }
 
+async function checkDeviceId(
+	deviceId: string | null | undefined,
+	excludeDeviceId?: number,
+): Promise<Result<undefined, Error>> {
+	if (deviceId === null || deviceId === undefined) {
+		return Result.ok(undefined)
+	}
+	const clash = (
+		await getDb().select().from(devices).where(eq(devices.device_id, deviceId)).limit(1)
+	)[0]
+	if (clash && clash.id !== excludeDeviceId) {
+		return Result.err(new DuplicateError('Device ID is already in use'))
+	}
+	return Result.ok(undefined)
+}
+
+/** Maps a device unique violation to the colliding field (asset tag vs device ID). */
+function duplicateDeviceError(err: unknown): Error {
+	const message = err instanceof Error ? err.message : String(err)
+	if (message.includes('device_id')) {
+		return new DuplicateError('Device ID is already in use')
+	}
+	if (message.includes('asset_tag')) {
+		return new DuplicateError('Asset tag is already in use')
+	}
+	return new DuplicateError('Asset tag is already in use')
+}
+
 // ---------------------------------------------------------------------------
 // Devices
 // ---------------------------------------------------------------------------
@@ -257,7 +285,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 	const conditions: SQL[] = []
 	if (params.search) {
 		conditions.push(
-			sql`(${devices.name} ILIKE ${pattern} ESCAPE '\\' OR ${devices.asset_tag} ILIKE ${pattern} ESCAPE '\\' OR ${devices.serial} ILIKE ${pattern} ESCAPE '\\')`,
+			sql`(${devices.name} ILIKE ${pattern} ESCAPE '\\' OR ${devices.asset_tag} ILIKE ${pattern} ESCAPE '\\' OR ${devices.device_id} ILIKE ${pattern} ESCAPE '\\' OR ${devices.serial} ILIKE ${pattern} ESCAPE '\\')`,
 		)
 	}
 	if (params.site) {
@@ -349,6 +377,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		await checkTenantExists(input.tenant_id),
 		await checkDeviceRoleExists(input.device_role_id),
 		await checkAssetTag(input.asset_tag),
+		await checkDeviceId(input.device_id),
 		await checkPlacement(input.name, createMount, templateOf(template)),
 	]) {
 		if (Result.isError(guard)) {
@@ -386,6 +415,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		name: input.name,
 		serial: input.serial ?? null,
 		asset_tag: input.asset_tag ?? null,
+		device_id: input.device_id ?? null,
 		tenant_id: input.tenant_id ?? null,
 		description: input.description ?? null,
 	}
@@ -411,7 +441,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		})
 	} catch (err) {
 		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Asset tag is already in use'))
+			return Result.err(duplicateDeviceError(err))
 		}
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
@@ -464,6 +494,7 @@ export async function updateDevice(
 		),
 		await checkTenantExists(input.tenant_id),
 		await checkAssetTag(input.asset_tag, id),
+		await checkDeviceId(input.device_id, id),
 	]) {
 		if (Result.isError(guard)) {
 			return Result.err(guard.error)
@@ -526,6 +557,9 @@ export async function updateDevice(
 	if (input.asset_tag !== undefined) {
 		patch.asset_tag = input.asset_tag
 	}
+	if (input.device_id !== undefined) {
+		patch.device_id = input.device_id
+	}
 	if (input.tenant_id !== undefined) {
 		patch.tenant_id = input.tenant_id
 	}
@@ -537,7 +571,7 @@ export async function updateDevice(
 			await getDb().update(devices).set(patch).where(eq(devices.id, id))
 		} catch (err) {
 			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Asset tag is already in use'))
+				return Result.err(duplicateDeviceError(err))
 			}
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}

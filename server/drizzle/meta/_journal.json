@@ -57,6 +57,13 @@
       "when": 1790759016085,
       "tag": "0007_device_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790844262684,
+      "tag": "0008_graceful_toro",
+      "breakpoints": true
     }
   ]
 }
