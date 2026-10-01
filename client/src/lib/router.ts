@@ -460,12 +460,22 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
 }
 
 /**
- * Leaves a form tab for `to` (save, cancel, back link): the form closes
- * like a dialog and the target shows in an existing tab, else in the
- * opener's history, else in place of the form.
+ * Leaves a form tab for `to` (save, cancel, back link): a form opened from
+ * another form (the "+" beside a select) closes back into its opener,
+ * leaving the in-progress form untouched; otherwise the form closes like a
+ * dialog and the target shows in an existing tab, else in the opener's
+ * history, else in place of the form.
  */
 function closeForm(form: TabState, to: string, refresh: boolean): void {
 	const others = tabs().filter((t) => t.id !== form.id)
+	const opener = others.find((t) => t.id === form.openerId)
+	if (opener && isFormRoute(opener.path)) {
+		// No `gen` bump here: remounting the opener would wipe its
+		// unsaved input.
+		removeTab(form.id)
+		show(opener)
+		return
+	}
 	const shown = others.find((t) => t.path === to)
 	if (shown) {
 		removeTab(form.id)
@@ -474,14 +484,13 @@ function closeForm(form: TabState, to: string, refresh: boolean): void {
 		show(next)
 		return
 	}
-	const opener = others.find((t) => t.id === form.openerId)
 	if (opener && !isFormRoute(opener.path)) {
 		removeTab(form.id)
 		show(visit(opener, to), 'push')
 		return
 	}
-	// Direct URL entry, or the opener is gone or is itself a form: turn the
-	// form tab into the target.
+	// Direct URL entry, or the opener is gone: turn the form tab into
+	// the target.
 	scrollByTab.delete(form.id)
 	const next = makeTab(form.id, [to], 0, form.openerId, form.gen)
 	updateTab(next)

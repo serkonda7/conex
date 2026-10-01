@@ -77,7 +77,20 @@ export default defineConfig({
 	projects: [
 		{ name: 'setup', testMatch: /.*\.setup\.ts/ },
 		{
+			// Functional suite (`bun run test:e2e`); visual baselines run
+			// separately as the `visual` project (`bun run test:visual`).
 			name: 'chromium',
+			testIgnore: /visual\.test\.ts/,
+			use: {
+				...devices['Desktop Chrome'],
+				viewport: { width: 1920, height: 1080 },
+				storageState: e2eAuthFile,
+			},
+			dependencies: ['setup'],
+		},
+		{
+			name: 'visual',
+			testMatch: /visual\.test\.ts/,
 			use: {
 				...devices['Desktop Chrome'],
 				viewport: { width: 1920, height: 1080 },

@@ -101,6 +101,7 @@ export function DeviceTypesPage(): JSX.Element {
 			filtered={filterManufacturer() !== ''}
 			columns={columns}
 			columnsKey="device-types"
+			defaultColumns={['manufacturer', 'model', 'description']}
 			rowName={(dt: DeviceTypeRow): string => dt.model}
 			editHref={(dt: DeviceTypeRow): string => `/device-types/${dt.id}/edit`}
 			emptyText={t('deviceType.empty')}

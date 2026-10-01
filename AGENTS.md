@@ -2,6 +2,7 @@
 - Tests:
   - Update existing tests to reflect behavior changes.
   - Add tests only when explicitly requested; otherwise, ask for confirmation.
+  - Running e2e tests requires `docker start conex-db` and `CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex`
 - Errors: use `better-result` Result, not throw (request-path and service code
   must return `Result<T, Error>`; only process-startup getters like
   `getConfig()`/`getDb()` throw on missing initialization).
