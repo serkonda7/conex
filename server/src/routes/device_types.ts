@@ -29,8 +29,8 @@ import {
 	requirePermissionMiddleware,
 } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
-import { sendCreated, sendCsv, sendRow } from './helpers'
+import { sendCsv } from '../util/http'
+import { sendCreated, sendResult } from '../util/result_response'
 
 export const deviceTypesApp = new Hono()
 	.use(authMiddleware)
@@ -78,7 +78,10 @@ export const deviceTypesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceTypeUpdateSchema, onValidationError),
 		async (c) => {
-			return sendRow(c, await updateDeviceType(c.req.valid('param').id, c.req.valid('json')))
+			return sendResult(
+				c,
+				await updateDeviceType(c.req.valid('param').id, c.req.valid('json')),
+			)
 		},
 	)
 	.delete(
@@ -86,7 +89,7 @@ export const deviceTypesApp = new Hono()
 		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
-			return sendRow(c, await deleteDeviceType(c.req.valid('param').id))
+			return sendResult(c, await deleteDeviceType(c.req.valid('param').id))
 		},
 	)
 	// Stub sub-resource.
@@ -110,7 +113,7 @@ export const deviceTypesApp = new Hono()
 		async (c) => {
 			// The `:id` segment is validated as an id; ownership is enforced by
 			// loading the stub itself.
-			return sendRow(c, await updateStub(c.req.valid('param').stubId, c.req.valid('json')))
+			return sendResult(c, await updateStub(c.req.valid('param').stubId, c.req.valid('json')))
 		},
 	)
 	.delete(
@@ -118,7 +121,7 @@ export const deviceTypesApp = new Hono()
 		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', StubIdParamsSchema, onValidationError),
 		async (c) => {
-			return sendRow(c, await deleteStub(c.req.valid('param').stubId))
+			return sendResult(c, await deleteStub(c.req.valid('param').stubId))
 		},
 	)
 	.get(

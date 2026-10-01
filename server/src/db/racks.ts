@@ -1,6 +1,7 @@
 import { Result } from 'better-result'
-import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import type {
+	ElevationDeviceRef,
 	ElevationResponse,
 	ElevationShelfDeviceRef,
 	ElevationShelfRef,
@@ -9,19 +10,25 @@ import type {
 	RackUpdate,
 } from 'shared/src/schemas'
 import { device_types, devices, locations, racks, shelves, sites } from '../schema'
-import { checkBounds, getOccupancy, type OccupantSpan } from '../services/occupancy'
+import { checkBounds, faceOf, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
+	checkExists,
 	checkTenantExists,
-	errOf,
+	exists,
+	findById,
+	findOne,
+	insertedId,
 	isPatchEmpty,
-	offsetOf,
-	pageOf,
-	searchPattern,
+	orderOf,
+	pageRows,
+	pickDefined,
+	searchCondition,
 	tenantConditions,
+	tryWrite,
 } from './list'
 
 type RackRecord = typeof racks.$inferSelect
@@ -29,13 +36,15 @@ type RackRecord = typeof racks.$inferSelect
 export type RackRow = Omit<RackRecord, 'height_u'> & { height_u: number }
 
 async function withRackHeights(rows: RackRecord[]): Promise<RackRow[]> {
-	const typeIds = [...new Set(rows.map((r) => r.rack_type_id).filter((id) => id !== null))]
+	const typeIds = [
+		...new Set(rows.map((r) => r.rack_type_id).filter((id): id is number => id !== null)),
+	]
 	const heights = new Map<number, number>()
 	if (typeIds.length > 0) {
 		for (const row of await getDb()
 			.select({ id: device_types.id, u_height: device_types.u_height })
 			.from(device_types)
-			.where(inArray(device_types.id, typeIds as number[]))) {
+			.where(inArray(device_types.id, typeIds))) {
 			heights.set(row.id, row.u_height)
 		}
 	}
@@ -53,6 +62,8 @@ async function withRackHeight(row: RackRecord): Promise<RackRow> {
 // Racks
 // ---------------------------------------------------------------------------
 
+const RACK_NAME_IN_USE = 'Rack name is already in use'
+
 export interface RackListParams extends ListParams, TenantFilterParams {
 	site?: number
 	location?: number
@@ -61,58 +72,32 @@ export interface RackListParams extends ListParams, TenantFilterParams {
 }
 
 export async function listRacks(params: RackListParams): Promise<Page<RackRow>> {
-	const db = getDb()
-	const pattern = searchPattern(params.search)
-	const conditions: SQL[] = []
-	if (params.search) {
-		conditions.push(
-			sql`(${racks.name} ILIKE ${pattern} ESCAPE '\\' OR ${racks.description} ILIKE ${pattern} ESCAPE '\\')`,
-		)
-	}
-	if (params.site) {
-		conditions.push(eq(racks.site_id, params.site))
-	}
-	if (params.location) {
-		conditions.push(eq(racks.location_id, params.location))
-	}
-	conditions.push(...tenantConditions(racks.tenant_id, params))
-	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const rows = await db
-		.select()
-		.from(racks)
-		.where(where)
-		.orderBy(params.order === 'desc' ? desc(racks.name) : asc(racks.name), asc(racks.id))
-		.limit(params.limit)
-		.offset(offsetOf(params))
-	const items = await withRackHeights(rows)
-	const totalRow = (await db.select({ n: count() }).from(racks).where(where).limit(1))[0]
-	return pageOf(items, totalRow?.n ?? 0, params)
+	const where = and(
+		searchCondition(params.search, [racks.name, racks.description]),
+		params.site ? eq(racks.site_id, params.site) : undefined,
+		params.location ? eq(racks.location_id, params.location) : undefined,
+		...tenantConditions(racks.tenant_id, params),
+	)
+	const page = await pageRows(
+		racks,
+		where,
+		[orderOf(racks.name, params.order), asc(racks.id)],
+		params,
+	)
+	return { ...page, items: await withRackHeights(page.items) }
 }
 
 export async function getRack(id: number): Promise<Result<RackRow, Error>> {
-	const row = (await getDb().select().from(racks).where(eq(racks.id, id)).limit(1))[0]
-	if (!row) {
-		return Result.err(new NotFoundError('Rack not found'))
-	}
-	return Result.ok(await withRackHeight(row))
+	const row = await findById(racks, id, 'Rack not found')
+	return Result.isOk(row) ? Result.ok(await withRackHeight(row.value)) : row
 }
 
-/**
- * Authoritative rack height in U, supplied by the rack type.
- */
+/** Authoritative rack height in U, supplied by the rack type. */
 export async function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): Promise<number> {
 	if (rack.rack_type_id === null) {
 		return 0
 	}
-	return (
-		(
-			await getDb()
-				.select({ u_height: device_types.u_height })
-				.from(device_types)
-				.where(eq(device_types.id, rack.rack_type_id))
-				.limit(1)
-		)[0]?.u_height ?? 0
-	)
+	return (await findOne(device_types, eq(device_types.id, rack.rack_type_id)))?.u_height ?? 0
 }
 
 /** Location must exist and belong to the rack's site; null clears the link. */
@@ -123,13 +108,35 @@ async function checkLocation(
 	if (locationId === null || locationId === undefined) {
 		return Result.ok(undefined)
 	}
-	const location = (
-		await getDb().select().from(locations).where(eq(locations.id, locationId)).limit(1)
-	)[0]
-	if (!location || location.site_id !== siteId) {
+	if (
+		!(await exists(locations, and(eq(locations.id, locationId), eq(locations.site_id, siteId))))
+	) {
 		return Result.err(new NotFoundError('Location not found in this site'))
 	}
 	return Result.ok(undefined)
+}
+
+/** Rack type row (a device type with a form factor); 404 otherwise. */
+async function getRackType(id: number): Promise<Result<typeof device_types.$inferSelect, Error>> {
+	const type = await findOne(device_types, eq(device_types.id, id))
+	if (!type || type.form_factor === null) {
+		return Result.err(new NotFoundError('Rack type not found'))
+	}
+	return Result.ok(type)
+}
+
+/** A U-mounted device with its type, as the elevation shows it. */
+type MountedDevice = ElevationDeviceRef
+
+function spanOf(device: MountedDevice): OccupantSpan {
+	return {
+		id: device.id,
+		name: device.name,
+		position_u: device.position_u,
+		height_u: device.u_height,
+		face: device.face,
+		is_full_depth: device.is_full_depth,
+	}
 }
 
 /**
@@ -139,30 +146,11 @@ async function checkLocation(
  * the elevation renders.
  */
 export async function deviceSpansOf(rackId: number): Promise<OccupantSpan[]> {
-	return (await deviceDetailsOf(rackId)).map((d) => ({
-		id: d.id,
-		name: d.name,
-		position_u: d.position_u,
-		height_u: d.u_height,
-		face: d.face,
-		is_full_depth: d.is_full_depth,
-	}))
+	return (await deviceDetailsOf(rackId)).map(spanOf)
 }
 
 /** Full device mount details behind each span, for the enriched elevation. */
-export async function deviceDetailsOf(rackId: number): Promise<
-	{
-		id: number
-		name: string
-		position_u: number
-		u_height: number
-		face: 'front' | 'rear' | null
-		status: string
-		device_type_id: number
-		device_type_model: string
-		is_full_depth: boolean
-	}[]
-> {
+async function deviceDetailsOf(rackId: number): Promise<MountedDevice[]> {
 	const rows = await getDb()
 		.select({
 			id: devices.id,
@@ -177,40 +165,18 @@ export async function deviceDetailsOf(rackId: number): Promise<
 		})
 		.from(devices)
 		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
-		.where(eq(devices.rack_id, rackId))
+		.where(and(eq(devices.rack_id, rackId), isNotNull(devices.position_u)))
 		.orderBy(asc(devices.position_u))
-	const details: {
-		id: number
-		name: string
-		position_u: number
-		u_height: number
-		face: 'front' | 'rear' | null
-		status: string
-		device_type_id: number
-		device_type_model: string
-		is_full_depth: boolean
-	}[] = []
-	for (const row of rows) {
-		if (row.position_u === null) {
-			continue
-		}
-		details.push({
-			id: row.id,
-			name: row.name,
-			position_u: row.position_u,
-			u_height: row.u_height,
-			face: row.face === 'front' || row.face === 'rear' ? row.face : null,
-			status: row.status,
-			device_type_id: row.device_type_id,
-			device_type_model: row.device_type_model,
-			is_full_depth: row.is_full_depth !== 0,
-		})
-	}
-	return details
+	return rows.map((row) => ({
+		...row,
+		position_u: row.position_u as number,
+		face: faceOf(row.face),
+		is_full_depth: row.is_full_depth !== 0,
+	}))
 }
 
 /** Full shelf mount details for one rack, ordered by bottom-U. */
-export async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
+async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
 	const rows = await getDb()
 		.select()
 		.from(shelves)
@@ -227,7 +193,7 @@ export async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[
 		})
 		.from(devices)
 		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
-		.where(and(eq(devices.rack_id, rackId), sql`${devices.shelf_id} IS NOT NULL`))
+		.where(and(eq(devices.rack_id, rackId), isNotNull(devices.shelf_id)))
 		.orderBy(asc(devices.name), asc(devices.id))
 	for (const { shelf_id, ...device } of shelved) {
 		if (shelf_id === null) {
@@ -240,7 +206,7 @@ export async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[
 	return rows.map((row) => ({
 		id: row.id,
 		name: row.name,
-		face: row.face === 'front' || row.face === 'rear' ? row.face : null,
+		face: faceOf(row.face),
 		position_u: row.position_u,
 		mount_height: row.mount_height,
 		mount_usable: row.mount_usable !== 0,
@@ -277,13 +243,10 @@ export function shelfBlockedRange(shelf: {
 	return { position_u: shelf.position_u, height_u: total }
 }
 
-/**
- * U-blocking shelf spans of one rack (at most one span per shelf).
- * Exported so device and shelf validation share the elevation's rows.
- */
-export async function shelfSpansOf(rackId: number): Promise<OccupantSpan[]> {
+/** U-blocking spans of shelves (at most one span per shelf). */
+function shelfSpans(details: ElevationShelfRef[]): OccupantSpan[] {
 	const spans: OccupantSpan[] = []
-	for (const s of await shelfDetailsOf(rackId)) {
+	for (const s of details) {
 		const blocked = shelfBlockedRange(s)
 		if (!blocked) {
 			continue
@@ -302,28 +265,19 @@ export async function shelfSpansOf(rackId: number): Promise<OccupantSpan[]> {
 
 /** All U-consuming spans of one rack: devices plus shelf blockers. */
 export async function rackSpansOf(rackId: number): Promise<OccupantSpan[]> {
-	return [...(await deviceSpansOf(rackId)), ...(await shelfSpansOf(rackId))]
+	return [...(await deviceSpansOf(rackId)), ...shelfSpans(await shelfDetailsOf(rackId))]
 }
 
 export async function createRack(input: RackCreate): Promise<Result<RackRow, Error>> {
-	const db = getDb()
-	const site = (await db.select().from(sites).where(eq(sites.id, input.site_id)).limit(1))[0]
-	if (!site) {
-		return Result.err(new NotFoundError('Site not found'))
-	}
-	const rackType = (
-		await db.select().from(device_types).where(eq(device_types.id, input.rack_type_id)).limit(1)
-	)[0]
-	if (!rackType || rackType.form_factor === null) {
-		return Result.err(new NotFoundError('Rack type not found'))
-	}
-	const tenantCheck = await checkTenantExists(input.tenant_id)
-	if (Result.isError(tenantCheck)) {
-		return Result.err(tenantCheck.error)
-	}
-	const locationCheck = await checkLocation(input.location_id, input.site_id)
-	if (Result.isError(locationCheck)) {
-		return Result.err(locationCheck.error)
+	for (const guard of [
+		await checkExists(sites, input.site_id, 'Site not found'),
+		await getRackType(input.rack_type_id),
+		await checkTenantExists(input.tenant_id),
+		await checkLocation(input.location_id, input.site_id),
+	]) {
+		if (Result.isError(guard)) {
+			return guard
+		}
 	}
 	const row: Omit<RackRecord, 'id'> = {
 		site_id: input.site_id,
@@ -333,18 +287,14 @@ export async function createRack(input: RackCreate): Promise<Result<RackRow, Err
 		name: input.name,
 		description: input.description ?? null,
 	}
-	try {
-		const inserted = (await db.insert(racks).values(row).returning({ id: racks.id }))[0]
-		if (!inserted) {
-			return Result.err(new Error('Rack insert did not return an id'))
-		}
-		return await logCreate('rack', await getRack(inserted.id))
-	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Rack name is already in use'))
-		}
-		return Result.err(err instanceof Error ? err : new Error(String(err)))
+	const id = await tryWrite(
+		async () => insertedId(await getDb().insert(racks).values(row).returning({ id: racks.id })),
+		RACK_NAME_IN_USE,
+	)
+	if (Result.isError(id)) {
+		return id
 	}
+	return await logCreate('rack', await getRack(id.value))
 }
 
 export async function updateRack(id: number, input: RackUpdate): Promise<Result<RackRow, Error>> {
@@ -353,73 +303,49 @@ export async function updateRack(id: number, input: RackUpdate): Promise<Result<
 		return current
 	}
 	const node = current.value
-	if (input.tenant_id !== undefined) {
-		const tenantCheck = await checkTenantExists(input.tenant_id)
-		if (Result.isError(tenantCheck)) {
-			return Result.err(tenantCheck.error)
+	for (const guard of [
+		await checkTenantExists(input.tenant_id),
+		await checkLocation(input.location_id, node.site_id),
+	]) {
+		if (Result.isError(guard)) {
+			return guard
 		}
 	}
-	if (input.location_id !== undefined) {
-		const locationCheck = await checkLocation(input.location_id, node.site_id)
-		if (Result.isError(locationCheck)) {
-			return Result.err(locationCheck.error)
-		}
-	}
-	const db = getDb()
-	let newTypeHeight: number | null = null
+	let effectiveHeight = node.height_u
 	if (input.rack_type_id !== undefined) {
-		const rackType = (
-			await db
-				.select()
-				.from(device_types)
-				.where(eq(device_types.id, input.rack_type_id))
-				.limit(1)
-		)[0]
-		if (!rackType || rackType.form_factor === null) {
-			return Result.err(new NotFoundError('Rack type not found'))
+		const rackType = await getRackType(input.rack_type_id)
+		if (Result.isError(rackType)) {
+			return rackType
 		}
-		newTypeHeight = rackType.u_height
+		effectiveHeight = rackType.value.u_height
 	}
-	const storedHeight = await rackHeightOf(node)
-	const effectiveHeight = newTypeHeight ?? storedHeight
-	if (effectiveHeight !== storedHeight) {
+	if (effectiveHeight !== node.height_u) {
 		// Shrinking below the topmost occupied U would strand devices outside
-		// the rack; reject with the same bounds error
-		// creation uses.
+		// the rack; reject with the same bounds error creation uses.
 		for (const span of await rackSpansOf(id)) {
 			const bounds = checkBounds(span, effectiveHeight, `Device "${span.name}"`)
 			if (Result.isError(bounds)) {
-				return Result.err(bounds.error)
+				return bounds
 			}
 		}
 	}
-	const patch: Partial<RackRow> = {}
-	if (input.name !== undefined) {
-		patch.name = input.name
-	}
-	if (input.rack_type_id !== undefined) {
-		patch.rack_type_id = input.rack_type_id
-	}
-	if (input.location_id !== undefined) {
-		patch.location_id = input.location_id
-	}
-	if (input.tenant_id !== undefined) {
-		patch.tenant_id = input.tenant_id
-	}
-	if (input.description !== undefined) {
-		patch.description = input.description
-	}
+	const patch = pickDefined(input, [
+		'name',
+		'rack_type_id',
+		'location_id',
+		'tenant_id',
+		'description',
+	])
 	if (!isPatchEmpty(patch)) {
-		try {
-			await db.update(racks).set(patch).where(eq(racks.id, id))
-		} catch (err) {
-			if (isUniqueViolation(err)) {
-				return Result.err(new DuplicateError('Rack name is already in use'))
-			}
-			return Result.err(err instanceof Error ? err : new Error(String(err)))
+		const written = await tryWrite(
+			() => getDb().update(racks).set(patch).where(eq(racks.id, id)),
+			RACK_NAME_IN_USE,
+		)
+		if (Result.isError(written)) {
+			return written
 		}
 	}
-	return await logUpdate('rack', current.value, await getRack(id))
+	return await logUpdate('rack', node, await getRack(id))
 }
 
 export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
@@ -427,18 +353,15 @@ export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
 	if (Result.isError(current)) {
 		return current
 	}
-	const device = (await getDb().select().from(devices).where(eq(devices.rack_id, id)).limit(1))[0]
-	if (device) {
+	if (await exists(devices, eq(devices.rack_id, id))) {
 		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
 	}
-	const shelf = (await getDb().select().from(shelves).where(eq(shelves.rack_id, id)).limit(1))[0]
-	if (shelf) {
+	if (await exists(shelves, eq(shelves.rack_id, id))) {
 		return Result.err(new ConflictError('Rack still has shelves; move or delete them first'))
 	}
-	try {
-		await getDb().delete(racks).where(eq(racks.id, id))
-	} catch (e) {
-		return Result.err(errOf(e))
+	const deleted = await tryWrite(() => getDb().delete(racks).where(eq(racks.id, id)))
+	if (Result.isError(deleted)) {
+		return deleted
 	}
 	return await logDelete('rack', current.value)
 }
@@ -450,75 +373,39 @@ export async function getElevation(id: number): Promise<Result<ElevationResponse
 		return current
 	}
 	const rack = current.value
-	const heightU = await rackHeightOf(rack)
 	const details = await deviceDetailsOf(id)
 	const shelfDetails = await shelfDetailsOf(id)
-	const occupancy = getOccupancy(heightU, [
-		...details.map((d) => ({
-			id: d.id,
-			name: d.name,
-			position_u: d.position_u,
-			height_u: d.u_height,
-			face: d.face,
-			is_full_depth: d.is_full_depth,
-		})),
-		...(await shelfSpansOf(id)),
-	])
+	const blockers = shelfSpans(shelfDetails)
+	const occupancy = getOccupancy(rack.height_u, [...details.map(spanOf), ...blockers])
 	if (Result.isError(occupancy)) {
-		return Result.err(occupancy.error)
+		return occupancy
 	}
-	const blockedU = (await shelfSpansOf(id)).reduce((sum, s) => sum + s.height_u, 0)
 	const deviceById = new Map(details.map((d) => [d.id, d]))
-	const shelfAt = (u: number): ElevationShelfRef[] =>
+	const shelvesAt = (u: number): ElevationShelfRef[] =>
 		shelfDetails.filter((s) => {
 			const blocked = shelfBlockedRange(s)
-			if (!blocked) {
-				return false
-			}
-			return u >= blocked.position_u && u < blocked.position_u + blocked.height_u
+			return (
+				blocked !== null &&
+				u >= blocked.position_u &&
+				u < blocked.position_u + blocked.height_u
+			)
 		})
-	const toRef = (
-		deviceRow: (typeof details)[number],
-	): ElevationResponse['units'][number]['device'] => ({
-		id: deviceRow.id,
-		name: deviceRow.name,
-		face: deviceRow.face,
-		position_u: deviceRow.position_u,
-		u_height: deviceRow.u_height,
-		status: deviceRow.status,
-		device_type_id: deviceRow.device_type_id,
-		device_type_model: deviceRow.device_type_model,
-		is_full_depth: deviceRow.is_full_depth,
-	})
 	const units: ElevationUnit[] = [...occupancy.value.units].reverse().map((u) => {
 		const deviceId = u.device?.id ?? null
-		const deviceRow = deviceId !== null && deviceId > 0 ? deviceById.get(deviceId) : undefined
-		const at = shelfAt(u.u)
+		const at = shelvesAt(u.u)
 		return {
 			u: u.u,
-			device: deviceRow === undefined ? null : toRef(deviceRow),
-			devices: details
-				.filter((d) => d.position_u <= u.u && d.position_u + d.u_height > u.u)
-				.map((d) => ({
-					id: d.id,
-					name: d.name,
-					face: d.face,
-					position_u: d.position_u,
-					u_height: d.u_height,
-					status: d.status,
-					device_type_id: d.device_type_id,
-					device_type_model: d.device_type_model,
-					is_full_depth: d.is_full_depth,
-				})),
+			device: (deviceId !== null && deviceId > 0 ? deviceById.get(deviceId) : null) ?? null,
+			devices: details.filter((d) => d.position_u <= u.u && d.position_u + d.u_height > u.u),
 			shelf: at[0] ?? null,
 			shelves: at,
 		}
 	})
 	return Result.ok({
 		rack_id: rack.id,
-		height_u: heightU,
+		height_u: rack.height_u,
 		units,
-		reserved_u: blockedU,
+		reserved_u: blockers.reduce((sum, s) => sum + s.height_u, 0),
 		shelves: shelfDetails,
 	})
 }

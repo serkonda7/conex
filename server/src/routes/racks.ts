@@ -6,7 +6,7 @@ import {
 	RackListQuerySchema,
 	RackUpdateSchema,
 } from 'shared/src/schemas'
-import { checkRead } from '../authz'
+import { checkTenant } from '../authz'
 import { createRack, deleteRack, getElevation, getRack, listRacks, updateRack } from '../db/racks'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
@@ -33,7 +33,7 @@ export const racksApp = baseRacksApp.get(
 		if (Result.isError(rack)) {
 			return sendResult(c, rack)
 		}
-		const denied = checkRead(c, rack.value.tenant_id)
+		const denied = checkTenant(c, rack.value.tenant_id)
 		if (denied) {
 			return denied
 		}

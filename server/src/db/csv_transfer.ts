@@ -1,9 +1,9 @@
 import { Result } from 'better-result'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import {
 	CableImportRowSchema,
 	DeviceImportRowSchema,
-	DeviceTypeImportRowSchema,
 	type ImportResponse,
 	type ImportRowResult,
 } from 'shared/src/schemas'
@@ -20,12 +20,13 @@ import {
 } from '../schema'
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
-import { connectCable } from './cables'
+import { cableInTenant, connectCable } from './cables'
 import { getDb, withTransaction } from './connection'
 import { createDevice } from './devices'
+import { errOf } from './list'
 import { createDeviceType, createStub } from './templates'
 
-export const DEVICE_CSV_HEADER = [
+const DEVICE_CSV_HEADER = [
 	'name',
 	'asset_tag',
 	'device_id',
@@ -37,7 +38,7 @@ export const DEVICE_CSV_HEADER = [
 	'status',
 ]
 
-export const CABLE_CSV_HEADER = [
+const CABLE_CSV_HEADER = [
 	'a_device',
 	'a_interface',
 	'b_device',
@@ -47,7 +48,7 @@ export const CABLE_CSV_HEADER = [
 	'status',
 ]
 
-export const DEVICE_TYPE_CSV_HEADER = [
+const DEVICE_TYPE_CSV_HEADER = [
 	'manufacturer_slug',
 	'model',
 	'u_height',
@@ -88,55 +89,6 @@ export async function exportDeviceTypesCsv(): Promise<string> {
 	)
 }
 
-/**
- * Device-type import: validates each row with `DeviceTypeImportRowSchema`,
- * resolves `manufacturer_slug` to an id, and creates the type. One bad row
- * fails only itself; the response reports per-row errors.
- */
-export async function importDeviceTypesCsv(text: string): Promise<Result<ImportResponse, Error>> {
-	const parsed = parseCsv(text)
-	if (Result.isError(parsed)) {
-		return Result.err(parsed.error)
-	}
-	const mfrBySlug = new Map(
-		(await getDb().select().from(manufacturers)).map((r) => [r.slug, r.id]),
-	)
-	const rows: ImportRowResult[] = []
-	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
-		const rowNumber = index + 2
-		const fail = (error: string): void => {
-			rows.push({ row: rowNumber, ok: false, id: null, error })
-		}
-		const validated = v.safeParse(DeviceTypeImportRowSchema, obj)
-		if (!validated.success) {
-			fail(formatValibotIssues(validated.issues))
-			continue
-		}
-		const input = validated.output
-		const mfrId = mfrBySlug.get(input.manufacturer_slug)
-		if (!mfrId) {
-			fail(`Unknown manufacturer_slug "${input.manufacturer_slug}"`)
-			continue
-		}
-		const created = await createDeviceType({
-			manufacturer_id: mfrId,
-			model: input.model,
-			u_height: input.u_height ?? 1,
-			is_full_depth: input.is_full_depth ?? true,
-			form_factor: input.form_factor,
-			width: (input.width ?? undefined) as 10 | 19 | 23 | undefined,
-			description: input.description,
-			comments: input.comments,
-		})
-		if (Result.isError(created)) {
-			fail(created.error.message)
-			continue
-		}
-		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
-	}
-	return Result.ok(importResult(rows))
-}
-
 /** Thrown inside the import transaction to roll back after a failed row. */
 class ImportRollback extends Error {}
 
@@ -155,9 +107,7 @@ export async function importDeviceTypesYaml(text: string): Promise<Result<Import
 	try {
 		parsed = Bun.YAML.parse(text)
 	} catch (error) {
-		return Result.err(
-			new Error(`Invalid YAML: ${error instanceof Error ? error.message : String(error)}`),
-		)
+		return Result.err(new Error(`Invalid YAML: ${errOf(error).message}`))
 	}
 	const definitions = Array.isArray(parsed) ? parsed : [parsed]
 	const rows: ImportRowResult[] = []
@@ -172,7 +122,7 @@ export async function importDeviceTypesYaml(text: string): Promise<Result<Import
 		})
 	} catch (err) {
 		if (!(err instanceof ImportRollback)) {
-			return Result.err(err instanceof Error ? err : new Error(String(err)))
+			return Result.err(errOf(err))
 		}
 		for (const r of rows) {
 			if (r.ok) {
@@ -352,54 +302,40 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 
 /** Cables export: endpoint device/interface names plus label/kind/status. */
 export async function exportCablesCsv(scopeTenantId?: number): Promise<string> {
-	const db = getDb()
-	// All cables (no 200-row cap); scope filter is an EXISTS on both ends so
-	// no peer name from another tenant leaks. Batched iface/device loads keep
-	// this O(1) queries instead of O(cables).
-	const items = await db
-		.select()
+	const aIface = alias(interfaces, 'a_iface')
+	const bIface = alias(interfaces, 'b_iface')
+	const aDevice = alias(devices, 'a_device')
+	const bDevice = alias(devices, 'b_device')
+	// All cables (no page cap); the scope filter keeps both ends in the
+	// tenant so no peer name from another tenant leaks.
+	const rows = await getDb()
+		.select({
+			a_device: aDevice.name,
+			a_interface: aIface.name,
+			b_device: bDevice.name,
+			b_interface: bIface.name,
+			label: cables.label,
+			kind: cables.kind,
+			status: cables.status,
+		})
 		.from(cables)
-		.where(
-			scopeTenantId === undefined
-				? undefined
-				: and(
-						sql`EXISTS (SELECT 1 FROM interfaces AS scope_ia JOIN devices AS scope_da ON scope_da.id = scope_ia.device_id WHERE scope_ia.id = ${cables.a_interface_id} AND scope_da.tenant_id = ${scopeTenantId})`,
-						sql`EXISTS (SELECT 1 FROM interfaces AS scope_ib JOIN devices AS scope_db ON scope_db.id = scope_ib.device_id WHERE scope_ib.id = ${cables.b_interface_id} AND scope_db.tenant_id = ${scopeTenantId})`,
-					),
-		)
+		.leftJoin(aIface, eq(aIface.id, cables.a_interface_id))
+		.leftJoin(aDevice, eq(aDevice.id, aIface.device_id))
+		.leftJoin(bIface, eq(bIface.id, cables.b_interface_id))
+		.leftJoin(bDevice, eq(bDevice.id, bIface.device_id))
+		.where(scopeTenantId === undefined ? undefined : cableInTenant(scopeTenantId))
 		.orderBy(cables.id)
-	const ifaceIds = [...new Set(items.flatMap((c) => [c.a_interface_id, c.b_interface_id]))]
-	const ifacesById = new Map<number, typeof interfaces.$inferSelect>()
-	if (ifaceIds.length > 0) {
-		for (const row of await db
-			.select()
-			.from(interfaces)
-			.where(inArray(interfaces.id, ifaceIds))) {
-			ifacesById.set(row.id, row)
-		}
-	}
-	const deviceIds = [...new Set([...ifacesById.values()].map((r) => r.device_id))]
-	const devicesById = new Map<number, typeof devices.$inferSelect>()
-	if (deviceIds.length > 0) {
-		for (const row of await db.select().from(devices).where(inArray(devices.id, deviceIds))) {
-			devicesById.set(row.id, row)
-		}
-	}
 	return toCsv(
 		CABLE_CSV_HEADER,
-		items.map((cable) => {
-			const aIface = ifacesById.get(cable.a_interface_id)
-			const bIface = ifacesById.get(cable.b_interface_id)
-			return [
-				aIface ? (devicesById.get(aIface.device_id)?.name ?? '') : '',
-				aIface?.name ?? '',
-				bIface ? (devicesById.get(bIface.device_id)?.name ?? '') : '',
-				bIface?.name ?? '',
-				cable.label,
-				cable.kind,
-				cable.status,
-			]
-		}),
+		rows.map((r) => [
+			r.a_device ?? '',
+			r.a_interface ?? '',
+			r.b_device ?? '',
+			r.b_interface ?? '',
+			r.label,
+			r.kind,
+			r.status,
+		]),
 	)
 }
 
@@ -411,15 +347,46 @@ function importResult(rows: ImportRowResult[]): ImportResponse {
 	}
 }
 
+/**
+ * Shared CSV import loop: validates each row with `schema` and hands it to
+ * `importRow`, which answers with the created row or a failure message. One
+ * bad row fails only itself; the response reports per-row errors.
+ */
+async function importCsvRows<S extends v.GenericSchema>(
+	text: string,
+	schema: S,
+	importRow: (input: v.InferOutput<S>) => Promise<string | Result<{ id: number }, Error>>,
+): Promise<Result<ImportResponse, Error>> {
+	const parsed = parseCsv(text)
+	if (Result.isError(parsed)) {
+		return parsed
+	}
+	const rows: ImportRowResult[] = []
+	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
+		const row = index + 2
+		const validated = v.safeParse(schema, obj)
+		const outcome = validated.success
+			? await importRow(validated.output)
+			: formatValibotIssues(validated.issues)
+		if (typeof outcome === 'string') {
+			rows.push({ row, ok: false, id: null, error: outcome })
+		} else if (Result.isError(outcome)) {
+			rows.push({ row, ok: false, id: null, error: outcome.error.message })
+		} else {
+			rows.push({ row, ok: true, id: outcome.value.id, error: null })
+		}
+	}
+	return Result.ok(importResult(rows))
+}
+
 /** Strict scope check: exactly the scope tenant, no shared rows. */
-function inScope(tenant: number | null | undefined, scope: number): boolean {
-	return tenant !== undefined && tenant !== null && tenant === scope
+function inScope(tenant: number | null, scope: number | undefined): boolean {
+	return scope === undefined || tenant === scope
 }
 
 /**
- * Devices import: validates each row with `DeviceImportRowSchema`, resolves
- * names to ids, and creates the device (stub expansion included). One bad
- * row fails only itself; the response reports per-row errors.
+ * Devices import: resolves names to ids and creates the device (stub
+ * expansion included).
  *
  * `scopeTenantId` serves scoped editors: rows referencing a site/rack
  * outside the scope (or shared rows they may not claim) fail per-row, and
@@ -429,92 +396,56 @@ export async function importDevicesCsv(
 	text: string,
 	scopeTenantId?: number,
 ): Promise<Result<ImportResponse, Error>> {
-	const parsed = parseCsv(text)
-	if (Result.isError(parsed)) {
-		return Result.err(parsed.error)
-	}
 	const db = getDb()
 	const typeByModel = new Map((await db.select().from(device_types)).map((r) => [r.model, r.id]))
 	const roleByName = new Map((await db.select().from(device_roles)).map((r) => [r.name, r.id]))
-	const siteByName = new Map(
-		(await db.select().from(sites)).map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
-	)
-	const rackByName = new Map(
-		(await db.select().from(racks)).map((r) => [r.name, { id: r.id, tenant_id: r.tenant_id }]),
-	)
-	const rows: ImportRowResult[] = []
-	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
-		const rowNumber = index + 2
-		const fail = (error: string): void => {
-			rows.push({ row: rowNumber, ok: false, id: null, error })
-		}
-		const validated = v.safeParse(DeviceImportRowSchema, obj)
-		if (!validated.success) {
-			fail(formatValibotIssues(validated.issues))
-			continue
-		}
-		const input = validated.output
+	const siteByName = new Map((await db.select().from(sites)).map((r) => [r.name, r]))
+	const rackByName = new Map((await db.select().from(racks)).map((r) => [r.name, r]))
+	return importCsvRows(text, DeviceImportRowSchema, async (input) => {
 		const typeId = typeByModel.get(input.device_type_model)
 		if (!typeId) {
-			fail(`Unknown device_type_model "${input.device_type_model}"`)
-			continue
+			return `Unknown device_type_model "${input.device_type_model}"`
 		}
 		const roleId = roleByName.get(input.device_role_name)
 		if (!roleId) {
-			fail(`Unknown device_role_name "${input.device_role_name}"`)
-			continue
+			return `Unknown device_role_name "${input.device_role_name}"`
 		}
-		let foundSiteId: number | undefined
+		const site = input.site_name ? siteByName.get(input.site_name) : undefined
 		if (input.site_name) {
-			const site = siteByName.get(input.site_name)
 			if (!site) {
-				fail(`Unknown site_name "${input.site_name}"`)
-				continue
+				return `Unknown site_name "${input.site_name}"`
 			}
-			foundSiteId = site.id
-			if (scopeTenantId !== undefined && !inScope(site.tenant_id, scopeTenantId)) {
-				fail(`Site "${input.site_name}" is outside your tenant scope`)
-				continue
+			if (!inScope(site.tenant_id, scopeTenantId)) {
+				return `Site "${input.site_name}" is outside your tenant scope`
 			}
 		}
-		let foundRackId: number | undefined
+		const rack = input.rack_name ? rackByName.get(input.rack_name) : undefined
 		if (input.rack_name) {
-			const rack = rackByName.get(input.rack_name)
 			if (!rack) {
-				fail(`Unknown rack_name "${input.rack_name}"`)
-				continue
+				return `Unknown rack_name "${input.rack_name}"`
 			}
-			foundRackId = rack.id
-			if (scopeTenantId !== undefined && !inScope(rack.tenant_id, scopeTenantId)) {
-				fail(`Rack "${input.rack_name}" is outside your tenant scope`)
-				continue
+			if (!inScope(rack.tenant_id, scopeTenantId)) {
+				return `Rack "${input.rack_name}" is outside your tenant scope`
 			}
 		}
-		const created = await createDevice({
+		return createDevice({
 			device_type_id: typeId,
 			device_role_id: roleId,
 			name: input.name,
 			status: input.status,
-			site_id: foundSiteId,
-			rack_id: foundRackId,
+			site_id: site?.id,
+			rack_id: rack?.id,
 			position_u: input.position_u,
 			asset_tag: input.asset_tag,
 			device_id: input.device_id,
 			...(scopeTenantId !== undefined ? { tenant_id: scopeTenantId } : {}),
 		})
-		if (Result.isError(created)) {
-			fail(created.error.message)
-			continue
-		}
-		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
-	}
-	return Result.ok(importResult(rows))
+	})
 }
 
 /**
- * Cables import: validates each row with `CableImportRowSchema`, resolves
- * device/interface names to ids, and connects the free ports. One bad row
- * fails only itself; the response reports per-row errors.
+ * Cables import: resolves device/interface names to ids and connects the
+ * free ports.
  *
  * `scopeTenantId` serves scoped editors: rows whose endpoint devices are
  * not both in the scope tenant fail per-row, mirroring the cable write
@@ -524,73 +455,37 @@ export async function importCablesCsv(
 	text: string,
 	scopeTenantId?: number,
 ): Promise<Result<ImportResponse, Error>> {
-	const parsed = parseCsv(text)
-	if (Result.isError(parsed)) {
-		return Result.err(parsed.error)
-	}
 	const db = getDb()
-	const deviceByName = new Map(
-		(await db.select().from(devices)).map((r) => [
-			r.name,
-			{ id: r.id, tenant_id: r.tenant_id },
-		]),
-	)
+	const deviceByName = new Map((await db.select().from(devices)).map((r) => [r.name, r]))
 	const ifaceByKey = new Map(
 		(await db.select().from(interfaces)).map((r) => [`${r.device_id}:${r.name}`, r.id]),
 	)
-	const rows: ImportRowResult[] = []
-	for (const [index, obj] of rowsToObjects(parsed.value.header, parsed.value.rows).entries()) {
-		const rowNumber = index + 2
-		const fail = (error: string): void => {
-			rows.push({ row: rowNumber, ok: false, id: null, error })
-		}
-		const validated = v.safeParse(CableImportRowSchema, obj)
-		if (!validated.success) {
-			fail(formatValibotIssues(validated.issues))
-			continue
-		}
-		const input = validated.output
+	return importCsvRows(text, CableImportRowSchema, async (input) => {
 		const aDev = deviceByName.get(input.a_device)
 		if (!aDev) {
-			fail(`Unknown a_device "${input.a_device}"`)
-			continue
+			return `Unknown a_device "${input.a_device}"`
 		}
 		const bDev = deviceByName.get(input.b_device)
 		if (!bDev) {
-			fail(`Unknown b_device "${input.b_device}"`)
-			continue
+			return `Unknown b_device "${input.b_device}"`
 		}
 		const aIfaceId = ifaceByKey.get(`${aDev.id}:${input.a_interface}`)
 		if (!aIfaceId) {
-			fail(`Device "${input.a_device}" has no interface "${input.a_interface}"`)
-			continue
+			return `Device "${input.a_device}" has no interface "${input.a_interface}"`
 		}
 		const bIfaceId = ifaceByKey.get(`${bDev.id}:${input.b_interface}`)
 		if (!bIfaceId) {
-			fail(`Device "${input.b_device}" has no interface "${input.b_interface}"`)
-			continue
+			return `Device "${input.b_device}" has no interface "${input.b_interface}"`
 		}
-		if (scopeTenantId !== undefined) {
-			if (
-				!inScope(aDev.tenant_id, scopeTenantId) ||
-				!inScope(bDev.tenant_id, scopeTenantId)
-			) {
-				fail('Cable endpoints are outside your tenant scope')
-				continue
-			}
+		if (!inScope(aDev.tenant_id, scopeTenantId) || !inScope(bDev.tenant_id, scopeTenantId)) {
+			return 'Cable endpoints are outside your tenant scope'
 		}
-		const created = await connectCable({
+		return connectCable({
 			a_interface_id: aIfaceId,
 			b_interface_id: bIfaceId,
 			status: input.status,
 			kind: input.kind,
 			label: input.label,
 		})
-		if (Result.isError(created)) {
-			fail(created.error.message)
-			continue
-		}
-		rows.push({ row: rowNumber, ok: true, id: created.value.id, error: null })
-	}
-	return Result.ok(importResult(rows))
+	})
 }

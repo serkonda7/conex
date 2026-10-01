@@ -6,7 +6,7 @@ import { getObjectChange, listChangelog } from '../db/changelog'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendRow } from './helpers'
+import { sendResult } from '../util/result_response'
 
 /**
  * Changelog: `changelog.view`, read-only. Every entry carries the tenant of its object, so
@@ -24,7 +24,7 @@ export const changelogApp = new Hono()
 		if (scope instanceof Response) {
 			return scope
 		}
-		return sendRow(
+		return sendResult(
 			c,
 			await listChangelog({
 				search: query.search,

@@ -10,7 +10,7 @@ import { createRole, deleteRole, getRole, listRoles, updateRole } from '../db/ro
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendCreated, sendRow } from './helpers'
+import { sendCreated, sendResult } from '../util/result_response'
 
 /**
  * Role management (`users.manage`): named permission bundles assigned to
@@ -31,16 +31,16 @@ export const rolesApp = new Hono()
 		return sendCreated(c, await createRole(c.req.valid('json')))
 	})
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		return sendRow(c, await getRole(c.req.valid('param').id))
+		return sendResult(c, await getRole(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', RoleUpdateSchema, onValidationError),
 		async (c) => {
-			return sendRow(c, await updateRole(c.req.valid('param').id, c.req.valid('json')))
+			return sendResult(c, await updateRole(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		return sendRow(c, await deleteRole(c.req.valid('param').id))
+		return sendResult(c, await deleteRole(c.req.valid('param').id))
 	})

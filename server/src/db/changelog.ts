@@ -1,22 +1,20 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Result } from 'better-result'
-import { and, count, desc, eq, lte, or, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, lte } from 'drizzle-orm'
 import type { ChangeAction, ChangeObjectType, ObjectChangeJson } from 'shared/src/schemas'
-import { deviceTenant, interfaceTenant, rackTenant } from '../authz'
 import { object_changes } from '../schema'
 import { nowSeconds } from '../util/time'
 import { getDb } from './connection'
-import { NotFoundError } from './errors'
 import {
-	errOf,
+	findById,
 	type ListParams,
-	offsetOf,
 	type Page,
-	pageOf,
-	searchPattern,
+	pageRows,
+	searchCondition,
 	type TenantFilterParams,
 	tenantConditions,
 } from './list'
+import { cableTenants, deviceTenant, rackTenant } from './owners'
 
 /** Changes older than this are dropped by the periodic session sweep. */
 export const CHANGELOG_RETENTION_S = 365 * 24 * 60 * 60
@@ -88,8 +86,8 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 			if (a === null || b === null) {
 				return null
 			}
-			const tenantA = (await interfaceTenant(a)) ?? null
-			return tenantA !== null && tenantA === (await interfaceTenant(b)) ? tenantA : null
+			const [tenantA, tenantB] = await cableTenants({ a_interface_id: a, b_interface_id: b })
+			return tenantA === tenantB ? tenantA : null
 		}
 		default:
 			return null
@@ -178,55 +176,26 @@ export interface ChangelogListParams extends ListParams, TenantFilterParams {
 export async function listChangelog(
 	params: ChangelogListParams,
 ): Promise<Result<Page<ObjectChangeJson>, Error>> {
-	const db = getDb()
-	const conditions: SQL[] = []
-	if (params.search) {
-		const pattern = searchPattern(params.search)
-		const match = or(
-			sql`${object_changes.object_repr} ILIKE ${pattern} ESCAPE '\\'`,
-			sql`${object_changes.username} ILIKE ${pattern} ESCAPE '\\'`,
-		)
-		if (match) {
-			conditions.push(match)
-		}
-	}
-	if (params.action) {
-		conditions.push(eq(object_changes.action, params.action))
-	}
-	if (params.object_type) {
-		conditions.push(eq(object_changes.object_type, params.object_type))
-	}
-	conditions.push(...tenantConditions(object_changes.tenant_id, params))
-	const where = conditions.length > 0 ? and(...conditions) : undefined
-	try {
-		const rows = await db
-			.select()
-			.from(object_changes)
-			.where(where)
-			.orderBy(desc(object_changes.created_at), desc(object_changes.id))
-			.limit(params.limit)
-			.offset(offsetOf(params))
-		const totalRow = (
-			await db.select({ n: count() }).from(object_changes).where(where).limit(1)
-		)[0]
-		return Result.ok(pageOf(rows as ObjectChangeJson[], totalRow?.n ?? 0, params))
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
+	const where = and(
+		searchCondition(params.search, [object_changes.object_repr, object_changes.username]),
+		params.action ? eq(object_changes.action, params.action) : undefined,
+		params.object_type ? eq(object_changes.object_type, params.object_type) : undefined,
+		...tenantConditions(object_changes.tenant_id, params),
+	)
+	const page = await pageRows(
+		object_changes,
+		where,
+		[desc(object_changes.created_at), desc(object_changes.id)],
+		params,
+	)
+	return Result.ok(page as Page<ObjectChangeJson>)
 }
 
 export async function getObjectChange(id: number): Promise<Result<ObjectChangeJson, Error>> {
-	try {
-		const row = (
-			await getDb().select().from(object_changes).where(eq(object_changes.id, id)).limit(1)
-		)[0]
-		if (!row) {
-			return Result.err(new NotFoundError('Change not found'))
-		}
-		return Result.ok(row as ObjectChangeJson)
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
+	return (await findById(object_changes, id, 'Change not found')) as Result<
+		ObjectChangeJson,
+		Error
+	>
 }
 
 /** Drops changes past the retention window; returns the number removed. */

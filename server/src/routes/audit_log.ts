@@ -5,7 +5,7 @@ import { listAuditLog } from '../db/audit'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendRow } from './helpers'
+import { sendResult } from '../util/result_response'
 
 /** Audit log: `audit_log.view`, read-only. Entries are written by the auth routes. */
 export const auditLogApp = new Hono()
@@ -13,7 +13,7 @@ export const auditLogApp = new Hono()
 	.use(requirePermissionMiddleware('audit_log.view'))
 	.get('/', vValidator('query', AuditLogListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
-		return sendRow(
+		return sendResult(
 			c,
 			await listAuditLog({
 				search: query.search,

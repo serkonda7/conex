@@ -7,14 +7,13 @@ import {
 	TenantListQuerySchema,
 	TenantUpdateSchema,
 } from 'shared/src/schemas'
-import { checkRead, requestUser, scopeTenantId } from '../authz'
+import { checkTenant, requestUser, scopeTenantId } from '../authz'
 import { ForbiddenError } from '../db/errors'
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
-import { sendCreated, sendRow } from './helpers'
+import { sendCreated, sendResult } from '../util/result_response'
 
 /**
  * Tenants are the scope boundary itself: scoped editors/viewers see exactly
@@ -60,7 +59,7 @@ export const tenantsApp = new Hono()
 			return sendResult(c, result)
 		}
 		// A tenant row is "its own" tenant: scoped requesters see only theirs.
-		const denied = checkRead(c, result.value.id)
+		const denied = checkTenant(c, result.value.id)
 		if (denied) {
 			return denied
 		}
@@ -78,7 +77,7 @@ export const tenantsApp = new Hono()
 					Result.err(new ForbiddenError('Tenant-scoped users cannot rename tenants')),
 				)
 			}
-			return sendRow(c, await updateTenant(c.req.valid('param').id, c.req.valid('json')))
+			return sendResult(c, await updateTenant(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.delete(
@@ -92,6 +91,6 @@ export const tenantsApp = new Hono()
 					Result.err(new ForbiddenError('Tenant-scoped users cannot delete tenants')),
 				)
 			}
-			return sendRow(c, await deleteTenant(c.req.valid('param').id))
+			return sendResult(c, await deleteTenant(c.req.valid('param').id))
 		},
 	)

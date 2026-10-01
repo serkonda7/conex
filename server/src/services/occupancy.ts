@@ -10,13 +10,21 @@ import { ConflictError } from '../db/errors'
  * `position_u..position_u+height_u-1`.
  */
 
+/** Rack face of a mount; `null` = no face (spans both). */
+export type Face = 'front' | 'rear' | null
+
+/** Narrows a stored face column to `Face` (anything else reads as no face). */
+export function faceOf(value: string | null): Face {
+	return value === 'front' || value === 'rear' ? value : null
+}
+
 export interface OccupantSpan {
 	id: number
 	name: string
 	position_u: number
 	height_u: number
 	/** Devices may share a U across opposite faces when both are half-depth. */
-	face?: 'front' | 'rear' | null
+	face?: Face
 	is_full_depth?: boolean
 }
 

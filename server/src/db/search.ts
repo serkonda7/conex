@@ -1,6 +1,9 @@
-import { asc, sql } from 'drizzle-orm'
+import { and, asc, eq, type SQL } from 'drizzle-orm'
+import type { PgColumn } from 'drizzle-orm/pg-core'
+import { cables, devices, racks, sites, tenants } from '../schema'
+import { cableInTenant } from './cables'
 import { getDb } from './connection'
-import { searchPattern } from './list'
+import { searchCondition } from './list'
 
 export interface SearchGroup<T> {
 	items: T[]
@@ -18,6 +21,10 @@ export interface GlobalSearchResponse {
 
 const GROUP_LIMIT = 10
 
+function groupOf<T>(items: T[]): SearchGroup<T> {
+	return { items, total: items.length }
+}
+
 /**
  * Cross-entity substring search over name/slug/asset_tag/label columns.
  * Tenants are documentation labels only, so one flat query spans every
@@ -34,90 +41,78 @@ export async function globalSearch(
 	q: string,
 	scopeTenantId?: number,
 ): Promise<GlobalSearchResponse> {
-	const db = getDb()
 	const query = q.trim()
-	const empty = <T>(): SearchGroup<T> => ({ items: [], total: 0 })
 	if (!query) {
 		return {
 			q: '',
-			tenants: empty(),
-			sites: empty(),
-			racks: empty(),
-			devices: empty(),
-			cables: empty(),
+			tenants: groupOf([]),
+			sites: groupOf([]),
+			racks: groupOf([]),
+			devices: groupOf([]),
+			cables: groupOf([]),
 		}
 	}
-	const pattern = searchPattern(query)
-	const scope = scopeTenantId
+	const db = getDb()
+	const inScope = (column: PgColumn): SQL | undefined =>
+		scopeTenantId === undefined ? undefined : eq(column, scopeTenantId)
 
 	const tenantRows = await db
-		.select({ id: sql<number>`id`, name: sql<string>`name` })
-		.from(sql`tenants`)
+		.select({ id: tenants.id, name: tenants.name })
+		.from(tenants)
 		.where(
-			scope === undefined
-				? sql`(name ILIKE ${pattern} ESCAPE '\\' OR customer_number ILIKE ${pattern} ESCAPE '\\')`
-				: sql`(name ILIKE ${pattern} ESCAPE '\\' OR customer_number ILIKE ${pattern} ESCAPE '\\') AND (id = ${scope})`,
+			and(
+				searchCondition(query, [tenants.name, tenants.customer_number]),
+				inScope(tenants.id),
+			),
 		)
-		.orderBy(asc(sql`name`), asc(sql`id`))
+		.orderBy(asc(tenants.name), asc(tenants.id))
 		.limit(GROUP_LIMIT)
-	const tenantScope = scope === undefined ? sql`` : sql` AND (tenant_id = ${scope})`
 	const siteRows = await db
-		.select({ id: sql<number>`id`, name: sql<string>`name` })
-		.from(sql`sites`)
-		.where(sql`(name ILIKE ${pattern} ESCAPE '\\')${tenantScope}`)
-		.orderBy(asc(sql`name`), asc(sql`id`))
+		.select({ id: sites.id, name: sites.name })
+		.from(sites)
+		.where(and(searchCondition(query, [sites.name]), inScope(sites.tenant_id)))
+		.orderBy(asc(sites.name), asc(sites.id))
 		.limit(GROUP_LIMIT)
 	const rackRows = await db
-		.select({ id: sql<number>`id`, name: sql<string>`name` })
-		.from(sql`racks`)
-		.where(sql`name ILIKE ${pattern} ESCAPE '\\'${tenantScope}`)
-		.orderBy(asc(sql`name`), asc(sql`id`))
+		.select({ id: racks.id, name: racks.name })
+		.from(racks)
+		.where(and(searchCondition(query, [racks.name]), inScope(racks.tenant_id)))
+		.orderBy(asc(racks.name), asc(racks.id))
 		.limit(GROUP_LIMIT)
 	const deviceRows = await db
-		.select({
-			id: sql<number>`id`,
-			name: sql<string>`name`,
-			asset_tag: sql<string | null>`asset_tag`,
-		})
-		.from(sql`devices`)
+		.select({ id: devices.id, name: devices.name, asset_tag: devices.asset_tag })
+		.from(devices)
 		.where(
-			sql`(name ILIKE ${pattern} ESCAPE '\\' OR asset_tag ILIKE ${pattern} ESCAPE '\\' OR device_id ILIKE ${pattern} ESCAPE '\\' OR serial ILIKE ${pattern} ESCAPE '\\')${tenantScope}`,
+			and(
+				searchCondition(query, [
+					devices.name,
+					devices.asset_tag,
+					devices.device_id,
+					devices.serial,
+				]),
+				inScope(devices.tenant_id),
+			),
 		)
-		.orderBy(asc(sql`name`), asc(sql`id`))
+		.orderBy(asc(devices.name), asc(devices.id))
 		.limit(GROUP_LIMIT)
-	const cableRows =
-		scope === undefined
-			? await db
-					.select({
-						id: sql<number>`id`,
-						label: sql<string | null>`label`,
-						kind: sql<string | null>`kind`,
-					})
-					.from(sql`cables`)
-					.where(
-						sql`(label ILIKE ${pattern} ESCAPE '\\' OR kind ILIKE ${pattern} ESCAPE '\\')`,
-					)
-					.orderBy(asc(sql`id`))
-					.limit(GROUP_LIMIT)
-			: await db
-					.select({
-						id: sql<number>`cables.id`,
-						label: sql<string | null>`cables.label`,
-						kind: sql<string | null>`cables.kind`,
-					})
-					.from(sql`cables`)
-					.where(
-						sql`(cables.label ILIKE ${pattern} ESCAPE '\\' OR cables.kind ILIKE ${pattern} ESCAPE '\\') AND EXISTS (SELECT 1 FROM interfaces AS search_ia JOIN devices AS search_da ON search_da.id = search_ia.device_id WHERE search_ia.id = cables.a_interface_id AND search_da.tenant_id = ${scope}) AND EXISTS (SELECT 1 FROM interfaces AS search_ib JOIN devices AS search_db ON search_db.id = search_ib.device_id WHERE search_ib.id = cables.b_interface_id AND search_db.tenant_id = ${scope})`,
-					)
-					.orderBy(asc(sql`cables.id`))
-					.limit(GROUP_LIMIT)
+	const cableRows = await db
+		.select({ id: cables.id, label: cables.label, kind: cables.kind })
+		.from(cables)
+		.where(
+			and(
+				searchCondition(query, [cables.label, cables.kind]),
+				scopeTenantId === undefined ? undefined : cableInTenant(scopeTenantId),
+			),
+		)
+		.orderBy(asc(cables.id))
+		.limit(GROUP_LIMIT)
 
 	return {
 		q: query,
-		tenants: { items: tenantRows, total: tenantRows.length },
-		sites: { items: siteRows, total: siteRows.length },
-		racks: { items: rackRows, total: rackRows.length },
-		devices: { items: deviceRows, total: deviceRows.length },
-		cables: { items: cableRows, total: cableRows.length },
+		tenants: groupOf(tenantRows),
+		sites: groupOf(siteRows),
+		racks: groupOf(rackRows),
+		devices: groupOf(deviceRows),
+		cables: groupOf(cableRows),
 	}
 }

@@ -19,9 +19,7 @@ import {
 	TicketCreateSchema,
 } from 'shared/src/schemas'
 import {
-	checkRead,
-	checkWrite,
-	deviceTenant,
+	checkTenant,
 	listTenantScope,
 	requestUser,
 	requireGlobalPermission,
@@ -30,6 +28,7 @@ import {
 } from '../authz'
 import { getDb } from '../db/connection'
 import { ForbiddenError, NotFoundError } from '../db/errors'
+import { deviceTenant } from '../db/owners'
 import { deviceBoard, tenantBoard } from '../integrations/board'
 import {
 	deleteLink,
@@ -58,8 +57,7 @@ import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { tenants } from '../schema'
 import { jsonError } from '../util/http'
-import { sendResult } from '../util/result_response'
-import { sendCreated, sendRow } from './helpers'
+import { sendCreated, sendResult } from '../util/result_response'
 
 /** 404 response when the provider has no integration row, else null. */
 async function requireConfigured(c: Context, provider: ProviderId): Promise<Response | null> {
@@ -119,7 +117,7 @@ export const integrationsApp = new Hono()
 		'/:provider',
 		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
-		async (c) => sendRow(c, await getIntegration(c.req.valid('param').provider)),
+		async (c) => sendResult(c, await getIntegration(c.req.valid('param').provider)),
 	)
 	.patch(
 		'/:provider',
@@ -127,13 +125,16 @@ export const integrationsApp = new Hono()
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', IntegrationUpdateSchema, onValidationError),
 		async (c) =>
-			sendRow(c, await updateIntegration(c.req.valid('param').provider, c.req.valid('json'))),
+			sendResult(
+				c,
+				await updateIntegration(c.req.valid('param').provider, c.req.valid('json')),
+			),
 	)
 	.delete(
 		'/:provider',
 		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
-		async (c) => sendRow(c, await deleteIntegration(c.req.valid('param').provider)),
+		async (c) => sendResult(c, await deleteIntegration(c.req.valid('param').provider)),
 	)
 	.post(
 		'/:provider/test',
@@ -142,7 +143,7 @@ export const integrationsApp = new Hono()
 		vValidator('json', IntegrationTestSchema, onValidationError),
 		async (c) => {
 			const res = await testIntegration(c.req.valid('param').provider, c.req.valid('json'))
-			return sendRow(
+			return sendResult(
 				c,
 				res.map(() => ({ ok: true })),
 			)
@@ -187,7 +188,7 @@ export const integrationsApp = new Hono()
 		vValidator('json', TicketCreateSchema, onValidationError),
 		async (c) => {
 			const input = c.req.valid('json')
-			const denied = checkRead(c, input.tenant_id)
+			const denied = checkTenant(c, input.tenant_id)
 			if (denied) {
 				return denied
 			}
@@ -200,7 +201,7 @@ export const integrationsApp = new Hono()
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
-			return sendRow(c, await getSyncRun(provider, id))
+			return sendResult(c, await getSyncRun(provider, id))
 		},
 	)
 	.get(
@@ -314,7 +315,7 @@ export const integrationsApp = new Hono()
 			if (!tenant) {
 				return sendResult(c, Result.err(new NotFoundError('Tenant not found')))
 			}
-			const denied = checkRead(c, tenantId)
+			const denied = checkTenant(c, tenantId)
 			if (denied) {
 				return denied
 			}
@@ -337,7 +338,7 @@ export const integrationsApp = new Hono()
 			if (!tenant) {
 				return sendResult(c, Result.err(new NotFoundError('Tenant not found')))
 			}
-			const denied = checkRead(c, id)
+			const denied = checkTenant(c, id)
 			if (denied) {
 				return denied
 			}
@@ -358,7 +359,7 @@ export const integrationsApp = new Hono()
 			if (tenant === undefined) {
 				return sendResult(c, Result.err(new NotFoundError('Device not found')))
 			}
-			const denied = checkRead(c, tenant)
+			const denied = checkTenant(c, tenant)
 			if (denied) {
 				return denied
 			}
@@ -398,7 +399,7 @@ export const integrationsApp = new Hono()
 					'manual',
 					userId,
 				)
-				return sendRow(c, res.map(linkJson))
+				return sendResult(c, res.map(linkJson))
 			}
 			const denied = requirePermission(c, 'integrations.manage')
 			if (denied) {
@@ -408,7 +409,7 @@ export const integrationsApp = new Hono()
 			if (tenant === undefined) {
 				return sendResult(c, Result.err(new NotFoundError('Device not found')))
 			}
-			const scopeDenied = checkWrite(c, tenant)
+			const scopeDenied = checkTenant(c, tenant)
 			if (scopeDenied) {
 				return scopeDenied
 			}
@@ -430,7 +431,7 @@ export const integrationsApp = new Hono()
 				'manual',
 				userId,
 			)
-			return sendRow(c, res.map(linkJson))
+			return sendResult(c, res.map(linkJson))
 		},
 	)
 	.put(
@@ -457,7 +458,7 @@ export const integrationsApp = new Hono()
 					external.external_id,
 					userId,
 				)
-				return sendRow(c, res.map(linkJson))
+				return sendResult(c, res.map(linkJson))
 			}
 			const denied = requirePermission(c, 'integrations.manage')
 			if (denied) {
@@ -482,7 +483,7 @@ export const integrationsApp = new Hono()
 				external.external_tenant_id,
 				userId,
 			)
-			return sendRow(c, res.map(linkJson))
+			return sendResult(c, res.map(linkJson))
 		},
 	)
 	.delete(
@@ -507,7 +508,7 @@ export const integrationsApp = new Hono()
 				}
 				if (row.entity_id !== null) {
 					const tenant = await deviceTenant(row.entity_id)
-					const scopeDenied = checkWrite(c, tenant ?? null)
+					const scopeDenied = checkTenant(c, tenant ?? null)
 					if (scopeDenied) {
 						return scopeDenied
 					}
@@ -522,6 +523,6 @@ export const integrationsApp = new Hono()
 					}
 				}
 			}
-			return sendRow(c, (await deleteLink(provider, id)).map(linkJson))
+			return sendResult(c, (await deleteLink(provider, id)).map(linkJson))
 		},
 	)

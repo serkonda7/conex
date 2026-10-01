@@ -43,3 +43,8 @@ export function sendResult<T>(
 	console.error(err)
 	return jsonError(c, 'Internal server error', 500)
 }
+
+/** Created (201) or mapped error. */
+export function sendCreated<T>(c: Context, result: Result<T, Error>): Response {
+	return sendResult(c, result, 201)
+}

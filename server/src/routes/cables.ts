@@ -1,6 +1,6 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
-import { Hono } from 'hono'
+import { type Context, Hono } from 'hono'
 import {
 	CableCreateSchema,
 	CableListQuerySchema,
@@ -9,55 +9,54 @@ import {
 	EntityParamsSchema,
 	TraceQuerySchema,
 } from 'shared/src/schemas'
+import { checkCable, checkTenant, requestScope } from '../authz'
 import {
-	cableTenants,
-	canReadCable,
-	canWriteCable,
-	checkRead,
-	deviceTenant,
-	interfaceTenant,
-	requestUser,
-	scopeTenantId,
-} from '../authz'
-import { connectCable, deleteCable, getCable, listCables, updateCable } from '../db/cables'
+	type CableRow,
+	connectCable,
+	deleteCable,
+	getCable,
+	listCables,
+	updateCable,
+} from '../db/cables'
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
+import { cableTenants, deviceTenant, interfaceTenant } from '../db/owners'
 import { getCableTrace } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
-import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
+import { sendCsv } from '../util/http'
+import { sendCreated, sendResult } from '../util/result_response'
+
+/** Loads a cable the requester may access: the row, or the 404/403 response. */
+async function loadCable(c: Context, id: number): Promise<CableRow | Response> {
+	const cable = await getCable(id)
+	if (Result.isError(cable)) {
+		return sendResult(c, cable)
+	}
+	return checkCable(c, await cableTenants(cable.value)) ?? cable.value
+}
 
 /**
  * Cables carry no tenant of their own: every gate follows both endpoint
- * devices (see `authz.ts` `canReadCable`/`canWriteCable`). Listing is
- * scope-filtered in SQL; single-object routes resolve the endpoints
- * (`undefined` = gone, fall through to the service 404).
+ * devices (see `authz.ts` `canAccessCable`). Listing is scope-filtered in
+ * SQL; single-object routes resolve the endpoints (`undefined` = gone, fall
+ * through to the service 404).
  */
 export const cablesApp = new Hono()
 	.use(authMiddleware)
 	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', CableListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
-		if (query.device !== undefined) {
-			const tenant = await deviceTenant(query.device)
-			if (tenant !== undefined) {
-				const denied = checkRead(c, tenant)
-				if (denied) {
-					return denied
-				}
-			}
+		const denied =
+			(query.device !== undefined
+				? checkTenant(c, await deviceTenant(query.device))
+				: null) ??
+			(query.interface !== undefined
+				? checkTenant(c, await interfaceTenant(query.interface))
+				: null)
+		if (denied) {
+			return denied
 		}
-		if (query.interface !== undefined) {
-			const tenant = await interfaceTenant(query.interface)
-			if (tenant !== undefined) {
-				const denied = checkRead(c, tenant)
-				if (denied) {
-					return denied
-				}
-			}
-		}
-		const scope = scopeTenantId(requestUser(c))
 		return c.json(
 			await listCables({
 				search: query.search,
@@ -66,7 +65,7 @@ export const cablesApp = new Hono()
 				status: query.status,
 				interface: query.interface,
 				device: query.device,
-				...(scope !== null ? { scopeTenantId: scope } : {}),
+				scopeTenantId: requestScope(c),
 			}),
 		)
 	})
@@ -79,8 +78,9 @@ export const cablesApp = new Hono()
 			const tenantA = await interfaceTenant(body.a_interface_id)
 			const tenantB = await interfaceTenant(body.b_interface_id)
 			if (tenantA !== undefined && tenantB !== undefined) {
-				if (!canWriteCable(requestUser(c), [tenantA, tenantB])) {
-					return sendResult(c, cableScopeDenied())
+				const denied = checkCable(c, [tenantA, tenantB])
+				if (denied) {
+					return denied
 				}
 			}
 			return sendCreated(c, await connectCable(body))
@@ -88,19 +88,14 @@ export const cablesApp = new Hono()
 	)
 	// CSV transfer (registered before `/:id` so the literal paths win).
 	.get('/export', async (c) => {
-		const scope = scopeTenantId(requestUser(c))
-		return sendCsv(c, await exportCablesCsv(scope ?? undefined), 'cables.csv')
+		return sendCsv(c, await exportCablesCsv(requestScope(c)), 'cables.csv')
 	})
 	.post(
 		'/import',
 		requirePermissionMiddleware('edit'),
 		vValidator('json', CsvImportBodySchema, onValidationError),
 		async (c) => {
-			const scope = scopeTenantId(requestUser(c))
-			return sendCreated(
-				c,
-				await importCablesCsv(c.req.valid('json').csv, scope ?? undefined),
-			)
+			return sendCreated(c, await importCablesCsv(c.req.valid('json').csv, requestScope(c)))
 		},
 	)
 	.get(
@@ -109,27 +104,22 @@ export const cablesApp = new Hono()
 		vValidator('query', TraceQuerySchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const depth = c.req.valid('query').depth
-			const result = await getCable(id)
-			if (Result.isError(result)) {
-				return sendResult(c, result)
+			const cable = await loadCable(c, id)
+			if (cable instanceof Response) {
+				return cable
 			}
-			if (!canReadCable(requestUser(c), await cableTenants(result.value))) {
-				return sendResult(c, cableScopeDenied())
-			}
-			const scope = scopeTenantId(requestUser(c))
-			return sendResult(c, await getCableTrace(id, depth, scope ?? undefined))
+			return sendResult(
+				c,
+				await getCableTrace(id, c.req.valid('query').depth, requestScope(c)),
+			)
 		},
 	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		const result = await getCable(c.req.valid('param').id)
-		if (Result.isError(result)) {
-			return sendResult(c, result)
+		const cable = await loadCable(c, c.req.valid('param').id)
+		if (cable instanceof Response) {
+			return cable
 		}
-		if (!canReadCable(requestUser(c), await cableTenants(result.value))) {
-			return sendResult(c, cableScopeDenied())
-		}
-		return c.json(result.value)
+		return c.json(cable)
 	})
 	.patch(
 		'/:id',
@@ -138,14 +128,11 @@ export const cablesApp = new Hono()
 		vValidator('json', CableUpdateSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const current = await getCable(id)
-			if (Result.isError(current)) {
-				return sendResult(c, current)
+			const cable = await loadCable(c, id)
+			if (cable instanceof Response) {
+				return cable
 			}
-			if (!canWriteCable(requestUser(c), await cableTenants(current.value))) {
-				return sendResult(c, cableScopeDenied())
-			}
-			return sendRow(c, await updateCable(id, c.req.valid('json')))
+			return sendResult(c, await updateCable(id, c.req.valid('json')))
 		},
 	)
 	.delete(
@@ -154,13 +141,10 @@ export const cablesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const current = await getCable(id)
-			if (Result.isError(current)) {
-				return sendResult(c, current)
+			const cable = await loadCable(c, id)
+			if (cable instanceof Response) {
+				return cable
 			}
-			if (!canWriteCable(requestUser(c), await cableTenants(current.value))) {
-				return sendResult(c, cableScopeDenied())
-			}
-			return sendRow(c, await deleteCable(id))
+			return sendResult(c, await deleteCable(id))
 		},
 	)

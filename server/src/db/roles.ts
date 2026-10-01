@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, isNull, ne, type SQL } from 'drizzle-orm'
 import {
 	PERMISSIONS,
 	type Permission,
@@ -9,15 +9,20 @@ import {
 } from 'shared/src/schemas'
 import { role_permissions, roles, users } from '../schema'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import { ConflictError, DuplicateError } from './errors'
 import {
-	errOf,
+	checkExists,
+	exists,
+	findById,
+	insertedId,
 	isPatchEmpty,
+	isTaken,
 	type ListParams,
-	offsetOf,
 	type Page,
-	pageOf,
-	searchPattern,
+	pageRows,
+	pickDefined,
+	searchCondition,
+	tryWrite,
 } from './list'
 
 // ---------------------------------------------------------------------------
@@ -41,11 +46,8 @@ export async function rolePermissions(roleId: number): Promise<Permission[]> {
 	return PERMISSIONS.filter((p) => granted.has(p))
 }
 
-async function userCount(roleId: number): Promise<number> {
-	const row = (
-		await getDb().select({ n: count() }).from(users).where(eq(users.role_id, roleId)).limit(1)
-	)[0]
-	return row?.n ?? 0
+function userCount(roleId: number): Promise<number> {
+	return getDb().$count(users, eq(users.role_id, roleId))
 }
 
 async function toRoleJson(row: typeof roles.$inferSelect): Promise<RoleJson> {
@@ -59,29 +61,18 @@ async function toRoleJson(row: typeof roles.$inferSelect): Promise<RoleJson> {
 }
 
 export async function listRoles(params: ListParams): Promise<Page<RoleJson>> {
-	const db = getDb()
-	const pattern = searchPattern(params.search)
-	const where = params.search
-		? sql`${roles.name} ILIKE ${pattern} ESCAPE '\\' OR ${roles.description} ILIKE ${pattern} ESCAPE '\\'`
-		: undefined
-	const rows = await db
-		.select()
-		.from(roles)
-		.where(where)
-		.orderBy(asc(roles.name), asc(roles.id))
-		.limit(params.limit)
-		.offset(offsetOf(params))
-	const totalRow = (await db.select({ n: count() }).from(roles).where(where).limit(1))[0]
-	const items = await Promise.all(rows.map(toRoleJson))
-	return pageOf(items, totalRow?.n ?? 0, params)
+	const page = await pageRows(
+		roles,
+		searchCondition(params.search, [roles.name, roles.description]),
+		[asc(roles.name), asc(roles.id)],
+		params,
+	)
+	return { ...page, items: await Promise.all(page.items.map(toRoleJson)) }
 }
 
 export async function getRole(id: number): Promise<Result<RoleJson, Error>> {
-	const row = (await getDb().select().from(roles).where(eq(roles.id, id)).limit(1))[0]
-	if (!row) {
-		return Result.err(new NotFoundError('Role not found'))
-	}
-	return Result.ok(await toRoleJson(row))
+	const row = await findById(roles, id, 'Role not found')
+	return Result.isOk(row) ? Result.ok(await toRoleJson(row.value)) : row
 }
 
 /**
@@ -123,38 +114,37 @@ async function replacePermissions(roleId: number, permissions: Permission[]): Pr
 	}
 }
 
-async function nameTaken(name: string, exceptId?: number): Promise<boolean> {
-	const row = (
-		await getDb().select({ id: roles.id }).from(roles).where(eq(roles.name, name)).limit(1)
-	)[0]
-	return row !== undefined && row.id !== exceptId
+function nameTaken(name: string, exceptId?: number): Promise<boolean> {
+	return isTaken(roles, eq(roles.name, name), exceptId)
+}
+
+/** Inserts a role with its permissions in one transaction; returns its id. */
+function insertRole(
+	name: string,
+	description: string | null,
+	permissions: Permission[],
+): Promise<number> {
+	return withTransaction(async () => {
+		const id = insertedId(
+			await getDb().insert(roles).values({ name, description }).returning({ id: roles.id }),
+		)
+		await replacePermissions(id, permissions)
+		return id
+	})
 }
 
 export async function createRole(input: RoleCreate): Promise<Result<RoleJson, Error>> {
 	if (await nameTaken(input.name)) {
 		return Result.err(new DuplicateError(NAME_IN_USE))
 	}
-	try {
-		const id = await withTransaction(async () => {
-			const inserted = (
-				await getDb()
-					.insert(roles)
-					.values({ name: input.name, description: input.description ?? null })
-					.returning({ id: roles.id })
-			)[0]
-			if (!inserted) {
-				throw new Error('Role insert did not return an id')
-			}
-			await replacePermissions(inserted.id, input.permissions)
-			return inserted.id
-		})
-		return await getRole(id)
-	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError(NAME_IN_USE))
-		}
-		return Result.err(errOf(err))
+	const id = await tryWrite(
+		() => insertRole(input.name, input.description ?? null, input.permissions),
+		NAME_IN_USE,
+	)
+	if (Result.isError(id)) {
+		return id
 	}
+	return await getRole(id.value)
 }
 
 export async function updateRole(id: number, input: RoleUpdate): Promise<Result<RoleJson, Error>> {
@@ -167,21 +157,16 @@ export async function updateRole(id: number, input: RoleUpdate): Promise<Result<
 	}
 	if (input.permissions !== undefined) {
 		const grantsManage = input.permissions.includes('users.manage')
-		if (grantsManage && !current.value.permissions.includes('users.manage')) {
-			const scoped = (
-				await getDb()
-					.select({ id: users.id })
-					.from(users)
-					.where(and(eq(users.role_id, id), sql`${users.tenant_id} IS NOT NULL`))
-					.limit(1)
-			)[0]
-			if (scoped) {
-				return Result.err(
-					new ConflictError(
-						'Role is assigned to tenant-scoped users; users.manage requires global users',
-					),
-				)
-			}
+		if (
+			grantsManage &&
+			!current.value.permissions.includes('users.manage') &&
+			(await exists(users, and(eq(users.role_id, id), isNotNull(users.tenant_id))))
+		) {
+			return Result.err(
+				new ConflictError(
+					'Role is assigned to tenant-scoped users; users.manage requires global users',
+				),
+			)
 		}
 		if (!grantsManage && (await countGlobalManagers({ excludeRoleId: id })) === 0) {
 			return Result.err(
@@ -189,27 +174,21 @@ export async function updateRole(id: number, input: RoleUpdate): Promise<Result<
 			)
 		}
 	}
-	const patch: Partial<typeof roles.$inferInsert> = {}
-	if (input.name !== undefined) {
-		patch.name = input.name
-	}
-	if (input.description !== undefined) {
-		patch.description = input.description
-	}
-	try {
-		await withTransaction(async () => {
-			if (!isPatchEmpty(patch)) {
-				await getDb().update(roles).set(patch).where(eq(roles.id, id))
-			}
-			if (input.permissions !== undefined) {
-				await replacePermissions(id, input.permissions)
-			}
-		})
-	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError(NAME_IN_USE))
-		}
-		return Result.err(errOf(err))
+	const patch = pickDefined(input, ['name', 'description'])
+	const written = await tryWrite(
+		() =>
+			withTransaction(async () => {
+				if (!isPatchEmpty(patch)) {
+					await getDb().update(roles).set(patch).where(eq(roles.id, id))
+				}
+				if (input.permissions !== undefined) {
+					await replacePermissions(id, input.permissions)
+				}
+			}),
+		NAME_IN_USE,
+	)
+	if (Result.isError(written)) {
+		return written
 	}
 	return await getRole(id)
 }
@@ -222,20 +201,16 @@ export async function deleteRole(id: number): Promise<Result<RoleJson, Error>> {
 	if (current.value.user_count > 0) {
 		return Result.err(new ConflictError('Role is still assigned to users; reassign them first'))
 	}
-	try {
-		await getDb().delete(roles).where(eq(roles.id, id))
-	} catch (e) {
-		return Result.err(errOf(e))
+	const deleted = await tryWrite(() => getDb().delete(roles).where(eq(roles.id, id)))
+	if (Result.isError(deleted)) {
+		return deleted
 	}
 	return current
 }
 
 /** Existence guard for user writes: missing role is 404. */
-export async function checkRoleExists(roleId: number): Promise<Result<undefined, Error>> {
-	const row = (
-		await getDb().select({ id: roles.id }).from(roles).where(eq(roles.id, roleId)).limit(1)
-	)[0]
-	return row ? Result.ok(undefined) : Result.err(new NotFoundError('Role not found'))
+export function checkRoleExists(roleId: number): Promise<Result<undefined, Error>> {
+	return checkExists(roles, roleId, 'Role not found')
 }
 
 /**
@@ -256,17 +231,5 @@ export async function fullAccessRoleId(): Promise<number> {
 		return full.role_id
 	}
 	const name = (await nameTaken('Admin')) ? 'Admin (setup)' : 'Admin'
-	return await withTransaction(async () => {
-		const inserted = (
-			await getDb()
-				.insert(roles)
-				.values({ name, description: null })
-				.returning({ id: roles.id })
-		)[0]
-		if (!inserted) {
-			throw new Error('Role insert did not return an id')
-		}
-		await replacePermissions(inserted.id, [...PERMISSIONS])
-		return inserted.id
-	})
+	return await insertRole(name, null, [...PERMISSIONS])
 }

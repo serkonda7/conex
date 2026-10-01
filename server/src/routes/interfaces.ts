@@ -1,8 +1,9 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { InterfaceListQuerySchema } from 'shared/src/schemas'
-import { checkRead, deviceTenant, requestUser, scopeTenantId } from '../authz'
+import { checkTenant, requestUser, scopeTenantId } from '../authz'
 import { listAllInterfaces } from '../db/devices'
+import { deviceTenant } from '../db/owners'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -20,7 +21,7 @@ export const interfacesApp = new Hono()
 		if (query.device !== undefined) {
 			const tenant = await deviceTenant(query.device)
 			if (tenant !== undefined) {
-				const denied = checkRead(c, tenant)
+				const denied = checkTenant(c, tenant)
 				if (denied) {
 					return denied
 				}

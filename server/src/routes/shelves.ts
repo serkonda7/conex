@@ -7,13 +7,13 @@ import {
 	ShelfListQuerySchema,
 	ShelfUpdateSchema,
 } from 'shared/src/schemas'
-import { checkRead, checkWrite, listTenantScope, rackTenant, shelfTenant } from '../authz'
+import { checkTenant, listTenantScope } from '../authz'
+import { rackTenant, shelfTenant } from '../db/owners'
 import { createShelf, deleteShelf, getShelf, listShelves, updateShelf } from '../db/shelves'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
-import { sendCreated, sendRow } from './helpers'
+import { sendCreated, sendResult } from '../util/result_response'
 
 /**
  * Shelves are tenant-bearing via their rack (no `tenant_id` column of their
@@ -53,7 +53,7 @@ export const shelvesApp = new Hono()
 			// answers 403 here before anything is written.
 			const tenant = await rackTenant(body.rack_id)
 			if (tenant !== undefined) {
-				const denied = checkWrite(c, tenant)
+				const denied = checkTenant(c, tenant)
 				if (denied) {
 					return denied
 				}
@@ -67,7 +67,7 @@ export const shelvesApp = new Hono()
 		if (Result.isError(row)) {
 			return sendResult(c, row)
 		}
-		const denied = checkRead(c, (await shelfTenant(id)) ?? null)
+		const denied = checkTenant(c, (await shelfTenant(id)) ?? null)
 		if (denied) {
 			return denied
 		}
@@ -85,7 +85,7 @@ export const shelvesApp = new Hono()
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			const denied = checkWrite(c, (await shelfTenant(id)) ?? null)
+			const denied = checkTenant(c, (await shelfTenant(id)) ?? null)
 			if (denied) {
 				return denied
 			}
@@ -93,13 +93,13 @@ export const shelvesApp = new Hono()
 			if (body.rack_id !== undefined && body.rack_id !== current.value.rack_id) {
 				const targetTenant = await rackTenant(body.rack_id)
 				if (targetTenant !== undefined) {
-					const targetDenied = checkWrite(c, targetTenant)
+					const targetDenied = checkTenant(c, targetTenant)
 					if (targetDenied) {
 						return targetDenied
 					}
 				}
 			}
-			return sendRow(c, await updateShelf(id, body))
+			return sendResult(c, await updateShelf(id, body))
 		},
 	)
 	.delete(
@@ -112,10 +112,10 @@ export const shelvesApp = new Hono()
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			const denied = checkWrite(c, (await shelfTenant(id)) ?? null)
+			const denied = checkTenant(c, (await shelfTenant(id)) ?? null)
 			if (denied) {
 				return denied
 			}
-			return sendRow(c, await deleteShelf(id))
+			return sendResult(c, await deleteShelf(id))
 		},
 	)

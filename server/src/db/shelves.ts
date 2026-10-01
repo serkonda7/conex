@@ -1,16 +1,29 @@
 import { Result } from 'better-result'
-import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { ShelfCreate, ShelfUpdate } from 'shared/src/schemas'
 import { devices, racks, shelves } from '../schema'
-import { checkBounds, checkOverlap } from '../services/occupancy'
+import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { ConflictError, isUniqueViolation, NotFoundError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
-import { errOf, isPatchEmpty, offsetOf, pageOf, searchPattern } from './list'
+import {
+	exists,
+	findById,
+	findOne,
+	insertedId,
+	isPatchEmpty,
+	orderOf,
+	pageRows,
+	pickDefined,
+	searchCondition,
+	tryWrite,
+} from './list'
 import { rackHeightOf, rackSpansOf, shelfBlockedRange } from './racks'
 
 export type ShelfRow = typeof shelves.$inferSelect
+
+const SHELF_NAME_IN_USE = 'Shelf name is already in use'
 
 export interface ShelfListParams extends ListParams {
 	rack?: number
@@ -20,183 +33,116 @@ export interface ShelfListParams extends ListParams {
 	scopeTenantId?: number
 }
 
-export async function listShelves(params: ShelfListParams): Promise<Page<ShelfRow>> {
-	const db = getDb()
-	const pattern = searchPattern(params.search)
-	const conditions: SQL[] = []
-	if (params.search) {
-		conditions.push(
-			sql`(${shelves.name} ILIKE ${pattern} ESCAPE '\\' OR ${shelves.description} ILIKE ${pattern} ESCAPE '\\')`,
-		)
-	}
-	if (params.rack) {
-		conditions.push(eq(shelves.rack_id, params.rack))
-	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(
-			sql`EXISTS (SELECT 1 FROM racks AS scope_r WHERE scope_r.id = ${shelves.rack_id} AND scope_r.tenant_id = ${params.scopeTenantId})`,
-		)
-	}
-	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const items = await db
-		.select()
-		.from(shelves)
-		.where(where)
-		.orderBy(params.order === 'desc' ? desc(shelves.name) : asc(shelves.name), asc(shelves.id))
-		.limit(params.limit)
-		.offset(offsetOf(params))
-	const totalRow = (await db.select({ n: count() }).from(shelves).where(where).limit(1))[0]
-	return pageOf(items, totalRow?.n ?? 0, params)
+export function listShelves(params: ShelfListParams): Promise<Page<ShelfRow>> {
+	const where = and(
+		searchCondition(params.search, [shelves.name, shelves.description]),
+		params.rack ? eq(shelves.rack_id, params.rack) : undefined,
+		params.scopeTenantId !== undefined
+			? sql`EXISTS (SELECT 1 FROM ${racks} AS scope_r WHERE scope_r.id = ${shelves.rack_id} AND scope_r.tenant_id = ${params.scopeTenantId})`
+			: undefined,
+	)
+	return pageRows(shelves, where, [orderOf(shelves.name, params.order), asc(shelves.id)], params)
 }
 
-export async function getShelf(id: number): Promise<Result<ShelfRow, Error>> {
-	const row = (await getDb().select().from(shelves).where(eq(shelves.id, id)).limit(1))[0]
-	if (!row) {
-		return Result.err(new NotFoundError('Shelf not found'))
-	}
-	return Result.ok(row)
+export function getShelf(id: number): Promise<Result<ShelfRow, Error>> {
+	return findById(shelves, id, 'Shelf not found')
 }
 
-async function checkShelfBounds(
-	name: string,
-	rackId: number,
-	positionU: number,
-	mountHeight: number,
-	mountUsable: boolean,
-	reservedHeight: number,
+/** Effective mount of a shelf, as created or after a patch. */
+interface ShelfMount {
+	name: string
+	rack_id: number
+	face: Face
+	is_full_depth: boolean
+	position_u: number
+	mount_height: number
+	mount_usable: boolean
+	reserved_height: number
+}
+
+/**
+ * Validates a shelf mount: the mount hardware and the blocked span must fit
+ * the rack, and the blocked span must not overlap other occupants (devices
+ * plus shelf blockers). `excludeShelfId` skips the shelf being updated.
+ */
+async function checkShelfMount(
+	mount: ShelfMount,
+	excludeShelfId?: number,
 ): Promise<Result<undefined, Error>> {
-	const rack = (await getDb().select().from(racks).where(eq(racks.id, rackId)).limit(1))[0]
+	const rack = await findOne(racks, eq(racks.id, mount.rack_id))
 	if (!rack) {
 		return Result.err(new NotFoundError('Rack not found'))
 	}
 	const height = await rackHeightOf(rack)
-	const blocked = shelfBlockedRange({
-		position_u: positionU,
-		mount_height: mountHeight,
-		mount_usable: mountUsable,
-		reserved_height: reservedHeight,
-	})
+	const label = `Shelf "${mount.name}"`
 	// The mount hardware itself must fit even when it stays usable.
 	const mountBounds = checkBounds(
-		{ position_u: positionU, height_u: mountHeight },
+		{ position_u: mount.position_u, height_u: mount.mount_height },
 		height,
-		`Shelf "${name}"`,
+		label,
 	)
 	if (Result.isError(mountBounds)) {
-		return Result.err(mountBounds.error)
+		return mountBounds
 	}
-	if (blocked) {
-		const bounds = checkBounds(
-			{ position_u: blocked.position_u, height_u: blocked.height_u },
-			height,
-			`Shelf "${name}"`,
-		)
-		if (Result.isError(bounds)) {
-			return Result.err(bounds.error)
-		}
-	}
-	// Overlap against every other occupant (devices + shelf blockers)
-	// is checked by the caller with the real face/depth.
-	return Result.ok(undefined)
-}
-
-/**
- * Validates a shelf mount with its real face/depth against all other
- * occupants. Split from `checkShelfBounds` so face/depth flow explicitly.
- */
-async function checkShelfOverlap(
-	name: string,
-	rackId: number,
-	face: 'front' | 'rear' | null,
-	isFullDepth: boolean,
-	positionU: number,
-	mountHeight: number,
-	mountUsable: boolean,
-	reservedHeight: number,
-	excludeShelfId?: number,
-): Promise<Result<undefined, Error>> {
-	const blocked = shelfBlockedRange({
-		position_u: positionU,
-		mount_height: mountHeight,
-		mount_usable: mountUsable,
-		reserved_height: reservedHeight,
-	})
+	const blocked = shelfBlockedRange(mount)
 	if (!blocked) {
 		return Result.ok(undefined)
 	}
-	const overlap = checkOverlap(
+	const bounds = checkBounds(blocked, height, label)
+	if (Result.isError(bounds)) {
+		return bounds
+	}
+	const spanId = excludeShelfId === undefined ? undefined : -excludeShelfId
+	return checkOverlap(
 		{
-			id: excludeShelfId === undefined ? 0 : -excludeShelfId,
-			name,
+			id: spanId ?? 0,
+			name: mount.name,
 			position_u: blocked.position_u,
 			height_u: blocked.height_u,
-			face,
-			is_full_depth: isFullDepth,
+			face: mount.face,
+			is_full_depth: mount.is_full_depth,
 		},
-		await rackSpansOf(rackId),
-		`Shelf "${name}"`,
-		excludeShelfId === undefined ? undefined : -excludeShelfId,
+		await rackSpansOf(mount.rack_id),
+		label,
+		spanId,
 	)
-	if (Result.isError(overlap)) {
-		return Result.err(overlap.error)
-	}
-	return Result.ok(undefined)
 }
 
 export async function createShelf(input: ShelfCreate): Promise<Result<ShelfRow, Error>> {
-	const name = input.name ?? 'shelf'
-	const mountHeight = input.mount_height ?? 1
-	const mountUsable = input.mount_usable ?? false
-	const reservedHeight = input.reserved_height ?? 0
-	const bounds = await checkShelfBounds(
-		name,
-		input.rack_id,
-		input.position_u,
-		mountHeight,
-		mountUsable,
-		reservedHeight,
-	)
-	if (Result.isError(bounds)) {
-		return Result.err(bounds.error)
+	const mount: ShelfMount = {
+		name: input.name ?? 'shelf',
+		rack_id: input.rack_id,
+		face: input.face ?? null,
+		is_full_depth: input.is_full_depth ?? true,
+		position_u: input.position_u,
+		mount_height: input.mount_height ?? 1,
+		mount_usable: input.mount_usable ?? false,
+		reserved_height: input.reserved_height ?? 0,
 	}
-	const overlap = await checkShelfOverlap(
-		name,
-		input.rack_id,
-		input.face ?? null,
-		input.is_full_depth ?? true,
-		input.position_u,
-		mountHeight,
-		mountUsable,
-		reservedHeight,
-	)
-	if (Result.isError(overlap)) {
-		return Result.err(overlap.error)
+	const valid = await checkShelfMount(mount)
+	if (Result.isError(valid)) {
+		return valid
 	}
 	const row: Omit<ShelfRow, 'id'> = {
-		rack_id: input.rack_id,
+		rack_id: mount.rack_id,
 		name: input.name ?? null,
-		face: input.face ?? null,
-		position_u: input.position_u,
-		mount_height: mountHeight,
-		mount_usable: mountUsable ? 1 : 0,
-		reserved_height: reservedHeight,
-		is_full_depth: (input.is_full_depth ?? true) ? 1 : 0,
+		face: mount.face,
+		position_u: mount.position_u,
+		mount_height: mount.mount_height,
+		mount_usable: mount.mount_usable ? 1 : 0,
+		reserved_height: mount.reserved_height,
+		is_full_depth: mount.is_full_depth ? 1 : 0,
 		description: input.description ?? null,
 	}
-	try {
-		const inserted = (
-			await getDb().insert(shelves).values(row).returning({ id: shelves.id })
-		)[0]
-		if (!inserted) {
-			return Result.err(new Error('Shelf insert did not return an id'))
-		}
-		return await logCreate('shelf', await getShelf(inserted.id))
-	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new ConflictError('Shelf name is already in use'))
-		}
-		return Result.err(err instanceof Error ? err : new Error(String(err)))
+	const id = await tryWrite(
+		async () =>
+			insertedId(await getDb().insert(shelves).values(row).returning({ id: shelves.id })),
+		() => new ConflictError(SHELF_NAME_IN_USE),
+	)
+	if (Result.isError(id)) {
+		return id
 	}
+	return await logCreate('shelf', await getShelf(id.value))
 }
 
 export async function updateShelf(
@@ -208,28 +154,15 @@ export async function updateShelf(
 		return current
 	}
 	const node = current.value
-	const rackId = input.rack_id ?? node.rack_id
-	const positionU = input.position_u ?? node.position_u
-	const mountHeight = input.mount_height ?? node.mount_height
-	const mountUsable = input.mount_usable ?? node.mount_usable !== 0
-	const reservedHeight = input.reserved_height ?? node.reserved_height
-	const face =
-		input.face !== undefined
-			? input.face
-			: node.face === 'front' || node.face === 'rear'
-				? node.face
-				: null
-	const isFullDepth = input.is_full_depth ?? node.is_full_depth !== 0
 	// Devices on the shelf share its rack; moving it would strand them.
-	if (input.rack_id !== undefined && input.rack_id !== node.rack_id) {
-		const occupant = (
-			await getDb().select().from(devices).where(eq(devices.shelf_id, id)).limit(1)
-		)[0]
-		if (occupant) {
-			return Result.err(
-				new ConflictError('Shelf still has devices; remove them before moving racks'),
-			)
-		}
+	if (
+		input.rack_id !== undefined &&
+		input.rack_id !== node.rack_id &&
+		(await exists(devices, eq(devices.shelf_id, id)))
+	) {
+		return Result.err(
+			new ConflictError('Shelf still has devices; remove them before moving racks'),
+		)
 	}
 	const mountChanged =
 		input.rack_id !== undefined ||
@@ -240,71 +173,48 @@ export async function updateShelf(
 		input.face !== undefined ||
 		input.is_full_depth !== undefined
 	if (mountChanged || input.name !== undefined) {
-		const bounds = await checkShelfBounds(
-			input.name ?? node.name ?? 'shelf',
-			rackId,
-			positionU,
-			mountHeight,
-			mountUsable,
-			reservedHeight,
-		)
-		if (Result.isError(bounds)) {
-			return Result.err(bounds.error)
-		}
-		const overlap = await checkShelfOverlap(
-			input.name ?? node.name ?? 'shelf',
-			rackId,
-			face,
-			isFullDepth,
-			positionU,
-			mountHeight,
-			mountUsable,
-			reservedHeight,
+		const valid = await checkShelfMount(
+			{
+				name: input.name ?? node.name ?? 'shelf',
+				rack_id: input.rack_id ?? node.rack_id,
+				face: input.face !== undefined ? input.face : faceOf(node.face),
+				is_full_depth: input.is_full_depth ?? node.is_full_depth !== 0,
+				position_u: input.position_u ?? node.position_u,
+				mount_height: input.mount_height ?? node.mount_height,
+				mount_usable: input.mount_usable ?? node.mount_usable !== 0,
+				reserved_height: input.reserved_height ?? node.reserved_height,
+			},
 			id,
 		)
-		if (Result.isError(overlap)) {
-			return Result.err(overlap.error)
+		if (Result.isError(valid)) {
+			return valid
 		}
 	}
-	const patch: Partial<ShelfRow> = {}
-	if (input.name !== undefined) {
-		patch.name = input.name
-	}
-	if (input.rack_id !== undefined) {
-		patch.rack_id = input.rack_id
-	}
-	if (input.face !== undefined) {
-		patch.face = input.face
-	}
-	if (input.position_u !== undefined) {
-		patch.position_u = input.position_u
-	}
-	if (input.mount_height !== undefined) {
-		patch.mount_height = input.mount_height
-	}
+	const patch: Partial<ShelfRow> = pickDefined(input, [
+		'name',
+		'rack_id',
+		'face',
+		'position_u',
+		'mount_height',
+		'reserved_height',
+		'description',
+	])
 	if (input.mount_usable !== undefined) {
 		patch.mount_usable = input.mount_usable ? 1 : 0
-	}
-	if (input.reserved_height !== undefined) {
-		patch.reserved_height = input.reserved_height
 	}
 	if (input.is_full_depth !== undefined) {
 		patch.is_full_depth = input.is_full_depth ? 1 : 0
 	}
-	if (input.description !== undefined) {
-		patch.description = input.description
-	}
 	if (!isPatchEmpty(patch)) {
-		try {
-			await getDb().update(shelves).set(patch).where(eq(shelves.id, id))
-		} catch (err) {
-			if (isUniqueViolation(err)) {
-				return Result.err(new ConflictError('Shelf name is already in use'))
-			}
-			return Result.err(err instanceof Error ? err : new Error(String(err)))
+		const written = await tryWrite(
+			() => getDb().update(shelves).set(patch).where(eq(shelves.id, id)),
+			() => new ConflictError(SHELF_NAME_IN_USE),
+		)
+		if (Result.isError(written)) {
+			return written
 		}
 	}
-	return await logUpdate('shelf', current.value, await getShelf(id))
+	return await logUpdate('shelf', node, await getShelf(id))
 }
 
 export async function deleteShelf(id: number): Promise<Result<ShelfRow, Error>> {
@@ -313,13 +223,14 @@ export async function deleteShelf(id: number): Promise<Result<ShelfRow, Error>> 
 		return current
 	}
 	// Devices on the shelf stay assigned to the rack, just unplaced.
-	try {
-		await getDb().transaction(async (tx) => {
+	const deleted = await tryWrite(() =>
+		getDb().transaction(async (tx) => {
 			await tx.update(devices).set({ shelf_id: null }).where(eq(devices.shelf_id, id))
 			await tx.delete(shelves).where(eq(shelves.id, id))
-		})
-	} catch (e) {
-		return Result.err(errOf(e))
+		}),
+	)
+	if (Result.isError(deleted)) {
+		return deleted
 	}
 	return await logDelete('shelf', current.value)
 }

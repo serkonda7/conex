@@ -1,7 +1,8 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { TopologyQuerySchema } from 'shared/src/schemas'
-import { checkRead, deviceTenant, listTenantScope } from '../authz'
+import { checkTenant, listTenantScope } from '../authz'
+import { deviceTenant } from '../db/owners'
 import { getTopology } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
@@ -25,7 +26,7 @@ export const topologyApp = new Hono()
 		if (query.device !== undefined) {
 			const tenant = await deviceTenant(query.device)
 			if (tenant !== undefined) {
-				const denied = checkRead(c, tenant)
+				const denied = checkTenant(c, tenant)
 				if (denied) {
 					return denied
 				}

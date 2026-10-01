@@ -11,25 +11,26 @@
  * - `NULL` = global, unconstrained. Always the case for `users.manage`
  *   holders (enforced in `db/users.ts` / `db/roles.ts`).
  * - set = limited to that single tenant, strictly: only rows whose `tenant_id` equals the scope
- *   are visible or writable. In particular, unscoped (`tenant_id IS NULL`)
- *   rows are invisible to scoped users — there is no shared visibility.
+ *   are visible or writable. Reads and writes follow the same rule. In
+ *   particular, unscoped (`tenant_id IS NULL`) rows are invisible to scoped
+ *   users — there is no shared visibility.
  * - Tenant-less catalog data (manufacturers, device types + stubs) is
  *   readable by everyone but writable only by global editors/admins.
- * - Tenant-less child rows inherit their parent's tenant: interfaces follow
- *   their device, cables follow both endpoint
- *   devices (both endpoints must sit in the scoped tenant).
+ * - Tenant-less child rows inherit their parent's tenant (`db/owners.ts`):
+ *   interfaces follow their device, cables follow both endpoint devices
+ *   (both endpoints must sit in the scoped tenant).
  */
 
 import { Result } from 'better-result'
-import { eq } from 'drizzle-orm'
 import type { Context } from 'hono'
-import { getDb } from './db/connection'
 import type { TenantFilterParams } from './db/list'
 import { resolveTenantGroupIds } from './db/tenancy'
-import { type cables, devices, interfaces, racks, shelves } from './schema'
 import type { CurrentUser, Permission } from './types'
 import { jsonError } from './util/http'
 import { sendResult } from './util/result_response'
+
+const OUTSIDE_SCOPE = 'Forbidden: outside your tenant scope'
+const CABLE_OUTSIDE_SCOPE = 'Cable endpoints are outside your tenant scope'
 
 /** The authenticated requester attached by `authMiddleware`. */
 export function requestUser(c: Context): CurrentUser {
@@ -41,35 +42,46 @@ export function scopeTenantId(user: CurrentUser): number | null {
 	return user.tenant_id
 }
 
+/** The requester's scope as a db filter param: `undefined` when global. */
+export function requestScope(c: Context): number | undefined {
+	return scopeTenantId(requestUser(c)) ?? undefined
+}
+
 /** True when the requester's role grants `permission`. */
 export function can(user: CurrentUser, permission: Permission): boolean {
 	return user.permissions.has(permission)
 }
 
-/** Read rule: scope members see exactly their own tenant — no shared rows. */
-export function canReadTenant(user: CurrentUser, tenant: number | null): boolean {
+/** Scope rule (read and write): scope members need an exact (non-null) tenant match. */
+export function canAccessTenant(user: CurrentUser, tenant: number | null): boolean {
 	const scope = scopeTenantId(user)
-	if (scope === null) {
-		return true
-	}
-	return tenant !== null && tenant === scope
+	return scope === null || tenant === scope
 }
 
-/** Write rule: scope members need an exact (non-null) tenant match. */
-export function canWriteTenant(user: CurrentUser, tenant: number | null): boolean {
-	const scope = scopeTenantId(user)
-	if (scope === null) {
-		return true
-	}
-	return tenant !== null && tenant === scope
+/** Cable rule (read and write): both endpoints must sit in the scoped tenant. */
+export function canAccessCable(
+	user: CurrentUser,
+	tenants: [number | null, number | null],
+): boolean {
+	return canAccessTenant(user, tenants[0]) && canAccessTenant(user, tenants[1])
+}
+
+/** 403 response in the shared `{ error }` shape. */
+export function forbidden(c: Context, message = OUTSIDE_SCOPE): Response {
+	return jsonError(c, message, 403)
 }
 
 /** Permission gate. Returns a 403 response or null. */
 export function requirePermission(c: Context, permission: Permission): Response | null {
 	if (!can(requestUser(c), permission)) {
-		return jsonError(c, `Forbidden: ${permission} permission required`, 403)
+		return forbidden(c, `Forbidden: ${permission} permission required`)
 	}
 	return null
+}
+
+/** Gate for operations only global (unscoped) requesters may perform. */
+export function requireGlobalScope(c: Context, message: string): Response | null {
+	return scopeTenantId(requestUser(c)) === null ? null : forbidden(c, message)
 }
 
 /**
@@ -77,30 +89,27 @@ export function requirePermission(c: Context, permission: Permission): Response 
  * users cannot change rows other tenants rely on.
  */
 export function requireGlobalPermission(c: Context, permission: Permission): Response | null {
-	const denied = requirePermission(c, permission)
-	if (denied) {
-		return denied
-	}
-	if (scopeTenantId(requestUser(c)) !== null) {
-		return jsonError(c, 'Forbidden: tenant-scoped users cannot edit shared catalog data', 403)
-	}
-	return null
+	return (
+		requirePermission(c, permission) ??
+		requireGlobalScope(c, 'Forbidden: tenant-scoped users cannot edit shared catalog data')
+	)
 }
 
-/** Single-object read gate for a tenant-bearing row. */
-export function checkRead(c: Context, tenant: number | null): Response | null {
-	if (!canReadTenant(requestUser(c), tenant)) {
-		return jsonError(c, 'Forbidden: outside your tenant scope', 403)
+/**
+ * Single-object scope gate for a tenant-bearing row. `undefined` (the row
+ * or its parent is missing, see `db/owners.ts`) passes, so the service
+ * answers 404 instead of a 403 being invented.
+ */
+export function checkTenant(c: Context, tenant: number | null | undefined): Response | null {
+	if (tenant === undefined || canAccessTenant(requestUser(c), tenant)) {
+		return null
 	}
-	return null
+	return forbidden(c)
 }
 
-/** Single-object write gate for a tenant-bearing row. */
-export function checkWrite(c: Context, tenant: number | null): Response | null {
-	if (!canWriteTenant(requestUser(c), tenant)) {
-		return jsonError(c, 'Forbidden: outside your tenant scope', 403)
-	}
-	return null
+/** Single-object scope gate for a cable, given its endpoint tenants. */
+export function checkCable(c: Context, tenants: [number | null, number | null]): Response | null {
+	return canAccessCable(requestUser(c), tenants) ? null : forbidden(c, CABLE_OUTSIDE_SCOPE)
 }
 
 /**
@@ -110,7 +119,7 @@ export function checkWrite(c: Context, tenant: number | null): Response | null {
 export function checkListTenantParam(c: Context, param: number | undefined): Response | null {
 	const scope = scopeTenantId(requestUser(c))
 	if (scope !== null && param !== undefined && param !== scope) {
-		return jsonError(c, 'Forbidden: outside your tenant scope', 403)
+		return forbidden(c)
 	}
 	return null
 }
@@ -127,13 +136,10 @@ export function resolveCreateTenant(
 	inputTenant: number | null | undefined,
 ): number | null | Response {
 	const scope = scopeTenantId(requestUser(c))
-	if (scope !== null) {
-		if (inputTenant !== undefined && inputTenant !== scope) {
-			return jsonError(c, 'Forbidden: outside your tenant scope', 403)
-		}
-		return scope
+	if (scope === null) {
+		return inputTenant ?? null
 	}
-	return inputTenant ?? null
+	return inputTenant === undefined || inputTenant === scope ? scope : forbidden(c)
 }
 
 /**
@@ -146,14 +152,7 @@ export function checkUpdateTenant(
 	currentTenant: number | null,
 	inputTenant: number | null | undefined,
 ): Response | null {
-	const denied = checkWrite(c, currentTenant)
-	if (denied) {
-		return denied
-	}
-	if (inputTenant !== undefined) {
-		return checkWrite(c, inputTenant)
-	}
-	return null
+	return checkTenant(c, currentTenant) ?? checkTenant(c, inputTenant)
 }
 
 /**
@@ -186,14 +185,11 @@ export async function listTenantScope(
 	const scope = scopeTenantId(requestUser(c))
 	if (scope !== null) {
 		if (tenantIds !== undefined && !tenantIds.includes(scope)) {
-			return jsonError(c, 'Forbidden: outside your tenant scope', 403)
+			return forbidden(c)
 		}
 		return { scopeTenantId: scope }
 	}
-	return {
-		...(queryTenant !== undefined ? { tenant: queryTenant } : {}),
-		...(tenantIds !== undefined ? { tenantIds } : {}),
-	}
+	return { tenant: queryTenant, tenantIds }
 }
 
 /** Sends a single tenant-bearing row: 404 when missing, 403 when out of scope. */
@@ -204,113 +200,5 @@ export function sendTenantRow<T extends { tenant_id: number | null }>(
 	if (Result.isError(result)) {
 		return sendResult(c, result)
 	}
-	const denied = checkRead(c, result.value.tenant_id)
-	if (denied) {
-		return denied
-	}
-	return c.json(result.value)
-}
-
-/**
- * Update gate for a tenant-bearing row: `edit` permission plus current-row
- * and post-patch tenant checks. Returns a denial response, or null when the
- * service call may proceed.
- */
-export function guardUpdate(
-	c: Context,
-	currentTenant: number | null,
-	inputTenant: number | null | undefined,
-): Response | null {
-	const denied = requirePermission(c, 'edit')
-	if (denied) {
-		return denied
-	}
-	return checkUpdateTenant(c, currentTenant, inputTenant)
-}
-
-/** Gate for a tenant-bearing row: `permission` plus scope check. */
-export function guardWrite(
-	c: Context,
-	permission: Permission,
-	currentTenant: number | null,
-): Response | null {
-	const denied = requirePermission(c, permission)
-	if (denied) {
-		return denied
-	}
-	return checkWrite(c, currentTenant)
-}
-
-// ---------------------------------------------------------------------------
-// Parent-tenant resolvers for tenant-less child rows.
-// `undefined` means the row (or its parent) does not exist; callers then
-// fall through to the normal 404 path instead of inventing a 403.
-// ---------------------------------------------------------------------------
-
-/** Tenant of a rack, or `undefined` when the rack is missing. */
-export async function rackTenant(rackId: number): Promise<number | null | undefined> {
-	const rack = (await getDb().select().from(racks).where(eq(racks.id, rackId)).limit(1))[0]
-	return rack?.tenant_id
-}
-
-/** Tenant of a device, or `undefined` when the device is missing. */
-export async function deviceTenant(deviceId: number): Promise<number | null | undefined> {
-	const device = (
-		await getDb().select().from(devices).where(eq(devices.id, deviceId)).limit(1)
-	)[0]
-	return device?.tenant_id
-}
-
-/**
- * Tenant of a shelf, inherited from its rack; `undefined` when either is
- * missing. `db/shelves.ts` owns the same lookup for service-layer paths.
- */
-export async function shelfTenant(shelfId: number): Promise<number | null | undefined> {
-	const shelf = (await getDb().select().from(shelves).where(eq(shelves.id, shelfId)).limit(1))[0]
-	if (!shelf) {
-		return undefined
-	}
-	const rack = (await getDb().select().from(racks).where(eq(racks.id, shelf.rack_id)).limit(1))[0]
-	return rack?.tenant_id
-}
-
-/** Tenant of an interface's device, or `undefined` when either is missing. */
-export async function interfaceTenant(interfaceId: number): Promise<number | null | undefined> {
-	const iface = (
-		await getDb().select().from(interfaces).where(eq(interfaces.id, interfaceId)).limit(1)
-	)[0]
-	if (!iface) {
-		return undefined
-	}
-	return await deviceTenant(iface.device_id)
-}
-
-/** Tenants of both endpoint devices of a cable row. */
-export async function cableTenants(
-	cable: typeof cables.$inferSelect,
-): Promise<[number | null, number | null]> {
-	const db = getDb()
-	const tenantOf = async (interfaceId: number): Promise<number | null> => {
-		const iface = (
-			await db.select().from(interfaces).where(eq(interfaces.id, interfaceId)).limit(1)
-		)[0]
-		if (!iface) {
-			return null
-		}
-		const device = (
-			await db.select().from(devices).where(eq(devices.id, iface.device_id)).limit(1)
-		)[0]
-		return device?.tenant_id ?? null
-	}
-	return [await tenantOf(cable.a_interface_id), await tenantOf(cable.b_interface_id)]
-}
-
-/** Cable read rule: both endpoints must sit in the scoped tenant. */
-export function canReadCable(user: CurrentUser, tenants: [number | null, number | null]): boolean {
-	return canReadTenant(user, tenants[0]) && canReadTenant(user, tenants[1])
-}
-
-/** Cable write rule: same as read — both endpoints in the scoped tenant. */
-export function canWriteCable(user: CurrentUser, tenants: [number | null, number | null]): boolean {
-	return canReadCable(user, tenants)
+	return checkTenant(c, result.value.tenant_id) ?? c.json(result.value)
 }

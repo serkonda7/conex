@@ -9,7 +9,7 @@ import { fetchMe, login, type SessionUser, setupAdmin } from '../api/auth'
 import { InlineError } from '../components/feedback'
 import { t } from '../i18n'
 
-export const APP_TITLE = 'CoNetBox'
+export const APP_TITLE = 'CoNex'
 
 /** Placeholder-labelled input with a visually hidden `<label>`. */
 function AuthInput(props: {

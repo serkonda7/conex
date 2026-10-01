@@ -23,8 +23,7 @@ import {
 	requirePermissionMiddleware,
 } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendResult } from '../util/result_response'
-import { sendCreated, sendRow } from './helpers'
+import { sendCreated, sendResult } from '../util/result_response'
 
 /**
  * Tenant groups bundle tenants for selection; they own no inventory.
@@ -77,11 +76,11 @@ export const tenantGroupsApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', TenantGroupUpdateSchema, onValidationError),
 		async (c) =>
-			sendRow(c, await updateTenantGroup(c.req.valid('param').id, c.req.valid('json'))),
+			sendResult(c, await updateTenantGroup(c.req.valid('param').id, c.req.valid('json'))),
 	)
 	.delete(
 		'/:id',
 		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
-		async (c) => sendRow(c, await deleteTenantGroup(c.req.valid('param').id)),
+		async (c) => sendResult(c, await deleteTenantGroup(c.req.valid('param').id)),
 	)

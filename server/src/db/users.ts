@@ -1,34 +1,31 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, gt, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import type { UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
-import { auth_states, roles, users } from '../schema'
+import { roles, users } from '../schema'
 import type { CurrentUser, User } from '../types'
 import { normalize_username } from '../util/username'
 import { getDb } from './connection'
-import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
 	checkTenantExists,
-	errOf,
+	findOne,
 	isPatchEmpty,
 	type ListParams,
 	offsetOf,
 	type Page,
 	pageOf,
-	searchPattern,
+	pickDefined,
+	searchCondition,
+	tryWrite,
 } from './list'
 import { checkRoleExists, countGlobalManagers, rolePermissions } from './roles'
 
 export async function getUserByUsername(username: string): Promise<User | null> {
-	const normalized = normalize_username(username)
-	const row = (
-		await getDb().select().from(users).where(eq(users.username, normalized)).limit(1)
-	)[0]
-	return (row as User | null) ?? null
+	return (await findOne(users, eq(users.username, normalize_username(username)))) ?? null
 }
 
-export async function getUserById(id: number): Promise<User | null> {
-	const row = (await getDb().select().from(users).where(eq(users.id, id)).limit(1))[0]
-	return (row as User | null) ?? null
+async function getUserById(id: number): Promise<User | null> {
+	return (await findOne(users, eq(users.id, id))) ?? null
 }
 
 /**
@@ -40,7 +37,7 @@ export async function getCurrentUser(username: string): Promise<CurrentUser | nu
 	if (!user) {
 		return null
 	}
-	const role = (await getDb().select().from(roles).where(eq(roles.id, user.role_id)).limit(1))[0]
+	const role = await findOne(roles, eq(roles.id, user.role_id))
 	return {
 		id: user.id,
 		username: user.username,
@@ -96,16 +93,25 @@ export async function hasAnyUser(): Promise<boolean> {
 // User management (`users.manage` via `routes/users.ts`)
 // ---------------------------------------------------------------------------
 
+/** A user with its role name, as the management API returns it (join `roles`). */
+const USER_JSON_COLUMNS: {
+	id: typeof users.id
+	username: typeof users.username
+	role_id: typeof users.role_id
+	role_name: typeof roles.name
+	tenant_id: typeof users.tenant_id
+} = {
+	id: users.id,
+	username: users.username,
+	role_id: users.role_id,
+	role_name: roles.name,
+	tenant_id: users.tenant_id,
+}
+
 async function getUserJson(id: number): Promise<UserJson | null> {
 	const row = (
 		await getDb()
-			.select({
-				id: users.id,
-				username: users.username,
-				role_id: users.role_id,
-				role_name: roles.name,
-				tenant_id: users.tenant_id,
-			})
+			.select(USER_JSON_COLUMNS)
 			.from(users)
 			.innerJoin(roles, eq(roles.id, users.role_id))
 			.where(eq(users.id, id))
@@ -119,6 +125,8 @@ async function roleManagesUsers(roleId: number): Promise<boolean> {
 	return (await rolePermissions(roleId)).includes('users.manage')
 }
 
+const USERNAME_IN_USE = 'Username is already in use'
+
 const MANAGER_GLOBAL =
 	'Users with the users.manage permission are global and cannot be limited to a tenant'
 
@@ -130,35 +138,20 @@ export interface UserListParams extends ListParams {
 export type UserPage = Page<UserJson>
 
 export async function listUsers(params: UserListParams): Promise<UserPage> {
-	const db = getDb()
-	const pattern = searchPattern(params.search)
-	const conditions: SQL[] = []
-	if (params.search) {
-		conditions.push(sql`${users.username} ILIKE ${pattern} ESCAPE '\\'`)
-	}
-	if (params.role) {
-		conditions.push(eq(users.role_id, params.role))
-	}
-	if (params.tenant) {
-		conditions.push(eq(users.tenant_id, params.tenant))
-	}
-	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const rows = await db
-		.select({
-			id: users.id,
-			username: users.username,
-			role_id: users.role_id,
-			role_name: roles.name,
-			tenant_id: users.tenant_id,
-		})
+	const where = and(
+		searchCondition(params.search, [users.username]),
+		params.role ? eq(users.role_id, params.role) : undefined,
+		params.tenant ? eq(users.tenant_id, params.tenant) : undefined,
+	)
+	const rows = await getDb()
+		.select(USER_JSON_COLUMNS)
 		.from(users)
 		.innerJoin(roles, eq(roles.id, users.role_id))
 		.where(where)
 		.orderBy(asc(users.username))
 		.limit(params.limit)
 		.offset(offsetOf(params))
-	const totalRow = (await db.select({ n: count() }).from(users).where(where).limit(1))[0]
-	return pageOf(rows, totalRow?.n ?? 0, params)
+	return pageOf(rows, await getDb().$count(users, where), params)
 }
 
 export async function getUserResult(id: number): Promise<Result<UserJson, Error>> {
@@ -169,40 +162,47 @@ export async function getUserResult(id: number): Promise<Result<UserJson, Error>
 	return Result.ok(row)
 }
 
+/** FK guards shared by user create/update. */
+async function checkUserInput(input: {
+	tenant_id?: number | null
+	role_id?: number
+}): Promise<Result<undefined, Error>> {
+	const tenantCheck = await checkTenantExists(input.tenant_id)
+	if (Result.isError(tenantCheck) || input.role_id === undefined) {
+		return tenantCheck
+	}
+	return checkRoleExists(input.role_id)
+}
+
 export async function createUser(input: UserCreate): Promise<Result<UserJson, Error>> {
 	const username = normalize_username(input.username)
 	if (!username) {
 		return Result.err(new ConflictError('Username and password are required.'))
 	}
 	if (await getUserByUsername(username)) {
-		return Result.err(new DuplicateError('Username is already in use'))
+		return Result.err(new DuplicateError(USERNAME_IN_USE))
 	}
-	const tenantCheck = await checkTenantExists(input.tenant_id)
-	if (Result.isError(tenantCheck)) {
-		return Result.err(tenantCheck.error)
-	}
-	const roleCheck = await checkRoleExists(input.role_id)
-	if (Result.isError(roleCheck)) {
-		return Result.err(roleCheck.error)
+	const valid = await checkUserInput(input)
+	if (Result.isError(valid)) {
+		return valid
 	}
 	if (input.tenant_id != null && (await roleManagesUsers(input.role_id))) {
 		return Result.err(new ConflictError(MANAGER_GLOBAL))
 	}
-	try {
-		const password_hash = await Bun.password.hash(input.password)
-		const user = await createLocalUser(
-			username,
-			password_hash,
-			input.role_id,
-			input.tenant_id ?? null,
-		)
-		return await getUserResult(user.id)
-	} catch (err) {
-		if (isUniqueViolation(err)) {
-			return Result.err(new DuplicateError('Username is already in use'))
-		}
-		return Result.err(err instanceof Error ? err : new Error(String(err)))
+	const user = await tryWrite(
+		async () =>
+			createLocalUser(
+				username,
+				await Bun.password.hash(input.password),
+				input.role_id,
+				input.tenant_id ?? null,
+			),
+		USERNAME_IN_USE,
+	)
+	if (Result.isError(user)) {
+		return user
 	}
+	return await getUserResult(user.value.id)
 }
 
 export async function updateUser(id: number, input: UserUpdate): Promise<Result<UserJson, Error>> {
@@ -210,17 +210,9 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 	if (!current) {
 		return Result.err(new NotFoundError('User not found'))
 	}
-	if (input.tenant_id !== undefined) {
-		const tenantCheck = await checkTenantExists(input.tenant_id)
-		if (Result.isError(tenantCheck)) {
-			return Result.err(tenantCheck.error)
-		}
-	}
-	if (input.role_id !== undefined) {
-		const roleCheck = await checkRoleExists(input.role_id)
-		if (Result.isError(roleCheck)) {
-			return Result.err(roleCheck.error)
-		}
+	const valid = await checkUserInput(input)
+	if (Result.isError(valid)) {
+		return valid
 	}
 	const effectiveRole = input.role_id ?? current.role_id
 	const effectiveTenant = input.tenant_id !== undefined ? input.tenant_id : current.tenant_id
@@ -237,26 +229,17 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 			new ConflictError('At least one global user must keep the users.manage permission'),
 		)
 	}
-	const patch: { role_id?: number; tenant_id?: number | null; password_hash?: string } = {}
-	if (input.role_id !== undefined) {
-		patch.role_id = input.role_id
-	}
-	if (input.tenant_id !== undefined) {
-		patch.tenant_id = input.tenant_id
-	}
-	if (input.password !== undefined) {
-		try {
+	const written = await tryWrite(async () => {
+		const patch: Partial<User> = pickDefined(input, ['role_id', 'tenant_id'])
+		if (input.password !== undefined) {
 			patch.password_hash = await Bun.password.hash(input.password)
-		} catch (err) {
-			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
-	}
-	if (!isPatchEmpty(patch)) {
-		try {
+		if (!isPatchEmpty(patch)) {
 			await getDb().update(users).set(patch).where(eq(users.id, id))
-		} catch (err) {
-			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
+	})
+	if (Result.isError(written)) {
+		return written
 	}
 	return await getUserResult(id)
 }
@@ -275,52 +258,9 @@ export async function deleteUser(id: number, actorId: number): Promise<Result<Us
 	) {
 		return Result.err(new ConflictError('Cannot delete the last user able to manage users'))
 	}
-	try {
-		await getDb().delete(users).where(eq(users.id, id))
-	} catch (e) {
-		return Result.err(errOf(e))
+	const deleted = await tryWrite(() => getDb().delete(users).where(eq(users.id, id)))
+	if (Result.isError(deleted)) {
+		return deleted
 	}
 	return Result.ok(current)
-}
-
-// ---------------------------------------------------------------------------
-// OAuth-style login states (kept for the session sweep; consumed by future
-// external providers, if any).
-// ---------------------------------------------------------------------------
-
-export async function createAuthState(
-	state: string,
-	verifier: string,
-	expiresAt: number,
-): Promise<void> {
-	await getDb().insert(auth_states).values({ state, verifier, expires_at: expiresAt })
-}
-
-export interface ConsumedAuthState {
-	verifier: string
-}
-
-/**
- * Atomically consumes a state: deletes the row only when it exists
- * and has not expired, returning its verifier.
- *
- * Returns `null` when the state is missing or expired. Expired rows are
- * removed as a side effect so failed callbacks do not accumulate.
- */
-export async function consumeAuthState(
-	state: string,
-	now: number,
-): Promise<ConsumedAuthState | null> {
-	const consumed = (
-		await getDb()
-			.delete(auth_states)
-			.where(and(eq(auth_states.state, state), gt(auth_states.expires_at, now)))
-			.returning({ verifier: auth_states.verifier })
-	)[0]
-	if (consumed) {
-		return consumed
-	}
-	// Missing or expired: drop an expired leftover if present, then report miss.
-	await getDb().delete(auth_states).where(eq(auth_states.state, state))
-	return null
 }

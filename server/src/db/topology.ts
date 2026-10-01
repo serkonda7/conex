@@ -2,11 +2,13 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import type {
 	CableTraceResponse,
+	DeviceTraceResponse,
 	InterfaceTraceResponse,
 	TopologyEdge,
 	TopologyNode,
 	TopologyResponse,
 	TraceHop,
+	TraceLink,
 	TracePath,
 	TracePeerDevice,
 	TracePeerInterface,
@@ -14,7 +16,7 @@ import type {
 import { cables, devices, interfaces, sites } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
-import type { TenantFilterParams } from './list'
+import { exists, type TenantFilterParams } from './list'
 
 type DeviceRow = typeof devices.$inferSelect
 type InterfaceRow = typeof interfaces.$inferSelect
@@ -120,38 +122,39 @@ function hopOf(graph: Graph, fromDeviceId: number, entry: AdjEntry): TraceHop | 
 	}
 }
 
+interface Walk {
+	deviceId: number
+	path: TraceHop[]
+}
+
 /**
- * BFS shortest paths from a source device, up to `depth` cable hops.
- * One path per reachable device (first visit wins = shortest), excluding
- * the source itself. Arrival interface is excluded from onward expansion
+ * Breadth-first expansion shared by the device and interface traces: one
+ * path per newly reached device (first visit wins = shortest), up to
+ * `depth` cable hops. The arrival cable is excluded from onward expansion
  * so paths never bounce straight back down the cable they arrived on.
  */
-export function bfsDevicePaths(graph: Graph, sourceDeviceId: number, depth: number): TracePath[] {
-	const paths: TracePath[] = []
-	const visited = new Set<number>([sourceDeviceId])
-	const queue: Array<{ deviceId: number; path: TraceHop[] }> = [
-		{ deviceId: sourceDeviceId, path: [] },
-	]
+function walkPaths(
+	graph: Graph,
+	queue: Walk[],
+	visited: Set<number>,
+	depth: number,
+	paths: TracePath[],
+): TracePath[] {
 	while (queue.length > 0 && paths.length < MAX_TRACE_PATHS) {
 		const current = queue.shift()
 		if (!current || current.path.length >= depth) {
 			continue
 		}
-		const entries = graph.adj.get(current.deviceId) ?? []
-		const arrivedOnCable =
-			current.path.length > 0 ? current.path[current.path.length - 1]?.cable_id : undefined
-		for (const entry of entries) {
-			if (entry.cable.id === arrivedOnCable) {
-				continue
-			}
-			if (visited.has(entry.peerDeviceId)) {
+		const arrivedOnCable = current.path.at(-1)?.cable_id
+		for (const entry of graph.adj.get(current.deviceId) ?? []) {
+			if (entry.cable.id === arrivedOnCable || visited.has(entry.peerDeviceId)) {
 				continue
 			}
 			const hop = hopOf(graph, current.deviceId, entry)
 			if (!hop) {
 				continue
 			}
-			const next: TraceHop[] = [...current.path, hop]
+			const next = [...current.path, hop]
 			visited.add(entry.peerDeviceId)
 			const end = graph.deviceById.get(entry.peerDeviceId)
 			if (end) {
@@ -168,67 +171,38 @@ export function bfsDevicePaths(graph: Graph, sourceDeviceId: number, depth: numb
 	return paths
 }
 
+/** BFS shortest paths from a source device (the source itself excluded). */
+function bfsDevicePaths(graph: Graph, sourceDeviceId: number, depth: number): TracePath[] {
+	return walkPaths(
+		graph,
+		[{ deviceId: sourceDeviceId, path: [] }],
+		new Set([sourceDeviceId]),
+		depth,
+		[],
+	)
+}
+
 /**
  * BFS shortest paths starting at one interface. The first hop is fixed to
  * that port's cable; onward expansion fans out from the peer device over
  * all of its other cabled ports.
  */
-export function bfsInterfacePaths(
-	graph: Graph,
-	startIface: InterfaceRow,
-	depth: number,
-): TracePath[] {
+function bfsInterfacePaths(graph: Graph, startIface: InterfaceRow, depth: number): TracePath[] {
 	const first = (graph.adj.get(startIface.device_id) ?? []).find(
 		(e) => e.localIface.id === startIface.id,
 	)
-	if (!first) {
-		return []
-	}
-	const firstHop = hopOf(graph, startIface.device_id, first)
-	if (!firstHop) {
+	const firstHop = first ? hopOf(graph, startIface.device_id, first) : null
+	if (!first || !firstHop) {
 		return []
 	}
 	const end = graph.deviceById.get(first.peerDeviceId)
-	const paths: TracePath[] = end ? [{ hops: [firstHop], end_device: peerDeviceOf(end) }] : []
-	if (depth <= 1) {
-		return paths
-	}
-	const visited = new Set<number>([startIface.device_id, first.peerDeviceId])
-	const queue: Array<{ deviceId: number; path: TraceHop[] }> = [
-		{ deviceId: first.peerDeviceId, path: [firstHop] },
-	]
-	while (queue.length > 0 && paths.length < MAX_TRACE_PATHS) {
-		const current = queue.shift()
-		if (!current || current.path.length >= depth) {
-			continue
-		}
-		const arrivedOnCable = current.path[current.path.length - 1]?.cable_id
-		for (const entry of graph.adj.get(current.deviceId) ?? []) {
-			if (entry.cable.id === arrivedOnCable) {
-				continue
-			}
-			if (visited.has(entry.peerDeviceId)) {
-				continue
-			}
-			const hop = hopOf(graph, current.deviceId, entry)
-			if (!hop) {
-				continue
-			}
-			const next = [...current.path, hop]
-			visited.add(entry.peerDeviceId)
-			const target = graph.deviceById.get(entry.peerDeviceId)
-			if (target) {
-				paths.push({ hops: next, end_device: peerDeviceOf(target) })
-			}
-			if (next.length < depth) {
-				queue.push({ deviceId: entry.peerDeviceId, path: next })
-			}
-			if (paths.length >= MAX_TRACE_PATHS) {
-				break
-			}
-		}
-	}
-	return paths
+	return walkPaths(
+		graph,
+		[{ deviceId: first.peerDeviceId, path: [firstHop] }],
+		new Set([startIface.device_id, first.peerDeviceId]),
+		depth,
+		end ? [{ hops: [firstHop], end_device: peerDeviceOf(end) }] : [],
+	)
 }
 
 export interface TopologyParams extends TenantFilterParams {
@@ -247,39 +221,24 @@ export interface TopologyParams extends TenantFilterParams {
  */
 export async function getTopology(params: TopologyParams): Promise<TopologyResponse> {
 	const graph = await loadGraph(params.scopeTenantId)
-	let nodeIds = new Set(graph.deviceById.keys())
-	if (params.tenant !== undefined) {
-		nodeIds = new Set(
-			[...nodeIds].filter((id) => graph.deviceById.get(id)?.tenant_id === params.tenant),
-		)
-	}
-	if (params.tenantIds !== undefined) {
-		const tenantIds = new Set(params.tenantIds)
-		nodeIds = new Set(
-			[...nodeIds].filter((id) => {
-				const tenantId = graph.deviceById.get(id)?.tenant_id
-				return tenantId !== null && tenantId !== undefined && tenantIds.has(tenantId)
-			}),
-		)
-	}
-	if (params.group !== undefined) {
-		const siteIds = new Set(
-			(await getDb().select().from(sites))
-				.filter((s) => s.site_group_id === params.group)
-				.map((s) => s.id),
-		)
-		nodeIds = new Set(
-			[...nodeIds].filter((id) => {
-				const siteId = graph.deviceById.get(id)?.site_id
-				return siteId !== null && siteId !== undefined && siteIds.has(siteId)
-			}),
-		)
-	}
-	if (params.site !== undefined) {
-		nodeIds = new Set(
-			[...nodeIds].filter((id) => graph.deviceById.get(id)?.site_id === params.site),
-		)
-	}
+	const tenantIds = params.tenantIds && new Set(params.tenantIds)
+	const groupSiteIds =
+		params.group === undefined
+			? undefined
+			: new Set(
+					(
+						await getDb()
+							.select({ id: sites.id })
+							.from(sites)
+							.where(eq(sites.site_group_id, params.group))
+					).map((s) => s.id),
+				)
+	const inFilter = (d: DeviceRow): boolean =>
+		(params.tenant === undefined || d.tenant_id === params.tenant) &&
+		(tenantIds === undefined || (d.tenant_id !== null && tenantIds.has(d.tenant_id))) &&
+		(groupSiteIds === undefined || (d.site_id !== null && groupSiteIds.has(d.site_id))) &&
+		(params.site === undefined || d.site_id === params.site)
+	let nodeIds = new Set([...graph.deviceById.values()].filter(inFilter).map((d) => d.id))
 	if (params.device !== undefined) {
 		if (!nodeIds.has(params.device)) {
 			return { nodes: [], edges: [] }
@@ -339,21 +298,54 @@ export async function getTopology(params: TopologyParams): Promise<TopologyRespo
 	return { nodes, edges }
 }
 
-export async function getDevicePaths(
+/** 404 for a device the scoped graph does not hold: out of scope, or missing. */
+async function deviceNotFound(deviceId: number): Promise<NotFoundError> {
+	return new NotFoundError(
+		(await exists(devices, eq(devices.id, deviceId)))
+			? 'Device is outside your tenant scope'
+			: 'Device not found',
+	)
+}
+
+/**
+ * Per-device trace: every local interface carrying a visible cable resolves
+ * to its peer as `dev:port <-> dev:port`, plus the depth-limited multi-hop
+ * shortest paths. Scoped callers only traverse cables with both ends in
+ * their tenant; a device outside the scope answers with no links or paths.
+ */
+export async function getDeviceTrace(
 	deviceId: number,
 	depth: number,
 	scopeTenantId?: number,
-): Promise<Result<TracePath[], Error>> {
+): Promise<Result<DeviceTraceResponse, Error>> {
 	const graph = await loadGraph(scopeTenantId)
 	if (!graph.deviceById.has(deviceId)) {
-		const exists = (
-			await getDb().select().from(devices).where(eq(devices.id, deviceId)).limit(1)
-		)[0]
-		return Result.err(
-			new NotFoundError(exists ? 'Device is outside your tenant scope' : 'Device not found'),
-		)
+		if (!(await exists(devices, eq(devices.id, deviceId)))) {
+			return Result.err(new NotFoundError('Device not found'))
+		}
+		return Result.ok({ device_id: deviceId, links: [], paths: [] })
 	}
-	return Result.ok(bfsDevicePaths(graph, deviceId, depth))
+	const links: TraceLink[] = []
+	for (const entry of graph.adj.get(deviceId) ?? []) {
+		const peerDevice = graph.deviceById.get(entry.peerDeviceId)
+		if (peerDevice) {
+			links.push({
+				cable_id: entry.cable.id,
+				cable_label: entry.cable.label,
+				cable_status: entry.cable.status,
+				local_interface: peerIfaceOf(entry.localIface),
+				peer_device: peerDeviceOf(peerDevice),
+				peer_interface: peerIfaceOf(entry.peerIface),
+			})
+		}
+	}
+	links.sort((a, b) => a.local_interface.id - b.local_interface.id)
+	const boundedDepth = Math.min(Math.max(Math.floor(depth), 1), 10)
+	return Result.ok({
+		device_id: deviceId,
+		links,
+		paths: bfsDevicePaths(graph, deviceId, boundedDepth),
+	})
 }
 
 export async function getInterfaceTrace(
@@ -365,12 +357,7 @@ export async function getInterfaceTrace(
 	const graph = await loadGraph(scopeTenantId)
 	const device = graph.deviceById.get(deviceId)
 	if (!device) {
-		const exists = (
-			await getDb().select().from(devices).where(eq(devices.id, deviceId)).limit(1)
-		)[0]
-		return Result.err(
-			new NotFoundError(exists ? 'Device is outside your tenant scope' : 'Device not found'),
-		)
+		return Result.err(await deviceNotFound(deviceId))
 	}
 	const iface = graph.ifaceById.get(ifaceId)
 	if (!iface || iface.device_id !== deviceId) {
@@ -391,12 +378,11 @@ export async function getCableTrace(
 	const graph = await loadGraph(scopeTenantId)
 	const cable = graph.cableById.get(cableId)
 	if (!cable) {
-		const exists = (
-			await getDb().select().from(cables).where(eq(cables.id, cableId)).limit(1)
-		)[0]
 		return Result.err(
 			new NotFoundError(
-				exists ? 'Cable endpoints are outside your tenant scope' : 'Cable not found',
+				(await exists(cables, eq(cables.id, cableId)))
+					? 'Cable endpoints are outside your tenant scope'
+					: 'Cable not found',
 			),
 		)
 	}

@@ -11,7 +11,7 @@ import { createUser, deleteUser, getUserResult, listUsers, updateUser } from '..
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sendCreated, sendRow } from './helpers'
+import { sendCreated, sendResult } from '../util/result_response'
 
 /**
  * User management (`users.manage`): create accounts with a role, change
@@ -39,16 +39,16 @@ export const usersApp = new Hono()
 		return sendCreated(c, await createUser(c.req.valid('json')))
 	})
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		return sendRow(c, await getUserResult(c.req.valid('param').id))
+		return sendResult(c, await getUserResult(c.req.valid('param').id))
 	})
 	.patch(
 		'/:id',
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', UserUpdateSchema, onValidationError),
 		async (c) => {
-			return sendRow(c, await updateUser(c.req.valid('param').id, c.req.valid('json')))
+			return sendResult(c, await updateUser(c.req.valid('param').id, c.req.valid('json')))
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		return sendRow(c, await deleteUser(c.req.valid('param').id, requestUser(c).id))
+		return sendResult(c, await deleteUser(c.req.valid('param').id, requestUser(c).id))
 	})

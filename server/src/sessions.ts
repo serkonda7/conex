@@ -1,4 +1,4 @@
-import { eq, lte, or } from 'drizzle-orm'
+import { and, eq, gt, lte, or } from 'drizzle-orm'
 import { sign } from 'hono/jwt'
 import type { CookieOptions } from 'hono/utils/cookie'
 import { SESSION_ABSOLUTE_TIMEOUT_S, SESSION_IDLE_TIMEOUT_S } from 'shared/src/session'
@@ -22,22 +22,6 @@ export function getSessionCookieOpts(): CookieOptions {
 	}
 }
 
-/**
- * Cookie options for the short-lived OAuth state cookie. Shares the secure
- * flag with the session cookie; SameSite=Lax (not Strict) so the browser
- * sends it back on the top-level redirect from the identity provider.
- * Deletions must mirror these flags or the cookie survives logout.
- */
-export function getStateCookieOpts(maxAgeSeconds: number): CookieOptions {
-	return {
-		httpOnly: true,
-		secure: getConfig().auth.secureCookies,
-		sameSite: 'Lax',
-		path: '/',
-		maxAge: maxAgeSeconds,
-	}
-}
-
 export const SESSION_SWEEP_INTERVAL_MS = 60 * 60 * 1000
 
 export async function createSession(userId: number): Promise<string> {
@@ -57,32 +41,29 @@ export async function createSession(userId: number): Promise<string> {
 	return id
 }
 
-export async function isValidSession(sid: string): Promise<boolean> {
-	const session = (await getDb().select().from(sessions).where(eq(sessions.id, sid)).limit(1))[0]
-	if (!session) {
-		return false
-	}
-
-	const now = nowSeconds()
-	if (session.expires_at <= now || session.last_seen_at + SESSION_IDLE_TIMEOUT_S <= now) {
-		await getDb().delete(sessions).where(eq(sessions.id, sid))
-		return false
-	}
-	return true
-}
-
 /**
- * Validates the session and refreshes its idle window in a single query round
- * trip. Returns false when the session is missing or expired (expired rows are
- * removed as a side effect). Callers must not check `isValidSession()` first —
- * that would query the same row twice per request.
+ * Validates the session and refreshes its idle window in one UPDATE.
+ * Returns false when the session is missing or expired (an expired row is
+ * removed as a side effect).
  */
 export async function touchSession(sid: string): Promise<boolean> {
-	if (!(await isValidSession(sid))) {
-		return false
+	const now = nowSeconds()
+	const touched = await getDb()
+		.update(sessions)
+		.set({ last_seen_at: now })
+		.where(
+			and(
+				eq(sessions.id, sid),
+				gt(sessions.expires_at, now),
+				gt(sessions.last_seen_at, now - SESSION_IDLE_TIMEOUT_S),
+			),
+		)
+		.returning({ id: sessions.id })
+	if (touched.length > 0) {
+		return true
 	}
-	await getDb().update(sessions).set({ last_seen_at: nowSeconds() }).where(eq(sessions.id, sid))
-	return true
+	await invalidateSession(sid)
+	return false
 }
 
 export async function invalidateSession(sid: string): Promise<void> {
