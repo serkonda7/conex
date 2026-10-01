@@ -5,6 +5,7 @@ import { SESSION_ABSOLUTE_TIMEOUT_S, SESSION_IDLE_TIMEOUT_S } from 'shared/src/s
 import { getConfig } from './config'
 import { getDb } from './db'
 import { pruneAuditLog } from './db/audit'
+import { pruneChangelog } from './db/changelog'
 import { getSigningKey } from './keys'
 import { JWT_ALGO, type JwtPayload } from './middleware/auth'
 import { auth_states, sessions } from './schema'
@@ -90,7 +91,7 @@ export async function invalidateSession(sid: string): Promise<void> {
 
 /**
  * Removes expired sessions and PKCE states in one scheduled sweep, plus
- * audit log entries past their retention.
+ * audit log and changelog entries past their retention.
  */
 export async function sweepExpired(): Promise<number> {
 	const now = nowSeconds()
@@ -111,7 +112,8 @@ export async function sweepExpired(): Promise<number> {
 		return sessionsRemoved + statesRemoved
 	})
 	const auditRemoved = await pruneAuditLog(now)
-	return removed + auditRemoved
+	const changesRemoved = await pruneChangelog(now)
+	return removed + auditRemoved + changesRemoved
 }
 
 export async function get_signed_jwt(user: User): Promise<string> {

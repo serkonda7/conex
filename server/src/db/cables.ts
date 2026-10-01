@@ -2,6 +2,7 @@ import { Result } from 'better-result'
 import { and, asc, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm'
 import type { CableCreate, CableUpdate, DeviceTraceResponse, TraceLink } from 'shared/src/schemas'
 import { cables, devices, interfaces } from '../schema'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import type { InterfaceRow } from './devices'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -167,7 +168,7 @@ export async function connectCable(input: CableCreate): Promise<Result<CableRow,
 	if (cableId === undefined) {
 		return Result.err(new Error('Cable insert did not return an id'))
 	}
-	return await getCable(cableId)
+	return await logCreate('cable', await getCable(cableId))
 }
 
 export async function updateCable(
@@ -201,7 +202,7 @@ export async function updateCable(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getCable(id)
+	return await logUpdate('cable', current.value, await getCable(id))
 }
 
 /**
@@ -230,7 +231,7 @@ export async function deleteCable(id: number): Promise<Result<CableRow, Error>> 
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(cable)
+	return await logDelete('cable', cable)
 }
 
 /** True when any cable touches an interface of the device (blocks device delete). */

@@ -57,7 +57,7 @@ export interface PageMeta {
 	crumbs?: readonly Crumb[]
 }
 
-const DEFAULT_PATH = '/tenants'
+const DEFAULT_PATH = '/dashboard'
 const STORAGE_KEY = 'conex:tabs'
 
 let nextTabId = 1

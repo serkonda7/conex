@@ -608,6 +608,12 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 }
 
+/* Standalone row above the groups: icon in the link, aligned with group labels
+   (padding override below `.app-nav-item > a`). */
+.app-nav-top {
+	margin-bottom: 0.3rem;
+}
+
 .app-nav a.active,
 .app-nav-item.active {
 	background-color: var(--bg-raised);
@@ -632,6 +638,10 @@ tbody tr:last-child td {
 	padding: 0.25rem 0.5rem 0.25rem calc(0.5rem + 16px + 0.45rem);
 	border: none;
 	background: transparent;
+}
+
+.app-nav-top > a {
+	padding-left: 0.5rem;
 }
 
 .app-nav-item:hover {
@@ -2630,4 +2640,35 @@ a.rack-shelf-plate:hover {
 		position: static;
 		padding-top: 0;
 	}
+}
+
+/* Dashboard: responsive grid of widget cards. */
+.dashboard-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
+	gap: 0.8rem;
+	align-items: start;
+}
+
+.dashboard-widget {
+	margin: 0;
+	min-width: 0;
+}
+
+.dashboard-widget h3 {
+	margin-top: 0;
+}
+
+/* Changelog before/after table: changed values tinted red (old) / green (new). */
+.app-content .changelog-diff td {
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+
+.app-content .changelog-diff .diff-removed {
+	background-color: var(--error-bg);
+}
+
+.app-content .changelog-diff .diff-added {
+	background-color: color-mix(in srgb, var(--success) 16%, transparent);
 }

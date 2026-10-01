@@ -21,6 +21,7 @@ import {
 import { checkBounds, checkOverlap } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
 import { deviceHasCables } from './cables'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { checkDeviceRoleExists } from './device_roles'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -448,7 +449,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 	if (deviceId === undefined) {
 		return Result.err(new Error('Device insert did not return an id'))
 	}
-	return await getDevice(deviceId)
+	return await logCreate('device', await getDevice(deviceId))
 }
 
 export async function updateDevice(
@@ -576,7 +577,7 @@ export async function updateDevice(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getDevice(id)
+	return await logUpdate('device', current.value, await getDevice(id))
 }
 
 /**
@@ -630,7 +631,7 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 	} catch (err) {
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
-	return await getDevice(id)
+	return await logUpdate('device', current.value, await getDevice(id))
 }
 
 export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>> {
@@ -658,7 +659,7 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('device', current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -793,7 +794,7 @@ export async function addInterface(
 		if (!inserted) {
 			return Result.err(new Error('Interface insert did not return an id'))
 		}
-		return await getInterface(deviceId, inserted.id)
+		return await logCreate('interface', await getInterface(deviceId, inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -852,5 +853,5 @@ export async function updateInterface(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getInterface(deviceId, ifaceId)
+	return await logUpdate('interface', current.value, await getInterface(deviceId, ifaceId))
 }

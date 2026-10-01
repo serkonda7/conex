@@ -10,6 +10,7 @@ import type {
 } from 'shared/src/schemas'
 import { device_types, devices, locations, racks, shelves, sites } from '../schema'
 import { checkBounds, getOccupancy, type OccupantSpan } from '../services/occupancy'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
@@ -337,7 +338,7 @@ export async function createRack(input: RackCreate): Promise<Result<RackRow, Err
 		if (!inserted) {
 			return Result.err(new Error('Rack insert did not return an id'))
 		}
-		return await getRack(inserted.id)
+		return await logCreate('rack', await getRack(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Rack name is already in use'))
@@ -418,7 +419,7 @@ export async function updateRack(id: number, input: RackUpdate): Promise<Result<
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getRack(id)
+	return await logUpdate('rack', current.value, await getRack(id))
 }
 
 export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
@@ -439,7 +440,7 @@ export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('rack', current.value)
 }
 
 /** Ordered U map of a rack, top-down (highest U first). */

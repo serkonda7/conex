@@ -14,6 +14,8 @@ import {
 	IconCpu,
 	IconFolder,
 	IconHistory,
+	IconLayoutDashboard,
+	IconListDetails,
 	IconLocation,
 	IconLock,
 	IconMapPin,
@@ -28,6 +30,9 @@ import type { Component } from 'solid-js'
 import { t, tp } from '../i18n'
 import { type Crumb, pageMetaFor, parseId, routeSegments } from '../lib/router'
 import { AuditLogPage } from '../pages/audit_log/list'
+import { ChangeDetailPage } from '../pages/changelog/detail'
+import { ChangelogPage } from '../pages/changelog/list'
+import { DashboardPage } from '../pages/dashboard/view'
 import { DeviceTypeDetailPage } from '../pages/device_types/detail'
 import { DeviceTypeAddPage, DeviceTypeEditPage } from '../pages/device_types/form'
 import { DeviceTypeImportPage } from '../pages/device_types/import'
@@ -97,6 +102,13 @@ export interface Section {
 
 /** Every routed section; the first one is the home page. Sidebar grouping lives in `sidebar.tsx`. */
 export const SECTIONS: readonly Section[] = [
+	{
+		path: 'dashboard',
+		noun: (): string => t('entity.dashboard'),
+		icon: IconLayoutDashboard,
+		hideAddInNav: true,
+		list: DashboardPage,
+	},
 	{
 		path: 'tenants',
 		noun: (n: number): string => tp('entity.tenant', n),
@@ -239,6 +251,14 @@ export const SECTIONS: readonly Section[] = [
 		adminOnly: true,
 		hideAddInNav: true,
 		list: AuditLogPage,
+	},
+	{
+		path: 'changelog',
+		noun: (n: number): string => tp('entity.changelog', n),
+		icon: IconListDetails,
+		hideAddInNav: true,
+		list: ChangelogPage,
+		detail: ChangeDetailPage,
 	},
 ]
 

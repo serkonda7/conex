@@ -19,7 +19,7 @@ import { Loading } from '../components/feedback'
 import { type Locale, locale, t } from '../i18n'
 import { activeTabId, goTo, type TabState, tabs } from '../lib/router'
 import { setSessionRole, setSessionScoped } from '../lib/session'
-import { refreshTenantContext, setTenantContextScoped, tenantContext } from '../lib/tenant_context'
+import { refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { RouteContent } from './route_content'
 import { Sidebar } from './sidebar'
@@ -56,11 +56,6 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	const isScoped = (): boolean => !isAdmin() && props.user.tenant_id !== null
 	// Tenant create is limited to global editors and admins (server-enforced).
 	const canAddTenants = (): boolean => isAdmin() || (props.user.role === 'editor' && !isScoped())
-	const tenantHomePath = (): string => {
-		const context = tenantContext()
-		const id = context.kind === 'tenant' ? context.id : props.user.tenant_id
-		return id === null ? '/tenants' : `/tenants/${id}`
-	}
 
 	createEffect(() => {
 		setSessionRole(props.user.role)
@@ -78,7 +73,7 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 			<header class="app-topbar">
 				<TenantContextSelector scoped={isScoped()} canAdd={canAddTenants()} />
 				<div class="app-topbar-actions">
-					<a href={tenantHomePath()} class="app-topbar-brand">
+					<a href="/dashboard" class="app-topbar-brand">
 						{APP_TITLE}
 					</a>
 				</div>

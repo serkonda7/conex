@@ -1,6 +1,7 @@
 import { Result } from 'better-result'
 import { and, asc, count, desc, eq, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
 import type {
+	ChangeObjectType,
 	DeviceTypeCreate,
 	DeviceTypeUpdate,
 	ManufacturerCreate,
@@ -12,6 +13,7 @@ import { slugify } from 'shared/src/slug'
 import { device_type_interfaces, device_types, devices, manufacturers, racks } from '../schema'
 import { checkBounds, checkOverlap } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
@@ -21,6 +23,11 @@ import { deviceSpansOf, rackHeightOf } from './racks'
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
 export type StubRow = typeof device_type_interfaces.$inferSelect
+
+/** Rack types share the device type table; a form factor marks them. */
+function typeKindOf(row: DeviceTypeRow): ChangeObjectType {
+	return row.form_factor === null ? 'device_type' : 'rack_type'
+}
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -92,7 +99,7 @@ export async function createManufacturer(
 		if (!inserted) {
 			return Result.err(new Error('Manufacturer insert did not return an id'))
 		}
-		return await getManufacturer(inserted.id)
+		return await logCreate('manufacturer', await getManufacturer(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Manufacturer slug or name is already in use'))
@@ -156,7 +163,7 @@ export async function updateManufacturer(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getManufacturer(id)
+	return await logUpdate('manufacturer', current.value, await getManufacturer(id))
 }
 
 export async function deleteManufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
@@ -181,7 +188,7 @@ export async function deleteManufacturer(id: number): Promise<Result<Manufacture
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('manufacturer', current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +293,7 @@ export async function createDeviceType(
 		if (!inserted) {
 			return Result.err(new Error('Device type insert did not return an id'))
 		}
-		return await getDeviceType(inserted.id)
+		return await logCreate(typeKindOf, await getDeviceType(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Device type already exists'))
@@ -427,7 +434,7 @@ export async function updateDeviceType(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getDeviceType(id)
+	return await logUpdate(typeKindOf, current.value, await getDeviceType(id))
 }
 
 export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>> {
@@ -453,7 +460,7 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete(typeKindOf, current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -562,7 +569,7 @@ export async function createStub(
 		if (!inserted) {
 			return Result.err(new Error('Stub insert did not return an id'))
 		}
-		return await getStub(inserted.id)
+		return await logCreate('interface_template', await getStub(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(
@@ -623,7 +630,7 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getStub(id)
+	return await logUpdate('interface_template', current.value, await getStub(id))
 }
 
 export async function deleteStub(id: number): Promise<Result<StubRow, Error>> {
@@ -636,5 +643,5 @@ export async function deleteStub(id: number): Promise<Result<StubRow, Error>> {
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('interface_template', current.value)
 }

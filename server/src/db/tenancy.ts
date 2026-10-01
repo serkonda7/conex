@@ -31,6 +31,7 @@ import {
 	depthOf,
 	maxDescendantOffset,
 } from '../services/hierarchy'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import {
@@ -235,7 +236,7 @@ export async function createTenantGroup(
 		if (!inserted) {
 			return Result.err(new Error('Tenant group insert did not return an id'))
 		}
-		return await getTenantGroup(inserted.id)
+		return await logCreate('tenant_group', await getTenantGroup(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Tenant group slug is already in use'))
@@ -275,7 +276,7 @@ export async function updateTenantGroup(
 			return Result.err(errOf(err))
 		}
 	}
-	return await getTenantGroup(id)
+	return await logUpdate('tenant_group', current.value, await getTenantGroup(id))
 }
 
 export async function deleteTenantGroup(id: number): Promise<Result<TenantGroupRow, Error>> {
@@ -297,7 +298,7 @@ export async function deleteTenantGroup(id: number): Promise<Result<TenantGroupR
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('tenant_group', current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +423,7 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantRo
 		if (!inserted) {
 			return Result.err(new Error('Tenant insert did not return an id'))
 		}
-		return await getTenant(inserted.id)
+		return await logCreate('tenant', await getTenant(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(duplicateTenantError(err))
@@ -474,7 +475,7 @@ export async function updateTenant(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getTenant(id)
+	return await logUpdate('tenant', current.value, await getTenant(id))
 }
 
 export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>> {
@@ -523,7 +524,7 @@ export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('tenant', current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -609,7 +610,7 @@ export async function createSite(input: SiteCreate): Promise<Result<SiteRow, Err
 		if (!inserted) {
 			return Result.err(new Error('Site insert did not return an id'))
 		}
-		return await getSite(inserted.id)
+		return await logCreate('site', await getSite(inserted.id))
 	} catch (err) {
 		return Result.err(err instanceof Error ? err : new Error(String(err)))
 	}
@@ -662,7 +663,7 @@ export async function updateSite(id: number, input: SiteUpdate): Promise<Result<
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getSite(id)
+	return await logUpdate('site', current.value, await getSite(id))
 }
 
 export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
@@ -685,7 +686,7 @@ export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('site', current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -779,7 +780,7 @@ export async function createSiteGroup(
 		if (!inserted) {
 			return Result.err(new Error('Site group insert did not return an id'))
 		}
-		return await getSiteGroup(inserted.id)
+		return await logCreate('site_group', await getSiteGroup(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Site group slug is already in use'))
@@ -828,7 +829,7 @@ export async function updateSiteGroup(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getSiteGroup(id)
+	return await logUpdate('site_group', current.value, await getSiteGroup(id))
 }
 
 export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, Error>> {
@@ -848,7 +849,7 @@ export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, 
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('site_group', current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,7 +1027,7 @@ export async function createLocation(input: LocationCreate): Promise<Result<Loca
 		if (!inserted) {
 			return Result.err(new Error('Location insert did not return an id'))
 		}
-		return await getLocation(inserted.id)
+		return await logCreate('location', await getLocation(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Location slug is already used under this parent'))
@@ -1112,7 +1113,7 @@ export async function updateLocation(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getLocation(id)
+	return await logUpdate('location', current.value, await getLocation(id))
 }
 
 export async function deleteLocation(id: number): Promise<Result<LocationRow, Error>> {
@@ -1139,5 +1140,5 @@ export async function deleteLocation(id: number): Promise<Result<LocationRow, Er
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('location', current.value)
 }

@@ -1024,6 +1024,72 @@ export interface AuditLogEntryJson {
 }
 
 // ---------------------------------------------------------------------------
+// Changelog (NetBox-style object change history, read-only)
+// ---------------------------------------------------------------------------
+
+export const CHANGE_ACTIONS = ['create', 'update', 'delete'] as const
+
+export const ChangeActionSchema = v.picklist(CHANGE_ACTIONS)
+
+export type ChangeAction = v.InferOutput<typeof ChangeActionSchema>
+
+export const CHANGE_OBJECT_TYPES = [
+	'tenant_group',
+	'tenant',
+	'site_group',
+	'site',
+	'location',
+	'rack',
+	'shelf',
+	'device',
+	'interface',
+	'cable',
+	'manufacturer',
+	'device_type',
+	'rack_type',
+	'interface_template',
+	'device_role',
+] as const
+
+export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)
+
+export type ChangeObjectType = v.InferOutput<typeof ChangeObjectTypeSchema>
+
+/** `search` matches the object name or the username; newest changes first. */
+export const ChangelogListQuerySchema = v.object({
+	...ListQueryEntries,
+	action: v.optional(ChangeActionSchema, undefined),
+	object_type: v.optional(ChangeObjectTypeSchema, undefined),
+	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
+})
+
+export type ChangelogListQuery = v.InferOutput<typeof ChangelogListQuerySchema>
+
+export interface ObjectChangeJson {
+	id: number
+	/** Unix seconds. */
+	created_at: number
+	/** Null once the user was deleted, or for changes made by the system. */
+	user_id: number | null
+	/** Name at the time of the change; empty for system changes. */
+	username: string
+	/** Shared by every change one request made. */
+	request_id: string | null
+	action: ChangeAction
+	object_type: ChangeObjectType
+	object_id: number
+	/** Object name at the time of the change. */
+	object_repr: string
+	/** Tenant of the object; null for catalog data and cross-tenant cables. */
+	tenant_id: number | null
+	/** Object state before the change; null for creations. */
+	prechange_data: Record<string, unknown> | null
+	/** Object state after the change; null for deletions. */
+	postchange_data: Record<string, unknown> | null
+}
+
+// ---------------------------------------------------------------------------
 // P6: global search / CSV import
 // ---------------------------------------------------------------------------
 

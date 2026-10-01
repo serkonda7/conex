@@ -1,6 +1,7 @@
 import { getCookie } from 'hono/cookie'
 import { createMiddleware } from 'hono/factory'
 import { verify } from 'hono/jwt'
+import { runAsActor } from '../db/changelog'
 import { getUserByUsername } from '../db/users'
 import { getSigningKey } from '../keys'
 import { touchSession } from '../sessions'
@@ -44,7 +45,11 @@ export const authMiddleware = createMiddleware<{
 
 		c.set('jwtPayload', payload)
 		c.set('currentUser', toCurrentUser(user))
-		await next()
+		// Changes recorded while handling this request are attributed to the user.
+		await runAsActor(
+			{ user_id: user.id, username: user.username, request_id: crypto.randomUUID() },
+			next,
+		)
 	} catch (_e) {
 		return jsonError(c, 'Unauthorized', 401)
 	}

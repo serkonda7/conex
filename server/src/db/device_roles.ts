@@ -2,6 +2,7 @@ import { Result } from 'better-result'
 import { asc, count, desc, eq, sql } from 'drizzle-orm'
 import type { DeviceRoleCreate, DeviceRoleUpdate } from 'shared/src/schemas'
 import { device_roles, devices } from '../schema'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
@@ -81,7 +82,7 @@ export async function createDeviceRole(
 		if (!inserted) {
 			return Result.err(new Error('Device role insert did not return an id'))
 		}
-		return await getDeviceRole(inserted.id)
+		return await logCreate('device_role', await getDeviceRole(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Device role name is already in use'))
@@ -128,7 +129,7 @@ export async function updateDeviceRole(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getDeviceRole(id)
+	return await logUpdate('device_role', current.value, await getDeviceRole(id))
 }
 
 export async function deleteDeviceRole(id: number): Promise<Result<DeviceRoleRow, Error>> {
@@ -149,5 +150,5 @@ export async function deleteDeviceRole(id: number): Promise<Result<DeviceRoleRow
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('device_role', current.value)
 }

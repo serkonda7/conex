@@ -7,6 +7,10 @@
 import {
 	AUDIT_EVENTS,
 	type AuditEvent,
+	CHANGE_ACTIONS,
+	CHANGE_OBJECT_TYPES,
+	type ChangeAction,
+	type ChangeObjectType,
 	type DeviceCompareField,
 	type FindingKind,
 	type IntegrationProvider,
@@ -90,6 +94,52 @@ export function auditEventLabel(value: string): string {
 /** `<select>` options for every audit log event. */
 export function auditEventOptions(): { value: AuditEvent; label: string }[] {
 	return AUDIT_EVENTS.map((value) => ({ value, label: auditEventLabel(value) }))
+}
+
+const CHANGE_ACTION_KEYS: Record<ChangeAction, MessageKey> = {
+	create: 'changeAction.create',
+	update: 'changeAction.update',
+	delete: 'changeAction.delete',
+}
+
+/** Changelog action (`create` / `update` / `delete`). */
+export function changeActionLabel(value: string): string {
+	return lookup(CHANGE_ACTION_KEYS, value)
+}
+
+/** `<select>` options for every changelog action. */
+export function changeActionOptions(): { value: ChangeAction; label: string }[] {
+	return CHANGE_ACTIONS.map((value) => ({ value, label: changeActionLabel(value) }))
+}
+
+const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
+	tenant_group: 'changeObject.tenantGroup',
+	tenant: 'changeObject.tenant',
+	site_group: 'changeObject.siteGroup',
+	site: 'changeObject.site',
+	location: 'changeObject.location',
+	rack: 'changeObject.rack',
+	shelf: 'changeObject.shelf',
+	device: 'changeObject.device',
+	interface: 'changeObject.interface',
+	cable: 'changeObject.cable',
+	manufacturer: 'changeObject.manufacturer',
+	device_type: 'changeObject.deviceType',
+	rack_type: 'changeObject.rackType',
+	interface_template: 'changeObject.interfaceTemplate',
+	device_role: 'changeObject.deviceRole',
+}
+
+/** Changelog object type (`device`, `rack_type`, …). */
+export function changeObjectLabel(value: string): string {
+	return lookup(CHANGE_OBJECT_KEYS, value)
+}
+
+/** `<select>` options for every changelog object type, sorted by label. */
+export function changeObjectOptions(): { value: ChangeObjectType; label: string }[] {
+	return CHANGE_OBJECT_TYPES.map((value) => ({ value, label: changeObjectLabel(value) })).sort(
+		(a, b) => a.label.localeCompare(b.label),
+	)
 }
 
 const ROLE_KEYS: Record<UserRole, MessageKey> = {

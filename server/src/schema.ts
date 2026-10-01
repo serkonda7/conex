@@ -539,3 +539,40 @@ export const sync_runs = pgTable(
 	},
 	(table) => [index('sync_runs_provider_idx').on(table.provider, table.started_at)],
 )
+
+// ---------------------------------------------------------------------------
+// Changelog (NetBox-style): one row per create/update/delete of an
+// inventory object, written by the service layer. `object_type` and
+// `action` are service-enforced (`ChangeObjectTypeSchema`,
+// `ChangeActionSchema`); `object_id` is polymorphic (no FK) and the
+// snapshots outlive the object. `username` keeps the actor's name so the
+// row stays readable after the user is deleted; both are empty/NULL for
+// changes made without a signed-in user. `request_id` groups the changes
+// of one request. `tenant_id` is the tenant the object belonged to (after
+// the change, or before a delete) and decides which tenant-scoped users see
+// the row; NULL for catalog data and cables spanning tenants. No FK: a
+// tenant's own delete is recorded after the row is gone.
+// ---------------------------------------------------------------------------
+
+export const object_changes = pgTable(
+	'object_changes',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		created_at: bigint('created_at', { mode: 'number' }).notNull(),
+		user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+		username: text('username').notNull(),
+		request_id: text('request_id'),
+		action: text('action').notNull(),
+		object_type: text('object_type').notNull(),
+		object_id: integer('object_id').notNull(),
+		object_repr: text('object_repr').notNull(),
+		tenant_id: integer('tenant_id'),
+		prechange_data: jsonb('prechange_data'),
+		postchange_data: jsonb('postchange_data'),
+	},
+	(table) => [
+		index('object_changes_created_at_idx').on(table.created_at),
+		index('object_changes_object_idx').on(table.object_type, table.object_id),
+		index('object_changes_tenant_id_idx').on(table.tenant_id),
+	],
+)

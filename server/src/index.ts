@@ -7,6 +7,7 @@ import { failInterruptedSyncs } from './integrations/sync'
 import { auditLogApp } from './routes/audit_log'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
+import { changelogApp } from './routes/changelog'
 import { deviceRolesApp } from './routes/device_roles'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
@@ -67,6 +68,7 @@ export function createApp() {
 			.route('/auth', authApp)
 			.route('/users', usersApp)
 			.route('/audit-log', auditLogApp)
+			.route('/changelog', changelogApp)
 			.route('/tenants', tenantsApp)
 			.route('/tenant-groups', tenantGroupsApp)
 			.route('/sites', sitesApp)

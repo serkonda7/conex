@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, type SQL, sql } from 'drizzle-orm'
 import type { ShelfCreate, ShelfUpdate } from 'shared/src/schemas'
 import { devices, racks, shelves } from '../schema'
 import { checkBounds, checkOverlap } from '../services/occupancy'
+import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { ConflictError, isUniqueViolation, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
@@ -189,7 +190,7 @@ export async function createShelf(input: ShelfCreate): Promise<Result<ShelfRow, 
 		if (!inserted) {
 			return Result.err(new Error('Shelf insert did not return an id'))
 		}
-		return await getShelf(inserted.id)
+		return await logCreate('shelf', await getShelf(inserted.id))
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new ConflictError('Shelf name is already in use'))
@@ -303,7 +304,7 @@ export async function updateShelf(
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	return await getShelf(id)
+	return await logUpdate('shelf', current.value, await getShelf(id))
 }
 
 export async function deleteShelf(id: number): Promise<Result<ShelfRow, Error>> {
@@ -320,5 +321,5 @@ export async function deleteShelf(id: number): Promise<Result<ShelfRow, Error>> 
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(current.value)
+	return await logDelete('shelf', current.value)
 }
