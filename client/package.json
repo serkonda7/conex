@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "solid-devtools": "~0.34.3",
-    "vite": "~8.3.1",
+    "vite": "~8.3.2",
     "vite-plugin-entry-shaking": "~0.5.2",
     "vite-plugin-solid": "~2.11.14"
   },
