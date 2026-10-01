@@ -18,7 +18,10 @@ import {
 	updateTenantGroup,
 } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
-import { requireGlobalWriteMiddleware } from '../middleware/roles'
+import {
+	requireGlobalPermissionMiddleware,
+	requirePermissionMiddleware,
+} from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 import { sendCreated, sendRow } from './helpers'
@@ -30,6 +33,7 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const tenantGroupsApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', TenantGroupListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		const scope = scopeTenantId(requestUser(c))
@@ -46,7 +50,7 @@ export const tenantGroupsApp = new Hono()
 	})
 	.post(
 		'/',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('json', TenantGroupCreateSchema, onValidationError),
 		async (c) => sendCreated(c, await createTenantGroup(c.req.valid('json'))),
 	)
@@ -69,7 +73,7 @@ export const tenantGroupsApp = new Hono()
 	})
 	.patch(
 		'/:id',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', TenantGroupUpdateSchema, onValidationError),
 		async (c) =>
@@ -77,7 +81,7 @@ export const tenantGroupsApp = new Hono()
 	)
 	.delete(
 		'/:id',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => sendRow(c, await deleteTenantGroup(c.req.valid('param').id)),
 	)

@@ -24,7 +24,7 @@ import { Empty, InlineError, Loading } from '../../components/feedback'
 import { t, tp } from '../../i18n'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { canWrite } from '../../lib/session'
+import { can } from '../../lib/session'
 
 const DEFAULT_STUB_COUNT = '24'
 
@@ -142,7 +142,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			</DetailShell>
 
 			<h3 id="device-type-stubs">{t('deviceType.stubs', { count: stubs()?.length ?? 0 })}</h3>
-			<Show when={canWrite()}>
+			<Show when={can('edit')}>
 				<form onSubmit={handleCreateStub}>
 					<input
 						placeholder={t('deviceType.stubPrefixPlaceholder')}
@@ -165,7 +165,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				getRowId={(s: StubRow): number => s.id}
 				columns={stubColumns}
 				showColumnCustomizer
-				rowActions={canWrite() ? stubActions : undefined}
+				rowActions={can('delete') ? stubActions : undefined}
 				loading={() => stubs.loading}
 				loadingContent={<Loading message={t('deviceType.loadingStubs')} />}
 				emptyContent={<Empty message={t('deviceType.noStubs')} />}

@@ -23,7 +23,7 @@ import { connectCable, deleteCable, getCable, listCables, updateCable } from '..
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
 import { getCableTrace } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
-import { requireWriteMiddleware } from '../middleware/roles'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
@@ -36,6 +36,7 @@ import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
  */
 export const cablesApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', CableListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {
@@ -71,7 +72,7 @@ export const cablesApp = new Hono()
 	})
 	.post(
 		'/',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('json', CableCreateSchema, onValidationError),
 		async (c) => {
 			const body = c.req.valid('json')
@@ -92,7 +93,7 @@ export const cablesApp = new Hono()
 	})
 	.post(
 		'/import',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('json', CsvImportBodySchema, onValidationError),
 		async (c) => {
 			const scope = scopeTenantId(requestUser(c))
@@ -132,7 +133,7 @@ export const cablesApp = new Hono()
 	})
 	.patch(
 		'/:id',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', CableUpdateSchema, onValidationError),
 		async (c) => {
@@ -149,7 +150,7 @@ export const cablesApp = new Hono()
 	)
 	.delete(
 		'/:id',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id

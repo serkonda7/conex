@@ -10,7 +10,7 @@ import { Result } from 'better-result'
 import { type JSX, type Resource, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
 import { type Crumb, forgetDeleted, navigate, usePageMeta } from '../lib/router'
-import { canWrite } from '../lib/session'
+import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, Loading } from './feedback'
 import { IconLabel } from './icon_label'
@@ -40,7 +40,8 @@ export function DetailShell(props: {
 }
 
 /**
- * Title header with the Edit / Delete action pair (hidden when read-only).
+ * Title header with the Edit / Delete actions, each shown only with the
+ * matching permission.
  * `extra` follows the name inside the heading (e.g. the rack height).
  */
 export function DetailHeader(props: {
@@ -61,14 +62,18 @@ export function DetailHeader(props: {
 				</Show>
 				<Show when={props.extra}> {props.extra}</Show>
 			</h2>
-			<Show when={canWrite()}>
+			<Show when={can('edit') || can('delete')}>
 				<div class="form-actions">
-					<button type="button" onClick={() => navigate(props.editHref)}>
-						<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
-					</button>
-					<button type="button" class="btn-danger" onClick={props.onDelete}>
-						<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
-					</button>
+					<Show when={can('edit')}>
+						<button type="button" onClick={() => navigate(props.editHref)}>
+							<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
+						</button>
+					</Show>
+					<Show when={can('delete')}>
+						<button type="button" class="btn-danger" onClick={props.onDelete}>
+							<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
+						</button>
+					</Show>
 				</div>
 			</Show>
 		</div>

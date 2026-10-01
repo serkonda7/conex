@@ -6,7 +6,8 @@
  * of inline in components, so endpoint paths and `{ error }` parsing exist once.
  */
 import type { Result } from 'better-result'
-import type { Role } from 'shared/src/types'
+import { PERMISSIONS } from 'shared/src/schemas'
+import type { Permission } from 'shared/src/types'
 import { t } from '../i18n'
 import { post_json } from './client'
 
@@ -49,10 +50,11 @@ export async function setupAdmin(username: string, password: string): Promise<Re
 	return res.map(() => undefined)
 }
 
-/** Current session identity: username plus the RBAC role and tenant scope. */
+/** Current session identity: username, role, its permissions and the tenant scope. */
 export interface SessionUser {
 	username: string
-	role: Role
+	role: { id: number; name: string }
+	permissions: Permission[]
 	tenant_id: number | null
 }
 
@@ -69,10 +71,15 @@ export async function fetchMe(): Promise<SessionUser | null> {
 		}
 		return {
 			username: data.username,
-			role:
-				data.role === 'admin' || data.role === 'editor' || data.role === 'viewer'
-					? data.role
-					: 'viewer',
+			role: {
+				id: typeof data.role?.id === 'number' ? data.role.id : 0,
+				name: typeof data.role?.name === 'string' ? data.role.name : '',
+			},
+			permissions: Array.isArray(data.permissions)
+				? data.permissions.filter((p: unknown): p is Permission =>
+						(PERMISSIONS as readonly unknown[]).includes(p),
+					)
+				: [],
 			tenant_id: typeof data.tenant_id === 'number' ? data.tenant_id : null,
 		}
 	} catch {

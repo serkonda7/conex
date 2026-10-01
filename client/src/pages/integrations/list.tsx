@@ -17,7 +17,7 @@ import { t, tp } from '../../i18n'
 import { providerLabel, syncStateLabel } from '../../i18n/labels'
 import { createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
-import { canWrite, canWriteGlobal, isAdmin } from '../../lib/session'
+import { can, canGlobal } from '../../lib/session'
 import { formatTime } from '../../lib/time'
 
 /** Login state: disabled, the last error, or when it last connected. */
@@ -76,13 +76,13 @@ function IntegrationActions(props: {
 		props.syncing !== null || props.integration.last_sync?.state === 'running'
 	return (
 		<div class="form-actions">
-			<Show when={canWrite()}>
+			<Show when={can('integrations.manage')}>
 				<button type="button" disabled={busy()} onClick={() => props.onSync(false)}>
 					<IconLabel icon={IconRefresh}>
 						{running() ? t('integration.syncing') : t('integration.syncNow')}
 					</IconLabel>
 				</button>
-				<Show when={canWriteGlobal()}>
+				<Show when={canGlobal('integrations.manage')}>
 					<button type="button" disabled={busy()} onClick={() => props.onSync(true)}>
 						<IconLabel icon={IconRefresh}>
 							{running() ? t('integration.syncing') : t('integration.forceFullSync')}
@@ -90,7 +90,7 @@ function IntegrationActions(props: {
 					</button>
 				</Show>
 			</Show>
-			<Show when={isAdmin()}>
+			<Show when={can('integrations.manage')}>
 				<button
 					type="button"
 					onClick={() => navigate(`/integrations/${props.integration.id}/edit`)}
@@ -191,7 +191,7 @@ export function IntegrationsPage(): JSX.Element {
 				<Show
 					when={configured(provider)}
 					fallback={
-						<Show when={isAdmin()}>
+						<Show when={can('integrations.manage')}>
 							<button
 								type="button"
 								class="btn-add"

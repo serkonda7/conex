@@ -23,8 +23,8 @@ import {
 	deviceTenant,
 	listTenantScope,
 	requestUser,
-	requireGlobalWrite,
-	requireWrite,
+	requireGlobalPermission,
+	requirePermission,
 	scopeTenantId,
 } from '../authz'
 import { getDb } from '../db/connection'
@@ -52,7 +52,7 @@ import {
 } from '../integrations/store'
 import { getSyncRun, startSync } from '../integrations/sync'
 import { authMiddleware } from '../middleware/auth'
-import { requireAdminMiddleware } from '../middleware/roles'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { tenants } from '../schema'
 import { jsonError } from '../util/http'
@@ -87,18 +87,22 @@ async function checkExternalDeviceWrite(
 }
 
 /**
- * Integrations: admins configure and list providers (credentials verified
- * before saving, secrets never returned). Links of tenants are global-write like
- * tenants themselves; device links follow the device's tenant scope.
+ * Integrations: `integrations.manage` configures and lists providers
+ * (credentials verified before saving, secrets never returned), runs syncs
+ * and edits links; the reports and boards only need `view`. Links of
+ * tenants are global-write like tenants themselves; device links follow the
+ * device's tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers.
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
-	.get('/', requireAdminMiddleware, async (c) => c.json(await listIntegrations()))
+	.get('/', requirePermissionMiddleware('integrations.manage'), async (c) =>
+		c.json(await listIntegrations()),
+	)
 	.post(
 		'/',
-		requireAdminMiddleware,
+		requirePermissionMiddleware('integrations.manage'),
 		vValidator('json', IntegrationCreateSchema, onValidationError),
 		async (c) => {
 			const created = await createIntegration(c.req.valid('json'), requestUser(c).id)
@@ -111,13 +115,13 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider',
-		requireAdminMiddleware,
+		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		async (c) => sendRow(c, await getIntegration(c.req.valid('param').provider)),
 	)
 	.patch(
 		'/:provider',
-		requireAdminMiddleware,
+		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', IntegrationUpdateSchema, onValidationError),
 		async (c) =>
@@ -125,13 +129,13 @@ export const integrationsApp = new Hono()
 	)
 	.delete(
 		'/:provider',
-		requireAdminMiddleware,
+		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		async (c) => sendRow(c, await deleteIntegration(c.req.valid('param').provider)),
 	)
 	.post(
 		'/:provider/test',
-		requireAdminMiddleware,
+		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', IntegrationTestSchema, onValidationError),
 		async (c) => {
@@ -147,18 +151,20 @@ export const integrationsApp = new Hono()
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', IntegrationSyncQuerySchema, onValidationError),
 		async (c) => {
-			const denied = requireWrite(c)
+			// Syncs create and update inventory, so they need `edit` as well.
+			const denied =
+				requirePermission(c, 'integrations.manage') ?? requirePermission(c, 'edit')
 			if (denied) {
 				return denied
 			}
 			const query = c.req.valid('query')
 			if (query.clean === 'true') {
-				const globalDenied = requireGlobalWrite(c)
+				const globalDenied = requireGlobalPermission(c, 'integrations.manage')
 				if (globalDenied) {
 					return globalDenied
 				}
 			}
-			// Scoped editors may only sync their own tenant.
+			// Scoped users may only sync their own tenant.
 			const scope = scopeTenantId(requestUser(c))
 			const queryTenant = query.tenant
 			if (scope !== null && queryTenant !== undefined && queryTenant !== scope) {
@@ -174,6 +180,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider/sync/:id',
+		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
@@ -182,6 +189,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider/tenants',
+		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', ExternalTenantQuerySchema, onValidationError),
 		async (c) => {
@@ -233,6 +241,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider/report',
+		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', IntegrationReportQuerySchema, onValidationError),
 		async (c) => {
@@ -255,6 +264,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider/board',
+		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', LinkBoardQuerySchema, onValidationError),
 		async (c) => {
@@ -297,6 +307,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider/tenant-status/:id',
+		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
@@ -319,6 +330,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider/device-status/:id',
+		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
@@ -346,7 +358,7 @@ export const integrationsApp = new Hono()
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
 			if (input.entity_type === 'tenant') {
-				const denied = requireGlobalWrite(c)
+				const denied = requireGlobalPermission(c, 'integrations.manage')
 				if (denied) {
 					return denied
 				}
@@ -372,7 +384,7 @@ export const integrationsApp = new Hono()
 				)
 				return sendRow(c, res.map(linkJson))
 			}
-			const denied = requireWrite(c)
+			const denied = requirePermission(c, 'integrations.manage')
 			if (denied) {
 				return denied
 			}
@@ -414,7 +426,7 @@ export const integrationsApp = new Hono()
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
 			if (input.entity_type === 'tenant') {
-				const denied = requireGlobalWrite(c)
+				const denied = requireGlobalPermission(c, 'integrations.manage')
 				if (denied) {
 					return denied
 				}
@@ -431,7 +443,7 @@ export const integrationsApp = new Hono()
 				)
 				return sendRow(c, res.map(linkJson))
 			}
-			const denied = requireWrite(c)
+			const denied = requirePermission(c, 'integrations.manage')
 			if (denied) {
 				return denied
 			}
@@ -468,12 +480,12 @@ export const integrationsApp = new Hono()
 			}
 			const row = link.value
 			if (row.entity_type === 'tenant') {
-				const denied = requireGlobalWrite(c)
+				const denied = requireGlobalPermission(c, 'integrations.manage')
 				if (denied) {
 					return denied
 				}
 			} else {
-				const denied = requireWrite(c)
+				const denied = requirePermission(c, 'integrations.manage')
 				if (denied) {
 					return denied
 				}

@@ -4,11 +4,12 @@ import { ChangelogListQuerySchema, EntityParamsSchema } from 'shared/src/schemas
 import { listTenantScope, sendTenantRow } from '../authz'
 import { getObjectChange, listChangelog } from '../db/changelog'
 import { authMiddleware } from '../middleware/auth'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendRow } from './helpers'
 
 /**
- * Changelog: read-only. Every entry carries the tenant of its object, so
+ * Changelog: `changelog.view`, read-only. Every entry carries the tenant of its object, so
  * tenant-scoped users see their own tenant's changes only (no catalog or
  * cross-tenant entries); global users see all and may narrow by
  * `?tenant=` / `?tenant_group=`. Entries are written by the service layer
@@ -16,6 +17,7 @@ import { sendRow } from './helpers'
  */
 export const changelogApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('changelog.view'))
 	.get('/', vValidator('query', ChangelogListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		const scope = await listTenantScope(c, query.tenant, query.tenant_group)

@@ -7,7 +7,7 @@ import { submit_form, useEntityForm } from '../../lib/form'
 import { IntegrationFormFields, secrets, useIntegrationForm } from './form_fields'
 
 /**
- * /integrations/:id/edit — admin-only. Blank secrets keep the stored ones;
+ * /integrations/:id/edit — `integrations.manage` only. Blank secrets keep the stored ones;
  * changing URL or credentials logs in again before saving.
  */
 export function IntegrationEditPage(props: { id: number }): JSX.Element {

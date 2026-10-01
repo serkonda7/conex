@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { SQL } from 'bun'
 import { closeDb, getDb, getSqlClient, initDb } from '../../server/src/db/connection'
+import { fullAccessRoleId } from '../../server/src/db/roles'
 import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
 import {
 	device_roles,
@@ -245,7 +246,7 @@ if (e2eSite && e2eRackType) {
 }
 
 if (!(await getUserByUsername(username))) {
-	await createLocalUser(username, await Bun.password.hash(password))
+	await createLocalUser(username, await Bun.password.hash(password), await fullAccessRoleId())
 }
 
 await closeDb()

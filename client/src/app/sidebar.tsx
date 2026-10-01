@@ -16,11 +16,9 @@ import type { Component } from 'solid-js'
 import { createEffect, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
 import type { SessionUser } from '../api/auth'
 import { type MessageKey, t } from '../i18n'
-import { roleLabel } from '../i18n/labels'
 import { goTo, path } from '../lib/router'
-import { canWrite } from '../lib/session'
 import { LanguageSwitcher } from './language_switcher'
-import { routeSection, SECTIONS, type Section } from './routes'
+import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
 /** Hover shortcut next to a nav row; without `href` a disabled placeholder. */
 function NavShortcut(props: {
@@ -93,7 +91,7 @@ function NavItem(props: { section: Section; topLevel?: boolean }): JSX.Element {
 				</Show>
 				{label()}
 			</a>
-			<Show when={canWrite()}>
+			<Show when={canAddInSection(props.section)}>
 				<Show when={props.section.hideAddInNav !== true}>
 					<NavShortcut
 						href={addHref()}
@@ -152,7 +150,7 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 					<span class="app-user-username">{name()}</span>
 					<Show when={props.user}>
 						{(user: () => SessionUser) => (
-							<span class="app-user-role">{roleLabel(user().role)}</span>
+							<span class="app-user-role">{user().role.name}</span>
 						)}
 					</Show>
 				</span>
@@ -208,7 +206,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.administration',
 		icon: IconSettings,
-		paths: ['integrations', 'users', 'audit-log'],
+		paths: ['integrations', 'users', 'roles', 'audit-log'],
 	},
 ]
 
@@ -220,7 +218,7 @@ const NAV_PARENT: Record<string, string> = {
 }
 
 /** Sections shown in a sidebar group: routed lists with an icon. */
-function navSections(paths: readonly string[], isAdmin: boolean): Section[] {
+function navSections(paths: readonly string[]): Section[] {
 	return paths
 		.map((p) => SECTIONS.find((section) => section.path === p))
 		.filter(
@@ -229,7 +227,7 @@ function navSections(paths: readonly string[], isAdmin: boolean): Section[] {
 				section.icon !== undefined &&
 				section.list !== undefined &&
 				section.hideInNav !== true &&
-				(section.adminOnly !== true || isAdmin),
+				canOpenSection(section),
 		)
 }
 
@@ -285,13 +283,12 @@ export function Sidebar(props: { user: SessionUser | null; onLogout: () => void 
 	return (
 		<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
 			<nav class="app-nav">
-				<For each={navSections(NAV_TOP, props.user?.role === 'admin')}>
+				<For each={navSections(NAV_TOP)}>
 					{(section: Section): JSX.Element => <NavItem section={section} topLevel />}
 				</For>
 				<For each={NAV_GROUPS}>
 					{(group: NavGroup): JSX.Element => {
-						const sections = (): Section[] =>
-							navSections(group.paths, props.user?.role === 'admin')
+						const sections = (): Section[] => navSections(group.paths)
 						return (
 							<Show when={sections().length > 0}>
 								<NavGroupSection group={group} sections={sections()} />

@@ -6,20 +6,14 @@ import { Breadcrumbs } from './breadcrumbs'
 import { matchRoute, type RouteMatch, routeCrumbs } from './routes'
 
 /** Page content for one tab; `routePath` is that tab's own path. */
-export function RouteContent(props: {
-	routePath: string
-	tabId: number
-	isAdmin: boolean
-}): JSX.Element {
+export function RouteContent(props: { routePath: string; tabId: number }): JSX.Element {
 	const TabContext = tabPathContext()
-	// A pane remounts whenever its tab's path changes, so only an admin-role
+	// A pane remounts whenever its tab's path changes, so only a permission
 	// change can re-resolve the route: keep the page mounted unless the
 	// resolved page itself differs.
-	const match = createMemo(
-		(): RouteMatch | null => matchRoute(props.routePath, props.isAdmin),
-		undefined,
-		{ equals: (a: RouteMatch | null, b: RouteMatch | null): boolean => a?.page === b?.page },
-	)
+	const match = createMemo((): RouteMatch | null => matchRoute(props.routePath), undefined, {
+		equals: (a: RouteMatch | null, b: RouteMatch | null): boolean => a?.page === b?.page,
+	})
 	// Tabs stay mounted in the background, so autofocus-on-mount only fires
 	// on first visit. Refocus the page's autofocus target on activation, but
 	// leave focus alone when it is already inside this tab (e.g. switching

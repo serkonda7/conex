@@ -7,7 +7,7 @@ import { submit_form, useFormState } from '../../lib/form'
 import { IntegrationFormFields, useIntegrationForm } from './form_fields'
 
 /**
- * /integrations/add — admin-only TANSS setup. Saving logs in to TANSS
+ * /integrations/add — TANSS setup (`integrations.manage`). Saving logs in to TANSS
  * first; the integration is only stored when the credentials work.
  */
 export function IntegrationAddPage(): JSX.Element {

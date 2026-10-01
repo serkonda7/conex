@@ -50,11 +50,13 @@ const TABLES: { table: PgTable; parentKey?: string }[] = [
  * Nullable columns added after the SQLite era: absent in the snapshot and
  * left NULL in Postgres. `devices.device_role_id` is required in Postgres,
  * so device rows are backfilled to a seeded `Unknown` role instead (see the
- * copy step below).
+ * copy step below). `users.role_id` replaces the SQLite `role` text column
+ * and is mapped onto the roles seeded by the Postgres migrations.
  */
 const POSTGRES_ONLY_COLUMNS: Record<string, readonly string[]> = {
 	tenants: ['tenant_group_id'],
 	devices: ['device_role_id'],
+	users: ['role_id'],
 }
 
 /**
@@ -65,6 +67,14 @@ const POSTGRES_ONLY_COLUMNS: Record<string, readonly string[]> = {
  */
 const SQLITE_ONLY_COLUMNS: Record<string, readonly string[]> = {
 	site_groups: ['parent_id'],
+	users: ['role'],
+}
+
+/** SQLite `users.role` value → name of the role seeded by `0012_roles.sql`. */
+const LEGACY_ROLE_NAMES: Record<string, string> = {
+	admin: 'Admin',
+	editor: 'Editor',
+	viewer: 'Viewer',
 }
 
 type Row = Record<string, unknown>
@@ -159,6 +169,11 @@ try {
 		const values = rows.map((row) => {
 			const out: Row = {}
 			for (const [column, value] of Object.entries(row)) {
+				if (name === 'users' && column === 'role') {
+					// Resolved to `role_id` in the copy step.
+					out.role = value
+					continue
+				}
 				if (sqliteOnly.has(column)) {
 					continue
 				}
@@ -208,6 +223,24 @@ try {
 				console.log(`  ${name.padEnd(24)} 1 row (seeded)`)
 				// The identity sequence already advanced past the seeded id.
 				continue
+			} else if (name === 'users') {
+				const roleRows = await tx
+					.select({ id: schema.roles.id, name: schema.roles.name })
+					.from(schema.roles)
+				const roleIdByName = new Map(roleRows.map((r) => [r.name, r.id]))
+				rows = values.map(({ role, ...userRow }) => {
+					const roleName = LEGACY_ROLE_NAMES[String(role)] ?? 'Viewer'
+					const roleId = roleIdByName.get(roleName)
+					if (roleId === undefined) {
+						fail(`roles has no seeded "${roleName}" role to map users onto`)
+					}
+					return {
+						...userRow,
+						role_id: roleId,
+						// Admins were always global.
+						tenant_id: role === 'admin' ? null : userRow.tenant_id,
+					}
+				})
 			} else if (name === 'devices') {
 				if (unknownRoleId === null) {
 					const existing = (

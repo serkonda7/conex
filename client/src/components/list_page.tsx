@@ -32,7 +32,7 @@ import { Portal } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
 import { use_visible_columns } from '../lib/column_visibility'
 import { navigate, queryParam } from '../lib/router'
-import { canWrite } from '../lib/session'
+import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, InlineError, Loading } from './feedback'
 
@@ -315,10 +315,10 @@ export function useEntityList<
 		selected,
 		selection: {
 			get selected(): Accessor<number[]> | undefined {
-				return canWrite() ? selected : undefined
+				return can('delete') ? selected : undefined
 			},
 			get onSelectionChange(): ((ids: (string | number)[]) => void) | undefined {
-				return canWrite()
+				return can('delete')
 					? (ids: (string | number)[]): void => {
 							setSelected(ids.map(Number))
 						}
@@ -408,7 +408,8 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		const name = props.rowName(row)
 		return (
 			<ListRowActions
-				edit_href={props.editHref?.(row)}
+				edit_href={can('edit') ? props.editHref?.(row) : undefined}
+				deletable={can('delete')}
 				name={name}
 				menu_open={openMenu()?.id === row.id}
 				onToggleMenu={(e: MouseEvent & { currentTarget: HTMLButtonElement }): void =>
@@ -459,7 +460,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				selected={bulk() ? list.selection.selected : undefined}
 				onSelectionChange={bulk() ? list.selection.onSelectionChange : undefined}
 				selectionLabel={list.selection.selectionLabel}
-				rowActions={canWrite() ? rowActions : undefined}
+				rowActions={can('edit') || can('delete') ? rowActions : undefined}
 				loading={() => list.page.loading}
 				loadingContent={<Loading message={t('list.loading', { noun: nouns() })} />}
 				emptyContent={<Empty message={emptyMessage()} />}
@@ -513,8 +514,8 @@ export function FilterSelect(props: {
 /**
  * List title (or sibling-list `tabs`) plus the "+ Add" button. `actions` renders extra header buttons
  * (e.g. the device-type Import button) beside "+ Add" inside a
- * `page-header-actions` wrapper. Both are write actions, hidden for
- * read-only sessions.
+ * `page-header-actions` wrapper. Both are write actions, hidden without
+ * the `edit` permission.
  */
 export function ListPageHeader(props: {
 	title: string
@@ -534,7 +535,7 @@ export function ListPageHeader(props: {
 					<ListTabs title={props.title} tabs={tabs()} />
 				)}
 			</Show>
-			<Show when={canWrite()}>
+			<Show when={can('edit')}>
 				<Show when={props.actions !== undefined} fallback={addButton}>
 					<div class="page-header-actions">
 						{addButton}
@@ -571,7 +572,7 @@ export function ListSearchField(props: {
 /** "Delete N selected" toolbar button, visible only with a selection. */
 export function BulkDeleteButton(props: { count: number; onClick: () => void }): JSX.Element {
 	return (
-		<Show when={props.count > 0 && canWrite()}>
+		<Show when={props.count > 0 && can('delete')}>
 			<button type="button" class="btn-danger" onClick={props.onClick}>
 				{t('list.deleteSelected', { count: props.count })}
 			</button>
@@ -582,10 +583,12 @@ export function BulkDeleteButton(props: { count: number; onClick: () => void }):
 /**
  * Per-row edit button plus the row-menu toggle. `edit_href` is optional:
  * lists without an edit page (rack types) render the menu toggle only.
+ * `deletable: false` drops the menu toggle (its only item is Delete).
  * `name` is the row's display name used in the button labels.
  */
 export function ListRowActions(props: {
 	edit_href?: string
+	deletable?: boolean
 	name: string
 	menu_open: boolean
 	onToggleMenu: (e: MouseEvent & { currentTarget: HTMLButtonElement }) => void
@@ -606,23 +609,25 @@ export function ListRowActions(props: {
 					</button>
 				)}
 			</Show>
-			<div class="row-menu-wrap">
-				<button
-					type="button"
-					class="icon-btn"
-					aria-label={t('common.moreActionsFor', { name: props.name })}
-					aria-haspopup="menu"
-					aria-expanded={props.menu_open}
-					onClick={props.onToggleMenu}
-					onKeyDown={(e: KeyboardEvent): void => {
-						if (e.key === 'Escape') {
-							props.onCloseMenu()
-						}
-					}}
-				>
-					<IconDotsVertical size={16} />
-				</button>
-			</div>
+			<Show when={props.deletable !== false}>
+				<div class="row-menu-wrap">
+					<button
+						type="button"
+						class="icon-btn"
+						aria-label={t('common.moreActionsFor', { name: props.name })}
+						aria-haspopup="menu"
+						aria-expanded={props.menu_open}
+						onClick={props.onToggleMenu}
+						onKeyDown={(e: KeyboardEvent): void => {
+							if (e.key === 'Escape') {
+								props.onCloseMenu()
+							}
+						}}
+					>
+						<IconDotsVertical size={16} />
+					</button>
+				</div>
+			</Show>
 		</div>
 	)
 }

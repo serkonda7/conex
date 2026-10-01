@@ -18,7 +18,7 @@ import { set_unauthorized_handler } from '../api/client'
 import { Loading } from '../components/feedback'
 import { type Locale, locale, t } from '../i18n'
 import { activeTabId, goTo, type TabState, tabs } from '../lib/router'
-import { setSessionRole, setSessionScoped } from '../lib/session'
+import { setSessionAccess } from '../lib/session'
 import { refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { RouteContent } from './route_content'
@@ -49,23 +49,22 @@ function onLinkClick(e: MouseEvent): void {
 	}
 }
 
-/** Signed-in layout; `user` drives the role-dependent parts. */
+/** Signed-in layout; `user` drives the permission-dependent parts. */
 function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Element {
-	const isAdmin = (): boolean => props.user.role === 'admin'
-	// Editors/viewers limited to one tenant: the context selector is fixed.
-	const isScoped = (): boolean => !isAdmin() && props.user.tenant_id !== null
-	// Tenant create is limited to global editors and admins (server-enforced).
-	const canAddTenants = (): boolean => isAdmin() || (props.user.role === 'editor' && !isScoped())
+	// Users limited to one tenant: the context selector is fixed.
+	const isScoped = (): boolean => props.user.tenant_id !== null
+	// Tenant create is limited to global users with `edit` (server-enforced).
+	const canAddTenants = (): boolean => props.user.permissions.includes('edit') && !isScoped()
 
 	createEffect(() => {
-		setSessionRole(props.user.role)
-		setSessionScoped(isScoped())
+		setSessionAccess({ permissions: props.user.permissions, scoped: isScoped() })
 		setTenantContextScoped(isScoped())
-		void refreshTenantContext()
+		if (props.user.permissions.includes('view')) {
+			void refreshTenantContext()
+		}
 	})
 	onCleanup(() => {
-		setSessionRole(null)
-		setSessionScoped(false)
+		setSessionAccess({ permissions: [], scoped: false })
 	})
 
 	return (
@@ -91,11 +90,7 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 									hidden={tab.id !== activeTabId()}
 									aria-hidden={tab.id !== activeTabId()}
 								>
-									<RouteContent
-										routePath={tab.path}
-										tabId={tab.id}
-										isAdmin={isAdmin()}
-									/>
+									<RouteContent routePath={tab.path} tabId={tab.id} />
 								</div>
 							)}
 						</For>

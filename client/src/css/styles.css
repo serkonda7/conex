@@ -1083,9 +1083,23 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
-.field > label {
+.field > label,
+.field > .field-group-label {
 	padding-top: 0.35rem;
 	text-align: right;
+}
+
+.field-fieldset {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.field-group-label {
+	font-size: var(--font-size-base);
+	font-weight: 600;
+	color: var(--text);
 }
 
 .field-control {
@@ -1200,7 +1214,8 @@ tbody tr:last-child td {
 		grid-template-columns: 1fr;
 	}
 
-	.field > label {
+	.field > label,
+	.field > .field-group-label {
 		padding-top: 0;
 		text-align: left;
 	}

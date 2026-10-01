@@ -11,7 +11,7 @@ import { checkRead, requestUser, scopeTenantId } from '../authz'
 import { ForbiddenError } from '../db/errors'
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
-import { requireWriteMiddleware } from '../middleware/roles'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 import { sendCreated, sendRow } from './helpers'
@@ -24,6 +24,7 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const tenantsApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', TenantListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		const scope = scopeTenantId(requestUser(c))
@@ -41,7 +42,7 @@ export const tenantsApp = new Hono()
 	})
 	.post(
 		'/',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('json', TenantCreateSchema, onValidationError),
 		async (c) => {
 			if (scopeTenantId(requestUser(c)) !== null) {
@@ -67,7 +68,7 @@ export const tenantsApp = new Hono()
 	})
 	.patch(
 		'/:id',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', TenantUpdateSchema, onValidationError),
 		async (c) => {
@@ -82,7 +83,7 @@ export const tenantsApp = new Hono()
 	)
 	.delete(
 		'/:id',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			if (scopeTenantId(requestUser(c)) !== null) {

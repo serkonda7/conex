@@ -69,7 +69,8 @@ export function LoginPage(props: { onLogin: (user: SessionUser) => void }): JSX.
 		setPassword('')
 		const fallback: SessionUser = {
 			username: username().trim(),
-			role: 'viewer',
+			role: { id: 0, name: '' },
+			permissions: [],
 			tenant_id: null,
 		}
 		props.onLogin((await fetchMe()) ?? fallback)
@@ -138,7 +139,14 @@ export function SetupPage(props: {
 			setError(res.error.message)
 			return
 		}
-		props.onDone({ username: name, role: 'admin', tenant_id: null })
+		props.onDone(
+			(await fetchMe()) ?? {
+				username: name,
+				role: { id: 0, name: '' },
+				permissions: [],
+				tenant_id: null,
+			},
+		)
 	}
 
 	return (

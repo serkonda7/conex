@@ -1,6 +1,6 @@
-import type { Role } from 'shared/src/schemas'
+import type { Permission } from 'shared/src/schemas'
 
-export type { Role }
+export type { Permission }
 
 export interface User {
 	id: number
@@ -8,22 +8,21 @@ export interface User {
 	password_hash: string | null
 	provider: string
 	provider_id: string | null
-	role: Role
+	role_id: number
 	tenant_id: number | null
 }
 
 /**
  * Authenticated requester attached to the context by `authMiddleware`.
- * `tenant_id = null` means global (all tenants); a number limits editors
- * and viewers to that single tenant. Admins ignore tenant scope.
+ * `permissions` come from the user's role, loaded per request.
+ * `tenant_id = null` means global (all tenants); a number limits the user
+ * to that single tenant (never set for `users.manage` holders).
  */
 export interface CurrentUser {
 	id: number
 	username: string
-	role: Role
+	role_id: number
+	role_name: string
+	permissions: ReadonlySet<Permission>
 	tenant_id: number | null
-}
-
-export function toCurrentUser(user: User): CurrentUser {
-	return { id: user.id, username: user.username, role: user.role, tenant_id: user.tenant_id }
 }

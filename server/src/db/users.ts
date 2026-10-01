@@ -1,8 +1,8 @@
 import { Result } from 'better-result'
 import { and, asc, count, eq, gt, type SQL, sql } from 'drizzle-orm'
-import type { Role, UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
-import { auth_states, users } from '../schema'
-import type { User } from '../types'
+import type { UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
+import { auth_states, roles, users } from '../schema'
+import type { CurrentUser, User } from '../types'
 import { normalize_username } from '../util/username'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -16,6 +16,7 @@ import {
 	pageOf,
 	searchPattern,
 } from './list'
+import { checkRoleExists, countGlobalManagers, rolePermissions } from './roles'
 
 export async function getUserByUsername(username: string): Promise<User | null> {
 	const normalized = normalize_username(username)
@@ -31,14 +32,30 @@ export async function getUserById(id: number): Promise<User | null> {
 }
 
 /**
- * Direct local-user insert. Defaults to `admin` so first-run setup and the
- * pre-roles single-user installs keep full access; the `/users` route passes
- * an explicit role for every account it creates.
+ * Requester identity for `authMiddleware`: the user row plus its role's
+ * name and permissions, read live so role edits apply immediately.
  */
+export async function getCurrentUser(username: string): Promise<CurrentUser | null> {
+	const user = await getUserByUsername(username)
+	if (!user) {
+		return null
+	}
+	const role = (await getDb().select().from(roles).where(eq(roles.id, user.role_id)).limit(1))[0]
+	return {
+		id: user.id,
+		username: user.username,
+		role_id: user.role_id,
+		role_name: role?.name ?? '',
+		permissions: new Set(await rolePermissions(user.role_id)),
+		tenant_id: user.tenant_id,
+	}
+}
+
+/** Direct local-user insert (first-run setup and the `/users` route). */
 export async function createLocalUser(
 	username: string,
 	passwordHash: string,
-	role: Role = 'admin',
+	roleId: number,
 	tenantId: number | null = null,
 ): Promise<User> {
 	const normalizedUsername = normalize_username(username)
@@ -50,7 +67,7 @@ export async function createLocalUser(
 				password_hash: passwordHash,
 				provider: 'local',
 				provider_id: null,
-				role,
+				role_id: roleId,
 				tenant_id: tenantId,
 			})
 			.returning({ id: users.id })
@@ -64,7 +81,7 @@ export async function createLocalUser(
 		password_hash: passwordHash,
 		provider: 'local',
 		provider_id: null,
-		role,
+		role_id: roleId,
 		tenant_id: tenantId,
 	}
 }
@@ -76,15 +93,37 @@ export async function hasAnyUser(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// User management (admin-only via `routes/users.ts`)
+// User management (`users.manage` via `routes/users.ts`)
 // ---------------------------------------------------------------------------
 
-export function toUserJson(row: User): UserJson {
-	return { id: row.id, username: row.username, role: row.role, tenant_id: row.tenant_id }
+async function getUserJson(id: number): Promise<UserJson | null> {
+	const row = (
+		await getDb()
+			.select({
+				id: users.id,
+				username: users.username,
+				role_id: users.role_id,
+				role_name: roles.name,
+				tenant_id: users.tenant_id,
+			})
+			.from(users)
+			.innerJoin(roles, eq(roles.id, users.role_id))
+			.where(eq(users.id, id))
+			.limit(1)
+	)[0]
+	return row ?? null
 }
 
+/** True when the role grants `users.manage` (such users must be global). */
+async function roleManagesUsers(roleId: number): Promise<boolean> {
+	return (await rolePermissions(roleId)).includes('users.manage')
+}
+
+const MANAGER_GLOBAL =
+	'Users with the users.manage permission are global and cannot be limited to a tenant'
+
 export interface UserListParams extends ListParams {
-	role?: Role
+	role?: number
 	tenant?: number
 }
 
@@ -98,40 +137,36 @@ export async function listUsers(params: UserListParams): Promise<UserPage> {
 		conditions.push(sql`${users.username} ILIKE ${pattern} ESCAPE '\\'`)
 	}
 	if (params.role) {
-		conditions.push(eq(users.role, params.role))
+		conditions.push(eq(users.role_id, params.role))
 	}
 	if (params.tenant) {
 		conditions.push(eq(users.tenant_id, params.tenant))
 	}
 	const where = conditions.length > 0 ? and(...conditions) : undefined
-	const rows = (await db
-		.select()
+	const rows = await db
+		.select({
+			id: users.id,
+			username: users.username,
+			role_id: users.role_id,
+			role_name: roles.name,
+			tenant_id: users.tenant_id,
+		})
 		.from(users)
+		.innerJoin(roles, eq(roles.id, users.role_id))
 		.where(where)
 		.orderBy(asc(users.username))
 		.limit(params.limit)
-		.offset(offsetOf(params))) as User[]
+		.offset(offsetOf(params))
 	const totalRow = (await db.select({ n: count() }).from(users).where(where).limit(1))[0]
-	return pageOf(rows.map(toUserJson), totalRow?.n ?? 0, params)
+	return pageOf(rows, totalRow?.n ?? 0, params)
 }
 
 export async function getUserResult(id: number): Promise<Result<UserJson, Error>> {
-	const row = await getUserById(id)
+	const row = await getUserJson(id)
 	if (!row) {
 		return Result.err(new NotFoundError('User not found'))
 	}
-	return Result.ok(toUserJson(row))
-}
-
-/** Number of admin accounts, optionally excluding one user id. */
-async function countAdmins(excludeId?: number): Promise<number> {
-	const db = getDb()
-	const where =
-		excludeId === undefined
-			? eq(users.role, 'admin')
-			: and(eq(users.role, 'admin'), sql`${users.id} != ${excludeId}`)
-	const row = (await db.select({ n: count() }).from(users).where(where).limit(1))[0]
-	return row?.n ?? 0
+	return Result.ok(row)
 }
 
 export async function createUser(input: UserCreate): Promise<Result<UserJson, Error>> {
@@ -146,16 +181,22 @@ export async function createUser(input: UserCreate): Promise<Result<UserJson, Er
 	if (Result.isError(tenantCheck)) {
 		return Result.err(tenantCheck.error)
 	}
-	const role = input.role ?? 'viewer'
-	if (role === 'admin' && input.tenant_id != null) {
-		return Result.err(
-			new ConflictError('Admin accounts are global and cannot be limited to a tenant'),
-		)
+	const roleCheck = await checkRoleExists(input.role_id)
+	if (Result.isError(roleCheck)) {
+		return Result.err(roleCheck.error)
+	}
+	if (input.tenant_id != null && (await roleManagesUsers(input.role_id))) {
+		return Result.err(new ConflictError(MANAGER_GLOBAL))
 	}
 	try {
 		const password_hash = await Bun.password.hash(input.password)
-		const user = await createLocalUser(username, password_hash, role, input.tenant_id ?? null)
-		return Result.ok(toUserJson(user))
+		const user = await createLocalUser(
+			username,
+			password_hash,
+			input.role_id,
+			input.tenant_id ?? null,
+		)
+		return await getUserResult(user.id)
 	} catch (err) {
 		if (isUniqueViolation(err)) {
 			return Result.err(new DuplicateError('Username is already in use'))
@@ -175,19 +216,30 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 			return Result.err(tenantCheck.error)
 		}
 	}
-	const effectiveRole = input.role ?? current.role
+	if (input.role_id !== undefined) {
+		const roleCheck = await checkRoleExists(input.role_id)
+		if (Result.isError(roleCheck)) {
+			return Result.err(roleCheck.error)
+		}
+	}
+	const effectiveRole = input.role_id ?? current.role_id
 	const effectiveTenant = input.tenant_id !== undefined ? input.tenant_id : current.tenant_id
-	if (effectiveRole === 'admin' && effectiveTenant !== null) {
+	const willManage = await roleManagesUsers(effectiveRole)
+	if (willManage && effectiveTenant !== null) {
+		return Result.err(new ConflictError(MANAGER_GLOBAL))
+	}
+	if (
+		!willManage &&
+		(await roleManagesUsers(current.role_id)) &&
+		(await countGlobalManagers({ excludeUserId: id })) === 0
+	) {
 		return Result.err(
-			new ConflictError('Admin accounts are global and cannot be limited to a tenant'),
+			new ConflictError('At least one global user must keep the users.manage permission'),
 		)
 	}
-	if (current.role === 'admin' && effectiveRole !== 'admin' && (await countAdmins(id)) === 0) {
-		return Result.err(new ConflictError('Cannot demote the last admin account'))
-	}
-	const patch: { role?: Role; tenant_id?: number | null; password_hash?: string } = {}
-	if (input.role !== undefined) {
-		patch.role = input.role
+	const patch: { role_id?: number; tenant_id?: number | null; password_hash?: string } = {}
+	if (input.role_id !== undefined) {
+		patch.role_id = input.role_id
 	}
 	if (input.tenant_id !== undefined) {
 		patch.tenant_id = input.tenant_id
@@ -206,30 +258,29 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 			return Result.err(err instanceof Error ? err : new Error(String(err)))
 		}
 	}
-	const updated = await getUserById(id)
-	if (!updated) {
-		return Result.err(new NotFoundError('User not found'))
-	}
-	return Result.ok(toUserJson(updated))
+	return await getUserResult(id)
 }
 
 export async function deleteUser(id: number, actorId: number): Promise<Result<UserJson, Error>> {
-	const current = await getUserById(id)
+	const current = await getUserJson(id)
 	if (!current) {
 		return Result.err(new NotFoundError('User not found'))
 	}
 	if (id === actorId) {
 		return Result.err(new ConflictError('Cannot delete your own account'))
 	}
-	if (current.role === 'admin' && (await countAdmins(id)) === 0) {
-		return Result.err(new ConflictError('Cannot delete the last admin account'))
+	if (
+		(await roleManagesUsers(current.role_id)) &&
+		(await countGlobalManagers({ excludeUserId: id })) === 0
+	) {
+		return Result.err(new ConflictError('Cannot delete the last user able to manage users'))
 	}
 	try {
 		await getDb().delete(users).where(eq(users.id, id))
 	} catch (e) {
 		return Result.err(errOf(e))
 	}
-	return Result.ok(toUserJson(current))
+	return Result.ok(current)
 }
 
 // ---------------------------------------------------------------------------

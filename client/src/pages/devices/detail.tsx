@@ -29,7 +29,7 @@ import { t, tp } from '../../i18n'
 import { faceLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { canWrite } from '../../lib/session'
+import { can } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
@@ -234,7 +234,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			getRowId={(iface: InterfaceJson): number => iface.id}
 			showColumnCustomizer
 			columns={columns}
-			rowActions={canWrite() ? portActions : undefined}
+			rowActions={can('edit') ? portActions : undefined}
 			empty={false}
 		/>
 	)

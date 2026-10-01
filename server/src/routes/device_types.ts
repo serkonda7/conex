@@ -24,13 +24,17 @@ import {
 	updateStub,
 } from '../db/templates'
 import { authMiddleware } from '../middleware/auth'
-import { requireGlobalWriteMiddleware } from '../middleware/roles'
+import {
+	requireGlobalPermissionMiddleware,
+	requirePermissionMiddleware,
+} from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 import { sendCreated, sendCsv, sendRow } from './helpers'
 
 export const deviceTypesApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', DeviceTypeListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(
@@ -47,7 +51,7 @@ export const deviceTypesApp = new Hono()
 	})
 	.post(
 		'/',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('json', DeviceTypeCreateSchema, onValidationError),
 		async (c) => {
 			return sendCreated(c, await createDeviceType(c.req.valid('json')))
@@ -59,7 +63,7 @@ export const deviceTypesApp = new Hono()
 	})
 	.post(
 		'/import',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('json', YamlImportBodySchema, onValidationError),
 		async (c) => {
 			return sendCreated(c, await importDeviceTypesYaml(c.req.valid('json').yaml))
@@ -70,7 +74,7 @@ export const deviceTypesApp = new Hono()
 	})
 	.patch(
 		'/:id',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', DeviceTypeUpdateSchema, onValidationError),
 		async (c) => {
@@ -79,7 +83,7 @@ export const deviceTypesApp = new Hono()
 	)
 	.delete(
 		'/:id',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			return sendRow(c, await deleteDeviceType(c.req.valid('param').id))
@@ -91,7 +95,7 @@ export const deviceTypesApp = new Hono()
 	})
 	.post(
 		'/:id/stubs',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', StubCreateSchema, onValidationError),
 		async (c) => {
@@ -100,7 +104,7 @@ export const deviceTypesApp = new Hono()
 	)
 	.patch(
 		'/:id/stubs/:stubId',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('param', StubIdParamsSchema, onValidationError),
 		vValidator('json', StubUpdateSchema, onValidationError),
 		async (c) => {
@@ -111,7 +115,7 @@ export const deviceTypesApp = new Hono()
 	)
 	.delete(
 		'/:id/stubs/:stubId',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', StubIdParamsSchema, onValidationError),
 		async (c) => {
 			return sendRow(c, await deleteStub(c.req.valid('param').stubId))

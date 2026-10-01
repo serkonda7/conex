@@ -10,7 +10,10 @@ import {
 	sendTenantRow,
 } from '../authz'
 import { authMiddleware } from '../middleware/auth'
-import { requireGlobalWriteMiddleware, requireWriteMiddleware } from '../middleware/roles'
+import {
+	requireGlobalPermissionMiddleware,
+	requirePermissionMiddleware,
+} from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendRow } from './helpers'
 
@@ -40,6 +43,7 @@ interface TenantCrudOptions {
 export function makeTenantApp(opts: TenantCrudOptions) {
 	return new Hono()
 		.use(authMiddleware)
+		.use(requirePermissionMiddleware('view'))
 		.get('/', vValidator('query', opts.listQuerySchema, onValidationError), async (c) => {
 			const query = c.req.valid('query') as Record<string, unknown> & {
 				search: string
@@ -68,7 +72,7 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 		})
 		.post(
 			'/',
-			requireWriteMiddleware,
+			requirePermissionMiddleware('edit'),
 			vValidator('json', opts.createSchema, onValidationError),
 			async (c) => {
 				const body = c.req.valid('json') as Record<string, unknown> & {
@@ -90,7 +94,7 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 		})
 		.patch(
 			'/:id',
-			requireWriteMiddleware,
+			requirePermissionMiddleware('edit'),
 			vValidator('param', opts.paramSchema, onValidationError),
 			vValidator('json', opts.updateSchema, onValidationError),
 			async (c) => {
@@ -111,7 +115,7 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 		)
 		.delete(
 			'/:id',
-			requireWriteMiddleware,
+			requirePermissionMiddleware('delete'),
 			vValidator('param', opts.paramSchema, onValidationError),
 			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
@@ -119,7 +123,7 @@ export function makeTenantApp(opts: TenantCrudOptions) {
 				if (Result.isError(current)) {
 					return sendRow(c, current as Result<never, Error>)
 				}
-				const denied = guardWrite(c, current.value.tenant_id)
+				const denied = guardWrite(c, 'delete', current.value.tenant_id)
 				if (denied) {
 					return denied
 				}
@@ -151,6 +155,7 @@ interface CatalogCrudOptions {
 export function makeCatalogApp(opts: CatalogCrudOptions) {
 	return new Hono()
 		.use(authMiddleware)
+		.use(requirePermissionMiddleware('view'))
 		.get('/', vValidator('query', opts.listQuerySchema, onValidationError), async (c) => {
 			const query = c.req.valid('query') as Record<string, unknown> & {
 				search: string
@@ -172,7 +177,7 @@ export function makeCatalogApp(opts: CatalogCrudOptions) {
 		})
 		.post(
 			'/',
-			requireGlobalWriteMiddleware,
+			requireGlobalPermissionMiddleware('edit'),
 			vValidator('json', opts.createSchema, onValidationError),
 			async (c) => {
 				return sendCreated(
@@ -190,7 +195,7 @@ export function makeCatalogApp(opts: CatalogCrudOptions) {
 		})
 		.patch(
 			'/:id',
-			requireGlobalWriteMiddleware,
+			requireGlobalPermissionMiddleware('edit'),
 			vValidator('param', opts.paramSchema, onValidationError),
 			vValidator('json', opts.updateSchema, onValidationError),
 			async (c) => {
@@ -206,7 +211,7 @@ export function makeCatalogApp(opts: CatalogCrudOptions) {
 		)
 		.delete(
 			'/:id',
-			requireGlobalWriteMiddleware,
+			requireGlobalPermissionMiddleware('delete'),
 			vValidator('param', opts.paramSchema, onValidationError),
 			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }

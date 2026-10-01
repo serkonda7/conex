@@ -4,6 +4,7 @@ import { InterfaceListQuerySchema } from 'shared/src/schemas'
 import { checkRead, deviceTenant, requestUser, scopeTenantId } from '../authz'
 import { listAllInterfaces } from '../db/devices'
 import { authMiddleware } from '../middleware/auth'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 
 /**
@@ -13,6 +14,7 @@ import { onValidationError } from '../middleware/validation'
  */
 export const interfacesApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', InterfaceListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {

@@ -10,7 +10,7 @@ import {
 import { checkRead, checkWrite, listTenantScope, rackTenant, shelfTenant } from '../authz'
 import { createShelf, deleteShelf, getShelf, listShelves, updateShelf } from '../db/shelves'
 import { authMiddleware } from '../middleware/auth'
-import { requireWriteMiddleware } from '../middleware/roles'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 import { sendCreated, sendRow } from './helpers'
@@ -22,6 +22,7 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const shelvesApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', ShelfListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		// Shelves have no `?tenant=` param of their own; the scope still
@@ -44,7 +45,7 @@ export const shelvesApp = new Hono()
 	})
 	.post(
 		'/',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('json', ShelfCreateSchema, onValidationError),
 		async (c) => {
 			const body = c.req.valid('json')
@@ -74,7 +75,7 @@ export const shelvesApp = new Hono()
 	})
 	.patch(
 		'/:id',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ShelfUpdateSchema, onValidationError),
 		async (c) => {
@@ -103,7 +104,7 @@ export const shelvesApp = new Hono()
 	)
 	.delete(
 		'/:id',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id

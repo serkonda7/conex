@@ -22,13 +22,16 @@ import {
 	IconNetwork,
 	IconPlugConnected,
 	IconServer,
+	IconShieldLock,
 	IconTag,
 	IconTemplate,
 	IconUsers,
 } from '@tabler/icons-solidjs'
+import type { Permission } from 'shared/src/types'
 import type { Component } from 'solid-js'
 import { t, tp } from '../i18n'
 import { type Crumb, pageMetaFor, parseId, routeSegments } from '../lib/router'
+import { can } from '../lib/session'
 import { AuditLogPage } from '../pages/audit_log/list'
 import { ChangeDetailPage } from '../pages/changelog/detail'
 import { ChangelogPage } from '../pages/changelog/list'
@@ -61,6 +64,8 @@ import { RackAddPage } from '../pages/racks/add'
 import { RackDetailPage } from '../pages/racks/detail'
 import { RackEditPage } from '../pages/racks/edit'
 import { RacksPage } from '../pages/racks/list'
+import { RoleAddPage, RoleEditPage } from '../pages/roles/form'
+import { RolesPage } from '../pages/roles/list'
 import { ShelfAddPage, ShelfEditPage } from '../pages/shelves/form'
 import { SiteGroupDetailPage } from '../pages/site_groups/detail'
 import { SiteGroupAddPage, SiteGroupEditPage } from '../pages/site_groups/form'
@@ -88,7 +93,8 @@ export interface Section {
 	noun: (count: number) => string
 	/** Sidebar icon; sections without one (or without a list) stay hidden. */
 	icon?: Component<{ size?: number }>
-	adminOnly?: boolean
+	/** Permission needed to open the section (and see it in the sidebar); `null` = none. */
+	permission: Permission | null
 	/** Routed but left out of the sidebar (reached another way). */
 	hideInNav?: boolean
 	/** No sidebar "+" shortcut (the add page is reached from the list). */
@@ -106,12 +112,14 @@ export const SECTIONS: readonly Section[] = [
 		path: 'dashboard',
 		noun: (): string => t('entity.dashboard'),
 		icon: IconLayoutDashboard,
+		permission: null,
 		hideAddInNav: true,
 		list: DashboardPage,
 	},
 	{
 		path: 'tenants',
 		noun: (n: number): string => tp('entity.tenant', n),
+		permission: 'view',
 		icon: IconUsers,
 		list: TenantsPage,
 		add: TenantAddPage,
@@ -121,6 +129,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'sites',
 		noun: (n: number): string => tp('entity.site', n),
+		permission: 'view',
 		icon: IconMapPin,
 		list: SitesPage,
 		add: SiteAddPage,
@@ -130,6 +139,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'locations',
 		noun: (n: number): string => tp('entity.location', n),
+		permission: 'view',
 		icon: IconLocation,
 		list: LocationsPage,
 		add: LocationAddPage,
@@ -139,6 +149,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'racks',
 		noun: (n: number): string => tp('entity.rack', n),
+		permission: 'view',
 		icon: IconBox,
 		list: RacksPage,
 		add: RackAddPage,
@@ -148,6 +159,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'devices',
 		noun: (n: number): string => tp('entity.device', n),
+		permission: 'view',
 		icon: IconServer,
 		list: DevicesPage,
 		add: DeviceAddPage,
@@ -157,6 +169,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'device-roles',
 		noun: (n: number): string => tp('entity.deviceRole', n),
+		permission: 'view',
 		icon: IconTag,
 		list: DeviceRolesPage,
 		add: DeviceRoleAddPage,
@@ -167,6 +180,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'rack-types',
 		aliases: ['templates'],
 		noun: (n: number): string => tp('entity.rackType', n),
+		permission: 'view',
 		icon: IconTemplate,
 		list: RackTypesPage,
 		add: RackTypeAddPage,
@@ -174,6 +188,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'device-types',
 		noun: (n: number): string => tp('entity.deviceType', n),
+		permission: 'view',
 		icon: IconCpu,
 		list: DeviceTypesPage,
 		add: DeviceTypeAddPage,
@@ -184,6 +199,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'manufacturers',
 		noun: (n: number): string => tp('entity.manufacturer', n),
+		permission: 'view',
 		icon: IconBuildingFactory,
 		list: ManufacturersPage,
 		add: ManufacturerAddPage,
@@ -193,6 +209,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'tenant-groups',
 		noun: (n: number): string => tp('entity.tenantGroup', n),
+		permission: 'view',
 		icon: IconBuildingSkyscraper,
 		hideInNav: true,
 		list: TenantGroupsPage,
@@ -203,6 +220,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'site-groups',
 		noun: (n: number): string => tp('entity.siteGroup', n),
+		permission: 'view',
 		icon: IconFolder,
 		hideInNav: true,
 		list: SiteGroupsPage,
@@ -213,12 +231,14 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'shelves',
 		noun: (n: number): string => tp('entity.shelf', n),
+		permission: 'view',
 		add: ShelfAddPage,
 		edit: ShelfEditPage,
 	},
 	{
 		path: 'topology',
 		noun: (): string => t('entity.topology'),
+		permission: 'view',
 		icon: IconNetwork,
 		hideAddInNav: true,
 		list: TopologyPage,
@@ -227,8 +247,8 @@ export const SECTIONS: readonly Section[] = [
 		path: 'integrations',
 		noun: (n: number): string => tp('entity.integration', n),
 		icon: IconPlugConnected,
-		// Admin-only setup, one integration per provider.
-		adminOnly: true,
+		// One integration per provider.
+		permission: 'integrations.manage',
 		hideAddInNav: true,
 		list: IntegrationsPage,
 		add: IntegrationAddPage,
@@ -239,16 +259,25 @@ export const SECTIONS: readonly Section[] = [
 		path: 'users',
 		noun: (n: number): string => tp('entity.user', n),
 		icon: IconLock,
-		adminOnly: true,
+		permission: 'users.manage',
 		list: UsersPage,
 		add: UserAddPage,
 		edit: UserEditPage,
 	},
 	{
+		path: 'roles',
+		noun: (n: number): string => tp('entity.role', n),
+		permission: 'users.manage',
+		icon: IconShieldLock,
+		list: RolesPage,
+		add: RoleAddPage,
+		edit: RoleEditPage,
+	},
+	{
 		path: 'audit-log',
 		noun: (n: number): string => tp('entity.auditLog', n),
 		icon: IconHistory,
-		adminOnly: true,
+		permission: 'audit_log.view',
 		hideAddInNav: true,
 		list: AuditLogPage,
 	},
@@ -256,6 +285,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'changelog',
 		noun: (n: number): string => tp('entity.changelog', n),
 		icon: IconListDetails,
+		permission: 'changelog.view',
 		hideAddInNav: true,
 		list: ChangelogPage,
 		detail: ChangeDetailPage,
@@ -275,10 +305,29 @@ export type RouteMatch =
 	| { kind: 'list' | 'add' | 'import'; section: Section; page: Component }
 	| { kind: 'detail' | 'edit'; section: Section; page: Component<{ id: number }>; id: number }
 
-/** Resolves a route path to its page, or null for not-found. */
-export function matchRoute(raw: string, isAdmin: boolean): RouteMatch | null {
+/** True when the signed-in user may open the section. */
+export function canOpenSection(section: Section): boolean {
+	return section.permission === null || can(section.permission)
+}
+
+/**
+ * True when the user may create entries in the section: inventory sections
+ * need `edit`, admin sections their own permission.
+ */
+export function canAddInSection(section: Section): boolean {
+	return section.permission === null || section.permission === 'view'
+		? can('edit')
+		: can(section.permission)
+}
+
+/**
+ * Resolves a route path to its page, or null for not-found (or not
+ * permitted; `checkPermission: false` resolves the shape only, e.g. for tab
+ * labels).
+ */
+export function matchRoute(raw: string, checkPermission = true): RouteMatch | null {
 	const section = routeSection(raw)
-	if (!section || (section.adminOnly === true && !isAdmin)) {
+	if (!section || (checkPermission && !canOpenSection(section))) {
 		return null
 	}
 	const [, second, third, ...rest] = routeSegments(raw)
@@ -306,7 +355,7 @@ export function matchRoute(raw: string, isAdmin: boolean): RouteMatch | null {
 }
 
 export function isDetailRoute(raw: string): boolean {
-	return matchRoute(raw, true)?.kind === 'detail'
+	return matchRoute(raw, false)?.kind === 'detail'
 }
 
 /**

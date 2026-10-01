@@ -16,10 +16,10 @@ import {
 	type IntegrationProvider,
 	LOCATION_TYPES,
 	type LocationType,
+	type Permission,
 	type SyncRunState,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
-import type { UserRole } from '../api/users'
 import { type MessageKey, t } from '.'
 
 function lookup(keys: Record<string, MessageKey>, value: string): string {
@@ -142,23 +142,19 @@ export function changeObjectOptions(): { value: ChangeObjectType; label: string 
 	)
 }
 
-const ROLE_KEYS: Record<UserRole, MessageKey> = {
-	admin: 'role.admin',
-	editor: 'role.editor',
-	viewer: 'role.viewer',
+const PERMISSION_KEYS: Record<Permission, MessageKey> = {
+	view: 'permission.view',
+	edit: 'permission.edit',
+	delete: 'permission.delete',
+	'users.manage': 'permission.usersManage',
+	'changelog.view': 'permission.changelogView',
+	'audit_log.view': 'permission.auditLogView',
+	'integrations.manage': 'permission.integrationsManage',
 }
 
-/** User role (`admin` / `editor` / `viewer`). */
-export function roleLabel(value: string): string {
-	return lookup(ROLE_KEYS, value)
-}
-
-/** `<select>` options for every user role. */
-export function roleOptions(): { value: UserRole; label: string }[] {
-	return (Object.keys(ROLE_KEYS) as UserRole[]).map((value) => ({
-		value,
-		label: roleLabel(value),
-	}))
+/** Role permission (`view`, `users.manage`, …). */
+export function permissionLabel(value: string): string {
+	return lookup(PERMISSION_KEYS, value)
 }
 
 const LOCATION_TYPE_KEYS: Record<LocationType, MessageKey> = {

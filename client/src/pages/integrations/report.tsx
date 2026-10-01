@@ -30,7 +30,7 @@ import {
 } from '../../i18n/labels'
 import { createRecord } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
-import { canWrite, canWriteGlobal, isScoped } from '../../lib/session'
+import { can, canGlobal, isScoped } from '../../lib/session'
 import { contextTenantRows, tenantContextFilters } from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
 import { ExternalTenantPicker } from './external_tenant_picker'
@@ -126,7 +126,10 @@ function LinkBoardPanel(props: {
 		void refetch()
 	}
 
-	const editable = (): boolean => (props.entity_type === 'tenant' ? canWriteGlobal() : canWrite())
+	const editable = (): boolean =>
+		props.entity_type === 'tenant'
+			? canGlobal('integrations.manage')
+			: can('integrations.manage')
 
 	return (
 		<div>
@@ -142,7 +145,7 @@ function LinkBoardPanel(props: {
 							options={tenantOptions()}
 						/>
 					</Show>
-					<Show when={canWrite() && board()?.external_tenant}>
+					<Show when={can('integrations.manage') && board()?.external_tenant}>
 						<button
 							type="button"
 							disabled={syncing()}
@@ -334,7 +337,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		switch (f.kind) {
 			case 'tenant_unlinked':
 				return (
-					<Show when={canWriteGlobal()}>
+					<Show when={canGlobal('integrations.manage')}>
 						<button
 							type="button"
 							class="btn-small"
@@ -346,7 +349,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				)
 			case 'tenant_missing_in_conex':
 				return (
-					<Show when={canWriteGlobal()}>
+					<Show when={canGlobal('integrations.manage')}>
 						<button
 							type="button"
 							class="btn-small"
@@ -361,10 +364,10 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 					</Show>
 				)
 			case 'tenant_stale':
-				return <Show when={canWriteGlobal()}>{unlink}</Show>
+				return <Show when={canGlobal('integrations.manage')}>{unlink}</Show>
 			case 'device_suggestion':
 				return (
-					<Show when={canWrite()}>
+					<Show when={can('integrations.manage')}>
 						<button
 							type="button"
 							class="btn-small"
@@ -385,7 +388,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				)
 			case 'device_missing_in_conex':
 				return (
-					<Show when={canWrite()}>
+					<Show when={can('integrations.manage')}>
 						<button
 							type="button"
 							class="btn-small"
@@ -401,7 +404,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				)
 			case 'device_stale':
 			case 'device_tenant_mismatch':
-				return <Show when={canWrite()}>{unlink}</Show>
+				return <Show when={can('integrations.manage')}>{unlink}</Show>
 			default:
 				return null
 		}
@@ -462,7 +465,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						name: providerLabel(integration()?.provider ?? 'tanss'),
 					})}
 				</h2>
-				<Show when={canWrite() && integration()}>
+				<Show when={can('integrations.manage') && integration()}>
 					<div class="form-actions">
 						<button
 							type="button"
@@ -473,7 +476,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 								{syncing() ? t('integration.syncing') : t('integration.syncNow')}
 							</IconLabel>
 						</button>
-						<Show when={canWriteGlobal()}>
+						<Show when={canGlobal('integrations.manage')}>
 							<button
 								type="button"
 								disabled={syncing()}

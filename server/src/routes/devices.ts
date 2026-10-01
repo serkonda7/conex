@@ -44,7 +44,7 @@ import {
 } from '../db/devices'
 import { getInterfaceTrace } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
-import { requireWriteMiddleware } from '../middleware/roles'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
@@ -56,6 +56,7 @@ import { cableScopeDenied, sendCreated, sendCsv, sendRow } from './helpers'
  */
 export const devicesApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', DeviceListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		const scope = await listTenantScope(c, query.tenant, query.tenant_group)
@@ -80,7 +81,7 @@ export const devicesApp = new Hono()
 	})
 	.post(
 		'/',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('json', DeviceCreateSchema, onValidationError),
 		async (c) => {
 			const body = c.req.valid('json')
@@ -98,7 +99,7 @@ export const devicesApp = new Hono()
 	})
 	.post(
 		'/import',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('json', CsvImportBodySchema, onValidationError),
 		async (c) => {
 			const scope = scopeTenantId(requestUser(c))
@@ -135,7 +136,7 @@ export const devicesApp = new Hono()
 		if (Result.isError(current)) {
 			return sendResult(c, current)
 		}
-		const denied = guardWrite(c, current.value.tenant_id)
+		const denied = guardWrite(c, 'delete', current.value.tenant_id)
 		if (denied) {
 			return denied
 		}
@@ -152,7 +153,7 @@ export const devicesApp = new Hono()
 			if (Result.isError(current)) {
 				return sendResult(c, current)
 			}
-			const denied = guardWrite(c, current.value.tenant_id)
+			const denied = guardWrite(c, 'edit', current.value.tenant_id)
 			if (denied) {
 				return denied
 			}
@@ -179,7 +180,7 @@ export const devicesApp = new Hono()
 	)
 	.post(
 		'/:id/interfaces',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', InterfaceCreateSchema, onValidationError),
 		async (c) => {
@@ -215,7 +216,7 @@ export const devicesApp = new Hono()
 	)
 	.patch(
 		'/:id/interfaces/:ifaceId',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('param', DeviceIfaceParamsSchema, onValidationError),
 		vValidator('json', InterfaceUpdateSchema, onValidationError),
 		async (c) => {
@@ -233,7 +234,7 @@ export const devicesApp = new Hono()
 	// Convenience connect: one end in the path, the peer in the body.
 	.post(
 		'/:id/interfaces/:ifaceId/connect',
-		requireWriteMiddleware,
+		requirePermissionMiddleware('edit'),
 		vValidator('param', DeviceIfaceParamsSchema, onValidationError),
 		vValidator('json', InterfaceConnectSchema, onValidationError),
 		async (c) => {

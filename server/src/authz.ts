@@ -1,15 +1,15 @@
 /**
- * Role-based access control plus single-tenant scoping.
+ * Permission-based access control plus single-tenant scoping.
  *
- * Roles (`shared/src/schemas.ts` `RoleSchema`):
- * - `admin`: reads+writes everything, manages users/roles. Ignores tenant scope.
- * - `editor`: reads+writes inventory, no user management.
- * - `viewer`: reads only (any POST/PATCH/PUT/DELETE answers 403).
+ * Permissions (`shared/src/schemas.ts` `PERMISSIONS`) come from the user's
+ * role: `view` / `edit` / `delete` cover all inventory and catalog
+ * resources; `users.manage`, `changelog.view`, `audit_log.view` and
+ * `integrations.manage` gate the admin areas.
  *
  * Tenant scope (`users.tenant_id`):
- * - `NULL` (or admin) = global, unconstrained.
- * - set (editors/viewers only; admins are always global) = limited to that
- *   single tenant, strictly: only rows whose `tenant_id` equals the scope
+ * - `NULL` = global, unconstrained. Always the case for `users.manage`
+ *   holders (enforced in `db/users.ts` / `db/roles.ts`).
+ * - set = limited to that single tenant, strictly: only rows whose `tenant_id` equals the scope
  *   are visible or writable. In particular, unscoped (`tenant_id IS NULL`)
  *   rows are invisible to scoped users — there is no shared visibility.
  * - Tenant-less catalog data (manufacturers, device types + stubs) is
@@ -26,7 +26,7 @@ import { getDb } from './db/connection'
 import type { TenantFilterParams } from './db/list'
 import { resolveTenantGroupIds } from './db/tenancy'
 import { type cables, devices, interfaces, racks, shelves } from './schema'
-import type { CurrentUser } from './types'
+import type { CurrentUser, Permission } from './types'
 import { jsonError } from './util/http'
 import { sendResult } from './util/result_response'
 
@@ -35,15 +35,14 @@ export function requestUser(c: Context): CurrentUser {
 	return c.get('currentUser') as CurrentUser
 }
 
-/**
- * Effective tenant scope: a tenant id for scoped editors/viewers, `null`
- * when the requester is unconstrained (admin or global editor/viewer).
- */
+/** Effective tenant scope: the user's tenant id, `null` when global. */
 export function scopeTenantId(user: CurrentUser): number | null {
-	if (user.role === 'admin' || user.tenant_id === null) {
-		return null
-	}
 	return user.tenant_id
+}
+
+/** True when the requester's role grants `permission`. */
+export function can(user: CurrentUser, permission: Permission): boolean {
+	return user.permissions.has(permission)
 }
 
 /** Read rule: scope members see exactly their own tenant — no shared rows. */
@@ -64,28 +63,22 @@ export function canWriteTenant(user: CurrentUser, tenant: number | null): boolea
 	return tenant !== null && tenant === scope
 }
 
-/** Admin-only gate (user management). Returns a 403 response or null. */
-export function requireAdmin(c: Context): Response | null {
-	if (requestUser(c).role !== 'admin') {
-		return jsonError(c, 'Forbidden: admin role required', 403)
+/** Permission gate. Returns a 403 response or null. */
+export function requirePermission(c: Context, permission: Permission): Response | null {
+	if (!can(requestUser(c), permission)) {
+		return jsonError(c, `Forbidden: ${permission} permission required`, 403)
 	}
 	return null
 }
 
-/** Write gate (editors + admins). Returns a 403 response or null. */
-export function requireWrite(c: Context): Response | null {
-	const role = requestUser(c).role
-	if (role !== 'admin' && role !== 'editor') {
-		return jsonError(c, 'Forbidden: editor role required', 403)
-	}
-	return null
-}
-
-/** Global-catalog write gate: scoped users cannot edit shared templates. */
-export function requireGlobalWrite(c: Context): Response | null {
-	const write = requireWrite(c)
-	if (write) {
-		return write
+/**
+ * Permission gate for shared data (catalog, tenants, tenant links): scoped
+ * users cannot change rows other tenants rely on.
+ */
+export function requireGlobalPermission(c: Context, permission: Permission): Response | null {
+	const denied = requirePermission(c, permission)
+	if (denied) {
+		return denied
 	}
 	if (scopeTenantId(requestUser(c)) !== null) {
 		return jsonError(c, 'Forbidden: tenant-scoped users cannot edit shared catalog data', 403)
@@ -218,8 +211,8 @@ export function sendTenantRow<T extends { tenant_id: number | null }>(
 }
 
 /**
- * Update gate for a tenant-bearing row: writer role plus current-row and
- * post-patch tenant checks. Returns a denial response, or null when the
+ * Update gate for a tenant-bearing row: `edit` permission plus current-row
+ * and post-patch tenant checks. Returns a denial response, or null when the
  * service call may proceed.
  */
 export function guardUpdate(
@@ -227,16 +220,20 @@ export function guardUpdate(
 	currentTenant: number | null,
 	inputTenant: number | null | undefined,
 ): Response | null {
-	const denied = requireWrite(c)
+	const denied = requirePermission(c, 'edit')
 	if (denied) {
 		return denied
 	}
 	return checkUpdateTenant(c, currentTenant, inputTenant)
 }
 
-/** Delete gate for a tenant-bearing row: writer role plus scope check. */
-export function guardWrite(c: Context, currentTenant: number | null): Response | null {
-	const denied = requireWrite(c)
+/** Gate for a tenant-bearing row: `permission` plus scope check. */
+export function guardWrite(
+	c: Context,
+	permission: Permission,
+	currentTenant: number | null,
+): Response | null {
+	const denied = requirePermission(c, permission)
 	if (denied) {
 		return denied
 	}

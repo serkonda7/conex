@@ -30,7 +30,7 @@ const MENU_WIDTH = 240
 
 /** Tab tooltip: the page's full breadcrumb trail, else its title. */
 function tabTooltip(tab: TabState): string {
-	const match = matchRoute(tab.path, true)
+	const match = matchRoute(tab.path, false)
 	const crumbs = match ? routeCrumbs(tab.path, match) : []
 	return crumbs.length > 0 ? crumbs.map((c) => c.label).join(' › ') : tabTitle(tab.path)
 }

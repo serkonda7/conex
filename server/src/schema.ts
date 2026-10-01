@@ -19,19 +19,42 @@ import { LOCATION_TYPES } from 'shared/src/schemas'
 // shapes did not change with the move from SQLite.
 // Session ids and auth-state values stay opaque random strings: they are
 // credentials, not entity references.
+// Roles bundle permissions (`shared/src/schemas.ts` `PERMISSIONS`); every
+// user carries exactly one. Permission strings are service-enforced (no DB
+// enum, writes go through `PermissionSchema`; unknown strings are ignored
+// on load). Role delete is blocked while users reference it (service layer
+// in `db/roles.ts`), so the users FK carries no cascade.
+export const roles = pgTable('roles', {
+	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+	name: text('name').notNull().unique(),
+	description: text('description'),
+})
+
+export const role_permissions = pgTable(
+	'role_permissions',
+	{
+		role_id: integer('role_id')
+			.notNull()
+			.references(() => roles.id, { onDelete: 'cascade' }),
+		permission: text('permission').notNull(),
+	},
+	(table) => [primaryKey({ columns: [table.role_id, table.permission] })],
+)
+
 export const users = pgTable('users', {
 	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 	username: text('username').notNull().unique(),
 	password_hash: text('password_hash'),
 	provider: text('provider').notNull().default('local'),
 	provider_id: text('provider_id').unique(),
-	// RBAC role (`admin` | `editor` | `viewer`, default `viewer`; the
-	// first-run setup account is created as `admin`). Service-enforced enum:
-	// no DB enum, so writes go through `RoleSchema`.
-	role: text('role').notNull().default('viewer'),
-	// Tenant scope for editors/viewers (`NULL` = global, all tenants).
-	// Admins ignore this column. Delete-blocked while referenced (service
-	// layer in `db/tenancy.ts`), so the FK carries no cascade.
+	// Assigned role (the first-run setup account gets a role holding every
+	// permission).
+	role_id: integer('role_id')
+		.notNull()
+		.references(() => roles.id),
+	// Tenant scope (`NULL` = global, all tenants). Always `NULL` for users
+	// whose role grants `users.manage`. Delete-blocked while referenced
+	// (service layer in `db/tenancy.ts`), so the FK carries no cascade.
 	tenant_id: integer('tenant_id').references(() => tenants.id),
 })
 

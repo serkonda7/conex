@@ -4,6 +4,7 @@ import { TopologyQuerySchema } from 'shared/src/schemas'
 import { checkRead, deviceTenant, listTenantScope } from '../authz'
 import { getTopology } from '../db/topology'
 import { authMiddleware } from '../middleware/auth'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 
 /**
@@ -18,6 +19,7 @@ import { onValidationError } from '../middleware/validation'
  */
 export const topologyApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', TopologyQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {

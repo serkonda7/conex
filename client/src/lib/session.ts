@@ -1,30 +1,28 @@
 /**
- * Session-wide permissions. The shell sets them from the signed-in
- * user's role; pages and shared components read it to hide add / import /
- * edit / delete actions for viewers (the server answers their writes with
- * 403 either way).
+ * Session-wide permissions. The shell sets them from the signed-in user's
+ * role; pages and shared components read them to hide add / import / edit /
+ * delete actions and admin areas the user may not use (the server answers
+ * such requests with 403 either way).
  */
+
+import type { Permission } from 'shared/src/types'
 import { createSignal } from 'solid-js'
-import type { SessionUser } from '../api/auth'
 
-const [role, setRole] = createSignal<SessionUser['role'] | null>(null)
-
-/** Records the signed-in user's role (`null` once signed out). */
-export function setSessionRole(next: SessionUser['role'] | null): void {
-	setRole(next)
-}
-
-/** True for editors and admins; viewers only read. */
-export function canWrite(): boolean {
-	const current = role()
-	return current !== null && current !== 'viewer'
-}
-
+const [permissions, setPermissions] = createSignal<ReadonlySet<Permission>>(new Set())
 const [scoped, setScoped] = createSignal(false)
 
-/** Records whether the user is limited to one tenant (admins never are). */
-export function setSessionScoped(next: boolean): void {
-	setScoped(next)
+/** Records the signed-in user's permissions and tenant scope (cleared on sign-out). */
+export function setSessionAccess(next: {
+	permissions: readonly Permission[]
+	scoped: boolean
+}): void {
+	setPermissions(new Set(next.permissions))
+	setScoped(next.scoped)
+}
+
+/** True when the user's role grants `permission`. */
+export function can(permission: Permission): boolean {
+	return permissions().has(permission)
 }
 
 /** True when the user is limited to one tenant. */
@@ -32,11 +30,7 @@ export function isScoped(): boolean {
 	return scoped()
 }
 
-export function isAdmin(): boolean {
-	return role() === 'admin'
-}
-
-/** Global editors and admins: may reshape tenants and their links. */
-export function canWriteGlobal(): boolean {
-	return canWrite() && !scoped()
+/** `permission` on shared data (catalog, tenants, tenant links): global users only. */
+export function canGlobal(permission: Permission): boolean {
+	return can(permission) && !scoped()
 }

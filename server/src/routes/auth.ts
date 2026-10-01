@@ -7,6 +7,7 @@ import { requestUser } from '../authz'
 import { getConfig } from '../config'
 import { recordAudit } from '../db/audit'
 import { isUniqueViolation } from '../db/errors'
+import { fullAccessRoleId } from '../db/roles'
 import { createLocalUser, getUserByUsername, hasAnyUser } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
@@ -60,10 +61,13 @@ authApp.post(
 
 		try {
 			const password_hash = await Bun.password.hash(body.password)
-			// First account owns the instance: always an admin (createLocalUser
-			// defaults to `admin`; passed explicitly so the role survives any
-			// future default change).
-			const user = await createLocalUser(username, password_hash, 'admin', null)
+			// First account owns the instance: a global role with every permission.
+			const user = await createLocalUser(
+				username,
+				password_hash,
+				await fullAccessRoleId(),
+				null,
+			)
 			const token = await get_signed_jwt(user)
 			setCookie(c, 'auth_token', token, getSessionCookieOpts())
 			return c.json({ success: true }, 201)
@@ -143,5 +147,10 @@ authApp.post('/logout', authMiddleware, async (c) => {
 
 authApp.get('/me', authMiddleware, (c) => {
 	const user = requestUser(c)
-	return c.json({ username: user.username, role: user.role, tenant_id: user.tenant_id })
+	return c.json({
+		username: user.username,
+		role: { id: user.role_id, name: user.role_name },
+		permissions: [...user.permissions],
+		tenant_id: user.tenant_id,
+	})
 })

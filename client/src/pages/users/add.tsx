@@ -1,28 +1,30 @@
 import { createSignal, type JSX, Show } from 'solid-js'
+import { fetch_roles, type RoleJson } from '../../api/roles'
 import { fetch_tenants } from '../../api/tenancy'
-import { create_user, type UserRole } from '../../api/users'
+import { create_user } from '../../api/users'
 import { FormPage, Hint, row_options, SelectField, TextField } from '../../components/form'
 import { t } from '../../i18n'
-import { roleOptions } from '../../i18n/labels'
 import { type FormValues, is_add_another_submit, submit_form, useFormState } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
-import { RoleHint } from './role_hint'
+import { managesUsers, RoleHint } from './role_hint'
 
-/** /users/add — admin-only account create form. */
+/** /users/add — account create form (`users.manage`). */
 export function UserAddPage(): JSX.Element {
 	const form = useFormState()
 	const [username, setUsername] = createSignal('')
 	const [password, setPassword] = createSignal('')
-	const [role, setRole] = createSignal<UserRole>('viewer')
+	const [roleId, setRoleId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [tenants] = createRows(fetch_tenants, form.setError)
+	const [roles] = createRows(fetch_roles, form.setError)
+	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
 
 	function validate(): string | null {
 		if (!password()) {
 			return t('auth.passwordRequired')
 		}
-		return role() === 'admin' && parseId(tenantId()) !== null ? t('user.adminGlobal') : null
+		return parseId(roleId()) === null ? t('user.selectRole') : null
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -36,8 +38,8 @@ export function UserAddPage(): JSX.Element {
 				create_user({
 					username: values.name,
 					password: password(),
-					role: role(),
-					tenant_id: parseId(tenantId()),
+					role_id: parseId(roleId()) ?? 0,
+					tenant_id: managesUsers(role()) ? null : parseId(tenantId()),
 				}),
 			navigateTo: '/users',
 			onSuccess: is_add_another_submit(e) ? () => setUsername('') : undefined,
@@ -70,12 +72,13 @@ export function UserAddPage(): JSX.Element {
 			<SelectField
 				id="user-role"
 				label={t('user.role')}
-				value={role()}
-				onChange={(value: string) => setRole(value as UserRole)}
-				options={roleOptions()}
-				hint={<RoleHint />}
+				required
+				value={roleId()}
+				onChange={setRoleId}
+				options={row_options(roles() ?? [])}
+				hint={<RoleHint role={role()} />}
 			/>
-			<Show when={role() !== 'admin'}>
+			<Show when={!managesUsers(role())}>
 				<SelectField
 					id="user-tenant"
 					label={t('user.tenantScope')}

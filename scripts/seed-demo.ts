@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { closeDb, getDb, getSqlClient, initDb } from '../server/src/db/connection'
+import { fullAccessRoleId } from '../server/src/db/roles'
 import {
 	cables,
 	device_type_interfaces,
@@ -554,7 +555,7 @@ await db.insert(users).values({
 	username: 'demo',
 	password_hash: await Bun.password.hash('demo-password'),
 	provider: 'local',
-	role: 'admin',
+	role_id: await fullAccessRoleId(),
 })
 
 console.log('Demo database reset')

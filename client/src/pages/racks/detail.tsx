@@ -28,7 +28,7 @@ import { faceLabel } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
-import { canWrite } from '../../lib/session'
+import { can } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
 import { RackElevation, type RackFace } from './elevation'
 
@@ -344,7 +344,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								on_select_device={openDeviceSelector}
 								on_add_device={installDevice}
 								on_add_shelf={installShelf}
-								readonly={!canWrite()}
+								readonly={!can('edit')}
 								shelf_actions={{
 									on_add_shelf_device: addShelfDevice,
 									on_select_shelf_device: openShelfDeviceSelector,

@@ -7,13 +7,12 @@ import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { ListRangeStatus, ListSearchField, useDebouncedSearch } from '../../components/list_page'
 import { t, tp } from '../../i18n'
-import { roleLabel } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 
 /**
- * /users — admin-only account list: search plus per-row edit/delete.
+ * /users — account list (`users.manage`): search plus per-row edit/delete.
  * Role/tenant assignment lives on the dedicated add/edit pages. Password
  * hashes never leave the server, so this table shows identity and scope
  * only.
@@ -30,7 +29,7 @@ export function UsersPage(): JSX.Element {
 		}
 		return res.value
 	})
-	// Tenant id → name for the scope column (admins see every tenant).
+	// Tenant id → name for the scope column (user managers are global).
 	const [tenants] = createRows(fetch_tenants)
 	const tenantName = useNameOf(tenants)
 	const scopeOf = (id: number | null): string =>
@@ -45,7 +44,7 @@ export function UsersPage(): JSX.Element {
 		{
 			key: 'role',
 			label: t('user.role'),
-			getValue: (u: UserJson): JSX.Element => <span>{roleLabel(u.role)}</span>,
+			getValue: (u: UserJson): JSX.Element => <span>{u.role_name}</span>,
 		},
 		{
 			key: 'tenant',

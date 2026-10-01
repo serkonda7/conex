@@ -2,10 +2,10 @@ import { getCookie } from 'hono/cookie'
 import { createMiddleware } from 'hono/factory'
 import { verify } from 'hono/jwt'
 import { runAsActor } from '../db/changelog'
-import { getUserByUsername } from '../db/users'
+import { getCurrentUser } from '../db/users'
 import { getSigningKey } from '../keys'
 import { touchSession } from '../sessions'
-import { type CurrentUser, toCurrentUser } from '../types'
+import type { CurrentUser } from '../types'
 import { jsonError } from '../util/http'
 
 export type JwtPayload = {
@@ -35,16 +35,17 @@ export const authMiddleware = createMiddleware<{
 			return jsonError(c, 'Unauthorized: Session invalidated', 401)
 		}
 
-		// Role checks run per request against the live row (not a JWT claim)
-		// so admin demotions and tenant re-scopes take effect immediately.
-		// Usernames are immutable, so the `sub` lookup cannot go stale.
-		const user = await getUserByUsername(payload.sub)
+		// Permission checks run per request against the live user and role
+		// rows (not a JWT claim) so role changes, permission edits and tenant
+		// re-scopes take effect immediately. Usernames are immutable, so the
+		// `sub` lookup cannot go stale.
+		const user = await getCurrentUser(payload.sub)
 		if (!user) {
 			return jsonError(c, 'Unauthorized', 401)
 		}
 
 		c.set('jwtPayload', payload)
-		c.set('currentUser', toCurrentUser(user))
+		c.set('currentUser', user)
 		// Changes recorded while handling this request are attributed to the user.
 		await runAsActor(
 			{ user_id: user.id, username: user.username, request_id: crypto.randomUUID() },

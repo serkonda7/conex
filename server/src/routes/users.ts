@@ -9,20 +9,20 @@ import {
 import { requestUser } from '../authz'
 import { createUser, deleteUser, getUserResult, listUsers, updateUser } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
-import { requireAdminMiddleware } from '../middleware/roles'
+import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendRow } from './helpers'
 
 /**
- * User management: admin-only. Admins create accounts with an explicit
- * role, change roles, (re)scope editors/viewers to a single tenant, reset
- * passwords, and delete accounts. The last admin account can neither be
- * demoted nor deleted, and nobody can delete their own account
+ * User management (`users.manage`): create accounts with a role, change
+ * roles, (re)scope users to a single tenant, reset passwords, and delete
+ * accounts. The last global user able to manage users can neither lose
+ * that permission nor be deleted, and nobody can delete their own account
  * (enforced in `db/users.ts`).
  */
 export const usersApp = new Hono()
 	.use(authMiddleware)
-	.use(requireAdminMiddleware)
+	.use(requirePermissionMiddleware('users.manage'))
 	.get('/', vValidator('query', UserListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(

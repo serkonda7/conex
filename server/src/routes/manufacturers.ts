@@ -14,7 +14,10 @@ import {
 	updateManufacturer,
 } from '../db/templates'
 import { authMiddleware } from '../middleware/auth'
-import { requireGlobalWriteMiddleware } from '../middleware/roles'
+import {
+	requireGlobalPermissionMiddleware,
+	requirePermissionMiddleware,
+} from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendRow } from './helpers'
 
@@ -25,6 +28,7 @@ import { sendCreated, sendRow } from './helpers'
  */
 export const manufacturersApp = new Hono()
 	.use(authMiddleware)
+	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', ManufacturerListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(
@@ -39,7 +43,7 @@ export const manufacturersApp = new Hono()
 	})
 	.post(
 		'/',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('json', ManufacturerCreateSchema, onValidationError),
 		async (c) => {
 			return sendCreated(c, await createManufacturer(c.req.valid('json')))
@@ -50,7 +54,7 @@ export const manufacturersApp = new Hono()
 	})
 	.patch(
 		'/:id',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('edit'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', ManufacturerUpdateSchema, onValidationError),
 		async (c) => {
@@ -62,7 +66,7 @@ export const manufacturersApp = new Hono()
 	)
 	.delete(
 		'/:id',
-		requireGlobalWriteMiddleware,
+		requireGlobalPermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			return sendRow(c, await deleteManufacturer(c.req.valid('param').id))

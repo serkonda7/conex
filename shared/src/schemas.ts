@@ -946,36 +946,85 @@ export const TopologyQuerySchema = v.object({
 export type TopologyQuery = v.InferOutput<typeof TopologyQuerySchema>
 
 // ---------------------------------------------------------------------------
-// P7: users / roles
+// P7: users / roles / permissions
 // ---------------------------------------------------------------------------
 
 /**
- * User role: `admin` manages users/roles and reads+writes everything;
- * `editor` reads+writes inventory (no user management); `viewer` reads only.
- * Editors and viewers with a `tenant_id` set are strictly limited to that
- * single tenant (null-tenant rows are invisible to them); `tenant_id = NULL`
- * means global (all tenants). Admins ignore tenant scope entirely.
+ * Permissions a role can grant. `view` / `edit` / `delete` cover every
+ * inventory and catalog resource at once (`edit` = create + update,
+ * including CSV import). The rest gate the admin areas; `integrations.manage`
+ * covers both configuring providers and running syncs / links.
  */
-export const RoleSchema = v.picklist(['admin', 'editor', 'viewer'])
+export const PERMISSIONS = [
+	'view',
+	'edit',
+	'delete',
+	'users.manage',
+	'changelog.view',
+	'audit_log.view',
+	'integrations.manage',
+] as const
 
-export type Role = v.InferOutput<typeof RoleSchema>
+export const PermissionSchema = v.picklist(PERMISSIONS)
+
+export type Permission = v.InferOutput<typeof PermissionSchema>
+
+const PermissionListSchema = v.pipe(
+	v.array(PermissionSchema),
+	v.transform((list) => PERMISSIONS.filter((p) => list.includes(p))),
+)
+
+/**
+ * Roles bundle permissions and are assigned to users (one role per user).
+ * Users whose role grants `users.manage` are always global (no tenant
+ * scope); everyone else with a `tenant_id` is strictly limited to that
+ * single tenant (null-tenant rows are invisible to them).
+ */
+export const RoleCreateSchema = v.strictObject({
+	name: NameSchema,
+	description: DescriptionSchema,
+	permissions: v.optional(PermissionListSchema, []),
+})
+
+export const RoleUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	permissions: v.optional(PermissionListSchema, undefined),
+})
+
+export const RoleListQuerySchema = v.object({
+	...ListQueryEntries,
+})
+
+/** Role as returned by `/roles`; `user_count` drives the delete guard in the UI. */
+export interface RoleJson {
+	id: number
+	name: string
+	description: string | null
+	permissions: Permission[]
+	user_count: number
+}
+
+export type RoleCreate = v.InferOutput<typeof RoleCreateSchema>
+export type RoleUpdate = v.InferOutput<typeof RoleUpdateSchema>
+export type RoleListQuery = v.InferOutput<typeof RoleListQuerySchema>
 
 export const UserCreateSchema = v.strictObject({
 	username: UsernameSchema,
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
-	role: v.optional(RoleSchema, 'viewer'),
+	role_id: IdSchema,
 	tenant_id: NullableIdSchema,
 })
 
 export const UserUpdateSchema = v.strictObject({
-	role: v.optional(RoleSchema, undefined),
+	role_id: v.optional(IdSchema, undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	password: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(1024)), undefined),
 })
 
 export const UserListQuerySchema = v.object({
 	...ListQueryEntries,
-	role: v.optional(RoleSchema, undefined),
+	role: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 })
 
@@ -983,7 +1032,8 @@ export const UserListQuerySchema = v.object({
 export interface UserJson {
 	id: number
 	username: string
-	role: Role
+	role_id: number
+	role_name: string
 	tenant_id: number | null
 }
 

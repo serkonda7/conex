@@ -22,15 +22,15 @@ import { SelectField } from '../../components/form'
 import { t } from '../../i18n'
 import { compareFieldLabel, findingKindLabel, providerLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
-import { canWrite, canWriteGlobal, isAdmin } from '../../lib/session'
+import { can, canGlobal } from '../../lib/session'
 import { ExternalTenantPicker } from './external_tenant_picker'
 
 /**
  * Configured, enabled integrations (empty on error: the cards just hide).
- * The list is admin-only, so other users never load (or see) cards.
+ * The list needs `integrations.manage`, so other users never load (or see) cards.
  */
 function useIntegrations(): () => IntegrationJson[] {
-	const [integrations] = createRowsFor(isAdmin, fetch_integrations)
+	const [integrations] = createRowsFor(() => can('integrations.manage'), fetch_integrations)
 	return () => (integrations() ?? []).filter((i) => i.enabled)
 }
 
@@ -89,7 +89,7 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 			<div class="page-header">
 				<h3>{providerLabel(provider())}</h3>
 				<div class="form-actions">
-					<Show when={canWrite() && status()?.link}>
+					<Show when={can('integrations.manage') && status()?.link}>
 						<button
 							type="button"
 							disabled={syncing()}
@@ -98,7 +98,7 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 							{syncing() ? t('integration.syncing') : t('integration.syncNow')}
 						</button>
 					</Show>
-					<Show when={canWriteGlobal()}>
+					<Show when={canGlobal('integrations.manage')}>
 						<button type="button" onClick={() => setPicking(true)}>
 							{status()?.link ? t('integration.changeLink') : t('integration.link')}
 						</button>
@@ -236,7 +236,7 @@ function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): 
 		<section class="card" aria-label={providerLabel(provider())}>
 			<div class="page-header">
 				<h3>{providerLabel(provider())}</h3>
-				<Show when={canWrite() && status()?.link}>
+				<Show when={can('integrations.manage') && status()?.link}>
 					<div class="form-actions">
 						<button
 							type="button"
@@ -258,7 +258,11 @@ function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): 
 						fallback={<p class="empty">{t('integration.tenantNotLinked')}</p>}
 					>
 						<p class="empty">{t('integration.deviceNotLinked')}</p>
-						<Show when={canWrite() && (status()?.candidates.length ?? 0) > 0}>
+						<Show
+							when={
+								can('integrations.manage') && (status()?.candidates.length ?? 0) > 0
+							}
+						>
 							<SelectField
 								id={`integration-${provider()}-device-link`}
 								label={t('integration.linkTo')}

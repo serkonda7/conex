@@ -1,41 +1,42 @@
 import { createSignal, type JSX, Show } from 'solid-js'
+import { fetch_roles, type RoleJson } from '../../api/roles'
 import { fetch_tenants } from '../../api/tenancy'
-import { fetch_user, type UserJson, type UserRole, update_user } from '../../api/users'
+import { fetch_user, type UserJson, update_user } from '../../api/users'
 import { FormPage, Hint, row_options, SelectField, TextField } from '../../components/form'
 import { t } from '../../i18n'
-import { roleOptions } from '../../i18n/labels'
 import { id_value, submit_form, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
-import { RoleHint } from './role_hint'
+import { managesUsers, RoleHint } from './role_hint'
 
-/** /users/:id/edit — admin-only role, tenant-scope, and password form. */
+/** /users/:id/edit — role, tenant-scope, and password form (`users.manage`). */
 export function UserEditPage(props: { id: number }): JSX.Element {
-	const [role, setRole] = createSignal<UserRole>('viewer')
+	const [roleId, setRoleId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_user,
 		fill: (row: UserJson) => {
-			setRole(row.role)
+			setRoleId(id_value(row.role_id))
 			setTenantId(id_value(row.tenant_id))
 		},
 	})
 	const [tenants] = createRows(fetch_tenants)
+	const [roles] = createRows(fetch_roles)
+	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		const tenant = parseId(tenantId())
 		await submit_form({
 			form,
 			name: '',
 			optionalName: true,
-			validate: () => (role() === 'admin' && tenant !== null ? t('user.adminGlobal') : null),
+			validate: () => (parseId(roleId()) === null ? t('user.selectRole') : null),
 			save: () =>
 				update_user(props.id, {
-					role: role(),
-					tenant_id: tenant,
+					role_id: parseId(roleId()) ?? undefined,
+					tenant_id: managesUsers(role()) ? null : parseId(tenantId()),
 					...(password() ? { password: password() } : {}),
 				}),
 			navigateTo: '/users',
@@ -54,14 +55,13 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 			<SelectField
 				id="user-edit-role"
 				label={t('user.role')}
-				value={role()}
-				onChange={(value: string) => setRole(value as UserRole)}
-				options={roleOptions()}
-				hint={
-					<RoleHint> {t('user.roleHintLastAdmin', { admin: t('role.admin') })}</RoleHint>
-				}
+				required
+				value={roleId()}
+				onChange={setRoleId}
+				options={row_options(roles() ?? [])}
+				hint={<RoleHint role={role()} />}
 			/>
-			<Show when={role() !== 'admin'}>
+			<Show when={!managesUsers(role())}>
 				<SelectField
 					id="user-edit-tenant"
 					label={t('user.tenantScope')}

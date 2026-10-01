@@ -16,6 +16,7 @@ import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
+import { rolesApp } from './routes/roles'
 import { searchApp } from './routes/search'
 import { shelvesApp } from './routes/shelves'
 import { siteGroupsApp } from './routes/site_groups'
@@ -67,6 +68,7 @@ export function createApp() {
 			})
 			.route('/auth', authApp)
 			.route('/users', usersApp)
+			.route('/roles', rolesApp)
 			.route('/audit-log', auditLogApp)
 			.route('/changelog', changelogApp)
 			.route('/tenants', tenantsApp)
