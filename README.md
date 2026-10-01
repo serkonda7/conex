@@ -5,7 +5,8 @@ Network inventory for MSPs.
 ## Getting Started
 ```sh
 docker start conex-db
-CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex bun run dev
+export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
+bun run dev
 ```
 
 ### Initial Setup
@@ -61,15 +62,21 @@ pg_restore -d "$CONEX_DATABASE_URL" conex-2026-09-30.dump
 ```
 
 
-## Checks
+## Development
+### Checks
 ```sh
 bun run check
 bun run build
 bun run lint:ci
+
+# Export CONEX_DATABASE_URL first (see Environment Variables above).
+bun run test:e2e
+bun run test:visual
+bun run test:visual:update
 ```
 
 
-## Development
+### Git Worktrees
 Use worktrees to work on parallel branches without disturbing the current checkout:
 ```sh
 git worktree add ../conex-feature -b feature/my-change
