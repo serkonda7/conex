@@ -34,7 +34,7 @@ import { siteTrail } from '../../lib/trails'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 
-/** Console, power and display ports; everything else is a network port. */
+/** General, power, outlet and display ports; everything else is a network port. */
 const isOtherPort = (iface: InterfaceJson): boolean => OTHER_PORT_KINDS.has(iface.kind)
 
 /** Connect or disconnect plus edit buttons of one port row. */
@@ -204,7 +204,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		nameColumn,
 		connectionColumn,
 	]
-	/** Console/power/display ports show their kind instead. */
+	/** Other ports show their kind instead. */
 	const otherColumns: DataTableColumn<InterfaceJson>[] = [
 		nameColumn,
 		{

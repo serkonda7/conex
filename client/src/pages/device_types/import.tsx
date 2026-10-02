@@ -1,6 +1,6 @@
 import { IconExternalLink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { DISPLAY_PORT_KINDS } from 'shared/src/schemas'
+import { DISPLAY_PORT_KINDS, GENERAL_PORT_KINDS } from 'shared/src/schemas'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, For, Show } from 'solid-js'
@@ -26,6 +26,8 @@ function PortsDescription(props: {
 	optional: string[]
 	defaultType?: string
 	types?: readonly string[]
+	/** With `defaultType`: types kept as-is, others fall back to the default. */
+	knownTypes?: readonly string[]
 }): JSX.Element {
 	return (
 		<>
@@ -46,7 +48,12 @@ function PortsDescription(props: {
 			.{' '}
 			{props.types
 				? t('import.fieldPortsTypes', { types: props.types.join(', ') })
-				: t('import.fieldPortsDefault', { type: props.defaultType ?? '' })}
+				: props.knownTypes
+					? t('import.fieldPortsKnownTypes', {
+							types: props.knownTypes.join(', '),
+							type: props.defaultType ?? '',
+						})
+					: t('import.fieldPortsDefault', { type: props.defaultType ?? '' })}
 		</>
 	)
 }
@@ -200,13 +207,15 @@ export function DeviceTypeImportPage(): JSX.Element {
 								</td>
 							</tr>
 							<tr>
-								<td>console-ports</td>
+								<td>ports</td>
 								<td>—</td>
 								<td>
 									<PortsDescription
 										optional={['type', 'description']}
-										defaultType="console"
-									/>
+										defaultType="port"
+										knownTypes={GENERAL_PORT_KINDS}
+									/>{' '}
+									{t('import.fieldAlias', { alias: 'console-ports' })}
 								</td>
 							</tr>
 							<tr>
@@ -216,6 +225,16 @@ export function DeviceTypeImportPage(): JSX.Element {
 									<PortsDescription
 										optional={['type', 'description']}
 										defaultType="power"
+									/>
+								</td>
+							</tr>
+							<tr>
+								<td>power-outlets</td>
+								<td>—</td>
+								<td>
+									<PortsDescription
+										optional={['type', 'description']}
+										defaultType="power-outlet"
 									/>
 								</td>
 							</tr>

@@ -416,15 +416,43 @@ export interface ElevationResponse {
 // P3: manufacturers / device templates
 // ---------------------------------------------------------------------------
 
-/** Display connector kinds; like console/power they only connect to their own kind. */
+/** Display connector kinds; like power they only connect to their own kind. */
 export const DISPLAY_PORT_KINDS = ['hdmi', 'displayport', 'vga', 'dvi'] as const
 
+/** Serial connectors (NetBox console port types); they connect to each other. */
+export const SERIAL_PORT_KINDS = ['rj-45', 'de-9', 'db-25', 'rj-11', 'rj-12', 'mini-din-8'] as const
+
+/** USB connectors (NetBox console port types); they connect to each other. */
+export const USB_PORT_KINDS = [
+	'usb-a',
+	'usb-b',
+	'usb-c',
+	'usb-mini-a',
+	'usb-mini-b',
+	'usb-micro-a',
+	'usb-micro-b',
+	'usb-micro-ab',
+] as const
+
+/**
+ * General-purpose port connectors (e.g. a docking station's USB-C uplink),
+ * kept as the port kind. Plain `port` is a port of unknown connector.
+ */
+export const GENERAL_PORT_KINDS = [...SERIAL_PORT_KINDS, ...USB_PORT_KINDS] as const
+
 /** Interface kinds offered when adding stubs; stored kinds stay free-form (NetBox types). */
-export const PORT_KINDS = ['ethernet', 'console', 'power', ...DISPLAY_PORT_KINDS] as const
+export const PORT_KINDS = [
+	'ethernet',
+	'port',
+	...GENERAL_PORT_KINDS,
+	'power',
+	'power-outlet',
+	...DISPLAY_PORT_KINDS,
+] as const
 
 export type PortKind = (typeof PORT_KINDS)[number]
 
-/** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `console`, `hdmi`). */
+/** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `usb-c`, `hdmi`). */
 export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
 
 /** Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`). */

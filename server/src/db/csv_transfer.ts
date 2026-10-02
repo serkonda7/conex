@@ -5,6 +5,7 @@ import {
 	CableImportRowSchema,
 	DeviceImportRowSchema,
 	DISPLAY_PORT_KINDS,
+	GENERAL_PORT_KINDS,
 	type ImportResponse,
 	type ImportRowResult,
 } from 'shared/src/schemas'
@@ -223,8 +224,11 @@ async function importDeviceTypeDefinition(
 	}
 	for (const [key, defaultKind] of [
 		['interfaces', 'ethernet'],
-		['console-ports', 'console'],
+		['ports', 'port'],
+		// NetBox's name for general ports.
+		['console-ports', 'port'],
 		['power-ports', 'power'],
+		['power-outlets', 'power-outlet'],
 		['display-ports', null],
 	] as const) {
 		const ports = item[key]
@@ -241,8 +245,10 @@ async function importDeviceTypeDefinition(
 				continue
 			}
 			// NetBox interface types may be a list; the first entry wins.
-			// Console/power ports keep their class as kind (the device detail
-			// page splits ports on it), dropping the connector type.
+			// Ports keep a known connector type (usb-c, rj-45, …) as kind;
+			// `other`, missing and unknown types fall back to `port`.
+			// Power ports and outlets keep their class as kind (the device
+			// detail page splits ports on it), dropping the connector type.
 			// Display ports (not a NetBox class) keep their connector type as
 			// kind, so it must be one of the known display kinds.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
@@ -255,6 +261,8 @@ async function importDeviceTypeDefinition(
 					)
 				}
 				kind = displayKind
+			} else if (key === 'ports' || key === 'console-ports') {
+				kind = GENERAL_PORT_KINDS.find((k) => k === type) ?? defaultKind
 			} else {
 				kind =
 					key !== 'interfaces' || type === undefined || type === null

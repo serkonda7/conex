@@ -1,5 +1,10 @@
 import { Result } from 'better-result'
-import { DISPLAY_PORT_KINDS } from 'shared/src/schemas'
+import {
+	DISPLAY_PORT_KINDS,
+	GENERAL_PORT_KINDS,
+	SERIAL_PORT_KINDS,
+	USB_PORT_KINDS,
+} from 'shared/src/schemas'
 import type { InputEventAndTarget, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
@@ -14,16 +19,47 @@ import { InlineError } from '../../components/feedback'
 import { Modal } from '../../components/modal'
 import { ObjectSearch } from '../../components/object_selector'
 import { t } from '../../i18n'
+import { portKindLabel } from '../../i18n/labels'
 
-/** Interface kinds that only connect to their own kind (never to network ports). */
-export const OTHER_PORT_KINDS = new Set<string>(['console', 'power', ...DISPLAY_PORT_KINDS])
+/** Interface kinds that never connect to network ports. */
+export const OTHER_PORT_KINDS = new Set<string>([
+	'port',
+	...GENERAL_PORT_KINDS,
+	'power',
+	'power-outlet',
+	...DISPLAY_PORT_KINDS,
+])
 
-/** Network ports pair with network ports; console/power/display only with the same kind. */
+const POWER_PORT_KINDS = new Set(['power', 'power-outlet'])
+
+/** Connector families cabled across connectors (rollover, USB-A to USB-C, …). */
+const PORT_FAMILIES = [new Set<string>(SERIAL_PORT_KINDS), new Set<string>(USB_PORT_KINDS)]
+
+/**
+ * Network ports pair with network ports; a power port pairs with a power port
+ * or outlet (never outlet to outlet); general ports pair within their
+ * connector family, a plain `port` with any general port; display only with
+ * the same kind.
+ */
 function isCompatible(local: InterfaceJson, peer: InterfaceJson): boolean {
+	if (POWER_PORT_KINDS.has(local.kind) && POWER_PORT_KINDS.has(peer.kind)) {
+		return local.kind === 'power' || peer.kind === 'power'
+	}
+	if (isGeneralPort(local.kind) && isGeneralPort(peer.kind)) {
+		return (
+			local.kind === 'port' ||
+			peer.kind === 'port' ||
+			PORT_FAMILIES.some((f) => f.has(local.kind) && f.has(peer.kind))
+		)
+	}
 	if (OTHER_PORT_KINDS.has(local.kind) || OTHER_PORT_KINDS.has(peer.kind)) {
 		return local.kind === peer.kind
 	}
 	return true
+}
+
+function isGeneralPort(kind: string): boolean {
+	return kind === 'port' || (GENERAL_PORT_KINDS as readonly string[]).includes(kind)
 }
 
 /** A candidate peer port plus, when it is taken, the cable's other end. */
@@ -222,7 +258,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 															? `→ ${link.peer_device.name}`
 															: iface.connected
 																? t('device.connected')
-																: iface.kind}
+																: portKindLabel(iface.kind)}
 													</small>
 												</button>
 											)}
