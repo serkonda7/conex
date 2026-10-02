@@ -1,5 +1,6 @@
 import { IconExternalLink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import { DISPLAY_PORT_KINDS } from 'shared/src/schemas'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, For, Show } from 'solid-js'
@@ -20,7 +21,12 @@ interfaces:
 `
 
 /** Field-options description for a NetBox port list (`interfaces`, …). */
-function PortsDescription(props: { optional: string[]; defaultType: string }): JSX.Element {
+/** Ports field help; `types` (required type from a fixed list) replaces `defaultType`. */
+function PortsDescription(props: {
+	optional: string[]
+	defaultType?: string
+	types?: readonly string[]
+}): JSX.Element {
 	return (
 		<>
 			{t('import.fieldPortsPrefix')} <code>name</code>
@@ -37,7 +43,10 @@ function PortsDescription(props: { optional: string[]; defaultType: string }): J
 					</>
 				)}
 			</For>
-			. {t('import.fieldPortsDefault', { type: props.defaultType })}
+			.{' '}
+			{props.types
+				? t('import.fieldPortsTypes', { types: props.types.join(', ') })
+				: t('import.fieldPortsDefault', { type: props.defaultType ?? '' })}
 		</>
 	)
 }
@@ -207,6 +216,16 @@ export function DeviceTypeImportPage(): JSX.Element {
 									<PortsDescription
 										optional={['type', 'description']}
 										defaultType="power"
+									/>
+								</td>
+							</tr>
+							<tr>
+								<td>display-ports</td>
+								<td>—</td>
+								<td>
+									<PortsDescription
+										optional={['description']}
+										types={DISPLAY_PORT_KINDS}
 									/>
 								</td>
 							</tr>

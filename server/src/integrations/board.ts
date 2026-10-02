@@ -16,7 +16,7 @@ import type {
 import { getDb } from '../db/connection'
 import { devices, tenant_groups, tenants } from '../schema'
 import { type ExternalLinkRow, linkOf, listLinks } from './links'
-import { matchDevices, normalizeName } from './match'
+import { group, matchDevices, normalizeName } from './match'
 import { lastSyncedAt, localDevices } from './report'
 import { readDevices, readTenant, readTenants } from './snapshot'
 
@@ -49,18 +49,8 @@ function uniqueNameMatches<L, E>(
 	localName: (l: L) => string,
 	externalName: (e: E) => string,
 ): Map<L, E> {
-	const count = <T>(items: T[], name: (t: T) => string): Map<string, T[]> => {
-		const out = new Map<string, T[]>()
-		for (const item of items) {
-			const key = normalizeName(name(item))
-			if (key !== null) {
-				out.set(key, [...(out.get(key) ?? []), item])
-			}
-		}
-		return out
-	}
-	const byLocal = count(locals, localName)
-	const byExternal = count(externals, externalName)
+	const byLocal = group(locals, (l) => normalizeName(localName(l)))
+	const byExternal = group(externals, (e) => normalizeName(externalName(e)))
 	const out = new Map<L, E>()
 	for (const [key, ls] of byLocal) {
 		const es = byExternal.get(key)

@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import type { PortKind } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
@@ -22,6 +23,7 @@ import {
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { t, tp } from '../../i18n'
+import { portKindLabel, portKindOptions } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
@@ -37,6 +39,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [stubPrefix, setStubPrefix] = createSignal('')
 	const [stubCount, setStubCount] = createSignal(DEFAULT_STUB_COUNT)
+	const [stubKind, setStubKind] = createSignal<PortKind>('ethernet')
 	const id = (): number => props.id
 	const [deviceType] = createRecord(id, fetch_device_type, setError)
 	const manufacturerId = (): number | undefined => deviceType()?.manufacturer_id
@@ -70,7 +73,11 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			setError(t('deviceType.stubCountInvalid'))
 			return
 		}
-		if (await run(() => create_stub(props.id, { prefix: stubPrefix(), count }))) {
+		if (
+			await run(() =>
+				create_stub(props.id, { prefix: stubPrefix(), count, kind: stubKind() }),
+			)
+		) {
 			setStubPrefix('')
 			setStubCount(DEFAULT_STUB_COUNT)
 		}
@@ -96,7 +103,11 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			label: t('deviceType.stubCount'),
 			getValue: (s: StubRow): number => s.count,
 		},
-		{ key: 'kind', label: t('deviceType.stubKind'), getValue: (s: StubRow): string => s.kind },
+		{
+			key: 'kind',
+			label: t('deviceType.stubKind'),
+			getValue: (s: StubRow): string => portKindLabel(s.kind),
+		},
 	]
 
 	const stubActions = (s: StubRow): JSX.Element => (
@@ -157,6 +168,19 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						value={stubCount()}
 						onInput={(e: InputEventAndTarget) => setStubCount(e.currentTarget.value)}
 					/>
+					<select
+						aria-label={t('deviceType.stubKindLabel')}
+						value={stubKind()}
+						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
+							setStubKind(e.currentTarget.value as PortKind)
+						}}
+					>
+						<For each={portKindOptions()}>
+							{(o: { value: PortKind; label: string }): JSX.Element => (
+								<option value={o.value}>{o.label}</option>
+							)}
+						</For>
+					</select>
 					<button type="submit">{t('deviceType.addStub')}</button>
 				</form>
 			</Show>

@@ -17,6 +17,8 @@ import {
 	LOCATION_TYPES,
 	type LocationType,
 	type Permission,
+	PORT_KINDS,
+	type PortKind,
 	type SyncRunState,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
@@ -56,6 +58,26 @@ export function faceOptions(): { value: 'front' | 'rear'; label: string }[] {
 		{ value: 'front', label: faceLabel('front') },
 		{ value: 'rear', label: faceLabel('rear') },
 	]
+}
+
+const PORT_KIND_KEYS: Record<PortKind, MessageKey> = {
+	ethernet: 'portKind.ethernet',
+	console: 'portKind.console',
+	power: 'portKind.power',
+	hdmi: 'portKind.hdmi',
+	displayport: 'portKind.displayport',
+	vga: 'portKind.vga',
+	dvi: 'portKind.dvi',
+}
+
+/** Interface kind (`ethernet`, `hdmi`, …); NetBox types fall back to the raw value. */
+export function portKindLabel(value: string): string {
+	return lookup(PORT_KIND_KEYS, value)
+}
+
+/** `<select>` options for the built-in interface kinds. */
+export function portKindOptions(): { value: PortKind; label: string }[] {
+	return PORT_KINDS.map((value) => ({ value, label: portKindLabel(value) }))
 }
 
 const CABLE_STATUS_KEYS: Record<string, MessageKey> = {

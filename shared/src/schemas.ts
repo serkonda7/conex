@@ -416,7 +416,15 @@ export interface ElevationResponse {
 // P3: manufacturers / device templates
 // ---------------------------------------------------------------------------
 
-/** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `console`). */
+/** Display connector kinds; like console/power they only connect to their own kind. */
+export const DISPLAY_PORT_KINDS = ['hdmi', 'displayport', 'vga', 'dvi'] as const
+
+/** Interface kinds offered when adding stubs; stored kinds stay free-form (NetBox types). */
+export const PORT_KINDS = ['ethernet', 'console', 'power', ...DISPLAY_PORT_KINDS] as const
+
+export type PortKind = (typeof PORT_KINDS)[number]
+
+/** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `console`, `hdmi`). */
 export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
 
 /** Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`). */

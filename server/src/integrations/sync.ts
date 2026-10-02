@@ -11,8 +11,8 @@ import { and, eq } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId, SyncRunJson } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { ConflictError, NotFoundError } from '../db/errors'
-import { errOf } from '../db/list'
-import { devices, sync_runs, tenants } from '../schema'
+import { checkTenantExists, errOf } from '../db/list'
+import { devices, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
 import { listLinks, setLink } from './links'
 import { matchDevices } from './match'
@@ -175,13 +175,9 @@ export async function startSync(
 	if (row.value.enabled !== 1) {
 		return Result.err(new ConflictError('Integration is disabled'))
 	}
-	if (tenantId !== null) {
-		const tenant = (
-			await getDb().select().from(tenants).where(eq(tenants.id, tenantId)).limit(1)
-		)[0]
-		if (!tenant) {
-			return Result.err(new NotFoundError('Tenant not found'))
-		}
+	const tenant = await checkTenantExists(tenantId)
+	if (Result.isError(tenant)) {
+		return tenant
 	}
 	if (running.has(provider)) {
 		return Result.err(new ConflictError('A sync is already running'))

@@ -4,7 +4,6 @@ import { type Context, Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
 import { type AuditEvent, LoginSchema, SetupSchema } from 'shared/src/schemas'
 import { requestUser } from '../authz'
-import { getConfig } from '../config'
 import { recordAudit } from '../db/audit'
 import { isUniqueViolation } from '../db/errors'
 import { fullAccessRoleId } from '../db/roles'
@@ -13,11 +12,19 @@ import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
 import { onValidationError } from '../middleware/validation'
 import { get_signed_jwt, getSessionCookieOpts, invalidateSession } from '../sessions'
+import type { User } from '../types'
 import { forwarded_for, peer_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
 import { normalize_username } from '../util/username'
 
 export const authApp = new Hono()
+
+const AUTH_COOKIE = 'auth_token'
+
+/** Opens a session for `user` and sets its cookie. */
+async function startSession(c: Context, user: User): Promise<void> {
+	setCookie(c, AUTH_COOKIE, await get_signed_jwt(user), getSessionCookieOpts())
+}
 
 // ---------------------------------------------------------------------------
 // Providers capability endpoint (local auth only in v1)
@@ -68,8 +75,7 @@ authApp.post(
 				await fullAccessRoleId(),
 				null,
 			)
-			const token = await get_signed_jwt(user)
-			setCookie(c, 'auth_token', token, getSessionCookieOpts())
+			await startSession(c, user)
 			return c.json({ success: true }, 201)
 		} catch (error: unknown) {
 			if (isUniqueViolation(error)) {
@@ -125,8 +131,7 @@ authApp.post(
 			await auditLogin(c, ip, 'login.failure', user.username, user.id)
 			return jsonError(c, 'Invalid username or password', 401)
 		}
-		const token = await get_signed_jwt(user)
-		setCookie(c, 'auth_token', token, getSessionCookieOpts())
+		await startSession(c, user)
 		await auditLogin(c, ip, 'login.success', user.username, user.id)
 
 		return c.json({ success: true })
@@ -137,11 +142,7 @@ authApp.post('/logout', authMiddleware, async (c) => {
 	const payload = c.get('jwtPayload')
 	await invalidateSession(payload.jti)
 
-	deleteCookie(c, 'auth_token', {
-		path: '/',
-		secure: getConfig().auth.secureCookies,
-		sameSite: 'Strict',
-	})
+	deleteCookie(c, AUTH_COOKIE, getSessionCookieOpts())
 	return c.json({ success: true })
 })
 

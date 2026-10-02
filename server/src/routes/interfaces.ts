@@ -1,7 +1,7 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { InterfaceListQuerySchema } from 'shared/src/schemas'
-import { checkTenant, requestUser, scopeTenantId } from '../authz'
+import { checkTenant, requestScope } from '../authz'
 import { listAllInterfaces } from '../db/devices'
 import { deviceTenant } from '../db/owners'
 import { authMiddleware } from '../middleware/auth'
@@ -19,15 +19,11 @@ export const interfacesApp = new Hono()
 	.get('/', vValidator('query', InterfaceListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {
-			const tenant = await deviceTenant(query.device)
-			if (tenant !== undefined) {
-				const denied = checkTenant(c, tenant)
-				if (denied) {
-					return denied
-				}
+			const denied = checkTenant(c, await deviceTenant(query.device))
+			if (denied) {
+				return denied
 			}
 		}
-		const scope = scopeTenantId(requestUser(c))
 		return c.json(
 			await listAllInterfaces({
 				search: query.search,
@@ -35,7 +31,7 @@ export const interfacesApp = new Hono()
 				limit: query.limit,
 				device: query.device,
 				connected: query.connected,
-				...(scope !== null ? { scopeTenantId: scope } : {}),
+				scopeTenantId: requestScope(c),
 			}),
 		)
 	})

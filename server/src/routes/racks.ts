@@ -29,14 +29,11 @@ export const racksApp = baseRacksApp.get(
 	'/:id/elevation',
 	vValidator('param', EntityParamsSchema, onValidationError),
 	async (c) => {
-		const rack = await getRack(c.req.valid('param').id)
+		const id = c.req.valid('param').id
+		const rack = await getRack(id)
 		if (Result.isError(rack)) {
 			return sendResult(c, rack)
 		}
-		const denied = checkTenant(c, rack.value.tenant_id)
-		if (denied) {
-			return denied
-		}
-		return sendResult(c, await getElevation(c.req.valid('param').id))
+		return checkTenant(c, rack.value.tenant_id) ?? sendResult(c, await getElevation(id))
 	},
 )

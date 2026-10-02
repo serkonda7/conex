@@ -18,11 +18,6 @@ const MAX_BUCKETS = 10_000
 type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
 
-/** Test helper: clears all counters. */
-export function reset_rate_limits(): void {
-	buckets.clear()
-}
-
 export function rate_limit(): MiddlewareHandler {
 	return async (c: Context, next: Next): Promise<Response | undefined> => {
 		const { maxAttempts, windowSeconds } = getConfig().auth.loginRateLimit

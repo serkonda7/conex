@@ -7,8 +7,7 @@ import {
 	TenantGroupListQuerySchema,
 	TenantGroupUpdateSchema,
 } from 'shared/src/schemas'
-import { requestUser, scopeTenantId } from '../authz'
-import { ForbiddenError } from '../db/errors'
+import { forbidden, requestScope } from '../authz'
 import {
 	createTenantGroup,
 	deleteTenantGroup,
@@ -35,7 +34,6 @@ export const tenantGroupsApp = new Hono()
 	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', TenantGroupListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
-		const scope = scopeTenantId(requestUser(c))
 		return c.json(
 			await listTenantGroups({
 				search: query.search,
@@ -43,7 +41,7 @@ export const tenantGroupsApp = new Hono()
 				limit: query.limit,
 				sort: query.sort,
 				order: query.order,
-				...(scope !== null ? { scopeTenantId: scope } : {}),
+				scopeTenantId: requestScope(c),
 			}),
 		)
 	})
@@ -58,14 +56,11 @@ export const tenantGroupsApp = new Hono()
 		if (Result.isError(result)) {
 			return sendResult(c, result)
 		}
-		const scope = scopeTenantId(requestUser(c))
-		if (scope !== null) {
+		const scope = requestScope(c)
+		if (scope !== undefined) {
 			const own = await getTenant(scope)
 			if (Result.isError(own) || own.value.tenant_group_id !== result.value.id) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Forbidden: outside your tenant scope')),
-				)
+				return forbidden(c)
 			}
 		}
 		return c.json(result.value)

@@ -1,7 +1,7 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Hono } from 'hono'
 import { SearchQuerySchema } from 'shared/src/schemas'
-import { requestUser, scopeTenantId } from '../authz'
+import { requestScope } from '../authz'
 import { globalSearch } from '../db/search'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
@@ -12,6 +12,5 @@ export const searchApp = new Hono()
 	.use(authMiddleware)
 	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', SearchQuerySchema, onValidationError), async (c) => {
-		const scope = scopeTenantId(requestUser(c))
-		return c.json(await globalSearch(c.req.valid('query').q, scope ?? undefined))
+		return c.json(await globalSearch(c.req.valid('query').q, requestScope(c)))
 	})

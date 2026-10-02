@@ -26,7 +26,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
-import { faceLabel } from '../../i18n/labels'
+import { faceLabel, portKindLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
@@ -34,7 +34,7 @@ import { siteTrail } from '../../lib/trails'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 
-/** Console and power ports; everything else is a network port. */
+/** Console, power and display ports; everything else is a network port. */
 const isOtherPort = (iface: InterfaceJson): boolean => OTHER_PORT_KINDS.has(iface.kind)
 
 /** Connect or disconnect plus edit buttons of one port row. */
@@ -204,13 +204,13 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		nameColumn,
 		connectionColumn,
 	]
-	/** Console/power ports show their kind instead. */
+	/** Console/power/display ports show their kind instead. */
 	const otherColumns: DataTableColumn<InterfaceJson>[] = [
 		nameColumn,
 		{
 			key: 'kind',
 			label: t('device.kind'),
-			getValue: (iface: InterfaceJson): string => iface.kind,
+			getValue: (iface: InterfaceJson): string => portKindLabel(iface.kind),
 		},
 		connectionColumn,
 	]

@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { type AppConfig, initConfig, load_config_file } from './config'
+import { initConfig, load_config_file } from './config'
 import { initDb } from './db/connection'
 import { failInterruptedSyncs } from './integrations/sync'
 import { auditLogApp } from './routes/audit_log'
@@ -34,12 +34,7 @@ import { get_server_root, getTrimmedEnv, resolveInDataDir } from './util/server_
 // 1. CONEX_CONFIG_PATH env var (absolute, or relative to the data dir)
 // 2. config.toml
 function resolve_config_path(serverRoot: string): string {
-	const configured_path = getTrimmedEnv('CONEX_CONFIG_PATH')
-	if (!configured_path) {
-		return resolveInDataDir(serverRoot, 'config.toml')
-	}
-
-	return resolveInDataDir(serverRoot, configured_path)
+	return resolveInDataDir(serverRoot, getTrimmedEnv('CONEX_CONFIG_PATH') ?? 'config.toml')
 }
 
 /**
@@ -102,14 +97,11 @@ if (import.meta.main) {
 
 	// Load and set
 	const configResult = load_config_file(resolve_config_path(serverRoot))
-	let config: AppConfig
-	if (configResult.isOk()) {
-		config = configResult.value
-		initConfig(config)
-	} else {
+	if (Result.isError(configResult)) {
 		console.error(`Failed to start server: ${configResult.error.message}`)
 		process.exit(1)
 	}
+	initConfig(configResult.value)
 
 	try {
 		await initDb({ serverRoot })

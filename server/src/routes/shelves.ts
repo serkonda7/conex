@@ -1,6 +1,6 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
-import { Hono } from 'hono'
+import { type Context, Hono } from 'hono'
 import {
 	EntityParamsSchema,
 	ShelfCreateSchema,
@@ -9,11 +9,27 @@ import {
 } from 'shared/src/schemas'
 import { checkTenant, listTenantScope } from '../authz'
 import { rackTenant, shelfTenant } from '../db/owners'
-import { createShelf, deleteShelf, getShelf, listShelves, updateShelf } from '../db/shelves'
+import {
+	createShelf,
+	deleteShelf,
+	getShelf,
+	listShelves,
+	type ShelfRow,
+	updateShelf,
+} from '../db/shelves'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+
+/** Loads a shelf the requester may access (via its rack): the row, or the 404/403 response. */
+async function loadShelf(c: Context, id: number): Promise<ShelfRow | Response> {
+	const shelf = await getShelf(id)
+	if (Result.isError(shelf)) {
+		return sendResult(c, shelf)
+	}
+	return checkTenant(c, (await shelfTenant(id)) ?? null) ?? shelf.value
+}
 
 /**
  * Shelves are tenant-bearing via their rack (no `tenant_id` column of their
@@ -51,27 +67,18 @@ export const shelvesApp = new Hono()
 			const body = c.req.valid('json')
 			// A missing rack answers 404 from the service; an out-of-scope rack
 			// answers 403 here before anything is written.
-			const tenant = await rackTenant(body.rack_id)
-			if (tenant !== undefined) {
-				const denied = checkTenant(c, tenant)
-				if (denied) {
-					return denied
-				}
-			}
-			return sendCreated(c, await createShelf(body))
+			return (
+				checkTenant(c, await rackTenant(body.rack_id)) ??
+				sendCreated(c, await createShelf(body))
+			)
 		},
 	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		const id = c.req.valid('param').id
-		const row = await getShelf(id)
-		if (Result.isError(row)) {
-			return sendResult(c, row)
+		const shelf = await loadShelf(c, c.req.valid('param').id)
+		if (shelf instanceof Response) {
+			return shelf
 		}
-		const denied = checkTenant(c, (await shelfTenant(id)) ?? null)
-		if (denied) {
-			return denied
-		}
-		return c.json(row.value)
+		return c.json(shelf)
 	})
 	.patch(
 		'/:id',
@@ -81,22 +88,15 @@ export const shelvesApp = new Hono()
 		async (c) => {
 			const id = c.req.valid('param').id
 			const body = c.req.valid('json')
-			const current = await getShelf(id)
-			if (Result.isError(current)) {
-				return sendResult(c, current)
-			}
-			const denied = checkTenant(c, (await shelfTenant(id)) ?? null)
-			if (denied) {
-				return denied
+			const shelf = await loadShelf(c, id)
+			if (shelf instanceof Response) {
+				return shelf
 			}
 			// Moving to another rack must not smuggle the shelf out of scope.
-			if (body.rack_id !== undefined && body.rack_id !== current.value.rack_id) {
-				const targetTenant = await rackTenant(body.rack_id)
-				if (targetTenant !== undefined) {
-					const targetDenied = checkTenant(c, targetTenant)
-					if (targetDenied) {
-						return targetDenied
-					}
+			if (body.rack_id !== undefined && body.rack_id !== shelf.rack_id) {
+				const denied = checkTenant(c, await rackTenant(body.rack_id))
+				if (denied) {
+					return denied
 				}
 			}
 			return sendResult(c, await updateShelf(id, body))
@@ -108,13 +108,9 @@ export const shelvesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const current = await getShelf(id)
-			if (Result.isError(current)) {
-				return sendResult(c, current)
-			}
-			const denied = checkTenant(c, (await shelfTenant(id)) ?? null)
-			if (denied) {
-				return denied
+			const shelf = await loadShelf(c, id)
+			if (shelf instanceof Response) {
+				return shelf
 			}
 			return sendResult(c, await deleteShelf(id))
 		},

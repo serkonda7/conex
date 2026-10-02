@@ -10,8 +10,8 @@ import type {
 	TicketCreate,
 	TicketCreated,
 } from 'shared/src/schemas'
-import { getDb } from '../db/connection'
 import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
+import { findOne } from '../db/list'
 import { devices, tenants } from '../schema'
 import { linkOf } from './links'
 import { getIntegrationRow, providerFor } from './store'
@@ -20,18 +20,13 @@ export async function createTicket(
 	provider: ProviderId,
 	input: TicketCreate,
 ): Promise<Result<TicketCreated, Error>> {
-	const db = getDb()
-	const tenant = (
-		await db.select().from(tenants).where(eq(tenants.id, input.tenant_id)).limit(1)
-	)[0]
+	const tenant = await findOne(tenants, eq(tenants.id, input.tenant_id))
 	if (!tenant) {
 		return Result.err(new NotFoundError('Tenant not found'))
 	}
 	let externalDeviceId: string | undefined
 	if (input.device_id !== undefined) {
-		const device = (
-			await db.select().from(devices).where(eq(devices.id, input.device_id)).limit(1)
-		)[0]
+		const device = await findOne(devices, eq(devices.id, input.device_id))
 		if (!device) {
 			return Result.err(new NotFoundError('Device not found'))
 		}

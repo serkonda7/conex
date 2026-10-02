@@ -24,12 +24,9 @@ export const topologyApp = new Hono()
 	.get('/', vValidator('query', TopologyQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		if (query.device !== undefined) {
-			const tenant = await deviceTenant(query.device)
-			if (tenant !== undefined) {
-				const denied = checkTenant(c, tenant)
-				if (denied) {
-					return denied
-				}
+			const denied = checkTenant(c, await deviceTenant(query.device))
+			if (denied) {
+				return denied
 			}
 		}
 		const scope = await listTenantScope(c, query.tenant, query.tenant_group)

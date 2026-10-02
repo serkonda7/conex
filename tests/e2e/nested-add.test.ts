@@ -12,7 +12,7 @@ async function openDeviceRoleAdd(page: Page, openerName: string): Promise<void> 
 	await page.goto('/devices/add')
 	await expect(page.locator('#device-name')).toBeVisible()
 	await page.locator('#device-name').fill(openerName)
-	await page.locator('div.field:has(#device-role) button').click()
+	await page.locator('div.field:has(#device-role) button.btn-add').click()
 	await expect(page).toHaveURL(/\/device-roles\/add/)
 	await expect(page.locator('#device-role-name')).toBeVisible()
 }

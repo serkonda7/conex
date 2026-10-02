@@ -7,8 +7,7 @@ import {
 	TenantListQuerySchema,
 	TenantUpdateSchema,
 } from 'shared/src/schemas'
-import { checkTenant, requestUser, scopeTenantId } from '../authz'
-import { ForbiddenError } from '../db/errors'
+import { checkTenant, requestScope, requireGlobalScope } from '../authz'
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
@@ -26,7 +25,6 @@ export const tenantsApp = new Hono()
 	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', TenantListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
-		const scope = scopeTenantId(requestUser(c))
 		return c.json(
 			await listTenants({
 				search: query.search,
@@ -35,7 +33,7 @@ export const tenantsApp = new Hono()
 				group: query.group,
 				sort: query.sort,
 				order: query.order,
-				...(scope !== null ? { scopeTenantId: scope } : {}),
+				scopeTenantId: requestScope(c),
 			}),
 		)
 	})
@@ -44,13 +42,10 @@ export const tenantsApp = new Hono()
 		requirePermissionMiddleware('edit'),
 		vValidator('json', TenantCreateSchema, onValidationError),
 		async (c) => {
-			if (scopeTenantId(requestUser(c)) !== null) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Tenant-scoped users cannot create tenants')),
-				)
-			}
-			return sendCreated(c, await createTenant(c.req.valid('json')))
+			return (
+				requireGlobalScope(c, 'Tenant-scoped users cannot create tenants') ??
+				sendCreated(c, await createTenant(c.req.valid('json')))
+			)
 		},
 	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
@@ -59,11 +54,7 @@ export const tenantsApp = new Hono()
 			return sendResult(c, result)
 		}
 		// A tenant row is "its own" tenant: scoped requesters see only theirs.
-		const denied = checkTenant(c, result.value.id)
-		if (denied) {
-			return denied
-		}
-		return c.json(result.value)
+		return checkTenant(c, result.value.id) ?? c.json(result.value)
 	})
 	.patch(
 		'/:id',
@@ -71,13 +62,10 @@ export const tenantsApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', TenantUpdateSchema, onValidationError),
 		async (c) => {
-			if (scopeTenantId(requestUser(c)) !== null) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Tenant-scoped users cannot rename tenants')),
-				)
-			}
-			return sendResult(c, await updateTenant(c.req.valid('param').id, c.req.valid('json')))
+			return (
+				requireGlobalScope(c, 'Tenant-scoped users cannot rename tenants') ??
+				sendResult(c, await updateTenant(c.req.valid('param').id, c.req.valid('json')))
+			)
 		},
 	)
 	.delete(
@@ -85,12 +73,9 @@ export const tenantsApp = new Hono()
 		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
-			if (scopeTenantId(requestUser(c)) !== null) {
-				return sendResult(
-					c,
-					Result.err(new ForbiddenError('Tenant-scoped users cannot delete tenants')),
-				)
-			}
-			return sendResult(c, await deleteTenant(c.req.valid('param').id))
+			return (
+				requireGlobalScope(c, 'Tenant-scoped users cannot delete tenants') ??
+				sendResult(c, await deleteTenant(c.req.valid('param').id))
+			)
 		},
 	)

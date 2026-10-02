@@ -3,20 +3,49 @@
  * device. The report and the link pickers read from here, so they work
  * without calling the external system on every page load.
  */
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { external_objects } from '../schema'
 import type { ExternalDevice, ExternalTenant } from './types'
 
-/** Rows per INSERT; keeps statements well under the Postgres parameter cap. */
+/** Rows per statement; keeps statements well under the Postgres parameter cap. */
 const CHUNK = 500
 
-async function insertChunked(rows: (typeof external_objects.$inferInsert)[]): Promise<void> {
-	for (let i = 0; i < rows.length; i += CHUNK) {
-		await getDb()
-			.insert(external_objects)
-			.values(rows.slice(i, i + CHUNK))
+type ObjectType = 'tenant' | 'device'
+type ObjectRow = typeof external_objects.$inferInsert
+
+function chunks<T>(items: T[]): T[][] {
+	const out: T[][] = []
+	for (let i = 0; i < items.length; i += CHUNK) {
+		out.push(items.slice(i, i + CHUNK))
+	}
+	return out
+}
+
+/** Snapshot rows of one provider and object type, narrowed by `extra`. */
+function objectsOf(provider: ProviderId, type: ObjectType, extra?: SQL): SQL | undefined {
+	return and(
+		eq(external_objects.provider, provider),
+		eq(external_objects.object_type, type),
+		extra,
+	)
+}
+
+function tenantRows(provider: ProviderId, tenants: ExternalTenant[], now: number): ObjectRow[] {
+	return tenants.map((tenant) => ({
+		provider,
+		object_type: 'tenant',
+		external_id: tenant.external_id,
+		external_tenant_id: tenant.external_id,
+		data: tenant,
+		fetched_at: now,
+	}))
+}
+
+async function insertChunked(rows: ObjectRow[]): Promise<void> {
+	for (const chunk of chunks(rows)) {
+		await getDb().insert(external_objects).values(chunk)
 	}
 }
 
@@ -26,24 +55,8 @@ export async function replaceTenants(
 	tenants: ExternalTenant[],
 	now: number,
 ): Promise<void> {
-	await getDb()
-		.delete(external_objects)
-		.where(
-			and(
-				eq(external_objects.provider, provider),
-				eq(external_objects.object_type, 'tenant'),
-			),
-		)
-	await insertChunked(
-		tenants.map((tenant) => ({
-			provider,
-			object_type: 'tenant',
-			external_id: tenant.external_id,
-			external_tenant_id: tenant.external_id,
-			data: tenant,
-			fetched_at: now,
-		})),
-	)
+	await getDb().delete(external_objects).where(objectsOf(provider, 'tenant'))
+	await insertChunked(tenantRows(provider, tenants, now))
 }
 
 /** Applies a partial tenant update without dropping unchanged snapshot rows. */
@@ -52,18 +65,10 @@ export async function mergeTenants(
 	changedTenants: ExternalTenant[],
 	now: number,
 ): Promise<ExternalTenant[]> {
-	const rows = changedTenants.map((tenant) => ({
-		provider,
-		object_type: 'tenant',
-		external_id: tenant.external_id,
-		external_tenant_id: tenant.external_id,
-		data: tenant,
-		fetched_at: now,
-	}))
-	for (let i = 0; i < rows.length; i += CHUNK) {
+	for (const chunk of chunks(tenantRows(provider, changedTenants, now))) {
 		await getDb()
 			.insert(external_objects)
-			.values(rows.slice(i, i + CHUNK))
+			.values(chunk)
 			.onConflictDoUpdate({
 				target: [
 					external_objects.provider,
@@ -90,24 +95,17 @@ export async function replaceDevices(
 	await getDb()
 		.delete(external_objects)
 		.where(
-			and(
-				eq(external_objects.provider, provider),
-				eq(external_objects.object_type, 'device'),
+			objectsOf(
+				provider,
+				'device',
 				eq(external_objects.external_tenant_id, externalTenantId),
 			),
 		)
 	// A device moved between companies may still sit under its old company.
-	const ids = devices.map((device) => device.external_id)
-	for (let i = 0; i < ids.length; i += CHUNK) {
+	for (const ids of chunks(devices.map((device) => device.external_id))) {
 		await getDb()
 			.delete(external_objects)
-			.where(
-				and(
-					eq(external_objects.provider, provider),
-					eq(external_objects.object_type, 'device'),
-					inArray(external_objects.external_id, ids.slice(i, i + CHUNK)),
-				),
-			)
+			.where(objectsOf(provider, 'device', inArray(external_objects.external_id, ids)))
 	}
 	await insertChunked(
 		devices.map((device) => ({
@@ -126,12 +124,7 @@ export async function pruneDevices(provider: ProviderId, keepTenantIds: string[]
 	const rows = await getDb()
 		.selectDistinct({ id: external_objects.external_tenant_id })
 		.from(external_objects)
-		.where(
-			and(
-				eq(external_objects.provider, provider),
-				eq(external_objects.object_type, 'device'),
-			),
-		)
+		.where(objectsOf(provider, 'device'))
 	const drop = rows
 		.map((row) => row.id)
 		.filter((id): id is string => id !== null && !keepTenantIds.includes(id))
@@ -140,51 +133,30 @@ export async function pruneDevices(provider: ProviderId, keepTenantIds: string[]
 	}
 	await getDb()
 		.delete(external_objects)
-		.where(
-			and(
-				eq(external_objects.provider, provider),
-				eq(external_objects.object_type, 'device'),
-				inArray(external_objects.external_tenant_id, drop),
-			),
-		)
+		.where(objectsOf(provider, 'device', inArray(external_objects.external_tenant_id, drop)))
 }
 
-export async function readTenants(provider: ProviderId): Promise<Map<string, ExternalTenant>> {
+async function readData<T>(where: SQL | undefined): Promise<T[]> {
 	const rows = await getDb()
 		.select({ data: external_objects.data })
 		.from(external_objects)
-		.where(
-			and(
-				eq(external_objects.provider, provider),
-				eq(external_objects.object_type, 'tenant'),
-			),
-		)
-	const out = new Map<string, ExternalTenant>()
-	for (const row of rows) {
-		const tenant = row.data as ExternalTenant
-		out.set(tenant.external_id, tenant)
-	}
-	return out
+		.where(where)
+	return rows.map((row) => row.data as T)
+}
+
+export async function readTenants(provider: ProviderId): Promise<Map<string, ExternalTenant>> {
+	const tenants = await readData<ExternalTenant>(objectsOf(provider, 'tenant'))
+	return new Map(tenants.map((tenant) => [tenant.external_id, tenant]))
 }
 
 export async function readTenant(
 	provider: ProviderId,
 	externalId: string,
 ): Promise<ExternalTenant | null> {
-	const row = (
-		await getDb()
-			.select({ data: external_objects.data })
-			.from(external_objects)
-			.where(
-				and(
-					eq(external_objects.provider, provider),
-					eq(external_objects.object_type, 'tenant'),
-					eq(external_objects.external_id, externalId),
-				),
-			)
-			.limit(1)
-	)[0]
-	return row ? (row.data as ExternalTenant) : null
+	const [tenant] = await readData<ExternalTenant>(
+		objectsOf(provider, 'tenant', eq(external_objects.external_id, externalId)),
+	)
+	return tenant ?? null
 }
 
 /** Devices of the given external tenants (all when omitted). */
@@ -195,37 +167,23 @@ export async function readDevices(
 	if (externalTenantIds !== undefined && externalTenantIds.length === 0) {
 		return []
 	}
-	const rows = await getDb()
-		.select({ data: external_objects.data })
-		.from(external_objects)
-		.where(
-			and(
-				eq(external_objects.provider, provider),
-				eq(external_objects.object_type, 'device'),
-				externalTenantIds !== undefined
-					? inArray(external_objects.external_tenant_id, externalTenantIds)
-					: undefined,
-			),
-		)
-	return rows.map((row) => row.data as ExternalDevice)
+	return readData<ExternalDevice>(
+		objectsOf(
+			provider,
+			'device',
+			externalTenantIds !== undefined
+				? inArray(external_objects.external_tenant_id, externalTenantIds)
+				: undefined,
+		),
+	)
 }
 
 export async function readDevice(
 	provider: ProviderId,
 	externalId: string,
 ): Promise<ExternalDevice | null> {
-	const row = (
-		await getDb()
-			.select({ data: external_objects.data })
-			.from(external_objects)
-			.where(
-				and(
-					eq(external_objects.provider, provider),
-					eq(external_objects.object_type, 'device'),
-					eq(external_objects.external_id, externalId),
-				),
-			)
-			.limit(1)
-	)[0]
-	return row ? (row.data as ExternalDevice) : null
+	const [device] = await readData<ExternalDevice>(
+		objectsOf(provider, 'device', eq(external_objects.external_id, externalId)),
+	)
+	return device ?? null
 }

@@ -20,15 +20,17 @@ import {
 	TicketCreateSchema,
 } from 'shared/src/schemas'
 import {
+	checkListTenantParam,
 	checkTenant,
+	forbidden,
 	listTenantScope,
+	requestScope,
 	requestUser,
 	requireGlobalPermission,
+	requireGlobalScope,
 	requirePermission,
-	scopeTenantId,
 } from '../authz'
-import { getDb } from '../db/connection'
-import { ForbiddenError, NotFoundError } from '../db/errors'
+import { exists } from '../db/list'
 import { deviceTenant } from '../db/owners'
 import { deviceBoard, tenantBoard } from '../integrations/board'
 import {
@@ -67,6 +69,29 @@ async function requireConfigured(c: Context, provider: ProviderId): Promise<Resp
 	return Result.isError(row) ? sendResult(c, row) : null
 }
 
+const EXTERNAL_TENANTS_GLOBAL = 'Forbidden: tenant-scoped users cannot list external tenants'
+
+function notFound(c: Context, message: string): Response {
+	return jsonError(c, message, 404)
+}
+
+/** Read gate for a tenant by id: 404 when missing, 403 when out of scope, else null. */
+async function checkTenantRow(c: Context, tenantId: number): Promise<Response | null> {
+	if (!(await exists(tenants, eq(tenants.id, tenantId)))) {
+		return notFound(c, 'Tenant not found')
+	}
+	return checkTenant(c, tenantId)
+}
+
+/** Tenant of a device in the requester's scope, or the 404/403 response. */
+async function loadDeviceTenant(c: Context, deviceId: number): Promise<number | null | Response> {
+	const tenant = await deviceTenant(deviceId)
+	if (tenant === undefined) {
+		return notFound(c, 'Device not found')
+	}
+	return checkTenant(c, tenant) ?? tenant
+}
+
 /**
  * Write gate for an ignored external device (no conex device to scope by):
  * scoped editors may only touch devices of the company linked to their
@@ -77,13 +102,13 @@ async function checkExternalDeviceWrite(
 	provider: ProviderId,
 	externalTenantId: string | null,
 ): Promise<Response | null> {
-	const scope = scopeTenantId(requestUser(c))
-	if (scope === null) {
+	const scope = requestScope(c)
+	if (scope === undefined) {
 		return null
 	}
 	const own = await linkOf(provider, 'tenant', scope)
 	if (!own || externalTenantId === null || own.external_id !== externalTenantId) {
-		return jsonError(c, 'Forbidden: outside your tenant scope', 403)
+		return forbidden(c)
 	}
 	return null
 }
@@ -163,24 +188,16 @@ export const integrationsApp = new Hono()
 				return denied
 			}
 			const query = c.req.valid('query')
-			if (query.clean === 'true') {
-				const globalDenied = requireGlobalPermission(c, 'integrations.manage')
-				if (globalDenied) {
-					return globalDenied
-				}
-			}
+			const clean = query.clean === 'true'
 			// Scoped users may only sync their own tenant.
-			const scope = scopeTenantId(requestUser(c))
-			const queryTenant = query.tenant
-			if (scope !== null && queryTenant !== undefined && queryTenant !== scope) {
-				return jsonError(c, 'Forbidden: outside your tenant scope', 403)
+			const scopeDenied =
+				(clean ? requireGlobalPermission(c, 'integrations.manage') : null) ??
+				checkListTenantParam(c, query.tenant)
+			if (scopeDenied) {
+				return scopeDenied
 			}
-			const tenant = scope ?? queryTenant ?? null
-			return sendResult(
-				c,
-				await startSync(c.req.valid('param').provider, tenant, query.clean === 'true'),
-				202,
-			)
+			const tenant = requestScope(c) ?? query.tenant ?? null
+			return sendResult(c, await startSync(c.req.valid('param').provider, tenant, clean), 202)
 		},
 	)
 	.post(
@@ -190,11 +207,10 @@ export const integrationsApp = new Hono()
 		vValidator('json', TicketCreateSchema, onValidationError),
 		async (c) => {
 			const input = c.req.valid('json')
-			const denied = checkTenant(c, input.tenant_id)
-			if (denied) {
-				return denied
-			}
-			return sendResult(c, await createTicket(c.req.valid('param').provider, input), 201)
+			return (
+				checkTenant(c, input.tenant_id) ??
+				sendCreated(c, await createTicket(c.req.valid('param').provider, input))
+			)
 		},
 	)
 	.get(
@@ -212,20 +228,12 @@ export const integrationsApp = new Hono()
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', ExternalTenantQuerySchema, onValidationError),
 		async (c) => {
-			if (scopeTenantId(requestUser(c)) !== null) {
-				return sendResult(
-					c,
-					Result.err(
-						new ForbiddenError(
-							'Forbidden: tenant-scoped users cannot list external tenants',
-						),
-					),
-				)
-			}
 			const { provider } = c.req.valid('param')
-			const missing = await requireConfigured(c, provider)
-			if (missing) {
-				return missing
+			const denied =
+				requireGlobalScope(c, EXTERNAL_TENANTS_GLOBAL) ??
+				(await requireConfigured(c, provider))
+			if (denied) {
+				return denied
 			}
 			const needle = c.req.valid('query').search.toLowerCase()
 			const rows = new Map<string, { tenant: number | null; ignored: boolean }>()
@@ -281,7 +289,7 @@ export const integrationsApp = new Hono()
 				return filter
 			}
 			const unfiltered =
-				scopeTenantId(requestUser(c)) === null &&
+				requestScope(c) === undefined &&
 				query.tenant === undefined &&
 				query.tenant_group === undefined
 			return c.json(await buildReport(provider, filter, unfiltered))
@@ -301,33 +309,18 @@ export const integrationsApp = new Hono()
 			const query = c.req.valid('query')
 			if (query.entity_type === 'tenant') {
 				// Lists every external company: global users only.
-				if (scopeTenantId(requestUser(c)) !== null) {
-					return sendResult(
-						c,
-						Result.err(
-							new ForbiddenError(
-								'Forbidden: tenant-scoped users cannot list external tenants',
-							),
-						),
-					)
-				}
-				return c.json(await tenantBoard(provider))
+				return (
+					requireGlobalScope(c, EXTERNAL_TENANTS_GLOBAL) ??
+					c.json(await tenantBoard(provider))
+				)
 			}
-			const tenantId = query.tenant ?? scopeTenantId(requestUser(c))
-			if (tenantId === null) {
+			const tenantId = query.tenant ?? requestScope(c)
+			if (tenantId === undefined) {
 				return jsonError(c, 'tenant is required for the device board', 400)
 			}
-			const tenant = (
-				await getDb().select().from(tenants).where(eq(tenants.id, tenantId)).limit(1)
-			)[0]
-			if (!tenant) {
-				return sendResult(c, Result.err(new NotFoundError('Tenant not found')))
-			}
-			const denied = checkTenant(c, tenantId)
-			if (denied) {
-				return denied
-			}
-			return c.json(await deviceBoard(provider, tenantId))
+			return (
+				(await checkTenantRow(c, tenantId)) ?? c.json(await deviceBoard(provider, tenantId))
+			)
 		},
 	)
 	.get(
@@ -340,17 +333,7 @@ export const integrationsApp = new Hono()
 			if (missing) {
 				return missing
 			}
-			const tenant = (
-				await getDb().select().from(tenants).where(eq(tenants.id, id)).limit(1)
-			)[0]
-			if (!tenant) {
-				return sendResult(c, Result.err(new NotFoundError('Tenant not found')))
-			}
-			const denied = checkTenant(c, id)
-			if (denied) {
-				return denied
-			}
-			return c.json(await tenantStatus(provider, id))
+			return (await checkTenantRow(c, id)) ?? c.json(await tenantStatus(provider, id))
 		},
 	)
 	.get(
@@ -363,13 +346,9 @@ export const integrationsApp = new Hono()
 			if (missing) {
 				return missing
 			}
-			const tenant = await deviceTenant(id)
-			if (tenant === undefined) {
-				return sendResult(c, Result.err(new NotFoundError('Device not found')))
-			}
-			const denied = checkTenant(c, tenant)
-			if (denied) {
-				return denied
+			const tenant = await loadDeviceTenant(c, id)
+			if (tenant instanceof Response) {
+				return tenant
 			}
 			return c.json(await deviceStatus(provider, id, tenant))
 		},
@@ -387,19 +366,12 @@ export const integrationsApp = new Hono()
 				if (denied) {
 					return denied
 				}
-				const tenant = (
-					await getDb()
-						.select()
-						.from(tenants)
-						.where(eq(tenants.id, input.entity_id))
-						.limit(1)
-				)[0]
-				if (!tenant) {
-					return sendResult(c, Result.err(new NotFoundError('Tenant not found')))
+				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
+					return notFound(c, 'Tenant not found')
 				}
 				const external = await readTenant(provider, input.external_id)
 				if (!external) {
-					return sendResult(c, Result.err(new NotFoundError('External tenant not found')))
+					return notFound(c, 'External tenant not found')
 				}
 				const res = await setLink(
 					provider,
@@ -413,17 +385,13 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			const tenant = await deviceTenant(input.entity_id)
-			if (tenant === undefined) {
-				return sendResult(c, Result.err(new NotFoundError('Device not found')))
-			}
-			const scopeDenied = checkTenant(c, tenant)
-			if (scopeDenied) {
-				return scopeDenied
+			const tenant = await loadDeviceTenant(c, input.entity_id)
+			if (tenant instanceof Response) {
+				return tenant
 			}
 			const external = await readDevice(provider, input.external_id)
 			if (!external) {
-				return sendResult(c, Result.err(new NotFoundError('External device not found')))
+				return notFound(c, 'External device not found')
 			}
 			const externalDenied = await checkExternalDeviceWrite(
 				c,
@@ -457,7 +425,7 @@ export const integrationsApp = new Hono()
 				}
 				const external = await readTenant(provider, input.external_id)
 				if (!external) {
-					return sendResult(c, Result.err(new NotFoundError('External tenant not found')))
+					return notFound(c, 'External tenant not found')
 				}
 				const res = await ignoreExternal(
 					provider,
@@ -474,7 +442,7 @@ export const integrationsApp = new Hono()
 			}
 			const external = await readDevice(provider, input.external_id)
 			if (!external) {
-				return sendResult(c, Result.err(new NotFoundError('External device not found')))
+				return notFound(c, 'External device not found')
 			}
 			const externalDenied = await checkExternalDeviceWrite(
 				c,
@@ -506,13 +474,9 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			const tenant = await deviceTenant(input.entity_id)
-			if (tenant === undefined) {
-				return sendResult(c, Result.err(new NotFoundError('Device not found')))
-			}
-			const scopeDenied = checkTenant(c, tenant)
-			if (scopeDenied) {
-				return scopeDenied
+			const tenant = await loadDeviceTenant(c, input.entity_id)
+			if (tenant instanceof Response) {
+				return tenant
 			}
 			const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
 			if (!tenantLink) {
@@ -557,8 +521,7 @@ export const integrationsApp = new Hono()
 					return denied
 				}
 				if (row.entity_id !== null) {
-					const tenant = await deviceTenant(row.entity_id)
-					const scopeDenied = checkTenant(c, tenant ?? null)
+					const scopeDenied = checkTenant(c, (await deviceTenant(row.entity_id)) ?? null)
 					if (scopeDenied) {
 						return scopeDenied
 					}

@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import { DISPLAY_PORT_KINDS } from 'shared/src/schemas'
 import type { InputEventAndTarget, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
@@ -15,9 +16,9 @@ import { ObjectSearch } from '../../components/object_selector'
 import { t } from '../../i18n'
 
 /** Interface kinds that only connect to their own kind (never to network ports). */
-export const OTHER_PORT_KINDS = new Set(['console', 'power'])
+export const OTHER_PORT_KINDS = new Set<string>(['console', 'power', ...DISPLAY_PORT_KINDS])
 
-/** Network ports pair with network ports; console/power only with the same kind. */
+/** Network ports pair with network ports; console/power/display only with the same kind. */
 function isCompatible(local: InterfaceJson, peer: InterfaceJson): boolean {
 	if (OTHER_PORT_KINDS.has(local.kind) || OTHER_PORT_KINDS.has(peer.kind)) {
 		return local.kind === peer.kind

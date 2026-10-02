@@ -20,7 +20,7 @@ import type {
 } from 'shared/src/schemas'
 import { DEVICE_COMPARE_FIELDS } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
-import type { TenantFilterParams } from '../db/list'
+import { type TenantFilterParams, tenantConditions } from '../db/list'
 import { device_types, devices, manufacturers, sync_runs, tenants } from '../schema'
 import { type ExternalLinkRow, linkJson, linkOf, listLinks } from './links'
 import { matchDevices, normalizeName, normalizeSerial, normalizeTag } from './match'
@@ -105,24 +105,6 @@ function finding(kind: FindingKind, values: Partial<IntegrationFinding>): Integr
 	}
 }
 
-function tenantConditionsById(params: TenantFilterParams): SQL[] {
-	const conditions: SQL[] = []
-	if (params.tenant !== undefined) {
-		conditions.push(eq(tenants.id, params.tenant))
-	}
-	if (params.tenantIds !== undefined) {
-		conditions.push(
-			params.tenantIds.length > 0
-				? inArray(tenants.id, params.tenantIds)
-				: eq(tenants.id, -1),
-		)
-	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(tenants.id, params.scopeTenantId))
-	}
-	return conditions
-}
-
 export async function lastSyncedAt(provider: ProviderId): Promise<number | null> {
 	const row = (
 		await getDb()
@@ -146,11 +128,10 @@ export async function buildReport(
 	includeUnmapped: boolean,
 ): Promise<IntegrationReport> {
 	const findings: IntegrationFinding[] = []
-	const conditions = tenantConditionsById(filter)
 	const tenantRows = await getDb()
 		.select({ id: tenants.id, name: tenants.name })
 		.from(tenants)
-		.where(conditions.length > 0 ? and(...conditions) : undefined)
+		.where(and(...tenantConditions(tenants.id, filter)))
 		.orderBy(tenants.name)
 	const tenantName = new Map(tenantRows.map((t) => [t.id, t.name]))
 	const externalTenants = await readTenants(provider)

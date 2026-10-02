@@ -65,7 +65,8 @@ export interface MatchResult {
 	suggestions: MatchPair[]
 }
 
-function group<T>(items: T[], key: (item: T) => string | null): Map<string, T[]> {
+/** Groups items by a normalized key; items without a key are left out. */
+export function group<T>(items: T[], key: (item: T) => string | null): Map<string, T[]> {
 	const out = new Map<string, T[]>()
 	for (const item of items) {
 		const k = key(item)

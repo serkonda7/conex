@@ -5,7 +5,7 @@
  * replaces that row. Route handlers do the RBAC/scope checks.
  */
 import { Result } from 'better-result'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import type {
 	ExternalLinkJson,
 	LinkEntityType,
@@ -13,7 +13,7 @@ import type {
 } from 'shared/src/schemas'
 import { getDb, withTransaction } from '../db/connection'
 import { NotFoundError } from '../db/errors'
-import { errOf } from '../db/list'
+import { tryWrite } from '../db/list'
 import { external_links } from '../schema'
 import { nowSeconds } from '../util/time'
 
@@ -91,101 +91,85 @@ export interface LinkInput {
 	external_tenant_id: string | null
 }
 
+type NewLink = Omit<ExternalLinkRow, 'id' | 'created_at'>
+
 /**
- * Links an entity to an external object. The entity's previous link and any
- * other row for the external object are replaced (one-to-one per provider).
+ * Writes a link row, replacing every other row of the same provider and
+ * entity type for the same conex entity or the same external object
+ * (one-to-one per provider).
  */
-export async function setLink(
-	provider: ProviderId,
-	input: LinkInput,
-	method: 'manual' | 'auto',
-	userId: number | null,
-): Promise<Result<ExternalLinkRow, Error>> {
-	try {
-		const row = await withTransaction(async () => {
+async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error>> {
+	return tryWrite(() =>
+		withTransaction(async () => {
 			const db = getDb()
 			await db
 				.delete(external_links)
 				.where(
 					and(
-						eq(external_links.provider, provider),
-						eq(external_links.entity_type, input.entity_type),
-						eq(external_links.entity_id, input.entity_id),
+						eq(external_links.provider, link.provider),
+						eq(external_links.entity_type, link.entity_type),
+						or(
+							eq(external_links.external_id, link.external_id),
+							link.entity_id === null
+								? undefined
+								: eq(external_links.entity_id, link.entity_id),
+						),
 					),
 				)
-			await db
-				.delete(external_links)
-				.where(
-					and(
-						eq(external_links.provider, provider),
-						eq(external_links.entity_type, input.entity_type),
-						eq(external_links.external_id, input.external_id),
-					),
-				)
-			return (
+			const row = (
 				await db
 					.insert(external_links)
-					.values({
-						provider,
-						entity_type: input.entity_type,
-						entity_id: input.entity_id,
-						external_id: input.external_id,
-						external_tenant_id: input.external_tenant_id,
-						state: 'linked',
-						method,
-						created_by: userId,
-						created_at: nowSeconds(),
-					})
+					.values({ ...link, created_at: nowSeconds() })
 					.returning()
 			)[0]
-		})
-		return row ? Result.ok(row) : Result.err(new Error('Link insert returned no row'))
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
+			if (!row) {
+				throw new Error('Link insert returned no row')
+			}
+			return row
+		}),
+	)
+}
+
+/**
+ * Links an entity to an external object. The entity's previous link and any
+ * other row for the external object are replaced (one-to-one per provider).
+ */
+export function setLink(
+	provider: ProviderId,
+	input: LinkInput,
+	method: 'manual' | 'auto',
+	userId: number | null,
+): Promise<Result<ExternalLinkRow, Error>> {
+	return replaceLink({
+		provider,
+		entity_type: input.entity_type,
+		entity_id: input.entity_id,
+		external_id: input.external_id,
+		external_tenant_id: input.external_tenant_id,
+		state: 'linked',
+		method,
+		created_by: userId,
+	})
 }
 
 /** Marks an external object as intentionally not in conex. */
-export async function ignoreExternal(
+export function ignoreExternal(
 	provider: ProviderId,
 	entityType: LinkEntityType,
 	externalId: string,
 	externalTenantId: string | null,
 	userId: number,
 ): Promise<Result<ExternalLinkRow, Error>> {
-	try {
-		const row = await withTransaction(async () => {
-			const db = getDb()
-			await db
-				.delete(external_links)
-				.where(
-					and(
-						eq(external_links.provider, provider),
-						eq(external_links.entity_type, entityType),
-						eq(external_links.external_id, externalId),
-					),
-				)
-			return (
-				await db
-					.insert(external_links)
-					.values({
-						provider,
-						entity_type: entityType,
-						entity_id: null,
-						external_id: externalId,
-						external_tenant_id: externalTenantId,
-						state: 'ignored',
-						method: 'manual',
-						created_by: userId,
-						created_at: nowSeconds(),
-					})
-					.returning()
-			)[0]
-		})
-		return row ? Result.ok(row) : Result.err(new Error('Link insert returned no row'))
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
+	return replaceLink({
+		provider,
+		entity_type: entityType,
+		entity_id: null,
+		external_id: externalId,
+		external_tenant_id: externalTenantId,
+		state: 'ignored',
+		method: 'manual',
+		created_by: userId,
+	})
 }
 
 /**
@@ -206,46 +190,23 @@ export function localIgnoreExternalId(entityType: LinkEntityType, entityId: numb
  * (suppresses its `device_missing_in_external` finding). Replaces any
  * previous link row of that entity.
  */
-export async function ignoreLocal(
+export function ignoreLocal(
 	provider: ProviderId,
 	entityType: LinkEntityType,
 	entityId: number,
 	externalTenantId: string | null,
 	userId: number,
 ): Promise<Result<ExternalLinkRow, Error>> {
-	try {
-		const row = await withTransaction(async () => {
-			const db = getDb()
-			await db
-				.delete(external_links)
-				.where(
-					and(
-						eq(external_links.provider, provider),
-						eq(external_links.entity_type, entityType),
-						eq(external_links.entity_id, entityId),
-					),
-				)
-			return (
-				await db
-					.insert(external_links)
-					.values({
-						provider,
-						entity_type: entityType,
-						entity_id: entityId,
-						external_id: localIgnoreExternalId(entityType, entityId),
-						external_tenant_id: externalTenantId,
-						state: 'ignored',
-						method: 'manual',
-						created_by: userId,
-						created_at: nowSeconds(),
-					})
-					.returning()
-			)[0]
-		})
-		return row ? Result.ok(row) : Result.err(new Error('Link insert returned no row'))
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
+	return replaceLink({
+		provider,
+		entity_type: entityType,
+		entity_id: entityId,
+		external_id: localIgnoreExternalId(entityType, entityId),
+		external_tenant_id: externalTenantId,
+		state: 'ignored',
+		method: 'manual',
+		created_by: userId,
+	})
 }
 
 export async function deleteLink(
@@ -256,10 +217,8 @@ export async function deleteLink(
 	if (Result.isError(current)) {
 		return current
 	}
-	try {
-		await getDb().delete(external_links).where(eq(external_links.id, id))
-	} catch (e) {
-		return Result.err(errOf(e))
-	}
-	return Result.ok(current.value)
+	const deleted = await tryWrite(() =>
+		getDb().delete(external_links).where(eq(external_links.id, id)),
+	)
+	return Result.isError(deleted) ? deleted : current
 }

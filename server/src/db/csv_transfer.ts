@@ -4,6 +4,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import {
 	CableImportRowSchema,
 	DeviceImportRowSchema,
+	DISPLAY_PORT_KINDS,
 	type ImportResponse,
 	type ImportRowResult,
 } from 'shared/src/schemas'
@@ -224,6 +225,7 @@ async function importDeviceTypeDefinition(
 		['interfaces', 'ethernet'],
 		['console-ports', 'console'],
 		['power-ports', 'power'],
+		['display-ports', null],
 	] as const) {
 		const ports = item[key]
 		if (!Array.isArray(ports)) {
@@ -241,14 +243,28 @@ async function importDeviceTypeDefinition(
 			// NetBox interface types may be a list; the first entry wins.
 			// Console/power ports keep their class as kind (the device detail
 			// page splits ports on it), dropping the connector type.
+			// Display ports (not a NetBox class) keep their connector type as
+			// kind, so it must be one of the known display kinds.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
+			let kind: string
+			if (defaultKind === null) {
+				const displayKind = DISPLAY_PORT_KINDS.find((k) => k === type)
+				if (!displayKind) {
+					return fail(
+						`${key} "${name}": type must be one of ${DISPLAY_PORT_KINDS.join(', ')}`,
+					)
+				}
+				kind = displayKind
+			} else {
+				kind =
+					key !== 'interfaces' || type === undefined || type === null
+						? defaultKind
+						: String(type)
+			}
 			const stub = await createStub(created.value.id, {
 				prefix: name,
 				count: 1,
-				kind:
-					key !== 'interfaces' || type === undefined || type === null
-						? defaultKind
-						: String(type),
+				kind,
 				label:
 					key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined,
 				description: typeof port.description === 'string' ? port.description : undefined,
