@@ -499,8 +499,8 @@ export function SelectField(props: {
 	)
 }
 
-/** Create actions. Cancel closes the tab without refreshing so the list
- * behind it keeps its exact contents; `singleton` drops "Create & Add
+/** Create actions. Cancel closes the tab back into the page that opened
+ * it, keeping its exact contents (`cancelTo` when there is none); `singleton` drops "Create & Add
  * Another" for one-of-a-kind objects. */
 function CreateActions(props: {
 	saving: boolean
@@ -511,7 +511,7 @@ function CreateActions(props: {
 		<div class="form-actions">
 			<button
 				type="button"
-				onClick={() => navigate(props.cancelTo, { refresh: false })}
+				onClick={() => navigate(props.cancelTo, { refresh: false, back: true })}
 				disabled={props.saving}
 			>
 				{t('common.cancel')}

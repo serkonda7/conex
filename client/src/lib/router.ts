@@ -41,6 +41,11 @@ export interface NavigateOptions {
 	 * underlying page keeps its exact contents.
 	 */
 	refresh?: boolean
+	/**
+	 * Leaving a form without saving (cancel): return to the tab that opened
+	 * it as it is; `to` is only the fallback when there is no opener.
+	 */
+	back?: boolean
 }
 
 /** One breadcrumb link; the last crumb of a trail has no `href`. */
@@ -460,16 +465,16 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
 }
 
 /**
- * Leaves a form tab for `to` (save, cancel, back link): a form opened from
- * another form (the "+" beside a select) closes back into its opener,
- * leaving the in-progress form untouched; otherwise the form closes like a
- * dialog and the target shows in an existing tab, else in the opener's
- * history, else in place of the form.
+ * Leaves a form tab for `to` (save, cancel, back link): a cancelled form
+ * (`back`) or one opened from another form (the "+" beside a select)
+ * closes back into its opener, leaving it untouched; otherwise the form
+ * closes like a dialog and the target shows in an existing tab, else in
+ * the opener's history, else in place of the form.
  */
-function closeForm(form: TabState, to: string, refresh: boolean): void {
+function closeForm(form: TabState, to: string, refresh: boolean, back: boolean): void {
 	const others = tabs().filter((t) => t.id !== form.id)
 	const opener = others.find((t) => t.id === form.openerId)
-	if (opener && isFormRoute(opener.path)) {
+	if (opener && (back || isFormRoute(opener.path))) {
 		// No `gen` bump here: remounting the opener would wipe its
 		// unsaved input.
 		removeTab(form.id)
@@ -526,7 +531,7 @@ export function navigate(to: string, opts: NavigateOptions = {}): void {
 		return
 	}
 	if (isFormRoute(active.path)) {
-		closeForm(active, to, opts.refresh ?? true)
+		closeForm(active, to, opts.refresh ?? true, opts.back === true)
 		return
 	}
 	if (to === active.path) {

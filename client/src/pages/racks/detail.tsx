@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import type { ElevationShelfDeviceRef, ElevationShelfRef } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices, update_device } from '../../api/devices'
-import { delete_rack, fetch_elevation, fetch_rack } from '../../api/racks'
+import { delete_rack, fetch_elevation, fetch_rack, fetch_racks } from '../../api/racks'
 import {
 	type DeviceTypeRow,
 	fetch_device_type,
@@ -30,6 +30,7 @@ import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
+import { useDeviceSearch } from '../devices/device_search'
 import { RackElevation, type RackFace } from './elevation'
 
 /**
@@ -72,6 +73,22 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [deviceTypes] = createRows(fetch_device_types, setError)
 	const [manufacturers] = createRows(fetch_manufacturers, setError)
 	const manufacturerName = useNameOf(manufacturers)
+	const [racks] = createRows(fetch_racks, setError)
+	const rackName = useNameOf(racks)
+	/** Shows where a candidate device is already racked. */
+	const deviceSearch = useDeviceSearch((device: DeviceRow) => {
+		if (device.rack_id === null) {
+			return undefined
+		}
+		const rackLabel = rackName(device.rack_id)
+		const place =
+			device.shelf_id !== null
+				? `${rackLabel} · ${t('elevation.onShelf')}`
+				: device.position_u !== null
+					? `${t('device.mountPosition', { rack: rackLabel, u: device.position_u })}${device.face ? ` (${faceLabel(device.face)})` : ''}`
+					: rackLabel
+		return t('device.rackedIn', { place })
+	})
 
 	function deviceTypeOf(typeId: number): DeviceTypeRow | undefined {
 		return deviceTypes()?.find((type) => type.id === typeId)
@@ -372,14 +389,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 												face: faceLabel(face()),
 											})
 								}
-								placeholder={t('rack.searchDevices')}
-								load={async (search: string) => {
-									const result = await fetch_devices({ search })
-									return Result.isError(result)
-										? Result.err(result.error)
-										: Result.ok(result.value.items)
-								}}
-								get_label={(device: DeviceRow) => device.name}
+								{...deviceSearch}
 								on_select={(device: DeviceRow) => void placeDevice(device)}
 								on_close={() => {
 									setSelectingDevice(false)

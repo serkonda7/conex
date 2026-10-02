@@ -145,7 +145,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 				<div class="form-actions">
 					<button
 						type="button"
-						onClick={() => navigate('/device-types', { refresh: false })}
+						onClick={() => navigate('/device-types', { refresh: false, back: true })}
 						disabled={importing()}
 					>
 						{t('common.cancel')}

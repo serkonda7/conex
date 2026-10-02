@@ -506,6 +506,7 @@ export const de: Messages = {
 	'device.connected': 'verbunden',
 	'device.kind': 'Art',
 	'device.alreadyConnected': 'Bereits verbunden',
+	'device.rackedIn': 'Eingebaut in {place}',
 	'device.connectToPeer': '{name} mit einem Gegenanschluss verbinden',
 	'device.connectCableFor': 'Kabel für {name} verbinden',
 	'device.editPort': 'Anschluss {name} bearbeiten',

@@ -497,6 +497,7 @@ export const en = {
 	'device.connected': 'connected',
 	'device.kind': 'Kind',
 	'device.alreadyConnected': 'Already connected',
+	'device.rackedIn': 'Racked in {place}',
 	'device.connectToPeer': 'Connect {name} to a peer port',
 	'device.connectCableFor': 'Connect cable for {name}',
 	'device.editPort': 'Edit port {name}',

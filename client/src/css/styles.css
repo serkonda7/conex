@@ -1589,22 +1589,43 @@ th[aria-sort="descending"] .data-table-sort::after {
 }
 
 .object-selector-results ul {
+	/* Rows share the columns so details line up after the longest label. */
+	display: grid;
+	grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+	column-gap: 1rem;
 	list-style: none;
 	padding: 0;
 	margin: 0;
 }
 
+.object-selector-results li {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+}
+
 .object-selector-option {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	width: 100%;
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	align-items: baseline;
+	row-gap: 0.1rem;
 	text-align: left;
 	border-radius: 0.25rem;
 }
 
 .object-selector-option small {
 	color: var(--text-muted);
+}
+
+.object-selector-label,
+.object-selector-detail,
+.object-selector-note {
+	overflow-wrap: anywhere;
+}
+
+.object-selector-note {
+	grid-column: 1 / -1;
 }
 
 /* Cable connect dialog: step indicator, peer card, port tile grid. */

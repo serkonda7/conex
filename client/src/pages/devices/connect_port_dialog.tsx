@@ -9,17 +9,13 @@ import type { InputEventAndTarget, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { create_cable, fetch_trace } from '../../api/cables'
-import {
-	type DeviceRow,
-	fetch_devices,
-	fetch_interfaces,
-	type InterfaceJson,
-} from '../../api/devices'
+import { type DeviceRow, fetch_interfaces, type InterfaceJson } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
 import { Modal } from '../../components/modal'
 import { ObjectSearch } from '../../components/object_selector'
 import { t } from '../../i18n'
 import { portKindLabel } from '../../i18n/labels'
+import { useDeviceSearch } from './device_search'
 
 /** Interface kinds that never connect to network ports. */
 export const OTHER_PORT_KINDS = new Set<string>([
@@ -87,6 +83,21 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [submitting, setSubmitting] = createSignal(false)
 
+	// Existing cables from the local device, keyed by peer device, so the
+	// device search can flag already connected devices and list them last.
+	const localLinksPromise = fetch_trace(props.iface.device_id, 1).then((trace) => {
+		const byPeer = new Map<number, TraceLink[]>()
+		for (const link of Result.isError(trace) ? [] : trace.value.links) {
+			byPeer.set(link.peer_device.id, [...(byPeer.get(link.peer_device.id) ?? []), link])
+		}
+		return byPeer
+	})
+	const [localLinks] = createResource(() => localLinksPromise)
+	const deviceSearch = useDeviceSearch((device: DeviceRow) => {
+		const links = localLinks()?.get(device.id)
+		return links?.map((l) => `${l.local_interface.name} ⟷ ${l.peer_interface.name}`).join(', ')
+	})
+
 	// The depth-1 trace runs in parallel and only names the far end of taken
 	// ports; if it fails the tiles fall back to a plain "connected".
 	const [peerPorts] = createResource(peerDevice, async (device: DeviceRow) => {
@@ -120,6 +131,14 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 						(p.link?.peer_device.name.toLowerCase().includes(needle) ?? false),
 				)
 	})
+
+	/** Device search results with already connected devices sorted last. */
+	async function loadDevices(search: string): Promise<Result<DeviceRow[], Error>> {
+		const [res, links] = await Promise.all([deviceSearch.load(search), localLinksPromise])
+		return res.map((devices) =>
+			devices.toSorted((a, b) => Number(links.has(a.id)) - Number(links.has(b.id))),
+		)
+	}
 
 	function pickDevice(device: DeviceRow): void {
 		setError(null)
@@ -178,17 +197,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			<Show
 				when={peerDevice()}
 				fallback={
-					<ObjectSearch
-						placeholder={t('rack.searchDevices')}
-						load={async (search: string) => {
-							const res = await fetch_devices({ search })
-							return Result.isError(res)
-								? Result.err(res.error)
-								: Result.ok(res.value.items)
-						}}
-						get_label={(device: DeviceRow) => device.name}
-						on_select={pickDevice}
-					/>
+					<ObjectSearch {...deviceSearch} load={loadDevices} on_select={pickDevice} />
 				}
 			>
 				{(device: () => DeviceRow): JSX.Element => (

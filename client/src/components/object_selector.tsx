@@ -9,6 +9,10 @@ export interface ObjectSearchProps<T extends { id: number }> {
 	placeholder?: string
 	load: (search: string) => Promise<ResultType<T[], Error>>
 	get_label: (object: T) => string
+	/** Column next to the label, aligned across results (e.g. the type). */
+	get_detail?: (object: T) => JSX.Element | undefined
+	/** Second line under the label (e.g. existing cables, placement). */
+	get_note?: (object: T) => JSX.Element | undefined
 	on_select: (object: T) => void
 }
 
@@ -48,8 +52,20 @@ export function ObjectSearch<T extends { id: number }>(props: ObjectSearchProps<
 											class="object-selector-option"
 											onClick={() => props.on_select(object)}
 										>
-											<span>{props.get_label(object)}</span>
-											<small>#{object.id}</small>
+											<span class="object-selector-label">
+												{props.get_label(object)}
+											</span>
+											<small class="object-selector-detail">
+												{props.get_detail?.(object)}
+											</small>
+											<small class="object-selector-id">#{object.id}</small>
+											<Show when={props.get_note?.(object)}>
+												{(note: () => JSX.Element): JSX.Element => (
+													<small class="object-selector-note">
+														{note()}
+													</small>
+												)}
+											</Show>
 										</button>
 									</li>
 								)}
@@ -77,6 +93,8 @@ export function ObjectSelector<T extends { id: number }>(
 				placeholder={props.placeholder}
 				load={props.load}
 				get_label={props.get_label}
+				get_detail={props.get_detail}
+				get_note={props.get_note}
 				on_select={props.on_select}
 			/>
 		</Modal>
