@@ -13,6 +13,7 @@ export const en = {
 	'common.close': 'Close',
 	'common.loading': 'Loading…',
 	'common.search': 'Search…',
+	'form.reloadOptions': 'Reload options',
 	'common.searchObjects': 'Search objects',
 	'common.noMatchingObjects': 'No matching objects.',
 	'common.name': 'Name',

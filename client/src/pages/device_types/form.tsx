@@ -11,6 +11,7 @@ import {
 	CheckboxField,
 	DescriptionField,
 	FormPage,
+	ReloadOptionsButton,
 	row_options,
 	SelectField,
 	TextAreaField,
@@ -61,7 +62,10 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 			setComments(row.comments ?? '')
 		},
 	})
-	const [manufacturers] = createRows(fetch_manufacturers, form.setError)
+	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
+		fetch_manufacturers,
+		form.setError,
+	)
 	const prefix = form.editing ? 'device-type-edit' : 'device-type'
 	const detailRoute = props.id === undefined ? '/device-types' : `/device-types/${props.id}`
 
@@ -128,12 +132,15 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				action={
-					<Show when={!form.editing}>
-						<AddOptionButton
-							label={tp('entity.manufacturer', 1)}
-							href="/manufacturers/add"
-						/>
-					</Show>
+					<>
+						<Show when={!form.editing}>
+							<AddOptionButton
+								label={tp('entity.manufacturer', 1)}
+								href="/manufacturers/add"
+							/>
+						</Show>
+						<ReloadOptionsButton onClick={refetchManufacturers} />
+					</>
 				}
 			/>
 			<TextField

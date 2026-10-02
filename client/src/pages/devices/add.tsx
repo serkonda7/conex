@@ -12,6 +12,7 @@ import {
 	FormPage,
 	Hint,
 	NameField,
+	ReloadOptionsButton,
 	row_options,
 	SelectField,
 	TextField,
@@ -68,9 +69,12 @@ export function DeviceAddPage(): JSX.Element {
 	const shelfId = parseId(queryParam('shelf'))
 	const [shelf] = createRecord(() => shelfId, fetch_shelf, form.setError)
 
-	const [types] = createRows(fetch_device_types, form.setError)
-	const [roles] = createRows(fetch_device_roles, form.setError)
-	const [manufacturers] = createRows(fetch_manufacturers, form.setError)
+	const [types, { refetch: refetchTypes }] = createRows(fetch_device_types, form.setError)
+	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
+	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
+		fetch_manufacturers,
+		form.setError,
+	)
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [racks] = createRows(fetch_racks, form.setError)
 	const [tenants] = createRows(fetch_tenants, form.setError)
@@ -81,6 +85,9 @@ export function DeviceAddPage(): JSX.Element {
 		form.setError,
 	)
 	const manufacturerName = useNameOf(manufacturers)
+	async function refreshTypes(): Promise<void> {
+		await Promise.all([refetchTypes(), refetchManufacturers()])
+	}
 
 	// Tenant defaults to the selected site's tenant until picked explicitly.
 	const siteTenantId = createMemo(() => {
@@ -171,7 +178,13 @@ export function DeviceAddPage(): JSX.Element {
 				}))}
 				emptyLabel={t('device.deviceTypePlaceholder')}
 				action={
-					<AddOptionButton label={tp('entity.deviceType', 1)} href="/device-types/add" />
+					<>
+						<AddOptionButton
+							label={tp('entity.deviceType', 1)}
+							href="/device-types/add"
+						/>
+						<ReloadOptionsButton onClick={refreshTypes} />
+					</>
 				}
 			/>
 			<SelectField
@@ -183,7 +196,13 @@ export function DeviceAddPage(): JSX.Element {
 				options={row_options(roles() ?? [])}
 				emptyLabel={t('device.rolePlaceholder')}
 				action={
-					<AddOptionButton label={tp('entity.deviceRole', 1)} href="/device-roles/add" />
+					<>
+						<AddOptionButton
+							label={tp('entity.deviceRole', 1)}
+							href="/device-roles/add"
+						/>
+						<ReloadOptionsButton onClick={refetchRoles} />
+					</>
 				}
 			/>
 			<DescriptionField

@@ -6,7 +6,7 @@
  * the e2e tests and the detail-page deep links address them directly.
  */
 
-import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
+import { IconChevronDown, IconPlus, IconRefresh } from '@tabler/icons-solidjs'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createEffect, createMemo, createSignal, For, type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
@@ -277,6 +277,22 @@ export function AddOptionButton(props: { label: string; href: string }): JSX.Ele
 			onClick={() => navigate(props.href)}
 		>
 			<IconPlus size={16} />
+		</button>
+	)
+}
+
+/** Refetches a select's options without remounting its form. */
+export function ReloadOptionsButton(props: { onClick: () => unknown }): JSX.Element {
+	const title = (): string => t('form.reloadOptions')
+	return (
+		<button
+			type="button"
+			class="icon-btn"
+			aria-label={title()}
+			title={title()}
+			onClick={() => void props.onClick()}
+		>
+			<IconRefresh size={16} />
 		</button>
 	)
 }

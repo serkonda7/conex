@@ -15,6 +15,7 @@ export const de: Messages = {
 	'common.close': 'Schließen',
 	'common.loading': 'Wird geladen…',
 	'common.search': 'Suchen…',
+	'form.reloadOptions': 'Optionen neu laden',
 	'common.searchObjects': 'Einträge durchsuchen',
 	'common.noMatchingObjects': 'Keine passenden Einträge gefunden.',
 	'common.name': 'Name',

@@ -121,6 +121,23 @@ export function DeviceTypeImportPage(): JSX.Element {
 						}
 					/>
 				</Field>
+				<Show when={error()}>
+					<div class="app-inline-error" role="alert">
+						{error()}
+					</div>
+				</Show>
+				<div class="form-actions">
+					<button
+						type="button"
+						onClick={() => navigate('/device-types', { refresh: false })}
+						disabled={importing()}
+					>
+						{t('common.cancel')}
+					</button>
+					<button type="submit" disabled={importing()}>
+						{importing() ? t('import.importing') : t('import.import')}
+					</button>
+				</div>
 				<section class="import-field-options" aria-labelledby="device-type-import-fields">
 					<h3 id="device-type-import-fields">{t('import.fieldOptions')}</h3>
 					<p class="field-hint">{t('import.fieldOptionsHint')}</p>
@@ -196,23 +213,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 						</tbody>
 					</table>
 				</section>
-				<Show when={error()}>
-					<div class="app-inline-error" role="alert">
-						{error()}
-					</div>
-				</Show>
-				<div class="form-actions">
-					<button
-						type="button"
-						onClick={() => navigate('/device-types', { refresh: false })}
-						disabled={importing()}
-					>
-						{t('common.cancel')}
-					</button>
-					<button type="submit" disabled={importing()}>
-						{importing() ? t('import.importing') : t('import.import')}
-					</button>
-				</div>
 			</form>
 
 			<Show when={results() !== null}>

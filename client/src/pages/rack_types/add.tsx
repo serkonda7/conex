@@ -4,6 +4,7 @@ import {
 	AddOptionButton,
 	Field,
 	FormPage,
+	ReloadOptionsButton,
 	row_options,
 	SelectField,
 	TextAreaField,
@@ -37,7 +38,10 @@ export function RackTypeAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [formFactor, setFormFactor] = createSignal<RackFormFactor | ''>('')
 	const [height, setHeight] = createSignal('1')
-	const [manufacturers] = createRows(fetch_manufacturers, form.setError)
+	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
+		fetch_manufacturers,
+		form.setError,
+	)
 
 	function validate(): string | null {
 		const rackHeight = Number(height())
@@ -97,10 +101,13 @@ export function RackTypeAddPage(): JSX.Element {
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				action={
-					<AddOptionButton
-						label={tp('entity.manufacturer', 1)}
-						href="/manufacturers/add"
-					/>
+					<>
+						<AddOptionButton
+							label={tp('entity.manufacturer', 1)}
+							href="/manufacturers/add"
+						/>
+						<ReloadOptionsButton onClick={refetchManufacturers} />
+					</>
 				}
 			/>
 			<TextField

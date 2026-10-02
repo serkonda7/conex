@@ -8,6 +8,7 @@ import {
 	FormPage,
 	Hint,
 	NameField,
+	ReloadOptionsButton,
 	row_options,
 	SelectField,
 } from '../../components/form'
@@ -38,8 +39,14 @@ export function RackAddPage(): JSX.Element {
 
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [tenants] = createRows(fetch_tenants, form.setError)
-	const [rackTypes] = createRows(() => fetch_device_types({ kind: 'rack' }), form.setError)
-	const [manufacturers] = createRows(fetch_manufacturers, form.setError)
+	const [rackTypes, { refetch: refetchRackTypes }] = createRows(
+		() => fetch_device_types({ kind: 'rack' }),
+		form.setError,
+	)
+	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
+		fetch_manufacturers,
+		form.setError,
+	)
 	// Location options belong to a site, so they follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),
@@ -47,6 +54,9 @@ export function RackAddPage(): JSX.Element {
 		form.setError,
 	)
 	const manufacturerName = useNameOf(manufacturers)
+	async function refreshRackTypes(): Promise<void> {
+		await Promise.all([refetchRackTypes(), refetchManufacturers()])
+	}
 
 	// Tenant defaults to the selected site's tenant until picked explicitly.
 	const siteTenantId = createMemo(() => {
@@ -120,7 +130,12 @@ export function RackAddPage(): JSX.Element {
 				emptyLabel={t('rack.rackTypePlaceholder')}
 				required
 				describedBy={RACK_TYPE_HINT_ID}
-				action={<AddOptionButton label={tp('entity.rackType', 1)} href="/rack-types/add" />}
+				action={
+					<>
+						<AddOptionButton label={tp('entity.rackType', 1)} href="/rack-types/add" />
+						<ReloadOptionsButton onClick={refreshRackTypes} />
+					</>
+				}
 			/>
 			<DescriptionField
 				id="rack-description"
