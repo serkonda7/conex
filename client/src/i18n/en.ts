@@ -273,7 +273,6 @@ export const en = {
 	'location.slugPlaceholder': 'floor-2',
 	'location.selectSiteFirst': 'Select a site first.',
 	'location.sitePlaceholder': 'Site…',
-	'location.sitesForTenant': 'Showing only sites for the selected tenant.',
 	'location.tenantFromSite': "Defaults to the site's tenant.",
 	'location.siteImmutable': 'Site cannot be changed after creation.',
 	'location.notFound': 'Location not found.',

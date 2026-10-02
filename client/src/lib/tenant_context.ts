@@ -16,7 +16,7 @@ import {
 	type TenantRow,
 } from '../api/tenancy'
 import { id_value } from './form'
-import { queryParam } from './router'
+import { parseId, queryParam } from './router'
 
 export type TenantContext =
 	| { kind: 'all' }
@@ -154,6 +154,14 @@ export function inTenantContext(row: { id: number; tenant_group_id: number | nul
 	return true
 }
 
+/** Rows owned by `tenant` (null: all rows). */
+export function rowsOfTenant<T extends { tenant_id: number | null }>(
+	rows: T[],
+	tenant: number | null,
+): T[] {
+	return tenant === null ? rows : rows.filter((row) => row.tenant_id === tenant)
+}
+
 /**
  * Tenant select of a create form: follows the tenant of the selected parent
  * (site, site group, …) until the user picks one explicitly. An explicit
@@ -169,6 +177,11 @@ export function useTenantDefault(
 	pick: (value: string) => void
 	/** Whether the value was picked rather than inherited. */
 	touched: () => boolean
+	/**
+	 * Tenant picked or preselected by the context, never the inherited one:
+	 * filtering the parent options by that would hide all other parents.
+	 */
+	selected: () => number | null
 } {
 	const explicit = queryParam('tenant')
 	const [value, setValue] = createSignal(explicit || contextTenantValue())
@@ -186,5 +199,6 @@ export function useTenantDefault(
 			setValue(next)
 		},
 		touched,
+		selected: () => (touched() ? parseId(value()) : contextTenantId()),
 	}
 }

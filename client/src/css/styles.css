@@ -16,7 +16,7 @@
 	--bg-hover: #3d3d3d;
 	--text: #f5f5f5;
 	--text-secondary: #b8b8b8;
-	--text-muted: #858585;
+	--text-muted: #969696;
 	--text-subtle: #a0a0a0;
 	--border: #3d3d3d;
 	--border-strong: #525252;
@@ -1160,6 +1160,11 @@ tbody tr:last-child td {
 	cursor: pointer;
 }
 
+.app-content .form-stacked .field .combobox-with-detail input {
+	/* The `.combobox-value` overlay renders the label alongside its detail. */
+	color: transparent;
+}
+
 .app-content .form-stacked .field .combobox-open input {
 	cursor: text;
 }
@@ -1207,6 +1212,44 @@ tbody tr:last-child td {
 	cursor: pointer;
 }
 
+.combobox-option-label,
+.combobox-detail {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.combobox-detail {
+	color: var(--text-muted);
+	font-weight: 400;
+	font-size: var(--font-size-sm);
+}
+
+/* Closed-state value with detail, overlaid on the (transparent) input text. */
+.combobox-value {
+	position: absolute;
+	top: 50%;
+	left: calc(0.5rem + 1px);
+	right: 1.8rem;
+	transform: translateY(-50%);
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	min-width: 0;
+	font-size: var(--font-size-base);
+	pointer-events: none;
+}
+
+.combobox-value > .combobox-option-label {
+	flex: 0 1 auto;
+	min-width: 3rem;
+}
+
+.combobox-value > .combobox-detail {
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
 .combobox-option-active {
 	background-color: var(--bg-hover);
 }
@@ -1218,6 +1261,23 @@ tbody tr:last-child td {
 .combobox-option-empty,
 .combobox-empty {
 	color: var(--text-muted);
+}
+
+/* Options with a detail line up in two columns: the detail starts right
+   after the longest label. */
+.combobox-list-detail {
+	display: grid;
+	grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+	column-gap: 1rem;
+	align-content: start;
+}
+
+.combobox-list-detail > .combobox-option,
+.combobox-list-detail > .combobox-empty {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	align-items: baseline;
 }
 
 .app-content .form-stacked .field .field-checkbox-label input {

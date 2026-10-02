@@ -28,12 +28,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { useTenantDefault } from '../../lib/tenant_context'
-
-/** Whether `site` belongs to another tenant than the chosen one. */
-function otherTenant(site: SiteRow | undefined, tenant: number | null): boolean {
-	return site !== undefined && tenant !== null && site.tenant_id !== tenant
-}
+import { rowsOfTenant, useTenantDefault } from '../../lib/tenant_context'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -62,27 +57,14 @@ export function LocationAddPage(): JSX.Element {
 		() => selectedSite()?.tenant_id ?? null,
 		() => sites() !== undefined,
 	)
-	const pickedTenant = (): number | null => (tenant.touched() ? parseId(tenant.value()) : null)
 
-	// An explicitly picked tenant only offers its own sites. The inherited
-	// tenant must not rebuild the options: replacing them would reset the
-	// selected site.
-	const siteOptions = createMemo(() => {
-		const all = sites() ?? []
-		const picked = pickedTenant()
-		return picked === null ? all : all.filter((s) => s.tenant_id === picked)
-	})
-
-	function clearSite(): void {
-		setSiteId('')
-		setParentId('')
-	}
-
-	// Enforce the tenant → sites filter for explicit choices (including
-	// `?tenant=` deep links) once the site list is known.
+	// A selected tenant only offers its own sites; a site of another tenant
+	// (e.g. from `?site=`) is dropped.
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
 	createEffect(() => {
-		if (sites() !== undefined && otherTenant(selectedSite(), pickedTenant())) {
-			clearSite()
+		const site = selectedSite()
+		if (site !== undefined && !siteOptions().includes(site)) {
+			handleSiteChange('')
 		}
 	})
 
@@ -151,11 +133,6 @@ export function LocationAddPage(): JSX.Element {
 				onChange={handleSiteChange}
 				options={row_options(siteOptions())}
 				emptyLabel={t('location.sitePlaceholder')}
-				hint={
-					<Show when={parseId(tenant.value()) !== null}>
-						<Hint>{t('location.sitesForTenant')}</Hint>
-					</Show>
-				}
 			/>
 			<SelectField
 				id="location-parent"

@@ -1,5 +1,5 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
@@ -29,7 +29,7 @@ import {
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { useTenantDefault } from '../../lib/tenant_context'
+import { rowsOfTenant, useTenantDefault } from '../../lib/tenant_context'
 
 /** Rack position from the field: null when blank, NaN when malformed. */
 export function parsePosition(value: string): number | null {
@@ -90,11 +90,22 @@ export function DeviceAddPage(): JSX.Element {
 	}
 
 	// Tenant defaults to the selected site's tenant until picked explicitly.
-	const siteTenantId = createMemo(() => {
+	const selectedSite = createMemo(() => {
 		const id = parseId(siteId())
-		return (sites() ?? []).find((site) => site.id === id)?.tenant_id ?? null
+		return (sites() ?? []).find((site) => site.id === id)
 	})
+	const siteTenantId = (): number | null => selectedSite()?.tenant_id ?? null
 	const tenant = useTenantDefault(siteTenantId, () => sites() !== undefined)
+
+	// A selected tenant only offers its own sites; a site of another tenant
+	// (e.g. from `?site=`) is dropped.
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
+	createEffect(() => {
+		const site = selectedSite()
+		if (site !== undefined && !siteOptions().includes(site)) {
+			handleSiteChange('')
+		}
+	})
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -174,7 +185,8 @@ export function DeviceAddPage(): JSX.Element {
 				onChange={setTypeId}
 				options={(types() ?? []).map((type) => ({
 					value: type.id,
-					label: `${type.model} (${manufacturerName(type.manufacturer_id)})`,
+					label: type.model,
+					detail: manufacturerName(type.manufacturer_id),
 				}))}
 				emptyLabel={t('device.deviceTypePlaceholder')}
 				action={
@@ -231,7 +243,7 @@ export function DeviceAddPage(): JSX.Element {
 				label={tp('entity.site', 1)}
 				value={siteId()}
 				onChange={handleSiteChange}
-				options={row_options(sites() ?? [])}
+				options={row_options(siteOptions())}
 				emptyLabel={t('device.noSite')}
 			/>
 			<SelectField

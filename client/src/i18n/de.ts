@@ -276,7 +276,6 @@ export const de: Messages = {
 	'location.slugPlaceholder': 'etage-2',
 	'location.selectSiteFirst': 'Bitte zuerst einen Standort auswählen.',
 	'location.sitePlaceholder': 'Standort…',
-	'location.sitesForTenant': 'Es werden nur Standorte des ausgewählten Mandanten angezeigt.',
 	'location.tenantFromSite': 'Standardmäßig wird der Mandant des Standorts verwendet.',
 	'location.siteImmutable': 'Der Standort kann nach dem Anlegen nicht mehr geändert werden.',
 	'location.notFound': 'Bereich nicht gefunden.',

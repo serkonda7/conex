@@ -18,6 +18,8 @@ import { InlineError, Loading } from './feedback'
 export interface FormOption {
 	value: number | string
 	label: string
+	/** Secondary text (e.g. the manufacturer), shown muted in a column after the labels. */
+	detail?: string
 }
 
 /** Maps list rows (`{ id, name }`) to `SelectField` options. */
@@ -336,8 +338,13 @@ export function SelectField(props: {
 		const needle = query().trim().toLowerCase()
 		return needle === ''
 			? choices()
-			: choices().filter((o) => o.label.toLowerCase().includes(needle))
+			: choices().filter(
+					(o) =>
+						o.label.toLowerCase().includes(needle) ||
+						(o.detail?.toLowerCase().includes(needle) ?? false),
+				)
 	})
+	const hasDetail = (): boolean => props.options.some((o) => o.detail !== undefined)
 	const editable = (): boolean => !props.disabled && props.onChange !== undefined
 
 	createEffect(() => {
@@ -398,7 +405,13 @@ export function SelectField(props: {
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
 			<div class="field-inline-actions">
-				<div class="combobox" classList={{ 'combobox-open': open() }}>
+				<div
+					class="combobox"
+					classList={{
+						'combobox-open': open(),
+						'combobox-with-detail': !open() && Boolean(selected()?.detail),
+					}}
+				>
 					<input
 						id={props.id}
 						ref={ref}
@@ -429,9 +442,21 @@ export function SelectField(props: {
 						onKeyDown={onKeyDown}
 						onBlur={() => setOpen(false)}
 					/>
+					<Show when={!open() && selected()?.detail}>
+						<span class="combobox-value" aria-hidden="true">
+							<span class="combobox-option-label">{selected()?.label}</span>
+							<span class="combobox-detail">{selected()?.detail}</span>
+						</span>
+					</Show>
 					<IconChevronDown class="combobox-chevron" size={16} aria-hidden="true" />
 					<Show when={open()}>
-						<div class="combobox-list" id={listId} ref={list} role="listbox">
+						<div
+							class="combobox-list"
+							classList={{ 'combobox-list-detail': hasDetail() }}
+							id={listId}
+							ref={list}
+							role="listbox"
+						>
 							<For
 								each={filtered()}
 								fallback={
@@ -458,7 +483,10 @@ export function SelectField(props: {
 										onMouseMove={() => setActive(index())}
 										onClick={() => pick(option)}
 									>
-										{option.label}
+										<span class="combobox-option-label">{option.label}</span>
+										<Show when={option.detail}>
+											<span class="combobox-detail">{option.detail}</span>
+										</Show>
 									</div>
 								)}
 							</For>

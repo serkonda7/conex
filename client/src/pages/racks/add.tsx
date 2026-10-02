@@ -1,4 +1,4 @@
-import { createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { create_rack } from '../../api/racks'
 import { fetch_device_types, fetch_manufacturers } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
@@ -23,7 +23,7 @@ import {
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { useTenantDefault } from '../../lib/tenant_context'
+import { rowsOfTenant, useTenantDefault } from '../../lib/tenant_context'
 
 /** Id of the hint under the rack-type select. */
 const RACK_TYPE_HINT_ID = 'rack-type-hint'
@@ -59,11 +59,22 @@ export function RackAddPage(): JSX.Element {
 	}
 
 	// Tenant defaults to the selected site's tenant until picked explicitly.
-	const siteTenantId = createMemo(() => {
+	const selectedSite = createMemo(() => {
 		const id = parseId(siteId())
-		return (sites() ?? []).find((site) => site.id === id)?.tenant_id ?? null
+		return (sites() ?? []).find((site) => site.id === id)
 	})
+	const siteTenantId = (): number | null => selectedSite()?.tenant_id ?? null
 	const tenant = useTenantDefault(siteTenantId, () => sites() !== undefined)
+
+	// A selected tenant only offers its own sites; a site of another tenant
+	// (e.g. from `?site=`) is dropped.
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
+	createEffect(() => {
+		const site = selectedSite()
+		if (site !== undefined && !siteOptions().includes(site)) {
+			handleSiteChange('')
+		}
+	})
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -105,7 +116,7 @@ export function RackAddPage(): JSX.Element {
 				required
 				value={siteId()}
 				onChange={handleSiteChange}
-				options={row_options(sites() ?? [])}
+				options={row_options(siteOptions())}
 				emptyLabel={t('location.sitePlaceholder')}
 			/>
 			<SelectField
@@ -125,7 +136,8 @@ export function RackAddPage(): JSX.Element {
 				onChange={setRackTypeId}
 				options={(rackTypes() ?? []).map((type) => ({
 					value: type.id,
-					label: `${type.model} (${manufacturerName(type.manufacturer_id)})`,
+					label: type.model,
+					detail: manufacturerName(type.manufacturer_id),
 				}))}
 				emptyLabel={t('rack.rackTypePlaceholder')}
 				required
