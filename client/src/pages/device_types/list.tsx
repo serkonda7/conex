@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import {
-	type DeviceTypeRow,
+	type DeviceTypeListRow,
 	type DeviceTypeSort,
 	delete_device_type,
 	fetch_device_types,
@@ -36,41 +36,46 @@ export function DeviceTypesPage(): JSX.Element {
 	const [manufacturers] = createRows(fetch_manufacturers, list.setError)
 	const manufacturerName = useNameOf(manufacturers)
 
-	const columns: DataTableColumn<DeviceTypeRow>[] = [
+	const columns: DataTableColumn<DeviceTypeListRow>[] = [
 		{
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
 			sortable: true,
-			getValue: (dt: DeviceTypeRow): string => manufacturerName(dt.manufacturer_id),
+			getValue: (dt: DeviceTypeListRow): string => manufacturerName(dt.manufacturer_id),
 		},
 		{
 			key: 'model',
 			label: t('common.model'),
 			sortable: true,
-			getValue: (dt: DeviceTypeRow): JSX.Element => (
+			getValue: (dt: DeviceTypeListRow): JSX.Element => (
 				<a href={`/device-types/${dt.id}`}>{dt.model}</a>
 			),
 		},
 		{
 			key: 'description',
 			label: t('common.description'),
-			getValue: (dt: DeviceTypeRow): string => dt.description ?? '—',
+			getValue: (dt: DeviceTypeListRow): string => dt.description ?? '—',
 		},
 		{
 			key: 'comments',
 			label: t('common.comments'),
-			getValue: (dt: DeviceTypeRow): string => dt.comments ?? '—',
+			getValue: (dt: DeviceTypeListRow): string => dt.comments ?? '—',
 		},
 		{
 			key: 'u_height',
 			label: t('common.heightU'),
-			getValue: (dt: DeviceTypeRow): string => `${dt.u_height}`,
+			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
 		},
 		{
 			key: 'is_full_depth',
 			label: t('common.fullDepth'),
-			getValue: (dt: DeviceTypeRow): string =>
+			getValue: (dt: DeviceTypeListRow): string =>
 				dt.is_full_depth ? t('common.yes') : t('common.no'),
+		},
+		{
+			key: 'devices',
+			label: tp('entity.device', 2),
+			getValue: (dt: DeviceTypeListRow): string => String(dt.instance_count),
 		},
 	]
 
@@ -101,9 +106,9 @@ export function DeviceTypesPage(): JSX.Element {
 			filtered={filterManufacturer() !== ''}
 			columns={columns}
 			columnsKey="device-types"
-			defaultColumns={['manufacturer', 'model', 'description']}
-			rowName={(dt: DeviceTypeRow): string => dt.model}
-			editHref={(dt: DeviceTypeRow): string => `/device-types/${dt.id}/edit`}
+			defaultColumns={['manufacturer', 'model', 'description', 'devices']}
+			rowName={(dt: DeviceTypeListRow): string => dt.model}
+			editHref={(dt: DeviceTypeListRow): string => `/device-types/${dt.id}/edit`}
 			emptyText={t('deviceType.empty')}
 		/>
 	)

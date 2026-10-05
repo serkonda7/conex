@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js'
 import {
 	delete_manufacturer,
 	fetch_manufacturers,
-	type ManufacturerRow,
+	type ManufacturerListRow,
 	type ManufacturerSort,
 } from '../../api/templates'
 import { descriptionColumn, nameColumn } from '../../components/data_table'
@@ -28,12 +28,19 @@ export function ManufacturersPage(): JSX.Element {
 			addHref="/manufacturers/add"
 			searchPlaceholder={t('manufacturer.searchPlaceholder')}
 			columns={[
-				nameColumn<ManufacturerRow>(t('common.name'), '/manufacturers', { sortable: true }),
+				nameColumn<ManufacturerListRow>(t('common.name'), '/manufacturers', {
+					sortable: true,
+				}),
 				descriptionColumn({ sortable: true }),
+				{
+					key: 'devices',
+					label: tp('entity.device', 2),
+					getValue: (m: ManufacturerListRow): string => String(m.device_count),
+				},
 			]}
 			columnsKey="manufacturers"
-			rowName={(m: ManufacturerRow): string => m.name}
-			editHref={(m: ManufacturerRow): string => `/manufacturers/${m.id}/edit`}
+			rowName={(m: ManufacturerListRow): string => m.name}
+			editHref={(m: ManufacturerListRow): string => `/manufacturers/${m.id}/edit`}
 			emptyText={t('manufacturer.empty')}
 		/>
 	)

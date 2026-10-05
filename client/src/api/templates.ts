@@ -4,7 +4,13 @@
  * `{ error }` message.
  */
 import type { Result } from 'better-result'
-import type { DeviceTypeRow, ManufacturerRow, StubRow } from 'server/src/db/templates'
+import type {
+	DeviceTypeListRow,
+	DeviceTypeRow,
+	ManufacturerListRow,
+	ManufacturerRow,
+	StubRow,
+} from 'server/src/db/templates'
 import type {
 	DeviceTypeCreate,
 	DeviceTypeListQuery,
@@ -18,7 +24,7 @@ import type {
 import { t } from '../i18n'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceTypeRow, ManufacturerRow, StubRow }
+export type { DeviceTypeListRow, DeviceTypeRow, ManufacturerListRow, ManufacturerRow, StubRow }
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -28,8 +34,8 @@ export type ManufacturerSort = ManufacturerListQuery['sort']
 
 export async function fetch_manufacturers(
 	filters?: Partial<ManufacturerListQuery>,
-): Promise<Result<Page<ManufacturerRow>, Error>> {
-	return getPage<ManufacturerRow>(
+): Promise<Result<Page<ManufacturerListRow>, Error>> {
+	return getPage<ManufacturerListRow>(
 		client.manufacturers.$get({
 			query: to_query({
 				...paging(filters),
@@ -87,8 +93,8 @@ export type DeviceTypeCreateInput = Omit<DeviceTypeCreate, 'u_height' | 'is_full
 
 export async function fetch_device_types(
 	filters?: Partial<DeviceTypeListQuery>,
-): Promise<Result<Page<DeviceTypeRow>, Error>> {
-	return getPage<DeviceTypeRow>(
+): Promise<Result<Page<DeviceTypeListRow>, Error>> {
+	return getPage<DeviceTypeListRow>(
 		client['device-types'].$get({
 			query: to_query({
 				...paging(filters),

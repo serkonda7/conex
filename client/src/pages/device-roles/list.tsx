@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import {
-	type DeviceRoleRow,
+	type DeviceRoleListRow,
 	type DeviceRoleSort,
 	delete_device_role,
 	fetch_device_roles,
@@ -28,13 +28,20 @@ export function DeviceRolesPage(): JSX.Element {
 			addHref="/device-roles/add"
 			searchPlaceholder={t('deviceRole.searchPlaceholder')}
 			columns={[
-				nameColumn<DeviceRoleRow>(t('common.name'), '/device-roles', { sortable: true }),
+				nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles', {
+					sortable: true,
+				}),
 				descriptionColumn({ sortable: true }),
+				{
+					key: 'devices',
+					label: tp('entity.device', 2),
+					getValue: (r: DeviceRoleListRow): string => String(r.device_count),
+				},
 			]}
 			columnsKey="device-roles"
-			rowName={(r: DeviceRoleRow): string => r.name}
-			editHref={(r: DeviceRoleRow): string => `/device-roles/${r.id}/edit`}
-			deletable={(r: DeviceRoleRow): boolean => r.key === null}
+			rowName={(r: DeviceRoleListRow): string => r.name}
+			editHref={(r: DeviceRoleListRow): string => `/device-roles/${r.id}/edit`}
+			deletable={(r: DeviceRoleListRow): boolean => r.key === null}
 			emptyText={t('deviceRole.empty')}
 		/>
 	)

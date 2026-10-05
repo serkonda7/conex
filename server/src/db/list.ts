@@ -2,6 +2,7 @@ import { Result } from 'better-result'
 import {
 	and,
 	asc,
+	count,
 	desc,
 	eq,
 	type InferSelectModel,
@@ -74,6 +75,19 @@ export async function pageRows<T extends PgTable>(
 		.offset(offsetOf(params))
 	const total = await db.$count(table, where)
 	return pageOf(items as InferSelectModel<T>[], total, params)
+}
+
+/** Rows of `column`'s table per value in `ids`; ids without rows are absent. */
+export async function countBy(column: PgColumn, ids: number[]): Promise<Map<number, number>> {
+	if (ids.length === 0) {
+		return new Map()
+	}
+	const rows = await getDb()
+		.select({ id: column, n: count() })
+		.from(column.table)
+		.where(inArray(column, ids))
+		.groupBy(column)
+	return new Map(rows.map((r) => [r.id as number, r.n]))
 }
 
 /** True when a patch object carries no columns to write. */

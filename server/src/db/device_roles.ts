@@ -8,6 +8,7 @@ import { ConflictError, DuplicateError, ValidationError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
+	countBy,
 	exists,
 	findById,
 	insertedId,
@@ -21,6 +22,7 @@ import {
 } from './list'
 
 export type DeviceRoleRow = typeof device_roles.$inferSelect
+export type DeviceRoleListRow = DeviceRoleRow & { device_count: number }
 
 // ---------------------------------------------------------------------------
 // Device roles (NetBox-style functional roles: `Server`, `Switch`, …).
@@ -38,14 +40,24 @@ export interface DeviceRoleListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
-export function listDeviceRoles(params: DeviceRoleListParams): Promise<Page<DeviceRoleRow>> {
+export async function listDeviceRoles(
+	params: DeviceRoleListParams,
+): Promise<Page<DeviceRoleListRow>> {
 	const orderColumn = params.sort === 'description' ? device_roles.description : device_roles.name
-	return pageRows(
+	const page = await pageRows(
 		device_roles,
 		searchCondition(params.search, [device_roles.name, device_roles.description]),
 		[orderOf(orderColumn, params.order), asc(device_roles.id)],
 		params,
 	)
+	const counts = await countBy(
+		devices.device_role_id,
+		page.items.map((r) => r.id),
+	)
+	return {
+		...page,
+		items: page.items.map((r) => ({ ...r, device_count: counts.get(r.id) ?? 0 })),
+	}
 }
 
 export function getDeviceRole(id: number): Promise<Result<DeviceRoleRow, Error>> {

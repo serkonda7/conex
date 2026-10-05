@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import {
-	type DeviceTypeRow,
+	type DeviceTypeListRow,
 	type DeviceTypeSort,
 	delete_device_type,
 	fetch_device_types,
@@ -39,35 +39,40 @@ export function RackTypesPage(): JSX.Element {
 	const [manufacturers] = createRows(fetch_manufacturers, list.setError)
 	const manufacturerName = useNameOf(manufacturers)
 
-	const columns: DataTableColumn<DeviceTypeRow>[] = [
+	const columns: DataTableColumn<DeviceTypeListRow>[] = [
 		{
 			key: 'model',
 			label: t('common.model'),
 			sortable: true,
-			getValue: (dt: DeviceTypeRow): string => dt.model,
+			getValue: (dt: DeviceTypeListRow): string => dt.model,
 		},
 		{
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
 			sortable: true,
-			getValue: (dt: DeviceTypeRow): string => manufacturerName(dt.manufacturer_id),
+			getValue: (dt: DeviceTypeListRow): string => manufacturerName(dt.manufacturer_id),
 		},
 		{
 			key: 'form_factor',
 			label: t('rackType.formFactor'),
 			sortable: true,
-			getValue: (dt: DeviceTypeRow): string =>
+			getValue: (dt: DeviceTypeListRow): string =>
 				dt.form_factor ? formFactorLabel(dt.form_factor) : '—',
 		},
 		{
 			key: 'width',
 			label: t('rackType.width'),
-			getValue: (dt: DeviceTypeRow): string => (dt.width === null ? '—' : `${dt.width}″`),
+			getValue: (dt: DeviceTypeListRow): string => (dt.width === null ? '—' : `${dt.width}″`),
 		},
 		{
 			key: 'u_height',
 			label: t('common.heightU'),
-			getValue: (dt: DeviceTypeRow): string => `${dt.u_height}`,
+			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
+		},
+		{
+			key: 'racks',
+			label: tp('entity.rack', 2),
+			getValue: (dt: DeviceTypeListRow): string => String(dt.instance_count),
 		},
 	]
 
@@ -89,7 +94,7 @@ export function RackTypesPage(): JSX.Element {
 			filtered={filterManufacturer() !== ''}
 			columns={columns}
 			columnsKey="rack-types"
-			rowName={(dt: DeviceTypeRow): string => dt.model}
+			rowName={(dt: DeviceTypeListRow): string => dt.model}
 			emptyText={t('rackType.empty')}
 		/>
 	)

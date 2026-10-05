@@ -4,7 +4,7 @@
  * message.
  */
 import type { Result } from 'better-result'
-import type { DeviceRoleRow } from 'server/src/db/device_roles'
+import type { DeviceRoleListRow, DeviceRoleRow } from 'server/src/db/device_roles'
 import type {
 	DeviceRoleCreate,
 	DeviceRoleListQuery,
@@ -13,14 +13,14 @@ import type {
 } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceRoleRow }
+export type { DeviceRoleListRow, DeviceRoleRow }
 
 export type DeviceRoleSort = DeviceRoleListQuery['sort']
 
 export async function fetch_device_roles(
 	filters?: Partial<DeviceRoleListQuery>,
-): Promise<Result<Page<DeviceRoleRow>, Error>> {
-	return getPage<DeviceRoleRow>(
+): Promise<Result<Page<DeviceRoleListRow>, Error>> {
+	return getPage<DeviceRoleListRow>(
 		client['device-roles'].$get({
 			query: to_query({
 				...paging(filters),

@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import type {
 	ChangeObjectType,
 	DeviceTypeCreate,
@@ -19,6 +19,7 @@ import { ConflictError, DuplicateError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
+	countBy,
 	exists,
 	findById,
 	findOne,
@@ -36,6 +37,9 @@ import { deviceSpansOf, rackHeightOf } from './racks'
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
 export type StubRow = typeof device_type_interfaces.$inferSelect
+export type ManufacturerListRow = ManufacturerRow & { device_count: number }
+/** `instance_count`: devices built from a device type, racks built from a rack type. */
+export type DeviceTypeListRow = DeviceTypeRow & { instance_count: number }
 
 /** Rack types share the device type table; a form factor marks them. */
 function typeKindOf(row: DeviceTypeRow): ChangeObjectType {
@@ -55,15 +59,36 @@ export interface ManufacturerListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
-export function listManufacturers(params: ManufacturerListParams): Promise<Page<ManufacturerRow>> {
+export async function listManufacturers(
+	params: ManufacturerListParams,
+): Promise<Page<ManufacturerListRow>> {
 	const orderColumn =
 		params.sort === 'description' ? manufacturers.description : manufacturers.name
-	return pageRows(
+	const page = await pageRows(
 		manufacturers,
 		searchCondition(params.search, [manufacturers.name]),
 		[orderOf(orderColumn, params.order), asc(manufacturers.id)],
 		params,
 	)
+	const counts = await manufacturerDeviceCounts(page.items.map((m) => m.id))
+	return {
+		...page,
+		items: page.items.map((m) => ({ ...m, device_count: counts.get(m.id) ?? 0 })),
+	}
+}
+
+/** Devices per manufacturer (through their device type); ids without devices are absent. */
+async function manufacturerDeviceCounts(ids: number[]): Promise<Map<number, number>> {
+	if (ids.length === 0) {
+		return new Map()
+	}
+	const rows = await getDb()
+		.select({ id: device_types.manufacturer_id, n: count() })
+		.from(devices)
+		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
+		.where(inArray(device_types.manufacturer_id, ids))
+		.groupBy(device_types.manufacturer_id)
+	return new Map(rows.map((r) => [r.id, r.n]))
 }
 
 export function getManufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
@@ -174,7 +199,9 @@ export interface DeviceTypeListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
-export function listDeviceTypes(params: DeviceTypeListParams): Promise<Page<DeviceTypeRow>> {
+export async function listDeviceTypes(
+	params: DeviceTypeListParams,
+): Promise<Page<DeviceTypeListRow>> {
 	const where = and(
 		searchCondition(params.search, [device_types.model]),
 		params.manufacturer ? eq(device_types.manufacturer_id, params.manufacturer) : undefined,
@@ -191,12 +218,20 @@ export function listDeviceTypes(params: DeviceTypeListParams): Promise<Page<Devi
 			: params.sort === 'form_factor' && params.kind === 'rack'
 				? device_types.form_factor
 				: device_types.model
-	return pageRows(
+	const page = await pageRows(
 		device_types,
 		where,
 		[orderOf(orderColumn, params.order), asc(device_types.id)],
 		params,
 	)
+	const counts = await countBy(
+		params.kind === 'rack' ? racks.rack_type_id : devices.device_type_id,
+		page.items.map((dt) => dt.id),
+	)
+	return {
+		...page,
+		items: page.items.map((dt) => ({ ...dt, instance_count: counts.get(dt.id) ?? 0 })),
+	}
 }
 
 export function getDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>> {
