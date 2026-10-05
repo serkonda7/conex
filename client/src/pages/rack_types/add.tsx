@@ -1,10 +1,8 @@
 import { createSignal, type JSX } from 'solid-js'
 import { create_device_type, fetch_manufacturers, type RackFormFactor } from '../../api/templates'
 import {
-	AddOptionButton,
 	Field,
 	FormPage,
-	ReloadOptionsButton,
 	row_options,
 	SelectField,
 	TextAreaField,
@@ -20,7 +18,7 @@ import {
 	useFormState,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, queryParam } from '../../lib/router'
 
 const FORM_FACTORS: RackFormFactor[] = [
 	'2-post frame',
@@ -34,7 +32,8 @@ const FORM_FACTORS: RackFormFactor[] = [
 export function RackTypeAddPage(): JSX.Element {
 	const form = useFormState()
 	const [manufacturerId, setManufacturerId] = createSignal('')
-	const [model, setModel] = createSignal('')
+	// `?name=` comes from the search typed into an opener's dropdown.
+	const [model, setModel] = createSignal(queryParam('name'))
 	const [description, setDescription] = createSignal('')
 	const [formFactor, setFormFactor] = createSignal<RackFormFactor | ''>('')
 	const [height, setHeight] = createSignal('1')
@@ -100,15 +99,8 @@ export function RackTypeAddPage(): JSX.Element {
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
-				action={
-					<>
-						<AddOptionButton
-							label={tp('entity.manufacturer', 1)}
-							href="/manufacturers/add"
-						/>
-						<ReloadOptionsButton onClick={refetchManufacturers} />
-					</>
-				}
+				add={{ label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }}
+				reload={refetchManufacturers}
 			/>
 			<TextField
 				id="rack-type-model"

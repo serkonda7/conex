@@ -14,10 +14,12 @@ import {
 	text,
 	useEntityForm,
 } from '../../lib/form'
+import { queryParam } from '../../lib/router'
 
 /** Manufacturer create (`id` omitted) or edit form. */
 function ManufacturerForm(props: { id?: number }): JSX.Element {
-	const [name, setName] = createSignal('')
+	// `?name=` comes from the search typed into an opener's dropdown.
+	const [name, setName] = createSignal(queryParam('name'))
 	const [description, setDescription] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,

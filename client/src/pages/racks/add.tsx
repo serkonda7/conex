@@ -3,12 +3,10 @@ import { create_rack } from '../../api/racks'
 import { fetch_device_types, fetch_manufacturers } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import {
-	AddOptionButton,
 	DescriptionField,
 	FormPage,
 	Hint,
 	NameField,
-	ReloadOptionsButton,
 	row_options,
 	SelectField,
 } from '../../components/form'
@@ -142,12 +140,8 @@ export function RackAddPage(): JSX.Element {
 				emptyLabel={t('rack.rackTypePlaceholder')}
 				required
 				describedBy={RACK_TYPE_HINT_ID}
-				action={
-					<>
-						<AddOptionButton label={tp('entity.rackType', 1)} href="/rack-types/add" />
-						<ReloadOptionsButton onClick={refreshRackTypes} />
-					</>
-				}
+				add={{ label: tp('entity.rackType', 1), href: '/rack-types/add' }}
+				reload={refreshRackTypes}
 			/>
 			<DescriptionField
 				id="rack-description"

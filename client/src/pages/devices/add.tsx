@@ -7,13 +7,11 @@ import { fetch_shelf } from '../../api/shelves'
 import { fetch_device_types, fetch_manufacturers } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import {
-	AddOptionButton,
 	DescriptionField,
 	FormPage,
 	FormSection,
 	Hint,
 	NameField,
-	ReloadOptionsButton,
 	row_options,
 	SelectField,
 	TextField,
@@ -215,15 +213,8 @@ export function DeviceAddPage(): JSX.Element {
 						detail: manufacturerName(type.manufacturer_id),
 					}))}
 					emptyLabel={t('common.selectPlaceholder')}
-					action={
-						<>
-							<AddOptionButton
-								label={tp('entity.deviceType', 1)}
-								href="/device-types/add"
-							/>
-							<ReloadOptionsButton onClick={refreshTypes} />
-						</>
-					}
+					add={{ label: tp('entity.deviceType', 1), href: '/device-types/add' }}
+					reload={refreshTypes}
 				/>
 				<SelectField
 					id="device-role"
@@ -233,15 +224,8 @@ export function DeviceAddPage(): JSX.Element {
 					onChange={setRoleId}
 					options={row_options(roles() ?? [])}
 					emptyLabel={t('common.selectPlaceholder')}
-					action={
-						<>
-							<AddOptionButton
-								label={tp('entity.deviceRole', 1)}
-								href="/device-roles/add"
-							/>
-							<ReloadOptionsButton onClick={refetchRoles} />
-						</>
-					}
+					add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
+					reload={refetchRoles}
 				/>
 				<DescriptionField
 					id="device-description"

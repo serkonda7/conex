@@ -1,4 +1,4 @@
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import {
 	create_device_type,
 	type DeviceTypeRow,
@@ -7,11 +7,9 @@ import {
 	update_device_type,
 } from '../../api/templates'
 import {
-	AddOptionButton,
 	CheckboxField,
 	DescriptionField,
 	FormPage,
-	ReloadOptionsButton,
 	row_options,
 	SelectField,
 	TextAreaField,
@@ -28,7 +26,7 @@ import {
 	useEntityForm,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, queryParam } from '../../lib/router'
 
 const MAX_HEIGHT = 60
 
@@ -45,7 +43,8 @@ interface DeviceTypeBody {
 /** Device-type create (`id` omitted) or edit form. */
 function DeviceTypeForm(props: { id?: number }): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
-	const [model, setModel] = createSignal('')
+	// `?name=` comes from the search typed into an opener's dropdown.
+	const [model, setModel] = createSignal(queryParam('name'))
 	const [uHeight, setUHeight] = createSignal('1')
 	const [fullDepth, setFullDepth] = createSignal(false)
 	const [description, setDescription] = createSignal('')
@@ -131,17 +130,12 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
-				action={
-					<>
-						<Show when={!form.editing}>
-							<AddOptionButton
-								label={tp('entity.manufacturer', 1)}
-								href="/manufacturers/add"
-							/>
-						</Show>
-						<ReloadOptionsButton onClick={refetchManufacturers} />
-					</>
+				add={
+					form.editing
+						? undefined
+						: { label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }
 				}
+				reload={refetchManufacturers}
 			/>
 			<TextField
 				id={`${prefix}-model`}

@@ -6,7 +6,7 @@
  * the e2e tests and the detail-page deep links address them directly.
  */
 
-import { IconChevronDown, IconPlus, IconRefresh } from '@tabler/icons-solidjs'
+import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createEffect, createMemo, createSignal, For, type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
@@ -271,42 +271,13 @@ export function CommentsField(props: {
 	)
 }
 
-/** "+" button beside a select that opens the add form of the selected kind. */
-export function AddOptionButton(props: { label: string; href: string }): JSX.Element {
-	const title = (): string => t('app.navAdd', { label: props.label })
-	return (
-		<button
-			type="button"
-			class="icon-btn btn-add"
-			aria-label={title()}
-			title={title()}
-			onClick={() => navigate(props.href)}
-		>
-			<IconPlus size={16} />
-		</button>
-	)
-}
-
-/** Refetches a select's options without remounting its form. */
-export function ReloadOptionsButton(props: { onClick: () => unknown }): JSX.Element {
-	const title = (): string => t('form.reloadOptions')
-	return (
-		<button
-			type="button"
-			class="icon-btn"
-			aria-label={title()}
-			title={title()}
-			onClick={() => void props.onClick()}
-		>
-			<IconRefresh size={16} />
-		</button>
-	)
-}
-
 /** Searchable dropdown of `options`, with an optional leading empty choice.
  * A text combobox: typing filters the options by label, arrow keys move the
  * highlight, Enter picks it. The input shows the selected label while closed;
- * the numeric value sits in `data-value` for e2e tests. */
+ * the numeric value sits in `data-value` for e2e tests. `reload` refetches
+ * the options whenever the list opens, and `add` pins an entry at the end of
+ * the list that opens the add form of the option kind, passing the typed
+ * search as `?name=`. */
 export function SelectField(props: {
 	id: string
 	label: string
@@ -321,7 +292,9 @@ export function SelectField(props: {
 	autofocus?: boolean
 	describedBy?: string
 	hint?: JSX.Element
-	action?: JSX.Element
+	reload?: () => unknown
+	/** Entity label and add-form path of the pinned "Add …" entry. */
+	add?: { label: string; href: string }
 }): JSX.Element {
 	let list: HTMLDivElement | undefined
 	const ref = useAutofocus(() => props.autofocus)
@@ -349,6 +322,9 @@ export function SelectField(props: {
 				)
 	})
 	const hasDetail = (): boolean => props.options.some((o) => o.detail !== undefined)
+	// The add entry follows the filtered options in the arrow-key cycle.
+	const addIndex = (): number => filtered().length
+	const count = (): number => filtered().length + (props.add ? 1 : 0)
 	const editable = (): boolean => !props.disabled && props.onChange !== undefined
 
 	createEffect(() => {
@@ -366,21 +342,31 @@ export function SelectField(props: {
 		const index = choices().findIndex((o) => String(o.value) === props.value)
 		setActive(Math.max(index, 0))
 		setOpen(true)
+		void props.reload?.()
 	}
 
-	function pick(option: FormOption | undefined): void {
+	function pick(index: number): void {
 		setOpen(false)
+		if (props.add && index === addIndex()) {
+			// The add form starts with whatever was typed as its name.
+			const name = query().trim()
+			navigate(
+				name === '' ? props.add.href : `${props.add.href}?name=${encodeURIComponent(name)}`,
+			)
+			return
+		}
+		const option = filtered()[index]
 		if (option && String(option.value) !== props.value) {
 			props.onChange?.(String(option.value))
 		}
 	}
 
 	function step(delta: number): void {
-		const count = filtered().length
+		const total = count()
 		if (!open()) {
 			show()
-		} else if (count > 0) {
-			setActive((active() + delta + count) % count)
+		} else if (total > 0) {
+			setActive((active() + delta + total) % total)
 		}
 	}
 
@@ -395,7 +381,7 @@ export function SelectField(props: {
 		}
 		if (e.key === 'Enter') {
 			e.preventDefault()
-			pick(filtered()[active()])
+			pick(active())
 		} else if (e.key === 'Escape') {
 			e.preventDefault()
 			e.stopPropagation()
@@ -408,96 +394,112 @@ export function SelectField(props: {
 
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
-			<div class="field-inline-actions">
-				<div
-					class="combobox"
-					classList={{
-						'combobox-open': open(),
-						'combobox-with-detail': !open() && Boolean(selected()?.detail),
+			<div
+				class="combobox"
+				classList={{
+					'combobox-open': open(),
+					'combobox-with-detail': !open() && Boolean(selected()?.detail),
+				}}
+			>
+				<input
+					id={props.id}
+					ref={ref}
+					role="combobox"
+					aria-expanded={open()}
+					aria-controls={listId}
+					aria-autocomplete="list"
+					aria-activedescendant={
+						open() && count() > 0 ? `${props.id}-option-${active()}` : undefined
+					}
+					aria-describedby={props.describedBy}
+					autocomplete="off"
+					required={props.required}
+					disabled={props.disabled}
+					readOnly={props.onChange === undefined}
+					data-autofocus={props.autofocus || undefined}
+					data-value={props.value}
+					placeholder={placeholder()}
+					value={open() ? query() : (selected()?.label ?? '')}
+					onClick={show}
+					onInput={(e: InputEventAndTarget) => {
+						show()
+						setQuery(e.currentTarget.value)
+						setActive(0)
 					}}
-				>
-					<input
-						id={props.id}
-						ref={ref}
-						role="combobox"
-						aria-expanded={open()}
-						aria-controls={listId}
-						aria-autocomplete="list"
-						aria-activedescendant={
-							open() && filtered().length > 0
-								? `${props.id}-option-${active()}`
-								: undefined
-						}
-						aria-describedby={props.describedBy}
-						autocomplete="off"
-						required={props.required}
-						disabled={props.disabled}
-						readOnly={props.onChange === undefined}
-						data-autofocus={props.autofocus || undefined}
-						data-value={props.value}
-						placeholder={placeholder()}
-						value={open() ? query() : (selected()?.label ?? '')}
-						onClick={show}
-						onInput={(e: InputEventAndTarget) => {
-							show()
-							setQuery(e.currentTarget.value)
-							setActive(0)
-						}}
-						onKeyDown={onKeyDown}
-						onBlur={() => setOpen(false)}
-					/>
-					<Show when={!open() && selected()?.detail}>
-						<span class="combobox-value" aria-hidden="true">
-							<span class="combobox-option-label">{selected()?.label}</span>
-							<span class="combobox-detail">{selected()?.detail}</span>
-						</span>
-					</Show>
-					<IconChevronDown class="combobox-chevron" size={16} aria-hidden="true" />
-					<Show when={open()}>
-						<div
-							class="combobox-list"
-							classList={{ 'combobox-list-detail': hasDetail() }}
-							id={listId}
-							ref={list}
-							role="listbox"
+					onKeyDown={onKeyDown}
+					onBlur={() => setOpen(false)}
+				/>
+				<Show when={!open() && selected()?.detail}>
+					<span class="combobox-value" aria-hidden="true">
+						<span class="combobox-option-label">{selected()?.label}</span>
+						<span class="combobox-detail">{selected()?.detail}</span>
+					</span>
+				</Show>
+				<IconChevronDown class="combobox-chevron" size={16} aria-hidden="true" />
+				<Show when={open()}>
+					<div
+						class="combobox-list"
+						classList={{ 'combobox-list-detail': hasDetail() }}
+						id={listId}
+						ref={list}
+						role="listbox"
+					>
+						<For
+							each={filtered()}
+							fallback={
+								<div class="combobox-empty">{t('common.noMatchingObjects')}</div>
+							}
 						>
-							<For
-								each={filtered()}
-								fallback={
-									<div class="combobox-empty">
-										{t('common.noMatchingObjects')}
-									</div>
-								}
-							>
-								{(option: FormOption, index: () => number): JSX.Element => (
-									// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection runs through the combobox input (aria-activedescendant)
-									// biome-ignore lint/a11y/useFocusableInteractive: focus stays in the combobox input
-									<div
-										id={`${props.id}-option-${index()}`}
-										data-index={index()}
-										role="option"
-										aria-selected={String(option.value) === props.value}
-										classList={{
-											'combobox-option': true,
-											'combobox-option-active': index() === active(),
-											'combobox-option-empty': option.value === '',
-										}}
-										// Keep focus in the input so blur doesn't close the list first.
-										onMouseDown={(e: MouseEvent) => e.preventDefault()}
-										onMouseMove={() => setActive(index())}
-										onClick={() => pick(option)}
-									>
-										<span class="combobox-option-label">{option.label}</span>
-										<Show when={option.detail}>
-											<span class="combobox-detail">{option.detail}</span>
-										</Show>
-									</div>
-								)}
-							</For>
-						</div>
-					</Show>
-				</div>
-				{props.action}
+							{(option: FormOption, index: () => number): JSX.Element => (
+								// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection runs through the combobox input (aria-activedescendant)
+								// biome-ignore lint/a11y/useFocusableInteractive: focus stays in the combobox input
+								<div
+									id={`${props.id}-option-${index()}`}
+									data-index={index()}
+									role="option"
+									aria-selected={String(option.value) === props.value}
+									classList={{
+										'combobox-option': true,
+										'combobox-option-active': index() === active(),
+										'combobox-option-empty': option.value === '',
+									}}
+									// Keep focus in the input so blur doesn't close the list first.
+									onMouseDown={(e: MouseEvent) => e.preventDefault()}
+									onMouseMove={() => setActive(index())}
+									onClick={() => pick(index())}
+								>
+									<span class="combobox-option-label">{option.label}</span>
+									<Show when={option.detail}>
+										<span class="combobox-detail">{option.detail}</span>
+									</Show>
+								</div>
+							)}
+						</For>
+						<Show when={props.add}>
+							{(add: () => { label: string; href: string }): JSX.Element => (
+								// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection runs through the combobox input (aria-activedescendant)
+								// biome-ignore lint/a11y/useFocusableInteractive: focus stays in the combobox input
+								<div
+									id={`${props.id}-option-${addIndex()}`}
+									data-index={addIndex()}
+									role="option"
+									aria-selected={false}
+									classList={{
+										'combobox-option': true,
+										'combobox-option-add': true,
+										'combobox-option-active': addIndex() === active(),
+									}}
+									onMouseDown={(e: MouseEvent) => e.preventDefault()}
+									onMouseMove={() => setActive(addIndex())}
+									onClick={() => pick(addIndex())}
+								>
+									<IconPlus size={14} aria-hidden="true" />
+									{t('app.navAdd', { label: add().label })}
+								</div>
+							)}
+						</Show>
+					</div>
+				</Show>
 			</div>
 		</Field>
 	)

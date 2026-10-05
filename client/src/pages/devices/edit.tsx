@@ -6,7 +6,6 @@ import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import {
-	AddOptionButton,
 	DescriptionField,
 	FormPage,
 	Hint,
@@ -142,9 +141,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				onChange={setRoleId}
 				options={row_options(roles() ?? [])}
 				emptyLabel={t('device.rolePlaceholder')}
-				action={
-					<AddOptionButton label={tp('entity.deviceRole', 1)} href="/device-roles/add" />
-				}
+				add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
 			/>
 			<DescriptionField
 				id="device-edit-description"

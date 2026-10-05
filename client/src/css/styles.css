@@ -1153,22 +1153,14 @@ tbody tr:last-child td {
 	padding: 0.36rem 0.5rem;
 }
 
-.field-inline-actions {
-	display: flex;
-	align-items: stretch;
-	gap: 0.4rem;
-}
-
 /* Searchable `SelectField`: text input plus an absolutely positioned
    listbox below it. */
 .combobox {
 	position: relative;
 }
 
-.app-content .form-stacked .field .field-inline-actions > select,
-.app-content .form-stacked .field .field-inline-actions > .combobox {
-	flex: 1 1 auto;
-	width: auto;
+.app-content .form-stacked .field .combobox {
+	width: 100%;
 	min-width: 0;
 }
 
@@ -1276,6 +1268,25 @@ tbody tr:last-child td {
 	font-weight: 600;
 }
 
+/* Pinned "Add …" entry below the options, kept in view while scrolling. */
+.combobox-option-add {
+	position: sticky;
+	bottom: -0.2rem;
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.2rem;
+	border-top: 1px solid var(--border);
+	border-radius: 0 0 0.25rem 0.25rem;
+	background-color: var(--bg-raised);
+	color: var(--primary);
+	font-weight: 600;
+}
+
+.combobox-option-add.combobox-option-active {
+	background-color: var(--bg-hover);
+}
+
 .combobox-option-empty,
 .combobox-empty {
 	color: var(--text-muted);
@@ -1296,6 +1307,11 @@ tbody tr:last-child td {
 	grid-column: 1 / -1;
 	grid-template-columns: subgrid;
 	align-items: baseline;
+}
+
+.combobox-list-detail > .combobox-option-add {
+	display: flex;
+	align-items: center;
 }
 
 .app-content .form-stacked .field .field-checkbox-label input {
@@ -2782,9 +2798,7 @@ a.rack-shelf-plate:hover {
 /* Dashboard: responsive grid of widget cards. */
 .dashboard-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
 	gap: 0.8rem;
-	align-items: start;
 }
 
 .dashboard-widget {

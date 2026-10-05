@@ -68,6 +68,11 @@ function detailText(f: IntegrationFinding): string {
 	}
 }
 
+/** `?kind=` preselects the finding filter (dashboard links); unknown kinds show all. */
+function parseKind(raw: string): FindingKind | '' {
+	return (FINDING_KINDS as readonly string[]).includes(raw) ? (raw as FindingKind) : ''
+}
+
 type View = 'report' | 'tenants' | 'devices'
 
 function parseView(raw: string): View {
@@ -240,7 +245,7 @@ function LinkBoardPanel(props: {
  */
 export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [kindFilter, setKindFilter] = createSignal('')
+	const [kindFilter, setKindFilter] = createSignal<string>(parseKind(queryParam('kind')))
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
 	const [syncing, setSyncing] = createSignal(false)
 	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
