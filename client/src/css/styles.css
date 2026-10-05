@@ -1061,6 +1061,24 @@ tbody tr:last-child td {
 	gap: 0.6rem;
 }
 
+.form-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+}
+
+.form-section + .form-section {
+	margin-top: 0.8rem;
+}
+
+.form-section-title {
+	margin: 0 0 0.6rem calc(10rem + 0.75rem);
+	padding: 0;
+	font-size: var(--font-size-lg);
+	font-weight: 600;
+	color: var(--text);
+}
+
 .app-content .form-stacked .field input,
 .app-content .form-stacked .field select,
 .app-content .form-stacked .field textarea {
@@ -1304,7 +1322,8 @@ tbody tr:last-child td {
 		grid-column: auto;
 	}
 
-	.form-actions {
+	.form-actions,
+	.form-section-title {
 		margin-left: 0;
 	}
 }

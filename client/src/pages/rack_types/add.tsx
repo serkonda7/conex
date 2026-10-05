@@ -147,7 +147,6 @@ export function RackTypeAddPage(): JSX.Element {
 				label={t('common.description')}
 				value={description()}
 				onInput={setDescription}
-				placeholder={t('common.descriptionPlaceholder')}
 				maxLength={500}
 			/>
 		</FormPage>

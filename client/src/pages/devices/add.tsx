@@ -10,6 +10,7 @@ import {
 	AddOptionButton,
 	DescriptionField,
 	FormPage,
+	FormSection,
 	Hint,
 	NameField,
 	ReloadOptionsButton,
@@ -90,6 +91,16 @@ export function DeviceAddPage(): JSX.Element {
 		form.setError,
 	)
 	const manufacturerName = useNameOf(manufacturers)
+	// 0U types are not rack-mounted.
+	const zeroHeight = (): boolean => {
+		const id = parseId(typeId())
+		return (types() ?? []).find((type) => type.id === id)?.u_height === 0
+	}
+	createEffect(() => {
+		if (zeroHeight() && shelfId() === null) {
+			handleRackChange('')
+		}
+	})
 	async function refreshTypes(): Promise<void> {
 		await Promise.all([refetchTypes(), refetchManufacturers()])
 	}
@@ -189,143 +200,134 @@ export function DeviceAddPage(): JSX.Element {
 		shelf()?.name || t('common.unitPosition', { u: shelf()?.position_u ?? '' })
 
 	return (
-		<FormPage
-			form={form}
-			title={t('device.addTitle')}
-			cancelTo="/devices"
-			onSubmit={handleCreate}
-		>
-			<NameField
-				id="device-name"
-				placeholder={t('device.namePlaceholder')}
-				value={name()}
-				onInput={setName}
-				autofocus
-			/>
-			<SelectField
-				id="device-type"
-				label={tp('entity.deviceType', 1)}
-				required
-				value={typeId()}
-				onChange={setTypeId}
-				options={(types() ?? []).map((type) => ({
-					value: type.id,
-					label: type.model,
-					detail: manufacturerName(type.manufacturer_id),
-				}))}
-				emptyLabel={t('device.deviceTypePlaceholder')}
-				action={
-					<>
-						<AddOptionButton
-							label={tp('entity.deviceType', 1)}
-							href="/device-types/add"
-						/>
-						<ReloadOptionsButton onClick={refreshTypes} />
-					</>
-				}
-			/>
-			<SelectField
-				id="device-role"
-				label={tp('entity.deviceRole', 1)}
-				required
-				value={roleId()}
-				onChange={setRoleId}
-				options={row_options(roles() ?? [])}
-				emptyLabel={t('device.rolePlaceholder')}
-				action={
-					<>
-						<AddOptionButton
-							label={tp('entity.deviceRole', 1)}
-							href="/device-roles/add"
-						/>
-						<ReloadOptionsButton onClick={refetchRoles} />
-					</>
-				}
-			/>
-			<DescriptionField
-				id="device-description"
-				value={description()}
-				onInput={setDescription}
-			/>
-			<TextField
-				id="device-serial"
-				label={t('device.serial')}
-				placeholder={t('device.serialPlaceholder')}
-				maxLength={100}
-				value={serial()}
-				onInput={setSerial}
-			/>
-			<TextField
-				id="device-device-id"
-				label={t('device.deviceId')}
-				placeholder={t('device.deviceIdPlaceholder')}
-				maxLength={100}
-				value={deviceId()}
-				onInput={setDeviceId}
-			/>
-			<SelectField
-				id="device-site"
-				label={tp('entity.site', 1)}
-				value={siteId()}
-				onChange={handleSiteChange}
-				options={row_options(siteOptions())}
-				emptyLabel={t('device.noSite')}
-			/>
-			<SelectField
-				id="device-location"
-				label={tp('entity.location', 1)}
-				value={locationId()}
-				disabled={siteId() === ''}
-				onChange={setLocationId}
-				options={row_options(locations() ?? [])}
-				emptyLabel={t('rack.noLocation')}
-			/>
-			<SelectField
-				id="device-rack"
-				label={tp('entity.rack', 1)}
-				value={rackId()}
-				disabled={shelfId() !== null}
-				onChange={handleRackChange}
-				options={row_options(racks() ?? [])}
-				emptyLabel="—"
-			/>
-			<SelectField
-				id="device-face"
-				label={t('shelf.face')}
-				value={face()}
-				disabled={rackId() === '' || shelfId() !== null}
-				onChange={setFace}
-				options={faceOptions()}
-				emptyLabel={t('device.noFace')}
-				hint={<Hint>{rackId() === '' ? '' : t('device.faceHint')}</Hint>}
-			/>
-			<TextField
-				id="device-position"
-				label={t('common.position')}
-				placeholder={t('device.positionPlaceholder')}
-				inputmode="numeric"
-				value={positionU()}
-				disabled={rackId() === '' || shelfId() !== null}
-				onInput={setPositionU}
-				hint={
-					<Hint>
-						{shelfId() === null ? '' : t('device.onShelfHint', { name: shelfName() })}
-					</Hint>
-				}
-			/>
-			<SelectField
-				id="device-tenant"
-				label={tp('entity.tenant', 1)}
-				value={tenant.value()}
-				onChange={tenant.pick}
-				options={row_options(tenants() ?? [])}
-				emptyLabel={t('common.noTenant')}
-				hint={
-					<Show when={!tenant.touched() && siteTenantId() !== null}>
-						<Hint>{t('location.tenantFromSite')}</Hint>
-					</Show>
-				}
-			/>
+		<FormPage form={form} cancelTo="/devices" onSubmit={handleCreate}>
+			<FormSection title={tp('entity.device', 1)}>
+				<NameField id="device-name" value={name()} onInput={setName} autofocus />
+				<SelectField
+					id="device-type"
+					label={tp('entity.deviceType', 1)}
+					required
+					value={typeId()}
+					onChange={setTypeId}
+					options={(types() ?? []).map((type) => ({
+						value: type.id,
+						label: type.model,
+						detail: manufacturerName(type.manufacturer_id),
+					}))}
+					emptyLabel={t('common.selectPlaceholder')}
+					action={
+						<>
+							<AddOptionButton
+								label={tp('entity.deviceType', 1)}
+								href="/device-types/add"
+							/>
+							<ReloadOptionsButton onClick={refreshTypes} />
+						</>
+					}
+				/>
+				<SelectField
+					id="device-role"
+					label={tp('entity.deviceRole', 1)}
+					required
+					value={roleId()}
+					onChange={setRoleId}
+					options={row_options(roles() ?? [])}
+					emptyLabel={t('common.selectPlaceholder')}
+					action={
+						<>
+							<AddOptionButton
+								label={tp('entity.deviceRole', 1)}
+								href="/device-roles/add"
+							/>
+							<ReloadOptionsButton onClick={refetchRoles} />
+						</>
+					}
+				/>
+				<DescriptionField
+					id="device-description"
+					value={description()}
+					onInput={setDescription}
+				/>
+				<TextField
+					id="device-serial"
+					label={t('device.serial')}
+					maxLength={100}
+					value={serial()}
+					onInput={setSerial}
+				/>
+				<TextField
+					id="device-device-id"
+					label={t('device.deviceId')}
+					maxLength={100}
+					value={deviceId()}
+					onInput={setDeviceId}
+				/>
+			</FormSection>
+			<FormSection title={tp('entity.location', 1)}>
+				<SelectField
+					id="device-site"
+					label={tp('entity.site', 1)}
+					value={siteId()}
+					onChange={handleSiteChange}
+					options={row_options(siteOptions())}
+					emptyLabel={t('common.selectPlaceholder')}
+				/>
+				<SelectField
+					id="device-location"
+					label={tp('entity.location', 1)}
+					value={locationId()}
+					disabled={siteId() === ''}
+					onChange={setLocationId}
+					options={row_options(locations() ?? [])}
+					emptyLabel={t('common.selectPlaceholder')}
+				/>
+				<SelectField
+					id="device-rack"
+					label={tp('entity.rack', 1)}
+					value={rackId()}
+					disabled={shelfId() !== null || zeroHeight()}
+					onChange={handleRackChange}
+					options={row_options(racks() ?? [])}
+					emptyLabel={t('common.selectPlaceholder')}
+				/>
+				<SelectField
+					id="device-face"
+					label={t('shelf.face')}
+					value={face()}
+					disabled={rackId() === '' || shelfId() !== null}
+					onChange={setFace}
+					options={faceOptions()}
+					emptyLabel={t('common.selectPlaceholder')}
+				/>
+				<TextField
+					id="device-position"
+					label={t('common.position')}
+					inputmode="numeric"
+					value={positionU()}
+					disabled={rackId() === '' || shelfId() !== null}
+					onInput={setPositionU}
+					hint={
+						<Hint>
+							{shelfId() === null
+								? ''
+								: t('device.onShelfHint', { name: shelfName() })}
+						</Hint>
+					}
+				/>
+				<SelectField
+					id="device-tenant"
+					label={tp('entity.tenant', 1)}
+					value={tenant.value()}
+					onChange={tenant.pick}
+					options={row_options(tenants() ?? [])}
+					emptyLabel={t('common.selectPlaceholder')}
+					hint={
+						<Show when={!tenant.touched() && siteTenantId() !== null}>
+							<Hint>{t('location.tenantFromSite')}</Hint>
+						</Show>
+					}
+				/>
+			</FormSection>
 		</FormPage>
 	)
 }

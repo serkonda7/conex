@@ -197,10 +197,20 @@ export function ReadOnlyField(props: {
 	)
 }
 
+/** Titled group of related fields within a stacked form. */
+export function FormSection(props: { title: string; children: JSX.Element }): JSX.Element {
+	return (
+		<fieldset class="field-fieldset form-section">
+			<legend class="form-section-title">{props.title}</legend>
+			{props.children}
+		</fieldset>
+	)
+}
+
 /** Required entity name input, optionally autofocused when the form mounts. */
 export function NameField(props: {
 	id: string
-	placeholder: string
+	placeholder?: string
 	value: string
 	onInput: (value: string) => void
 	autofocus?: boolean
@@ -242,14 +252,7 @@ export function DescriptionField(props: {
 	value: string
 	onInput: (value: string) => void
 }): JSX.Element {
-	return (
-		<TextField
-			{...props}
-			label={t('common.description')}
-			placeholder={t('common.descriptionPlaceholder')}
-			maxLength={500}
-		/>
-	)
+	return <TextField {...props} label={t('common.description')} maxLength={500} />
 }
 
 /** The optional free-text comments field. */
@@ -566,7 +569,7 @@ function EditActions(props: {
  */
 export function FormPage(props: {
 	form: FormState
-	title: string
+	title?: string
 	onSubmit: (e: SubmitEvent) => void
 	cancelTo: string
 	name?: string
@@ -581,7 +584,9 @@ export function FormPage(props: {
 	usePageMeta(() => ({ name: props.name, crumbs: props.crumbs }))
 	return (
 		<div class="form-page">
-			<h2>{props.title}</h2>
+			<Show when={props.title}>
+				<h2>{props.title}</h2>
+			</Show>
 			<Show
 				when={props.form.loaded()}
 				fallback={<Loading message={props.loadingText ?? t('common.loading')} />}

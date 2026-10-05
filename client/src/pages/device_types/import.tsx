@@ -196,7 +196,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 			<p class="page-subtitle">
 				{t('import.libraryIntro')}{' '}
 				<a
-					href="https://github.com/netbox-community/devicetype-library"
+					href="https://github.com/serkonda7/conex-device-types"
 					target="_blank"
 					rel="noreferrer"
 				>

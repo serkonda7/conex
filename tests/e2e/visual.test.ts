@@ -56,3 +56,11 @@ test('locations list layout', async ({ page }) => {
 		maskColor: '#242424',
 	})
 })
+
+test('device add form layout', async ({ page }) => {
+	await page.goto('/devices/add')
+	await expect(page.locator('#device-name')).toBeVisible()
+	await expect(page.locator('.form-section-title')).toHaveCount(2)
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('device-add-form.png')
+})
