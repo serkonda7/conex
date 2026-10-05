@@ -1,0 +1,129 @@
+import { Result } from 'better-result'
+import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
+import { initConfig, load_config_file } from './config'
+import { initDb } from './db/connection'
+import { failInterruptedSyncs } from './integrations/sync'
+import { auditLogApp } from './routes/audit_log'
+import { authApp } from './routes/auth'
+import { cablesApp } from './routes/cables'
+import { changelogApp } from './routes/changelog'
+import { deviceRolesApp } from './routes/device_roles'
+import { deviceTypesApp } from './routes/device_types'
+import { devicesApp } from './routes/devices'
+import { integrationsApp } from './routes/integrations'
+import { interfacesApp } from './routes/interfaces'
+import { locationsApp } from './routes/locations'
+import { manufacturersApp } from './routes/manufacturers'
+import { racksApp } from './routes/racks'
+import { rolesApp } from './routes/roles'
+import { searchApp } from './routes/search'
+import { shelvesApp } from './routes/shelves'
+import { siteGroupsApp } from './routes/site_groups'
+import { sitesApp } from './routes/sites'
+import { tenantGroupsApp } from './routes/tenant_groups'
+import { tenantsApp } from './routes/tenants'
+import { topologyApp } from './routes/topology'
+import { usersApp } from './routes/users'
+import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
+import { jsonError } from './util/http'
+import { start_sweep } from './util/periodic'
+import { get_server_root, getTrimmedEnv, resolveInDataDir } from './util/server_root'
+
+// Precedence for the config path:
+// 1. CONEX_CONFIG_PATH env var (absolute, or relative to the data dir)
+// 2. config.toml
+function resolve_config_path(serverRoot: string): string {
+	return resolveInDataDir(serverRoot, getTrimmedEnv('CONEX_CONFIG_PATH') ?? 'config.toml')
+}
+
+/**
+ * Builds a fresh Hono application. No module-scope singleton: callers
+ * (production startup, tests) get a clean instance with no shared state.
+ * `AppType` stays derived from here so `client/src/api/client.ts` RPC typing is stable.
+ */
+// biome-ignore lint/nursery/useExplicitType: return type intentionally inferred —
+// biome-ignore lint/nursery/useExplicitReturnType: naming it `: Hono` erases the chained-route generics that `hc<AppType>` depends on
+export function createApp() {
+	return (
+		new Hono()
+			// Aborted requests (e.g. a malformed JSON body rejected by a validator) must
+			// answer with the same `{ error }` shape as the handlers, because that is the
+			// only field the client reads.
+			.onError((err, c) => {
+				if (err instanceof HTTPException) {
+					return jsonError(c, err.message, err.status)
+				}
+
+				console.error(err)
+				return jsonError(c, 'Internal server error', 500)
+			})
+			.get('/health', (c) => {
+				return c.json({ status: 'ok', version: '0.1.0' })
+			})
+			.route('/auth', authApp)
+			.route('/users', usersApp)
+			.route('/roles', rolesApp)
+			.route('/audit-log', auditLogApp)
+			.route('/changelog', changelogApp)
+			.route('/tenants', tenantsApp)
+			.route('/tenant-groups', tenantGroupsApp)
+			.route('/sites', sitesApp)
+			.route('/site-groups', siteGroupsApp)
+			.route('/locations', locationsApp)
+			.route('/racks', racksApp)
+			.route('/shelves', shelvesApp)
+			.route('/manufacturers', manufacturersApp)
+			.route('/device-types', deviceTypesApp)
+			.route('/device-roles', deviceRolesApp)
+			.route('/devices', devicesApp)
+			.route('/interfaces', interfacesApp)
+			.route('/cables', cablesApp)
+			.route('/topology', topologyApp)
+			.route('/search', searchApp)
+			.route('/integrations', integrationsApp)
+	)
+}
+
+export type AppType = ReturnType<typeof createApp>
+
+if (import.meta.main) {
+	const rootRes = get_server_root()
+	if (Result.isError(rootRes)) {
+		console.error(`Failed to start server: ${rootRes.error.message}`)
+		process.exit(1)
+	}
+	const serverRoot = Result.unwrap(rootRes)
+
+	// Load and set
+	const configResult = load_config_file(resolve_config_path(serverRoot))
+	if (Result.isError(configResult)) {
+		console.error(`Failed to start server: ${configResult.error.message}`)
+		process.exit(1)
+	}
+	initConfig(configResult.value)
+
+	try {
+		await initDb({ serverRoot })
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err)
+		console.error(`Failed to start server: ${msg}`)
+		process.exit(1)
+	}
+
+	const app = createApp()
+
+	// Drop timed out sessions even while nobody tries to use them.
+	// Scheduled here and not at module scope, so it never keeps a test process alive.
+	await sweepExpired()
+	start_sweep(sweepExpired, SESSION_SWEEP_INTERVAL_MS)
+	await failInterruptedSyncs()
+
+	const server = Bun.serve({
+		hostname: '0.0.0.0',
+		port: Number(process.env.CONEX_SERVER_PORT ?? 3000),
+		fetch: app.fetch,
+	})
+
+	console.log(`API running on ${server.url}`)
+}

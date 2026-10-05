@@ -1,0 +1,21 @@
+# build output
+dist/
+
+# dependencies
+node_modules/
+
+# caches
+.turbo/
+docs/.vitepress/cache/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# editor files
+.vscode/
+!.vscode/extensions.json
+
+# config and app data
+data/
+config.toml
+backups/

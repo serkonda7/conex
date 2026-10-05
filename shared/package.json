@@ -1,0 +1,10 @@
+{
+  "name": "shared",
+  "version": "0.0.0-dev",
+  "scripts": {
+    "check": "tsc"
+  },
+  "dependencies": {
+    "valibot": "catalog:"
+  }
+}

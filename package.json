@@ -1,0 +1,44 @@
+{
+  "name": "conex",
+  "version": "0.0.1-dev",
+  "license": "MPL-2.0",
+  "workspaces": [
+    "server",
+    "client",
+    "shared"
+  ],
+  "scripts": {
+    "lint": "biome check --write",
+    "lint:ci": "biome ci",
+    "check": "turbo run check",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "db:generate": "bun run --cwd server db:generate",
+    "db:seed:demo": "bun scripts/seed-demo.ts",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:reuse": "CONEX_E2E_REUSE_SERVERS=1 playwright test --project=chromium",
+    "test:visual": "playwright test --project=visual",
+    "test:visual:update": "playwright test --project=visual --update-snapshots"
+  },
+  "packageManager": "bun@1.4.2",
+  "catalog": {
+    "drizzle-kit": "~0.31.11",
+    "drizzle-orm": "~0.45.3",
+    "hono": "~4.13.12",
+    "@hono/valibot-validator": "~0.6.1",
+    "better-result": "~3.0.1",
+    "valibot": "~1.5.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@playwright/test": "~1.63.0",
+    "@types/bun": "1.4.2",
+    "@types/node": "~26.6.3",
+    "turbo": "~2.11.6",
+    "typescript": "~7.0.2",
+    "vitepress": "~1.6.4"
+  }
+}

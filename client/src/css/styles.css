@@ -1,0 +1,2786 @@
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+/* MakerWorld-inspired dark palette. */
+:root {
+	color-scheme: dark;
+	--bg-base: #1c1c1c;
+	--bg-default: #222225;
+	--bg-surface: #242424;
+	--bg-raised: #2e2e2e;
+	--bg-input: #2d2d31;
+	--bg-code: #333333;
+	--bg-hover: #3d3d3d;
+	--text: #f5f5f5;
+	--text-secondary: #b8b8b8;
+	--text-muted: #969696;
+	--text-subtle: #a0a0a0;
+	--border: #3d3d3d;
+	--border-strong: #525252;
+	--primary: #08bf08;
+	--primary-hover: #00b800;
+	--primary-contrast: #ffffff;
+	--link: #74caff;
+	--error: #ffa48d;
+	--error-bg: rgba(225, 71, 71, 0.16);
+	--success: #5be584;
+	--muted-dot: #666666;
+	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+	--font-size-sm: 0.75rem;
+	--font-size-base: 0.9375rem; /* 15px */
+	--font-size-lg: 1rem;
+	--font-size-xl: 1.15rem;
+	--font-size-2xl: 1.3rem;
+	/* Fixed top bar height; the sticky sidebar sizes itself against it. */
+	--topbar-height: 3.5rem;
+}
+
+html {
+	background-color: var(--bg-base);
+}
+
+html,
+body,
+#root {
+	min-height: 100%;
+}
+
+body {
+	font-family:
+		system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+		sans-serif;
+	margin: 0;
+	padding: 0;
+	background-color: var(--bg-base);
+	color: var(--text);
+	font-size: var(--font-size-base);
+	line-height: 1.45;
+	transition:
+		background-color 150ms ease,
+		color 150ms ease;
+}
+
+/* Full-viewport shell: fixed left sidebar + fluid content. */
+h1,
+h2,
+h3 {
+	color: var(--text);
+	line-height: 1.25;
+	text-wrap: balance;
+}
+
+h2 {
+	font-size: var(--font-size-2xl);
+	margin: 0 0 0.5rem;
+}
+
+h3 {
+	font-size: var(--font-size-lg);
+	margin: 1rem 0 0.4rem;
+}
+
+p {
+	margin: 0 0 0.5rem;
+}
+
+ul {
+	padding-left: 1.1rem;
+}
+
+li {
+	margin-bottom: 0.2rem;
+}
+h1,
+h2,
+h3 {
+	color: var(--text);
+}
+
+a {
+	color: var(--link);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+code {
+	background-color: var(--bg-code);
+	color: var(--text);
+	padding: 0.05rem 0.3rem;
+	border-radius: 0.25rem;
+	border: 1px solid var(--border);
+	font-size: var(--font-size-base);
+}
+
+form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	max-width: 20rem;
+}
+
+input,
+select,
+textarea {
+	padding: 0.36rem 0.5rem;
+	font-family: inherit;
+	font-size: var(--font-size-base);
+	background-color: var(--bg-input);
+	color: var(--text);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.3rem;
+}
+
+textarea {
+	resize: vertical;
+	min-height: 4.5rem;
+	line-height: 1.45;
+}
+
+input::placeholder,
+textarea::placeholder {
+	color: var(--text-muted);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 1px;
+}
+
+button {
+	padding: 0.36rem 0.6rem;
+	font-size: var(--font-size-base);
+	cursor: pointer;
+	background-color: var(--bg-raised);
+	color: var(--text);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.3rem;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease;
+}
+
+button:hover {
+	background-color: var(--bg-hover);
+}
+
+button[type="submit"] {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+button[type="submit"]:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+table {
+	width: 100%;
+	max-width: 100%;
+	border-collapse: collapse;
+	margin: 0.5rem 0;
+	font-size: var(--font-size-base);
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	overflow: hidden;
+}
+
+th,
+td {
+	text-align: left;
+	padding: 0.35rem 0.5rem;
+	border-bottom: 1px solid var(--border);
+}
+
+thead th {
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+	font-weight: 600;
+	font-size: var(--font-size-sm);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+
+tbody tr:hover {
+	background-color: var(--bg-hover);
+}
+
+tbody tr:last-child td {
+	border-bottom: none;
+}
+
+/* Locations use the name cell as the tree view instead of a Parent column. */
+.location-tree-name {
+	position: relative;
+	padding-left: calc(var(--location-depth, 0) * 1.25rem);
+	min-height: 1.25rem;
+	display: flex;
+	align-items: center;
+}
+
+.location-tree-child::before {
+	content: "";
+	position: absolute;
+	left: calc(var(--location-depth, 0) * 1.25rem - 0.55rem);
+	top: 0;
+	bottom: 0;
+	border-left: 1px solid var(--border-strong);
+}
+
+.location-tree-child::after {
+	content: "";
+	position: absolute;
+	left: calc(var(--location-depth, 0) * 1.25rem - 0.55rem);
+	top: 50%;
+	width: 0.4rem;
+	border-top: 1px solid var(--border-strong);
+}
+
+.app-shell {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	min-height: 100vh;
+	width: 100%;
+}
+
+.app-topbar {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	background-color: var(--bg-surface);
+	border-bottom: 1px solid var(--border);
+	padding: 0.35rem 0.75rem;
+	height: var(--topbar-height);
+}
+
+.app-topbar-brand {
+	font-size: var(--font-size-lg);
+	font-weight: 700;
+	color: var(--text);
+	text-decoration: none;
+	flex-shrink: 0;
+}
+
+.app-topbar-brand:hover {
+	color: var(--text);
+}
+
+/* Top-bar "Ticket" action: highlighted, compact. */
+.app-topbar-ticket {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+	font-weight: 600;
+	padding: 0.25rem 0.6rem;
+	flex-shrink: 0;
+}
+
+.app-topbar-ticket:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+.app-topbar-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+.app-language-switcher {
+	display: inline-flex;
+	align-items: center;
+}
+
+.app-language-select {
+	padding: 0.25rem 0.4rem;
+	max-width: 8rem;
+}
+
+.app-tenant-context {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.app-tenant-context-fixed {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.app-tenant-context-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	max-width: 18rem;
+	padding: 0.3rem 0.5rem;
+	background-color: var(--bg-input);
+	border: 1px solid var(--border-strong);
+}
+
+.app-tenant-context-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.app-tenant-context-chevron {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+
+.app-tenant-context-popover {
+	position: absolute;
+	left: 0;
+	top: calc(100% + 0.3rem);
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	width: 18rem;
+	padding: 0.35rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+}
+
+.app-tenant-context-search {
+	width: 100%;
+}
+
+.app-tenant-context-options {
+	max-height: 20rem;
+	overflow-y: auto;
+}
+
+.app-tenant-context-option {
+	display: block;
+	width: 100%;
+	padding: 0.3rem 0.5rem;
+	border: none;
+	background: transparent;
+	text-align: left;
+	border-radius: 0.25rem;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.app-tenant-context-option.group {
+	font-weight: 600;
+}
+
+.app-tenant-context-option.nested {
+	padding-left: 1.4rem;
+}
+
+.app-tenant-context-option.active {
+	background-color: var(--bg-hover);
+}
+
+.app-tenant-context-option.selected {
+	color: var(--primary);
+}
+
+.app-tenant-context-empty {
+	margin: 0;
+	padding: 0.3rem 0.5rem;
+	color: var(--text-muted);
+}
+
+.app-tenant-context-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	width: 100%;
+	border: none;
+	border-top: 1px solid var(--border);
+	border-radius: 0;
+	background: transparent;
+	text-align: left;
+}
+
+.app-tenant-context-add:hover {
+	background-color: var(--bg-hover);
+}
+
+.app-tenant-context-add.primary {
+	color: var(--primary);
+	font-weight: 600;
+}
+
+.app-user-menu {
+	position: relative;
+}
+
+.app-user-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	max-width: 12rem;
+	font-size: var(--font-size-base);
+	border: none;
+	background: transparent;
+}
+
+.app-user-button:hover {
+	background-color: var(--bg-hover);
+}
+
+.app-user-info {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	min-width: 0;
+	line-height: 1.2;
+}
+
+.app-user-role {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.app-user-username {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.app-user-dropdown {
+	position: absolute;
+	left: 0;
+	bottom: calc(100% + 0.3rem);
+	min-width: 10rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+	padding: 0.25rem;
+	z-index: 10;
+}
+
+.app-user-language {
+	padding: 0.25rem;
+	border-bottom: 1px solid var(--border);
+	margin-bottom: 0.25rem;
+}
+
+.app-user-language .app-language-switcher,
+.app-user-language .app-language-select {
+	width: 100%;
+	max-width: none;
+}
+
+.app-user-logout {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	border: none;
+	background: transparent;
+	text-align: left;
+}
+
+.app-user-logout:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Account menu pinned to the bottom of the sidebar. */
+.app-sidebar-user {
+	margin-top: auto;
+	padding-top: 0.5rem;
+	border-top: 1px solid var(--border);
+}
+
+.app-sidebar-user .app-user-button {
+	width: 100%;
+	max-width: none;
+}
+
+.app-body {
+	display: flex;
+	align-items: stretch;
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+}
+
+.app-main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.app-sidebar {
+	width: 13rem;
+	flex-shrink: 0;
+	position: sticky;
+	top: var(--topbar-height);
+	height: calc(100vh - var(--topbar-height));
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	background-color: var(--bg-surface);
+	border-right: 1px solid var(--border);
+	padding: 0.6rem 0.5rem;
+	overflow-y: auto;
+}
+
+.app-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.app-nav-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.app-nav-label {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	margin: 0;
+	padding: 0.3rem 0.5rem;
+	border: none;
+	border-radius: 0.3rem;
+	background: transparent;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.app-nav-label:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.app-nav-label-text {
+	flex: 1;
+	text-align: left;
+}
+
+.app-nav-chevron {
+	display: inline-flex;
+	transform: rotate(-90deg);
+	transition: transform 120ms ease;
+}
+
+.app-nav-group.open .app-nav-chevron {
+	transform: none;
+}
+
+.app-nav a,
+.app-nav-item > a {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	padding: 0.35rem 0.5rem;
+	border-radius: 0.3rem;
+	text-decoration: none;
+	font-size: var(--font-size-base);
+	color: var(--text);
+	border: 1px solid transparent;
+}
+
+.app-nav-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.app-nav a:hover,
+.app-nav-item:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Standalone row above the groups: icon in the link, aligned with group labels
+   (padding override below `.app-nav-item > a`). */
+.app-nav-top {
+	margin-bottom: 0.3rem;
+}
+
+.app-nav a.active,
+.app-nav-item.active {
+	background-color: var(--bg-raised);
+	border-color: var(--border);
+	font-weight: 600;
+}
+
+/* NetBox-style quick-add "+" on each nav row. Hidden until the row is
+   hovered, active, or focus-within; dummy buttons stay disabled. */
+.app-nav-item {
+	position: relative;
+	display: flex;
+	align-items: center;
+	border: 1px solid transparent;
+	border-radius: 0.3rem;
+}
+
+.app-nav-item > a {
+	flex: 1;
+	min-width: 0;
+	/* Aligned with the group label (past the group icon). */
+	padding: 0.25rem 0.5rem 0.25rem calc(0.5rem + 16px + 0.45rem);
+	border: none;
+	background: transparent;
+}
+
+.app-nav-top > a {
+	padding-left: 0.5rem;
+}
+
+.app-nav-item:hover {
+	background-color: var(--bg-hover);
+}
+
+.app-nav-item.active {
+	background-color: var(--bg-raised);
+	border-color: var(--border);
+}
+
+.app-nav-add {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	margin-right: 0.25rem;
+	padding: 0.15rem;
+	border: 1px solid transparent;
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--text-secondary);
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.app-nav-add-icon {
+	display: inline-flex;
+}
+
+.app-nav-item:hover .app-nav-add,
+.app-nav-item.active .app-nav-add,
+.app-nav-item:focus-within .app-nav-add,
+.app-nav-add:focus-visible {
+	opacity: 1;
+}
+
+.app-nav-add:hover:not(:disabled) {
+	background-color: var(--bg-hover);
+	border-color: var(--border);
+	color: var(--text);
+}
+
+.app-nav-add:disabled {
+	cursor: default;
+}
+
+.app-content {
+	flex: 1;
+	min-width: 0;
+	width: 100%;
+	padding: 0.9rem 1rem 2rem;
+}
+
+.app-content > div:not(.app-auth) {
+	max-width: none;
+}
+
+/* First heading on a page reads as the page title. */
+.app-content h2:first-of-type {
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--border);
+}
+
+.page-subtitle {
+	color: var(--text-secondary);
+	margin-top: -0.25rem;
+	font-size: var(--font-size-base);
+}
+
+.card {
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	padding: 0.7rem 0.8rem;
+	margin: 0.6rem 0;
+}
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	align-items: end;
+	margin-bottom: 0.4rem;
+}
+
+.empty {
+	color: var(--text-secondary);
+	background-color: var(--bg-surface);
+	border: 1px dashed var(--border-strong);
+	border-radius: 0.35rem;
+	padding: 0.6rem 0.75rem;
+	margin: 0.5rem 0;
+	font-size: var(--font-size-base);
+}
+
+.skeleton {
+	color: var(--text-secondary);
+}
+
+/* Status pills: <span class="badge badge-active">active</span>. */
+.badge {
+	display: inline-block;
+	padding: 0.05rem 0.4rem;
+	border-radius: 999px;
+	border: 1px solid var(--border-strong);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	line-height: 1.4;
+	white-space: nowrap;
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+}
+
+.badge-active,
+.badge-connected {
+	color: var(--success);
+	border-color: var(--success);
+}
+
+.badge-planned,
+.badge-staged {
+	color: var(--link);
+	border-color: var(--link);
+}
+
+.badge-decommissioned {
+	color: var(--error);
+	border-color: var(--error);
+}
+
+/* Inline state text (integration connection errors, field mismatches). */
+.text-danger {
+	color: var(--error);
+}
+
+.text-success {
+	color: var(--success);
+}
+
+.text-muted {
+	color: var(--text-muted);
+}
+
+.btn-danger:hover {
+	background-color: var(--error-bg);
+	border-color: var(--error);
+	color: var(--error);
+}
+
+/* Generic "add" action for list pages: distinct primary color. */
+.btn-add {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+	font-weight: 600;
+}
+
+.btn-add:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+/* Tables scroll horizontally instead of clipping on narrow screens. */
+.app-content div:has(> table) {
+	overflow-x: auto;
+}
+
+.app-content thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.app-content tbody tr:nth-child(even) {
+	background-color: color-mix(in srgb, var(--bg-hover) 45%, transparent);
+}
+
+.app-content tbody tr:hover {
+	background-color: var(--bg-hover);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.skip-link {
+	position: absolute;
+	left: -9999px;
+	top: 0;
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+	padding: 0.5rem 0.75rem;
+	border-radius: 0 0 0.5rem 0;
+	z-index: 10;
+}
+
+.skip-link:focus {
+	left: 0;
+}
+
+.app-content--centered {
+	display: grid;
+	place-items: center;
+}
+
+.app-auth {
+	width: 100%;
+	max-width: 24rem;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	padding: 1.25rem;
+	box-shadow: var(--shadow);
+}
+
+.app-auth form {
+	max-width: none;
+}
+
+.app-content form {
+	max-width: none;
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: end;
+}
+
+.app-content form input,
+.app-content form select,
+.app-content form textarea {
+	flex: 1 1 9rem;
+	min-width: 0;
+}
+
+.app-content form button {
+	flex-shrink: 0;
+}
+
+/* Auth keeps the classic vertical stacking. */
+.app-content .app-auth form {
+	flex-direction: column;
+	align-items: stretch;
+	flex-wrap: nowrap;
+}
+
+.app-content .app-auth form input,
+.app-content .app-auth form select,
+.app-content .app-auth form textarea,
+.app-content .app-auth form button {
+	flex: none;
+}
+
+@media (max-width: 48rem) {
+	.app-topbar {
+		flex-wrap: wrap;
+		height: auto;
+		min-height: var(--topbar-height);
+	}
+
+	.app-body {
+		flex-direction: column;
+	}
+
+	.app-sidebar {
+		width: 100%;
+		height: auto;
+		position: static;
+		border-right: none;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.app-nav {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.app-content {
+		padding: 0.75rem 0.75rem 1.5rem;
+	}
+}
+
+.app-inline-error {
+	color: var(--error);
+	background-color: var(--error-bg);
+	border: 1px solid var(--error);
+	border-radius: 0.3rem;
+	margin-top: 0.4rem;
+	padding: 0.35rem 0.5rem;
+	font-size: var(--font-size-base);
+}
+
+.app-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.status-dot-connected {
+	color: var(--success);
+}
+
+.status-dot-free {
+	color: var(--muted-dot);
+}
+
+/* Page header: title left, primary action right (NetBox-style). */
+.page-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0.4rem;
+	margin-bottom: 0.5rem;
+}
+
+.page-header h2 {
+	margin: 0;
+	padding: 0;
+	border-bottom: none;
+}
+
+/* Sibling-list tabs (tenants ↔ tenant groups, sites ↔ site groups) in
+   place of the list title: compact links whose active underline
+   sits on the page-header rule, so they cost no extra row. */
+.list-tabs {
+	display: flex;
+	align-self: stretch;
+	align-items: flex-end;
+	gap: 1rem;
+	min-width: 0;
+}
+
+.list-tabs a {
+	margin-bottom: calc(-0.4rem - 1px);
+	padding-bottom: 0.4rem;
+	border-bottom: 2px solid transparent;
+	font-size: var(--font-size-lg);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--text-muted);
+	white-space: nowrap;
+	text-decoration: none;
+}
+
+.list-tabs a:hover {
+	color: var(--text);
+	text-decoration: none;
+}
+
+.list-tabs a[aria-current="page"] {
+	color: var(--text);
+	border-bottom-color: var(--primary);
+}
+
+.app-nav-item.active > a {
+	font-weight: 600;
+}
+
+.page-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.app-content .page-header h2:first-of-type {
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+/* Centered column for create/edit views (NetBox-style two-column rows:
+   label on the left, control on the right). Pages render inside
+   `.tab-pane`, so this must be a descendant selector — a child combinator
+   off `.app-content` never matches and the max-width silently stops
+   applying. */
+.app-content .form-page {
+	max-width: 66rem;
+	margin-inline: auto;
+}
+
+.app-content .device-type-import-page {
+	max-width: 52rem;
+}
+
+.app-content .device-type-import-page .import-data {
+	font-family:
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		"Liberation Mono", "Courier New", monospace;
+}
+
+.app-content form.form-stacked {
+	flex-direction: column;
+	align-items: stretch;
+	flex-wrap: nowrap;
+	max-width: none;
+	gap: 0.6rem;
+}
+
+.app-content .form-stacked .field input,
+.app-content .form-stacked .field select,
+.app-content .form-stacked .field textarea {
+	flex: none;
+	width: 100%;
+}
+
+.form-actions {
+	display: flex;
+	gap: 0.4rem;
+	padding-top: 0.2rem;
+	margin-left: calc(10rem + 0.75rem);
+}
+
+.field {
+	display: grid;
+	grid-template-columns: 10rem minmax(0, 1fr);
+	gap: 0.25rem 0.75rem;
+	align-items: start;
+}
+
+.field label {
+	font-size: var(--font-size-base);
+	font-weight: 600;
+	color: var(--text);
+}
+
+.field .required {
+	color: var(--error);
+}
+
+.field-hint {
+	margin: 0;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.field-group-label {
+	font-size: var(--font-size-base);
+	font-weight: 600;
+	color: var(--text);
+}
+
+.field > label,
+.field > .field-group-label {
+	padding-top: 0.35rem;
+	text-align: right;
+}
+
+.field-fieldset {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.field-control {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
+	grid-column: 2;
+}
+
+.field-checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.rack-type-fixed-width {
+	padding: 0.36rem 0.5rem;
+}
+
+.field-inline-actions {
+	display: flex;
+	align-items: stretch;
+	gap: 0.4rem;
+}
+
+/* Searchable `SelectField`: text input plus an absolutely positioned
+   listbox below it. */
+.combobox {
+	position: relative;
+}
+
+.app-content .form-stacked .field .field-inline-actions > select,
+.app-content .form-stacked .field .field-inline-actions > .combobox {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+}
+
+.app-content .form-stacked .field .combobox input {
+	padding-right: 1.8rem;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.app-content .form-stacked .field .combobox-with-detail input {
+	/* The `.combobox-value` overlay renders the label alongside its detail. */
+	color: transparent;
+}
+
+.app-content .form-stacked .field .combobox-open input {
+	cursor: text;
+}
+
+.app-content .form-stacked .field input:disabled,
+.app-content .form-stacked .field textarea:disabled {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
+.combobox-chevron {
+	position: absolute;
+	top: 50%;
+	right: 0.5rem;
+	transform: translateY(-50%);
+	color: var(--text-muted);
+	pointer-events: none;
+}
+
+.combobox-list {
+	position: absolute;
+	top: calc(100% + 0.2rem);
+	left: 0;
+	right: 0;
+	z-index: 20;
+	max-height: 16rem;
+	overflow-y: auto;
+	margin: 0;
+	padding: 0.2rem;
+	list-style: none;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.3rem;
+	box-shadow: var(--shadow);
+}
+
+.combobox-option,
+.combobox-empty {
+	padding: 0.3rem 0.5rem;
+	border-radius: 0.25rem;
+	font-size: var(--font-size-base);
+}
+
+.combobox-option {
+	cursor: pointer;
+}
+
+.combobox-option-label,
+.combobox-detail {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.combobox-detail {
+	color: var(--text-muted);
+	font-weight: 400;
+	font-size: var(--font-size-sm);
+}
+
+/* Closed-state value with detail, overlaid on the (transparent) input text. */
+.combobox-value {
+	position: absolute;
+	top: 50%;
+	left: calc(0.5rem + 1px);
+	right: 1.8rem;
+	transform: translateY(-50%);
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	min-width: 0;
+	font-size: var(--font-size-base);
+	pointer-events: none;
+}
+
+.combobox-value > .combobox-option-label {
+	flex: 0 1 auto;
+	min-width: 3rem;
+}
+
+.combobox-value > .combobox-detail {
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+.combobox-option-active {
+	background-color: var(--bg-hover);
+}
+
+.combobox-option[aria-selected="true"] {
+	font-weight: 600;
+}
+
+.combobox-option-empty,
+.combobox-empty {
+	color: var(--text-muted);
+}
+
+/* Options with a detail line up in two columns: the detail starts right
+   after the longest label. */
+.combobox-list-detail {
+	display: grid;
+	grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+	column-gap: 1rem;
+	align-content: start;
+}
+
+.combobox-list-detail > .combobox-option,
+.combobox-list-detail > .combobox-empty {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	align-items: baseline;
+}
+
+.app-content .form-stacked .field .field-checkbox-label input {
+	flex: none;
+	width: auto;
+}
+
+@media (max-width: 36rem) {
+	.field {
+		grid-template-columns: 1fr;
+	}
+
+	.field > label,
+	.field > .field-group-label {
+		padding-top: 0;
+		text-align: left;
+	}
+
+	.field-control,
+	.app-content .form-stacked .field > input,
+	.app-content .form-stacked .field > select,
+	.app-content .form-stacked .field > textarea,
+	.field > .field-hint {
+		grid-column: auto;
+	}
+
+	.form-actions {
+		margin-left: 0;
+	}
+}
+
+.import-field-options {
+	margin-top: 0.35rem;
+	padding: 0.7rem 0.8rem;
+	border: 1px solid var(--border);
+	border-radius: 0.25rem;
+	background: var(--bg-surface);
+}
+
+.import-field-options h3 {
+	margin: 0 0 0.25rem;
+	font-size: var(--font-size-lg);
+}
+
+.app-content .import-field-options-table {
+	width: 100%;
+	margin-top: 0.65rem;
+	border-collapse: collapse;
+	font-size: var(--font-size-sm);
+}
+
+.app-content .import-field-options-table th,
+.app-content .import-field-options-table td {
+	padding: 0.35rem 0.45rem;
+	border-bottom: 1px solid var(--border);
+	text-align: left;
+}
+
+.app-content .import-field-options-table th {
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.app-content .import-field-options-table td:nth-child(2) {
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+@media (max-width: 36rem) {
+	.import-field-options {
+		overflow-x: auto;
+	}
+
+	.import-field-options-table {
+		min-width: 30rem;
+	}
+}
+
+/* NetBox-style list toolbar: search + paging controls + selection actions. */
+.toolbar-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.5rem 0;
+}
+
+.toolbar-search {
+	flex: 1 1 14rem;
+	display: flex;
+}
+
+.toolbar-search-input {
+	flex: 1 1 auto;
+	width: 100%;
+	min-width: 0;
+}
+
+.toolbar-count {
+	font-size: var(--font-size-base);
+	color: var(--text-secondary);
+	white-space: nowrap;
+}
+
+.toolbar-spacer {
+	flex: 1 1 auto;
+}
+
+/* Sortable column headers. */
+.sort-th {
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-transform: inherit;
+	letter-spacing: inherit;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.sort-th:hover {
+	background: transparent;
+	color: var(--text);
+}
+
+/* Keep sortable headers the same width when the active sort moves. The
+   component appends an arrow to the active header and conditionally renders
+   its clear button, so reserve both indicators on every sortable header. */
+.data-table-sort::after {
+	content: " ▲×";
+	visibility: hidden;
+}
+
+th[aria-sort="ascending"] .data-table-sort::after,
+th[aria-sort="descending"] .data-table-sort::after {
+	content: none;
+}
+
+.data-table-sort-clear {
+	margin-left: 0;
+}
+
+/* Table cell helpers. */
+.cell-checkbox {
+	width: 2rem;
+}
+
+.cell-truncate {
+	max-width: 16rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Link-styled button for in-table navigation/edit affordances. */
+.link-btn {
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--link);
+	font: inherit;
+	cursor: pointer;
+	text-align: left;
+}
+
+.link-btn:hover {
+	background: transparent;
+}
+
+/* Row actions: icon edit button plus a dropdown menu (NetBox-style). */
+.row-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.3rem;
+}
+
+/* Connect-cable row action: bigger green icon so the primary action stands out. */
+.icon-btn-connect {
+	color: var(--success);
+	padding: 0.45rem;
+}
+
+.icon-btn-connect:disabled {
+	color: var(--text-secondary);
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.icon-btn-danger {
+	color: var(--error);
+	padding: 0.45rem;
+}
+
+.row-menu-wrap {
+	position: relative;
+	display: inline-flex;
+}
+
+/* Row menu: viewport-anchored via Portal, so the table's horizontal
+   scroll container can never clip it. Position comes from inline style. */
+.row-menu {
+	position: fixed;
+	z-index: 30;
+	min-width: 9rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+	padding: 0.25rem;
+}
+
+.row-menu-danger {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	border: none;
+	background: transparent;
+	color: var(--error);
+	text-align: left;
+}
+
+.row-menu-danger:hover {
+	background-color: var(--error-bg);
+}
+
+/* "Showing X-Y of Z" result status under the table. */
+.paginator-showing {
+	margin: 0.5rem 0;
+	font-size: var(--font-size-base);
+	color: var(--text-secondary);
+	white-space: nowrap;
+}
+
+/* Edit dialog. The backdrop is a real button (sibling of the dialog) so
+   dismissing it stays keyboard-accessible. */
+.app-content .modal-wrap {
+	position: fixed;
+	inset: 0;
+	z-index: 20;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 4rem 1rem 1rem;
+}
+
+.app-content .modal-backdrop {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	border: none;
+	border-radius: 0;
+	background-color: rgba(0, 0, 0, 0.45);
+	cursor: default;
+}
+
+.app-content .modal-backdrop:hover {
+	background-color: rgba(0, 0, 0, 0.45);
+}
+
+.app-content .modal {
+	position: relative;
+	width: 100%;
+	max-width: 28rem;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	box-shadow: var(--shadow);
+	padding: 1rem 1.1rem 1.1rem;
+}
+
+.modal h3 {
+	margin-top: 0;
+}
+
+.object-selector {
+	max-width: 34rem;
+}
+
+.modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.modal-header h3 {
+	margin-bottom: 0.75rem;
+}
+
+.object-selector-search {
+	width: 100%;
+}
+
+.object-selector-results {
+	max-height: 22rem;
+	overflow-y: auto;
+	margin-top: 0.75rem;
+}
+
+.object-selector-results ul {
+	/* Rows share the columns so details line up after the longest label. */
+	display: grid;
+	grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+	column-gap: 1rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.object-selector-results li {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+}
+
+.object-selector-option {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	align-items: baseline;
+	row-gap: 0.1rem;
+	text-align: left;
+	border-radius: 0.25rem;
+}
+
+.object-selector-option small {
+	color: var(--text-muted);
+}
+
+.object-selector-label,
+.object-selector-detail,
+.object-selector-note {
+	overflow-wrap: anywhere;
+}
+
+.object-selector-note {
+	grid-column: 1 / -1;
+}
+
+/* Cable connect dialog: step indicator, peer card, port tile grid. */
+.app-content .modal.connect-dialog {
+	max-width: 40rem;
+}
+
+.connect-steps {
+	display: flex;
+	gap: 1.25rem;
+	list-style: none;
+	padding: 0 0 0.75rem;
+	margin: 0 0 0.75rem;
+	border-bottom: 1px solid var(--border);
+	font-size: var(--font-size-base);
+	color: var(--text-muted);
+}
+
+.connect-steps li {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.connect-steps li.active {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.connect-step-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.35rem;
+	height: 1.35rem;
+	border-radius: 50%;
+	border: 1px solid var(--border-strong);
+	font-size: var(--font-size-sm);
+}
+
+.connect-steps li.active .connect-step-num {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.connect-steps li.done .connect-step-num {
+	border-color: var(--primary);
+	color: var(--primary);
+}
+
+.app-content .connect-dialog form.connect-port-form {
+	flex-direction: column;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	gap: 0.75rem;
+}
+
+.app-content .connect-port-form .object-selector-search {
+	flex: none;
+}
+
+.connect-peer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.5rem 0.75rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+}
+
+.connect-peer-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.connect-peer-info strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.connect-peer-info small {
+	color: var(--text-muted);
+}
+
+.port-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+	gap: 0.4rem;
+	max-height: 18rem;
+	overflow-y: auto;
+	padding: 0.1rem;
+}
+
+.app-content .port-grid .port-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.1rem;
+	min-width: 0;
+	padding: 0.4rem 0.55rem;
+	text-align: left;
+	background-color: var(--bg-input);
+	border-color: var(--border);
+}
+
+.app-content .port-grid .port-tile:hover:not(:disabled) {
+	border-color: var(--border-strong);
+	background-color: var(--bg-hover);
+}
+
+.app-content .port-grid .port-tile.selected,
+.app-content .port-grid .port-tile.selected:hover {
+	border-color: var(--primary);
+	background-color: rgba(8, 191, 8, 0.14);
+	box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.app-content .port-grid .port-tile:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.port-tile-name {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family:
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		"Liberation Mono", "Courier New", monospace;
+}
+
+.port-tile small {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.connect-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
+.connect-summary {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0;
+	min-width: 0;
+	white-space: nowrap;
+}
+
+.connect-summary-peer {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.connect-summary-hint {
+	color: var(--text-muted);
+}
+
+.modal-actions {
+	display: flex;
+	gap: 0.4rem;
+	margin-left: auto;
+}
+
+.modal-actions button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+/* Detail page: stat strip linking to each related-object section. */
+.detail-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0.6rem 0;
+}
+
+.detail-stat {
+	flex: 1 1 8rem;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	padding: 0.5rem 0.75rem;
+	text-decoration: none;
+	color: var(--text);
+}
+
+.detail-stat:hover {
+	background-color: var(--bg-hover);
+	border-color: var(--border-strong);
+}
+
+.detail-stat-value {
+	font-size: var(--font-size-xl);
+	font-weight: 700;
+}
+
+.detail-stat-label {
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Detail page: fact grid inside a card (slug, description, comments). */
+.detail-grid {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.3rem 0.75rem;
+	margin: 0;
+}
+
+.detail-grid dt {
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-secondary);
+}
+
+.detail-grid dd {
+	margin: 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* Two-column detail layout: facts/stats left, main content right. */
+.detail-columns {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+	align-items: start;
+	margin: 0.6rem 0;
+}
+
+.rack-unracked {
+	margin-top: 1rem;
+}
+
+.rack-unracked h3 {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.rack-unracked .badge {
+	display: inline-flex;
+	min-width: 1.5rem;
+	height: 1.5rem;
+	align-items: center;
+	justify-content: center;
+	padding: 0 0.25rem;
+	border-radius: 0.3rem;
+	background-color: var(--bg-hover);
+}
+
+.rack-unracked-empty {
+	color: var(--text-muted);
+}
+
+@media (max-width: 60rem) {
+	.detail-columns {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* NetBox-like visual rack elevation: front and rear side by side. */
+.rack-elev-dual {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+	margin: 0;
+}
+
+@media (max-width: 48rem) {
+	.rack-elev-dual {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.rack-face-title {
+	margin: 0 0 0.3rem;
+	font-size: var(--font-size-base);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-secondary);
+}
+
+.rack-util {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.5rem 0;
+	font-size: var(--font-size-base);
+	color: var(--text-secondary);
+}
+
+.rack-util-bar {
+	flex: 1 1 12rem;
+	height: 0.6rem;
+	border-radius: 999px;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	overflow: hidden;
+}
+
+.rack-util-fill {
+	display: block;
+	height: 100%;
+	background-color: var(--primary);
+}
+
+.rack-elev {
+	--rack-row-h: 1.9rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	box-sizing: border-box;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border-strong);
+	border-radius: 0;
+	display: grid;
+	grid-template-columns: 2rem minmax(0, 1fr);
+	grid-auto-rows: var(--rack-row-h);
+	gap: 0;
+}
+
+.rack-u {
+	display: flex;
+	align-items: stretch;
+	min-height: var(--rack-row-h);
+	border: 0;
+	border-bottom: 1px solid var(--border);
+	margin: 0;
+	outline: none;
+	background-color: var(--bg-default);
+	overflow: hidden;
+}
+
+.rack-u:last-child {
+	border-bottom: 0;
+}
+
+/* Gutter cell for one U (block layout keeps one label per U). */
+.rack-u-gutter-row {
+	display: flex;
+	align-items: stretch;
+	margin: 0;
+	background-color: var(--bg-raised);
+	border-bottom: 1px solid var(--border);
+	overflow: hidden;
+}
+
+/* Multi-U device/shelf blocks in the body column. */
+.rack-block {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: center;
+	margin: 0;
+	min-height: var(--rack-row-h);
+	border-bottom: 1px solid var(--border);
+	background-color: var(--bg-default);
+	overflow: hidden;
+}
+
+.rack-u-gutter {
+	flex: 0 0 1.65rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--bg-raised);
+	color: var(--text-subtle);
+	font-size: 0.7rem;
+	font-variant-numeric: tabular-nums;
+	border-right: 1px solid var(--border);
+	padding: 0 0.25rem;
+}
+
+.rack-u-gutter-row .rack-u-gutter {
+	flex: 1 1 auto;
+}
+
+.rack-u-body {
+	flex: 1 1 auto;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	padding: 0 0.4rem;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.rack-u-device {
+	background-color: var(--bg-raised);
+}
+
+.rack-u-device:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Back side of a full-depth device (NetBox-style diagonal stripes). */
+.rack-u-device-rear,
+.rack-u-device-rear:hover {
+	background-image: repeating-linear-gradient(
+		-45deg,
+		transparent 0 5px,
+		rgba(225, 71, 71, 0.35) 5px 7px
+	);
+}
+
+.rack-u-free {
+	border-style: solid;
+}
+
+.rack-u-free:hover {
+	background-color: var(--bg-raised);
+}
+
+.rack-dev {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	min-width: 0;
+	width: 100%;
+	overflow: hidden;
+}
+
+.rack-dev {
+	color: var(--text);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.rack-dev {
+	justify-content: center;
+}
+
+.rack-dev-name {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	flex-shrink: 1;
+	min-width: 0;
+}
+
+.rack-dev-meta {
+	color: var(--text-secondary);
+	font-size: var(--font-size-sm);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	flex-shrink: 2;
+	min-width: 0;
+}
+
+.rack-u-device-rear .rack-dev-name {
+	padding: 0 0.3rem;
+	border-radius: 3px;
+	background-color: var(--bg-raised);
+	font-weight: 500;
+}
+
+.rack-u-device-rear .rack-dev-meta {
+	display: none;
+}
+
+.rack-dev-face {
+	flex-shrink: 0;
+	font-size: var(--font-size-sm);
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+	padding: 0 0.4rem;
+	color: var(--text-secondary);
+}
+
+.rack-u-body .badge {
+	flex-shrink: 0;
+}
+
+.rack-free-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1 1 0;
+	height: 100%;
+	min-width: 0;
+	padding: 0.15rem 0.45rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.2rem;
+	background: var(--bg-raised);
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.rack-free-actions {
+	display: none;
+	gap: 0.35rem;
+	align-items: center;
+	width: 100%;
+	height: 100%;
+}
+
+.rack-u-free:hover .rack-free-actions,
+.rack-u-free:focus-within .rack-free-actions {
+	display: flex;
+}
+
+.rack-free-btn:hover,
+.rack-free-btn:focus-visible {
+	background: var(--primary);
+	color: var(--primary-contrast);
+}
+
+/* Shelf blocks: reserved area (hatched, dashed) with the shelf plate row. */
+.rack-u-shelf {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	background-color: var(--bg-raised);
+}
+
+.rack-shelf-clearance {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 0.2rem 0.4rem;
+	outline: 1px dashed var(--border-strong);
+	outline-offset: -1px;
+	background: repeating-linear-gradient(
+		-45deg,
+		transparent 0 6px,
+		var(--bg-hover) 6px 7px
+	);
+	overflow: hidden;
+}
+
+.rack-shelf-caption {
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+/* Usable mount row of a shelf (single U, stays device-mountable). */
+.rack-u-shelf-mount {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	background-color: var(--bg-default);
+	overflow: hidden;
+}
+
+.rack-mount-slot {
+	flex: 1 1 auto;
+	display: flex;
+	align-items: center;
+	padding: 0 0.6rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-style: italic;
+}
+
+.rack-u-shelf-mount:hover .rack-mount-slot,
+.rack-u-shelf-mount:focus-within .rack-mount-slot {
+	display: none;
+}
+
+.rack-shelf-clearance-link {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	justify-content: center;
+	padding-left: 0.6rem;
+	color: var(--text);
+	text-decoration: none;
+}
+
+a.rack-shelf-clearance-link:hover {
+	background-color: var(--bg-hover);
+}
+
+.rack-child-shelf {
+	flex-shrink: 0;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.2rem;
+	padding: 0 0.3rem;
+	white-space: nowrap;
+}
+
+.rack-mount-actions {
+	display: none;
+	gap: 0.35rem;
+	align-items: center;
+	flex: 1 1 auto;
+	padding: 0.15rem 0.15rem 0.15rem 0.4rem;
+}
+
+.rack-u-shelf-mount:hover .rack-mount-actions,
+.rack-u-shelf-mount:focus-within .rack-mount-actions {
+	display: flex;
+}
+
+.rack-shelf-plate {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	justify-content: center;
+	flex: 1 1 auto;
+	min-height: var(--rack-row-h);
+	padding: 0 0.4rem;
+	color: var(--text);
+	text-decoration: none;
+	overflow: hidden;
+}
+
+a.rack-shelf-plate:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Plate row: shelf label plus the devices on a shelf without reserve. */
+.rack-shelf-plate-row {
+	position: relative;
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+	min-height: var(--rack-row-h);
+	overflow: hidden;
+}
+
+/* Devices sitting on a shelf: removable chips plus hover actions. */
+.rack-shelf-devices {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rack-shelf-plate-row .rack-shelf-devices,
+.rack-u-shelf-mount .rack-shelf-devices {
+	flex-wrap: nowrap;
+	overflow: hidden;
+	padding-right: 0.25rem;
+}
+
+.rack-shelf-device {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.15rem;
+	max-width: 12rem;
+	padding: 0 0 0 0.4rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.2rem;
+	background-color: var(--bg-raised);
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+}
+
+.rack-shelf-device-link {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.rack-shelf-device-link:hover {
+	text-decoration: underline;
+}
+
+.rack-shelf-device-remove {
+	flex-shrink: 0;
+	padding: 0 0.35rem;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	line-height: 1.3;
+}
+
+.rack-shelf-device-remove:hover,
+.rack-shelf-device-remove:focus-visible {
+	color: var(--error);
+	background-color: var(--error-bg);
+}
+
+.rack-shelf-device-actions {
+	display: none;
+	position: absolute;
+	top: 0.2rem;
+	right: 0.25rem;
+	gap: 0.25rem;
+	height: 1.4rem;
+}
+
+.rack-shelf-device-actions {
+	max-width: calc(100% - 0.5rem);
+	background-color: var(--bg-raised);
+}
+
+.rack-shelf-device-actions .rack-free-btn {
+	flex: 0 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rack-u-shelf:hover .rack-shelf-device-actions,
+.rack-u-shelf:focus-within .rack-shelf-device-actions {
+	display: inline-flex;
+}
+
+/* Topology view: device graph in SVG. */
+.topo-wrap {
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	margin: 0.5rem 0;
+	max-width: 46rem;
+	overflow: hidden;
+}
+
+.topo-svg {
+	display: block;
+	width: 100%;
+	min-width: 24rem;
+	height: auto;
+}
+
+.topo-pannable {
+	cursor: grab;
+	touch-action: none;
+	user-select: none;
+}
+
+.topo-pannable:active {
+	cursor: grabbing;
+}
+
+.topo-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.5rem 0 0;
+}
+
+.topo-hint {
+	color: var(--text-muted);
+	font-size: 0.8rem;
+}
+
+.topo-edge {
+	stroke: var(--border-strong);
+	stroke-width: 2;
+	cursor: pointer;
+}
+
+.topo-edge:hover {
+	stroke: var(--link);
+	stroke-width: 3;
+}
+
+.topo-edge-active {
+	stroke: var(--primary);
+	stroke-width: 3;
+}
+
+.topo-node {
+	cursor: pointer;
+	outline: none;
+}
+
+.topo-circle {
+	fill: var(--bg-raised);
+	stroke: var(--border-strong);
+	stroke-width: 2;
+}
+
+.topo-node:focus-visible .topo-circle {
+	stroke: var(--primary);
+	stroke-width: 3;
+}
+
+.topo-circle:hover {
+	stroke: var(--link);
+}
+
+.topo-status-active {
+	stroke: var(--success);
+}
+
+.topo-status-planned,
+.topo-status-staged {
+	stroke: var(--link);
+}
+
+.topo-status-decommissioned {
+	stroke: var(--error);
+}
+
+.topo-label {
+	fill: var(--text-secondary);
+	font-size: 12px;
+}
+
+.topo-dimmed {
+	opacity: 0.3;
+}
+
+/* Smart tabs: add/edit forms open as new tabs so the page behind keeps its
+   state. Only the active pane is visible; the rest stay mounted. */
+.tab-bar-wrap {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--border);
+}
+
+.tab-bar {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	align-items: stretch;
+	gap: 0;
+	overflow-x: auto;
+	padding: 0;
+	margin: 0;
+	scrollbar-width: thin;
+}
+
+.tab-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-shrink: 0;
+	max-width: 14rem;
+	padding: 0.3rem 0.35rem 0.3rem 0.6rem;
+	border: 1px solid var(--border);
+	border-radius: 0;
+	background-color: var(--bg-surface);
+	color: var(--text-secondary);
+	font-size: var(--font-size-base);
+	cursor: pointer;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.tab-item:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.tab-item.active {
+	background-color: var(--bg-raised);
+	border-color: var(--border-strong);
+	color: var(--text);
+	font-weight: 600;
+}
+
+.tab-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 10rem;
+}
+
+.tab-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	padding: 0.15rem;
+	border: 1px solid transparent;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.tab-close:hover {
+	background-color: var(--bg-hover);
+	border-color: var(--border);
+	color: var(--text);
+}
+
+.tab-close-icon {
+	display: inline-flex;
+}
+
+.tab-pane[hidden] {
+	display: none;
+}
+
+.tab-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.tab-item.active .tab-icon {
+	color: var(--text-secondary);
+}
+
+/* Dropdown of all tabs, shown once they overflow the strip. */
+.tab-list {
+	position: relative;
+	display: flex;
+	flex-shrink: 0;
+}
+
+.tab-list-toggle {
+	display: inline-flex;
+	align-items: center;
+	padding: 0 0.45rem;
+	border: 1px solid var(--border);
+	border-radius: 0;
+	background-color: var(--bg-surface);
+	color: var(--text-secondary);
+}
+
+.tab-list-toggle:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.tab-menu {
+	display: flex;
+	flex-direction: column;
+	min-width: 12rem;
+	max-width: 22rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+	padding: 0.25rem;
+	z-index: 20;
+}
+
+.tab-list-menu {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 0.2rem);
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.tab-context-menu {
+	position: fixed;
+}
+
+.tab-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	border: none;
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	white-space: nowrap;
+}
+
+.tab-menu-item:hover,
+.tab-menu-item.active {
+	background-color: var(--bg-hover);
+}
+
+.tab-menu .tab-title {
+	max-width: none;
+}
+
+/* Path to the shown object above detail and form pages. */
+.breadcrumbs {
+	margin: 0 0 0.75rem;
+	font-size: var(--font-size-base);
+}
+
+.breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.breadcrumbs li + li::before {
+	content: "›";
+	margin-right: 0.35rem;
+	color: var(--text-muted);
+}
+
+.breadcrumbs [aria-current="page"] {
+	color: var(--text-secondary);
+}
+
+/* Integration view switch: report / link tenants / link devices. */
+.view-switch {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+	margin: 0.5rem 0;
+}
+
+.view-switch [aria-pressed="true"] {
+	border-color: var(--primary);
+	background-color: var(--bg-hover);
+}
+
+/* Link board: conex table | actions | external table. */
+.link-board {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 12rem minmax(0, 1fr);
+	gap: 0.75rem;
+	align-items: start;
+}
+
+.link-board h3 {
+	margin: 0.25rem 0 0.4rem;
+}
+
+.link-board .toolbar-search-input {
+	margin-bottom: 0.25rem;
+}
+
+.app-content .link-board-scroll {
+	max-height: 70vh;
+	overflow: auto;
+}
+
+.link-board-row {
+	cursor: pointer;
+}
+
+.link-board-row:hover td {
+	background-color: var(--bg-raised);
+}
+
+.link-board-row.inactive td {
+	color: var(--text-muted);
+}
+
+.link-board-row.highlighted td {
+	background-color: rgba(116, 202, 255, 0.12);
+}
+
+.link-board-row.selected td {
+	background-color: rgba(8, 191, 8, 0.18);
+}
+
+.link-board-row.drop-target td {
+	background-color: rgba(8, 191, 8, 0.32);
+}
+
+.link-board-detail {
+	display: block;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.link-board-state {
+	text-align: right;
+	white-space: nowrap;
+}
+
+.link-board-state > * + * {
+	margin-left: 0.35rem;
+}
+
+.link-board-suggestion {
+	color: var(--link);
+}
+
+.link-board-middle {
+	position: sticky;
+	top: calc(var(--topbar-height) + 0.5rem);
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	padding-top: 2.1rem;
+}
+
+.link-board-hint {
+	margin: 0;
+	color: var(--text-secondary);
+	font-size: var(--font-size-sm);
+}
+
+.link-board-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+	.link-board {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.link-board-middle {
+		position: static;
+		padding-top: 0;
+	}
+}
+
+/* Dashboard: responsive grid of widget cards. */
+.dashboard-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
+	gap: 0.8rem;
+	align-items: start;
+}
+
+.dashboard-widget {
+	margin: 0;
+	min-width: 0;
+}
+
+.dashboard-widget h3 {
+	margin-top: 0;
+}
+
+/* Changelog before/after table: changed values tinted red (old) / green (new). */
+.app-content .changelog-diff td {
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+
+.app-content .changelog-diff .diff-removed {
+	background-color: var(--error-bg);
+}
+
+.app-content .changelog-diff .diff-added {
+	background-color: color-mix(in srgb, var(--success) 16%, transparent);
+}
