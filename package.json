@@ -13,6 +13,9 @@
     "check": "turbo run check",
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "db:generate": "bun run --cwd server db:generate",
     "db:seed:demo": "bun scripts/seed-demo.ts",
     "test:e2e": "playwright test --project=chromium",
@@ -34,7 +37,8 @@
     "@playwright/test": "~1.63.0",
     "@types/bun": "1.4.2",
     "@types/node": "~26.6.3",
+    "turbo": "~2.11.6",
     "typescript": "~7.0.2",
-    "turbo": "~2.11.6"
+    "vitepress": "~1.6.4"
   }
 }

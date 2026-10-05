@@ -64,6 +64,14 @@ bun run test:visual:update
 ```
 
 
+### Documentation
+User docs live in `docs/` (VitePress) and are published to GitHub Pages on push to `main`.
+```sh
+bun run docs:dev
+bun run docs:build
+```
+
+
 ### Git Worktrees
 Use worktrees to work on parallel branches without disturbing the current checkout:
 ```sh
