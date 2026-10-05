@@ -593,6 +593,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 					? t('integration.syncedAt', { time: formatTime(report()?.synced_at ?? 0) })
 					: t('integration.neverSynced')}
 			</p>
+			<InlineError message={error()} />
 
 			<Show
 				when={!integration.loading}
@@ -684,7 +685,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 					on_close={() => setLinkingTenant(null)}
 				/>
 			</Show>
-			<InlineError message={error()} />
 		</div>
 	)
 }

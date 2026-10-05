@@ -473,7 +473,7 @@ export const de: Messages = {
 	// device
 	'device.mount': 'Montage',
 	'device.mountPosition': '{rack} HE{u}',
-	'device.searchPlaceholder': 'Name oder Seriennummer suchen…',
+	'device.searchPlaceholder': 'Name, Seriennummer oder Typ suchen…',
 	'device.filterByRack': 'Nach Rack filtern',
 	'device.allRacks': 'Alle Racks',
 	'device.filterByRole': 'Nach Rolle filtern',

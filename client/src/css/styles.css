@@ -2746,10 +2746,6 @@ a.rack-shelf-plate:hover {
 	background-color: rgba(8, 191, 8, 0.18);
 }
 
-.link-board-row.drop-target td {
-	background-color: rgba(8, 191, 8, 0.32);
-}
-
 .link-board-detail {
 	display: block;
 	color: var(--text-muted);

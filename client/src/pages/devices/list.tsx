@@ -49,21 +49,25 @@ export function DevicesPage(): JSX.Element {
 		{
 			key: 'device_id',
 			label: t('device.deviceId'),
+			sortable: true,
 			getValue: (d: DeviceRow): string => d.device_id ?? '—',
 		},
 		{
 			key: 'role',
 			label: tp('entity.deviceRole', 1),
+			sortable: true,
 			getValue: (d: DeviceRow): string => roleName(d.device_role_id),
 		},
 		{
 			key: 'type',
 			label: t('common.type'),
+			sortable: true,
 			getValue: (d: DeviceRow): string => typeName(d.device_type_id),
 		},
 		{
 			key: 'mount',
 			label: t('device.mount'),
+			sortable: true,
 			getValue: (d: DeviceRow): JSX.Element => (
 				<span>
 					{d.position_u !== null ? (

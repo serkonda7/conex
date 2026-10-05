@@ -713,7 +713,7 @@ export const DeviceListQuerySchema = v.object({
 	status: v.optional(DeviceStatusSchema, undefined),
 	/** Placed = U-mounted; unplaced = neither mounted nor rack-assigned. */
 	placed: v.optional(looseBoolean(false), undefined),
-	sort: v.optional(v.picklist(['name', 'status']), 'name'),
+	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 

@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
 import type {
 	DeviceCreate,
 	DeviceMove,
@@ -7,7 +7,18 @@ import type {
 	InterfaceCreate,
 	InterfaceUpdate,
 } from 'shared/src/schemas'
-import { devices, external_links, interfaces, locations, racks, shelves, sites } from '../schema'
+import {
+	device_roles,
+	device_types,
+	devices,
+	external_links,
+	interfaces,
+	locations,
+	manufacturers,
+	racks,
+	shelves,
+	sites,
+} from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
 import { deviceHasCables } from './cables'
@@ -214,18 +225,38 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
-	sort: 'name' | 'status'
+	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
 }
 
 export function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> {
 	const where = and(
-		searchCondition(params.search, [
-			devices.name,
-			devices.asset_tag,
-			devices.device_id,
-			devices.serial,
-		]),
+		params.search
+			? or(
+					searchCondition(params.search, [
+						devices.name,
+						devices.asset_tag,
+						devices.device_id,
+						devices.serial,
+					]),
+					inArray(
+						devices.device_type_id,
+						getDb()
+							.select({ id: device_types.id })
+							.from(device_types)
+							.innerJoin(
+								manufacturers,
+								eq(manufacturers.id, device_types.manufacturer_id),
+							)
+							.where(
+								searchCondition(params.search, [
+									device_types.model,
+									manufacturers.name,
+								]),
+							),
+					),
+				)
+			: undefined,
 		params.site ? eq(devices.site_id, params.site) : undefined,
 		params.rack ? eq(devices.rack_id, params.rack) : undefined,
 		params.role ? eq(devices.device_role_id, params.role) : undefined,
@@ -237,8 +268,41 @@ export function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> 
 				? isNotNull(devices.position_u)
 				: isNull(devices.position_u),
 	)
-	const orderColumn = params.sort === 'status' ? devices.status : devices.name
-	return pageRows(devices, where, [orderOf(orderColumn, params.order), asc(devices.id)], params)
+	return pageRows(devices, where, [...deviceOrder(params), asc(devices.id)], params)
+}
+
+/** ORDER BY terms for a device list sort; related names via correlated subqueries. */
+function deviceOrder(params: DeviceListParams): SQL[] {
+	switch (params.sort) {
+		case 'status':
+			return [orderOf(devices.status, params.order)]
+		case 'device_id':
+			return [orderOf(devices.device_id, params.order)]
+		case 'role':
+			return [
+				orderOf(
+					sql`(SELECT ${device_roles.name} FROM ${device_roles} WHERE ${device_roles.id} = ${devices.device_role_id})`,
+					params.order,
+				),
+			]
+		case 'type':
+			return [
+				orderOf(
+					sql`(SELECT ${device_types.model} FROM ${device_types} WHERE ${device_types.id} = ${devices.device_type_id})`,
+					params.order,
+				),
+			]
+		case 'mount':
+			return [
+				orderOf(
+					sql`(SELECT ${racks.name} FROM ${racks} WHERE ${racks.id} = ${devices.rack_id})`,
+					params.order,
+				),
+				orderOf(devices.position_u, params.order),
+			]
+		default:
+			return [orderOf(devices.name, params.order)]
+	}
 }
 
 export function getDevice(id: number): Promise<Result<DeviceRow, Error>> {

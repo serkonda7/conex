@@ -22,8 +22,6 @@ interface Picked {
 	id: string
 }
 
-const DRAG_TYPE = 'application/x-conex-link'
-
 function matches(needle: string, ...values: (string | null)[]): boolean {
 	return needle === '' || values.some((v) => (v ?? '').toLowerCase().includes(needle))
 }
@@ -54,10 +52,9 @@ function detailText(...values: (string | null)[]): string {
 
 /**
  * conex objects (left) and external objects (right) of one link level side
- * by side. Click a row on each side (either order) or drop a row onto a row
- * of the other table to link them; "Link all suggestions" takes every
- * unambiguous match at once. Picking a row ranks likely partners first on
- * the other side. Linked rows stay visible after unlinked ones; ignored rows
+ * by side. Click a row on each side (either order) to link them; "Link all
+ * suggestions" takes every unambiguous match at once. Picking a row ranks
+ * likely partners first on the other side. Linked rows stay visible after unlinked ones; ignored rows
  * are hidden unless toggled on, so both lists shrink while working. Changes
  * show immediately and are reconciled with the server's board afterwards.
  */
@@ -75,8 +72,6 @@ export function LinkBoardView(props: {
 	const [localSearch, setLocalSearch] = createSignal('')
 	const [externalSearch, setExternalSearch] = createSignal('')
 	const [picked, setPicked] = createSignal<Picked | null>(null)
-	const [dragged, setDragged] = createSignal<Picked | null>(null)
-	const [dropTarget, setDropTarget] = createSignal<string | null>(null)
 	const [busy, setBusy] = createSignal(false)
 	// Optimistic changes, dropped whenever a fresh board arrives.
 	const [linked, setLinked] = createSignal(new Map<number, string>())
@@ -322,66 +317,6 @@ export function LinkBoardView(props: {
 		setPicked(current?.id === id ? null : { side, id })
 	}
 
-	// Drag and drop ---------------------------------------------------------------
-	function dragProps<T extends HTMLElement>(side: Side, id: string): JSX.HTMLAttributes<T> {
-		if (!props.editable) {
-			return {}
-		}
-		return {
-			draggable: true,
-			onDragStart: (e: DragEvent): void => {
-				e.dataTransfer?.setData(DRAG_TYPE, `${side}:${id}`)
-				e.dataTransfer?.setData('text/plain', id)
-				if (e.dataTransfer) {
-					e.dataTransfer.effectAllowed = 'link'
-				}
-				setDragged({ side, id })
-			},
-			onDragEnd: (): void => {
-				setDragged(null)
-				setDropTarget(null)
-			},
-		}
-	}
-
-	/** Drop handlers for a target that accepts rows of `accepts`. */
-	function dropProps<T extends HTMLElement>(
-		key: string,
-		accepts: Side,
-		onDrop: (id: string) => void,
-	): JSX.HTMLAttributes<T> {
-		if (!props.editable) {
-			return {}
-		}
-		return {
-			onDragOver: (e: DragEvent): void => {
-				if (dragged()?.side === accepts) {
-					e.preventDefault()
-					if (e.dataTransfer) {
-						e.dataTransfer.dropEffect = 'link'
-					}
-					setDropTarget(key)
-				}
-			},
-			onDragLeave: (e: DragEvent): void => {
-				const next = e.relatedTarget as Node | null
-				if (!(e.currentTarget as HTMLElement).contains(next) && dropTarget() === key) {
-					setDropTarget(null)
-				}
-			},
-			onDrop: (e: DragEvent): void => {
-				const current = dragged()
-				setDragged(null)
-				setDropTarget(null)
-				if (current?.side !== accepts) {
-					return
-				}
-				e.preventDefault()
-				onDrop(current.id)
-			},
-		}
-	}
-
 	function rowKeyDown(e: KeyboardEvent, activate: () => void): void {
 		if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
 			e.preventDefault()
@@ -568,7 +503,6 @@ export function LinkBoardView(props: {
 												pickedExternal() !== undefined &&
 												row.suggestion?.external_id ===
 													pickedExternal()?.external_id,
-											'drop-target': dropTarget() === `local:${row.id}`,
 											inactive: !row.active,
 										}}
 										tabIndex={0}
@@ -577,13 +511,6 @@ export function LinkBoardView(props: {
 										onKeyDown={(e: KeyboardEvent) =>
 											rowKeyDown(e, () => pick('local', String(row.id)))
 										}
-										{...dragProps('local', String(row.id))}
-										{...dropProps(
-											`local:${row.id}`,
-											'external',
-											(externalId: string) =>
-												void linkPairs([[row.id, externalId]]),
-										)}
 									>
 										<td>
 											<a
@@ -653,8 +580,6 @@ export function LinkBoardView(props: {
 											highlighted:
 												pickedLocal()?.suggestion?.external_id ===
 												row.external_id,
-											'drop-target':
-												dropTarget() === `external:${row.external_id}`,
 											inactive: !row.active,
 										}}
 										tabIndex={0}
@@ -665,15 +590,6 @@ export function LinkBoardView(props: {
 										onKeyDown={(e: KeyboardEvent) =>
 											rowKeyDown(e, () => pick('external', row.external_id))
 										}
-										{...dragProps('external', row.external_id)}
-										{...dropProps(
-											`external:${row.external_id}`,
-											'local',
-											(localId: string) =>
-												void linkPairs([
-													[Number(localId), row.external_id],
-												]),
-										)}
 									>
 										<td>
 											{row.name}

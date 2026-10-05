@@ -465,7 +465,7 @@ export const en = {
 	// device
 	'device.mount': 'Mount',
 	'device.mountPosition': '{rack} U{u}',
-	'device.searchPlaceholder': 'Search name or serial…',
+	'device.searchPlaceholder': 'Search name, serial or type…',
 	'device.filterByRack': 'Filter by rack',
 	'device.allRacks': 'All racks',
 	'device.filterByRole': 'Filter by role',
