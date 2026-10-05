@@ -174,7 +174,7 @@ export function ignoreExternal(
 
 /**
  * Synthetic `external_id` for a conex entity ignored as missing in the
- * external system. Real device ids are `pc:<n>` and tenant ids are numeric
+ * external system. Real device ids are `pc:<n>` or `periphery:<n>` and tenant ids are numeric
  * company ids, so the `conex:` prefix cannot collide. The unique index on
  * `(provider, entity_type, external_id)` stays satisfied (one row per
  * ignored entity), and `setLink`/`deleteLink` keep working: linking the

@@ -258,12 +258,20 @@ export async function buildReport(
 		}
 		const company = tenantId !== null ? liveCompany.get(tenantId) : undefined
 		if (company !== external.external_tenant_id) {
-			findings.push(finding('device_tenant_mismatch', withExternal))
+			findings.push(
+				finding('device_mismatch', {
+					...withExternal,
+					field: 'tenant',
+					local: company ?? null,
+					remote: external.external_tenant_id,
+				}),
+			)
 		}
 		if ((device.status === 'active') !== external.active) {
 			findings.push(
-				finding('device_status_mismatch', {
+				finding('device_mismatch', {
 					...withExternal,
+					field: 'status',
 					local: device.status,
 					remote: external.active ? 'active' : 'inactive',
 				}),
@@ -272,7 +280,7 @@ export async function buildReport(
 		for (const cmp of compareFields(device, external)) {
 			if (!cmp.equal) {
 				findings.push(
-					finding('device_field_mismatch', {
+					finding('device_mismatch', {
 						...withExternal,
 						field: cmp.field,
 						local: cmp.local,

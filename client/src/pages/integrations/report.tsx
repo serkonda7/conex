@@ -48,24 +48,31 @@ function findingKey(f: IntegrationFinding): string {
 	return [f.kind, f.tenant_id, f.device_id, f.external_id, f.field].join('|')
 }
 
-function detailText(f: IntegrationFinding): string {
-	switch (f.kind) {
-		case 'device_suggestion':
-			return f.field !== null
-				? t('integration.matchedBy', { field: compareFieldLabel(f.field) })
-				: ''
-		case 'device_status_mismatch':
-			return `${deviceStatusLabel(f.local ?? '')} ≠ ${
-				f.remote === 'active' ? t('integration.active') : t('integration.inactive')
-			}`
-		case 'device_field_mismatch':
-		case 'tenant_customer_number_mismatch':
-			return `${f.field !== null ? `${compareFieldLabel(f.field)}: ` : ''}${f.local ?? '—'} ≠ ${
-				f.remote ?? '—'
-			}`
-		default:
-			return ''
+/** Field, conex value and external value of a mismatch; matched field of a suggestion. */
+function details(f: IntegrationFinding): JSX.Element {
+	if (f.field === null) {
+		return ''
 	}
+	if (f.kind === 'device_suggestion') {
+		return t('integration.matchedBy', { field: compareFieldLabel(f.field) })
+	}
+	if (f.kind !== 'device_mismatch' && f.kind !== 'tenant_customer_number_mismatch') {
+		return ''
+	}
+	const status = f.field === 'status'
+	const local = status ? deviceStatusLabel(f.local ?? '') : (f.local ?? '—')
+	const remote = status
+		? f.remote === 'active'
+			? t('integration.active')
+			: t('integration.inactive')
+		: (f.remote ?? '—')
+	return (
+		<span class="finding-detail">
+			<span class="text-muted">{compareFieldLabel(f.field)}</span>
+			<span class="text-success">{local}</span>
+			<span class="text-danger">{remote}</span>
+		</span>
+	)
 }
 
 /** `?kind=` preselects the finding filter (dashboard links); unknown kinds show all. */
@@ -451,8 +458,11 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 					</Show>
 				)
 			case 'device_stale':
-			case 'device_tenant_mismatch':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
+			case 'device_mismatch':
+				return (
+					<Show when={f.field === 'tenant' && can('integrations.manage')}>{unlink}</Show>
+				)
 			default:
 				return null
 		}
@@ -501,7 +511,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		{
 			key: 'details',
 			label: t('integration.details'),
-			getValue: (f: IntegrationFinding): string => detailText(f),
+			getValue: (f: IntegrationFinding): JSX.Element => details(f),
 		},
 	]
 	const [visibleColumns, setVisibleColumns] = useTableColumns(

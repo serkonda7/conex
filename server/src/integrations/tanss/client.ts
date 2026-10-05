@@ -3,7 +3,7 @@
  *
  * Two credentials, two isolated client instances (never the shared
  * `client` singleton, so no auth state leaks between integrations):
- * - user API (`/api/v1/...`, PCs and manufacturers): JWT from
+ * - user API (`/api/v1/...`, PCs, peripheries and manufacturers): JWT from
  *   `POST /api/v1/login`, valid ~4 h with a 2 min idle timeout. A session
  *   logs in lazily and re-logs in once on 401.
  * - ERP API (`/api/erp/v1/...`, company list): the ERP role token.
@@ -23,6 +23,8 @@ import {
 	postApiV1Pcs,
 	postApiV1Tickets,
 	putApiV1Pcs,
+	putApiV1Peripheries,
+	type TnsPeripheryWithIpGuarantee,
 	type TnsPersonalComputer,
 	type TnsPersonalComputerWithDetails,
 } from 'tanss-api'
@@ -48,6 +50,8 @@ export interface TanssCompany {
 }
 
 export type TanssPc = TnsPersonalComputerWithDetails
+
+export type TanssPeriphery = TnsPeripheryWithIpGuarantee
 
 /** Raised for HTTP failures; `status` 401/403 means bad credentials. */
 export class TanssApiError extends Error {
@@ -78,13 +82,14 @@ const PcResponseSchema = v.object({
 	content: v.looseObject({ id: v.pipe(v.number(), v.integer()) }),
 })
 
-/** TANSS link type of a PC/server (`linkTypeId` of tickets and assignments). */
-const PC_LINK_TYPE = 1
+/** TANSS link types (`linkTypeId` of tickets and assignments). */
+export const PC_LINK_TYPE = 1
+export const PERIPHERY_LINK_TYPE = 3
 
 export interface TanssTicketInput {
 	companyId: number
-	/** PC/server the ticket is about. */
-	pcId?: number
+	/** Device (PC/server or periphery) the ticket is about. */
+	link?: { typeId: number; id: number }
 	title: string
 	content: string
 }
@@ -353,12 +358,17 @@ export class TanssSession {
 		return Result.ok(companies)
 	}
 
-	/** PCs of exactly one company (branches are their own tenants). */
+	/** PCs and servers of exactly one company (branches are their own tenants). */
 	async listPcs(companyId: number): Promise<Result<TanssPc[], Error>> {
 		const res = await this.userCall('PC list', (client) =>
 			putApiV1Pcs({
 				client,
-				body: { companyId, branches: 'COMPANY_ONLY', active: 'ACTIVE_AND_INACTIVE' },
+				body: {
+					companyId,
+					branches: 'COMPANY_ONLY',
+					active: 'ACTIVE_AND_INACTIVE',
+					servers: 'SERVERS_AND_PCS',
+				},
 			}),
 		)
 		if (Result.isError(res)) {
@@ -369,6 +379,24 @@ export class TanssSession {
 			return dump
 		}
 		return res.map((data) => listContent(data) as TanssPc[])
+	}
+
+	/** Peripheries of exactly one company (branches are their own tenants). */
+	async listPeripheries(companyId: number): Promise<Result<TanssPeriphery[], Error>> {
+		const res = await this.userCall('periphery list', (client) =>
+			putApiV1Peripheries({
+				client,
+				body: { companyId, branches: 'COMPANY_ONLY', active: 'ACTIVE_AND_INACTIVE' },
+			}),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const dump = await saveRawResponse(`peripheries-company-${companyId}`, res.value)
+		if (Result.isError(dump)) {
+			return dump
+		}
+		return res.map((data) => listContent(data) as TanssPeriphery[])
 	}
 
 	/** Manufacturer id → name. */
@@ -408,8 +436,8 @@ export class TanssSession {
 					companyId: input.companyId,
 					title: input.title,
 					content: input.content,
-					...(input.pcId !== undefined
-						? { linkTypeId: PC_LINK_TYPE, linkId: input.pcId }
+					...(input.link !== undefined
+						? { linkTypeId: input.link.typeId, linkId: input.link.id }
 						: {}),
 				},
 			}),

@@ -6,7 +6,15 @@ import type {
 	IntegrationProvider,
 	TicketInput,
 } from '../types'
-import { type TanssCompany, type TanssCredentials, type TanssPc, TanssSession } from './client'
+import {
+	PC_LINK_TYPE,
+	PERIPHERY_LINK_TYPE,
+	type TanssCompany,
+	type TanssCredentials,
+	type TanssPc,
+	type TanssPeriphery,
+	TanssSession,
+} from './client'
 
 function toTenant(company: TanssCompany): ExternalTenant {
 	return {
@@ -24,14 +32,10 @@ function text(value: string | undefined): string | null {
 	return trimmed === '' ? null : trimmed
 }
 
-function toDevice(
-	pc: TanssPc,
-	companyId: string,
-	manufacturers: Map<number, string>,
-): ExternalDevice {
+function addresses(entries: TanssPc['ips']): { macs: string[]; ips: string[] } {
 	const macs: string[] = []
 	const ips: string[] = []
-	for (const entry of pc.ips ?? []) {
+	for (const entry of entries ?? []) {
 		if (entry.mac) {
 			macs.push(entry.mac)
 		}
@@ -39,6 +43,15 @@ function toDevice(
 			ips.push(entry.ip)
 		}
 	}
+	return { macs, ips }
+}
+
+function toDevice(
+	pc: TanssPc,
+	companyId: string,
+	manufacturers: Map<number, string>,
+): ExternalDevice {
+	const { macs, ips } = addresses(pc.ips)
 	return {
 		external_id: `pc:${pc.id}`,
 		external_tenant_id: companyId,
@@ -55,9 +68,34 @@ function toDevice(
 	}
 }
 
+/** `type` is the free-text description TANSS shows in lists; used as model. */
+function peripheryToDevice(
+	periphery: TanssPeriphery,
+	companyId: string,
+	manufacturers: Map<number, string>,
+): ExternalDevice {
+	const { macs, ips } = addresses(periphery.ips)
+	return {
+		external_id: `periphery:${periphery.id}`,
+		external_tenant_id: companyId,
+		kind: 'periphery',
+		name: text(periphery.name) ?? text(periphery.type) ?? `#${periphery.id}`,
+		serial: text(periphery.serialNumber),
+		asset_tag: text(periphery.inventoryNumber),
+		manufacturer:
+			periphery.manufacturerId !== undefined
+				? (manufacturers.get(periphery.manufacturerId) ?? null)
+				: null,
+		model: text(periphery.type),
+		macs,
+		ips,
+		active: periphery.active !== false,
+	}
+}
+
 /**
  * TANSS: tenant ↔ company (branches are companies of their own), device ↔
- * PC/server. Peripherals and components are out of scope for now.
+ * PC/server or periphery. Components are out of scope for now.
  */
 export class TanssProvider implements IntegrationProvider {
 	readonly id = 'tanss' as const
@@ -96,11 +134,23 @@ export class TanssProvider implements IntegrationProvider {
 			return manufacturers
 		}
 		const pcs = await this.session.listPcs(companyId)
-		return pcs.map((rows) =>
-			rows
+		if (Result.isError(pcs)) {
+			return pcs
+		}
+		const peripheries = await this.session.listPeripheries(companyId)
+		if (Result.isError(peripheries)) {
+			return peripheries
+		}
+		return Result.ok([
+			...pcs.value
 				.filter((pc) => pc.id !== undefined)
 				.map((pc) => toDevice(pc, externalTenantId, manufacturers.value)),
-		)
+			...peripheries.value
+				.filter((periphery) => periphery.id !== undefined)
+				.map((periphery) =>
+					peripheryToDevice(periphery, externalTenantId, manufacturers.value),
+				),
+		])
 	}
 
 	/** Manufacturer id → name, fetched once per provider instance. */
@@ -147,18 +197,21 @@ export class TanssProvider implements IntegrationProvider {
 		if (!Number.isInteger(companyId)) {
 			return Result.err(new Error(`Invalid TANSS company id ${input.externalTenantId}`))
 		}
-		let pcId: number | undefined
+		let link: { typeId: number; id: number } | undefined
 		if (input.externalDeviceId !== undefined) {
-			// Device links are `pc:<id>` (see `toDevice`).
-			const match = /^pc:(\d+)$/.exec(input.externalDeviceId)
+			// Device links are `pc:<id>` or `periphery:<id>` (see `toDevice`).
+			const match = /^(pc|periphery):(\d+)$/.exec(input.externalDeviceId)
 			if (!match) {
 				return Result.err(new Error(`Invalid TANSS device id ${input.externalDeviceId}`))
 			}
-			pcId = Number(match[1])
+			link = {
+				typeId: match[1] === 'pc' ? PC_LINK_TYPE : PERIPHERY_LINK_TYPE,
+				id: Number(match[2]),
+			}
 		}
 		return this.session.createTicket({
 			companyId,
-			...(pcId !== undefined ? { pcId } : {}),
+			...(link !== undefined ? { link } : {}),
 			title: input.title,
 			content: input.content,
 		})

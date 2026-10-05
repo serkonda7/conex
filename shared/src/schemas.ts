@@ -1515,7 +1515,7 @@ export interface ExternalTenantListItem extends ExternalTenantJson {
 	ignored: boolean
 }
 
-/** Normalized external device (TANSS PC/server). */
+/** Normalized external device (TANSS PC/server or periphery). */
 export interface ExternalDeviceJson {
 	/** Type-prefixed, e.g. `pc:123`. */
 	external_id: string
@@ -1566,9 +1566,7 @@ export const FINDING_KINDS = [
 	'device_missing_in_external',
 	'device_suggestion',
 	'device_stale',
-	'device_tenant_mismatch',
-	'device_field_mismatch',
-	'device_status_mismatch',
+	'device_mismatch',
 ] as const
 
 export type FindingKind = (typeof FINDING_KINDS)[number]
@@ -1584,7 +1582,8 @@ export interface IntegrationFinding {
 	external_id: string | null
 	external_name: string | null
 	external_tenant_id: string | null
-	field: DeviceCompareField | 'customer_number' | null
+	/** `tenant`/`status` only on `device_mismatch`. */
+	field: DeviceCompareField | 'customer_number' | 'tenant' | 'status' | null
 	local: string | null
 	remote: string | null
 }

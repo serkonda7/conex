@@ -801,6 +801,15 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+/* Consistency finding: field, conex value, external value. Fixed leading
+   tracks keep the values aligned across rows; the last one takes the rest. */
+.finding-detail {
+	display: grid;
+	grid-template-columns: 8rem 12rem minmax(8rem, 1fr);
+	gap: 0.5rem;
+	overflow-wrap: anywhere;
+}
+
 .btn-danger:hover {
 	background-color: var(--error-bg);
 	border-color: var(--error);

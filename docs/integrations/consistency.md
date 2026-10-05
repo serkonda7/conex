@@ -17,7 +17,7 @@ context is switched.
 | conex         | TANSS            |
 | ------------- | ---------------- |
 | Tenant        | Company          |
-| Device        | PC / server      |
+| Device        | PC / server / periphery |
 | Asset tag     | Inventory number |
 
 Name, serial number, manufacturer, model and active status are compared
@@ -45,9 +45,7 @@ the sync. Ignored objects are not reported as missing or suggested.
 | Finding                      | Meaning |
 | ---------------------------- | ------- |
 | **Device no longer exists**  | Linked device was not found in the last sync. |
-| **Different tenant**         | Device belongs to another company than its tenant's. |
-| **Different status**         | Active in one system, inactive in the other. |
-| **Different value**          | Name, serial number, asset tag, manufacturer or model differ. Empty values are not compared. |
+| **Mismatch**                 | One finding per differing aspect: tenant (device belongs to another company than its tenant's), status (active in one system, inactive in the other), or name, serial number, asset tag, manufacturer or model (empty values are not compared). |
 
 ### Not linked objects
 
