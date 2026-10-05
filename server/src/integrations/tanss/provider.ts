@@ -1,5 +1,11 @@
 import { Result } from 'better-result'
-import type { ExternalDevice, ExternalTenant, IntegrationProvider, TicketInput } from '../types'
+import type {
+	DeviceInput,
+	ExternalDevice,
+	ExternalTenant,
+	IntegrationProvider,
+	TicketInput,
+} from '../types'
 import { type TanssCompany, type TanssCredentials, type TanssPc, TanssSession } from './client'
 
 function toTenant(company: TanssCompany): ExternalTenant {
@@ -85,6 +91,20 @@ export class TanssProvider implements IntegrationProvider {
 		if (!Number.isInteger(companyId)) {
 			return Result.err(new Error(`Invalid TANSS company id ${externalTenantId}`))
 		}
+		const manufacturers = await this.manufacturerNames()
+		if (Result.isError(manufacturers)) {
+			return manufacturers
+		}
+		const pcs = await this.session.listPcs(companyId)
+		return pcs.map((rows) =>
+			rows
+				.filter((pc) => pc.id !== undefined)
+				.map((pc) => toDevice(pc, externalTenantId, manufacturers.value)),
+		)
+	}
+
+	/** Manufacturer id → name, fetched once per provider instance. */
+	private async manufacturerNames(): Promise<Result<Map<number, string>, Error>> {
 		if (this.manufacturers === null) {
 			const names = await this.session.manufacturerNames()
 			if (Result.isError(names)) {
@@ -92,13 +112,34 @@ export class TanssProvider implements IntegrationProvider {
 			}
 			this.manufacturers = names.value
 		}
-		const manufacturers = this.manufacturers
-		const pcs = await this.session.listPcs(companyId)
-		return pcs.map((rows) =>
-			rows
-				.filter((pc) => pc.id !== undefined)
-				.map((pc) => toDevice(pc, externalTenantId, manufacturers)),
-		)
+		return Result.ok(this.manufacturers)
+	}
+
+	/** Creates a PC; the manufacturer is matched by name (case-insensitive). */
+	async createDevice(input: DeviceInput): Promise<Result<ExternalDevice, Error>> {
+		const companyId = Number(input.externalTenantId)
+		if (!Number.isInteger(companyId)) {
+			return Result.err(new Error(`Invalid TANSS company id ${input.externalTenantId}`))
+		}
+		const manufacturers = await this.manufacturerNames()
+		if (Result.isError(manufacturers)) {
+			return manufacturers
+		}
+		const wanted = input.manufacturer?.trim().toLowerCase()
+		const manufacturerId = [...manufacturers.value].find(
+			([, name]) => name.trim().toLowerCase() === wanted,
+		)?.[0]
+		const created = await this.session.createPc({
+			companyId,
+			name: input.name,
+			active: input.active,
+			server: input.server,
+			...(input.serial !== null ? { serialNumber: input.serial } : {}),
+			...(input.asset_tag !== null ? { inventoryNumber: input.asset_tag } : {}),
+			...(input.model !== null ? { model: input.model } : {}),
+			...(manufacturerId !== undefined ? { manufacturerId } : {}),
+		})
+		return created.map((pc) => toDevice(pc, input.externalTenantId, manufacturers.value))
 	}
 
 	async createTicket(input: TicketInput): Promise<Result<number, Error>> {

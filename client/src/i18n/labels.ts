@@ -236,7 +236,7 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	tenant_missing_in_conex: 'finding.tenant_missing_in_conex',
 	tenant_stale: 'finding.tenant_stale',
 	tenant_inactive: 'finding.tenant_inactive',
-	tenant_name_mismatch: 'finding.tenant_name_mismatch',
+	tenant_customer_number_mismatch: 'finding.tenant_customer_number_mismatch',
 	device_missing_in_conex: 'finding.device_missing_in_conex',
 	device_missing_in_external: 'finding.device_missing_in_external',
 	device_suggestion: 'finding.device_suggestion',
@@ -251,8 +251,9 @@ export function findingKindLabel(value: string): string {
 	return lookup(FINDING_KEYS, value)
 }
 
-const COMPARE_FIELD_KEYS: Record<DeviceCompareField, MessageKey> = {
+const COMPARE_FIELD_KEYS: Record<DeviceCompareField | 'customer_number', MessageKey> = {
 	name: 'compareField.name',
+	customer_number: 'compareField.customer_number',
 	serial: 'compareField.serial',
 	asset_tag: 'compareField.asset_tag',
 	manufacturer: 'compareField.manufacturer',

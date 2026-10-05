@@ -572,6 +572,10 @@ export interface ExpandedInterface {
 // Shared catalog data (no tenant column): every device carries exactly one.
 // ---------------------------------------------------------------------------
 
+/** Built-in device roles: seeded by migration, never renamed or deleted. */
+export const DEVICE_ROLE_KEYS = ['pc', 'server'] as const
+export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
+
 export const DeviceRoleCreateSchema = v.strictObject({
 	name: NameSchema,
 	description: DescriptionSchema,
@@ -1402,9 +1406,18 @@ export const ExternalIgnoreLocalSchema = v.strictObject({
 	entity_id: IdSchema,
 })
 
+/**
+ * Creates a conex device in the external system (resolves its
+ * `device_missing_in_external` finding) and links the two.
+ */
+export const ExternalDeviceCreateSchema = v.strictObject({
+	device_id: IdSchema,
+})
+
 export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
+export type ExternalDeviceCreate = v.InferOutput<typeof ExternalDeviceCreateSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */
@@ -1546,7 +1559,7 @@ export const FINDING_KINDS = [
 	'tenant_missing_in_conex',
 	'tenant_stale',
 	'tenant_inactive',
-	'tenant_name_mismatch',
+	'tenant_customer_number_mismatch',
 	'device_missing_in_conex',
 	'device_missing_in_external',
 	'device_suggestion',
@@ -1569,7 +1582,7 @@ export interface IntegrationFinding {
 	external_id: string | null
 	external_name: string | null
 	external_tenant_id: string | null
-	field: DeviceCompareField | null
+	field: DeviceCompareField | 'customer_number' | null
 	local: string | null
 	remote: string | null
 }

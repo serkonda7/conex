@@ -68,6 +68,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 				value={name()}
 				onInput={setName}
 				autofocus={!form.editing}
+				disabled={form.record()?.key != null}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

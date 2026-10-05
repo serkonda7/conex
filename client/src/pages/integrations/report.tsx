@@ -2,8 +2,9 @@ import { IconRefresh } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { FINDING_KINDS, type FindingKind, type IntegrationFinding } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
+	create_external_device,
 	type ExternalTenantJson,
 	type ExternalTenantListItem,
 	fetch_integration,
@@ -22,6 +23,7 @@ import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { row_options, SelectField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
+import { useTableColumns } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import {
 	compareFieldLabel,
@@ -32,7 +34,12 @@ import {
 import { createRecord } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped } from '../../lib/session'
-import { contextTenantRows, tenantContextFilters } from '../../lib/tenant_context'
+import {
+	contextTenantId,
+	contextTenantRows,
+	tenantContext,
+	tenantContextFilters,
+} from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
 import { ExternalTenantPicker } from './external_tenant_picker'
 import { LinkBoardView } from './link_board'
@@ -52,7 +59,7 @@ function detailText(f: IntegrationFinding): string {
 				f.remote === 'active' ? t('integration.active') : t('integration.inactive')
 			}`
 		case 'device_field_mismatch':
-		case 'tenant_name_mismatch':
+		case 'tenant_customer_number_mismatch':
 			return `${f.field !== null ? `${compareFieldLabel(f.field)}: ` : ''}${f.local ?? '—'} ≠ ${
 				f.remote ?? '—'
 			}`
@@ -69,16 +76,23 @@ function parseView(raw: string): View {
 
 /**
  * Link board of tenants, or of the devices of one tenant (picked here;
- * defaults to `?tenant=` or the tenant context).
+ * follows `default_tenant` whenever that changes).
  */
 function LinkBoardPanel(props: {
 	provider: IntegrationProvider
 	entity_type: 'tenant' | 'device'
+	default_tenant: number | null
 	reload: number
 	on_error: (message: string | null) => void
 }): JSX.Element {
-	const initialTenant = parseId(queryParam('tenant')) ?? tenantContextFilters().tenant ?? null
-	const [tenant, setTenant] = createSignal<number | null>(initialTenant)
+	const [tenant, setTenant] = createSignal<number | null>(props.default_tenant)
+	createEffect(
+		on(
+			() => props.default_tenant,
+			(next: number | null) => setTenant(next),
+			{ defer: true },
+		),
+	)
 	const [syncing, setSyncing] = createSignal(false)
 
 	// Scoped users only see their own tenant: preselect it.
@@ -219,9 +233,10 @@ function LinkBoardPanel(props: {
 
 /**
  * /integrations/:id — consistency report of one provider, plus link boards
- * (`?view=tenants|devices`) for side-by-side linking. The report honors the
- * tenant selector (or `?tenant=`); rows offer the fitting fix: link, confirm
- * a suggestion, ignore, or unlink.
+ * (`?view=tenants|devices`) for side-by-side linking. The report and the
+ * device board follow the tenant selector; `?tenant=` (from a tenant's
+ * integration card) wins until the selector is switched. Rows offer the fitting fix: link, confirm
+ * a suggestion, create the device externally, ignore, or unlink.
  */
 export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -231,6 +246,10 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
 	// Bumped after a full sync so an open link board reloads too.
 	const [boardReload, setBoardReload] = createSignal(0)
+	const [queryTenant, setQueryTenant] = createSignal(parseId(queryParam('tenant')))
+	createEffect(on(tenantContext, () => setQueryTenant(null), { defer: true }))
+	// Preselected tenant of the device board.
+	const boardTenant = (): number | null => queryTenant() ?? contextTenantId()
 	const views = (): { id: View; label: string }[] => [
 		{ id: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.
@@ -252,7 +271,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		}
 		return {
 			provider: row.provider,
-			...tenantContextFilters(parseId(queryParam('tenant')) ?? undefined),
+			...tenantContextFilters(queryTenant() ?? undefined),
 		}
 	})
 
@@ -410,6 +429,15 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							type="button"
 							class="btn-small"
 							onClick={() =>
+								void run(() => create_external_device(provider, f.device_id ?? 0))
+							}
+						>
+							{t('integration.createExternal', { provider: providerLabel(provider) })}
+						</button>
+						<button
+							type="button"
+							class="btn-small"
+							onClick={() =>
 								void run(() => ignore_local_device(provider, f.device_id ?? 0))
 							}
 						>
@@ -471,6 +499,10 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			getValue: (f: IntegrationFinding): string => detailText(f),
 		},
 	]
+	const [visibleColumns, setVisibleColumns] = useTableColumns(
+		'integration-report',
+		columns.map((c) => c.key),
+	)
 
 	return (
 		<div>
@@ -539,6 +571,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="tenant"
+							default_tenant={null}
 							reload={boardReload()}
 							on_error={setError}
 						/>
@@ -547,6 +580,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="device"
+							default_tenant={boardTenant()}
 							reload={boardReload()}
 							on_error={setError}
 						/>
@@ -581,6 +615,9 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 									rows={rows}
 									getRowId={findingKey}
 									columns={columns}
+									showColumnCustomizer
+									visibleColumns={visibleColumns}
+									onVisibleColumnsChange={setVisibleColumns}
 									rowActions={(f: IntegrationFinding): JSX.Element => (
 										<div class="row-actions">{actions(f)}</div>
 									)}

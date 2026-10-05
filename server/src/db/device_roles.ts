@@ -4,7 +4,7 @@ import type { DeviceRoleCreate, DeviceRoleUpdate } from 'shared/src/schemas'
 import { device_roles, devices } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { ConflictError, DuplicateError } from './errors'
+import { ConflictError, DuplicateError, ValidationError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
@@ -27,6 +27,8 @@ export type DeviceRoleRow = typeof device_roles.$inferSelect
 // Shared catalog data (no tenant column): readable by every authenticated
 // user, writable only by global editors/admins. Every device carries exactly
 // one role, so delete is blocked while devices reference the role.
+// Built-in roles (`key` set, see `DEVICE_ROLE_KEYS`) keep their name and
+// cannot be deleted; only their description is editable.
 // ---------------------------------------------------------------------------
 
 const NAME_IN_USE = 'Device role name is already in use'
@@ -63,6 +65,7 @@ export async function createDeviceRole(
 	const row: Omit<DeviceRoleRow, 'id'> = {
 		name: input.name,
 		description: input.description ?? null,
+		key: null,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -91,6 +94,13 @@ export async function updateDeviceRole(
 	) {
 		return Result.err(new DuplicateError(NAME_IN_USE))
 	}
+	if (
+		current.value.key !== null &&
+		input.name !== undefined &&
+		input.name !== current.value.name
+	) {
+		return Result.err(new ValidationError('Built-in device roles cannot be renamed'))
+	}
 	const patch = pickDefined(input, ['name', 'description'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
@@ -108,6 +118,9 @@ export async function deleteDeviceRole(id: number): Promise<Result<DeviceRoleRow
 	const current = await getDeviceRole(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (current.value.key !== null) {
+		return Result.err(new ConflictError('Built-in device roles cannot be deleted'))
 	}
 	if (await exists(devices, eq(devices.device_role_id, id))) {
 		return Result.err(

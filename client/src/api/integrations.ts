@@ -249,6 +249,18 @@ export async function ignore_local_device(
 	return to_result<ExternalLinkJson>(res, t('integration.linkFailed'))
 }
 
+/** Creates a conex device in the external system and links the two. */
+export async function create_external_device(
+	provider: IntegrationProvider,
+	device_id: number,
+): Promise<Result<ExternalLinkJson, Error>> {
+	const res = await client.integrations[':provider'].devices.$post({
+		param: { provider },
+		json: { device_id },
+	})
+	return to_result<ExternalLinkJson>(res, t('integration.createExternalFailed'))
+}
+
 export async function unlink_external(
 	provider: IntegrationProvider,
 	linkId: number,

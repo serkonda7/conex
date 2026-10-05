@@ -204,6 +204,7 @@ export function NameField(props: {
 	value: string
 	onInput: (value: string) => void
 	autofocus?: boolean
+	disabled?: boolean
 }): JSX.Element {
 	return <TextField {...props} label={t('common.name')} required maxLength={100} />
 }

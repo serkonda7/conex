@@ -384,6 +384,8 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	defaultColumns?: string[]
 	rowName: (row: Row) => string
 	editHref?: (row: Row) => string
+	/** Rows that can never be deleted (e.g. built-in records). */
+	deletable?: (row: Row) => boolean
 	emptyText: string
 }): JSX.Element {
 	const list = props.list
@@ -409,7 +411,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		return (
 			<ListRowActions
 				edit_href={can('edit') ? props.editHref?.(row) : undefined}
-				deletable={can('delete')}
+				deletable={can('delete') && props.deletable?.(row) !== false}
 				name={name}
 				menu_open={openMenu()?.id === row.id}
 				onToggleMenu={(e: MouseEvent & { currentTarget: HTMLButtonElement }): void =>

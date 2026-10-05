@@ -45,6 +45,7 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 					name={role()?.name}
 					editHref={`/device-roles/${props.id}/edit`}
 					onDelete={handleDelete}
+					deletable={role()?.key == null}
 				/>
 				<DetailSubtitle description={role()?.description} />
 

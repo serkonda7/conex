@@ -51,6 +51,8 @@ export function DetailHeader(props: {
 	testId?: string
 	editHref: string
 	onDelete: () => void
+	/** False hides "Delete" (e.g. built-in records). */
+	deletable?: boolean
 }): JSX.Element {
 	return (
 		<div class="page-header">
@@ -62,14 +64,14 @@ export function DetailHeader(props: {
 				</Show>
 				<Show when={props.extra}> {props.extra}</Show>
 			</h2>
-			<Show when={can('edit') || can('delete')}>
+			<Show when={can('edit') || (can('delete') && props.deletable !== false)}>
 				<div class="form-actions">
 					<Show when={can('edit')}>
 						<button type="button" onClick={() => navigate(props.editHref)}>
 							<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
 						</button>
 					</Show>
-					<Show when={can('delete')}>
+					<Show when={can('delete') && props.deletable !== false}>
 						<button type="button" class="btn-danger" onClick={props.onDelete}>
 							<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
 						</button>

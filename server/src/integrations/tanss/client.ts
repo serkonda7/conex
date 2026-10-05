@@ -20,8 +20,10 @@ import {
 	createErpClient,
 	getApiV1Manufacturers,
 	postApiV1Login,
+	postApiV1Pcs,
 	postApiV1Tickets,
 	putApiV1Pcs,
+	type TnsPersonalComputer,
 	type TnsPersonalComputerWithDetails,
 } from 'tanss-api'
 import * as v from 'valibot'
@@ -70,6 +72,10 @@ const LoginResponseSchema = v.object({
 
 const TicketResponseSchema = v.object({
 	content: v.object({ id: v.pipe(v.number(), v.integer()) }),
+})
+
+const PcResponseSchema = v.object({
+	content: v.looseObject({ id: v.pipe(v.number(), v.integer()) }),
 })
 
 /** TANSS link type of a PC/server (`linkTypeId` of tickets and assignments). */
@@ -416,5 +422,18 @@ export class TanssSession {
 			return Result.err(new TanssApiError('TANSS ticket create returned no ticket id', null))
 		}
 		return Result.ok(parsed.output.content.id)
+	}
+
+	/** Creates a PC/server and returns it as stored by TANSS. */
+	async createPc(pc: TnsPersonalComputer): Promise<Result<TanssPc, Error>> {
+		const res = await this.userCall('PC create', (client) => postApiV1Pcs({ client, body: pc }))
+		if (Result.isError(res)) {
+			return res
+		}
+		const parsed = v.safeParse(PcResponseSchema, res.value)
+		if (!parsed.success) {
+			return Result.err(new TanssApiError('TANSS PC create returned no PC id', null))
+		}
+		return Result.ok(parsed.output.content as TanssPc)
 	}
 }

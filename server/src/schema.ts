@@ -306,6 +306,9 @@ export const device_roles = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		description: text('description'),
+		// Built-in roles (`DEVICE_ROLE_KEYS`) carry their key; they are seeded
+		// by migration and can be neither renamed nor deleted.
+		key: text('key').unique(),
 	},
 	(table) => [index('device_roles_name_idx').on(table.name)],
 )

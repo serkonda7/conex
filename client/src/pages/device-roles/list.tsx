@@ -34,6 +34,7 @@ export function DeviceRolesPage(): JSX.Element {
 			columnsKey="device-roles"
 			rowName={(r: DeviceRoleRow): string => r.name}
 			editHref={(r: DeviceRoleRow): string => `/device-roles/${r.id}/edit`}
+			deletable={(r: DeviceRoleRow): boolean => r.key === null}
 			emptyText={t('deviceRole.empty')}
 		/>
 	)

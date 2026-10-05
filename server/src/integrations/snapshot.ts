@@ -187,3 +187,33 @@ export async function readDevice(
 	)
 	return device ?? null
 }
+
+/** Adds or replaces one device in the snapshot (e.g. right after creating it). */
+export async function upsertDevice(
+	provider: ProviderId,
+	device: ExternalDevice,
+	now: number,
+): Promise<void> {
+	await getDb()
+		.insert(external_objects)
+		.values({
+			provider,
+			object_type: 'device',
+			external_id: device.external_id,
+			external_tenant_id: device.external_tenant_id,
+			data: device,
+			fetched_at: now,
+		})
+		.onConflictDoUpdate({
+			target: [
+				external_objects.provider,
+				external_objects.object_type,
+				external_objects.external_id,
+			],
+			set: {
+				external_tenant_id: sql`excluded.external_tenant_id`,
+				data: sql`excluded.data`,
+				fetched_at: sql`excluded.fetched_at`,
+			},
+		})
+}

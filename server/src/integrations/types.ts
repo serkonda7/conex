@@ -22,6 +22,21 @@ export interface IntegrationProvider {
 	fetchDevices(externalTenantId: string): Promise<Result<ExternalDeviceJson[], Error>>
 	/** Opens a ticket and returns its external id; absent without a ticket system. */
 	createTicket?(input: TicketInput): Promise<Result<number, Error>>
+	/** Creates a device and returns it as fetched by a sync; absent when unsupported. */
+	createDevice?(input: DeviceInput): Promise<Result<ExternalDeviceJson, Error>>
+}
+
+export interface DeviceInput {
+	externalTenantId: string
+	name: string
+	serial: string | null
+	asset_tag: string | null
+	/** Matched by name; omitted when the external system does not know it. */
+	manufacturer: string | null
+	model: string | null
+	/** Device role is the built-in `server` role. */
+	server: boolean
+	active: boolean
 }
 
 export interface TicketInput {

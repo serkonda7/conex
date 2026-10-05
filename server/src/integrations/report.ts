@@ -129,7 +129,7 @@ export async function buildReport(
 ): Promise<IntegrationReport> {
 	const findings: IntegrationFinding[] = []
 	const tenantRows = await getDb()
-		.select({ id: tenants.id, name: tenants.name })
+		.select({ id: tenants.id, name: tenants.name, customer_number: tenants.customer_number })
 		.from(tenants)
 		.where(and(...tenantConditions(tenants.id, filter)))
 		.orderBy(tenants.name)
@@ -166,13 +166,18 @@ export async function buildReport(
 		if (!external.active) {
 			findings.push(finding('tenant_inactive', withName))
 		}
-		if (normalizeName(external.name) !== normalizeName(tenant.name)) {
+		const localNumber = tenant.customer_number?.trim() || null
+		const remoteNumber = external.display_id?.trim() || null
+		// Customer numbers identify the company: a missing number on either
+		// side counts as a difference (only both-empty is equal). Compared
+		// case-insensitively, like asset tags.
+		if ((localNumber?.toUpperCase() ?? null) !== (remoteNumber?.toUpperCase() ?? null)) {
 			findings.push(
-				finding('tenant_name_mismatch', {
+				finding('tenant_customer_number_mismatch', {
 					...withName,
-					field: 'name',
-					local: tenant.name,
-					remote: external.name,
+					field: 'customer_number',
+					local: tenant.customer_number,
+					remote: external.display_id,
 				}),
 			)
 		}

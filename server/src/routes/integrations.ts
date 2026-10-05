@@ -3,6 +3,7 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import { type Context, Hono } from 'hono'
 import {
+	ExternalDeviceCreateSchema,
 	ExternalIgnoreLocalSchema,
 	ExternalIgnoreSchema,
 	ExternalLinkCreateSchema,
@@ -33,6 +34,7 @@ import {
 import { exists } from '../db/list'
 import { deviceTenant } from '../db/owners'
 import { deviceBoard, tenantBoard } from '../integrations/board'
+import { createExternalDevice } from '../integrations/create_device'
 import {
 	deleteLink,
 	getLink,
@@ -121,6 +123,7 @@ async function checkExternalDeviceWrite(
  * device's tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers. `tickets.create` opens tickets for tenants in scope.
+ * `integrations.manage` may also create conex devices in the external system.
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
@@ -498,6 +501,39 @@ export const integrationsApp = new Hono()
 				userId,
 			)
 			return sendResult(c, res.map(linkJson))
+		},
+	)
+	.post(
+		'/:provider/devices',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalDeviceCreateSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const input = c.req.valid('json')
+			const denied = requirePermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const tenant = await loadDeviceTenant(c, input.device_id)
+			if (tenant instanceof Response) {
+				return tenant
+			}
+			const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
+			if (!tenantLink) {
+				return jsonError(c, "The device's tenant is not linked yet", 400)
+			}
+			const externalDenied = await checkExternalDeviceWrite(
+				c,
+				provider,
+				tenantLink.external_id,
+			)
+			if (externalDenied) {
+				return externalDenied
+			}
+			return sendCreated(
+				c,
+				await createExternalDevice(provider, input.device_id, requestUser(c).id),
+			)
 		},
 	)
 	.delete(

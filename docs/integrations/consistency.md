@@ -2,6 +2,8 @@
 
 The consistency report compares conex with the data of the last sync from an
 external system (currently **TANSS**) and lists each difference as a *finding*.
+It covers the tenants of the selected tenant context and reloads when the
+context is switched.
 
 ## Sync
 
@@ -36,7 +38,7 @@ the sync. Ignored objects are not reported as missing or suggested.
 | ---------------------------- | ------- |
 | **Company no longer exists** | Linked company was deleted. Its devices are not checked. |
 | **Company inactive**         | Linked company is inactive. |
-| **Different name**           | Tenant and company names differ. |
+| **Different customer number**| Tenant and company customer numbers differ. A missing number on either side counts as a difference (only both empty is equal); comparison ignores case. |
 
 #### Devices
 
@@ -61,7 +63,7 @@ the sync. Ignored objects are not reported as missing or suggested.
 | Finding                      | Meaning |
 | ---------------------------- | ------- |
 | **Possible match**           | Devices share a serial number, asset tag or name. |
-| **Missing externally**       | Active conex device without counterpart. |
+| **Missing externally**       | Active conex device without counterpart. Can be created in the external system, which links it right away. |
 | **Missing in conex**         | Active external device without counterpart. |
 
 ## Device matching
