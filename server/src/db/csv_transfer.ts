@@ -112,11 +112,20 @@ export async function importDeviceTypesYaml(text: string): Promise<Result<Import
 		return Result.err(new Error(`Invalid YAML: ${errOf(error).message}`))
 	}
 	const definitions = Array.isArray(parsed) ? parsed : [parsed]
+	// Snapshot before the transaction so models created by earlier rows of
+	// this import count as in-file duplicates, not as existing types.
+	const existing = new Map(
+		(await getDb().select().from(device_types)).map((r) => [r.model, r.id]),
+	)
+	const seen = new Set<string>()
 	const rows: ImportRowResult[] = []
 	try {
 		await withTransaction(async () => {
 			for (const [index, definition] of definitions.entries()) {
-				rows.push({ row: index + 1, ...(await importDeviceTypeRow(definition)) })
+				rows.push({
+					row: index + 1,
+					...(await importDeviceTypeRow(definition, existing, seen)),
+				})
 			}
 			if (rows.some((r) => !r.ok)) {
 				throw new ImportRollback()
@@ -148,10 +157,14 @@ class RowRollback extends Error {
  * failed statement, so without it every later row would only report
  * "current transaction is aborted" instead of its own validation result.
  */
-async function importDeviceTypeRow(definition: unknown): Promise<Omit<ImportRowResult, 'row'>> {
+async function importDeviceTypeRow(
+	definition: unknown,
+	existing: Map<string, number>,
+	seen: Set<string>,
+): Promise<Omit<ImportRowResult, 'row'>> {
 	try {
 		return await withTransaction(async () => {
-			const result = await importDeviceTypeDefinition(definition)
+			const result = await importDeviceTypeDefinition(definition, existing, seen)
 			if (!result.ok) {
 				throw new RowRollback(result)
 			}
@@ -165,9 +178,14 @@ async function importDeviceTypeRow(definition: unknown): Promise<Omit<ImportRowR
 	}
 }
 
-/** Creates one NetBox device-type definition with its ports. */
+/**
+ * Creates one NetBox device-type definition with its ports. Models must be
+ * unique: device CSV import resolves types by model alone.
+ */
 async function importDeviceTypeDefinition(
 	definition: unknown,
+	existing: Map<string, number>,
+	seen: Set<string>,
 ): Promise<Omit<ImportRowResult, 'row'>> {
 	const fail = (error: string): Omit<ImportRowResult, 'row'> => ({ ok: false, id: null, error })
 	if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
@@ -179,6 +197,17 @@ async function importDeviceTypeDefinition(
 	if (!manufacturer || !model) {
 		return fail('manufacturer and model are required by NetBox YAML')
 	}
+	const existingId = existing.get(model)
+	if (existingId !== undefined) {
+		return {
+			...fail('Already exists'),
+			existing_device_type: { id: existingId, model },
+		}
+	}
+	if (seen.has(model)) {
+		return fail('Duplicate in this import')
+	}
+	seen.add(model)
 	const mfr = (await getDb().select().from(manufacturers)).find(
 		(row) => row.name.toLowerCase() === manufacturer.toLowerCase() || row.slug === manufacturer,
 	)

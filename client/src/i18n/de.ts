@@ -381,6 +381,11 @@ export const de: Messages = {
 	'import.fieldAlias': 'Auch als {alias} akzeptiert.',
 	'import.createManufacturer': 'Hersteller „{name}“ anlegen',
 	'import.manufacturerCreated': 'Hersteller „{name}“ angelegt. Import erneut ausführen.',
+	'import.renameExisting': 'Bestehenden umbenennen',
+	'import.newName': 'Neuer Name',
+	'import.rename': 'Umbenennen',
+	'import.deviceTypeRenamed':
+		'Bestehender „{name}“ in „{newName}“ umbenannt. Import erneut ausführen.',
 	'import.rolledBack':
 		'Es wurde nichts importiert, da einige Zeilen fehlgeschlagen sind. Beheben Sie diese und führen Sie den Import erneut aus.',
 	'import.notImported': 'nicht importiert',

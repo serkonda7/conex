@@ -1300,6 +1300,8 @@ export interface ImportRowResult {
 	error: string | null
 	/** Set when the row failed only because this manufacturer does not exist. */
 	unknown_manufacturer?: string
+	/** Set when the row failed because a device type with this model already exists. */
+	existing_device_type?: { id: number; model: string }
 }
 
 export interface ImportResponse {

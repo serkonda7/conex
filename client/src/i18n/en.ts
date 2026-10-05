@@ -375,6 +375,10 @@ export const en = {
 	'import.fieldAlias': 'Also accepted as {alias}.',
 	'import.createManufacturer': 'Create manufacturer "{name}"',
 	'import.manufacturerCreated': 'Manufacturer "{name}" created. Run the import again.',
+	'import.renameExisting': 'Rename existing',
+	'import.newName': 'New name',
+	'import.rename': 'Rename',
+	'import.deviceTypeRenamed': 'Existing "{name}" renamed to "{newName}". Run the import again.',
 	'import.rolledBack':
 		'Nothing was imported because some rows failed. Fix them and run the import again.',
 	'import.notImported': 'not imported',

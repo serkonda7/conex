@@ -4,7 +4,7 @@ import { DISPLAY_PORT_KINDS, GENERAL_PORT_KINDS } from 'shared/src/schemas'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, For, Show } from 'solid-js'
-import { create_manufacturer } from '../../api/templates'
+import { create_manufacturer, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
 import { Field } from '../../components/form'
@@ -63,7 +63,8 @@ function PortsDescription(props: {
  * Posts the file text as `{ yaml }` JSON. The import is all-or-nothing: if any
  * document fails, nothing is created and the response reports per-row errors
  * below. The pasted text is kept on failure; rows failing on an unknown
- * manufacturer offer to create it.
+ * manufacturer offer to create it, rows clashing with an existing device type
+ * offer to rename the existing one.
  */
 export function DeviceTypeImportPage(): JSX.Element {
 	const [yamlText, setYamlText] = createSignal('')
@@ -74,6 +75,10 @@ export function DeviceTypeImportPage(): JSX.Element {
 	const [failed, setFailed] = createSignal(0)
 	const [createdManufacturers, setCreatedManufacturers] = createSignal<string[]>([])
 	const [creatingManufacturer, setCreatingManufacturer] = createSignal<string | null>(null)
+	/** Existing device type ids renamed since the last import, with their new model. */
+	const [renamedTypes, setRenamedTypes] = createSignal<Record<number, string>>({})
+	const [renameDraft, setRenameDraft] = createSignal<{ id: number; model: string } | null>(null)
+	const [renamingType, setRenamingType] = createSignal(false)
 
 	async function handleCreateManufacturer(name: string): Promise<void> {
 		setError(null)
@@ -87,11 +92,85 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setCreatedManufacturers((prev) => [...prev, name])
 	}
 
+	async function handleRenameType(e: SubmitEvent): Promise<void> {
+		e.preventDefault()
+		const draft = renameDraft()
+		if (draft === null) {
+			return
+		}
+		setError(null)
+		setRenamingType(true)
+		const res = await update_device_type(draft.id, { model: draft.model })
+		setRenamingType(false)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		setRenamedTypes((prev) => ({ ...prev, [draft.id]: res.value.model }))
+		setRenameDraft(null)
+	}
+
+	function RenameExisting(props: { id: number; model: string }): JSX.Element {
+		return (
+			<Show
+				when={renamedTypes()[props.id] === undefined}
+				fallback={t('import.deviceTypeRenamed', {
+					name: props.model,
+					newName: renamedTypes()[props.id] ?? '',
+				})}
+			>
+				<Show
+					when={renameDraft()?.id === props.id}
+					fallback={
+						<button
+							type="button"
+							disabled={renamingType()}
+							onClick={() => setRenameDraft({ id: props.id, model: props.model })}
+						>
+							{t('import.renameExisting')}
+						</button>
+					}
+				>
+					<form class="import-rename" onSubmit={handleRenameType}>
+						<input
+							type="text"
+							aria-label={t('import.newName')}
+							value={renameDraft()?.model ?? ''}
+							onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
+								setRenameDraft({ id: props.id, model: e.currentTarget.value })
+							}
+							required
+						/>
+						<button
+							type="submit"
+							disabled={
+								renamingType() ||
+								!renameDraft()?.model.trim() ||
+								renameDraft()?.model.trim() === props.model
+							}
+						>
+							{t('import.rename')}
+						</button>
+						<button
+							type="button"
+							disabled={renamingType()}
+							onClick={() => setRenameDraft(null)}
+						>
+							{t('common.cancel')}
+						</button>
+					</form>
+				</Show>
+			</Show>
+		)
+	}
+
 	async function handleImport(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setError(null)
 		setResults(null)
 		setCreatedManufacturers([])
+		setRenamedTypes({})
+		setRenameDraft(null)
 		if (!yamlText().trim()) {
 			setError(t('import.pasteFirst'))
 			return
@@ -154,103 +233,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 						{importing() ? t('import.importing') : t('import.import')}
 					</button>
 				</div>
-				<section class="import-field-options" aria-labelledby="device-type-import-fields">
-					<h3 id="device-type-import-fields">{t('import.fieldOptions')}</h3>
-					<p class="field-hint">{t('import.fieldOptionsHint')}</p>
-					<table class="import-field-options-table">
-						<thead>
-							<tr>
-								<th scope="col">{t('import.field')}</th>
-								<th scope="col">{t('import.required')}</th>
-								<th scope="col">{t('common.description')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr>
-								<td>manufacturer</td>
-								<td>{t('common.yes')}</td>
-								<td>{t('import.fieldManufacturer')}</td>
-							</tr>
-							<tr>
-								<td>model</td>
-								<td>{t('common.yes')}</td>
-								<td>{t('import.fieldModel')}</td>
-							</tr>
-							<tr>
-								<td>u_height</td>
-								<td>—</td>
-								<td>{t('import.fieldUHeight')}</td>
-							</tr>
-							<tr>
-								<td>is_full_depth</td>
-								<td>—</td>
-								<td>{t('import.fieldFullDepth')}</td>
-							</tr>
-							<tr>
-								<td>description</td>
-								<td>—</td>
-								<td>{t('import.fieldDescription')}</td>
-							</tr>
-							<tr>
-								<td>comments</td>
-								<td>—</td>
-								<td>{t('import.fieldComments')}</td>
-							</tr>
-							<tr>
-								<td>interfaces</td>
-								<td>—</td>
-								<td>
-									<PortsDescription
-										optional={['type', 'label', 'description']}
-										defaultType="ethernet"
-									/>
-								</td>
-							</tr>
-							<tr>
-								<td>ports</td>
-								<td>—</td>
-								<td>
-									<PortsDescription
-										optional={['type', 'description']}
-										defaultType="port"
-										knownTypes={GENERAL_PORT_KINDS}
-									/>{' '}
-									{t('import.fieldAlias', { alias: 'console-ports' })}
-								</td>
-							</tr>
-							<tr>
-								<td>power-ports</td>
-								<td>—</td>
-								<td>
-									<PortsDescription
-										optional={['type', 'description']}
-										defaultType="power"
-									/>
-								</td>
-							</tr>
-							<tr>
-								<td>power-outlets</td>
-								<td>—</td>
-								<td>
-									<PortsDescription
-										optional={['type', 'description']}
-										defaultType="power-outlet"
-									/>
-								</td>
-							</tr>
-							<tr>
-								<td>display-ports</td>
-								<td>—</td>
-								<td>
-									<PortsDescription
-										optional={['description']}
-										types={DISPLAY_PORT_KINDS}
-									/>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</section>
 			</form>
 
 			<Show when={results() !== null}>
@@ -305,6 +287,14 @@ export function DeviceTypeImportPage(): JSX.Element {
 							key: 'error',
 							label: t('import.error'),
 							getValue: (r: ImportRowResult): JSX.Element => {
+								const existing = r.existing_device_type
+								if (existing !== undefined) {
+									return (
+										<span>
+											{r.error} <RenameExisting {...existing} />
+										</span>
+									)
+								}
 								const name = r.unknown_manufacturer
 								if (name === undefined) {
 									return r.error ?? '—'
@@ -332,6 +322,103 @@ export function DeviceTypeImportPage(): JSX.Element {
 					emptyContent={<p class="empty">{t('import.noRows')}</p>}
 				/>
 			</Show>
+			<section class="import-field-options" aria-labelledby="device-type-import-fields">
+				<h3 id="device-type-import-fields">{t('import.fieldOptions')}</h3>
+				<p class="field-hint">{t('import.fieldOptionsHint')}</p>
+				<table class="import-field-options-table">
+					<thead>
+						<tr>
+							<th scope="col">{t('import.field')}</th>
+							<th scope="col">{t('import.required')}</th>
+							<th scope="col">{t('common.description')}</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>manufacturer</td>
+							<td>{t('common.yes')}</td>
+							<td>{t('import.fieldManufacturer')}</td>
+						</tr>
+						<tr>
+							<td>model</td>
+							<td>{t('common.yes')}</td>
+							<td>{t('import.fieldModel')}</td>
+						</tr>
+						<tr>
+							<td>u_height</td>
+							<td>—</td>
+							<td>{t('import.fieldUHeight')}</td>
+						</tr>
+						<tr>
+							<td>is_full_depth</td>
+							<td>—</td>
+							<td>{t('import.fieldFullDepth')}</td>
+						</tr>
+						<tr>
+							<td>description</td>
+							<td>—</td>
+							<td>{t('import.fieldDescription')}</td>
+						</tr>
+						<tr>
+							<td>comments</td>
+							<td>—</td>
+							<td>{t('import.fieldComments')}</td>
+						</tr>
+						<tr>
+							<td>interfaces</td>
+							<td>—</td>
+							<td>
+								<PortsDescription
+									optional={['type', 'label', 'description']}
+									defaultType="ethernet"
+								/>
+							</td>
+						</tr>
+						<tr>
+							<td>ports</td>
+							<td>—</td>
+							<td>
+								<PortsDescription
+									optional={['type', 'description']}
+									defaultType="port"
+									knownTypes={GENERAL_PORT_KINDS}
+								/>{' '}
+								{t('import.fieldAlias', { alias: 'console-ports' })}
+							</td>
+						</tr>
+						<tr>
+							<td>power-ports</td>
+							<td>—</td>
+							<td>
+								<PortsDescription
+									optional={['type', 'description']}
+									defaultType="power"
+								/>
+							</td>
+						</tr>
+						<tr>
+							<td>power-outlets</td>
+							<td>—</td>
+							<td>
+								<PortsDescription
+									optional={['type', 'description']}
+									defaultType="power-outlet"
+								/>
+							</td>
+						</tr>
+						<tr>
+							<td>display-ports</td>
+							<td>—</td>
+							<td>
+								<PortsDescription
+									optional={['description']}
+									types={DISPLAY_PORT_KINDS}
+								/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
 		</div>
 	)
 }
