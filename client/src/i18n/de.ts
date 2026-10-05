@@ -763,6 +763,8 @@ export const de: Messages = {
 	'integration.unlinkFailed': 'Verknüpfung konnte nicht gelöst werden',
 	'integration.createExternal': 'In {provider} anlegen',
 	'integration.createExternalFailed': 'Gerät konnte extern nicht angelegt werden',
+	'integration.updateExternal': 'In {provider} aktualisieren',
+	'integration.updateExternalFailed': 'Gerät konnte extern nicht aktualisiert werden',
 	'integration.pickTenant': '{provider}-Firma verknüpfen',
 	'integration.searchTenants': 'Name oder Kundennummer suchen…',
 	'integration.alreadyLinked': 'verknüpft',

@@ -1416,10 +1416,22 @@ export const ExternalDeviceCreateSchema = v.strictObject({
 	device_id: IdSchema,
 })
 
+/** Device fields whose conex value can overwrite the external one on a mismatch. */
+export const EXTERNAL_PUSH_FIELDS = ['name', 'manufacturer', 'model'] as const
+
+export type ExternalPushField = (typeof EXTERNAL_PUSH_FIELDS)[number]
+
+/** Writes one conex field of a linked device to the external system. */
+export const ExternalDeviceUpdateSchema = v.strictObject({
+	device_id: IdSchema,
+	field: v.picklist(EXTERNAL_PUSH_FIELDS),
+})
+
 export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
 export type ExternalDeviceCreate = v.InferOutput<typeof ExternalDeviceCreateSchema>
+export type ExternalDeviceUpdate = v.InferOutput<typeof ExternalDeviceUpdateSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */

@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { type Context, Hono } from 'hono'
 import {
 	ExternalDeviceCreateSchema,
+	ExternalDeviceUpdateSchema,
 	ExternalIgnoreLocalSchema,
 	ExternalIgnoreSchema,
 	ExternalLinkCreateSchema,
@@ -58,6 +59,7 @@ import {
 } from '../integrations/store'
 import { getSyncRun, startSync } from '../integrations/sync'
 import { createTicket } from '../integrations/tickets'
+import { updateExternalDevice } from '../integrations/update_device'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -123,7 +125,8 @@ async function checkExternalDeviceWrite(
  * device's tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers. `tickets.create` opens tickets for tenants in scope.
- * `integrations.manage` may also create conex devices in the external system.
+ * `integrations.manage` may also create conex devices in the external system
+ * and overwrite external device fields with conex values.
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
@@ -534,6 +537,36 @@ export const integrationsApp = new Hono()
 				c,
 				await createExternalDevice(provider, input.device_id, requestUser(c).id),
 			)
+		},
+	)
+	.put(
+		'/:provider/devices',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalDeviceUpdateSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const input = c.req.valid('json')
+			const denied = requirePermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const tenant = await loadDeviceTenant(c, input.device_id)
+			if (tenant instanceof Response) {
+				return tenant
+			}
+			const link = await linkOf(provider, 'device', input.device_id)
+			if (!link) {
+				return jsonError(c, 'Device is not linked', 400)
+			}
+			const externalDenied = await checkExternalDeviceWrite(
+				c,
+				provider,
+				link.external_tenant_id,
+			)
+			if (externalDenied) {
+				return externalDenied
+			}
+			return sendResult(c, await updateExternalDevice(provider, input.device_id, input.field))
 		},
 	)
 	.delete(

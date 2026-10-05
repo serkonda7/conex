@@ -1,6 +1,7 @@
 import { Result } from 'better-result'
 import type {
 	DeviceInput,
+	DeviceUpdate,
 	ExternalDevice,
 	ExternalTenant,
 	IntegrationProvider,
@@ -21,7 +22,7 @@ function toTenant(company: TanssCompany): ExternalTenant {
 		external_id: String(company.id),
 		display_id: company.displayId,
 		name: company.name,
-		active: !company.inactive && !company.lockout,
+		active: company.active,
 		private: company.private,
 		headquarter_id: company.headquarterId === null ? null : String(company.headquarterId),
 	}
@@ -91,6 +92,26 @@ function peripheryToDevice(
 		ips,
 		active: periphery.active !== false,
 	}
+}
+
+/** Device ids are `pc:<id>` or `periphery:<id>` (see `toDevice`). */
+function parseDeviceId(
+	externalId: string,
+): Result<{ type: 'pc' | 'periphery'; id: number }, Error> {
+	const match = /^(pc|periphery):(\d+)$/.exec(externalId)
+	if (!match) {
+		return Result.err(new Error(`Invalid TANSS device id ${externalId}`))
+	}
+	return Result.ok({ type: match[1] as 'pc' | 'periphery', id: Number(match[2]) })
+}
+
+/** Manufacturer id by name (case-insensitive). */
+function manufacturerIdOf(
+	manufacturers: Map<number, string>,
+	name: string | null,
+): number | undefined {
+	const wanted = name?.trim().toLowerCase()
+	return [...manufacturers].find(([, n]) => n.trim().toLowerCase() === wanted)?.[0]
 }
 
 /**
@@ -175,10 +196,7 @@ export class TanssProvider implements IntegrationProvider {
 		if (Result.isError(manufacturers)) {
 			return manufacturers
 		}
-		const wanted = input.manufacturer?.trim().toLowerCase()
-		const manufacturerId = [...manufacturers.value].find(
-			([, name]) => name.trim().toLowerCase() === wanted,
-		)?.[0]
+		const manufacturerId = manufacturerIdOf(manufacturers.value, input.manufacturer)
 		const created = await this.session.createPc({
 			companyId,
 			name: input.name,
@@ -199,14 +217,13 @@ export class TanssProvider implements IntegrationProvider {
 		}
 		let link: { typeId: number; id: number } | undefined
 		if (input.externalDeviceId !== undefined) {
-			// Device links are `pc:<id>` or `periphery:<id>` (see `toDevice`).
-			const match = /^(pc|periphery):(\d+)$/.exec(input.externalDeviceId)
-			if (!match) {
-				return Result.err(new Error(`Invalid TANSS device id ${input.externalDeviceId}`))
+			const device = parseDeviceId(input.externalDeviceId)
+			if (Result.isError(device)) {
+				return device
 			}
 			link = {
-				typeId: match[1] === 'pc' ? PC_LINK_TYPE : PERIPHERY_LINK_TYPE,
-				id: Number(match[2]),
+				typeId: device.value.type === 'pc' ? PC_LINK_TYPE : PERIPHERY_LINK_TYPE,
+				id: device.value.id,
 			}
 		}
 		return this.session.createTicket({
@@ -215,5 +232,70 @@ export class TanssProvider implements IntegrationProvider {
 			title: input.title,
 			content: input.content,
 		})
+	}
+
+	/**
+	 * Read-modify-write: TANSS replaces the whole object on update, so the
+	 * current one is fetched and only the given fields are changed. A
+	 * periphery's model is its `type`.
+	 */
+	async updateDevice(
+		externalId: string,
+		changes: DeviceUpdate,
+	): Promise<Result<ExternalDevice, Error>> {
+		const device = parseDeviceId(externalId)
+		if (Result.isError(device)) {
+			return device
+		}
+		const manufacturers = await this.manufacturerNames()
+		if (Result.isError(manufacturers)) {
+			return manufacturers
+		}
+		let manufacturerId: number | undefined
+		if (changes.manufacturer !== undefined) {
+			manufacturerId = manufacturerIdOf(manufacturers.value, changes.manufacturer)
+			if (manufacturerId === undefined) {
+				return Result.err(
+					new Error(`Manufacturer "${changes.manufacturer}" does not exist in TANSS`),
+				)
+			}
+		}
+		const common = {
+			...(changes.name !== undefined ? { name: changes.name } : {}),
+			...(manufacturerId !== undefined ? { manufacturerId } : {}),
+		}
+		const { id } = device.value
+		if (device.value.type === 'pc') {
+			const current = await this.session.getPc(id)
+			if (Result.isError(current)) {
+				return current
+			}
+			// Details are read-only lists, not part of the update body.
+			const { serviceIcons, components, peripheries, softwarelicenses, ...pc } = current.value
+			const updated = await this.session.updatePc(id, {
+				...pc,
+				...common,
+				...(changes.model !== undefined ? { model: changes.model } : {}),
+			})
+			return updated.map((row) =>
+				toDevice(row, String(row.companyId ?? pc.companyId), manufacturers.value),
+			)
+		}
+		const current = await this.session.getPeriphery(id)
+		if (Result.isError(current)) {
+			return current
+		}
+		const updated = await this.session.updatePeriphery(id, {
+			...current.value,
+			...common,
+			...(changes.model !== undefined ? { type: changes.model } : {}),
+		})
+		return updated.map((row) =>
+			peripheryToDevice(
+				row,
+				String(row.companyId ?? current.value.companyId),
+				manufacturers.value,
+			),
+		)
 	}
 }

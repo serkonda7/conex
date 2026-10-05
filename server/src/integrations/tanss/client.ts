@@ -7,9 +7,9 @@
  *   `POST /api/v1/login`, valid ~4 h with a 2 min idle timeout. A session
  *   logs in lazily and re-logs in once on 401.
  * - ERP API (`/api/erp/v1/...`, company list): the ERP role token.
- * Both are sent verbatim in the `apiToken` header (already `Bearer ...`);
- * `createErpClient(...).instance` is an isolated hey-api client with exactly
- * that auth, so it is reused for the user API with the login JWT.
+ * Both are sent verbatim in the `apiToken` header (already `Bearer ...`).
+ * The raw generated functions are used with each facade's `instance`, so
+ * errors stay `{ data, error }` values instead of thrown exceptions.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -17,16 +17,25 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Result } from 'better-result'
 import {
+	type Customer,
+	type CustomersCombine,
 	createErpClient,
+	createTanssClient,
+	TanssApiError as FacadeError,
 	getApiV1Manufacturers,
+	getApiV1PcsPcId,
+	getApiV1PeripheriesPeripheryId,
 	postApiV1Login,
 	postApiV1Pcs,
 	postApiV1Tickets,
 	putApiV1Pcs,
+	putApiV1PcsPcId,
 	putApiV1Peripheries,
+	putApiV1PeripheriesPeripheryId,
 	type TnsPeripheryWithIpGuarantee,
 	type TnsPersonalComputer,
 	type TnsPersonalComputerWithDetails,
+	type TnsPersonalComputerWithIpGuarantee,
 } from 'tanss-api'
 import * as v from 'valibot'
 
@@ -42,8 +51,7 @@ export interface TanssCompany {
 	id: number
 	name: string
 	displayId: string | null
-	inactive: boolean
-	lockout: boolean
+	active: boolean
 	/** Private person, not a business customer. */
 	private: boolean
 	headquarterId: number | null
@@ -78,7 +86,8 @@ const TicketResponseSchema = v.object({
 	content: v.object({ id: v.pipe(v.number(), v.integer()) }),
 })
 
-const PcResponseSchema = v.object({
+/** Single PC/server or periphery response. */
+const DeviceResponseSchema = v.object({
 	content: v.looseObject({ id: v.pipe(v.number(), v.integer()) }),
 })
 
@@ -145,10 +154,11 @@ async function call(
 ): Promise<Result<unknown, Error>> {
 	const res = await Result.tryPromise({
 		try: run,
+		// Facade methods (ERP client) throw instead of returning `error`.
 		catch: (e: unknown) =>
 			new TanssApiError(
 				`TANSS ${what} failed: ${e instanceof Error ? e.message : String(e)}`,
-				null,
+				e instanceof FacadeError ? (e.status ?? null) : null,
 			),
 	})
 	if (Result.isError(res)) {
@@ -163,17 +173,13 @@ async function call(
 	return Result.ok(data)
 }
 
-function instanceFor(baseUrl: string, token: string): ReturnType<typeof createErpClient> {
-	return createErpClient({ baseUrl, token })
-}
-
 /** Logs in a TANSS user and returns the `Bearer ...` API key. */
 export async function tanssLogin(
 	baseUrl: string,
 	username: string,
 	password: string,
 ): Promise<Result<string, Error>> {
-	const client = instanceFor(baseUrl, '').instance
+	const client = createTanssClient({ baseUrl, token: '' }).instance
 	const res = await call('login', () => postApiV1Login({ client, body: { username, password } }))
 	if (Result.isError(res)) {
 		return res
@@ -228,38 +234,21 @@ function isSupplier(categories: unknown): boolean {
 	)
 }
 
-/**
- * The ERP customer list is untyped in the OpenAPI spec. Real installations
- * answer `{ customers: [{ id, customer_number, name, headquarters, active,
- * … }], employees: [...] }`; the `CompanyDetail` field names are accepted as
- * well. Rows without id or name are skipped, as are suppliers (see
- * `isSupplier`).
- */
-function toCompany(raw: unknown): TanssCompany | null {
-	if (typeof raw !== 'object' || raw === null) {
-		return null
-	}
-	const r = raw as Record<string, unknown>
-	const id = num(r.id ?? r.companyId)
-	const name = str(r.name ?? r.companyName)
-	if (id === null || name === null || isSupplier(r.categories)) {
+/** Rows without id or name are skipped, as are suppliers (see `isSupplier`). */
+function toCompany(raw: Customer): TanssCompany | null {
+	const id = num(raw.id)
+	const name = str(raw.name)
+	if (id === null || name === null || isSupplier(raw.categories)) {
 		return null
 	}
 	return {
 		id,
 		name,
-		displayId: str(r.customer_number ?? r.displayId ?? r.customerNumber ?? r.number),
-		inactive: r.inactive === true || r.active === false,
-		lockout: r.lockout === true,
-		private: r.private === true,
-		headquarterId: num(r.headquarters ?? r.headquarterId),
+		displayId: str(raw.customer_number),
+		active: raw.active !== false,
+		private: raw.private === true,
+		headquarterId: num(raw.headquarters),
 	}
-}
-
-/** Rows of the ERP customer list: `customers`, else a generic list. */
-function customerRows(data: unknown): unknown[] {
-	const customers = (data as { customers?: unknown } | null)?.customers
-	return Array.isArray(customers) ? customers : listContent(data)
 }
 
 function listContent(data: unknown): unknown[] {
@@ -267,28 +256,18 @@ function listContent(data: unknown): unknown[] {
 		return data
 	}
 	const parsed = v.safeParse(ContentListSchema, data)
-	if (parsed.success) {
-		return parsed.output.content ?? []
-	}
-	const content = (data as { content?: unknown } | null)?.content
-	if (typeof content === 'object' && content !== null) {
-		// Some ERP endpoints wrap lists one level deeper.
-		for (const value of Object.values(content)) {
-			if (Array.isArray(value)) {
-				return value
-			}
-		}
-	}
-	return []
+	return parsed.success ? (parsed.output.content ?? []) : []
 }
 
 /** One authenticated TANSS connection (one sync run or one check). */
 export class TanssSession {
 	private apiKey: string | null = null
 	private readonly erp: ReturnType<typeof createErpClient>
+	private readonly tanss: ReturnType<typeof createTanssClient>
 
 	constructor(private readonly creds: TanssCredentials) {
-		this.erp = instanceFor(creds.base_url, creds.erp_token)
+		this.erp = createErpClient({ baseUrl: creds.base_url, token: creds.erp_token })
+		this.tanss = createTanssClient({ baseUrl: creds.base_url, token: '' })
 	}
 
 	async login(): Promise<Result<void, Error>> {
@@ -297,13 +276,14 @@ export class TanssSession {
 			return res
 		}
 		this.apiKey = res.value
+		this.tanss.setToken(res.value)
 		return Result.ok(undefined)
 	}
 
 	/** User-API call with lazy login and one re-login on 401. */
 	private async userCall(
 		what: string,
-		run: (client: ReturnType<typeof createErpClient>['instance']) => Promise<HeyApiResult>,
+		run: (client: ReturnType<typeof createTanssClient>['instance']) => Promise<HeyApiResult>,
 	): Promise<Result<unknown, Error>> {
 		for (let attempt = 0; attempt < 2; attempt++) {
 			if (this.apiKey === null) {
@@ -312,8 +292,7 @@ export class TanssSession {
 					return login
 				}
 			}
-			const client = instanceFor(this.creds.base_url, this.apiKey ?? '').instance
-			const res = await call(what, () => run(client))
+			const res = await call(what, () => run(this.tanss.instance))
 			if (
 				Result.isError(res) &&
 				res.error instanceof TanssApiError &&
@@ -349,7 +328,7 @@ export class TanssSession {
 			return dump
 		}
 		const companies: TanssCompany[] = []
-		for (const raw of customerRows(res.value)) {
+		for (const raw of (res.value as CustomersCombine).customers ?? []) {
 			const company = toCompany(raw)
 			if (company) {
 				companies.push(company)
@@ -458,10 +437,61 @@ export class TanssSession {
 		if (Result.isError(res)) {
 			return res
 		}
-		const parsed = v.safeParse(PcResponseSchema, res.value)
+		const parsed = v.safeParse(DeviceResponseSchema, res.value)
 		if (!parsed.success) {
 			return Result.err(new TanssApiError('TANSS PC create returned no PC id', null))
 		}
 		return Result.ok(parsed.output.content as TanssPc)
 	}
+
+	/** One PC/server, as needed for a read-modify-write update. */
+	async getPc(pcId: number): Promise<Result<TanssPc, Error>> {
+		const res = await this.userCall('PC fetch', (client) =>
+			getApiV1PcsPcId({ client, path: { pcId } }),
+		)
+		return parseDevice<TanssPc>('PC fetch', res)
+	}
+
+	/**
+	 * Saves a PC/server. TANSS replaces the stored object (including IPs),
+	 * so `pc` must be complete: fetch it with `getPc` first.
+	 */
+	async updatePc(
+		pcId: number,
+		pc: TnsPersonalComputerWithIpGuarantee,
+	): Promise<Result<TanssPc, Error>> {
+		const res = await this.userCall('PC update', (client) =>
+			putApiV1PcsPcId({ client, path: { pcId }, body: pc }),
+		)
+		return parseDevice<TanssPc>('PC update', res)
+	}
+
+	async getPeriphery(peripheryId: number): Promise<Result<TanssPeriphery, Error>> {
+		const res = await this.userCall('periphery fetch', (client) =>
+			getApiV1PeripheriesPeripheryId({ client, path: { peripheryId } }),
+		)
+		return parseDevice<TanssPeriphery>('periphery fetch', res)
+	}
+
+	/** Saves a periphery; like `updatePc`, `periphery` must be complete. */
+	async updatePeriphery(
+		peripheryId: number,
+		periphery: TanssPeriphery,
+	): Promise<Result<TanssPeriphery, Error>> {
+		const res = await this.userCall('periphery update', (client) =>
+			putApiV1PeripheriesPeripheryId({ client, path: { peripheryId }, body: periphery }),
+		)
+		return parseDevice<TanssPeriphery>('periphery update', res)
+	}
+}
+
+function parseDevice<T>(what: string, res: Result<unknown, Error>): Result<T, Error> {
+	if (Result.isError(res)) {
+		return res
+	}
+	const parsed = v.safeParse(DeviceResponseSchema, res.value)
+	if (!parsed.success) {
+		return Result.err(new TanssApiError(`TANSS ${what} returned no device`, null))
+	}
+	return Result.ok(parsed.output.content as T)
 }

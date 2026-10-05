@@ -6,7 +6,9 @@
 import { Result } from 'better-result'
 import type {
 	DeviceIntegrationStatus,
+	ExternalDeviceJson,
 	ExternalLinkJson,
+	ExternalPushField,
 	ExternalTenantJson,
 	ExternalTenantListItem,
 	IntegrationCreate,
@@ -259,6 +261,19 @@ export async function create_external_device(
 		json: { device_id },
 	})
 	return to_result<ExternalLinkJson>(res, t('integration.createExternalFailed'))
+}
+
+/** Overwrites one field of the linked external device with the conex value. */
+export async function update_external_device(
+	provider: IntegrationProvider,
+	device_id: number,
+	field: ExternalPushField,
+): Promise<Result<ExternalDeviceJson, Error>> {
+	const res = await client.integrations[':provider'].devices.$put({
+		param: { provider },
+		json: { device_id, field },
+	})
+	return to_result<ExternalDeviceJson>(res, t('integration.updateExternalFailed'))
 }
 
 export async function unlink_external(

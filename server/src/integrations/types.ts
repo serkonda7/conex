@@ -1,6 +1,7 @@
 import type { Result } from 'better-result'
 import type {
 	ExternalDeviceJson,
+	ExternalPushField,
 	ExternalTenantJson,
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
@@ -24,7 +25,15 @@ export interface IntegrationProvider {
 	createTicket?(input: TicketInput): Promise<Result<number, Error>>
 	/** Creates a device and returns it as fetched by a sync; absent when unsupported. */
 	createDevice?(input: DeviceInput): Promise<Result<ExternalDeviceJson, Error>>
+	/** Overwrites fields of a device and returns it as fetched by a sync; absent when unsupported. */
+	updateDevice?(
+		externalId: string,
+		changes: DeviceUpdate,
+	): Promise<Result<ExternalDeviceJson, Error>>
 }
+
+/** Manufacturer is matched by name like on create. */
+export type DeviceUpdate = Partial<Record<ExternalPushField, string>>
 
 export interface DeviceInput {
 	externalTenantId: string

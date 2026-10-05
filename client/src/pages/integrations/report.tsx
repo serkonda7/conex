@@ -1,6 +1,12 @@
 import { IconRefresh } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { FINDING_KINDS, type FindingKind, type IntegrationFinding } from 'shared/src/schemas'
+import {
+	EXTERNAL_PUSH_FIELDS,
+	type ExternalPushField,
+	FINDING_KINDS,
+	type FindingKind,
+	type IntegrationFinding,
+} from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
@@ -18,6 +24,7 @@ import {
 	run_sync,
 	start_sync,
 	unlink_external,
+	update_external_device,
 } from '../../api/integrations'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
@@ -43,6 +50,14 @@ import {
 import { formatTime } from '../../lib/time'
 import { ExternalTenantPicker } from './external_tenant_picker'
 import { LinkBoardView } from './link_board'
+
+/** Field of a mismatch that can be written to the external system. */
+function pushField(f: IntegrationFinding): ExternalPushField | null {
+	return f.kind === 'device_mismatch' &&
+		(EXTERNAL_PUSH_FIELDS as readonly string[]).includes(f.field ?? '')
+		? (f.field as ExternalPushField)
+		: null
+}
 
 function findingKey(f: IntegrationFinding): string {
 	return [f.kind, f.tenant_id, f.device_id, f.external_id, f.field].join('|')
@@ -459,10 +474,29 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				)
 			case 'device_stale':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
-			case 'device_mismatch':
+			case 'device_mismatch': {
+				const field = pushField(f)
 				return (
-					<Show when={f.field === 'tenant' && can('integrations.manage')}>{unlink}</Show>
+					<Show when={can('integrations.manage')}>
+						<Show when={f.field === 'tenant'}>{unlink}</Show>
+						{field !== null && (
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										update_external_device(provider, f.device_id ?? 0, field),
+									)
+								}
+							>
+								{t('integration.updateExternal', {
+									provider: providerLabel(provider),
+								})}
+							</button>
+						)}
+					</Show>
 				)
+			}
 			default:
 				return null
 		}

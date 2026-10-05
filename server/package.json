@@ -14,7 +14,7 @@
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "shared": "workspace:*",
-    "tanss-api": "~0.3.0",
+    "tanss-api": "~0.4.0",
     "valibot": "catalog:"
   },
   "devDependencies": {

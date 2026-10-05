@@ -751,6 +751,8 @@ export const en = {
 	'integration.unlinkFailed': 'Failed to remove the link',
 	'integration.createExternal': 'Create in {provider}',
 	'integration.createExternalFailed': 'Failed to create the device externally',
+	'integration.updateExternal': 'Update in {provider}',
+	'integration.updateExternalFailed': 'Failed to update the device externally',
 	'integration.pickTenant': 'Link {provider} company',
 	'integration.searchTenants': 'Search name or customer number…',
 	'integration.alreadyLinked': 'linked',

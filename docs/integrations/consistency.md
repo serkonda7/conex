@@ -21,7 +21,7 @@ context is switched.
 | Asset tag     | Inventory number |
 
 Name, serial number, manufacturer, model and active status are compared
-one-to-one. A company is inactive when it is marked inactive or locked out.
+one-to-one.
 
 ## Links
 
@@ -45,7 +45,7 @@ the sync. Ignored objects are not reported as missing or suggested.
 | Finding                      | Meaning |
 | ---------------------------- | ------- |
 | **Device no longer exists**  | Linked device was not found in the last sync. |
-| **Mismatch**                 | One finding per differing aspect: tenant (device belongs to another company than its tenant's), status (active in one system, inactive in the other), or name, serial number, asset tag, manufacturer or model (empty values are not compared). |
+| **Mismatch**                 | One finding per differing aspect: tenant (device belongs to another company than its tenant's), status (active in one system, inactive in the other), or name, serial number, asset tag, manufacturer or model (empty values are not compared). Name, manufacturer and model can be overwritten in TANSS with the conex value; the manufacturer must already exist in TANSS. |
 
 ### Not linked objects
 

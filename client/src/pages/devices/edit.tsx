@@ -1,5 +1,5 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, fetch_device, update_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'

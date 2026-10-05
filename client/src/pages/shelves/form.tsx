@@ -1,6 +1,6 @@
 import { Result } from 'better-result'
 import type { DeviceFace } from 'shared/src/types'
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { fetch_racks } from '../../api/racks'
 import {
 	create_shelf,
