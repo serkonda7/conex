@@ -5,7 +5,7 @@
  * foreign-key link pattern, the related-object sections, and the
  * confirm-then-delete flow.
  */
-import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconCopy, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Resource, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
@@ -40,8 +40,8 @@ export function DetailShell(props: {
 }
 
 /**
- * Title header with the Edit / Delete actions, each shown only with the
- * matching permission.
+ * Title header with the Edit / Clone / Delete actions, each shown only with
+ * the matching permission.
  * `extra` follows the name inside the heading (e.g. the rack height).
  */
 export function DetailHeader(props: {
@@ -50,6 +50,8 @@ export function DetailHeader(props: {
 	extra?: JSX.Element
 	testId?: string
 	editHref: string
+	/** Add form pre-filled from this record; omitted hides "Clone". */
+	cloneHref?: string
 	onDelete: () => void
 	/** False hides "Delete" (e.g. built-in records). */
 	deletable?: boolean
@@ -70,6 +72,13 @@ export function DetailHeader(props: {
 						<button type="button" onClick={() => navigate(props.editHref)}>
 							<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
 						</button>
+					</Show>
+					<Show when={can('edit') && props.cloneHref}>
+						{(href: () => string) => (
+							<button type="button" onClick={() => navigate(href())}>
+								<IconLabel icon={IconCopy}>{t('common.clone')}</IconLabel>
+							</button>
+						)}
 					</Show>
 					<Show when={can('delete') && props.deletable !== false}>
 						<button type="button" class="btn-danger" onClick={props.onDelete}>

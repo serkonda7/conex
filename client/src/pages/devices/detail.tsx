@@ -281,6 +281,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<DetailHeader
 					name={device()?.name}
 					editHref={`/devices/${props.id}/edit`}
+					cloneHref={`/devices/add?clone=${props.id}`}
 					onDelete={handleDelete}
 				/>
 				<DetailSubtitle description={device()?.description} />

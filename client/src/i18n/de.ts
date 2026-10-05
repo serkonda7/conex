@@ -5,6 +5,7 @@ export const de: Messages = {
 	// common
 	'common.add': '+ Hinzufügen',
 	'common.edit': 'Bearbeiten',
+	'common.clone': 'Klonen',
 	'common.delete': 'Löschen',
 	'common.cancel': 'Abbrechen',
 	'common.create': 'Erstellen',

@@ -3,6 +3,7 @@ export const en = {
 	// common
 	'common.add': '+ Add',
 	'common.edit': 'Edit',
+	'common.clone': 'Clone',
 	'common.delete': 'Delete',
 	'common.cancel': 'Cancel',
 	'common.create': 'Create',

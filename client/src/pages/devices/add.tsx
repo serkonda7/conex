@@ -1,7 +1,7 @@
 import type { DeviceFace } from 'shared/src/types'
 import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
-import { create_device } from '../../api/devices'
+import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_device_types, fetch_manufacturers } from '../../api/templates'
@@ -21,6 +21,7 @@ import { t, tp } from '../../i18n'
 import { faceOptions } from '../../i18n/labels'
 import {
 	type FormValues,
+	id_value,
 	is_add_another_submit,
 	submit_form,
 	text,
@@ -47,7 +48,11 @@ function queryFace(): string {
 	return face === 'front' || face === 'rear' ? face : ''
 }
 
-/** /devices/add — NetBox-style device instantiate form. */
+/**
+ * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
+ * pre-fills it from that device, except the name, serial, device ID and
+ * U position, which must differ per device.
+ */
 export function DeviceAddPage(): JSX.Element {
 	const form = useFormState()
 	const [name, setName] = createSignal('')
@@ -66,8 +71,8 @@ export function DeviceAddPage(): JSX.Element {
 	const [positionU, setPositionU] = createSignal(queryParam('position_u'))
 	// Shelf deep link (`/devices/add?rack=<id>&shelf=<id>`) places the device
 	// on that shelf: the rack follows the shelf and there is no U position.
-	const shelfId = parseId(queryParam('shelf'))
-	const [shelf] = createRecord(() => shelfId, fetch_shelf, form.setError)
+	const [shelfId, setShelfId] = createSignal(parseId(queryParam('shelf')))
+	const [shelf] = createRecord(shelfId, fetch_shelf, form.setError)
 
 	const [types, { refetch: refetchTypes }] = createRows(fetch_device_types, form.setError)
 	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
@@ -107,6 +112,26 @@ export function DeviceAddPage(): JSX.Element {
 		}
 	})
 
+	const [source] = createRecord(() => parseId(queryParam('clone')), fetch_device, form.setError)
+	createEffect(() => {
+		const row = source()
+		if (row) {
+			fillFrom(row)
+		}
+	})
+
+	function fillFrom(row: DeviceRow): void {
+		setTypeId(id_value(row.device_type_id))
+		setRoleId(id_value(row.device_role_id))
+		setDescription(row.description ?? '')
+		tenant.pick(id_value(row.tenant_id))
+		setSiteId(id_value(row.site_id))
+		setLocationId(id_value(row.location_id))
+		setRackId(id_value(row.rack_id))
+		setShelfId(row.shelf_id)
+		setFace(row.face ?? '')
+	}
+
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
 		setLocationId('')
@@ -132,7 +157,7 @@ export function DeviceAddPage(): JSX.Element {
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		const onShelf = shelfId !== null
+		const onShelf = shelfId() !== null
 		await submit_form({
 			form,
 			name: name(),
@@ -150,7 +175,7 @@ export function DeviceAddPage(): JSX.Element {
 					rack_id: parseId(rackId()),
 					face: onShelf ? null : ((face() || null) as DeviceFace | null),
 					position_u: onShelf ? null : parsePosition(positionU()),
-					shelf_id: shelfId,
+					shelf_id: shelfId(),
 					tenant_id: parseId(tenant.value()),
 				}),
 			// Elevation deep links return to the rack they came from.
@@ -259,7 +284,7 @@ export function DeviceAddPage(): JSX.Element {
 				id="device-rack"
 				label={tp('entity.rack', 1)}
 				value={rackId()}
-				disabled={shelfId !== null}
+				disabled={shelfId() !== null}
 				onChange={handleRackChange}
 				options={row_options(racks() ?? [])}
 				emptyLabel="—"
@@ -268,7 +293,7 @@ export function DeviceAddPage(): JSX.Element {
 				id="device-face"
 				label={t('shelf.face')}
 				value={face()}
-				disabled={rackId() === '' || shelfId !== null}
+				disabled={rackId() === '' || shelfId() !== null}
 				onChange={setFace}
 				options={faceOptions()}
 				emptyLabel={t('device.noFace')}
@@ -280,11 +305,11 @@ export function DeviceAddPage(): JSX.Element {
 				placeholder={t('device.positionPlaceholder')}
 				inputmode="numeric"
 				value={positionU()}
-				disabled={rackId() === '' || shelfId !== null}
+				disabled={rackId() === '' || shelfId() !== null}
 				onInput={setPositionU}
 				hint={
 					<Hint>
-						{shelfId === null ? '' : t('device.onShelfHint', { name: shelfName() })}
+						{shelfId() === null ? '' : t('device.onShelfHint', { name: shelfName() })}
 					</Hint>
 				}
 			/>
