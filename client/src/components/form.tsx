@@ -9,8 +9,10 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createEffect, createMemo, createSignal, For, type JSX, onMount, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { t } from '../i18n'
 import type { FormState } from '../lib/form'
+import type { IconComponent } from '../lib/icons'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
 import { InlineError, Loading } from './feedback'
 
@@ -20,6 +22,8 @@ export interface FormOption {
 	label: string
 	/** Secondary text (e.g. the manufacturer), shown muted in a column after the labels. */
 	detail?: string
+	/** Glyph shown before the label, in the list and in the closed input. */
+	icon?: IconComponent
 }
 
 /** Maps list rows (`{ id, name }`) to `SelectField` options. */
@@ -399,6 +403,7 @@ export function SelectField(props: {
 				classList={{
 					'combobox-open': open(),
 					'combobox-with-detail': !open() && Boolean(selected()?.detail),
+					'combobox-with-icon': !open() && selected()?.icon !== undefined,
 				}}
 			>
 				<input
@@ -429,6 +434,13 @@ export function SelectField(props: {
 					onKeyDown={onKeyDown}
 					onBlur={() => setOpen(false)}
 				/>
+				<Show when={!open() && selected()?.icon}>
+					{(icon: () => IconComponent): JSX.Element => (
+						<span class="combobox-icon" aria-hidden="true">
+							<Dynamic component={icon()} size={14} />
+						</span>
+					)}
+				</Show>
 				<Show when={!open() && selected()?.detail}>
 					<span class="combobox-value" aria-hidden="true">
 						<span class="combobox-option-label">{selected()?.label}</span>
@@ -468,7 +480,19 @@ export function SelectField(props: {
 									onMouseMove={() => setActive(index())}
 									onClick={() => pick(index())}
 								>
-									<span class="combobox-option-label">{option.label}</span>
+									<span class="combobox-option-label">
+										<Show when={option.icon}>
+											{(icon: () => IconComponent): JSX.Element => (
+												<span
+													class="combobox-option-icon"
+													aria-hidden="true"
+												>
+													<Dynamic component={icon()} size={14} />
+												</span>
+											)}
+										</Show>
+										{option.label}
+									</span>
 									<Show when={option.detail}>
 										<span class="combobox-detail">{option.detail}</span>
 									</Show>

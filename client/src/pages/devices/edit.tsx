@@ -18,6 +18,7 @@ import {
 import { t, tp } from '../../i18n'
 import { faceOptions } from '../../i18n/labels'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
+import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, routeSegments, useOpenerPath } from '../../lib/router'
@@ -139,7 +140,11 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				required
 				value={roleId()}
 				onChange={setRoleId}
-				options={row_options(roles() ?? [])}
+				options={(roles() ?? []).map((role) => ({
+					value: role.id,
+					label: role.name,
+					icon: deviceRoleIcon(role.icon),
+				}))}
 				emptyLabel={t('device.rolePlaceholder')}
 				add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
 			/>

@@ -20,8 +20,10 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
+import { locationTypeIcon } from '../../lib/icons'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { siteTrail } from '../../lib/trails'
@@ -91,7 +93,11 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 						<code>{location()?.slug}</code>
 					</dd>
 					<dt>{t('location.type')}</dt>
-					<dd>{locationTypeLabel(location()?.type ?? 'other')}</dd>
+					<dd>
+						<IconLabel icon={locationTypeIcon(location()?.type ?? 'other')}>
+							{locationTypeLabel(location()?.type ?? 'other')}
+						</IconLabel>
+					</dd>
 					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<RecordLink id={tenantId()} record={tenant} base="/tenants" />

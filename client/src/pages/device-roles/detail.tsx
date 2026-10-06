@@ -1,4 +1,4 @@
-import { createSignal, type JSX } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import { delete_device_role, fetch_device_role } from '../../api/device_roles'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { nameColumn } from '../../components/data_table'
@@ -11,7 +11,10 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
+import { deviceRoleIconLabel } from '../../i18n/labels'
+import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRowsFor } from '../../lib/resource'
 
 /**
@@ -50,6 +53,16 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 				<DetailSubtitle description={role()?.description} />
 
 				<DetailCard label={t('deviceRole.details')}>
+					<dt>{t('deviceRole.icon')}</dt>
+					<dd>
+						<Show when={role()?.icon} fallback="—">
+							{(icon: () => string): JSX.Element => (
+								<IconLabel icon={deviceRoleIcon(icon())}>
+									{deviceRoleIconLabel(icon())}
+								</IconLabel>
+							)}
+						</Show>
+					</dd>
 					<dt>{t('common.description')}</dt>
 					<dd>{role()?.description || '—'}</dd>
 				</DetailCard>

@@ -9,7 +9,7 @@ import {
 	text,
 	uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { LOCATION_TYPES } from 'shared/src/schemas'
+import { DEVICE_ROLE_ICONS, LOCATION_TYPES } from 'shared/src/schemas'
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
@@ -306,6 +306,7 @@ export const device_roles = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		description: text('description'),
+		icon: text('icon', { enum: DEVICE_ROLE_ICONS }),
 		// Built-in roles (`DEVICE_ROLE_KEYS`) carry their key; they are seeded
 		// by migration and can be neither renamed nor deleted.
 		key: text('key').unique(),

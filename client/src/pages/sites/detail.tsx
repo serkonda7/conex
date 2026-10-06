@@ -20,8 +20,10 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
+import { locationTypeIcon } from '../../lib/icons'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import { siteGroupTrail } from '../../lib/trails'
 import { LocationTreeName } from '../locations/list'
@@ -129,7 +131,11 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					{
 						key: 'type',
 						label: t('location.type'),
-						getValue: (l: LocationRow): string => locationTypeLabel(l.type),
+						getValue: (l: LocationRow): JSX.Element => (
+							<IconLabel icon={locationTypeIcon(l.type)}>
+								{locationTypeLabel(l.type)}
+							</IconLabel>
+						),
 					},
 				]}
 			/>

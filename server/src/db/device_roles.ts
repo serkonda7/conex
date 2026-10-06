@@ -30,7 +30,7 @@ export type DeviceRoleListRow = DeviceRoleRow & { device_count: number }
 // user, writable only by global editors/admins. Every device carries exactly
 // one role, so delete is blocked while devices reference the role.
 // Built-in roles (`key` set, see `DEVICE_ROLE_KEYS`) keep their name and
-// cannot be deleted; only their description is editable.
+// cannot be deleted; only their description and icon are editable.
 // ---------------------------------------------------------------------------
 
 const NAME_IN_USE = 'Device role name is already in use'
@@ -77,6 +77,7 @@ export async function createDeviceRole(
 	const row: Omit<DeviceRoleRow, 'id'> = {
 		name: input.name,
 		description: input.description ?? null,
+		icon: input.icon ?? null,
 		key: null,
 	}
 	const id = await tryWrite(
@@ -113,7 +114,7 @@ export async function updateDeviceRole(
 	) {
 		return Result.err(new ValidationError('Built-in device roles cannot be renamed'))
 	}
-	const patch = pickDefined(input, ['name', 'description'])
+	const patch = pickDefined(input, ['name', 'description', 'icon'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(device_roles).set(patch).where(eq(device_roles.id, id)),

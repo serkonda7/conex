@@ -5,9 +5,11 @@ import {
 	delete_device_role,
 	fetch_device_roles,
 } from '../../api/device_roles'
-import { descriptionColumn, nameColumn } from '../../components/data_table'
+import { descriptionColumn } from '../../components/data_table'
+import { IconLabel } from '../../components/icon_label'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
+import { deviceRoleIcon } from '../../lib/icons'
 
 /**
  * /device-roles — device role list: search, sortable columns, row
@@ -28,9 +30,16 @@ export function DeviceRolesPage(): JSX.Element {
 			addHref="/device-roles/add"
 			searchPlaceholder={t('deviceRole.searchPlaceholder')}
 			columns={[
-				nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles', {
+				{
+					key: 'name',
+					label: t('common.name'),
 					sortable: true,
-				}),
+					getValue: (r: DeviceRoleListRow): JSX.Element => (
+						<IconLabel icon={deviceRoleIcon(r.icon)}>
+							<a href={`/device-roles/${r.id}`}>{r.name}</a>
+						</IconLabel>
+					),
+				},
 				descriptionColumn({ sortable: true }),
 				{
 					key: 'devices',

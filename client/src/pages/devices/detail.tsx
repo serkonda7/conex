@@ -25,8 +25,10 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { faceLabel, portKindLabel } from '../../i18n/labels'
+import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
@@ -298,12 +300,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 					<dt>{tp('entity.deviceRole', 1)}</dt>
 					<dd>
-						<ForeignKeyLink
-							id={roleId()}
-							loading={deviceRole.loading}
-							name={deviceRole()?.name}
-							href={`/device-roles/${roleId() ?? ''}`}
-						/>
+						<IconLabel icon={deviceRoleIcon(deviceRole()?.icon)}>
+							<ForeignKeyLink
+								id={roleId()}
+								loading={deviceRole.loading}
+								name={deviceRole()?.name}
+								href={`/device-roles/${roleId() ?? ''}`}
+							/>
+						</IconLabel>
 					</dd>
 					<dt>{t('device.serial')}</dt>
 					<dd>{device()?.serial ?? '—'}</dd>

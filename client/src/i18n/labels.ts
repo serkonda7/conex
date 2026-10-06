@@ -11,7 +11,9 @@ import {
 	CHANGE_OBJECT_TYPES,
 	type ChangeAction,
 	type ChangeObjectType,
+	DEVICE_ROLE_ICONS,
 	type DeviceCompareField,
+	type DeviceRoleIcon,
 	type FindingKind,
 	type IntegrationProvider,
 	LOCATION_TYPES,
@@ -22,6 +24,8 @@ import {
 	type SyncRunState,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
+import type { FormOption } from '../components/form'
+import { deviceRoleIcon, locationTypeIcon } from '../lib/icons'
 import { type MessageKey, t } from '.'
 
 function lookup(keys: Record<string, MessageKey>, value: string): string {
@@ -207,8 +211,47 @@ export function locationTypeLabel(value: string): string {
 }
 
 /** `<select>` options for built-in location types. */
-export function locationTypeOptions(): { value: LocationType; label: string }[] {
-	return LOCATION_TYPES.map((value) => ({ value, label: locationTypeLabel(value) }))
+export function locationTypeOptions(): (FormOption & { value: LocationType })[] {
+	return LOCATION_TYPES.map((value) => ({
+		value,
+		label: locationTypeLabel(value),
+		icon: locationTypeIcon(value),
+	}))
+}
+
+const DEVICE_ROLE_ICON_KEYS: Record<DeviceRoleIcon, MessageKey> = {
+	desktop: 'deviceRoleIcon.desktop',
+	laptop: 'deviceRoleIcon.laptop',
+	server: 'deviceRoleIcon.server',
+	switch: 'deviceRoleIcon.switch',
+	router: 'deviceRoleIcon.router',
+	firewall: 'deviceRoleIcon.firewall',
+	'access-point': 'deviceRoleIcon.accessPoint',
+	storage: 'deviceRoleIcon.storage',
+	printer: 'deviceRoleIcon.printer',
+	phone: 'deviceRoleIcon.phone',
+	mobile: 'deviceRoleIcon.mobile',
+	tablet: 'deviceRoleIcon.tablet',
+	display: 'deviceRoleIcon.display',
+	camera: 'deviceRoleIcon.camera',
+	ups: 'deviceRoleIcon.ups',
+	'patch-panel': 'deviceRoleIcon.patchPanel',
+	cloud: 'deviceRoleIcon.cloud',
+	virtual: 'deviceRoleIcon.virtual',
+}
+
+/** Device role icon (`server`, `access-point`, …). */
+export function deviceRoleIconLabel(value: string): string {
+	return lookup(DEVICE_ROLE_ICON_KEYS, value)
+}
+
+/** `<select>` options for every device role icon. */
+export function deviceRoleIconOptions(): (FormOption & { value: DeviceRoleIcon })[] {
+	return DEVICE_ROLE_ICONS.map((value) => ({
+		value,
+		label: deviceRoleIconLabel(value),
+		icon: deviceRoleIcon(value),
+	}))
 }
 
 const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {

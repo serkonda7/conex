@@ -1,9 +1,10 @@
-import { createSignal, type JSX } from 'solid-js'
+import { createMemo, createSignal, type JSX } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
+import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
 	FilterSelect,
@@ -11,6 +12,7 @@ import {
 	useQueryFilter,
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
+import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
@@ -42,6 +44,7 @@ export function DevicesPage(): JSX.Element {
 	const [racks] = createRows(fetch_racks, list.setError)
 	const typeName = useNameOf(types, (type) => type.model)
 	const roleName = useNameOf(roles)
+	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
 	const rackName = useNameOf(racks)
 
 	const columns: DataTableColumn<DeviceRow>[] = [
@@ -56,7 +59,11 @@ export function DevicesPage(): JSX.Element {
 			key: 'role',
 			label: tp('entity.deviceRole', 1),
 			sortable: true,
-			getValue: (d: DeviceRow): string => roleName(d.device_role_id),
+			getValue: (d: DeviceRow): JSX.Element => (
+				<IconLabel icon={deviceRoleIcon(roleById().get(d.device_role_id)?.icon)}>
+					{roleName(d.device_role_id)}
+				</IconLabel>
+			),
 		},
 		{
 			key: 'type',

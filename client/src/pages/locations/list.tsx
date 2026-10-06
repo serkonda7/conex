@@ -8,6 +8,7 @@ import {
 	type LocationSort,
 } from '../../api/tenancy'
 import type { DataTableColumn } from '../../components/data_table'
+import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
 	FilterSelect,
@@ -16,6 +17,7 @@ import {
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
+import { locationTypeIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
@@ -91,7 +93,9 @@ export function LocationsPage(): JSX.Element {
 		{
 			key: 'type',
 			label: t('location.type'),
-			getValue: (l: LocationRow): string => locationTypeLabel(l.type),
+			getValue: (l: LocationRow): JSX.Element => (
+				<IconLabel icon={locationTypeIcon(l.type)}>{locationTypeLabel(l.type)}</IconLabel>
+			),
 		},
 		{
 			key: 'site',

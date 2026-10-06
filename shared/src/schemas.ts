@@ -576,14 +576,41 @@ export interface ExpandedInterface {
 export const DEVICE_ROLE_KEYS = ['pc', 'server'] as const
 export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
 
+/** Icons a device role can show next to its name; the client maps each to a glyph. */
+export const DEVICE_ROLE_ICONS = [
+	'desktop',
+	'laptop',
+	'server',
+	'switch',
+	'router',
+	'firewall',
+	'access-point',
+	'storage',
+	'printer',
+	'phone',
+	'mobile',
+	'tablet',
+	'display',
+	'camera',
+	'ups',
+	'patch-panel',
+	'cloud',
+	'virtual',
+] as const
+export type DeviceRoleIcon = (typeof DEVICE_ROLE_ICONS)[number]
+
+export const DeviceRoleIconSchema = v.picklist(DEVICE_ROLE_ICONS)
+
 export const DeviceRoleCreateSchema = v.strictObject({
 	name: NameSchema,
 	description: DescriptionSchema,
+	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
 })
 
 export const DeviceRoleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
 })
 
 export type DeviceRoleCreate = v.InferOutput<typeof DeviceRoleCreateSchema>

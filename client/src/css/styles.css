@@ -616,6 +616,8 @@ tbody tr:last-child td {
 .app-nav-icon {
 	display: inline-flex;
 	flex-shrink: 0;
+	/* Inline (non-flex) parents such as table cells: center on the text. */
+	vertical-align: -0.15em;
 }
 
 .app-nav a:hover,
@@ -1182,6 +1184,28 @@ tbody tr:last-child td {
 .app-content .form-stacked .field .combobox-with-detail input {
 	/* The `.combobox-value` overlay renders the label alongside its detail. */
 	color: transparent;
+}
+
+.app-content .form-stacked .field .combobox-with-icon input {
+	padding-left: 1.7rem;
+}
+
+/* Closed-state glyph of the selected option, inside the input's left padding. */
+.combobox-icon {
+	position: absolute;
+	top: 50%;
+	left: 0.55rem;
+	display: inline-flex;
+	transform: translateY(-50%);
+	color: var(--text-muted);
+	pointer-events: none;
+}
+
+.combobox-option-icon {
+	display: inline-flex;
+	margin-right: 0.4rem;
+	vertical-align: -0.15em;
+	color: var(--text-muted);
 }
 
 .app-content .form-stacked .field .combobox-open input {

@@ -113,6 +113,13 @@
       "when": 1791184183504,
       "tag": "0015_builtin_device_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791268876987,
+      "tag": "0016_device_role_icons",
+      "breakpoints": true
     }
   ]
 }
