@@ -1,5 +1,5 @@
 /**
- * `external_links`: which conex tenant/device is which external object, plus
+ * `external_links`: which conex tenant/device/employee is which external object, plus
  * external objects marked as intentionally absent (`ignored`). An external
  * object has at most one row per entity type; linking or ignoring it again
  * replaces that row. Route handlers do the RBAC/scope checks.
@@ -174,8 +174,8 @@ export function ignoreExternal(
 
 /**
  * Synthetic `external_id` for a conex entity ignored as missing in the
- * external system. Real device ids are `pc:<n>` or `periphery:<n>` and tenant ids are numeric
- * company ids, so the `conex:` prefix cannot collide. The unique index on
+ * external system. Real device ids are `pc:<n>` or `periphery:<n>`, tenant
+ * and employee ids are numeric, so the `conex:` prefix cannot collide. The unique index on
  * `(provider, entity_type, external_id)` stays satisfied (one row per
  * ignored entity), and `setLink`/`deleteLink` keep working: linking the
  * entity deletes this row by `entity_id`, deleting the entity deletes it in
@@ -187,7 +187,7 @@ export function localIgnoreExternalId(entityType: LinkEntityType, entityId: numb
 
 /**
  * Marks a conex entity as intentionally absent from the external system
- * (suppresses its `device_missing_in_external` finding). Replaces any
+ * (suppresses its `*_missing_in_external` finding). Replaces any
  * previous link row of that entity.
  */
 export function ignoreLocal(

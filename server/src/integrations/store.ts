@@ -28,6 +28,7 @@ export type SyncRunRow = typeof sync_runs.$inferSelect
 const CountsSchema = v.object({
 	tenants: v.optional(v.number(), 0),
 	devices: v.optional(v.number(), 0),
+	employees: v.optional(v.number(), 0),
 	auto_linked: v.optional(v.number(), 0),
 })
 
@@ -41,7 +42,9 @@ export function syncRunJson(row: SyncRunRow): SyncRunJson {
 		finished_at: row.finished_at,
 		state: row.state as SyncRunJson['state'],
 		error: row.error,
-		counts: counts.success ? counts.output : { tenants: 0, devices: 0, auto_linked: 0 },
+		counts: counts.success
+			? counts.output
+			: { tenants: 0, devices: 0, employees: 0, auto_linked: 0 },
 	}
 }
 

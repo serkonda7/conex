@@ -6,7 +6,9 @@
 import { Result } from 'better-result'
 import type {
 	DeviceIntegrationStatus,
+	EmployeeIntegrationStatus,
 	ExternalDeviceJson,
+	ExternalEmployeeJson,
 	ExternalLinkJson,
 	ExternalPushField,
 	ExternalTenantJson,
@@ -32,6 +34,8 @@ import { client, failed, to_query, to_result } from './client'
 
 export type {
 	DeviceIntegrationStatus,
+	EmployeeIntegrationStatus,
+	ExternalEmployeeJson,
 	ExternalLinkJson,
 	ExternalTenantJson,
 	ExternalTenantListItem,
@@ -195,7 +199,7 @@ export async function fetch_integration_report(
 	return to_result<IntegrationReport>(res, t('integration.reportFailed'))
 }
 
-/** Link board of tenants, or of one tenant's devices. */
+/** Link board of tenants, or of one tenant's devices or employees. */
 export async function fetch_link_board(
 	provider: IntegrationProvider,
 	entity_type: LinkEntityType,
@@ -228,6 +232,16 @@ export async function fetch_device_integration(
 	return to_result<DeviceIntegrationStatus>(res, t('integration.statusFailed'))
 }
 
+export async function fetch_employee_integration(
+	provider: IntegrationProvider,
+	employeeId: number,
+): Promise<Result<EmployeeIntegrationStatus, Error>> {
+	const res = await client.integrations[':provider']['employee-status'][':id'].$get({
+		param: { provider, id: String(employeeId) },
+	})
+	return to_result<EmployeeIntegrationStatus>(res, t('integration.statusFailed'))
+}
+
 export async function link_external(
 	provider: IntegrationProvider,
 	entity_type: LinkEntityType,
@@ -253,16 +267,30 @@ export async function ignore_external(
 	return to_result<ExternalLinkJson>(res, t('integration.linkFailed'))
 }
 
-/** Marks a conex device as intentionally absent from the external system. */
-export async function ignore_local_device(
+/** Marks a conex device or employee as intentionally absent from the external system. */
+export async function ignore_local(
 	provider: IntegrationProvider,
+	entity_type: 'device' | 'employee',
 	entity_id: number,
 ): Promise<Result<ExternalLinkJson, Error>> {
 	const res = await client.integrations[':provider'].links['ignore-local'].$put({
 		param: { provider },
-		json: { entity_type: 'device', entity_id },
+		json: { entity_type, entity_id },
 	})
 	return to_result<ExternalLinkJson>(res, t('integration.linkFailed'))
+}
+
+/** Creates conex employees of a tenant from external ones and links them. */
+export async function import_external_employees(
+	provider: IntegrationProvider,
+	tenant_id: number,
+	external_ids: string[],
+): Promise<Result<{ created: number }, Error>> {
+	const res = await client.integrations[':provider'].employees.$post({
+		param: { provider },
+		json: { tenant_id, external_ids },
+	})
+	return to_result<{ created: number }>(res, t('integration.importEmployeesFailed'))
 }
 
 /** Creates a conex device in the external system and links the two. */

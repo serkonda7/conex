@@ -8,6 +8,7 @@
  * resolves to not-found.
  */
 import {
+	IconAddressBook,
 	IconBox,
 	IconBuildingFactory,
 	IconBuildingSkyscraper,
@@ -47,6 +48,9 @@ import { DeviceAddPage } from '../pages/devices/add'
 import { DeviceDetailPage } from '../pages/devices/detail'
 import { DeviceEditPage } from '../pages/devices/edit'
 import { DevicesPage } from '../pages/devices/list'
+import { EmployeeDetailPage } from '../pages/employees/detail'
+import { EmployeeAddPage, EmployeeEditPage } from '../pages/employees/form'
+import { EmployeesPage } from '../pages/employees/list'
 import { IntegrationAddPage } from '../pages/integrations/add'
 import { IntegrationEditPage } from '../pages/integrations/edit'
 import { IntegrationsPage } from '../pages/integrations/list'
@@ -124,6 +128,16 @@ export const SECTIONS: readonly Section[] = [
 		add: TenantAddPage,
 		detail: TenantDetailPage,
 		edit: TenantEditPage,
+	},
+	{
+		path: 'employees',
+		noun: (n: number): string => tp('entity.employee', n),
+		permission: 'view',
+		icon: IconAddressBook,
+		list: EmployeesPage,
+		add: EmployeeAddPage,
+		detail: EmployeeDetailPage,
+		edit: EmployeeEditPage,
 	},
 	{
 		path: 'sites',

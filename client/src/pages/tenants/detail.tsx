@@ -1,5 +1,6 @@
 import { createSignal, type JSX } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
+import { type EmployeeRow, fetch_employees } from '../../api/employees'
 import { fetch_racks, type RackRow } from '../../api/racks'
 import {
 	delete_tenant,
@@ -23,12 +24,14 @@ import {
 import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
 import { createRecord, createRowsFor } from '../../lib/resource'
+import { EmailLink } from '../employees/list'
 import { TenantIntegrationCards } from '../integrations/cards'
 import { rackHeightColumn } from '../racks/columns'
 
 /**
  * /tenants/:id — tenant detail: header with description/comments, the
- * integration cards, and the related sites/site groups/racks/devices tables.
+ * integration cards, and the related employees/sites/site groups/racks/devices
+ * tables.
  */
 export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -45,6 +48,11 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	)
 	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ tenant: key }), setError)
 	const [devices] = createRowsFor(id, (key: number) => fetch_devices({ tenant: key }), setError)
+	const [employees] = createRowsFor(
+		id,
+		(key: number) => fetch_employees({ tenant: key }),
+		setError,
+	)
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.tenant',
@@ -82,6 +90,28 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 				<TenantIntegrationCards tenantId={props.id} />
 			</DetailShell>
+
+			<RelatedSection
+				id="tenant-employees"
+				title={tp('entity.employee', 2)}
+				noun="noun.employee"
+				rows={employees}
+				emptyText={t('tenant.noEmployees')}
+				viewAllHref={`/employees?tenant=${props.id}`}
+				columns={[
+					nameColumn<EmployeeRow>(t('common.name'), '/employees'),
+					{
+						key: 'title',
+						label: t('employee.title'),
+						getValue: (e: EmployeeRow): string => e.title ?? '—',
+					},
+					{
+						key: 'email',
+						label: t('employee.email'),
+						getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={e.email} />,
+					},
+				]}
+			/>
 
 			<RelatedSection
 				id="tenant-sites"

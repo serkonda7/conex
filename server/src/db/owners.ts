@@ -5,7 +5,7 @@
  * fall through to the normal 404 path instead of inventing a 403.
  */
 import { eq } from 'drizzle-orm'
-import { type cables, devices, interfaces, racks, shelves } from '../schema'
+import { type cables, devices, employees, interfaces, racks, shelves } from '../schema'
 import { getDb } from './connection'
 
 type Tenant = number | null | undefined
@@ -26,6 +26,16 @@ export async function deviceTenant(deviceId: number): Promise<Tenant> {
 		.select({ tenant_id: devices.tenant_id })
 		.from(devices)
 		.where(eq(devices.id, deviceId))
+		.limit(1)
+	return rows[0]?.tenant_id
+}
+
+/** Tenant of an employee, or `undefined` when the employee is missing. */
+export async function employeeTenant(employeeId: number): Promise<number | undefined> {
+	const rows = await getDb()
+		.select({ tenant_id: employees.tenant_id })
+		.from(employees)
+		.where(eq(employees.id, employeeId))
 		.limit(1)
 	return rows[0]?.tenant_id
 }

@@ -3,6 +3,8 @@ import type {
 	DeviceInput,
 	DeviceUpdate,
 	ExternalDevice,
+	ExternalDirectory,
+	ExternalEmployee,
 	ExternalTenant,
 	ExternalTicket,
 	IntegrationProvider,
@@ -13,6 +15,7 @@ import {
 	PERIPHERY_LINK_TYPE,
 	type TanssCompany,
 	type TanssCredentials,
+	type TanssEmployee,
 	type TanssPc,
 	type TanssPeriphery,
 	TanssSession,
@@ -27,6 +30,24 @@ function toTenant(company: TanssCompany): ExternalTenant {
 		active: company.active,
 		private: company.private,
 		headquarter_id: company.headquarterId === null ? null : String(company.headquarterId),
+	}
+}
+
+function toEmployee(employee: TanssEmployee): ExternalEmployee {
+	const companyIds = employee.companyIds.map(String)
+	return {
+		external_id: String(employee.id),
+		external_tenant_id: companyIds[0] ?? null,
+		external_tenant_ids: companyIds,
+		name: [employee.firstName, employee.lastName].filter((p) => p !== null).join(' '),
+		first_name: employee.firstName,
+		last_name: employee.lastName,
+		salutation: employee.salutation,
+		title: employee.title,
+		email: employee.email,
+		phone: employee.phone,
+		mobile: employee.mobile,
+		active: employee.active,
 	}
 }
 
@@ -129,7 +150,8 @@ function manufacturerIdOf(
 
 /**
  * TANSS: tenant ↔ company (branches are companies of their own), device ↔
- * PC/server or periphery. Components are out of scope for now.
+ * PC/server or periphery, employee ↔ employee (contact person) of the
+ * company. Components are out of scope for now.
  */
 export class TanssProvider implements IntegrationProvider {
 	readonly id = 'tanss' as const
@@ -146,16 +168,19 @@ export class TanssProvider implements IntegrationProvider {
 		if (Result.isError(login)) {
 			return login
 		}
-		const companies = await this.session.listCompanies()
-		if (Result.isError(companies)) {
-			return Result.err(new Error(`ERP token rejected: ${companies.error.message}`))
+		const customers = await this.session.listCustomers()
+		if (Result.isError(customers)) {
+			return Result.err(new Error(`ERP token rejected: ${customers.error.message}`))
 		}
 		return Result.ok(undefined)
 	}
 
-	async listTenants(modifiedSince?: number): Promise<Result<ExternalTenant[], Error>> {
-		const res = await this.session.listCompanies(modifiedSince)
-		return res.map((companies) => companies.map(toTenant))
+	async listTenants(modifiedSince?: number): Promise<Result<ExternalDirectory, Error>> {
+		const res = await this.session.listCustomers(modifiedSince)
+		return res.map(({ companies, employees }) => ({
+			tenants: companies.map(toTenant),
+			employees: employees.map(toEmployee),
+		}))
 	}
 
 	async fetchDevices(externalTenantId: string): Promise<Result<ExternalDevice[], Error>> {

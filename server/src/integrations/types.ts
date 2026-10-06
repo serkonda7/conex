@@ -1,6 +1,7 @@
 import type { Result } from 'better-result'
 import type {
 	ExternalDeviceJson,
+	ExternalEmployeeJson,
 	ExternalPushField,
 	ExternalTenantJson,
 	ExternalTicketJson,
@@ -9,6 +10,7 @@ import type {
 
 export type {
 	ExternalDeviceJson as ExternalDevice,
+	ExternalEmployeeJson as ExternalEmployee,
 	ExternalTenantJson as ExternalTenant,
 	ExternalTicketJson as ExternalTicket,
 }
@@ -24,7 +26,11 @@ export interface IntegrationProvider {
 	tenantCardinality: 'one' | 'many'
 	/** Logs in with every stored credential; used before saving. */
 	verify(): Promise<Result<void, Error>>
-	listTenants(modifiedSince?: number): Promise<Result<ExternalTenantJson[], Error>>
+	/**
+	 * Tenants plus their employees. With `modifiedSince` only records
+	 * changed since then (both lists come from one call in TANSS).
+	 */
+	listTenants(modifiedSince?: number): Promise<Result<ExternalDirectory, Error>>
 	fetchDevices(externalTenantId: string): Promise<Result<ExternalDeviceJson[], Error>>
 	/** Opens a ticket and returns its external id; absent without a ticket system. */
 	createTicket?(input: TicketInput): Promise<Result<number, Error>>
@@ -37,6 +43,12 @@ export interface IntegrationProvider {
 		externalId: string,
 		changes: DeviceUpdate,
 	): Promise<Result<ExternalDeviceJson, Error>>
+}
+
+export interface ExternalDirectory {
+	tenants: ExternalTenantJson[]
+	/** Empty for providers without employees. */
+	employees: ExternalEmployeeJson[]
 }
 
 /** Manufacturer is matched by name like on create. */

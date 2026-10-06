@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import {
 	type AnyPgColumn,
 	bigint,
@@ -9,7 +10,7 @@ import {
 	text,
 	uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { DEVICE_ROLE_ICONS, LOCATION_TYPES } from 'shared/src/schemas'
+import { DEVICE_ROLE_ICONS, EMPLOYEE_SALUTATIONS, LOCATION_TYPES } from 'shared/src/schemas'
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
@@ -197,6 +198,42 @@ export const locations = pgTable(
 		index('locations_site_id_idx').on(table.site_id),
 		index('locations_parent_id_idx').on(table.parent_id),
 		uniqueIndex('locations_sibling_slug_idx').on(table.site_id, table.parent_id, table.slug),
+	],
+)
+
+// Employees: contact persons of a tenant (NetBox-style contacts). Every
+// employee belongs to exactly one tenant; tenant delete is blocked while
+// employees reference it (service layer), so the FK carries no cascade.
+// `active` is 0/1 like the other flags; inactive employees stay listed but
+// are never reported as missing in an external system. `name` is generated
+// from first + last name, so lists, search and the changelog treat employees
+// like every other named row.
+export const employees = pgTable(
+	'employees',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		tenant_id: integer('tenant_id')
+			.notNull()
+			.references(() => tenants.id),
+		first_name: text('first_name'),
+		last_name: text('last_name').notNull(),
+		name: text('name')
+			.notNull()
+			.generatedAlwaysAs(sql`btrim(coalesce(first_name, '') || ' ' || last_name)`),
+		// `mr` (Herr) / `ms` (Frau); null when unknown.
+		salutation: text('salutation', { enum: EMPLOYEE_SALUTATIONS }),
+		// Job title / function (`Managing director`, …).
+		title: text('title'),
+		email: text('email'),
+		phone: text('phone'),
+		mobile: text('mobile'),
+		active: integer('active').notNull().default(1),
+		description: text('description'),
+		comments: text('comments'),
+	},
+	(table) => [
+		index('employees_tenant_id_idx').on(table.tenant_id),
+		index('employees_name_idx').on(table.name),
 	],
 )
 
@@ -471,7 +508,7 @@ export const cables = pgTable(
 // AES-GCM encrypted with a key derived from `auth.appKey` (`keys.ts`) and
 // never leave the server. `external_links` maps conex tenants/devices to
 // external ids for every provider; `entity_id` is polymorphic (no FK), so
-// tenant/device deletes remove their links in the service layer.
+// tenant/device/employee deletes remove their links in the service layer.
 // `external_objects` is the last fetched snapshot the report runs against.
 // ---------------------------------------------------------------------------
 
@@ -505,7 +542,7 @@ export const external_links = pgTable(
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		provider: text('provider').notNull(),
-		// `tenant` | `device` (service-enforced).
+		// `tenant` | `device` | `employee` (service-enforced).
 		entity_type: text('entity_type').notNull(),
 		// conex id; NULL when `state = 'ignored'`.
 		entity_id: integer('entity_id'),
@@ -531,11 +568,12 @@ export const external_objects = pgTable(
 	'external_objects',
 	{
 		provider: text('provider').notNull(),
-		// `tenant` | `device`.
+		// `tenant` | `device` | `employee`.
 		object_type: text('object_type').notNull(),
 		external_id: text('external_id').notNull(),
 		external_tenant_id: text('external_tenant_id'),
-		// Normalized record (`ExternalTenantJson` / `ExternalDeviceJson`).
+		// Normalized record (`ExternalTenantJson` / `ExternalDeviceJson` /
+		// `ExternalEmployeeJson`).
 		data: jsonb('data').notNull(),
 		fetched_at: bigint('fetched_at', { mode: 'number' }).notNull(),
 	},

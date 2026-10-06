@@ -5,6 +5,7 @@ import { type Context, Hono } from 'hono'
 import {
 	ExternalDeviceCreateSchema,
 	ExternalDeviceUpdateSchema,
+	ExternalEmployeeImportSchema,
 	ExternalIgnoreLocalSchema,
 	ExternalIgnoreSchema,
 	ExternalLinkCreateSchema,
@@ -34,9 +35,10 @@ import {
 	requirePermission,
 } from '../authz'
 import { exists } from '../db/list'
-import { deviceTenant } from '../db/owners'
-import { deviceBoard, tenantBoard } from '../integrations/board'
+import { deviceTenant, employeeTenant } from '../db/owners'
+import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
 import { createExternalDevice } from '../integrations/create_device'
+import { importExternalEmployees } from '../integrations/import_employees'
 import {
 	deleteLink,
 	getLink,
@@ -47,8 +49,8 @@ import {
 	listLinks,
 	setLink,
 } from '../integrations/links'
-import { buildReport, deviceStatus, tenantStatus } from '../integrations/report'
-import { readDevice, readTenant, readTenants } from '../integrations/snapshot'
+import { buildReport, deviceStatus, employeeStatus, tenantStatus } from '../integrations/report'
+import { readDevice, readEmployee, readTenant, readTenants } from '../integrations/snapshot'
 import {
 	createIntegration,
 	deleteIntegration,
@@ -97,38 +99,63 @@ async function loadDeviceTenant(c: Context, deviceId: number): Promise<number | 
 	return checkTenant(c, tenant) ?? tenant
 }
 
+/** Tenant of an employee in the requester's scope, or the 404/403 response. */
+async function loadEmployeeTenant(c: Context, employeeId: number): Promise<number | Response> {
+	const tenant = await employeeTenant(employeeId)
+	if (tenant === undefined) {
+		return notFound(c, 'Employee not found')
+	}
+	return checkTenant(c, tenant) ?? tenant
+}
+
 /**
- * Write gate for an ignored external device (no conex device to scope by):
- * scoped editors may only touch devices of the company linked to their
- * own tenant.
+ * Write gate for an external device or employee (an ignored one has no
+ * conex object to scope by): scoped editors may only touch objects of the
+ * company linked to their own tenant. Employees may belong to several
+ * companies; any of them counts.
  */
-async function checkExternalDeviceWrite(
+async function checkExternalWrite(
 	c: Context,
 	provider: ProviderId,
-	externalTenantId: string | null,
+	externalTenantIds: string | null | string[],
 ): Promise<Response | null> {
 	const scope = requestScope(c)
 	if (scope === undefined) {
 		return null
 	}
 	const own = await linkOf(provider, 'tenant', scope)
-	if (!own || externalTenantId === null || own.external_id !== externalTenantId) {
+	const ids = Array.isArray(externalTenantIds) ? externalTenantIds : [externalTenantIds]
+	if (!own || !ids.includes(own.external_id)) {
 		return forbidden(c)
 	}
 	return null
+}
+
+/** Company an employee link is filed under: the tenant's, when assigned to it. */
+async function employeeCompany(
+	provider: ProviderId,
+	tenantId: number,
+	externalTenantIds: string[],
+	fallback: string | null,
+): Promise<string | null> {
+	const company = await linkOf(provider, 'tenant', tenantId)
+	return company && externalTenantIds.includes(company.external_id)
+		? company.external_id
+		: fallback
 }
 
 /**
  * Integrations: `integrations.manage` configures and lists providers
  * (credentials verified before saving, secrets never returned), runs syncs
  * and edits links; the reports and boards only need `view`. Links of
- * tenants are global-write like tenants themselves; device links follow the
- * device's tenant scope.
+ * tenants are global-write like tenants themselves; device and employee
+ * links follow the object's tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers. `tickets.create` opens tickets for tenants in scope and lists
  * their open tickets.
- * `integrations.manage` may also create conex devices in the external system
- * and overwrite external device fields with conex values.
+ * `integrations.manage` may also create conex devices in the external system,
+ * overwrite external device fields with conex values and (with `edit`)
+ * import external employees into conex.
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
@@ -342,10 +369,15 @@ export const integrationsApp = new Hono()
 			}
 			const tenantId = query.tenant ?? requestScope(c)
 			if (tenantId === undefined) {
-				return jsonError(c, 'tenant is required for the device board', 400)
+				return jsonError(c, `tenant is required for the ${query.entity_type} board`, 400)
 			}
 			return (
-				(await checkTenantRow(c, tenantId)) ?? c.json(await deviceBoard(provider, tenantId))
+				(await checkTenantRow(c, tenantId)) ??
+				c.json(
+					query.entity_type === 'employee'
+						? await employeeBoard(provider, tenantId)
+						: await deviceBoard(provider, tenantId),
+				)
 			)
 		},
 	)
@@ -377,6 +409,23 @@ export const integrationsApp = new Hono()
 				return tenant
 			}
 			return c.json(await deviceStatus(provider, id, tenant))
+		},
+	)
+	.get(
+		'/:provider/employee-status/:id',
+		requirePermissionMiddleware('view'),
+		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
+		async (c) => {
+			const { provider, id } = c.req.valid('param')
+			const missing = await requireConfigured(c, provider)
+			if (missing) {
+				return missing
+			}
+			const tenant = await loadEmployeeTenant(c, id)
+			if (tenant instanceof Response) {
+				return tenant
+			}
+			return c.json(await employeeStatus(provider, id, tenant))
 		},
 	)
 	.put(
@@ -411,6 +460,37 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
+			if (input.entity_type === 'employee') {
+				const tenant = await loadEmployeeTenant(c, input.entity_id)
+				if (tenant instanceof Response) {
+					return tenant
+				}
+				const external = await readEmployee(provider, input.external_id)
+				if (!external) {
+					return notFound(c, 'External employee not found')
+				}
+				const externalDenied = await checkExternalWrite(
+					c,
+					provider,
+					external.external_tenant_ids,
+				)
+				if (externalDenied) {
+					return externalDenied
+				}
+				const company = await employeeCompany(
+					provider,
+					tenant,
+					external.external_tenant_ids,
+					external.external_tenant_id,
+				)
+				const res = await setLink(
+					provider,
+					{ ...input, external_tenant_id: company },
+					'manual',
+					userId,
+				)
+				return sendResult(c, res.map(linkJson))
+			}
 			const tenant = await loadDeviceTenant(c, input.entity_id)
 			if (tenant instanceof Response) {
 				return tenant
@@ -419,7 +499,7 @@ export const integrationsApp = new Hono()
 			if (!external) {
 				return notFound(c, 'External device not found')
 			}
-			const externalDenied = await checkExternalDeviceWrite(
+			const externalDenied = await checkExternalWrite(
 				c,
 				provider,
 				external.external_tenant_id,
@@ -466,11 +546,44 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
+			if (input.entity_type === 'employee') {
+				const external = await readEmployee(provider, input.external_id)
+				if (!external) {
+					return notFound(c, 'External employee not found')
+				}
+				const externalDenied = await checkExternalWrite(
+					c,
+					provider,
+					external.external_tenant_ids,
+				)
+				if (externalDenied) {
+					return externalDenied
+				}
+				// Filed under the scoped user's company, so they can restore it.
+				const scope = requestScope(c)
+				const company =
+					scope === undefined
+						? external.external_tenant_id
+						: await employeeCompany(
+								provider,
+								scope,
+								external.external_tenant_ids,
+								external.external_tenant_id,
+							)
+				const res = await ignoreExternal(
+					provider,
+					'employee',
+					external.external_id,
+					company,
+					userId,
+				)
+				return sendResult(c, res.map(linkJson))
+			}
 			const external = await readDevice(provider, input.external_id)
 			if (!external) {
 				return notFound(c, 'External device not found')
 			}
-			const externalDenied = await checkExternalDeviceWrite(
+			const externalDenied = await checkExternalWrite(
 				c,
 				provider,
 				external.external_tenant_id,
@@ -500,25 +613,24 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			const tenant = await loadDeviceTenant(c, input.entity_id)
+			const tenant =
+				input.entity_type === 'employee'
+					? await loadEmployeeTenant(c, input.entity_id)
+					: await loadDeviceTenant(c, input.entity_id)
 			if (tenant instanceof Response) {
 				return tenant
 			}
 			const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
 			if (!tenantLink) {
-				return jsonError(c, "The device's tenant is not linked yet", 400)
+				return jsonError(c, `The ${input.entity_type}'s tenant is not linked yet`, 400)
 			}
-			const externalDenied = await checkExternalDeviceWrite(
-				c,
-				provider,
-				tenantLink.external_id,
-			)
+			const externalDenied = await checkExternalWrite(c, provider, tenantLink.external_id)
 			if (externalDenied) {
 				return externalDenied
 			}
 			const res = await ignoreLocal(
 				provider,
-				'device',
+				input.entity_type,
 				input.entity_id,
 				tenantLink.external_id,
 				userId,
@@ -545,11 +657,7 @@ export const integrationsApp = new Hono()
 			if (!tenantLink) {
 				return jsonError(c, "The device's tenant is not linked yet", 400)
 			}
-			const externalDenied = await checkExternalDeviceWrite(
-				c,
-				provider,
-				tenantLink.external_id,
-			)
+			const externalDenied = await checkExternalWrite(c, provider, tenantLink.external_id)
 			if (externalDenied) {
 				return externalDenied
 			}
@@ -578,15 +686,29 @@ export const integrationsApp = new Hono()
 			if (!link) {
 				return jsonError(c, 'Device is not linked', 400)
 			}
-			const externalDenied = await checkExternalDeviceWrite(
-				c,
-				provider,
-				link.external_tenant_id,
-			)
+			const externalDenied = await checkExternalWrite(c, provider, link.external_tenant_id)
 			if (externalDenied) {
 				return externalDenied
 			}
 			return sendResult(c, await updateExternalDevice(provider, input.device_id, input.field))
+		},
+	)
+	.post(
+		'/:provider/employees',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalEmployeeImportSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const input = c.req.valid('json')
+			// Imports create inventory, so they need `edit` as well.
+			const denied =
+				requirePermission(c, 'integrations.manage') ??
+				requirePermission(c, 'edit') ??
+				(await checkTenantRow(c, input.tenant_id))
+			if (denied) {
+				return denied
+			}
+			return sendCreated(c, await importExternalEmployees(provider, input, requestUser(c).id))
 		},
 	)
 	.delete(
@@ -610,12 +732,16 @@ export const integrationsApp = new Hono()
 					return denied
 				}
 				if (row.entity_id !== null) {
-					const scopeDenied = checkTenant(c, (await deviceTenant(row.entity_id)) ?? null)
+					const owner =
+						row.entity_type === 'employee'
+							? await employeeTenant(row.entity_id)
+							: await deviceTenant(row.entity_id)
+					const scopeDenied = checkTenant(c, owner ?? null)
 					if (scopeDenied) {
 						return scopeDenied
 					}
 				} else {
-					const externalDenied = await checkExternalDeviceWrite(
+					const externalDenied = await checkExternalWrite(
 						c,
 						provider,
 						row.external_tenant_id,

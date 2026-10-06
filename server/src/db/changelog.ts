@@ -66,6 +66,7 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 	switch (objectType) {
 		case 'tenant':
 			return row.id
+		case 'employee':
 		case 'site_group':
 		case 'site':
 		case 'location':

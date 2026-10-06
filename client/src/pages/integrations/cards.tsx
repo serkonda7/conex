@@ -1,15 +1,24 @@
 /**
- * Integration cards on the tenant and device detail pages: one card per
- * configured provider with the linked external object, link/unlink actions
- * and (tenants) finding counts or (devices) a field comparison.
+ * Integration cards on the tenant, device and employee detail pages: one
+ * card per configured provider with the linked external object, link/unlink
+ * actions and (tenants) finding counts or (devices, employees) a field
+ * comparison.
  */
 import { Result } from 'better-result'
-import type { ExternalDeviceJson, FieldComparison, FindingKind } from 'shared/src/schemas'
+import type {
+	ExternalDeviceJson,
+	ExternalEmployeeJson,
+	ExternalLinkJson,
+	ExternalTenantJson,
+	FieldComparison,
+	FindingKind,
+} from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import {
 	type ExternalTenantListItem,
 	fetch_device_integration,
+	fetch_employee_integration,
 	fetch_integrations,
 	fetch_tenant_integration,
 	type IntegrationJson,
@@ -20,7 +29,12 @@ import {
 import { InlineError } from '../../components/feedback'
 import { SelectField } from '../../components/form'
 import { t } from '../../i18n'
-import { compareFieldLabel, findingKindLabel, providerLabel } from '../../i18n/labels'
+import {
+	compareFieldLabel,
+	compareValueLabel,
+	findingKindLabel,
+	providerLabel,
+} from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import { can, canGlobal } from '../../lib/session'
 import { ExternalTenantPicker } from './external_tenant_picker'
@@ -202,22 +216,50 @@ function deviceLabel(d: ExternalDeviceJson): string {
 
 /** Value of an equal (or one-sided) field comparison. */
 function fieldText(cmp: FieldComparison, provider: string): string {
-	if (cmp.local !== null && cmp.remote === null) {
-		return t('integration.onlyLocal', { value: cmp.local })
+	const local = compareValueLabel(cmp.field, cmp.local)
+	const remote = compareValueLabel(cmp.field, cmp.remote)
+	if (local !== null && remote === null) {
+		return t('integration.onlyLocal', { value: local })
 	}
-	if (cmp.local === null && cmp.remote !== null) {
-		return t('integration.onlyRemote', { provider, value: cmp.remote })
+	if (local === null && remote !== null) {
+		return t('integration.onlyRemote', { provider, value: remote })
 	}
-	return cmp.local ?? '—'
+	return local ?? '—'
 }
 
-function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): JSX.Element {
+/** Link status of a device or employee, as the status endpoints return it. */
+interface LinkedStatus<E extends { external_id: string; name: string; active: boolean }> {
+	link: ExternalLinkJson | null
+	external: E | null
+	fields: FieldComparison[]
+	external_tenant: ExternalTenantJson | null
+	candidates: E[]
+}
+
+/**
+ * Card of one linked object (device or employee): the linked external
+ * object with a field comparison, or a picker over the unlinked external
+ * objects of the tenant's company.
+ */
+function LinkedObjectCard<E extends { external_id: string; name: string; active: boolean }>(props: {
+	integration: IntegrationJson
+	entityType: 'device' | 'employee'
+	id: number
+	load: (
+		provider: IntegrationJson['provider'],
+		id: number,
+	) => Promise<Result<LinkedStatus<E>, Error>>
+	notLinkedText: string
+	pickText: string
+	staleText: (externalId: string) => string
+	candidateLabel: (candidate: E) => string
+}): JSX.Element {
 	const provider = (): IntegrationJson['provider'] => props.integration.provider
 	const [error, setError] = createSignal<string | null>(null)
 	const [candidate, setCandidate] = createSignal('')
 	const [status, { refetch }] = createRecord(
-		() => props.deviceId,
-		(id: number) => fetch_device_integration(provider(), id),
+		() => props.id,
+		(id: number) => props.load(provider(), id),
 		setError,
 	)
 
@@ -257,26 +299,31 @@ function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): 
 						when={status()?.external_tenant}
 						fallback={<p class="empty">{t('integration.tenantNotLinked')}</p>}
 					>
-						<p class="empty">{t('integration.deviceNotLinked')}</p>
+						<p class="empty">{props.notLinkedText}</p>
 						<Show
 							when={
 								can('integrations.manage') && (status()?.candidates.length ?? 0) > 0
 							}
 						>
 							<SelectField
-								id={`integration-${provider()}-device-link`}
+								id={`integration-${provider()}-${props.entityType}-link`}
 								label={t('integration.linkTo')}
 								value={candidate()}
 								onChange={(value: string) => {
 									setCandidate(value)
 									void run(() =>
-										link_external(provider(), 'device', props.deviceId, value),
+										link_external(
+											provider(),
+											props.entityType,
+											props.id,
+											value,
+										),
 									)
 								}}
-								emptyLabel={t('integration.pickDevice')}
-								options={(status()?.candidates ?? []).map((d) => ({
-									value: d.external_id,
-									label: deviceLabel(d),
+								emptyLabel={props.pickText}
+								options={(status()?.candidates ?? []).map((c) => ({
+									value: c.external_id,
+									label: props.candidateLabel(c),
 								}))}
 							/>
 						</Show>
@@ -287,9 +334,7 @@ function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): 
 					when={status()?.external}
 					fallback={
 						<p class="text-danger">
-							{t('integration.staleDevice', {
-								id: status()?.link?.external_id ?? '',
-							})}
+							{props.staleText(status()?.link?.external_id ?? '')}
 						</p>
 					}
 				>
@@ -314,9 +359,13 @@ function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): 
 										>
 											<span class="text-danger">
 												{t('integration.valueMismatch', {
-													local: cmp.local ?? '—',
+													local:
+														compareValueLabel(cmp.field, cmp.local) ??
+														'—',
 													provider: providerLabel(provider()),
-													remote: cmp.remote ?? '—',
+													remote:
+														compareValueLabel(cmp.field, cmp.remote) ??
+														'—',
 												})}
 											</span>
 										</Show>
@@ -329,6 +378,59 @@ function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): 
 			</Show>
 			<InlineError message={error()} />
 		</section>
+	)
+}
+
+function DeviceCard(props: { integration: IntegrationJson; deviceId: number }): JSX.Element {
+	return (
+		<LinkedObjectCard
+			integration={props.integration}
+			entityType="device"
+			id={props.deviceId}
+			load={fetch_device_integration}
+			notLinkedText={t('integration.deviceNotLinked')}
+			pickText={t('integration.pickDevice')}
+			staleText={(id: string) => t('integration.staleDevice', { id })}
+			candidateLabel={deviceLabel}
+		/>
+	)
+}
+
+function employeeLabel(e: ExternalEmployeeJson): string {
+	const parts = [e.name]
+	if (e.email !== null) {
+		parts.push(`(${e.email})`)
+	}
+	if (!e.active) {
+		parts.push(`· ${t('integration.inactive')}`)
+	}
+	return parts.join(' ')
+}
+
+function EmployeeCard(props: { integration: IntegrationJson; employeeId: number }): JSX.Element {
+	return (
+		<LinkedObjectCard
+			integration={props.integration}
+			entityType="employee"
+			id={props.employeeId}
+			load={fetch_employee_integration}
+			notLinkedText={t('integration.employeeNotLinked')}
+			pickText={t('integration.pickEmployee')}
+			staleText={(id: string) => t('integration.staleEmployee', { id })}
+			candidateLabel={employeeLabel}
+		/>
+	)
+}
+
+/** Integration cards for `/employees/:id`. */
+export function EmployeeIntegrationCards(props: { employeeId: number }): JSX.Element {
+	const integrations = useIntegrations()
+	return (
+		<For each={integrations()}>
+			{(integration: IntegrationJson): JSX.Element => (
+				<EmployeeCard integration={integration} employeeId={props.employeeId} />
+			)}
+		</For>
 	)
 }
 

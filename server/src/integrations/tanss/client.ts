@@ -18,6 +18,7 @@ import { resolve } from 'node:path'
 import { Result } from 'better-result'
 import {
 	type Customer,
+	type CustomerEmployee,
 	type CustomersCombine,
 	createErpClient,
 	createTanssClient,
@@ -57,6 +58,28 @@ export interface TanssCompany {
 	/** Private person, not a business customer. */
 	private: boolean
 	headquarterId: number | null
+}
+
+/** Employee (contact person) row of the ERP customer list. */
+export interface TanssEmployee {
+	id: number
+	firstName: string | null
+	lastName: string
+	/** `Herr` → `mr`, `Frau …` → `ms`; null for any other salutation. */
+	salutation: 'mr' | 'ms' | null
+	title: string | null
+	email: string | null
+	phone: string | null
+	mobile: string | null
+	active: boolean
+	/** Preferred company first, then the other assigned ones (deduplicated). */
+	companyIds: number[]
+}
+
+/** Companies and their employees, as the ERP customer list returns them. */
+export interface TanssCustomers {
+	companies: TanssCompany[]
+	employees: TanssEmployee[]
 }
 
 export type TanssPc = TnsPersonalComputerWithDetails
@@ -292,6 +315,52 @@ function toCompany(raw: Customer): TanssCompany | null {
 	}
 }
 
+/** `Herr` → `mr`, `Frau` / `Frau Dr.` → `ms`, anything else unknown. */
+function salutationOf(raw: unknown): 'mr' | 'ms' | null {
+	const word = str(raw)?.split(/\s+/)[0]?.toLowerCase()
+	return word === 'herr' || word === 'mr' ? 'mr' : word === 'frau' || word === 'ms' ? 'ms' : null
+}
+
+/**
+ * Rows without id or any name are skipped. `name` is the last name in
+ * TANSS and stands in for a missing `last_name`; a first name alone becomes
+ * the last name. Company id 0 means "no preferred company".
+ */
+function toEmployee(raw: CustomerEmployee): TanssEmployee | null {
+	const id = num(raw.id)
+	let firstName = str(raw.first_name)
+	let lastName = str(raw.last_name) ?? str(raw.name)
+	if (lastName === null) {
+		lastName = firstName
+		firstName = null
+	}
+	if (id === null || lastName === null) {
+		return null
+	}
+	const companyIds: number[] = []
+	for (const candidate of [
+		raw.preferred_customer?.id,
+		...(raw.assigned_to_customers ?? []).map((c) => c.id),
+	]) {
+		const companyId = num(candidate)
+		if (companyId !== null && companyId !== 0 && !companyIds.includes(companyId)) {
+			companyIds.push(companyId)
+		}
+	}
+	return {
+		id,
+		firstName,
+		lastName,
+		salutation: salutationOf(raw.salutation),
+		title: str(raw.function),
+		email: str(raw.email),
+		phone: str(raw.phone_number_1) ?? str(raw.phone_number_2),
+		mobile: str(raw.mobile_number_1) ?? str(raw.mobile_number_2),
+		active: raw.active !== false,
+		companyIds,
+	}
+}
+
 function listContent(data: unknown): unknown[] {
 	if (Array.isArray(data)) {
 		return data
@@ -348,8 +417,11 @@ export class TanssSession {
 		return Result.err(new TanssApiError(`TANSS ${what} failed: unauthorized`, 401))
 	}
 
-	/** All companies on the first sync; changed companies on later syncs. */
-	async listCompanies(modifiedSince?: number): Promise<Result<TanssCompany[], Error>> {
+	/**
+	 * All companies and employees on the first sync; changed ones on later
+	 * syncs.
+	 */
+	async listCustomers(modifiedSince?: number): Promise<Result<TanssCustomers, Error>> {
 		const res = await call('customer list', async () => ({
 			data:
 				modifiedSince === undefined
@@ -368,14 +440,22 @@ export class TanssSession {
 		if (Result.isError(dump)) {
 			return dump
 		}
+		const data = res.value as CustomersCombine
 		const companies: TanssCompany[] = []
-		for (const raw of (res.value as CustomersCombine).customers ?? []) {
+		for (const raw of data.customers ?? []) {
 			const company = toCompany(raw)
 			if (company) {
 				companies.push(company)
 			}
 		}
-		return Result.ok(companies)
+		const employees: TanssEmployee[] = []
+		for (const raw of data.employees ?? []) {
+			const employee = toEmployee(raw)
+			if (employee) {
+				employees.push(employee)
+			}
+		}
+		return Result.ok({ companies, employees })
 	}
 
 	/** PCs and servers of exactly one company (branches are their own tenants). */

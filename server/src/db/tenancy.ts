@@ -16,6 +16,7 @@ import {
 } from 'shared/src/schemas'
 import {
 	devices,
+	employees,
 	external_links,
 	locations,
 	racks,
@@ -417,6 +418,11 @@ export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>
 		],
 		[racks, eq(racks.tenant_id, id), 'Tenant still has racks; move or delete them first'],
 		[devices, eq(devices.tenant_id, id), 'Tenant still has devices; move or delete them first'],
+		[
+			employees,
+			eq(employees.tenant_id, id),
+			'Tenant still has employees; move or delete them first',
+		],
 		[users, eq(users.tenant_id, id), 'Tenant still has users; reassign them before deleting'],
 	])
 	if (Result.isError(blocked)) {

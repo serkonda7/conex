@@ -4,7 +4,8 @@ import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
 	type IntegrationProvider,
 	ignore_external,
-	ignore_local_device,
+	ignore_local,
+	import_external_employees,
 	type LinkBoard,
 	type LinkBoardExternal,
 	type LinkBoardLocal,
@@ -14,6 +15,7 @@ import {
 import { t, tp } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { goTo } from '../../lib/router'
+import { can } from '../../lib/session'
 
 type Side = 'local' | 'external'
 
@@ -57,10 +59,14 @@ function detailText(...values: (string | null)[]): string {
  * likely partners first on the other side. Linked rows stay visible after unlinked ones; ignored rows
  * are hidden unless toggled on, so both lists shrink while working. Changes
  * show immediately and are reconciled with the server's board afterwards.
+ * The employee board can also import every open external employee into
+ * conex at once.
  */
 export function LinkBoardView(props: {
 	provider: IntegrationProvider
 	board: LinkBoard
+	/** conex tenant of a device/employee board. */
+	tenant_id?: number
 	editable: boolean
 	on_error: (message: string | null) => void
 	/** Reloads the board from the server. */
@@ -95,8 +101,17 @@ export function LinkBoardView(props: {
 	)
 
 	const provider = (): string => providerLabel(props.provider)
-	const isDevice = (): boolean => props.board.entity_type === 'device'
-	const localPath = (id: number): string => `/${isDevice() ? 'devices' : 'tenants'}/${id}`
+	/** Device and employee boards can ignore conex rows as missing externally. */
+	const ignoresLocal = (): boolean => props.board.entity_type !== 'tenant'
+	const localPath = (id: number): string => {
+		const base =
+			props.board.entity_type === 'device'
+				? 'devices'
+				: props.board.entity_type === 'employee'
+					? 'employees'
+					: 'tenants'
+		return `/${base}/${id}`
+	}
 
 	const localById = createMemo(() => new Map(props.board.local.map((r) => [r.id, r])))
 	const externalById = createMemo(
@@ -270,11 +285,52 @@ export function LinkBoardView(props: {
 		props.on_changed()
 	}
 
-	async function ignoreLocal(deviceId: number): Promise<void> {
+	async function ignoreLocal(localId: number): Promise<void> {
+		const entityType = props.board.entity_type
+		if (entityType === 'tenant') {
+			return
+		}
 		props.on_error(null)
 		setPicked(null)
-		setIgnoredLocal((prev) => new Set(prev).add(deviceId))
-		const res = await ignore_local_device(props.provider, deviceId)
+		setIgnoredLocal((prev) => new Set(prev).add(localId))
+		const res = await ignore_local(props.provider, entityType, localId)
+		if (Result.isError(res)) {
+			props.on_error(res.error.message)
+		}
+		props.on_changed()
+	}
+
+	/**
+	 * Active external employees still open and not suggested for a conex
+	 * row: what "Import" would create (suggestions are linked instead).
+	 */
+	const importable = createMemo(() => {
+		if (props.board.entity_type !== 'employee') {
+			return []
+		}
+		const suggested = new Set(suggestions().map(([, externalId]) => externalId))
+		return openExternal().filter((r) => r.active && !suggested.has(r.external_id))
+	})
+
+	async function importAll(): Promise<void> {
+		const tenantId = props.tenant_id
+		const rows = importable()
+		if (
+			tenantId === undefined ||
+			rows.length === 0 ||
+			!window.confirm(tp('integration.confirmImportEmployees', rows.length))
+		) {
+			return
+		}
+		props.on_error(null)
+		setPicked(null)
+		setBusy(true)
+		const res = await import_external_employees(
+			props.provider,
+			tenantId,
+			rows.map((r) => r.external_id),
+		)
+		setBusy(false)
 		if (Result.isError(res)) {
 			props.on_error(res.error.message)
 		}
@@ -377,7 +433,7 @@ export function LinkBoardView(props: {
 		const suggested = suggestionOf().get(row.id)
 		if (suggested === undefined) {
 			return (
-				<Show when={props.editable && isDevice()}>
+				<Show when={props.editable && ignoresLocal()}>
 					<button
 						type="button"
 						class="btn-small"
@@ -402,7 +458,7 @@ export function LinkBoardView(props: {
 						{t('integration.confirmLink')}
 					</button>
 				</Show>
-				<Show when={props.editable && isDevice()}>
+				<Show when={props.editable && ignoresLocal()}>
 					<button
 						type="button"
 						class="btn-small"
@@ -544,6 +600,15 @@ export function LinkBoardView(props: {
 							onClick={() => void linkPairs(suggestions())}
 						>
 							{tp('integration.linkSuggestions', suggestions().length)}
+						</button>
+					</Show>
+					<Show
+						when={
+							can('edit') && props.tenant_id !== undefined && importable().length > 0
+						}
+					>
+						<button type="button" disabled={busy()} onClick={() => void importAll()}>
+							{tp('integration.importEmployees', importable().length)}
 						</button>
 					</Show>
 				</Show>

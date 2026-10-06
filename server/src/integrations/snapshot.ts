@@ -1,18 +1,18 @@
 /**
- * `external_objects`: the last fetched state of each external tenant and
- * device. The report and the link pickers read from here, so they work
- * without calling the external system on every page load.
+ * `external_objects`: the last fetched state of each external tenant,
+ * device and employee. The report and the link pickers read from here, so
+ * they work without calling the external system on every page load.
  */
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { external_objects } from '../schema'
-import type { ExternalDevice, ExternalTenant } from './types'
+import type { ExternalDevice, ExternalEmployee, ExternalTenant } from './types'
 
 /** Rows per statement; keeps statements well under the Postgres parameter cap. */
 const CHUNK = 500
 
-type ObjectType = 'tenant' | 'device'
+type ObjectType = 'tenant' | 'device' | 'employee'
 type ObjectRow = typeof external_objects.$inferInsert
 
 function chunks<T>(items: T[]): T[][] {
@@ -43,9 +43,45 @@ function tenantRows(provider: ProviderId, tenants: ExternalTenant[], now: number
 	}))
 }
 
+function employeeRows(
+	provider: ProviderId,
+	employees: ExternalEmployee[],
+	now: number,
+): ObjectRow[] {
+	return employees.map((employee) => ({
+		provider,
+		object_type: 'employee',
+		external_id: employee.external_id,
+		external_tenant_id: employee.external_tenant_id,
+		data: employee,
+		fetched_at: now,
+	}))
+}
+
 async function insertChunked(rows: ObjectRow[]): Promise<void> {
 	for (const chunk of chunks(rows)) {
 		await getDb().insert(external_objects).values(chunk)
+	}
+}
+
+/** Inserts rows, replacing existing rows with the same key. */
+async function upsertChunked(rows: ObjectRow[]): Promise<void> {
+	for (const chunk of chunks(rows)) {
+		await getDb()
+			.insert(external_objects)
+			.values(chunk)
+			.onConflictDoUpdate({
+				target: [
+					external_objects.provider,
+					external_objects.object_type,
+					external_objects.external_id,
+				],
+				set: {
+					external_tenant_id: sql`excluded.external_tenant_id`,
+					data: sql`excluded.data`,
+					fetched_at: sql`excluded.fetched_at`,
+				},
+			})
 	}
 }
 
@@ -65,24 +101,27 @@ export async function mergeTenants(
 	changedTenants: ExternalTenant[],
 	now: number,
 ): Promise<ExternalTenant[]> {
-	for (const chunk of chunks(tenantRows(provider, changedTenants, now))) {
-		await getDb()
-			.insert(external_objects)
-			.values(chunk)
-			.onConflictDoUpdate({
-				target: [
-					external_objects.provider,
-					external_objects.object_type,
-					external_objects.external_id,
-				],
-				set: {
-					external_tenant_id: sql`excluded.external_tenant_id`,
-					data: sql`excluded.data`,
-					fetched_at: sql`excluded.fetched_at`,
-				},
-			})
-	}
+	await upsertChunked(tenantRows(provider, changedTenants, now))
 	return [...(await readTenants(provider)).values()]
+}
+
+/** Replaces the whole employee snapshot (fetched in full with the tenants). */
+export async function replaceEmployees(
+	provider: ProviderId,
+	employees: ExternalEmployee[],
+	now: number,
+): Promise<void> {
+	await getDb().delete(external_objects).where(objectsOf(provider, 'employee'))
+	await insertChunked(employeeRows(provider, employees, now))
+}
+
+/** Applies a partial employee update without dropping unchanged snapshot rows. */
+export async function mergeEmployees(
+	provider: ProviderId,
+	changedEmployees: ExternalEmployee[],
+	now: number,
+): Promise<void> {
+	await upsertChunked(employeeRows(provider, changedEmployees, now))
 }
 
 /** Replaces the device snapshot of one external tenant. */
@@ -178,6 +217,37 @@ export async function readDevices(
 	)
 }
 
+/** True once an employee snapshot was stored for the provider. */
+export async function hasEmployees(provider: ProviderId): Promise<boolean> {
+	const rows = await getDb()
+		.select({ id: external_objects.external_id })
+		.from(external_objects)
+		.where(objectsOf(provider, 'employee'))
+		.limit(1)
+	return rows.length > 0
+}
+
+/** Employees assigned to the given external tenant (all when omitted). */
+export async function readEmployees(
+	provider: ProviderId,
+	externalTenantId?: string,
+): Promise<ExternalEmployee[]> {
+	const employees = await readData<ExternalEmployee>(objectsOf(provider, 'employee'))
+	return externalTenantId === undefined
+		? employees
+		: employees.filter((e) => e.external_tenant_ids.includes(externalTenantId))
+}
+
+export async function readEmployee(
+	provider: ProviderId,
+	externalId: string,
+): Promise<ExternalEmployee | null> {
+	const [employee] = await readData<ExternalEmployee>(
+		objectsOf(provider, 'employee', eq(external_objects.external_id, externalId)),
+	)
+	return employee ?? null
+}
+
 export async function readDevice(
 	provider: ProviderId,
 	externalId: string,
@@ -194,26 +264,14 @@ export async function upsertDevice(
 	device: ExternalDevice,
 	now: number,
 ): Promise<void> {
-	await getDb()
-		.insert(external_objects)
-		.values({
+	await upsertChunked([
+		{
 			provider,
 			object_type: 'device',
 			external_id: device.external_id,
 			external_tenant_id: device.external_tenant_id,
 			data: device,
 			fetched_at: now,
-		})
-		.onConflictDoUpdate({
-			target: [
-				external_objects.provider,
-				external_objects.object_type,
-				external_objects.external_id,
-			],
-			set: {
-				external_tenant_id: sql`excluded.external_tenant_id`,
-				data: sql`excluded.data`,
-				fetched_at: sql`excluded.fetched_at`,
-			},
-		})
+		},
+	])
 }

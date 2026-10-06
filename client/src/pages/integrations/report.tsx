@@ -18,7 +18,8 @@ import {
 	fetch_link_board,
 	type IntegrationProvider,
 	ignore_external,
-	ignore_local_device,
+	ignore_local,
+	import_external_employees,
 	type LinkBoard,
 	link_external,
 	run_sync,
@@ -34,6 +35,7 @@ import { useTableColumns } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import {
 	compareFieldLabel,
+	compareValueLabel,
 	deviceStatusLabel,
 	findingKindLabel,
 	providerLabel,
@@ -68,19 +70,25 @@ function details(f: IntegrationFinding): JSX.Element {
 	if (f.field === null) {
 		return ''
 	}
-	if (f.kind === 'device_suggestion') {
+	if (f.kind === 'device_suggestion' || f.kind === 'employee_suggestion') {
 		return t('integration.matchedBy', { field: compareFieldLabel(f.field) })
 	}
-	if (f.kind !== 'device_mismatch' && f.kind !== 'tenant_customer_number_mismatch') {
+	if (
+		f.kind !== 'device_mismatch' &&
+		f.kind !== 'employee_mismatch' &&
+		f.kind !== 'tenant_customer_number_mismatch'
+	) {
 		return ''
 	}
+	const activeLabel = (value: string | null): string =>
+		value === 'active' ? t('integration.active') : t('integration.inactive')
 	const status = f.field === 'status'
-	const local = status ? deviceStatusLabel(f.local ?? '') : (f.local ?? '—')
-	const remote = status
-		? f.remote === 'active'
-			? t('integration.active')
-			: t('integration.inactive')
-		: (f.remote ?? '—')
+	const local = status
+		? f.kind === 'employee_mismatch'
+			? activeLabel(f.local)
+			: deviceStatusLabel(f.local ?? '')
+		: (compareValueLabel(f.field, f.local) ?? '—')
+	const remote = status ? activeLabel(f.remote) : (compareValueLabel(f.field, f.remote) ?? '—')
 	return (
 		<span class="finding-detail">
 			<span class="text-muted">{compareFieldLabel(f.field)}</span>
@@ -95,19 +103,19 @@ function parseKind(raw: string): FindingKind | '' {
 	return (FINDING_KINDS as readonly string[]).includes(raw) ? (raw as FindingKind) : ''
 }
 
-type View = 'report' | 'tenants' | 'devices'
+type View = 'report' | 'tenants' | 'devices' | 'employees'
 
 function parseView(raw: string): View {
-	return raw === 'tenants' || raw === 'devices' ? raw : 'report'
+	return raw === 'tenants' || raw === 'devices' || raw === 'employees' ? raw : 'report'
 }
 
 /**
- * Link board of tenants, or of the devices of one tenant (picked here;
- * follows `default_tenant` whenever that changes).
+ * Link board of tenants, or of the devices or employees of one tenant
+ * (picked here; follows `default_tenant` whenever that changes).
  */
 function LinkBoardPanel(props: {
 	provider: IntegrationProvider
-	entity_type: 'tenant' | 'device'
+	entity_type: 'tenant' | 'device' | 'employee'
 	default_tenant: number | null
 	reload: number
 	on_error: (message: string | null) => void
@@ -175,7 +183,7 @@ function LinkBoardPanel(props: {
 
 	return (
 		<div>
-			<Show when={props.entity_type === 'device'}>
+			<Show when={props.entity_type !== 'tenant'}>
 				<div class="toolbar-row">
 					<Show when={!isScoped()}>
 						<SelectField
@@ -240,6 +248,7 @@ function LinkBoardPanel(props: {
 								<LinkBoardView
 									provider={props.provider}
 									board={current()}
+									tenant_id={effectiveTenant() ?? undefined}
 									editable={editable()}
 									on_error={props.on_error}
 									on_changed={() => void refetch()}
@@ -260,8 +269,8 @@ function LinkBoardPanel(props: {
 
 /**
  * /integrations/:id — consistency report of one provider, plus link boards
- * (`?view=tenants|devices`) for side-by-side linking. The report and the
- * device board follow the tenant selector; `?tenant=` (from a tenant's
+ * (`?view=tenants|devices|employees`) for side-by-side linking. The report
+ * and the device/employee boards follow the tenant selector; `?tenant=` (from a tenant's
  * integration card) wins until the selector is switched. Rows offer the fitting fix: link, confirm
  * a suggestion, create the device externally, ignore, or unlink.
  */
@@ -282,6 +291,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		// The tenant board lists every external company: global users only.
 		...(isScoped() ? [] : [{ id: 'tenants' as const, label: t('integration.viewTenants') }]),
 		{ id: 'devices', label: t('integration.viewDevices') },
+		{ id: 'employees', label: t('integration.viewEmployees') },
 	]
 
 	const [integration] = createRecord(() => props.id, fetch_integration, setError)
@@ -465,7 +475,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							type="button"
 							class="btn-small"
 							onClick={() =>
-								void run(() => ignore_local_device(provider, f.device_id ?? 0))
+								void run(() => ignore_local(provider, 'device', f.device_id ?? 0))
 							}
 						>
 							{t('integration.ignore')}
@@ -497,6 +507,80 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 					</Show>
 				)
 			}
+			case 'employee_suggestion':
+				return (
+					<Show when={can('integrations.manage')}>
+						<button
+							type="button"
+							class="btn-small"
+							onClick={() =>
+								void run(() =>
+									link_external(
+										provider,
+										'employee',
+										f.employee_id ?? 0,
+										f.external_id ?? '',
+									),
+								)
+							}
+						>
+							{t('integration.confirmLink')}
+						</button>
+					</Show>
+				)
+			case 'employee_missing_in_conex':
+				return (
+					<Show when={can('integrations.manage')}>
+						<Show when={can('edit') && f.tenant_id !== null}>
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										import_external_employees(provider, f.tenant_id ?? 0, [
+											f.external_id ?? '',
+										]),
+									)
+								}
+							>
+								{t('integration.importToConex')}
+							</button>
+						</Show>
+						<button
+							type="button"
+							class="btn-small"
+							onClick={() =>
+								void run(() =>
+									ignore_external(provider, 'employee', f.external_id ?? ''),
+								)
+							}
+						>
+							{t('integration.ignore')}
+						</button>
+					</Show>
+				)
+			case 'employee_missing_in_external':
+				return (
+					<Show when={can('integrations.manage')}>
+						<button
+							type="button"
+							class="btn-small"
+							onClick={() =>
+								void run(() =>
+									ignore_local(provider, 'employee', f.employee_id ?? 0),
+								)
+							}
+						>
+							{t('integration.ignore')}
+						</button>
+					</Show>
+				)
+			case 'employee_stale':
+				return <Show when={can('integrations.manage')}>{unlink}</Show>
+			case 'employee_mismatch':
+				return (
+					<Show when={can('integrations.manage') && f.field === 'tenant'}>{unlink}</Show>
+				)
 			default:
 				return null
 		}
@@ -526,6 +610,16 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			getValue: (f: IntegrationFinding): JSX.Element =>
 				f.device_id !== null ? (
 					<a href={`/devices/${f.device_id}`}>{f.device_name}</a>
+				) : (
+					'—'
+				),
+		},
+		{
+			key: 'employee',
+			label: tp('entity.employee', 1),
+			getValue: (f: IntegrationFinding): JSX.Element =>
+				f.employee_id !== null ? (
+					<a href={`/employees/${f.employee_id}`}>{f.employee_name}</a>
 				) : (
 					'—'
 				),
@@ -630,6 +724,15 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="device"
+							default_tenant={boardTenant()}
+							reload={boardReload()}
+							on_error={setError}
+						/>
+					</Show>
+					<Show when={view() === 'employees'}>
+						<LinkBoardPanel
+							provider={integration()?.provider ?? 'tanss'}
+							entity_type="employee"
 							default_tenant={boardTenant()}
 							reload={boardReload()}
 							on_error={setError}

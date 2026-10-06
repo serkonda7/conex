@@ -11,6 +11,7 @@ import { changelogApp } from './routes/changelog'
 import { deviceRolesApp } from './routes/device_roles'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
+import { employeesApp } from './routes/employees'
 import { integrationsApp } from './routes/integrations'
 import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
@@ -68,6 +69,7 @@ export function createApp() {
 			.route('/changelog', changelogApp)
 			.route('/tenants', tenantsApp)
 			.route('/tenant-groups', tenantGroupsApp)
+			.route('/employees', employeesApp)
 			.route('/sites', sitesApp)
 			.route('/site-groups', siteGroupsApp)
 			.route('/locations', locationsApp)

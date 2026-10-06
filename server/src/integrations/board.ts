@@ -2,9 +2,9 @@
  * Link board: conex objects and external objects of one link level side by
  * side, with their link state and unambiguous match suggestions. Tenants are
  * listed in full (global users only; inactive and private customers only when linked);
- * devices per conex tenant, against the devices of the company linked to it.
- * Inactive devices are ignored by default (hidden unless toggled on, never
- * suggested); linked ones stay visible as linked.
+ * devices and employees per conex tenant, against the ones of the company
+ * linked to it. Inactive devices/employees are ignored by default (hidden
+ * unless toggled on, never suggested); linked ones stay visible as linked.
  */
 import { eq, inArray } from 'drizzle-orm'
 import type {
@@ -14,11 +14,11 @@ import type {
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
-import { devices, tenant_groups, tenants } from '../schema'
+import { devices, employees, tenant_groups, tenants } from '../schema'
 import { type ExternalLinkRow, linkOf, listLinks } from './links'
-import { group, matchDevices, normalizeName } from './match'
-import { lastSyncedAt, localDevices } from './report'
-import { readDevices, readTenant, readTenants } from './snapshot'
+import { group, matchDevices, matchEmployees, normalizeName } from './match'
+import { lastSyncedAt, localDevices, localEmployees } from './report'
+import { readDevices, readEmployees, readTenant, readTenants } from './snapshot'
 
 function joinDetail(...parts: (string | null)[]): string | null {
 	const text = parts.filter((p) => p !== null && p !== '').join(' ')
@@ -40,6 +40,11 @@ function externalRow(
 				? entityName(link.entity_id)
 				: null,
 	}
+}
+
+function employeeDetail(e: { title: string | null; email: string | null }): string | null {
+	const text = [e.title, e.email].filter((p) => p !== null && p !== '').join(' · ')
+	return text === '' ? null : text
 }
 
 /** Suggests a name match when it is unique on both free sides. */
@@ -265,6 +270,116 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 	return {
 		provider,
 		entity_type: 'device',
+		synced_at: await lastSyncedAt(provider),
+		external_tenant: company,
+		local,
+		external,
+	}
+}
+
+/** Like {@link deviceBoard}: employees of one tenant against its company's. */
+export async function employeeBoard(provider: ProviderId, tenantId: number): Promise<LinkBoard> {
+	const locals = (await localEmployees(eq(employees.tenant_id, tenantId))).sort((a, b) =>
+		a.name.localeCompare(b.name),
+	)
+	const tenantLink = await linkOf(provider, 'tenant', tenantId)
+	const company = tenantLink ? await readTenant(provider, tenantLink.external_id) : null
+	const allExternal = await readEmployees(provider)
+	const externals = company
+		? allExternal
+				.filter((e) => e.external_tenant_ids.includes(company.external_id))
+				.sort((a, b) => a.name.localeCompare(b.name))
+		: []
+	const links = await listLinks(provider, 'employee')
+	const linkByExternal = new Map(links.map((l) => [l.external_id, l]))
+	const linkByEmployee = new Map<number, ExternalLinkRow>()
+	const ignoredByEmployee = new Map<number, ExternalLinkRow>()
+	for (const link of links) {
+		if (link.state === 'linked' && link.entity_id !== null) {
+			linkByEmployee.set(link.entity_id, link)
+		} else if (link.state === 'ignored' && link.entity_id !== null) {
+			ignoredByEmployee.set(link.entity_id, link)
+		}
+	}
+
+	// Names of linked objects outside this board (other tenant / company).
+	const localName = new Map(locals.map((e) => [e.id, e.name]))
+	const foreignIds = externals
+		.map((e) => linkByExternal.get(e.external_id)?.entity_id)
+		.filter((id): id is number => id !== null && id !== undefined && !localName.has(id))
+	if (foreignIds.length > 0) {
+		for (const row of await getDb()
+			.select({ id: employees.id, name: employees.name })
+			.from(employees)
+			.where(inArray(employees.id, foreignIds))) {
+			localName.set(row.id, row.name)
+		}
+	}
+	const externalName = new Map(allExternal.map((e) => [e.external_id, e.name]))
+
+	const { auto, suggestions } = matchEmployees(
+		locals.filter(
+			(e) => e.active === 1 && !linkByEmployee.has(e.id) && !ignoredByEmployee.has(e.id),
+		),
+		externals.filter((e) => e.active && !linkByExternal.has(e.external_id)),
+	)
+	// Only offer a suggestion when the employee has exactly one candidate.
+	const candidates = new Map<number, typeof auto>()
+	for (const pair of [...auto, ...suggestions]) {
+		candidates.set(pair.employee_id, [...(candidates.get(pair.employee_id) ?? []), pair])
+	}
+
+	const local: LinkBoardLocal[] = locals
+		.map((e): LinkBoardLocal => {
+			const link = linkByEmployee.get(e.id)
+			const ignored = ignoredByEmployee.get(e.id)
+			const defaultIgnored = e.active !== 1 && link === undefined && ignored === undefined
+			const pairs = candidates.get(e.id) ?? []
+			const pair = pairs.length === 1 && !ignored && !defaultIgnored ? pairs[0] : undefined
+			return {
+				id: e.id,
+				name: e.name,
+				detail: employeeDetail(e),
+				serial: null,
+				active: e.active === 1,
+				link_id: link?.id ?? ignored?.id ?? null,
+				external_id: link?.external_id ?? null,
+				external_name: link ? (externalName.get(link.external_id) ?? null) : null,
+				ignored: ignored !== undefined || defaultIgnored,
+				suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
+			}
+		})
+		.sort(
+			(a, b) =>
+				(a.ignored ? 2 : a.external_id === null ? 0 : 1) -
+					(b.ignored ? 2 : b.external_id === null ? 0 : 1) ||
+				a.name.localeCompare(b.name),
+		)
+	const externalStateOrder = (state: LinkBoardExternal['state']): number =>
+		state === 'ignored' ? 2 : state === 'linked' ? 1 : 0
+	const external = externals
+		.map((e) => {
+			const row = externalRow(
+				{
+					external_id: e.external_id,
+					name: e.name,
+					detail: employeeDetail(e),
+					serial: null,
+					active: e.active,
+				},
+				linkByExternal.get(e.external_id),
+				(id) => localName.get(id) ?? null,
+			)
+			return row.state === null && !e.active ? { ...row, state: 'ignored' as const } : row
+		})
+		.sort(
+			(a, b) =>
+				externalStateOrder(a.state) - externalStateOrder(b.state) ||
+				a.name.localeCompare(b.name),
+		)
+	return {
+		provider,
+		entity_type: 'employee',
 		synced_at: await lastSyncedAt(provider),
 		external_tenant: company,
 		local,

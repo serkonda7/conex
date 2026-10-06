@@ -1,6 +1,7 @@
 /**
- * Sync runs: fetch external tenants (always all) and the devices of linked
- * tenants, store the snapshot, then auto-link devices (`match.ts`).
+ * Sync runs: fetch external tenants and employees (always all) and the
+ * devices of linked tenants, store the snapshot, then auto-link devices and
+ * employees (`match.ts`).
  *
  * A run is started in the background and tracked in `sync_runs`; the API
  * answers right away with the `running` row and the client polls. One run
@@ -12,11 +13,20 @@ import type { IntegrationProvider as ProviderId, SyncRunJson } from 'shared/src/
 import { getDb } from '../db/connection'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { checkTenantExists, errOf } from '../db/list'
-import { devices, sync_runs } from '../schema'
+import { devices, employees, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
 import { listLinks, setLink } from './links'
-import { matchDevices } from './match'
-import { mergeTenants, pruneDevices, replaceDevices, replaceTenants } from './snapshot'
+import { matchDevices, matchEmployees } from './match'
+import {
+	hasEmployees,
+	mergeEmployees,
+	mergeTenants,
+	pruneDevices,
+	readEmployees,
+	replaceDevices,
+	replaceEmployees,
+	replaceTenants,
+} from './snapshot'
 import {
 	getIntegrationRow,
 	lastSuccessfulSyncStartedAt,
@@ -24,52 +34,47 @@ import {
 	recordConnection,
 	syncRunJson,
 } from './store'
-import type { ExternalDevice, IntegrationProvider } from './types'
+import type { ExternalDevice, ExternalEmployee, IntegrationProvider } from './types'
 
 const running = new Set<ProviderId>()
 
 interface Counts {
 	tenants: number
 	devices: number
+	employees: number
 	auto_linked: number
 }
 
-/** Auto-links unlinked devices of one tenant; returns the number of new links. */
-async function autoLink(
+/** External ids that already have a link row, and conex ids that are linked. */
+async function linkState(
 	provider: ProviderId,
-	tenantId: number,
-	externalTenantId: string,
-	fetched: ExternalDevice[],
-): Promise<number> {
-	const deviceLinks = await listLinks(provider, 'device')
+	entityType: 'device' | 'employee',
+): Promise<{ linkedLocal: Set<number>; takenExternal: Set<string> }> {
 	const linkedLocal = new Set<number>()
 	const takenExternal = new Set<string>()
-	for (const link of deviceLinks) {
+	for (const link of await listLinks(provider, entityType)) {
 		takenExternal.add(link.external_id)
 		if (link.entity_id !== null) {
 			linkedLocal.add(link.entity_id)
 		}
 	}
-	const locals = (
-		await getDb()
-			.select({
-				id: devices.id,
-				name: devices.name,
-				serial: devices.serial,
-				asset_tag: devices.asset_tag,
-			})
-			.from(devices)
-			.where(eq(devices.tenant_id, tenantId))
-	).filter((d) => !linkedLocal.has(d.id))
-	const externals = fetched.filter((e) => !takenExternal.has(e.external_id))
-	const { auto } = matchDevices(locals, externals)
+	return { linkedLocal, takenExternal }
+}
+
+/** Writes auto links; returns the number of new links. */
+async function writeAutoLinks(
+	provider: ProviderId,
+	entityType: 'device' | 'employee',
+	externalTenantId: string,
+	pairs: { local_id: number; external_id: string }[],
+): Promise<number> {
 	let linked = 0
-	for (const pair of auto) {
+	for (const pair of pairs) {
 		const res = await setLink(
 			provider,
 			{
-				entity_type: 'device',
-				entity_id: pair.device_id,
+				entity_type: entityType,
+				entity_id: pair.local_id,
 				external_id: pair.external_id,
 				external_tenant_id: externalTenantId,
 			},
@@ -83,6 +88,62 @@ async function autoLink(
 	return linked
 }
 
+/** Auto-links unlinked devices of one tenant; returns the number of new links. */
+async function autoLink(
+	provider: ProviderId,
+	tenantId: number,
+	externalTenantId: string,
+	fetched: ExternalDevice[],
+): Promise<number> {
+	const { linkedLocal, takenExternal } = await linkState(provider, 'device')
+	const locals = (
+		await getDb()
+			.select({
+				id: devices.id,
+				name: devices.name,
+				serial: devices.serial,
+				asset_tag: devices.asset_tag,
+			})
+			.from(devices)
+			.where(eq(devices.tenant_id, tenantId))
+	).filter((d) => !linkedLocal.has(d.id))
+	const externals = fetched.filter((e) => !takenExternal.has(e.external_id))
+	const { auto } = matchDevices(locals, externals)
+	return writeAutoLinks(
+		provider,
+		'device',
+		externalTenantId,
+		auto.map((pair) => ({ local_id: pair.device_id, external_id: pair.external_id })),
+	)
+}
+
+/** Auto-links unlinked employees of one tenant; returns the number of new links. */
+async function autoLinkEmployees(
+	provider: ProviderId,
+	tenantId: number,
+	externalTenantId: string,
+	snapshot: ExternalEmployee[],
+): Promise<number> {
+	const { linkedLocal, takenExternal } = await linkState(provider, 'employee')
+	const locals = (
+		await getDb()
+			.select({ id: employees.id, name: employees.name, email: employees.email })
+			.from(employees)
+			.where(eq(employees.tenant_id, tenantId))
+	).filter((e) => !linkedLocal.has(e.id))
+	const externals = snapshot.filter(
+		(e) =>
+			e.external_tenant_ids.includes(externalTenantId) && !takenExternal.has(e.external_id),
+	)
+	const { auto } = matchEmployees(locals, externals)
+	return writeAutoLinks(
+		provider,
+		'employee',
+		externalTenantId,
+		auto.map((pair) => ({ local_id: pair.employee_id, external_id: pair.external_id })),
+	)
+}
+
 async function execute(
 	provider: ProviderId,
 	instance: IntegrationProvider,
@@ -90,16 +151,24 @@ async function execute(
 	clean: boolean,
 ): Promise<Result<Counts, Error>> {
 	const now = nowSeconds()
-	const modifiedSince = clean ? null : await lastSuccessfulSyncStartedAt(provider)
-	const externalTenants = await instance.listTenants(modifiedSince ?? undefined)
-	if (Result.isError(externalTenants)) {
-		return externalTenants
+	// Snapshots from before employees were synced need one full fetch.
+	const modifiedSince =
+		clean || !(await hasEmployees(provider))
+			? null
+			: await lastSuccessfulSyncStartedAt(provider)
+	const directory = await instance.listTenants(modifiedSince ?? undefined)
+	if (Result.isError(directory)) {
+		return directory
 	}
-	let tenantSnapshot = externalTenants.value
+	let tenantSnapshot = directory.value.tenants
+	let employeeSnapshot = directory.value.employees
 	if (modifiedSince === null) {
 		await replaceTenants(provider, tenantSnapshot, now)
+		await replaceEmployees(provider, employeeSnapshot, now)
 	} else {
 		tenantSnapshot = await mergeTenants(provider, tenantSnapshot, now)
+		await mergeEmployees(provider, employeeSnapshot, now)
+		employeeSnapshot = await readEmployees(provider)
 	}
 	const known = new Set(tenantSnapshot.map((t) => t.external_id))
 
@@ -109,7 +178,12 @@ async function execute(
 			link.entity_id !== null &&
 			(tenantId === null || link.entity_id === tenantId),
 	)
-	const counts: Counts = { tenants: tenantSnapshot.length, devices: 0, auto_linked: 0 }
+	const counts: Counts = {
+		tenants: tenantSnapshot.length,
+		devices: 0,
+		employees: employeeSnapshot.length,
+		auto_linked: 0,
+	}
 	for (const link of tenantLinks) {
 		// Stale links (company gone) are reported, not fetched.
 		if (link.entity_id === null || !known.has(link.external_id)) {
@@ -126,6 +200,12 @@ async function execute(
 			link.entity_id,
 			link.external_id,
 			fetched.value,
+		)
+		counts.auto_linked += await autoLinkEmployees(
+			provider,
+			link.entity_id,
+			link.external_id,
+			employeeSnapshot,
 		)
 	}
 	if (tenantId === null) {

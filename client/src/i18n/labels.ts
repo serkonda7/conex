@@ -14,6 +14,9 @@ import {
 	DEVICE_ROLE_ICONS,
 	type DeviceCompareField,
 	type DeviceRoleIcon,
+	EMPLOYEE_SALUTATIONS,
+	type EmployeeCompareField,
+	type EmployeeSalutation,
 	type FindingKind,
 	type IntegrationProvider,
 	LOCATION_TYPES,
@@ -156,6 +159,7 @@ export function changeActionOptions(): { value: ChangeAction; label: string }[] 
 const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	tenant_group: 'changeObject.tenantGroup',
 	tenant: 'changeObject.tenant',
+	employee: 'changeObject.employee',
 	site_group: 'changeObject.siteGroup',
 	site: 'changeObject.site',
 	location: 'changeObject.location',
@@ -285,6 +289,11 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	device_suggestion: 'finding.device_suggestion',
 	device_stale: 'finding.device_stale',
 	device_mismatch: 'finding.device_mismatch',
+	employee_missing_in_conex: 'finding.employee_missing_in_conex',
+	employee_missing_in_external: 'finding.employee_missing_in_external',
+	employee_suggestion: 'finding.employee_suggestion',
+	employee_stale: 'finding.employee_stale',
+	employee_mismatch: 'finding.employee_mismatch',
 }
 
 /** Consistency finding kind (`device_missing_in_conex`, …). */
@@ -293,7 +302,7 @@ export function findingKindLabel(value: string): string {
 }
 
 const COMPARE_FIELD_KEYS: Record<
-	DeviceCompareField | 'customer_number' | 'tenant' | 'status',
+	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'tenant' | 'status',
 	MessageKey
 > = {
 	name: 'compareField.name',
@@ -304,9 +313,36 @@ const COMPARE_FIELD_KEYS: Record<
 	asset_tag: 'compareField.asset_tag',
 	manufacturer: 'compareField.manufacturer',
 	model: 'compareField.model',
+	first_name: 'compareField.first_name',
+	last_name: 'compareField.last_name',
+	salutation: 'compareField.salutation',
+	title: 'compareField.title',
+	email: 'compareField.email',
+	phone: 'compareField.phone',
+	mobile: 'compareField.mobile',
 }
 
-/** Compared device field (`serial`, `asset_tag`, …). */
+/** Compared device or employee field (`serial`, `email`, …). */
 export function compareFieldLabel(value: string): string {
 	return lookup(COMPARE_FIELD_KEYS, value)
+}
+
+const EMPLOYEE_SALUTATION_KEYS: Record<EmployeeSalutation, MessageKey> = {
+	mr: 'employeeSalutation.mr',
+	ms: 'employeeSalutation.ms',
+}
+
+/** Employee salutation (`mr` → Herr, `ms` → Frau). */
+export function employeeSalutationLabel(value: string): string {
+	return lookup(EMPLOYEE_SALUTATION_KEYS, value)
+}
+
+/** `<select>` options for the employee salutations. */
+export function employeeSalutationOptions(): { value: EmployeeSalutation; label: string }[] {
+	return EMPLOYEE_SALUTATIONS.map((value) => ({ value, label: employeeSalutationLabel(value) }))
+}
+
+/** A compared field value for display: enum values (salutation) are localized. */
+export function compareValueLabel(field: string | null, value: string | null): string | null {
+	return field === 'salutation' && value !== null ? employeeSalutationLabel(value) : value
 }

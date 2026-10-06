@@ -212,6 +212,54 @@ export const LocationUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
+/** Optional short contact field (title, email, phone numbers). */
+const ContactFieldSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
+
+const EmailSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.maxLength(200),
+	v.email('Must be an email address'),
+)
+
+/** Salutation of an employee (`mr` = Herr, `ms` = Frau). */
+export const EMPLOYEE_SALUTATIONS = ['mr', 'ms'] as const
+
+export const EmployeeSalutationSchema = v.picklist(EMPLOYEE_SALUTATIONS)
+
+export type EmployeeSalutation = v.InferOutput<typeof EmployeeSalutationSchema>
+
+/** Employees always belong to a tenant (contact persons of a customer). */
+export const EmployeeCreateSchema = v.strictObject({
+	first_name: v.optional(NameSchema, undefined),
+	last_name: NameSchema,
+	salutation: v.optional(v.nullable(EmployeeSalutationSchema), undefined),
+	tenant_id: IdSchema,
+	title: v.optional(ContactFieldSchema, undefined),
+	email: v.optional(EmailSchema, undefined),
+	phone: v.optional(ContactFieldSchema, undefined),
+	mobile: v.optional(ContactFieldSchema, undefined),
+	active: v.optional(v.boolean(), true),
+	description: DescriptionSchema,
+	comments: CommentsSchema,
+})
+
+export const EmployeeUpdateSchema = v.strictObject({
+	first_name: v.optional(v.nullable(NameSchema), undefined),
+	last_name: v.optional(NameSchema, undefined),
+	salutation: v.optional(v.nullable(EmployeeSalutationSchema), undefined),
+	tenant_id: v.optional(IdSchema, undefined),
+	title: v.optional(v.nullable(ContactFieldSchema), undefined),
+	email: v.optional(v.nullable(EmailSchema), undefined),
+	phone: v.optional(v.nullable(ContactFieldSchema), undefined),
+	mobile: v.optional(v.nullable(ContactFieldSchema), undefined),
+	active: v.optional(v.boolean(), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
+})
+
+export type EmployeeCreate = v.InferOutput<typeof EmployeeCreateSchema>
+export type EmployeeUpdate = v.InferOutput<typeof EmployeeUpdateSchema>
 export type TenantGroupCreate = v.InferOutput<typeof TenantGroupCreateSchema>
 export type TenantGroupUpdate = v.InferOutput<typeof TenantGroupUpdateSchema>
 export type TenantCreate = v.InferOutput<typeof TenantCreateSchema>
@@ -294,6 +342,21 @@ export const LocationListQuerySchema = v.object({
 	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
+
+export const EmployeeListQuerySchema = v.object({
+	...ListQueryEntries,
+	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
+	/** `true` / `false` narrows to active / inactive employees. */
+	active: v.optional(v.picklist(['true', 'false']), undefined),
+	sort: v.optional(
+		v.picklist(['name', 'first_name', 'last_name', 'title', 'email']),
+		'last_name',
+	),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export type EmployeeListQuery = v.InferOutput<typeof EmployeeListQuerySchema>
 
 export const EntityParamsSchema = v.object({ id: IdSchema })
 export const DeviceIfaceParamsSchema = v.object({ id: IdSchema, ifaceId: IdSchema })
@@ -1151,6 +1214,7 @@ export type ChangeAction = v.InferOutput<typeof ChangeActionSchema>
 export const CHANGE_OBJECT_TYPES = [
 	'tenant_group',
 	'tenant',
+	'employee',
 	'site_group',
 	'site',
 	'location',
@@ -1405,13 +1469,13 @@ export const IntegrationEntityParamsSchema = v.object({
 	id: IdSchema,
 })
 
-export const LinkEntityTypeSchema = v.picklist(['tenant', 'device'])
+export const LinkEntityTypeSchema = v.picklist(['tenant', 'device', 'employee'])
 
 export type LinkEntityType = v.InferOutput<typeof LinkEntityTypeSchema>
 
 const ExternalIdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
 
-/** Links a conex tenant/device to an external object (replaces its old link). */
+/** Links a conex tenant/device/employee to an external object (replaces its old link). */
 export const ExternalLinkCreateSchema = v.strictObject({
 	entity_type: LinkEntityTypeSchema,
 	entity_id: IdSchema,
@@ -1425,14 +1489,24 @@ export const ExternalIgnoreSchema = v.strictObject({
 })
 
 /**
- * Marks a conex device as intentionally absent from the external system
- * (suppresses its `device_missing_in_external` finding). Stored as an
- * `ignored` link row keyed by the conex entity; see `ignoreLocal` in
+ * Marks a conex device or employee as intentionally absent from the
+ * external system (suppresses its `*_missing_in_external` finding). Stored
+ * as an `ignored` link row keyed by the conex entity; see `ignoreLocal` in
  * `server/src/integrations/links.ts` for the synthetic `external_id`.
  */
 export const ExternalIgnoreLocalSchema = v.strictObject({
-	entity_type: v.literal('device'),
+	entity_type: v.picklist(['device', 'employee']),
 	entity_id: IdSchema,
+})
+
+/**
+ * Creates conex employees of a tenant from external employees of the
+ * company linked to it (resolves `employee_missing_in_conex`) and links
+ * each pair.
+ */
+export const ExternalEmployeeImportSchema = v.strictObject({
+	tenant_id: IdSchema,
+	external_ids: v.pipe(v.array(ExternalIdSchema), v.minLength(1), v.maxLength(1000)),
 })
 
 /**
@@ -1458,6 +1532,7 @@ export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
 export type ExternalDeviceCreate = v.InferOutput<typeof ExternalDeviceCreateSchema>
+export type ExternalEmployeeImport = v.InferOutput<typeof ExternalEmployeeImportSchema>
 export type ExternalDeviceUpdate = v.InferOutput<typeof ExternalDeviceUpdateSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
@@ -1478,10 +1553,10 @@ export const IntegrationReportQuerySchema = v.object({
 
 export type IntegrationReportQuery = v.InferOutput<typeof IntegrationReportQuerySchema>
 
-/** Link board: tenants, or the devices of one conex tenant. */
+/** Link board: tenants, or the devices/employees of one conex tenant. */
 export const LinkBoardQuerySchema = v.object({
 	entity_type: LinkEntityTypeSchema,
-	/** Device board only: the conex tenant whose devices are shown. */
+	/** Device/employee board only: the conex tenant whose objects are shown. */
 	tenant: OptionalIdEntry,
 })
 
@@ -1543,7 +1618,7 @@ export interface SyncRunJson {
 	finished_at: number | null
 	state: SyncRunState
 	error: string | null
-	counts: { tenants: number; devices: number; auto_linked: number }
+	counts: { tenants: number; devices: number; employees: number; auto_linked: number }
 }
 
 /** Integration without secrets: only whether they are set. */
@@ -1597,6 +1672,25 @@ export interface ExternalDeviceJson {
 	active: boolean
 }
 
+/** Normalized external employee (TANSS contact person of a company). */
+export interface ExternalEmployeeJson {
+	external_id: string
+	/** Preferred company, else the first assigned one; null when unassigned. */
+	external_tenant_id: string | null
+	/** Every company the employee is assigned to. */
+	external_tenant_ids: string[]
+	/** First + last name. */
+	name: string
+	first_name: string | null
+	last_name: string
+	salutation: EmployeeSalutation | null
+	title: string | null
+	email: string | null
+	phone: string | null
+	mobile: string | null
+	active: boolean
+}
+
 export type ExternalLinkState = 'linked' | 'ignored'
 
 export interface ExternalLinkJson {
@@ -1622,6 +1716,18 @@ export const DEVICE_COMPARE_FIELDS = [
 
 export type DeviceCompareField = (typeof DEVICE_COMPARE_FIELDS)[number]
 
+export const EMPLOYEE_COMPARE_FIELDS = [
+	'first_name',
+	'last_name',
+	'salutation',
+	'title',
+	'email',
+	'phone',
+	'mobile',
+] as const
+
+export type EmployeeCompareField = (typeof EMPLOYEE_COMPARE_FIELDS)[number]
+
 export const FINDING_KINDS = [
 	'tenant_unlinked',
 	'tenant_missing_in_conex',
@@ -1633,6 +1739,11 @@ export const FINDING_KINDS = [
 	'device_suggestion',
 	'device_stale',
 	'device_mismatch',
+	'employee_missing_in_conex',
+	'employee_missing_in_external',
+	'employee_suggestion',
+	'employee_stale',
+	'employee_mismatch',
 ] as const
 
 export type FindingKind = (typeof FINDING_KINDS)[number]
@@ -1644,12 +1755,20 @@ export interface IntegrationFinding {
 	tenant_name: string | null
 	device_id: number | null
 	device_name: string | null
+	employee_id: number | null
+	employee_name: string | null
 	link_id: number | null
 	external_id: string | null
 	external_name: string | null
 	external_tenant_id: string | null
-	/** `tenant`/`status` only on `device_mismatch`. */
-	field: DeviceCompareField | 'customer_number' | 'tenant' | 'status' | null
+	/** `tenant`/`status` only on `device_mismatch` and `employee_mismatch`. */
+	field:
+		| DeviceCompareField
+		| EmployeeCompareField
+		| 'customer_number'
+		| 'tenant'
+		| 'status'
+		| null
 	local: string | null
 	remote: string | null
 }
@@ -1661,9 +1780,9 @@ export interface IntegrationReport {
 	findings: IntegrationFinding[]
 }
 
-/** Side-by-side value of one compared device field. */
+/** Side-by-side value of one compared device or employee field. */
 export interface FieldComparison {
-	field: DeviceCompareField
+	field: DeviceCompareField | EmployeeCompareField
 	local: string | null
 	remote: string | null
 	equal: boolean
@@ -1673,7 +1792,7 @@ export interface FieldComparison {
 export interface LinkBoardLocal {
 	id: number
 	name: string
-	/** Tenant group, or device manufacturer + model. */
+	/** Tenant group, device manufacturer + model, or employee title + email. */
 	detail: string | null
 	serial: string | null
 	active: boolean
@@ -1684,14 +1803,14 @@ export interface LinkBoardLocal {
 	/** True when the conex object is ignored as missing in the external system. */
 	ignored: boolean
 	/** Unambiguous match candidate among the free external objects. */
-	suggestion: { external_id: string; via: 'name' | 'serial' | 'asset_tag' } | null
+	suggestion: { external_id: string; via: 'name' | 'serial' | 'asset_tag' | 'email' } | null
 }
 
 /** External side of the link board. */
 export interface LinkBoardExternal {
 	external_id: string
 	name: string
-	/** Customer number, or device manufacturer + model. */
+	/** Customer number, device manufacturer + model, or employee title + email. */
 	detail: string | null
 	serial: string | null
 	active: boolean
@@ -1708,7 +1827,7 @@ export interface LinkBoard {
 	entity_type: LinkEntityType
 	/** Finish time of the last successful sync (unix seconds), null = never. */
 	synced_at: number | null
-	/** Device board: company linked to the tenant (null = not linked). */
+	/** Device/employee board: company linked to the tenant (null = not linked). */
 	external_tenant: ExternalTenantJson | null
 	local: LinkBoardLocal[]
 	external: LinkBoardExternal[]
@@ -1730,4 +1849,15 @@ export interface DeviceIntegrationStatus {
 	external_tenant: ExternalTenantJson | null
 	/** Unlinked, not ignored external devices of that company (link picker). */
 	candidates: ExternalDeviceJson[]
+}
+
+/** Integration card on the employee detail page. */
+export interface EmployeeIntegrationStatus {
+	link: ExternalLinkJson | null
+	external: ExternalEmployeeJson | null
+	fields: FieldComparison[]
+	/** Company linked to the employee's tenant, if any. */
+	external_tenant: ExternalTenantJson | null
+	/** Unlinked, not ignored external employees of that company (link picker). */
+	candidates: ExternalEmployeeJson[]
 }
