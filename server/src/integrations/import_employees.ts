@@ -31,12 +31,18 @@ function createInput(
 		salutation: external.salutation,
 		tenant_id: tenantId,
 		title: external.title?.slice(0, 200),
-		email: external.email ?? undefined,
-		phone: external.phone?.slice(0, 200),
-		mobile: external.mobile?.slice(0, 200),
+		emails: external.email ? [{ address: external.email, scope: 'work' }] : [],
+		phones: [
+			...(external.phone
+				? [{ number: external.phone.slice(0, 200), type: 'phone', scope: 'work' }]
+				: []),
+			...(external.mobile
+				? [{ number: external.mobile.slice(0, 200), type: 'mobile', scope: 'work' }]
+				: []),
+		],
 		active: external.active,
 	}
-	for (const candidate of [input, { ...input, email: undefined }]) {
+	for (const candidate of [input, { ...input, emails: [] }]) {
 		const parsed = v.safeParse(EmployeeCreateSchema, candidate)
 		if (parsed.success) {
 			return Result.ok(parsed.output)

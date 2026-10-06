@@ -127,7 +127,7 @@ async function autoLinkEmployees(
 	const { linkedLocal, takenExternal } = await linkState(provider, 'employee')
 	const locals = (
 		await getDb()
-			.select({ id: employees.id, name: employees.name, email: employees.email })
+			.select({ id: employees.id, name: employees.name, emails: employees.emails })
 			.from(employees)
 			.where(eq(employees.tenant_id, tenantId))
 	).filter((e) => !linkedLocal.has(e.id))

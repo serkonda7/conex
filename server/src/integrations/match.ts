@@ -7,6 +7,7 @@
  * Callers pass only devices without a link (and external devices that are
  * neither linked nor ignored), so manual links are never overwritten.
  */
+import { type EmployeeEmail, primaryEmail } from 'shared/src/schemas'
 import type { ExternalDevice, ExternalEmployee } from './types'
 
 /** Vendor placeholders that must never count as a serial match. */
@@ -55,7 +56,7 @@ export interface LocalDevice {
 export interface LocalEmployee {
 	id: number
 	name: string
-	email: string | null
+	emails: EmployeeEmail[]
 }
 
 export type MatchKey = 'serial' | 'asset_tag' | 'name'
@@ -225,7 +226,7 @@ export function matchEmployees(
 		[
 			[
 				'email',
-				(l: LocalEmployee): string | null => normalizeEmail(l.email),
+				(l: LocalEmployee): string | null => normalizeEmail(primaryEmail(l.emails)),
 				(e: ExternalEmployee): string | null => normalizeEmail(e.email),
 			],
 		],

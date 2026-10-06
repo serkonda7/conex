@@ -229,6 +229,48 @@ export const EmployeeSalutationSchema = v.picklist(EMPLOYEE_SALUTATIONS)
 
 export type EmployeeSalutation = v.InferOutput<typeof EmployeeSalutationSchema>
 
+/** Whether an employee's mail address or phone number is for work or private use. */
+export const CONTACT_SCOPES = ['work', 'private'] as const
+
+export const ContactScopeSchema = v.picklist(CONTACT_SCOPES)
+
+export type ContactScope = v.InferOutput<typeof ContactScopeSchema>
+
+/** Kind of an employee phone number. */
+export const PHONE_TYPES = ['phone', 'mobile', 'fax'] as const
+
+export const PhoneTypeSchema = v.picklist(PHONE_TYPES)
+
+export type PhoneType = v.InferOutput<typeof PhoneTypeSchema>
+
+/** One mail address of an employee; the first one in the list is the primary address. */
+export const EmployeeEmailSchema = v.strictObject({
+	address: EmailSchema,
+	scope: ContactScopeSchema,
+})
+
+export const EmployeePhoneSchema = v.strictObject({
+	number: v.pipe(ContactFieldSchema, v.minLength(1)),
+	type: PhoneTypeSchema,
+	scope: ContactScopeSchema,
+})
+
+export type EmployeeEmail = v.InferOutput<typeof EmployeeEmailSchema>
+export type EmployeePhone = v.InferOutput<typeof EmployeePhoneSchema>
+
+const EmployeeEmailsSchema = v.pipe(v.array(EmployeeEmailSchema), v.maxLength(20))
+const EmployeePhonesSchema = v.pipe(v.array(EmployeePhoneSchema), v.maxLength(20))
+
+/** Primary mail address: the first one in the list. */
+export function primaryEmail(emails: readonly EmployeeEmail[]): string | null {
+	return emails[0]?.address ?? null
+}
+
+/** First phone number of `type`, the primary one of that kind. */
+export function primaryPhone(phones: readonly EmployeePhone[], type: PhoneType): string | null {
+	return phones.find((p) => p.type === type)?.number ?? null
+}
+
 /** Employees always belong to a tenant (contact persons of a customer). */
 export const EmployeeCreateSchema = v.strictObject({
 	first_name: v.optional(NameSchema, undefined),
@@ -236,9 +278,8 @@ export const EmployeeCreateSchema = v.strictObject({
 	salutation: v.optional(v.nullable(EmployeeSalutationSchema), undefined),
 	tenant_id: IdSchema,
 	title: v.optional(ContactFieldSchema, undefined),
-	email: v.optional(EmailSchema, undefined),
-	phone: v.optional(ContactFieldSchema, undefined),
-	mobile: v.optional(ContactFieldSchema, undefined),
+	emails: v.optional(EmployeeEmailsSchema, []),
+	phones: v.optional(EmployeePhonesSchema, []),
 	active: v.optional(v.boolean(), true),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
@@ -250,9 +291,8 @@ export const EmployeeUpdateSchema = v.strictObject({
 	salutation: v.optional(v.nullable(EmployeeSalutationSchema), undefined),
 	tenant_id: v.optional(IdSchema, undefined),
 	title: v.optional(v.nullable(ContactFieldSchema), undefined),
-	email: v.optional(v.nullable(EmailSchema), undefined),
-	phone: v.optional(v.nullable(ContactFieldSchema), undefined),
-	mobile: v.optional(v.nullable(ContactFieldSchema), undefined),
+	emails: v.optional(EmployeeEmailsSchema, undefined),
+	phones: v.optional(EmployeePhonesSchema, undefined),
 	active: v.optional(v.boolean(), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),

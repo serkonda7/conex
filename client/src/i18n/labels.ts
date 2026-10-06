@@ -11,6 +11,8 @@ import {
 	CHANGE_OBJECT_TYPES,
 	type ChangeAction,
 	type ChangeObjectType,
+	CONTACT_SCOPES,
+	type ContactScope,
 	DEVICE_ROLE_ICONS,
 	type DeviceCompareField,
 	type DeviceRoleIcon,
@@ -22,6 +24,8 @@ import {
 	LOCATION_TYPES,
 	type LocationType,
 	type Permission,
+	PHONE_TYPES,
+	type PhoneType,
 	PORT_KINDS,
 	type PortKind,
 	type SyncRunState,
@@ -340,6 +344,37 @@ export function employeeSalutationLabel(value: string): string {
 /** `<select>` options for the employee salutations. */
 export function employeeSalutationOptions(): { value: EmployeeSalutation; label: string }[] {
 	return EMPLOYEE_SALUTATIONS.map((value) => ({ value, label: employeeSalutationLabel(value) }))
+}
+
+const CONTACT_SCOPE_KEYS: Record<ContactScope, MessageKey> = {
+	work: 'contactScope.work',
+	private: 'contactScope.private',
+}
+
+/** Work / private use of an employee mail address or phone number. */
+export function contactScopeLabel(value: string): string {
+	return lookup(CONTACT_SCOPE_KEYS, value)
+}
+
+/** `<select>` options for the contact scopes. */
+export function contactScopeOptions(): { value: ContactScope; label: string }[] {
+	return CONTACT_SCOPES.map((value) => ({ value, label: contactScopeLabel(value) }))
+}
+
+const PHONE_TYPE_KEYS: Record<PhoneType, MessageKey> = {
+	phone: 'phoneType.phone',
+	mobile: 'phoneType.mobile',
+	fax: 'phoneType.fax',
+}
+
+/** Kind of an employee phone number (phone, mobile, fax). */
+export function phoneTypeLabel(value: string): string {
+	return lookup(PHONE_TYPE_KEYS, value)
+}
+
+/** `<select>` options for the phone number kinds. */
+export function phoneTypeOptions(): { value: PhoneType; label: string }[] {
+	return PHONE_TYPES.map((value) => ({ value, label: phoneTypeLabel(value) }))
 }
 
 /** A compared field value for display: enum values (salutation) are localized. */

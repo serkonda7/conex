@@ -1,3 +1,4 @@
+import { primaryEmail } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { type EmployeeRow, fetch_employees } from '../../api/employees'
@@ -108,7 +109,9 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					{
 						key: 'email',
 						label: t('employee.email'),
-						getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={e.email} />,
+						getValue: (e: EmployeeRow): JSX.Element => (
+							<EmailLink email={primaryEmail(e.emails)} />
+						),
 					},
 				]}
 			/>

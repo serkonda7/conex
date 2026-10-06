@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { EmployeeCreate, EmployeeUpdate } from 'shared/src/schemas'
 import { employees, external_links } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -38,9 +38,8 @@ export function listEmployees(params: EmployeeListParams): Promise<Page<Employee
 		searchCondition(params.search, [
 			employees.name,
 			employees.title,
-			employees.email,
-			employees.phone,
-			employees.mobile,
+			sql`jsonb_path_query_array(${employees.emails}, '$[*].address')::text`,
+			sql`jsonb_path_query_array(${employees.phones}, '$[*].number')::text`,
 		]),
 		params.active !== undefined ? eq(employees.active, params.active ? 1 : 0) : undefined,
 		...tenantConditions(employees.tenant_id, params),
@@ -50,7 +49,8 @@ export function listEmployees(params: EmployeeListParams): Promise<Page<Employee
 		first_name: employees.first_name,
 		last_name: employees.last_name,
 		title: employees.title,
-		email: employees.email,
+		// Primary (first) address.
+		email: sql`${employees.emails}->0->>'address'`,
 	}[params.sort]
 	return pageRows(
 		employees,
@@ -76,9 +76,8 @@ export async function createEmployee(input: EmployeeCreate): Promise<Result<Empl
 		last_name: input.last_name,
 		salutation: input.salutation ?? null,
 		title: input.title ?? null,
-		email: input.email ?? null,
-		phone: input.phone ?? null,
-		mobile: input.mobile ?? null,
+		emails: input.emails,
+		phones: input.phones,
 		active: input.active ? 1 : 0,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
@@ -111,9 +110,8 @@ export async function updateEmployee(
 			'salutation',
 			'tenant_id',
 			'title',
-			'email',
-			'phone',
-			'mobile',
+			'emails',
+			'phones',
 			'description',
 			'comments',
 		]),

@@ -13,6 +13,7 @@ import type {
 	LinkBoardLocal,
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
+import { primaryEmail } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { devices, employees, tenant_groups, tenants } from '../schema'
 import { type ExternalLinkRow, linkOf, listLinks } from './links'
@@ -42,8 +43,8 @@ function externalRow(
 	}
 }
 
-function employeeDetail(e: { title: string | null; email: string | null }): string | null {
-	const text = [e.title, e.email].filter((p) => p !== null && p !== '').join(' · ')
+function employeeDetail(title: string | null, email: string | null): string | null {
+	const text = [title, email].filter((p) => p !== null && p !== '').join(' · ')
 	return text === '' ? null : text
 }
 
@@ -339,7 +340,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 			return {
 				id: e.id,
 				name: e.name,
-				detail: employeeDetail(e),
+				detail: employeeDetail(e.title, primaryEmail(e.emails)),
 				serial: null,
 				active: e.active === 1,
 				link_id: link?.id ?? ignored?.id ?? null,
@@ -363,7 +364,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 				{
 					external_id: e.external_id,
 					name: e.name,
-					detail: employeeDetail(e),
+					detail: employeeDetail(e.title, e.email),
 					serial: null,
 					active: e.active,
 				},

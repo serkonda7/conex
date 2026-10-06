@@ -1,3 +1,4 @@
+import { primaryEmail, primaryPhone } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import {
 	delete_employee,
@@ -81,17 +82,17 @@ export function EmployeesPage(): JSX.Element {
 			key: 'email',
 			label: t('employee.email'),
 			sortable: true,
-			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={e.email} />,
+			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={primaryEmail(e.emails)} />,
 		},
 		{
 			key: 'phone',
 			label: t('employee.phone'),
-			getValue: (e: EmployeeRow): string => e.phone ?? '—',
+			getValue: (e: EmployeeRow): string => primaryPhone(e.phones, 'phone') ?? '—',
 		},
 		{
 			key: 'mobile',
 			label: t('employee.mobile'),
-			getValue: (e: EmployeeRow): string => e.mobile ?? '—',
+			getValue: (e: EmployeeRow): string => primaryPhone(e.phones, 'mobile') ?? '—',
 		},
 		{
 			key: 'tenant',

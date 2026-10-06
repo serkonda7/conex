@@ -1154,6 +1154,38 @@ tbody tr:last-child td {
 	grid-column: 2;
 }
 
+/* Employee mail addresses / phone numbers on the detail page. */
+.contact-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* Employee mail / phone rows: value input, narrow selects, remove button. */
+.contact-row {
+	display: flex;
+	gap: 0.4rem;
+	align-items: center;
+}
+
+.app-content .form-stacked .field .contact-row input {
+	flex: 1 1 auto;
+	width: auto;
+}
+
+/* Kind / scope selects stay narrow. */
+.app-content .form-stacked .field .contact-row select {
+	flex: 0 0 8rem;
+	width: 8rem;
+}
+
+.contact-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	align-self: flex-start;
+}
+
 .field-checkbox-label {
 	display: flex;
 	align-items: center;

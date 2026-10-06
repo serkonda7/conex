@@ -12,7 +12,9 @@ import type {
 	DeviceCompareField,
 	DeviceIntegrationStatus,
 	EmployeeCompareField,
+	EmployeeEmail,
 	EmployeeIntegrationStatus,
+	EmployeePhone,
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
 	FieldComparison,
@@ -112,9 +114,8 @@ export interface LocalEmployeeRow {
 	last_name: string
 	salutation: string | null
 	title: string | null
-	email: string | null
-	phone: string | null
-	mobile: string | null
+	emails: EmployeeEmail[]
+	phones: EmployeePhone[]
 	active: number
 	tenant_id: number
 }
@@ -128,9 +129,8 @@ export async function localEmployees(where: SQL | undefined): Promise<LocalEmplo
 			last_name: employees.last_name,
 			salutation: employees.salutation,
 			title: employees.title,
-			email: employees.email,
-			phone: employees.phone,
-			mobile: employees.mobile,
+			emails: employees.emails,
+			phones: employees.phones,
 			active: employees.active,
 			tenant_id: employees.tenant_id,
 		})
@@ -154,17 +154,38 @@ const EMPLOYEE_NORMALIZERS: Record<EmployeeCompareField, (raw: string | null) =>
 	mobile: normalizePhone,
 }
 
-/** Like {@link compareFields}, for employees. */
+/** conex values of `field`: every address / number of that kind, single fields as one entry. */
+function localEmployeeValues(local: LocalEmployeeRow, field: EmployeeCompareField): string[] {
+	switch (field) {
+		case 'email':
+			return local.emails.map((e) => e.address)
+		case 'phone':
+		case 'mobile':
+			return local.phones.filter((p) => p.type === field).map((p) => p.number)
+		default: {
+			const value = local[field]
+			return value === null ? [] : [value]
+		}
+	}
+}
+
+/**
+ * Like {@link compareFields}, for employees. Mail addresses and phone numbers
+ * are equal when any conex entry of that kind matches the external value
+ * (aliases, private numbers); otherwise the primary entry is shown.
+ */
 export function compareEmployeeFields(
 	local: LocalEmployeeRow,
 	remote: ExternalEmployee,
 ): FieldComparison[] {
 	return EMPLOYEE_COMPARE_FIELDS.map((field) => {
-		const l = local[field]
 		const r = remote[field]
 		const normalize = EMPLOYEE_NORMALIZERS[field]
-		const nl = normalize(l)
 		const nr = normalize(r)
+		const values = localEmployeeValues(local, field)
+		const matched = values.find((value) => nr !== null && normalize(value) === nr)
+		const l = matched ?? values[0] ?? null
+		const nl = normalize(l)
 		return { field, local: l, remote: r, equal: nl === null || nr === null || nl === nr }
 	})
 }

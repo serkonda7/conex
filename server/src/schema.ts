@@ -10,7 +10,13 @@ import {
 	text,
 	uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { DEVICE_ROLE_ICONS, EMPLOYEE_SALUTATIONS, LOCATION_TYPES } from 'shared/src/schemas'
+import {
+	DEVICE_ROLE_ICONS,
+	EMPLOYEE_SALUTATIONS,
+	type EmployeeEmail,
+	type EmployeePhone,
+	LOCATION_TYPES,
+} from 'shared/src/schemas'
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
@@ -201,6 +207,16 @@ export const locations = pgTable(
 	],
 )
 
+/**
+ * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
+ * stringifies first, and Bun's SQL driver then stores that string as a JSON
+ * string instead of an object.
+ */
+const jsonb = customType<{ data: unknown; driverData: unknown }>({
+	dataType: () => 'jsonb',
+	toDriver: (value: unknown): unknown => value,
+})
+
 // Employees: contact persons of a tenant (NetBox-style contacts). Every
 // employee belongs to exactly one tenant; tenant delete is blocked while
 // employees reference it (service layer), so the FK carries no cascade.
@@ -224,9 +240,9 @@ export const employees = pgTable(
 		salutation: text('salutation', { enum: EMPLOYEE_SALUTATIONS }),
 		// Job title / function (`Managing director`, …).
 		title: text('title'),
-		email: text('email'),
-		phone: text('phone'),
-		mobile: text('mobile'),
+		// Mail addresses (first = primary) and phone numbers, in display order.
+		emails: jsonb('emails').$type<EmployeeEmail[]>().notNull().default(sql`'[]'::jsonb`),
+		phones: jsonb('phones').$type<EmployeePhone[]>().notNull().default(sql`'[]'::jsonb`),
 		active: integer('active').notNull().default(1),
 		description: text('description'),
 		comments: text('comments'),
@@ -511,16 +527,6 @@ export const cables = pgTable(
 // tenant/device/employee deletes remove their links in the service layer.
 // `external_objects` is the last fetched snapshot the report runs against.
 // ---------------------------------------------------------------------------
-
-/**
- * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
- * stringifies first, and Bun's SQL driver then stores that string as a JSON
- * string instead of an object.
- */
-const jsonb = customType<{ data: unknown; driverData: unknown }>({
-	dataType: () => 'jsonb',
-	toDriver: (value: unknown): unknown => value,
-})
 
 export const integrations = pgTable('integrations', {
 	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
