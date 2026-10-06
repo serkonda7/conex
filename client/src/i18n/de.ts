@@ -829,6 +829,16 @@ export const de: Messages = {
 	'ticket.titleRequired': 'Titel ist erforderlich.',
 	'ticket.created': '{provider}-Ticket #{id} erstellt.',
 	'ticket.createFailed': 'Ticket konnte nicht erstellt werden',
+	'ticket.listFailed': 'Tickets konnten nicht geladen werden',
+	'ticket.loading': 'Tickets werden geladen…',
+	'ticket.openTickets': 'Offene Tickets',
+	'ticket.status': 'Status',
+	'ticket.modified': 'Letzte Änderung',
+	'ticket.noOpenTickets': 'Keine offenen Tickets.',
+	'ticket.notLinked': 'Dieser Mandant ist mit keiner {provider}-Firma verknüpft.',
+	'ticket.pickTenantContext':
+		'Wählen Sie im Mandantenkontext einen einzelnen Mandanten, um dessen Tickets zu sehen.',
+	'ticket.fetchedAt': 'Stand: {time}',
 
 	'provider.tanss': 'TANSS',
 	'syncState.running': 'Läuft',

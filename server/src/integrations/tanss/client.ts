@@ -32,6 +32,8 @@ import {
 	putApiV1PcsPcId,
 	putApiV1Peripheries,
 	putApiV1PeripheriesPeripheryId,
+	putApiV1Tickets,
+	type TicketList,
 	type TnsPeripheryWithIpGuarantee,
 	type TnsPersonalComputer,
 	type TnsPersonalComputerWithDetails,
@@ -60,6 +62,12 @@ export interface TanssCompany {
 export type TanssPc = TnsPersonalComputerWithDetails
 
 export type TanssPeriphery = TnsPeripheryWithIpGuarantee
+
+/** Open ticket with its status name resolved from the linked entities. */
+export interface TanssTicket {
+	ticket: TicketList
+	statusName: string | null
+}
 
 /** Raised for HTTP failures; `status` 401/403 means bad credentials. */
 export class TanssApiError extends Error {
@@ -104,6 +112,39 @@ export interface TanssTicketInput {
 }
 
 const ContentListSchema = v.object({ content: v.optional(v.nullable(v.array(v.unknown()))) })
+
+const LinkedEntitiesSchema = v.object({
+	meta: v.optional(
+		v.nullable(
+			v.object({ linkedEntities: v.optional(v.nullable(v.record(v.string(), v.unknown()))) }),
+		),
+	),
+})
+
+/**
+ * Id → name of one `meta.linkedEntities` kind; TANSS sends either a list of
+ * `{ id, name }` or an object keyed by id (values `{ name }` or the name).
+ */
+function linkedNames(data: unknown, kind: string): Map<number, string> {
+	const names = new Map<number, string>()
+	const parsed = v.safeParse(LinkedEntitiesSchema, data)
+	const entities = parsed.success ? parsed.output.meta?.linkedEntities?.[kind] : undefined
+	if (typeof entities !== 'object' || entities === null) {
+		return names
+	}
+	const entries: [unknown, unknown][] = Array.isArray(entities)
+		? entities.map((e: unknown) => [(e as { id?: unknown } | null)?.id, e])
+		: Object.entries(entities)
+	for (const [key, value] of entries) {
+		const id = num(key)
+		const name =
+			typeof value === 'string' ? str(value) : str((value as { name?: unknown } | null)?.name)
+		if (id !== null && name !== null) {
+			names.set(id, name)
+		}
+	}
+	return names
+}
 
 /** Saves successful, unmodified API response bodies outside the database. */
 async function saveRawResponse(endpoint: string, payload: unknown): Promise<Result<void, Error>> {
@@ -429,6 +470,28 @@ export class TanssSession {
 			return Result.err(new TanssApiError('TANSS ticket create returned no ticket id', null))
 		}
 		return Result.ok(parsed.output.content.id)
+	}
+
+	/** Open tickets of exactly one company (TANSS skips done tickets by default). */
+	async listOpenTickets(companyId: number): Promise<Result<TanssTicket[], Error>> {
+		const res = await this.userCall('ticket list', (client) =>
+			putApiV1Tickets({ client, body: { companies: [companyId] } }),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const dump = await saveRawResponse(`tickets-company-${companyId}`, res.value)
+		if (Result.isError(dump)) {
+			return dump
+		}
+		const states = linkedNames(res.value, 'ticketStates')
+		return Result.ok(
+			(listContent(res.value) as TicketList[]).map((ticket) => ({
+				ticket,
+				statusName:
+					ticket.statusId !== undefined ? (states.get(ticket.statusId) ?? null) : null,
+			})),
+		)
 	}
 
 	/** Creates a PC/server and returns it as stored by TANSS. */

@@ -20,6 +20,7 @@ import {
 	LinkBoardQuerySchema,
 	type IntegrationProvider as ProviderId,
 	TicketCreateSchema,
+	TicketListQuerySchema,
 } from 'shared/src/schemas'
 import {
 	checkListTenantParam,
@@ -58,7 +59,7 @@ import {
 	updateIntegration,
 } from '../integrations/store'
 import { getSyncRun, startSync } from '../integrations/sync'
-import { createTicket } from '../integrations/tickets'
+import { createTicket, listTickets } from '../integrations/tickets'
 import { updateExternalDevice } from '../integrations/update_device'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
@@ -124,7 +125,8 @@ async function checkExternalDeviceWrite(
  * tenants are global-write like tenants themselves; device links follow the
  * device's tenant scope.
  * External company lists are global-only: scoped users must not see other
- * customers. `tickets.create` opens tickets for tenants in scope.
+ * customers. `tickets.create` opens tickets for tenants in scope and lists
+ * their open tickets.
  * `integrations.manage` may also create conex devices in the external system
  * and overwrite external device fields with conex values.
  */
@@ -217,6 +219,24 @@ export const integrationsApp = new Hono()
 				checkTenant(c, input.tenant_id) ??
 				sendCreated(c, await createTicket(c.req.valid('param').provider, input))
 			)
+		},
+	)
+	.get(
+		'/:provider/tickets',
+		requirePermissionMiddleware('tickets.create'),
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('query', TicketListQuerySchema, onValidationError),
+		async (c) => {
+			const query = c.req.valid('query')
+			const denied = checkListTenantParam(c, query.tenant)
+			if (denied) {
+				return denied
+			}
+			const tenant = requestScope(c) ?? query.tenant
+			if (tenant === undefined) {
+				return jsonError(c, 'tenant is required', 400)
+			}
+			return sendResult(c, await listTickets(c.req.valid('param').provider, tenant))
 		},
 	)
 	.get(

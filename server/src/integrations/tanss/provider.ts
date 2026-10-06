@@ -4,6 +4,7 @@ import type {
 	DeviceUpdate,
 	ExternalDevice,
 	ExternalTenant,
+	ExternalTicket,
 	IntegrationProvider,
 	TicketInput,
 } from '../types'
@@ -15,6 +16,7 @@ import {
 	type TanssPc,
 	type TanssPeriphery,
 	TanssSession,
+	type TanssTicket,
 } from './client'
 
 function toTenant(company: TanssCompany): ExternalTenant {
@@ -91,6 +93,17 @@ function peripheryToDevice(
 		macs,
 		ips,
 		active: periphery.active !== false,
+	}
+}
+
+/** Last change is `modified`, else the last status change. */
+function toTicket({ ticket, statusName }: TanssTicket): ExternalTicket {
+	return {
+		id: ticket.id ?? 0,
+		title: text(ticket.title) ?? `#${ticket.id}`,
+		status: statusName,
+		created_at: ticket.creationDate ?? null,
+		modified_at: ticket.modified ?? ticket.lastStateChangeDate ?? null,
 	}
 }
 
@@ -232,6 +245,15 @@ export class TanssProvider implements IntegrationProvider {
 			title: input.title,
 			content: input.content,
 		})
+	}
+
+	async listTickets(externalTenantId: string): Promise<Result<ExternalTicket[], Error>> {
+		const companyId = Number(externalTenantId)
+		if (!Number.isInteger(companyId)) {
+			return Result.err(new Error(`Invalid TANSS company id ${externalTenantId}`))
+		}
+		const res = await this.session.listOpenTickets(companyId)
+		return res.map((tickets) => tickets.filter((t) => t.ticket.id !== undefined).map(toTicket))
 	}
 
 	/**

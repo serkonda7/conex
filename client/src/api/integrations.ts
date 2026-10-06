@@ -25,6 +25,7 @@ import type {
 	TenantIntegrationStatus,
 	TicketCreate,
 	TicketCreated,
+	TicketListJson,
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { client, failed, to_query, to_result } from './client'
@@ -42,6 +43,7 @@ export type {
 	LinkBoardLocal,
 	SyncRunJson,
 	TenantIntegrationStatus,
+	TicketListJson,
 }
 
 export async function fetch_integrations(): Promise<Result<IntegrationJson[], Error>> {
@@ -113,6 +115,18 @@ export async function create_ticket(
 		json: input,
 	})
 	return to_result<TicketCreated>(res, t('ticket.createFailed'))
+}
+
+/** Open tickets of `tenant` (scoped users: always their own tenant). */
+export async function fetch_tickets(
+	provider: IntegrationProvider,
+	tenant?: number,
+): Promise<Result<TicketListJson, Error>> {
+	const res = await client.integrations[':provider'].tickets.$get({
+		param: { provider },
+		query: to_query({ tenant }),
+	})
+	return to_result<TicketListJson>(res, t('ticket.listFailed'))
 }
 
 export async function fetch_sync_run(

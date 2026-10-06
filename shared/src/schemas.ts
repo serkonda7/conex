@@ -1505,6 +1505,33 @@ export interface TicketCreated {
 	id: number
 }
 
+/** Open tickets of one tenant; scoped users always get their own tenant. */
+export const TicketListQuerySchema = v.object({
+	tenant: OptionalIdEntry,
+})
+
+export type TicketListQuery = v.InferOutput<typeof TicketListQuerySchema>
+
+/** Open ticket in the external system (times in unix seconds). */
+export interface ExternalTicketJson {
+	id: number
+	title: string
+	/** Status name; null when the external system did not resolve it. */
+	status: string | null
+	created_at: number | null
+	modified_at: number | null
+}
+
+/**
+ * Open tickets of a tenant, cached server-side for up to 30 minutes.
+ * `linked` is false (and the list empty) without a company link.
+ */
+export interface TicketListJson {
+	linked: boolean
+	fetched_at: number | null
+	tickets: ExternalTicketJson[]
+}
+
 export type SyncRunState = 'running' | 'ok' | 'error'
 
 export interface SyncRunJson {

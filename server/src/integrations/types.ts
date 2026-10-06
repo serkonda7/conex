@@ -3,10 +3,15 @@ import type {
 	ExternalDeviceJson,
 	ExternalPushField,
 	ExternalTenantJson,
+	ExternalTicketJson,
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
 
-export type { ExternalDeviceJson as ExternalDevice, ExternalTenantJson as ExternalTenant }
+export type {
+	ExternalDeviceJson as ExternalDevice,
+	ExternalTenantJson as ExternalTenant,
+	ExternalTicketJson as ExternalTicket,
+}
 
 /**
  * One external system mapped onto normalized records, so linking, matching
@@ -23,6 +28,8 @@ export interface IntegrationProvider {
 	fetchDevices(externalTenantId: string): Promise<Result<ExternalDeviceJson[], Error>>
 	/** Opens a ticket and returns its external id; absent without a ticket system. */
 	createTicket?(input: TicketInput): Promise<Result<number, Error>>
+	/** Open tickets of one external tenant; absent without a ticket system. */
+	listTickets?(externalTenantId: string): Promise<Result<ExternalTicketJson[], Error>>
 	/** Creates a device and returns it as fetched by a sync; absent when unsupported. */
 	createDevice?(input: DeviceInput): Promise<Result<ExternalDeviceJson, Error>>
 	/** Overwrites fields of a device and returns it as fetched by a sync; absent when unsupported. */
