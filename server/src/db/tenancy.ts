@@ -491,8 +491,12 @@ export async function createSite(input: SiteCreate): Promise<Result<SiteRow, Err
 		name: input.name,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
-		physical_address: input.physical_address ?? null,
-		shipping_address: input.shipping_address ?? null,
+		physical_street: input.physical_street ?? null,
+		physical_postcode: input.physical_postcode ?? null,
+		physical_city: input.physical_city ?? null,
+		shipping_street: input.shipping_street ?? null,
+		shipping_postcode: input.shipping_postcode ?? null,
+		shipping_city: input.shipping_city ?? null,
 	}
 	const id = await tryWrite(async () =>
 		insertedId(await getDb().insert(sites).values(row).returning({ id: sites.id })),
@@ -518,8 +522,12 @@ export async function updateSite(id: number, input: SiteUpdate): Promise<Result<
 		'site_group_id',
 		'description',
 		'comments',
-		'physical_address',
-		'shipping_address',
+		'physical_street',
+		'physical_postcode',
+		'physical_city',
+		'shipping_street',
+		'shipping_postcode',
+		'shipping_city',
 	])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(() =>

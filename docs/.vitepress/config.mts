@@ -16,7 +16,10 @@ export default defineConfig({
 			},
 			{
 				text: 'Integrations',
-				items: [{ text: 'Consistency Checks', link: '/integrations/consistency' }],
+				items: [
+					{ text: 'Consistency Checks', link: '/integrations/consistency' },
+					{ text: 'AGFEO Dashboard', link: '/integrations/agfeo' },
+				],
 			},
 		],
 		socialLinks: [{ icon: 'github', link: 'https://github.com/serkonda7/conex' }],

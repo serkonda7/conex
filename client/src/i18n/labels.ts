@@ -200,6 +200,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'audit_log.view': 'permission.auditLogView',
 	'integrations.manage': 'permission.integrationsManage',
 	'tickets.create': 'permission.ticketsCreate',
+	'contacts.directory': 'permission.contactsDirectory',
 }
 
 /** Role permission (`view`, `users.manage`, …). */
@@ -364,10 +365,10 @@ export function contactScopeOptions(): { value: ContactScope; label: string }[] 
 const PHONE_TYPE_KEYS: Record<PhoneType, MessageKey> = {
 	phone: 'phoneType.phone',
 	mobile: 'phoneType.mobile',
-	fax: 'phoneType.fax',
+	extension: 'phoneType.extension',
 }
 
-/** Kind of an employee phone number (phone, mobile, fax). */
+/** Kind of an employee phone number (phone, mobile, extension). */
 export function phoneTypeLabel(value: string): string {
 	return lookup(PHONE_TYPE_KEYS, value)
 }

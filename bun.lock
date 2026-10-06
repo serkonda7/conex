@@ -33,6 +33,14 @@
         "vite-plugin-solid": "~2.11.14",
       },
     },
+    "plugins/agfeo-ldap": {
+      "name": "agfeo-ldap",
+      "version": "0.0.0-dev",
+      "dependencies": {
+        "better-result": "catalog:",
+        "shared": "workspace:*",
+      },
+    },
     "server": {
       "name": "server",
       "version": "0.0.0-dev",
@@ -499,6 +507,8 @@
     "@vueuse/metadata": ["@vueuse/metadata@12.8.2", "", {}, "sha512-rAyLGEuoBJ/Il5AmFHiziCPdQzRt88VxR+Y/A/QhJ1EWtWqPBBAxTAFaSkviwEuOEZNtW8pvkPgoCZQ+HxqW1A=="],
 
     "@vueuse/shared": ["@vueuse/shared@12.8.2", "", { "dependencies": { "vue": "^3.5.13" } }, "sha512-dznP38YzxZoNloI0qpEfpkms8knDtaoQ6Y/sfS0L7Yki4zh40LFHEhur0odJC6xTHG5dxWVPiUWBXn+wCG2s5w=="],
+
+    "agfeo-ldap": ["agfeo-ldap@workspace:plugins/agfeo-ldap"],
 
     "algoliasearch": ["algoliasearch@5.59.0", "", { "dependencies": { "@algolia/abtesting": "1.25.0", "@algolia/client-abtesting": "5.59.0", "@algolia/client-analytics": "5.59.0", "@algolia/client-common": "5.59.0", "@algolia/client-insights": "5.59.0", "@algolia/client-personalization": "5.59.0", "@algolia/client-query-suggestions": "5.59.0", "@algolia/client-search": "5.59.0", "@algolia/ingestion": "1.59.0", "@algolia/monitoring": "1.59.0", "@algolia/recommend": "5.59.0", "@algolia/requester-browser-xhr": "5.59.0", "@algolia/requester-fetch": "5.59.0", "@algolia/requester-node-http": "5.59.0" } }, "sha512-wUXzaeI7B526W4y1gFg3lcxgDZ67XSgRJIiellYWOas/pLpO7rOtxm9Gr2E/C8aiSDXIgx1q5TdSsvK67Uakqw=="],
 

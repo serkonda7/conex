@@ -1173,6 +1173,23 @@ tbody tr:last-child td {
 	width: auto;
 }
 
+/* Postcode and city share one row; the postcode stays narrow. */
+.address-place-row {
+	display: flex;
+	gap: 0.4rem;
+}
+
+.app-content .form-stacked .field .address-place-row input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+}
+
+.app-content .form-stacked .field .address-place-row .address-postcode {
+	flex: 0 0 7rem;
+	width: 7rem;
+}
+
 /* Kind / scope selects stay narrow. */
 .app-content .form-stacked .field .contact-row select {
 	flex: 0 0 8rem;

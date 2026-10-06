@@ -1,4 +1,4 @@
-import type { SiteCreate } from 'shared/src/types'
+import type { InputEventAndTarget, SiteCreate } from 'shared/src/types'
 import { createMemo, createSignal, type JSX } from 'solid-js'
 import {
 	create_site,
@@ -11,11 +11,13 @@ import {
 import {
 	CommentsField,
 	DescriptionField,
+	Field,
 	FormPage,
+	FormSection,
 	NameField,
 	row_options,
 	SelectField,
-	TextAreaField,
+	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import {
@@ -31,14 +33,71 @@ import { createRows } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { useTenantDefault } from '../../lib/tenant_context'
 
+/** Street, postcode and city of one site address. */
+interface Address {
+	street: string
+	postcode: string
+	city: string
+}
+
+const blankAddress = (): Address => ({ street: '', postcode: '', city: '' })
+
+/** Titled street / postcode / city inputs of one site address. */
+function AddressFields(props: {
+	id: string
+	title: string
+	value: Address
+	onChange: (value: Address) => void
+}): JSX.Element {
+	const set = (patch: Partial<Address>): void => props.onChange({ ...props.value, ...patch })
+	return (
+		<FormSection title={props.title}>
+			<TextField
+				id={`${props.id}-street`}
+				label={t('site.street')}
+				placeholder={t('site.streetPlaceholder')}
+				maxLength={200}
+				autocomplete="off"
+				value={props.value.street}
+				onInput={(street: string) => set({ street })}
+			/>
+			<Field label={t('site.postcodeCity')} for={`${props.id}-postcode`}>
+				<div class="address-place-row">
+					<input
+						id={`${props.id}-postcode`}
+						class="address-postcode"
+						aria-label={t('site.postcode')}
+						placeholder={t('site.postcodePlaceholder')}
+						maxLength={20}
+						autocomplete="off"
+						value={props.value.postcode}
+						onInput={(e: InputEventAndTarget) =>
+							set({ postcode: e.currentTarget.value })
+						}
+					/>
+					<input
+						id={`${props.id}-city`}
+						aria-label={t('site.city')}
+						placeholder={t('site.cityPlaceholder')}
+						maxLength={100}
+						autocomplete="off"
+						value={props.value.city}
+						onInput={(e: InputEventAndTarget) => set({ city: e.currentTarget.value })}
+					/>
+				</div>
+			</Field>
+		</FormSection>
+	)
+}
+
 /** Site create (`id` omitted) or edit form. */
 function SiteForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [groupId, setGroupId] = createSignal(queryParam('group'))
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
-	const [physicalAddress, setPhysicalAddress] = createSignal('')
-	const [shippingAddress, setShippingAddress] = createSignal('')
+	const [physicalAddress, setPhysicalAddress] = createSignal(blankAddress())
+	const [shippingAddress, setShippingAddress] = createSignal(blankAddress())
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_site,
@@ -48,8 +107,16 @@ function SiteForm(props: { id?: number }): JSX.Element {
 			setGroupId(id_value(row.site_group_id))
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
-			setPhysicalAddress(row.physical_address ?? '')
-			setShippingAddress(row.shipping_address ?? '')
+			setPhysicalAddress({
+				street: row.physical_street ?? '',
+				postcode: row.physical_postcode ?? '',
+				city: row.physical_city ?? '',
+			})
+			setShippingAddress({
+				street: row.shipping_street ?? '',
+				postcode: row.shipping_postcode ?? '',
+				city: row.shipping_city ?? '',
+			})
 		},
 	})
 	const [tenants] = createRows(fetch_tenants, form.setError)
@@ -69,8 +136,12 @@ function SiteForm(props: { id?: number }): JSX.Element {
 		site_group_id: parseId(groupId()),
 		description: text(description()),
 		comments: text(comments()),
-		physical_address: text(physicalAddress()),
-		shipping_address: text(shippingAddress()),
+		physical_street: text(physicalAddress().street),
+		physical_postcode: text(physicalAddress().postcode),
+		physical_city: text(physicalAddress().city),
+		shipping_street: text(shippingAddress().street),
+		shipping_postcode: text(shippingAddress().postcode),
+		shipping_city: text(shippingAddress().city),
 	})
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
@@ -126,23 +197,17 @@ function SiteForm(props: { id?: number }): JSX.Element {
 				onInput={setDescription}
 			/>
 			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
-			<TextAreaField
-				id={`${prefix}-physical-address`}
-				label={t('site.physicalAddress')}
-				placeholder={t('site.physicalAddressPlaceholder')}
-				rows={3}
-				maxLength={500}
+			<AddressFields
+				id={`${prefix}-physical`}
+				title={t('site.physicalAddress')}
 				value={physicalAddress()}
-				onInput={setPhysicalAddress}
+				onChange={setPhysicalAddress}
 			/>
-			<TextAreaField
-				id={`${prefix}-shipping-address`}
-				label={t('site.shippingAddress')}
-				placeholder={t('site.shippingAddressPlaceholder')}
-				rows={3}
-				maxLength={500}
+			<AddressFields
+				id={`${prefix}-shipping`}
+				title={t('site.shippingAddress')}
 				value={shippingAddress()}
-				onInput={setShippingAddress}
+				onChange={setShippingAddress}
 			/>
 		</FormPage>
 	)

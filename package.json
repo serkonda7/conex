@@ -5,7 +5,8 @@
   "workspaces": [
     "server",
     "client",
-    "shared"
+    "shared",
+    "plugins/*"
   ],
   "scripts": {
     "lint": "biome check --write",

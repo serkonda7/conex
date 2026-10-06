@@ -135,7 +135,9 @@ export const TenantUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
-export const AddressSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined)
+const StreetSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
+const PostcodeSchema = v.pipe(v.string(), v.trim(), v.maxLength(20))
+const CitySchema = v.pipe(v.string(), v.trim(), v.maxLength(100))
 
 export const SiteCommentsSchema = v.optional(
 	v.pipe(v.string(), v.trim(), v.maxLength(2000)),
@@ -148,8 +150,12 @@ export const SiteCreateSchema = v.strictObject({
 	site_group_id: NullableIdSchema,
 	description: DescriptionSchema,
 	comments: SiteCommentsSchema,
-	physical_address: AddressSchema,
-	shipping_address: AddressSchema,
+	physical_street: v.optional(StreetSchema, undefined),
+	physical_postcode: v.optional(PostcodeSchema, undefined),
+	physical_city: v.optional(CitySchema, undefined),
+	shipping_street: v.optional(StreetSchema, undefined),
+	shipping_postcode: v.optional(PostcodeSchema, undefined),
+	shipping_city: v.optional(CitySchema, undefined),
 })
 
 export const SiteUpdateSchema = v.strictObject({
@@ -158,14 +164,12 @@ export const SiteUpdateSchema = v.strictObject({
 	site_group_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
-	physical_address: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
-		undefined,
-	),
-	shipping_address: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
-		undefined,
-	),
+	physical_street: v.optional(v.nullable(StreetSchema), undefined),
+	physical_postcode: v.optional(v.nullable(PostcodeSchema), undefined),
+	physical_city: v.optional(v.nullable(CitySchema), undefined),
+	shipping_street: v.optional(v.nullable(StreetSchema), undefined),
+	shipping_postcode: v.optional(v.nullable(PostcodeSchema), undefined),
+	shipping_city: v.optional(v.nullable(CitySchema), undefined),
 })
 
 /** Built-in location kinds; `other` covers anything not listed. */
@@ -236,8 +240,8 @@ export const ContactScopeSchema = v.picklist(CONTACT_SCOPES)
 
 export type ContactScope = v.InferOutput<typeof ContactScopeSchema>
 
-/** Kind of an employee phone number. */
-export const PHONE_TYPES = ['phone', 'mobile', 'fax'] as const
+/** Kind of an employee phone number; `extension` is a direct-dial extension (Durchwahl). */
+export const PHONE_TYPES = ['phone', 'mobile', 'extension'] as const
 
 export const PhoneTypeSchema = v.picklist(PHONE_TYPES)
 
@@ -297,6 +301,28 @@ export const EmployeeUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
+
+/**
+ * Active employee as published by `/directory/contacts` for telephony. Phone
+ * numbers are normalized (`normalizePhone`) and spread over fixed slots;
+ * further numbers are left out.
+ */
+export interface DirectoryContact {
+	id: number
+	customer_number: string | null
+	company: string
+	first_name: string | null
+	last_name: string
+	name: string
+	title: string | null
+	email: string | null
+	phone_business: string | null
+	phone_business2: string | null
+	phone_home: string | null
+	phone_home2: string | null
+	phone_mobile: string | null
+	phone_mobile2: string | null
+}
 
 export type EmployeeCreate = v.InferOutput<typeof EmployeeCreateSchema>
 export type EmployeeUpdate = v.InferOutput<typeof EmployeeUpdateSchema>
@@ -1120,7 +1146,9 @@ export type TopologyQuery = v.InferOutput<typeof TopologyQuerySchema>
  * inventory and catalog resource at once (`edit` = create + update,
  * including CSV import). The rest gate the admin areas; `integrations.manage`
  * covers both configuring providers and running syncs / links;
- * `tickets.create` opens tickets in the external ticket system (TANSS).
+ * `tickets.create` opens tickets in the external ticket system (TANSS);
+ * `contacts.directory` reads the contact directory (`/directory/contacts`),
+ * e.g. for the AGFEO Dashboard LDAP plugin.
  */
 export const PERMISSIONS = [
 	'view',
@@ -1131,6 +1159,7 @@ export const PERMISSIONS = [
 	'audit_log.view',
 	'integrations.manage',
 	'tickets.create',
+	'contacts.directory',
 ] as const
 
 export const PermissionSchema = v.picklist(PERMISSIONS)

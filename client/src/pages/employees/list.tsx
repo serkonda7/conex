@@ -111,12 +111,13 @@ export function EmployeesPage(): JSX.Element {
 		<EntityListPage
 			list={list}
 			title={tp('entity.employee', 2)}
-			addHref="/employees/add"
+			// The filtered tenant is preselected in the add form.
+			addHref={filterTenant() ? `/employees/add?tenant=${filterTenant()}` : '/employees/add'}
 			searchPlaceholder={t('employee.searchPlaceholder')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="employees"
-			defaultColumns={['name', 'title', 'email', 'phone', 'tenant', 'status']}
+			defaultColumns={['name', 'title', 'email', 'phone', 'mobile', 'status']}
 			rowName={(e: EmployeeRow): string => e.name}
 			editHref={(e: EmployeeRow): string => `/employees/${e.id}/edit`}
 			emptyText={t('employee.empty')}

@@ -11,6 +11,7 @@ import { changelogApp } from './routes/changelog'
 import { deviceRolesApp } from './routes/device_roles'
 import { deviceTypesApp } from './routes/device_types'
 import { devicesApp } from './routes/devices'
+import { directoryApp } from './routes/directory'
 import { employeesApp } from './routes/employees'
 import { integrationsApp } from './routes/integrations'
 import { interfacesApp } from './routes/interfaces'
@@ -84,6 +85,7 @@ export function createApp() {
 			.route('/topology', topologyApp)
 			.route('/search', searchApp)
 			.route('/integrations', integrationsApp)
+			.route('/directory', directoryApp)
 	)
 }
 

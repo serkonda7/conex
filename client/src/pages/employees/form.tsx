@@ -1,4 +1,5 @@
 import { IconPlus, IconTrash } from '@tabler/icons-solidjs'
+import { inferPhoneType } from 'shared/src/phone'
 import type {
 	ContactScope,
 	EmployeeCreate,
@@ -43,7 +44,16 @@ import { useTenantDefault } from '../../lib/tenant_context'
 type SelectEvent = Event & { currentTarget: HTMLSelectElement }
 
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
-const blankPhone = (): EmployeePhone => ({ number: '', type: 'phone', scope: 'work' })
+/** Phone row being edited; `typePicked` once the type no longer follows the number. */
+type PhoneRow = EmployeePhone & { typePicked?: boolean }
+
+const blankPhone = (): PhoneRow => ({ number: '', type: 'phone', scope: 'work' })
+
+/** Loaded rows whose type differs from the inferred one keep it while editing. */
+const phoneRow = (p: EmployeePhone): PhoneRow => ({
+	...p,
+	typePicked: inferPhoneType(p.number) !== p.type,
+})
 
 /** Native `<select>` of a contact row. */
 function RowSelect<T extends string>(props: {
@@ -119,7 +129,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const [salutation, setSalutation] = createSignal('')
 	const [title, setTitle] = createSignal('')
 	const [emails, setEmails] = createSignal<EmployeeEmail[]>([blankEmail()])
-	const [phones, setPhones] = createSignal<EmployeePhone[]>([blankPhone()])
+	const [phones, setPhones] = createSignal<PhoneRow[]>([blankPhone()])
 	const [active, setActive] = createSignal(true)
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
@@ -133,7 +143,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			tenant.pick(id_value(row.tenant_id))
 			setTitle(row.title ?? '')
 			setEmails(row.emails.length > 0 ? row.emails : [blankEmail()])
-			setPhones(row.phones.length > 0 ? row.phones : [blankPhone()])
+			setPhones(row.phones.length > 0 ? row.phones.map(phoneRow) : [blankPhone()])
 			setActive(row.active === 1)
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
@@ -158,7 +168,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			.map((e) => ({ ...e, address: e.address.trim() }))
 			.filter((e) => e.address !== ''),
 		phones: phones()
-			.map((p) => ({ ...p, number: p.number.trim() }))
+			.map(({ typePicked: _, ...p }) => ({ ...p, number: p.number.trim() }))
 			.filter((p) => p.number !== ''),
 		active: active(),
 		description: text(description()),
@@ -285,8 +295,8 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				onChange={setPhones}
 				blank={blankPhone}
 				row={(
-					entry: () => EmployeePhone,
-					update: (patch: Partial<EmployeePhone>) => void,
+					entry: () => PhoneRow,
+					update: (patch: Partial<PhoneRow>) => void,
 					index: number,
 				): JSX.Element => (
 					<>
@@ -297,15 +307,17 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 							maxLength={200}
 							aria-label={t('employee.phoneNumber')}
 							value={entry().number}
-							onInput={(e: InputEventAndTarget) =>
-								update({ number: e.currentTarget.value })
-							}
+							onInput={(e: InputEventAndTarget) => {
+								const number = e.currentTarget.value
+								const inferred = entry().typePicked ? null : inferPhoneType(number)
+								update(inferred === null ? { number } : { number, type: inferred })
+							}}
 						/>
 						<RowSelect
 							label={t('employee.phoneType')}
 							value={entry().type}
 							options={phoneTypeOptions()}
-							onChange={(type: PhoneType) => update({ type })}
+							onChange={(type: PhoneType) => update({ type, typePicked: true })}
 						/>
 						<RowSelect
 							label={t('employee.contactScope')}

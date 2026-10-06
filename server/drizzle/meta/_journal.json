@@ -148,6 +148,20 @@
       "when": 1791287259408,
       "tag": "0020_employee_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791293894109,
+      "tag": "0021_directory_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791296390774,
+      "tag": "0022_site_addresses",
+      "breakpoints": true
     }
   ]
 }

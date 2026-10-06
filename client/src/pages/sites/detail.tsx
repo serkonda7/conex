@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, type JSX } from 'solid-js'
+import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_racks, type RackRow } from '../../api/racks'
 import {
@@ -48,6 +48,24 @@ function treeOrder(rows: readonly LocationRow[]): { row: LocationRow; depth: num
 	}
 	visit(null, 0)
 	return out
+}
+
+/** Address as "street" over "postcode city", or a dash when empty. */
+function SiteAddress(props: {
+	street?: string | null
+	postcode?: string | null
+	city?: string | null
+}): JSX.Element {
+	const place = (): string => [props.postcode, props.city].filter(Boolean).join(' ')
+	return (
+		<Show when={props.street || place()} fallback="—">
+			{props.street}
+			<Show when={props.street && place()}>
+				<br />
+			</Show>
+			{place()}
+		</Show>
+	)
 }
 
 /**
@@ -106,9 +124,21 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					<dt>{t('common.comments')}</dt>
 					<dd>{site()?.comments || '—'}</dd>
 					<dt>{t('site.physicalAddress')}</dt>
-					<dd>{site()?.physical_address || '—'}</dd>
+					<dd>
+						<SiteAddress
+							street={site()?.physical_street}
+							postcode={site()?.physical_postcode}
+							city={site()?.physical_city}
+						/>
+					</dd>
 					<dt>{t('site.shippingAddress')}</dt>
-					<dd>{site()?.shipping_address || '—'}</dd>
+					<dd>
+						<SiteAddress
+							street={site()?.shipping_street}
+							postcode={site()?.shipping_postcode}
+							city={site()?.shipping_city}
+						/>
+					</dd>
 				</DetailCard>
 			</DetailShell>
 
