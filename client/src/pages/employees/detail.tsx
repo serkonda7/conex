@@ -1,7 +1,7 @@
-import type { EmployeeEmail, EmployeePhone } from 'shared/src/types'
-import { createSignal, For, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { delete_employee, fetch_employee } from '../../api/employees'
 import { fetch_tenant } from '../../api/tenancy'
+import { EmailList, PhoneList } from '../../components/contacts'
 import {
 	DetailCard,
 	DetailHeader,
@@ -12,52 +12,10 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
-import { contactScopeLabel, employeeSalutationLabel, phoneTypeLabel } from '../../i18n/labels'
+import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord } from '../../lib/resource'
 import { EmployeeIntegrationCards } from '../integrations/cards'
-import { EmailLink, EmployeeStatus } from './list'
-
-/** Mail addresses, one per line with their scope; the first is marked primary. */
-function EmailList(props: { emails: EmployeeEmail[] }): JSX.Element {
-	return (
-		<Show when={props.emails.length > 0} fallback="—">
-			<ul class="contact-list">
-				<For each={props.emails}>
-					{(e: EmployeeEmail, index: () => number): JSX.Element => (
-						<li>
-							<EmailLink email={e.address} />{' '}
-							<span class="text-muted">{contactScopeLabel(e.scope)}</span>
-							<Show when={index() === 0 && props.emails.length > 1}>
-								{' '}
-								<span class="badge">{t('employee.primary')}</span>
-							</Show>
-						</li>
-					)}
-				</For>
-			</ul>
-		</Show>
-	)
-}
-
-/** Phone numbers, one per line with their kind and scope. */
-function PhoneList(props: { phones: EmployeePhone[] }): JSX.Element {
-	return (
-		<Show when={props.phones.length > 0} fallback="—">
-			<ul class="contact-list">
-				<For each={props.phones}>
-					{(p: EmployeePhone): JSX.Element => (
-						<li>
-							<a href={`tel:${p.number.replace(/[^\d+]/g, '')}`}>{p.number}</a>{' '}
-							<span class="text-muted">
-								{phoneTypeLabel(p.type)} · {contactScopeLabel(p.scope)}
-							</span>
-						</li>
-					)}
-				</For>
-			</ul>
-		</Show>
-	)
-}
+import { EmployeeStatus } from './list'
 
 /**
  * /employees/:id — employee detail: header with description, the contact

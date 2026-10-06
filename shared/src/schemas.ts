@@ -90,6 +90,102 @@ const NullableIdSchema = v.optional(v.nullable(IdSchema), undefined)
 /** Maximum nesting depth of the location tree (root counts as depth 1). */
 export const MAX_LOCATION_DEPTH = 5
 
+/** Optional short contact field (title, email, phone numbers). */
+const ContactFieldSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
+
+const EmailSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.maxLength(200),
+	v.email('Must be an email address'),
+)
+
+/** Salutation of an employee (`mr` = Herr, `ms` = Frau). */
+export const EMPLOYEE_SALUTATIONS = ['mr', 'ms'] as const
+
+export const EmployeeSalutationSchema = v.picklist(EMPLOYEE_SALUTATIONS)
+
+export type EmployeeSalutation = v.InferOutput<typeof EmployeeSalutationSchema>
+
+/** Whether an employee's mail address or phone number is for work or private use. */
+export const CONTACT_SCOPES = ['work', 'private'] as const
+
+export const ContactScopeSchema = v.picklist(CONTACT_SCOPES)
+
+export type ContactScope = v.InferOutput<typeof ContactScopeSchema>
+
+/** Kind of an employee phone number; `extension` is a direct-dial extension (Durchwahl). */
+export const PHONE_TYPES = ['phone', 'mobile', 'extension'] as const
+
+export const PhoneTypeSchema = v.picklist(PHONE_TYPES)
+
+export type PhoneType = v.InferOutput<typeof PhoneTypeSchema>
+
+/** One mail address of an employee; the first one in the list is the primary address. */
+export const EmployeeEmailSchema = v.strictObject({
+	address: EmailSchema,
+	scope: ContactScopeSchema,
+})
+
+export const EmployeePhoneSchema = v.strictObject({
+	number: v.pipe(ContactFieldSchema, v.minLength(1)),
+	type: PhoneTypeSchema,
+	scope: ContactScopeSchema,
+})
+
+/**
+ * Company-wide mail address / phone number of a tenant (main contact). No
+ * work/private scope; the first mail address is the primary one, and its
+ * domain is the company mail domain.
+ */
+export const TenantEmailSchema = v.strictObject({ address: EmailSchema })
+
+export const TenantPhoneSchema = v.strictObject({
+	number: v.pipe(ContactFieldSchema, v.minLength(1)),
+	type: PhoneTypeSchema,
+})
+
+export type EmployeeEmail = v.InferOutput<typeof EmployeeEmailSchema>
+export type EmployeePhone = v.InferOutput<typeof EmployeePhoneSchema>
+export type TenantEmail = v.InferOutput<typeof TenantEmailSchema>
+export type TenantPhone = v.InferOutput<typeof TenantPhoneSchema>
+
+const EmployeeEmailsSchema = v.pipe(v.array(EmployeeEmailSchema), v.maxLength(20))
+const EmployeePhonesSchema = v.pipe(v.array(EmployeePhoneSchema), v.maxLength(20))
+const TenantEmailsSchema = v.pipe(v.array(TenantEmailSchema), v.maxLength(20))
+const TenantPhonesSchema = v.pipe(v.array(TenantPhoneSchema), v.maxLength(20))
+
+/** Primary mail address: the first one in the list. */
+export function primaryEmail(emails: readonly TenantEmail[]): string | null {
+	return emails[0]?.address ?? null
+}
+
+/** First phone number of `type`, the primary one of that kind. */
+export function primaryPhone(phones: readonly TenantPhone[], type: PhoneType): string | null {
+	return phones.find((p) => p.type === type)?.number ?? null
+}
+
+/** Company mail domain of a tenant: the domain of its primary mail address. */
+export function emailDomain(emails: readonly TenantEmail[]): string | null {
+	const address = primaryEmail(emails)
+	const at = address?.lastIndexOf('@') ?? -1
+	return address && at >= 0 ? address.slice(at + 1) : null
+}
+
+/**
+ * Completes an address typed without a domain (`max.mustermann` or
+ * `max.mustermann@`) with `domain`; other input is returned unchanged.
+ */
+export function withEmailDomain(address: string, domain: string | null): string {
+	const trimmed = address.trim()
+	const at = trimmed.indexOf('@')
+	const local = at >= 0 ? trimmed.slice(0, at) : trimmed
+	if (domain === null || local === '' || (at >= 0 && at < trimmed.length - 1)) {
+		return address
+	}
+	return `${local}@${domain}`
+}
+
 /** Tenant groups are flat: a named bundle of tenants, no parent. */
 export const TenantGroupCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -116,10 +212,26 @@ export const DeviceIdSchema = v.optional(
 	undefined,
 )
 
+/** Company website: a full http(s) URL or a bare host like `acme.de`. */
+const WebsiteSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.maxLength(200),
+	v.regex(/^(https?:\/\/)?[^\s/:]+\.[^\s/:]+(:\d+)?(\/\S*)?$/i, 'Must be a website address'),
+)
+
+/** Link target of a website: bare hosts get `https://`. */
+export function websiteUrl(website: string): string {
+	return /^https?:\/\//i.test(website) ? website : `https://${website}`
+}
+
 export const TenantCreateSchema = v.strictObject({
 	name: NameSchema,
 	tenant_group_id: NullableIdSchema,
 	customer_number: CustomerNumberSchema,
+	website: v.optional(WebsiteSchema, undefined),
+	emails: v.optional(TenantEmailsSchema, []),
+	phones: v.optional(TenantPhonesSchema, []),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
@@ -131,6 +243,9 @@ export const TenantUpdateSchema = v.strictObject({
 		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))),
 		undefined,
 	),
+	website: v.optional(v.nullable(WebsiteSchema), undefined),
+	emails: v.optional(TenantEmailsSchema, undefined),
+	phones: v.optional(TenantPhonesSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -215,65 +330,6 @@ export const LocationUpdateSchema = v.strictObject({
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
-
-/** Optional short contact field (title, email, phone numbers). */
-const ContactFieldSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
-
-const EmailSchema = v.pipe(
-	v.string(),
-	v.trim(),
-	v.maxLength(200),
-	v.email('Must be an email address'),
-)
-
-/** Salutation of an employee (`mr` = Herr, `ms` = Frau). */
-export const EMPLOYEE_SALUTATIONS = ['mr', 'ms'] as const
-
-export const EmployeeSalutationSchema = v.picklist(EMPLOYEE_SALUTATIONS)
-
-export type EmployeeSalutation = v.InferOutput<typeof EmployeeSalutationSchema>
-
-/** Whether an employee's mail address or phone number is for work or private use. */
-export const CONTACT_SCOPES = ['work', 'private'] as const
-
-export const ContactScopeSchema = v.picklist(CONTACT_SCOPES)
-
-export type ContactScope = v.InferOutput<typeof ContactScopeSchema>
-
-/** Kind of an employee phone number; `extension` is a direct-dial extension (Durchwahl). */
-export const PHONE_TYPES = ['phone', 'mobile', 'extension'] as const
-
-export const PhoneTypeSchema = v.picklist(PHONE_TYPES)
-
-export type PhoneType = v.InferOutput<typeof PhoneTypeSchema>
-
-/** One mail address of an employee; the first one in the list is the primary address. */
-export const EmployeeEmailSchema = v.strictObject({
-	address: EmailSchema,
-	scope: ContactScopeSchema,
-})
-
-export const EmployeePhoneSchema = v.strictObject({
-	number: v.pipe(ContactFieldSchema, v.minLength(1)),
-	type: PhoneTypeSchema,
-	scope: ContactScopeSchema,
-})
-
-export type EmployeeEmail = v.InferOutput<typeof EmployeeEmailSchema>
-export type EmployeePhone = v.InferOutput<typeof EmployeePhoneSchema>
-
-const EmployeeEmailsSchema = v.pipe(v.array(EmployeeEmailSchema), v.maxLength(20))
-const EmployeePhonesSchema = v.pipe(v.array(EmployeePhoneSchema), v.maxLength(20))
-
-/** Primary mail address: the first one in the list. */
-export function primaryEmail(emails: readonly EmployeeEmail[]): string | null {
-	return emails[0]?.address ?? null
-}
-
-/** First phone number of `type`, the primary one of that kind. */
-export function primaryPhone(phones: readonly EmployeePhone[], type: PhoneType): string | null {
-	return phones.find((p) => p.type === type)?.number ?? null
-}
 
 /** Employees always belong to a tenant (contact persons of a customer). */
 export const EmployeeCreateSchema = v.strictObject({

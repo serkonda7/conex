@@ -16,6 +16,8 @@ import {
 	type EmployeeEmail,
 	type EmployeePhone,
 	LOCATION_TYPES,
+	type TenantEmail,
+	type TenantPhone,
 } from 'shared/src/schemas'
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
@@ -116,6 +118,16 @@ export const audit_log = pgTable(
 // children exist (enforced in the service layer, not by FK cascade).
 // ---------------------------------------------------------------------------
 
+/**
+ * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
+ * stringifies first, and Bun's SQL driver then stores that string as a JSON
+ * string instead of an object.
+ */
+const jsonb = customType<{ data: unknown; driverData: unknown }>({
+	dataType: () => 'jsonb',
+	toDriver: (value: unknown): unknown => value,
+})
+
 // Tenant groups are flat (no nesting) and own no inventory: they only
 // bundle tenants so several can be selected at once. A tenant sits in at
 // most one group; group delete is blocked while tenants reference it.
@@ -138,6 +150,11 @@ export const tenants = pgTable(
 		tenant_group_id: integer('tenant_group_id').references(() => tenant_groups.id),
 		name: text('name').notNull(),
 		customer_number: text('customer_number').unique(),
+		website: text('website'),
+		// Company-wide mail addresses (first = primary, its domain completes
+		// employee addresses) and phone numbers, in display order.
+		emails: jsonb('emails').$type<TenantEmail[]>().notNull().default(sql`'[]'::jsonb`),
+		phones: jsonb('phones').$type<TenantPhone[]>().notNull().default(sql`'[]'::jsonb`),
 		description: text('description'),
 		comments: text('comments'),
 	},
@@ -210,16 +227,6 @@ export const locations = pgTable(
 		uniqueIndex('locations_sibling_slug_idx').on(table.site_id, table.parent_id, table.slug),
 	],
 )
-
-/**
- * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
- * stringifies first, and Bun's SQL driver then stores that string as a JSON
- * string instead of an object.
- */
-const jsonb = customType<{ data: unknown; driverData: unknown }>({
-	dataType: () => 'jsonb',
-	toDriver: (value: unknown): unknown => value,
-})
 
 // Employees: contact persons of a tenant (NetBox-style contacts). Every
 // employee belongs to exactly one tenant; tenant delete is blocked while

@@ -1,14 +1,6 @@
-import { IconPlus, IconTrash } from '@tabler/icons-solidjs'
-import { inferPhoneType } from 'shared/src/phone'
-import type {
-	ContactScope,
-	EmployeeCreate,
-	EmployeeEmail,
-	EmployeePhone,
-	InputEventAndTarget,
-	PhoneType,
-} from 'shared/src/types'
-import { createSignal, For, Index, type JSX } from 'solid-js'
+import { emailDomain, withEmailDomain } from 'shared/src/schemas'
+import type { ContactScope, EmployeeCreate, EmployeeEmail, EmployeePhone } from 'shared/src/types'
+import { createSignal, type JSX } from 'solid-js'
 import {
 	create_employee,
 	type EmployeeRow,
@@ -17,17 +9,26 @@ import {
 } from '../../api/employees'
 import { fetch_tenants } from '../../api/tenancy'
 import {
+	ContactListField,
+	EmailInput,
+	emailsOf,
+	PhoneInputs,
+	type PhoneRow,
+	phoneRow,
+	phonesOf,
+	RowSelect,
+} from '../../components/contacts'
+import {
 	CheckboxField,
 	CommentsField,
 	DescriptionField,
-	Field,
 	FormPage,
 	row_options,
 	SelectField,
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { contactScopeOptions, employeeSalutationOptions, phoneTypeOptions } from '../../i18n/labels'
+import { contactScopeOptions, employeeSalutationOptions } from '../../i18n/labels'
 import {
 	cleared,
 	type FormValues,
@@ -41,86 +42,8 @@ import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 import { useTenantDefault } from '../../lib/tenant_context'
 
-type SelectEvent = Event & { currentTarget: HTMLSelectElement }
-
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
-/** Phone row being edited; `typePicked` once the type no longer follows the number. */
-type PhoneRow = EmployeePhone & { typePicked?: boolean }
-
-const blankPhone = (): PhoneRow => ({ number: '', type: 'phone', scope: 'work' })
-
-/** Loaded rows whose type differs from the inferred one keep it while editing. */
-const phoneRow = (p: EmployeePhone): PhoneRow => ({
-	...p,
-	typePicked: inferPhoneType(p.number) !== p.type,
-})
-
-/** Native `<select>` of a contact row. */
-function RowSelect<T extends string>(props: {
-	label: string
-	value: T
-	options: { value: T; label: string }[]
-	onChange: (value: T) => void
-}): JSX.Element {
-	return (
-		<select
-			aria-label={props.label}
-			value={props.value}
-			onChange={(e: SelectEvent): void => props.onChange(e.currentTarget.value as T)}
-		>
-			<For each={props.options}>
-				{(o: { value: T; label: string }): JSX.Element => (
-					<option value={o.value}>{o.label}</option>
-				)}
-			</For>
-		</select>
-	)
-}
-
-/**
- * Editable list of contact rows (mail addresses or phone numbers): one row
- * per entry with a remove button, plus an add button below. Rows keep their
- * DOM nodes by index, so typing never loses focus.
- */
-function ContactListField<T>(props: {
-	id: string
-	label: string
-	addLabel: string
-	rows: T[]
-	onChange: (rows: T[]) => void
-	blank: () => T
-	row: (entry: () => T, update: (patch: Partial<T>) => void, index: number) => JSX.Element
-}): JSX.Element {
-	const update = (index: number, patch: Partial<T>): void =>
-		props.onChange(props.rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
-	return (
-		<Field label={props.label} for={`${props.id}-0`}>
-			<Index each={props.rows}>
-				{(entry: () => T, index: number): JSX.Element => (
-					<div class="contact-row">
-						{props.row(entry, (patch: Partial<T>) => update(index, patch), index)}
-						<button
-							type="button"
-							class="icon-btn"
-							aria-label={t('employee.removeEntry')}
-							title={t('employee.removeEntry')}
-							onClick={() => props.onChange(props.rows.filter((_, i) => i !== index))}
-						>
-							<IconTrash size={16} />
-						</button>
-					</div>
-				)}
-			</Index>
-			<button
-				type="button"
-				class="contact-add"
-				onClick={() => props.onChange([...props.rows, props.blank()])}
-			>
-				<IconPlus size={14} aria-hidden="true" /> {props.addLabel}
-			</button>
-		</Field>
-	)
-}
+const blankPhone = (): PhoneRow<EmployeePhone> => ({ number: '', type: 'phone', scope: 'work' })
 
 /** Employee create (`id` omitted) or edit form. */
 function EmployeeForm(props: { id?: number }): JSX.Element {
@@ -129,7 +52,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const [salutation, setSalutation] = createSignal('')
 	const [title, setTitle] = createSignal('')
 	const [emails, setEmails] = createSignal<EmployeeEmail[]>([blankEmail()])
-	const [phones, setPhones] = createSignal<PhoneRow[]>([blankPhone()])
+	const [phones, setPhones] = createSignal<PhoneRow<EmployeePhone>[]>([blankPhone()])
 	const [active, setActive] = createSignal(true)
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
@@ -154,6 +77,21 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 		() => null,
 		() => !form.editing,
 	)
+	/** Company mail domain of the tenant, from its primary mail address. */
+	const domainOf = (tenantId: number | null): string | null =>
+		emailDomain(tenants()?.find((row) => row.id === tenantId)?.emails ?? [])
+	const emailPlaceholder = (): string | undefined => {
+		const domain = domainOf(parseId(tenant.value()))
+		return domain === null ? undefined : t('employee.emailPlaceholder', { domain })
+	}
+	const completeEmail = (index: number): void => {
+		const domain = domainOf(parseId(tenant.value()))
+		setEmails(
+			emails().map((e, i) =>
+				i === index ? { ...e, address: withEmailDomain(e.address, domain) } : e,
+			),
+		)
+	}
 	const prefix = form.editing ? 'employee-edit' : 'employee'
 	const detailRoute = props.id === undefined ? '/employees' : `/employees/${props.id}`
 
@@ -163,13 +101,14 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 		salutation: (salutation() || null) as EmployeeCreate['salutation'],
 		tenant_id: tenantId,
 		title: text(title()),
-		// Rows left blank are dropped.
-		emails: emails()
-			.map((e) => ({ ...e, address: e.address.trim() }))
-			.filter((e) => e.address !== ''),
-		phones: phones()
-			.map(({ typePicked: _, ...p }) => ({ ...p, number: p.number.trim() }))
-			.filter((p) => p.number !== ''),
+		// Rows left blank are dropped; addresses without a domain get the tenant's.
+		emails: emailsOf(
+			emails().map((e) => ({
+				...e,
+				address: withEmailDomain(e.address, domainOf(tenantId)),
+			})),
+		),
+		phones: phonesOf(phones()),
 		active: active(),
 		description: text(description()),
 		comments: text(comments()),
@@ -267,16 +206,12 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 					index: number,
 				): JSX.Element => (
 					<>
-						<input
+						<EmailInput
 							id={`${prefix}-email-${index}`}
-							type="email"
-							autocomplete="off"
-							maxLength={200}
-							aria-label={t('employee.email')}
+							placeholder={emailPlaceholder()}
 							value={entry().address}
-							onInput={(e: InputEventAndTarget) =>
-								update({ address: e.currentTarget.value })
-							}
+							onInput={(address: string) => update({ address })}
+							onComplete={() => completeEmail(index)}
 						/>
 						<RowSelect
 							label={t('employee.contactScope')}
@@ -295,29 +230,15 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				onChange={setPhones}
 				blank={blankPhone}
 				row={(
-					entry: () => PhoneRow,
-					update: (patch: Partial<PhoneRow>) => void,
+					entry: () => PhoneRow<EmployeePhone>,
+					update: (patch: Partial<PhoneRow<EmployeePhone>>) => void,
 					index: number,
 				): JSX.Element => (
 					<>
-						<input
+						<PhoneInputs
 							id={`${prefix}-phone-${index}`}
-							type="tel"
-							autocomplete="off"
-							maxLength={200}
-							aria-label={t('employee.phoneNumber')}
-							value={entry().number}
-							onInput={(e: InputEventAndTarget) => {
-								const number = e.currentTarget.value
-								const inferred = entry().typePicked ? null : inferPhoneType(number)
-								update(inferred === null ? { number } : { number, type: inferred })
-							}}
-						/>
-						<RowSelect
-							label={t('employee.phoneType')}
-							value={entry().type}
-							options={phoneTypeOptions()}
-							onChange={(type: PhoneType) => update({ type, typePicked: true })}
+							entry={entry}
+							update={update}
 						/>
 						<RowSelect
 							label={t('employee.contactScope')}

@@ -240,6 +240,8 @@ export const de: Messages = {
 	'tenant.namePlaceholder': 'Musterfirma GmbH',
 	'tenant.customerNumber': 'Kundennummer',
 	'tenant.customerNumberPlaceholder': 'Kundennummer (optional)',
+	'tenant.website': 'Website',
+	'tenant.websitePlaceholder': 'beispiel.de',
 	'tenant.loadingOne': 'Mandant wird geladen…',
 	'tenant.notFound': 'Mandant nicht gefunden.',
 	'tenant.details': 'Mandantendetails',
@@ -270,6 +272,7 @@ export const de: Messages = {
 	'employee.phone': 'Telefon',
 	'employee.mobile': 'Mobil',
 	'employee.emails': 'E-Mail-Adressen',
+	'employee.emailPlaceholder': 'name@{domain}',
 	'employee.phones': 'Telefonnummern',
 	'employee.addEmail': 'E-Mail-Adresse hinzufügen',
 	'employee.addPhone': 'Telefonnummer hinzufügen',
@@ -298,7 +301,6 @@ export const de: Messages = {
 	'tenantGroup.notFound': 'Mandantengruppe nicht gefunden.',
 	'tenantGroup.details': 'Mandantengruppendetails',
 	'tenantGroup.noTenants': 'In dieser Gruppe sind noch keine Mandanten.',
-	'tenantGroup.hint': 'Ein Mandant gehört zu höchstens einer Gruppe.',
 
 	// site
 	'site.searchPlaceholder': 'Name oder Beschreibung suchen…',

@@ -1,5 +1,5 @@
-import { primaryEmail } from 'shared/src/schemas'
-import { createSignal, type JSX } from 'solid-js'
+import { primaryEmail, websiteUrl } from 'shared/src/schemas'
+import { createSignal, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { type EmployeeRow, fetch_employees } from '../../api/employees'
 import { fetch_racks, type RackRow } from '../../api/racks'
@@ -12,6 +12,7 @@ import {
 	type SiteGroupRow,
 	type SiteRow,
 } from '../../api/tenancy'
+import { EmailList, PhoneList } from '../../components/contacts'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -86,6 +87,28 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 					<dt>{t('tenant.customerNumber')}</dt>
 					<dd>{tenant()?.customer_number || '—'}</dd>
+					<dt>{t('tenant.website')}</dt>
+					<dd>
+						<Show when={tenant()?.website} fallback="—">
+							{(website: () => string): JSX.Element => (
+								<a
+									href={websiteUrl(website())}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									{website()}
+								</a>
+							)}
+						</Show>
+					</dd>
+					<dt>{t('employee.emails')}</dt>
+					<dd>
+						<EmailList emails={tenant()?.emails ?? []} />
+					</dd>
+					<dt>{t('employee.phones')}</dt>
+					<dd>
+						<PhoneList phones={tenant()?.phones ?? []} />
+					</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>{tenant()?.comments || '—'}</dd>
 				</DetailCard>

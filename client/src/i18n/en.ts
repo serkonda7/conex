@@ -237,6 +237,8 @@ export const en = {
 	'tenant.namePlaceholder': 'Acme Corp',
 	'tenant.customerNumber': 'Customer number',
 	'tenant.customerNumberPlaceholder': 'Customer number (optional)',
+	'tenant.website': 'Website',
+	'tenant.websitePlaceholder': 'acme.com',
 	'tenant.loadingOne': 'Loading tenant…',
 	'tenant.notFound': 'Tenant not found.',
 	'tenant.details': 'Tenant details',
@@ -267,6 +269,7 @@ export const en = {
 	'employee.phone': 'Phone',
 	'employee.mobile': 'Mobile',
 	'employee.emails': 'Email addresses',
+	'employee.emailPlaceholder': 'name@{domain}',
 	'employee.phones': 'Phone numbers',
 	'employee.addEmail': 'Add email address',
 	'employee.addPhone': 'Add phone number',
@@ -295,7 +298,6 @@ export const en = {
 	'tenantGroup.notFound': 'Tenant group not found.',
 	'tenantGroup.details': 'Tenant group details',
 	'tenantGroup.noTenants': 'No tenants in this group yet.',
-	'tenantGroup.hint': 'A tenant belongs to at most one group.',
 
 	// site
 	'site.searchPlaceholder': 'Search name or description…',

@@ -162,6 +162,20 @@
       "when": 1791296390774,
       "tag": "0022_site_addresses",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791297656982,
+      "tag": "0023_tenant_contacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791297916175,
+      "tag": "0024_tenant_website",
+      "breakpoints": true
     }
   ]
 }
