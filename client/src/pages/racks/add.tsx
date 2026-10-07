@@ -1,6 +1,5 @@
-import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import { create_rack } from '../../api/racks'
-import { fetch_device_types, fetch_manufacturers } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import {
 	DescriptionField,
@@ -18,10 +17,10 @@ import {
 	text,
 	useFormState,
 } from '../../lib/form'
-import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { rowsOfTenant, useTenantDefault } from '../../lib/tenant_context'
+import { useSiteTenant } from '../../lib/tenant_context'
+import { useDeviceTypeOptions } from '../device_types/options'
 
 /** Id of the hint under the rack-type select. */
 const RACK_TYPE_HINT_ID = 'rack-type-hint'
@@ -37,42 +36,17 @@ export function RackAddPage(): JSX.Element {
 
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [tenants] = createRows(fetch_tenants, form.setError)
-	const [rackTypes, { refetch: refetchRackTypes }] = createRows(
-		() => fetch_device_types({ kind: 'rack' }),
-		form.setError,
-	)
-	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
-		fetch_manufacturers,
-		form.setError,
-	)
+	const rackTypes = useDeviceTypeOptions({ kind: 'rack' }, form.setError)
 	// Location options belong to a site, so they follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),
 		(key: number) => fetch_locations({ site: key }),
 		form.setError,
 	)
-	const manufacturerName = useNameOf(manufacturers)
-	async function refreshRackTypes(): Promise<void> {
-		await Promise.all([refetchRackTypes(), refetchManufacturers()])
-	}
 
-	// Tenant defaults to the selected site's tenant until picked explicitly.
-	const selectedSite = createMemo(() => {
-		const id = parseId(siteId())
-		return (sites() ?? []).find((site) => site.id === id)
-	})
-	const siteTenantId = (): number | null => selectedSite()?.tenant_id ?? null
-	const tenant = useTenantDefault(siteTenantId, () => sites() !== undefined)
-
-	// A selected tenant only offers its own sites; a site of another tenant
-	// (e.g. from `?site=`) is dropped.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
-	createEffect(() => {
-		const site = selectedSite()
-		if (site !== undefined && !siteOptions().includes(site)) {
-			handleSiteChange('')
-		}
-	})
+	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>
+		handleSiteChange(''),
+	)
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -132,16 +106,12 @@ export function RackAddPage(): JSX.Element {
 				label={tp('entity.rackType', 1)}
 				value={rackTypeId()}
 				onChange={setRackTypeId}
-				options={(rackTypes() ?? []).map((type) => ({
-					value: type.id,
-					label: type.model,
-					detail: manufacturerName(type.manufacturer_id),
-				}))}
+				options={rackTypes.options()}
 				emptyLabel={t('rack.rackTypePlaceholder')}
 				required
 				describedBy={RACK_TYPE_HINT_ID}
 				add={{ label: tp('entity.rackType', 1), href: '/rack-types/add' }}
-				reload={refreshRackTypes}
+				reload={rackTypes.reload}
 			/>
 			<DescriptionField
 				id="rack-description"

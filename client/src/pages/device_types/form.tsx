@@ -8,11 +8,11 @@ import {
 } from '../../api/templates'
 import {
 	CheckboxField,
+	CommentsField,
 	DescriptionField,
 	FormPage,
 	row_options,
 	SelectField,
-	TextAreaField,
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
@@ -170,13 +170,7 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 				value={description()}
 				onInput={setDescription}
 			/>
-			<TextAreaField
-				id={`${prefix}-comments`}
-				label={t('common.comments')}
-				maxLength={2000}
-				value={comments()}
-				onInput={setComments}
-			/>
+			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>
 	)
 }

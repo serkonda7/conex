@@ -8,7 +8,7 @@
  * context always reads as "all" and the selector shows a fixed label.
  */
 import { Result } from 'better-result'
-import { createEffect, createSignal } from 'solid-js'
+import { createEffect, createMemo, createSignal } from 'solid-js'
 import {
 	fetch_tenant_groups,
 	fetch_tenants,
@@ -201,4 +201,38 @@ export function useTenantDefault(
 		touched,
 		selected: () => (touched() ? parseId(value()) : contextTenantId()),
 	}
+}
+
+/**
+ * Site select of a create form whose tenant follows the site (locations,
+ * racks, devices): the tenant defaults to the selected site's tenant until
+ * picked explicitly, and a selected tenant only offers its own sites. A
+ * selected site of another tenant (e.g. from `?site=`) is dropped through
+ * `onDrop`.
+ */
+export function useSiteTenant<S extends { id: number; tenant_id: number | null }>(
+	sites: () => S[] | undefined,
+	siteId: () => string,
+	onDrop: () => void,
+): {
+	site: () => S | undefined
+	/** Tenant of the selected site, which the tenant select inherits. */
+	siteTenantId: () => number | null
+	siteOptions: () => S[]
+	tenant: ReturnType<typeof useTenantDefault>
+} {
+	const site = createMemo(() => {
+		const id = parseId(siteId())
+		return (sites() ?? []).find((row) => row.id === id)
+	})
+	const siteTenantId = (): number | null => site()?.tenant_id ?? null
+	const tenant = useTenantDefault(siteTenantId, () => sites() !== undefined)
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
+	createEffect(() => {
+		const current = site()
+		if (current !== undefined && !siteOptions().includes(current)) {
+			onDrop()
+		}
+	})
+	return { site, siteTenantId, siteOptions, tenant }
 }

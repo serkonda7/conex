@@ -2,9 +2,10 @@
  * `createResource` wrappers for the API's `Result` returns. Every page used
  * to repeat the same unwrap: report a failure to the page's error line and
  * fall back to an empty value, so the rest of the page stays usable.
+ * `useAction` is the write-side counterpart.
  */
 import { Result } from 'better-result'
-import { createResource, type ResourceReturn } from 'solid-js'
+import { type Accessor, createResource, createSignal, type ResourceReturn } from 'solid-js'
 
 /** Receives the message of a failed request (usually a page's `setError`). */
 export type ErrorSink = (message: string) => void
@@ -62,4 +63,30 @@ export function createRecord<S, T>(
 		source,
 		async (value: S): Promise<T | null> => unwrap(await load(value), null, onError),
 	)
+}
+
+/**
+ * Write requests of a page: `run` clears the error line, flags `pending`
+ * while the action runs and reports a failure to `setError`. It resolves to
+ * whether the action succeeded, so callers refetch or move on only then.
+ */
+export function useAction(setError: (message: string | null) => void): {
+	pending: Accessor<boolean>
+	run: (action: () => Promise<Result<unknown, Error>>) => Promise<boolean>
+} {
+	const [pending, setPending] = createSignal(false)
+	return {
+		pending,
+		run: async (action: () => Promise<Result<unknown, Error>>): Promise<boolean> => {
+			setError(null)
+			setPending(true)
+			const res = await action()
+			setPending(false)
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return false
+			}
+			return true
+		},
+	}
 }

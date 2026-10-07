@@ -4,7 +4,7 @@ import { createResource, createSignal, For, type JSX, Show } from 'solid-js'
 import { type AuditLogEntryJson, fetch_audit_log } from '../../api/audit_log'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListSearchField, useDebouncedSearch } from '../../components/list_page'
+import { ListRangeStatus, ListSearchField, useDebouncedSearch } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { formatTime } from '../../lib/time'
@@ -139,14 +139,7 @@ export function AuditLogPage(): JSX.Element {
 				emptyContent={<Empty message={emptyText()} />}
 			/>
 
-			{/* Only the newest page is fetched, so the range can end before the total. */}
-			<p class="paginator-showing" role="status">
-				{t('list.range', {
-					from: entries()?.items.length ? 1 : 0,
-					to: entries()?.items.length ?? 0,
-					total: entries()?.total ?? 0,
-				})}
-			</p>
+			<ListRangeStatus shown={entries()?.items.length ?? 0} total={entries()?.total ?? 0} />
 
 			<InlineError message={error()} />
 		</div>

@@ -15,6 +15,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
+import { yesNo } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 
 /**
@@ -83,8 +84,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 					{
 						key: 'is_full_depth',
 						label: t('common.fullDepth'),
-						getValue: (dt: DeviceTypeRow): string =>
-							dt.is_full_depth ? t('common.yes') : t('common.no'),
+						getValue: (dt: DeviceTypeRow): string => yesNo(dt.is_full_depth),
 					},
 				]}
 			/>

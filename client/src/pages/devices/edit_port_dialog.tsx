@@ -1,4 +1,3 @@
-import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
 import { type InterfaceJson, update_interface } from '../../api/devices'
@@ -6,6 +5,7 @@ import { InlineError } from '../../components/feedback'
 import { CheckboxField, TextField } from '../../components/form'
 import { Modal } from '../../components/modal'
 import { t } from '../../i18n'
+import { useAction } from '../../lib/resource'
 
 export interface EditPortDialogProps {
 	device_id: number
@@ -21,7 +21,7 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 	const [name, setName] = createSignal(props.iface.name)
 	const [enabled, setEnabled] = createSignal(props.iface.enabled)
 	const [error, setError] = createSignal<string | null>(null)
-	const [submitting, setSubmitting] = createSignal(false)
+	const save = useAction(setError)
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -39,15 +39,9 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 			props.on_close()
 			return
 		}
-		setError(null)
-		setSubmitting(true)
-		const res = await update_interface(props.device_id, props.iface.id, input)
-		setSubmitting(false)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+		if (await save.run(() => update_interface(props.device_id, props.iface.id, input))) {
+			props.on_saved()
 		}
-		props.on_saved()
 	}
 
 	return (
@@ -70,7 +64,7 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 					/>
 				</Show>
 				<div class="modal-actions">
-					<button type="submit" disabled={!name().trim() || submitting()}>
+					<button type="submit" disabled={!name().trim() || save.pending()}>
 						{t('common.save')}
 					</button>
 					<button type="button" onClick={props.on_close}>

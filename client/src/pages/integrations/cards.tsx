@@ -26,7 +26,7 @@ import {
 	run_sync,
 	unlink_external,
 } from '../../api/integrations'
-import { InlineError } from '../../components/feedback'
+import { Empty, InlineError } from '../../components/feedback'
 import { SelectField } from '../../components/form'
 import { t } from '../../i18n'
 import {
@@ -35,7 +35,7 @@ import {
 	findingKindLabel,
 	providerLabel,
 } from '../../i18n/labels'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { can, canGlobal } from '../../lib/session'
 import { ExternalTenantPicker } from './external_tenant_picker'
 
@@ -52,7 +52,6 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 	const provider = (): IntegrationJson['provider'] => props.integration.provider
 	const [error, setError] = createSignal<string | null>(null)
 	const [picking, setPicking] = createSignal(false)
-	const [syncing, setSyncing] = createSignal(false)
 	const [status, { refetch }] = createRecord(
 		() => props.tenantId,
 		(id: number) => fetch_tenant_integration(provider(), id),
@@ -62,14 +61,13 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 		() => Object.entries(status()?.finding_counts ?? {}) as [FindingKind, number][],
 	)
 
-	async function run(action: () => Promise<Result<unknown, Error>>): Promise<void> {
-		setError(null)
-		const res = await action()
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+	const action = useAction(setError)
+	const sync = useAction(setError)
+
+	async function run(request: () => Promise<Result<unknown, Error>>): Promise<void> {
+		if (await action.run(request)) {
+			void refetch()
 		}
-		void refetch()
 	}
 
 	function handlePick(item: ExternalTenantListItem): void {
@@ -90,9 +88,9 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 	}
 
 	async function handleSync(): Promise<void> {
-		setSyncing(true)
-		await run(() => run_sync(provider(), props.tenantId))
-		setSyncing(false)
+		if (await sync.run(() => run_sync(provider(), props.tenantId))) {
+			void refetch()
+		}
 	}
 
 	const reportHref = (): string =>
@@ -106,10 +104,10 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 					<Show when={can('integrations.manage') && status()?.link}>
 						<button
 							type="button"
-							disabled={syncing()}
+							disabled={sync.pending()}
 							onClick={() => void handleSync()}
 						>
-							{syncing() ? t('integration.syncing') : t('integration.syncNow')}
+							{sync.pending() ? t('integration.syncing') : t('integration.syncNow')}
 						</button>
 					</Show>
 					<Show when={canGlobal('integrations.manage')}>
@@ -263,15 +261,13 @@ function LinkedObjectCard<E extends { external_id: string; name: string; active:
 		setError,
 	)
 
-	async function run(action: () => Promise<Result<unknown, Error>>): Promise<void> {
-		setError(null)
-		const res = await action()
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+	const action = useAction(setError)
+
+	async function run(request: () => Promise<Result<unknown, Error>>): Promise<void> {
+		if (await action.run(request)) {
+			setCandidate('')
+			void refetch()
 		}
-		setCandidate('')
-		void refetch()
 	}
 
 	return (
@@ -297,9 +293,9 @@ function LinkedObjectCard<E extends { external_id: string; name: string; active:
 				fallback={
 					<Show
 						when={status()?.external_tenant}
-						fallback={<p class="empty">{t('integration.tenantNotLinked')}</p>}
+						fallback={<Empty message={t('integration.tenantNotLinked')} />}
 					>
-						<p class="empty">{props.notLinkedText}</p>
+						<Empty message={props.notLinkedText} />
 						<Show
 							when={
 								can('integrations.manage') && (status()?.candidates.length ?? 0) > 0

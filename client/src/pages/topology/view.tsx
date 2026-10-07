@@ -15,6 +15,7 @@ import { fetch_trace } from '../../api/cables'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_site_groups, fetch_sites, type SiteGroupRow, type SiteRow } from '../../api/tenancy'
 import { fetch_cable_trace, fetch_topology } from '../../api/topology'
+import { Empty, InlineError, Loading } from '../../components/feedback'
 import { t } from '../../i18n'
 import { cableStatusLabel, deviceStatusLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
@@ -459,14 +460,8 @@ export function TopologyPage(): JSX.Element {
 				</button>
 				<span class="topo-hint">{t('topology.hint')}</span>
 			</div>
-			<Show
-				when={!topology.loading}
-				fallback={<p class="skeleton">{t('topology.loading')}</p>}
-			>
-				<Show
-					when={nodes().length > 0}
-					fallback={<p class="empty">{t('topology.empty')}</p>}
-				>
+			<Show when={!topology.loading} fallback={<Loading message={t('topology.loading')} />}>
+				<Show when={nodes().length > 0} fallback={<Empty message={t('topology.empty')} />}>
 					<div class="topo-wrap">
 						<svg
 							ref={svgRef}
@@ -606,11 +601,11 @@ export function TopologyPage(): JSX.Element {
 					</h3>
 					<Show
 						when={!deviceTrace.loading}
-						fallback={<p class="skeleton">{t('topology.loadingPath')}</p>}
+						fallback={<Loading message={t('topology.loadingPath')} />}
 					>
 						<Show
 							when={(deviceTrace()?.paths ?? []).length > 0}
-							fallback={<p class="empty">{t('topology.noPaths')}</p>}
+							fallback={<Empty message={t('topology.noPaths')} />}
 						>
 							<ul>
 								<For each={deviceTrace()?.paths ?? []}>
@@ -650,11 +645,11 @@ export function TopologyPage(): JSX.Element {
 					<h3>{t('topology.cablePath')}</h3>
 					<Show
 						when={!cableTrace.loading}
-						fallback={<p class="skeleton">{t('topology.loadingCablePath')}</p>}
+						fallback={<Loading message={t('topology.loadingCablePath')} />}
 					>
 						<Show
 							when={cableTrace()}
-							fallback={<p class="empty">{t('topology.cableNotFound')}</p>}
+							fallback={<Empty message={t('topology.cableNotFound')} />}
 						>
 							<p>
 								<code>
@@ -673,7 +668,7 @@ export function TopologyPage(): JSX.Element {
 							</h4>
 							<Show
 								when={(cableTrace()?.paths_from_a ?? []).length > 0}
-								fallback={<p class="empty">{t('topology.deadEnd')}</p>}
+								fallback={<Empty message={t('topology.deadEnd')} />}
 							>
 								<ul>
 									<For each={cableTrace()?.paths_from_a ?? []}>
@@ -693,7 +688,7 @@ export function TopologyPage(): JSX.Element {
 							</h4>
 							<Show
 								when={(cableTrace()?.paths_from_b ?? []).length > 0}
-								fallback={<p class="empty">{t('topology.deadEnd')}</p>}
+								fallback={<Empty message={t('topology.deadEnd')} />}
 							>
 								<ul>
 									<For each={cableTrace()?.paths_from_b ?? []}>
@@ -757,9 +752,7 @@ export function TopologyPage(): JSX.Element {
 				</table>
 			</Show>
 
-			<Show when={error()}>
-				<div class="app-inline-error">{error()}</div>
-			</Show>
+			<InlineError message={error()} />
 		</div>
 	)
 }

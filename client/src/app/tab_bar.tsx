@@ -7,6 +7,7 @@ import { IconChevronDown, IconX } from '@tabler/icons-solidjs'
 import { createEffect, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { t } from '../i18n'
+import { useDismiss } from '../lib/dismiss'
 import {
 	activateTab,
 	activeTabId,
@@ -205,29 +206,20 @@ export function TabBar(): JSX.Element {
 		setListOpen(false)
 	}
 
+	useDismiss('.tab-menu, .tab-list-toggle', closeMenus)
 	onMount(() => {
 		const observer = new ResizeObserver(measure)
 		if (strip) {
 			observer.observe(strip)
-		}
-		const onPointerDown = (e: PointerEvent): void => {
-			if (
-				e.target instanceof Element &&
-				e.target.closest('.tab-menu, .tab-list-toggle') === null
-			) {
-				closeMenus()
-			}
 		}
 		const onKeyDown = (e: KeyboardEvent): void => {
 			if (e.key === 'Escape') {
 				closeMenus()
 			}
 		}
-		document.addEventListener('pointerdown', onPointerDown)
 		document.addEventListener('keydown', onKeyDown)
 		onCleanup(() => {
 			observer.disconnect()
-			document.removeEventListener('pointerdown', onPointerDown)
 			document.removeEventListener('keydown', onKeyDown)
 		})
 	})

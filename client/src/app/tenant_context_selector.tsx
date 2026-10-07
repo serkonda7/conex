@@ -7,11 +7,10 @@ import {
 	createUniqueId,
 	For,
 	type JSX,
-	onCleanup,
-	onMount,
 	Show,
 } from 'solid-js'
 import { t } from '../i18n'
+import { useDismiss } from '../lib/dismiss'
 import { navigate } from '../lib/router'
 import {
 	contextGroups,
@@ -183,15 +182,7 @@ export function TenantContextSelector(props: { scoped: boolean; canAdd: boolean 
 		}
 	}
 
-	onMount(() => {
-		const onPointerDown = (e: PointerEvent): void => {
-			if (root && e.target instanceof Node && !root.contains(e.target)) {
-				close()
-			}
-		}
-		document.addEventListener('pointerdown', onPointerDown)
-		onCleanup(() => document.removeEventListener('pointerdown', onPointerDown))
-	})
+	useDismiss(() => root, close)
 
 	return (
 		<Show

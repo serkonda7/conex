@@ -1,11 +1,10 @@
-import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import {
 	create_location,
 	fetch_locations,
 	fetch_sites,
 	fetch_tenants,
 	type LocationType,
-	type SiteRow,
 } from '../../api/tenancy'
 import {
 	DescriptionField,
@@ -28,7 +27,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { rowsOfTenant, useTenantDefault } from '../../lib/tenant_context'
+import { useSiteTenant } from '../../lib/tenant_context'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -47,26 +46,9 @@ export function LocationAddPage(): JSX.Element {
 		(key: number) => fetch_locations({ site: key }),
 		form.setError,
 	)
-	const selectedSite = (): SiteRow | undefined => {
-		const id = parseId(siteId())
-		return (sites() ?? []).find((s) => s.id === id)
-	}
-
-	// Tenant defaults to the selected site's tenant until picked explicitly.
-	const tenant = useTenantDefault(
-		() => selectedSite()?.tenant_id ?? null,
-		() => sites() !== undefined,
+	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>
+		handleSiteChange(''),
 	)
-
-	// A selected tenant only offers its own sites; a site of another tenant
-	// (e.g. from `?site=`) is dropped.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
-	createEffect(() => {
-		const site = selectedSite()
-		if (site !== undefined && !siteOptions().includes(site)) {
-			handleSiteChange('')
-		}
-	})
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -151,7 +133,7 @@ export function LocationAddPage(): JSX.Element {
 				options={row_options(tenants() ?? [])}
 				emptyLabel={t('common.noTenant')}
 				hint={
-					<Show when={!tenant.touched() && selectedSite()?.tenant_id != null}>
+					<Show when={!tenant.touched() && siteTenantId() !== null}>
 						<Hint>{t('location.tenantFromSite')}</Hint>
 					</Show>
 				}

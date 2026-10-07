@@ -1,6 +1,5 @@
 import { createSignal, type JSX } from 'solid-js'
 import { fetch_rack, type RackRow, update_rack } from '../../api/racks'
-import { fetch_device_types } from '../../api/templates'
 import { fetch_location, fetch_locations, fetch_site, fetch_tenants } from '../../api/tenancy'
 import {
 	DescriptionField,
@@ -15,6 +14,7 @@ import { t, tp } from '../../i18n'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId } from '../../lib/router'
+import { useDeviceTypeOptions } from '../device_types/options'
 
 /** /racks/:id/edit — rack edit form. Saves back to the detail page. */
 export function RackEditPage(props: { id: number }): JSX.Element {
@@ -37,7 +37,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 	// The site is immutable; location options stay within it.
 	const siteId = (): number | undefined => form.record()?.site_id
 	const [tenants] = createRows(fetch_tenants, form.setError)
-	const [rackTypes] = createRows(() => fetch_device_types({ kind: 'rack' }), form.setError)
+	const rackTypes = useDeviceTypeOptions({ kind: 'rack' }, form.setError)
 	const [siblings] = createRowsFor(
 		siteId,
 		(key: number) => fetch_locations({ site: key }),
@@ -108,7 +108,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 				label={tp('entity.rackType', 1)}
 				value={rackTypeId()}
 				onChange={setRackTypeId}
-				options={(rackTypes() ?? []).map((type) => ({ value: type.id, label: type.model }))}
+				options={rackTypes.options()}
 				required
 			/>
 			<SelectField

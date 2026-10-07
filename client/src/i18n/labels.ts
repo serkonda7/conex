@@ -28,6 +28,7 @@ import {
 	type PhoneType,
 	PORT_KINDS,
 	type PortKind,
+	RACK_FORM_FACTORS,
 	type SyncRunState,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
@@ -51,6 +52,16 @@ const FORM_FACTOR_KEYS: Record<RackFormFactor, MessageKey> = {
 /** Rack form factor (`4-post cabinet`, …). */
 export function formFactorLabel(value: string): string {
 	return lookup(FORM_FACTOR_KEYS, value)
+}
+
+/** `<select>` options for the rack form factors. */
+export function formFactorOptions(): { value: RackFormFactor; label: string }[] {
+	return RACK_FORM_FACTORS.map((value) => ({ value, label: formFactorLabel(value) }))
+}
+
+/** "Yes" / "No" for a boolean (or 0/1 DB flag) cell. */
+export function yesNo(value: boolean | number): string {
+	return value ? t('common.yes') : t('common.no')
 }
 
 const FACE_KEYS: Record<'front' | 'rear', MessageKey> = {

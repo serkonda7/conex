@@ -1,15 +1,15 @@
 import { createSignal, type JSX } from 'solid-js'
 import { create_device_type, fetch_manufacturers, type RackFormFactor } from '../../api/templates'
 import {
+	DescriptionField,
 	Field,
 	FormPage,
 	row_options,
 	SelectField,
-	TextAreaField,
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { formFactorLabel } from '../../i18n/labels'
+import { formFactorOptions } from '../../i18n/labels'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -19,14 +19,6 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-
-const FORM_FACTORS: RackFormFactor[] = [
-	'2-post frame',
-	'4-post frame',
-	'4-post cabinet',
-	'wall-mounted frame',
-	'wall-mounted cabinet',
-]
 
 /** /rack-types/add — create a NetBox-compatible rack type. */
 export function RackTypeAddPage(): JSX.Element {
@@ -117,7 +109,7 @@ export function RackTypeAddPage(): JSX.Element {
 				required
 				value={formFactor()}
 				onChange={(value: string) => setFormFactor(value as RackFormFactor | '')}
-				options={FORM_FACTORS.map((value) => ({ value, label: formFactorLabel(value) }))}
+				options={formFactorOptions()}
 				emptyLabel={t('rackType.formFactorPlaceholder')}
 			/>
 			<Field label={t('rackType.widthInches')} for="rack-type-width" required>
@@ -134,12 +126,10 @@ export function RackTypeAddPage(): JSX.Element {
 				onInput={setHeight}
 				placeholder="42"
 			/>
-			<TextAreaField
+			<DescriptionField
 				id="rack-type-description"
-				label={t('common.description')}
 				value={description()}
 				onInput={setDescription}
-				maxLength={500}
 			/>
 		</FormPage>
 	)

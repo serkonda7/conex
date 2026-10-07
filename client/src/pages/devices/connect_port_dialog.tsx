@@ -10,11 +10,12 @@ import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { create_cable, fetch_trace } from '../../api/cables'
 import { type DeviceRow, fetch_interfaces, type InterfaceJson } from '../../api/devices'
-import { InlineError } from '../../components/feedback'
+import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Modal } from '../../components/modal'
 import { ObjectSearch } from '../../components/object_selector'
 import { t } from '../../i18n'
 import { portKindLabel } from '../../i18n/labels'
+import { useAction } from '../../lib/resource'
 import { useDeviceSearch } from './device_search'
 
 /** Interface kinds that never connect to network ports. */
@@ -81,7 +82,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	const [peerIface, setPeerIface] = createSignal<InterfaceJson | null>(null)
 	const [portFilter, setPortFilter] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
-	const [submitting, setSubmitting] = createSignal(false)
+	const submit = useAction(setError)
 
 	// Existing cables from the local device, keyed by peer device, so the
 	// device search can flag already connected devices and list them last.
@@ -158,21 +159,15 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			setError(t('device.pickPeerPort'))
 			return
 		}
-		if (submitting()) {
+		if (submit.pending()) {
 			return
 		}
-		setError(null)
-		setSubmitting(true)
-		const res = await create_cable({
-			a_interface_id: props.iface.id,
-			b_interface_id: peer.id,
-		})
-		setSubmitting(false)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+		const created = await submit.run(() =>
+			create_cable({ a_interface_id: props.iface.id, b_interface_id: peer.id }),
+		)
+		if (created) {
+			props.on_connected()
 		}
-		props.on_connected()
 	}
 
 	function handleSubmit(e: SubmitEvent): void {
@@ -230,15 +225,15 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 						/>
 						<Show
 							when={!peerPorts.loading}
-							fallback={<p class="skeleton">{t('common.loading')}</p>}
+							fallback={<Loading message={t('common.loading')} />}
 						>
 							<Show
 								when={(peerPorts() ?? []).length > 0}
-								fallback={<p class="empty">{t('device.noPeerPorts')}</p>}
+								fallback={<Empty message={t('device.noPeerPorts')} />}
 							>
 								<Show
 									when={visiblePorts().length > 0}
-									fallback={<p class="empty">{t('common.noMatchingObjects')}</p>}
+									fallback={<Empty message={t('common.noMatchingObjects')} />}
 								>
 									<div class="port-grid">
 										<For each={visiblePorts()}>
@@ -301,7 +296,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 								<button type="button" onClick={props.on_close}>
 									{t('common.cancel')}
 								</button>
-								<button type="submit" disabled={!peerIface() || submitting()}>
+								<button type="submit" disabled={!peerIface() || submit.pending()}>
 									{t('device.connect')}
 								</button>
 							</div>

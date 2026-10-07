@@ -14,6 +14,7 @@ import {
 } from '../../api/integrations'
 import { t, tp } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
+import { useAction } from '../../lib/resource'
 import { goTo } from '../../lib/router'
 import { can } from '../../lib/session'
 
@@ -79,6 +80,7 @@ export function LinkBoardView(props: {
 	const [externalSearch, setExternalSearch] = createSignal('')
 	const [picked, setPicked] = createSignal<Picked | null>(null)
 	const [busy, setBusy] = createSignal(false)
+	const write = useAction(props.on_error)
 	// Optimistic changes, dropped whenever a fresh board arrives.
 	const [linked, setLinked] = createSignal(new Map<number, string>())
 	const [ignored, setIgnored] = createSignal(new Set<string>())
@@ -275,13 +277,9 @@ export function LinkBoardView(props: {
 	}
 
 	async function ignore(externalId: string): Promise<void> {
-		props.on_error(null)
 		setPicked(null)
 		setIgnored((prev) => new Set(prev).add(externalId))
-		const res = await ignore_external(props.provider, props.board.entity_type, externalId)
-		if (Result.isError(res)) {
-			props.on_error(res.error.message)
-		}
+		await write.run(() => ignore_external(props.provider, props.board.entity_type, externalId))
 		props.on_changed()
 	}
 
@@ -290,13 +288,9 @@ export function LinkBoardView(props: {
 		if (entityType === 'tenant') {
 			return
 		}
-		props.on_error(null)
 		setPicked(null)
 		setIgnoredLocal((prev) => new Set(prev).add(localId))
-		const res = await ignore_local(props.provider, entityType, localId)
-		if (Result.isError(res)) {
-			props.on_error(res.error.message)
-		}
+		await write.run(() => ignore_local(props.provider, entityType, localId))
 		props.on_changed()
 	}
 
@@ -322,28 +316,22 @@ export function LinkBoardView(props: {
 		) {
 			return
 		}
-		props.on_error(null)
 		setPicked(null)
 		setBusy(true)
-		const res = await import_external_employees(
-			props.provider,
-			tenantId,
-			rows.map((r) => r.external_id),
+		await write.run(() =>
+			import_external_employees(
+				props.provider,
+				tenantId,
+				rows.map((r) => r.external_id),
+			),
 		)
 		setBusy(false)
-		if (Result.isError(res)) {
-			props.on_error(res.error.message)
-		}
 		props.on_changed()
 	}
 
 	async function unlink(linkId: number, externalId: string): Promise<void> {
-		props.on_error(null)
 		setReleased((prev) => new Set(prev).add(externalId))
-		const res = await unlink_external(props.provider, linkId)
-		if (Result.isError(res)) {
-			props.on_error(res.error.message)
-		}
+		await write.run(() => unlink_external(props.provider, linkId))
 		props.on_changed()
 	}
 
@@ -351,12 +339,9 @@ export function LinkBoardView(props: {
 		if (row.link_id === null) {
 			return
 		}
-		props.on_error(null)
 		setReleasedLocal((prev) => new Set(prev).add(row.id))
-		const res = await unlink_external(props.provider, row.link_id)
-		if (Result.isError(res)) {
-			props.on_error(res.error.message)
-		}
+		const linkId = row.link_id
+		await write.run(() => unlink_external(props.provider, linkId))
 		props.on_changed()
 	}
 

@@ -14,9 +14,10 @@ import {
 	IconSettings,
 } from '@tabler/icons-solidjs'
 import type { Component } from 'solid-js'
-import { createEffect, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createSignal, For, type JSX, Show } from 'solid-js'
 import type { SessionUser } from '../api/auth'
 import { type MessageKey, t } from '../i18n'
+import { useDismiss } from '../lib/dismiss'
 import { goTo, path } from '../lib/router'
 import { LanguageSwitcher } from './language_switcher'
 import { PasswordDialog } from './password_dialog'
@@ -127,15 +128,7 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 	const [changingPassword, setChangingPassword] = createSignal(false)
 	const name = (): string => props.user?.username ?? '…'
 
-	onMount(() => {
-		const onDocClick = (e: MouseEvent): void => {
-			if (e.target instanceof Element && e.target.closest('.app-user-menu') === null) {
-				setOpen(false)
-			}
-		}
-		document.addEventListener('click', onDocClick)
-		onCleanup(() => document.removeEventListener('click', onDocClick))
-	})
+	useDismiss('.app-user-menu', () => setOpen(false))
 
 	return (
 		<div class="app-user-menu">

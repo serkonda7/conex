@@ -670,13 +670,15 @@ export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.
 export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
 
 /** NetBox rack form-factor choices. */
-export const RackFormFactorSchema = v.picklist([
+export const RACK_FORM_FACTORS = [
 	'2-post frame',
 	'4-post frame',
 	'4-post cabinet',
 	'wall-mounted frame',
 	'wall-mounted cabinet',
-])
+] as const
+
+export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 
 export const RackWidthSchema = v.picklist([10, 19, 23])
 

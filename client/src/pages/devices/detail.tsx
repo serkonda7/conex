@@ -1,5 +1,4 @@
 import { IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
-import { Result } from 'better-result'
 import type { TraceLink } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import { delete_cable, fetch_trace } from '../../api/cables'
@@ -27,9 +26,9 @@ import {
 import { InlineError } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { faceLabel, portKindLabel } from '../../i18n/labels'
+import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
@@ -134,14 +133,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		void refetchTrace()
 	}
 
+	const action = useAction(setError)
+
 	async function handleDisconnect(cableId: number): Promise<void> {
-		setError(null)
-		const res = await delete_cable(cableId)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+		if (await action.run(() => delete_cable(cableId))) {
+			refetchAll()
 		}
-		refetchAll()
 	}
 
 	const handleDelete = useDetailDelete({
@@ -195,8 +192,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		{
 			key: 'enabled',
 			label: t('device.enabled'),
-			getValue: (iface: InterfaceJson): string =>
-				iface.enabled ? t('common.yes') : t('common.no'),
+			getValue: (iface: InterfaceJson): string => yesNo(iface.enabled),
 		},
 		{
 			key: 'port',

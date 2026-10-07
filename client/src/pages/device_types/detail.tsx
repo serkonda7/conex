@@ -1,4 +1,4 @@
-import { Result } from 'better-result'
+import type { Result } from 'better-result'
 import type { PortKind } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { createSignal, For, type JSX, Show } from 'solid-js'
@@ -23,8 +23,8 @@ import {
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { t, tp } from '../../i18n'
-import { portKindLabel, portKindOptions } from '../../i18n/labels'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { portKindLabel, portKindOptions, yesNo } from '../../i18n/labels'
+import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
 
@@ -55,15 +55,14 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		return row ? [{ label: row.name, href: `/manufacturers/${row.id}` }] : []
 	}
 
-	async function run(action: () => Promise<Result<unknown, Error>>): Promise<boolean> {
-		setError(null)
-		const res = await action()
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return false
+	const action = useAction(setError)
+
+	async function run(request: () => Promise<Result<unknown, Error>>): Promise<boolean> {
+		const ok = await action.run(request)
+		if (ok) {
+			void refetchStubs()
 		}
-		void refetchStubs()
-		return true
+		return ok
 	}
 
 	async function handleCreateStub(e: SubmitEvent): Promise<void> {
@@ -148,7 +147,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<dt>{t('common.heightU')}</dt>
 					<dd>{deviceType()?.u_height}</dd>
 					<dt>{t('common.fullDepth')}</dt>
-					<dd>{deviceType()?.is_full_depth ? t('common.yes') : t('common.no')}</dd>
+					<dd>{yesNo(deviceType()?.is_full_depth ?? 0)}</dd>
 				</DetailCard>
 			</DetailShell>
 

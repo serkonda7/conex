@@ -8,12 +8,30 @@ import {
 	type SiteSort,
 } from '../../api/tenancy'
 import { type DataTableColumn, descriptionColumn, nameColumn } from '../../components/data_table'
-import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
+import {
+	EntityListPage,
+	type ListTab,
+	useEntityList,
+	useQueryFilter,
+} from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
+
+/** Sites ↔ site groups tabs, carrying the `?tenant=` filter across. */
+export function siteTabs(active: 'sites' | 'site-groups', tenant: string): ListTab[] {
+	const suffix = tenant === '' ? '' : `?tenant=${encodeURIComponent(tenant)}`
+	return [
+		{ label: tp('entity.site', 2), href: `/sites${suffix}`, active: active === 'sites' },
+		{
+			label: tp('entity.siteGroup', 2),
+			href: `/site-groups${suffix}`,
+			active: active === 'site-groups',
+		},
+	]
+}
 
 /**
  * /sites — NetBox-style site list: search, sortable columns, tenant
@@ -49,22 +67,12 @@ export function SitesPage(): JSX.Element {
 			getValue: (s: SiteRow): string => groupName(s.site_group_id),
 		},
 	]
-	/** Carries the tenant filter across the sites ↔ site groups tabs. */
-	const tenantSuffix = (): string =>
-		filterTenant() === '' ? '' : `?tenant=${encodeURIComponent(filterTenant())}`
 
 	return (
 		<EntityListPage
 			list={list}
 			title={tp('entity.site', 2)}
-			tabs={[
-				{ label: tp('entity.site', 2), href: `/sites${tenantSuffix()}`, active: true },
-				{
-					label: tp('entity.siteGroup', 2),
-					href: `/site-groups${tenantSuffix()}`,
-					active: false,
-				},
-			]}
+			tabs={siteTabs('sites', filterTenant())}
 			addHref="/sites/add"
 			searchPlaceholder={t('site.searchPlaceholder')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}

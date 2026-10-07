@@ -14,6 +14,7 @@ import {
 	useQueryFilter,
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
+import { yesNo } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { navigate, parseId } from '../../lib/router'
@@ -69,8 +70,7 @@ export function DeviceTypesPage(): JSX.Element {
 		{
 			key: 'is_full_depth',
 			label: t('common.fullDepth'),
-			getValue: (dt: DeviceTypeListRow): string =>
-				dt.is_full_depth ? t('common.yes') : t('common.no'),
+			getValue: (dt: DeviceTypeListRow): string => yesNo(dt.is_full_depth),
 		},
 		{
 			key: 'devices',

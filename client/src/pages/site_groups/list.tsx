@@ -13,6 +13,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
+import { siteTabs } from '../sites/list'
 
 /**
  * /site-groups — flat site group list: search, sortable columns, tenant
@@ -30,22 +31,12 @@ export function SiteGroupsPage(): JSX.Element {
 	})
 	const [tenants] = createRows(fetch_tenants, list.setError)
 	const tenantName = useNameOf(tenants)
-	/** Carries the tenant filter across the sites ↔ site groups tabs. */
-	const tenantSuffix = (): string =>
-		filterTenant() === '' ? '' : `?tenant=${encodeURIComponent(filterTenant())}`
 
 	return (
 		<EntityListPage
 			list={list}
 			title={tp('entity.siteGroup', 2)}
-			tabs={[
-				{ label: tp('entity.site', 2), href: `/sites${tenantSuffix()}`, active: false },
-				{
-					label: tp('entity.siteGroup', 2),
-					href: `/site-groups${tenantSuffix()}`,
-					active: true,
-				},
-			]}
+			tabs={siteTabs('site-groups', filterTenant())}
 			addHref="/site-groups/add"
 			searchPlaceholder={t('tenant.searchPlaceholder')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}

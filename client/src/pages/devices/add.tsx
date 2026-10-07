@@ -1,10 +1,9 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { createEffect, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
-import { fetch_device_types, fetch_manufacturers } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import {
 	DescriptionField,
@@ -27,10 +26,10 @@ import {
 	useFormState,
 } from '../../lib/form'
 import { deviceRoleIcon } from '../../lib/icons'
-import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { rowsOfTenant, useTenantDefault } from '../../lib/tenant_context'
+import { useSiteTenant } from '../../lib/tenant_context'
+import { useDeviceTypeOptions } from '../device_types/options'
 
 /** Rack position from the field: null when blank, NaN when malformed. */
 export function parsePosition(value: string): number | null {
@@ -43,7 +42,7 @@ export function validPosition(position: number | null): boolean {
 }
 
 /** `?face=` of a rack-elevation deep link, if it names a face. */
-function queryFace(): string {
+export function queryFace(): string {
 	const face = queryParam('face')
 	return face === 'front' || face === 'rear' ? face : ''
 }
@@ -74,12 +73,12 @@ export function DeviceAddPage(): JSX.Element {
 	const [shelfId, setShelfId] = createSignal(parseId(queryParam('shelf')))
 	const [shelf] = createRecord(shelfId, fetch_shelf, form.setError)
 
-	const [types, { refetch: refetchTypes }] = createRows(fetch_device_types, form.setError)
+	const {
+		types,
+		options: typeOptions,
+		reload: reloadTypes,
+	} = useDeviceTypeOptions({}, form.setError)
 	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
-	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
-		fetch_manufacturers,
-		form.setError,
-	)
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [racks] = createRows(fetch_racks, form.setError)
 	const [tenants] = createRows(fetch_tenants, form.setError)
@@ -89,7 +88,6 @@ export function DeviceAddPage(): JSX.Element {
 		(key: number) => fetch_locations({ site: key }),
 		form.setError,
 	)
-	const manufacturerName = useNameOf(manufacturers)
 	// 0U types are not rack-mounted.
 	const zeroHeight = (): boolean => {
 		const id = parseId(typeId())
@@ -100,27 +98,10 @@ export function DeviceAddPage(): JSX.Element {
 			handleRackChange('')
 		}
 	})
-	async function refreshTypes(): Promise<void> {
-		await Promise.all([refetchTypes(), refetchManufacturers()])
-	}
 
-	// Tenant defaults to the selected site's tenant until picked explicitly.
-	const selectedSite = createMemo(() => {
-		const id = parseId(siteId())
-		return (sites() ?? []).find((site) => site.id === id)
-	})
-	const siteTenantId = (): number | null => selectedSite()?.tenant_id ?? null
-	const tenant = useTenantDefault(siteTenantId, () => sites() !== undefined)
-
-	// A selected tenant only offers its own sites; a site of another tenant
-	// (e.g. from `?site=`) is dropped.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
-	createEffect(() => {
-		const site = selectedSite()
-		if (site !== undefined && !siteOptions().includes(site)) {
-			handleSiteChange('')
-		}
-	})
+	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>
+		handleSiteChange(''),
+	)
 
 	const [source] = createRecord(() => parseId(queryParam('clone')), fetch_device, form.setError)
 	createEffect(() => {
@@ -208,14 +189,10 @@ export function DeviceAddPage(): JSX.Element {
 					required
 					value={typeId()}
 					onChange={setTypeId}
-					options={(types() ?? []).map((type) => ({
-						value: type.id,
-						label: type.model,
-						detail: manufacturerName(type.manufacturer_id),
-					}))}
+					options={typeOptions()}
 					emptyLabel={t('common.selectPlaceholder')}
 					add={{ label: tp('entity.deviceType', 1), href: '/device-types/add' }}
-					reload={refreshTypes}
+					reload={reloadTypes}
 				/>
 				<SelectField
 					id="device-role"

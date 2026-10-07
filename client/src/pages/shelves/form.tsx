@@ -22,12 +22,7 @@ import { faceOptions } from '../../i18n/labels'
 import { is_add_another_submit, submit_form, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { type Crumb, navigate, parseId, queryParam } from '../../lib/router'
-
-/** `?face=` of a rack-elevation deep link, if it names a face. */
-function queryFace(): string {
-	const face = queryParam('face')
-	return face === 'front' || face === 'rear' ? face : ''
-}
+import { queryFace } from '../devices/add'
 
 /** Whole number from a field, `fallback` when blank, NaN when malformed. */
 function count(value: string, fallback: number): number {

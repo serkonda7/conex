@@ -11,11 +11,11 @@ import {
 	start_sync,
 	wait_for_sync,
 } from '../../api/integrations'
-import { InlineError, Loading } from '../../components/feedback'
+import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { providerLabel, syncStateLabel } from '../../i18n/labels'
-import { createRows } from '../../lib/resource'
+import { createRows, useAction } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { formatTime } from '../../lib/time'
@@ -143,6 +143,7 @@ export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [syncing, setSyncing] = createSignal<IntegrationProvider | null>(null)
 	const [integrations, { refetch }] = createRows(fetch_integrations, setError)
+	const action = useAction(setError)
 
 	const configured = (provider: IntegrationProvider): IntegrationJson | undefined =>
 		integrations()?.find((i) => i.provider === provider)
@@ -175,13 +176,9 @@ export function IntegrationsPage(): JSX.Element {
 		if (!window.confirm(t('integration.confirmDelete', { name }))) {
 			return
 		}
-		setError(null)
-		const res = await delete_integration(integration.provider)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+		if (await action.run(() => delete_integration(integration.provider))) {
+			void refetch()
 		}
-		void refetch()
 	}
 
 	const card = (provider: IntegrationProvider): JSX.Element => (
@@ -214,7 +211,7 @@ export function IntegrationsPage(): JSX.Element {
 			</div>
 			<Show
 				when={configured(provider)}
-				fallback={<p class="empty">{t('integration.notConfigured')}</p>}
+				fallback={<Empty message={t('integration.notConfigured')} />}
 			>
 				{(integration: () => IntegrationJson): JSX.Element => (
 					<IntegrationDetails integration={integration()} />

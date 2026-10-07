@@ -3,6 +3,7 @@ import type { InputEventAndTarget } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createResource, createSignal, For, Show } from 'solid-js'
 import { t } from '../i18n'
+import { Empty, Loading } from './feedback'
 import { Modal } from './modal'
 
 export interface ObjectSearchProps<T extends { id: number }> {
@@ -35,13 +36,10 @@ export function ObjectSearch<T extends { id: number }>(props: ObjectSearchProps<
 				onInput={(e: InputEventAndTarget) => setSearch(e.currentTarget.value)}
 			/>
 			<div class="object-selector-results">
-				<Show
-					when={!objects.loading}
-					fallback={<p class="skeleton">{t('common.loading')}</p>}
-				>
+				<Show when={!objects.loading} fallback={<Loading message={t('common.loading')} />}>
 					<Show
 						when={(objects() ?? []).length > 0}
-						fallback={<p class="empty">{t('common.noMatchingObjects')}</p>}
+						fallback={<Empty message={t('common.noMatchingObjects')} />}
 					>
 						<ul>
 							<For each={objects() ?? []}>

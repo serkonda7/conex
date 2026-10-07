@@ -21,7 +21,6 @@ import {
 	CommentsField,
 	DescriptionField,
 	FormPage,
-	Hint,
 	NameField,
 	row_options,
 	SelectField,

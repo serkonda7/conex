@@ -7,6 +7,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { create_manufacturer, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
+import { Empty, InlineError } from '../../components/feedback'
 import { Field } from '../../components/form'
 import { t } from '../../i18n'
 import { navigate } from '../../lib/router'
@@ -216,11 +217,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 						}
 					/>
 				</Field>
-				<Show when={error()}>
-					<div class="app-inline-error" role="alert">
-						{error()}
-					</div>
-				</Show>
+				<InlineError message={error()} alert />
 				<div class="form-actions">
 					<button
 						type="button"
@@ -237,11 +234,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 
 			<Show when={results() !== null}>
 				<h3>{t('import.result', { created: created(), failed: failed() })}</h3>
-				<Show when={failed() > 0}>
-					<p class="app-inline-error" role="alert">
-						{t('import.rolledBack')}
-					</p>
-				</Show>
+				<InlineError message={failed() > 0 ? t('import.rolledBack') : null} alert />
 				<DataTable
 					rows={() => results() ?? []}
 					getRowId={(r: ImportRowResult): number => r.row}
@@ -319,7 +312,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 							},
 						},
 					]}
-					emptyContent={<p class="empty">{t('import.noRows')}</p>}
+					emptyContent={<Empty message={t('import.noRows')} />}
 				/>
 			</Show>
 			<section class="import-field-options" aria-labelledby="device-type-import-fields">

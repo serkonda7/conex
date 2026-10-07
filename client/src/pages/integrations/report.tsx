@@ -1,5 +1,5 @@
 import { IconRefresh } from '@tabler/icons-solidjs'
-import { Result } from 'better-result'
+import type { Result } from 'better-result'
 import {
 	EXTERNAL_PUSH_FIELDS,
 	type ExternalPushField,
@@ -40,7 +40,7 @@ import {
 	findingKindLabel,
 	providerLabel,
 } from '../../i18n/labels'
-import { createRecord } from '../../lib/resource'
+import { createRecord, useAction } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped } from '../../lib/session'
 import {
@@ -128,7 +128,7 @@ function LinkBoardPanel(props: {
 			{ defer: true },
 		),
 	)
-	const [syncing, setSyncing] = createSignal(false)
+	const sync = useAction(props.on_error)
 
 	// Scoped users only see their own tenant: preselect it.
 	const tenantOptions = createMemo(() => row_options(contextTenantRows()))
@@ -166,13 +166,7 @@ function LinkBoardPanel(props: {
 		if (id === null) {
 			return
 		}
-		props.on_error(null)
-		setSyncing(true)
-		const done = await run_sync(props.provider, id)
-		setSyncing(false)
-		if (Result.isError(done)) {
-			props.on_error(done.error.message)
-		}
+		await sync.run(() => run_sync(props.provider, id))
 		void refetch()
 	}
 
@@ -198,11 +192,13 @@ function LinkBoardPanel(props: {
 					<Show when={can('integrations.manage') && board()?.external_tenant}>
 						<button
 							type="button"
-							disabled={syncing()}
+							disabled={sync.pending()}
 							onClick={() => void handleSyncTenant()}
 						>
 							<IconLabel icon={IconRefresh}>
-								{syncing() ? t('integration.syncing') : t('integration.syncTenant')}
+								{sync.pending()
+									? t('integration.syncing')
+									: t('integration.syncTenant')}
 							</IconLabel>
 						</button>
 					</Show>
@@ -278,7 +274,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [kindFilter, setKindFilter] = createSignal<string>(parseKind(queryParam('kind')))
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
-	const [syncing, setSyncing] = createSignal(false)
 	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
 	// Bumped after a full sync so an open link board reloads too.
 	const [boardReload, setBoardReload] = createSignal(0)
@@ -332,14 +327,13 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		return kind === '' ? all : all.filter((f) => f.kind === kind)
 	})
 
-	async function run(action: () => Promise<Result<unknown, Error>>): Promise<void> {
-		setError(null)
-		const res = await action()
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
+	const action = useAction(setError)
+	const sync = useAction(setError)
+
+	async function run(request: () => Promise<Result<unknown, Error>>): Promise<void> {
+		if (await action.run(request)) {
+			void refetch()
 		}
-		void refetch()
 	}
 
 	async function handleSync(clean = false): Promise<void> {
@@ -353,13 +347,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		) {
 			return
 		}
-		setError(null)
-		setSyncing(true)
-		const done = await run_sync(row.provider, undefined, clean)
-		setSyncing(false)
-		if (Result.isError(done)) {
-			setError(done.error.message)
-		}
+		await sync.run(() => run_sync(row.provider, undefined, clean))
 		void refetch()
 		setBoardReload((n) => n + 1)
 	}
@@ -659,21 +647,23 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 					<div class="form-actions">
 						<button
 							type="button"
-							disabled={syncing()}
+							disabled={sync.pending()}
 							onClick={() => void handleSync()}
 						>
 							<IconLabel icon={IconRefresh}>
-								{syncing() ? t('integration.syncing') : t('integration.syncNow')}
+								{sync.pending()
+									? t('integration.syncing')
+									: t('integration.syncNow')}
 							</IconLabel>
 						</button>
 						<Show when={canGlobal('integrations.manage')}>
 							<button
 								type="button"
-								disabled={syncing()}
+								disabled={sync.pending()}
 								onClick={() => void handleSync(true)}
 							>
 								<IconLabel icon={IconRefresh}>
-									{syncing()
+									{sync.pending()
 										? t('integration.syncing')
 										: t('integration.forceFullSync')}
 								</IconLabel>

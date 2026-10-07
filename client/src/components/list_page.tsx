@@ -13,7 +13,7 @@
 
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { InputEventAndTarget, Page } from 'shared/src/types'
+import type { InputEventAndTarget, Page, Permission } from 'shared/src/types'
 import {
 	type Accessor,
 	createEffect,
@@ -31,6 +31,7 @@ import {
 import { Portal } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
 import { use_visible_columns } from '../lib/column_visibility'
+import { useDismiss } from '../lib/dismiss'
 import { navigate, queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
@@ -157,19 +158,14 @@ export function useRowMenu(): {
 		setOpenMenu(null)
 	}
 
+	// The portaled menu sits outside its toggle's wrapper, so both count as inside.
+	useDismiss('.row-menu-wrap, .row-menu', closeMenu)
 	onMount(() => {
 		// The menu is viewport-anchored, so any scroll or resize dismisses it
 		// too instead of leaving it adrift.
-		const onDocClick = (e: MouseEvent): void => {
-			if (e.target instanceof Element && e.target.closest('.row-menu-wrap') === null) {
-				closeMenu()
-			}
-		}
-		document.addEventListener('click', onDocClick)
 		window.addEventListener('scroll', closeMenu, true)
 		window.addEventListener('resize', closeMenu)
 		onCleanup(() => {
-			document.removeEventListener('click', onDocClick)
 			window.removeEventListener('scroll', closeMenu, true)
 			window.removeEventListener('resize', closeMenu)
 		})
@@ -210,6 +206,10 @@ export interface EntityList<Row> {
 	setError: Setter<string | null>
 	selected: Accessor<number[]>
 	selection: SelectionProps
+	/** Whether the session may add/edit rows (`manage`, else `edit`). */
+	canEdit: () => boolean
+	/** Whether the session may delete rows (`manage`, else `delete`). */
+	canDelete: () => boolean
 	handleDelete: (id: number, name: string) => Promise<void>
 	handleBulkDelete: () => Promise<void>
 }
@@ -218,7 +218,8 @@ export interface EntityList<Row> {
  * State of a standard list page: search, sort and the page-specific
  * `filters` form the query for `fetch`; a new result set clears the
  * checkbox selection. Deletes confirm first, report through `error` and
- * refetch.
+ * refetch. Omit `sort` for endpoints without sorting; `manage` replaces the
+ * `edit`/`delete` permissions for admin lists (users, roles).
  */
 export function useEntityList<
 	Row extends { id: number },
@@ -226,13 +227,16 @@ export function useEntityList<
 	F extends object,
 >(opts: {
 	noun: PluralKey
-	sort: Sort
+	sort?: Sort
+	manage?: Permission
 	filters?: () => F
 	fetch: (
-		query: { search: string; sort: Sort; order: 'asc' | 'desc' } & F,
+		query: { search: string; sort?: Sort; order: 'asc' | 'desc' } & F,
 	) => Promise<Result<Page<Row>, Error>>
 	remove: (id: number) => Promise<Result<unknown, Error>>
 }): EntityList<Row> {
+	const canEdit = (): boolean => can(opts.manage ?? 'edit')
+	const canDelete = (): boolean => can(opts.manage ?? 'delete')
 	const [error, setError] = createSignal<string | null>(null)
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 	const { sort, order, handleSort, clearSort } = useSort<Sort>(opts.sort)
@@ -315,10 +319,10 @@ export function useEntityList<
 		selected,
 		selection: {
 			get selected(): Accessor<number[]> | undefined {
-				return can('delete') ? selected : undefined
+				return canDelete() ? selected : undefined
 			},
 			get onSelectionChange(): ((ids: (string | number)[]) => void) | undefined {
-				return can('delete')
+				return canDelete()
 					? (ids: (string | number)[]): void => {
 							setSelected(ids.map(Number))
 						}
@@ -326,6 +330,8 @@ export function useEntityList<
 			},
 			selectionLabel: t('list.selectAll', { noun: tp(opts.noun, 2) }),
 		},
+		canEdit,
+		canDelete,
 		handleDelete,
 		handleBulkDelete,
 	}
@@ -410,8 +416,8 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		const name = props.rowName(row)
 		return (
 			<ListRowActions
-				edit_href={can('edit') ? props.editHref?.(row) : undefined}
-				deletable={can('delete') && props.deletable?.(row) !== false}
+				edit_href={list.canEdit() ? props.editHref?.(row) : undefined}
+				deletable={list.canDelete() && props.deletable?.(row) !== false}
 				name={name}
 				menu_open={openMenu()?.id === row.id}
 				onToggleMenu={(e: MouseEvent & { currentTarget: HTMLButtonElement }): void =>
@@ -429,6 +435,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				tabs={props.tabs}
 				add_href={props.addHref}
 				actions={props.headerActions}
+				can_add={list.canEdit()}
 			/>
 
 			<div class="toolbar-row">
@@ -442,7 +449,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				<span class="toolbar-spacer" />
 				<Show when={bulk()}>
 					<BulkDeleteButton
-						count={list.selected().length}
+						count={list.canDelete() ? list.selected().length : 0}
 						onClick={list.handleBulkDelete}
 					/>
 				</Show>
@@ -462,13 +469,13 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				selected={bulk() ? list.selection.selected : undefined}
 				onSelectionChange={bulk() ? list.selection.onSelectionChange : undefined}
 				selectionLabel={list.selection.selectionLabel}
-				rowActions={can('edit') || can('delete') ? rowActions : undefined}
+				rowActions={list.canEdit() || list.canDelete() ? rowActions : undefined}
 				loading={() => list.page.loading}
 				loadingContent={<Loading message={t('list.loading', { noun: nouns() })} />}
 				emptyContent={<Empty message={emptyMessage()} />}
 			/>
 
-			<ListRangeStatus total={list.total()} />
+			<ListRangeStatus shown={list.rows().length} total={list.total()} />
 
 			<RowMenu
 				menu={openMenu}
@@ -516,14 +523,15 @@ export function FilterSelect(props: {
 /**
  * List title (or sibling-list `tabs`) plus the "+ Add" button. `actions` renders extra header buttons
  * (e.g. the device-type Import button) beside "+ Add" inside a
- * `page-header-actions` wrapper. Both are write actions, hidden without
- * the `edit` permission.
+ * `page-header-actions` wrapper. Both are write actions, hidden unless
+ * `can_add`.
  */
-export function ListPageHeader(props: {
+function ListPageHeader(props: {
 	title: string
 	tabs?: readonly ListTab[]
 	add_href: string
 	actions?: JSX.Element
+	can_add: boolean
 }): JSX.Element {
 	const addButton = (
 		<button type="button" class="btn-add" onClick={(): void => navigate(props.add_href)}>
@@ -537,7 +545,7 @@ export function ListPageHeader(props: {
 					<ListTabs title={props.title} tabs={tabs()} />
 				)}
 			</Show>
-			<Show when={can('edit')}>
+			<Show when={props.can_add}>
 				<Show when={props.actions !== undefined} fallback={addButton}>
 					<div class="page-header-actions">
 						{addButton}
@@ -572,9 +580,9 @@ export function ListSearchField(props: {
 }
 
 /** "Delete N selected" toolbar button, visible only with a selection. */
-export function BulkDeleteButton(props: { count: number; onClick: () => void }): JSX.Element {
+function BulkDeleteButton(props: { count: number; onClick: () => void }): JSX.Element {
 	return (
-		<Show when={props.count > 0 && can('delete')}>
+		<Show when={props.count > 0}>
 			<button type="button" class="btn-danger" onClick={props.onClick}>
 				{t('list.deleteSelected', { count: props.count })}
 			</button>
@@ -588,7 +596,7 @@ export function BulkDeleteButton(props: { count: number; onClick: () => void }):
  * `deletable: false` drops the menu toggle (its only item is Delete).
  * `name` is the row's display name used in the button labels.
  */
-export function ListRowActions(props: {
+function ListRowActions(props: {
 	edit_href?: string
 	deletable?: boolean
 	name: string
@@ -635,7 +643,7 @@ export function ListRowActions(props: {
 }
 
 /** Portal row menu with the single Delete item. */
-export function RowMenu(props: {
+function RowMenu(props: {
 	menu: Accessor<RowMenuAnchor | null>
 	onClose: () => void
 	onDelete: (menu: RowMenuAnchor) => void
@@ -679,13 +687,16 @@ export function RowMenu(props: {
 	)
 }
 
-/** "Showing 1-N of N" line under the table. */
-export function ListRangeStatus(props: { total: number }): JSX.Element {
+/**
+ * "Showing 1-N of M" line under the table. Lists fetch only their first
+ * page, so `shown` (the rendered rows) can end before `total`.
+ */
+export function ListRangeStatus(props: { shown: number; total: number }): JSX.Element {
 	return (
 		<p class="paginator-showing" role="status">
 			{t('list.range', {
-				from: props.total === 0 ? 0 : 1,
-				to: props.total,
+				from: props.shown === 0 ? 0 : 1,
+				to: props.shown,
 				total: props.total,
 			})}
 		</p>

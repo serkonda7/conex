@@ -4,7 +4,7 @@ import { createResource, createSignal, For, type JSX } from 'solid-js'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListSearchField, useDebouncedSearch } from '../../components/list_page'
+import { ListRangeStatus, ListSearchField, useDebouncedSearch } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { changeActionOptions, changeObjectLabel, changeObjectOptions } from '../../i18n/labels'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
@@ -142,14 +142,7 @@ export function ChangelogPage(): JSX.Element {
 				emptyContent={<Empty message={emptyText()} />}
 			/>
 
-			{/* Only the newest page is fetched, so the range can end before the total. */}
-			<p class="paginator-showing" role="status">
-				{t('list.range', {
-					from: changes()?.items.length ? 1 : 0,
-					to: changes()?.items.length ?? 0,
-					total: changes()?.total ?? 0,
-				})}
-			</p>
+			<ListRangeStatus shown={changes()?.items.length ?? 0} total={changes()?.total ?? 0} />
 
 			<InlineError message={error()} />
 		</div>
