@@ -105,6 +105,7 @@ export const audit_log = pgTable(
 		event: text('event').notNull(),
 		username: text('username').notNull(),
 		user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+		target_username: text('target_username'),
 		ip: text('ip').notNull(),
 		forwarded_for: text('forwarded_for'),
 		user_agent: text('user_agent'),

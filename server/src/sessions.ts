@@ -1,4 +1,4 @@
-import { and, eq, gt, lte, or } from 'drizzle-orm'
+import { and, eq, gt, lte, ne, or } from 'drizzle-orm'
 import { sign } from 'hono/jwt'
 import type { CookieOptions } from 'hono/utils/cookie'
 import { SESSION_ABSOLUTE_TIMEOUT_S, SESSION_IDLE_TIMEOUT_S } from 'shared/src/session'
@@ -68,6 +68,13 @@ export async function touchSession(sid: string): Promise<boolean> {
 
 export async function invalidateSession(sid: string): Promise<void> {
 	await getDb().delete(sessions).where(eq(sessions.id, sid))
+}
+
+/** Ends every session of `userId` except `keepSid` (after a password change). */
+export async function invalidateUserSessions(userId: number, keepSid?: string): Promise<void> {
+	await getDb()
+		.delete(sessions)
+		.where(and(eq(sessions.user_id, userId), keepSid ? ne(sessions.id, keepSid) : undefined))
 }
 
 /**

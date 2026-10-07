@@ -7,6 +7,7 @@ import {
 	IconBuilding,
 	IconChevronDown,
 	IconDownload,
+	IconKey,
 	IconLogout,
 	IconPlus,
 	IconServer,
@@ -18,6 +19,7 @@ import type { SessionUser } from '../api/auth'
 import { type MessageKey, t } from '../i18n'
 import { goTo, path } from '../lib/router'
 import { LanguageSwitcher } from './language_switcher'
+import { PasswordDialog } from './password_dialog'
 import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
 /** Hover shortcut next to a nav row; without `href` a disabled placeholder. */
@@ -119,9 +121,10 @@ function NavItem(props: { section: Section; topLevel?: boolean }): JSX.Element {
 	)
 }
 
-/** Account button with the language switcher and logout in its dropdown. */
+/** Account button with the language switcher, password change and logout in its dropdown. */
 function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JSX.Element {
 	const [open, setOpen] = createSignal(false)
+	const [changingPassword, setChangingPassword] = createSignal(false)
 	const name = (): string => props.user?.username ?? '…'
 
 	onMount(() => {
@@ -169,6 +172,20 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 						class="app-user-logout"
 						onClick={() => {
 							setOpen(false)
+							setChangingPassword(true)
+						}}
+					>
+						<span aria-hidden="true" class="app-nav-icon">
+							<IconKey size={16} />
+						</span>
+						{t('account.changePassword')}
+					</button>
+					<button
+						type="button"
+						role="menuitem"
+						class="app-user-logout"
+						onClick={() => {
+							setOpen(false)
 							props.onLogout()
 						}}
 					>
@@ -178,6 +195,9 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 						{t('app.logout')}
 					</button>
 				</div>
+			</Show>
+			<Show when={changingPassword()}>
+				<PasswordDialog on_close={() => setChangingPassword(false)} />
 			</Show>
 		</div>
 	)

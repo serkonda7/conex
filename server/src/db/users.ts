@@ -1,11 +1,11 @@
 import { Result } from 'better-result'
 import { and, asc, eq } from 'drizzle-orm'
-import type { UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
+import type { PasswordChange, UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
 import { roles, users } from '../schema'
 import type { CurrentUser, User } from '../types'
 import { normalize_username } from '../util/username'
 import { getDb } from './connection'
-import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { ConflictError, DuplicateError, NotFoundError, ValidationError } from './errors'
 import {
 	checkTenantExists,
 	findOne,
@@ -263,4 +263,28 @@ export async function deleteUser(id: number, actorId: number): Promise<Result<Us
 		return deleted
 	}
 	return Result.ok(current)
+}
+
+/** Replaces `id`'s password after re-checking the current one. */
+export async function changeOwnPassword(
+	id: number,
+	input: PasswordChange,
+): Promise<Result<undefined, Error>> {
+	const current = await getUserById(id)
+	if (!current) {
+		return Result.err(new NotFoundError('User not found'))
+	}
+	if (
+		!current.password_hash ||
+		!(await Bun.password.verify(input.current_password, current.password_hash))
+	) {
+		return Result.err(new ValidationError('Current password is incorrect'))
+	}
+	const written = await tryWrite(async () => {
+		await getDb()
+			.update(users)
+			.set({ password_hash: await Bun.password.hash(input.new_password) })
+			.where(eq(users.id, id))
+	})
+	return written.map(() => undefined)
 }

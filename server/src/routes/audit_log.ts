@@ -7,7 +7,7 @@ import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
 
-/** Audit log: `audit_log.view`, read-only. Entries are written by the auth routes. */
+/** Audit log: `audit_log.view`, read-only. Entries are written by the auth and user routes. */
 export const auditLogApp = new Hono()
 	.use(authMiddleware)
 	.use(requirePermissionMiddleware('audit_log.view'))

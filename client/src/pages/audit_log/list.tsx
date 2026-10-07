@@ -9,10 +9,17 @@ import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { formatTime } from '../../lib/time'
 
+const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
+	'login.success': 'badge-active',
+	'login.failure': 'badge-decommissioned',
+	'password.change': 'badge-planned',
+	'password.reset': 'badge-planned',
+}
+
 /**
- * /audit-log — admin-only, read-only list of login attempts (newest
- * first) with their source address. Searchable by username or IP and
- * filterable by event.
+ * /audit-log — admin-only, read-only list of login attempts and password
+ * changes (newest first) with their source address. Searchable by username
+ * or IP and filterable by event.
  */
 export function AuditLogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -42,13 +49,7 @@ export function AuditLogPage(): JSX.Element {
 			key: 'event',
 			label: t('audit.event'),
 			getValue: (e: AuditLogEntryJson): JSX.Element => (
-				<span
-					class={
-						e.event === 'login.success'
-							? 'badge badge-active'
-							: 'badge badge-decommissioned'
-					}
-				>
+				<span class={`badge ${AUDIT_EVENT_BADGE[e.event]}`}>
 					{auditEventLabel(e.event)}
 				</span>
 			),
@@ -57,6 +58,11 @@ export function AuditLogPage(): JSX.Element {
 			key: 'username',
 			label: t('auth.username'),
 			getValue: (e: AuditLogEntryJson): string => e.username,
+		},
+		{
+			key: 'target',
+			label: t('audit.target'),
+			getValue: (e: AuditLogEntryJson): string => e.target_username ?? '',
 		},
 		{
 			key: 'ip',

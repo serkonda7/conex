@@ -39,6 +39,15 @@ export const SetupSchema = v.strictObject({
 
 export type Setup = v.InferOutput<typeof SetupSchema>
 
+// Self-service password change: the current password re-authenticates the
+// session owner before the new one is stored.
+export const PasswordChangeSchema = v.strictObject({
+	current_password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
+	new_password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
+})
+
+export type PasswordChange = v.InferOutput<typeof PasswordChangeSchema>
+
 // Shared list-query contract (?search=&page=&limit=) used by every P1+
 // list endpoint. Defaults keep callers from re-declaring pagination math.
 export const ListQuerySchema = v.strictObject({
@@ -1298,13 +1307,22 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 // Audit log (admin-only, read-only)
 // ---------------------------------------------------------------------------
 
-export const AUDIT_EVENTS = ['login.success', 'login.failure'] as const
+/**
+ * `password.change`: a user changed their own password. `password.reset`: a
+ * user manager set another account's password (`target_username`).
+ */
+export const AUDIT_EVENTS = [
+	'login.success',
+	'login.failure',
+	'password.change',
+	'password.reset',
+] as const
 
 export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
 
 export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
 
-/** `search` matches username, peer IP or forwarded-for; newest entries first. */
+/** `search` matches username, target username, peer IP or forwarded-for; newest entries first. */
 export const AuditLogListQuerySchema = v.object({
 	...ListQueryEntries,
 	event: v.optional(AuditEventSchema, undefined),
@@ -1317,8 +1335,11 @@ export interface AuditLogEntryJson {
 	/** Unix seconds. */
 	created_at: number
 	event: AuditEvent
+	/** Acting user (for logins, the attempted username). */
 	username: string
 	user_id: number | null
+	/** Account acted upon when it differs from the actor (`password.reset`). */
+	target_username: string | null
 	/** Socket peer address. */
 	ip: string
 	/** Raw `X-Forwarded-For` header, if sent (client-controlled). */

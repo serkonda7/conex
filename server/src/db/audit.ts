@@ -20,6 +20,7 @@ export interface AuditRecord {
 	event: AuditEvent
 	username: string
 	user_id: number | null
+	target_username?: string | null
 	ip: string
 	forwarded_for: string | null
 	user_agent: string | null
@@ -34,6 +35,7 @@ export async function recordAudit(entry: AuditRecord): Promise<Result<unknown, E
 				event: entry.event,
 				username: clip(entry.username) ?? '',
 				user_id: entry.user_id,
+				target_username: clip(entry.target_username ?? null),
 				ip: clip(entry.ip) ?? 'unknown',
 				forwarded_for: clip(entry.forwarded_for),
 				user_agent: clip(entry.user_agent),
@@ -49,7 +51,12 @@ export async function listAuditLog(
 	params: AuditListParams,
 ): Promise<Result<Page<AuditLogEntryJson>, Error>> {
 	const where = and(
-		searchCondition(params.search, [audit_log.username, audit_log.ip, audit_log.forwarded_for]),
+		searchCondition(params.search, [
+			audit_log.username,
+			audit_log.target_username,
+			audit_log.ip,
+			audit_log.forwarded_for,
+		]),
 		params.event ? eq(audit_log.event, params.event) : undefined,
 	)
 	const page = await pageRows(

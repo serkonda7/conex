@@ -98,6 +98,20 @@ export async function login(username: string, password: string): Promise<Result<
 	return res.map(() => undefined)
 }
 
+/** Changes the signed-in user's password; their other sessions end. */
+export async function change_password(
+	current_password: string,
+	new_password: string,
+): Promise<Result<void, Error>> {
+	const res = await post_json<unknown>(
+		'/api/auth/password',
+		{ current_password, new_password },
+		t('api.passwordChangeFailed'),
+		t('api.networkError'),
+	)
+	return res.map(() => undefined)
+}
+
 /** Releases the server session. Never throws: logout is best-effort. */
 export async function logout(): Promise<void> {
 	try {

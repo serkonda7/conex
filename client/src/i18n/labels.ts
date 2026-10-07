@@ -132,9 +132,11 @@ export function deviceStatusLabel(value: string): string {
 const AUDIT_EVENT_KEYS: Record<AuditEvent, MessageKey> = {
 	'login.success': 'auditEvent.loginSuccess',
 	'login.failure': 'auditEvent.loginFailure',
+	'password.change': 'auditEvent.passwordChange',
+	'password.reset': 'auditEvent.passwordReset',
 }
 
-/** Audit log event (`login.success` / `login.failure`). */
+/** Audit log event (`login.success`, `password.reset`, …). */
 export function auditEventLabel(value: string): string {
 	return lookup(AUDIT_EVENT_KEYS, value)
 }

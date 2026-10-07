@@ -2,19 +2,25 @@ import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
-import { type AuditEvent, LoginSchema, SetupSchema } from 'shared/src/schemas'
+import { LoginSchema, PasswordChangeSchema, SetupSchema } from 'shared/src/schemas'
 import { requestUser } from '../authz'
-import { recordAudit } from '../db/audit'
 import { isUniqueViolation } from '../db/errors'
 import { fullAccessRoleId } from '../db/roles'
-import { createLocalUser, getUserByUsername, hasAnyUser } from '../db/users'
+import { changeOwnPassword, createLocalUser, getUserByUsername, hasAnyUser } from '../db/users'
 import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
 import { onValidationError } from '../middleware/validation'
-import { get_signed_jwt, getSessionCookieOpts, invalidateSession } from '../sessions'
+import {
+	get_signed_jwt,
+	getSessionCookieOpts,
+	invalidateSession,
+	invalidateUserSessions,
+} from '../sessions'
 import type { User } from '../types'
-import { forwarded_for, peer_ip } from '../util/client_ip'
+import { auditRequest } from '../util/audit'
+import { peer_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
+import { sendResult } from '../util/result_response'
 import { normalize_username } from '../util/username'
 
 export const authApp = new Hono()
@@ -86,30 +92,6 @@ authApp.post(
 	},
 )
 
-/**
- * Appends a login attempt to the audit log. A failed write is logged but
- * never changes the login outcome.
- */
-async function auditLogin(
-	c: Context,
-	ip: string,
-	event: AuditEvent,
-	username: string,
-	userId: number | null,
-): Promise<void> {
-	const res = await recordAudit({
-		event,
-		username,
-		user_id: userId,
-		ip,
-		forwarded_for: forwarded_for(c),
-		user_agent: c.req.header('user-agent') ?? null,
-	})
-	if (Result.isError(res)) {
-		console.error('Failed to write audit log entry:', res.error)
-	}
-}
-
 authApp.post(
 	'/login',
 	rate_limit(),
@@ -122,17 +104,29 @@ authApp.post(
 
 		const user = await getUserByUsername(body.username)
 		if (!user?.password_hash) {
-			await auditLogin(c, ip, 'login.failure', body.username, user?.id ?? null)
+			await auditRequest(
+				c,
+				{ event: 'login.failure', username: body.username, user_id: user?.id ?? null },
+				ip,
+			)
 			return jsonError(c, 'Invalid username or password', 401)
 		}
 
 		const isMatch = await Bun.password.verify(body.password, user.password_hash)
 		if (!isMatch) {
-			await auditLogin(c, ip, 'login.failure', user.username, user.id)
+			await auditRequest(
+				c,
+				{ event: 'login.failure', username: user.username, user_id: user.id },
+				ip,
+			)
 			return jsonError(c, 'Invalid username or password', 401)
 		}
 		await startSession(c, user)
-		await auditLogin(c, ip, 'login.success', user.username, user.id)
+		await auditRequest(
+			c,
+			{ event: 'login.success', username: user.username, user_id: user.id },
+			ip,
+		)
 
 		return c.json({ success: true })
 	},
@@ -145,6 +139,32 @@ authApp.post('/logout', authMiddleware, async (c) => {
 	deleteCookie(c, AUTH_COOKIE, getSessionCookieOpts())
 	return c.json({ success: true })
 })
+
+// Self-service password change. Other sessions of the user end; the
+// current one stays signed in.
+authApp.post(
+	'/password',
+	authMiddleware,
+	rate_limit(),
+	vValidator('json', PasswordChangeSchema, onValidationError),
+	async (c) => {
+		const user = requestUser(c)
+		const ip = peer_ip(c)
+		const res = await changeOwnPassword(user.id, c.req.valid('json'))
+		if (Result.isOk(res)) {
+			await invalidateUserSessions(user.id, c.get('jwtPayload').jti)
+			await auditRequest(
+				c,
+				{ event: 'password.change', username: user.username, user_id: user.id },
+				ip,
+			)
+		}
+		return sendResult(
+			c,
+			res.map(() => ({ success: true })),
+		)
+	},
+)
 
 authApp.get('/me', authMiddleware, (c) => {
 	const user = requestUser(c)

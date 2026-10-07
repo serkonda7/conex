@@ -1,4 +1,5 @@
 import { vValidator } from '@hono/valibot-validator'
+import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
 	EntityParamsSchema,
@@ -11,6 +12,8 @@ import { createUser, deleteUser, getUserResult, listUsers, updateUser } from '..
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
+import { invalidateUserSessions } from '../sessions'
+import { auditRequest } from '../util/audit'
 import { sendCreated, sendResult } from '../util/result_response'
 
 /**
@@ -46,7 +49,20 @@ export const usersApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		vValidator('json', UserUpdateSchema, onValidationError),
 		async (c) => {
-			return sendResult(c, await updateUser(c.req.valid('param').id, c.req.valid('json')))
+			const input = c.req.valid('json')
+			const res = await updateUser(c.req.valid('param').id, input)
+			if (Result.isOk(res) && input.password !== undefined) {
+				// A reset signs the account out everywhere except the actor's own session.
+				const actor = requestUser(c)
+				await invalidateUserSessions(res.value.id, c.get('jwtPayload').jti)
+				await auditRequest(c, {
+					event: 'password.reset',
+					username: actor.username,
+					user_id: actor.id,
+					target_username: res.value.username,
+				})
+			}
+			return sendResult(c, res)
 		},
 	)
 	.delete('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
