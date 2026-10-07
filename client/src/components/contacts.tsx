@@ -1,4 +1,4 @@
-import { IconPlus, IconTrash } from '@tabler/icons-solidjs'
+import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-solidjs'
 import { inferPhoneType } from 'shared/src/phone'
 import type {
 	ContactScope,
@@ -64,8 +64,8 @@ export function RowSelect<T extends string>(props: {
 
 /**
  * Editable list of contact rows (mail addresses or phone numbers): one row
- * per entry with a remove button, plus an add button below. Rows keep their
- * DOM nodes by index, so typing never loses focus.
+ * per entry with move and remove buttons, plus an add button below. Rows keep
+ * their DOM nodes by index, so typing never loses focus.
  */
 export function ContactListField<T>(props: {
 	id: string
@@ -78,12 +78,39 @@ export function ContactListField<T>(props: {
 }): JSX.Element {
 	const update = (index: number, patch: Partial<T>): void =>
 		props.onChange(props.rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+	const move = (index: number, to: number): void => {
+		const rows = [...props.rows]
+		;[rows[index], rows[to]] = [rows[to] as T, rows[index] as T]
+		props.onChange(rows)
+	}
 	return (
 		<Field label={props.label} for={`${props.id}-0`}>
 			<Index each={props.rows}>
 				{(entry: () => T, index: number): JSX.Element => (
 					<div class="contact-row">
 						{props.row(entry, (patch: Partial<T>) => update(index, patch), index)}
+						<Show when={props.rows.length > 1}>
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label={t('employee.moveEntryUp')}
+								title={t('employee.moveEntryUp')}
+								disabled={index === 0}
+								onClick={() => move(index, index - 1)}
+							>
+								<IconArrowUp size={16} />
+							</button>
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label={t('employee.moveEntryDown')}
+								title={t('employee.moveEntryDown')}
+								disabled={index === props.rows.length - 1}
+								onClick={() => move(index, index + 1)}
+							>
+								<IconArrowDown size={16} />
+							</button>
+						</Show>
 						<button
 							type="button"
 							class="icon-btn"
@@ -175,7 +202,7 @@ export function PhoneInputs<P extends TenantPhone>(props: {
 	)
 }
 
-/** Mail addresses, one per line with their scope; the first is marked primary. */
+/** Mail addresses, one per line with their scope (if any); the first is primary. */
 export function EmailList(props: {
 	emails: (TenantEmail & { scope?: ContactScope })[]
 }): JSX.Element {
@@ -183,23 +210,13 @@ export function EmailList(props: {
 		<Show when={props.emails.length > 0} fallback="—">
 			<ul class="contact-list">
 				<For each={props.emails}>
-					{(
-						e: TenantEmail & { scope?: ContactScope },
-						index: () => number,
-					): JSX.Element => (
+					{(e: TenantEmail & { scope?: ContactScope }): JSX.Element => (
 						<li>
 							<EmailLink email={e.address} />
 							<Show when={e.scope}>
 								{(scope: () => ContactScope): JSX.Element => (
-									<>
-										{' '}
-										<span class="text-muted">{contactScopeLabel(scope())}</span>
-									</>
+									<span class="text-muted">{contactScopeLabel(scope())}</span>
 								)}
-							</Show>
-							<Show when={index() === 0 && props.emails.length > 1}>
-								{' '}
-								<span class="badge">{t('employee.primary')}</span>
 							</Show>
 						</li>
 					)}
@@ -209,21 +226,26 @@ export function EmailList(props: {
 	)
 }
 
-/** Phone numbers, one per line with their kind (and scope, if any). */
+/** Phone numbers, one per line with their kind and scope (if any) in own columns. */
 export function PhoneList(props: {
 	phones: (TenantPhone & { scope?: ContactScope })[]
 }): JSX.Element {
 	return (
 		<Show when={props.phones.length > 0} fallback="—">
-			<ul class="contact-list">
+			<ul
+				class="contact-list"
+				classList={{ 'contact-list-scoped': props.phones.some((p) => p.scope) }}
+			>
 				<For each={props.phones}>
 					{(p: TenantPhone & { scope?: ContactScope }): JSX.Element => (
 						<li>
-							<a href={`tel:${p.number.replace(/[^\d+]/g, '')}`}>{p.number}</a>{' '}
-							<span class="text-muted">
-								{phoneTypeLabel(p.type)}
-								{p.scope ? ` · ${contactScopeLabel(p.scope)}` : ''}
-							</span>
+							<a href={`tel:${p.number.replace(/[^\d+]/g, '')}`}>{p.number}</a>
+							<span class="text-muted">{phoneTypeLabel(p.type)}</span>
+							<Show when={p.scope}>
+								{(scope: () => ContactScope): JSX.Element => (
+									<span class="text-muted">{contactScopeLabel(scope())}</span>
+								)}
+							</Show>
 						</li>
 					)}
 				</For>

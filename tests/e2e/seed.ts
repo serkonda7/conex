@@ -8,6 +8,7 @@ import {
 	device_roles,
 	device_types,
 	devices,
+	employees,
 	locations,
 	manufacturers,
 	racks,
@@ -244,6 +245,35 @@ if (e2eSite && e2eRackType) {
 		await db.insert(shelves).values(shelfValues)
 	}
 }
+
+// Employee with several mail addresses and phone numbers for the visual suite.
+const visualEmployee: typeof employees.$inferInsert = {
+	tenant_id: tenant.id,
+	salutation: 'ms',
+	first_name: 'Erika',
+	last_name: 'E2E Visual',
+	title: 'Managing director',
+	emails: [
+		{ address: 'erika.visual@e2e.example', scope: 'work' },
+		{ address: 'erika@private.example', scope: 'private' },
+	],
+	phones: [
+		{ number: '+49 30 1234567', type: 'phone', scope: 'work' },
+		{ number: '+49 170 1234567', type: 'mobile', scope: 'work' },
+		{ number: '+49 30 7654321', type: 'phone', scope: 'private' },
+	],
+	active: 1,
+	description: 'Contact person for screenshot coverage.',
+	comments: null,
+}
+const existingEmployee = (await db.select().from(employees)).find(
+	(row) => row.last_name === visualEmployee.last_name,
+)
+// Recreated each run so earlier edits never leak into the baseline.
+if (existingEmployee) {
+	await getSqlClient()`DELETE FROM employees WHERE id = ${existingEmployee.id}`
+}
+await db.insert(employees).values(visualEmployee)
 
 if (!(await getUserByUsername(username))) {
 	await createLocalUser(username, await Bun.password.hash(password), await fullAccessRoleId())

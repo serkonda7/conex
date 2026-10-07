@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { stabilizeForSnapshot } from './helpers'
 
 // Screenshot suite at 1920x1080 to catch layout regressions.
@@ -63,4 +63,32 @@ test('device add form layout', async ({ page }) => {
 	await expect(page.locator('.form-section-title')).toHaveCount(2)
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('device-add-form.png')
+})
+
+async function visualEmployeeId(page: Page): Promise<number> {
+	const response = await page.request.get('/api/employees?search=E2E%20Visual&limit=200')
+	expect(response.ok()).toBeTruthy()
+	const list = (await response.json()) as { items: { id: number; last_name: string }[] }
+	const id = list.items.find((employee) => employee.last_name === 'E2E Visual')?.id
+	expect(id).toBeDefined()
+	return id as number
+}
+
+test('employee detail layout', async ({ page }) => {
+	const employeeId = await visualEmployeeId(page)
+	await page.goto(`/employees/${employeeId}`)
+	await expect(page.locator('main.app-content h2')).toContainText('Erika E2E Visual')
+	await expect(page.locator('.breadcrumbs')).toContainText('E2E Tenant')
+	await expect(page.locator('.contact-list li')).toHaveCount(5)
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('employee-detail.png')
+})
+
+test('employee edit form layout', async ({ page }) => {
+	const employeeId = await visualEmployeeId(page)
+	await page.goto(`/employees/${employeeId}/edit`)
+	await expect(page.locator('#employee-edit-last-name')).toHaveValue('E2E Visual')
+	await expect(page.locator('#employee-edit-phone-2')).toHaveValue('+49 30 7654321')
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('employee-edit-form.png')
 })

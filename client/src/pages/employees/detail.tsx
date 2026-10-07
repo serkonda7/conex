@@ -7,19 +7,19 @@ import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
-	RecordLink,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { t, tp } from '../../i18n'
+import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord } from '../../lib/resource'
+import type { Crumb } from '../../lib/router'
 import { EmployeeIntegrationCards } from '../integrations/cards'
 import { EmployeeStatus } from './list'
 
 /**
- * /employees/:id — employee detail: header with description, the contact
- * details and the integration cards.
+ * /employees/:id — employee detail: tenant breadcrumb, header with
+ * description, the contact details and the integration cards.
  */
 export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -27,6 +27,11 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [employee] = createRecord(id, fetch_employee, setError)
 	const tenantId = (): number | undefined => employee()?.tenant_id
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
+
+	const tenantCrumbs = (): Crumb[] => {
+		const row = tenant()
+		return row ? [{ label: row.name, href: `/tenants/${row.id}` }] : []
+	}
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.employee',
@@ -41,6 +46,7 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				name={employee()?.name}
+				crumbs={tenantCrumbs()}
 				record={employee}
 				loadingText={t('employee.loadingOne')}
 				emptyText={t('employee.notFound')}
@@ -53,20 +59,12 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 				<DetailSubtitle description={employee()?.description} />
 
 				<DetailCard label={t('employee.details')}>
-					<dt>{tp('entity.tenant', 1)}</dt>
-					<dd>
-						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
-					</dd>
 					<dt>{t('employee.salutation')}</dt>
 					<dd>
 						{employee()?.salutation
 							? employeeSalutationLabel(employee()?.salutation ?? '')
 							: '—'}
 					</dd>
-					<dt>{t('employee.firstName')}</dt>
-					<dd>{employee()?.first_name || '—'}</dd>
-					<dt>{t('employee.lastName')}</dt>
-					<dd>{employee()?.last_name}</dd>
 					<dt>{t('employee.title')}</dt>
 					<dd>{employee()?.title || '—'}</dd>
 					<dt>{t('employee.emails')}</dt>

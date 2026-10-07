@@ -39,14 +39,14 @@ bun run dev
 | `CONEX_CONFIG_PATH`      | Relative to `server/data` or absolute              | `config.toml` |
 | `CONEX_E2E_DATABASE_URL` | Separate Postgres database for `bun run test:e2e`  | `CONEX_DATABASE_URL` + `_e2e` (auto-created) |
 
-### Backing up Postgres
-Backup:
+
+### Backing up Postgres Database
 ```sh
-docker exec conex-db pg_dump -U conex conex > backups/conex-$(date +%F).sql
-```
-Restore:
-```sh
-pg_restore -d "$CONEX_DATABASE_URL" conex-2026-09-30.dump
+# Backup
+docker exec conex-db pg_dump -U conex -Fc conex > backups/conex-$(date +%F).dump
+
+# Restore
+docker exec -i conex-db pg_restore -U conex -d conex < backups/<file>.dump
 ```
 
 

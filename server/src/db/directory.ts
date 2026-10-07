@@ -9,16 +9,14 @@ import { getDb } from './connection'
 // telephony lookups (AGFEO Dashboard LDAP plugin).
 // ---------------------------------------------------------------------------
 
-/** `pos`-th (0-based) number of `type` (and `scope`, if given), normalized. */
+/** `pos`-th (0-based) number of `type` and `scope`, normalized. */
 function phone(
 	phones: readonly EmployeePhone[],
 	type: PhoneType,
-	scope: EmployeePhone['scope'] | null,
+	scope: EmployeePhone['scope'],
 	pos: number,
 ): string | null {
-	const number = phones.filter((p) => p.type === type && (scope === null || p.scope === scope))[
-		pos
-	]?.number
+	const number = phones.filter((p) => p.type === type && p.scope === scope)[pos]?.number
 	return number ? normalizePhone(number) || null : null
 }
 
@@ -52,7 +50,9 @@ export async function listDirectoryContacts(tenantScope?: number): Promise<Direc
 		phone_business2: phone(phones, 'phone', 'work', 1),
 		phone_home: phone(phones, 'phone', 'private', 0),
 		phone_home2: phone(phones, 'phone', 'private', 1),
-		phone_mobile: phone(phones, 'mobile', null, 0),
-		phone_mobile2: phone(phones, 'mobile', null, 1),
+		phone_mobile: phone(phones, 'mobile', 'work', 0),
+		phone_mobile2: phone(phones, 'mobile', 'work', 1),
+		phone_mobile_home: phone(phones, 'mobile', 'private', 0),
+		phone_mobile_home2: phone(phones, 'mobile', 'private', 1),
 	}))
 }

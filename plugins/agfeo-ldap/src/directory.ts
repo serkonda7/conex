@@ -80,7 +80,7 @@ export function contactEntry(row: DirectoryContact, baseDn: string): Entry {
 				['sn', row.last_name],
 				['company', row.company],
 				['customerNumber', row.customer_number],
-				['title', row.title],
+				['department', row.title],
 				['mail', row.email],
 				['telephoneNumber', row.phone_business],
 				['otherTelephone', row.phone_business2],
@@ -88,6 +88,8 @@ export function contactEntry(row: DirectoryContact, baseDn: string): Entry {
 				['otherHomePhone', row.phone_home2],
 				['mobile', row.phone_mobile],
 				['otherMobile', row.phone_mobile2],
+				['homeMobile', row.phone_mobile_home],
+				['otherHomeMobile', row.phone_mobile_home2],
 			]),
 		],
 	}
@@ -119,6 +121,8 @@ const PHONE_ATTRIBUTES = new Set([
 	'otherhomephone',
 	'mobile',
 	'othermobile',
+	'homemobile',
+	'otherhomemobile',
 ])
 
 function valuesOf(entry: Entry, attr: string): string[] | undefined {

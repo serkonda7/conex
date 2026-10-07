@@ -387,6 +387,8 @@ export interface DirectoryContact {
 	phone_home2: string | null
 	phone_mobile: string | null
 	phone_mobile2: string | null
+	phone_mobile_home: string | null
+	phone_mobile_home2: string | null
 }
 
 export type EmployeeCreate = v.InferOutput<typeof EmployeeCreateSchema>
