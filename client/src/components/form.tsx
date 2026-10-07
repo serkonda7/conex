@@ -6,25 +6,16 @@
  * the e2e tests and the detail-page deep links address them directly.
  */
 
-import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
+import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { createEffect, createMemo, createSignal, For, type JSX, onMount, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import type { FormState } from '../lib/form'
-import type { IconComponent } from '../lib/icons'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
 import { InlineError, Loading } from './feedback'
 
 /** One `SelectField` entry. */
-export interface FormOption {
-	value: number | string
-	label: string
-	/** Secondary text (e.g. the manufacturer), shown muted in a column after the labels. */
-	detail?: string
-	/** Glyph shown before the label, in the list and in the closed input. */
-	icon?: IconComponent
-}
+export type FormOption = ComboboxOption
 
 /** Maps list rows (`{ id, name }`) to `SelectField` options. */
 export function row_options(rows: readonly { id: number; name: string }[]): FormOption[] {
@@ -275,13 +266,11 @@ export function CommentsField(props: {
 	)
 }
 
-/** Searchable dropdown of `options`, with an optional leading empty choice.
- * A text combobox: typing filters the options by label, arrow keys move the
- * highlight, Enter picks it. The input shows the selected label while closed;
- * the numeric value sits in `data-value` for e2e tests. `reload` refetches
- * the options whenever the list opens, and `add` pins an entry at the end of
- * the list that opens the add form of the option kind, passing the typed
- * search as `?name=`. */
+/** Searchable dropdown of `options` (the solid-components `Combobox`), with
+ * an optional leading empty choice. The numeric value sits in `data-value`
+ * for e2e tests. `reload` refetches the options whenever the list opens, and
+ * `add` pins an entry at the end of the list that opens the add form of the
+ * option kind, passing the typed search as `?name=`. */
 export function SelectField(props: {
 	id: string
 	label: string
@@ -300,231 +289,39 @@ export function SelectField(props: {
 	/** Entity label and add-form path of the pinned "Add …" entry. */
 	add?: { label: string; href: string }
 }): JSX.Element {
-	let list: HTMLDivElement | undefined
-	const ref = useAutofocus(() => props.autofocus)
-	const listId = `${props.id}-listbox`
-	const [open, setOpen] = createSignal(false)
-	const [query, setQuery] = createSignal('')
-	const [active, setActive] = createSignal(0)
-
-	const choices = createMemo((): FormOption[] =>
-		props.emptyLabel === undefined
-			? props.options
-			: [{ value: '', label: props.emptyLabel }, ...props.options],
-	)
-	const selected = createMemo(() =>
-		props.value === '' ? undefined : choices().find((o) => String(o.value) === props.value),
-	)
-	const filtered = createMemo((): FormOption[] => {
-		const needle = query().trim().toLowerCase()
-		return needle === ''
-			? choices()
-			: choices().filter(
-					(o) =>
-						o.label.toLowerCase().includes(needle) ||
-						(o.detail?.toLowerCase().includes(needle) ?? false),
-				)
-	})
-	const hasDetail = (): boolean => props.options.some((o) => o.detail !== undefined)
-	// The add entry follows the filtered options in the arrow-key cycle.
-	const addIndex = (): number => filtered().length
-	const count = (): number => filtered().length + (props.add ? 1 : 0)
-	const editable = (): boolean => !props.disabled && props.onChange !== undefined
-
-	createEffect(() => {
-		// Keep the highlighted option visible while arrowing through a long list.
-		if (open()) {
-			list?.querySelector(`[data-index="${active()}"]`)?.scrollIntoView({ block: 'nearest' })
+	onMount(() => {
+		// The tab shell refocuses `[data-autofocus]` when the tab is reactivated.
+		if (props.autofocus === true) {
+			document.querySelector(`#${CSS.escape(props.id)}`)?.setAttribute('data-autofocus', '')
 		}
 	})
 
-	function show(): void {
-		if (open() || !editable()) {
-			return
-		}
-		setQuery('')
-		const index = choices().findIndex((o) => String(o.value) === props.value)
-		setActive(Math.max(index, 0))
-		setOpen(true)
-		void props.reload?.()
-	}
-
-	function pick(index: number): void {
-		setOpen(false)
-		if (props.add && index === addIndex()) {
+	function openAddForm(name: string): void {
+		const href = props.add?.href
+		if (href !== undefined) {
 			// The add form starts with whatever was typed as its name.
-			const name = query().trim()
-			navigate(
-				name === '' ? props.add.href : `${props.add.href}?name=${encodeURIComponent(name)}`,
-			)
-			return
-		}
-		const option = filtered()[index]
-		if (option && String(option.value) !== props.value) {
-			props.onChange?.(String(option.value))
+			navigate(name === '' ? href : `${href}?name=${encodeURIComponent(name)}`)
 		}
 	}
-
-	function step(delta: number): void {
-		const total = count()
-		if (!open()) {
-			show()
-		} else if (total > 0) {
-			setActive((active() + delta + total) % total)
-		}
-	}
-
-	function onKeyDown(e: KeyboardEvent): void {
-		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-			e.preventDefault()
-			step(e.key === 'ArrowDown' ? 1 : -1)
-			return
-		}
-		if (!open()) {
-			return
-		}
-		if (e.key === 'Enter') {
-			e.preventDefault()
-			pick(active())
-		} else if (e.key === 'Escape') {
-			e.preventDefault()
-			e.stopPropagation()
-			setOpen(false)
-		}
-	}
-
-	const placeholder = (): string | undefined =>
-		open() ? (selected()?.label ?? props.emptyLabel ?? t('common.search')) : props.emptyLabel
 
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
-			<div
-				class="combobox"
-				classList={{
-					'combobox-open': open(),
-					'combobox-with-detail': !open() && Boolean(selected()?.detail),
-					'combobox-with-icon': !open() && selected()?.icon !== undefined,
-				}}
-			>
-				<input
-					id={props.id}
-					ref={ref}
-					role="combobox"
-					aria-expanded={open()}
-					aria-controls={listId}
-					aria-autocomplete="list"
-					aria-activedescendant={
-						open() && count() > 0 ? `${props.id}-option-${active()}` : undefined
-					}
-					aria-describedby={props.describedBy}
-					autocomplete="off"
-					required={props.required}
-					disabled={props.disabled}
-					readOnly={props.onChange === undefined}
-					data-autofocus={props.autofocus || undefined}
-					data-value={props.value}
-					placeholder={placeholder()}
-					value={open() ? query() : (selected()?.label ?? '')}
-					onClick={show}
-					onInput={(e: InputEventAndTarget) => {
-						show()
-						setQuery(e.currentTarget.value)
-						setActive(0)
-					}}
-					onKeyDown={onKeyDown}
-					onBlur={() => setOpen(false)}
-				/>
-				<Show when={!open() && selected()?.icon}>
-					{(icon: () => IconComponent): JSX.Element => (
-						<span class="combobox-icon" aria-hidden="true">
-							<Dynamic component={icon()} size={14} />
-						</span>
-					)}
-				</Show>
-				<Show when={!open() && selected()?.detail}>
-					<span class="combobox-value" aria-hidden="true">
-						<span class="combobox-option-label">{selected()?.label}</span>
-						<span class="combobox-detail">{selected()?.detail}</span>
-					</span>
-				</Show>
-				<IconChevronDown class="combobox-chevron" size={16} aria-hidden="true" />
-				<Show when={open()}>
-					<div
-						class="combobox-list"
-						classList={{ 'combobox-list-detail': hasDetail() }}
-						id={listId}
-						ref={list}
-						role="listbox"
-					>
-						<For
-							each={filtered()}
-							fallback={
-								<div class="combobox-empty">{t('common.noMatchingObjects')}</div>
-							}
-						>
-							{(option: FormOption, index: () => number): JSX.Element => (
-								// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection runs through the combobox input (aria-activedescendant)
-								// biome-ignore lint/a11y/useFocusableInteractive: focus stays in the combobox input
-								<div
-									id={`${props.id}-option-${index()}`}
-									data-index={index()}
-									role="option"
-									aria-selected={String(option.value) === props.value}
-									classList={{
-										'combobox-option': true,
-										'combobox-option-active': index() === active(),
-										'combobox-option-empty': option.value === '',
-									}}
-									// Keep focus in the input so blur doesn't close the list first.
-									onMouseDown={(e: MouseEvent) => e.preventDefault()}
-									onMouseMove={() => setActive(index())}
-									onClick={() => pick(index())}
-								>
-									<span class="combobox-option-label">
-										<Show when={option.icon}>
-											{(icon: () => IconComponent): JSX.Element => (
-												<span
-													class="combobox-option-icon"
-													aria-hidden="true"
-												>
-													<Dynamic component={icon()} size={14} />
-												</span>
-											)}
-										</Show>
-										{option.label}
-									</span>
-									<Show when={option.detail}>
-										<span class="combobox-detail">{option.detail}</span>
-									</Show>
-								</div>
-							)}
-						</For>
-						<Show when={props.add}>
-							{(add: () => { label: string; href: string }): JSX.Element => (
-								// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection runs through the combobox input (aria-activedescendant)
-								// biome-ignore lint/a11y/useFocusableInteractive: focus stays in the combobox input
-								<div
-									id={`${props.id}-option-${addIndex()}`}
-									data-index={addIndex()}
-									role="option"
-									aria-selected={false}
-									classList={{
-										'combobox-option': true,
-										'combobox-option-add': true,
-										'combobox-option-active': addIndex() === active(),
-									}}
-									onMouseDown={(e: MouseEvent) => e.preventDefault()}
-									onMouseMove={() => setActive(addIndex())}
-									onClick={() => pick(addIndex())}
-								>
-									<IconPlus size={14} aria-hidden="true" />
-									{t('app.navAdd', { label: add().label })}
-								</div>
-							)}
-						</Show>
-					</div>
-				</Show>
-			</div>
+			<Combobox
+				id={props.id}
+				value={props.value}
+				onChange={props.onChange}
+				options={props.options}
+				emptyLabel={props.emptyLabel}
+				required={props.required}
+				disabled={props.disabled}
+				autofocus={props.autofocus}
+				describedBy={props.describedBy}
+				onOpen={props.reload}
+				onAdd={props.add ? openAddForm : undefined}
+				addLabel={props.add ? t('app.navAdd', { label: props.add.label }) : undefined}
+				searchLabel={t('common.search')}
+				noMatchesLabel={t('common.noMatchingObjects')}
+			/>
 		</Field>
 	)
 }
