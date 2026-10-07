@@ -1,3 +1,4 @@
+import { primaryPhone } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
 import { delete_employee, fetch_employee } from '../../api/employees'
 import { fetch_tenant } from '../../api/tenancy'
@@ -73,7 +74,10 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 					<dt>{t('employee.phones')}</dt>
 					<dd>
-						<PhoneList phones={employee()?.phones ?? []} />
+						<PhoneList
+							phones={employee()?.phones ?? []}
+							mainNumber={primaryPhone(tenant()?.phones ?? [], 'phone')}
+						/>
 					</dd>
 					<dt>{t('employee.status')}</dt>
 					<dd>

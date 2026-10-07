@@ -59,7 +59,10 @@ A user limited to a tenant only sees that tenant's employees.
 | `company`            | Company           |
 | `department`         | Department        |
 
-Other phone numbers are not exported.
+Extensions are published as business or private phone numbers, completed
+with the tenant's main phone number up to its last `-` (`+49 521 44709-0` and
+extension `45` give `+495214470945`); without such a main number they are left
+out. Other phone numbers are not exported.
 
 
 ## Configuration

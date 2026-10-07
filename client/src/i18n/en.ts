@@ -287,6 +287,8 @@ export const en = {
 	'phoneType.phone': 'Phone',
 	'phoneType.mobile': 'Mobile',
 	'phoneType.extension': 'Extension',
+	'employee.extensionNotDialable': 'not dialable',
+	'employee.extensionNoMainNumber': 'Not dialable: tenant has no main number like 44709-0',
 	'employee.status': 'Status',
 	'employee.active': 'Active',
 	'employee.inactive': 'Inactive',

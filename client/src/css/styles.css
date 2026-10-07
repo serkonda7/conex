@@ -1127,6 +1127,10 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+.field-hint-error {
+	color: var(--error);
+}
+
 .field-group-label {
 	font-size: var(--font-size-base);
 	font-weight: 600;

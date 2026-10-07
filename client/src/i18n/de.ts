@@ -289,6 +289,8 @@ export const de: Messages = {
 	'phoneType.phone': 'Telefon',
 	'phoneType.mobile': 'Mobil',
 	'phoneType.extension': 'Durchwahl',
+	'employee.extensionNotDialable': 'nicht anwählbar',
+	'employee.extensionNoMainNumber': 'Nicht anwählbar: Mandant hat keine Hauptnummer wie 44709-0',
 	'employee.status': 'Status',
 	'employee.active': 'Aktiv',
 	'employee.inactive': 'Inaktiv',

@@ -42,3 +42,17 @@ export function inferPhoneType(raw: string): PhoneType | null {
 	}
 	return 'phone'
 }
+
+/**
+ * Full number of an extension: the tenant's main number up to its last `-`
+ * (`+49 (0)521 44709-0` → `+4952144709`) followed by the extension's digits,
+ * normalized. `null` if the main number has no `-` separating the extension.
+ */
+export function extensionNumber(extension: string, mainNumber: string | null): string | null {
+	const cut = mainNumber?.lastIndexOf('-') ?? -1
+	const digits = extension.replace(/[^0-9]/g, '')
+	if (mainNumber == null || cut === -1 || digits === '') {
+		return null
+	}
+	return normalizePhone(mainNumber.slice(0, cut)) + digits
+}

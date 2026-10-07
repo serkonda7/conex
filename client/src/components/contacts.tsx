@@ -1,5 +1,5 @@
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-solidjs'
-import { inferPhoneType } from 'shared/src/phone'
+import { extensionNumber, inferPhoneType } from 'shared/src/phone'
 import type {
 	ContactScope,
 	InputEventAndTarget,
@@ -75,6 +75,8 @@ export function ContactListField<T>(props: {
 	onChange: (rows: T[]) => void
 	blank: () => T
 	row: (entry: () => T, update: (patch: Partial<T>) => void, index: number) => JSX.Element
+	/** Note shown below a row, e.g. why its value is unusable. */
+	rowHint?: (entry: () => T) => JSX.Element
 }): JSX.Element {
 	const update = (index: number, patch: Partial<T>): void =>
 		props.onChange(props.rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
@@ -87,40 +89,45 @@ export function ContactListField<T>(props: {
 		<Field label={props.label} for={`${props.id}-0`}>
 			<Index each={props.rows}>
 				{(entry: () => T, index: number): JSX.Element => (
-					<div class="contact-row">
-						{props.row(entry, (patch: Partial<T>) => update(index, patch), index)}
-						<Show when={props.rows.length > 1}>
+					<>
+						<div class="contact-row">
+							{props.row(entry, (patch: Partial<T>) => update(index, patch), index)}
+							<Show when={props.rows.length > 1}>
+								<button
+									type="button"
+									class="icon-btn"
+									aria-label={t('employee.moveEntryUp')}
+									title={t('employee.moveEntryUp')}
+									disabled={index === 0}
+									onClick={() => move(index, index - 1)}
+								>
+									<IconArrowUp size={16} />
+								</button>
+								<button
+									type="button"
+									class="icon-btn"
+									aria-label={t('employee.moveEntryDown')}
+									title={t('employee.moveEntryDown')}
+									disabled={index === props.rows.length - 1}
+									onClick={() => move(index, index + 1)}
+								>
+									<IconArrowDown size={16} />
+								</button>
+							</Show>
 							<button
 								type="button"
 								class="icon-btn"
-								aria-label={t('employee.moveEntryUp')}
-								title={t('employee.moveEntryUp')}
-								disabled={index === 0}
-								onClick={() => move(index, index - 1)}
+								aria-label={t('employee.removeEntry')}
+								title={t('employee.removeEntry')}
+								onClick={() =>
+									props.onChange(props.rows.filter((_, i) => i !== index))
+								}
 							>
-								<IconArrowUp size={16} />
+								<IconTrash size={16} />
 							</button>
-							<button
-								type="button"
-								class="icon-btn"
-								aria-label={t('employee.moveEntryDown')}
-								title={t('employee.moveEntryDown')}
-								disabled={index === props.rows.length - 1}
-								onClick={() => move(index, index + 1)}
-							>
-								<IconArrowDown size={16} />
-							</button>
-						</Show>
-						<button
-							type="button"
-							class="icon-btn"
-							aria-label={t('employee.removeEntry')}
-							title={t('employee.removeEntry')}
-							onClick={() => props.onChange(props.rows.filter((_, i) => i !== index))}
-						>
-							<IconTrash size={16} />
-						</button>
-					</div>
+						</div>
+						{props.rowHint?.(entry)}
+					</>
 				)}
 			</Index>
 			<button
@@ -226,10 +233,27 @@ export function EmailList(props: {
 	)
 }
 
-/** Phone numbers, one per line with their kind and scope (if any) in own columns. */
+/** Extension that can't be completed to a full number with `mainNumber`. */
+export function isUndialableExtension(p: TenantPhone, mainNumber: string | null): boolean {
+	return (
+		p.type === 'extension' &&
+		p.number.trim() !== '' &&
+		extensionNumber(p.number, mainNumber) === null
+	)
+}
+
+/**
+ * Phone numbers, one per line with their kind and scope (if any) in own
+ * columns. Extensions dial via `mainNumber`; without one they are marked.
+ */
 export function PhoneList(props: {
 	phones: (TenantPhone & { scope?: ContactScope })[]
+	mainNumber?: string | null
 }): JSX.Element {
+	const dial = (p: TenantPhone): string | null =>
+		p.type === 'extension'
+			? extensionNumber(p.number, props.mainNumber ?? null)
+			: p.number.replace(/[^\d+]/g, '')
 	return (
 		<Show when={props.phones.length > 0} fallback="—">
 			<ul
@@ -239,7 +263,24 @@ export function PhoneList(props: {
 				<For each={props.phones}>
 					{(p: TenantPhone & { scope?: ContactScope }): JSX.Element => (
 						<li>
-							<a href={`tel:${p.number.replace(/[^\d+]/g, '')}`}>{p.number}</a>
+							<Show
+								when={dial(p)}
+								fallback={
+									<span>
+										{p.number}{' '}
+										<span
+											class="text-danger"
+											title={t('employee.extensionNoMainNumber')}
+										>
+											({t('employee.extensionNotDialable')})
+										</span>
+									</span>
+								}
+							>
+								{(tel: () => string): JSX.Element => (
+									<a href={`tel:${tel()}`}>{p.number}</a>
+								)}
+							</Show>
 							<span class="text-muted">{phoneTypeLabel(p.type)}</span>
 							<Show when={p.scope}>
 								{(scope: () => ContactScope): JSX.Element => (

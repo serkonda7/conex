@@ -1,6 +1,6 @@
-import { emailDomain, withEmailDomain } from 'shared/src/schemas'
+import { emailDomain, primaryPhone, withEmailDomain } from 'shared/src/schemas'
 import type { ContactScope, EmployeeCreate, EmployeeEmail, EmployeePhone } from 'shared/src/types'
-import { createSignal, type JSX } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import {
 	create_employee,
 	type EmployeeRow,
@@ -12,6 +12,7 @@ import {
 	ContactListField,
 	EmailInput,
 	emailsOf,
+	isUndialableExtension,
 	PhoneInputs,
 	type PhoneRow,
 	phoneRow,
@@ -84,6 +85,12 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 		const domain = domainOf(parseId(tenant.value()))
 		return domain === null ? undefined : t('employee.emailPlaceholder', { domain })
 	}
+	/** Main phone number of the tenant, which extensions are dialed through. */
+	const mainNumber = (): string | null =>
+		primaryPhone(
+			tenants()?.find((row) => row.id === parseId(tenant.value()))?.phones ?? [],
+			'phone',
+		)
 	const completeEmail = (index: number): void => {
 		const domain = domainOf(parseId(tenant.value()))
 		setEmails(
@@ -229,6 +236,18 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				rows={phones()}
 				onChange={setPhones}
 				blank={blankPhone}
+				rowHint={(entry: () => PhoneRow<EmployeePhone>): JSX.Element => (
+					<Show
+						when={
+							parseId(tenant.value()) !== null &&
+							isUndialableExtension(entry(), mainNumber())
+						}
+					>
+						<p class="field-hint field-hint-error" role="status">
+							{t('employee.extensionNoMainNumber')}
+						</p>
+					</Show>
+				)}
 				row={(
 					entry: () => PhoneRow<EmployeePhone>,
 					update: (patch: Partial<PhoneRow<EmployeePhone>>) => void,

@@ -1,6 +1,12 @@
 import { and, asc, eq } from 'drizzle-orm'
-import { normalizePhone } from 'shared/src/phone'
-import type { DirectoryContact, EmployeePhone, PhoneType } from 'shared/src/schemas'
+import { extensionNumber, normalizePhone } from 'shared/src/phone'
+import {
+	type DirectoryContact,
+	type EmployeePhone,
+	type PhoneType,
+	primaryPhone,
+	type TenantPhone,
+} from 'shared/src/schemas'
 import { employees, tenants } from '../schema'
 import { getDb } from './connection'
 
@@ -9,15 +15,27 @@ import { getDb } from './connection'
 // telephony lookups (AGFEO Dashboard LDAP plugin).
 // ---------------------------------------------------------------------------
 
-/** `pos`-th (0-based) number of `type` and `scope`, normalized. */
-function phone(
+/**
+ * Normalized numbers of `type` and `scope`. Extensions count as `phone` and
+ * are completed with the tenant's main number; unresolvable ones are dropped.
+ */
+function numbers(
 	phones: readonly EmployeePhone[],
-	type: PhoneType,
+	tenantPhones: readonly TenantPhone[],
+	type: Exclude<PhoneType, 'extension'>,
 	scope: EmployeePhone['scope'],
-	pos: number,
-): string | null {
-	const number = phones.filter((p) => p.type === type && p.scope === scope)[pos]?.number
-	return number ? normalizePhone(number) || null : null
+): string[] {
+	const main = primaryPhone(tenantPhones, 'phone')
+	return phones
+		.filter(
+			(p) =>
+				p.scope === scope &&
+				(p.type === type || (type === 'phone' && p.type === 'extension')),
+		)
+		.map((p) =>
+			p.type === 'extension' ? extensionNumber(p.number, main) : normalizePhone(p.number),
+		)
+		.filter((n): n is string => !!n)
 }
 
 /** All active employees, or those of one tenant for a scoped requester. */
@@ -33,6 +51,7 @@ export async function listDirectoryContacts(tenantScope?: number): Promise<Direc
 			title: employees.title,
 			emails: employees.emails,
 			phones: employees.phones,
+			tenant_phones: tenants.phones,
 		})
 		.from(employees)
 		.innerJoin(tenants, eq(tenants.id, employees.tenant_id))
@@ -43,16 +62,22 @@ export async function listDirectoryContacts(tenantScope?: number): Promise<Direc
 			),
 		)
 		.orderBy(asc(employees.name), asc(employees.id))
-	return rows.map(({ emails, phones, ...row }) => ({
-		...row,
-		email: emails[0]?.address ?? null,
-		phone_business: phone(phones, 'phone', 'work', 0),
-		phone_business2: phone(phones, 'phone', 'work', 1),
-		phone_home: phone(phones, 'phone', 'private', 0),
-		phone_home2: phone(phones, 'phone', 'private', 1),
-		phone_mobile: phone(phones, 'mobile', 'work', 0),
-		phone_mobile2: phone(phones, 'mobile', 'work', 1),
-		phone_mobile_home: phone(phones, 'mobile', 'private', 0),
-		phone_mobile_home2: phone(phones, 'mobile', 'private', 1),
-	}))
+	return rows.map(({ emails, phones, tenant_phones, ...row }) => {
+		const business = numbers(phones, tenant_phones, 'phone', 'work')
+		const home = numbers(phones, tenant_phones, 'phone', 'private')
+		const mobile = numbers(phones, tenant_phones, 'mobile', 'work')
+		const mobileHome = numbers(phones, tenant_phones, 'mobile', 'private')
+		return {
+			...row,
+			email: emails[0]?.address ?? null,
+			phone_business: business[0] ?? null,
+			phone_business2: business[1] ?? null,
+			phone_home: home[0] ?? null,
+			phone_home2: home[1] ?? null,
+			phone_mobile: mobile[0] ?? null,
+			phone_mobile2: mobile[1] ?? null,
+			phone_mobile_home: mobileHome[0] ?? null,
+			phone_mobile_home2: mobileHome[1] ?? null,
+		}
+	})
 }
