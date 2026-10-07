@@ -1,4 +1,4 @@
-import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-solidjs'
+import { IconMenu2, IconPlus, IconTrash } from '@tabler/icons-solidjs'
 import { extensionNumber, inferPhoneType } from 'shared/src/phone'
 import type {
 	ContactScope,
@@ -7,7 +7,7 @@ import type {
 	TenantEmail,
 	TenantPhone,
 } from 'shared/src/types'
-import { For, Index, type JSX, Show } from 'solid-js'
+import { createSignal, For, Index, type JSX, Show } from 'solid-js'
 import { t } from '../i18n'
 import { contactScopeLabel, phoneTypeLabel, phoneTypeOptions } from '../i18n/labels'
 import { EmailLink } from '../pages/employees/list'
@@ -64,8 +64,9 @@ export function RowSelect<T extends string>(props: {
 
 /**
  * Editable list of contact rows (mail addresses or phone numbers): one row
- * per entry with move and remove buttons, plus an add button below. Rows keep
- * their DOM nodes by index, so typing never loses focus.
+ * per entry with a drag handle (arrow keys move too) and a remove button,
+ * plus an add button below. Rows keep their DOM nodes by index, so typing
+ * never loses focus.
  */
 export function ContactListField<T>(props: {
 	id: string
@@ -78,64 +79,108 @@ export function ContactListField<T>(props: {
 	/** Note shown below a row, e.g. why its value is unusable. */
 	rowHint?: (entry: () => T) => JSX.Element
 }): JSX.Element {
+	/** Row whose handle is pressed; only that row is draggable, not its inputs. */
+	const [grabbed, setGrabbed] = createSignal<number | null>(null)
+	const [dragging, setDragging] = createSignal<number | null>(null)
+	let list: HTMLDivElement | undefined
 	const update = (index: number, patch: Partial<T>): void =>
 		props.onChange(props.rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 	const move = (index: number, to: number): void => {
 		const rows = [...props.rows]
-		;[rows[index], rows[to]] = [rows[to] as T, rows[index] as T]
+		const [moved] = rows.splice(index, 1)
+		rows.splice(to, 0, moved as T)
 		props.onChange(rows)
+	}
+	const onHandleKey = (e: KeyboardEvent, index: number): void => {
+		const to = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : null
+		if (to === null || to < 0 || to >= props.rows.length) {
+			return
+		}
+		e.preventDefault()
+		move(index, to)
+		list?.querySelectorAll<HTMLElement>('.contact-handle')[to]?.focus()
 	}
 	return (
 		<Field label={props.label} for={`${props.id}-0`}>
-			<Index each={props.rows}>
-				{(entry: () => T, index: number): JSX.Element => (
-					<>
-						<div class="contact-row">
-							{props.row(entry, (patch: Partial<T>) => update(index, patch), index)}
-							<Show when={props.rows.length > 1}>
-								<button
-									type="button"
-									class="icon-btn"
-									aria-label={t('employee.moveEntryUp')}
-									title={t('employee.moveEntryUp')}
-									disabled={index === 0}
-									onClick={() => move(index, index - 1)}
-								>
-									<IconArrowUp size={16} />
-								</button>
-								<button
-									type="button"
-									class="icon-btn"
-									aria-label={t('employee.moveEntryDown')}
-									title={t('employee.moveEntryDown')}
-									disabled={index === props.rows.length - 1}
-									onClick={() => move(index, index + 1)}
-								>
-									<IconArrowDown size={16} />
-								</button>
-							</Show>
-							<button
-								type="button"
-								class="icon-btn"
-								aria-label={t('employee.removeEntry')}
-								title={t('employee.removeEntry')}
-								onClick={() =>
-									props.onChange(props.rows.filter((_, i) => i !== index))
-								}
+			<div
+				class="contact-rows"
+				classList={{ 'contact-rows-sortable': props.rows.length > 1 }}
+				ref={list}
+			>
+				<Index each={props.rows}>
+					{(entry: () => T, index: number): JSX.Element => (
+						<>
+							{/* biome-ignore lint/a11y/noStaticElementInteractions: drag target; the handle button moves rows by keyboard. */}
+							<div
+								class="contact-row"
+								classList={{ 'contact-row-dragging': dragging() === index }}
+								draggable={grabbed() === index}
+								onDragStart={(e: DragEvent) => {
+									e.dataTransfer?.setData('text/plain', '')
+									setDragging(index)
+								}}
+								onDragEnd={() => {
+									setDragging(null)
+									setGrabbed(null)
+								}}
+								onDragOver={(e: DragEvent) => {
+									const from = dragging()
+									if (from === null) {
+										return
+									}
+									e.preventDefault()
+									if (from !== index) {
+										move(from, index)
+										setDragging(index)
+									}
+								}}
+								onDrop={(e: DragEvent) => e.preventDefault()}
 							>
-								<IconTrash size={16} />
-							</button>
-						</div>
-						{props.rowHint?.(entry)}
-					</>
-				)}
-			</Index>
+								<Show when={props.rows.length > 1}>
+									<button
+										type="button"
+										class="contact-handle"
+										aria-label={t('employee.reorderEntry')}
+										title={t('employee.reorderEntry')}
+										onPointerDown={() => setGrabbed(index)}
+										onPointerUp={() => setGrabbed(null)}
+										onKeyDown={(e: KeyboardEvent) => onHandleKey(e, index)}
+									>
+										<IconMenu2 size={16} aria-hidden="true" />
+									</button>
+								</Show>
+								<div class="contact-inputs">
+									{props.row(
+										entry,
+										(patch: Partial<T>) => update(index, patch),
+										index,
+									)}
+								</div>
+								<button
+									type="button"
+									class="contact-remove"
+									aria-label={t('employee.removeEntry')}
+									title={t('employee.removeEntry')}
+									onClick={() =>
+										props.onChange(props.rows.filter((_, i) => i !== index))
+									}
+								>
+									<IconTrash size={16} />
+								</button>
+							</div>
+							{props.rowHint?.(entry)}
+						</>
+					)}
+				</Index>
+			</div>
 			<button
 				type="button"
 				class="contact-add"
+				aria-label={props.addLabel}
+				title={props.addLabel}
 				onClick={() => props.onChange([...props.rows, props.blank()])}
 			>
-				<IconPlus size={14} aria-hidden="true" /> {props.addLabel}
+				<IconPlus size={18} aria-hidden="true" />
 			</button>
 		</Field>
 	)
