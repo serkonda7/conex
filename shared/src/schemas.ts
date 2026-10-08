@@ -1163,50 +1163,6 @@ export const TraceQuerySchema = v.object({
 export type TraceQuery = v.InferOutput<typeof TraceQuerySchema>
 
 // ---------------------------------------------------------------------------
-// Topology view (device graph)
-// ---------------------------------------------------------------------------
-
-/** One device node in the topology graph. */
-export interface TopologyNode {
-	id: number
-	name: string
-	status: string
-	site_id: number | null
-	rack_id: number | null
-	tenant_id: number | null
-}
-
-export interface TopologyEndpoint {
-	device: TracePeerDevice
-	iface: TracePeerInterface
-}
-
-/** One cable edge in the topology graph (device-to-device). */
-export interface TopologyEdge {
-	cable_id: number
-	cable_label: string | null
-	cable_status: string
-	cable_kind: string | null
-	a: TopologyEndpoint
-	b: TopologyEndpoint
-}
-
-export interface TopologyResponse {
-	nodes: TopologyNode[]
-	edges: TopologyEdge[]
-}
-
-export const TopologyQuerySchema = v.object({
-	site: OptionalIdEntry,
-	device: OptionalIdEntry,
-	tenant: OptionalIdEntry,
-	tenant_group: OptionalIdEntry,
-	group: OptionalIdEntry,
-})
-
-export type TopologyQuery = v.InferOutput<typeof TopologyQuerySchema>
-
-// ---------------------------------------------------------------------------
 // P7: users / roles / permissions
 // ---------------------------------------------------------------------------
 

@@ -47,6 +47,9 @@ docker exec conex-db pg_dump -U conex -Fc conex > backups/conex-$(date +%F).dump
 
 # Restore
 docker exec -i conex-db pg_restore -U conex -d conex < backups/<file>.dump
+
+# Restore and overwrite any existing data
+docker exec -i conex-db pg_restore -U conex -d conex --clean --if-exists --no-owner < backups/<file>.dump
 ```
 
 

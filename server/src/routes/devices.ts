@@ -39,7 +39,7 @@ import {
 	updateInterface,
 } from '../db/devices'
 import { deviceTenant, interfaceTenant } from '../db/owners'
-import { getDeviceTrace, getInterfaceTrace } from '../db/topology'
+import { getDeviceTrace, getInterfaceTrace } from '../db/trace'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'

@@ -1,6 +1,6 @@
 /**
  * Global tenant context: the top-bar selection of "all tenants", one
- * tenant group, or one tenant. List pages, the topology view and create
+ * tenant group, or one tenant. List pages and create
  * forms read it; detail pages and catalog data ignore it. The choice is
  * shared by all tabs and persisted to localStorage (`conex:tenant-context`).
  *

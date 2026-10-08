@@ -20,7 +20,7 @@ import {
 } from '../db/cables'
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
 import { cableTenants, deviceTenant, interfaceTenant } from '../db/owners'
-import { getCableTrace } from '../db/topology'
+import { getCableTrace } from '../db/trace'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'

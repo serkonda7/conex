@@ -1,9 +1,8 @@
 import { IconExternalLink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { DISPLAY_PORT_KINDS, GENERAL_PORT_KINDS } from 'shared/src/schemas'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { create_manufacturer, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
@@ -20,44 +19,6 @@ interfaces:
   - name: GigabitEthernet
     type: 1000base-t
 `
-
-/** Field-options description for a NetBox port list (`interfaces`, …). */
-/** Ports field help; `types` (required type from a fixed list) replaces `defaultType`. */
-function PortsDescription(props: {
-	optional: string[]
-	defaultType?: string
-	types?: readonly string[]
-	/** With `defaultType`: types kept as-is, others fall back to the default. */
-	knownTypes?: readonly string[]
-}): JSX.Element {
-	return (
-		<>
-			{t('import.fieldPortsPrefix')} <code>name</code>
-			{t('import.fieldPortsOptional')}{' '}
-			<For each={props.optional}>
-				{(field: string, i: () => number): JSX.Element => (
-					<>
-						<Show when={i() > 0}>
-							{i() === props.optional.length - 1
-								? ` ${t('import.fieldPortsAnd')} `
-								: ', '}
-						</Show>
-						<code>{field}</code>
-					</>
-				)}
-			</For>
-			.{' '}
-			{props.types
-				? t('import.fieldPortsTypes', { types: props.types.join(', ') })
-				: props.knownTypes
-					? t('import.fieldPortsKnownTypes', {
-							types: props.knownTypes.join(', '),
-							type: props.defaultType ?? '',
-						})
-					: t('import.fieldPortsDefault', { type: props.defaultType ?? '' })}
-		</>
-	)
-}
 
 /**
  * /device-types/import — NetBox YAML import for device types (no manual add form).
@@ -317,7 +278,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 			</Show>
 			<section class="import-field-options" aria-labelledby="device-type-import-fields">
 				<h3 id="device-type-import-fields">{t('import.fieldOptions')}</h3>
-				<p class="field-hint">{t('import.fieldOptionsHint')}</p>
 				<table class="import-field-options-table">
 					<thead>
 						<tr>
@@ -361,52 +321,35 @@ export function DeviceTypeImportPage(): JSX.Element {
 							<td>interfaces</td>
 							<td>—</td>
 							<td>
-								<PortsDescription
-									optional={['type', 'label', 'description']}
-									defaultType="ethernet"
-								/>
+								{t('import.fieldInterfaces')}
 							</td>
 						</tr>
 						<tr>
 							<td>ports</td>
 							<td>—</td>
 							<td>
-								<PortsDescription
-									optional={['type', 'description']}
-									defaultType="port"
-									knownTypes={GENERAL_PORT_KINDS}
-								/>{' '}
-								{t('import.fieldAlias', { alias: 'console-ports' })}
+								{t('import.fieldPorts')}{' '}
 							</td>
 						</tr>
 						<tr>
 							<td>power-ports</td>
 							<td>—</td>
 							<td>
-								<PortsDescription
-									optional={['type', 'description']}
-									defaultType="power"
-								/>
+								{t('import.fieldPowerPorts')}
 							</td>
 						</tr>
 						<tr>
 							<td>power-outlets</td>
 							<td>—</td>
 							<td>
-								<PortsDescription
-									optional={['type', 'description']}
-									defaultType="power-outlet"
-								/>
+								{t('import.fieldPowerOutlets')}
 							</td>
 						</tr>
 						<tr>
 							<td>display-ports</td>
 							<td>—</td>
 							<td>
-								<PortsDescription
-									optional={['description']}
-									types={DISPLAY_PORT_KINDS}
-								/>
+								{t('import.fieldDisplayPorts')}
 							</td>
 						</tr>
 					</tbody>

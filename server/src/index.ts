@@ -25,7 +25,6 @@ import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
 import { tenantGroupsApp } from './routes/tenant_groups'
 import { tenantsApp } from './routes/tenants'
-import { topologyApp } from './routes/topology'
 import { usersApp } from './routes/users'
 import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
 import { jsonError } from './util/http'
@@ -82,7 +81,6 @@ export function createApp() {
 			.route('/devices', devicesApp)
 			.route('/interfaces', interfacesApp)
 			.route('/cables', cablesApp)
-			.route('/topology', topologyApp)
 			.route('/search', searchApp)
 			.route('/integrations', integrationsApp)
 			.route('/directory', directoryApp)

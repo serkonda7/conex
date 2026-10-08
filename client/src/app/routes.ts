@@ -20,7 +20,6 @@ import {
 	IconLocation,
 	IconLock,
 	IconMapPin,
-	IconNetwork,
 	IconPlugConnected,
 	IconServer,
 	IconShieldLock,
@@ -84,7 +83,6 @@ import { TenantDetailPage } from '../pages/tenants/detail'
 import { TenantAddPage, TenantEditPage } from '../pages/tenants/form'
 import { TenantsPage } from '../pages/tenants/list'
 import { TicketAddPage } from '../pages/tickets/add'
-import { TopologyPage } from '../pages/topology/view'
 import { UserAddPage } from '../pages/users/add'
 import { UserEditPage } from '../pages/users/edit'
 import { UsersPage } from '../pages/users/list'
@@ -246,14 +244,6 @@ export const SECTIONS: readonly Section[] = [
 		permission: 'view',
 		add: ShelfAddPage,
 		edit: ShelfEditPage,
-	},
-	{
-		path: 'topology',
-		noun: (): string => t('entity.topology'),
-		permission: 'view',
-		icon: IconNetwork,
-		hideAddInNav: true,
-		list: TopologyPage,
 	},
 	{
 		path: 'integrations',

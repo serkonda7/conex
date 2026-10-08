@@ -111,7 +111,6 @@ function RoleForm(props: { id?: number }): JSX.Element {
 								</label>
 							)}
 						</For>
-						<Hint>{t('role.permissionsHint')}</Hint>
 					</div>
 				</div>
 			</fieldset>

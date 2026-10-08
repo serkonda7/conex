@@ -4,19 +4,16 @@ import type {
 	CableTraceResponse,
 	DeviceTraceResponse,
 	InterfaceTraceResponse,
-	TopologyEdge,
-	TopologyNode,
-	TopologyResponse,
 	TraceHop,
 	TraceLink,
 	TracePath,
 	TracePeerDevice,
 	TracePeerInterface,
 } from 'shared/src/schemas'
-import { cables, devices, interfaces, sites } from '../schema'
+import { cables, devices, interfaces } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
-import { exists, type TenantFilterParams } from './list'
+import { exists } from './list'
 
 type DeviceRow = typeof devices.$inferSelect
 type InterfaceRow = typeof interfaces.$inferSelect
@@ -37,17 +34,6 @@ function peerDeviceOf(row: DeviceRow): TracePeerDevice {
 
 function peerIfaceOf(row: InterfaceRow): TracePeerInterface {
 	return { id: row.id, name: row.name, kind: row.kind }
-}
-
-function toNode(row: DeviceRow): TopologyNode {
-	return {
-		id: row.id,
-		name: row.name,
-		status: row.status,
-		site_id: row.site_id,
-		rack_id: row.rack_id,
-		tenant_id: row.tenant_id,
-	}
 }
 
 interface Graph {
@@ -203,99 +189,6 @@ function bfsInterfacePaths(graph: Graph, startIface: InterfaceRow, depth: number
 		depth,
 		end ? [{ hops: [firstHop], end_device: peerDeviceOf(end) }] : [],
 	)
-}
-
-export interface TopologyParams extends TenantFilterParams {
-	site?: number
-	device?: number
-	group?: number
-}
-
-/**
- * Device-graph snapshot for the topology view: every visible device is a
- * node, every visible cable an edge. `tenant` keeps only that tenant's
- * nodes, `tenantIds` only nodes of those tenants (a tenant group), `group` keeps only nodes whose site sits in that site group,
- * `site` keeps only that site's nodes (edges need both ends inside);
- * `device` keeps the connected component containing that device (after
- * the other filters). Filters intersect — each narrows the previous set.
- */
-export async function getTopology(params: TopologyParams): Promise<TopologyResponse> {
-	const graph = await loadGraph(params.scopeTenantId)
-	const tenantIds = params.tenantIds && new Set(params.tenantIds)
-	const groupSiteIds =
-		params.group === undefined
-			? undefined
-			: new Set(
-					(
-						await getDb()
-							.select({ id: sites.id })
-							.from(sites)
-							.where(eq(sites.site_group_id, params.group))
-					).map((s) => s.id),
-				)
-	const inFilter = (d: DeviceRow): boolean =>
-		(params.tenant === undefined || d.tenant_id === params.tenant) &&
-		(tenantIds === undefined || (d.tenant_id !== null && tenantIds.has(d.tenant_id))) &&
-		(groupSiteIds === undefined || (d.site_id !== null && groupSiteIds.has(d.site_id))) &&
-		(params.site === undefined || d.site_id === params.site)
-	let nodeIds = new Set([...graph.deviceById.values()].filter(inFilter).map((d) => d.id))
-	if (params.device !== undefined) {
-		if (!nodeIds.has(params.device)) {
-			return { nodes: [], edges: [] }
-		}
-		const seen = new Set<number>([params.device])
-		const queue = [params.device]
-		while (queue.length > 0) {
-			const current = queue.shift()
-			if (current === undefined) {
-				continue
-			}
-			for (const entry of graph.adj.get(current) ?? []) {
-				if (!nodeIds.has(entry.peerDeviceId) || seen.has(entry.peerDeviceId)) {
-					continue
-				}
-				seen.add(entry.peerDeviceId)
-				queue.push(entry.peerDeviceId)
-			}
-		}
-		nodeIds = seen
-	}
-	const nodes: TopologyNode[] = [...nodeIds]
-		.map((id) => graph.deviceById.get(id))
-		.filter((d): d is DeviceRow => d !== undefined)
-		.sort((a, b) => a.name.localeCompare(b.name))
-		.map(toNode)
-	const edges: TopologyEdge[] = []
-	const seenCables = new Set<number>()
-	for (const deviceId of nodeIds) {
-		for (const entry of graph.adj.get(deviceId) ?? []) {
-			if (seenCables.has(entry.cable.id) || !nodeIds.has(entry.peerDeviceId)) {
-				continue
-			}
-			const aDevice = graph.deviceById.get(entry.localIface.device_id)
-			const bDevice = graph.deviceById.get(entry.peerIface.device_id)
-			if (!aDevice || !bDevice) {
-				continue
-			}
-			seenCables.add(entry.cable.id)
-			edges.push({
-				cable_id: entry.cable.id,
-				cable_label: entry.cable.label,
-				cable_status: entry.cable.status,
-				cable_kind: entry.cable.kind,
-				a: {
-					device: peerDeviceOf(aDevice),
-					iface: peerIfaceOf(entry.localIface),
-				},
-				b: {
-					device: peerDeviceOf(bDevice),
-					iface: peerIfaceOf(entry.peerIface),
-				},
-			})
-		}
-	}
-	edges.sort((a, b) => a.cable_id - b.cable_id)
-	return { nodes, edges }
 }
 
 /** 404 for a device the scoped graph does not hold: out of scope, or missing. */
