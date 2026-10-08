@@ -1625,6 +1625,39 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background-color: var(--error-bg);
 }
 
+/* Device-type "Add components" dropdown (NetBox-style). */
+.add-component-menu {
+	position: relative;
+	display: inline-flex;
+}
+
+.add-component-dropdown {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 0.3rem);
+	min-width: 11rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+	padding: 0.25rem;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+}
+
+.add-component-item {
+	width: 100%;
+	border: none;
+	background: transparent;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.add-component-item:hover {
+	background-color: var(--bg-hover);
+}
+
 /* "Showing X-Y of Z" result status under the table. */
 .paginator-showing {
 	margin: 0.5rem 0;

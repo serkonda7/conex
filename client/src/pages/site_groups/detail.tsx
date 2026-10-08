@@ -67,8 +67,6 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
 					</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{group()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>
 						<Markdown text={group()?.comments} />

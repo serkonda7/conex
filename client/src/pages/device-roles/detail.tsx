@@ -63,8 +63,6 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 							)}
 						</Show>
 					</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{role()?.description || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 

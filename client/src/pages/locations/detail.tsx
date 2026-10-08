@@ -110,8 +110,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={parentId()} record={parent} base="/locations" />
 					</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{location()?.description || '—'}</dd>
 				</DetailCard>
 			</DetailShell>
 

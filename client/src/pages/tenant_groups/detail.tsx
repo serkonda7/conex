@@ -64,8 +64,6 @@ export function TenantGroupDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<code>{group()?.slug}</code>
 					</dd>
-					<dt>{t('common.description')}</dt>
-					<dd>{group()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>
 						<Markdown text={group()?.comments} />

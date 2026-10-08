@@ -6,7 +6,6 @@ import {
 	fetch_manufacturer,
 } from '../../api/templates'
 import {
-	DetailCard,
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
@@ -55,11 +54,6 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 					onDelete={handleDelete}
 				/>
 				<DetailSubtitle description={manufacturer()?.description} />
-
-				<DetailCard label={t('manufacturer.details')}>
-					<dt>{t('common.description')}</dt>
-					<dd>{manufacturer()?.description || '—'}</dd>
-				</DetailCard>
 			</DetailShell>
 
 			<RelatedSection

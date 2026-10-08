@@ -23,10 +23,10 @@ import {
 	type IntegrationProvider,
 	LOCATION_TYPES,
 	type LocationType,
+	NETBOX_INTERFACE_TYPES,
 	type Permission,
 	PHONE_TYPES,
 	type PhoneType,
-	PORT_KINDS,
 	type PortKind,
 	RACK_FORM_FACTORS,
 	type SyncRunState,
@@ -107,14 +107,15 @@ const PORT_KIND_KEYS: Record<PortKind, MessageKey> = {
 	dvi: 'portKind.dvi',
 }
 
-/** Interface kind (`ethernet`, `hdmi`, …); NetBox types fall back to the raw value. */
+/**
+ * Interface kind (`ethernet`, `hdmi`, …). NetBox interface types show their
+ * untranslated NetBox name; unknown types fall back to the raw value.
+ */
 export function portKindLabel(value: string): string {
+	if (Object.hasOwn(NETBOX_INTERFACE_TYPES, value)) {
+		return NETBOX_INTERFACE_TYPES[value as keyof typeof NETBOX_INTERFACE_TYPES]
+	}
 	return lookup(PORT_KIND_KEYS, value)
-}
-
-/** `<select>` options for the built-in interface kinds. */
-export function portKindOptions(): { value: PortKind; label: string }[] {
-	return PORT_KINDS.map((value) => ({ value, label: portKindLabel(value) }))
 }
 
 const CABLE_STATUS_KEYS: Record<string, MessageKey> = {

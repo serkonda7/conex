@@ -55,6 +55,8 @@ export function DetailHeader(props: {
 	onDelete: () => void
 	/** False hides "Delete" (e.g. built-in records). */
 	deletable?: boolean
+	/** Leading buttons before Edit; the caller gates them on permissions. */
+	actions?: JSX.Element
 }): JSX.Element {
 	return (
 		<div class="page-header">
@@ -68,6 +70,7 @@ export function DetailHeader(props: {
 			</h2>
 			<Show when={can('edit') || (can('delete') && props.deletable !== false)}>
 				<div class="form-actions">
+					{props.actions}
 					<Show when={can('edit')}>
 						<button type="button" onClick={() => navigate(props.editHref)}>
 							<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
