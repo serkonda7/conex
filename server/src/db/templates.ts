@@ -1,8 +1,9 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import type {
 	ChangeObjectType,
 	DeviceTypeCreate,
+	DeviceTypeListQuery,
 	DeviceTypeUpdate,
 	ManufacturerCreate,
 	ManufacturerUpdate,
@@ -195,7 +196,7 @@ const DEVICE_TYPE_EXISTS = 'Device type already exists'
 export interface DeviceTypeListParams extends ListParams {
 	manufacturer?: number
 	kind: 'device' | 'rack'
-	sort: 'model' | 'manufacturer' | 'form_factor'
+	sort: DeviceTypeListQuery['sort']
 	order: 'asc' | 'desc'
 }
 
@@ -203,7 +204,18 @@ export async function listDeviceTypes(
 	params: DeviceTypeListParams,
 ): Promise<Page<DeviceTypeListRow>> {
 	const where = and(
-		searchCondition(params.search, [device_types.model]),
+		params.search
+			? or(
+					searchCondition(params.search, [device_types.model, device_types.description]),
+					inArray(
+						device_types.manufacturer_id,
+						getDb()
+							.select({ id: manufacturers.id })
+							.from(manufacturers)
+							.where(searchCondition(params.search, [manufacturers.name])),
+					),
+				)
+			: undefined,
 		params.manufacturer ? eq(device_types.manufacturer_id, params.manufacturer) : undefined,
 		// Rack types are the rows with rack-template dimensions; regular device
 		// types deliberately have no form factor. Keep this filter in the query so
@@ -212,12 +224,18 @@ export async function listDeviceTypes(
 			? isNotNull(device_types.form_factor)
 			: isNull(device_types.form_factor),
 	)
-	const orderColumn =
-		params.sort === 'manufacturer'
-			? sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`
-			: params.sort === 'form_factor' && params.kind === 'rack'
-				? device_types.form_factor
-				: device_types.model
+	const instances = params.kind === 'rack' ? racks.rack_type_id : devices.device_type_id
+	const orderColumns = {
+		model: device_types.model,
+		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`,
+		form_factor: params.kind === 'rack' ? device_types.form_factor : device_types.model,
+		description: device_types.description,
+		comments: device_types.comments,
+		u_height: device_types.u_height,
+		is_full_depth: device_types.is_full_depth,
+		devices: sql`(SELECT count(*) FROM ${instances.table} WHERE ${instances} = ${device_types.id})`,
+	}
+	const orderColumn = orderColumns[params.sort]
 	const page = await pageRows(
 		device_types,
 		where,
@@ -225,7 +243,7 @@ export async function listDeviceTypes(
 		params,
 	)
 	const counts = await countBy(
-		params.kind === 'rack' ? racks.rack_type_id : devices.device_type_id,
+		instances,
 		page.items.map((dt) => dt.id),
 	)
 	return {

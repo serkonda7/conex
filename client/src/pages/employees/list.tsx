@@ -31,9 +31,9 @@ export function EmailLink(props: { email: string | null }): JSX.Element {
 }
 
 /**
- * /employees — contact persons of the tenants: search, sortable columns,
- * tenant filter (deep-linkable via `?tenant=<id>`), row selection with bulk
- * delete, and icon actions with delete in a row menu.
+ * /employees — contact persons of the tenants: search, sortable columns, tenant
+ * filter (deep-linkable via `?tenant=<id>`), and icon actions with delete in a
+ * row menu.
  */
 export function EmployeesPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
@@ -113,7 +113,7 @@ export function EmployeesPage(): JSX.Element {
 			title={tp('entity.employee', 2)}
 			// The filtered tenant is preselected in the add form.
 			addHref={filterTenant() ? `/employees/add?tenant=${filterTenant()}` : '/employees/add'}
-			searchPlaceholder={t('employee.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="employees"

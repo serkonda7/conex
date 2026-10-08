@@ -10,8 +10,8 @@ import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 
 /**
- * /manufacturers — manufacturer list: search, sortable columns, row
- * selection with bulk delete, and icon actions with delete in a row menu.
+ * /manufacturers — manufacturer list: search, sortable columns, and icon
+ * actions with delete in a row menu.
  */
 export function ManufacturersPage(): JSX.Element {
 	const list = useEntityList({
@@ -26,7 +26,7 @@ export function ManufacturersPage(): JSX.Element {
 			list={list}
 			title={tp('entity.manufacturer', 2)}
 			addHref="/manufacturers/add"
-			searchPlaceholder={t('manufacturer.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				nameColumn<ManufacturerListRow>(t('common.name'), '/manufacturers', {
 					sortable: true,

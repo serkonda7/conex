@@ -18,7 +18,7 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 /**
  * /racks — NetBox-style rack list: search, sortable columns, site /
  * location / tenant filters (deep-linkable via `?site=<id>` /
- * `?location=<id>` / `?tenant=<id>`), row selection with bulk delete, and
+ * `?location=<id>` / `?tenant=<id>`), and
  * icon actions with delete in a row menu.
  */
 export function RacksPage(): JSX.Element {
@@ -87,7 +87,7 @@ export function RacksPage(): JSX.Element {
 			list={list}
 			title={tp('entity.rack', 2)}
 			addHref="/racks/add"
-			searchPlaceholder={t('manufacturer.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filters={
 				<>
 					<FilterSelect

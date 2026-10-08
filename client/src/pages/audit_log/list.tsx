@@ -105,7 +105,7 @@ export function AuditLogPage(): JSX.Element {
 			<div class="toolbar-row">
 				<ListSearchField
 					label={t('list.searchLabel', { noun: tp('noun.auditEntry', 2) })}
-					placeholder={t('audit.searchPlaceholder')}
+					placeholder={t('common.quickSearch')}
 					value={search()}
 					onInput={setSearch}
 				/>

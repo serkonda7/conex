@@ -16,9 +16,9 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { siteTabs } from '../sites/list'
 
 /**
- * /site-groups — flat site group list: search, sortable columns, tenant
- * filter (deep-linkable via `?tenant=<id>`), row selection with bulk
- * delete, and icon actions with delete in a row menu.
+ * /site-groups — flat site group list: search, sortable columns, tenant filter
+ * (deep-linkable via `?tenant=<id>`), and icon actions with delete in a row
+ * menu.
  */
 export function SiteGroupsPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
@@ -38,7 +38,7 @@ export function SiteGroupsPage(): JSX.Element {
 			title={tp('entity.siteGroup', 2)}
 			tabs={siteTabs('site-groups', filterTenant())}
 			addHref="/site-groups/add"
-			searchPlaceholder={t('tenant.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={[
 				nameColumn<SiteGroupRow>(t('common.group'), '/site-groups', { sortable: true }),

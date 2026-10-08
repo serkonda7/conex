@@ -1,12 +1,12 @@
 /**
  * Shared building blocks for the entity list pages (tenants, sites,
  * devices, …). `useEntityList` owns the list state (debounced search, sort,
- * the fetched page, checkbox selection, single/bulk delete) and
+ * the fetched page, row delete) and
  * `EntityListPage` renders the standard page around it: header with
  * "+ Add", search/filter toolbar, table with row actions and row menu,
  * range status and error line.
  *
- * Write actions (add, edit, delete, bulk selection) render only when the
+ * Write actions (add, edit, delete) render only when the
  * session can write. `noun` options take a `noun.<entity>` plural key used
  * to build localized confirm/aria/status text.
  */
@@ -182,13 +182,6 @@ export function useRowMenu(): {
 	return { openMenu, closeMenu, toggleMenu }
 }
 
-/** DataTable selection props; read-only sessions get no checkboxes. */
-export interface SelectionProps {
-	selected: Accessor<number[]> | undefined
-	onSelectionChange: ((ids: (string | number)[]) => void) | undefined
-	selectionLabel: string
-}
-
 /** Everything `EntityListPage` needs from {@link useEntityList}. */
 export interface EntityList<Row> {
 	noun: PluralKey
@@ -204,20 +197,16 @@ export interface EntityList<Row> {
 	total: Accessor<number>
 	error: Accessor<string | null>
 	setError: Setter<string | null>
-	selected: Accessor<number[]>
-	selection: SelectionProps
 	/** Whether the session may add/edit rows (`manage`, else `edit`). */
 	canEdit: () => boolean
 	/** Whether the session may delete rows (`manage`, else `delete`). */
 	canDelete: () => boolean
 	handleDelete: (id: number, name: string) => Promise<void>
-	handleBulkDelete: () => Promise<void>
 }
 
 /**
  * State of a standard list page: search, sort and the page-specific
- * `filters` form the query for `fetch`; a new result set clears the
- * checkbox selection. Deletes confirm first, report through `error` and
+ * `filters` form the query for `fetch`. Deletes confirm first, report through `error` and
  * refetch. Omit `sort` for endpoints without sorting; `manage` replaces the
  * `edit`/`delete` permissions for admin lists (users, roles).
  */
@@ -240,7 +229,6 @@ export function useEntityList<
 	const [error, setError] = createSignal<string | null>(null)
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 	const { sort, order, handleSort, clearSort } = useSort<Sort>(opts.sort)
-	const [selected, setSelected] = createSignal<number[]>([])
 
 	const query = createMemo(() => ({
 		search: debouncedSearch(),
@@ -258,12 +246,6 @@ export function useEntityList<
 		return res.value
 	})
 
-	// A new result set invalidates the checkbox selection.
-	createEffect(() => {
-		query()
-		setSelected([])
-	})
-
 	async function handleDelete(id: number, name: string): Promise<void> {
 		if (!window.confirm(t('list.confirmDelete', { noun: tp(opts.noun, 1), name }))) {
 			return
@@ -273,31 +255,6 @@ export function useEntityList<
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
-		}
-		setSelected((prev) => prev.filter((s) => s !== id))
-		void refetch()
-	}
-
-	async function handleBulkDelete(): Promise<void> {
-		const ids = selected()
-		const noun = tp(opts.noun, ids.length)
-		if (
-			ids.length === 0 ||
-			!window.confirm(t('list.confirmBulkDelete', { count: ids.length, noun }))
-		) {
-			return
-		}
-		setError(null)
-		const failures: string[] = []
-		for (const id of ids) {
-			const res = await opts.remove(id)
-			if (Result.isError(res)) {
-				failures.push(res.error.message)
-			}
-		}
-		setSelected([])
-		if (failures.length > 0) {
-			setError(failures[0] ?? t('list.bulkDeleteFailed'))
 		}
 		void refetch()
 	}
@@ -316,24 +273,9 @@ export function useEntityList<
 		total: () => page()?.total ?? 0,
 		error,
 		setError,
-		selected,
-		selection: {
-			get selected(): Accessor<number[]> | undefined {
-				return canDelete() ? selected : undefined
-			},
-			get onSelectionChange(): ((ids: (string | number)[]) => void) | undefined {
-				return canDelete()
-					? (ids: (string | number)[]): void => {
-							setSelected(ids.map(Number))
-						}
-					: undefined
-			},
-			selectionLabel: t('list.selectAll', { noun: tp(opts.noun, 2) }),
-		},
 		canEdit,
 		canDelete,
 		handleDelete,
-		handleBulkDelete,
 	}
 }
 
@@ -382,8 +324,6 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	searchPlaceholder: string
 	filters?: JSX.Element
 	filtered?: boolean
-	/** Defaults to true; false drops the checkboxes and "Delete selected". */
-	bulkDelete?: boolean
 	columns: DataTableColumn<Row>[]
 	/** Storage key of the persisted column choice. */
 	columnsKey: string
@@ -402,7 +342,6 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		props.columns.map((c) => c.key),
 		props.defaultColumns,
 	)
-	const bulk = (): boolean => props.bulkDelete !== false
 
 	function emptyMessage(): string {
 		if (props.filtered === true) {
@@ -436,9 +375,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				add_href={props.addHref}
 				actions={props.headerActions}
 				can_add={list.canEdit()}
-			/>
-
-			<div class="toolbar-row">
+			>
 				<ListSearchField
 					label={t('list.searchLabel', { noun: nouns() })}
 					placeholder={props.searchPlaceholder}
@@ -447,13 +384,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				/>
 				{props.filters}
 				<span class="toolbar-spacer" />
-				<Show when={bulk()}>
-					<BulkDeleteButton
-						count={list.canDelete() ? list.selected().length : 0}
-						onClick={list.handleBulkDelete}
-					/>
-				</Show>
-			</div>
+			</ListPageHeader>
 
 			<DataTable
 				rows={list.rows}
@@ -466,9 +397,6 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				showColumnCustomizer
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
-				selected={bulk() ? list.selection.selected : undefined}
-				onSelectionChange={bulk() ? list.selection.onSelectionChange : undefined}
-				selectionLabel={list.selection.selectionLabel}
 				rowActions={list.canEdit() || list.canDelete() ? rowActions : undefined}
 				loading={() => list.page.loading}
 				loadingContent={<Loading message={t('list.loading', { noun: nouns() })} />}
@@ -532,6 +460,8 @@ function ListPageHeader(props: {
 	add_href: string
 	actions?: JSX.Element
 	can_add: boolean
+	/** Toolbar controls (search, filters, …) between the title and the buttons. */
+	children?: JSX.Element
 }): JSX.Element {
 	const addButton = (
 		<button type="button" class="btn-add" onClick={(): void => navigate(props.add_href)}>
@@ -540,11 +470,13 @@ function ListPageHeader(props: {
 	)
 	return (
 		<div class="page-header">
-			<Show when={props.tabs} fallback={<h2>{props.title}</h2>}>
+			{/* The app tab already names the page; keep the heading for screen readers. */}
+			<Show when={props.tabs} fallback={<h2 class="visually-hidden">{props.title}</h2>}>
 				{(tabs: () => readonly ListTab[]): JSX.Element => (
 					<ListTabs title={props.title} tabs={tabs()} />
 				)}
 			</Show>
+			{props.children}
 			<Show when={props.can_add}>
 				<Show when={props.actions !== undefined} fallback={addButton}>
 					<div class="page-header-actions">
@@ -576,17 +508,6 @@ export function ListSearchField(props: {
 				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
 			/>
 		</label>
-	)
-}
-
-/** "Delete N selected" toolbar button, visible only with a selection. */
-function BulkDeleteButton(props: { count: number; onClick: () => void }): JSX.Element {
-	return (
-		<Show when={props.count > 0}>
-			<button type="button" class="btn-danger" onClick={props.onClick}>
-				{t('list.deleteSelected', { count: props.count })}
-			</button>
-		</Show>
 	)
 }
 

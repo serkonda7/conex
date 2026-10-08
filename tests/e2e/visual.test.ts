@@ -57,6 +57,18 @@ test('locations list layout', async ({ page }) => {
 	})
 })
 
+test('device types list layout', async ({ page }) => {
+	await page.goto('/device-types')
+	await expect(page.getByRole('link', { name: 'E2E 2U Server', exact: true })).toBeVisible()
+	await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
+	await stabilizeForSnapshot(page)
+	await expect(page).toHaveScreenshot('device-types-list.png', {
+		fullPage: true,
+		mask: [page.locator('.app-user-username')],
+		maskColor: '#242424',
+	})
+})
+
 test('device add form layout', async ({ page }) => {
 	await page.goto('/devices/add')
 	await expect(page.locator('#device-name')).toBeVisible()

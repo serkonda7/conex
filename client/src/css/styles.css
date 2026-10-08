@@ -982,6 +982,7 @@ tbody tr:last-child td {
 /* Page header: title left, primary action right (NetBox-style). */
 .page-header {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
 	gap: 0.75rem;
@@ -1037,6 +1038,13 @@ tbody tr:last-child td {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+}
+
+/* List titles are visually hidden, so keep the buttons on the right even
+   without the toolbar (search) that would otherwise push them there. */
+.page-header > .btn-add,
+.page-header-actions {
+	margin-left: auto;
 }
 
 .app-content .page-header h2:first-of-type {

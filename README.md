@@ -68,7 +68,7 @@ bun run test:visual:update
 
 
 ### Documentation
-User docs live in `docs/` (VitePress) and are published to GitHub Pages on push to `main`.
+User docs live in `docs/` ([mdBook](https://rust-lang.github.io/mdBook/), install it separately; optionally `mdbook-last-changed` for page dates) and are published to GitHub Pages on push to `main`.
 ```sh
 bun run docs:dev
 bun run docs:build

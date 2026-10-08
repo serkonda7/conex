@@ -91,7 +91,7 @@ export function ChangelogPage(): JSX.Element {
 			<div class="toolbar-row">
 				<ListSearchField
 					label={t('list.searchLabel', { noun: tp('noun.change', 2) })}
-					placeholder={t('changelog.searchPlaceholder')}
+					placeholder={t('common.quickSearch')}
 					value={search()}
 					onInput={setSearch}
 				/>

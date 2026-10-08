@@ -13,6 +13,7 @@ export const en = {
 	'common.saving': 'Saving…',
 	'common.close': 'Close',
 	'common.loading': 'Loading…',
+	'common.quickSearch': 'Quick search',
 	'common.search': 'Search…',
 	'common.searchObjects': 'Search objects',
 	'common.noMatchingObjects': 'No matching objects.',
@@ -159,12 +160,8 @@ export const en = {
 	'form.slugHintEdit': 'URL-safe identifier: lowercase letters, digits, single dashes.',
 	'form.nameRequired': 'Name is required.',
 	'form.slugRequired': 'Slug is required.',
-	'list.deleteSelected': 'Delete {count} selected',
 	'list.confirmDelete': 'Delete {noun} "{name}"?',
-	'list.confirmBulkDelete': 'Delete {count} {noun}?',
-	'list.bulkDeleteFailed': 'Bulk delete failed',
 	'list.range': 'Showing {from}-{to} of {total}',
-	'list.selectAll': 'Select all {noun}',
 	'table.columns': 'Columns',
 	'table.shownColumns': 'Shown columns',
 	'table.showAll': 'Show all',
@@ -232,7 +229,6 @@ export const en = {
 	'list.noMatchFilters': 'No {noun} match the current filters.',
 
 	// tenant
-	'tenant.searchPlaceholder': 'Search name or description…',
 	'tenant.empty': 'No tenants yet. Add the first one above.',
 	'tenant.addTitle': 'Add a new tenant',
 	'tenant.editTitle': 'Edit tenant',
@@ -249,7 +245,6 @@ export const en = {
 	'tenant.noRacks': 'No racks for this tenant yet.',
 	'tenant.noDevices': 'No devices for this tenant yet.',
 	'tenant.noEmployees': 'No employees for this tenant yet.',
-	'employee.searchPlaceholder': 'Search name, title, email or phone…',
 	'employee.empty': 'No employees yet. Add the first one above.',
 	'employee.addTitle': 'Add a new employee',
 	'employee.editTitle': 'Edit employee',
@@ -292,7 +287,6 @@ export const en = {
 	'employee.inactive': 'Inactive',
 	'employee.tenantRequired': 'Tenant is required.',
 	// tenantGroup
-	'tenantGroup.searchPlaceholder': 'Search name, slug or description…',
 	'tenantGroup.empty': 'No tenant groups yet. Add the first one above.',
 	'tenantGroup.addTitle': 'Add a new tenant group',
 	'tenantGroup.editTitle': 'Edit tenant group',
@@ -304,7 +298,6 @@ export const en = {
 	'tenantGroup.noTenants': 'No tenants in this group yet.',
 
 	// site
-	'site.searchPlaceholder': 'Search name or description…',
 	'site.empty': 'No sites yet. Add the first one above.',
 	'site.addTitle': 'Add a new site',
 	'site.editTitle': 'Edit site',
@@ -339,7 +332,6 @@ export const en = {
 	'siteGroup.noSites': 'No sites in this group yet.',
 
 	// location
-	'location.searchPlaceholder': 'Search name or slug…',
 	'location.empty': 'No locations yet. Add the first one above.',
 	'location.filterBySite': 'Filter by site',
 	'location.allSites': 'All sites',
@@ -365,7 +357,6 @@ export const en = {
 	'locationType.other': 'Other',
 
 	// manufacturer
-	'manufacturer.searchPlaceholder': 'Search name…',
 	'manufacturer.empty': 'No manufacturers yet. Add the first one above.',
 	'manufacturer.addTitle': 'Add a new manufacturer',
 	'manufacturer.editTitle': 'Edit manufacturer',
@@ -377,7 +368,6 @@ export const en = {
 
 	// deviceType
 	'deviceType.import': '⭳ Import',
-	'deviceType.searchPlaceholder': 'Search model…',
 	'deviceType.filterByManufacturer': 'Filter by manufacturer',
 	'deviceType.allManufacturers': 'All manufacturers',
 	'deviceType.empty': 'No device types yet. Import the first one above.',
@@ -443,7 +433,6 @@ export const en = {
 	'import.noRows': 'No rows processed.',
 
 	// deviceRole
-	'deviceRole.searchPlaceholder': 'Search name or description…',
 	'deviceRole.empty': 'No device roles yet. Add the first one above.',
 	'deviceRole.addTitle': 'Add a new device role',
 	'deviceRole.editTitle': 'Edit device role',
@@ -536,7 +525,6 @@ export const en = {
 	// device
 	'device.mount': 'Mount',
 	'device.mountPosition': '{rack} U{u}',
-	'device.searchPlaceholder': 'Search name, serial or type…',
 	'device.filterByRack': 'Filter by rack',
 	'device.allRacks': 'All racks',
 	'device.filterByRole': 'Filter by role',
@@ -596,7 +584,6 @@ export const en = {
 	// user
 	'user.role': 'Role',
 	'user.tenantScope': 'Tenant scope',
-	'user.searchPlaceholder': 'Search username…',
 	'user.empty': 'No users yet. Add the first one above.',
 	'user.addTitle': 'Add a new user',
 	'user.editTitle': 'Edit user',
@@ -611,7 +598,6 @@ export const en = {
 	// role
 	'role.permissions': 'Permissions',
 	'role.noPermissions': 'No permissions',
-	'role.searchPlaceholder': 'Search name or description…',
 	'role.empty': 'No roles yet. Add the first one above.',
 	'role.addTitle': 'Add a new role',
 	'role.editTitle': 'Edit role',
@@ -632,7 +618,6 @@ export const en = {
 	'audit.viaPeer': 'via {ip}',
 	'audit.userAgent': 'User agent',
 	'audit.target': 'Affected user',
-	'audit.searchPlaceholder': 'Search username or IP…',
 	'audit.filterByEvent': 'Filter by event',
 	'audit.allEvents': 'All events',
 	'audit.empty': 'No audit log entries yet.',
@@ -649,7 +634,6 @@ export const en = {
 	'changelog.object': 'Object',
 	'changelog.requestId': 'Request ID',
 	'changelog.system': 'System',
-	'changelog.searchPlaceholder': 'Search object or user…',
 	'changelog.filterByAction': 'Filter by action',
 	'changelog.allActions': 'All actions',
 	'changelog.filterByType': 'Filter by object type',

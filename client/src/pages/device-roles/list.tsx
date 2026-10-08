@@ -12,8 +12,8 @@ import { t, tp } from '../../i18n'
 import { deviceRoleIcon } from '../../lib/icons'
 
 /**
- * /device-roles — device role list: search, sortable columns, row
- * selection with bulk delete, and icon actions with delete in a row menu.
+ * /device-roles — device role list: search, sortable columns, and icon actions
+ * with delete in a row menu.
  */
 export function DeviceRolesPage(): JSX.Element {
 	const list = useEntityList({
@@ -28,7 +28,7 @@ export function DeviceRolesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.deviceRole', 2)}
 			addHref="/device-roles/add"
-			searchPlaceholder={t('deviceRole.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				{
 					key: 'name',

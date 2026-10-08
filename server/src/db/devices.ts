@@ -222,6 +222,7 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	site?: number
 	rack?: number
 	role?: number
+	device_type?: number
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
@@ -260,6 +261,7 @@ export function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> 
 		params.site ? eq(devices.site_id, params.site) : undefined,
 		params.rack ? eq(devices.rack_id, params.rack) : undefined,
 		params.role ? eq(devices.device_role_id, params.role) : undefined,
+		params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
 		...tenantConditions(devices.tenant_id, params),
 		params.status ? eq(devices.status, params.status) : undefined,
 		params.placed === undefined

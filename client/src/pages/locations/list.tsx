@@ -56,8 +56,8 @@ export function LocationTreeName(props: { location: LocationRow; depth: number }
 
 /**
  * /locations — NetBox-style location list: search, sortable columns, site +
- * tenant filters (deep-linkable via `?site=<id>` / `?tenant=<id>`), row
- * selection with bulk delete, and icon actions with delete in a row menu.
+ * tenant filters (deep-linkable via `?site=<id>` / `?tenant=<id>`), and icon
+ * actions with delete in a row menu.
  */
 export function LocationsPage(): JSX.Element {
 	const [filterSite, setFilterSite] = useQueryFilter('site')
@@ -119,7 +119,7 @@ export function LocationsPage(): JSX.Element {
 			list={list}
 			title={tp('entity.location', 2)}
 			addHref="/locations/add"
-			searchPlaceholder={t('location.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filters={
 				<FilterSelect
 					label={t('location.filterBySite')}

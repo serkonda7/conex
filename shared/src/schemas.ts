@@ -750,7 +750,19 @@ export const DeviceTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdEntry,
 	kind: v.optional(v.picklist(['device', 'rack']), 'device'),
-	sort: v.optional(v.picklist(['model', 'manufacturer', 'form_factor']), 'model'),
+	sort: v.optional(
+		v.picklist([
+			'model',
+			'manufacturer',
+			'form_factor',
+			'description',
+			'comments',
+			'u_height',
+			'is_full_depth',
+			'devices',
+		]),
+		'model',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -933,6 +945,7 @@ export const DeviceListQuerySchema = v.object({
 	site: OptionalIdEntry,
 	rack: OptionalIdEntry,
 	role: OptionalIdEntry,
+	device_type: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),

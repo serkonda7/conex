@@ -15,6 +15,7 @@ export const de: Messages = {
 	'common.saving': 'Wird gespeichert…',
 	'common.close': 'Schließen',
 	'common.loading': 'Wird geladen…',
+	'common.quickSearch': 'Suche',
 	'common.search': 'Suchen…',
 	'common.searchObjects': 'Einträge durchsuchen',
 	'common.noMatchingObjects': 'Keine passenden Einträge gefunden.',
@@ -162,12 +163,8 @@ export const de: Messages = {
 		'URL-sicherer Bezeichner: Kleinbuchstaben, Ziffern und einzelne Bindestriche.',
 	'form.nameRequired': 'Name ist erforderlich.',
 	'form.slugRequired': 'Kurzname ist erforderlich.',
-	'list.deleteSelected': '{count} ausgewählte löschen',
 	'list.confirmDelete': '{noun} „{name}“ löschen?',
-	'list.confirmBulkDelete': '{count} {noun} löschen?',
-	'list.bulkDeleteFailed': 'Massenlöschung fehlgeschlagen',
 	'list.range': 'Einträge {from}–{to} von {total}',
-	'list.selectAll': 'Alle {noun} auswählen',
 	'table.columns': 'Spalten',
 	'table.shownColumns': 'Angezeigte Spalten',
 	'table.showAll': 'Alle anzeigen',
@@ -234,7 +231,6 @@ export const de: Messages = {
 	'list.noMatchFilters': 'Keine {noun} für die aktuellen Filter gefunden.',
 
 	// tenant
-	'tenant.searchPlaceholder': 'Name oder Beschreibung suchen…',
 	'tenant.empty': 'Noch keine Mandanten vorhanden. Fügen Sie oben den ersten hinzu.',
 	'tenant.addTitle': 'Neuen Mandanten hinzufügen',
 	'tenant.editTitle': 'Mandant bearbeiten',
@@ -251,7 +247,6 @@ export const de: Messages = {
 	'tenant.noRacks': 'Für diesen Mandanten sind noch keine Racks vorhanden.',
 	'tenant.noDevices': 'Für diesen Mandanten sind noch keine Geräte vorhanden.',
 	'tenant.noEmployees': 'Für diesen Mandanten sind noch keine Mitarbeiter vorhanden.',
-	'employee.searchPlaceholder': 'Name, Funktion, E-Mail oder Telefon suchen…',
 	'employee.empty': 'Noch keine Mitarbeiter. Fügen Sie oben den ersten hinzu.',
 	'employee.addTitle': 'Neuen Mitarbeiter hinzufügen',
 	'employee.editTitle': 'Mitarbeiter bearbeiten',
@@ -294,7 +289,6 @@ export const de: Messages = {
 	'employee.inactive': 'Inaktiv',
 	'employee.tenantRequired': 'Mandant ist erforderlich.',
 	// tenantGroup
-	'tenantGroup.searchPlaceholder': 'Name, Kurzname oder Beschreibung suchen…',
 	'tenantGroup.empty': 'Noch keine Mandantengruppen vorhanden. Fügen Sie oben die erste hinzu.',
 	'tenantGroup.addTitle': 'Neue Mandantengruppe hinzufügen',
 	'tenantGroup.editTitle': 'Mandantengruppe bearbeiten',
@@ -306,7 +300,6 @@ export const de: Messages = {
 	'tenantGroup.noTenants': 'In dieser Gruppe sind noch keine Mandanten.',
 
 	// site
-	'site.searchPlaceholder': 'Name oder Beschreibung suchen…',
 	'site.empty': 'Noch keine Standorte vorhanden. Fügen Sie oben den ersten hinzu.',
 	'site.addTitle': 'Neuen Standort hinzufügen',
 	'site.editTitle': 'Standort bearbeiten',
@@ -341,7 +334,6 @@ export const de: Messages = {
 	'siteGroup.noSites': 'Noch keine Standorte in dieser Gruppe vorhanden.',
 
 	// location
-	'location.searchPlaceholder': 'Name oder Kurzname suchen…',
 	'location.empty': 'Noch keine Bereiche vorhanden. Fügen Sie oben den ersten hinzu.',
 	'location.filterBySite': 'Nach Standort filtern',
 	'location.allSites': 'Alle Standorte',
@@ -367,7 +359,6 @@ export const de: Messages = {
 	'locationType.other': 'Sonstiges',
 
 	// manufacturer
-	'manufacturer.searchPlaceholder': 'Namen suchen…',
 	'manufacturer.empty': 'Noch keine Hersteller vorhanden. Fügen Sie oben den ersten hinzu.',
 	'manufacturer.addTitle': 'Neuen Hersteller hinzufügen',
 	'manufacturer.editTitle': 'Hersteller bearbeiten',
@@ -379,7 +370,6 @@ export const de: Messages = {
 
 	// deviceType
 	'deviceType.import': '⭳ Importieren',
-	'deviceType.searchPlaceholder': 'Modell suchen…',
 	'deviceType.filterByManufacturer': 'Nach Hersteller filtern',
 	'deviceType.allManufacturers': 'Alle Hersteller',
 	'deviceType.empty':
@@ -416,8 +406,7 @@ export const de: Messages = {
 	'import.fieldOptions': 'Feldoptionen',
 	'import.field': 'Feld',
 	'import.required': 'Erforderlich',
-	'import.fieldManufacturer':
-		'Hersteller des Gerätes',
+	'import.fieldManufacturer': 'Hersteller des Gerätes',
 	'import.fieldModel': 'Modell',
 	'import.fieldUHeight': 'Rackmontage: Höhe (HE); sonst 0',
 	'import.fieldFullDepth': 'Rackmontage: belegt Vorder- und Rückseite',
@@ -449,7 +438,6 @@ export const de: Messages = {
 	'import.noRows': 'Keine Zeilen verarbeitet.',
 
 	// deviceRole
-	'deviceRole.searchPlaceholder': 'Name oder Beschreibung suchen…',
 	'deviceRole.empty': 'Noch keine Geräterollen vorhanden. Fügen Sie oben die erste hinzu.',
 	'deviceRole.addTitle': 'Neue Geräterolle hinzufügen',
 	'deviceRole.editTitle': 'Geräterolle bearbeiten',
@@ -543,7 +531,6 @@ export const de: Messages = {
 	// device
 	'device.mount': 'Montage',
 	'device.mountPosition': '{rack} HE{u}',
-	'device.searchPlaceholder': 'Name, Seriennummer oder Typ suchen…',
 	'device.filterByRack': 'Nach Rack filtern',
 	'device.allRacks': 'Alle Racks',
 	'device.filterByRole': 'Nach Rolle filtern',
@@ -605,7 +592,6 @@ export const de: Messages = {
 	// user
 	'user.role': 'Rolle',
 	'user.tenantScope': 'Mandantenzuordnung',
-	'user.searchPlaceholder': 'Benutzername suchen…',
 	'user.empty': 'Noch keine Benutzer vorhanden. Fügen Sie oben den ersten hinzu.',
 	'user.addTitle': 'Neuen Benutzer hinzufügen',
 	'user.editTitle': 'Benutzer bearbeiten',
@@ -620,7 +606,6 @@ export const de: Messages = {
 	// role
 	'role.permissions': 'Berechtigungen',
 	'role.noPermissions': 'Keine Berechtigungen',
-	'role.searchPlaceholder': 'Name oder Beschreibung suchen…',
 	'role.empty': 'Noch keine Rollen vorhanden. Fügen Sie oben die erste hinzu.',
 	'role.addTitle': 'Neue Rolle hinzufügen',
 	'role.editTitle': 'Rolle bearbeiten',
@@ -641,7 +626,6 @@ export const de: Messages = {
 	'audit.viaPeer': 'über {ip}',
 	'audit.userAgent': 'User-Agent',
 	'audit.target': 'Betroffener Benutzer',
-	'audit.searchPlaceholder': 'Benutzername oder IP suchen…',
 	'audit.filterByEvent': 'Nach Ereignis filtern',
 	'audit.allEvents': 'Alle Ereignisse',
 	'audit.empty': 'Noch keine Audit-Log-Einträge vorhanden.',
@@ -658,7 +642,6 @@ export const de: Messages = {
 	'changelog.object': 'Objekt',
 	'changelog.requestId': 'Anfrage-ID',
 	'changelog.system': 'System',
-	'changelog.searchPlaceholder': 'Objekt oder Benutzer suchen…',
 	'changelog.filterByAction': 'Nach Aktion filtern',
 	'changelog.allActions': 'Alle Aktionen',
 	'changelog.filterByType': 'Nach Objekttyp filtern',

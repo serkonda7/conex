@@ -20,20 +20,22 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 
 /**
  * /devices — NetBox-style device list: search, sortable columns, rack /
- * role / tenant filters (tenant and role deep-linkable via `?tenant=<id>`
- * and `?role=<id>`), row selection with bulk delete, and icon actions with
+ * role / tenant filters (tenant, role and device type deep-linkable via
+ * `?tenant=<id>`, `?role=<id>` and `?device_type=<id>`), and icon actions with
  * delete in a row menu.
  */
 export function DevicesPage(): JSX.Element {
 	const [filterRack, setFilterRack] = createSignal('')
 	const [filterRole, setFilterRole] = useQueryFilter('role')
 	const [filterTenant] = useQueryFilter('tenant')
+	const [filterType] = useQueryFilter('device_type')
 	const list = useEntityList({
 		noun: 'noun.device',
 		sort: 'name' as DeviceSort,
 		filters: () => ({
 			rack: parseId(filterRack()) ?? undefined,
 			role: parseId(filterRole()) ?? undefined,
+			device_type: parseId(filterType()) ?? undefined,
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_devices,
@@ -97,7 +99,7 @@ export function DevicesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.device', 2)}
 			addHref="/devices/add"
-			searchPlaceholder={t('device.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filters={
 				<>
 					<FilterSelect
@@ -120,6 +122,7 @@ export function DevicesPage(): JSX.Element {
 				filterRack() !== '' ||
 				filterRole() !== '' ||
 				filterTenant() !== '' ||
+				filterType() !== '' ||
 				tenantContext().kind !== 'all'
 			}
 			columns={columns}

@@ -59,9 +59,8 @@ export function TenantsPage(): JSX.Element {
 				{ label: tp('entity.tenantGroup', 2), href: '/tenant-groups', active: false },
 			]}
 			addHref="/tenants/add"
-			searchPlaceholder={t('tenant.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filtered={group() !== undefined}
-			bulkDelete={false}
 			columns={columns}
 			columnsKey="tenants"
 			rowName={(row: TenantWithCounts): string => row.name}

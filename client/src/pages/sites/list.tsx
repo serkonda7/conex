@@ -34,9 +34,9 @@ export function siteTabs(active: 'sites' | 'site-groups', tenant: string): ListT
 }
 
 /**
- * /sites — NetBox-style site list: search, sortable columns, tenant
- * filter (deep-linkable via `?tenant=<id>`), row selection with bulk
- * delete, and icon actions with delete in a row menu.
+ * /sites — NetBox-style site list: search, sortable columns, tenant filter
+ * (deep-linkable via `?tenant=<id>`), and icon actions with delete in a row
+ * menu.
  */
 export function SitesPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
@@ -74,7 +74,7 @@ export function SitesPage(): JSX.Element {
 			title={tp('entity.site', 2)}
 			tabs={siteTabs('sites', filterTenant())}
 			addHref="/sites/add"
-			searchPlaceholder={t('site.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="sites"

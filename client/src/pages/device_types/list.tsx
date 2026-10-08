@@ -7,12 +7,7 @@ import {
 	fetch_manufacturers,
 } from '../../api/templates'
 import type { DataTableColumn } from '../../components/data_table'
-import {
-	EntityListPage,
-	FilterSelect,
-	useEntityList,
-	useQueryFilter,
-} from '../../components/list_page'
+import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { yesNo } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
@@ -20,13 +15,14 @@ import { createRows } from '../../lib/resource'
 import { navigate, parseId } from '../../lib/router'
 
 /**
- * /device-types — device-type list: search, sortable columns, manufacturer
- * filter (deep-linkable via `?manufacturer=<id>`), row selection with bulk
- * delete, and icon actions with delete in a row menu. New types can be added
- * manually or imported from the /device-types/import page.
+ * /device-types — device-type list: search (model, manufacturer, description),
+ * sortable columns, manufacturer filter via `?manufacturer=<id>` (linked from
+ * the manufacturer page), and icon actions
+ * with delete in a row menu. New types can be added manually or imported from
+ * the /device-types/import page.
  */
 export function DeviceTypesPage(): JSX.Element {
-	const [filterManufacturer, setFilterManufacturer] = useQueryFilter('manufacturer')
+	const [filterManufacturer] = useQueryFilter('manufacturer')
 	const list = useEntityList({
 		noun: 'noun.deviceType',
 		sort: 'model' as DeviceTypeSort,
@@ -42,7 +38,11 @@ export function DeviceTypesPage(): JSX.Element {
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
 			sortable: true,
-			getValue: (dt: DeviceTypeListRow): string => manufacturerName(dt.manufacturer_id),
+			getValue: (dt: DeviceTypeListRow): JSX.Element => (
+				<a href={`/manufacturers/${dt.manufacturer_id}`}>
+					{manufacturerName(dt.manufacturer_id)}
+				</a>
+			),
 		},
 		{
 			key: 'model',
@@ -54,28 +54,35 @@ export function DeviceTypesPage(): JSX.Element {
 		},
 		{
 			key: 'description',
+			sortable: true,
 			label: t('common.description'),
 			getValue: (dt: DeviceTypeListRow): string => dt.description ?? '—',
 		},
 		{
 			key: 'comments',
+			sortable: true,
 			label: t('common.comments'),
 			getValue: (dt: DeviceTypeListRow): string => dt.comments ?? '—',
 		},
 		{
 			key: 'u_height',
+			sortable: true,
 			label: t('common.heightU'),
 			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
 		},
 		{
 			key: 'is_full_depth',
+			sortable: true,
 			label: t('common.fullDepth'),
 			getValue: (dt: DeviceTypeListRow): string => yesNo(dt.is_full_depth),
 		},
 		{
 			key: 'devices',
+			sortable: true,
 			label: tp('entity.device', 2),
-			getValue: (dt: DeviceTypeListRow): string => String(dt.instance_count),
+			getValue: (dt: DeviceTypeListRow): JSX.Element => (
+				<a href={`/devices?device_type=${dt.id}`}>{dt.instance_count}</a>
+			),
 		},
 	]
 
@@ -93,16 +100,7 @@ export function DeviceTypesPage(): JSX.Element {
 					{t('deviceType.import')}
 				</button>
 			}
-			searchPlaceholder={t('deviceType.searchPlaceholder')}
-			filters={
-				<FilterSelect
-					label={t('deviceType.filterByManufacturer')}
-					allLabel={t('deviceType.allManufacturers')}
-					value={filterManufacturer()}
-					onChange={setFilterManufacturer}
-					rows={manufacturers() ?? []}
-				/>
-			}
+			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterManufacturer() !== ''}
 			columns={columns}
 			columnsKey="device-types"

@@ -320,37 +320,27 @@ export function DeviceTypeImportPage(): JSX.Element {
 						<tr>
 							<td>interfaces</td>
 							<td>—</td>
-							<td>
-								{t('import.fieldInterfaces')}
-							</td>
+							<td>{t('import.fieldInterfaces')}</td>
 						</tr>
 						<tr>
 							<td>ports</td>
 							<td>—</td>
-							<td>
-								{t('import.fieldPorts')}{' '}
-							</td>
+							<td>{t('import.fieldPorts')}</td>
 						</tr>
 						<tr>
 							<td>power-ports</td>
 							<td>—</td>
-							<td>
-								{t('import.fieldPowerPorts')}
-							</td>
+							<td>{t('import.fieldPowerPorts')}</td>
 						</tr>
 						<tr>
 							<td>power-outlets</td>
 							<td>—</td>
-							<td>
-								{t('import.fieldPowerOutlets')}
-							</td>
+							<td>{t('import.fieldPowerOutlets')}</td>
 						</tr>
 						<tr>
 							<td>display-ports</td>
 							<td>—</td>
-							<td>
-								{t('import.fieldDisplayPorts')}
-							</td>
+							<td>{t('import.fieldDisplayPorts')}</td>
 						</tr>
 					</tbody>
 				</table>

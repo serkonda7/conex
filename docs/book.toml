@@ -1,0 +1,14 @@
+[book]
+title = "conex"
+description = "Network inventory for MSPs."
+
+[preprocessor.last-changed]
+command = "mdbook-last-changed"
+renderer = ["html"]
+# Skip with a warning when the plugin isn't installed locally.
+optional = true
+
+[output.html]
+site-url = "/conex/"
+git-repository-url = "https://github.com/serkonda7/conex"
+additional-css = ["last-changed.css"]

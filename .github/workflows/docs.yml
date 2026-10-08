@@ -23,14 +23,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # lastUpdated reads git history
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: bun run docs:build
+          fetch-depth: 0 # mdbook-last-changed reads git history
+      - uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: 'latest'
+      - name: Install mdbook-last-changed
+        run: |
+          mkdir -p ~/.local/bin
+          curl -sSL https://github.com/badboy/mdbook-last-changed/releases/download/v0.4.0/mdbook-last-changed-v0.4.0-x86_64-unknown-linux-gnu.tar.gz | tar xz -C ~/.local/bin
+          echo ~/.local/bin >> "$GITHUB_PATH"
+      - run: mdbook build docs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/.vitepress/dist
+          path: docs/book
 
   deploy:
     needs: build

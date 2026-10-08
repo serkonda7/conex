@@ -11,7 +11,7 @@ import { t, tp } from '../../i18n'
 
 /**
  * /tenant-groups — flat tenant group list: search, sortable columns,
- * member counts, row selection with bulk delete.
+ * member counts.
  */
 export function TenantGroupsPage(): JSX.Element {
 	const list = useEntityList({
@@ -30,7 +30,7 @@ export function TenantGroupsPage(): JSX.Element {
 				{ label: tp('entity.tenantGroup', 2), href: '/tenant-groups', active: true },
 			]}
 			addHref="/tenant-groups/add"
-			searchPlaceholder={t('tenantGroup.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				nameColumn<TenantGroupListItem>(tp('entity.tenantGroup', 1), '/tenant-groups', {
 					sortable: true,

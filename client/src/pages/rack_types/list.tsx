@@ -21,8 +21,8 @@ import { parseId } from '../../lib/router'
 
 /**
  * /rack-types — rack-type catalog: search, sortable columns, manufacturer
- * filter (deep-linkable via `?manufacturer=<id>`), row selection with bulk
- * delete, and delete in a row menu. There is no edit page.
+ * filter (deep-linkable via `?manufacturer=<id>`), and delete in a row menu.
+ * There is no edit page.
  */
 export function RackTypesPage(): JSX.Element {
 	const [filterManufacturer, setFilterManufacturer] = useQueryFilter('manufacturer')
@@ -81,7 +81,7 @@ export function RackTypesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.rackType', 2)}
 			addHref="/rack-types/add"
-			searchPlaceholder={t('deviceType.searchPlaceholder')}
+			searchPlaceholder={t('common.quickSearch')}
 			filters={
 				<FilterSelect
 					label={t('deviceType.filterByManufacturer')}
