@@ -11,6 +11,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { Markdown } from '../../components/markdown'
 import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord } from '../../lib/resource'
@@ -84,7 +85,9 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 						<EmployeeStatus active={employee()?.active ?? 1} />
 					</dd>
 					<dt>{t('common.comments')}</dt>
-					<dd>{employee()?.comments || '—'}</dd>
+					<dd>
+						<Markdown text={employee()?.comments} />
+					</dd>
 				</DetailCard>
 				<EmployeeIntegrationCards employeeId={props.id} />
 			</DetailShell>

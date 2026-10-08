@@ -2,7 +2,7 @@ import { PERMISSIONS } from 'shared/src/schemas'
 import type { Permission } from 'shared/src/types'
 import { createSignal, For, type JSX } from 'solid-js'
 import { create_role, fetch_role, type RoleJson, update_role } from '../../api/roles'
-import { DescriptionField, FormPage, Hint, NameField } from '../../components/form'
+import { DescriptionField, FormPage, NameField } from '../../components/form'
 import { t } from '../../i18n'
 import { permissionLabel } from '../../i18n/labels'
 import {

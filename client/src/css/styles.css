@@ -1979,6 +1979,67 @@ th[aria-sort="descending"] .data-table-sort::after {
 	overflow-wrap: anywhere;
 }
 
+/* Rendered markdown of user-written comments. */
+.markdown :is(p, ul, ol, pre, blockquote, table, hr, h3, h4, h5, h6) {
+	margin: 0;
+}
+
+.markdown > :nth-child(n + 2) {
+	margin-top: 0.4rem;
+}
+
+.markdown :is(ul, ol) {
+	padding-left: 1.25rem;
+}
+
+.markdown :is(h3, h4, h5, h6) {
+	font-size: var(--font-size-lg);
+}
+
+.markdown :any-link {
+	color: var(--link);
+}
+
+.markdown code {
+	padding: 0.05rem 0.25rem;
+	border-radius: 3px;
+	background: var(--bg-code);
+	font-size: 0.9em;
+}
+
+.markdown pre {
+	padding: 0.5rem;
+	border-radius: 4px;
+	background: var(--bg-code);
+	overflow-x: auto;
+}
+
+.markdown pre code {
+	padding: 0;
+	background: none;
+}
+
+.markdown blockquote {
+	padding-left: 0.6rem;
+	border-left: 3px solid var(--border-strong);
+	color: var(--text-secondary);
+}
+
+.markdown hr {
+	border: none;
+	border-top: 1px solid var(--border);
+}
+
+.markdown table {
+	border-collapse: collapse;
+}
+
+.markdown :is(th, td) {
+	padding: 0.2rem 0.5rem;
+	border: 1px solid var(--border);
+	text-align: left;
+}
+
 /* Two-column detail layout: facts/stats left, main content right. */
 .detail-columns {
 	display: grid;
@@ -2722,7 +2783,7 @@ a.rack-shelf-plate:hover {
 	white-space: nowrap;
 }
 
-.link-board-state > * + * {
+.link-board-state > * + .btn-small {
 	margin-left: 0.35rem;
 }
 

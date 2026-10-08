@@ -24,6 +24,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import { EmailLink } from '../employees/list'
@@ -110,7 +111,9 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 						<PhoneList phones={tenant()?.phones ?? []} />
 					</dd>
 					<dt>{t('common.comments')}</dt>
-					<dd>{tenant()?.comments || '—'}</dd>
+					<dd>
+						<Markdown text={tenant()?.comments} />
+					</dd>
 				</DetailCard>
 				<TenantIntegrationCards tenantId={props.id} />
 			</DetailShell>

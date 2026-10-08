@@ -8,6 +8,7 @@ import {
 } from '../../api/templates'
 import type { DataTableColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
+import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { yesNo } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
@@ -62,7 +63,10 @@ export function DeviceTypesPage(): JSX.Element {
 			key: 'comments',
 			sortable: true,
 			label: t('common.comments'),
-			getValue: (dt: DeviceTypeListRow): string => dt.comments ?? '—',
+			class: 'cell-truncate',
+			getValue: (dt: DeviceTypeListRow): JSX.Element => (
+				<Markdown text={dt.comments} inline />
+			),
 		},
 		{
 			key: 'u_height',

@@ -17,6 +17,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { createRecord, createRowsFor } from '../../lib/resource'
 
@@ -69,7 +70,9 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 					<dt>{t('common.description')}</dt>
 					<dd>{group()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
-					<dd>{group()?.comments || '—'}</dd>
+					<dd>
+						<Markdown text={group()?.comments} />
+					</dd>
 				</DetailCard>
 			</DetailShell>
 

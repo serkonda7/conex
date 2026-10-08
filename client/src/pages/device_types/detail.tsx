@@ -22,6 +22,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
+import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { portKindLabel, portKindOptions, yesNo } from '../../i18n/labels'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
@@ -143,7 +144,9 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<dt>{t('common.description')}</dt>
 					<dd>{deviceType()?.description || '—'}</dd>
 					<dt>{t('common.comments')}</dt>
-					<dd>{deviceType()?.comments || '—'}</dd>
+					<dd>
+						<Markdown text={deviceType()?.comments} />
+					</dd>
 					<dt>{t('common.heightU')}</dt>
 					<dd>{deviceType()?.u_height}</dd>
 					<dt>{t('common.fullDepth')}</dt>

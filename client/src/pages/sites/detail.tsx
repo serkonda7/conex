@@ -21,6 +21,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
+import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
@@ -122,7 +123,9 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 						<RecordLink id={groupId()} record={siteGroup} base="/site-groups" />
 					</dd>
 					<dt>{t('common.comments')}</dt>
-					<dd>{site()?.comments || '—'}</dd>
+					<dd>
+						<Markdown text={site()?.comments} />
+					</dd>
 					<dt>{t('site.physicalAddress')}</dt>
 					<dd>
 						<SiteAddress

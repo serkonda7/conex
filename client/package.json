@@ -17,7 +17,9 @@
     "@serkonda7/solid-components": "~0.0.8",
     "@tabler/icons-solidjs": "~3.49.0",
     "better-result": "catalog:",
+    "dompurify": "~3.4.16",
     "hono": "catalog:",
+    "marked": "~18.1.0",
     "server": "workspace:*",
     "shared": "workspace:*",
     "solid-js": "~1.9.16"
