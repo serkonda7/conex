@@ -174,6 +174,7 @@ export const en = {
 	'app.account': 'Account',
 	'app.accountNamed': 'Account: {name}',
 	'app.logout': 'Log out',
+	'app.buildInfo': '{version} · {commit} ({date})',
 	'account.changePassword': 'Change password',
 	'account.currentPassword': 'Current password',
 	'account.passwordChanged':

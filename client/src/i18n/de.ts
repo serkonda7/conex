@@ -177,6 +177,7 @@ export const de: Messages = {
 	'app.account': 'Konto',
 	'app.accountNamed': 'Konto: {name}',
 	'app.logout': 'Abmelden',
+	'app.buildInfo': '{version} · {commit} ({date})',
 	'account.changePassword': 'Passwort ändern',
 	'account.currentPassword': 'Aktuelles Passwort',
 	'account.passwordChanged': 'Ihr Passwort wurde geändert. Andere Sitzungen wurden abgemeldet.',

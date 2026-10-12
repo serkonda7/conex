@@ -20,6 +20,7 @@ import { type Locale, locale, t } from '../i18n'
 import { activeTabId, goTo, type TabState, tabs } from '../lib/router'
 import { setSessionAccess } from '../lib/session'
 import { refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
+import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { RouteContent } from './route_content'
@@ -97,6 +98,13 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 							)}
 						</For>
 					</main>
+					<footer class="app-footer">
+						{t('app.buildInfo', {
+							version: __APP_VERSION__,
+							commit: __APP_COMMIT__ || '?',
+							date: formatTime(__BUILD_TIME__),
+						})}
+					</footer>
 				</div>
 			</div>
 		</>

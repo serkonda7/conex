@@ -713,6 +713,15 @@ tbody tr:last-child td {
 	padding: 0.9rem 1rem 2rem;
 }
 
+/* Version, commit and build date, right-aligned below the page content. */
+.app-footer {
+	padding: 0.4rem 1rem;
+	border-top: 1px solid var(--border);
+	color: var(--text-muted);
+	font-size: 0.75rem;
+	text-align: right;
+}
+
 .app-content > div:not(.app-auth) {
 	max-width: none;
 }
