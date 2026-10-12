@@ -174,7 +174,7 @@ export const en = {
 	'app.account': 'Account',
 	'app.accountNamed': 'Account: {name}',
 	'app.logout': 'Log out',
-	'app.buildInfo': '{version} · {commit} ({date})',
+	'app.buildInfo': '{version} ({date})',
 	'account.changePassword': 'Change password',
 	'account.currentPassword': 'Current password',
 	'account.passwordChanged':
@@ -769,7 +769,6 @@ export const en = {
 	'integration.staleDevice': 'Linked device {id} no longer exists',
 	'integration.staleEmployee': 'Linked employee {id} no longer exists',
 	'integration.link': 'Link…',
-	'integration.changeLink': 'Change link…',
 	'integration.unlink': 'Unlink',
 	'integration.confirmLink': 'Link',
 	'integration.ignore': 'Ignore',

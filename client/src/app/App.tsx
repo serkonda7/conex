@@ -100,8 +100,9 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 					</main>
 					<footer class="app-footer">
 						{t('app.buildInfo', {
-							version: __APP_VERSION__,
-							commit: __APP_COMMIT__ || '?',
+							version: __APP_COMMIT__
+								? `${__APP_VERSION__} · ${__APP_COMMIT__}`
+								: __APP_VERSION__,
 							date: formatTime(__BUILD_TIME__),
 						})}
 					</footer>

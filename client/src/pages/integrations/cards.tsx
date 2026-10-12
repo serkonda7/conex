@@ -1,10 +1,10 @@
 /**
  * Integration cards on the tenant, device and employee detail pages: one
- * card per configured provider with the linked external object, link/unlink
- * actions and (tenants) finding counts or (devices, employees) a field
- * comparison.
+ * card per configured provider with the linked external object and
+ * (tenants) finding counts and a report link or (devices, employees)
+ * link/unlink actions and a field comparison.
  */
-import { Result } from 'better-result'
+import type { Result } from 'better-result'
 import type {
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
@@ -16,14 +16,12 @@ import type {
 import type { JSX } from 'solid-js'
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import {
-	type ExternalTenantListItem,
 	fetch_device_integration,
 	fetch_employee_integration,
 	fetch_integrations,
 	fetch_tenant_integration,
 	type IntegrationJson,
 	link_external,
-	run_sync,
 	unlink_external,
 } from '../../api/integrations'
 import { Empty, InlineError } from '../../components/feedback'
@@ -36,8 +34,7 @@ import {
 	providerLabel,
 } from '../../i18n/labels'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
-import { can, canGlobal } from '../../lib/session'
-import { ExternalTenantPicker } from './external_tenant_picker'
+import { can } from '../../lib/session'
 
 /**
  * Configured, enabled integrations (empty on error: the cards just hide).
@@ -51,8 +48,7 @@ function useIntegrations(): () => IntegrationJson[] {
 function TenantCard(props: { integration: IntegrationJson; tenantId: number }): JSX.Element {
 	const provider = (): IntegrationJson['provider'] => props.integration.provider
 	const [error, setError] = createSignal<string | null>(null)
-	const [picking, setPicking] = createSignal(false)
-	const [status, { refetch }] = createRecord(
+	const [status] = createRecord(
 		() => props.tenantId,
 		(id: number) => fetch_tenant_integration(provider(), id),
 		setError,
@@ -61,38 +57,6 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 		() => Object.entries(status()?.finding_counts ?? {}) as [FindingKind, number][],
 	)
 
-	const action = useAction(setError)
-	const sync = useAction(setError)
-
-	async function run(request: () => Promise<Result<unknown, Error>>): Promise<void> {
-		if (await action.run(request)) {
-			void refetch()
-		}
-	}
-
-	function handlePick(item: ExternalTenantListItem): void {
-		setPicking(false)
-		void run(async () => {
-			const linked = await link_external(
-				provider(),
-				'tenant',
-				props.tenantId,
-				item.external_id,
-			)
-			if (Result.isError(linked)) {
-				return linked
-			}
-			// Fetch the company's devices right away so the counts are useful.
-			return run_sync(provider(), props.tenantId)
-		})
-	}
-
-	async function handleSync(): Promise<void> {
-		if (await sync.run(() => run_sync(provider(), props.tenantId))) {
-			void refetch()
-		}
-	}
-
 	const reportHref = (): string =>
 		`/integrations/${props.integration.id}?tenant=${props.tenantId}`
 
@@ -100,35 +64,7 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 		<section class="card" aria-label={providerLabel(provider())}>
 			<div class="page-header">
 				<h3>{providerLabel(provider())}</h3>
-				<div class="form-actions">
-					<Show when={can('integrations.manage') && status()?.link}>
-						<button
-							type="button"
-							disabled={sync.pending()}
-							onClick={() => void handleSync()}
-						>
-							{sync.pending() ? t('integration.syncing') : t('integration.syncNow')}
-						</button>
-					</Show>
-					<Show when={canGlobal('integrations.manage')}>
-						<button type="button" onClick={() => setPicking(true)}>
-							{status()?.link ? t('integration.changeLink') : t('integration.link')}
-						</button>
-						<Show when={status()?.link}>
-							{(link: () => NonNullable<ReturnType<typeof status>>['link']) => (
-								<button
-									type="button"
-									class="btn-danger"
-									onClick={() =>
-										void run(() => unlink_external(provider(), link()?.id ?? 0))
-									}
-								>
-									{t('integration.unlink')}
-								</button>
-							)}
-						</Show>
-					</Show>
-				</div>
+				<a href={reportHref()}>{t('integration.openReport')}</a>
 			</div>
 			<dl class="detail-grid">
 				<dt>{t('integration.company')}</dt>
@@ -174,16 +110,6 @@ function TenantCard(props: { integration: IntegrationJson; tenantId: number }): 
 					</Show>
 				</dd>
 			</dl>
-			<p>
-				<a href={reportHref()}>{t('integration.openReport')}</a>
-			</p>
-			<Show when={picking()}>
-				<ExternalTenantPicker
-					provider={provider()}
-					on_select={handlePick}
-					on_close={() => setPicking(false)}
-				/>
-			</Show>
 			<InlineError message={error()} />
 		</section>
 	)

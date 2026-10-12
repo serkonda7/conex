@@ -12,10 +12,24 @@ const rootPackage = JSON.parse(
 	readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8'),
 ) as { version: string }
 
-/** Short hash of the checked-out commit; empty outside a git checkout. */
+/**
+ * Short hash of the checked-out commit; empty for tagged releases and outside a
+ * git checkout. `CONEX_COMMIT` overrides it (e.g. Docker builds without .git).
+ */
 function gitCommit(): string {
+	if (process.env.CONEX_COMMIT !== undefined) {
+		return process.env.CONEX_COMMIT
+	}
+	const git = (args: string): string =>
+		execSync(`git ${args}`, { encoding: 'utf8', stdio: 'pipe' }).trim()
 	try {
-		return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+		git('describe --exact-match --tags HEAD')
+		return ''
+	} catch {
+		// not on a tag
+	}
+	try {
+		return git('rev-parse --short HEAD')
 	} catch {
 		return ''
 	}

@@ -2072,6 +2072,19 @@ th[aria-sort="descending"] .data-table-sort::after {
 	text-align: left;
 }
 
+/* Related-section heading followed by its "View in … →" link. */
+.section-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.75rem;
+	margin: 1rem 0 0.4rem;
+}
+
+.section-header h3 {
+	margin: 0;
+}
+
 /* Two-column detail layout: facts/stats left, main content right. */
 .detail-columns {
 	display: grid;

@@ -151,7 +151,7 @@ export function RecordLink(props: {
 /**
  * Related-object section: `h3` with a count badge, the loading/empty gate
  * around a table of `rows` (or custom `children`), and an optional
- * "View in … →" follow-up link.
+ * "View in … →" link after the heading.
  */
 export function RelatedSection<Row extends { id: number }>(props: {
 	id: string
@@ -178,9 +178,16 @@ export function RelatedSection<Row extends { id: number }>(props: {
 		t('list.loading', { noun: props.noun ? tp(props.noun, 2) : props.title })
 	return (
 		<>
-			<h3 id={props.id}>
-				{props.title} <span class="badge">{count()}</span>
-			</h3>
+			<div class="section-header">
+				<h3 id={props.id}>
+					{props.title} <span class="badge">{count()}</span>
+				</h3>
+				<Show when={props.viewAllHref}>
+					{(href: () => string) => (
+						<a href={href()}>{t('common.viewIn', { target: props.title })}</a>
+					)}
+				</Show>
+			</div>
 			<Show when={!props.rows.loading} fallback={<Loading message={loadingText()} />}>
 				<Show when={count() > 0} fallback={<Empty message={props.emptyText} />}>
 					<Show when={props.columns} fallback={props.children}>
@@ -194,13 +201,6 @@ export function RelatedSection<Row extends { id: number }>(props: {
 						)}
 					</Show>
 				</Show>
-			</Show>
-			<Show when={props.viewAllHref}>
-				{(href: () => string) => (
-					<p>
-						<a href={href()}>{t('common.viewIn', { target: props.title })}</a>
-					</p>
-				)}
 			</Show>
 		</>
 	)

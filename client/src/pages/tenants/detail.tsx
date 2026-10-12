@@ -33,9 +33,9 @@ import { rackHeightColumn } from '../racks/columns'
 import { TenantTickets } from '../tickets/tenant_tickets'
 
 /**
- * /tenants/:id — tenant detail: header with description/comments, the
- * integration cards, the open tickets and the related
- * employees/sites/site groups/racks/devices tables.
+ * /tenants/:id — tenant detail: header with description, the details card
+ * beside the integration cards, the open tickets and the
+ * related employees/sites/site groups (if any)/racks/devices tables.
  */
 export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -82,41 +82,47 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle description={tenant()?.description} />
 
-				<DetailCard label={t('tenant.details')}>
-					<dt>{tp('entity.tenantGroup', 1)}</dt>
-					<dd>
-						<RecordLink id={groupId()} record={group} base="/tenant-groups" />
-					</dd>
-					<dt>{t('tenant.customerNumber')}</dt>
-					<dd>{tenant()?.customer_number || '—'}</dd>
-					<dt>{t('tenant.website')}</dt>
-					<dd>
-						<Show when={tenant()?.website} fallback="—">
-							{(website: () => string): JSX.Element => (
-								<a
-									href={websiteUrl(website())}
-									target="_blank"
-									rel="noopener noreferrer"
-								>
-									{website()}
-								</a>
-							)}
-						</Show>
-					</dd>
-					<dt>{t('employee.emails')}</dt>
-					<dd>
-						<EmailList emails={tenant()?.emails ?? []} />
-					</dd>
-					<dt>{t('employee.phones')}</dt>
-					<dd>
-						<PhoneList phones={tenant()?.phones ?? []} />
-					</dd>
-					<dt>{t('common.comments')}</dt>
-					<dd>
-						<Markdown text={tenant()?.comments} />
-					</dd>
-				</DetailCard>
-				<TenantIntegrationCards tenantId={props.id} />
+				<div class="detail-columns">
+					<div>
+						<DetailCard label={t('tenant.details')}>
+							<dt>{tp('entity.tenantGroup', 1)}</dt>
+							<dd>
+								<RecordLink id={groupId()} record={group} base="/tenant-groups" />
+							</dd>
+							<dt>{t('tenant.customerNumber')}</dt>
+							<dd>{tenant()?.customer_number || '—'}</dd>
+							<dt>{t('tenant.website')}</dt>
+							<dd>
+								<Show when={tenant()?.website} fallback="—">
+									{(website: () => string): JSX.Element => (
+										<a
+											href={websiteUrl(website())}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											{website()}
+										</a>
+									)}
+								</Show>
+							</dd>
+							<dt>{t('employee.emails')}</dt>
+							<dd>
+								<EmailList emails={tenant()?.emails ?? []} />
+							</dd>
+							<dt>{t('employee.phones')}</dt>
+							<dd>
+								<PhoneList phones={tenant()?.phones ?? []} />
+							</dd>
+							<dt>{t('common.comments')}</dt>
+							<dd>
+								<Markdown text={tenant()?.comments} />
+							</dd>
+						</DetailCard>
+					</div>
+					<div>
+						<TenantIntegrationCards tenantId={props.id} />
+					</div>
+				</div>
 			</DetailShell>
 
 			<TenantTickets tenantId={props.id} />
@@ -155,22 +161,24 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				columns={[nameColumn<SiteRow>(t('common.name'), '/sites')]}
 			/>
 
-			<RelatedSection
-				id="tenant-site-groups"
-				title={tp('entity.siteGroup', 2)}
-				noun="noun.siteGroup"
-				rows={siteGroups}
-				emptyText={t('tenant.noSiteGroups')}
-				viewAllHref={`/site-groups?tenant=${props.id}`}
-				columns={[
-					nameColumn<SiteGroupRow>(t('common.name'), '/site-groups'),
-					{
-						key: 'slug',
-						label: t('common.slug'),
-						getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
-					},
-				]}
-			/>
+			<Show when={(siteGroups()?.length ?? 0) > 0}>
+				<RelatedSection
+					id="tenant-site-groups"
+					title={tp('entity.siteGroup', 2)}
+					noun="noun.siteGroup"
+					rows={siteGroups}
+					emptyText={t('tenant.noSiteGroups')}
+					viewAllHref={`/site-groups?tenant=${props.id}`}
+					columns={[
+						nameColumn<SiteGroupRow>(t('common.name'), '/site-groups'),
+						{
+							key: 'slug',
+							label: t('common.slug'),
+							getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
+						},
+					]}
+				/>
+			</Show>
 
 			<RelatedSection
 				id="tenant-racks"
