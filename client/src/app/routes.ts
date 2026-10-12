@@ -15,7 +15,6 @@ import {
 	IconCpu,
 	IconFolder,
 	IconHistory,
-	IconLayoutDashboard,
 	IconListDetails,
 	IconLocation,
 	IconLock,
@@ -112,9 +111,8 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'dashboard',
 		noun: (): string => t('entity.dashboard'),
-		icon: IconLayoutDashboard,
 		permission: null,
-		hideAddInNav: true,
+		hideInNav: true,
 		list: DashboardPage,
 	},
 	{

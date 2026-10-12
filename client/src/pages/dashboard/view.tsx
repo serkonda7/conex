@@ -1,24 +1,17 @@
-import type { JSX } from 'solid-js'
-import { t } from '../../i18n'
-import { ChangelogWidget } from './changelog_widget'
-import { ConsistencyWidget } from './consistency_widget'
-import { TicketWidget } from './ticket_widget'
+import { createEffect, type JSX } from 'solid-js'
+import { activeTab, navigate, useTabPath } from '../../lib/router'
+import { homePath } from '../../lib/tenant_context'
 
 /**
- * /dashboard — home page and target of the top bar title: a grid of
- * overview widgets.
+ * /dashboard — home route kept for the default path and old links: replaces
+ * itself with the home tenant page (see `homePath`) once its tab is shown.
  */
 export function DashboardPage(): JSX.Element {
-	return (
-		<div>
-			<div class="page-header">
-				<h2>{t('entity.dashboard')}</h2>
-			</div>
-			<div class="dashboard-grid">
-				<TicketWidget />
-				<ConsistencyWidget />
-				<ChangelogWidget />
-			</div>
-		</div>
-	)
+	const tabPath = useTabPath()
+	createEffect(() => {
+		if (activeTab()?.path === tabPath) {
+			navigate(homePath(), { replace: true })
+		}
+	})
+	return null
 }

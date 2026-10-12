@@ -639,8 +639,6 @@ export const de: Messages = {
 	'auditEvent.loginFailure': 'Anmeldung fehlgeschlagen',
 	'auditEvent.passwordChange': 'Passwort geändert',
 	'auditEvent.passwordReset': 'Passwort zurückgesetzt',
-	'dashboard.consistency': 'Datenabgleich',
-	'dashboard.findingCount': 'Anzahl',
 	'changelog.time': 'Zeitpunkt',
 	'changelog.user': 'Benutzer',
 	'changelog.action': 'Aktion',
@@ -851,8 +849,6 @@ export const de: Messages = {
 	'ticket.modified': 'Letzte Änderung',
 	'ticket.noOpenTickets': 'Keine offenen Tickets.',
 	'ticket.notLinked': 'Dieser Mandant ist mit keiner {provider}-Firma verknüpft.',
-	'ticket.pickTenantContext':
-		'Wählen Sie im Mandantenkontext einen einzelnen Mandanten, um dessen Tickets zu sehen.',
 	'ticket.fetchedAt': 'Stand: {time}',
 
 	'provider.tanss': 'TANSS',

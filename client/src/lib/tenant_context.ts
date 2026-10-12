@@ -17,6 +17,7 @@ import {
 } from '../api/tenancy'
 import { id_value } from './form'
 import { parseId, queryParam } from './router'
+import { isScoped, sessionTenantId } from './session'
 
 export type TenantContext =
 	| { kind: 'all' }
@@ -135,6 +136,16 @@ export function contextGroupId(): number | undefined {
 export function contextTenantId(): number | null {
 	const ctx = tenantContext()
 	return ctx.kind === 'tenant' ? ctx.id : null
+}
+
+/**
+ * Target of the dashboard nav entry and the top bar title: the detail page
+ * of the user's own tenant (scoped users) or of the single context tenant,
+ * else the tenant list.
+ */
+export function homePath(): string {
+	const id = isScoped() ? sessionTenantId() : contextTenantId()
+	return id === null ? '/tenants' : `/tenants/${id}`
 }
 
 /** `contextTenantId` as a `<select>` value (`''` = no tenant). */

@@ -98,7 +98,7 @@ function details(f: IntegrationFinding): JSX.Element {
 	)
 }
 
-/** `?kind=` preselects the finding filter (dashboard links); unknown kinds show all. */
+/** `?kind=` preselects the finding filter (finding count links); unknown kinds show all. */
 function parseKind(raw: string): FindingKind | '' {
 	return (FINDING_KINDS as readonly string[]).includes(raw) ? (raw as FindingKind) : ''
 }

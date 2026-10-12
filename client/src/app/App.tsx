@@ -19,7 +19,7 @@ import { Loading } from '../components/feedback'
 import { type Locale, locale, t } from '../i18n'
 import { activeTabId, goTo, type TabState, tabs } from '../lib/router'
 import { setSessionAccess } from '../lib/session'
-import { refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
+import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
 import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
@@ -59,14 +59,14 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	const canAddTenants = (): boolean => props.user.permissions.includes('edit') && !isScoped()
 
 	createEffect(() => {
-		setSessionAccess({ permissions: props.user.permissions, scoped: isScoped() })
+		setSessionAccess({ permissions: props.user.permissions, tenantId: props.user.tenant_id })
 		setTenantContextScoped(isScoped())
 		if (props.user.permissions.includes('view')) {
 			void refreshTenantContext()
 		}
 	})
 	onCleanup(() => {
-		setSessionAccess({ permissions: [], scoped: false })
+		setSessionAccess({ permissions: [], tenantId: null })
 	})
 
 	return (
@@ -75,7 +75,7 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 				<TenantContextSelector scoped={isScoped()} canAdd={canAddTenants()} />
 				<CreateTicketButton scopeTenantId={props.user.tenant_id} />
 				<div class="app-topbar-actions">
-					<a href="/dashboard" class="app-topbar-brand">
+					<a href={homePath()} class="app-topbar-brand">
 						{APP_TITLE}
 					</a>
 				</div>

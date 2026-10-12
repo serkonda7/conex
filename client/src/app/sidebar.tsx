@@ -52,10 +52,9 @@ function NavShortcut(props: {
 }
 
 /**
- * One section row: its list link plus the add/import shortcuts. Top-level
- * rows (outside any group) show the section icon in the link.
+ * One section row: its list link plus the add/import shortcuts.
  */
-function NavItem(props: { section: Section; topLevel?: boolean }): JSX.Element {
+function NavItem(props: { section: Section }): JSX.Element {
 	const href = (): string => `/${props.section.path}`
 	const active = (): boolean => {
 		const current = routeSection(path())
@@ -73,28 +72,12 @@ function NavItem(props: { section: Section; topLevel?: boolean }): JSX.Element {
 	const label = (): string => props.section.noun(2)
 	const addHref = (): string | undefined => (props.section.add ? `${href()}/add` : undefined)
 	return (
-		<div
-			classList={{
-				'app-nav-item': true,
-				active: active(),
-				'app-nav-top': props.topLevel === true,
-			}}
-		>
+		<div classList={{ 'app-nav-item': true, active: active() }}>
 			<a
 				href={href()}
 				class={active() ? 'active' : ''}
 				aria-current={active() ? 'page' : undefined}
 			>
-				<Show when={props.topLevel === true ? props.section.icon : undefined}>
-					{(icon: () => Component<{ size?: number }>): JSX.Element => {
-						const Icon = icon()
-						return (
-							<span aria-hidden="true" class="app-nav-icon">
-								<Icon size={16} />
-							</span>
-						)
-					}}
-				</Show>
 				{label()}
 			</a>
 			<Show when={canAddInSection(props.section)}>
@@ -202,9 +185,6 @@ interface NavGroup {
 	paths: readonly string[]
 }
 
-/** Sections shown above the groups as standalone rows. */
-const NAV_TOP: readonly string[] = ['dashboard']
-
 /** Sidebar groups in display order, listing section paths. Group lists are
  * tabs of their parent page, so only the parents appear here. */
 const NAV_GROUPS: readonly NavGroup[] = [
@@ -222,7 +202,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.administration',
 		icon: IconSettings,
-		paths: ['integrations', 'users', 'roles', 'audit-log'],
+		paths: ['integrations', 'users', 'roles', 'audit-log', 'changelog'],
 	},
 ]
 
@@ -230,7 +210,6 @@ const NAV_GROUPS: readonly NavGroup[] = [
 const NAV_PARENT: Record<string, string> = {
 	'tenant-groups': 'tenants',
 	'site-groups': 'sites',
-	changelog: 'dashboard',
 }
 
 /** Sections shown in a sidebar group: routed lists with an icon. */
@@ -299,9 +278,6 @@ export function Sidebar(props: { user: SessionUser | null; onLogout: () => void 
 	return (
 		<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
 			<nav class="app-nav">
-				<For each={navSections(NAV_TOP)}>
-					{(section: Section): JSX.Element => <NavItem section={section} topLevel />}
-				</For>
 				<For each={NAV_GROUPS}>
 					{(group: NavGroup): JSX.Element => {
 						const sections = (): Section[] => navSections(group.paths)

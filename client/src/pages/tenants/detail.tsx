@@ -30,11 +30,12 @@ import { createRecord, createRowsFor } from '../../lib/resource'
 import { EmailLink } from '../employees/list'
 import { TenantIntegrationCards } from '../integrations/cards'
 import { rackHeightColumn } from '../racks/columns'
+import { TenantTickets } from '../tickets/tenant_tickets'
 
 /**
  * /tenants/:id — tenant detail: header with description/comments, the
- * integration cards, and the related employees/sites/site groups/racks/devices
- * tables.
+ * integration cards, the open tickets and the related
+ * employees/sites/site groups/racks/devices tables.
  */
 export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -117,6 +118,8 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 				<TenantIntegrationCards tenantId={props.id} />
 			</DetailShell>
+
+			<TenantTickets tenantId={props.id} />
 
 			<RelatedSection
 				id="tenant-employees"

@@ -8,7 +8,7 @@ import { providerLabel } from '../../i18n/labels'
 import { useFormState } from '../../lib/form'
 import { createRowsFor } from '../../lib/resource'
 import { parseId, queryParam, useOpenerPath } from '../../lib/router'
-import { contextTenantRows } from '../../lib/tenant_context'
+import { contextTenantRows, homePath } from '../../lib/tenant_context'
 
 /** Ticket system; TANSS is the only one so far. */
 export const TICKET_PROVIDER: IntegrationProvider = 'tanss'
@@ -76,7 +76,7 @@ export function TicketAddPage(): JSX.Element {
 		<FormPage
 			form={form}
 			title={t('ticket.createTitle', { provider: providerLabel(TICKET_PROVIDER) })}
-			cancelTo={openerPath() ?? '/dashboard'}
+			cancelTo={openerPath() ?? homePath()}
 			singleton
 			onSubmit={handleSubmit}
 		>

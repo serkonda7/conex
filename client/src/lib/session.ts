@@ -10,14 +10,16 @@ import { createSignal } from 'solid-js'
 
 const [permissions, setPermissions] = createSignal<ReadonlySet<Permission>>(new Set())
 const [scoped, setScoped] = createSignal(false)
+const [tenantId, setTenantId] = createSignal<number | null>(null)
 
 /** Records the signed-in user's permissions and tenant scope (cleared on sign-out). */
 export function setSessionAccess(next: {
 	permissions: readonly Permission[]
-	scoped: boolean
+	tenantId: number | null
 }): void {
 	setPermissions(new Set(next.permissions))
-	setScoped(next.scoped)
+	setScoped(next.tenantId !== null)
+	setTenantId(next.tenantId)
 }
 
 /** True when the user's role grants `permission`. */
@@ -28,6 +30,11 @@ export function can(permission: Permission): boolean {
 /** True when the user is limited to one tenant. */
 export function isScoped(): boolean {
 	return scoped()
+}
+
+/** Tenant a scoped user is limited to; null for global users. */
+export function sessionTenantId(): number | null {
+	return tenantId()
 }
 
 /** `permission` on shared data (catalog, tenants, tenant links): global users only. */

@@ -632,8 +632,6 @@ export const en = {
 	'auditEvent.loginFailure': 'Login failed',
 	'auditEvent.passwordChange': 'Password changed',
 	'auditEvent.passwordReset': 'Password reset',
-	'dashboard.consistency': 'Consistency checks',
-	'dashboard.findingCount': 'Count',
 	'changelog.time': 'Time',
 	'changelog.user': 'User',
 	'changelog.action': 'Action',
@@ -840,7 +838,6 @@ export const en = {
 	'ticket.modified': 'Last change',
 	'ticket.noOpenTickets': 'No open tickets.',
 	'ticket.notLinked': 'This tenant is not linked to a {provider} company.',
-	'ticket.pickTenantContext': 'Select a single tenant in the tenant context to see its tickets.',
 	'ticket.fetchedAt': 'As of {time}',
 
 	'provider.tanss': 'TANSS',
