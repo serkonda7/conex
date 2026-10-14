@@ -2167,6 +2167,118 @@ th[aria-sort="descending"] .data-table-sort::after {
 	overflow-wrap: anywhere;
 }
 
+/* Floor-plan star on a thumbnail: always shown on the marked image. */
+.attachment-item {
+	position: relative;
+}
+
+.attachment-star {
+	position: absolute;
+	top: 0.55rem;
+	right: 0.55rem;
+	display: inline-flex;
+	padding: 0.25rem;
+	color: var(--text-secondary);
+	background-color: rgba(0, 0, 0, 0.55);
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+}
+
+span.attachment-star,
+.attachment-star.marked {
+	color: #f5c518;
+}
+
+/* Floor plan: the image at fit-to-width with areas and markers on top, all
+   positioned in normalized (0..1) coordinates. */
+.floorplan-heading {
+	scroll-margin-top: calc(var(--topbar-height) + 0.75rem);
+}
+
+.floorplan-stage {
+	position: relative;
+	margin: 0.6rem 0;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	overflow: hidden;
+	background-color: var(--bg-raised);
+}
+
+.floorplan-stage > img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+.floorplan-overlay {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.floorplan-area polygon {
+	fill: rgba(116, 202, 255, 0.14);
+	stroke: var(--link);
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+	cursor: pointer;
+}
+
+.floorplan-area:hover polygon {
+	fill: rgba(116, 202, 255, 0.28);
+}
+
+.floorplan-area-label {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	max-width: 40%;
+	padding: 0.05rem 0.4rem;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	color: var(--text);
+	background-color: rgba(0, 0, 0, 0.6);
+	border-radius: 0.25rem;
+	text-decoration: none;
+}
+
+.floorplan-marker {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	display: grid;
+	place-items: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	color: var(--text);
+	background-color: var(--bg-surface);
+	border: 2px solid var(--primary);
+	border-radius: 999px;
+	box-shadow: var(--shadow);
+}
+
+.floorplan-marker-rack {
+	border-radius: 0.3rem;
+}
+
+.floorplan-marker-inactive {
+	border-style: dashed;
+	opacity: 0.75;
+}
+
+.floorplan-marker:hover,
+.floorplan-marker:focus-visible {
+	z-index: 1;
+	background-color: var(--bg-hover);
+}
+
+.floorplan-hint {
+	color: var(--text-muted);
+	font-size: var(--font-size-base);
+}
+
 /* Two-column detail layout: facts/stats left, main content right. */
 .detail-columns {
 	display: grid;

@@ -7,6 +7,10 @@
  * Browser Back/Forward step through the active tab's history. Switching
  * tabs replaces the current browser history entry instead of pushing one.
  * Tabs are saved in `sessionStorage`, so a reload brings them back.
+ *
+ * A route may end in an in-page anchor (`/sites/3#floorplan`). It is part
+ * of the tab's path, ignored by route matching, and scrolled to by the
+ * section that carries it (`useAnchorScroll`) once that has rendered.
  */
 import { Result } from 'better-result'
 import {
@@ -14,6 +18,7 @@ import {
 	createEffect,
 	createRoot,
 	createSignal,
+	onCleanup,
 	untrack,
 	useContext,
 } from 'solid-js'
@@ -78,7 +83,7 @@ function makeTab(
 }
 
 function currentUrl(): string {
-	return window.location.pathname + window.location.search
+	return window.location.pathname + window.location.search + window.location.hash
 }
 
 function initialPath(): string {
@@ -232,9 +237,22 @@ export function path(): string {
 	return activeTab()?.path ?? DEFAULT_PATH
 }
 
-/** Path segments of a route, ignoring the query string and trailing slashes. */
+/** A route without its query string and anchor. */
+function barePath(raw: string): string {
+	return raw.split(/[?#]/)[0] ?? ''
+}
+
+/** Path segments of a route, ignoring the query string, anchor and trailing slashes. */
 export function routeSegments(raw: string): string[] {
-	return (raw.split('?')[0] ?? '').split('/').filter((p) => p.length > 0)
+	return barePath(raw)
+		.split('/')
+		.filter((p) => p.length > 0)
+}
+
+/** In-page anchor of a route (`/sites/3#floorplan` → `floorplan`), or `''`. */
+export function routeAnchor(raw: string): string {
+	const at = raw.indexOf('#')
+	return at === -1 ? '' : raw.slice(at + 1)
 }
 
 /** Last path segment is add/edit/import: the route opens as a form tab. */
@@ -390,7 +408,7 @@ export function closeTabsToRight(id: number): void {
 
 /** The route shows the object at `objectPath` or one of its sub-pages. */
 function showsObject(route: string, objectPath: string): boolean {
-	const bare = route.split('?')[0] ?? ''
+	const bare = barePath(route)
 	return bare === objectPath || bare.startsWith(`${objectPath}/`)
 }
 
@@ -407,7 +425,7 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
 	for (const tab of list) {
 		const kept = tab.entries.flatMap((entry, i) => (showsObject(entry, objectPath) ? [] : [i]))
 		if (kept.length === tab.entries.length) {
-			const isList = (tab.path.split('?')[0] ?? '') === listRoute
+			const isList = barePath(tab.path) === listRoute
 			next.push(isList ? { ...tab, gen: tab.gen + 1 } : tab)
 			continue
 		}
@@ -448,7 +466,7 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
 	}
 	const closed = list.find((t) => t.id === activeId)
 	const target =
-		next.find((t) => (t.path.split('?')[0] ?? '') === listRoute) ??
+		next.find((t) => barePath(t.path) === listRoute) ??
 		next.find((t) => t.id === closed?.openerId)
 	if (target) {
 		setTabs(next)
@@ -585,6 +603,34 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Scrolls `el` into view once it has rendered when the tab's route names
+ * `anchor` (`/sites/3#floorplan`). Sections render after their data loads,
+ * so the browser's own anchor jump would come too early; this runs once
+ * per mount, i.e. once per visit of the route.
+ */
+export function useAnchorScroll(anchor: string, el: () => HTMLElement | undefined): void {
+	const forPath = useTabPath()
+	if (routeAnchor(forPath) !== anchor) {
+		return
+	}
+	let done = false
+	createEffect(() => {
+		const target = el()
+		if (done || !target || path() !== forPath) {
+			return
+		}
+		const frame = requestAnimationFrame(() => {
+			if (path() !== forPath || !target.isConnected || target.closest('[hidden]')) {
+				return
+			}
+			done = true
+			target.scrollIntoView({ block: 'start' })
+		})
+		onCleanup(() => cancelAnimationFrame(frame))
+	})
+}
+
+/**
  * Tab-local route path for data fetching. Pages keep calling `queryParam`
  * with no args; inside a tab pane it reads that tab's path instead of the
  * globally active one, so background tabs never cross-talk.
@@ -633,7 +679,7 @@ export function useFormReturnRoute(listRoute: string, id?: number): () => string
 
 /** Reads one query param from the current tab's route (e.g. `?tenant=<id>`). */
 export function queryParam(key: string, fromPath?: string): string {
-	const current = fromPath ?? useTabPath()
+	const current = (fromPath ?? useTabPath()).split('#')[0] ?? ''
 	const query = current.includes('?') ? (current.split('?')[1] ?? '') : ''
 	return new URLSearchParams(query).get(key) ?? ''
 }

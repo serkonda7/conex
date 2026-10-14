@@ -155,6 +155,8 @@ export const en = {
 	'noun.externalTenant.other': 'external companies',
 	'noun.attachment.one': 'image',
 	'noun.attachment.other': 'images',
+	'noun.floorplan.one': 'floor plan',
+	'noun.floorplan.other': 'floor plans',
 
 	// components
 	'form.slugHint':
@@ -680,6 +682,31 @@ export const en = {
 	'attachment.dimensions': '{width} × {height} px',
 	'attachment.kilobytes': '{size} KB',
 	'attachment.megabytes': '{size} MB',
+
+	// floorplan
+	'floorplan.title': 'Floor plan',
+	'floorplan.loading': 'Loading floor plan…',
+	'floorplan.image': 'Floor plan {name}',
+	'floorplan.empty': 'No areas or markers on this floor plan yet.',
+	'floorplan.badge': 'Floor plan',
+	'floorplan.mark': 'Use as floor plan',
+	'floorplan.markNamed': 'Use {name} as floor plan',
+	'floorplan.unmark': 'Stop using as floor plan',
+	'floorplan.unmarkNamed': 'Stop using {name} as floor plan',
+	'floorplan.confirmReplace':
+		'Use "{name}" as the floor plan? The current floor plan "{current}" has {areas} and {markers}, which will be deleted.',
+	'floorplan.confirmUnmark':
+		'Stop using "{name}" as the floor plan? Its {areas} and {markers} will be deleted.',
+	'floorplan.confirmReplaceHidden':
+		'Use "{name}" as the floor plan? All areas and markers on "{current}" will be deleted, including content outside your tenant scope.',
+	'floorplan.confirmUnmarkHidden':
+		'Stop using "{name}" as the floor plan? All its areas and markers will be deleted, including content outside your tenant scope.',
+	'floorplan.areaCount.one': '{count} area',
+	'floorplan.areaCount.other': '{count} areas',
+	'floorplan.markerCount.one': '{count} marker',
+	'floorplan.markerCount.other': '{count} markers',
+	'floorplan.openArea': 'Open {name}',
+	'floorplan.markerTitle': '{name} · {detail}',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',

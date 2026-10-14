@@ -1433,6 +1433,102 @@ export interface AttachmentJson {
 }
 
 // ---------------------------------------------------------------------------
+// Floor plans: areas and markers on an owner's marked attachment
+// ---------------------------------------------------------------------------
+
+/** Normalized image coordinate: 0 is the left/top edge, 1 the right/bottom one. */
+const FloorplanCoordSchema = v.pipe(
+	v.number('Coordinate must be a number'),
+	v.minValue(0, 'Coordinate must be between 0 and 1'),
+	v.maxValue(1, 'Coordinate must be between 0 and 1'),
+)
+
+/** `[x, y]` pair of normalized coordinates. */
+export type FloorplanPoint = [number, number]
+
+/** Area linking to one site or location: a polygon of at least three points. */
+const FloorplanAreaInputSchema = v.pipe(
+	v.strictObject({
+		site_id: v.optional(IdSchema, undefined),
+		location_id: v.optional(IdSchema, undefined),
+		/** Shown instead of the target's name; empty or missing shows the name. */
+		label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+		points: v.pipe(
+			v.array(v.tuple([FloorplanCoordSchema, FloorplanCoordSchema])),
+			v.minLength(3, 'An area needs at least 3 points'),
+			v.maxLength(100, 'An area has at most 100 points'),
+		),
+	}),
+	v.check(
+		(area) => hasOneOwner(area.site_id, area.location_id),
+		'Exactly one of site or location is required as the area target',
+	),
+)
+
+/** Rack or device marker at a normalized position. */
+const FloorplanPlacementInputSchema = v.pipe(
+	v.strictObject({
+		rack_id: v.optional(IdSchema, undefined),
+		device_id: v.optional(IdSchema, undefined),
+		x: FloorplanCoordSchema,
+		y: FloorplanCoordSchema,
+	}),
+	v.check(
+		(placement) => (placement.rack_id === undefined) !== (placement.device_id === undefined),
+		'Exactly one of rack or device is required',
+	),
+)
+
+/** `PUT /attachments/:id/plan`: the full set of areas and placements, replaced atomically. */
+export const FloorplanPutSchema = v.strictObject({
+	areas: v.pipe(v.array(FloorplanAreaInputSchema), v.maxLength(500)),
+	placements: v.pipe(v.array(FloorplanPlacementInputSchema), v.maxLength(2000)),
+})
+
+export type FloorplanPut = v.InferOutput<typeof FloorplanPutSchema>
+
+/** Area on the wire, with its target resolved for display and linking. */
+export interface FloorplanAreaJson {
+	id: number
+	/** Target: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	/** Custom label; `null` shows `target_name`. */
+	label: string | null
+	points: FloorplanPoint[]
+	target_name: string
+	/** Location type of a location target; `null` for a site. */
+	target_type: LocationType | null
+}
+
+/** Marker on the wire, with its rack or device resolved for display. */
+export interface FloorplanPlacementJson {
+	id: number
+	/** Exactly one of `rack_id` / `device_id` is set. */
+	rack_id: number | null
+	device_id: number | null
+	x: number
+	y: number
+	name: string
+	/** Device status; `null` for a rack. */
+	status: string | null
+	/** Icon of the device's role; `null` for a rack or a role without one. */
+	role_icon: DeviceRoleIcon | null
+}
+
+/**
+ * `GET /attachments/:id/plan`. Areas and placements whose target or object
+ * lies outside the requester's tenant scope are left out.
+ */
+export interface FloorplanJson {
+	attachment_id: number
+	areas: FloorplanAreaJson[]
+	placements: FloorplanPlacementJson[]
+	/** Warn before clearing a plan even when some content is outside the scope. */
+	has_hidden_content: boolean
+}
+
+// ---------------------------------------------------------------------------
 // Changelog (NetBox-style object change history, read-only)
 // ---------------------------------------------------------------------------
 

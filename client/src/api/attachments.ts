@@ -1,15 +1,22 @@
 /**
- * Attachments API wrappers: image list, multipart upload / replace, edit
- * and delete over the hono RPC client. Errors surface as `Result.err` with
- * the server's `{ error }` message. Images load straight from
- * `attachment_file_url` (same-origin, the session cookie authorizes them).
+ * Attachments API wrappers: image list, multipart upload / replace, edit,
+ * delete and the floor plan of the marked image over the hono RPC client.
+ * Errors surface as `Result.err` with the server's `{ error }` message.
+ * Images load straight from `attachment_file_url` (same-origin, the session
+ * cookie authorizes them).
  */
 import type { Result } from 'better-result'
-import type { AttachmentJson, AttachmentUpdate } from 'shared/src/types'
+import type {
+	AttachmentJson,
+	AttachmentUpdate,
+	FloorplanAreaJson,
+	FloorplanJson,
+	FloorplanPlacementJson,
+} from 'shared/src/types'
 import { t } from '../i18n'
 import { by_id, client, failed, to_query, to_result } from './client'
 
-export type { AttachmentJson }
+export type { AttachmentJson, FloorplanAreaJson, FloorplanJson, FloorplanPlacementJson }
 
 /** Owner of an attachment: exactly one of the two ids. */
 export type AttachmentOwner = { site_id: number } | { location_id: number }
@@ -63,6 +70,12 @@ export async function replace_attachment_file(
 export async function delete_attachment(id: number): Promise<Result<unknown, Error>> {
 	const res = await client.attachments[':id'].$delete(by_id(id))
 	return to_result<unknown>(res, failed.delete('noun.attachment'))
+}
+
+/** Areas and markers of a floor plan, limited to the requester's tenant scope. */
+export async function fetch_floorplan(id: number): Promise<Result<FloorplanJson, Error>> {
+	const res = await client.attachments[':id'].plan.$get(by_id(id))
+	return to_result<FloorplanJson>(res, failed.load('noun.floorplan'))
 }
 
 /** Image URL; the storage key changes with every file, so a replace busts the cache. */

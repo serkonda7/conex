@@ -1,25 +1,36 @@
 /**
  * Image attachments of a site or location: a thumbnail grid (CSS-scaled
  * originals) with upload by button or drop, and a lightbox per image to
- * edit its description, replace the file or delete it. Type and size are
- * checked here before uploading; the server checks them again from the
- * bytes.
+ * edit its description, mark it as the floor plan, replace the file or
+ * delete it. Type and size are checked here before uploading; the server
+ * checks them again from the bytes. The page loads the images once
+ * (`createOwnerImages`) and shares them with its `FloorplanSection`.
  */
-import { IconPencil, IconReplace, IconTrash, IconUpload } from '@tabler/icons-solidjs'
+import {
+	IconPencil,
+	IconReplace,
+	IconStar,
+	IconStarFilled,
+	IconTrash,
+	IconUpload,
+} from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIMES } from 'shared/src/schemas'
-import { createSignal, For, type JSX, Show } from 'solid-js'
+import { createSignal, For, type JSX, type Resource, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
 	type AttachmentOwner,
 	attachment_file_url,
 	delete_attachment,
 	fetch_attachments,
+	fetch_floorplan,
 	replace_attachment_file,
 	update_attachment,
 	upload_attachment,
 } from '../api/attachments'
 import { locale, t, tp } from '../i18n'
-import { createRowsFor, useAction } from '../lib/resource'
+import { createRowsFor, type ErrorSink, useAction } from '../lib/resource'
 import { can } from '../lib/session'
 import { Empty, InlineError, Loading } from './feedback'
 import { TextAreaField } from './form'
@@ -58,9 +69,106 @@ function pickFiles(multiple: boolean, onPick: (files: File[]) => void): void {
 	input.click()
 }
 
-/** Lightbox: the full image, its facts, and the edit / replace / delete actions. */
+/** The images of one owner, shared by its floor-plan and images sections. */
+export interface OwnerImages {
+	owner: AttachmentOwner
+	rows: Resource<AttachmentJson[]>
+	refetch: () => void
+	/** The image marked as the floor plan, if any. */
+	floorplan: () => AttachmentJson | undefined
+}
+
+/** Loads the images of `owner`; a failed fetch reports to `onError`. */
+export function createOwnerImages(owner: AttachmentOwner, onError?: ErrorSink): OwnerImages {
+	const [rows, { refetch }] = createRowsFor(() => owner, fetch_attachments, onError)
+	return {
+		owner,
+		rows,
+		refetch: () => void refetch(),
+		floorplan: () => rows()?.find((row) => row.is_floorplan),
+	}
+}
+
+/**
+ * Asks before a mark change discards floor-plan content: marking `row`
+ * clears the current floor plan, unmarking clears `row` itself. Only
+ * plans with areas or markers ask. True to go on.
+ */
+async function confirmMarkChange(
+	row: AttachmentJson,
+	current: AttachmentJson | undefined,
+): Promise<Result<boolean, Error>> {
+	const cleared = row.is_floorplan ? row : current
+	if (!cleared) {
+		return Result.ok(true)
+	}
+	const plan = await fetch_floorplan(cleared.id)
+	if (Result.isError(plan)) {
+		return plan
+	}
+	const { areas, placements } = plan.value
+	if (plan.value.has_hidden_content) {
+		return Result.ok(
+			window.confirm(
+				row.is_floorplan
+					? t('floorplan.confirmUnmarkHidden', { name: row.filename })
+					: t('floorplan.confirmReplaceHidden', {
+							name: row.filename,
+							current: cleared.filename,
+						}),
+			),
+		)
+	}
+	if (areas.length === 0 && placements.length === 0) {
+		return Result.ok(true)
+	}
+	const counts = {
+		name: row.filename,
+		areas: tp('floorplan.areaCount', areas.length),
+		markers: tp('floorplan.markerCount', placements.length),
+	}
+	return Result.ok(
+		window.confirm(
+			row.is_floorplan
+				? t('floorplan.confirmUnmark', counts)
+				: t('floorplan.confirmReplace', { ...counts, current: cleared.filename }),
+		),
+	)
+}
+
+/** Toggles the floor-plan mark of `row` after `confirmMarkChange`; true when changed. */
+async function toggleFloorplan(
+	row: AttachmentJson,
+	current: AttachmentJson | undefined,
+	action: ReturnType<typeof useAction>,
+): Promise<boolean> {
+	if (action.pending()) {
+		return false
+	}
+	let changed = false
+	const ok = await action.run(async () => {
+		const confirmed = await confirmMarkChange(row, current)
+		if (Result.isError(confirmed)) {
+			return confirmed
+		}
+		if (!confirmed.value) {
+			return Result.ok(undefined)
+		}
+		const updated = await update_attachment(row.id, { is_floorplan: !row.is_floorplan })
+		changed = Result.isOk(updated)
+		return updated
+	})
+	return ok && changed
+}
+
+/**
+ * Lightbox: the full image, its facts, and the edit / floor-plan /
+ * replace / delete actions.
+ */
 function AttachmentLightbox(props: {
 	attachment: AttachmentJson
+	/** The owner's current floor plan, for the mark confirmation. */
+	floorplan: AttachmentJson | undefined
 	on_changed: () => void
 	on_deleted: () => void
 	on_close: () => void
@@ -83,6 +191,12 @@ function AttachmentLightbox(props: {
 		)
 		if (ok) {
 			setEditing(false)
+			props.on_changed()
+		}
+	}
+
+	async function toggleMark(): Promise<void> {
+		if (await toggleFloorplan(props.attachment, props.floorplan, action)) {
 			props.on_changed()
 		}
 	}
@@ -170,6 +284,15 @@ function AttachmentLightbox(props: {
 								{t('attachment.editDescription')}
 							</IconLabel>
 						</button>
+						<button type="button" disabled={action.pending()} onClick={toggleMark}>
+							<IconLabel
+								icon={props.attachment.is_floorplan ? IconStarFilled : IconStar}
+							>
+								{props.attachment.is_floorplan
+									? t('floorplan.unmark')
+									: t('floorplan.mark')}
+							</IconLabel>
+						</button>
 						<button type="button" disabled={action.pending()} onClick={replace}>
 							<IconLabel icon={IconReplace}>{t('attachment.replace')}</IconLabel>
 						</button>
@@ -194,14 +317,16 @@ function AttachmentLightbox(props: {
 /**
  * "Images" section of a site or location detail page. `id` is the heading
  * anchor. Editors upload through the button or by dropping files onto the
- * grid.
+ * grid, and mark the floor plan with the star on its thumbnail.
  */
-export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }): JSX.Element {
+export function AttachmentsSection(props: { id: string; images: OwnerImages }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [rows, { refetch }] = createRowsFor(() => props.owner, fetch_attachments, setError)
+	const rows = props.images.rows
+	const refetch = props.images.refetch
 	const [openId, setOpenId] = createSignal<number | null>(null)
 	const [dragging, setDragging] = createSignal(false)
 	const upload = useAction(setError)
+	const mark = useAction(setError)
 	const open = (): AttachmentJson | undefined => rows()?.find((row) => row.id === openId())
 
 	/** Uploads the valid files one by one; the first rejected file is reported. */
@@ -209,7 +334,7 @@ export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }
 		const invalid = files.map(checkFile).find((message) => message !== null)
 		const valid = files.filter((file) => checkFile(file) === null)
 		for (const file of valid) {
-			if (!(await upload.run(() => upload_attachment(props.owner, file)))) {
+			if (!(await upload.run(() => upload_attachment(props.images.owner, file)))) {
 				break
 			}
 		}
@@ -217,7 +342,7 @@ export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }
 			setError(invalid)
 		}
 		if (valid.length > 0) {
-			await refetch()
+			refetch()
 		}
 	}
 
@@ -247,9 +372,15 @@ export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }
 		void uploadFiles([...(e.dataTransfer?.files ?? [])])
 	}
 
-	async function afterDelete(): Promise<void> {
+	function afterDelete(): void {
 		setOpenId(null)
-		await refetch()
+		refetch()
+	}
+
+	async function toggleMark(row: AttachmentJson): Promise<void> {
+		if (await toggleFloorplan(row, props.images.floorplan(), mark)) {
+			refetch()
+		}
 	}
 
 	return (
@@ -297,7 +428,7 @@ export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }
 						<ul class="attachment-grid">
 							<For each={rows()}>
 								{(row: AttachmentJson) => (
-									<li>
+									<li class="attachment-item">
 										<button
 											type="button"
 											class="attachment-thumb"
@@ -315,6 +446,49 @@ export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }
 												{row.description || row.filename}
 											</span>
 										</button>
+										<Show
+											when={can('edit')}
+											fallback={
+												<Show when={row.is_floorplan}>
+													<span
+														class="attachment-star"
+														title={t('floorplan.badge')}
+													>
+														<IconStarFilled size={16} />
+														<span class="visually-hidden">
+															{t('floorplan.badge')}
+														</span>
+													</span>
+												</Show>
+											}
+										>
+											<button
+												type="button"
+												class="attachment-star"
+												classList={{ marked: row.is_floorplan }}
+												disabled={mark.pending()}
+												aria-pressed={row.is_floorplan}
+												title={
+													row.is_floorplan
+														? t('floorplan.unmark')
+														: t('floorplan.mark')
+												}
+												aria-label={t(
+													row.is_floorplan
+														? 'floorplan.unmarkNamed'
+														: 'floorplan.markNamed',
+													{ name: row.filename },
+												)}
+												onClick={() => void toggleMark(row)}
+											>
+												<Dynamic
+													component={
+														row.is_floorplan ? IconStarFilled : IconStar
+													}
+													size={16}
+												/>
+											</button>
+										</Show>
 									</li>
 								)}
 							</For>
@@ -330,8 +504,9 @@ export function AttachmentsSection(props: { id: string; owner: AttachmentOwner }
 				{(attachment: () => AttachmentJson) => (
 					<AttachmentLightbox
 						attachment={attachment()}
-						on_changed={() => void refetch()}
-						on_deleted={() => void afterDelete()}
+						floorplan={props.images.floorplan()}
+						on_changed={refetch}
+						on_deleted={afterDelete}
 						on_close={() => setOpenId(null)}
 					/>
 				)}

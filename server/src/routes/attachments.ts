@@ -10,13 +10,14 @@ import {
 	AttachmentUpdateSchema,
 	EntityParamsSchema,
 } from 'shared/src/schemas'
-import { checkTenant, requestUser } from '../authz'
+import { checkTenant, requestScope, requestUser } from '../authz'
 import {
 	type AttachmentRow,
 	type AttachmentUpload,
 	createAttachment,
 	deleteAttachment,
 	getAttachmentRow,
+	getPlan,
 	listAttachments,
 	replaceAttachmentFile,
 	updateAttachment,
@@ -55,7 +56,8 @@ async function uploadOf(file: File): Promise<AttachmentUpload> {
  * Image attachments of sites and locations. Wired by hand (not
  * `makeTenantApp`) for the multipart and binary endpoints. Tenant scope
  * comes from the owning site or location; the files are served only after
- * that check.
+ * that check. The floor plan of a marked attachment is further filtered to
+ * the requester's scope by the service.
  */
 export const attachmentsApp = new Hono()
 	.use(authMiddleware)
@@ -132,6 +134,14 @@ export const attachmentsApp = new Hono()
 			return sendResult(c, await deleteAttachment(id))
 		},
 	)
+	.get('/:id/plan', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const id = c.req.valid('param').id
+		const row = await loadAttachment(c, id)
+		if (row instanceof Response) {
+			return row
+		}
+		return sendResult(c, await getPlan(id, requestScope(c)))
+	})
 	.get('/:id/file', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
 		const row = await loadAttachment(c, c.req.valid('param').id)
 		if (row instanceof Response) {

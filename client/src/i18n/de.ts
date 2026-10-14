@@ -157,6 +157,8 @@ export const de: Messages = {
 	'noun.externalTenant.other': 'externe Firmen',
 	'noun.attachment.one': 'Bild',
 	'noun.attachment.other': 'Bilder',
+	'noun.floorplan.one': 'Grundriss',
+	'noun.floorplan.other': 'Grundrisse',
 
 	// components
 	'form.slugHint':
@@ -688,6 +690,31 @@ export const de: Messages = {
 	'attachment.dimensions': '{width} × {height} px',
 	'attachment.kilobytes': '{size} KB',
 	'attachment.megabytes': '{size} MB',
+
+	// floorplan
+	'floorplan.title': 'Grundriss',
+	'floorplan.loading': 'Grundriss wird geladen…',
+	'floorplan.image': 'Grundriss {name}',
+	'floorplan.empty': 'Dieser Grundriss hat noch keine Bereiche oder Markierungen.',
+	'floorplan.badge': 'Grundriss',
+	'floorplan.mark': 'Als Grundriss verwenden',
+	'floorplan.markNamed': '{name} als Grundriss verwenden',
+	'floorplan.unmark': 'Nicht mehr als Grundriss verwenden',
+	'floorplan.unmarkNamed': '{name} nicht mehr als Grundriss verwenden',
+	'floorplan.confirmReplace':
+		'„{name}“ als Grundriss verwenden? Der bisherige Grundriss „{current}“ enthält {areas} und {markers}, die dabei gelöscht werden.',
+	'floorplan.confirmUnmark':
+		'„{name}“ nicht mehr als Grundriss verwenden? Seine {areas} und {markers} werden gelöscht.',
+	'floorplan.confirmReplaceHidden':
+		'„{name}“ als Grundriss verwenden? Alle Bereiche und Markierungen auf „{current}“ werden gelöscht, einschließlich der Inhalte außerhalb deiner Firma.',
+	'floorplan.confirmUnmarkHidden':
+		'„{name}“ nicht mehr als Grundriss verwenden? Alle seine Bereiche und Markierungen werden gelöscht, einschließlich der Inhalte außerhalb deiner Firma.',
+	'floorplan.areaCount.one': '{count} Bereich',
+	'floorplan.areaCount.other': '{count} Bereiche',
+	'floorplan.markerCount.one': '{count} Markierung',
+	'floorplan.markerCount.other': '{count} Markierungen',
+	'floorplan.openArea': '{name} öffnen',
+	'floorplan.markerTitle': '{name} · {detail}',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',

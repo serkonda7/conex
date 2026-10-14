@@ -6,9 +6,23 @@
  * crash leaves at worst an orphan file, which the startup sweep removes.
  */
 import { Result } from 'better-result'
-import { and, asc, eq, ne, type SQL, sql } from 'drizzle-orm'
-import type { AttachmentJson, AttachmentMime, AttachmentUpdate } from 'shared/src/schemas'
-import { attachments, locations, sites } from '../schema'
+import { and, asc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm'
+import type {
+	AttachmentJson,
+	AttachmentMime,
+	AttachmentUpdate,
+	FloorplanJson,
+} from 'shared/src/schemas'
+import {
+	attachments,
+	device_roles,
+	devices,
+	floorplan_areas,
+	floorplan_placements,
+	locations,
+	racks,
+	sites,
+} from '../schema'
 import {
 	attachmentFileName,
 	listAttachmentFiles,
@@ -20,6 +34,7 @@ import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
+import { NotFoundError } from './errors'
 import { checkExists, findById, insertedId, isPatchEmpty, pickDefined, tryWrite } from './list'
 
 export type AttachmentRow = typeof attachments.$inferSelect
@@ -199,8 +214,25 @@ export async function replaceAttachmentFile(
 }
 
 /**
- * Updates the description and the floor-plan mark. Marking unmarks the
- * owner's previous floor plan in the same transaction.
+ * Clears the areas and placements of the given attachments. Runs on the
+ * caller's `getDb()` (its transaction).
+ */
+async function clearPlans(ids: number[]): Promise<void> {
+	if (ids.length === 0) {
+		return
+	}
+	await getDb().delete(floorplan_areas).where(inArray(floorplan_areas.attachment_id, ids))
+	await getDb()
+		.delete(floorplan_placements)
+		.where(inArray(floorplan_placements.attachment_id, ids))
+}
+
+/**
+ * Updates the description and the floor-plan mark. Areas and placements
+ * exist only on the marked attachment, so in one transaction marking
+ * unmarks the owner's previous floor plan and clears its plan, and
+ * unmarking clears this attachment's plan. The client confirms that loss
+ * beforehand.
  */
 export async function updateAttachment(
 	id: number,
@@ -210,40 +242,158 @@ export async function updateAttachment(
 	if (Result.isError(current)) {
 		return current
 	}
-	const row = current.value
 	const patch: Partial<AttachmentRow> = pickDefined(input, ['description'])
 	if (input.is_floorplan !== undefined) {
 		patch.is_floorplan = input.is_floorplan ? 1 : 0
 	}
-	if (!isPatchEmpty(patch)) {
-		const owner: AttachmentOwner = {
-			site_id: row.site_id ?? undefined,
-			location_id: row.location_id ?? undefined,
-		}
-		const written = await tryWrite(
-			() =>
-				withTransaction(async () => {
-					if (input.is_floorplan === true && row.is_floorplan === 0) {
-						await getDb()
-							.update(attachments)
-							.set({ is_floorplan: 0 })
-							.where(
-								and(
-									ownerCondition(owner),
-									ne(attachments.id, id),
-									eq(attachments.is_floorplan, 1),
-								),
-							)
-					}
-					await getDb().update(attachments).set(patch).where(eq(attachments.id, id))
-				}),
-			FLOORPLAN_TAKEN,
-		)
-		if (Result.isError(written)) {
-			return written
-		}
+	if (isPatchEmpty(patch)) {
+		return Result.ok(toJson(current.value))
 	}
-	return await logUpdate('attachment', toJson(row), await getAttachment(id))
+	const owner: AttachmentOwner = {
+		site_id: current.value.site_id ?? undefined,
+		location_id: current.value.location_id ?? undefined,
+	}
+	const written = await tryWrite(
+		() =>
+			withTransaction(async (): Promise<Result<AttachmentJson, Error>> => {
+				// Serialize mark changes per owner, including when there is no
+				// marked attachment yet. Re-read only after acquiring the lock.
+				if (owner.site_id !== undefined) {
+					await getDb()
+						.select({ id: sites.id })
+						.from(sites)
+						.where(eq(sites.id, owner.site_id))
+						.for('update')
+				} else if (owner.location_id !== undefined) {
+					await getDb()
+						.select({ id: locations.id })
+						.from(locations)
+						.where(eq(locations.id, owner.location_id))
+						.for('update')
+				}
+				const [row] = await getDb()
+					.select()
+					.from(attachments)
+					.where(eq(attachments.id, id))
+					.for('update')
+				if (!row) {
+					return Result.err(new NotFoundError(NOT_FOUND))
+				}
+				if (input.is_floorplan === true) {
+					const unmarked = await getDb()
+						.update(attachments)
+						.set({ is_floorplan: 0 })
+						.where(
+							and(
+								ownerCondition(owner),
+								ne(attachments.id, id),
+								eq(attachments.is_floorplan, 1),
+							),
+						)
+						.returning()
+					await clearPlans(unmarked.map((other) => other.id))
+					for (const other of unmarked) {
+						await logUpdate(
+							'attachment',
+							toJson({ ...other, is_floorplan: 1 }),
+							Result.ok(toJson(other)),
+						)
+					}
+				}
+				if (input.is_floorplan === false) {
+					await clearPlans([id])
+				}
+				const [updated] = await getDb()
+					.update(attachments)
+					.set(patch)
+					.where(eq(attachments.id, id))
+					.returning()
+				return updated
+					? logUpdate('attachment', toJson(row), Result.ok(toJson(updated)))
+					: Result.err(new NotFoundError(NOT_FOUND))
+			}),
+		FLOORPLAN_TAKEN,
+	)
+	return Result.isError(written) ? written : written.value
+}
+
+/**
+ * Areas and placements of an attachment with their targets and objects
+ * resolved. `scopeTenantId` (a scoped requester) leaves out areas whose
+ * target and placements whose rack or device belong to another tenant.
+ * An unmarked attachment has an empty plan.
+ */
+export async function getPlan(
+	id: number,
+	scopeTenantId?: number,
+): Promise<Result<FloorplanJson, Error>> {
+	const found = await getAttachmentRow(id)
+	if (Result.isError(found)) {
+		return found
+	}
+	if (found.value.is_floorplan === 0) {
+		return Result.ok({
+			attachment_id: id,
+			areas: [],
+			placements: [],
+			has_hidden_content: false,
+		})
+	}
+	const areaTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
+	const areas = await getDb()
+		.select({
+			id: floorplan_areas.id,
+			site_id: floorplan_areas.site_id,
+			location_id: floorplan_areas.location_id,
+			label: floorplan_areas.label,
+			points: floorplan_areas.points,
+			target_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
+			target_type: locations.type,
+		})
+		.from(floorplan_areas)
+		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
+		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.where(
+			and(
+				eq(floorplan_areas.attachment_id, id),
+				scopeTenantId === undefined ? undefined : eq(areaTenant, scopeTenantId),
+			),
+		)
+		.orderBy(asc(floorplan_areas.id))
+	const placementTenant = sql<number | null>`coalesce(${racks.tenant_id}, ${devices.tenant_id})`
+	const placements = await getDb()
+		.select({
+			id: floorplan_placements.id,
+			rack_id: floorplan_placements.rack_id,
+			device_id: floorplan_placements.device_id,
+			x: floorplan_placements.x,
+			y: floorplan_placements.y,
+			name: sql<string>`coalesce(${racks.name}, ${devices.name})`,
+			status: devices.status,
+			role_icon: device_roles.icon,
+		})
+		.from(floorplan_placements)
+		.leftJoin(racks, eq(racks.id, floorplan_placements.rack_id))
+		.leftJoin(devices, eq(devices.id, floorplan_placements.device_id))
+		.leftJoin(device_roles, eq(device_roles.id, devices.device_role_id))
+		.where(
+			and(
+				eq(floorplan_placements.attachment_id, id),
+				scopeTenantId === undefined ? undefined : eq(placementTenant, scopeTenantId),
+			),
+		)
+		.orderBy(asc(floorplan_placements.id))
+	// A scoped editor must still be warned before a mark change clears
+	// hidden content. Reveal only its existence, never its targets or counts.
+	const hasHiddenContent =
+		scopeTenantId !== undefined &&
+		((await getDb().$count(floorplan_areas, eq(floorplan_areas.attachment_id, id))) >
+			areas.length ||
+			(await getDb().$count(
+				floorplan_placements,
+				eq(floorplan_placements.attachment_id, id),
+			)) > placements.length)
+	return Result.ok({ attachment_id: id, areas, placements, has_hidden_content: hasHiddenContent })
 }
 
 export async function deleteAttachment(id: number): Promise<Result<AttachmentJson, Error>> {

@@ -9,7 +9,7 @@ import {
 	fetch_tenant,
 	type LocationRow,
 } from '../../api/tenancy'
-import { AttachmentsSection } from '../../components/attachments'
+import { AttachmentsSection, createOwnerImages } from '../../components/attachments'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -21,6 +21,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { FloorplanSection } from '../../components/floorplan'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
@@ -61,6 +62,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_devices({ site: key }),
 		setError,
 	)
+
+	const images = createOwnerImages({ location_id: props.id }, setError)
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.location',
@@ -114,6 +117,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 			</DetailShell>
 
+			<FloorplanSection id="floorplan" attachment={images.floorplan()} />
+
 			<RelatedSection
 				id="location-children"
 				title={t('location.children')}
@@ -152,7 +157,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
 			/>
 
-			<AttachmentsSection id="location-attachments" owner={{ location_id: props.id }} />
+			<AttachmentsSection id="location-attachments" images={images} />
 
 			<InlineError message={error()} />
 		</div>

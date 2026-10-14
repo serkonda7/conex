@@ -9,7 +9,7 @@ import {
 	fetch_tenant,
 	type LocationRow,
 } from '../../api/tenancy'
-import { AttachmentsSection } from '../../components/attachments'
+import { AttachmentsSection, createOwnerImages } from '../../components/attachments'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -21,6 +21,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { FloorplanSection } from '../../components/floorplan'
 import { IconLabel } from '../../components/icon_label'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
@@ -89,6 +90,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 	const tree = createMemo(() => treeOrder(locations() ?? []))
 	const depthOf = createMemo(() => new Map(tree().map((entry) => [entry.row.id, entry.depth])))
 
+	const images = createOwnerImages({ site_id: props.id }, setError)
+
 	const handleDelete = useDetailDelete({
 		noun: 'noun.site',
 		name: () => site()?.name,
@@ -146,6 +149,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 			</DetailShell>
 
+			<FloorplanSection id="floorplan" attachment={images.floorplan()} />
+
 			<RelatedSection
 				id="site-locations"
 				title={tp('entity.location', 2)}
@@ -192,7 +197,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
 			/>
 
-			<AttachmentsSection id="site-attachments" owner={{ site_id: props.id }} />
+			<AttachmentsSection id="site-attachments" images={images} />
 
 			<InlineError message={error()} />
 		</div>
