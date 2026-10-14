@@ -1,6 +1,5 @@
 /** Glyphs for API enum values (location types, device role icons). */
 import {
-	IconAccessPoint,
 	IconBatteryCharging,
 	IconCloud,
 	IconCube,
@@ -9,8 +8,7 @@ import {
 	IconDeviceDesktop,
 	IconDeviceLaptop,
 	IconDeviceMobile,
-	IconDeviceTablet,
-	IconDeviceTv,
+	IconDevices2,
 	IconDoor,
 	IconMapPin,
 	IconPhone,
@@ -21,6 +19,7 @@ import {
 	IconShieldLock,
 	IconSitemap,
 	IconStack2,
+	IconWifi,
 } from '@tabler/icons-solidjs'
 import type { DeviceRoleIcon, LocationType } from 'shared/src/schemas'
 import type { Component } from 'solid-js'
@@ -39,19 +38,18 @@ export function locationTypeIcon(value: string): IconComponent {
 }
 
 const DEVICE_ROLE_ICONS: Record<DeviceRoleIcon, IconComponent> = {
-	desktop: IconDeviceDesktop,
+	desktop: IconDevices2,
 	laptop: IconDeviceLaptop,
 	server: IconServer,
 	switch: IconSitemap,
 	router: IconRouter,
 	firewall: IconShieldLock,
-	'access-point': IconAccessPoint,
+	'access-point': IconWifi,
 	storage: IconDatabase,
 	printer: IconPrinter,
 	phone: IconPhone,
 	mobile: IconDeviceMobile,
-	tablet: IconDeviceTablet,
-	display: IconDeviceTv,
+	display: IconDeviceDesktop,
 	camera: IconDeviceCctv,
 	ups: IconBatteryCharging,
 	'patch-panel': IconPlugConnected,

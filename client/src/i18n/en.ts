@@ -462,7 +462,6 @@ export const en = {
 	'deviceRoleIcon.printer': 'Printer',
 	'deviceRoleIcon.phone': 'Phone',
 	'deviceRoleIcon.mobile': 'Mobile',
-	'deviceRoleIcon.tablet': 'Tablet',
 	'deviceRoleIcon.display': 'Display',
 	'deviceRoleIcon.camera': 'Camera',
 	'deviceRoleIcon.ups': 'UPS',

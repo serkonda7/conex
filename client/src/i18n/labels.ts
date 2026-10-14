@@ -254,7 +254,6 @@ const DEVICE_ROLE_ICON_KEYS: Record<DeviceRoleIcon, MessageKey> = {
 	printer: 'deviceRoleIcon.printer',
 	phone: 'deviceRoleIcon.phone',
 	mobile: 'deviceRoleIcon.mobile',
-	tablet: 'deviceRoleIcon.tablet',
 	display: 'deviceRoleIcon.display',
 	camera: 'deviceRoleIcon.camera',
 	ups: 'deviceRoleIcon.ups',

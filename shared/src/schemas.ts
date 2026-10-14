@@ -833,7 +833,6 @@ export const DEVICE_ROLE_ICONS = [
 	'printer',
 	'phone',
 	'mobile',
-	'tablet',
 	'display',
 	'camera',
 	'ups',

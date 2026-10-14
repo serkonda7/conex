@@ -466,7 +466,6 @@ export const de: Messages = {
 	'deviceRoleIcon.printer': 'Drucker',
 	'deviceRoleIcon.phone': 'Telefon',
 	'deviceRoleIcon.mobile': 'Mobilgerät',
-	'deviceRoleIcon.tablet': 'Tablet',
 	'deviceRoleIcon.display': 'Bildschirm',
 	'deviceRoleIcon.camera': 'Kamera',
 	'deviceRoleIcon.ups': 'USV',
