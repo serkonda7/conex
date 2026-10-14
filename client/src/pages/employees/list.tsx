@@ -113,7 +113,6 @@ export function EmployeesPage(): JSX.Element {
 			title={tp('entity.employee', 2)}
 			// The filtered tenant is preselected in the add form.
 			addHref={filterTenant() ? `/employees/add?tenant=${filterTenant()}` : '/employees/add'}
-			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="employees"

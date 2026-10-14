@@ -9,7 +9,7 @@ import {
 import type { DataTableColumn } from '../../components/data_table'
 import {
 	EntityListPage,
-	FilterSelect,
+	idOptions,
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
@@ -81,17 +81,15 @@ export function RackTypesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.rackType', 2)}
 			addHref="/rack-types/add"
-			searchPlaceholder={t('common.quickSearch')}
-			filters={
-				<FilterSelect
-					label={t('deviceType.filterByManufacturer')}
-					allLabel={t('deviceType.allManufacturers')}
-					value={filterManufacturer()}
-					onChange={setFilterManufacturer}
-					rows={manufacturers() ?? []}
-				/>
-			}
-			filtered={filterManufacturer() !== ''}
+			filters={[
+				{
+					key: 'manufacturer',
+					label: tp('entity.manufacturer', 1),
+					options: idOptions(manufacturers()),
+					value: filterManufacturer,
+					onChange: setFilterManufacturer,
+				},
+			]}
 			columns={columns}
 			columnsKey="rack-types"
 			rowName={(dt: DeviceTypeListRow): string => dt.model}

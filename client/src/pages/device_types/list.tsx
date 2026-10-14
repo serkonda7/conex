@@ -104,7 +104,6 @@ export function DeviceTypesPage(): JSX.Element {
 					{t('deviceType.import')}
 				</button>
 			}
-			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterManufacturer() !== ''}
 			columns={columns}
 			columnsKey="device-types"

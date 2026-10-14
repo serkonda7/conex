@@ -1,10 +1,10 @@
 import { Result } from 'better-result'
 import type { AuditEvent } from 'shared/src/schemas'
-import { createResource, createSignal, For, type JSX, Show } from 'solid-js'
+import { createResource, createSignal, type JSX, Show } from 'solid-js'
 import { type AuditLogEntryJson, fetch_audit_log } from '../../api/audit_log'
-import { DataTable, type DataTableColumn } from '../../components/data_table'
+import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListRangeStatus, ListSearchField, useDebouncedSearch } from '../../components/list_page'
+import { ListRangeStatus, useDebouncedSearch, useListFilters } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { formatTime } from '../../lib/time'
@@ -25,6 +25,21 @@ export function AuditLogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 	const [event, setEvent] = createSignal<AuditEvent | ''>('')
+	const filters = useListFilters<AuditLogEntryJson>({
+		search,
+		setSearch,
+		filters: () => [
+			{
+				key: 'event',
+				label: t('audit.event'),
+				options: auditEventOptions(),
+				value: event,
+				onChange: (value: string): void => {
+					setEvent(value as AuditEvent | '')
+				},
+			},
+		],
+	})
 
 	const [entries] = createResource(
 		() => ({ search: debouncedSearch(), event: event() }),
@@ -102,34 +117,13 @@ export function AuditLogPage(): JSX.Element {
 				<h2>{tp('entity.auditLog', 1)}</h2>
 			</div>
 
-			<div class="toolbar-row">
-				<ListSearchField
-					label={t('list.searchLabel', { noun: tp('noun.auditEntry', 2) })}
-					placeholder={t('common.quickSearch')}
-					value={search()}
-					onInput={setSearch}
-				/>
-				<label>
-					<span class="visually-hidden">{t('audit.filterByEvent')}</span>
-					<select
-						aria-label={t('audit.filterByEvent')}
-						value={event()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
-							setEvent(e.currentTarget.value as AuditEvent | '')
-						}}
-					>
-						<option value="">{t('audit.allEvents')}</option>
-						<For each={auditEventOptions()}>
-							{(o: { value: AuditEvent; label: string }): JSX.Element => (
-								<option value={o.value}>{o.label}</option>
-							)}
-						</For>
-					</select>
-				</label>
-			</div>
-
-			<DataTable
+			<FilterTable
 				rows={() => entries()?.items ?? []}
+				filters={filters.filters()}
+				filterValues={filters.filterValues}
+				onFilterValuesChange={filters.onFilterValuesChange}
+				manualFiltering
+				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.auditEntry', 2) })}
 				getRowId={(e: AuditLogEntryJson): number => e.id}
 				columns={columns}
 				loading={() => entries.loading}

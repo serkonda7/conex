@@ -170,6 +170,11 @@ export const de: Messages = {
 	'table.showAll': 'Alle anzeigen',
 	'table.reset': 'Zurücksetzen',
 	'table.selectAllRows': 'Alle Zeilen auswählen',
+	'table.results': 'Ergebnisse',
+	'table.filters': 'Filter',
+	'table.applyFilters': 'Suchen',
+	'table.clearAll': 'Alle entfernen',
+	'table.any': 'Beliebig',
 
 	// app
 	'app.skipToContent': 'Zum Inhalt springen',
@@ -336,8 +341,6 @@ export const de: Messages = {
 
 	// location
 	'location.empty': 'Noch keine Bereiche vorhanden. Fügen Sie oben den ersten hinzu.',
-	'location.filterBySite': 'Nach Standort filtern',
-	'location.allSites': 'Alle Standorte',
 	'location.addTitle': 'Neuen Bereich hinzufügen',
 	'location.editTitle': 'Bereich bearbeiten',
 	'location.loadingOne': 'Bereich wird geladen…',
@@ -370,8 +373,6 @@ export const de: Messages = {
 
 	// deviceType
 	'deviceType.import': '⭳ Importieren',
-	'deviceType.filterByManufacturer': 'Nach Hersteller filtern',
-	'deviceType.allManufacturers': 'Alle Hersteller',
 	'deviceType.empty':
 		'Noch keine Gerätetypen vorhanden. Importieren Sie oben den ersten Datensatz.',
 	'deviceType.addTitle': 'Neuen Gerätetyp hinzufügen',
@@ -491,8 +492,6 @@ export const de: Messages = {
 
 	// rack
 	'rack.empty': 'Noch keine Racks vorhanden. Fügen Sie oben das erste hinzu.',
-	'rack.filterByLocation': 'Nach Bereich filtern',
-	'rack.allLocations': 'Alle Bereiche',
 	'rack.addTitle': 'Neues Rack hinzufügen',
 	'rack.editTitle': 'Rack bearbeiten',
 	'rack.loadingOne': 'Rack wird geladen…',
@@ -537,10 +536,6 @@ export const de: Messages = {
 	// device
 	'device.mount': 'Montage',
 	'device.mountPosition': '{rack} HE{u}',
-	'device.filterByRack': 'Nach Rack filtern',
-	'device.allRacks': 'Alle Racks',
-	'device.filterByRole': 'Nach Rolle filtern',
-	'device.allRoles': 'Alle Rollen',
 	'device.rolePlaceholder': 'Geräterolle…',
 	'device.selectRole': 'Bitte eine Geräterolle auswählen.',
 	'device.empty': 'Noch keine Geräte vorhanden. Fügen Sie oben das erste hinzu.',
@@ -632,8 +627,6 @@ export const de: Messages = {
 	'audit.viaPeer': 'über {ip}',
 	'audit.userAgent': 'User-Agent',
 	'audit.target': 'Betroffener Benutzer',
-	'audit.filterByEvent': 'Nach Ereignis filtern',
-	'audit.allEvents': 'Alle Ereignisse',
 	'audit.empty': 'Noch keine Audit-Log-Einträge vorhanden.',
 	'auditEvent.loginSuccess': 'Anmeldung erfolgreich',
 	'auditEvent.loginFailure': 'Anmeldung fehlgeschlagen',
@@ -646,10 +639,6 @@ export const de: Messages = {
 	'changelog.object': 'Objekt',
 	'changelog.requestId': 'Anfrage-ID',
 	'changelog.system': 'System',
-	'changelog.filterByAction': 'Nach Aktion filtern',
-	'changelog.allActions': 'Alle Aktionen',
-	'changelog.filterByType': 'Nach Objekttyp filtern',
-	'changelog.allTypes': 'Alle Objekttypen',
 	'changelog.empty': 'Noch keine Änderungen erfasst.',
 	'changelog.title': 'Änderung #{id}',
 	'changelog.loadingOne': 'Änderung wird geladen…',

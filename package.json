@@ -2,6 +2,7 @@
   "name": "conex",
   "version": "0.0.1-dev",
   "license": "MPL-2.0",
+  "type": "module",
   "workspaces": [
     "server",
     "client",

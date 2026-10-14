@@ -28,7 +28,6 @@ export function DeviceRolesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.deviceRole', 2)}
 			addHref="/device-roles/add"
-			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				{
 					key: 'name',

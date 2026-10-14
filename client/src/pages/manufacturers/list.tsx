@@ -26,7 +26,6 @@ export function ManufacturersPage(): JSX.Element {
 			list={list}
 			title={tp('entity.manufacturer', 2)}
 			addHref="/manufacturers/add"
-			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				nameColumn<ManufacturerListRow>(t('common.name'), '/manufacturers', {
 					sortable: true,

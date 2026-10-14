@@ -30,7 +30,6 @@ export function UsersPage(): JSX.Element {
 			list={list}
 			title={tp('entity.user', 2)}
 			addHref="/users/add"
-			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				{
 					key: 'username',

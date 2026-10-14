@@ -30,7 +30,6 @@ export function TenantGroupsPage(): JSX.Element {
 				{ label: tp('entity.tenantGroup', 2), href: '/tenant-groups', active: true },
 			]}
 			addHref="/tenant-groups/add"
-			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				nameColumn<TenantGroupListItem>(tp('entity.tenantGroup', 1), '/tenant-groups', {
 					sortable: true,

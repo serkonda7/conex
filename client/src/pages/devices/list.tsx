@@ -7,7 +7,7 @@ import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
-	FilterSelect,
+	idOptions,
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
@@ -99,31 +99,24 @@ export function DevicesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.device', 2)}
 			addHref="/devices/add"
-			searchPlaceholder={t('common.quickSearch')}
-			filters={
-				<>
-					<FilterSelect
-						label={t('device.filterByRack')}
-						allLabel={t('device.allRacks')}
-						value={filterRack()}
-						onChange={setFilterRack}
-						rows={racks() ?? []}
-					/>
-					<FilterSelect
-						label={t('device.filterByRole')}
-						allLabel={t('device.allRoles')}
-						value={filterRole()}
-						onChange={setFilterRole}
-						rows={roles() ?? []}
-					/>
-				</>
-			}
+			filters={[
+				{
+					key: 'rack',
+					label: tp('entity.rack', 1),
+					options: idOptions(racks()),
+					value: filterRack,
+					onChange: setFilterRack,
+				},
+				{
+					key: 'role',
+					label: tp('entity.deviceRole', 1),
+					options: idOptions(roles()),
+					value: filterRole,
+					onChange: setFilterRole,
+				},
+			]}
 			filtered={
-				filterRack() !== '' ||
-				filterRole() !== '' ||
-				filterTenant() !== '' ||
-				filterType() !== '' ||
-				tenantContext().kind !== 'all'
+				filterTenant() !== '' || filterType() !== '' || tenantContext().kind !== 'all'
 			}
 			columns={columns}
 			columnsKey="devices"

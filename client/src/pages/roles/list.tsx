@@ -23,7 +23,6 @@ export function RolesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.role', 2)}
 			addHref="/roles/add"
-			searchPlaceholder={t('common.quickSearch')}
 			columns={[
 				{
 					key: 'name',
