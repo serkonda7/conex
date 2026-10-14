@@ -23,6 +23,7 @@ import {
 	use_slug_fields,
 	useEntityForm,
 } from '../../lib/form'
+import { useFormReturnRoute } from '../../lib/router'
 
 /** Tenant group create (`id` omitted) or edit form. */
 function TenantGroupForm(props: { id?: number }): JSX.Element {
@@ -39,7 +40,7 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 		},
 	})
 	const prefix = form.editing ? 'tenant-group-edit' : 'tenant-group'
-	const detailRoute = props.id === undefined ? '/tenant-groups' : `/tenant-groups/${props.id}`
+	const backTo = useFormReturnRoute('/tenant-groups', props.id)
 
 	const body = (values: FormValues): TenantGroupCreate => ({
 		name: values.name,
@@ -59,7 +60,7 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 				id === undefined
 					? create_tenant_group(body(values))
 					: update_tenant_group(id, cleared(body(values))),
-			navigateTo: detailRoute,
+			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
@@ -70,7 +71,7 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 			title={form.editing ? t('tenantGroup.editTitle') : t('tenantGroup.addTitle')}
 			name={form.record()?.name}
 			loadingText={t('tenantGroup.loadingOne')}
-			cancelTo={detailRoute}
+			cancelTo={backTo()}
 			onSubmit={handleSubmit}
 		>
 			<NameField
@@ -102,7 +103,7 @@ export function TenantGroupAddPage(): JSX.Element {
 	return <TenantGroupForm />
 }
 
-/** /tenant-groups/:id/edit — tenant group edit form. Saves back to the detail page. */
+/** /tenant-groups/:id/edit — tenant group edit form. Saves back to the list when opened from it, else to the detail page. */
 export function TenantGroupEditPage(props: { id: number }): JSX.Element {
 	return <TenantGroupForm id={props.id} />
 }

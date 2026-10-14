@@ -28,7 +28,7 @@ import {
 	useEntityForm,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, useFormReturnRoute } from '../../lib/router'
 import { contextTenantValue } from '../../lib/tenant_context'
 
 /** Site group create (`id` omitted) or edit form. */
@@ -50,7 +50,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 	})
 	const [tenants] = createRows(fetch_tenants, form.setError)
 	const prefix = form.editing ? 'site-group-edit' : 'site-group'
-	const detailRoute = props.id === undefined ? '/site-groups' : `/site-groups/${props.id}`
+	const backTo = useFormReturnRoute('/site-groups', props.id)
 
 	const body = (values: FormValues): SiteGroupCreate => ({
 		name: values.name,
@@ -71,7 +71,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 				id === undefined
 					? create_site_group(body(values))
 					: update_site_group(id, cleared(body(values))),
-			navigateTo: detailRoute,
+			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
 		})
 	}
@@ -82,7 +82,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 			title={form.editing ? t('siteGroup.editTitle') : t('siteGroup.addTitle')}
 			name={form.record()?.name}
 			loadingText={t('siteGroup.loadingOne')}
-			cancelTo={detailRoute}
+			cancelTo={backTo()}
 			onSubmit={handleSubmit}
 		>
 			<NameField
@@ -122,7 +122,7 @@ export function SiteGroupAddPage(): JSX.Element {
 	return <SiteGroupForm />
 }
 
-/** /site-groups/:id/edit — site group edit form. Saves back to the detail page. */
+/** /site-groups/:id/edit — site group edit form. Saves back to the list when opened from it, else to the detail page. */
 export function SiteGroupEditPage(props: { id: number }): JSX.Element {
 	return <SiteGroupForm id={props.id} />
 }

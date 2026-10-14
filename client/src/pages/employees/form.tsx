@@ -40,7 +40,7 @@ import {
 	useEntityForm,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, useFormReturnRoute } from '../../lib/router'
 import { useTenantDefault } from '../../lib/tenant_context'
 
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
@@ -100,7 +100,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 		)
 	}
 	const prefix = form.editing ? 'employee-edit' : 'employee'
-	const detailRoute = props.id === undefined ? '/employees' : `/employees/${props.id}`
+	const backTo = useFormReturnRoute('/employees', props.id)
 
 	const body = (values: FormValues, tenantId: number): EmployeeCreate => ({
 		first_name: text(firstName()),
@@ -135,7 +135,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				id === undefined
 					? create_employee(body(values, tenantId ?? 0))
 					: update_employee(id, cleared(body(values, tenantId ?? 0))),
-			navigateTo: detailRoute,
+			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
 				? () => {
 						setFirstName('')
@@ -155,7 +155,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			title={form.editing ? t('employee.editTitle') : t('employee.addTitle')}
 			name={form.record()?.name}
 			loadingText={t('employee.loadingOne')}
-			cancelTo={detailRoute}
+			cancelTo={backTo()}
 			onSubmit={handleSubmit}
 		>
 			<SelectField
@@ -289,7 +289,7 @@ export function EmployeeAddPage(): JSX.Element {
 	return <EmployeeForm />
 }
 
-/** /employees/:id/edit — employee edit form. Saves back to the detail page. */
+/** /employees/:id/edit — employee edit form. Saves back to the list when opened from it, else to the detail page. */
 export function EmployeeEditPage(props: { id: number }): JSX.Element {
 	return <EmployeeForm id={props.id} />
 }

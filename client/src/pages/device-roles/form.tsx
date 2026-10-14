@@ -16,7 +16,7 @@ import {
 	text,
 	useEntityForm,
 } from '../../lib/form'
-import { queryParam } from '../../lib/router'
+import { queryParam, useFormReturnRoute } from '../../lib/router'
 
 /** Device role create (`id` omitted) or edit form. */
 function DeviceRoleForm(props: { id?: number }): JSX.Element {
@@ -34,7 +34,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 		},
 	})
 	const prefix = form.editing ? 'device-role-edit' : 'device-role'
-	const detailRoute = props.id === undefined ? '/device-roles' : `/device-roles/${props.id}`
+	const backTo = useFormReturnRoute('/device-roles', props.id)
 
 	const selectedIcon = (): DeviceRoleIcon | null =>
 		icon() === '' ? null : (icon() as DeviceRoleIcon)
@@ -57,7 +57,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 							description: text(description()) ?? null,
 							icon: selectedIcon(),
 						}),
-			navigateTo: detailRoute,
+			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
 				? (): void => {
 						setName('')
@@ -74,7 +74,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 			title={form.editing ? t('deviceRole.editTitle') : t('deviceRole.addTitle')}
 			name={form.record()?.name}
 			loadingText={t('deviceRole.loadingOne')}
-			cancelTo={detailRoute}
+			cancelTo={backTo()}
 			onSubmit={handleSubmit}
 		>
 			<NameField
@@ -107,7 +107,7 @@ export function DeviceRoleAddPage(): JSX.Element {
 	return <DeviceRoleForm />
 }
 
-/** /device-roles/:id/edit — device role edit form. Saves back to the detail page. */
+/** /device-roles/:id/edit — device role edit form. Saves back to the list when opened from it. */
 export function DeviceRoleEditPage(props: { id: number }): JSX.Element {
 	return <DeviceRoleForm id={props.id} />
 }

@@ -14,7 +14,7 @@ import {
 	text,
 	useEntityForm,
 } from '../../lib/form'
-import { queryParam } from '../../lib/router'
+import { queryParam, useFormReturnRoute } from '../../lib/router'
 
 /** Manufacturer create (`id` omitted) or edit form. */
 function ManufacturerForm(props: { id?: number }): JSX.Element {
@@ -30,7 +30,7 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 		},
 	})
 	const prefix = form.editing ? 'manufacturer-edit' : 'manufacturer'
-	const detailRoute = props.id === undefined ? '/manufacturers' : `/manufacturers/${props.id}`
+	const backTo = useFormReturnRoute('/manufacturers', props.id)
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -45,7 +45,7 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 							name: trimmed,
 							description: text(description()) ?? null,
 						}),
-			navigateTo: detailRoute,
+			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
 				? (): void => {
 						setName('')
@@ -61,7 +61,7 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 			title={form.editing ? t('manufacturer.editTitle') : t('manufacturer.addTitle')}
 			name={form.record()?.name}
 			loadingText={t('manufacturer.loadingOne')}
-			cancelTo={detailRoute}
+			cancelTo={backTo()}
 			onSubmit={handleSubmit}
 		>
 			<NameField
@@ -85,7 +85,7 @@ export function ManufacturerAddPage(): JSX.Element {
 	return <ManufacturerForm />
 }
 
-/** /manufacturers/:id/edit — manufacturer edit form. Saves back to the detail page. */
+/** /manufacturers/:id/edit — manufacturer edit form. Saves back to the list when opened from it, else to the detail page. */
 export function ManufacturerEditPage(props: { id: number }): JSX.Element {
 	return <ManufacturerForm id={props.id} />
 }

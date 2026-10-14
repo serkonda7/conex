@@ -21,7 +21,7 @@ import { type FormValues, id_value, submit_form, text, useEntityForm } from '../
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
-import { parseId, routeSegments, useOpenerPath } from '../../lib/router'
+import { parseId, useFormReturnRoute } from '../../lib/router'
 import { parsePosition, validPosition } from './add'
 
 /**
@@ -69,13 +69,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 		form.setError,
 	)
 	const typeName = useNameOf(types, (type) => type.model)
-	const openerPath = useOpenerPath()
-	function backTo(): string {
-		const opener = openerPath()
-		return opener !== null && routeSegments(opener).join('/') === 'devices'
-			? opener
-			: `/devices/${props.id}`
-	}
+	const backTo = useFormReturnRoute('/devices', props.id)
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)

@@ -26,7 +26,7 @@ import {
 	useEntityForm,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId, queryParam } from '../../lib/router'
+import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 
 const MAX_HEIGHT = 60
 
@@ -66,7 +66,7 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 		form.setError,
 	)
 	const prefix = form.editing ? 'device-type-edit' : 'device-type'
-	const detailRoute = props.id === undefined ? '/device-types' : `/device-types/${props.id}`
+	const backTo = useFormReturnRoute('/device-types', props.id)
 
 	function validate(): string | null {
 		if (parseId(manufacturerId()) === null) {
@@ -107,7 +107,7 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 				id === undefined
 					? create_device_type(body(values))
 					: update_device_type(id, cleared(body(values))),
-			navigateTo: detailRoute,
+			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e) ? resetForNext : undefined,
 		})
 	}
@@ -118,7 +118,7 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 			title={form.editing ? t('deviceType.editTitle') : t('deviceType.addTitle')}
 			name={form.record()?.model}
 			loadingText={t('deviceType.loadingOne')}
-			cancelTo={detailRoute}
+			cancelTo={backTo()}
 			onSubmit={handleSubmit}
 		>
 			<SelectField
@@ -180,7 +180,7 @@ export function DeviceTypeAddPage(): JSX.Element {
 	return <DeviceTypeForm />
 }
 
-/** /device-types/:id/edit — device-type edit form. Saves back to the detail page. */
+/** /device-types/:id/edit — device-type edit form. Saves back to the list when opened from it, else to the detail page. */
 export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	return <DeviceTypeForm id={props.id} />
 }

@@ -28,9 +28,9 @@ import {
 	useEntityForm,
 } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, useFormReturnRoute } from '../../lib/router'
 
-/** /locations/:id/edit — location edit form. Saves back to the detail page. */
+/** /locations/:id/edit — location edit form. Saves back to the list when opened from it, else to the detail page. */
 export function LocationEditPage(props: { id: number }): JSX.Element {
 	const slugFields = use_slug_fields()
 	const [locationType, setLocationType] = createSignal<LocationType>('other')
@@ -58,6 +58,8 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 	)
 	const [site] = createRecord(siteId, fetch_site)
 
+	const backTo = useFormReturnRoute('/locations', props.id)
+
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_form({
@@ -73,7 +75,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 					tenant_id: parseId(tenantId()),
 					description: text(description()) ?? null,
 				}),
-			navigateTo: `/locations/${props.id}`,
+			navigateTo: backTo(),
 		})
 	}
 
@@ -83,7 +85,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 			title={t('location.editTitle')}
 			name={form.record()?.name}
 			loadingText={t('location.loadingOne')}
-			cancelTo={`/locations/${props.id}`}
+			cancelTo={backTo()}
 			onSubmit={handleSave}
 		>
 			<ReadOnlyField

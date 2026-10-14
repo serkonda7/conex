@@ -612,6 +612,25 @@ export function useOpenerPath(): () => string | null {
 	}
 }
 
+/**
+ * Where an add/edit form goes on save and cancel: the entity's list for add
+ * (`id` omitted), and for edit the opener when it shows that list, else the
+ * detail page. `listRoute` is the list path, e.g. `/device-roles`.
+ */
+export function useFormReturnRoute(listRoute: string, id?: number): () => string {
+	const openerPath = useOpenerPath()
+	return () => {
+		if (id === undefined) {
+			return listRoute
+		}
+		const opener = openerPath()
+		return opener !== null &&
+			routeSegments(opener).join('/') === routeSegments(listRoute).join('/')
+			? opener
+			: `${listRoute}/${id}`
+	}
+}
+
 /** Reads one query param from the current tab's route (e.g. `?tenant=<id>`). */
 export function queryParam(key: string, fromPath?: string): string {
 	const current = fromPath ?? useTabPath()

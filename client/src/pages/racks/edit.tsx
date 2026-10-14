@@ -13,10 +13,10 @@ import {
 import { t, tp } from '../../i18n'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
-import { parseId } from '../../lib/router'
+import { parseId, useFormReturnRoute } from '../../lib/router'
 import { useDeviceTypeOptions } from '../device_types/options'
 
-/** /racks/:id/edit — rack edit form. Saves back to the detail page. */
+/** /racks/:id/edit — rack edit form. Saves back to the list when opened from it, else to the detail page. */
 export function RackEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
@@ -57,6 +57,8 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 		return options
 	}
 
+	const backTo = useFormReturnRoute('/racks', props.id)
+
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_form({
@@ -70,7 +72,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 					tenant_id: parseId(tenantId()),
 					description: text(description()) ?? null,
 				}),
-			navigateTo: `/racks/${props.id}`,
+			navigateTo: backTo(),
 		})
 	}
 
@@ -80,7 +82,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 			title={t('rack.editTitle')}
 			name={form.record()?.name}
 			loadingText={t('rack.loadingOne')}
-			cancelTo={`/racks/${props.id}`}
+			cancelTo={backTo()}
 			onSubmit={handleSave}
 		>
 			<ReadOnlyField
