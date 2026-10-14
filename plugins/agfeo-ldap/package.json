@@ -5,7 +5,7 @@
     "start": "bun run src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "compile": "bun build ./src/index.ts --compile --outfile ./dist/agfeo-ldap.bin",
-    "check": "tsc"
+    "check": "bun check"
   },
   "dependencies": {
     "better-result": "catalog:",

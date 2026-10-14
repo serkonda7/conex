@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "check": "tsc"
+    "check": "bun check"
   },
   "devDependencies": {
     "solid-devtools": "~0.34.3",

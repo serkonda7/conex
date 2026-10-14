@@ -2,7 +2,7 @@
   "name": "shared",
   "version": "0.0.0-dev",
   "scripts": {
-    "check": "tsc"
+    "check": "bun check"
   },
   "dependencies": {
     "valibot": "catalog:"
