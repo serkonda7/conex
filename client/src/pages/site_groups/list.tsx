@@ -38,7 +38,6 @@ export function SiteGroupsPage(): JSX.Element {
 			title={tp('entity.siteGroup', 2)}
 			tabs={siteTabs('site-groups', filterTenant())}
 			addHref="/site-groups/add"
-			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={[
 				nameColumn<SiteGroupRow>(t('common.group'), '/site-groups', { sortable: true }),

@@ -74,7 +74,6 @@ export function SitesPage(): JSX.Element {
 			title={tp('entity.site', 2)}
 			tabs={siteTabs('sites', filterTenant())}
 			addHref="/sites/add"
-			searchPlaceholder={t('common.quickSearch')}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="sites"

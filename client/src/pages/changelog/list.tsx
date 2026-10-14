@@ -1,10 +1,10 @@
 import { Result } from 'better-result'
 import type { ChangeAction, ChangeObjectType } from 'shared/src/schemas'
-import { createResource, createSignal, For, type JSX } from 'solid-js'
+import { createResource, createSignal, type JSX } from 'solid-js'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
-import { DataTable, type DataTableColumn } from '../../components/data_table'
+import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListRangeStatus, ListSearchField, useDebouncedSearch } from '../../components/list_page'
+import { ListRangeStatus, useDebouncedSearch, useListFilters } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { changeActionOptions, changeObjectLabel, changeObjectOptions } from '../../i18n/labels'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
@@ -21,6 +21,30 @@ export function ChangelogPage(): JSX.Element {
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 	const [action, setAction] = createSignal<ChangeAction | ''>('')
 	const [objectType, setObjectType] = createSignal<ChangeObjectType | ''>('')
+	const filters = useListFilters<ObjectChangeJson>({
+		search,
+		setSearch,
+		filters: () => [
+			{
+				key: 'action',
+				label: t('changelog.action'),
+				options: changeActionOptions(),
+				value: action,
+				onChange: (value: string): void => {
+					setAction(value as ChangeAction | '')
+				},
+			},
+			{
+				key: 'object_type',
+				label: t('changelog.objectType'),
+				options: changeObjectOptions(),
+				value: objectType,
+				onChange: (value: string): void => {
+					setObjectType(value as ChangeObjectType | '')
+				},
+			},
+		],
+	})
 
 	const [changes] = createResource(
 		() => ({
@@ -88,51 +112,13 @@ export function ChangelogPage(): JSX.Element {
 				<h2>{tp('entity.changelog', 1)}</h2>
 			</div>
 
-			<div class="toolbar-row">
-				<ListSearchField
-					label={t('list.searchLabel', { noun: tp('noun.change', 2) })}
-					placeholder={t('common.quickSearch')}
-					value={search()}
-					onInput={setSearch}
-				/>
-				<label>
-					<span class="visually-hidden">{t('changelog.filterByAction')}</span>
-					<select
-						aria-label={t('changelog.filterByAction')}
-						value={action()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
-							setAction(e.currentTarget.value as ChangeAction | '')
-						}}
-					>
-						<option value="">{t('changelog.allActions')}</option>
-						<For each={changeActionOptions()}>
-							{(o: { value: ChangeAction; label: string }): JSX.Element => (
-								<option value={o.value}>{o.label}</option>
-							)}
-						</For>
-					</select>
-				</label>
-				<label>
-					<span class="visually-hidden">{t('changelog.filterByType')}</span>
-					<select
-						aria-label={t('changelog.filterByType')}
-						value={objectType()}
-						onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
-							setObjectType(e.currentTarget.value as ChangeObjectType | '')
-						}}
-					>
-						<option value="">{t('changelog.allTypes')}</option>
-						<For each={changeObjectOptions()}>
-							{(o: { value: ChangeObjectType; label: string }): JSX.Element => (
-								<option value={o.value}>{o.label}</option>
-							)}
-						</For>
-					</select>
-				</label>
-			</div>
-
-			<DataTable
+			<FilterTable
 				rows={() => changes()?.items ?? []}
+				filters={filters.filters()}
+				filterValues={filters.filterValues}
+				onFilterValuesChange={filters.onFilterValuesChange}
+				manualFiltering
+				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.change', 2) })}
 				getRowId={(c: ObjectChangeJson): number => c.id}
 				columns={columns}
 				loading={() => changes.loading}

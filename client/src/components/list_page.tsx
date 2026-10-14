@@ -3,17 +3,18 @@
  * devices, …). `useEntityList` owns the list state (debounced search, sort,
  * the fetched page, row delete) and
  * `EntityListPage` renders the standard page around it: header with
- * "+ Add", search/filter toolbar, table with row actions and row menu,
- * range status and error line.
+ * "+ Add", filter table (quick search, filters) with row actions and row
+ * menu, range status and error line.
  *
  * Write actions (add, edit, delete) render only when the
  * session can write. `noun` options take a `noun.<entity>` plural key used
  * to build localized confirm/aria/status text.
  */
 
+import type { ComboboxOption } from '@serkonda7/solid-components'
 import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { InputEventAndTarget, Page, Permission } from 'shared/src/types'
+import type { Page, Permission } from 'shared/src/types'
 import {
 	type Accessor,
 	createEffect,
@@ -34,7 +35,12 @@ import { use_visible_columns } from '../lib/column_visibility'
 import { useDismiss } from '../lib/dismiss'
 import { navigate, queryParam } from '../lib/router'
 import { can } from '../lib/session'
-import { DataTable, type DataTableColumn } from './data_table'
+import {
+	type DataTableColumn,
+	FilterTable,
+	type FilterTableFilter,
+	type FilterTableValues,
+} from './data_table'
 import { Empty, InlineError, Loading } from './feedback'
 
 /** Search text plus its debounced (trimmed) projection for list queries. */
@@ -97,6 +103,80 @@ export function useSort<T extends string>(
  */
 export function useQueryFilter(key: string): [Accessor<string>, Setter<string>] {
 	return createSignal(queryParam(key))
+}
+
+/**
+ * Single-choice server-side filter shown in the FilterTable's Filters tab.
+ * `value` is the chosen option value as a string (`''` = any).
+ */
+export interface ListFilter {
+	key: string
+	label: string
+	options: ComboboxOption[]
+	value: Accessor<string>
+	onChange: (value: string) => void
+}
+
+/**
+ * Binds the search signal (FilterTable's quick search, `q`) and the
+ * single-value `filters` to a server-filtered FilterTable. The table's
+ * select filters hold a list; the endpoints take one id, so the most
+ * recently chosen option wins.
+ */
+export function useListFilters<Row>(opts: {
+	search: Accessor<string>
+	setSearch: (value: string) => void
+	filters?: () => readonly ListFilter[] | undefined
+}): {
+	filters: () => FilterTableFilter<Row>[]
+	filterValues: () => FilterTableValues
+	onFilterValuesChange: (values: FilterTableValues) => void
+	/** Whether any filter (not the search) is set. */
+	filtered: () => boolean
+} {
+	const list = (): readonly ListFilter[] => opts.filters?.() ?? []
+	return {
+		filters: () =>
+			list().map(
+				(f: ListFilter): FilterTableFilter<Row> => ({
+					key: f.key,
+					label: f.label,
+					type: 'select',
+					options: f.options,
+				}),
+			),
+		filterValues: () => {
+			const values: FilterTableValues = { q: opts.search() }
+			for (const f of list()) {
+				if (f.value() !== '') {
+					values[f.key] = [f.value()]
+				}
+			}
+			return values
+		},
+		onFilterValuesChange: (values: FilterTableValues): void => {
+			const q = values.q
+			opts.setSearch(typeof q === 'string' ? q : '')
+			// Diff against a snapshot first: a handler may reset a dependent
+			// filter (site → location), which must not be undone here.
+			const changed = list().flatMap((f: ListFilter) => {
+				const v = values[f.key]
+				const next = Array.isArray(v) ? (v.at(-1) ?? '') : (v ?? '')
+				return next === f.value() ? [] : [{ f, next }]
+			})
+			for (const { f, next } of changed) {
+				f.onChange(next)
+			}
+		},
+		filtered: () => list().some((f: ListFilter) => f.value() !== ''),
+	}
+}
+
+/** `{ id, name }` rows as filter options keyed by the stringified id. */
+export function idOptions(
+	rows: readonly { id: number; name: string }[] | undefined,
+): ComboboxOption[] {
+	return (rows ?? []).map((r) => ({ value: String(r.id), label: r.name }))
 }
 
 /** Persisted visible-column state for a DataTable column customizer. */
@@ -308,10 +388,10 @@ function ListTabs(props: { title: string; tabs: readonly ListTab[] }): JSX.Eleme
 }
 
 /**
- * Standard list page around {@link useEntityList}. `filters` are extra
- * toolbar controls; `filtered` tells the empty message whether they (or
- * the tenant context) narrow the list. Without `editHref` the rows only get
- * the menu toggle.
+ * Standard list page around {@link useEntityList}. `filters` populate the
+ * table's Filters tab; `filtered` tells the empty message whether something
+ * beyond them (e.g. the tenant context) narrows the list. Without `editHref`
+ * the rows only get the menu toggle.
  */
 export function EntityListPage<Row extends { id: number }>(props: {
 	list: EntityList<Row>
@@ -321,8 +401,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	addHref: string
 	/** Extra header buttons beside "+ Add" (e.g. Import). */
 	headerActions?: JSX.Element
-	searchPlaceholder: string
-	filters?: JSX.Element
+	filters?: readonly ListFilter[]
 	filtered?: boolean
 	columns: DataTableColumn<Row>[]
 	/** Storage key of the persisted column choice. */
@@ -342,9 +421,14 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		props.columns.map((c) => c.key),
 		props.defaultColumns,
 	)
+	const filters = useListFilters<Row>({
+		search: list.search,
+		setSearch: list.setSearch,
+		filters: () => props.filters,
+	})
 
 	function emptyMessage(): string {
-		if (props.filtered === true) {
+		if (props.filtered === true || filters.filtered()) {
 			return t('list.noMatchFilters', { noun: nouns() })
 		}
 		const search = list.debouncedSearch()
@@ -375,19 +459,15 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				add_href={props.addHref}
 				actions={props.headerActions}
 				can_add={list.canEdit()}
-			>
-				<ListSearchField
-					label={t('list.searchLabel', { noun: nouns() })}
-					placeholder={props.searchPlaceholder}
-					value={list.search()}
-					onInput={list.setSearch}
-				/>
-				{props.filters}
-				<span class="toolbar-spacer" />
-			</ListPageHeader>
+			/>
 
-			<DataTable
+			<FilterTable
 				rows={list.rows}
+				filters={filters.filters()}
+				filterValues={filters.filterValues}
+				onFilterValuesChange={filters.onFilterValuesChange}
+				manualFiltering
+				quickSearchLabel={t('list.searchLabel', { noun: nouns() })}
 				getRowId={(row: Row): number => row.id}
 				columns={props.columns}
 				sortKey={list.sort}
@@ -417,38 +497,6 @@ export function EntityListPage<Row extends { id: number }>(props: {
 }
 
 /**
- * Toolbar `<select>` narrowing a list: an "all" entry followed by `rows`.
- * The value is the chosen row id as a string (`''` = all).
- */
-export function FilterSelect(props: {
-	label: string
-	allLabel: string
-	value: string
-	onChange: (value: string) => void
-	rows: readonly { id: number; name: string }[]
-}): JSX.Element {
-	return (
-		<label>
-			<span class="visually-hidden">{props.label}</span>
-			<select
-				aria-label={props.label}
-				value={props.value}
-				onChange={(e: Event & { currentTarget: HTMLSelectElement }): void =>
-					props.onChange(e.currentTarget.value)
-				}
-			>
-				<option value="">{props.allLabel}</option>
-				<For each={props.rows}>
-					{(row: { id: number; name: string }): JSX.Element => (
-						<option value={row.id}>{row.name}</option>
-					)}
-				</For>
-			</select>
-		</label>
-	)
-}
-
-/**
  * List title (or sibling-list `tabs`) plus the "+ Add" button. `actions` renders extra header buttons
  * (e.g. the device-type Import button) beside "+ Add" inside a
  * `page-header-actions` wrapper. Both are write actions, hidden unless
@@ -460,8 +508,6 @@ function ListPageHeader(props: {
 	add_href: string
 	actions?: JSX.Element
 	can_add: boolean
-	/** Toolbar controls (search, filters, …) between the title and the buttons. */
-	children?: JSX.Element
 }): JSX.Element {
 	const addButton = (
 		<button type="button" class="btn-add" onClick={(): void => navigate(props.add_href)}>
@@ -476,7 +522,6 @@ function ListPageHeader(props: {
 					<ListTabs title={props.title} tabs={tabs()} />
 				)}
 			</Show>
-			{props.children}
 			<Show when={props.can_add}>
 				<Show when={props.actions !== undefined} fallback={addButton}>
 					<div class="page-header-actions">
@@ -486,28 +531,6 @@ function ListPageHeader(props: {
 				</Show>
 			</Show>
 		</div>
-	)
-}
-
-/** Search input in the list toolbar row. */
-export function ListSearchField(props: {
-	label: string
-	placeholder: string
-	value: string
-	onInput: (value: string) => void
-}): JSX.Element {
-	return (
-		<label class="toolbar-search">
-			<span class="visually-hidden">{props.label}</span>
-			<input
-				type="search"
-				class="toolbar-search-input"
-				placeholder={props.placeholder}
-				aria-label={props.label}
-				value={props.value}
-				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
-			/>
-		</label>
 	)
 }
 

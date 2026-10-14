@@ -1,30 +1,68 @@
 /**
- * `DataTable` from solid-components with its built-in English labels
- * (column customizer, select-all checkbox) replaced by localized defaults.
- * Pages import `DataTable` from here instead of the package.
+ * `DataTable` and `FilterTable` from solid-components with their built-in
+ * English labels (column customizer, select-all checkbox, filter tabs and
+ * form) replaced by localized defaults. Pages import them from here instead
+ * of the package.
  */
 import {
 	DataTable as BaseDataTable,
+	FilterTable as BaseFilterTable,
 	type DataTableColumn,
 	type DataTableProps,
+	type FilterTableFilter,
+	type FilterTableProps,
+	type FilterTableValues,
 } from '@serkonda7/solid-components'
 import { type JSX, mergeProps } from 'solid-js'
 import { t } from '../i18n'
 
-export type { DataTableColumn, DataTableProps }
+export type {
+	DataTableColumn,
+	DataTableProps,
+	FilterTableFilter,
+	FilterTableProps,
+	FilterTableValues,
+}
+
+function tableLabels(): Pick<
+	DataTableProps<never>,
+	| 'selectionLabel'
+	| 'columnCustomizerLabel'
+	| 'columnCustomizerTitle'
+	| 'columnCustomizerShowAllLabel'
+	| 'columnCustomizerResetLabel'
+> {
+	return {
+		selectionLabel: t('table.selectAllRows'),
+		columnCustomizerLabel: t('table.columns'),
+		columnCustomizerTitle: t('table.shownColumns'),
+		columnCustomizerShowAllLabel: t('table.showAll'),
+		columnCustomizerResetLabel: t('table.reset'),
+	}
+}
 
 export function DataTable<TRow>(props: DataTableProps<TRow>): JSX.Element {
+	const merged = mergeProps(tableLabels(), props)
+	return <BaseDataTable {...merged} />
+}
+
+export function FilterTable<TRow>(props: FilterTableProps<TRow>): JSX.Element {
 	const merged = mergeProps(
+		tableLabels(),
 		{
-			selectionLabel: t('table.selectAllRows'),
-			columnCustomizerLabel: t('table.columns'),
-			columnCustomizerTitle: t('table.shownColumns'),
-			columnCustomizerShowAllLabel: t('table.showAll'),
-			columnCustomizerResetLabel: t('table.reset'),
+			quickSearchLabel: t('common.quickSearch'),
+			resultsLabel: t('table.results'),
+			filtersLabel: t('table.filters'),
+			applyLabel: t('table.applyFilters'),
+			resetLabel: t('table.reset'),
+			clearAllLabel: t('table.clearAll'),
+			anyLabel: t('table.any'),
+			yesLabel: t('common.yes'),
+			noLabel: t('common.no'),
 		},
 		props,
 	)
-	return <BaseDataTable {...merged} />
+	return <BaseFilterTable {...merged} />
 }
 
 /**

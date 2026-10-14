@@ -11,7 +11,7 @@ import type { DataTableColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
-	FilterSelect,
+	idOptions,
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
@@ -119,19 +119,16 @@ export function LocationsPage(): JSX.Element {
 			list={list}
 			title={tp('entity.location', 2)}
 			addHref="/locations/add"
-			searchPlaceholder={t('common.quickSearch')}
-			filters={
-				<FilterSelect
-					label={t('location.filterBySite')}
-					allLabel={t('location.allSites')}
-					value={filterSite()}
-					onChange={setFilterSite}
-					rows={sites() ?? []}
-				/>
-			}
-			filtered={
-				filterSite() !== '' || filterTenant() !== '' || tenantContext().kind !== 'all'
-			}
+			filters={[
+				{
+					key: 'site',
+					label: tp('entity.site', 1),
+					options: idOptions(sites()),
+					value: filterSite,
+					onChange: setFilterSite,
+				},
+			]}
+			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="locations"
 			defaultColumns={['name', 'type', 'site']}

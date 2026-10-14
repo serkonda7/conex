@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, type Page } from '@playwright/test'
 
@@ -15,27 +16,44 @@ export async function loginAsE2E(page: Page): Promise<void> {
 	await expect(page.getByRole('link', { name: 'CoNex', exact: true })).toBeVisible()
 }
 
+// Bundled font so baselines don't depend on the host's system fonts.
+const pinnedFontFamily = 'E2E Sans'
+const pinnedFontDataUrl: string = `data:font/woff2;base64,${readFileSync(
+	path.resolve(
+		'node_modules/@fontsource-variable/noto-sans/files/noto-sans-latin-wght-normal.woff2',
+	),
+).toString('base64')}`
+
 /**
  * Settle the page before a screenshot: DOM ready, fonts loaded, CSS
- * motion frozen, text caret hidden. Keeps baselines deterministic.
+ * motion frozen, text caret hidden, build-info footer hidden (layout is
+ * kept), UI font pinned to a bundled one. Keeps baselines deterministic.
  * Avoids `networkidle` (waits for 500ms of zero requests) — callers
  * already assert visibility of the screenshotted content first.
  */
 export async function stabilizeForSnapshot(page: Page): Promise<void> {
 	await page.waitForLoadState('domcontentloaded')
-	await page.evaluate(async () => {
-		try {
-			await Promise.race([
-				document.fonts.ready,
-				new Promise((resolve) => setTimeout(resolve, 2000)),
-			])
-		} catch {
-			// Fonts API unavailable — fall through to the screenshot anyway.
-		}
-		const style = document.createElement('style')
-		style.setAttribute('data-visual-freeze', '')
-		style.textContent =
-			'*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}'
-		document.head.appendChild(style)
-	})
+	await page.evaluate(
+		async ({ family, fontUrl }) => {
+			const style = document.createElement('style')
+			style.setAttribute('data-visual-freeze', '')
+			// The footer shows commit hash + build time, which change on every build.
+			style.textContent =
+				'*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' +
+				'.app-footer{visibility:hidden!important}' +
+				`@font-face{font-family:"${family}";font-weight:100 900;src:url(${fontUrl}) format("woff2")}` +
+				`body{font-family:"${family}",sans-serif!important}`
+			document.head.appendChild(style)
+			try {
+				await document.fonts.load(`400 16px "${family}"`)
+				await Promise.race([
+					document.fonts.ready,
+					new Promise((resolve) => setTimeout(resolve, 2000)),
+				])
+			} catch {
+				// Fonts API unavailable — fall through to the screenshot anyway.
+			}
+		},
+		{ family: pinnedFontFamily, fontUrl: pinnedFontDataUrl },
+	)
 }

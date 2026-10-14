@@ -167,6 +167,11 @@ export const en = {
 	'table.showAll': 'Show all',
 	'table.reset': 'Reset',
 	'table.selectAllRows': 'Select all rows',
+	'table.results': 'Results',
+	'table.filters': 'Filters',
+	'table.applyFilters': 'Search',
+	'table.clearAll': 'Clear all',
+	'table.any': 'Any',
 
 	// app
 	'app.skipToContent': 'Skip to content',
@@ -334,8 +339,6 @@ export const en = {
 
 	// location
 	'location.empty': 'No locations yet. Add the first one above.',
-	'location.filterBySite': 'Filter by site',
-	'location.allSites': 'All sites',
 	'location.addTitle': 'Add a new location',
 	'location.editTitle': 'Edit location',
 	'location.loadingOne': 'Loading location…',
@@ -368,8 +371,6 @@ export const en = {
 
 	// deviceType
 	'deviceType.import': '⭳ Import',
-	'deviceType.filterByManufacturer': 'Filter by manufacturer',
-	'deviceType.allManufacturers': 'All manufacturers',
 	'deviceType.empty': 'No device types yet. Import the first one above.',
 	'deviceType.addTitle': 'Add a new device type',
 	'deviceType.editTitle': 'Edit device type',
@@ -487,8 +488,6 @@ export const en = {
 
 	// rack
 	'rack.empty': 'No racks yet. Add the first one above.',
-	'rack.filterByLocation': 'Filter by location',
-	'rack.allLocations': 'All locations',
 	'rack.addTitle': 'Add a new rack',
 	'rack.editTitle': 'Edit rack',
 	'rack.loadingOne': 'Loading rack…',
@@ -532,10 +531,6 @@ export const en = {
 	// device
 	'device.mount': 'Mount',
 	'device.mountPosition': '{rack} U{u}',
-	'device.filterByRack': 'Filter by rack',
-	'device.allRacks': 'All racks',
-	'device.filterByRole': 'Filter by role',
-	'device.allRoles': 'All roles',
 	'device.rolePlaceholder': 'Device role…',
 	'device.selectRole': 'Select a device role.',
 	'device.empty': 'No devices yet. Add the first one above.',
@@ -625,8 +620,6 @@ export const en = {
 	'audit.viaPeer': 'via {ip}',
 	'audit.userAgent': 'User agent',
 	'audit.target': 'Affected user',
-	'audit.filterByEvent': 'Filter by event',
-	'audit.allEvents': 'All events',
 	'audit.empty': 'No audit log entries yet.',
 	'auditEvent.loginSuccess': 'Login succeeded',
 	'auditEvent.loginFailure': 'Login failed',
@@ -639,10 +632,6 @@ export const en = {
 	'changelog.object': 'Object',
 	'changelog.requestId': 'Request ID',
 	'changelog.system': 'System',
-	'changelog.filterByAction': 'Filter by action',
-	'changelog.allActions': 'All actions',
-	'changelog.filterByType': 'Filter by object type',
-	'changelog.allTypes': 'All object types',
 	'changelog.empty': 'No changes recorded yet.',
 	'changelog.title': 'Change #{id}',
 	'changelog.loadingOne': 'Loading change…',

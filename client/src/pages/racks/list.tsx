@@ -5,7 +5,7 @@ import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import { type DataTableColumn, descriptionColumn, nameColumn } from '../../components/data_table'
 import {
 	EntityListPage,
-	FilterSelect,
+	idOptions,
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
@@ -87,31 +87,23 @@ export function RacksPage(): JSX.Element {
 			list={list}
 			title={tp('entity.rack', 2)}
 			addHref="/racks/add"
-			searchPlaceholder={t('common.quickSearch')}
-			filters={
-				<>
-					<FilterSelect
-						label={t('location.filterBySite')}
-						allLabel={t('location.allSites')}
-						value={filterSite()}
-						onChange={handleSiteFilter}
-						rows={sites() ?? []}
-					/>
-					<FilterSelect
-						label={t('rack.filterByLocation')}
-						allLabel={t('rack.allLocations')}
-						value={filterLocation()}
-						onChange={setFilterLocation}
-						rows={locations() ?? []}
-					/>
-				</>
-			}
-			filtered={
-				filterSite() !== '' ||
-				filterLocation() !== '' ||
-				filterTenant() !== '' ||
-				tenantContext().kind !== 'all'
-			}
+			filters={[
+				{
+					key: 'site',
+					label: tp('entity.site', 1),
+					options: idOptions(sites()),
+					value: filterSite,
+					onChange: handleSiteFilter,
+				},
+				{
+					key: 'location',
+					label: tp('entity.location', 1),
+					options: idOptions(locations()),
+					value: filterLocation,
+					onChange: setFilterLocation,
+				},
+			]}
+			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="racks"
 			defaultColumns={['name', 'site', 'location', 'description', 'type']}
