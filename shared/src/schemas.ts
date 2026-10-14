@@ -1354,6 +1354,85 @@ export interface AuditLogEntryJson {
 }
 
 // ---------------------------------------------------------------------------
+// Attachments: images owned by one site or location
+// ---------------------------------------------------------------------------
+
+/** Accepted image types, detected server-side from the magic bytes. */
+export const ATTACHMENT_MIMES = ['image/png', 'image/jpeg'] as const
+
+export type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
+
+/** Upload limit per image file. */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+
+/** Exactly one of the two owner keys must be set. */
+function hasOneOwner(site: number | undefined, location: number | undefined): boolean {
+	return (site === undefined) !== (location === undefined)
+}
+
+const ONE_OWNER = 'Exactly one of site or location is required'
+
+/** Multipart file field: presence and size; the type is checked from the bytes. */
+const AttachmentFileSchema = v.pipe(
+	v.file('A file is required'),
+	v.maxSize(ATTACHMENT_MAX_BYTES, 'Image is larger than 10 MB'),
+)
+
+/** `?site=` or `?location=`: the attachments of one owner. */
+export const AttachmentListQuerySchema = v.pipe(
+	v.object({
+		site: OptionalIdEntry,
+		location: OptionalIdEntry,
+	}),
+	v.check((q) => hasOneOwner(q.site, q.location), ONE_OWNER),
+)
+
+/** Multipart upload body (form fields arrive as strings). */
+export const AttachmentCreateSchema = v.pipe(
+	v.strictObject({
+		file: AttachmentFileSchema,
+		site_id: v.optional(IdSchema, undefined),
+		location_id: v.optional(IdSchema, undefined),
+		description: DescriptionSchema,
+	}),
+	v.check((body) => hasOneOwner(body.site_id, body.location_id), ONE_OWNER),
+)
+
+/** Multipart body of a file replace. */
+export const AttachmentFileReplaceSchema = v.strictObject({ file: AttachmentFileSchema })
+
+export const AttachmentUpdateSchema = v.strictObject({
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	/** Marks the attachment as its owner's floor plan (unmarking the previous one). */
+	is_floorplan: v.optional(v.boolean(), undefined),
+})
+
+export type AttachmentListQuery = v.InferOutput<typeof AttachmentListQuerySchema>
+export type AttachmentCreate = v.InferOutput<typeof AttachmentCreateSchema>
+export type AttachmentUpdate = v.InferOutput<typeof AttachmentUpdateSchema>
+
+/** Attachment row on the wire (the image itself is `GET /attachments/:id/file`). */
+export interface AttachmentJson {
+	id: number
+	/** Owner: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	/** Original file name. */
+	filename: string
+	mime: AttachmentMime
+	size_bytes: number
+	width_px: number
+	height_px: number
+	/** Random per stored file, so it changes on replace and doubles as a cache key. */
+	storage_key: string
+	is_floorplan: boolean
+	description: string | null
+	/** Unix seconds. */
+	created_at: number
+	created_by: number | null
+}
+
+// ---------------------------------------------------------------------------
 // Changelog (NetBox-style object change history, read-only)
 // ---------------------------------------------------------------------------
 
@@ -1380,6 +1459,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'rack_type',
 	'interface_template',
 	'device_role',
+	'attachment',
 ] as const
 
 export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)

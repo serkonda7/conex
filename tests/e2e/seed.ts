@@ -30,6 +30,14 @@ if (!fs.existsSync(configPath)) {
 		'[auth]\nappKey = "e2e-app-key-0123456789abcdef-0123456789abcdef"\nsecureCookies = false\n',
 	)
 }
+// Keep e2e attachments next to the e2e config: the startup sweep removes
+// files without a row, so sharing the dev directory would delete dev images.
+if (!fs.readFileSync(configPath, 'utf8').includes('[storage]')) {
+	fs.appendFileSync(
+		configPath,
+		`\n[storage]\nattachmentsDir = ${JSON.stringify(path.join(dataDir, 'attachments'))}\n`,
+	)
+}
 
 // Create the dedicated e2e database on first run (via the maintenance db).
 const dbUrl = new URL(process.env.CONEX_DATABASE_URL ?? '')

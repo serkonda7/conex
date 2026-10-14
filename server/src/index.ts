@@ -2,8 +2,10 @@ import { Result } from 'better-result'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { initConfig, load_config_file } from './config'
+import { sweepAttachmentFiles } from './db/attachments'
 import { initDb } from './db/connection'
 import { failInterruptedSyncs } from './integrations/sync'
+import { attachmentsApp } from './routes/attachments'
 import { auditLogApp } from './routes/audit_log'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
@@ -27,6 +29,7 @@ import { tenantGroupsApp } from './routes/tenant_groups'
 import { tenantsApp } from './routes/tenants'
 import { usersApp } from './routes/users'
 import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
+import { initStorage } from './storage'
 import { jsonError } from './util/http'
 import { start_sweep } from './util/periodic'
 import { get_server_root, getTrimmedEnv, resolveInDataDir } from './util/server_root'
@@ -84,6 +87,7 @@ export function createApp() {
 			.route('/search', searchApp)
 			.route('/integrations', integrationsApp)
 			.route('/directory', directoryApp)
+			.route('/attachments', attachmentsApp)
 	)
 }
 
@@ -107,6 +111,7 @@ if (import.meta.main) {
 
 	try {
 		await initDb({ serverRoot })
+		await initStorage(serverRoot)
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err)
 		console.error(`Failed to start server: ${msg}`)
@@ -119,6 +124,14 @@ if (import.meta.main) {
 	// Scheduled here and not at module scope, so it never keeps a test process alive.
 	await sweepExpired()
 	start_sweep(sweepExpired, SESSION_SWEEP_INTERVAL_MS)
+	// Files left behind by interrupted uploads or deletes; only at startup,
+	// while no upload can be in flight.
+	const swept = await sweepAttachmentFiles()
+	if (Result.isError(swept)) {
+		console.error('Attachment sweep failed:', swept.error)
+	} else if (swept.value.removed > 0) {
+		console.log(`Removed ${swept.value.removed} orphaned attachment file(s)`)
+	}
 	await failInterruptedSyncs()
 
 	const server = Bun.serve({

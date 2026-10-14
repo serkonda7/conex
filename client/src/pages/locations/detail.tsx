@@ -9,6 +9,7 @@ import {
 	fetch_tenant,
 	type LocationRow,
 } from '../../api/tenancy'
+import { AttachmentsSection } from '../../components/attachments'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -150,6 +151,8 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				customizable
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
 			/>
+
+			<AttachmentsSection id="location-attachments" owner={{ location_id: props.id }} />
 
 			<InlineError message={error()} />
 		</div>

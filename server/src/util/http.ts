@@ -25,3 +25,16 @@ export function sendCsv(c: Context, csv: string, filename: string): Response {
 		'Content-Disposition': `attachment; filename="${filename}"`,
 	})
 }
+
+/**
+ * `Content-Disposition` value for a file name: a quoted ASCII fallback
+ * (quotes, backslashes and non-ASCII replaced) plus the exact UTF-8 name.
+ */
+export function contentDisposition(kind: 'inline' | 'attachment', filename: string): string {
+	const fallback = filename.replace(/[^\x20-\x7e]|["\\]/g, '_')
+	const encoded = encodeURIComponent(filename).replace(
+		/['()*]/g,
+		(ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`,
+	)
+	return `${kind}; filename="${fallback}"; filename*=UTF-8''${encoded}`
+}

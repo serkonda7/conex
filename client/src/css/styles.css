@@ -2085,6 +2085,88 @@ th[aria-sort="descending"] .data-table-sort::after {
 	margin: 0;
 }
 
+/* Image attachments: drop zone around a grid of CSS-scaled thumbnails. */
+.attachment-drop {
+	position: relative;
+	border: 1px dashed transparent;
+	border-radius: 0.35rem;
+}
+
+.attachment-drop.dragging {
+	border-color: var(--primary);
+	background-color: var(--bg-surface);
+}
+
+.attachment-drop-hint {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0;
+	color: var(--text);
+	background-color: rgba(0, 0, 0, 0.45);
+	pointer-events: none;
+}
+
+.attachment-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+	gap: 0.6rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.attachment-thumb {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	width: 100%;
+	padding: 0.3rem;
+	text-align: left;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+}
+
+.attachment-thumb img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	object-fit: cover;
+	border-radius: 0.25rem;
+	background-color: var(--bg-raised);
+}
+
+.attachment-caption {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-base);
+	color: var(--text-secondary);
+}
+
+.app-content .modal.attachment-lightbox {
+	max-width: min(80rem, 100%);
+}
+
+.attachment-full {
+	display: block;
+	max-width: 100%;
+	max-height: 70vh;
+	width: auto;
+	height: auto;
+	margin: 0 auto;
+}
+
+.attachment-meta,
+.attachment-description {
+	color: var(--text-secondary);
+	font-size: var(--font-size-base);
+	overflow-wrap: anywhere;
+}
+
 /* Two-column detail layout: facts/stats left, main content right. */
 .detail-columns {
 	display: grid;

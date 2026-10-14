@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm'
 import {
 	type AnyPgColumn,
 	bigint,
+	check,
 	customType,
+	doublePrecision,
 	index,
 	integer,
 	pgTable,
@@ -11,6 +13,7 @@ import {
 	uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import {
+	ATTACHMENT_MIMES,
 	DEVICE_ROLE_ICONS,
 	EMPLOYEE_SALUTATIONS,
 	type EmployeeEmail,
@@ -527,6 +530,109 @@ export const cables = pgTable(
 		index('cables_a_interface_id_idx').on(table.a_interface_id),
 		index('cables_b_interface_id_idx').on(table.b_interface_id),
 		index('cables_status_idx').on(table.status),
+	],
+)
+
+// ---------------------------------------------------------------------------
+// Attachments and floor plans. An attachment is an image (PNG / JPEG) owned
+// by exactly one site or location; tenant scope comes from that owner. The
+// file lives on disk (`storage.ts`, named by `storage_key`), the row only
+// holds metadata. Owner deletes remove their attachments and files in the
+// service layer, so the owner FKs carry no cascade.
+// At most one attachment per owner is marked as the floor plan. Areas
+// (links to other sites/locations) and placements (racks, devices) belong
+// to the marked attachment; coordinates are normalized to 0..1, so they
+// survive a file replace. Areas and placements are pure dependent data and
+// cascade with their attachment and every object they reference.
+// ---------------------------------------------------------------------------
+
+export const attachments = pgTable(
+	'attachments',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		site_id: integer('site_id').references(() => sites.id),
+		location_id: integer('location_id').references(() => locations.id),
+		// Original file name, for display and download.
+		filename: text('filename').notNull(),
+		// `image/png` | `image/jpeg`, detected from the magic bytes.
+		mime: text('mime', { enum: ATTACHMENT_MIMES }).notNull(),
+		size_bytes: integer('size_bytes').notNull(),
+		width_px: integer('width_px').notNull(),
+		height_px: integer('height_px').notNull(),
+		// Random uuid, the file name on disk; a replaced file gets a new one.
+		storage_key: text('storage_key').notNull().unique(),
+		is_floorplan: integer('is_floorplan').notNull().default(0),
+		description: text('description'),
+		created_at: bigint('created_at', { mode: 'number' }).notNull(),
+		created_by: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+	},
+	(table) => [
+		check(
+			'attachments_owner_check',
+			sql`(${table.site_id} IS NULL) <> (${table.location_id} IS NULL)`,
+		),
+		uniqueIndex('attachments_site_floorplan_idx')
+			.on(table.site_id)
+			.where(sql`${table.is_floorplan} = 1`),
+		uniqueIndex('attachments_location_floorplan_idx')
+			.on(table.location_id)
+			.where(sql`${table.is_floorplan} = 1`),
+		index('attachments_site_id_idx').on(table.site_id),
+		index('attachments_location_id_idx').on(table.location_id),
+	],
+)
+
+// Area on a floor plan linking to another site or location (each target at
+// most once per plan). `points` is a polygon of at least three `[x, y]`
+// pairs; `label` NULL shows the target's name.
+export const floorplan_areas = pgTable(
+	'floorplan_areas',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		attachment_id: integer('attachment_id')
+			.notNull()
+			.references(() => attachments.id, { onDelete: 'cascade' }),
+		site_id: integer('site_id').references(() => sites.id, { onDelete: 'cascade' }),
+		location_id: integer('location_id').references(() => locations.id, {
+			onDelete: 'cascade',
+		}),
+		label: text('label'),
+		points: jsonb('points').$type<[number, number][]>().notNull(),
+	},
+	(table) => [
+		check(
+			'floorplan_areas_target_check',
+			sql`(${table.site_id} IS NULL) <> (${table.location_id} IS NULL)`,
+		),
+		uniqueIndex('floorplan_areas_site_idx').on(table.attachment_id, table.site_id),
+		uniqueIndex('floorplan_areas_location_idx').on(table.attachment_id, table.location_id),
+	],
+)
+
+// Rack or device marker on a floor plan. Each object sits on at most one
+// plan (unique FK).
+export const floorplan_placements = pgTable(
+	'floorplan_placements',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		attachment_id: integer('attachment_id')
+			.notNull()
+			.references(() => attachments.id, { onDelete: 'cascade' }),
+		rack_id: integer('rack_id')
+			.unique()
+			.references(() => racks.id, { onDelete: 'cascade' }),
+		device_id: integer('device_id')
+			.unique()
+			.references(() => devices.id, { onDelete: 'cascade' }),
+		x: doublePrecision('x').notNull(),
+		y: doublePrecision('y').notNull(),
+	},
+	(table) => [
+		check(
+			'floorplan_placements_object_check',
+			sql`(${table.rack_id} IS NULL) <> (${table.device_id} IS NULL)`,
+		),
+		index('floorplan_placements_attachment_id_idx').on(table.attachment_id),
 	],
 )
 

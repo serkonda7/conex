@@ -9,6 +9,7 @@ import {
 	fetch_tenant,
 	type LocationRow,
 } from '../../api/tenancy'
+import { AttachmentsSection } from '../../components/attachments'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -190,6 +191,8 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				emptyText={t('site.noDevices')}
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
 			/>
+
+			<AttachmentsSection id="site-attachments" owner={{ site_id: props.id }} />
 
 			<InlineError message={error()} />
 		</div>

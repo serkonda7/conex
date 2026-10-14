@@ -7,3 +7,8 @@
 # Minimum 32 chars. Generate one with: openssl rand -hex 48
 appKey = "REPLACE-ME-with-at-least-32-chars-long-random-secret"
 secureCookies = false # plain-HTTP local dev; keep true behind HTTPS
+
+[storage]
+# Image attachments (site/location photos, floor plans). Relative to the data
+# dir, or absolute. Back it up together with the database.
+attachmentsDir = "attachments"

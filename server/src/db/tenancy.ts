@@ -33,8 +33,10 @@ import {
 	depthOf,
 	maxDescendantOffset,
 } from '../services/hierarchy'
+import { removeAttachmentFiles } from '../storage'
+import { type AttachmentRow, deleteOwnerAttachments } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
 	checkExists,
@@ -565,10 +567,18 @@ export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
 	if (Result.isError(blocked)) {
 		return blocked
 	}
-	const deleted = await tryWrite(() => getDb().delete(sites).where(eq(sites.id, id)))
+	// Attachments go with their site; their files only after the commit.
+	const deleted = await tryWrite(() =>
+		withTransaction(async (): Promise<AttachmentRow[]> => {
+			const removed = await deleteOwnerAttachments({ site_id: id })
+			await getDb().delete(sites).where(eq(sites.id, id))
+			return removed
+		}),
+	)
 	if (Result.isError(deleted)) {
 		return deleted
 	}
+	await removeAttachmentFiles(deleted.value)
 	return await logDelete('site', current.value)
 }
 
@@ -922,9 +932,17 @@ export async function deleteLocation(id: number): Promise<Result<LocationRow, Er
 	if (Result.isError(blocked)) {
 		return blocked
 	}
-	const deleted = await tryWrite(() => getDb().delete(locations).where(eq(locations.id, id)))
+	// Attachments go with their location; their files only after the commit.
+	const deleted = await tryWrite(() =>
+		withTransaction(async (): Promise<AttachmentRow[]> => {
+			const removed = await deleteOwnerAttachments({ location_id: id })
+			await getDb().delete(locations).where(eq(locations.id, id))
+			return removed
+		}),
+	)
 	if (Result.isError(deleted)) {
 		return deleted
 	}
+	await removeAttachmentFiles(deleted.value)
 	return await logDelete('location', current.value)
 }

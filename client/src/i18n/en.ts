@@ -153,6 +153,8 @@ export const en = {
 	'noun.integration.other': 'integrations',
 	'noun.externalTenant.one': 'external company',
 	'noun.externalTenant.other': 'external companies',
+	'noun.attachment.one': 'image',
+	'noun.attachment.other': 'images',
 
 	// components
 	'form.slugHint':
@@ -661,6 +663,23 @@ export const en = {
 	'changeObject.rackType': 'Rack type',
 	'changeObject.interfaceTemplate': 'Interface stub',
 	'changeObject.deviceRole': 'Device role',
+	'changeObject.attachment': 'Image',
+
+	// attachment
+	'attachment.title': 'Images',
+	'attachment.empty': 'No images yet.',
+	'attachment.emptyDrop': 'No images yet. Drop PNG or JPEG files here to upload them.',
+	'attachment.upload': 'Upload images',
+	'attachment.uploading': 'Uploading…',
+	'attachment.dropHere': 'Drop images to upload them',
+	'attachment.open': 'Open {name}',
+	'attachment.unsupportedType': '{name}: only PNG and JPEG images are supported.',
+	'attachment.tooLarge': '{name}: the image is larger than {max}.',
+	'attachment.editDescription': 'Edit description',
+	'attachment.replace': 'Replace image',
+	'attachment.dimensions': '{width} × {height} px',
+	'attachment.kilobytes': '{size} KB',
+	'attachment.megabytes': '{size} MB',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',
@@ -875,6 +894,7 @@ export const en = {
 	'api.deleteStubFailed': 'Failed to delete interface stub',
 	'api.loadElevationFailed': 'Failed to load rack elevation',
 	'api.importFailed': 'Failed to import {noun}',
+	'api.uploadFailed': 'Failed to upload {name}',
 	'api.setupFailed': 'Setup failed.',
 	'api.passwordChangeFailed': 'Changing the password failed.',
 	'api.signInFailed': 'Sign-in failed.',

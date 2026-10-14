@@ -155,6 +155,8 @@ export const de: Messages = {
 	'noun.integration.other': 'Integrationen',
 	'noun.externalTenant.one': 'externe Firma',
 	'noun.externalTenant.other': 'externe Firmen',
+	'noun.attachment.one': 'Bild',
+	'noun.attachment.other': 'Bilder',
 
 	// components
 	'form.slugHint':
@@ -668,6 +670,24 @@ export const de: Messages = {
 	'changeObject.rackType': 'Racktyp',
 	'changeObject.interfaceTemplate': 'Anschlussplatzhalter',
 	'changeObject.deviceRole': 'Geräterolle',
+	'changeObject.attachment': 'Bild',
+
+	// attachment
+	'attachment.title': 'Bilder',
+	'attachment.empty': 'Noch keine Bilder.',
+	'attachment.emptyDrop':
+		'Noch keine Bilder. Legen Sie PNG- oder JPEG-Dateien hier ab, um sie hochzuladen.',
+	'attachment.upload': 'Bilder hochladen',
+	'attachment.uploading': 'Wird hochgeladen…',
+	'attachment.dropHere': 'Bilder zum Hochladen hier ablegen',
+	'attachment.open': '{name} öffnen',
+	'attachment.unsupportedType': '{name}: Nur PNG- und JPEG-Bilder werden unterstützt.',
+	'attachment.tooLarge': '{name}: Das Bild ist größer als {max}.',
+	'attachment.editDescription': 'Beschreibung bearbeiten',
+	'attachment.replace': 'Bild ersetzen',
+	'attachment.dimensions': '{width} × {height} px',
+	'attachment.kilobytes': '{size} KB',
+	'attachment.megabytes': '{size} MB',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',
@@ -887,6 +907,7 @@ export const de: Messages = {
 	'api.deleteStubFailed': 'Anschlussplatzhalter konnte nicht gelöscht werden',
 	'api.loadElevationFailed': 'Rackansicht konnte nicht geladen werden',
 	'api.importFailed': '{noun} konnten nicht importiert werden',
+	'api.uploadFailed': '{name} konnte nicht hochgeladen werden',
 	'api.setupFailed': 'Einrichtung fehlgeschlagen.',
 	'api.passwordChangeFailed': 'Das Passwort konnte nicht geändert werden.',
 	'api.signInFailed': 'Anmeldung fehlgeschlagen.',
