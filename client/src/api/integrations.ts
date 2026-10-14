@@ -7,6 +7,7 @@ import { Result } from 'better-result'
 import type {
 	DeviceIntegrationStatus,
 	EmployeeIntegrationStatus,
+	EmployeePushField,
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
 	ExternalLinkJson,
@@ -326,4 +327,17 @@ export async function unlink_external(
 		param: { provider, id: String(linkId) },
 	})
 	return to_result<unknown>(res, t('integration.unlinkFailed'))
+}
+
+/** Overwrites one field of the linked external employee with the conex value. */
+export async function update_external_employee(
+	provider: IntegrationProvider,
+	employee_id: number,
+	field: EmployeePushField,
+): Promise<Result<ExternalEmployeeJson, Error>> {
+	const res = await client.integrations[':provider'].employees.$put({
+		param: { provider },
+		json: { employee_id, field },
+	})
+	return to_result<ExternalEmployeeJson>(res, t('integration.updateExternalEmployeeFailed'))
 }

@@ -26,6 +26,7 @@ import {
 	getApiV1Manufacturers,
 	getApiV1PcsPcId,
 	getApiV1PeripheriesPeripheryId,
+	type PutApiErpV1EmployeesIdData,
 	postApiV1Login,
 	postApiV1Pcs,
 	postApiV1Tickets,
@@ -81,6 +82,8 @@ export interface TanssCustomers {
 	companies: TanssCompany[]
 	employees: TanssEmployee[]
 }
+
+export type TanssEmployeeUpdate = PutApiErpV1EmployeesIdData['body']
 
 export type TanssPc = TnsPersonalComputerWithDetails
 
@@ -572,6 +575,17 @@ export class TanssSession {
 					ticket.statusId !== undefined ? (states.get(ticket.statusId) ?? null) : null,
 			})),
 		)
+	}
+
+	/** Overwrites the given fields of an employee (ERP API; omitted fields stay). */
+	async updateEmployee(
+		employeeId: number,
+		changes: TanssEmployeeUpdate,
+	): Promise<Result<void, Error>> {
+		const res = await call('employee update', async () => ({
+			data: await this.erp.employees.update(employeeId, changes),
+		}))
+		return res.map(() => undefined)
 	}
 
 	/** Creates a PC/server and returns it as stored by TANSS. */

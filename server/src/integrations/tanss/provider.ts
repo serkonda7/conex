@@ -2,6 +2,7 @@ import { Result } from 'better-result'
 import type {
 	DeviceInput,
 	DeviceUpdate,
+	EmployeeUpdate,
 	ExternalDevice,
 	ExternalDirectory,
 	ExternalEmployee,
@@ -344,5 +345,23 @@ export class TanssProvider implements IntegrationProvider {
 				manufacturers.value,
 			),
 		)
+	}
+
+	/** Partial update: TANSS keeps every field not sent. */
+	async updateEmployee(
+		externalId: string,
+		changes: EmployeeUpdate,
+	): Promise<Result<void, Error>> {
+		const id = Number(externalId)
+		if (!Number.isInteger(id)) {
+			return Result.err(new Error(`Invalid TANSS employee id ${externalId}`))
+		}
+		return this.session.updateEmployee(id, {
+			...(changes.first_name !== undefined ? { firstName: changes.first_name } : {}),
+			...(changes.last_name !== undefined ? { lastName: changes.last_name } : {}),
+			...(changes.email !== undefined ? { emailAddress: changes.email } : {}),
+			...(changes.phone !== undefined ? { telephoneNumber: changes.phone } : {}),
+			...(changes.mobile !== undefined ? { mobilePhone: changes.mobile } : {}),
+		})
 	}
 }

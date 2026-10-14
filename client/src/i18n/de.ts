@@ -794,6 +794,8 @@ export const de: Messages = {
 	'integration.createExternalFailed': 'Gerät konnte extern nicht angelegt werden',
 	'integration.updateExternal': 'In {provider} aktualisieren',
 	'integration.updateExternalFailed': 'Gerät konnte extern nicht aktualisiert werden',
+	'integration.updateExternalEmployeeFailed':
+		'Mitarbeiter konnte extern nicht aktualisiert werden',
 	'integration.pickTenant': '{provider}-Firma verknüpfen',
 	'integration.searchTenants': 'Name oder Kundennummer suchen…',
 	'integration.alreadyLinked': 'verknüpft',
@@ -819,10 +821,10 @@ export const de: Messages = {
 	'integration.ignored': 'Ignoriert',
 	'integration.restore': 'Wiederherstellen',
 	'integration.staleExternal': '{id} (existiert nicht mehr)',
-	'integration.pickBoardTenant': 'Mandant auswählen, um seine Geräte zu verknüpfen.',
+	'integration.pickBoardTenant':
+		'Mandant in der Mandantenauswahl wählen, um seine Geräte und Mitarbeiter zu verknüpfen.',
 	'integration.boardTenantNotLinked':
 		'Dieser Mandant ist noch mit keiner {provider}-Firma verknüpft.',
-	'integration.syncTenant': 'Mandant synchronisieren',
 	'integration.openCount': '{count} offen',
 	'integration.linkSuggestions.one': '{count} Vorschlag verknüpfen',
 	'integration.linkSuggestions.other': 'Alle {count} Vorschläge verknüpfen',

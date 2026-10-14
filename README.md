@@ -4,7 +4,7 @@ Network inventory for MSPs.
 
 ## Getting Started
 ```sh
-docker start conex-db
+docker start conex-dev-db
 export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
 bun run dev
 ```
@@ -14,8 +14,8 @@ bun run dev
 bun install
 
 # Create postgres DB
-docker run -d --name conex-db -p 5432:5432 \
-  -e POSTGRES_USER=conex -e POSTGRES_PASSWORD=conex -e POSTGRES_DB=conex postgres:16
+docker run -d --name conex-dev-db -p 5432:5432 \
+  -e POSTGRES_USER=conex -e POSTGRES_PASSWORD=conex -e POSTGRES_DB=conex postgres:17
 export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
 ```
 
@@ -43,13 +43,13 @@ bun run dev
 ### Backing up Postgres Database
 ```sh
 # Backup
-docker exec conex-db pg_dump -U conex -Fc conex > backups/conex-$(date +%F).dump
+docker exec conex-dev-db pg_dump -U conex -Fc conex > backups/conex-$(date +%F).dump
 
 # Restore
-docker exec -i conex-db pg_restore -U conex -d conex < backups/<file>.dump
+docker exec -i conex-dev-db pg_restore -U conex -d conex < backups/<file>.dump
 
 # Restore and overwrite any existing data
-docker exec -i conex-db pg_restore -U conex -d conex --clean --if-exists --no-owner < backups/<file>.dump
+docker exec -i conex-dev-db pg_restore -U conex -d conex --clean --if-exists --no-owner < backups/<file>.dump
 ```
 
 

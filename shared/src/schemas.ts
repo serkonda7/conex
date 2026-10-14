@@ -1681,12 +1681,24 @@ export const ExternalDeviceUpdateSchema = v.strictObject({
 	field: v.picklist(EXTERNAL_PUSH_FIELDS),
 })
 
+/** Employee fields whose conex value can overwrite the external one on a mismatch. */
+export const EMPLOYEE_PUSH_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'mobile'] as const
+
+export type EmployeePushField = (typeof EMPLOYEE_PUSH_FIELDS)[number]
+
+/** Writes one conex field of a linked employee to the external system. */
+export const ExternalEmployeeUpdateSchema = v.strictObject({
+	employee_id: IdSchema,
+	field: v.picklist(EMPLOYEE_PUSH_FIELDS),
+})
+
 export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
 export type ExternalDeviceCreate = v.InferOutput<typeof ExternalDeviceCreateSchema>
 export type ExternalEmployeeImport = v.InferOutput<typeof ExternalEmployeeImportSchema>
 export type ExternalDeviceUpdate = v.InferOutput<typeof ExternalDeviceUpdateSchema>
+export type ExternalEmployeeUpdate = v.InferOutput<typeof ExternalEmployeeUpdateSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */

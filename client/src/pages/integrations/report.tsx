@@ -1,6 +1,8 @@
 import { IconRefresh } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import {
+	EMPLOYEE_PUSH_FIELDS,
+	type EmployeePushField,
 	EXTERNAL_PUSH_FIELDS,
 	type ExternalPushField,
 	FINDING_KINDS,
@@ -11,7 +13,6 @@ import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
 	create_external_device,
-	type ExternalTenantJson,
 	type ExternalTenantListItem,
 	fetch_integration,
 	fetch_integration_report,
@@ -26,10 +27,11 @@ import {
 	start_sync,
 	unlink_external,
 	update_external_device,
+	update_external_employee,
 } from '../../api/integrations'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { row_options, SelectField } from '../../components/form'
+import { SelectField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { useTableColumns } from '../../components/list_page'
 import { t, tp } from '../../i18n'
@@ -42,13 +44,8 @@ import {
 } from '../../i18n/labels'
 import { createRecord, useAction } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
-import { can, canGlobal, isScoped } from '../../lib/session'
-import {
-	contextTenantId,
-	contextTenantRows,
-	tenantContext,
-	tenantContextFilters,
-} from '../../lib/tenant_context'
+import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
+import { contextTenantId, tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
 import { ExternalTenantPicker } from './external_tenant_picker'
 import { LinkBoardView } from './link_board'
@@ -58,6 +55,15 @@ function pushField(f: IntegrationFinding): ExternalPushField | null {
 	return f.kind === 'device_mismatch' &&
 		(EXTERNAL_PUSH_FIELDS as readonly string[]).includes(f.field ?? '')
 		? (f.field as ExternalPushField)
+		: null
+}
+
+/** Field of an employee mismatch that can be written to the external system. */
+function employeePushField(f: IntegrationFinding): EmployeePushField | null {
+	return f.kind === 'employee_mismatch' &&
+		f.local !== null &&
+		(EMPLOYEE_PUSH_FIELDS as readonly string[]).includes(f.field ?? '')
+		? (f.field as EmployeePushField)
 		: null
 }
 
@@ -110,40 +116,23 @@ function parseView(raw: string): View {
 }
 
 /**
- * Link board of tenants, or of the devices or employees of one tenant
- * (picked here; follows `default_tenant` whenever that changes).
+ * Link board of tenants, or of the devices or employees of the selected
+ * tenant (`tenant`, null: none selected).
  */
 function LinkBoardPanel(props: {
 	provider: IntegrationProvider
 	entity_type: 'tenant' | 'device' | 'employee'
-	default_tenant: number | null
+	tenant: number | null
 	reload: number
 	on_error: (message: string | null) => void
 }): JSX.Element {
-	const [tenant, setTenant] = createSignal<number | null>(props.default_tenant)
-	createEffect(
-		on(
-			() => props.default_tenant,
-			(next: number | null) => setTenant(next),
-			{ defer: true },
-		),
-	)
-	const sync = useAction(props.on_error)
-
-	// Scoped users only see their own tenant: preselect it.
-	const tenantOptions = createMemo(() => row_options(contextTenantRows()))
-	const effectiveTenant = createMemo((): number | null => {
-		const rows = contextTenantRows()
-		return tenant() ?? (isScoped() && rows.length === 1 ? (rows[0]?.id ?? null) : null)
-	})
-
 	const source = createMemo(() =>
 		props.entity_type === 'tenant'
 			? { entity_type: props.entity_type, tenant: undefined, reload: props.reload }
-			: effectiveTenant() !== null
+			: props.tenant !== null
 				? {
 						entity_type: props.entity_type,
-						tenant: effectiveTenant() ?? undefined,
+						tenant: props.tenant,
 						reload: props.reload,
 					}
 				: null,
@@ -161,15 +150,6 @@ function LinkBoardPanel(props: {
 		void start_sync(props.provider, tenantIds.length === 1 ? tenantIds[0] : undefined)
 	}
 
-	async function handleSyncTenant(): Promise<void> {
-		const id = effectiveTenant()
-		if (id === null) {
-			return
-		}
-		await sync.run(() => run_sync(props.provider, id))
-		void refetch()
-	}
-
 	const editable = (): boolean =>
 		props.entity_type === 'tenant'
 			? canGlobal('integrations.manage')
@@ -177,33 +157,6 @@ function LinkBoardPanel(props: {
 
 	return (
 		<div>
-			<Show when={props.entity_type !== 'tenant'}>
-				<div class="toolbar-row">
-					<Show when={!isScoped()}>
-						<SelectField
-							id="link-board-tenant"
-							label={tp('entity.tenant', 1)}
-							value={String(effectiveTenant() ?? '')}
-							onChange={(v: string) => setTenant(parseId(v))}
-							emptyLabel={t('integration.pickBoardTenant')}
-							options={tenantOptions()}
-						/>
-					</Show>
-					<Show when={can('integrations.manage') && board()?.external_tenant}>
-						<button
-							type="button"
-							disabled={sync.pending()}
-							onClick={() => void handleSyncTenant()}
-						>
-							<IconLabel icon={IconRefresh}>
-								{sync.pending()
-									? t('integration.syncing')
-									: t('integration.syncTenant')}
-							</IconLabel>
-						</button>
-					</Show>
-				</div>
-			</Show>
 			<Show
 				when={source() !== null}
 				fallback={<Empty message={t('integration.pickBoardTenant')} />}
@@ -231,20 +184,10 @@ function LinkBoardPanel(props: {
 									/>
 								}
 							>
-								<Show when={current().external_tenant}>
-									{(company: () => ExternalTenantJson): JSX.Element => (
-										<p class="page-subtitle">
-											{t('integration.linkedTo')}: {company().name}
-											{company().display_id !== null
-												? ` (${company().display_id})`
-												: ''}
-										</p>
-									)}
-								</Show>
 								<LinkBoardView
 									provider={props.provider}
 									board={current()}
-									tenant_id={effectiveTenant() ?? undefined}
+									tenant_id={props.tenant ?? undefined}
 									editable={editable()}
 									on_error={props.on_error}
 									on_changed={() => void refetch()}
@@ -265,10 +208,10 @@ function LinkBoardPanel(props: {
 
 /**
  * /integrations/:id — consistency report of one provider, plus link boards
- * (`?view=tenants|devices|employees`) for side-by-side linking. The report
- * and the device/employee boards follow the tenant selector; `?tenant=` (from a tenant's
- * integration card) wins until the selector is switched. Rows offer the fitting fix: link, confirm
- * a suggestion, create the device externally, ignore, or unlink.
+ * (`?view=tenants|devices|employees`) for side-by-side linking. The report, the
+ * device/employee boards and "Sync now" follow the tenant selector; `?tenant=` (from a
+ * tenant's integration card) wins until the selector is switched. Rows offer the fitting
+ * fix: link, confirm a suggestion, create the device externally, ignore, or unlink.
  */
 export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -279,8 +222,9 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [boardReload, setBoardReload] = createSignal(0)
 	const [queryTenant, setQueryTenant] = createSignal(parseId(queryParam('tenant')))
 	createEffect(on(tenantContext, () => setQueryTenant(null), { defer: true }))
-	// Preselected tenant of the device board.
-	const boardTenant = (): number | null => queryTenant() ?? contextTenantId()
+	// Single selected tenant (scoped users: their own) of the boards and syncs.
+	const selectedTenant = (): number | null =>
+		queryTenant() ?? (isScoped() ? sessionTenantId() : contextTenantId())
 	const views = (): { id: View; label: string }[] => [
 		{ id: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.
@@ -347,7 +291,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		) {
 			return
 		}
-		await sync.run(() => run_sync(row.provider, undefined, clean))
+		await sync.run(() => run_sync(row.provider, selectedTenant() ?? undefined, clean))
 		void refetch()
 		setBoardReload((n) => n + 1)
 	}
@@ -565,10 +509,33 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				)
 			case 'employee_stale':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
-			case 'employee_mismatch':
+			case 'employee_mismatch': {
+				const field = employeePushField(f)
 				return (
-					<Show when={can('integrations.manage') && f.field === 'tenant'}>{unlink}</Show>
+					<Show when={can('integrations.manage')}>
+						<Show when={f.field === 'tenant'}>{unlink}</Show>
+						{field !== null && (
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										update_external_employee(
+											provider,
+											f.employee_id ?? 0,
+											field,
+										),
+									)
+								}
+							>
+								{t('integration.updateExternal', {
+									provider: providerLabel(provider),
+								})}
+							</button>
+						)}
+					</Show>
 				)
+			}
 			default:
 				return null
 		}
@@ -705,7 +672,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="tenant"
-							default_tenant={null}
+							tenant={null}
 							reload={boardReload()}
 							on_error={setError}
 						/>
@@ -714,7 +681,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="device"
-							default_tenant={boardTenant()}
+							tenant={selectedTenant()}
 							reload={boardReload()}
 							on_error={setError}
 						/>
@@ -723,7 +690,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="employee"
-							default_tenant={boardTenant()}
+							tenant={selectedTenant()}
 							reload={boardReload()}
 							on_error={setError}
 						/>

@@ -1,5 +1,6 @@
 import type { Result } from 'better-result'
 import type {
+	EmployeePushField,
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
 	ExternalPushField,
@@ -43,6 +44,8 @@ export interface IntegrationProvider {
 		externalId: string,
 		changes: DeviceUpdate,
 	): Promise<Result<ExternalDeviceJson, Error>>
+	/** Overwrites fields of an employee; absent when unsupported. */
+	updateEmployee?(externalId: string, changes: EmployeeUpdate): Promise<Result<void, Error>>
 }
 
 export interface ExternalDirectory {
@@ -53,6 +56,8 @@ export interface ExternalDirectory {
 
 /** Manufacturer is matched by name like on create. */
 export type DeviceUpdate = Partial<Record<ExternalPushField, string>>
+
+export type EmployeeUpdate = Partial<Record<EmployeePushField, string>>
 
 export interface DeviceInput {
 	externalTenantId: string

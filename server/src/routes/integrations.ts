@@ -6,6 +6,7 @@ import {
 	ExternalDeviceCreateSchema,
 	ExternalDeviceUpdateSchema,
 	ExternalEmployeeImportSchema,
+	ExternalEmployeeUpdateSchema,
 	ExternalIgnoreLocalSchema,
 	ExternalIgnoreSchema,
 	ExternalLinkCreateSchema,
@@ -63,6 +64,7 @@ import {
 import { getSyncRun, startSync } from '../integrations/sync'
 import { createTicket, listTickets } from '../integrations/tickets'
 import { updateExternalDevice } from '../integrations/update_device'
+import { updateExternalEmployee } from '../integrations/update_employee'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -691,6 +693,40 @@ export const integrationsApp = new Hono()
 				return externalDenied
 			}
 			return sendResult(c, await updateExternalDevice(provider, input.device_id, input.field))
+		},
+	)
+	.put(
+		'/:provider/employees',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalEmployeeUpdateSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const input = c.req.valid('json')
+			const denied = requirePermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const tenant = await loadEmployeeTenant(c, input.employee_id)
+			if (tenant instanceof Response) {
+				return tenant
+			}
+			const link = await linkOf(provider, 'employee', input.employee_id)
+			if (!link) {
+				return jsonError(c, 'Employee is not linked', 400)
+			}
+			const external = await readEmployee(provider, link.external_id)
+			const externalDenied = await checkExternalWrite(
+				c,
+				provider,
+				external?.external_tenant_ids ?? link.external_tenant_id,
+			)
+			if (externalDenied) {
+				return externalDenied
+			}
+			return sendResult(
+				c,
+				await updateExternalEmployee(provider, input.employee_id, input.field),
+			)
 		},
 	)
 	.post(

@@ -8,6 +8,7 @@
  * state are still compared.
  */
 import { and, desc, eq, inArray, type SQL } from 'drizzle-orm'
+import { normalizePhone } from 'shared/src/phone'
 import type {
 	DeviceCompareField,
 	DeviceIntegrationStatus,
@@ -138,9 +139,9 @@ export async function localEmployees(where: SQL | undefined): Promise<LocalEmplo
 		.where(where)
 }
 
-/** Phone numbers: digits and a leading `+` only; null when empty. */
-function normalizePhone(raw: string | null): string | null {
-	const key = (raw ?? '').replace(/(?!^\+)[^\d]/g, '')
+/** Phone numbers in international format (see `normalizePhone`); null when empty. */
+function phoneKey(raw: string | null): string | null {
+	const key = normalizePhone(raw ?? '')
 	return key === '' || key === '+' ? null : key
 }
 
@@ -150,8 +151,8 @@ const EMPLOYEE_NORMALIZERS: Record<EmployeeCompareField, (raw: string | null) =>
 	salutation: normalizeName,
 	title: normalizeName,
 	email: normalizeEmail,
-	phone: normalizePhone,
-	mobile: normalizePhone,
+	phone: phoneKey,
+	mobile: phoneKey,
 }
 
 /** conex values of `field`: every address / number of that kind, single fields as one entry. */
