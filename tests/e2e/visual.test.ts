@@ -104,3 +104,25 @@ test('employee edit form layout', async ({ page }) => {
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('employee-edit-form.png')
 })
+
+test('floor plan with polygon area layout', async ({ page }) => {
+	const locationsResponse = await page.request.get(
+		'/api/locations?search=E2E%20Floor%202&limit=200',
+	)
+	const location = (
+		(await locationsResponse.json()) as { items: { id: number; name: string }[] }
+	).items.find((item) => item.name === 'E2E Floor 2')
+	expect(location).toBeDefined()
+	const attachmentsResponse = await page.request.get(`/api/attachments?location=${location?.id}`)
+	const plan = (
+		(await attachmentsResponse.json()) as { id: number; is_floorplan: boolean }[]
+	).find((item) => item.is_floorplan)
+	expect(plan).toBeDefined()
+
+	await page.goto(`/floorplans/${plan?.id}`)
+	await expect(page.locator('.floorplan-area polygon')).toHaveCount(1)
+	await expect(page.locator('.floorplan-area-label')).toHaveText('E2E Triangle')
+	await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('floorplan-polygon.png')
+})
