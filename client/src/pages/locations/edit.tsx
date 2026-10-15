@@ -15,24 +15,16 @@ import {
 	ReadOnlyField,
 	row_options,
 	SelectField,
-	SlugField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { locationTypeOptions } from '../../i18n/labels'
-import {
-	type FormValues,
-	id_value,
-	submit_form,
-	text,
-	use_slug_fields,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 
 /** /locations/:id/edit — location edit form. Saves back to the list when opened from it, else to the detail page. */
 export function LocationEditPage(props: { id: number }): JSX.Element {
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	const [locationType, setLocationType] = createSignal<LocationType>('other')
 	const [parentId, setParentId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
@@ -41,7 +33,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 		id: props.id,
 		load: fetch_location,
 		fill: (row: LocationRow) => {
-			slugFields.fill(row.name, row.slug)
+			setName(row.name)
 			setLocationType(row.type)
 			setParentId(id_value(row.parent_id))
 			setTenantId(id_value(row.tenant_id))
@@ -64,12 +56,10 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 		e.preventDefault()
 		await submit_form({
 			form,
-			name: slugFields.name(),
-			slug: slugFields.slug(),
+			name: name(),
 			save: (values: FormValues) =>
 				update_location(props.id, {
 					name: values.name,
-					slug: values.slug,
 					type: locationType(),
 					parent_id: parseId(parentId()),
 					tenant_id: parseId(tenantId()),
@@ -97,15 +87,8 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 			<NameField
 				id="location-edit-name"
 				placeholder={t('location.namePlaceholder')}
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
-			/>
-			<SlugField
-				id="location-edit-slug"
-				placeholder={t('location.slugPlaceholder')}
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
-				editing
+				value={name()}
+				onInput={setName}
 			/>
 			<SelectField
 				id="location-edit-type"

@@ -46,7 +46,6 @@ export function TenantGroupDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={group()?.name}
-					slug={group()?.slug}
 					editHref={`/tenant-groups/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
@@ -60,10 +59,6 @@ export function TenantGroupDetailPage(props: { id: number }): JSX.Element {
 				</div>
 
 				<DetailCard label={t('tenantGroup.details')}>
-					<dt>{t('common.slug')}</dt>
-					<dd>
-						<code>{group()?.slug}</code>
-					</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>
 						<Markdown text={group()?.comments} />

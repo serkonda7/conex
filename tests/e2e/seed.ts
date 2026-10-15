@@ -105,11 +105,9 @@ if (!site) {
 	await db.insert(sites).values({ name: 'E2E Site', tenant_id: tenant.id })
 }
 
-let manufacturer = (await db.select().from(manufacturers)).find((row) => row.slug === 'e2e-maker')
+let manufacturer = (await db.select().from(manufacturers)).find((row) => row.name === 'E2E Maker')
 if (!manufacturer) {
-	manufacturer = (
-		await db.insert(manufacturers).values({ name: 'E2E Maker', slug: 'e2e-maker' }).returning()
-	)[0]
+	manufacturer = (await db.insert(manufacturers).values({ name: 'E2E Maker' }).returning())[0]
 }
 if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 42U Cabinet')) {
 	await db.insert(device_types).values({
@@ -170,11 +168,11 @@ const e2eSwitch = (await db.select().from(device_types)).find(
 // Nested location tree for the locations list snapshot; parents come first.
 if (e2eSite) {
 	const locationTree = [
-		{ name: 'E2E Floor 1', slug: 'e2e-floor-1', type: 'floor', parent: null },
-		{ name: 'E2E Server Room', slug: 'e2e-server-room', type: 'room', parent: 'E2E Floor 1' },
-		{ name: 'E2E Cage A', slug: 'e2e-cage-a', type: 'other', parent: 'E2E Server Room' },
-		{ name: 'E2E Storage Room', slug: 'e2e-storage-room', type: 'room', parent: 'E2E Floor 1' },
-		{ name: 'E2E Floor 2', slug: 'e2e-floor-2', type: 'floor', parent: null },
+		{ name: 'E2E Floor 1', type: 'floor', parent: null },
+		{ name: 'E2E Server Room', type: 'room', parent: 'E2E Floor 1' },
+		{ name: 'E2E Cage A', type: 'other', parent: 'E2E Server Room' },
+		{ name: 'E2E Storage Room', type: 'room', parent: 'E2E Floor 1' },
+		{ name: 'E2E Floor 2', type: 'floor', parent: null },
 	] as const
 	const locationIds = new Map<string, number>()
 	for (const location of locationTree) {
@@ -183,7 +181,6 @@ if (e2eSite) {
 			parent_id: location.parent ? (locationIds.get(location.parent) ?? null) : null,
 			tenant_id: tenant.id,
 			name: location.name,
-			slug: location.slug,
 			type: location.type,
 			description: null,
 		}

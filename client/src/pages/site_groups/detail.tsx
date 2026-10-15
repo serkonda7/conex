@@ -22,7 +22,7 @@ import { t, tp } from '../../i18n'
 import { createRecord, createRowsFor } from '../../lib/resource'
 
 /**
- * /site-groups/:id — flat site group detail: header with slug,
+ * /site-groups/:id — flat site group detail: header,
  * detail grid, and the sites-in-group table.
  */
 export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
@@ -52,17 +52,12 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={group()?.name}
-					slug={group()?.slug}
 					editHref={`/site-groups/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
 				<DetailSubtitle description={group()?.description} />
 
 				<DetailCard label={t('siteGroup.details')}>
-					<dt>{t('common.slug')}</dt>
-					<dd>
-						<code>{group()?.slug}</code>
-					</dd>
 					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<RecordLink id={tenantId()} record={tenant} base="/tenants" />

@@ -13,7 +13,6 @@ import {
 	NameField,
 	row_options,
 	SelectField,
-	SlugField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { locationTypeOptions } from '../../i18n/labels'
@@ -22,7 +21,6 @@ import {
 	is_add_another_submit,
 	submit_form,
 	text,
-	use_slug_fields,
 	useFormState,
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
@@ -32,7 +30,7 @@ import { useSiteTenant } from '../../lib/tenant_context'
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
 	const form = useFormState()
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationType, setLocationType] = createSignal<LocationType>('other')
 	const [parentId, setParentId] = createSignal('')
@@ -59,13 +57,11 @@ export function LocationAddPage(): JSX.Element {
 		e.preventDefault()
 		await submit_form({
 			form,
-			name: slugFields.name(),
-			slug: slugFields.slug(),
+			name: name(),
 			validate: () => (parseId(siteId()) === null ? t('location.selectSiteFirst') : null),
 			save: (values: FormValues) =>
 				create_location({
 					name: values.name,
-					slug: values.slug,
 					type: locationType(),
 					site_id: Number(siteId()),
 					parent_id: parseId(parentId()),
@@ -73,7 +69,11 @@ export function LocationAddPage(): JSX.Element {
 					description: text(description()),
 				}),
 			navigateTo: '/locations',
-			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
+			onSuccess: is_add_another_submit(e)
+				? (): void => {
+						setName('')
+					}
+				: undefined,
 		})
 	}
 
@@ -87,15 +87,9 @@ export function LocationAddPage(): JSX.Element {
 			<NameField
 				id="location-name"
 				placeholder={t('location.namePlaceholder')}
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
+				value={name()}
+				onInput={setName}
 				autofocus
-			/>
-			<SlugField
-				id="location-slug"
-				placeholder={t('location.slugPlaceholder')}
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
 			/>
 			<SelectField
 				id="location-type"

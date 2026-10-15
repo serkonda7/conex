@@ -6,13 +6,7 @@ import {
 	type TenantGroupRow,
 	update_tenant_group,
 } from '../../api/tenancy'
-import {
-	CommentsField,
-	DescriptionField,
-	FormPage,
-	NameField,
-	SlugField,
-} from '../../components/form'
+import { CommentsField, DescriptionField, FormPage, NameField } from '../../components/form'
 import { t } from '../../i18n'
 import {
 	cleared,
@@ -20,21 +14,20 @@ import {
 	is_add_another_submit,
 	submit_form,
 	text,
-	use_slug_fields,
 	useEntityForm,
 } from '../../lib/form'
 import { useFormReturnRoute } from '../../lib/router'
 
 /** Tenant group create (`id` omitted) or edit form. */
 function TenantGroupForm(props: { id?: number }): JSX.Element {
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_tenant_group,
 		fill: (row: TenantGroupRow) => {
-			slugFields.fill(row.name, row.slug)
+			setName(row.name)
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
@@ -44,7 +37,6 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 
 	const body = (values: FormValues): TenantGroupCreate => ({
 		name: values.name,
-		slug: values.slug,
 		description: text(description()),
 		comments: text(comments()),
 	})
@@ -54,14 +46,17 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 		const id = props.id
 		await submit_form({
 			form,
-			name: slugFields.name(),
-			slug: slugFields.slug(),
+			name: name(),
 			save: (values: FormValues) =>
 				id === undefined
 					? create_tenant_group(body(values))
 					: update_tenant_group(id, cleared(body(values))),
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
+			onSuccess: is_add_another_submit(e)
+				? (): void => {
+						setName('')
+					}
+				: undefined,
 		})
 	}
 
@@ -77,16 +72,9 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 			<NameField
 				id={`${prefix}-name`}
 				placeholder={t('tenantGroup.namePlaceholder')}
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
+				value={name()}
+				onInput={setName}
 				autofocus={!form.editing}
-			/>
-			<SlugField
-				id={`${prefix}-slug`}
-				placeholder={t('tenantGroup.slugPlaceholder')}
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
-				editing={form.editing}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

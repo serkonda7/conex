@@ -214,33 +214,6 @@ export function NameField(props: {
 	return <TextField {...props} label={t('common.name')} required maxLength={100} />
 }
 
-/** Required URL slug input, pattern-checked against `SlugSchema`. Create
- * forms note that the slug is auto-filled from the name. */
-export function SlugField(props: {
-	id: string
-	placeholder: string
-	value: string
-	onInput: (value: string) => void
-	/** Edit forms: the slug no longer follows the name. */
-	editing?: boolean
-}): JSX.Element {
-	return (
-		<TextField
-			id={props.id}
-			label={t('common.slug')}
-			placeholder={props.placeholder}
-			required
-			maxLength={100}
-			pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-			value={props.value}
-			onInput={props.onInput}
-			hint={
-				<Hint>{props.editing === true ? t('form.slugHintEdit') : t('form.slugHint')}</Hint>
-			}
-		/>
-	)
-}
-
 /** The optional one-line description every entity form offers. */
 export function DescriptionField(props: {
 	id: string

@@ -51,7 +51,7 @@ const CABLE_CSV_HEADER = [
 ]
 
 const DEVICE_TYPE_CSV_HEADER = [
-	'manufacturer_slug',
+	'manufacturer',
 	'model',
 	'u_height',
 	'is_full_depth',
@@ -60,12 +60,12 @@ const DEVICE_TYPE_CSV_HEADER = [
 	'description',
 ]
 
-/** Device-type export: one row per type, manufacturer as slug for re-import. */
+/** Device-type export: one row per type, manufacturer as name for re-import. */
 export async function exportDeviceTypesCsv(): Promise<string> {
 	const db = getDb()
 	const rows = await db
 		.select({
-			manufacturer_slug: manufacturers.slug,
+			manufacturer: manufacturers.name,
 			model: device_types.model,
 			u_height: device_types.u_height,
 			is_full_depth: device_types.is_full_depth,
@@ -80,7 +80,7 @@ export async function exportDeviceTypesCsv(): Promise<string> {
 	return toCsv(
 		DEVICE_TYPE_CSV_HEADER,
 		rows.map((r) => [
-			r.manufacturer_slug,
+			r.manufacturer,
 			r.model,
 			String(r.u_height),
 			r.is_full_depth ? 'true' : 'false',
@@ -96,7 +96,7 @@ class ImportRollback extends Error {}
 
 /**
  * Imports the device-type YAML used by NetBox's device-type library. NetBox
- * uses manufacturer names (rather than Conex manufacturer slugs), and one
+ * uses manufacturer names, and one
  * YAML document represents one device type. A YAML sequence is accepted too,
  * which makes pasting a collection of library definitions convenient.
  *
@@ -209,7 +209,7 @@ async function importDeviceTypeDefinition(
 	}
 	seen.add(model)
 	const mfr = (await getDb().select().from(manufacturers)).find(
-		(row) => row.name.toLowerCase() === manufacturer.toLowerCase() || row.slug === manufacturer,
+		(row) => row.name.toLowerCase() === manufacturer.toLowerCase(),
 	)
 	if (!mfr) {
 		return {

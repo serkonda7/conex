@@ -74,10 +74,7 @@ const dentist: typeof tenants.$inferSelect = await one(
 )
 
 const dentistGroup: typeof site_groups.$inferSelect = await one(
-	db
-		.insert(site_groups)
-		.values({ tenant_id: dentist.id, name: 'Customer Sites', slug: 'customer-sites' })
-		.returning(),
+	db.insert(site_groups).values({ tenant_id: dentist.id, name: 'Customer Sites' }).returning(),
 )
 
 const dentistSite: typeof sites.$inferSelect = await one(
@@ -98,7 +95,6 @@ const dentistSite: typeof sites.$inferSelect = await one(
 async function addLocation(
 	siteId: number,
 	name: string,
-	slug: string,
 	tenantId: number | null,
 	type: LocationType,
 	parentId: number | null = null,
@@ -106,7 +102,7 @@ async function addLocation(
 	return await one(
 		db
 			.insert(locations)
-			.values({ site_id: siteId, tenant_id: tenantId, type, parent_id: parentId, name, slug })
+			.values({ site_id: siteId, tenant_id: tenantId, type, parent_id: parentId, name })
 			.returning(),
 	)
 }
@@ -134,14 +130,12 @@ async function addRack(
 const dentistFloor: typeof locations.$inferSelect = await addLocation(
 	dentistSite.id,
 	'Ground Floor',
-	'ground-floor',
 	dentist.id,
 	'floor',
 )
 const dentistRoom: typeof locations.$inferSelect = await addLocation(
 	dentistSite.id,
 	'IT Closet',
-	'it-closet',
 	dentist.id,
 	'room',
 	dentistFloor.id,
@@ -149,7 +143,6 @@ const dentistRoom: typeof locations.$inferSelect = await addLocation(
 const dentistBackoffice: typeof locations.$inferSelect = await addLocation(
 	dentistSite.id,
 	'Backoffice',
-	'backoffice',
 	dentist.id,
 	'room',
 	dentistFloor.id,
@@ -157,7 +150,6 @@ const dentistBackoffice: typeof locations.$inferSelect = await addLocation(
 const dentistEmpfang: typeof locations.$inferSelect = await addLocation(
 	dentistSite.id,
 	'Empfang',
-	'empfang',
 	dentist.id,
 	'room',
 	dentistFloor.id,
@@ -165,29 +157,28 @@ const dentistEmpfang: typeof locations.$inferSelect = await addLocation(
 const dentistBehandlung1: typeof locations.$inferSelect = await addLocation(
 	dentistSite.id,
 	'Behandlung 1',
-	'behandlung-1',
 	dentist.id,
 	'room',
 	dentistFloor.id,
 )
 
 const ubiquiti: typeof manufacturers.$inferSelect = await one(
-	db.insert(manufacturers).values({ name: 'Ubiquiti', slug: 'ubiquiti' }).returning(),
+	db.insert(manufacturers).values({ name: 'Ubiquiti' }).returning(),
 )
 const dell: typeof manufacturers.$inferSelect = await one(
-	db.insert(manufacturers).values({ name: 'Dell', slug: 'dell' }).returning(),
+	db.insert(manufacturers).values({ name: 'Dell' }).returning(),
 )
 const fortinet: typeof manufacturers.$inferSelect = await one(
-	db.insert(manufacturers).values({ name: 'Fortinet', slug: 'fortinet' }).returning(),
+	db.insert(manufacturers).values({ name: 'Fortinet' }).returning(),
 )
 const apc: typeof manufacturers.$inferSelect = await one(
-	db.insert(manufacturers).values({ name: 'APC', slug: 'apc' }).returning(),
+	db.insert(manufacturers).values({ name: 'APC' }).returning(),
 )
 const grandstream: typeof manufacturers.$inferSelect = await one(
-	db.insert(manufacturers).values({ name: 'Grandstream', slug: 'grandstream' }).returning(),
+	db.insert(manufacturers).values({ name: 'Grandstream' }).returning(),
 )
 const generic: typeof manufacturers.$inferSelect = await one(
-	db.insert(manufacturers).values({ name: 'Generic', slug: 'generic' }).returning(),
+	db.insert(manufacturers).values({ name: 'Generic' }).returning(),
 )
 
 const switchType: typeof device_types.$inferSelect = await one(

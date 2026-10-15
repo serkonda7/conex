@@ -115,7 +115,9 @@ export const SECTIONS: readonly Section[] = [
 		path: 'dashboard',
 		noun: (): string => t('entity.dashboard'),
 		permission: null,
+		// Linked at the top of the sidebar, outside the groups.
 		hideInNav: true,
+		hideAddInNav: true,
 		list: DashboardPage,
 	},
 	{
@@ -123,6 +125,8 @@ export const SECTIONS: readonly Section[] = [
 		noun: (n: number): string => tp('entity.tenant', n),
 		permission: 'view',
 		icon: IconUsers,
+		// Reached via the list button next to the top-bar tenant context.
+		hideInNav: true,
 		list: TenantsPage,
 		add: TenantAddPage,
 		detail: TenantDetailPage,

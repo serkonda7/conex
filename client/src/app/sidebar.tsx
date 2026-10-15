@@ -191,7 +191,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.organization',
 		icon: IconBuilding,
-		paths: ['tenants', 'floorplans', 'employees', 'sites', 'locations'],
+		paths: ['floorplans', 'employees', 'sites', 'locations'],
 	},
 	{ label: 'app.navGroup.devices', icon: IconServer, paths: ['racks', 'devices'] },
 	{
@@ -208,7 +208,6 @@ const NAV_GROUPS: readonly NavGroup[] = [
 
 /** Routes without a nav entry mapped to the entry they highlight. */
 const NAV_PARENT: Record<string, string> = {
-	'tenant-groups': 'tenants',
 	'site-groups': 'sites',
 }
 
@@ -278,6 +277,9 @@ export function Sidebar(props: { user: SessionUser | null; onLogout: () => void 
 	return (
 		<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
 			<nav class="app-nav">
+				<Show when={SECTIONS.find((section) => section.path === 'dashboard')}>
+					{(section: () => Section): JSX.Element => <NavItem section={section()} />}
+				</Show>
 				<For each={NAV_GROUPS}>
 					{(group: NavGroup): JSX.Element => {
 						const sections = (): Section[] => navSections(group.paths)

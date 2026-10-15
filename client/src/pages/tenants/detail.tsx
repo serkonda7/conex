@@ -169,14 +169,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					rows={siteGroups}
 					emptyText={t('tenant.noSiteGroups')}
 					viewAllHref={`/site-groups?tenant=${props.id}`}
-					columns={[
-						nameColumn<SiteGroupRow>(t('common.name'), '/site-groups'),
-						{
-							key: 'slug',
-							label: t('common.slug'),
-							getValue: (g: SiteGroupRow): JSX.Element => <code>{g.slug}</code>,
-						},
-					]}
+					columns={[nameColumn<SiteGroupRow>(t('common.name'), '/site-groups')]}
 				/>
 			</Show>
 

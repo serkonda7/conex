@@ -62,15 +62,6 @@ export type ListQuery = v.InferOutput<typeof ListQuerySchema>
 // P1: tenants / sites / locations
 // ---------------------------------------------------------------------------
 
-/** URL-safe identifier: lowercase alphanumerics separated by single dashes. */
-export const SlugSchema = v.pipe(
-	v.string(),
-	v.trim(),
-	v.minLength(1),
-	v.maxLength(100),
-	v.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Must be lowercase letters, digits, or single dashes'),
-)
-
 export const NameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100))
 
 export const DescriptionSchema = v.optional(
@@ -198,14 +189,12 @@ export function withEmailDomain(address: string, domain: string | null): string 
 /** Tenant groups are flat: a named bundle of tenants, no parent. */
 export const TenantGroupCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: SlugSchema,
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
 
 export const TenantGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -297,7 +286,7 @@ export const SiteUpdateSchema = v.strictObject({
 })
 
 /** Built-in location kinds; `other` covers anything not listed. */
-export const LOCATION_TYPES = ['floor', 'room', 'other'] as const
+export const LOCATION_TYPES = ['building', 'floor', 'room', 'desk', 'other'] as const
 
 export const LocationTypeSchema = v.picklist(LOCATION_TYPES)
 
@@ -305,7 +294,6 @@ export type LocationType = v.InferOutput<typeof LocationTypeSchema>
 
 export const LocationCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: SlugSchema,
 	type: v.optional(LocationTypeSchema, 'other'),
 	site_id: IdSchema,
 	parent_id: NullableIdSchema,
@@ -315,7 +303,6 @@ export const LocationCreateSchema = v.strictObject({
 
 export const SiteGroupCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: SlugSchema,
 	tenant_id: NullableIdSchema,
 	description: DescriptionSchema,
 	comments: CommentsSchema,
@@ -323,7 +310,6 @@ export const SiteGroupCreateSchema = v.strictObject({
 
 export const SiteGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
@@ -331,7 +317,6 @@ export const SiteGroupUpdateSchema = v.strictObject({
 
 export const LocationUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	type: v.optional(LocationTypeSchema, undefined),
 	// site_id is immutable after create: moving a subtree across sites
 	// would silently re-parent every descendant.
@@ -437,7 +422,7 @@ const OptionalIdEntry = v.optional(IdSchema, undefined)
 
 export const TenantGroupListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -462,7 +447,7 @@ export const SiteGroupListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -472,7 +457,7 @@ export const LocationListQuerySchema = v.object({
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	parent: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'slug', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -720,13 +705,11 @@ export const StubLabelSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
-	slug: v.optional(SlugSchema, undefined),
 	description: DescriptionSchema,
 })
 
 export const ManufacturerUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	slug: v.optional(SlugSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
@@ -1782,11 +1765,11 @@ export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 const LooseBooleanSchema = looseBoolean(true)
 
 /**
- * One device-type CSV row. `manufacturer_slug` resolves to an id
+ * One device-type CSV row. `manufacturer` resolves to an id
  * server-side; `u_height`/`width` arrive as text and coerce through Number.
  */
 export const DeviceTypeImportRowSchema = v.object({
-	manufacturer_slug: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	manufacturer: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	model: NameSchema,
 	u_height: v.optional(
 		v.pipe(

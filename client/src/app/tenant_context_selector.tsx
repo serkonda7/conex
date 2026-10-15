@@ -1,4 +1,4 @@
-import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
+import { IconChevronDown, IconList, IconPlus } from '@tabler/icons-solidjs'
 import type { InputEventAndTarget } from 'shared/src/types'
 import {
 	createEffect,
@@ -12,6 +12,7 @@ import {
 import { t } from '../i18n'
 import { useDismiss } from '../lib/dismiss'
 import { navigate } from '../lib/router'
+import { can } from '../lib/session'
 import {
 	contextGroups,
 	contextTenantRows,
@@ -43,6 +44,7 @@ function matches(text: string, query: string): boolean {
  * tenants, a whole tenant group, or a single tenant (listed under its
  * group). Users allowed to create tenants get an add button; when the
  * search matches nothing it offers to create a tenant with that name.
+ * A list button next to it opens the tenants page (not in the sidebar).
  * Scoped users get a fixed label with their own tenant instead.
  */
 export function TenantContextSelector(props: { scoped: boolean; canAdd: boolean }): JSX.Element {
@@ -274,6 +276,18 @@ export function TenantContextSelector(props: { scoped: boolean; canAdd: boolean 
 							</button>
 						</Show>
 					</div>
+				</Show>
+				<Show when={can('view')}>
+					<a
+						href="/tenants"
+						class="app-tenant-context-list"
+						title={t('app.tenantContextList')}
+					>
+						<span aria-hidden="true" class="app-nav-icon">
+							<IconList size={16} />
+						</span>
+						<span class="visually-hidden">{t('app.tenantContextList')}</span>
+					</a>
 				</Show>
 			</div>
 		</Show>

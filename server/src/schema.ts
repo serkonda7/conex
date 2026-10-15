@@ -140,7 +140,6 @@ export const tenant_groups = pgTable(
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull(),
-		slug: text('slug').notNull().unique(),
 		description: text('description'),
 		comments: text('comments'),
 	},
@@ -168,15 +167,13 @@ export const tenants = pgTable(
 	],
 )
 
-// Site groups are flat (no nesting): a named bundle of sites. Slug is
-// globally unique, like tenant groups.
+// Site groups are flat (no nesting): a named bundle of sites.
 export const site_groups = pgTable(
 	'site_groups',
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
 		name: text('name').notNull(),
-		slug: text('slug').notNull().unique(),
 		description: text('description'),
 		comments: text('comments'),
 	},
@@ -219,16 +216,12 @@ export const locations = pgTable(
 		parent_id: integer('parent_id').references((): AnyPgColumn => locations.id),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
 		name: text('name').notNull(),
-		// Slug is unique per parent (service-enforced; Postgres treats NULL
-		// parents as distinct so a composite unique index cannot cover roots).
-		slug: text('slug').notNull(),
 		type: text('type', { enum: LOCATION_TYPES }).notNull().default('other'),
 		description: text('description'),
 	},
 	(table) => [
 		index('locations_site_id_idx').on(table.site_id),
 		index('locations_parent_id_idx').on(table.parent_id),
-		uniqueIndex('locations_sibling_slug_idx').on(table.site_id, table.parent_id, table.slug),
 	],
 )
 
@@ -307,7 +300,6 @@ export const manufacturers = pgTable(
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
-		slug: text('slug').notNull().unique(),
 		description: text('description'),
 	},
 	(table) => [index('manufacturers_name_idx').on(table.name)],

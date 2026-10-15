@@ -224,12 +224,14 @@ export function permissionLabel(value: string): string {
 }
 
 const LOCATION_TYPE_KEYS: Record<LocationType, MessageKey> = {
+	building: 'locationType.building',
 	floor: 'locationType.floor',
 	room: 'locationType.room',
+	desk: 'locationType.desk',
 	other: 'locationType.other',
 }
 
-/** Location type (`floor` / `room` / `other`). */
+/** Location type (`building` / `floor` / `room` / `desk` / `other`). */
 export function locationTypeLabel(value: string): string {
 	return lookup(LOCATION_TYPE_KEYS, value)
 }

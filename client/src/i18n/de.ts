@@ -20,7 +20,6 @@ export const de: Messages = {
 	'common.searchObjects': 'Einträge durchsuchen',
 	'common.noMatchingObjects': 'Keine passenden Einträge gefunden.',
 	'common.name': 'Name',
-	'common.slug': 'Kurzname',
 	'common.description': 'Beschreibung',
 	'common.comments': 'Kommentare',
 	'common.group': 'Gruppe',
@@ -163,12 +162,7 @@ export const de: Messages = {
 	'noun.floorplan.other': 'Grundrisse',
 
 	// components
-	'form.slugHint':
-		'URL-sicherer Bezeichner: Kleinbuchstaben, Ziffern und einzelne Bindestriche. Wird automatisch aus dem Namen ausgefüllt.',
-	'form.slugHintEdit':
-		'URL-sicherer Bezeichner: Kleinbuchstaben, Ziffern und einzelne Bindestriche.',
 	'form.nameRequired': 'Name ist erforderlich.',
-	'form.slugRequired': 'Kurzname ist erforderlich.',
 	'list.confirmDelete': '{noun} „{name}“ löschen?',
 	'list.range': 'Einträge {from}–{to} von {total}',
 	'table.columns': 'Spalten',
@@ -214,6 +208,7 @@ export const de: Messages = {
 	'app.tenantContextNoMatch': 'Kein Mandant passt zu „{search}“.',
 	'app.tenantContextAdd': 'Mandant hinzufügen',
 	'app.tenantContextCreate': 'Mandant „{name}“ anlegen',
+	'app.tenantContextList': 'Mandanten verwalten',
 	'auth.username': 'Benutzername',
 	'auth.password': 'Passwort',
 	'auth.login': 'Anmelden',
@@ -305,7 +300,6 @@ export const de: Messages = {
 	'tenantGroup.addTitle': 'Neue Mandantengruppe hinzufügen',
 	'tenantGroup.editTitle': 'Mandantengruppe bearbeiten',
 	'tenantGroup.namePlaceholder': 'Muster Holding',
-	'tenantGroup.slugPlaceholder': 'muster-holding',
 	'tenantGroup.loadingOne': 'Mandantengruppe wird geladen…',
 	'tenantGroup.notFound': 'Mandantengruppe nicht gefunden.',
 	'tenantGroup.details': 'Mandantengruppendetails',
@@ -340,7 +334,6 @@ export const de: Messages = {
 	'siteGroup.editTitle': 'Standortgruppe bearbeiten',
 	'siteGroup.loadingOne': 'Standortgruppe wird geladen…',
 	'siteGroup.namePlaceholder': 'Norddeutschland',
-	'siteGroup.slugPlaceholder': 'norddeutschland',
 	'siteGroup.notFound': 'Standortgruppe nicht gefunden.',
 	'siteGroup.details': 'Details der Standortgruppe',
 	'siteGroup.noSites': 'Noch keine Standorte in dieser Gruppe vorhanden.',
@@ -351,7 +344,6 @@ export const de: Messages = {
 	'location.editTitle': 'Bereich bearbeiten',
 	'location.loadingOne': 'Bereich wird geladen…',
 	'location.namePlaceholder': '2. Etage',
-	'location.slugPlaceholder': 'etage-2',
 	'location.selectSiteFirst': 'Bitte zuerst einen Standort auswählen.',
 	'location.sitePlaceholder': 'Standort…',
 	'location.tenantFromSite': 'Standardmäßig wird der Mandant des Standorts verwendet.',
@@ -364,8 +356,10 @@ export const de: Messages = {
 	'location.noChildren': 'Noch keine Unterbereiche vorhanden.',
 	'location.noRacks': 'Hier sind noch keine Racks vorhanden.',
 	'location.noDevices': 'Hier sind noch keine Geräte vorhanden.',
+	'locationType.building': 'Gebäude',
 	'locationType.floor': 'Etage',
 	'locationType.room': 'Raum',
+	'locationType.desk': 'Arbeitsplatz',
 	'locationType.other': 'Sonstiges',
 
 	// manufacturer

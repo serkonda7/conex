@@ -26,7 +26,7 @@ function groupOf<T>(items: T[]): SearchGroup<T> {
 }
 
 /**
- * Cross-entity substring search over name/slug/asset_tag/label columns.
+ * Cross-entity substring search over name/asset_tag/label columns.
  * Tenants are documentation labels only, so one flat query spans every
  * group — no row-level isolation applies. Each group caps at 10 hits;
  * an empty query returns empty groups instead of the whole inventory.

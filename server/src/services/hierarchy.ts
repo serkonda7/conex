@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 
 /**
  * Pure location-tree helpers. They operate on in-memory parent links so the
- * slug/hierarchy guards and the depth cap are unit-testable without a
+ * hierarchy guards and the depth cap are unit-testable without a
  * database; `db/tenancy.ts` loads the rows and delegates the math here.
  */
 

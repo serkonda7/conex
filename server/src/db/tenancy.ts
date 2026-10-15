@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { PgTable } from 'drizzle-orm/pg-core'
 import {
 	type LocationCreate,
@@ -111,10 +111,8 @@ async function checkNoDependents(
 // Tenant groups (flat, no nesting; they bundle tenants but own no inventory)
 // ---------------------------------------------------------------------------
 
-const TENANT_GROUP_SLUG_IN_USE = 'Tenant group slug is already in use'
-
 export interface TenantGroupListParams extends ListParams {
-	sort: 'name' | 'slug' | 'description'
+	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to the
@@ -132,21 +130,13 @@ export async function listTenantGroups(
 	params: TenantGroupListParams,
 ): Promise<Page<TenantGroupListItem>> {
 	const where = and(
-		searchCondition(params.search, [
-			tenant_groups.name,
-			tenant_groups.slug,
-			tenant_groups.description,
-		]),
+		searchCondition(params.search, [tenant_groups.name, tenant_groups.description]),
 		params.scopeTenantId !== undefined
 			? sql`${tenant_groups.id} IN (SELECT ${tenants.tenant_group_id} FROM ${tenants} WHERE ${tenants.id} = ${params.scopeTenantId})`
 			: undefined,
 	)
 	const orderColumn =
-		params.sort === 'slug'
-			? tenant_groups.slug
-			: params.sort === 'description'
-				? tenant_groups.description
-				: tenant_groups.name
+		params.sort === 'description' ? tenant_groups.description : tenant_groups.name
 	const page = await pageRows(
 		tenant_groups,
 		where,
@@ -198,16 +188,13 @@ export async function createTenantGroup(
 ): Promise<Result<TenantGroupRow, Error>> {
 	const row: Omit<TenantGroupRow, 'id'> = {
 		name: input.name,
-		slug: input.slug,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
-	const id = await tryWrite(
-		async () =>
-			insertedId(
-				await getDb().insert(tenant_groups).values(row).returning({ id: tenant_groups.id }),
-			),
-		TENANT_GROUP_SLUG_IN_USE,
+	const id = await tryWrite(async () =>
+		insertedId(
+			await getDb().insert(tenant_groups).values(row).returning({ id: tenant_groups.id }),
+		),
 	)
 	if (Result.isError(id)) {
 		return id
@@ -223,11 +210,10 @@ export async function updateTenantGroup(
 	if (Result.isError(current)) {
 		return current
 	}
-	const patch = pickDefined(input, ['name', 'slug', 'description', 'comments'])
+	const patch = pickDefined(input, ['name', 'description', 'comments'])
 	if (!isPatchEmpty(patch)) {
-		const written = await tryWrite(
-			() => getDb().update(tenant_groups).set(patch).where(eq(tenant_groups.id, id)),
-			TENANT_GROUP_SLUG_IN_USE,
+		const written = await tryWrite(() =>
+			getDb().update(tenant_groups).set(patch).where(eq(tenant_groups.id, id)),
 		)
 		if (Result.isError(written)) {
 			return written
@@ -602,24 +588,17 @@ export async function deleteSite(
 // Site groups (flat, no nesting; they bundle sites but own no inventory)
 // ---------------------------------------------------------------------------
 
-const SITE_GROUP_SLUG_IN_USE = 'Site group slug is already in use'
-
 export interface SiteGroupListParams extends ListParams, TenantFilterParams {
-	sort: 'name' | 'slug' | 'description'
+	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 }
 
 export function listSiteGroups(params: SiteGroupListParams): Promise<Page<SiteGroupRow>> {
 	const where = and(
-		searchCondition(params.search, [site_groups.name, site_groups.slug]),
+		searchCondition(params.search, [site_groups.name, site_groups.description]),
 		...tenantConditions(site_groups.tenant_id, params),
 	)
-	const orderColumn =
-		params.sort === 'slug'
-			? site_groups.slug
-			: params.sort === 'description'
-				? site_groups.description
-				: site_groups.name
+	const orderColumn = params.sort === 'description' ? site_groups.description : site_groups.name
 	return pageRows(
 		site_groups,
 		where,
@@ -642,16 +621,11 @@ export async function createSiteGroup(
 	const row: Omit<SiteGroupRow, 'id'> = {
 		tenant_id: input.tenant_id ?? null,
 		name: input.name,
-		slug: input.slug,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
-	const id = await tryWrite(
-		async () =>
-			insertedId(
-				await getDb().insert(site_groups).values(row).returning({ id: site_groups.id }),
-			),
-		SITE_GROUP_SLUG_IN_USE,
+	const id = await tryWrite(async () =>
+		insertedId(await getDb().insert(site_groups).values(row).returning({ id: site_groups.id })),
 	)
 	if (Result.isError(id)) {
 		return id
@@ -671,11 +645,10 @@ export async function updateSiteGroup(
 	if (Result.isError(tenantCheck)) {
 		return tenantCheck
 	}
-	const patch = pickDefined(input, ['name', 'slug', 'tenant_id', 'description', 'comments'])
+	const patch = pickDefined(input, ['name', 'tenant_id', 'description', 'comments'])
 	if (!isPatchEmpty(patch)) {
-		const written = await tryWrite(
-			() => getDb().update(site_groups).set(patch).where(eq(site_groups.id, id)),
-			SITE_GROUP_SLUG_IN_USE,
+		const written = await tryWrite(() =>
+			getDb().update(site_groups).set(patch).where(eq(site_groups.id, id)),
 		)
 		if (Result.isError(written)) {
 			return written
@@ -710,13 +683,12 @@ export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, 
 // Locations
 // ---------------------------------------------------------------------------
 
-const LOCATION_SLUG_IN_USE = 'Location slug is already used under this parent'
 const LOCATION_DEPTH_EXCEEDED = `Location hierarchy is limited to ${MAX_LOCATION_DEPTH} levels`
 
 export interface LocationListParams extends ListParams, TenantFilterParams {
 	site?: number
 	parent?: number
-	sort: 'name' | 'slug' | 'description'
+	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 }
 
@@ -777,7 +749,7 @@ function sortLocationsHierarchically(
 
 export async function listLocations(params: LocationListParams): Promise<Page<LocationRow>> {
 	const where = and(
-		searchCondition(params.search, [locations.name, locations.slug]),
+		searchCondition(params.search, [locations.name, locations.description]),
 		params.site ? eq(locations.site_id, params.site) : undefined,
 		params.parent ? eq(locations.parent_id, params.parent) : undefined,
 		...tenantConditions(locations.tenant_id, params),
@@ -790,23 +762,6 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 
 export function getLocation(id: number): Promise<Result<LocationRow, Error>> {
 	return findById(locations, id, 'Location not found')
-}
-
-function siblingSlugClash(
-	siteId: number,
-	parentId: number | null,
-	slug: string,
-	excludeId?: number,
-): Promise<boolean> {
-	return isTaken(
-		locations,
-		and(
-			eq(locations.site_id, siteId),
-			parentId === null ? isNull(locations.parent_id) : eq(locations.parent_id, parentId),
-			eq(locations.slug, slug),
-		),
-		excludeId,
-	)
 }
 
 /** Parent links of every location in a site, for depth/cycle checks. */
@@ -866,22 +821,16 @@ export async function createLocation(input: LocationCreate): Promise<Result<Loca
 			return parent
 		}
 	}
-	if (await siblingSlugClash(input.site_id, parentId, input.slug)) {
-		return Result.err(new DuplicateError(LOCATION_SLUG_IN_USE))
-	}
 	const row: Omit<LocationRow, 'id'> = {
 		site_id: input.site_id,
 		parent_id: parentId,
 		tenant_id: input.tenant_id ?? null,
 		name: input.name,
-		slug: input.slug,
 		type: input.type,
 		description: input.description ?? null,
 	}
-	const id = await tryWrite(
-		async () =>
-			insertedId(await getDb().insert(locations).values(row).returning({ id: locations.id })),
-		LOCATION_SLUG_IN_USE,
+	const id = await tryWrite(async () =>
+		insertedId(await getDb().insert(locations).values(row).returning({ id: locations.id })),
 	)
 	if (Result.isError(id)) {
 		return id
@@ -909,28 +858,16 @@ export async function updateLocation(
 			return parent
 		}
 	}
-	if (await siblingSlugClash(node.site_id, effectiveParent, input.slug ?? node.slug, id)) {
-		return Result.err(new DuplicateError(LOCATION_SLUG_IN_USE))
-	}
-	const patch = pickDefined(input, [
-		'name',
-		'slug',
-		'type',
-		'parent_id',
-		'tenant_id',
-		'description',
-	])
+	const patch = pickDefined(input, ['name', 'type', 'parent_id', 'tenant_id', 'description'])
 	if (!isPatchEmpty(patch)) {
 		// A new parent can take placed racks and devices out of a plan's scope.
-		const written = await tryWrite(
-			() =>
-				withTransaction(async () => {
-					await getDb().update(locations).set(patch).where(eq(locations.id, id))
-					if (patch.parent_id !== undefined && patch.parent_id !== node.parent_id) {
-						await prunePlacements()
-					}
-				}),
-			LOCATION_SLUG_IN_USE,
+		const written = await tryWrite(() =>
+			withTransaction(async () => {
+				await getDb().update(locations).set(patch).where(eq(locations.id, id))
+				if (patch.parent_id !== undefined && patch.parent_id !== node.parent_id) {
+					await prunePlacements()
+				}
+			}),
 		)
 		if (Result.isError(written)) {
 			return written

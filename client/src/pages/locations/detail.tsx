@@ -33,7 +33,7 @@ import { siteTrail } from '../../lib/trails'
 import { rackHeightColumn } from '../racks/columns'
 
 /**
- * /locations/:id — location detail: header with slug, parent breadcrumb,
+ * /locations/:id — location detail: header with parent breadcrumb,
  * detail grid, and the child-locations / racks / devices tables.
  */
 export function LocationDetailPage(props: { id: number }): JSX.Element {
@@ -86,7 +86,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={location()?.name}
-					slug={location()?.slug}
 					editHref={`/locations/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
@@ -94,10 +93,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 
 				<div class="detail-split">
 					<DetailCard label={t('location.details')}>
-						<dt>{t('common.slug')}</dt>
-						<dd>
-							<code>{location()?.slug}</code>
-						</dd>
 						<dt>{t('location.type')}</dt>
 						<dd>
 							<IconLabel icon={locationTypeIcon(location()?.type ?? 'other')}>
@@ -147,14 +142,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				loadingText={t('location.loadingChildren')}
 				emptyText={t('location.noChildren')}
 				customizable
-				columns={[
-					nameColumn<LocationRow>(t('common.name'), '/locations'),
-					{
-						key: 'slug',
-						label: t('common.slug'),
-						getValue: (l: LocationRow): JSX.Element => <code>{l.slug}</code>,
-					},
-				]}
+				columns={[nameColumn<LocationRow>(t('common.name'), '/locations')]}
 			/>
 
 			<RelatedSection

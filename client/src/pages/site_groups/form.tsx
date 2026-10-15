@@ -14,7 +14,6 @@ import {
 	NameField,
 	row_options,
 	SelectField,
-	SlugField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import {
@@ -24,7 +23,6 @@ import {
 	is_add_another_submit,
 	submit_form,
 	text,
-	use_slug_fields,
 	useEntityForm,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
@@ -33,7 +31,7 @@ import { contextTenantValue } from '../../lib/tenant_context'
 
 /** Site group create (`id` omitted) or edit form. */
 function SiteGroupForm(props: { id?: number }): JSX.Element {
-	const slugFields = use_slug_fields()
+	const [name, setName] = createSignal('')
 	// A single-tenant context preselects that tenant.
 	const [tenantId, setTenantId] = createSignal(contextTenantValue())
 	const [description, setDescription] = createSignal('')
@@ -42,7 +40,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 		id: props.id,
 		load: fetch_site_group,
 		fill: (row: SiteGroupRow) => {
-			slugFields.fill(row.name, row.slug)
+			setName(row.name)
 			setTenantId(id_value(row.tenant_id))
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
@@ -54,7 +52,6 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 
 	const body = (values: FormValues): SiteGroupCreate => ({
 		name: values.name,
-		slug: values.slug,
 		tenant_id: parseId(tenantId()),
 		description: text(description()),
 		comments: text(comments()),
@@ -65,14 +62,17 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 		const id = props.id
 		await submit_form({
 			form,
-			name: slugFields.name(),
-			slug: slugFields.slug(),
+			name: name(),
 			save: (values: FormValues) =>
 				id === undefined
 					? create_site_group(body(values))
 					: update_site_group(id, cleared(body(values))),
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e) ? slugFields.resetName : undefined,
+			onSuccess: is_add_another_submit(e)
+				? (): void => {
+						setName('')
+					}
+				: undefined,
 		})
 	}
 
@@ -88,16 +88,9 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 			<NameField
 				id={`${prefix}-name`}
 				placeholder={t('siteGroup.namePlaceholder')}
-				value={slugFields.name()}
-				onInput={slugFields.handleNameInput}
+				value={name()}
+				onInput={setName}
 				autofocus={!form.editing}
-			/>
-			<SlugField
-				id={`${prefix}-slug`}
-				placeholder={t('siteGroup.slugPlaceholder')}
-				value={slugFields.slug()}
-				onInput={slugFields.handleSlugInput}
-				editing={form.editing}
 			/>
 			<SelectField
 				id={`${prefix}-tenant`}

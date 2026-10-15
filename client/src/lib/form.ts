@@ -1,13 +1,11 @@
 /**
  * Shared logic behind the entity add/edit forms: the error/saving/loaded
- * state, loading the record of an edit form, the name/slug auto-fill pair,
- * value conversion for the API bodies, and the trim → validate → save →
- * navigate flow.
+ * state, loading the record of an edit form, value conversion for the API
+ * bodies, and the trim → validate → save → navigate flow.
  *
  * The matching markup lives in `../components/form`.
  */
 import { Result } from 'better-result'
-import { slugify } from 'shared/src/slug'
 import { createResource, createSignal, type Resource, type Setter } from 'solid-js'
 import { t } from '../i18n'
 import { navigate } from './router'
@@ -42,57 +40,6 @@ export function cleared<T extends object>(body: T): Cleared<T> {
 		out[key] = value === undefined ? null : value
 	}
 	return out as Cleared<T>
-}
-
-/** Accessors for the name/slug pair of an entity form. */
-export interface SlugFields {
-	/** Current name value. */
-	name: () => string
-	/** Current slug value; follows the name until the slug is edited. */
-	slug: () => string
-	/** Name input handler: mirrors the slug while it is untouched. */
-	handleNameInput: (value: string) => void
-	/** Slug input handler: marks the slug as user-owned. */
-	handleSlugInput: (value: string) => void
-	/** Fills both from a loaded record; the slug no longer follows the name. */
-	fill: (name: string, slug: string) => void
-	/** Clears only the name and slug for the next item. */
-	resetName: () => void
-}
-
-/**
- * Name/slug signals with the shared auto-fill rule: typing the name mirrors
- * the slug until the slug itself is edited.
- */
-export function use_slug_fields(): SlugFields {
-	const [name, setName] = createSignal('')
-	const [slug, setSlug] = createSignal('')
-	const [slugTouched, setSlugTouched] = createSignal(false)
-
-	return {
-		name,
-		slug,
-		handleNameInput: (value: string): void => {
-			setName(value)
-			if (!slugTouched()) {
-				setSlug(slugify(value))
-			}
-		},
-		handleSlugInput: (value: string): void => {
-			setSlugTouched(true)
-			setSlug(value)
-		},
-		fill: (nextName: string, nextSlug: string): void => {
-			setName(nextName)
-			setSlug(nextSlug)
-			setSlugTouched(true)
-		},
-		resetName: (): void => {
-			setName('')
-			setSlug('')
-			setSlugTouched(false)
-		},
-	}
 }
 
 /** Error / saving / loaded signals shared by every entity form. */
@@ -148,10 +95,9 @@ export function useEntityForm<T>(opts: {
 	return { ...base, editing: opts.id !== undefined, loaded, record }
 }
 
-/** Trimmed name/slug pair handed to `SubmitFormOptions.save`. */
+/** Trimmed name handed to `SubmitFormOptions.save`. */
 export interface FormValues {
 	name: string
-	slug: string
 }
 
 /** Options for {@link submit_form}. */
@@ -163,11 +109,9 @@ export interface SubmitFormOptions<T> {
 	optionalName?: boolean
 	/** Overrides the default "Name is required." message. */
 	nameError?: string
-	/** Raw slug value; omit on forms without a slug. */
-	slug?: string
 	/** Form-specific checks; return a message to abort the submit. */
 	validate?: () => string | null
-	/** Persists the entity using the trimmed name and slug. */
+	/** Persists the entity using the trimmed name. */
 	save: (values: FormValues) => Promise<Result<T, Error>>
 	/** Route opened after a successful save. */
 	navigateTo: string
@@ -175,26 +119,23 @@ export interface SubmitFormOptions<T> {
 	onSuccess?: () => void
 }
 
-/** The first failed check, or null when the name, slug and form checks pass. */
+/** The first failed check, or null when the name and form checks pass. */
 function invalid<T>(opts: SubmitFormOptions<T>, values: FormValues): string | null {
 	if (!values.name && opts.optionalName !== true) {
 		return opts.nameError ?? t('form.nameRequired')
-	}
-	if (opts.slug !== undefined && !values.slug) {
-		return t('form.slugRequired')
 	}
 	return opts.validate?.() ?? null
 }
 
 /**
- * Shared create/save flow: trims and requires the name (and the slug, when the
- * form has one), runs the form-specific checks, flips the saving flag, and
- * routes an API failure into the form's error slot or navigates away.
+ * Shared create/save flow: trims and requires the name, runs the
+ * form-specific checks, flips the saving flag, and routes an API failure
+ * into the form's error slot or navigates away.
  */
 export async function submit_form<T>(opts: SubmitFormOptions<T>): Promise<void> {
 	const { form } = opts
 	form.setError(null)
-	const values = { name: opts.name.trim(), slug: opts.slug?.trim() ?? '' }
+	const values = { name: opts.name.trim() }
 	const problem = invalid(opts, values)
 	if (problem !== null) {
 		form.setError(problem)

@@ -1,9 +1,11 @@
 /** Glyphs for API enum values (location types, device role icons). */
 import {
 	IconBatteryCharging,
+	IconBuilding,
 	IconCloud,
 	IconCube,
 	IconDatabase,
+	IconDesk,
 	IconDeviceCctv,
 	IconDeviceDesktop,
 	IconDeviceLaptop,
@@ -27,8 +29,10 @@ import type { Component } from 'solid-js'
 export type IconComponent = Component<{ size?: number }>
 
 const LOCATION_TYPE_ICONS: Record<LocationType, IconComponent> = {
+	building: IconBuilding,
 	floor: IconStack2,
 	room: IconDoor,
+	desk: IconDesk,
 	other: IconMapPin,
 }
 

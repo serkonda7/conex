@@ -47,7 +47,6 @@ export function DetailShell(props: {
  */
 export function DetailHeader(props: {
 	name: string | undefined
-	slug?: string
 	extra?: JSX.Element
 	testId?: string
 	editHref: string
@@ -63,10 +62,6 @@ export function DetailHeader(props: {
 		<div class="page-header">
 			<h2 data-testid={props.testId}>
 				{props.name}
-				<Show when={props.slug !== undefined}>
-					{' '}
-					<code>{props.slug}</code>
-				</Show>
 				<Show when={props.extra}> {props.extra}</Show>
 			</h2>
 			<Show when={can('edit') || (can('delete') && props.deletable !== false)}>

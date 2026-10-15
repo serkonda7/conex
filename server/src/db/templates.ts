@@ -10,7 +10,6 @@ import type {
 	StubCreate,
 	StubUpdate,
 } from 'shared/src/schemas'
-import { slugify } from 'shared/src/slug'
 import { device_type_interfaces, device_types, devices, manufacturers, racks } from '../schema'
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
 import { expandStubs, type StubInput } from '../services/templates'
@@ -51,9 +50,7 @@ function typeKindOf(row: DeviceTypeRow): ChangeObjectType {
 // Manufacturers
 // ---------------------------------------------------------------------------
 
-const MANUFACTURER_SLUG_IN_USE = 'Manufacturer slug is already in use'
 const MANUFACTURER_NAME_IN_USE = 'Manufacturer name is already in use'
-const MANUFACTURER_IN_USE = 'Manufacturer slug or name is already in use'
 
 export interface ManufacturerListParams extends ListParams {
 	sort: 'name' | 'description'
@@ -96,18 +93,11 @@ export function getManufacturer(id: number): Promise<Result<ManufacturerRow, Err
 	return findById(manufacturers, id, 'Manufacturer not found')
 }
 
-/** Slug/name uniqueness guard; `excludeId` skips the row being updated. */
+/** Name uniqueness guard; `excludeId` skips the row being updated. */
 async function checkManufacturerUnique(
-	slug: string | undefined,
 	name: string | undefined,
 	excludeId?: number,
 ): Promise<Result<undefined, Error>> {
-	if (
-		slug !== undefined &&
-		(await isTaken(manufacturers, eq(manufacturers.slug, slug), excludeId))
-	) {
-		return Result.err(new DuplicateError(MANUFACTURER_SLUG_IN_USE))
-	}
 	if (
 		name !== undefined &&
 		(await isTaken(manufacturers, eq(manufacturers.name, name), excludeId))
@@ -120,14 +110,12 @@ async function checkManufacturerUnique(
 export async function createManufacturer(
 	input: ManufacturerCreate,
 ): Promise<Result<ManufacturerRow, Error>> {
-	const slug = input.slug ?? slugify(input.name)
-	const unique = await checkManufacturerUnique(slug, input.name)
+	const unique = await checkManufacturerUnique(input.name)
 	if (Result.isError(unique)) {
 		return unique
 	}
 	const row: Omit<ManufacturerRow, 'id'> = {
 		name: input.name,
-		slug,
 		description: input.description ?? null,
 	}
 	const id = await tryWrite(
@@ -135,7 +123,7 @@ export async function createManufacturer(
 			insertedId(
 				await getDb().insert(manufacturers).values(row).returning({ id: manufacturers.id }),
 			),
-		MANUFACTURER_IN_USE,
+		MANUFACTURER_NAME_IN_USE,
 	)
 	if (Result.isError(id)) {
 		return id
@@ -151,15 +139,15 @@ export async function updateManufacturer(
 	if (Result.isError(current)) {
 		return current
 	}
-	const unique = await checkManufacturerUnique(input.slug, input.name, id)
+	const unique = await checkManufacturerUnique(input.name, id)
 	if (Result.isError(unique)) {
 		return unique
 	}
-	const patch = pickDefined(input, ['name', 'slug', 'description'])
+	const patch = pickDefined(input, ['name', 'description'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(manufacturers).set(patch).where(eq(manufacturers.id, id)),
-			MANUFACTURER_IN_USE,
+			MANUFACTURER_NAME_IN_USE,
 		)
 		if (Result.isError(written)) {
 			return written

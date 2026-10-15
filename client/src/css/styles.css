@@ -321,6 +321,23 @@ tbody tr:last-child td {
 	min-width: 0;
 }
 
+/* List button right of the dropdown: opens the tenants page. */
+.app-tenant-context-list {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-left: 0.35rem;
+	padding: 0.3rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.3rem;
+	color: var(--text-muted);
+}
+
+.app-tenant-context-list:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
 .app-tenant-context-fixed {
 	font-weight: 600;
 	color: var(--text);
@@ -1989,7 +2006,7 @@ th[aria-sort="descending"] .data-table-sort::after {
 	letter-spacing: 0.04em;
 }
 
-/* Detail page: fact grid inside a card (slug, description, comments). */
+/* Detail page: fact grid inside a card (description, comments). */
 .detail-grid {
 	display: grid;
 	grid-template-columns: auto 1fr;
