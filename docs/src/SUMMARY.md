@@ -5,6 +5,7 @@
 # Inventory
 
 - [Racks](racks.md)
+- [Images and Floor Plans](floorplans.md)
 
 # Integrations
 
