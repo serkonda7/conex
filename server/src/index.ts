@@ -22,6 +22,7 @@ import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
 import { rolesApp } from './routes/roles'
 import { searchApp } from './routes/search'
+import { prioritiesApp, serviceLevelsApp } from './routes/service_catalog'
 import { shelvesApp } from './routes/shelves'
 import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
@@ -81,6 +82,8 @@ export function createApp() {
 			.route('/manufacturers', manufacturersApp)
 			.route('/device-types', deviceTypesApp)
 			.route('/device-roles', deviceRolesApp)
+			.route('/priorities', prioritiesApp)
+			.route('/service-levels', serviceLevelsApp)
 			.route('/devices', devicesApp)
 			.route('/interfaces', interfacesApp)
 			.route('/cables', cablesApp)

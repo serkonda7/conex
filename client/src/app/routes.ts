@@ -8,11 +8,11 @@
  * resolves to not-found.
  */
 import {
-	IconAddressBook,
-	IconBox,
-	IconBuildingFactory,
+	IconBuildingFactory2,
 	IconBuildingSkyscraper,
 	IconCpu,
+	IconDevices,
+	IconFlag,
 	IconFolder,
 	IconHistory,
 	IconLayoutDashboard,
@@ -22,8 +22,9 @@ import {
 	IconMap,
 	IconMapPin,
 	IconPlugConnected,
-	IconServer,
 	IconShieldLock,
+	IconStack3,
+	IconStopwatch,
 	IconTag,
 	IconTemplate,
 	IconUsers,
@@ -64,6 +65,9 @@ import { LocationsPage } from '../pages/locations/list'
 import { ManufacturerDetailPage } from '../pages/manufacturers/detail'
 import { ManufacturerAddPage, ManufacturerEditPage } from '../pages/manufacturers/form'
 import { ManufacturersPage } from '../pages/manufacturers/list'
+import { PriorityDetailPage } from '../pages/priorities/detail'
+import { PriorityAddPage, PriorityEditPage } from '../pages/priorities/form'
+import { PrioritiesPage } from '../pages/priorities/list'
 import { RackTypeAddPage } from '../pages/rack_types/add'
 import { RackTypesPage } from '../pages/rack_types/list'
 import { RackAddPage } from '../pages/racks/add'
@@ -72,6 +76,9 @@ import { RackEditPage } from '../pages/racks/edit'
 import { RacksPage } from '../pages/racks/list'
 import { RoleAddPage, RoleEditPage } from '../pages/roles/form'
 import { RolesPage } from '../pages/roles/list'
+import { ServiceLevelDetailPage } from '../pages/service-levels/detail'
+import { ServiceLevelAddPage, ServiceLevelEditPage } from '../pages/service-levels/form'
+import { ServiceLevelsPage } from '../pages/service-levels/list'
 import { ShelfAddPage, ShelfEditPage } from '../pages/shelves/form'
 import { SiteGroupDetailPage } from '../pages/site_groups/detail'
 import { SiteGroupAddPage, SiteGroupEditPage } from '../pages/site_groups/form'
@@ -148,7 +155,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'employees',
 		noun: (n: number): string => tp('entity.employee', n),
 		permission: 'view',
-		icon: IconAddressBook,
+		icon: IconUsers,
 		list: EmployeesPage,
 		add: EmployeeAddPage,
 		detail: EmployeeDetailPage,
@@ -178,7 +185,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'racks',
 		noun: (n: number): string => tp('entity.rack', n),
 		permission: 'view',
-		icon: IconBox,
+		icon: IconStack3,
 		list: RacksPage,
 		add: RackAddPage,
 		detail: RackDetailPage,
@@ -188,7 +195,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'devices',
 		noun: (n: number): string => tp('entity.device', n),
 		permission: 'view',
-		icon: IconServer,
+		icon: IconDevices,
 		list: DevicesPage,
 		add: DeviceAddPage,
 		detail: DeviceDetailPage,
@@ -227,11 +234,31 @@ export const SECTIONS: readonly Section[] = [
 		path: 'manufacturers',
 		noun: (n: number): string => tp('entity.manufacturer', n),
 		permission: 'view',
-		icon: IconBuildingFactory,
+		icon: IconBuildingFactory2,
 		list: ManufacturersPage,
 		add: ManufacturerAddPage,
 		detail: ManufacturerDetailPage,
 		edit: ManufacturerEditPage,
+	},
+	{
+		path: 'service-levels',
+		noun: (n: number): string => tp('entity.serviceLevel', n),
+		permission: 'view',
+		icon: IconStopwatch,
+		list: ServiceLevelsPage,
+		add: ServiceLevelAddPage,
+		detail: ServiceLevelDetailPage,
+		edit: ServiceLevelEditPage,
+	},
+	{
+		path: 'priorities',
+		noun: (n: number): string => tp('entity.priority', n),
+		permission: 'view',
+		icon: IconFlag,
+		list: PrioritiesPage,
+		add: PriorityAddPage,
+		detail: PriorityDetailPage,
+		edit: PriorityEditPage,
 	},
 	{
 		path: 'tenant-groups',

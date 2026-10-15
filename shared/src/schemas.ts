@@ -851,6 +851,177 @@ export const DeviceRoleListQuerySchema = v.object({
 export type DeviceRoleListQuery = v.InferOutput<typeof DeviceRoleListQuerySchema>
 
 // ---------------------------------------------------------------------------
+// P3c: service catalog (MSP operations). Shared catalog data (no tenant
+// column): ticket priorities with their definitions, service levels (SLA:
+// service hours plus response/resolution targets per priority).
+// ---------------------------------------------------------------------------
+
+/** Long free-text definition of when a priority applies; markdown. */
+const DefinitionSchema = v.pipe(v.string(), v.trim(), v.maxLength(4000))
+
+export const PriorityCreateSchema = v.strictObject({
+	name: NameSchema,
+	/** 1 = most urgent; lists and SLA matrices sort by it. */
+	rank: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)),
+	description: DescriptionSchema,
+	definition: v.optional(DefinitionSchema, undefined),
+})
+
+export const PriorityUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	rank: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	definition: v.optional(v.nullable(DefinitionSchema), undefined),
+})
+
+export type PriorityCreate = v.InferOutput<typeof PriorityCreateSchema>
+export type PriorityUpdate = v.InferOutput<typeof PriorityUpdateSchema>
+
+export const PriorityListQuerySchema = v.object({
+	...ListQueryEntries,
+	sort: v.optional(v.picklist(['rank', 'name', 'description']), 'rank'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export type PriorityListQuery = v.InferOutput<typeof PriorityListQuerySchema>
+
+/** ISO weekdays: 1 = Monday … 7 = Sunday. */
+export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const
+export type Weekday = (typeof WEEKDAYS)[number]
+
+/** `HH:MM`, 00:00–24:00 (24:00 only makes sense as an end time). */
+const TimeOfDaySchema = v.pipe(
+	v.string(),
+	v.regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'Must be a time HH:MM'),
+)
+
+/** One weekday's service window; times compare as strings since they are zero-padded. */
+export const ServiceWindowSchema = v.pipe(
+	v.strictObject({
+		day: v.picklist(WEEKDAYS),
+		from: TimeOfDaySchema,
+		to: TimeOfDaySchema,
+	}),
+	v.check((w) => w.from < w.to, 'Service window must end after it starts'),
+)
+
+export type ServiceWindow = v.InferOutput<typeof ServiceWindowSchema>
+
+/** Service hours: at most one window per weekday; days without one are closed. */
+export const ServiceHoursSchema = v.pipe(
+	v.array(ServiceWindowSchema),
+	v.check(
+		(windows) => new Set(windows.map((w) => w.day)).size === windows.length,
+		'Each weekday may have only one service window',
+	),
+)
+
+/**
+ * German federal states (ISO 3166-2) whose public holidays pause the SLA
+ * clock in addition to the nationwide ones.
+ */
+export const HOLIDAY_REGIONS = [
+	'DE-BW',
+	'DE-BY',
+	'DE-BE',
+	'DE-BB',
+	'DE-HB',
+	'DE-HH',
+	'DE-HE',
+	'DE-MV',
+	'DE-NI',
+	'DE-NW',
+	'DE-RP',
+	'DE-SL',
+	'DE-SN',
+	'DE-ST',
+	'DE-SH',
+	'DE-TH',
+] as const
+export type HolidayRegion = (typeof HOLIDAY_REGIONS)[number]
+
+export const HolidayRegionSchema = v.picklist(HOLIDAY_REGIONS)
+
+/** Upper bound of a target: one year, in minutes. */
+const MAX_TARGET_MINUTES = 365 * 24 * 60
+
+const TargetMinutesSchema = v.pipe(
+	v.number(),
+	v.integer(),
+	v.minValue(1),
+	v.maxValue(MAX_TARGET_MINUTES),
+)
+
+/**
+ * Response/resolution target of one priority, in minutes. The clock runs
+ * only within the service hours unless `around_the_clock` is set (e.g. a
+ * 24/7 emergency line for P1). No resolution time = best effort.
+ */
+export const ServiceLevelTargetSchema = v.pipe(
+	v.strictObject({
+		priority_id: IdSchema,
+		response_minutes: TargetMinutesSchema,
+		resolution_minutes: v.optional(v.nullable(TargetMinutesSchema), null),
+		around_the_clock: v.optional(v.boolean(), false),
+	}),
+	v.check(
+		(t) => t.resolution_minutes === null || t.resolution_minutes >= t.response_minutes,
+		'Resolution time must not be shorter than the response time',
+	),
+)
+
+export type ServiceLevelTarget = v.InferOutput<typeof ServiceLevelTargetSchema>
+
+/** Targets of one service level: at most one per priority. */
+const ServiceLevelTargetsSchema = v.pipe(
+	v.array(ServiceLevelTargetSchema),
+	v.check(
+		(targets) => new Set(targets.map((t) => t.priority_id)).size === targets.length,
+		'Each priority may have only one target',
+	),
+)
+
+export const ServiceLevelCreateSchema = v.strictObject({
+	name: NameSchema,
+	description: DescriptionSchema,
+	service_hours: v.optional(ServiceHoursSchema, []),
+	holiday_region: v.optional(v.nullable(HolidayRegionSchema), undefined),
+	targets: v.optional(ServiceLevelTargetsSchema, []),
+	comments: CommentsSchema,
+})
+
+/** `service_hours` and `targets` replace the stored set when present. */
+export const ServiceLevelUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	service_hours: v.optional(ServiceHoursSchema, undefined),
+	holiday_region: v.optional(v.nullable(HolidayRegionSchema), undefined),
+	targets: v.optional(ServiceLevelTargetsSchema, undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
+})
+
+export type ServiceLevelCreate = v.InferOutput<typeof ServiceLevelCreateSchema>
+export type ServiceLevelUpdate = v.InferOutput<typeof ServiceLevelUpdateSchema>
+
+export const ServiceLevelListQuerySchema = v.object({
+	...ListQueryEntries,
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export type ServiceLevelListQuery = v.InferOutput<typeof ServiceLevelListQuerySchema>
+
+/** A stored target with its priority, as returned by the API (sorted by rank). */
+export interface ServiceLevelTargetJson {
+	priority_id: number
+	priority_name: string
+	priority_rank: number
+	response_minutes: number
+	resolution_minutes: number | null
+	around_the_clock: boolean
+}
+
+// ---------------------------------------------------------------------------
 // P4: devices / interfaces
 // ---------------------------------------------------------------------------
 
@@ -1645,6 +1816,8 @@ export const CHANGE_OBJECT_TYPES = [
 	'interface_template',
 	'device_role',
 	'attachment',
+	'priority',
+	'service_level',
 ] as const
 
 export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)

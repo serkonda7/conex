@@ -1218,6 +1218,53 @@ tbody tr:last-child td {
 	grid-column: 2;
 }
 
+/* Service level form: one weekday's window (open checkbox, from – to). */
+.service-window {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.app-content .form-stacked .field .service-window input[type="time"] {
+	width: 8rem;
+}
+
+.app-content .form-stacked .field .service-window input[type="checkbox"] {
+	width: auto;
+}
+
+/* Blocks spanning the control column without a label of their own. */
+.form-wide {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	margin-left: calc(10rem + 0.75rem);
+}
+
+.service-targets {
+	margin: 0;
+}
+
+.service-targets input:not([type="checkbox"]) {
+	width: 100%;
+}
+
+/* Service level detail: weekday and window in two columns. */
+.service-hours-list {
+	display: grid;
+	grid-template-columns: max-content auto;
+	column-gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.service-hours-list > li {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+}
+
 /* Employee mail addresses / phone numbers on the detail page: values and
    their scope / type info line up in two columns. */
 .contact-list {

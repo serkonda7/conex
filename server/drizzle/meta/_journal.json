@@ -204,6 +204,13 @@
       "when": 1792058708311,
       "tag": "0028_remove_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792062463531,
+      "tag": "0029_service_catalog",
+      "breakpoints": true
     }
   ]
 }

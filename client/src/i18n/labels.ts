@@ -20,6 +20,8 @@ import {
 	type EmployeeCompareField,
 	type EmployeeSalutation,
 	type FindingKind,
+	HOLIDAY_REGIONS,
+	type HolidayRegion,
 	type IntegrationProvider,
 	LOCATION_TYPES,
 	type LocationType,
@@ -192,6 +194,8 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	interface_template: 'changeObject.interfaceTemplate',
 	device_role: 'changeObject.deviceRole',
 	attachment: 'changeObject.attachment',
+	priority: 'changeObject.priority',
+	service_level: 'changeObject.serviceLevel',
 }
 
 /** Changelog object type (`device`, `rack_type`, …). */
@@ -397,4 +401,35 @@ export function phoneTypeOptions(): { value: PhoneType; label: string }[] {
 /** A compared field value for display: enum values (salutation) are localized. */
 export function compareValueLabel(field: string | null, value: string | null): string | null {
 	return field === 'salutation' && value !== null ? employeeSalutationLabel(value) : value
+}
+
+const HOLIDAY_REGION_KEYS: Record<HolidayRegion, MessageKey> = {
+	'DE-BW': 'holidayRegion.bw',
+	'DE-BY': 'holidayRegion.by',
+	'DE-BE': 'holidayRegion.be',
+	'DE-BB': 'holidayRegion.bb',
+	'DE-HB': 'holidayRegion.hb',
+	'DE-HH': 'holidayRegion.hh',
+	'DE-HE': 'holidayRegion.he',
+	'DE-MV': 'holidayRegion.mv',
+	'DE-NI': 'holidayRegion.ni',
+	'DE-NW': 'holidayRegion.nw',
+	'DE-RP': 'holidayRegion.rp',
+	'DE-SL': 'holidayRegion.sl',
+	'DE-SN': 'holidayRegion.sn',
+	'DE-ST': 'holidayRegion.st',
+	'DE-SH': 'holidayRegion.sh',
+	'DE-TH': 'holidayRegion.th',
+}
+
+/** German federal state whose holidays a service level observes (`DE-BY`, …). */
+export function holidayRegionLabel(value: string): string {
+	return lookup(HOLIDAY_REGION_KEYS, value)
+}
+
+/** `<select>` options for the holiday regions, sorted by label. */
+export function holidayRegionOptions(): (FormOption & { value: HolidayRegion })[] {
+	return HOLIDAY_REGIONS.map((value) => ({ value, label: holidayRegionLabel(value) })).sort(
+		(a, b) => a.label.localeCompare(b.label),
+	)
 }

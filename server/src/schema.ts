@@ -18,7 +18,9 @@ import {
 	EMPLOYEE_SALUTATIONS,
 	type EmployeeEmail,
 	type EmployeePhone,
+	HOLIDAY_REGIONS,
 	LOCATION_TYPES,
+	type ServiceWindow,
 	type TenantEmail,
 	type TenantPhone,
 } from 'shared/src/schemas'
@@ -372,6 +374,68 @@ export const device_roles = pgTable(
 		key: text('key').unique(),
 	},
 	(table) => [index('device_roles_name_idx').on(table.name)],
+)
+
+// ---------------------------------------------------------------------------
+// P3c: service catalog (MSP operations). Shared catalog data like device
+// roles: readable by every authenticated user, writable only by global
+// editors/admins.
+// - priorities: ticket priorities with their definition; `rank` 1 = most
+//   urgent (not unique, ties sort by name). Delete is blocked while a
+//   service level has a target for the priority.
+// - service_levels: SLA = service hours (`ServiceWindow[]`, at most one
+//   window per ISO weekday) + optional federal-state holiday calendar +
+//   one target row per priority. Targets go with their service level
+//   (cascade) and are written as a whole set.
+// ---------------------------------------------------------------------------
+
+export const priorities = pgTable(
+	'priorities',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		name: text('name').notNull().unique(),
+		rank: integer('rank').notNull(),
+		description: text('description'),
+		definition: text('definition'),
+	},
+	(table) => [index('priorities_rank_idx').on(table.rank)],
+)
+
+export const service_levels = pgTable(
+	'service_levels',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		name: text('name').notNull().unique(),
+		description: text('description'),
+		service_hours: jsonb('service_hours')
+			.$type<ServiceWindow[]>()
+			.notNull()
+			.default(sql`'[]'::jsonb`),
+		holiday_region: text('holiday_region', { enum: HOLIDAY_REGIONS }),
+		comments: text('comments'),
+	},
+	(table) => [index('service_levels_name_idx').on(table.name)],
+)
+
+export const service_level_targets = pgTable(
+	'service_level_targets',
+	{
+		service_level_id: integer('service_level_id')
+			.notNull()
+			.references(() => service_levels.id, { onDelete: 'cascade' }),
+		priority_id: integer('priority_id')
+			.notNull()
+			.references(() => priorities.id),
+		response_minutes: integer('response_minutes').notNull(),
+		// NULL = best effort (no committed resolution time).
+		resolution_minutes: integer('resolution_minutes'),
+		// 0/1: the clock also runs outside the service hours (24/7).
+		around_the_clock: integer('around_the_clock').notNull().default(0),
+	},
+	(table) => [
+		primaryKey({ columns: [table.service_level_id, table.priority_id] }),
+		index('service_level_targets_priority_id_idx').on(table.priority_id),
+	],
 )
 
 // ---------------------------------------------------------------------------

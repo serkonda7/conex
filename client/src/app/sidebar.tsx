@@ -230,7 +230,14 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{ label: 'app.navGroup.devices', paths: ['racks', 'devices'] },
 	{
 		label: 'app.navGroup.catalog',
-		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types'],
+		paths: [
+			'manufacturers',
+			'device-types',
+			'device-roles',
+			'rack-types',
+			'service-levels',
+			'priorities',
+		],
 	},
 	{
 		label: 'app.navGroup.administration',

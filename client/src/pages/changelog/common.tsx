@@ -27,6 +27,8 @@ const OBJECT_ROUTES: Partial<Record<ChangeObjectType, string>> = {
 	manufacturer: 'manufacturers',
 	device_type: 'device-types',
 	device_role: 'device-roles',
+	priority: 'priorities',
+	service_level: 'service-levels',
 }
 
 /** Object name at the time of the change, linked while the object can still exist. */
