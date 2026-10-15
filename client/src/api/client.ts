@@ -6,7 +6,7 @@
 import { Result } from 'better-result'
 import { hc } from 'hono/client'
 import type { AppType } from 'server/src/index'
-import type { Page } from 'shared/src/types'
+import type { FloorplanImpactJson, Page } from 'shared/src/types'
 import { type PluralKey, t, tp } from '../i18n'
 
 /** RPC client */
@@ -22,6 +22,37 @@ export class UnauthorizedError extends Error {
 	}
 }
 
+/**
+ * A delete the server refused with 409 until the caller confirms that the
+ * floor-plan data in `floorplan` goes with it (retry with `confirm: 'floorplan'`).
+ */
+export class FloorplanImpactError extends Error {
+	readonly floorplan: FloorplanImpactJson
+
+	constructor(message: string, floorplan: FloorplanImpactJson) {
+		super(message)
+		this.name = 'FloorplanImpactError'
+		this.floorplan = floorplan
+	}
+}
+
+/** The floor-plan impact of a 409 body, if it carries one. */
+function floorplan_impact(data: unknown): FloorplanImpactJson | null {
+	if (typeof data !== 'object' || !data || !('floorplan' in data)) {
+		return null
+	}
+	const impact = (data as { floorplan: unknown }).floorplan
+	if (typeof impact !== 'object' || !impact) {
+		return null
+	}
+	const { areas, placements, linkedFrom } = impact as Record<string, unknown>
+	return typeof areas === 'number' &&
+		typeof placements === 'number' &&
+		typeof linkedFrom === 'number'
+		? { areas, placements, linkedFrom }
+		: null
+}
+
 /** Notified on every 401, so the UI can return to the login page. */
 let unauthorized_handler: (() => void) | null = null
 
@@ -33,13 +64,17 @@ export function set_unauthorized_handler(handler: () => void): void {
 	unauthorized_handler = handler
 }
 
-/** The server's `{ error }` message, or `fallback_msg` when the body has none. */
-export async function read_api_error(response: ApiResponse, fallback_msg: string): Promise<string> {
-	const data = await response.json().catch(() => null)
+/** The `{ error }` message of a parsed body, or `fallback_msg` when it has none. */
+function error_message(data: unknown, fallback_msg: string): string {
 	if (typeof data === 'object' && data && 'error' in data) {
 		return String((data as { error: unknown }).error)
 	}
 	return fallback_msg
+}
+
+/** The server's `{ error }` message, or `fallback_msg` when the body has none. */
+export async function read_api_error(response: ApiResponse, fallback_msg: string): Promise<string> {
+	return error_message(await response.json().catch(() => null), fallback_msg)
 }
 
 /**
@@ -56,8 +91,10 @@ export async function to_result<T>(res: ApiResponse, fallback: string): Promise<
 		return Result.err(new UnauthorizedError())
 	}
 	if (!res.ok) {
-		const msg = await read_api_error(res, `${fallback} (${res.status})`)
-		return Result.err(new Error(msg))
+		const data = await res.json().catch(() => null)
+		const msg = error_message(data, `${fallback} (${res.status})`)
+		const impact = res.status === 409 ? floorplan_impact(data) : null
+		return Result.err(impact ? new FloorplanImpactError(msg, impact) : new Error(msg))
 	}
 	return Result.ok((await res.json()) as T)
 }

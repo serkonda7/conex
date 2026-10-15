@@ -33,6 +33,7 @@ import { Portal } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
 import { use_visible_columns } from '../lib/column_visibility'
 import { useDismiss } from '../lib/dismiss'
+import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
 import { navigate, queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import {
@@ -302,7 +303,7 @@ export function useEntityList<
 	fetch: (
 		query: { search: string; sort?: Sort; order: 'asc' | 'desc' } & F,
 	) => Promise<Result<Page<Row>, Error>>
-	remove: (id: number) => Promise<Result<unknown, Error>>
+	remove: RemoveFn
 }): EntityList<Row> {
 	const canEdit = (): boolean => can(opts.manage ?? 'edit')
 	const canDelete = (): boolean => can(opts.manage ?? 'delete')
@@ -331,12 +332,14 @@ export function useEntityList<
 			return
 		}
 		setError(null)
-		const res = await opts.remove(id)
+		const res = await removeConfirmingFloorplan(opts.remove, id, name)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
 		}
-		void refetch()
+		if (res.value) {
+			void refetch()
+		}
 	}
 
 	return {

@@ -191,6 +191,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	rack_type: 'changeObject.rackType',
 	interface_template: 'changeObject.interfaceTemplate',
 	device_role: 'changeObject.deviceRole',
+	attachment: 'changeObject.attachment',
 }
 
 /** Changelog object type (`device`, `rack_type`, …). */

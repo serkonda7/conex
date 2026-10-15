@@ -1,6 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import zlib from 'node:zlib'
 import { SQL } from 'bun'
+import { initConfig, load_config_file } from '../../server/src/config'
+import {
+	createAttachment,
+	deleteAttachment,
+	listAttachments,
+	putPlan,
+	updateAttachment,
+} from '../../server/src/db/attachments'
 import { closeDb, getDb, getSqlClient, initDb } from '../../server/src/db/connection'
 import { fullAccessRoleId } from '../../server/src/db/roles'
 import { createLocalUser, getUserByUsername } from '../../server/src/db/users'
@@ -16,6 +25,7 @@ import {
 	sites,
 	tenants,
 } from '../../server/src/schema'
+import { initStorage } from '../../server/src/storage'
 
 const dataDir: string = process.env.CONEX_E2E_DATA_DIR ?? path.resolve('test-results/e2e-data')
 const username: string = process.env.CONEX_E2E_USERNAME ?? 'e2e-user'
@@ -28,6 +38,14 @@ if (!fs.existsSync(configPath)) {
 	fs.writeFileSync(
 		configPath,
 		'[auth]\nappKey = "e2e-app-key-0123456789abcdef-0123456789abcdef"\nsecureCookies = false\n',
+	)
+}
+// Keep e2e attachments next to the e2e config: the startup sweep removes
+// files without a row, so sharing the dev directory would delete dev images.
+if (!fs.readFileSync(configPath, 'utf8').includes('[storage]')) {
+	fs.appendFileSync(
+		configPath,
+		`\n[storage]\nattachmentsDir = ${JSON.stringify(path.join(dataDir, 'attachments'))}\n`,
 	)
 }
 
@@ -46,6 +64,35 @@ await initDb({
 	migrationsFolder: path.join(repoRoot, 'server/drizzle'),
 	serverRoot: path.join(repoRoot, 'server'),
 })
+// Floor plan images are stored files, so the storage directory must be known.
+initConfig(load_config_file(configPath).unwrap())
+await initStorage(path.join(repoRoot, 'server'))
+
+/** Flat light-gray PNG; the floor plan tests only need an image to draw on. */
+function plainPng(width: number, height: number): Uint8Array {
+	const chunk = (type: string, data: Uint8Array): Buffer => {
+		const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+		const out = Buffer.alloc(body.length + 8)
+		out.writeUInt32BE(data.length, 0)
+		body.copy(out, 4)
+		out.writeUInt32BE(Bun.hash.crc32(body), body.length + 4)
+		return out
+	}
+	const header = Buffer.alloc(13)
+	header.writeUInt32BE(width, 0)
+	header.writeUInt32BE(height, 4)
+	header[8] = 8 // bit depth; color type 0 (grayscale) and the rest stay 0
+	const rows = Buffer.alloc((width + 1) * height, 240)
+	for (let y = 0; y < height; y++) {
+		rows[y * (width + 1)] = 0 // filter type: none
+	}
+	return Buffer.concat([
+		Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+		chunk('IHDR', header),
+		chunk('IDAT', zlib.deflateSync(rows)),
+		chunk('IEND', new Uint8Array()),
+	])
+}
 
 const db = getDb()
 let tenant = (await db.select().from(tenants)).find((row) => row.name === 'E2E Tenant')
@@ -150,6 +197,42 @@ if (e2eSite) {
 			const inserted = (await db.insert(locations).values(values).returning())[0]
 			locationIds.set(location.name, inserted.id)
 		}
+	}
+
+	// Floor plans, recreated each run so earlier edits never leak into the tests:
+	// Floor 1 stays empty (the drawing test adds areas), Floor 2 has a triangle
+	// area for the screenshot.
+	const planOwners = [
+		{ name: 'E2E Floor 1', areas: [] },
+		{
+			name: 'E2E Floor 2',
+			areas: [
+				{
+					location_id: locationIds.get('E2E Storage Room') as number,
+					label: 'E2E Triangle',
+					points: [
+						[0.2, 0.7],
+						[0.5, 0.2],
+						[0.8, 0.7],
+					] as [number, number][],
+				},
+			],
+		},
+	]
+	for (const owner of planOwners) {
+		const ownerId = locationIds.get(owner.name) as number
+		for (const old of (await listAttachments({ location_id: ownerId })).unwrap()) {
+			;(await deleteAttachment(old.id, true)).unwrap()
+		}
+		const plan = (
+			await createAttachment(
+				{ location_id: ownerId },
+				{ name: 'e2e-plan.png', bytes: plainPng(1200, 800) },
+				{ description: 'E2E floor plan', created_by: null },
+			)
+		).unwrap()
+		;(await updateAttachment(plan.id, { is_floorplan: true })).unwrap()
+		;(await putPlan(plan.id, { areas: owner.areas, placements: [] })).unwrap()
 	}
 }
 

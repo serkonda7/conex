@@ -1,8 +1,17 @@
 import path from 'node:path'
+import zlib from 'node:zlib'
+import { initConfig, load_config_file } from '../server/src/config'
+import {
+	createAttachment,
+	putPlan,
+	sweepAttachmentFiles,
+	updateAttachment,
+} from '../server/src/db/attachments'
 import { closeDb, getDb, getSqlClient, initDb } from '../server/src/db/connection'
 import { fullAccessRoleId } from '../server/src/db/roles'
 import {
 	cables,
+	device_roles,
 	device_type_interfaces,
 	device_types,
 	devices,
@@ -16,11 +25,21 @@ import {
 	tenants,
 	users,
 } from '../server/src/schema'
-import type { LocationType } from '../shared/src/schemas'
+import { initStorage } from '../server/src/storage'
+import { getTrimmedEnv, resolveInDataDir } from '../server/src/util/server_root'
+import type { DeviceRoleIcon, LocationType } from '../shared/src/schemas'
 
 const repoRoot = path.resolve(import.meta.dir, '..')
 
-await initDb({ serverRoot: path.join(repoRoot, 'server') })
+const serverRoot = path.join(repoRoot, 'server')
+// The config names the attachments directory the demo floor plan is written to.
+initConfig(
+	load_config_file(
+		resolveInDataDir(serverRoot, getTrimmedEnv('CONEX_CONFIG_PATH') ?? 'config.toml'),
+	).unwrap(),
+)
+await initDb({ serverRoot })
+await initStorage(serverRoot)
 const db = getDb()
 
 /** First row of an insert `.returning()`; the seed cannot continue without it. */
@@ -35,11 +54,14 @@ async function one<T>(query: PromiseLike<T[]>): Promise<T> {
 // This script is intentionally destructive: it is the local demo reset command.
 // Ids restart at 1 so demo URLs stay stable across resets.
 await getSqlClient().unsafe(`
-	TRUNCATE cables, interfaces, devices, shelves, racks, locations, sites, site_groups,
-		device_type_interfaces, device_types, manufacturers, sessions, auth_states, users, tenants,
-		tenant_groups
+	TRUNCATE floorplan_placements, floorplan_areas, attachments, cables, interfaces, devices,
+		shelves, racks, locations, sites, site_groups, device_type_interfaces, device_types,
+		manufacturers, sessions, auth_states, users, tenants, tenant_groups, employees,
+		integrations, sync_runs, external_links, object_changes, audit_log
 	RESTART IDENTITY
 `)
+// The truncated attachments leave their files behind; the sweep removes them.
+await sweepAttachmentFiles().then((result) => result.unwrap())
 
 const dentist: typeof tenants.$inferSelect = await one(
 	db
@@ -277,6 +299,35 @@ await db
 	.insert(device_type_interfaces)
 	.values({ device_type_id: modemType.id, prefix: 'LAN', count: 1, kind: 'ethernet' })
 
+/**
+ * Demo device role by name. `device_roles` survives the reset (the built-in
+ * roles come from a migration), so an existing role is reused.
+ */
+async function deviceRole(name: string, icon: DeviceRoleIcon): Promise<number> {
+	const row = await one(
+		db
+			.insert(device_roles)
+			.values({ name, icon })
+			.onConflictDoUpdate({ target: device_roles.name, set: { icon } })
+			.returning({ id: device_roles.id }),
+	)
+	return row.id
+}
+
+const networkRole: number = await deviceRole('Network', 'switch')
+/** Role of each demo device, by its device type. */
+const roleOfType: Map<number, number> = new Map([
+	[firewallType.id, await deviceRole('Firewall', 'firewall')],
+	[phoneSystemType.id, await deviceRole('Phone system', 'phone')],
+	[powerOutletBarType.id, await deviceRole('Power', 'ups')],
+	[cableOrganizerType.id, await deviceRole('Cable management', 'patch-panel')],
+	[switchType.id, networkRole],
+	[clientType.id, await deviceRole('PC', 'desktop')],
+	[tiConnectorType.id, await deviceRole('TI connector', 'router')],
+	[cloudKeyType.id, await deviceRole('Cloud controller', 'cloud')],
+	[modemType.id, await deviceRole('Modem', 'router')],
+])
+
 async function addDevice(
 	typeId: number,
 	siteId: number,
@@ -293,6 +344,7 @@ async function addDevice(
 			.insert(devices)
 			.values({
 				device_type_id: typeId,
+				device_role_id: roleOfType.get(typeId) ?? networkRole,
 				site_id: siteId,
 				location_id: locationId,
 				rack_id: rackId,
@@ -553,6 +605,127 @@ await db.insert(cables).values({
 	kind: 'cat6a',
 	label: 'Behandlung 1 client to switch',
 })
+/**
+ * Grayscale PNG of `width` x `height` with `draw(x, y)` as the pixel value
+ * (0 black .. 255 white). Enough for a demo floor plan without an image
+ * dependency.
+ */
+function grayPng(
+	width: number,
+	height: number,
+	draw: (x: number, y: number) => number,
+): Uint8Array {
+	const crcTable = Array.from({ length: 256 }, (_, n) => {
+		let c = n
+		for (let k = 0; k < 8; k++) {
+			c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+		}
+		return c >>> 0
+	})
+	const crc32 = (bytes: Uint8Array): number => {
+		let c = 0xffffffff
+		for (const byte of bytes) {
+			c = (crcTable[(c ^ byte) & 0xff] as number) ^ (c >>> 8)
+		}
+		return (c ^ 0xffffffff) >>> 0
+	}
+	const chunk = (type: string, data: Uint8Array): Buffer => {
+		const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+		const out = Buffer.alloc(body.length + 8)
+		out.writeUInt32BE(data.length, 0)
+		body.copy(out, 4)
+		out.writeUInt32BE(crc32(body), body.length + 4)
+		return out
+	}
+	const header = Buffer.alloc(13)
+	header.writeUInt32BE(width, 0)
+	header.writeUInt32BE(height, 4)
+	header[8] = 8 // bit depth; color type 0 (grayscale) and the rest stay 0
+	const rows = Buffer.alloc((width + 1) * height)
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+			rows[y * (width + 1) + 1 + x] = draw(x, y)
+		}
+	}
+	return Buffer.concat([
+		Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+		chunk('IHDR', header),
+		chunk('IDAT', zlib.deflateSync(rows)),
+		chunk('IEND', new Uint8Array()),
+	])
+}
+
+// Ground floor plan: three rooms along the top, a hallway, the treatment
+// room and the waiting room below. Coordinates are normalized like the
+// plan's areas, so the walls and the areas line up.
+type Rect = [x0: number, y0: number, x1: number, y1: number]
+const planWidth = 1200
+const planHeight = 800
+const rooms: Record<string, Rect> = {
+	empfang: [0.04, 0.06, 0.38, 0.44],
+	backoffice: [0.38, 0.06, 0.7, 0.44],
+	itCloset: [0.7, 0.06, 0.96, 0.44],
+	behandlung1: [0.04, 0.58, 0.5, 0.94],
+	waiting: [0.5, 0.58, 0.96, 0.94],
+}
+const doors: Rect[] = [
+	[0.17, 0.43, 0.25, 0.45],
+	[0.5, 0.43, 0.58, 0.45],
+	[0.79, 0.43, 0.87, 0.45],
+	[0.23, 0.57, 0.31, 0.59],
+	[0.69, 0.57, 0.77, 0.59],
+]
+const inRect = (nx: number, ny: number, [x0, y0, x1, y1]: Rect): boolean =>
+	nx >= x0 && nx <= x1 && ny >= y0 && ny <= y1
+const wall: number = 4 / planWidth
+const groundFloorPng = grayPng(planWidth, planHeight, (x, y) => {
+	const nx = x / planWidth
+	const ny = y / planHeight
+	const floor = inRect(nx, ny, [0.04, 0.44 + wall, 0.96, 0.58 - wall]) ? 235 : 250
+	if (doors.some((door) => inRect(nx, ny, door))) {
+		return floor
+	}
+	const onWall = Object.values(rooms).some(
+		([x0, y0, x1, y1]) =>
+			inRect(nx, ny, [x0 - wall, y0 - wall, x1 + wall, y1 + wall]) &&
+			!inRect(nx, ny, [x0 + wall, y0 + wall, x1 - wall, y1 - wall]),
+	)
+	return onWall ? 40 : floor
+})
+const rectPoints = ([x0, y0, x1, y1]: Rect): [number, number][] => [
+	[x0, y0],
+	[x1, y0],
+	[x1, y1],
+	[x0, y1],
+]
+const center = ([x0, y0, x1, y1]: Rect): { x: number; y: number } => ({
+	x: (x0 + x1) / 2,
+	y: (y0 + y1) / 2,
+})
+
+const groundFloorPlan = (
+	await createAttachment(
+		{ location_id: dentistFloor.id },
+		{ name: 'ground-floor.png', bytes: groundFloorPng },
+		{ description: 'Ground floor plan', created_by: null },
+	)
+).unwrap()
+await updateAttachment(groundFloorPlan.id, { is_floorplan: true }).then((result) => result.unwrap())
+await putPlan(groundFloorPlan.id, {
+	areas: [
+		{ location_id: dentistEmpfang.id, points: rectPoints(rooms.empfang as Rect) },
+		{ location_id: dentistBackoffice.id, points: rectPoints(rooms.backoffice as Rect) },
+		{ location_id: dentistRoom.id, points: rectPoints(rooms.itCloset as Rect) },
+		{ location_id: dentistBehandlung1.id, points: rectPoints(rooms.behandlung1 as Rect) },
+	],
+	placements: [
+		{ rack_id: dentistRack.id, ...center(rooms.itCloset as Rect) },
+		{ device_id: dentistEmpfangClient.id, ...center(rooms.empfang as Rect) },
+		{ device_id: dentistBackofficeClient.id, ...center(rooms.backoffice as Rect) },
+		{ device_id: dentistBehandlung1Client.id, ...center(rooms.behandlung1 as Rect) },
+	],
+}).then((result) => result.unwrap())
+
 await db.insert(users).values({
 	username: 'demo',
 	password_hash: await Bun.password.hash('demo-password'),
@@ -563,7 +736,7 @@ await db.insert(users).values({
 console.log('Demo database reset')
 console.log('Login: demo / demo-password')
 console.log(
-	'Created 1 tenant, 1 site, 1 24U rack, 10 device models, 1 rack type, 12 devices, and 8 cables.',
+	'Created 1 tenant, 1 site, 1 24U rack, 10 device models, 1 rack type, 12 devices, 8 cables, and 1 floor plan.',
 )
 
 await closeDb()

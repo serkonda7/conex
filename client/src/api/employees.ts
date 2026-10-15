@@ -49,6 +49,6 @@ export async function update_employee(
 }
 
 export async function delete_employee(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.employees[':id'].$delete(by_id(id))
+	const res = await client.employees[':id'].$delete({ ...by_id(id), query: {} })
 	return to_result<unknown>(res, failed.delete('noun.employee'))
 }

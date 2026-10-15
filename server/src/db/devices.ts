@@ -21,9 +21,10 @@ import {
 } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
+import { prunePlacements } from './attachments'
 import { deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists } from './device_roles'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
@@ -475,8 +476,18 @@ export async function updateDevice(
 		patch.location_id = deviceLocationId
 	}
 	if (!isPatchEmpty(patch)) {
+		// Another site or location can take the device out of its floor plan's scope.
 		const written = await tryWrite(
-			() => getDb().update(devices).set(patch).where(eq(devices.id, id)),
+			() =>
+				withTransaction(async () => {
+					await getDb().update(devices).set(patch).where(eq(devices.id, id))
+					if (
+						(patch.site_id !== undefined && patch.site_id !== node.site_id) ||
+						(patch.location_id !== undefined && patch.location_id !== node.location_id)
+					) {
+						await prunePlacements()
+					}
+				}),
 			duplicateDeviceError,
 		)
 		if (Result.isError(written)) {
@@ -526,7 +537,12 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 		patch.location_id = rackLocation.value
 	}
 	const written = await tryWrite(() =>
-		getDb().update(devices).set(patch).where(eq(devices.id, id)),
+		withTransaction(async () => {
+			await getDb().update(devices).set(patch).where(eq(devices.id, id))
+			if (patch.location_id !== undefined && patch.location_id !== node.location_id) {
+				await prunePlacements()
+			}
+		}),
 	)
 	if (Result.isError(written)) {
 		return written

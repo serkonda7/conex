@@ -40,16 +40,25 @@ bun run dev
 | `CONEX_E2E_DATABASE_URL` | Separate Postgres database for `bun run test:e2e`  | `CONEX_DATABASE_URL` + `_e2e` (auto-created) |
 
 
-### Backing up Postgres Database
+### Backing up
+A backup consists of the Postgres database and the attachments directory
+(images; `server/data/attachments` unless `[storage] attachmentsDir` in
+`config.toml` points elsewhere). Back up both at the same time and restore
+them together: the database holds only the image metadata, the files live on
+disk. On startup the server removes files without a database row and logs rows
+whose file is missing.
 ```sh
 # Backup
 docker exec conex-dev-db pg_dump -U conex -Fc conex > backups/conex-$(date +%F).dump
+tar -czf backups/conex-attachments-$(date +%F).tar.gz -C server/data attachments
 
 # Restore
 docker exec -i conex-dev-db pg_restore -U conex -d conex < backups/<file>.dump
+tar -xzf backups/conex-attachments-<date>.tar.gz -C server/data
 
 # Restore and overwrite any existing data
 docker exec -i conex-dev-db pg_restore -U conex -d conex --clean --if-exists --no-owner < backups/<file>.dump
+rm -rf server/data/attachments && tar -xzf backups/conex-attachments-<date>.tar.gz -C server/data
 ```
 
 

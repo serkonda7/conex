@@ -9,6 +9,7 @@ import { IconCopy, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Resource, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
+import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
 import { type Crumb, forgetDeleted, navigate, usePageMeta } from '../lib/router'
 import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
@@ -208,7 +209,8 @@ export function RelatedSection<Row extends { id: number }>(props: {
 
 /**
  * Confirm-then-delete flow shared by every detail page: confirms with the
- * entity noun (a `noun.<entity>` plural key) and name, reports through
+ * entity noun (a `noun.<entity>` plural key) and name, asks again when
+ * floor-plan data goes with the object, reports through
  * `setError`, then drops the object from the open tabs and shows the
  * previous page or the refreshed list.
  */
@@ -216,7 +218,8 @@ export function useDetailDelete(opts: {
 	noun: PluralKey
 	name: () => string | undefined
 	id: number
-	remove: (id: number) => Promise<Result<unknown, Error>>
+	/** Sites and locations answer with a floor-plan 409, which asks a second confirm. */
+	remove: RemoveFn
 	setError: Setter<string | null>
 	listRoute: string
 }): () => Promise<void> {
@@ -226,9 +229,12 @@ export function useDetailDelete(opts: {
 			return
 		}
 		opts.setError(null)
-		const res = await opts.remove(opts.id)
+		const res = await removeConfirmingFloorplan(opts.remove, opts.id, name)
 		if (Result.isError(res)) {
 			opts.setError(res.error.message)
+			return
+		}
+		if (!res.value) {
 			return
 		}
 		forgetDeleted(`${opts.listRoute}/${opts.id}`, opts.listRoute)

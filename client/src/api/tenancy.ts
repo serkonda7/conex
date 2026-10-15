@@ -14,6 +14,7 @@ import type {
 	TenantRow,
 } from 'server/src/db/tenancy'
 import type {
+	DeleteQuery,
 	LocationCreate,
 	LocationListQuery,
 	LocationType,
@@ -177,8 +178,12 @@ export async function update_site(id: number, patch: SiteUpdate): Promise<Result
 	return to_result<SiteRow>(res, failed.update('noun.site'))
 }
 
-export async function delete_site(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.sites[':id'].$delete(by_id(id))
+/** `opts.confirm` also deletes the site's floor-plan data (see `FloorplanImpactError`). */
+export async function delete_site(id: number, opts?: DeleteQuery): Promise<Result<unknown, Error>> {
+	const res = await client.sites[':id'].$delete({
+		...by_id(id),
+		query: to_query({ confirm: opts?.confirm }),
+	})
 	return to_result<unknown>(res, failed.delete('noun.site'))
 }
 
@@ -232,8 +237,15 @@ export async function update_location(
 	return to_result<LocationRow>(res, failed.update('noun.location'))
 }
 
-export async function delete_location(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.locations[':id'].$delete(by_id(id))
+/** `opts.confirm` also deletes the location's floor-plan data (see `FloorplanImpactError`). */
+export async function delete_location(
+	id: number,
+	opts?: DeleteQuery,
+): Promise<Result<unknown, Error>> {
+	const res = await client.locations[':id'].$delete({
+		...by_id(id),
+		query: to_query({ confirm: opts?.confirm }),
+	})
 	return to_result<unknown>(res, failed.delete('noun.location'))
 }
 
@@ -281,6 +293,6 @@ export async function update_site_group(
 }
 
 export async function delete_site_group(id: number): Promise<Result<unknown, Error>> {
-	const res = await client['site-groups'][':id'].$delete(by_id(id))
+	const res = await client['site-groups'][':id'].$delete({ ...by_id(id), query: {} })
 	return to_result<unknown>(res, failed.delete('noun.siteGroup'))
 }

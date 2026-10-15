@@ -21,6 +21,13 @@ export const configSchema = v.strictObject({
 		secureCookies: v.optional(v.boolean(), true), // Only disable for plain-HTTP local development
 	}),
 	frontendUrl: v.optional(v.string()),
+	storage: v.optional(
+		v.strictObject({
+			// Image attachments; relative to the data dir, or absolute.
+			attachmentsDir: v.optional(v.pipe(v.string(), v.minLength(1)), 'attachments'),
+		}),
+		{},
+	),
 })
 
 type RawConfig = v.InferOutput<typeof configSchema>

@@ -2085,6 +2085,408 @@ th[aria-sort="descending"] .data-table-sort::after {
 	margin: 0;
 }
 
+/* Detail page: details card with the images section beside it; stacks when narrow. */
+.detail-split {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
+	gap: 0 1rem;
+	align-items: start;
+}
+
+.detail-split .section-header {
+	margin-top: 0.6rem;
+}
+
+/* Image attachments: drop zone around a grid of CSS-scaled thumbnails. */
+.attachment-drop {
+	position: relative;
+	border: 1px dashed transparent;
+	border-radius: 0.35rem;
+}
+
+.attachment-drop.dragging {
+	border-color: var(--primary);
+	background-color: var(--bg-surface);
+}
+
+.attachment-drop-hint {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0;
+	color: var(--text);
+	background-color: rgba(0, 0, 0, 0.45);
+	pointer-events: none;
+}
+
+.attachment-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+	gap: 0.6rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.attachment-thumb {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	width: 100%;
+	padding: 0.3rem;
+	text-align: left;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+}
+
+.attachment-thumb img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	object-fit: cover;
+	border-radius: 0.25rem;
+	background-color: var(--bg-raised);
+}
+
+.attachment-caption {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-base);
+	color: var(--text-secondary);
+}
+
+.app-content .modal.attachment-lightbox {
+	max-width: min(80rem, 100%);
+}
+
+.attachment-full {
+	display: block;
+	max-width: 100%;
+	max-height: 70vh;
+	width: auto;
+	height: auto;
+	margin: 0 auto;
+}
+
+.attachment-meta,
+.attachment-description {
+	color: var(--text-secondary);
+	font-size: var(--font-size-base);
+	overflow-wrap: anywhere;
+}
+
+/* Floor-plan star on a thumbnail: always shown on the marked image. */
+.attachment-item {
+	position: relative;
+}
+
+.attachment-star {
+	position: absolute;
+	top: 0.55rem;
+	right: 0.55rem;
+	display: inline-flex;
+	padding: 0.25rem;
+	color: var(--text-secondary);
+	background-color: rgba(0, 0, 0, 0.55);
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+}
+
+span.attachment-star,
+.attachment-star.marked {
+	color: #f5c518;
+}
+
+/* Floor plan: the image, capped in height and shrink-wrapped by the stage,
+   with areas and markers on top, all positioned in normalized (0..1)
+   coordinates. */
+.floorplan-stage {
+	position: relative;
+	width: fit-content;
+	max-width: 100%;
+	margin: 0.6rem 0;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	overflow: hidden;
+	background-color: var(--bg-raised);
+}
+
+.floorplan-stage > img {
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 100%;
+	max-height: 60vh;
+}
+
+.floorplan-overlay {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.floorplan-area polygon {
+	fill: rgba(116, 202, 255, 0.14);
+	stroke: var(--link);
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+	cursor: pointer;
+}
+
+.floorplan-area:hover polygon {
+	fill: rgba(116, 202, 255, 0.28);
+}
+
+.floorplan-area-label {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	max-width: 40%;
+	padding: 0.05rem 0.4rem;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	color: var(--text);
+	background-color: rgba(0, 0, 0, 0.6);
+	border-radius: 0.25rem;
+	text-decoration: none;
+}
+
+.floorplan-marker {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	display: grid;
+	place-items: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	color: var(--text);
+	background-color: var(--bg-surface);
+	border: 2px solid var(--primary);
+	border-radius: 999px;
+	box-shadow: var(--shadow);
+}
+
+.floorplan-marker-rack {
+	border-radius: 0.3rem;
+}
+
+.floorplan-marker-inactive {
+	border-style: dashed;
+	opacity: 0.75;
+}
+
+.floorplan-marker:hover,
+.floorplan-marker:focus-visible {
+	z-index: 1;
+	background-color: var(--bg-hover);
+}
+
+/* Edit mode: editing affordances on top of the view styles. */
+.floorplan-editor {
+	margin: 0.6rem 0;
+}
+
+.floorplan-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.floorplan-palette-actions button.active,
+.floorplan-kinds button.active {
+	background-color: var(--bg-hover);
+	border-color: var(--primary);
+}
+
+.floorplan-kinds {
+	display: flex;
+	gap: 0.4rem;
+	margin-bottom: 0.5rem;
+}
+
+.floorplan-edit-layout,
+.floorplan-view {
+	--floorplan-palette-width: 16rem;
+	--floorplan-palette-gap: 0.75rem;
+}
+
+.floorplan-edit-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) var(--floorplan-palette-width);
+	gap: var(--floorplan-palette-gap);
+	align-items: start;
+}
+
+/* The view leaves the room the editor's palette takes, so the image keeps
+   its size when switching modes. */
+.floorplan-view {
+	max-width: calc(
+		100% -
+		var(--floorplan-palette-width) -
+		var(--floorplan-palette-gap)
+	);
+}
+
+.floorplan-area.floorplan-area-editing polygon {
+	cursor: move;
+}
+
+.floorplan-area.floorplan-area-editing.selected polygon {
+	fill: rgba(116, 202, 255, 0.3);
+	stroke-dasharray: 6 3;
+}
+
+.floorplan-draft {
+	fill: rgba(116, 202, 255, 0.2);
+	stroke: var(--link);
+	stroke-width: 2;
+	stroke-dasharray: 4 3;
+	vector-effect: non-scaling-stroke;
+}
+
+.floorplan-area-label-static {
+	pointer-events: none;
+}
+
+.floorplan-handle {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	width: 0.8rem;
+	height: 0.8rem;
+	background-color: var(--bg-surface);
+	border: 2px solid var(--primary);
+	border-radius: 0.15rem;
+	cursor: nwse-resize;
+	touch-action: none;
+}
+
+.floorplan-handle-vertex {
+	cursor: move;
+}
+
+.floorplan-handle-midpoint {
+	width: 0.6rem;
+	height: 0.6rem;
+	border-width: 1px;
+	border-radius: 50%;
+	opacity: 0.75;
+	cursor: copy;
+}
+
+.floorplan-handle-close {
+	border-radius: 50%;
+	background-color: var(--primary);
+	cursor: pointer;
+}
+
+.floorplan-draw-layer {
+	position: absolute;
+	inset: 0;
+	cursor: crosshair;
+	touch-action: none;
+}
+
+.floorplan-marker-editing {
+	cursor: move;
+	touch-action: none;
+}
+
+.floorplan-marker-remove {
+	position: absolute;
+	top: -0.45rem;
+	right: -0.45rem;
+	display: grid;
+	place-items: center;
+	width: 0.9rem;
+	height: 0.9rem;
+	padding: 0;
+	border-radius: 999px;
+}
+
+.floorplan-inspector {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 0.6rem;
+	margin-bottom: 0.6rem;
+}
+
+.floorplan-inspector label {
+	display: grid;
+	gap: 0.2rem;
+	font-size: var(--font-size-sm);
+}
+
+.floorplan-palette {
+	max-height: 70vh;
+	overflow-y: auto;
+	padding: 0.5rem;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+}
+
+.floorplan-palette-actions {
+	margin-bottom: 0.6rem;
+}
+
+.floorplan-draw-toggle {
+	width: 100%;
+}
+
+.floorplan-palette h4,
+.floorplan-palette h5 {
+	margin: 0 0 0.4rem;
+}
+
+.floorplan-palette h5 {
+	margin-top: 0.6rem;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.floorplan-palette-search {
+	width: 100%;
+}
+
+.floorplan-palette ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.floorplan-palette-item {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	width: 100%;
+	margin-bottom: 0.2rem;
+	text-align: left;
+	cursor: grab;
+}
+
+@media (max-width: 800px) {
+	.floorplan-edit-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.floorplan-hint {
+	color: var(--text-muted);
+	font-size: var(--font-size-base);
+}
+
+.floorplan-palette-actions .floorplan-hint {
+	margin: 0.4rem 0 0;
+	font-size: var(--font-size-sm);
+}
+
 /* Two-column detail layout: facts/stats left, main content right. */
 .detail-columns {
 	display: grid;

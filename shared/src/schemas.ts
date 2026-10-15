@@ -1354,6 +1354,287 @@ export interface AuditLogEntryJson {
 }
 
 // ---------------------------------------------------------------------------
+// Attachments: images owned by one site or location
+// ---------------------------------------------------------------------------
+
+/** Accepted image types, detected server-side from the magic bytes. */
+export const ATTACHMENT_MIMES = ['image/png', 'image/jpeg'] as const
+
+export type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
+
+/** Upload limit per image file. */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+
+/** Exactly one of the two owner keys must be set. */
+function hasOneOwner(site: number | undefined, location: number | undefined): boolean {
+	return (site === undefined) !== (location === undefined)
+}
+
+const ONE_OWNER = 'Exactly one of site or location is required'
+
+/** Multipart file field: presence and size; the type is checked from the bytes. */
+const AttachmentFileSchema = v.pipe(
+	v.file('A file is required'),
+	v.maxSize(ATTACHMENT_MAX_BYTES, 'Image is larger than 10 MB'),
+)
+
+/** `?site=` or `?location=`: the attachments of one owner. */
+export const AttachmentListQuerySchema = v.pipe(
+	v.object({
+		site: OptionalIdEntry,
+		location: OptionalIdEntry,
+	}),
+	v.check((q) => hasOneOwner(q.site, q.location), ONE_OWNER),
+)
+
+/** Multipart upload body (form fields arrive as strings). */
+export const AttachmentCreateSchema = v.pipe(
+	v.strictObject({
+		file: AttachmentFileSchema,
+		site_id: v.optional(IdSchema, undefined),
+		location_id: v.optional(IdSchema, undefined),
+		description: DescriptionSchema,
+	}),
+	v.check((body) => hasOneOwner(body.site_id, body.location_id), ONE_OWNER),
+)
+
+/** Multipart body of a file replace. */
+export const AttachmentFileReplaceSchema = v.strictObject({ file: AttachmentFileSchema })
+
+export const AttachmentUpdateSchema = v.strictObject({
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	/** Marks the attachment as its owner's floor plan (unmarking the previous one). */
+	is_floorplan: v.optional(v.boolean(), undefined),
+})
+
+export type AttachmentListQuery = v.InferOutput<typeof AttachmentListQuerySchema>
+export type AttachmentCreate = v.InferOutput<typeof AttachmentCreateSchema>
+export type AttachmentUpdate = v.InferOutput<typeof AttachmentUpdateSchema>
+
+/** Attachment row on the wire (the image itself is `GET /attachments/:id/file`). */
+export interface AttachmentJson {
+	id: number
+	/** Owner: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	/** Original file name. */
+	filename: string
+	mime: AttachmentMime
+	size_bytes: number
+	width_px: number
+	height_px: number
+	/** Random per stored file, so it changes on replace and doubles as a cache key. */
+	storage_key: string
+	is_floorplan: boolean
+	description: string | null
+	/** Unix seconds. */
+	created_at: number
+	created_by: number | null
+}
+
+// ---------------------------------------------------------------------------
+// Floor plans: areas and markers on an owner's marked attachment
+// ---------------------------------------------------------------------------
+
+/** Normalized image coordinate: 0 is the left/top edge, 1 the right/bottom one. */
+const FloorplanCoordSchema = v.pipe(
+	v.number('Coordinate must be a number'),
+	v.minValue(0, 'Coordinate must be between 0 and 1'),
+	v.maxValue(1, 'Coordinate must be between 0 and 1'),
+)
+
+/** `[x, y]` pair of normalized coordinates. */
+export type FloorplanPoint = [number, number]
+
+/** Area linking to one site or location: a polygon of at least three points. */
+const FloorplanAreaInputSchema = v.pipe(
+	v.strictObject({
+		site_id: v.optional(IdSchema, undefined),
+		location_id: v.optional(IdSchema, undefined),
+		/** Shown instead of the target's name; empty or missing shows the name. */
+		label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+		points: v.pipe(
+			v.array(v.tuple([FloorplanCoordSchema, FloorplanCoordSchema])),
+			v.minLength(3, 'An area needs at least 3 points'),
+			v.maxLength(100, 'An area has at most 100 points'),
+		),
+	}),
+	v.check(
+		(area) => hasOneOwner(area.site_id, area.location_id),
+		'Exactly one of site or location is required as the area target',
+	),
+)
+
+/** Rack or device marker at a normalized position. */
+const FloorplanPlacementInputSchema = v.pipe(
+	v.strictObject({
+		rack_id: v.optional(IdSchema, undefined),
+		device_id: v.optional(IdSchema, undefined),
+		x: FloorplanCoordSchema,
+		y: FloorplanCoordSchema,
+	}),
+	v.check(
+		(placement) => (placement.rack_id === undefined) !== (placement.device_id === undefined),
+		'Exactly one of rack or device is required',
+	),
+)
+
+/** `PUT /attachments/:id/plan`: the full set of areas and placements, replaced atomically. */
+export const FloorplanPutSchema = v.strictObject({
+	areas: v.pipe(v.array(FloorplanAreaInputSchema), v.maxLength(500)),
+	placements: v.pipe(v.array(FloorplanPlacementInputSchema), v.maxLength(2000)),
+})
+
+export type FloorplanPut = v.InferOutput<typeof FloorplanPutSchema>
+
+/** Area on the wire, with its target resolved for display and linking. */
+export interface FloorplanAreaJson {
+	id: number
+	/** Target: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	/** Custom label; `null` shows `target_name`. */
+	label: string | null
+	points: FloorplanPoint[]
+	target_name: string
+	/** Location type of a location target; `null` for a site. */
+	target_type: LocationType | null
+	/** Floor plan (attachment) of the target, if it has one marked. */
+	target_plan_id: number | null
+}
+
+/** Marker on the wire, with its rack or device resolved for display. */
+export interface FloorplanPlacementJson {
+	id: number
+	/** Exactly one of `rack_id` / `device_id` is set. */
+	rack_id: number | null
+	device_id: number | null
+	x: number
+	y: number
+	name: string
+	/** Device status; `null` for a rack. */
+	status: string | null
+	/** Icon of the device's role; `null` for a rack or a role without one. */
+	role_icon: DeviceRoleIcon | null
+}
+
+/**
+ * `GET /attachments/:id/plan`. Areas and placements whose target or object
+ * lies outside the requester's tenant scope are left out.
+ */
+export interface FloorplanJson {
+	attachment_id: number
+	areas: FloorplanAreaJson[]
+	placements: FloorplanPlacementJson[]
+	/** Warn before clearing a plan even when some content is outside the scope. */
+	has_hidden_content: boolean
+}
+
+/**
+ * `?confirm=floorplan` on `DELETE /sites/:id`, `/locations/:id` and
+ * `/attachments/:id`: also delete when floor-plan data is affected.
+ */
+export const DeleteQuerySchema = v.object({
+	confirm: v.optional(v.picklist(['floorplan']), undefined),
+})
+
+export type DeleteQuery = v.InferOutput<typeof DeleteQuerySchema>
+
+/** Floor-plan data a delete would remove (the 409 body's `floorplan`). */
+export interface FloorplanImpactJson {
+	/** Areas on the deleted object's own floor plan. */
+	areas: number
+	/** Markers on the deleted object's own floor plan. */
+	placements: number
+	/** Areas on other floor plans that link to the deleted object. */
+	linkedFrom: number
+}
+
+/** 409 body of a delete that needs `?confirm=floorplan`. */
+export interface FloorplanImpactErrorJson {
+	error: string
+	floorplan: FloorplanImpactJson
+}
+
+/**
+ * `GET /attachments/floorplan-links?site=|location=|rack=|device=`: plans
+ * that place the rack or device, or that have an area linking to the site
+ * or location. Plans whose owner the requester cannot see are left out.
+ */
+export const FloorplanLinksQuerySchema = v.pipe(
+	v.object({
+		site: OptionalIdEntry,
+		location: OptionalIdEntry,
+		rack: OptionalIdEntry,
+		device: OptionalIdEntry,
+	}),
+	v.check(
+		(q) => [q.site, q.location, q.rack, q.device].filter((id) => id !== undefined).length === 1,
+		'Exactly one of site, location, rack or device is required',
+	),
+)
+
+export type FloorplanLinksQuery = v.InferOutput<typeof FloorplanLinksQuerySchema>
+
+/** Floor plan referencing an object, identified by its owner. */
+export interface FloorplanLinkJson {
+	attachment_id: number
+	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+}
+
+/**
+ * `GET /attachments/:id/plan/candidates`: racks and devices the editor may
+ * place on this plan. They lie in the owner's scope (its site, or the
+ * location and its descendants), are visible to the requester and are not
+ * placed on another plan. Those already on this plan are included.
+ */
+export interface FloorplanCandidateJson {
+	/** Exactly one of `rack_id` / `device_id` is set. */
+	rack_id: number | null
+	device_id: number | null
+	name: string
+	/** Device status; `null` for a rack. */
+	status: string | null
+	/** Icon of the device's role; `null` for a rack or a role without one. */
+	role_icon: DeviceRoleIcon | null
+	/** Location of the object, for grouping in the palette; `null` directly on the site. */
+	location_id: number | null
+	location_name: string | null
+}
+
+/**
+ * `GET /attachments/floorplans?search=&tenant=&tenant_group=`: every marked
+ * floor plan, filtered by its owner's tenant and searched by owner or site name.
+ */
+export const FloorplanListQuerySchema = v.object({
+	search: ListQueryEntries.search,
+	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
+})
+
+export type FloorplanListQuery = v.InferOutput<typeof FloorplanListQuerySchema>
+
+/** Floor plan row of the `/floorplans` list. */
+export interface FloorplanListJson {
+	attachment_id: number
+	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+	/** Location type of a location owner; `null` for a site. */
+	location_type: LocationType | null
+	/** The owner's site (the owner itself for a site). */
+	site_name: string
+	tenant_id: number | null
+	tenant_name: string | null
+	areas: number
+	placements: number
+}
+
+// ---------------------------------------------------------------------------
 // Changelog (NetBox-style object change history, read-only)
 // ---------------------------------------------------------------------------
 
@@ -1380,6 +1661,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'rack_type',
 	'interface_template',
 	'device_role',
+	'attachment',
 ] as const
 
 export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)

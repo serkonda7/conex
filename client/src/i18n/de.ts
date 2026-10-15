@@ -113,6 +113,8 @@ export const de: Messages = {
 	'entity.auditLog.other': 'Audit-Log',
 	'entity.changelog.one': 'Änderungsprotokoll',
 	'entity.changelog.other': 'Änderungsprotokoll',
+	'entity.floorplan.one': 'Grundriss',
+	'entity.floorplan.other': 'Grundrisse',
 	'noun.tenant.one': 'Mandant',
 	'noun.tenant.other': 'Mandanten',
 	'noun.tenantGroup.one': 'Mandantengruppe',
@@ -155,6 +157,10 @@ export const de: Messages = {
 	'noun.integration.other': 'Integrationen',
 	'noun.externalTenant.one': 'externe Firma',
 	'noun.externalTenant.other': 'externe Firmen',
+	'noun.attachment.one': 'Bild',
+	'noun.attachment.other': 'Bilder',
+	'noun.floorplan.one': 'Grundriss',
+	'noun.floorplan.other': 'Grundrisse',
 
 	// components
 	'form.slugHint':
@@ -668,6 +674,77 @@ export const de: Messages = {
 	'changeObject.rackType': 'Racktyp',
 	'changeObject.interfaceTemplate': 'Anschlussplatzhalter',
 	'changeObject.deviceRole': 'Geräterolle',
+	'changeObject.attachment': 'Bild',
+
+	// attachment
+	'attachment.title': 'Bilder',
+	'attachment.empty': 'Noch keine Bilder.',
+	'attachment.emptyDrop':
+		'Noch keine Bilder. Legen Sie PNG- oder JPEG-Dateien hier ab, um sie hochzuladen.',
+	'attachment.upload': 'Bilder hochladen',
+	'attachment.uploading': 'Wird hochgeladen…',
+	'attachment.dropHere': 'Bilder zum Hochladen hier ablegen',
+	'attachment.open': '{name} öffnen',
+	'attachment.unsupportedType': '{name}: Nur PNG- und JPEG-Bilder werden unterstützt.',
+	'attachment.tooLarge': '{name}: Das Bild ist größer als {max}.',
+	'attachment.editDescription': 'Beschreibung bearbeiten',
+	'attachment.replace': 'Bild ersetzen',
+	'attachment.dimensions': '{width} × {height} px',
+	'attachment.kilobytes': '{size} KB',
+	'attachment.megabytes': '{size} MB',
+
+	// floorplan
+	'floorplan.title': 'Grundriss',
+	'floorplan.loading': 'Grundriss wird geladen…',
+	'floorplan.image': 'Grundriss {name}',
+	'floorplan.empty': 'Dieser Grundriss hat noch keine Bereiche oder Markierungen.',
+	'floorplan.badge': 'Grundriss',
+	'floorplan.mark': 'Als Grundriss verwenden',
+	'floorplan.markNamed': '{name} als Grundriss verwenden',
+	'floorplan.unmark': 'Nicht mehr als Grundriss verwenden',
+	'floorplan.unmarkNamed': '{name} nicht mehr als Grundriss verwenden',
+	'floorplan.confirmReplace':
+		'„{name}“ als Grundriss verwenden? Der bisherige Grundriss „{current}“ enthält {areas} und {markers}, die dabei gelöscht werden.',
+	'floorplan.confirmUnmark':
+		'„{name}“ nicht mehr als Grundriss verwenden? Seine {areas} und {markers} werden gelöscht.',
+	'floorplan.confirmReplaceHidden':
+		'„{name}“ als Grundriss verwenden? Alle Bereiche und Markierungen auf „{current}“ werden gelöscht, einschließlich der Inhalte außerhalb deiner Firma.',
+	'floorplan.confirmUnmarkHidden':
+		'„{name}“ nicht mehr als Grundriss verwenden? Alle seine Bereiche und Markierungen werden gelöscht, einschließlich der Inhalte außerhalb deiner Firma.',
+	'floorplan.areaCount.one': '{count} Bereich',
+	'floorplan.areaCount.other': '{count} Bereiche',
+	'floorplan.markerCount.one': '{count} Markierung',
+	'floorplan.markerCount.other': '{count} Markierungen',
+	'floorplan.openArea': '{name} öffnen',
+	'floorplan.markerTitle': '{name} · {detail}',
+	'floorplan.pageName': 'Grundriss {name}',
+	'floorplan.notFound': 'Grundriss nicht gefunden.',
+	'floorplan.open': 'Grundriss öffnen',
+	'floorplan.edit': 'Grundriss bearbeiten',
+	'floorplan.drawArea': 'Bereich zeichnen',
+	'floorplan.finishHint': 'Enter drücken, um den Bereich abzuschließen.',
+	'floorplan.closePolygon': 'Bereich abschließen',
+	'floorplan.selectTarget': 'Ziel des Bereichs wählen',
+	'floorplan.areaLabel': 'Beschriftung des Bereichs {name}',
+	'floorplan.deleteArea': 'Bereich löschen',
+	'floorplan.removeMarker': '{name} vom Grundriss entfernen',
+	'floorplan.palette': 'Racks und Geräte',
+	'floorplan.paletteSearch': 'Racks und Geräte suchen…',
+	'floorplan.paletteEmpty': 'Keine unplatzierten Racks oder Geräte.',
+	'floorplan.noLocation': 'Ohne Standort',
+	'floorplan.placeHint': 'Auf den Grundriss ziehen oder klicken, um in der Mitte zu platzieren',
+	'floorplan.confirmCancel': 'Die nicht gespeicherten Änderungen an diesem Grundriss verwerfen?',
+	'floorplan.linkedFrom': 'Verlinkt von',
+	'floorplan.onPlanOf': 'Auf dem Grundriss von',
+	'floorplan.confirmDelete':
+		'"{name}" und die zugehörigen Grundrissdaten löschen? Das löscht auch {impact}.',
+	'floorplan.linkedCount.one': '{count} Bereich auf anderen Grundrissen, der hierher verlinkt',
+	'floorplan.linkedCount.other':
+		'{count} Bereiche auf anderen Grundrissen, die hierher verlinken',
+	'floorplan.areas': 'Bereiche',
+	'floorplan.markers': 'Markierungen',
+	'floorplan.listEmpty':
+		'Noch keine Grundrisse. Markiere ein Bild eines Standorts oder Bereichs als Grundriss.',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',
@@ -887,6 +964,7 @@ export const de: Messages = {
 	'api.deleteStubFailed': 'Anschlussplatzhalter konnte nicht gelöscht werden',
 	'api.loadElevationFailed': 'Rackansicht konnte nicht geladen werden',
 	'api.importFailed': '{noun} konnten nicht importiert werden',
+	'api.uploadFailed': '{name} konnte nicht hochgeladen werden',
 	'api.setupFailed': 'Einrichtung fehlgeschlagen.',
 	'api.passwordChangeFailed': 'Das Passwort konnte nicht geändert werden.',
 	'api.signInFailed': 'Anmeldung fehlgeschlagen.',

@@ -1,6 +1,7 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { Hono } from 'hono'
+import { type DeleteQuery, DeleteQuerySchema } from 'shared/src/schemas'
 import type * as v from 'valibot'
 import {
 	checkTenant,
@@ -29,7 +30,7 @@ interface CrudOptions<Row> {
 	get: (id: number) => Promise<Result<Row, Error>>
 	// biome-ignore lint/suspicious/noExplicitAny: factory bridges heterogeneous db signatures
 	update: (id: number, input: any) => Promise<Result<unknown, Error>>
-	remove: (id: number) => Promise<Result<unknown, Error>>
+	remove: (id: number, query: DeleteQuery) => Promise<Result<unknown, Error>>
 	/** Extra list filters picked from the validated query, e.g. `(q) => ({ group: q.group })`. */
 	// biome-ignore lint/suspicious/noExplicitAny: validated query shapes vary per entity
 	filters?: (query: any) => Record<string, unknown>
@@ -115,6 +116,7 @@ export function makeTenantApp(
 			'/:id',
 			requirePermissionMiddleware('delete'),
 			vValidator('param', opts.paramSchema, onValidationError),
+			vValidator('query', DeleteQuerySchema, onValidationError),
 			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
 				const current = await opts.get(id)
@@ -122,7 +124,8 @@ export function makeTenantApp(
 					return sendResult(c, current)
 				}
 				return (
-					checkTenant(c, current.value.tenant_id) ?? sendResult(c, await opts.remove(id))
+					checkTenant(c, current.value.tenant_id) ??
+					sendResult(c, await opts.remove(id, c.req.valid('query')))
 				)
 			},
 		)
@@ -165,7 +168,7 @@ export function makeCatalogApp(opts: CrudOptions<unknown>) {
 			vValidator('param', opts.paramSchema, onValidationError),
 			async (c) => {
 				const { id } = c.req.valid('param') as { id: number }
-				return sendResult(c, await opts.remove(id))
+				return sendResult(c, await opts.remove(id, {}))
 			},
 		)
 }

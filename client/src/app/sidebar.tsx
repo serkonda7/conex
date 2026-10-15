@@ -191,7 +191,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.organization',
 		icon: IconBuilding,
-		paths: ['tenants', 'employees', 'sites', 'locations'],
+		paths: ['tenants', 'floorplans', 'employees', 'sites', 'locations'],
 	},
 	{ label: 'app.navGroup.devices', icon: IconServer, paths: ['racks', 'devices'] },
 	{

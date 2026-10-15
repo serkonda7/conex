@@ -14,7 +14,7 @@ import {
 	type TenantFilterParams,
 	tenantConditions,
 } from './list'
-import { cableTenants, deviceTenant, rackTenant } from './owners'
+import { cableTenants, deviceTenant, ownerTenant, rackTenant } from './owners'
 
 /** Changes older than this are dropped by the periodic session sweep. */
 export const CHANGELOG_RETENTION_S = 365 * 24 * 60 * 60
@@ -42,9 +42,9 @@ function resolveType<T>(objectType: ObjectTypeOf<T>, row: T): ChangeObjectType {
 	return typeof objectType === 'function' ? objectType(row) : objectType
 }
 
-/** Display name of an object: its name, model or label, else `#id`. */
+/** Display name of an object: its name, model, label or file name, else `#id`. */
 function reprOf(row: Snapshot): string {
-	for (const key of ['name', 'model', 'label']) {
+	for (const key of ['name', 'model', 'label', 'filename']) {
 		const value = (row as Record<string, unknown>)[key]
 		if (typeof value === 'string' && value !== '') {
 			return value
@@ -73,6 +73,11 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 		case 'rack':
 		case 'device':
 			return ref('tenant_id')
+		case 'attachment':
+			return (
+				(await ownerTenant({ site_id: ref('site_id'), location_id: ref('location_id') })) ??
+				null
+			)
 		case 'shelf': {
 			const rack = ref('rack_id')
 			return rack === null ? null : ((await rackTenant(rack)) ?? null)

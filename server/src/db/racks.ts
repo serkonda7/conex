@@ -11,8 +11,9 @@ import type {
 } from 'shared/src/schemas'
 import { device_types, devices, locations, racks, shelves, sites } from '../schema'
 import { checkBounds, faceOf, getOccupancy, type OccupantSpan } from '../services/occupancy'
+import { prunePlacements } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { ConflictError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
@@ -337,8 +338,15 @@ export async function updateRack(id: number, input: RackUpdate): Promise<Result<
 		'description',
 	])
 	if (!isPatchEmpty(patch)) {
+		// Another location can take the rack out of its floor plan's scope.
 		const written = await tryWrite(
-			() => getDb().update(racks).set(patch).where(eq(racks.id, id)),
+			() =>
+				withTransaction(async () => {
+					await getDb().update(racks).set(patch).where(eq(racks.id, id))
+					if (patch.location_id !== undefined && patch.location_id !== node.location_id) {
+						await prunePlacements()
+					}
+				}),
 			RACK_NAME_IN_USE,
 		)
 		if (Result.isError(written)) {

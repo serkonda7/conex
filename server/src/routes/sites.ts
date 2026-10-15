@@ -1,4 +1,5 @@
 import {
+	type DeleteQuery,
 	EntityParamsSchema,
 	SiteCreateSchema,
 	SiteListQuerySchema,
@@ -16,6 +17,6 @@ export const sitesApp = makeTenantApp({
 	create: createSite,
 	get: getSite,
 	update: updateSite,
-	remove: deleteSite,
+	remove: (id: number, query: DeleteQuery) => deleteSite(id, query.confirm === 'floorplan'),
 	filters: (q: { group?: number }) => ({ group: q.group }),
 })

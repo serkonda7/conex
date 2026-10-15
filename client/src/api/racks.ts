@@ -59,6 +59,6 @@ export async function update_rack(id: number, patch: RackUpdate): Promise<Result
 }
 
 export async function delete_rack(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.racks[':id'].$delete(by_id(id))
+	const res = await client.racks[':id'].$delete({ ...by_id(id), query: {} })
 	return to_result<unknown>(res, failed.delete('noun.rack'))
 }

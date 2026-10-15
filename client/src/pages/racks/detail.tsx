@@ -21,6 +21,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError, Loading } from '../../components/feedback'
+import { FloorplanLinks } from '../../components/floorplan_links'
 import { useSort } from '../../components/list_page'
 import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
@@ -295,6 +296,11 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									href={`/device-types/${rackTypeId() ?? ''}`}
 								/>
 							</dd>
+							<FloorplanLinks
+								target={{ rack: props.id }}
+								label="floorplan.onPlanOf"
+								onError={setError}
+							/>
 						</DetailCard>
 
 						<section class="rack-unracked" aria-label={t('rack.unracked')}>
