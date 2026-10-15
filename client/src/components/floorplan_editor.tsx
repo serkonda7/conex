@@ -2,10 +2,14 @@
  * Edit mode of a floor plan. The editor works on a draft copy of the plan
  * and sends it with one `PUT /plan` on save; cancel discards it.
  *
- * - Area tool: drag on the stage to draw a rectangle (four points), then
- *   pick its target site or location. Areas are selected by click, moved
- *   by dragging, resized with corner handles (a vertex handle for areas
- *   that are not rectangles), relabelled and deleted below the stage.
+ * - Area tool: drag on the stage to draw a rectangle (four points), or
+ *   click corner by corner to draw a polygon (closed by clicking the first
+ *   corner, a double click or Enter; Backspace drops the last corner,
+ *   Escape the whole draft). Then pick its target site or location. Areas
+ *   are selected by click, moved by dragging, reshaped with corner handles
+ *   (a rectangle's neighbors follow), relabelled and deleted below the
+ *   stage. Dragging an edge's midpoint handle inserts a corner there; a
+ *   double click on a corner handle removes it.
  * - Palette: unplaced racks and devices, grouped by location. Dragging an
  *   item onto the stage (HTML5 drag and drop) places a marker at the drop
  *   point; a click places it in the center. Markers move with pointer
@@ -42,6 +46,7 @@ import { fetch_locations, fetch_sites } from '../api/tenancy'
 import { t, tp } from '../i18n'
 import { createRows, useAction } from '../lib/resource'
 import { useLeaveGuard } from '../lib/router'
+import { tenantContextFilters } from '../lib/tenant_context'
 import { InlineError, Loading } from './feedback'
 import {
 	areaCenter,
@@ -57,8 +62,14 @@ import { ObjectSearch } from './object_selector'
 
 type Point = [number, number]
 
-/** Smallest side (fraction of the plan) of a drawn area; smaller drags are discarded. */
+/** Smallest side (fraction of the plan) of a drawn area's bounding box; smaller ones are discarded. */
 const MIN_AREA_SIZE = 0.01
+
+/** Most corners of an area (as `FloorplanPutSchema` allows). */
+const MAX_AREA_POINTS = 100
+
+/** Corners closer than this (fraction of the plan) count as the same one. */
+const SAME_POINT = 0.002
 
 function clamp01(value: number): number {
 	return Math.min(1, Math.max(0, value))
@@ -103,6 +114,33 @@ function moveCorner(points: Point[], index: number, to: Point): Point[] {
 	next[after] = afterSharesX ? [to[0], points[after][1]] : [points[after][0], to[1]]
 	next[before] = afterSharesX ? [points[before][0], to[1]] : [to[0], points[before][1]]
 	return next
+}
+
+/** True if the bounding box of `points` is large enough to keep as an area. */
+function largeEnough(points: Point[]): boolean {
+	const xs = points.map((point: Point) => point[0])
+	const ys = points.map((point: Point) => point[1])
+	return (
+		points.length >= 3 &&
+		Math.max(...xs) - Math.min(...xs) >= MIN_AREA_SIZE &&
+		Math.max(...ys) - Math.min(...ys) >= MIN_AREA_SIZE
+	)
+}
+
+function samePoint(a: Point, b: Point): boolean {
+	return Math.abs(a[0] - b[0]) < SAME_POINT && Math.abs(a[1] - b[1]) < SAME_POINT
+}
+
+/** The midpoint of each edge; entry `i` lies between corner `i` and the next one. */
+function edgeMidpoints(points: Point[]): Point[] {
+	return points.map((point: Point, index: number): Point => {
+		const next = points[(index + 1) % points.length]
+		return [(point[0] + next[0]) / 2, (point[1] + next[1]) / 2]
+	})
+}
+
+function svgPoints(points: Point[]): string {
+	return points.map((point: Point) => point.join(',')).join(' ')
 }
 
 /** `points` shifted by the delta, limited so the bounding box stays on the plan. */
@@ -165,8 +203,9 @@ function AreaTargetPicker(props: {
 		)
 
 	const load = async (search: string): Promise<Result<{ id: number; name: string }[], Error>> => {
+		const filters = { search, ...tenantContextFilters() }
 		const res: Result<{ items: { id: number; name: string }[] }, Error> =
-			kind() === 'site' ? await fetch_sites({ search }) : await fetch_locations({ search })
+			kind() === 'site' ? await fetch_sites(filters) : await fetch_locations(filters)
 		if (Result.isError(res)) {
 			return Result.err(res.error)
 		}
@@ -333,8 +372,10 @@ export function FloorplanEditor(props: {
 	)
 	const [selected, setSelected] = createSignal<number | null>(null)
 	const [drawing, setDrawing] = createSignal(false)
-	/** Rectangle being dragged out, then held while its target is picked. */
-	const [rect, setRect] = createSignal<Point[] | null>(null)
+	/** Area being drawn (rectangle or polygon corners), then held while its target is picked. */
+	const [draft, setDraft] = createSignal<Point[] | null>(null)
+	/** Pointer position over the plan while drawing a polygon, for the next edge's preview. */
+	const [hover, setHover] = createSignal<Point | null>(null)
 	const [picking, setPicking] = createSignal(false)
 	const [dragged, setDragged] = createSignal<string | null>(null)
 	const [stage, setStage] = createSignal<HTMLDivElement>()
@@ -439,6 +480,27 @@ export function FloorplanEditor(props: {
 		)
 	}
 
+	/** Inserts a corner in the middle of edge `index` and drags it. */
+	function dragMidpoint(e: PointerEvent, area: FloorplanAreaJson, index: number): void {
+		if (area.points.length >= MAX_AREA_POINTS) {
+			e.preventDefault()
+			e.stopPropagation()
+			return
+		}
+		const origin = [...area.points]
+		origin.splice(index + 1, 0, edgeMidpoints(area.points)[index])
+		patchArea(area.id, { points: origin })
+		dragCorner(e, { ...area, points: origin }, index + 1)
+	}
+
+	function removeCorner(area: FloorplanAreaJson, index: number): void {
+		if (area.points.length > 3) {
+			patchArea(area.id, {
+				points: area.points.filter((_point: Point, i: number) => i !== index),
+			})
+		}
+	}
+
 	function dragMarker(e: PointerEvent, placement: FloorplanPlacementJson): void {
 		setSelected(null)
 		const [x, y] = [placement.x, placement.y]
@@ -447,36 +509,118 @@ export function FloorplanEditor(props: {
 		)
 	}
 
+	/** True while a rectangle is dragged out; a draft otherwise is a polygon in progress. */
+	const [rectDragging, setRectDragging] = createSignal(false)
+
+	function toggleDrawing(on: boolean): void {
+		setDrawing(on)
+		setDraft(null)
+		setHover(null)
+	}
+
+	/**
+	 * Pointer down on the draw layer: adds a corner to a polygon in progress.
+	 * Otherwise a drag draws a rectangle and a click starts a polygon.
+	 */
 	function drawStart(e: PointerEvent): void {
+		if (draft() !== null) {
+			addPolygonPoint(e)
+			return
+		}
 		const from = stagePoint(e)
-		setRect(rectPoints(from, from))
 		startDrag(
 			e,
-			(dx: number, dy: number) =>
-				setRect(rectPoints(from, [clamp01(from[0] + dx), clamp01(from[1] + dy)])),
-			() => {
-				const drawn = rect()
-				setDrawing(false)
+			(dx: number, dy: number) => {
 				if (
-					drawn &&
-					drawn[2][0] - drawn[0][0] >= MIN_AREA_SIZE &&
-					drawn[2][1] - drawn[0][1] >= MIN_AREA_SIZE
+					!rectDragging() &&
+					Math.abs(dx) < MIN_AREA_SIZE &&
+					Math.abs(dy) < MIN_AREA_SIZE
 				) {
+					return
+				}
+				setRectDragging(true)
+				setHover(null)
+				setDraft(rectPoints(from, [clamp01(from[0] + dx), clamp01(from[1] + dy)]))
+			},
+			() => {
+				if (!rectDragging()) {
+					setDraft([from])
+					return
+				}
+				setRectDragging(false)
+				const drawn = draft()
+				setDrawing(false)
+				if (drawn && largeEnough(drawn)) {
 					setPicking(true)
 				} else {
-					setRect(null)
+					setDraft(null)
 				}
 			},
 		)
 	}
 
+	function addPolygonPoint(e: PointerEvent): void {
+		e.preventDefault()
+		e.stopPropagation()
+		const at = stagePoint(e)
+		const points = draft() ?? []
+		// The second click of a double click lands on the corner just added.
+		if (points.length > 0 && samePoint(points[points.length - 1], at)) {
+			return
+		}
+		if (points.length >= 3 && samePoint(points[0], at)) {
+			finishPolygon()
+			return
+		}
+		if (points.length < MAX_AREA_POINTS) {
+			setDraft([...points, at])
+		}
+	}
+
+	function finishPolygon(): void {
+		const drawn = draft()
+		if (!drawn || !largeEnough(drawn)) {
+			return
+		}
+		setDrawing(false)
+		setHover(null)
+		setPicking(true)
+	}
+
+	// Keys of the area tool; ignored while typing in a field.
+	const onKeyDown = (e: KeyboardEvent): void => {
+		if (!drawing() || rectDragging() || picking() || e.target instanceof HTMLInputElement) {
+			return
+		}
+		const points = draft() ?? []
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			finishPolygon()
+		} else if (e.key === 'Escape') {
+			e.preventDefault()
+			toggleDrawing(points.length > 0)
+		} else if (e.key === 'Backspace' && points.length > 0) {
+			e.preventDefault()
+			setDraft(points.length > 1 ? points.slice(0, -1) : null)
+		}
+	}
+	onMount(() => window.addEventListener('keydown', onKeyDown))
+	onCleanup(() => window.removeEventListener('keydown', onKeyDown))
+
+	/** The draft as drawn so far, with the polygon's next edge to the pointer. */
+	const draftPreview = createMemo((): Point[] | null => {
+		const points = draft()
+		const at = hover()
+		return points && drawing() && at ? [...points, at] : points
+	})
+
 	function closePicker(): void {
 		setPicking(false)
-		setRect(null)
+		setDraft(null)
 	}
 
 	function addArea(target: AreaTarget): void {
-		const points = rect()
+		const points = draft()
 		closePicker()
 		if (!points) {
 			return
@@ -605,22 +749,13 @@ export function FloorplanEditor(props: {
 										classList={{ selected: selected() === area.id }}
 										onPointerDown={(e: PointerEvent) => dragArea(e, area)}
 									>
-										<polygon
-											points={area.points
-												.map((point: Point) => point.join(','))
-												.join(' ')}
-										/>
+										<polygon points={svgPoints(area.points)} />
 									</g>
 								)}
 							</For>
-							<Show when={rect()}>
+							<Show when={draftPreview()}>
 								{(points: () => Point[]) => (
-									<polygon
-										class="floorplan-draft"
-										points={points()
-											.map((point: Point) => point.join(','))
-											.join(' ')}
-									/>
+									<polygon class="floorplan-draft" points={svgPoints(points())} />
 								)}
 							</Show>
 						</svg>
@@ -639,20 +774,43 @@ export function FloorplanEditor(props: {
 						</For>
 						<Show when={selectedArea()}>
 							{(area: () => FloorplanAreaJson) => (
-								<Index each={area().points}>
-									{(point: () => Point, index: number) => (
-										<div
-											class="floorplan-handle"
-											style={{
-												left: percent(point()[0]),
-												top: percent(point()[1]),
-											}}
-											onPointerDown={(e: PointerEvent) =>
-												dragCorner(e, area(), index)
-											}
-										/>
-									)}
-								</Index>
+								<>
+									<Index each={edgeMidpoints(area().points)}>
+										{(point: () => Point, index: number) => (
+											<div
+												class="floorplan-handle floorplan-handle-midpoint"
+												style={{
+													left: percent(point()[0]),
+													top: percent(point()[1]),
+												}}
+												onPointerDown={(e: PointerEvent) =>
+													dragMidpoint(e, area(), index)
+												}
+											/>
+										)}
+									</Index>
+									<Index each={area().points}>
+										{(point: () => Point, index: number) => (
+											// biome-ignore lint/a11y/noStaticElementInteractions: Pointer-only shape editing, like the other handles.
+											<div
+												class="floorplan-handle"
+												classList={{
+													'floorplan-handle-vertex': !isRect(
+														area().points,
+													),
+												}}
+												style={{
+													left: percent(point()[0]),
+													top: percent(point()[1]),
+												}}
+												onPointerDown={(e: PointerEvent) =>
+													dragCorner(e, area(), index)
+												}
+												onDblClick={() => removeCorner(area(), index)}
+											/>
+										)}
+									</Index>
+								</>
 							)}
 						</Show>
 						<For each={placements()}>
@@ -698,8 +856,33 @@ export function FloorplanEditor(props: {
 							)}
 						</For>
 						<Show when={drawing()}>
-							{/* Covers the plan so the drag draws instead of moving what lies below. */}
-							<div class="floorplan-draw-layer" onPointerDown={drawStart} />
+							{/* Covers the plan so the pointer draws instead of moving what lies below. */}
+							{/* biome-ignore lint/a11y/noStaticElementInteractions: Enter finishes the polygon from the keyboard. */}
+							<div
+								class="floorplan-draw-layer"
+								onPointerDown={drawStart}
+								onPointerMove={(e: PointerEvent) =>
+									draft() !== null && !rectDragging() && setHover(stagePoint(e))
+								}
+								onPointerLeave={() => setHover(null)}
+								onDblClick={finishPolygon}
+							/>
+							<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
+								{/* Clicking the first corner closes the polygon. */}
+								<div
+									class="floorplan-handle floorplan-handle-close"
+									style={{
+										left: percent(draft()?.[0][0] ?? 0),
+										top: percent(draft()?.[0][1] ?? 0),
+									}}
+									title={t('floorplan.closePolygon')}
+									onPointerDown={(e: PointerEvent) => {
+										e.preventDefault()
+										e.stopPropagation()
+										finishPolygon()
+									}}
+								/>
+							</Show>
 						</Show>
 					</FloorplanStage>
 					<Show when={selectedArea()}>
@@ -733,15 +916,15 @@ export function FloorplanEditor(props: {
 								class="floorplan-draw-toggle"
 								aria-pressed={drawing()}
 								classList={{ active: drawing() }}
-								onClick={() => setDrawing(!drawing())}
+								onClick={() => toggleDrawing(!drawing())}
 							>
 								<IconLabel icon={IconPencilPlus}>
 									{t('floorplan.drawArea')}
 								</IconLabel>
 							</button>
-							<p class="floorplan-hint">
-								{drawing() ? t('floorplan.drawHint') : t('floorplan.editHint')}
-							</p>
+							<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
+								<p class="floorplan-hint">{t('floorplan.finishHint')}</p>
+							</Show>
 						</>
 					}
 					candidates={candidates()}

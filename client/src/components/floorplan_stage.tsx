@@ -25,8 +25,21 @@ export function areaName(area: FloorplanAreaJson): string {
 	return area.label || area.target_name
 }
 
-/** Label anchor of an area: the center of its bounding box. */
+/** Label anchor of an area: its centroid, or the center of its bounding box when it has no area. */
 export function areaCenter(area: FloorplanAreaJson): { x: number; y: number } {
+	let twiceArea = 0
+	let cx = 0
+	let cy = 0
+	area.points.forEach(([x0, y0], index) => {
+		const [x1, y1] = area.points[(index + 1) % area.points.length]
+		const cross = x0 * y1 - x1 * y0
+		twiceArea += cross
+		cx += (x0 + x1) * cross
+		cy += (y0 + y1) * cross
+	})
+	if (Math.abs(twiceArea) > 1e-9) {
+		return { x: cx / (3 * twiceArea), y: cy / (3 * twiceArea) }
+	}
 	const xs = area.points.map((point) => point[0])
 	const ys = area.points.map((point) => point[1])
 	return {

@@ -2367,6 +2367,25 @@ span.attachment-star,
 	touch-action: none;
 }
 
+.floorplan-handle-vertex {
+	cursor: move;
+}
+
+.floorplan-handle-midpoint {
+	width: 0.6rem;
+	height: 0.6rem;
+	border-width: 1px;
+	border-radius: 50%;
+	opacity: 0.75;
+	cursor: copy;
+}
+
+.floorplan-handle-close {
+	border-radius: 50%;
+	background-color: var(--primary);
+	cursor: pointer;
+}
+
 .floorplan-draw-layer {
 	position: absolute;
 	inset: 0;
