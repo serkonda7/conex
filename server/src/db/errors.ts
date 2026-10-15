@@ -3,6 +3,8 @@
  * `DrizzleQueryError` whose `cause` is the Bun `PostgresError`.
  */
 
+import type { FloorplanImpactJson } from 'shared/src/schemas'
+
 const PG_UNIQUE_VIOLATION = '23505'
 
 export function isUniqueViolation(err: unknown): boolean {
@@ -44,6 +46,17 @@ export class ConflictError extends Error {
 	constructor(message = 'Operation conflicts with existing data') {
 		super(message)
 		this.name = 'ConflictError'
+	}
+}
+
+/**
+ * Wrapped in a `Result.err` when a delete would remove floor-plan data and
+ * the request lacks `?confirm=floorplan`. Mapped to 409 with the impact.
+ */
+export class FloorplanImpactError extends ConflictError {
+	constructor(readonly floorplan: FloorplanImpactJson) {
+		super('Deleting this also removes floor-plan data; confirm to continue')
+		this.name = 'FloorplanImpactError'
 	}
 }
 

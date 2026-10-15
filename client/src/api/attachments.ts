@@ -9,9 +9,11 @@ import type { Result } from 'better-result'
 import type {
 	AttachmentJson,
 	AttachmentUpdate,
+	DeleteQuery,
 	FloorplanAreaJson,
 	FloorplanCandidateJson,
 	FloorplanJson,
+	FloorplanLinkJson,
 	FloorplanPlacementJson,
 	FloorplanPut,
 } from 'shared/src/types'
@@ -23,6 +25,7 @@ export type {
 	FloorplanAreaJson,
 	FloorplanCandidateJson,
 	FloorplanJson,
+	FloorplanLinkJson,
 	FloorplanPlacementJson,
 	FloorplanPut,
 }
@@ -76,8 +79,15 @@ export async function replace_attachment_file(
 	return to_result<AttachmentJson>(res, t('api.uploadFailed', { name: file.name }))
 }
 
-export async function delete_attachment(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.attachments[':id'].$delete(by_id(id))
+/** `opts.confirm` also deletes the floor-plan data of a marked image (see `FloorplanImpactError`). */
+export async function delete_attachment(
+	id: number,
+	opts?: DeleteQuery,
+): Promise<Result<unknown, Error>> {
+	const res = await client.attachments[':id'].$delete({
+		...by_id(id),
+		query: to_query({ confirm: opts?.confirm }),
+	})
 	return to_result<unknown>(res, failed.delete('noun.attachment'))
 }
 
@@ -102,6 +112,31 @@ export async function put_floorplan(
 ): Promise<Result<FloorplanJson, Error>> {
 	const res = await client.attachments[':id'].plan.$put({ ...by_id(id), json: plan })
 	return to_result<FloorplanJson>(res, failed.update('noun.floorplan'))
+}
+
+/** What a floor-plan link lookup is about: exactly one of the four ids. */
+export type FloorplanLinkTarget =
+	| { site: number }
+	| { location: number }
+	| { rack: number }
+	| { device: number }
+
+/**
+ * Floor plans referencing an object: the plan a rack or device is placed on
+ * (0 or 1), or the plans with an area linking to a site or location.
+ */
+export async function fetch_floorplan_links(
+	target: FloorplanLinkTarget,
+): Promise<Result<FloorplanLinkJson[], Error>> {
+	const res = await client.attachments['floorplan-links'].$get({
+		query: to_query({
+			site: 'site' in target ? target.site : undefined,
+			location: 'location' in target ? target.location : undefined,
+			rack: 'rack' in target ? target.rack : undefined,
+			device: 'device' in target ? target.device : undefined,
+		}),
+	})
+	return to_result<FloorplanLinkJson[]>(res, failed.list('noun.floorplan'))
 }
 
 /** Image URL; the storage key changes with every file, so a replace busts the cache. */

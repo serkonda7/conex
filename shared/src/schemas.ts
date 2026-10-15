@@ -1529,6 +1529,61 @@ export interface FloorplanJson {
 }
 
 /**
+ * `?confirm=floorplan` on `DELETE /sites/:id`, `/locations/:id` and
+ * `/attachments/:id`: also delete when floor-plan data is affected.
+ */
+export const DeleteQuerySchema = v.object({
+	confirm: v.optional(v.picklist(['floorplan']), undefined),
+})
+
+export type DeleteQuery = v.InferOutput<typeof DeleteQuerySchema>
+
+/** Floor-plan data a delete would remove (the 409 body's `floorplan`). */
+export interface FloorplanImpactJson {
+	/** Areas on the deleted object's own floor plan. */
+	areas: number
+	/** Markers on the deleted object's own floor plan. */
+	placements: number
+	/** Areas on other floor plans that link to the deleted object. */
+	linkedFrom: number
+}
+
+/** 409 body of a delete that needs `?confirm=floorplan`. */
+export interface FloorplanImpactErrorJson {
+	error: string
+	floorplan: FloorplanImpactJson
+}
+
+/**
+ * `GET /attachments/floorplan-links?site=|location=|rack=|device=`: plans
+ * that place the rack or device, or that have an area linking to the site
+ * or location. Plans whose owner the requester cannot see are left out.
+ */
+export const FloorplanLinksQuerySchema = v.pipe(
+	v.object({
+		site: OptionalIdEntry,
+		location: OptionalIdEntry,
+		rack: OptionalIdEntry,
+		device: OptionalIdEntry,
+	}),
+	v.check(
+		(q) => [q.site, q.location, q.rack, q.device].filter((id) => id !== undefined).length === 1,
+		'Exactly one of site, location, rack or device is required',
+	),
+)
+
+export type FloorplanLinksQuery = v.InferOutput<typeof FloorplanLinksQuerySchema>
+
+/** Floor plan referencing an object, identified by its owner. */
+export interface FloorplanLinkJson {
+	attachment_id: number
+	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+}
+
+/**
  * `GET /attachments/:id/plan/candidates`: racks and devices the editor may
  * place on this plan. They lie in the owner's scope (its site, or the
  * location and its descendants), are visible to the requester and are not

@@ -8,7 +8,9 @@ import {
 	AttachmentFileReplaceSchema,
 	AttachmentListQuerySchema,
 	AttachmentUpdateSchema,
+	DeleteQuerySchema,
 	EntityParamsSchema,
+	FloorplanLinksQuerySchema,
 	FloorplanPutSchema,
 } from 'shared/src/schemas'
 import { checkTenant, requestScope, requestUser } from '../authz'
@@ -20,12 +22,13 @@ import {
 	getAttachmentRow,
 	getPlan,
 	listAttachments,
+	listFloorplanLinks,
 	listPlanCandidates,
 	putPlan,
 	replaceAttachmentFile,
 	updateAttachment,
 } from '../db/attachments'
-import { ownerTenant } from '../db/owners'
+import { deviceTenant, ownerTenant, rackTenant } from '../db/owners'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -72,6 +75,22 @@ export const attachmentsApp = new Hono()
 			checkTenant(c, await ownerTenant(owner)) ?? sendResult(c, await listAttachments(owner))
 		)
 	})
+	.get(
+		'/floorplan-links',
+		vValidator('query', FloorplanLinksQuerySchema, onValidationError),
+		async (c) => {
+			const query = c.req.valid('query')
+			const tenant =
+				query.site !== undefined || query.location !== undefined
+					? await ownerTenant({ site_id: query.site, location_id: query.location })
+					: query.rack !== undefined
+						? await rackTenant(query.rack)
+						: await deviceTenant(query.device ?? 0)
+			return (
+				checkTenant(c, tenant) ?? c.json(await listFloorplanLinks(query, requestScope(c)))
+			)
+		},
+	)
 	.post(
 		'/',
 		requirePermissionMiddleware('edit'),
@@ -128,13 +147,15 @@ export const attachmentsApp = new Hono()
 		'/:id',
 		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('query', DeleteQuerySchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
 			const row = await loadAttachment(c, id)
 			if (row instanceof Response) {
 				return row
 			}
-			return sendResult(c, await deleteAttachment(id))
+			const confirmed = c.req.valid('query').confirm === 'floorplan'
+			return sendResult(c, await deleteAttachment(id, confirmed))
 		},
 	)
 	.get('/:id/plan', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {

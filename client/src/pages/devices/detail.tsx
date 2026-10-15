@@ -24,6 +24,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
@@ -326,6 +327,11 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						<RecordLink id={rackId()} record={rack} base="/racks" />
 						<Mount />
 					</dd>
+					<FloorplanLinks
+						target={{ device: props.id }}
+						label="floorplan.onPlanOf"
+						onError={setError}
+					/>
 				</DetailCard>
 			</DetailShell>
 			<h3 id="device-interfaces">

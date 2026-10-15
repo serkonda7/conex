@@ -722,6 +722,12 @@ export const en = {
 	'floorplan.noLocation': 'No location',
 	'floorplan.placeHint': 'Drag onto the plan, or click to place in the center',
 	'floorplan.confirmCancel': 'Discard the unsaved changes to this floor plan?',
+	'floorplan.linkedFrom': 'Linked from',
+	'floorplan.onPlanOf': 'On floor plan of',
+	'floorplan.confirmDelete':
+		'Delete "{name}" and its floor-plan data? This also deletes {impact}.',
+	'floorplan.linkedCount.one': '{count} area on other floor plans linking here',
+	'floorplan.linkedCount.other': '{count} areas on other floor plans linking here',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',

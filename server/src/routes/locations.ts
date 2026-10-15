@@ -1,4 +1,5 @@
 import {
+	type DeleteQuery,
 	EntityParamsSchema,
 	LocationCreateSchema,
 	LocationListQuerySchema,
@@ -22,6 +23,6 @@ export const locationsApp = makeTenantApp({
 	create: createLocation,
 	get: getLocation,
 	update: updateLocation,
-	remove: deleteLocation,
+	remove: (id: number, query: DeleteQuery) => deleteLocation(id, query.confirm === 'floorplan'),
 	filters: (q: { site?: number; parent?: number }) => ({ site: q.site, parent: q.parent }),
 })

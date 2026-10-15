@@ -22,6 +22,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { FloorplanSection } from '../../components/floorplan'
+import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
@@ -114,6 +115,11 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={parentId()} record={parent} base="/locations" />
 					</dd>
+					<FloorplanLinks
+						target={{ location: props.id }}
+						label="floorplan.linkedFrom"
+						onError={setError}
+					/>
 				</DetailCard>
 			</DetailShell>
 

@@ -13,7 +13,10 @@ import type {
 	AttachmentMime,
 	AttachmentUpdate,
 	FloorplanCandidateJson,
+	FloorplanImpactJson,
 	FloorplanJson,
+	FloorplanLinkJson,
+	FloorplanLinksQuery,
 	FloorplanPut,
 } from 'shared/src/schemas'
 import {
@@ -38,7 +41,7 @@ import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, NotFoundError, ValidationError } from './errors'
+import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
 import { checkExists, findById, insertedId, isPatchEmpty, pickDefined, tryWrite } from './list'
 
 export type AttachmentRow = typeof attachments.$inferSelect
@@ -801,10 +804,156 @@ export async function putPlan(
 	return getPlan(id, scopeTenantId)
 }
 
-export async function deleteAttachment(id: number): Promise<Result<AttachmentJson, Error>> {
+/**
+ * Removes placements whose rack or device no longer lies in its plan
+ * owner's scope (see `ownerLocations`), after a site, location or rack
+ * change. Runs on the caller's `getDb()` (its transaction).
+ */
+export async function prunePlacements(): Promise<void> {
+	await getDb().execute(sql`
+		delete from ${floorplan_placements} fp
+		using ${attachments} a
+		where a.id = fp.attachment_id
+		and not exists (
+			select 1
+			from (
+				select site_id, location_id from ${racks} where id = fp.rack_id
+				union all
+				select site_id, location_id from ${devices} where id = fp.device_id
+			) o
+			where o.site_id = a.site_id
+			or a.location_id in (
+				with recursive ancestors(id) as (
+					select o.location_id
+					union
+					select l.parent_id from ${locations} l
+					join ancestors on l.id = ancestors.id
+					where l.parent_id is not null
+				)
+				select id from ancestors
+			)
+		)
+	`)
+}
+
+/**
+ * Floor-plan data deleting an owner removes: its marked plan's areas and
+ * placements, and the areas on other plans linking to it.
+ */
+async function floorplanImpact(owner: AttachmentOwner): Promise<FloorplanImpactJson> {
+	const [plan] = await getDb()
+		.select({ id: attachments.id })
+		.from(attachments)
+		.where(and(ownerCondition(owner), eq(attachments.is_floorplan, 1)))
+	const linked =
+		owner.site_id !== undefined
+			? eq(floorplan_areas.site_id, owner.site_id)
+			: eq(floorplan_areas.location_id, owner.location_id ?? 0)
+	return {
+		areas: plan
+			? await getDb().$count(floorplan_areas, eq(floorplan_areas.attachment_id, plan.id))
+			: 0,
+		placements: plan
+			? await getDb().$count(
+					floorplan_placements,
+					eq(floorplan_placements.attachment_id, plan.id),
+				)
+			: 0,
+		linkedFrom: await getDb().$count(floorplan_areas, linked),
+	}
+}
+
+/**
+ * Refuses deleting an owner that has floor-plan data unless `confirmed`
+ * (`?confirm=floorplan`); the error carries the impact for the client.
+ */
+export async function checkFloorplanDelete(
+	owner: AttachmentOwner,
+	confirmed: boolean,
+): Promise<Result<undefined, Error>> {
+	if (confirmed) {
+		return Result.ok(undefined)
+	}
+	const impact = await floorplanImpact(owner)
+	return impact.areas + impact.placements + impact.linkedFrom > 0
+		? Result.err(new FloorplanImpactError(impact))
+		: Result.ok(undefined)
+}
+
+/**
+ * Plans referencing an object (`FloorplanLinkJson`): the one placing a rack
+ * or device, or those with an area linking to a site or location. Plans
+ * whose owner lies outside `scopeTenantId` are left out.
+ */
+export async function listFloorplanLinks(
+	query: FloorplanLinksQuery,
+	scopeTenantId?: number,
+): Promise<FloorplanLinkJson[]> {
+	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
+	const columns = {
+		attachment_id: attachments.id,
+		site_id: attachments.site_id,
+		location_id: attachments.location_id,
+		owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
+	}
+	const visible = scopeTenantId === undefined ? undefined : eq(ownerTenant, scopeTenantId)
+	if (query.rack !== undefined || query.device !== undefined) {
+		return getDb()
+			.select(columns)
+			.from(floorplan_placements)
+			.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
+			.leftJoin(sites, eq(sites.id, attachments.site_id))
+			.leftJoin(locations, eq(locations.id, attachments.location_id))
+			.where(
+				and(
+					query.rack !== undefined
+						? eq(floorplan_placements.rack_id, query.rack)
+						: eq(floorplan_placements.device_id, query.device ?? 0),
+					visible,
+				),
+			)
+	}
+	return getDb()
+		.select(columns)
+		.from(floorplan_areas)
+		.innerJoin(attachments, eq(attachments.id, floorplan_areas.attachment_id))
+		.leftJoin(sites, eq(sites.id, attachments.site_id))
+		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.where(
+			and(
+				query.site !== undefined
+					? eq(floorplan_areas.site_id, query.site)
+					: eq(floorplan_areas.location_id, query.location ?? 0),
+				visible,
+			),
+		)
+		.orderBy(asc(columns.owner_name), asc(attachments.id))
+}
+
+/**
+ * Deletes an attachment. The marked floor plan with areas or placements
+ * needs `confirmed` (`?confirm=floorplan`).
+ */
+export async function deleteAttachment(
+	id: number,
+	confirmed = false,
+): Promise<Result<AttachmentJson, Error>> {
 	const current = await getAttachmentRow(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (current.value.is_floorplan === 1 && !confirmed) {
+		const impact = {
+			areas: await getDb().$count(floorplan_areas, eq(floorplan_areas.attachment_id, id)),
+			placements: await getDb().$count(
+				floorplan_placements,
+				eq(floorplan_placements.attachment_id, id),
+			),
+			linkedFrom: 0,
+		}
+		if (impact.areas + impact.placements > 0) {
+			return Result.err(new FloorplanImpactError(impact))
+		}
 	}
 	const deleted = await tryWrite(() => getDb().delete(attachments).where(eq(attachments.id, id)))
 	if (Result.isError(deleted)) {

@@ -730,6 +730,13 @@ export const de: Messages = {
 	'floorplan.noLocation': 'Ohne Standort',
 	'floorplan.placeHint': 'Auf den Grundriss ziehen oder klicken, um in der Mitte zu platzieren',
 	'floorplan.confirmCancel': 'Die nicht gespeicherten Änderungen an diesem Grundriss verwerfen?',
+	'floorplan.linkedFrom': 'Verlinkt von',
+	'floorplan.onPlanOf': 'Auf dem Grundriss von',
+	'floorplan.confirmDelete':
+		'"{name}" und die zugehörigen Grundrissdaten löschen? Das löscht auch {impact}.',
+	'floorplan.linkedCount.one': '{count} Bereich auf anderen Grundrissen, der hierher verlinkt',
+	'floorplan.linkedCount.other':
+		'{count} Bereiche auf anderen Grundrissen, die hierher verlinken',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',

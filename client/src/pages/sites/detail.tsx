@@ -22,6 +22,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { FloorplanSection } from '../../components/floorplan'
+import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
@@ -126,6 +127,11 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={groupId()} record={siteGroup} base="/site-groups" />
 					</dd>
+					<FloorplanLinks
+						target={{ site: props.id }}
+						label="floorplan.linkedFrom"
+						onError={setError}
+					/>
 					<dt>{t('common.comments')}</dt>
 					<dd>
 						<Markdown text={site()?.comments} />

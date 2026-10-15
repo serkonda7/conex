@@ -30,6 +30,7 @@ import {
 	upload_attachment,
 } from '../api/attachments'
 import { locale, t, tp } from '../i18n'
+import { removeConfirmingFloorplan } from '../lib/floorplan_delete'
 import { createRowsFor, type ErrorSink, useAction } from '../lib/resource'
 import { can } from '../lib/session'
 import { Empty, InlineError, Loading } from './feedback'
@@ -223,7 +224,17 @@ function AttachmentLightbox(props: {
 		if (!window.confirm(t('list.confirmDelete', { noun: tp('noun.attachment', 1), name }))) {
 			return
 		}
-		if (await action.run(() => delete_attachment(props.attachment.id))) {
+		let deleted = false
+		const ok = await action.run(async () => {
+			const res = await removeConfirmingFloorplan(
+				delete_attachment,
+				props.attachment.id,
+				name,
+			)
+			deleted = Result.isOk(res) && res.value
+			return res
+		})
+		if (ok && deleted) {
 			props.on_deleted()
 		}
 	}

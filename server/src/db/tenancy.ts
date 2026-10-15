@@ -34,7 +34,12 @@ import {
 	maxDescendantOffset,
 } from '../services/hierarchy'
 import { removeAttachmentFiles } from '../storage'
-import { type AttachmentRow, deleteOwnerAttachments } from './attachments'
+import {
+	type AttachmentRow,
+	checkFloorplanDelete,
+	deleteOwnerAttachments,
+	prunePlacements,
+} from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
@@ -551,7 +556,14 @@ export async function updateSite(id: number, input: SiteUpdate): Promise<Result<
 	return await logUpdate('site', current.value, await getSite(id))
 }
 
-export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
+/**
+ * Deletes a site with its attachments. Floor-plan data (its own plan's
+ * content, areas linking to it elsewhere) needs `confirmFloorplan`.
+ */
+export async function deleteSite(
+	id: number,
+	confirmFloorplan = false,
+): Promise<Result<SiteRow, Error>> {
 	const current = await getSite(id)
 	if (Result.isError(current)) {
 		return current
@@ -566,6 +578,10 @@ export async function deleteSite(id: number): Promise<Result<SiteRow, Error>> {
 	])
 	if (Result.isError(blocked)) {
 		return blocked
+	}
+	const floorplan = await checkFloorplanDelete({ site_id: id }, confirmFloorplan)
+	if (Result.isError(floorplan)) {
+		return floorplan
 	}
 	// Attachments go with their site; their files only after the commit.
 	const deleted = await tryWrite(() =>
@@ -905,8 +921,15 @@ export async function updateLocation(
 		'description',
 	])
 	if (!isPatchEmpty(patch)) {
+		// A new parent can take placed racks and devices out of a plan's scope.
 		const written = await tryWrite(
-			() => getDb().update(locations).set(patch).where(eq(locations.id, id)),
+			() =>
+				withTransaction(async () => {
+					await getDb().update(locations).set(patch).where(eq(locations.id, id))
+					if (patch.parent_id !== undefined && patch.parent_id !== node.parent_id) {
+						await prunePlacements()
+					}
+				}),
 			LOCATION_SLUG_IN_USE,
 		)
 		if (Result.isError(written)) {
@@ -916,7 +939,14 @@ export async function updateLocation(
 	return await logUpdate('location', node, await getLocation(id))
 }
 
-export async function deleteLocation(id: number): Promise<Result<LocationRow, Error>> {
+/**
+ * Deletes a location with its attachments. Floor-plan data (its own plan's
+ * content, areas linking to it elsewhere) needs `confirmFloorplan`.
+ */
+export async function deleteLocation(
+	id: number,
+	confirmFloorplan = false,
+): Promise<Result<LocationRow, Error>> {
 	const current = await getLocation(id)
 	if (Result.isError(current)) {
 		return current
@@ -931,6 +961,10 @@ export async function deleteLocation(id: number): Promise<Result<LocationRow, Er
 	])
 	if (Result.isError(blocked)) {
 		return blocked
+	}
+	const floorplan = await checkFloorplanDelete({ location_id: id }, confirmFloorplan)
+	if (Result.isError(floorplan)) {
+		return floorplan
 	}
 	// Attachments go with their location; their files only after the commit.
 	const deleted = await tryWrite(() =>
