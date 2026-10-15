@@ -195,6 +195,8 @@ export const en = {
 	'app.allTabs': 'All open pages',
 	'app.navAdd': 'Add {label}',
 	'app.navAddSoon': 'Add {label} (coming soon)',
+	'app.collapseSidebar': 'Collapse sidebar',
+	'app.expandSidebar': 'Expand sidebar',
 	'app.navImport': 'Import {label}',
 	'app.navGroup.organization': 'Organization',
 	'app.navGroup.devices': 'Devices',

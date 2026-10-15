@@ -196,6 +196,8 @@ export const de: Messages = {
 	'app.allTabs': 'Alle geöffneten Seiten',
 	'app.navAdd': '{label} hinzufügen',
 	'app.navAddSoon': '{label} hinzufügen (demnächst verfügbar)',
+	'app.collapseSidebar': 'Seitenleiste einklappen',
+	'app.expandSidebar': 'Seitenleiste ausklappen',
 	'app.navImport': '{label} importieren',
 	'app.navGroup.organization': 'Firma',
 	'app.navGroup.devices': 'Geräte',

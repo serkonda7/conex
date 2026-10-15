@@ -525,9 +525,33 @@ tbody tr:last-child td {
 
 /* Account menu pinned to the bottom of the sidebar. */
 .app-sidebar-user {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
 	margin-top: auto;
 	padding-top: 0.5rem;
 	border-top: 1px solid var(--border);
+}
+
+.app-sidebar-user .app-user-menu {
+	flex: 1;
+	min-width: 0;
+}
+
+.app-sidebar-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	padding: 0.35rem;
+	border: none;
+	background: transparent;
+	color: var(--text-secondary);
+}
+
+.app-sidebar-toggle:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
 }
 
 .app-sidebar-user .app-user-button {
@@ -563,13 +587,17 @@ tbody tr:last-child td {
 	background-color: var(--bg-surface);
 	border-right: 1px solid var(--border);
 	padding: 0.6rem 0.5rem;
-	overflow-y: auto;
 }
 
+/* The nav scrolls instead of the sidebar so the account dropdown can
+   overflow the (collapsed) sidebar's edge. */
 .app-nav {
 	display: flex;
 	flex-direction: column;
 	gap: 0.3rem;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
 }
 
 .app-nav-group {
@@ -579,42 +607,20 @@ tbody tr:last-child td {
 }
 
 .app-nav-label {
-	display: flex;
-	align-items: center;
-	gap: 0.45rem;
-	width: 100%;
-	margin: 0;
 	padding: 0.3rem 0.5rem;
-	border: none;
-	border-radius: 0.3rem;
-	background: transparent;
-	font: inherit;
 	font-size: var(--font-size-sm);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--text-muted);
-	cursor: pointer;
+	white-space: nowrap;
 }
 
-.app-nav-label:hover {
-	background-color: var(--bg-hover);
-	color: var(--text);
-}
-
-.app-nav-label-text {
-	flex: 1;
-	text-align: left;
-}
-
-.app-nav-chevron {
-	display: inline-flex;
-	transform: rotate(-90deg);
-	transition: transform 120ms ease;
-}
-
-.app-nav-group.open .app-nav-chevron {
-	transform: none;
+.app-nav-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .app-nav a,
@@ -662,8 +668,7 @@ tbody tr:last-child td {
 .app-nav-item > a {
 	flex: 1;
 	min-width: 0;
-	/* Aligned with the group label (past the group icon). */
-	padding: 0.25rem 0.5rem 0.25rem calc(0.5rem + 16px + 0.45rem);
+	padding: 0.25rem 0.5rem;
 	border: none;
 	background: transparent;
 }
@@ -711,6 +716,32 @@ tbody tr:last-child td {
 
 .app-nav-add:disabled {
 	cursor: default;
+}
+
+/* Icon rail: labels, group headings and shortcuts give way to icons. */
+.app-sidebar.collapsed {
+	width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 4px);
+}
+
+.app-sidebar.collapsed .app-nav-text,
+.app-sidebar.collapsed .app-user-info {
+	display: none;
+}
+
+.app-sidebar.collapsed .app-nav-label {
+	height: 0;
+	padding: 0;
+	margin: 0.25rem 0.25rem;
+	overflow: hidden;
+	border-top: 1px solid var(--border);
+}
+
+.app-sidebar.collapsed .app-sidebar-user {
+	flex-direction: column;
+}
+
+.app-sidebar.collapsed .app-user-button {
+	justify-content: center;
 }
 
 .app-content {
@@ -952,12 +983,17 @@ tbody tr:last-child td {
 		flex-direction: column;
 	}
 
-	.app-sidebar {
+	.app-sidebar,
+	.app-sidebar.collapsed {
 		width: 100%;
 		height: auto;
 		position: static;
 		border-right: none;
 		border-bottom: 1px solid var(--border);
+	}
+
+	.app-sidebar-toggle {
+		display: none;
 	}
 
 	.app-nav {

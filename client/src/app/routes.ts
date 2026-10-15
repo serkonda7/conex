@@ -15,6 +15,7 @@ import {
 	IconCpu,
 	IconFolder,
 	IconHistory,
+	IconLayoutDashboard,
 	IconListDetails,
 	IconLocation,
 	IconLock,
@@ -115,6 +116,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'dashboard',
 		noun: (): string => t('entity.dashboard'),
 		permission: null,
+		icon: IconLayoutDashboard,
 		// Linked at the top of the sidebar, outside the groups.
 		hideInNav: true,
 		hideAddInNav: true,

@@ -11,7 +11,7 @@ import {
 } from 'solid-js'
 import { t } from '../i18n'
 import { useDismiss } from '../lib/dismiss'
-import { navigate } from '../lib/router'
+import { navigate, path } from '../lib/router'
 import { can } from '../lib/session'
 import {
 	contextGroups,
@@ -139,6 +139,13 @@ export function TenantContextSelector(props: { scoped: boolean; canAdd: boolean 
 	function choose(option: ContextOption): void {
 		setTenantContext(option.context)
 		close()
+		// On a tenant's detail page, picking another tenant shows that tenant.
+		if (
+			option.context.kind === 'tenant' &&
+			/^\/tenants\/\d+\/?$/.test(path().split(/[?#]/)[0] ?? '')
+		) {
+			navigate(`/tenants/${option.context.id}`)
+		}
 	}
 
 	function addTenant(): void {

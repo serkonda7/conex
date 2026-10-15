@@ -1,20 +1,18 @@
 /**
  * Main navigation: routed sections in labeled groups (NetBox-style, with
  * quick add/import buttons for writers) and the account menu at the bottom.
+ * The whole sidebar collapses to an icon rail (persisted to localStorage).
  */
 import {
-	IconBook,
-	IconBuilding,
-	IconChevronDown,
+	IconChevronsLeft,
+	IconChevronsRight,
 	IconDownload,
 	IconKey,
 	IconLogout,
 	IconPlus,
-	IconServer,
-	IconSettings,
+	IconUserCircle,
 } from '@tabler/icons-solidjs'
-import type { Component } from 'solid-js'
-import { createEffect, createSignal, For, type JSX, Show } from 'solid-js'
+import { createSignal, For, type JSX, Show } from 'solid-js'
 import type { SessionUser } from '../api/auth'
 import { type MessageKey, t } from '../i18n'
 import { useDismiss } from '../lib/dismiss'
@@ -51,8 +49,30 @@ function NavShortcut(props: {
 	)
 }
 
+const COLLAPSED_KEY = 'conex:sidebar-collapsed'
+
+function loadCollapsed(): boolean {
+	try {
+		return window.localStorage.getItem(COLLAPSED_KEY) === '1'
+	} catch {
+		return false
+	}
+}
+
+const [collapsed, setCollapsedSignal] = createSignal(loadCollapsed())
+
+function setCollapsed(next: boolean): void {
+	setCollapsedSignal(next)
+	try {
+		window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0')
+	} catch {
+		// Storage unavailable (private mode): the toggle still works for the session.
+	}
+}
+
 /**
- * One section row: its list link plus the add/import shortcuts.
+ * One section row: icon and list link plus the add/import shortcuts
+ * (the shortcuts are hidden while the sidebar is collapsed).
  */
 function NavItem(props: { section: Section }): JSX.Element {
 	const href = (): string => `/${props.section.path}`
@@ -77,10 +97,22 @@ function NavItem(props: { section: Section }): JSX.Element {
 				href={href()}
 				class={active() ? 'active' : ''}
 				aria-current={active() ? 'page' : undefined}
+				aria-label={collapsed() ? label() : undefined}
+				title={collapsed() ? label() : undefined}
 			>
-				{label()}
+				<Show when={props.section.icon}>
+					{(icon: () => NonNullable<Section['icon']>): JSX.Element => {
+						const Icon = icon()
+						return (
+							<span aria-hidden="true" class="app-nav-icon">
+								<Icon size={20} />
+							</span>
+						)
+					}}
+				</Show>
+				<span class="app-nav-text">{label()}</span>
 			</a>
-			<Show when={canAddInSection(props.section)}>
+			<Show when={!collapsed() && canAddInSection(props.section)}>
 				<Show when={props.section.hideAddInNav !== true}>
 					<NavShortcut
 						href={addHref()}
@@ -121,6 +153,7 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 				aria-haspopup="menu"
 				aria-expanded={open()}
 				aria-label={t('app.accountNamed', { name: name() })}
+				title={collapsed() ? name() : undefined}
 				onClick={() => setOpen(!open())}
 				onKeyDown={(e: KeyboardEvent): void => {
 					if (e.key === 'Escape') {
@@ -128,6 +161,9 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 					}
 				}}
 			>
+				<span aria-hidden="true" class="app-nav-icon app-user-icon">
+					<IconUserCircle size={20} />
+				</span>
 				<span class="app-user-info">
 					<span class="app-user-username">{name()}</span>
 					<Show when={props.user}>
@@ -181,7 +217,6 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 
 interface NavGroup {
 	label: MessageKey
-	icon: Component<{ size?: number }>
 	paths: readonly string[]
 }
 
@@ -190,24 +225,23 @@ interface NavGroup {
 const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.organization',
-		icon: IconBuilding,
 		paths: ['floorplans', 'employees', 'sites', 'locations'],
 	},
-	{ label: 'app.navGroup.devices', icon: IconServer, paths: ['racks', 'devices'] },
+	{ label: 'app.navGroup.devices', paths: ['racks', 'devices'] },
 	{
 		label: 'app.navGroup.catalog',
-		icon: IconBook,
 		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types'],
 	},
 	{
 		label: 'app.navGroup.administration',
-		icon: IconSettings,
 		paths: ['integrations', 'users', 'roles', 'audit-log', 'changelog'],
 	},
 ]
 
 /** Routes without a nav entry mapped to the entry they highlight. */
 const NAV_PARENT: Record<string, string> = {
+	// The dashboard redirects to the home tenant page, so that page is "the dashboard".
+	tenants: 'dashboard',
 	'site-groups': 'sites',
 }
 
@@ -225,57 +259,24 @@ function navSections(paths: readonly string[]): Section[] {
 		)
 }
 
-/**
- * Collapsible group (NetBox-style): starts open when it holds the current
- * page and opens itself when navigation lands in it; otherwise the header
- * toggles it.
- */
+/** Labeled group; collapsed, the label gives way to a divider. */
 function NavGroupSection(props: { group: NavGroup; sections: Section[] }): JSX.Element {
-	const holdsActive = (): boolean => {
-		const current = routeSection(path())
-		if (current === null) {
-			return false
-		}
-		if (props.sections.includes(current)) {
-			return true
-		}
-		const parent = NAV_PARENT[current.path]
-		return parent !== undefined && props.sections.some((section) => section.path === parent)
-	}
-	const [open, setOpen] = createSignal(holdsActive())
-	createEffect(() => {
-		if (holdsActive()) {
-			setOpen(true)
-		}
-	})
 	return (
-		<div class={open() ? 'app-nav-group open' : 'app-nav-group'}>
-			<button
-				type="button"
-				class="app-nav-label"
-				aria-expanded={open()}
-				onClick={() => setOpen(!open())}
-			>
-				<span aria-hidden="true" class="app-nav-icon">
-					<props.group.icon size={16} />
-				</span>
-				<span class="app-nav-label-text">{t(props.group.label)}</span>
-				<span aria-hidden="true" class="app-nav-chevron">
-					<IconChevronDown size={14} />
-				</span>
-			</button>
-			<Show when={open()}>
-				<For each={props.sections}>
-					{(section: Section): JSX.Element => <NavItem section={section} />}
-				</For>
-			</Show>
+		<div class="app-nav-group">
+			<div class="app-nav-label">{t(props.group.label)}</div>
+			<For each={props.sections}>
+				{(section: Section): JSX.Element => <NavItem section={section} />}
+			</For>
 		</div>
 	)
 }
 
 export function Sidebar(props: { user: SessionUser | null; onLogout: () => void }): JSX.Element {
 	return (
-		<aside class="app-sidebar" aria-label={t('app.mainNavigation')}>
+		<aside
+			classList={{ 'app-sidebar': true, collapsed: collapsed() }}
+			aria-label={t('app.mainNavigation')}
+		>
 			<nav class="app-nav">
 				<Show when={SECTIONS.find((section) => section.path === 'dashboard')}>
 					{(section: () => Section): JSX.Element => <NavItem section={section()} />}
@@ -293,6 +294,20 @@ export function Sidebar(props: { user: SessionUser | null; onLogout: () => void 
 			</nav>
 			<div class="app-sidebar-user">
 				<UserMenu user={props.user} onLogout={props.onLogout} />
+				<button
+					type="button"
+					class="app-sidebar-toggle"
+					aria-expanded={!collapsed()}
+					aria-label={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
+					title={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
+					onClick={() => setCollapsed(!collapsed())}
+				>
+					<span aria-hidden="true" class="app-nav-icon">
+						<Show when={collapsed()} fallback={<IconChevronsLeft size={20} />}>
+							<IconChevronsRight size={20} />
+						</Show>
+					</span>
+				</button>
 			</div>
 		</aside>
 	)

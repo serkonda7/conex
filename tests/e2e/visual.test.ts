@@ -50,11 +50,7 @@ test('locations list layout', async ({ page }) => {
 	await expect(page.locator('main.app-content h2')).toBeVisible()
 	await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
 	await stabilizeForSnapshot(page)
-	await expect(page).toHaveScreenshot('locations-list.png', {
-		fullPage: true,
-		mask: [page.locator('.app-user-username')],
-		maskColor: '#242424',
-	})
+	await expect(page.locator('main.app-content')).toHaveScreenshot('locations-list.png')
 })
 
 test('device types list layout', async ({ page }) => {
@@ -62,11 +58,7 @@ test('device types list layout', async ({ page }) => {
 	await expect(page.getByRole('link', { name: 'E2E 2U Server', exact: true })).toBeVisible()
 	await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
 	await stabilizeForSnapshot(page)
-	await expect(page).toHaveScreenshot('device-types-list.png', {
-		fullPage: true,
-		mask: [page.locator('.app-user-username')],
-		maskColor: '#242424',
-	})
+	await expect(page.locator('main.app-content')).toHaveScreenshot('device-types-list.png')
 })
 
 test('device add form layout', async ({ page }) => {
@@ -126,3 +118,36 @@ test('floor plan with polygon area layout', async ({ page }) => {
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('floorplan-polygon.png')
 })
+
+test('expanded sidebar layout', async ({ page }) => {
+	await page.goto('/locations')
+	await expect(page.locator('main.app-content h2')).toBeVisible()
+	await expect(page.locator('.app-sidebar.collapsed')).toHaveCount(0)
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('.app-sidebar')).toHaveScreenshot('sidebar-expanded.png', {
+		mask: [page.locator('.app-user-username')],
+		maskColor: '#242424',
+	})
+})
+
+// Top-left corner (top bar + sidebar top) with the tenant dropdown open:
+// guards the dropdown's stacking above the sidebar.
+const topLeftCorner = { x: 0, y: 0, width: 480, height: 480 }
+
+for (const collapsed of [false, true]) {
+	const state = collapsed ? 'collapsed' : 'expanded'
+	test(`tenant dropdown over ${state} sidebar`, async ({ page }) => {
+		await page.goto('/locations')
+		await expect(page.locator('main.app-content h2')).toBeVisible()
+		if (collapsed) {
+			await page.locator('.app-sidebar-toggle').click()
+			await expect(page.locator('.app-sidebar.collapsed')).toBeVisible()
+		}
+		await page.locator('.app-tenant-context-button').click()
+		await expect(page.locator('.app-tenant-context-popover')).toBeVisible()
+		await stabilizeForSnapshot(page)
+		await expect(page).toHaveScreenshot(`tenant-dropdown-${state}-sidebar.png`, {
+			clip: topLeftCorner,
+		})
+	})
+}
