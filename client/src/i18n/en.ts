@@ -707,6 +707,21 @@ export const en = {
 	'floorplan.markerCount.other': '{count} markers',
 	'floorplan.openArea': 'Open {name}',
 	'floorplan.markerTitle': '{name} · {detail}',
+	'floorplan.edit': 'Edit floor plan',
+	'floorplan.drawArea': 'Draw area',
+	'floorplan.drawHint': 'Drag on the plan to draw an area.',
+	'floorplan.editHint':
+		'Drag racks and devices from the list onto the plan. Select an area to move, resize, relabel or delete it.',
+	'floorplan.selectTarget': 'Select area target',
+	'floorplan.areaLabel': 'Label of area {name}',
+	'floorplan.deleteArea': 'Delete area',
+	'floorplan.removeMarker': 'Remove {name} from the plan',
+	'floorplan.palette': 'Racks and devices',
+	'floorplan.paletteSearch': 'Search racks and devices…',
+	'floorplan.paletteEmpty': 'No unplaced racks or devices.',
+	'floorplan.noLocation': 'No location',
+	'floorplan.placeHint': 'Drag onto the plan, or click to place in the center',
+	'floorplan.confirmCancel': 'Discard the unsaved changes to this floor plan?',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',

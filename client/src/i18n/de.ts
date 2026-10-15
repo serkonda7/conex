@@ -715,6 +715,21 @@ export const de: Messages = {
 	'floorplan.markerCount.other': '{count} Markierungen',
 	'floorplan.openArea': '{name} öffnen',
 	'floorplan.markerTitle': '{name} · {detail}',
+	'floorplan.edit': 'Grundriss bearbeiten',
+	'floorplan.drawArea': 'Bereich zeichnen',
+	'floorplan.drawHint': 'Zum Zeichnen eines Bereichs auf dem Grundriss ziehen.',
+	'floorplan.editHint':
+		'Racks und Geräte aus der Liste auf den Grundriss ziehen. Einen Bereich auswählen, um ihn zu verschieben, in der Größe zu ändern, umzubenennen oder zu löschen.',
+	'floorplan.selectTarget': 'Ziel des Bereichs wählen',
+	'floorplan.areaLabel': 'Beschriftung des Bereichs {name}',
+	'floorplan.deleteArea': 'Bereich löschen',
+	'floorplan.removeMarker': '{name} vom Grundriss entfernen',
+	'floorplan.palette': 'Racks und Geräte',
+	'floorplan.paletteSearch': 'Racks und Geräte suchen…',
+	'floorplan.paletteEmpty': 'Keine unplatzierten Racks oder Geräte.',
+	'floorplan.noLocation': 'Ohne Standort',
+	'floorplan.placeHint': 'Auf den Grundriss ziehen oder klicken, um in der Mitte zu platzieren',
+	'floorplan.confirmCancel': 'Die nicht gespeicherten Änderungen an diesem Grundriss verwerfen?',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',

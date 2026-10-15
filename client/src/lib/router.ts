@@ -199,6 +199,9 @@ const scrollByTab = new Map<number, number[]>()
  */
 let historySeq = 0
 
+/** Set while the browser undoes a Back / Forward step a leave guard refused. */
+let undoingStep = false
+
 function readSeq(state: unknown): number | null {
 	if (typeof state !== 'object' || state === null || !('seq' in state)) {
 		return null
@@ -350,11 +353,42 @@ export function activateTab(id: number): void {
 	show(tab)
 }
 
+/**
+ * Unsaved-work checks per tab. A guard asks the user and returns true when
+ * the tab's page must stay (see `useLeaveGuard`).
+ */
+const leaveGuards = new Map<number, Set<() => boolean>>()
+
+/** True when a guard of one of `tabIds` keeps its page: the user declined to leave. */
+function leaveBlocked(...tabIds: number[]): boolean {
+	return tabIds.some((id) => [...(leaveGuards.get(id) ?? [])].some((guard) => guard()))
+}
+
+/**
+ * Asks with `message` before the calling component's page is left while
+ * `isDirty()`: navigating its tab elsewhere, Back / Forward, refreshing or
+ * closing the tab. Inactive tabs stay mounted, so switching tabs keeps the
+ * work. Registers for the active tab, which is the one being edited.
+ */
+export function useLeaveGuard(isDirty: () => boolean, message: () => string): void {
+	const tabId = activeTabId()
+	const guard = (): boolean => isDirty() && !window.confirm(message())
+	const set = leaveGuards.get(tabId) ?? new Set()
+	set.add(guard)
+	leaveGuards.set(tabId, set)
+	onCleanup(() => {
+		set.delete(guard)
+		if (set.size === 0 && leaveGuards.get(tabId) === set) {
+			leaveGuards.delete(tabId)
+		}
+	})
+}
+
 /** Close a tab and focus its opener (or the nearest neighbor). */
 export function closeTab(id: number): void {
 	const list = tabs()
 	const closing = list.find((t) => t.id === id)
-	if (!closing || list.length === 1) {
+	if (!closing || list.length === 1 || leaveBlocked(id)) {
 		return
 	}
 	const remaining = list.filter((t) => t.id !== id)
@@ -374,7 +408,7 @@ export function closeTab(id: number): void {
 /** Closes every tab except `id` and shows it. */
 export function closeOtherTabs(id: number): void {
 	const keep = tabs().find((t) => t.id === id)
-	if (!keep) {
+	if (!keep || leaveBlocked(...tabs().flatMap((t) => (t.id === id ? [] : [t.id])))) {
 		return
 	}
 	for (const tab of tabs()) {
@@ -397,6 +431,9 @@ export function closeTabsToRight(id: number): void {
 		return
 	}
 	const closing = list.slice(index + 1)
+	if (leaveBlocked(...closing.map((t) => t.id))) {
+		return
+	}
 	for (const tab of closing) {
 		scrollByTab.delete(tab.id)
 	}
@@ -548,6 +585,9 @@ export function navigate(to: string, opts: NavigateOptions = {}): void {
 		openTab(to, active.id)
 		return
 	}
+	if ((to !== active.path || opts.refresh === true) && leaveBlocked(active.id)) {
+		return
+	}
 	if (isFormRoute(active.path)) {
 		closeForm(active, to, opts.refresh ?? true, opts.back === true)
 		return
@@ -583,11 +623,21 @@ if (typeof window !== 'undefined') {
 		}
 		const step = seq - historySeq
 		historySeq = seq
+		if (undoingStep) {
+			undoingStep = false
+			return
+		}
 		const active = activeTab()
 		if (!active) {
 			return
 		}
 		const index = Math.max(0, Math.min(active.entries.length - 1, active.index + step))
+		if (index !== active.index && leaveBlocked(active.id)) {
+			// Undo the browser's step; the popstate that fires keeps the page.
+			undoingStep = true
+			window.history.go(-step)
+			return
+		}
 		if (index !== active.index) {
 			rememberScroll(active)
 			const next = makeTab(active.id, active.entries, index, active.openerId, active.gen)

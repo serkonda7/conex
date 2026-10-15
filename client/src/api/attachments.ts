@@ -10,13 +10,22 @@ import type {
 	AttachmentJson,
 	AttachmentUpdate,
 	FloorplanAreaJson,
+	FloorplanCandidateJson,
 	FloorplanJson,
 	FloorplanPlacementJson,
+	FloorplanPut,
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { by_id, client, failed, to_query, to_result } from './client'
 
-export type { AttachmentJson, FloorplanAreaJson, FloorplanJson, FloorplanPlacementJson }
+export type {
+	AttachmentJson,
+	FloorplanAreaJson,
+	FloorplanCandidateJson,
+	FloorplanJson,
+	FloorplanPlacementJson,
+	FloorplanPut,
+}
 
 /** Owner of an attachment: exactly one of the two ids. */
 export type AttachmentOwner = { site_id: number } | { location_id: number }
@@ -76,6 +85,23 @@ export async function delete_attachment(id: number): Promise<Result<unknown, Err
 export async function fetch_floorplan(id: number): Promise<Result<FloorplanJson, Error>> {
 	const res = await client.attachments[':id'].plan.$get(by_id(id))
 	return to_result<FloorplanJson>(res, failed.load('noun.floorplan'))
+}
+
+/** Racks and devices the editor may place on this plan (those already on it included). */
+export async function fetch_floorplan_candidates(
+	id: number,
+): Promise<Result<FloorplanCandidateJson[], Error>> {
+	const res = await client.attachments[':id'].plan.candidates.$get(by_id(id))
+	return to_result<FloorplanCandidateJson[]>(res, failed.load('noun.floorplan'))
+}
+
+/** Replaces the plan's areas and markers atomically; answers with the resolved plan. */
+export async function put_floorplan(
+	id: number,
+	plan: FloorplanPut,
+): Promise<Result<FloorplanJson, Error>> {
+	const res = await client.attachments[':id'].plan.$put({ ...by_id(id), json: plan })
+	return to_result<FloorplanJson>(res, failed.update('noun.floorplan'))
 }
 
 /** Image URL; the storage key changes with every file, so a replace busts the cache. */

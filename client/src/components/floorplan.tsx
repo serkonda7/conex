@@ -7,36 +7,35 @@
  * so plans drill down site → floor → room; a marker links to its rack or
  * device.
  *
- * The stage and its layers are separate pieces so an edit mode can swap the
- * view layers for editable ones on the same stage.
+ * The stage and its layers are separate pieces so the edit mode
+ * (`FloorplanEditor`) can swap the view layers for editable ones on the same
+ * stage.
  */
-import { IconBox, IconServer } from '@tabler/icons-solidjs'
+import { IconPencil } from '@tabler/icons-solidjs'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
-	attachment_file_url,
 	type FloorplanAreaJson,
 	type FloorplanJson,
 	type FloorplanPlacementJson,
 	fetch_floorplan,
 } from '../api/attachments'
-import { t, tp } from '../i18n'
-import { deviceStatusLabel } from '../i18n/labels'
-import { deviceRoleIcon, type IconComponent } from '../lib/icons'
+import { t } from '../i18n'
 import { createRecord } from '../lib/resource'
 import { goTo, useAnchorScroll } from '../lib/router'
+import { can } from '../lib/session'
 import { InlineError, Loading } from './feedback'
-
-/** Percent offset of a normalized coordinate, for `left` / `top`. */
-function percent(value: number): string {
-	return `${value * 100}%`
-}
-
-/** Display name of an area: its label, else its target's name. */
-function areaName(area: FloorplanAreaJson): string {
-	return area.label || area.target_name
-}
+import { FloorplanEditor } from './floorplan_editor'
+import {
+	areaCenter,
+	areaName,
+	FloorplanStage,
+	markerIcon,
+	markerTitle,
+	percent,
+} from './floorplan_stage'
+import { IconLabel } from './icon_label'
 
 /** The area's target page, scrolled to its own floor plan. */
 function areaHref(area: FloorplanAreaJson): string {
@@ -45,52 +44,10 @@ function areaHref(area: FloorplanAreaJson): string {
 		: `/locations/${area.location_id}#floorplan`
 }
 
-/** Label anchor of an area: the center of its bounding box. */
-function areaCenter(area: FloorplanAreaJson): { x: number; y: number } {
-	const xs = area.points.map((point) => point[0])
-	const ys = area.points.map((point) => point[1])
-	return {
-		x: (Math.min(...xs) + Math.max(...xs)) / 2,
-		y: (Math.min(...ys) + Math.max(...ys)) / 2,
-	}
-}
-
 function markerHref(placement: FloorplanPlacementJson): string {
 	return placement.rack_id !== null
 		? `/racks/${placement.rack_id}`
 		: `/devices/${placement.device_id}`
-}
-
-/** Rack glyph for racks, the role glyph for devices (a generic one without). */
-function markerIcon(placement: FloorplanPlacementJson): IconComponent {
-	if (placement.rack_id !== null) {
-		return IconBox
-	}
-	return deviceRoleIcon(placement.role_icon) ?? IconServer
-}
-
-/** Tooltip of a marker: the name with the device status, or "Rack". */
-function markerTitle(placement: FloorplanPlacementJson): string {
-	const detail =
-		placement.status !== null ? deviceStatusLabel(placement.status) : tp('entity.rack', 1)
-	return t('floorplan.markerTitle', { name: placement.name, detail })
-}
-
-/** The image at fit-to-width with the overlay layers (`children`) on top. */
-function FloorplanStage(props: { attachment: AttachmentJson; children: JSX.Element }): JSX.Element {
-	return (
-		<div class="floorplan-stage">
-			<img
-				src={attachment_file_url(props.attachment)}
-				alt={t('floorplan.image', {
-					name: props.attachment.description || props.attachment.filename,
-				})}
-				width={props.attachment.width_px}
-				height={props.attachment.height_px}
-			/>
-			{props.children}
-		</div>
-	)
 }
 
 /**
@@ -180,7 +137,7 @@ export function FloorplanSection(props: {
 	attachment: AttachmentJson | undefined
 }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const [plan] = createRecord(
+	const [plan, { mutate }] = createRecord(
 		() => props.attachment?.id,
 		(id: number) => {
 			setError(null)
@@ -188,6 +145,7 @@ export function FloorplanSection(props: {
 		},
 		setError,
 	)
+	const [editing, setEditing] = createSignal(false)
 	const [heading, setHeading] = createSignal<HTMLElement>()
 	useAnchorScroll(props.id, () => (plan.loading ? undefined : heading()))
 
@@ -199,6 +157,11 @@ export function FloorplanSection(props: {
 						<h3 id={props.id} class="floorplan-heading" ref={setHeading}>
 							{t('floorplan.title')}
 						</h3>
+						<Show when={can('edit') && !editing() && plan()}>
+							<button type="button" onClick={() => setEditing(true)}>
+								<IconLabel icon={IconPencil}>{t('floorplan.edit')}</IconLabel>
+							</button>
+						</Show>
 					</div>
 					<Show
 						when={!plan.loading}
@@ -206,7 +169,20 @@ export function FloorplanSection(props: {
 					>
 						<Show when={plan()}>
 							{(loaded: () => FloorplanJson) => (
-								<>
+								<Show
+									when={!editing()}
+									fallback={
+										<FloorplanEditor
+											attachment={attachment()}
+											plan={loaded()}
+											on_saved={(saved: FloorplanJson) => {
+												mutate(saved)
+												setEditing(false)
+											}}
+											on_cancel={() => setEditing(false)}
+										/>
+									}
+								>
 									<FloorplanStage attachment={attachment()}>
 										<AreaLayer areas={loaded().areas} />
 										<MarkerLayer placements={loaded().placements} />
@@ -219,7 +195,7 @@ export function FloorplanSection(props: {
 									>
 										<p class="floorplan-hint">{t('floorplan.empty')}</p>
 									</Show>
-								</>
+								</Show>
 							)}
 						</Show>
 					</Show>

@@ -9,6 +9,7 @@ import {
 	AttachmentListQuerySchema,
 	AttachmentUpdateSchema,
 	EntityParamsSchema,
+	FloorplanPutSchema,
 } from 'shared/src/schemas'
 import { checkTenant, requestScope, requestUser } from '../authz'
 import {
@@ -19,6 +20,8 @@ import {
 	getAttachmentRow,
 	getPlan,
 	listAttachments,
+	listPlanCandidates,
+	putPlan,
 	replaceAttachmentFile,
 	updateAttachment,
 } from '../db/attachments'
@@ -142,6 +145,33 @@ export const attachmentsApp = new Hono()
 		}
 		return sendResult(c, await getPlan(id, requestScope(c)))
 	})
+	.put(
+		'/:id/plan',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', FloorplanPutSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const row = await loadAttachment(c, id)
+			if (row instanceof Response) {
+				return row
+			}
+			return sendResult(c, await putPlan(id, c.req.valid('json'), requestScope(c)))
+		},
+	)
+	.get(
+		'/:id/plan/candidates',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const row = await loadAttachment(c, id)
+			if (row instanceof Response) {
+				return row
+			}
+			return sendResult(c, await listPlanCandidates(id, requestScope(c)))
+		},
+	)
 	.get('/:id/file', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
 		const row = await loadAttachment(c, c.req.valid('param').id)
 		if (row instanceof Response) {

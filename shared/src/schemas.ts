@@ -1528,6 +1528,26 @@ export interface FloorplanJson {
 	has_hidden_content: boolean
 }
 
+/**
+ * `GET /attachments/:id/plan/candidates`: racks and devices the editor may
+ * place on this plan. They lie in the owner's scope (its site, or the
+ * location and its descendants), are visible to the requester and are not
+ * placed on another plan. Those already on this plan are included.
+ */
+export interface FloorplanCandidateJson {
+	/** Exactly one of `rack_id` / `device_id` is set. */
+	rack_id: number | null
+	device_id: number | null
+	name: string
+	/** Device status; `null` for a rack. */
+	status: string | null
+	/** Icon of the device's role; `null` for a rack or a role without one. */
+	role_icon: DeviceRoleIcon | null
+	/** Location of the object, for grouping in the palette; `null` directly on the site. */
+	location_id: number | null
+	location_name: string | null
+}
+
 // ---------------------------------------------------------------------------
 // Changelog (NetBox-style object change history, read-only)
 // ---------------------------------------------------------------------------

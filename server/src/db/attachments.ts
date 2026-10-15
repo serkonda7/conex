@@ -6,12 +6,15 @@
  * crash leaves at worst an orphan file, which the startup sweep removes.
  */
 import { Result } from 'better-result'
-import { and, asc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, ne, notInArray, or, type SQL, sql } from 'drizzle-orm'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 import type {
 	AttachmentJson,
 	AttachmentMime,
 	AttachmentUpdate,
+	FloorplanCandidateJson,
 	FloorplanJson,
+	FloorplanPut,
 } from 'shared/src/schemas'
 import {
 	attachments,
@@ -23,6 +26,7 @@ import {
 	racks,
 	sites,
 } from '../schema'
+import { buildChildrenMap } from '../services/hierarchy'
 import {
 	attachmentFileName,
 	listAttachmentFiles,
@@ -34,10 +38,12 @@ import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { NotFoundError } from './errors'
+import { ConflictError, NotFoundError, ValidationError } from './errors'
 import { checkExists, findById, insertedId, isPatchEmpty, pickDefined, tryWrite } from './list'
 
 export type AttachmentRow = typeof attachments.$inferSelect
+type FloorplanAreaRow = typeof floorplan_areas.$inferSelect
+type FloorplanPlacementRow = typeof floorplan_placements.$inferSelect
 
 /** Owner of an attachment: exactly one of the two ids is set. */
 export interface AttachmentOwner {
@@ -53,6 +59,8 @@ export interface AttachmentUpload {
 
 const NOT_FOUND = 'Attachment not found'
 const FLOORPLAN_TAKEN = 'Another attachment is already marked as the floor plan'
+const NOT_MARKED = 'Only the marked floor plan can hold areas and markers'
+const ALREADY_PLACED = 'A rack or device is already placed on another floor plan'
 
 /** Stored files are `<uuid>.<ext>`, plus `<uuid>.tmp` while being written. */
 const STORED_FILE = new RegExp(
@@ -394,6 +402,403 @@ export async function getPlan(
 				eq(floorplan_placements.attachment_id, id),
 			)) > placements.length)
 	return Result.ok({ attachment_id: id, areas, placements, has_hidden_content: hasHiddenContent })
+}
+
+function ownerOf(row: AttachmentRow): AttachmentOwner {
+	return { site_id: row.site_id ?? undefined, location_id: row.location_id ?? undefined }
+}
+
+/**
+ * Locations a plan owner contains: `null` for a site (all of it), else the
+ * location itself and its descendants.
+ */
+async function ownerLocations(owner: AttachmentOwner): Promise<number[] | null> {
+	if (owner.location_id === undefined) {
+		return null
+	}
+	const ids = [owner.location_id]
+	const [root] = await getDb()
+		.select({ site_id: locations.site_id })
+		.from(locations)
+		.where(eq(locations.id, owner.location_id))
+	if (!root) {
+		return ids
+	}
+	const children = buildChildrenMap(
+		await getDb()
+			.select({ id: locations.id, parent_id: locations.parent_id })
+			.from(locations)
+			.where(eq(locations.site_id, root.site_id)),
+	)
+	for (let i = 0; i < ids.length; i++) {
+		ids.push(...(children.get(ids[i] as number) ?? []))
+	}
+	return ids
+}
+
+/** Rack or device columns lying in the owner's scope (see `ownerLocations`). */
+function containedIn(
+	columns: { site_id: PgColumn; location_id: PgColumn },
+	owner: AttachmentOwner,
+	locationIds: number[] | null,
+): SQL {
+	return locationIds === null
+		? eq(columns.site_id, owner.site_id ?? 0)
+		: inArray(columns.location_id, locationIds)
+}
+
+function visibleTo(tenant: number | null, scopeTenantId: number | undefined): boolean {
+	return scopeTenantId === undefined || tenant === scopeTenantId
+}
+
+/** Racks and devices the editor may place on a plan (`FloorplanCandidateJson`). */
+export async function listPlanCandidates(
+	id: number,
+	scopeTenantId?: number,
+): Promise<Result<FloorplanCandidateJson[], Error>> {
+	const found = await getAttachmentRow(id)
+	if (Result.isError(found)) {
+		return found
+	}
+	const owner = ownerOf(found.value)
+	const locationIds = await ownerLocations(owner)
+	// Unplaced, or placed on this plan.
+	const free = or(isNull(floorplan_placements.id), eq(floorplan_placements.attachment_id, id))
+	const rackRows = await getDb()
+		.select({
+			rack_id: racks.id,
+			name: racks.name,
+			location_id: racks.location_id,
+			location_name: locations.name,
+		})
+		.from(racks)
+		.leftJoin(locations, eq(locations.id, racks.location_id))
+		.leftJoin(floorplan_placements, eq(floorplan_placements.rack_id, racks.id))
+		.where(
+			and(
+				containedIn(racks, owner, locationIds),
+				free,
+				scopeTenantId === undefined ? undefined : eq(racks.tenant_id, scopeTenantId),
+			),
+		)
+		.orderBy(asc(racks.name), asc(racks.id))
+	const deviceRows = await getDb()
+		.select({
+			device_id: devices.id,
+			name: devices.name,
+			status: devices.status,
+			role_icon: device_roles.icon,
+			location_id: devices.location_id,
+			location_name: locations.name,
+		})
+		.from(devices)
+		.leftJoin(device_roles, eq(device_roles.id, devices.device_role_id))
+		.leftJoin(locations, eq(locations.id, devices.location_id))
+		.leftJoin(floorplan_placements, eq(floorplan_placements.device_id, devices.id))
+		.where(
+			and(
+				containedIn(devices, owner, locationIds),
+				free,
+				scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId),
+			),
+		)
+		.orderBy(asc(devices.name), asc(devices.id))
+	return Result.ok([
+		...rackRows.map((row) => ({ ...row, device_id: null, status: null, role_icon: null })),
+		...deviceRows.map((row) => ({ ...row, rack_id: null })),
+	])
+}
+
+/**
+ * Checks a plan save against its owner: area targets exist, are visible,
+ * are not the owner and occur once; placed racks and devices exist, are
+ * visible, occur once, lie in the owner's scope and are not placed on
+ * another plan. Missing and invisible objects get the same message.
+ */
+async function checkPlanInput(
+	id: number,
+	owner: AttachmentOwner,
+	input: FloorplanPut,
+	scopeTenantId: number | undefined,
+): Promise<Result<undefined, Error>> {
+	const siteIds = input.areas.flatMap((area) =>
+		area.site_id === undefined ? [] : [area.site_id],
+	)
+	const locationIds = input.areas.flatMap((area) =>
+		area.location_id === undefined ? [] : [area.location_id],
+	)
+	if (new Set(siteIds).size < siteIds.length || new Set(locationIds).size < locationIds.length) {
+		return Result.err(new ValidationError('Each site or location can be linked only once'))
+	}
+	if (
+		(owner.site_id !== undefined && siteIds.includes(owner.site_id)) ||
+		(owner.location_id !== undefined && locationIds.includes(owner.location_id))
+	) {
+		return Result.err(new ValidationError('An area cannot link to the floor plan itself'))
+	}
+	const targetSites =
+		siteIds.length === 0
+			? []
+			: await getDb()
+					.select({ id: sites.id, tenant_id: sites.tenant_id })
+					.from(sites)
+					.where(inArray(sites.id, siteIds))
+	const targetLocations =
+		locationIds.length === 0
+			? []
+			: await getDb()
+					.select({ id: locations.id, tenant_id: locations.tenant_id })
+					.from(locations)
+					.where(inArray(locations.id, locationIds))
+	for (const [ids, rows, noun] of [
+		[siteIds, targetSites, 'Site'],
+		[locationIds, targetLocations, 'Location'],
+	] as const) {
+		for (const targetId of ids) {
+			const row = rows.find((target) => target.id === targetId)
+			if (!row || !visibleTo(row.tenant_id, scopeTenantId)) {
+				return Result.err(new ValidationError(`${noun} #${targetId} not found`))
+			}
+		}
+	}
+
+	const rackIds = input.placements.flatMap((p) => (p.rack_id === undefined ? [] : [p.rack_id]))
+	const deviceIds = input.placements.flatMap((p) =>
+		p.device_id === undefined ? [] : [p.device_id],
+	)
+	if (new Set(rackIds).size < rackIds.length || new Set(deviceIds).size < deviceIds.length) {
+		return Result.err(new ValidationError('Each rack or device can be placed only once'))
+	}
+	const placedRacks =
+		rackIds.length === 0
+			? []
+			: await getDb()
+					.select({
+						id: racks.id,
+						name: racks.name,
+						tenant_id: racks.tenant_id,
+						site_id: racks.site_id,
+						location_id: racks.location_id,
+					})
+					.from(racks)
+					.where(inArray(racks.id, rackIds))
+	const placedDevices =
+		deviceIds.length === 0
+			? []
+			: await getDb()
+					.select({
+						id: devices.id,
+						name: devices.name,
+						tenant_id: devices.tenant_id,
+						site_id: devices.site_id,
+						location_id: devices.location_id,
+					})
+					.from(devices)
+					.where(inArray(devices.id, deviceIds))
+	const scope = await ownerLocations(owner)
+	for (const [ids, rows, noun] of [
+		[rackIds, placedRacks, 'Rack'],
+		[deviceIds, placedDevices, 'Device'],
+	] as const) {
+		for (const objectId of ids) {
+			const row = rows.find((object) => object.id === objectId)
+			if (!row || !visibleTo(row.tenant_id, scopeTenantId)) {
+				return Result.err(new ValidationError(`${noun} #${objectId} not found`))
+			}
+			const contained =
+				scope === null
+					? row.site_id === owner.site_id
+					: row.location_id !== null && scope.includes(row.location_id)
+			if (!contained) {
+				return Result.err(
+					new ValidationError(
+						`${noun} "${row.name ?? `#${row.id}`}" is outside this floor plan's site or location`,
+					),
+				)
+			}
+		}
+	}
+	const elsewhere = await getDb()
+		.select({ id: floorplan_placements.id })
+		.from(floorplan_placements)
+		.where(
+			and(
+				ne(floorplan_placements.attachment_id, id),
+				or(
+					rackIds.length === 0
+						? sql`false`
+						: inArray(floorplan_placements.rack_id, rackIds),
+					deviceIds.length === 0
+						? sql`false`
+						: inArray(floorplan_placements.device_id, deviceIds),
+				),
+			),
+		)
+		.limit(1)
+	return elsewhere.length > 0
+		? Result.err(new ConflictError(ALREADY_PLACED))
+		: Result.ok(undefined)
+}
+
+/**
+ * Ids of the plan's areas and placements a scoped requester cannot see;
+ * a save keeps them as they are. None for a global requester.
+ */
+async function hiddenPlanIds(
+	id: number,
+	scopeTenantId: number | undefined,
+): Promise<{ areas: number[]; placements: number[] }> {
+	if (scopeTenantId === undefined) {
+		return { areas: [], placements: [] }
+	}
+	const areas = await getDb()
+		.select({ id: floorplan_areas.id })
+		.from(floorplan_areas)
+		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
+		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.where(
+			and(
+				eq(floorplan_areas.attachment_id, id),
+				sql`coalesce(${sites.tenant_id}, ${locations.tenant_id}) is distinct from ${scopeTenantId}`,
+			),
+		)
+	const placements = await getDb()
+		.select({ id: floorplan_placements.id })
+		.from(floorplan_placements)
+		.leftJoin(racks, eq(racks.id, floorplan_placements.rack_id))
+		.leftJoin(devices, eq(devices.id, floorplan_placements.device_id))
+		.where(
+			and(
+				eq(floorplan_placements.attachment_id, id),
+				sql`coalesce(${racks.tenant_id}, ${devices.tenant_id}) is distinct from ${scopeTenantId}`,
+			),
+		)
+	return { areas: areas.map((row) => row.id), placements: placements.map((row) => row.id) }
+}
+
+/** Areas and placements of a plan as stored, for the changelog entry of a save. */
+async function planSnapshot(id: number): Promise<{
+	areas: Pick<FloorplanAreaRow, 'site_id' | 'location_id' | 'label' | 'points'>[]
+	placements: Pick<FloorplanPlacementRow, 'rack_id' | 'device_id' | 'x' | 'y'>[]
+}> {
+	const areas = await getDb()
+		.select({
+			site_id: floorplan_areas.site_id,
+			location_id: floorplan_areas.location_id,
+			label: floorplan_areas.label,
+			points: floorplan_areas.points,
+		})
+		.from(floorplan_areas)
+		.where(eq(floorplan_areas.attachment_id, id))
+		.orderBy(asc(floorplan_areas.id))
+	const placements = await getDb()
+		.select({
+			rack_id: floorplan_placements.rack_id,
+			device_id: floorplan_placements.device_id,
+			x: floorplan_placements.x,
+			y: floorplan_placements.y,
+		})
+		.from(floorplan_placements)
+		.where(eq(floorplan_placements.attachment_id, id))
+		.orderBy(asc(floorplan_placements.id))
+	return { areas, placements }
+}
+
+/**
+ * Replaces the areas and placements of the marked floor plan in one
+ * transaction and records one changelog entry for the save. Items hidden
+ * from a scoped requester stay unchanged. Returns the saved plan as
+ * `getPlan` resolves it for the requester.
+ */
+export async function putPlan(
+	id: number,
+	input: FloorplanPut,
+	scopeTenantId?: number,
+): Promise<Result<FloorplanJson, Error>> {
+	const written = await tryWrite(
+		() =>
+			withTransaction(async (): Promise<Result<undefined, Error>> => {
+				// Serializes with mark changes, which clear the plan.
+				const [row] = await getDb()
+					.select()
+					.from(attachments)
+					.where(eq(attachments.id, id))
+					.for('update')
+				if (!row) {
+					return Result.err(new NotFoundError(NOT_FOUND))
+				}
+				if (row.is_floorplan === 0) {
+					return Result.err(new ConflictError(NOT_MARKED))
+				}
+				const checked = await checkPlanInput(id, ownerOf(row), input, scopeTenantId)
+				if (Result.isError(checked)) {
+					return checked
+				}
+				const before = await planSnapshot(id)
+				const hidden = await hiddenPlanIds(id, scopeTenantId)
+				await getDb()
+					.delete(floorplan_areas)
+					.where(
+						and(
+							eq(floorplan_areas.attachment_id, id),
+							hidden.areas.length === 0
+								? undefined
+								: notInArray(floorplan_areas.id, hidden.areas),
+						),
+					)
+				await getDb()
+					.delete(floorplan_placements)
+					.where(
+						and(
+							eq(floorplan_placements.attachment_id, id),
+							hidden.placements.length === 0
+								? undefined
+								: notInArray(floorplan_placements.id, hidden.placements),
+						),
+					)
+				if (input.areas.length > 0) {
+					await getDb()
+						.insert(floorplan_areas)
+						.values(
+							input.areas.map((area) => ({
+								attachment_id: id,
+								site_id: area.site_id ?? null,
+								location_id: area.location_id ?? null,
+								label: area.label || null,
+								points: area.points,
+							})),
+						)
+				}
+				if (input.placements.length > 0) {
+					await getDb()
+						.insert(floorplan_placements)
+						.values(
+							input.placements.map((placement) => ({
+								attachment_id: id,
+								rack_id: placement.rack_id ?? null,
+								device_id: placement.device_id ?? null,
+								x: placement.x,
+								y: placement.y,
+							})),
+						)
+				}
+				const after = await planSnapshot(id)
+				await logUpdate(
+					'attachment',
+					{ ...toJson(row), plan: before },
+					Result.ok({ ...toJson(row), plan: after }),
+				)
+				return Result.ok(undefined)
+			}),
+		ALREADY_PLACED,
+	)
+	if (Result.isError(written)) {
+		return written
+	}
+	if (Result.isError(written.value)) {
+		return written.value
+	}
+	return getPlan(id, scopeTenantId)
 }
 
 export async function deleteAttachment(id: number): Promise<Result<AttachmentJson, Error>> {
