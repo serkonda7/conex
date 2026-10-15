@@ -4,7 +4,7 @@
  * edit its description, mark it as the floor plan, replace the file or
  * delete it. Type and size are checked here before uploading; the server
  * checks them again from the bytes. The page loads the images once
- * (`createOwnerImages`) and shares them with its `FloorplanSection`.
+ * (`createOwnerImages`) and uses them for its link to the floor plan page.
  */
 import {
 	IconPencil,

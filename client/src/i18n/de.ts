@@ -113,6 +113,8 @@ export const de: Messages = {
 	'entity.auditLog.other': 'Audit-Log',
 	'entity.changelog.one': 'Änderungsprotokoll',
 	'entity.changelog.other': 'Änderungsprotokoll',
+	'entity.floorplan.one': 'Grundriss',
+	'entity.floorplan.other': 'Grundrisse',
 	'noun.tenant.one': 'Mandant',
 	'noun.tenant.other': 'Mandanten',
 	'noun.tenantGroup.one': 'Mandantengruppe',
@@ -715,6 +717,8 @@ export const de: Messages = {
 	'floorplan.markerCount.other': '{count} Markierungen',
 	'floorplan.openArea': '{name} öffnen',
 	'floorplan.markerTitle': '{name} · {detail}',
+	'floorplan.notFound': 'Grundriss nicht gefunden.',
+	'floorplan.open': 'Grundriss öffnen',
 	'floorplan.edit': 'Grundriss bearbeiten',
 	'floorplan.drawArea': 'Bereich zeichnen',
 	'floorplan.drawHint': 'Zum Zeichnen eines Bereichs auf dem Grundriss ziehen.',
@@ -737,6 +741,10 @@ export const de: Messages = {
 	'floorplan.linkedCount.one': '{count} Bereich auf anderen Grundrissen, der hierher verlinkt',
 	'floorplan.linkedCount.other':
 		'{count} Bereiche auf anderen Grundrissen, die hierher verlinken',
+	'floorplan.areas': 'Bereiche',
+	'floorplan.markers': 'Markierungen',
+	'floorplan.listEmpty':
+		'Noch keine Grundrisse. Markiere ein Bild eines Standorts oder Bereichs als Grundriss.',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',

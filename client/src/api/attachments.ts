@@ -14,6 +14,8 @@ import type {
 	FloorplanCandidateJson,
 	FloorplanJson,
 	FloorplanLinkJson,
+	FloorplanListJson,
+	FloorplanListQuery,
 	FloorplanPlacementJson,
 	FloorplanPut,
 } from 'shared/src/types'
@@ -26,6 +28,7 @@ export type {
 	FloorplanCandidateJson,
 	FloorplanJson,
 	FloorplanLinkJson,
+	FloorplanListJson,
 	FloorplanPlacementJson,
 	FloorplanPut,
 }
@@ -43,6 +46,11 @@ export async function fetch_attachments(
 		}),
 	})
 	return to_result<AttachmentJson[]>(res, failed.list('noun.attachment'))
+}
+
+export async function fetch_attachment(id: number): Promise<Result<AttachmentJson, Error>> {
+	const res = await client.attachments[':id'].$get(by_id(id))
+	return to_result<AttachmentJson>(res, failed.load('noun.attachment'))
 }
 
 export async function upload_attachment(
@@ -137,6 +145,14 @@ export async function fetch_floorplan_links(
 		}),
 	})
 	return to_result<FloorplanLinkJson[]>(res, failed.list('noun.floorplan'))
+}
+
+/** Every marked floor plan, narrowed by search and tenant filters. */
+export async function fetch_floorplans(
+	query: Partial<FloorplanListQuery>,
+): Promise<Result<FloorplanListJson[], Error>> {
+	const res = await client.attachments.floorplans.$get({ query: to_query(query) })
+	return to_result<FloorplanListJson[]>(res, failed.list('noun.floorplan'))
 }
 
 /** Image URL; the storage key changes with every file, so a replace busts the cache. */

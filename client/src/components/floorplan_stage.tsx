@@ -52,7 +52,7 @@ export function markerTitle(placement: Pick<FloorplanPlacementJson, 'name' | 'st
 	return t('floorplan.markerTitle', { name: placement.name, detail })
 }
 
-/** The image at fit-to-width with the overlay layers (`children`) on top. */
+/** The image capped at 60vh high with the overlay layers (`children`) on top. */
 export function FloorplanStage(props: {
 	attachment: AttachmentJson
 	children: JSX.Element

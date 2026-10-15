@@ -111,6 +111,8 @@ export const en = {
 	'entity.auditLog.other': 'Audit log',
 	'entity.changelog.one': 'Changelog',
 	'entity.changelog.other': 'Changelog',
+	'entity.floorplan.one': 'Floor plan',
+	'entity.floorplan.other': 'Floor plans',
 	'noun.tenant.one': 'tenant',
 	'noun.tenant.other': 'tenants',
 	'noun.tenantGroup.one': 'tenant group',
@@ -707,6 +709,8 @@ export const en = {
 	'floorplan.markerCount.other': '{count} markers',
 	'floorplan.openArea': 'Open {name}',
 	'floorplan.markerTitle': '{name} · {detail}',
+	'floorplan.notFound': 'Floor plan not found.',
+	'floorplan.open': 'Open floor plan',
 	'floorplan.edit': 'Edit floor plan',
 	'floorplan.drawArea': 'Draw area',
 	'floorplan.drawHint': 'Drag on the plan to draw an area.',
@@ -728,6 +732,10 @@ export const en = {
 		'Delete "{name}" and its floor-plan data? This also deletes {impact}.',
 	'floorplan.linkedCount.one': '{count} area on other floor plans linking here',
 	'floorplan.linkedCount.other': '{count} areas on other floor plans linking here',
+	'floorplan.areas': 'Areas',
+	'floorplan.markers': 'Markers',
+	'floorplan.listEmpty':
+		'No floor plans yet. Mark an image of a site or location as its floor plan.',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',

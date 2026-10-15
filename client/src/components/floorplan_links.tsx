@@ -13,13 +13,6 @@ import {
 import { type MessageKey, t } from '../i18n'
 import { createRowsFor, type ErrorSink } from '../lib/resource'
 
-/** Link to the owner's detail page at its floor plan. */
-function planHref(link: FloorplanLinkJson): string {
-	return link.site_id !== null
-		? `/sites/${link.site_id}#floorplan`
-		: `/locations/${link.location_id}#floorplan`
-}
-
 export function FloorplanLinks(props: {
 	target: FloorplanLinkTarget
 	label: MessageKey
@@ -34,7 +27,7 @@ export function FloorplanLinks(props: {
 					{(link: FloorplanLinkJson, index: () => number) => (
 						<>
 							<Show when={index() > 0}>{', '}</Show>
-							<a href={planHref(link)}>{link.owner_name}</a>
+							<a href={`/floorplans/${link.attachment_id}`}>{link.owner_name}</a>
 						</>
 					)}
 				</For>

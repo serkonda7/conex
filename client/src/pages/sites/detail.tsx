@@ -1,4 +1,5 @@
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
+import type { AttachmentJson } from '../../api/attachments'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_racks, type RackRow } from '../../api/racks'
 import {
@@ -21,7 +22,6 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { FloorplanSection } from '../../components/floorplan'
 import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { Markdown } from '../../components/markdown'
@@ -118,44 +118,59 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle description={site()?.description} />
 
-				<DetailCard label={t('site.details')}>
-					<dt>{tp('entity.tenant', 1)}</dt>
-					<dd>
-						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
-					</dd>
-					<dt>{t('common.group')}</dt>
-					<dd>
-						<RecordLink id={groupId()} record={siteGroup} base="/site-groups" />
-					</dd>
-					<FloorplanLinks
-						target={{ site: props.id }}
-						label="floorplan.linkedFrom"
-						onError={setError}
-					/>
-					<dt>{t('common.comments')}</dt>
-					<dd>
-						<Markdown text={site()?.comments} />
-					</dd>
-					<dt>{t('site.physicalAddress')}</dt>
-					<dd>
-						<SiteAddress
-							street={site()?.physical_street}
-							postcode={site()?.physical_postcode}
-							city={site()?.physical_city}
+				<div class="detail-split">
+					<DetailCard label={t('site.details')}>
+						<dt>{tp('entity.tenant', 1)}</dt>
+						<dd>
+							<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+						</dd>
+						<dt>{t('common.group')}</dt>
+						<dd>
+							<RecordLink id={groupId()} record={siteGroup} base="/site-groups" />
+						</dd>
+						<Show when={images.floorplan()}>
+							{(plan: () => AttachmentJson) => (
+								<>
+									<dt>{t('floorplan.title')}</dt>
+									<dd>
+										<a href={`/floorplans/${plan().id}`}>
+											{t('floorplan.open')}
+										</a>
+									</dd>
+								</>
+							)}
+						</Show>
+						<FloorplanLinks
+							target={{ site: props.id }}
+							label="floorplan.linkedFrom"
+							onError={setError}
 						/>
-					</dd>
-					<dt>{t('site.shippingAddress')}</dt>
-					<dd>
-						<SiteAddress
-							street={site()?.shipping_street}
-							postcode={site()?.shipping_postcode}
-							city={site()?.shipping_city}
-						/>
-					</dd>
-				</DetailCard>
+						<dt>{t('common.comments')}</dt>
+						<dd>
+							<Markdown text={site()?.comments} />
+						</dd>
+						<dt>{t('site.physicalAddress')}</dt>
+						<dd>
+							<SiteAddress
+								street={site()?.physical_street}
+								postcode={site()?.physical_postcode}
+								city={site()?.physical_city}
+							/>
+						</dd>
+						<dt>{t('site.shippingAddress')}</dt>
+						<dd>
+							<SiteAddress
+								street={site()?.shipping_street}
+								postcode={site()?.shipping_postcode}
+								city={site()?.shipping_city}
+							/>
+						</dd>
+					</DetailCard>
+					<div>
+						<AttachmentsSection id="site-attachments" images={images} />
+					</div>
+				</div>
 			</DetailShell>
-
-			<FloorplanSection id="floorplan" attachment={images.floorplan()} />
 
 			<RelatedSection
 				id="site-locations"
@@ -202,8 +217,6 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				emptyText={t('site.noDevices')}
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
 			/>
-
-			<AttachmentsSection id="site-attachments" images={images} />
 
 			<InlineError message={error()} />
 		</div>

@@ -1,11 +1,11 @@
 /**
- * Floor plan of a site or location: its marked image at fit-to-width with
- * the plan's areas and markers on top. Coordinates are normalized to 0..1,
+ * Floor plan of a site or location (the body of `/floorplans/:id`): its
+ * marked image capped in height with the plan's areas and markers on top. Coordinates are normalized to 0..1,
  * so the overlay scales with the image: areas are polygons in an SVG with
  * `viewBox="0 0 1 1"` stretched over it, labels and markers are positioned
- * in percent. An area links to its target's own floor plan (`#floorplan`),
- * so plans drill down site → floor → room; a marker links to its rack or
- * device.
+ * in percent. An area links to its target's own floor plan, so plans drill
+ * down site → floor → room (a target without one links to its detail page);
+ * a marker links to its rack or device.
  *
  * The stage and its layers are separate pieces so the edit mode
  * (`FloorplanEditor`) can swap the view layers for editable ones on the same
@@ -23,7 +23,7 @@ import {
 } from '../api/attachments'
 import { t } from '../i18n'
 import { createRecord } from '../lib/resource'
-import { goTo, useAnchorScroll } from '../lib/router'
+import { goTo } from '../lib/router'
 import { can } from '../lib/session'
 import { InlineError, Loading } from './feedback'
 import { FloorplanEditor } from './floorplan_editor'
@@ -37,11 +37,12 @@ import {
 } from './floorplan_stage'
 import { IconLabel } from './icon_label'
 
-/** The area's target page, scrolled to its own floor plan. */
+/** The area target's own floor plan, else its detail page. */
 function areaHref(area: FloorplanAreaJson): string {
-	return area.site_id !== null
-		? `/sites/${area.site_id}#floorplan`
-		: `/locations/${area.location_id}#floorplan`
+	if (area.target_plan_id !== null) {
+		return `/floorplans/${area.target_plan_id}`
+	}
+	return area.site_id !== null ? `/sites/${area.site_id}` : `/locations/${area.location_id}`
 }
 
 function markerHref(placement: FloorplanPlacementJson): string {
@@ -128,17 +129,16 @@ function MarkerLayer(props: { placements: FloorplanPlacementJson[] }): JSX.Eleme
 }
 
 /**
- * "Floor plan" section of a site or location detail page, shown while one
- * of its images is marked as the floor plan. `id` is the heading anchor; a
- * route ending in `#<id>` scrolls here once the plan has loaded.
+ * Page header and body of a floor plan: `title` with the Edit button, then
+ * the plan or, while editing, the editor.
  */
-export function FloorplanSection(props: {
-	id: string
-	attachment: AttachmentJson | undefined
+export function FloorplanView(props: {
+	attachment: AttachmentJson
+	title: JSX.Element
 }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [plan, { mutate }] = createRecord(
-		() => props.attachment?.id,
+		() => props.attachment.id,
 		(id: number) => {
 			setError(null)
 			return fetch_floorplan(id)
@@ -146,62 +146,59 @@ export function FloorplanSection(props: {
 		setError,
 	)
 	const [editing, setEditing] = createSignal(false)
-	const [heading, setHeading] = createSignal<HTMLElement>()
-	useAnchorScroll(props.id, () => (plan.loading ? undefined : heading()))
+	const [actions, setActions] = createSignal<HTMLElement>()
 
 	return (
-		<Show when={props.attachment}>
-			{(attachment: () => AttachmentJson) => (
-				<>
-					<div class="section-header">
-						<h3 id={props.id} class="floorplan-heading" ref={setHeading}>
-							{t('floorplan.title')}
-						</h3>
-						<Show when={can('edit') && !editing() && plan()}>
+		<>
+			<div class="page-header">
+				<h2>{props.title}</h2>
+				{/* The editor puts Cancel / Save here, so the header keeps its height. */}
+				<Show when={can('edit') && plan()}>
+					<div class="form-actions" ref={setActions}>
+						<Show when={!editing()}>
 							<button type="button" onClick={() => setEditing(true)}>
 								<IconLabel icon={IconPencil}>{t('floorplan.edit')}</IconLabel>
 							</button>
 						</Show>
 					</div>
-					<Show
-						when={!plan.loading}
-						fallback={<Loading message={t('floorplan.loading')} />}
-					>
-						<Show when={plan()}>
-							{(loaded: () => FloorplanJson) => (
-								<Show
-									when={!editing()}
-									fallback={
-										<FloorplanEditor
-											attachment={attachment()}
-											plan={loaded()}
-											on_saved={(saved: FloorplanJson) => {
-												mutate(saved)
-												setEditing(false)
-											}}
-											on_cancel={() => setEditing(false)}
-										/>
-									}
-								>
-									<FloorplanStage attachment={attachment()}>
-										<AreaLayer areas={loaded().areas} />
-										<MarkerLayer placements={loaded().placements} />
-									</FloorplanStage>
-									<Show
-										when={
-											loaded().areas.length === 0 &&
-											loaded().placements.length === 0
-										}
-									>
-										<p class="floorplan-hint">{t('floorplan.empty')}</p>
-									</Show>
-								</Show>
-							)}
+				</Show>
+			</div>
+			<Show when={!plan.loading} fallback={<Loading message={t('floorplan.loading')} />}>
+				<Show when={plan()}>
+					{(loaded: () => FloorplanJson) => (
+						<Show
+							when={!editing()}
+							fallback={
+								<FloorplanEditor
+									attachment={props.attachment}
+									plan={loaded()}
+									on_saved={(saved: FloorplanJson) => {
+										mutate(saved)
+										setEditing(false)
+									}}
+									on_cancel={() => setEditing(false)}
+									actions_mount={actions()}
+								/>
+							}
+						>
+							<div class="floorplan-view">
+								<FloorplanStage attachment={props.attachment}>
+									<AreaLayer areas={loaded().areas} />
+									<MarkerLayer placements={loaded().placements} />
+								</FloorplanStage>
+							</div>
+							<Show
+								when={
+									loaded().areas.length === 0 && loaded().placements.length === 0
+								}
+							>
+								<p class="floorplan-hint">{t('floorplan.empty')}</p>
+							</Show>
 						</Show>
-					</Show>
-					<InlineError message={error()} />
-				</>
-			)}
-		</Show>
+					)}
+				</Show>
+			</Show>
+			<InlineError message={error()} />
+		</>
 	)
 }

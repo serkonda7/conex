@@ -217,8 +217,8 @@ export interface TenantFilterParams {
 	scopeTenantId?: number
 }
 
-/** WHERE conditions for `TenantFilterParams` on a row's `tenant_id` column. */
-export function tenantConditions(column: PgColumn, params: TenantFilterParams): SQL[] {
+/** WHERE conditions for `TenantFilterParams` on a row's `tenant_id` column (or expression). */
+export function tenantConditions(column: SQLWrapper, params: TenantFilterParams): SQL[] {
 	const conditions: SQL[] = []
 	if (params.tenant !== undefined) {
 		conditions.push(eq(column, params.tenant))

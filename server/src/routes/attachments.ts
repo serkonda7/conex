@@ -11,18 +11,21 @@ import {
 	DeleteQuerySchema,
 	EntityParamsSchema,
 	FloorplanLinksQuerySchema,
+	FloorplanListQuerySchema,
 	FloorplanPutSchema,
 } from 'shared/src/schemas'
-import { checkTenant, requestScope, requestUser } from '../authz'
+import { checkTenant, listTenantScope, requestScope, requestUser } from '../authz'
 import {
 	type AttachmentRow,
 	type AttachmentUpload,
 	createAttachment,
 	deleteAttachment,
+	getAttachment,
 	getAttachmentRow,
 	getPlan,
 	listAttachments,
 	listFloorplanLinks,
+	listFloorplans,
 	listPlanCandidates,
 	putPlan,
 	replaceAttachmentFile,
@@ -76,6 +79,18 @@ export const attachmentsApp = new Hono()
 		)
 	})
 	.get(
+		'/floorplans',
+		vValidator('query', FloorplanListQuerySchema, onValidationError),
+		async (c) => {
+			const query = c.req.valid('query')
+			const scope = await listTenantScope(c, query.tenant, query.tenant_group)
+			if (scope instanceof Response) {
+				return scope
+			}
+			return c.json(await listFloorplans({ search: query.search, ...scope }))
+		},
+	)
+	.get(
 		'/floorplan-links',
 		vValidator('query', FloorplanLinksQuerySchema, onValidationError),
 		async (c) => {
@@ -91,6 +106,11 @@ export const attachmentsApp = new Hono()
 			)
 		},
 	)
+	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const id = c.req.valid('param').id
+		const row = await loadAttachment(c, id)
+		return row instanceof Response ? row : sendResult(c, await getAttachment(id))
+	})
 	.post(
 		'/',
 		requirePermissionMiddleware('edit'),

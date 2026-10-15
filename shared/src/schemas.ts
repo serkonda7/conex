@@ -1499,6 +1499,8 @@ export interface FloorplanAreaJson {
 	target_name: string
 	/** Location type of a location target; `null` for a site. */
 	target_type: LocationType | null
+	/** Floor plan (attachment) of the target, if it has one marked. */
+	target_plan_id: number | null
 }
 
 /** Marker on the wire, with its rack or device resolved for display. */
@@ -1601,6 +1603,35 @@ export interface FloorplanCandidateJson {
 	/** Location of the object, for grouping in the palette; `null` directly on the site. */
 	location_id: number | null
 	location_name: string | null
+}
+
+/**
+ * `GET /attachments/floorplans?search=&tenant=&tenant_group=`: every marked
+ * floor plan, filtered by its owner's tenant and searched by owner or site name.
+ */
+export const FloorplanListQuerySchema = v.object({
+	search: ListQueryEntries.search,
+	tenant: OptionalIdEntry,
+	tenant_group: OptionalIdEntry,
+})
+
+export type FloorplanListQuery = v.InferOutput<typeof FloorplanListQuerySchema>
+
+/** Floor plan row of the `/floorplans` list. */
+export interface FloorplanListJson {
+	attachment_id: number
+	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+	/** Location type of a location owner; `null` for a site. */
+	location_type: LocationType | null
+	/** The owner's site (the owner itself for a site). */
+	site_name: string
+	tenant_id: number | null
+	tenant_name: string | null
+	areas: number
+	placements: number
 }
 
 // ---------------------------------------------------------------------------

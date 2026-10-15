@@ -6,8 +6,20 @@
  * crash leaves at worst an orphan file, which the startup sweep removes.
  */
 import { Result } from 'better-result'
-import { and, asc, eq, inArray, isNull, ne, notInArray, or, type SQL, sql } from 'drizzle-orm'
-import type { PgColumn } from 'drizzle-orm/pg-core'
+import {
+	and,
+	asc,
+	count,
+	eq,
+	inArray,
+	isNull,
+	ne,
+	notInArray,
+	or,
+	type SQL,
+	sql,
+} from 'drizzle-orm'
+import { alias, type PgColumn } from 'drizzle-orm/pg-core'
 import type {
 	AttachmentJson,
 	AttachmentMime,
@@ -17,6 +29,7 @@ import type {
 	FloorplanJson,
 	FloorplanLinkJson,
 	FloorplanLinksQuery,
+	FloorplanListJson,
 	FloorplanPut,
 } from 'shared/src/schemas'
 import {
@@ -28,6 +41,7 @@ import {
 	locations,
 	racks,
 	sites,
+	tenants,
 } from '../schema'
 import { buildChildrenMap } from '../services/hierarchy'
 import {
@@ -42,7 +56,17 @@ import { nowSeconds } from '../util/time'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
-import { checkExists, findById, insertedId, isPatchEmpty, pickDefined, tryWrite } from './list'
+import {
+	checkExists,
+	findById,
+	insertedId,
+	isPatchEmpty,
+	pickDefined,
+	searchCondition,
+	type TenantFilterParams,
+	tenantConditions,
+	tryWrite,
+} from './list'
 
 export type AttachmentRow = typeof attachments.$inferSelect
 type FloorplanAreaRow = typeof floorplan_areas.$inferSelect
@@ -351,6 +375,7 @@ export async function getPlan(
 		})
 	}
 	const areaTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
+	const targetPlan = alias(attachments, 'target_plan')
 	const areas = await getDb()
 		.select({
 			id: floorplan_areas.id,
@@ -360,10 +385,21 @@ export async function getPlan(
 			points: floorplan_areas.points,
 			target_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
 			target_type: locations.type,
+			target_plan_id: targetPlan.id,
 		})
 		.from(floorplan_areas)
 		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
 		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.leftJoin(
+			targetPlan,
+			and(
+				eq(targetPlan.is_floorplan, 1),
+				or(
+					eq(targetPlan.site_id, floorplan_areas.site_id),
+					eq(targetPlan.location_id, floorplan_areas.location_id),
+				),
+			),
+		)
 		.where(
 			and(
 				eq(floorplan_areas.attachment_id, id),
@@ -928,6 +964,87 @@ export async function listFloorplanLinks(
 			),
 		)
 		.orderBy(asc(columns.owner_name), asc(attachments.id))
+}
+
+/**
+ * Every marked floor plan whose owner matches the tenant filters, ordered by
+ * site and owner name. `search` matches the owner or site name. The area and
+ * marker counts leave out content outside `params.scopeTenantId`, like
+ * `getPlan`.
+ */
+export async function listFloorplans(
+	params: TenantFilterParams & { search?: string },
+): Promise<FloorplanListJson[]> {
+	const ownerSite = alias(sites, 'owner_site')
+	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
+	const ownerName = sql<string>`coalesce(${sites.name}, ${locations.name})`
+	const rows = await getDb()
+		.select({
+			attachment_id: attachments.id,
+			site_id: attachments.site_id,
+			location_id: attachments.location_id,
+			owner_name: ownerName,
+			location_type: locations.type,
+			site_name: ownerSite.name,
+			tenant_id: ownerTenant,
+			tenant_name: tenants.name,
+		})
+		.from(attachments)
+		.leftJoin(sites, eq(sites.id, attachments.site_id))
+		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.innerJoin(
+			ownerSite,
+			eq(ownerSite.id, sql`coalesce(${attachments.site_id}, ${locations.site_id})`),
+		)
+		.leftJoin(tenants, eq(tenants.id, ownerTenant))
+		.where(
+			and(
+				eq(attachments.is_floorplan, 1),
+				searchCondition(params.search ?? '', [ownerName, ownerSite.name]),
+				...tenantConditions(ownerTenant, params),
+			),
+		)
+		.orderBy(asc(ownerSite.name), asc(ownerName), asc(attachments.id))
+	if (rows.length === 0) {
+		return []
+	}
+	const ids = rows.map((row) => row.attachment_id)
+	const scope = params.scopeTenantId
+	const areaCounts = await getDb()
+		.select({ id: floorplan_areas.attachment_id, n: count() })
+		.from(floorplan_areas)
+		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
+		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.where(
+			and(
+				inArray(floorplan_areas.attachment_id, ids),
+				scope === undefined
+					? undefined
+					: eq(sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`, scope),
+			),
+		)
+		.groupBy(floorplan_areas.attachment_id)
+	const placementCounts = await getDb()
+		.select({ id: floorplan_placements.attachment_id, n: count() })
+		.from(floorplan_placements)
+		.leftJoin(racks, eq(racks.id, floorplan_placements.rack_id))
+		.leftJoin(devices, eq(devices.id, floorplan_placements.device_id))
+		.where(
+			and(
+				inArray(floorplan_placements.attachment_id, ids),
+				scope === undefined
+					? undefined
+					: eq(sql`coalesce(${racks.tenant_id}, ${devices.tenant_id})`, scope),
+			),
+		)
+		.groupBy(floorplan_placements.attachment_id)
+	const areas = new Map(areaCounts.map((row) => [row.id, row.n]))
+	const placements = new Map(placementCounts.map((row) => [row.id, row.n]))
+	return rows.map((row) => ({
+		...row,
+		areas: areas.get(row.attachment_id) ?? 0,
+		placements: placements.get(row.attachment_id) ?? 0,
+	}))
 }
 
 /**

@@ -18,6 +18,7 @@ import {
 	IconListDetails,
 	IconLocation,
 	IconLock,
+	IconMap,
 	IconMapPin,
 	IconPlugConnected,
 	IconServer,
@@ -49,6 +50,8 @@ import { DevicesPage } from '../pages/devices/list'
 import { EmployeeDetailPage } from '../pages/employees/detail'
 import { EmployeeAddPage, EmployeeEditPage } from '../pages/employees/form'
 import { EmployeesPage } from '../pages/employees/list'
+import { FloorplanDetailPage } from '../pages/floorplans/detail'
+import { FloorplansPage } from '../pages/floorplans/list'
 import { IntegrationAddPage } from '../pages/integrations/add'
 import { IntegrationEditPage } from '../pages/integrations/edit'
 import { IntegrationsPage } from '../pages/integrations/list'
@@ -124,6 +127,16 @@ export const SECTIONS: readonly Section[] = [
 		add: TenantAddPage,
 		detail: TenantDetailPage,
 		edit: TenantEditPage,
+	},
+	{
+		// Plans are marked as such on their site or location (its images).
+		path: 'floorplans',
+		noun: (n: number): string => tp('entity.floorplan', n),
+		permission: 'view',
+		icon: IconMap,
+		hideAddInNav: true,
+		list: FloorplansPage,
+		detail: FloorplanDetailPage,
 	},
 	{
 		path: 'employees',

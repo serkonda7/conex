@@ -8,9 +8,8 @@
  * tabs replaces the current browser history entry instead of pushing one.
  * Tabs are saved in `sessionStorage`, so a reload brings them back.
  *
- * A route may end in an in-page anchor (`/sites/3#floorplan`). It is part
- * of the tab's path, ignored by route matching, and scrolled to by the
- * section that carries it (`useAnchorScroll`) once that has rendered.
+ * A route may end in an in-page anchor (`/sites/3#attachments`). It is part
+ * of the tab's path and ignored by route matching.
  */
 import { Result } from 'better-result'
 import {
@@ -250,12 +249,6 @@ export function routeSegments(raw: string): string[] {
 	return barePath(raw)
 		.split('/')
 		.filter((p) => p.length > 0)
-}
-
-/** In-page anchor of a route (`/sites/3#floorplan` → `floorplan`), or `''`. */
-export function routeAnchor(raw: string): string {
-	const at = raw.indexOf('#')
-	return at === -1 ? '' : raw.slice(at + 1)
 }
 
 /** Last path segment is add/edit/import: the route opens as a form tab. */
@@ -649,34 +642,6 @@ if (typeof window !== 'undefined') {
 		if (currentUrl() !== active.path) {
 			replaceUrl(active.path)
 		}
-	})
-}
-
-/**
- * Scrolls `el` into view once it has rendered when the tab's route names
- * `anchor` (`/sites/3#floorplan`). Sections render after their data loads,
- * so the browser's own anchor jump would come too early; this runs once
- * per mount, i.e. once per visit of the route.
- */
-export function useAnchorScroll(anchor: string, el: () => HTMLElement | undefined): void {
-	const forPath = useTabPath()
-	if (routeAnchor(forPath) !== anchor) {
-		return
-	}
-	let done = false
-	createEffect(() => {
-		const target = el()
-		if (done || !target || path() !== forPath) {
-			return
-		}
-		const frame = requestAnimationFrame(() => {
-			if (path() !== forPath || !target.isConnected || target.closest('[hidden]')) {
-				return
-			}
-			done = true
-			target.scrollIntoView({ block: 'start' })
-		})
-		onCleanup(() => cancelAnimationFrame(frame))
 	})
 }
 

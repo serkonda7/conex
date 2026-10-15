@@ -1,4 +1,5 @@
-import { createResource, createSignal, type JSX } from 'solid-js'
+import { createResource, createSignal, type JSX, Show } from 'solid-js'
+import type { AttachmentJson } from '../../api/attachments'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_racks, type RackRow } from '../../api/racks'
 import {
@@ -21,7 +22,6 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { FloorplanSection } from '../../components/floorplan'
 import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
@@ -92,38 +92,53 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle description={location()?.description} />
 
-				<DetailCard label={t('location.details')}>
-					<dt>{t('common.slug')}</dt>
-					<dd>
-						<code>{location()?.slug}</code>
-					</dd>
-					<dt>{t('location.type')}</dt>
-					<dd>
-						<IconLabel icon={locationTypeIcon(location()?.type ?? 'other')}>
-							{locationTypeLabel(location()?.type ?? 'other')}
-						</IconLabel>
-					</dd>
-					<dt>{tp('entity.tenant', 1)}</dt>
-					<dd>
-						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
-					</dd>
-					<dt>{tp('entity.site', 1)}</dt>
-					<dd>
-						<RecordLink id={siteId()} record={site} base="/sites" />
-					</dd>
-					<dt>{t('site.parentLocation')}</dt>
-					<dd>
-						<RecordLink id={parentId()} record={parent} base="/locations" />
-					</dd>
-					<FloorplanLinks
-						target={{ location: props.id }}
-						label="floorplan.linkedFrom"
-						onError={setError}
-					/>
-				</DetailCard>
+				<div class="detail-split">
+					<DetailCard label={t('location.details')}>
+						<dt>{t('common.slug')}</dt>
+						<dd>
+							<code>{location()?.slug}</code>
+						</dd>
+						<dt>{t('location.type')}</dt>
+						<dd>
+							<IconLabel icon={locationTypeIcon(location()?.type ?? 'other')}>
+								{locationTypeLabel(location()?.type ?? 'other')}
+							</IconLabel>
+						</dd>
+						<dt>{tp('entity.tenant', 1)}</dt>
+						<dd>
+							<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+						</dd>
+						<dt>{tp('entity.site', 1)}</dt>
+						<dd>
+							<RecordLink id={siteId()} record={site} base="/sites" />
+						</dd>
+						<dt>{t('site.parentLocation')}</dt>
+						<dd>
+							<RecordLink id={parentId()} record={parent} base="/locations" />
+						</dd>
+						<Show when={images.floorplan()}>
+							{(plan: () => AttachmentJson) => (
+								<>
+									<dt>{t('floorplan.title')}</dt>
+									<dd>
+										<a href={`/floorplans/${plan().id}`}>
+											{t('floorplan.open')}
+										</a>
+									</dd>
+								</>
+							)}
+						</Show>
+						<FloorplanLinks
+							target={{ location: props.id }}
+							label="floorplan.linkedFrom"
+							onError={setError}
+						/>
+					</DetailCard>
+					<div>
+						<AttachmentsSection id="location-attachments" images={images} />
+					</div>
+				</div>
 			</DetailShell>
-
-			<FloorplanSection id="floorplan" attachment={images.floorplan()} />
 
 			<RelatedSection
 				id="location-children"
@@ -162,8 +177,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				customizable
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
 			/>
-
-			<AttachmentsSection id="location-attachments" images={images} />
 
 			<InlineError message={error()} />
 		</div>

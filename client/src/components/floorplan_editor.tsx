@@ -27,7 +27,7 @@ import {
 	Show,
 	Switch,
 } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { Dynamic, Portal } from 'solid-js/web'
 import {
 	type AttachmentJson,
 	type FloorplanAreaJson,
@@ -218,8 +218,12 @@ interface PaletteGroup {
 	items: FloorplanCandidateJson[]
 }
 
-/** Search field plus the unplaced racks and devices, grouped by location. */
+/**
+ * The side list of the editor: `actions` on top, then a search field plus
+ * the unplaced racks and devices, grouped by location.
+ */
 function Palette(props: {
+	actions: JSX.Element
 	candidates: FloorplanCandidateJson[] | undefined
 	loading: boolean
 	placed: Set<string>
@@ -254,6 +258,7 @@ function Palette(props: {
 
 	return (
 		<aside class="floorplan-palette" aria-label={t('floorplan.palette')}>
+			<div class="floorplan-palette-actions">{props.actions}</div>
 			<h4>{t('floorplan.palette')}</h4>
 			<input
 				type="search"
@@ -318,6 +323,8 @@ export function FloorplanEditor(props: {
 	plan: FloorplanJson
 	on_saved: (plan: FloorplanJson) => void
 	on_cancel: () => void
+	/** Page header slot the Cancel / Save buttons render into, in place of the Edit button. */
+	actions_mount: HTMLElement | undefined
 }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [areas, setAreas] = createSignal<FloorplanAreaJson[]>(props.plan.areas)
@@ -485,6 +492,7 @@ export function FloorplanEditor(props: {
 				points,
 				target_name: target.name,
 				target_type: null,
+				target_plan_id: null,
 			},
 		])
 		setSelected(id)
@@ -550,31 +558,24 @@ export function FloorplanEditor(props: {
 
 	return (
 		<div class="floorplan-editor">
-			<div class="floorplan-toolbar">
-				<button
-					type="button"
-					aria-pressed={drawing()}
-					classList={{ active: drawing() }}
-					onClick={() => setDrawing(!drawing())}
-				>
-					<IconLabel icon={IconPencilPlus}>{t('floorplan.drawArea')}</IconLabel>
-				</button>
-				<span class="floorplan-hint">
-					{drawing() ? t('floorplan.drawHint') : t('floorplan.editHint')}
-				</span>
-				<div class="modal-actions">
-					<button type="button" onClick={onCancel} disabled={save.pending()}>
-						{t('common.cancel')}
-					</button>
-					<button
-						type="submit"
-						onClick={() => void onSave()}
-						disabled={save.pending() || !dirty()}
-					>
-						{save.pending() ? t('common.saving') : t('common.save')}
-					</button>
-				</div>
-			</div>
+			<Show when={props.actions_mount}>
+				{(mount: () => HTMLElement) => (
+					<Portal mount={mount()}>
+						<div class="modal-actions">
+							<button type="button" onClick={onCancel} disabled={save.pending()}>
+								{t('common.cancel')}
+							</button>
+							<button
+								type="submit"
+								onClick={() => void onSave()}
+								disabled={save.pending() || !dirty()}
+							>
+								{save.pending() ? t('common.saving') : t('common.save')}
+							</button>
+						</div>
+					</Portal>
+				)}
+			</Show>
 			<InlineError message={error()} />
 			<div class="floorplan-edit-layout">
 				<div>
@@ -725,6 +726,24 @@ export function FloorplanEditor(props: {
 					</Show>
 				</div>
 				<Palette
+					actions={
+						<>
+							<button
+								type="button"
+								class="floorplan-draw-toggle"
+								aria-pressed={drawing()}
+								classList={{ active: drawing() }}
+								onClick={() => setDrawing(!drawing())}
+							>
+								<IconLabel icon={IconPencilPlus}>
+									{t('floorplan.drawArea')}
+								</IconLabel>
+							</button>
+							<p class="floorplan-hint">
+								{drawing() ? t('floorplan.drawHint') : t('floorplan.editHint')}
+							</p>
+						</>
+					}
 					candidates={candidates()}
 					loading={candidates.loading}
 					placed={placed()}
