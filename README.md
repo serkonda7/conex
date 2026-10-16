@@ -1,8 +1,9 @@
 # conex
 Network inventory for MSPs.
 
+For production deployment, see [conex-docker](https://github.com/serkonda7/conex-docker).
 
-## Getting Started
+## Development
 ```sh
 docker start conex-dev-db
 export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
@@ -41,12 +42,10 @@ bun run dev
 
 
 ### Backing up
-A backup consists of the Postgres database and the attachments directory
-(images; `server/data/attachments` unless `[storage] attachmentsDir` in
-`config.toml` points elsewhere). Back up both at the same time and restore
-them together: the database holds only the image metadata, the files live on
-disk. On startup the server removes files without a database row and logs rows
-whose file is missing.
+There are two storage locations that have to backed up and restored together!
+- Postgres database (core data and image references)
+- `server/data/attachments` OR `[storage] attachmentsDir` (images)
+
 ```sh
 # Backup
 docker exec conex-dev-db pg_dump -U conex -Fc conex > backups/conex-$(date +%F).dump
@@ -62,8 +61,7 @@ rm -rf server/data/attachments && tar -xzf backups/conex-attachments-<date>.tar.
 ```
 
 
-## Development
-### Checks
+## Checks
 ```sh
 bun run check
 bun run build
@@ -76,8 +74,8 @@ bun run test:visual:update
 ```
 
 
-### Documentation
-User docs live in `docs/` ([mdBook](https://rust-lang.github.io/mdBook/), install it separately; optionally `mdbook-last-changed` for page dates) and are published to GitHub Pages on push to `main`.
+## Documentation
+User docs in `docs/` are published using [mdBook](https://rust-lang.github.io/mdBook/). Install it separately.
 ```sh
 bun run docs:dev
 bun run docs:build
