@@ -75,6 +75,8 @@ export interface DeviceInput {
 export interface TicketInput {
 	externalTenantId: string
 	externalDeviceId?: string
+	/** Contact person who reports the issue. */
+	externalEmployeeId?: string
 	title: string
 	content: string
 }

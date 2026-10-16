@@ -1,10 +1,10 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createEffect, createSignal, type JSX, Show } from 'solid-js'
+import { createEffect, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
-import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
+import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
 	DescriptionField,
 	FormPage,
@@ -16,7 +16,6 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { faceOptions } from '../../i18n/labels'
 import {
 	type FormValues,
 	id_value,
@@ -28,8 +27,10 @@ import {
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { useSiteTenant } from '../../lib/tenant_context'
+import { contextTenantId, useSiteTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
+import { EmployeeAssignmentField } from './employee_assignment'
+import { RackMountField } from './rack_mount'
 
 /** Rack position from the field: null when blank, NaN when malformed. */
 export function parsePosition(value: string): number | null {
@@ -49,8 +50,12 @@ export function queryFace(): string {
 
 /**
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
- * pre-fills it from that device, except the name, serial, device ID and
- * U position, which must differ per device.
+ * pre-fills it from that device, except the name, serial, device ID,
+ * U position and employee assignment, which are chosen per device.
+ *
+ * Shares its layout (sections, field order, rack mount row) with the edit
+ * form in `edit.tsx`, so a device looks the same while created and edited;
+ * keep the two in sync.
  */
 export function DeviceAddPage(): JSX.Element {
 	const form = useFormState()
@@ -60,6 +65,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
+	const [employeeId, setEmployeeId] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
@@ -81,7 +87,6 @@ export function DeviceAddPage(): JSX.Element {
 	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [racks] = createRows(fetch_racks, form.setError)
-	const [tenants] = createRows(fetch_tenants, form.setError)
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),
@@ -99,9 +104,8 @@ export function DeviceAddPage(): JSX.Element {
 		}
 	})
 
-	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>
-		handleSiteChange(''),
-	)
+	const { siteOptions, tenant } = useSiteTenant(sites, siteId, () => handleSiteChange(''))
+	createEffect(on(tenant.value, () => setEmployeeId(''), { defer: true }))
 
 	const [source] = createRecord(() => parseId(queryParam('clone')), fetch_device, form.setError)
 	createEffect(() => {
@@ -115,7 +119,10 @@ export function DeviceAddPage(): JSX.Element {
 		setTypeId(id_value(row.device_type_id))
 		setRoleId(id_value(row.device_role_id))
 		setDescription(row.description ?? '')
-		tenant.pick(id_value(row.tenant_id))
+		// A clone keeps its tenant unless the global tenant selection decides.
+		if (contextTenantId() === null) {
+			tenant.pick(id_value(row.tenant_id))
+		}
 		setSiteId(id_value(row.site_id))
 		setLocationId(id_value(row.location_id))
 		setRackId(id_value(row.rack_id))
@@ -168,6 +175,7 @@ export function DeviceAddPage(): JSX.Element {
 					position_u: onShelf ? null : parsePosition(positionU()),
 					shelf_id: shelfId(),
 					tenant_id: parseId(tenant.value()),
+					employee_id: parseId(employeeId()),
 				}),
 			// Elevation deep links return to the rack they came from.
 			navigateTo:
@@ -229,7 +237,17 @@ export function DeviceAddPage(): JSX.Element {
 					onInput={setDeviceId}
 				/>
 			</FormSection>
-			<FormSection title={tp('entity.location', 1)}>
+			<FormSection title={t('device.assignmentSection')}>
+				<EmployeeAssignmentField
+					id="device-employee"
+					tenantId={parseId(tenant.value())}
+					value={employeeId()}
+					onChange={setEmployeeId}
+					onError={form.setError}
+					emptyLabel={t('common.selectPlaceholder')}
+				/>
+			</FormSection>
+			<FormSection title={t('device.locationSection')}>
 				<SelectField
 					id="device-site"
 					label={tp('entity.site', 1)}
@@ -247,49 +265,22 @@ export function DeviceAddPage(): JSX.Element {
 					options={row_options(locations() ?? [])}
 					emptyLabel={t('common.selectPlaceholder')}
 				/>
-				<SelectField
-					id="device-rack"
-					label={tp('entity.rack', 1)}
-					value={rackId()}
-					disabled={shelfId() !== null || zeroHeight()}
-					onChange={handleRackChange}
-					options={row_options(racks() ?? [])}
-					emptyLabel={t('common.selectPlaceholder')}
-				/>
-				<SelectField
-					id="device-face"
-					label={t('shelf.face')}
-					value={face()}
-					disabled={rackId() === '' || shelfId() !== null}
-					onChange={setFace}
-					options={faceOptions()}
-					emptyLabel={t('common.selectPlaceholder')}
-				/>
-				<TextField
-					id="device-position"
-					label={t('common.position')}
-					inputmode="numeric"
-					value={positionU()}
-					disabled={rackId() === '' || shelfId() !== null}
-					onInput={setPositionU}
+				<RackMountField
+					idPrefix="device"
+					rackId={rackId()}
+					face={face()}
+					positionU={positionU()}
+					onRackChange={handleRackChange}
+					onFaceChange={setFace}
+					onPositionInput={setPositionU}
+					racks={row_options(racks() ?? [])}
+					rackEmptyLabel={t('common.selectPlaceholder')}
+					faceEmptyLabel={t('shelf.face')}
+					rackDisabled={shelfId() !== null || zeroHeight()}
+					mountDisabled={rackId() === '' || shelfId() !== null}
 					hint={
-						<Hint>
-							{shelfId() === null
-								? ''
-								: t('device.onShelfHint', { name: shelfName() })}
-						</Hint>
-					}
-				/>
-				<SelectField
-					id="device-tenant"
-					label={tp('entity.tenant', 1)}
-					value={tenant.value()}
-					onChange={tenant.pick}
-					options={row_options(tenants() ?? [])}
-					emptyLabel={t('common.selectPlaceholder')}
-					hint={
-						<Show when={!tenant.touched() && siteTenantId() !== null}>
-							<Hint>{t('location.tenantFromSite')}</Hint>
+						<Show when={shelfId() !== null}>
+							<Hint>{t('device.onShelfHint', { name: shelfName() })}</Hint>
 						</Show>
 					}
 				/>

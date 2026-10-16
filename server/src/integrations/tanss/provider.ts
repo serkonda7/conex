@@ -265,9 +265,19 @@ export class TanssProvider implements IntegrationProvider {
 				id: device.value.id,
 			}
 		}
+		let remitterId: number | undefined
+		if (input.externalEmployeeId !== undefined) {
+			remitterId = Number(input.externalEmployeeId)
+			if (!Number.isInteger(remitterId)) {
+				return Result.err(
+					new Error(`Invalid TANSS employee id ${input.externalEmployeeId}`),
+				)
+			}
+		}
 		return this.session.createTicket({
 			companyId,
 			...(link !== undefined ? { link } : {}),
+			...(remitterId !== undefined ? { remitterId } : {}),
 			title: input.title,
 			content: input.content,
 		})

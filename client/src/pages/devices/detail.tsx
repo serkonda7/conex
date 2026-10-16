@@ -1,14 +1,16 @@
-import { IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
+import { IconArrowsExchange, IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
 import type { TraceLink } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import { delete_cable, fetch_trace } from '../../api/cables'
 import { fetch_device_role } from '../../api/device_roles'
 import {
+	type DeviceRow,
 	delete_device,
 	fetch_device,
 	fetch_interfaces,
 	type InterfaceJson,
 } from '../../api/devices'
+import { fetch_employee } from '../../api/employees'
 import { fetch_rack } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_device_type } from '../../api/templates'
@@ -31,10 +33,11 @@ import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { can } from '../../lib/session'
+import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
+import { MoveTenantDialog } from './move_tenant_dialog'
 
 /** General, power, outlet and display ports; everything else is a network port. */
 const isOtherPort = (iface: InterfaceJson): boolean => OTHER_PORT_KINDS.has(iface.kind)
@@ -98,9 +101,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [connectingIface, setConnectingIface] = createSignal<InterfaceJson | null>(null)
 	const [editingIface, setEditingIface] = createSignal<InterfaceJson | null>(null)
+	const [movingTenant, setMovingTenant] = createSignal(false)
 	const id = (): number => props.id
 
-	const [device] = createRecord(id, fetch_device, setError)
+	const [device, { refetch: refetchDevice }] = createRecord(id, fetch_device, setError)
 	const [ifaces, { refetch: refetchIfaces }] = createRowsFor(id, fetch_interfaces, setError)
 	const [trace, { refetch: refetchTrace }] = createRecord(
 		id,
@@ -114,6 +118,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const rackId = (): number | null | undefined => device()?.rack_id
 	const shelfId = (): number | null | undefined => device()?.shelf_id
 	const tenantId = (): number | null | undefined => device()?.tenant_id
+	const employeeId = (): number | null | undefined => device()?.employee_id
 	const [deviceType] = createRecord(typeId, fetch_device_type)
 	const [deviceRole] = createRecord(roleId, fetch_device_role, setError)
 	const [site] = createRecord(siteId, fetch_site, setError)
@@ -121,6 +126,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [rack] = createRecord(rackId, fetch_rack, setError)
 	const [shelf] = createRecord(shelfId, fetch_shelf, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
+	const [employee] = createRecord(employeeId, fetch_employee, setError)
 	const [trail] = createResource(
 		() => ({ site: site(), location: locationId() ?? null, rack: rack() }),
 		async ({ site: siteRow, location: locationKey, rack: rackRow }): Promise<Crumb[]> => [
@@ -282,6 +288,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/devices/${props.id}/edit`}
 					cloneHref={`/devices/add?clone=${props.id}`}
 					onDelete={handleDelete}
+					actions={
+						<Show when={canGlobal('edit')}>
+							<button type="button" onClick={() => setMovingTenant(true)}>
+								<IconLabel icon={IconArrowsExchange}>
+									{t('device.moveTenant')}
+								</IconLabel>
+							</button>
+						</Show>
+					}
 				/>
 				<DetailSubtitle description={device()?.description} />
 
@@ -313,6 +328,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+					</dd>
+					<dt>{t('device.assignedEmployee')}</dt>
+					<dd>
+						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
@@ -367,6 +386,18 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							void refetchIfaces()
 						}}
 						on_close={() => setEditingIface(null)}
+					/>
+				)}
+			</Show>
+			<Show when={movingTenant() ? device() : undefined}>
+				{(row: () => DeviceRow): JSX.Element => (
+					<MoveTenantDialog
+						device={row()}
+						on_moved={() => {
+							setMovingTenant(false)
+							void refetchDevice()
+						}}
+						on_close={() => setMovingTenant(false)}
 					/>
 				)}
 			</Show>

@@ -11,6 +11,7 @@ import {
 	device_roles,
 	device_types,
 	devices,
+	employees,
 	external_links,
 	interfaces,
 	locations,
@@ -180,6 +181,26 @@ async function checkLocation(
 	return Result.ok(undefined)
 }
 
+/** Assignments cannot expose or link contacts from another tenant. */
+async function checkEmployeeAssignment(
+	employeeId: number | null | undefined,
+	tenantId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
+	if (employeeId === null || employeeId === undefined) {
+		return Result.ok(undefined)
+	}
+	if (tenantId === null || tenantId === undefined) {
+		return Result.err(new ConflictError('Select a tenant before assigning an employee'))
+	}
+	const employee = await findOne(
+		employees,
+		and(eq(employees.id, employeeId), eq(employees.tenant_id, tenantId)),
+	)
+	return employee
+		? Result.ok(undefined)
+		: Result.err(new NotFoundError('Employee not found in this tenant'))
+}
+
 /** The rack location is authoritative for a rack-mounted device. */
 async function rackLocationId(rackId: number): Promise<Result<number | null, Error>> {
 	const rack = await findOne(racks, eq(racks.id, rackId))
@@ -224,6 +245,7 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	rack?: number
 	role?: number
 	device_type?: number
+	employee?: number
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
@@ -263,6 +285,7 @@ export function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> 
 		params.rack ? eq(devices.rack_id, params.rack) : undefined,
 		params.role ? eq(devices.device_role_id, params.role) : undefined,
 		params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
+		params.employee ? eq(devices.employee_id, params.employee) : undefined,
 		...tenantConditions(devices.tenant_id, params),
 		params.status ? eq(devices.status, params.status) : undefined,
 		params.placed === undefined
@@ -341,6 +364,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		await checkExists(sites, deviceSiteId, 'Site not found'),
 		await checkLocation(deviceLocationId, deviceSiteId),
 		await checkTenantExists(input.tenant_id),
+		await checkEmployeeAssignment(input.employee_id, input.tenant_id),
 		await checkDeviceRoleExists(input.device_role_id),
 		await checkDeviceUnique(input),
 		await checkPlacement(input.name, mount, template.value),
@@ -370,6 +394,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		asset_tag: input.asset_tag ?? null,
 		device_id: input.device_id ?? null,
 		tenant_id: input.tenant_id ?? null,
+		employee_id: input.employee_id ?? null,
 		description: input.description ?? null,
 	}
 	const id = await tryWrite(
@@ -433,6 +458,10 @@ export async function updateDevice(
 			input.site_id !== undefined ? input.site_id : node.site_id,
 		),
 		await checkTenantExists(input.tenant_id),
+		await checkEmployeeAssignment(
+			input.employee_id !== undefined ? input.employee_id : node.employee_id,
+			input.tenant_id !== undefined ? input.tenant_id : node.tenant_id,
+		),
 		await checkDeviceUnique(input, id),
 	]) {
 		if (Result.isError(guard)) {
@@ -470,6 +499,7 @@ export async function updateDevice(
 		'asset_tag',
 		'device_id',
 		'tenant_id',
+		'employee_id',
 		'description',
 	])
 	if (input.location_id !== undefined || relocated) {

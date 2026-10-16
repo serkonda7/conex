@@ -3,7 +3,7 @@
  * over the hono RPC client. Errors surface as `Result.err` with the server's
  * `{ error }` message.
  */
-import type { Result } from 'better-result'
+import { Result } from 'better-result'
 import type { EmployeeRow } from 'server/src/db/employees'
 import type { EmployeeCreate, EmployeeListQuery, EmployeeUpdate, Page } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
@@ -33,6 +33,23 @@ export async function fetch_employees(
 export async function fetch_employee(id: number): Promise<Result<EmployeeRow, Error>> {
 	const res = await client.employees[':id'].$get(by_id(id))
 	return to_result<EmployeeRow>(res, failed.load('noun.employee'))
+}
+
+/** Complete contact options, including tenants with more than one page of employees. */
+export async function fetch_all_employees(
+	filters?: Partial<EmployeeListQuery>,
+): Promise<Result<EmployeeRow[], Error>> {
+	const rows: EmployeeRow[] = []
+	for (let page = 1; ; page++) {
+		const result = await fetch_employees({ ...filters, page, limit: 200 })
+		if (Result.isError(result)) {
+			return result
+		}
+		rows.push(...result.value.items)
+		if (rows.length >= result.value.total || result.value.items.length === 0) {
+			return Result.ok(rows)
+		}
+	}
 }
 
 export async function create_employee(input: EmployeeCreate): Promise<Result<EmployeeRow, Error>> {

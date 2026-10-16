@@ -12,11 +12,12 @@
  */
 
 import type { ComboboxOption } from '@serkonda7/solid-components'
-import { IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconCopy, IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { Page, Permission } from 'shared/src/types'
 import {
 	type Accessor,
+	type Component,
 	createEffect,
 	createMemo,
 	createResource,
@@ -189,6 +190,13 @@ export function useTableColumns(
 	return use_visible_columns(storage_key, all_keys, default_keys ?? all_keys)
 }
 
+/** Extra row-menu item beside Clone and Delete. */
+export interface RowMenuAction {
+	label: string
+	icon: Component<{ size?: number }>
+	onSelect: () => void
+}
+
 /**
  * Anchor for the row menu, rendered in a Portal so the table's scroll
  * container can never clip it. `edge` is a viewport `top` offset when
@@ -202,8 +210,8 @@ export interface RowMenuAnchor {
 	up: boolean
 }
 
-/** Single-item menu height estimate; only the upward flip depends on it. */
-const ROW_MENU_HEIGHT = 64
+/** Three-item menu height estimate; only the upward flip depends on it. */
+const ROW_MENU_HEIGHT = 140
 const ROW_MENU_GAP = 4
 
 /**
@@ -224,7 +232,7 @@ function anchorBelow(button: HTMLElement, id: number, name: string): RowMenuAnch
 	}
 }
 
-/** Viewport-anchored single-item row menu with outside/scroll/resize dismiss. */
+/** Viewport-anchored row menu with outside/scroll/resize dismiss. */
 export function useRowMenu(): {
 	openMenu: Accessor<RowMenuAnchor | null>
 	closeMenu: () => void
@@ -283,6 +291,8 @@ export interface EntityList<Row> {
 	/** Whether the session may delete rows (`manage`, else `delete`). */
 	canDelete: () => boolean
 	handleDelete: (id: number, name: string) => Promise<void>
+	/** Refetches the current page (after a change made outside the list). */
+	reload: () => void
 }
 
 /**
@@ -359,6 +369,7 @@ export function useEntityList<
 		canEdit,
 		canDelete,
 		handleDelete,
+		reload: (): void => void refetch(),
 	}
 }
 
@@ -412,6 +423,10 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	defaultColumns?: string[]
 	rowName: (row: Row) => string
 	editHref?: (row: Row) => string
+	/** Add form pre-filled from a row; omitted leaves "Clone" out of the row menu. */
+	cloneHref?: (row: Row) => string
+	/** Further row-menu items between Clone and Delete; empty hides the item. */
+	menuActions?: (row: Row) => readonly RowMenuAction[]
 	/** Rows that can never be deleted (e.g. built-in records). */
 	deletable?: (row: Row) => boolean
 	emptyText: string
@@ -438,12 +453,16 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		return search ? t('list.noMatch', { noun: nouns(), search }) : props.emptyText
 	}
 
+	const cloneable = (): boolean => list.canEdit() && props.cloneHref !== undefined
+	const actionsOf = (row: Row): readonly RowMenuAction[] => props.menuActions?.(row) ?? []
+	const deletableRow = (row: Row): boolean => list.canDelete() && props.deletable?.(row) !== false
+
 	function rowActions(row: Row): JSX.Element {
 		const name = props.rowName(row)
 		return (
 			<ListRowActions
 				edit_href={list.canEdit() ? props.editHref?.(row) : undefined}
-				deletable={list.canDelete() && props.deletable?.(row) !== false}
+				has_menu={cloneable() || actionsOf(row).length > 0 || deletableRow(row)}
 				name={name}
 				menu_open={openMenu()?.id === row.id}
 				onToggleMenu={(e: MouseEvent & { currentTarget: HTMLButtonElement }): void =>
@@ -491,6 +510,18 @@ export function EntityListPage<Row extends { id: number }>(props: {
 			<RowMenu
 				menu={openMenu}
 				onClose={closeMenu}
+				cloneHref={(menu: RowMenuAnchor): string | undefined => {
+					const row = list.rows().find((r) => r.id === menu.id)
+					return cloneable() && row ? props.cloneHref?.(row) : undefined
+				}}
+				actions={(menu: RowMenuAnchor): readonly RowMenuAction[] => {
+					const row = list.rows().find((r) => r.id === menu.id)
+					return row ? actionsOf(row) : []
+				}}
+				deletable={(menu: RowMenuAnchor): boolean => {
+					const row = list.rows().find((r) => r.id === menu.id)
+					return row !== undefined && deletableRow(row)
+				}}
 				onDelete={(menu: RowMenuAnchor): void => void list.handleDelete(menu.id, menu.name)}
 			/>
 
@@ -540,12 +571,12 @@ function ListPageHeader(props: {
 /**
  * Per-row edit button plus the row-menu toggle. `edit_href` is optional:
  * lists without an edit page (rack types) render the menu toggle only.
- * `deletable: false` drops the menu toggle (its only item is Delete).
+ * `has_menu: false` drops the menu toggle (no menu item to offer).
  * `name` is the row's display name used in the button labels.
  */
 function ListRowActions(props: {
 	edit_href?: string
-	deletable?: boolean
+	has_menu: boolean
 	name: string
 	menu_open: boolean
 	onToggleMenu: (e: MouseEvent & { currentTarget: HTMLButtonElement }) => void
@@ -566,7 +597,7 @@ function ListRowActions(props: {
 					</button>
 				)}
 			</Show>
-			<Show when={props.deletable !== false}>
+			<Show when={props.has_menu}>
 				<div class="row-menu-wrap">
 					<button
 						type="button"
@@ -589,12 +620,21 @@ function ListRowActions(props: {
 	)
 }
 
-/** Portal row menu with the single Delete item. */
+/** Portal row menu with the Clone, extra action and Delete items a row offers. */
 function RowMenu(props: {
 	menu: Accessor<RowMenuAnchor | null>
 	onClose: () => void
+	/** Clone target of the menu's row; undefined hides "Clone". */
+	cloneHref: (menu: RowMenuAnchor) => string | undefined
+	actions: (menu: RowMenuAnchor) => readonly RowMenuAction[]
+	deletable: (menu: RowMenuAnchor) => boolean
 	onDelete: (menu: RowMenuAnchor) => void
 }): JSX.Element {
+	const closeOnEscape = (e: KeyboardEvent): void => {
+		if (e.key === 'Escape') {
+			props.onClose()
+		}
+	}
 	return (
 		<Show when={props.menu()}>
 			{(menu: () => RowMenuAnchor) => (
@@ -609,24 +649,56 @@ function RowMenu(props: {
 							right: `${menu().right}px`,
 						}}
 					>
-						<button
-							type="button"
-							role="menuitem"
-							class="row-menu-danger"
-							onClick={() => {
-								const current = menu()
-								props.onClose()
-								props.onDelete(current)
-							}}
-							onKeyDown={(e: KeyboardEvent): void => {
-								if (e.key === 'Escape') {
+						<Show when={props.cloneHref(menu())}>
+							{(href: () => string) => (
+								<button
+									type="button"
+									role="menuitem"
+									class="row-menu-item"
+									onClick={() => {
+										props.onClose()
+										navigate(href())
+									}}
+									onKeyDown={closeOnEscape}
+								>
+									<IconCopy size={16} />
+									{t('common.clone')}
+								</button>
+							)}
+						</Show>
+						<For each={props.actions(menu())}>
+							{(action: RowMenuAction): JSX.Element => (
+								<button
+									type="button"
+									role="menuitem"
+									class="row-menu-item"
+									onClick={() => {
+										props.onClose()
+										action.onSelect()
+									}}
+									onKeyDown={closeOnEscape}
+								>
+									<action.icon size={16} />
+									{action.label}
+								</button>
+							)}
+						</For>
+						<Show when={props.deletable(menu())}>
+							<button
+								type="button"
+								role="menuitem"
+								class="row-menu-item row-menu-danger"
+								onClick={() => {
+									const current = menu()
 									props.onClose()
-								}
-							}}
-						>
-							<IconTrash size={16} />
-							{t('common.delete')}
-						</button>
+									props.onDelete(current)
+								}}
+								onKeyDown={closeOnEscape}
+							>
+								<IconTrash size={16} />
+								{t('common.delete')}
+							</button>
+						</Show>
 					</div>
 				</Portal>
 			)}

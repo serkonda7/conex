@@ -133,6 +133,8 @@ export interface TanssTicketInput {
 	companyId: number
 	/** Device (PC/server or periphery) the ticket is about. */
 	link?: { typeId: number; id: number }
+	/** TANSS employee (contact person) who reports the issue. */
+	remitterId?: number
 	title: string
 	content: string
 }
@@ -533,12 +535,13 @@ export class TanssSession {
 		const res = await this.userCall('ticket create', (client) =>
 			postApiV1Tickets({
 				client,
-				// No remitter: tickets are opened by the integration user.
+				// Without a remitter tickets are opened by the integration user.
 				query: { remitterCheck: false },
 				body: {
 					companyId: input.companyId,
 					title: input.title,
 					content: input.content,
+					...(input.remitterId !== undefined ? { remitterId: input.remitterId } : {}),
 					...(input.link !== undefined
 						? { linkTypeId: input.link.typeId, linkId: input.link.id }
 						: {}),

@@ -1069,6 +1069,7 @@ export const DeviceCreateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: DeviceIdSchema,
 	tenant_id: NullableIdSchema,
+	employee_id: NullableIdSchema,
 	description: DescriptionSchema,
 })
 
@@ -1088,6 +1089,7 @@ export const DeviceUpdateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	employee_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
@@ -1133,6 +1135,7 @@ export const DeviceListQuerySchema = v.object({
 	rack: OptionalIdEntry,
 	role: OptionalIdEntry,
 	device_type: OptionalIdEntry,
+	employee: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
@@ -2166,11 +2169,13 @@ export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
 
 /**
  * New ticket in the external system for a linked tenant (company), optionally
- * attached to one of its linked devices.
+ * attached to one of its linked devices and reported by one of its linked
+ * employees.
  */
 export const TicketCreateSchema = v.strictObject({
 	tenant_id: IdSchema,
 	device_id: v.optional(IdSchema, undefined),
+	employee_id: v.optional(IdSchema, undefined),
 	title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
 	content: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(10000)), ''),
 })

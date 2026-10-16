@@ -6,7 +6,7 @@ import { t } from '../../i18n'
 import { createRecord } from '../../lib/resource'
 import { navigate, path, routeSegments } from '../../lib/router'
 import { can } from '../../lib/session'
-import { tenantContext } from '../../lib/tenant_context'
+import { contextTenantId } from '../../lib/tenant_context'
 
 /** Id of the device open in the active tab (`/devices/:id`), else null. */
 function openDeviceId(): number | null {
@@ -18,9 +18,10 @@ function openDeviceId(): number | null {
 
 /**
  * Top-bar "Ticket" button next to the tenant context (`tickets.create`):
- * opens `/tickets/add` in its own tab. The device open in the active tab is
- * preselected; the tenant is the user's own (scoped users), else the
- * selected tenant context, else the open device's tenant.
+ * opens `/tickets/add` in its own tab, which uses the user's own tenant
+ * (scoped users) or the selected tenant context. The device open in the
+ * active tab is preselected, along with the employee it is assigned to, when
+ * it belongs to that tenant.
  */
 export function CreateTicketButton(props: { scopeTenantId: number | null }): JSX.Element {
 	const [device] = createRecord(
@@ -28,15 +29,12 @@ export function CreateTicketButton(props: { scopeTenantId: number | null }): JSX
 		fetch_device,
 	)
 	const target = (): string => {
-		const ctx = tenantContext()
 		const d = device()
-		const tenant =
-			props.scopeTenantId ?? (ctx.kind === 'tenant' ? ctx.id : null) ?? d?.tenant_id ?? null
 		const query = new URLSearchParams()
-		if (tenant !== null) {
-			query.set('tenant', String(tenant))
-			if (d && d.tenant_id === tenant) {
-				query.set('device', String(d.id))
+		if (d && d.tenant_id === (props.scopeTenantId ?? contextTenantId())) {
+			query.set('device', String(d.id))
+			if (d.employee_id !== null) {
+				query.set('employee', String(d.employee_id))
 			}
 		}
 		const qs = query.toString()

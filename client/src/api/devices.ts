@@ -30,6 +30,7 @@ export async function fetch_devices(
 				rack: filters?.rack,
 				role: filters?.role,
 				device_type: filters?.device_type,
+				employee: filters?.employee,
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
 				status: filters?.status,
