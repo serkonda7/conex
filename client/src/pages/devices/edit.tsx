@@ -8,6 +8,7 @@ import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
 	DescriptionField,
 	FormPage,
+	FormSection,
 	Hint,
 	NameField,
 	ReadOnlyField,
@@ -16,7 +17,6 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { faceOptions } from '../../i18n/labels'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
@@ -24,10 +24,15 @@ import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { parsePosition, validPosition } from './add'
 import { EmployeeAssignmentField } from './employee_assignment'
+import { RackMountField } from './rack_mount'
 
 /**
  * /devices/:id/edit — device edit form. Saves back to the device list when
  * opened from it, else to the detail page.
+ *
+ * Shares its layout (sections, field order, rack mount row) with the add
+ * form in `add.tsx`, so a device looks the same while created and edited;
+ * keep the two in sync.
  */
 export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [name, setName] = createSignal('')
@@ -118,100 +123,94 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			cancelTo={backTo()}
 			onSubmit={handleSave}
 		>
-			<NameField
-				id="device-edit-name"
-				placeholder={t('device.namePlaceholder')}
-				value={name()}
-				onInput={setName}
-			/>
-			<ReadOnlyField
-				id="device-edit-type"
-				label={tp('entity.deviceType', 1)}
-				value={form.record() ? typeName(form.record()?.device_type_id) : ''}
-			/>
-			<SelectField
-				id="device-edit-role"
-				label={tp('entity.deviceRole', 1)}
-				required
-				value={roleId()}
-				onChange={setRoleId}
-				options={(roles() ?? []).map((role) => ({
-					value: role.id,
-					label: role.name,
-					icon: deviceRoleIcon(role.icon),
-				}))}
-				emptyLabel={t('device.rolePlaceholder')}
-				add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
-			/>
-			<DescriptionField
-				id="device-edit-description"
-				value={description()}
-				onInput={setDescription}
-			/>
-			<TextField
-				id="device-edit-serial"
-				label={t('device.serial')}
-				placeholder={t('device.serialPlaceholder')}
-				maxLength={100}
-				value={serial()}
-				onInput={setSerial}
-			/>
-			<TextField
-				id="device-edit-device-id"
-				label={t('device.deviceId')}
-				placeholder={t('device.deviceIdPlaceholder')}
-				maxLength={100}
-				value={deviceId()}
-				onInput={setDeviceId}
-			/>
-			<SelectField
-				id="device-edit-site"
-				label={tp('entity.site', 1)}
-				value={siteId()}
-				onChange={handleSiteChange}
-				options={row_options(sites() ?? [])}
-				emptyLabel={t('device.noSite')}
-			/>
-			<SelectField
-				id="device-edit-location"
-				label={tp('entity.location', 1)}
-				value={locationId()}
-				onChange={setLocationId}
-				options={row_options(locations() ?? [])}
-				emptyLabel={t('rack.noLocation')}
-				disabled={siteId() === ''}
-			/>
-			<SelectField
-				id="device-edit-rack"
-				label={tp('entity.rack', 1)}
-				value={rackId()}
-				onChange={setRackId}
-				options={row_options(racks() ?? [])}
-				emptyLabel="—"
-			/>
-			<SelectField
-				id="device-edit-face"
-				label={t('shelf.face')}
-				value={face()}
-				onChange={setFace}
-				options={faceOptions()}
-				emptyLabel={t('device.noFace')}
-			/>
-			<TextField
-				id="device-edit-position"
-				label={t('common.position')}
-				placeholder={t('device.positionEditPlaceholder')}
-				inputmode="numeric"
-				value={positionU()}
-				onInput={setPositionU}
-			/>
-			<EmployeeAssignmentField
-				id="device-edit-employee"
-				tenantId={parseId(tenantId())}
-				value={employeeId()}
-				onChange={setEmployeeId}
-				onError={form.setError}
-			/>
+			<FormSection title={tp('entity.device', 1)}>
+				<NameField
+					id="device-edit-name"
+					placeholder={t('device.namePlaceholder')}
+					value={name()}
+					onInput={setName}
+				/>
+				<ReadOnlyField
+					id="device-edit-type"
+					label={tp('entity.deviceType', 1)}
+					value={form.record() ? typeName(form.record()?.device_type_id) : ''}
+				/>
+				<SelectField
+					id="device-edit-role"
+					label={tp('entity.deviceRole', 1)}
+					required
+					value={roleId()}
+					onChange={setRoleId}
+					options={(roles() ?? []).map((role) => ({
+						value: role.id,
+						label: role.name,
+						icon: deviceRoleIcon(role.icon),
+					}))}
+					emptyLabel={t('device.rolePlaceholder')}
+					add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
+				/>
+				<DescriptionField
+					id="device-edit-description"
+					value={description()}
+					onInput={setDescription}
+				/>
+				<TextField
+					id="device-edit-serial"
+					label={t('device.serial')}
+					placeholder={t('device.serialPlaceholder')}
+					maxLength={100}
+					value={serial()}
+					onInput={setSerial}
+				/>
+				<TextField
+					id="device-edit-device-id"
+					label={t('device.deviceId')}
+					placeholder={t('device.deviceIdPlaceholder')}
+					maxLength={100}
+					value={deviceId()}
+					onInput={setDeviceId}
+				/>
+			</FormSection>
+			<FormSection title={t('device.assignmentSection')}>
+				<EmployeeAssignmentField
+					id="device-edit-employee"
+					tenantId={parseId(tenantId())}
+					value={employeeId()}
+					onChange={setEmployeeId}
+					onError={form.setError}
+				/>
+			</FormSection>
+			<FormSection title={t('device.locationSection')}>
+				<SelectField
+					id="device-edit-site"
+					label={tp('entity.site', 1)}
+					value={siteId()}
+					onChange={handleSiteChange}
+					options={row_options(sites() ?? [])}
+					emptyLabel={t('device.noSite')}
+				/>
+				<SelectField
+					id="device-edit-location"
+					label={tp('entity.location', 1)}
+					value={locationId()}
+					onChange={setLocationId}
+					options={row_options(locations() ?? [])}
+					emptyLabel={t('rack.noLocation')}
+					disabled={siteId() === ''}
+				/>
+				<RackMountField
+					idPrefix="device-edit"
+					rackId={rackId()}
+					face={face()}
+					positionU={positionU()}
+					onRackChange={setRackId}
+					onFaceChange={setFace}
+					onPositionInput={setPositionU}
+					racks={row_options(racks() ?? [])}
+					rackEmptyLabel="—"
+					faceEmptyLabel={t('device.noFace')}
+				/>
+			</FormSection>
 		</FormPage>
 	)
 }

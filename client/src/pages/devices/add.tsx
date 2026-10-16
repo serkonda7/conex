@@ -1,5 +1,5 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createEffect, createSignal, type JSX, on } from 'solid-js'
+import { createEffect, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
@@ -16,7 +16,6 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { faceOptions } from '../../i18n/labels'
 import {
 	type FormValues,
 	id_value,
@@ -31,6 +30,7 @@ import { parseId, queryParam } from '../../lib/router'
 import { contextTenantId, useSiteTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 import { EmployeeAssignmentField } from './employee_assignment'
+import { RackMountField } from './rack_mount'
 
 /** Rack position from the field: null when blank, NaN when malformed. */
 export function parsePosition(value: string): number | null {
@@ -52,6 +52,10 @@ export function queryFace(): string {
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
  * pre-fills it from that device, except the name, serial, device ID,
  * U position and employee assignment, which are chosen per device.
+ *
+ * Shares its layout (sections, field order, rack mount row) with the edit
+ * form in `edit.tsx`, so a device looks the same while created and edited;
+ * keep the two in sync.
  */
 export function DeviceAddPage(): JSX.Element {
 	const form = useFormState()
@@ -233,6 +237,16 @@ export function DeviceAddPage(): JSX.Element {
 					onInput={setDeviceId}
 				/>
 			</FormSection>
+			<FormSection title={t('device.assignmentSection')}>
+				<EmployeeAssignmentField
+					id="device-employee"
+					tenantId={parseId(tenant.value())}
+					value={employeeId()}
+					onChange={setEmployeeId}
+					onError={form.setError}
+					emptyLabel={t('common.selectPlaceholder')}
+				/>
+			</FormSection>
 			<FormSection title={t('device.locationSection')}>
 				<SelectField
 					id="device-site"
@@ -251,45 +265,24 @@ export function DeviceAddPage(): JSX.Element {
 					options={row_options(locations() ?? [])}
 					emptyLabel={t('common.selectPlaceholder')}
 				/>
-				<SelectField
-					id="device-rack"
-					label={tp('entity.rack', 1)}
-					value={rackId()}
-					disabled={shelfId() !== null || zeroHeight()}
-					onChange={handleRackChange}
-					options={row_options(racks() ?? [])}
-					emptyLabel={t('common.selectPlaceholder')}
-				/>
-				<SelectField
-					id="device-face"
-					label={t('shelf.face')}
-					value={face()}
-					disabled={rackId() === '' || shelfId() !== null}
-					onChange={setFace}
-					options={faceOptions()}
-					emptyLabel={t('common.selectPlaceholder')}
-				/>
-				<TextField
-					id="device-position"
-					label={t('common.position')}
-					inputmode="numeric"
-					value={positionU()}
-					disabled={rackId() === '' || shelfId() !== null}
-					onInput={setPositionU}
+				<RackMountField
+					idPrefix="device"
+					rackId={rackId()}
+					face={face()}
+					positionU={positionU()}
+					onRackChange={handleRackChange}
+					onFaceChange={setFace}
+					onPositionInput={setPositionU}
+					racks={row_options(racks() ?? [])}
+					rackEmptyLabel={t('common.selectPlaceholder')}
+					faceEmptyLabel={t('shelf.face')}
+					rackDisabled={shelfId() !== null || zeroHeight()}
+					mountDisabled={rackId() === '' || shelfId() !== null}
 					hint={
-						<Hint>
-							{shelfId() === null
-								? ''
-								: t('device.onShelfHint', { name: shelfName() })}
-						</Hint>
+						<Show when={shelfId() !== null}>
+							<Hint>{t('device.onShelfHint', { name: shelfName() })}</Hint>
+						</Show>
 					}
-				/>
-				<EmployeeAssignmentField
-					id="device-employee"
-					tenantId={parseId(tenant.value())}
-					value={employeeId()}
-					onChange={setEmployeeId}
-					onError={form.setError}
 				/>
 			</FormSection>
 		</FormPage>

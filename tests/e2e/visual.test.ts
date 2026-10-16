@@ -62,11 +62,38 @@ test('device types list layout', async ({ page }) => {
 })
 
 test('device add form layout', async ({ page }) => {
+	// With a tenant in the global context the employee picker is enabled.
+	const response = await page.request.get('/api/tenants?search=E2E%20Tenant&limit=200')
+	expect(response.ok()).toBeTruthy()
+	const list = (await response.json()) as { items: { id: number; name: string }[] }
+	const tenantId = list.items.find((tenant) => tenant.name === 'E2E Tenant')?.id
+	expect(tenantId).toBeDefined()
+	await page.addInitScript((id: number) => {
+		window.localStorage.setItem('conex:tenant-context', `tenant:${id}`)
+	}, tenantId as number)
+
 	await page.goto('/devices/add')
 	await expect(page.locator('#device-name')).toBeVisible()
-	await expect(page.locator('.form-section-title')).toHaveCount(2)
+	await expect(page.locator('#device-employee')).toBeEnabled()
+	await expect(page.locator('.form-section-title')).toHaveCount(3)
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('device-add-form.png')
+})
+
+test('device edit form layout', async ({ page }) => {
+	const response = await page.request.get('/api/devices?search=E2E%20Edge%20Server&limit=200')
+	expect(response.ok()).toBeTruthy()
+	const list = (await response.json()) as { items: { id: number; name: string }[] }
+	const deviceId = list.items.find((device) => device.name === 'E2E Edge Server')?.id
+	expect(deviceId).toBeDefined()
+
+	await page.goto(`/devices/${deviceId}/edit`)
+	await expect(page.locator('#device-edit-name')).toHaveValue('E2E Edge Server')
+	await expect(page.locator('#device-edit-rack')).toHaveValue('E2E Visual Rack')
+	await expect(page.locator('#device-edit-position')).toHaveValue('9')
+	await expect(page.locator('.form-section-title')).toHaveCount(3)
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('device-edit-form.png')
 })
 
 test('ticket add form layout', async ({ page }) => {
@@ -140,9 +167,9 @@ test('expanded sidebar layout', async ({ page }) => {
 	})
 })
 
-// Top-left corner (top bar + sidebar top) with the tenant dropdown open:
+// Top-left strip (top bar + sidebar top) with the tenant dropdown open:
 // guards the dropdown's stacking above the sidebar.
-const topLeftCorner = { x: 0, y: 0, width: 480, height: 480 }
+const topLeftCorner = { x: 0, y: 0, width: 480, height: 210 }
 
 for (const collapsed of [false, true]) {
 	const state = collapsed ? 'collapsed' : 'expanded'

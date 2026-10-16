@@ -71,16 +71,20 @@ export function DevicesPage(): JSX.Element {
 			label: tp('entity.deviceRole', 1),
 			sortable: true,
 			getValue: (d: DeviceRow): JSX.Element => (
-				<IconLabel icon={deviceRoleIcon(roleById().get(d.device_role_id)?.icon)}>
-					{roleName(d.device_role_id)}
-				</IconLabel>
+				<a href={`/device-roles/${d.device_role_id}`}>
+					<IconLabel icon={deviceRoleIcon(roleById().get(d.device_role_id)?.icon)}>
+						{roleName(d.device_role_id)}
+					</IconLabel>
+				</a>
 			),
 		},
 		{
 			key: 'type',
 			label: t('common.type'),
 			sortable: true,
-			getValue: (d: DeviceRow): string => typeName(d.device_type_id),
+			getValue: (d: DeviceRow): JSX.Element => (
+				<a href={`/device-types/${d.device_type_id}`}>{typeName(d.device_type_id)}</a>
+			),
 		},
 		{
 			key: 'employee',
@@ -98,20 +102,20 @@ export function DevicesPage(): JSX.Element {
 			key: 'mount',
 			label: t('device.mount'),
 			sortable: true,
-			getValue: (d: DeviceRow): JSX.Element => (
-				<span>
-					{d.position_u !== null ? (
-						<code>
-							{t('device.mountPosition', {
-								rack: d.rack_id === null ? tp('noun.rack', 1) : rackName(d.rack_id),
-								u: d.position_u,
-							})}
-						</code>
-					) : (
-						<span>—</span>
-					)}
-				</span>
-			),
+			getValue: (d: DeviceRow): JSX.Element => {
+				if (d.position_u === null) {
+					return <span>—</span>
+				}
+				const label = t('device.mountPosition', {
+					rack: d.rack_id === null ? tp('noun.rack', 1) : rackName(d.rack_id),
+					u: d.position_u,
+				})
+				return d.rack_id === null ? (
+					<span>{label}</span>
+				) : (
+					<a href={`/racks/${d.rack_id}`}>{label}</a>
+				)
+			},
 		},
 	]
 

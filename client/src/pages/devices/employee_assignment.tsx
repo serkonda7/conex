@@ -11,6 +11,7 @@ export function EmployeeAssignmentField(props: {
 	value: string
 	onChange: (value: string) => void
 	onError: ErrorSink
+	emptyLabel?: string
 }): JSX.Element {
 	const [employees] = createRowsFor(
 		() => props.tenantId,
@@ -26,7 +27,7 @@ export function EmployeeAssignmentField(props: {
 			options={row_options(
 				(employees() ?? []).filter((row) => row.tenant_id === props.tenantId),
 			)}
-			emptyLabel={t('device.noEmployee')}
+			emptyLabel={props.emptyLabel ?? t('device.noEmployee')}
 			disabled={props.tenantId === null || employees.loading}
 			hint={props.tenantId === null ? t('device.employeeTenantHint') : undefined}
 		/>
