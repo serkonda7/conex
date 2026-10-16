@@ -495,9 +495,6 @@ export const de: Messages = {
 	'priority.rank': 'Rang',
 	'priority.rankHint': '1 ist am dringendsten. Listen und SLA-Tabellen sind nach Rang sortiert.',
 	'priority.rankInvalid': 'Der Rang muss eine ganze Zahl von 1 bis 99 sein.',
-	'priority.definition': 'Definition',
-	'priority.definitionPlaceholder':
-		'Wann gilt diese Priorität? Z. B. „Server oder Firewall ausgefallen, die ganze Firma kann nicht arbeiten.“ Markdown wird unterstützt.',
 	// serviceLevel
 	'serviceLevel.empty': 'Noch keine Service-Level vorhanden. Fügen Sie oben das erste hinzu.',
 	'serviceLevel.addTitle': 'Neues Service-Level hinzufügen',
@@ -509,10 +506,13 @@ export const de: Messages = {
 	'serviceLevel.serviceHours': 'Servicezeiten',
 	'serviceLevel.noServiceHours': 'Keine Servicezeiten',
 	'serviceLevel.closed': 'Geschlossen',
+	'serviceLevel.allDay': '24 Stunden',
+	'serviceLevel.allDayHint': 'Beginn und Ende leer lassen für 24 Stunden.',
 	'serviceLevel.dayOpen': 'Service am {day}',
 	'serviceLevel.windowFrom': '{day} von',
 	'serviceLevel.windowTo': '{day} bis',
-	'serviceLevel.windowInvalid': 'Die Servicezeit am {day} muss nach ihrem Beginn enden.',
+	'serviceLevel.windowInvalid':
+		'Die Servicezeit am {day} muss nach ihrem Beginn enden oder beide Felder müssen für 24 Stunden leer sein.',
 	'serviceLevel.holidayRegion': 'Feiertage',
 	'serviceLevel.holidayNationwide': 'Nur bundesweite Feiertage',
 	'serviceLevel.holidayRegionHint':

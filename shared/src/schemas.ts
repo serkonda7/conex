@@ -852,26 +852,21 @@ export type DeviceRoleListQuery = v.InferOutput<typeof DeviceRoleListQuerySchema
 
 // ---------------------------------------------------------------------------
 // P3c: service catalog (MSP operations). Shared catalog data (no tenant
-// column): ticket priorities with their definitions, service levels (SLA:
+// column): ticket priorities, service levels (SLA:
 // service hours plus response/resolution targets per priority).
 // ---------------------------------------------------------------------------
-
-/** Long free-text definition of when a priority applies; markdown. */
-const DefinitionSchema = v.pipe(v.string(), v.trim(), v.maxLength(4000))
 
 export const PriorityCreateSchema = v.strictObject({
 	name: NameSchema,
 	/** 1 = most urgent; lists and SLA matrices sort by it. */
 	rank: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)),
 	description: DescriptionSchema,
-	definition: v.optional(DefinitionSchema, undefined),
 })
 
 export const PriorityUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	rank: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
-	definition: v.optional(v.nullable(DefinitionSchema), undefined),
 })
 
 export type PriorityCreate = v.InferOutput<typeof PriorityCreateSchema>
@@ -895,14 +890,18 @@ const TimeOfDaySchema = v.pipe(
 	v.regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'Must be a time HH:MM'),
 )
 
-/** One weekday's service window; times compare as strings since they are zero-padded. */
+/**
+ * One weekday's service window; times compare as strings since they are
+ * zero-padded. An empty `from` and `to` mean the whole day (24 hours).
+ */
 export const ServiceWindowSchema = v.pipe(
 	v.strictObject({
 		day: v.picklist(WEEKDAYS),
-		from: TimeOfDaySchema,
-		to: TimeOfDaySchema,
+		from: v.union([TimeOfDaySchema, v.literal('')]),
+		to: v.union([TimeOfDaySchema, v.literal('')]),
 	}),
-	v.check((w) => w.from < w.to, 'Service window must end after it starts'),
+	v.check((w) => (w.from === '') === (w.to === ''), 'Set both start and end, or neither'),
+	v.check((w) => w.from === '' || w.from < w.to, 'Service window must end after it starts'),
 )
 
 export type ServiceWindow = v.InferOutput<typeof ServiceWindowSchema>
@@ -987,7 +986,6 @@ export const ServiceLevelCreateSchema = v.strictObject({
 	service_hours: v.optional(ServiceHoursSchema, []),
 	holiday_region: v.optional(v.nullable(HolidayRegionSchema), undefined),
 	targets: v.optional(ServiceLevelTargetsSchema, []),
-	comments: CommentsSchema,
 })
 
 /** `service_hours` and `targets` replace the stored set when present. */
@@ -997,7 +995,6 @@ export const ServiceLevelUpdateSchema = v.strictObject({
 	service_hours: v.optional(ServiceHoursSchema, undefined),
 	holiday_region: v.optional(v.nullable(HolidayRegionSchema), undefined),
 	targets: v.optional(ServiceLevelTargetsSchema, undefined),
-	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 export type ServiceLevelCreate = v.InferOutput<typeof ServiceLevelCreateSchema>

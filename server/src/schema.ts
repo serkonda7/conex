@@ -382,7 +382,7 @@ export const device_roles = pgTable(
 // P3c: service catalog (MSP operations). Shared catalog data like device
 // roles: readable by every authenticated user, writable only by global
 // editors/admins.
-// - priorities: ticket priorities with their definition; `rank` 1 = most
+// - priorities: ticket priorities; `rank` 1 = most
 //   urgent (not unique, ties sort by name). Delete is blocked while a
 //   service level has a target for the priority.
 // - service_levels: SLA = service hours (`ServiceWindow[]`, at most one
@@ -398,7 +398,6 @@ export const priorities = pgTable(
 		name: text('name').notNull().unique(),
 		rank: integer('rank').notNull(),
 		description: text('description'),
-		definition: text('definition'),
 	},
 	(table) => [index('priorities_rank_idx').on(table.rank)],
 )
@@ -414,7 +413,6 @@ export const service_levels = pgTable(
 			.notNull()
 			.default(sql`'[]'::jsonb`),
 		holiday_region: text('holiday_region', { enum: HOLIDAY_REGIONS }),
-		comments: text('comments'),
 	},
 	(table) => [index('service_levels_name_idx').on(table.name)],
 )

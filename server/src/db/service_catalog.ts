@@ -38,7 +38,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export type PriorityRow = typeof priorities.$inferSelect
-export type PriorityListRow = PriorityRow & { service_level_count: number }
+export type PriorityListRow = PriorityRow
 
 const PRIORITY_NAME_IN_USE = 'Priority name is already in use'
 
@@ -54,20 +54,12 @@ export async function listPriorities(params: PriorityListParams): Promise<Page<P
 			: params.sort === 'description'
 				? priorities.description
 				: priorities.rank
-	const page = await pageRows(
+	return await pageRows(
 		priorities,
 		searchCondition(params.search, [priorities.name, priorities.description]),
 		[orderOf(orderColumn, params.order), asc(priorities.name), asc(priorities.id)],
 		params,
 	)
-	const counts = await countBy(
-		service_level_targets.priority_id,
-		page.items.map((r) => r.id),
-	)
-	return {
-		...page,
-		items: page.items.map((r) => ({ ...r, service_level_count: counts.get(r.id) ?? 0 })),
-	}
 }
 
 export function getPriority(id: number): Promise<Result<PriorityRow, Error>> {
@@ -82,7 +74,6 @@ export async function createPriority(input: PriorityCreate): Promise<Result<Prio
 		name: input.name,
 		rank: input.rank,
 		description: input.description ?? null,
-		definition: input.definition || null,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -111,10 +102,7 @@ export async function updatePriority(
 	) {
 		return Result.err(new DuplicateError(PRIORITY_NAME_IN_USE))
 	}
-	const patch = pickDefined(input, ['name', 'rank', 'description', 'definition'])
-	if (patch.definition === '') {
-		patch.definition = null
-	}
+	const patch = pickDefined(input, ['name', 'rank', 'description'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(priorities).set(patch).where(eq(priorities.id, id)),
@@ -257,7 +245,6 @@ export async function createServiceLevel(
 		description: input.description ?? null,
 		service_hours: sortedHours(input.service_hours),
 		holiday_region: input.holiday_region ?? null,
-		comments: input.comments ?? null,
 	}
 	const id = await tryWrite(
 		() =>
@@ -301,7 +288,7 @@ export async function updateServiceLevel(
 		}
 	}
 	const patch = {
-		...pickDefined(input, ['name', 'description', 'holiday_region', 'comments']),
+		...pickDefined(input, ['name', 'description', 'holiday_region']),
 		...(input.service_hours === undefined
 			? {}
 			: { service_hours: sortedHours(input.service_hours) }),

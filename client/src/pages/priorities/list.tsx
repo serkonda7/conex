@@ -35,11 +35,6 @@ export function PrioritiesPage(): JSX.Element {
 				},
 				nameColumn<PriorityListRow>(t('common.name'), '/priorities', { sortable: true }),
 				descriptionColumn({ sortable: true }),
-				{
-					key: 'service_levels',
-					label: tp('entity.serviceLevel', 2),
-					getValue: (r: PriorityListRow): string => String(r.service_level_count),
-				},
 			]}
 			columnsKey="priorities"
 			rowName={(r: PriorityListRow): string => r.name}

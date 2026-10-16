@@ -10,11 +10,10 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { Empty, InlineError } from '../../components/feedback'
-import { Markdown } from '../../components/markdown'
 import { t } from '../../i18n'
 import { holidayRegionLabel } from '../../i18n/labels'
 import { createRecord } from '../../lib/resource'
-import { formatMinutes, weekdayLabel } from '../../lib/service_level'
+import { formatMinutes, formatWindow, weekdayLabel } from '../../lib/service_level'
 
 /**
  * /service-levels/:id — service level detail: service hours, holiday
@@ -63,9 +62,7 @@ export function ServiceLevelDetailPage(props: { id: number }): JSX.Element {
 									{(w: ServiceWindow): JSX.Element => (
 										<li>
 											<span>{weekdayLabel(w.day, 'long')}</span>
-											<span>
-												{w.from}–{w.to}
-											</span>
+											<span>{formatWindow(w)}</span>
 										</li>
 									)}
 								</For>
@@ -77,10 +74,6 @@ export function ServiceLevelDetailPage(props: { id: number }): JSX.Element {
 						{level()?.holiday_region == null
 							? t('serviceLevel.holidayNationwide')
 							: holidayRegionLabel(level()?.holiday_region ?? '')}
-					</dd>
-					<dt>{t('common.comments')}</dt>
-					<dd>
-						<Markdown text={level()?.comments} />
 					</dd>
 				</DetailCard>
 

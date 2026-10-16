@@ -492,9 +492,6 @@ export const en = {
 	'priority.rank': 'Rank',
 	'priority.rankHint': '1 is the most urgent. Lists and SLA tables are sorted by rank.',
 	'priority.rankInvalid': 'Rank must be a whole number from 1 to 99.',
-	'priority.definition': 'Definition',
-	'priority.definitionPlaceholder':
-		'When does this priority apply? E.g. "Server or firewall down, whole company cannot work." Markdown supported.',
 	// serviceLevel
 	'serviceLevel.empty': 'No service levels yet. Add the first one above.',
 	'serviceLevel.addTitle': 'Add a new service level',
@@ -506,10 +503,13 @@ export const en = {
 	'serviceLevel.serviceHours': 'Service hours',
 	'serviceLevel.noServiceHours': 'No service hours',
 	'serviceLevel.closed': 'Closed',
+	'serviceLevel.allDay': '24 hours',
+	'serviceLevel.allDayHint': 'Leave start and end empty for 24 hours.',
 	'serviceLevel.dayOpen': 'Service on {day}',
 	'serviceLevel.windowFrom': '{day} from',
 	'serviceLevel.windowTo': '{day} until',
-	'serviceLevel.windowInvalid': 'Service hours on {day} must end after they start.',
+	'serviceLevel.windowInvalid':
+		'Service hours on {day} must end after they start, or both be empty for 24 hours.',
 	'serviceLevel.holidayRegion': 'Holidays',
 	'serviceLevel.holidayNationwide': 'Nationwide holidays only',
 	'serviceLevel.holidayRegionHint':

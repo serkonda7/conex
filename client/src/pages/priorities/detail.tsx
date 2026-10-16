@@ -8,11 +8,10 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { Markdown } from '../../components/markdown'
 import { t } from '../../i18n'
 import { createRecord } from '../../lib/resource'
 
-/** /priorities/:id — priority detail: rank and the definition of when it applies. */
+/** /priorities/:id — priority detail: rank. */
 export function PriorityDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const id = (): number => props.id
@@ -45,10 +44,6 @@ export function PriorityDetailPage(props: { id: number }): JSX.Element {
 				<DetailCard label={t('priority.details')}>
 					<dt>{t('priority.rank')}</dt>
 					<dd>{priority()?.rank}</dd>
-					<dt>{t('priority.definition')}</dt>
-					<dd>
-						<Markdown text={priority()?.definition} />
-					</dd>
 				</DetailCard>
 			</DetailShell>
 

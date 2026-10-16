@@ -9,7 +9,6 @@ import {
 	DescriptionField,
 	FormPage,
 	FormSection,
-	Hint,
 	NameField,
 	ReadOnlyField,
 	row_options,

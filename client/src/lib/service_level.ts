@@ -55,6 +55,11 @@ export function weekdayLabel(day: Weekday, style: 'short' | 'long' = 'short'): s
 	)
 }
 
+/** `08:00–17:00`, or `24 hours` for a window without start and end. */
+export function formatWindow(window: Pick<ServiceWindow, 'from' | 'to'>): string {
+	return window.from === '' ? t('serviceLevel.allDay') : `${window.from}–${window.to}`
+}
+
 /**
  * Compact service hours: consecutive weekdays with the same window merge,
  * e.g. `Mon–Fri 08:00–17:00, Sat 09:00–12:00`. Empty for no windows.
@@ -80,7 +85,7 @@ export function formatServiceHours(windows: readonly ServiceWindow[]): string {
 				g.first === g.last
 					? weekdayLabel(g.first)
 					: `${weekdayLabel(g.first)}–${weekdayLabel(g.last)}`
-			return `${days} ${g.from}–${g.to}`
+			return `${days} ${formatWindow(g)}`
 		})
 		.join(', ')
 }

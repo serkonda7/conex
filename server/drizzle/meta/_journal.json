@@ -218,6 +218,20 @@
       "when": 1792139114823,
       "tag": "0030_device_employee_assignment",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792161236509,
+      "tag": "0031_remove_priority_definition",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792161307662,
+      "tag": "0032_remove_service_level_comments",
+      "breakpoints": true
     }
   ]
 }

@@ -16,7 +16,6 @@ import {
 	update_service_level,
 } from '../../api/service_catalog'
 import {
-	CommentsField,
 	DescriptionField,
 	Field,
 	FormPage,
@@ -77,7 +76,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 	// `?name=` comes from the search typed into an opener's dropdown.
 	const [name, setName] = createSignal(queryParam('name'))
 	const [description, setDescription] = createSignal('')
-	const [comments, setComments] = createSignal('')
 	const [holidayRegion, setHolidayRegion] = createSignal('')
 	const [hours, setHours] = createSignal<Hours>(defaultHours())
 	const [targets, setTargets] = createSignal<Record<number, TargetState>>({})
@@ -88,7 +86,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 		fill: (row: ServiceLevelDetail) => {
 			setName(row.name)
 			setDescription(row.description ?? '')
-			setComments(row.comments ?? '')
 			setHolidayRegion(row.holiday_region ?? '')
 			setHours(hoursOf(row.service_hours))
 			setTargets(
@@ -131,7 +128,7 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 	/** Checks the service windows; a message for the first bad one. */
 	function hoursProblem(): string | null {
 		for (const w of serviceHours()) {
-			if (w.from === '' || w.to === '' || w.from >= w.to) {
+			if ((w.from === '') !== (w.to === '') || (w.from !== '' && w.from >= w.to)) {
 				return t('serviceLevel.windowInvalid', { day: weekdayLabel(w.day, 'long') })
 			}
 		}
@@ -170,7 +167,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 	function reset(): void {
 		setName('')
 		setDescription('')
-		setComments('')
 		setHolidayRegion('')
 		setHours(defaultHours())
 		setTargets({})
@@ -195,13 +191,11 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 					? create_service_level({
 							name: trimmed,
 							description: text(description()),
-							comments: text(comments()),
 							...values,
 						})
 					: update_service_level(id, {
 							name: trimmed,
 							description: text(description()) ?? null,
-							comments: text(comments()) ?? null,
 							...values,
 						})
 			},
@@ -274,10 +268,14 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 								<Show when={!day(d).open}>
 									<span class="field-hint">{t('serviceLevel.closed')}</span>
 								</Show>
+								<Show when={day(d).open && day(d).from === '' && day(d).to === ''}>
+									<span class="field-hint">{t('serviceLevel.allDay')}</span>
+								</Show>
 							</div>
 						</Field>
 					)}
 				</For>
+				<Hint>{t('serviceLevel.allDayHint')}</Hint>
 				<SelectField
 					id={`${prefix}-holiday-region`}
 					label={t('serviceLevel.holidayRegion')}
@@ -368,8 +366,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 					</Show>
 				</div>
 			</FormSection>
-
-			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>
 	)
 }

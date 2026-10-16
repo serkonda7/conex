@@ -5,14 +5,7 @@ import {
 	type PriorityRow,
 	update_priority,
 } from '../../api/service_catalog'
-import {
-	DescriptionField,
-	FormPage,
-	Hint,
-	NameField,
-	TextAreaField,
-	TextField,
-} from '../../components/form'
+import { DescriptionField, FormPage, Hint, NameField, TextField } from '../../components/form'
 import { t } from '../../i18n'
 import {
 	type FormValues,
@@ -29,7 +22,6 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal(queryParam('name'))
 	const [rank, setRank] = createSignal('')
 	const [description, setDescription] = createSignal('')
-	const [definition, setDefinition] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_priority,
@@ -37,7 +29,6 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 			setName(row.name)
 			setRank(String(row.rank))
 			setDescription(row.description ?? '')
-			setDefinition(row.definition ?? '')
 		},
 	})
 	const prefix = form.editing ? 'priority-edit' : 'priority'
@@ -47,7 +38,6 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 		setName('')
 		setRank('')
 		setDescription('')
-		setDefinition('')
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
@@ -67,13 +57,11 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 							name: trimmed,
 							rank: rankValue,
 							description: text(description()),
-							definition: text(definition()),
 						})
 					: update_priority(id, {
 							name: trimmed,
 							rank: rankValue,
 							description: text(description()) ?? null,
-							definition: text(definition()) ?? null,
 						}),
 			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e) ? reset : undefined,
@@ -112,15 +100,6 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 				id={`${prefix}-description`}
 				value={description()}
 				onInput={setDescription}
-			/>
-			<TextAreaField
-				id={`${prefix}-definition`}
-				label={t('priority.definition')}
-				placeholder={t('priority.definitionPlaceholder')}
-				rows={6}
-				maxLength={4000}
-				value={definition()}
-				onInput={setDefinition}
 			/>
 		</FormPage>
 	)
