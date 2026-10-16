@@ -148,6 +148,24 @@ export function DevicesPage(): JSX.Element {
 						<a href={`/devices/${d.host_device_id}`}>{d.host_name}</a>
 					)
 				}
+				if (d.shelf_id !== null) {
+					const shelfLabel = t('device.onShelf', {
+						name:
+							d.shelf_name ||
+							t('common.unitPosition', { u: d.shelf_position_u ?? '' }),
+					})
+					return (
+						<span>
+							<Show when={d.rack_id !== null}>
+								<a href={`/racks/${d.rack_id}`}>{rackName(d.rack_id)}</a>
+								{' · '}
+							</Show>
+							<Show when={d.rack_id !== null} fallback={shelfLabel}>
+								<a href={`/racks/${d.rack_id}`}>{shelfLabel}</a>
+							</Show>
+						</span>
+					)
+				}
 				if (d.position_u === null) {
 					return <span>—</span>
 				}

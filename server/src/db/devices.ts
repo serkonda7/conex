@@ -258,7 +258,7 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 
 /** One device list row: a physical device or a virtual machine (with its host's name). */
 export type DeviceListItem =
-	| ({ kind: 'device' } & DeviceRow)
+	| ({ kind: 'device'; shelf_name: string | null; shelf_position_u: number | null } & DeviceRow)
 	| ({ kind: 'vm'; host_name: string | null } & VirtualMachineRow)
 
 const nullInt = (name: string): SQL.Aliased<number | null> =>
@@ -354,6 +354,8 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			face: devices.face,
 			position_u: devices.position_u,
 			shelf_id: devices.shelf_id,
+			shelf_name: sql<string | null>`${shelves.name}`.as('shelf_name'),
+			shelf_position_u: sql<number | null>`${shelves.position_u}`.as('shelf_position_u'),
 			serial: devices.serial,
 			asset_tag: devices.asset_tag,
 			device_id: devices.device_id,
@@ -366,6 +368,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
 		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
 		.leftJoin(racks, eq(racks.id, devices.rack_id))
+		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
 		.where(deviceWhere)
 	const vmBranch = db
 		.select({
@@ -384,6 +387,8 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			face: nullText('face'),
 			position_u: nullInt('position_u'),
 			shelf_id: nullInt('shelf_id'),
+			shelf_name: nullText('shelf_name'),
+			shelf_position_u: nullInt('shelf_position_u'),
 			serial: nullText('serial'),
 			asset_tag: nullText('asset_tag'),
 			device_id: nullText('device_id'),
@@ -411,6 +416,8 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 /** A raw union row: the columns of both kinds, the other kind's ones null. */
 type DeviceListRow = Omit<DeviceRow, 'device_type_id'> & {
 	kind: DeviceListKind
+	shelf_name: string | null
+	shelf_position_u: number | null
 	device_type_id: number | null
 	host_device_id: number | null
 	sort_mount: string | null
@@ -445,6 +452,8 @@ function toListItem(row: DeviceListRow): DeviceListItem {
 		face: row.face,
 		position_u: row.position_u,
 		shelf_id: row.shelf_id,
+		shelf_name: row.shelf_name,
+		shelf_position_u: row.shelf_position_u,
 		serial: row.serial,
 		asset_tag: row.asset_tag,
 		device_id: row.device_id,
