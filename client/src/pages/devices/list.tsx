@@ -1,11 +1,18 @@
 import { IconArrowsExchange } from '@tabler/icons-solidjs'
+import type { DeviceListKind } from 'shared/src/types'
 import { createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
-import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../../api/devices'
+import {
+	type DeviceListItem,
+	type DeviceSort,
+	delete_device,
+	fetch_device_list,
+} from '../../api/devices'
 import { fetch_all_employees } from '../../api/employees'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
-import { type DataTableColumn, nameColumn } from '../../components/data_table'
+import { delete_virtual_machine } from '../../api/virtual_machines'
+import type { DataTableColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
@@ -22,11 +29,18 @@ import { canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { MoveTenantDialog } from './move_tenant_dialog'
 
+/** Detail route of a list row: `/devices/:id` or `/devices/vm/:id`. */
+export function deviceListHref(row: DeviceListItem): string {
+	return row.kind === 'vm' ? `/devices/vm/${row.id}` : `/devices/${row.id}`
+}
+
 /**
- * /devices — NetBox-style device list: search, sortable columns, rack /
- * role / tenant filters (tenant, role and device type deep-linkable via
- * `?tenant=<id>`, `?role=<id>` and `?device_type=<id>`), and icon actions with
- * clone, move to another tenant and delete in a row menu.
+ * /devices — NetBox-style device list of devices and virtual machines:
+ * search, sortable columns, kind / rack / role / tenant filters (tenant,
+ * role and device type deep-linkable via `?tenant=<id>`, `?role=<id>` and
+ * `?device_type=<id>`), and icon actions with clone, move to another tenant
+ * and delete in a row menu. Ids collide across the two kinds, so rows are
+ * keyed `device-<id>` / `vm-<id>`.
  */
 export function DevicesPage(): JSX.Element {
 	const [filterRack, setFilterRack] = createSignal('')
@@ -34,19 +48,23 @@ export function DevicesPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
 	const [filterType] = useQueryFilter('device_type')
 	const [filterEmployee, setFilterEmployee] = useQueryFilter('employee')
-	const [movingDevice, setMovingDevice] = createSignal<DeviceRow | null>(null)
+	const [filterKind, setFilterKind] = useQueryFilter('kind')
+	const [movingRow, setMovingRow] = createSignal<DeviceListItem | null>(null)
 	const list = useEntityList({
 		noun: 'noun.device',
 		sort: 'name' as DeviceSort,
 		filters: () => ({
+			kind: (filterKind() || undefined) as DeviceListKind | undefined,
 			rack: parseId(filterRack()) ?? undefined,
 			role: parseId(filterRole()) ?? undefined,
 			device_type: parseId(filterType()) ?? undefined,
 			employee: parseId(filterEmployee()) ?? undefined,
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
-		fetch: fetch_devices,
+		fetch: fetch_device_list,
 		remove: delete_device,
+		removeOf: (row: DeviceListItem) =>
+			row.kind === 'vm' ? delete_virtual_machine : delete_device,
 	})
 	const [types] = createRows(fetch_device_types, list.setError)
 	const [roles] = createRows(fetch_device_roles, list.setError)
@@ -58,19 +76,24 @@ export function DevicesPage(): JSX.Element {
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
 	const rackName = useNameOf(racks)
 
-	const columns: DataTableColumn<DeviceRow>[] = [
-		nameColumn(tp('entity.device', 1), '/devices', { sortable: true }),
+	const columns: DataTableColumn<DeviceListItem>[] = [
+		{
+			key: 'name',
+			label: tp('entity.device', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element => <a href={deviceListHref(d)}>{d.name}</a>,
+		},
 		{
 			key: 'device_id',
 			label: t('device.deviceId'),
 			sortable: true,
-			getValue: (d: DeviceRow): string => d.device_id ?? '—',
+			getValue: (d: DeviceListItem): string => (d.kind === 'device' && d.device_id) || '—',
 		},
 		{
 			key: 'role',
 			label: tp('entity.deviceRole', 1),
 			sortable: true,
-			getValue: (d: DeviceRow): JSX.Element => (
+			getValue: (d: DeviceListItem): JSX.Element => (
 				<a href={`/device-roles/${d.device_role_id}`}>
 					<IconLabel icon={deviceRoleIcon(roleById().get(d.device_role_id)?.icon)}>
 						{roleName(d.device_role_id)}
@@ -82,14 +105,17 @@ export function DevicesPage(): JSX.Element {
 			key: 'type',
 			label: t('common.type'),
 			sortable: true,
-			getValue: (d: DeviceRow): JSX.Element => (
-				<a href={`/device-types/${d.device_type_id}`}>{typeName(d.device_type_id)}</a>
-			),
+			getValue: (d: DeviceListItem): JSX.Element =>
+				d.kind === 'vm' ? (
+					<span>{t('vm.typeLabel')}</span>
+				) : (
+					<a href={`/device-types/${d.device_type_id}`}>{typeName(d.device_type_id)}</a>
+				),
 		},
 		{
 			key: 'employee',
 			label: t('device.assignedEmployee'),
-			getValue: (device: DeviceRow): JSX.Element =>
+			getValue: (device: DeviceListItem): JSX.Element =>
 				device.employee_id === null ? (
 					<span>—</span>
 				) : (
@@ -102,7 +128,14 @@ export function DevicesPage(): JSX.Element {
 			key: 'mount',
 			label: t('device.mount'),
 			sortable: true,
-			getValue: (d: DeviceRow): JSX.Element => {
+			getValue: (d: DeviceListItem): JSX.Element => {
+				if (d.kind === 'vm') {
+					return d.host_device_id === null ? (
+						<span>{t('vm.cloud')}</span>
+					) : (
+						<a href={`/devices/${d.host_device_id}`}>{d.host_name}</a>
+					)
+				}
 				if (d.position_u === null) {
 					return <span>—</span>
 				}
@@ -126,6 +159,16 @@ export function DevicesPage(): JSX.Element {
 				title={tp('entity.device', 2)}
 				addHref="/devices/add"
 				filters={[
+					{
+						key: 'kind',
+						label: t('vm.kind'),
+						options: [
+							{ value: 'device', label: t('vm.kindDevices') },
+							{ value: 'vm', label: t('vm.kindVms') },
+						],
+						value: filterKind,
+						onChange: setFilterKind,
+					},
 					{
 						key: 'employee',
 						label: t('device.assignedEmployee'),
@@ -153,17 +196,21 @@ export function DevicesPage(): JSX.Element {
 				}
 				columns={columns}
 				columnsKey="devices"
-				rowName={(d: DeviceRow): string => d.name}
-				editHref={(d: DeviceRow): string => `/devices/${d.id}/edit`}
-				cloneHref={(d: DeviceRow): string => `/devices/add?clone=${d.id}`}
-				menuActions={(d: DeviceRow) =>
-					canGlobal('edit')
+				rowName={(d: DeviceListItem): string => d.name}
+				rowKey={(d: DeviceListItem): string => `${d.kind}-${d.id}`}
+				editHref={(d: DeviceListItem): string => `${deviceListHref(d)}/edit`}
+				cloneHref={(d: DeviceListItem): string =>
+					d.kind === 'vm' ? `/devices/vm/add?clone=${d.id}` : `/devices/add?clone=${d.id}`
+				}
+				menuActions={(d: DeviceListItem) =>
+					// A hosted VM follows its host's tenant.
+					canGlobal('edit') && !(d.kind === 'vm' && d.host_device_id !== null)
 						? [
 								{
 									label: t('device.moveTenant'),
 									icon: IconArrowsExchange,
 									onSelect: (): void => {
-										setMovingDevice(d)
+										setMovingRow(d)
 									},
 								},
 							]
@@ -171,15 +218,15 @@ export function DevicesPage(): JSX.Element {
 				}
 				emptyText={t('device.empty')}
 			/>
-			<Show when={movingDevice()}>
-				{(device: () => DeviceRow): JSX.Element => (
+			<Show when={movingRow()}>
+				{(row: () => DeviceListItem): JSX.Element => (
 					<MoveTenantDialog
-						device={device()}
+						row={row()}
 						on_moved={() => {
-							setMovingDevice(null)
+							setMovingRow(null)
 							list.reload()
 						}}
-						on_close={() => setMovingDevice(null)}
+						on_close={() => setMovingRow(null)}
 					/>
 				)}
 			</Show>

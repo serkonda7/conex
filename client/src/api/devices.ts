@@ -4,7 +4,7 @@
  * message.
  */
 import type { Result } from 'better-result'
-import type { DeviceRow, InterfaceJson } from 'server/src/db/devices'
+import type { DeviceListItem, DeviceRow, InterfaceJson } from 'server/src/db/devices'
 import type {
 	DeviceCreate,
 	DeviceListQuery,
@@ -15,14 +15,15 @@ import type {
 } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceRow, InterfaceJson }
+export type { DeviceListItem, DeviceRow, InterfaceJson }
 
 export type DeviceSort = DeviceListQuery['sort']
 
-export async function fetch_devices(
+/** Device list rows of both kinds (physical devices and virtual machines). */
+export async function fetch_device_list(
 	filters?: Partial<DeviceListQuery>,
-): Promise<Result<Page<DeviceRow>, Error>> {
-	return getPage<DeviceRow>(
+): Promise<Result<Page<DeviceListItem>, Error>> {
+	return getPage<DeviceListItem>(
 		client.devices.$get({
 			query: to_query({
 				...paging(filters),
@@ -35,12 +36,23 @@ export async function fetch_devices(
 				tenant_group: filters?.tenant_group,
 				status: filters?.status,
 				placed: filters?.placed,
+				kind: filters?.kind,
+				host: filters?.host,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),
 		}),
 		failed.list('noun.device'),
 	)
+}
+
+/** Physical devices only (no virtual machines). */
+export function fetch_devices(
+	filters?: Partial<Omit<DeviceListQuery, 'kind' | 'host'>>,
+): Promise<Result<Page<DeviceRow>, Error>> {
+	return fetch_device_list({ ...filters, kind: 'device' }) as Promise<
+		Result<Page<DeviceRow>, Error>
+	>
 }
 
 export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {

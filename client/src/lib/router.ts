@@ -676,9 +676,14 @@ export function useOpenerPath(): () => string | null {
 /**
  * Where an add/edit form goes on save and cancel: the entity's list for add
  * (`id` omitted), and for edit the opener when it shows that list, else the
- * detail page. `listRoute` is the list path, e.g. `/device-roles`.
+ * detail page. `listRoute` is the list path, e.g. `/device-roles`;
+ * `detailBase` the detail path prefix when it differs (`/devices/vm`).
  */
-export function useFormReturnRoute(listRoute: string, id?: number): () => string {
+export function useFormReturnRoute(
+	listRoute: string,
+	id?: number,
+	detailBase: string = listRoute,
+): () => string {
 	const openerPath = useOpenerPath()
 	return () => {
 		if (id === undefined) {
@@ -688,7 +693,7 @@ export function useFormReturnRoute(listRoute: string, id?: number): () => string
 		return opener !== null &&
 			routeSegments(opener).join('/') === routeSegments(listRoute).join('/')
 			? opener
-			: `${listRoute}/${id}`
+			: `${detailBase}/${id}`
 	}
 }
 

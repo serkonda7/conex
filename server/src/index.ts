@@ -29,6 +29,7 @@ import { sitesApp } from './routes/sites'
 import { tenantGroupsApp } from './routes/tenant_groups'
 import { tenantsApp } from './routes/tenants'
 import { usersApp } from './routes/users'
+import { virtualMachinesApp } from './routes/virtual_machines'
 import { SESSION_SWEEP_INTERVAL_MS, sweepExpired } from './sessions'
 import { initStorage } from './storage'
 import { jsonError } from './util/http'
@@ -85,6 +86,7 @@ export function createApp() {
 			.route('/priorities', prioritiesApp)
 			.route('/service-levels', serviceLevelsApp)
 			.route('/devices', devicesApp)
+			.route('/virtual-machines', virtualMachinesApp)
 			.route('/interfaces', interfacesApp)
 			.route('/cables', cablesApp)
 			.route('/search', searchApp)

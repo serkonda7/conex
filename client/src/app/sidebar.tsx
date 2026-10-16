@@ -250,6 +250,7 @@ const NAV_PARENT: Record<string, string> = {
 	// The dashboard redirects to the home tenant page, so that page is "the dashboard".
 	tenants: 'dashboard',
 	'site-groups': 'sites',
+	'devices/vm': 'devices',
 }
 
 /** Sections shown in a sidebar group: routed lists with an icon. */

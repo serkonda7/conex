@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import { asc, eq } from 'drizzle-orm'
 import type { DeviceRoleCreate, DeviceRoleUpdate } from 'shared/src/schemas'
-import { device_roles, devices } from '../schema'
+import { device_roles, devices, virtual_machines } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { ConflictError, DuplicateError, ValidationError } from './errors'
@@ -50,13 +50,15 @@ export async function listDeviceRoles(
 		[orderOf(orderColumn, params.order), asc(device_roles.id)],
 		params,
 	)
-	const counts = await countBy(
-		devices.device_role_id,
-		page.items.map((r) => r.id),
-	)
+	const ids = page.items.map((r) => r.id)
+	const counts = await countBy(devices.device_role_id, ids)
+	const vmCounts = await countBy(virtual_machines.device_role_id, ids)
 	return {
 		...page,
-		items: page.items.map((r) => ({ ...r, device_count: counts.get(r.id) ?? 0 })),
+		items: page.items.map((r) => ({
+			...r,
+			device_count: (counts.get(r.id) ?? 0) + (vmCounts.get(r.id) ?? 0),
+		})),
 	}
 }
 
@@ -135,9 +137,14 @@ export async function deleteDeviceRole(id: number): Promise<Result<DeviceRoleRow
 	if (current.value.key !== null) {
 		return Result.err(new ConflictError('Built-in device roles cannot be deleted'))
 	}
-	if (await exists(devices, eq(devices.device_role_id, id))) {
+	if (
+		(await exists(devices, eq(devices.device_role_id, id))) ||
+		(await exists(virtual_machines, eq(virtual_machines.device_role_id, id)))
+	) {
 		return Result.err(
-			new ConflictError('Device role still has devices; move or delete them first'),
+			new ConflictError(
+				'Device role still has devices or virtual machines; move or delete them first',
+			),
 		)
 	}
 	const deleted = await tryWrite(() =>

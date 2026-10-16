@@ -1489,6 +1489,23 @@ tbody tr:last-child td {
 	border-top-color: var(--border);
 }
 
+/* VM form: the host name with its select / remove buttons in one row. */
+.vm-host-row {
+	display: flex;
+	gap: 0.4rem;
+}
+
+.app-content .form-stacked .field .vm-host-row input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+}
+
+.vm-host-row button {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
 /* Device form: rack, face and U position share one row; face and
    position stay narrow. */
 .rack-mount-row {

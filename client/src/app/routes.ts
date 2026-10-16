@@ -5,7 +5,8 @@
  *
  * URL shape per section: `/<path>` (list), `/<path>/add`, `/<path>/import`,
  * `/<path>/:id` (detail) and `/<path>/:id/edit`. A kind without a page
- * resolves to not-found.
+ * resolves to not-found. A `path` may span several segments
+ * (`devices/vm`); the longest matching section wins.
  */
 import {
 	IconBuildingFactory2,
@@ -49,6 +50,8 @@ import { DeviceAddPage } from '../pages/devices/add'
 import { DeviceDetailPage } from '../pages/devices/detail'
 import { DeviceEditPage } from '../pages/devices/edit'
 import { DevicesPage } from '../pages/devices/list'
+import { VirtualMachineDetailPage } from '../pages/devices/vm_detail'
+import { VirtualMachineAddPage, VirtualMachineEditPage } from '../pages/devices/vm_form'
 import { EmployeeDetailPage } from '../pages/employees/detail'
 import { EmployeeAddPage, EmployeeEditPage } from '../pages/employees/form'
 import { EmployeesPage } from '../pages/employees/list'
@@ -98,8 +101,10 @@ import { UserEditPage } from '../pages/users/edit'
 import { UsersPage } from '../pages/users/list'
 
 export interface Section {
-	/** First URL segment (`/devices/…`). */
+	/** Leading URL segment(s) (`/devices/…`, `/devices/vm/…`). */
 	path: string
+	/** Section whose list heads the breadcrumbs of a section without its own list. */
+	parent?: string
 	/** Localized entity name for tab titles and the sidebar. */
 	noun: (count: number) => string
 	/** Sidebar icon; sections without one (or without a list) stay hidden. */
@@ -200,6 +205,17 @@ export const SECTIONS: readonly Section[] = [
 		add: DeviceAddPage,
 		detail: DeviceDetailPage,
 		edit: DeviceEditPage,
+	},
+	{
+		// Virtual machines are listed in the devices table.
+		path: 'devices/vm',
+		parent: 'devices',
+		noun: (n: number): string => tp('entity.virtualMachine', n),
+		permission: 'view',
+		hideInNav: true,
+		add: VirtualMachineAddPage,
+		detail: VirtualMachineDetailPage,
+		edit: VirtualMachineEditPage,
 	},
 	{
 		path: 'device-roles',
@@ -346,13 +362,27 @@ export const SECTIONS: readonly Section[] = [
 	},
 ]
 
+/** Section of a route plus the segments after its path; the bare root maps to the home section. */
+function sectionMatch(raw: string): { section: Section; rest: string[] } | null {
+	const segments = routeSegments(raw)
+	if (segments.length === 0) {
+		const home = SECTIONS[0]
+		return home ? { section: home, rest: [] } : null
+	}
+	let best: { section: Section; rest: string[] } | null = null
+	for (const section of SECTIONS) {
+		const parts = section.path.split('/')
+		const matches = parts.every((part, i) => segments[i] === part)
+		if (matches && (best === null || parts.length > segments.length - best.rest.length)) {
+			best = { section, rest: segments.slice(parts.length) }
+		}
+	}
+	return best
+}
+
 /** Section a route belongs to; the bare root maps to the home section. */
 export function routeSection(raw: string): Section | null {
-	const first = routeSegments(raw)[0]
-	if (first === undefined) {
-		return SECTIONS[0] ?? null
-	}
-	return SECTIONS.find((s) => s.path === first) ?? null
+	return sectionMatch(raw)?.section ?? null
 }
 
 export type RouteMatch =
@@ -380,11 +410,12 @@ export function canAddInSection(section: Section): boolean {
  * labels).
  */
 export function matchRoute(raw: string, checkPermission = true): RouteMatch | null {
-	const section = routeSection(raw)
-	if (!section || (checkPermission && !canOpenSection(section))) {
+	const matched = sectionMatch(raw)
+	if (!matched || (checkPermission && !canOpenSection(matched.section))) {
 		return null
 	}
-	const [, second, third, ...rest] = routeSegments(raw)
+	const { section } = matched
+	const [second, third, ...rest] = matched.rest
 	if (rest.length > 0) {
 		return null
 	}
@@ -417,12 +448,13 @@ export function isDetailRoute(raw: string): boolean {
  * its page reported once loaded.
  */
 export function tabTitle(raw: string): string {
-	const section = routeSection(raw)
-	const [first, second, third] = routeSegments(raw)
+	const matched = sectionMatch(raw)
 	const name = pageMetaFor(raw)?.name
-	if (!section) {
-		return first ?? t('tab.page')
+	if (!matched) {
+		return routeSegments(raw)[0] ?? t('tab.page')
 	}
+	const { section } = matched
+	const [second, third] = matched.rest
 	if (second === 'add') {
 		return t('tab.add', { entity: section.noun(1) })
 	}
@@ -452,9 +484,8 @@ export function routeCrumbs(raw: string, match: RouteMatch): Crumb[] {
 		return []
 	}
 	const meta = pageMetaFor(raw)
-	const trail: Crumb[] = section.list
-		? [{ label: section.noun(2), href: `/${section.path}` }]
-		: []
+	const head = section.list ? section : SECTIONS.find((s) => s.path === section.parent)
+	const trail: Crumb[] = head?.list ? [{ label: head.noun(2), href: `/${head.path}` }] : []
 	if (match.kind === 'edit') {
 		const detailPath = `/${section.path}/${match.id}`
 		const detail = pageMetaFor(detailPath)

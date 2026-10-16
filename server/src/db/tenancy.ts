@@ -25,6 +25,7 @@ import {
 	tenant_groups,
 	tenants,
 	users,
+	virtual_machines,
 } from '../schema'
 import {
 	buildChildrenMap,
@@ -420,6 +421,11 @@ export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>
 		],
 		[racks, eq(racks.tenant_id, id), 'Tenant still has racks; move or delete them first'],
 		[devices, eq(devices.tenant_id, id), 'Tenant still has devices; move or delete them first'],
+		[
+			virtual_machines,
+			eq(virtual_machines.tenant_id, id),
+			'Tenant still has virtual machines; move or delete them first',
+		],
 		[
 			employees,
 			eq(employees.tenant_id, id),

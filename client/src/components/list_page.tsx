@@ -203,7 +203,8 @@ export interface RowMenuAction {
  * opening downward, a `bottom` offset when flipped upward.
  */
 export interface RowMenuAnchor {
-	id: number
+	/** Row key (`getRowId`), unique within the list. */
+	key: string | number
 	name: string
 	edge: number
 	right: number
@@ -218,13 +219,13 @@ const ROW_MENU_GAP = 4
  * Anchors the row menu to its toggle button in viewport coordinates,
  * flipped upward when there is no room below (e.g. the last table row).
  */
-function anchorBelow(button: HTMLElement, id: number, name: string): RowMenuAnchor {
+function anchorBelow(button: HTMLElement, key: string | number, name: string): RowMenuAnchor {
 	const rect = button.getBoundingClientRect()
 	const spaceBelow = window.innerHeight - rect.bottom - ROW_MENU_GAP
 	const spaceAbove = rect.top - ROW_MENU_GAP
 	const up = spaceBelow < ROW_MENU_HEIGHT && spaceAbove >= ROW_MENU_HEIGHT
 	return {
-		id,
+		key,
 		name,
 		edge: up ? window.innerHeight - rect.top + ROW_MENU_GAP : rect.bottom + ROW_MENU_GAP,
 		right: Math.max(0, window.innerWidth - rect.right),
@@ -238,7 +239,7 @@ export function useRowMenu(): {
 	closeMenu: () => void
 	toggleMenu: (
 		e: MouseEvent & { currentTarget: HTMLButtonElement },
-		id: number,
+		key: string | number,
 		name: string,
 	) => void
 } {
@@ -262,10 +263,10 @@ export function useRowMenu(): {
 
 	function toggleMenu(
 		e: MouseEvent & { currentTarget: HTMLButtonElement },
-		id: number,
+		key: string | number,
 		name: string,
 	): void {
-		setOpenMenu(openMenu()?.id === id ? null : anchorBelow(e.currentTarget, id, name))
+		setOpenMenu(openMenu()?.key === key ? null : anchorBelow(e.currentTarget, key, name))
 	}
 
 	return { openMenu, closeMenu, toggleMenu }
@@ -290,7 +291,7 @@ export interface EntityList<Row> {
 	canEdit: () => boolean
 	/** Whether the session may delete rows (`manage`, else `delete`). */
 	canDelete: () => boolean
-	handleDelete: (id: number, name: string) => Promise<void>
+	handleDelete: (row: Row, name: string) => Promise<void>
 	/** Refetches the current page (after a change made outside the list). */
 	reload: () => void
 }
@@ -299,7 +300,8 @@ export interface EntityList<Row> {
  * State of a standard list page: search, sort and the page-specific
  * `filters` form the query for `fetch`. Deletes confirm first, report through `error` and
  * refetch. Omit `sort` for endpoints without sorting; `manage` replaces the
- * `edit`/`delete` permissions for admin lists (users, roles).
+ * `edit`/`delete` permissions for admin lists (users, roles). `removeOf`
+ * picks the delete call per row for lists mixing kinds (devices and VMs).
  */
 export function useEntityList<
 	Row extends { id: number },
@@ -314,6 +316,7 @@ export function useEntityList<
 		query: { search: string; sort?: Sort; order: 'asc' | 'desc' } & F,
 	) => Promise<Result<Page<Row>, Error>>
 	remove: RemoveFn
+	removeOf?: (row: Row) => RemoveFn
 }): EntityList<Row> {
 	const canEdit = (): boolean => can(opts.manage ?? 'edit')
 	const canDelete = (): boolean => can(opts.manage ?? 'delete')
@@ -337,12 +340,13 @@ export function useEntityList<
 		return res.value
 	})
 
-	async function handleDelete(id: number, name: string): Promise<void> {
+	async function handleDelete(row: Row, name: string): Promise<void> {
 		if (!window.confirm(t('list.confirmDelete', { noun: tp(opts.noun, 1), name }))) {
 			return
 		}
 		setError(null)
-		const res = await removeConfirmingFloorplan(opts.remove, id, name)
+		const remove = opts.removeOf?.(row) ?? opts.remove
+		const res = await removeConfirmingFloorplan(remove, row.id, name)
 		if (Result.isError(res)) {
 			setError(res.error.message)
 			return
@@ -422,6 +426,8 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	columnsKey: string
 	defaultColumns?: string[]
 	rowName: (row: Row) => string
+	/** Row key when ids are not unique within the list (mixed kinds); defaults to `id`. */
+	rowKey?: (row: Row) => string | number
 	editHref?: (row: Row) => string
 	/** Add form pre-filled from a row; omitted leaves "Clone" out of the row menu. */
 	cloneHref?: (row: Row) => string
@@ -456,6 +462,9 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	const cloneable = (): boolean => list.canEdit() && props.cloneHref !== undefined
 	const actionsOf = (row: Row): readonly RowMenuAction[] => props.menuActions?.(row) ?? []
 	const deletableRow = (row: Row): boolean => list.canDelete() && props.deletable?.(row) !== false
+	const keyOf = (row: Row): string | number => props.rowKey?.(row) ?? row.id
+	const menuRow = (menu: RowMenuAnchor): Row | undefined =>
+		list.rows().find((r) => keyOf(r) === menu.key)
 
 	function rowActions(row: Row): JSX.Element {
 		const name = props.rowName(row)
@@ -464,9 +473,9 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				edit_href={list.canEdit() ? props.editHref?.(row) : undefined}
 				has_menu={cloneable() || actionsOf(row).length > 0 || deletableRow(row)}
 				name={name}
-				menu_open={openMenu()?.id === row.id}
+				menu_open={openMenu()?.key === keyOf(row)}
 				onToggleMenu={(e: MouseEvent & { currentTarget: HTMLButtonElement }): void =>
-					toggleMenu(e, row.id, name)
+					toggleMenu(e, keyOf(row), name)
 				}
 				onCloseMenu={closeMenu}
 			/>
@@ -490,7 +499,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				onFilterValuesChange={filters.onFilterValuesChange}
 				manualFiltering
 				quickSearchLabel={t('list.searchLabel', { noun: nouns() })}
-				getRowId={(row: Row): number => row.id}
+				getRowId={keyOf}
 				columns={props.columns}
 				sortKey={list.sort}
 				sortDirection={list.order}
@@ -511,18 +520,23 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				menu={openMenu}
 				onClose={closeMenu}
 				cloneHref={(menu: RowMenuAnchor): string | undefined => {
-					const row = list.rows().find((r) => r.id === menu.id)
+					const row = menuRow(menu)
 					return cloneable() && row ? props.cloneHref?.(row) : undefined
 				}}
 				actions={(menu: RowMenuAnchor): readonly RowMenuAction[] => {
-					const row = list.rows().find((r) => r.id === menu.id)
+					const row = menuRow(menu)
 					return row ? actionsOf(row) : []
 				}}
 				deletable={(menu: RowMenuAnchor): boolean => {
-					const row = list.rows().find((r) => r.id === menu.id)
+					const row = menuRow(menu)
 					return row !== undefined && deletableRow(row)
 				}}
-				onDelete={(menu: RowMenuAnchor): void => void list.handleDelete(menu.id, menu.name)}
+				onDelete={(menu: RowMenuAnchor): void => {
+					const row = menuRow(menu)
+					if (row) {
+						void list.handleDelete(row, menu.name)
+					}
+				}}
 			/>
 
 			<InlineError message={list.error()} />

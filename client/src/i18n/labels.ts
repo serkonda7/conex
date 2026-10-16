@@ -187,6 +187,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	rack: 'changeObject.rack',
 	shelf: 'changeObject.shelf',
 	device: 'changeObject.device',
+	virtual_machine: 'changeObject.virtualMachine',
 	interface: 'changeObject.interface',
 	cable: 'changeObject.cable',
 	manufacturer: 'changeObject.manufacturer',

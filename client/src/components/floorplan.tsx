@@ -187,13 +187,6 @@ export function FloorplanView(props: {
 									<MarkerLayer placements={loaded().placements} />
 								</FloorplanStage>
 							</div>
-							<Show
-								when={
-									loaded().areas.length === 0 && loaded().placements.length === 0
-								}
-							>
-								<p class="floorplan-hint">{t('floorplan.empty')}</p>
-							</Show>
 						</Show>
 					)}
 				</Show>
