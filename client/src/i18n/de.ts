@@ -423,8 +423,37 @@ export const de: Messages = {
 	'deviceType.noDevices': 'Noch keine Geräte dieses Typs vorhanden.',
 	'import.pasteFirst': 'Bitte zuerst NetBox-YAML einfügen.',
 	'import.title': 'Gerätetypen importieren',
-	'import.libraryIntro': 'Vorgefertigte Definitionen finden Sie in der',
-	'import.libraryLink': 'Conex-Gerätetypbibliothek',
+	'import.aiTitle': 'Gerätetyp mit KI erstellen',
+	'import.aiHint':
+		'Prompt für Ihren KI-Assistenten kopieren, dessen YAML prüfen und unten einfügen.',
+	'import.copyPrompt': 'KI-Prompt kopieren',
+	'import.copyPromptFor':
+		'Prompt zur Gerätetyp-Erstellung mit KI für {manufacturer}: {model} kopieren',
+	'import.promptCopied': 'Prompt in die Zwischenablage kopiert.',
+	'import.promptCopyFailed':
+		'Der Prompt konnte nicht kopiert werden. Zugriff auf die Zwischenablage erlauben und HTTPS oder localhost verwenden, dann erneut versuchen.',
+	'import.aiPrompt': `Erstelle ein conex-Gerätetyp-YAML (NetBox-devicetype-library-Format) für Hersteller „{manufacturer}“, Modell „{model}“.
+
+Quellenpriorität:
+1) https://github.com/serkonda7/conex-device-types — suche einen exakten Treffer unter device-types/<Manufacturer>/<model>.yaml und gib ihn unverändert zurück. Durchsuche auch das Verzeichnis; vorhandene Dateinamen können die Großschreibung des Modells beibehalten.
+2) https://github.com/netbox-community/devicetype-library — übernimm bei einem Treffer die Vorlage, aber nur mit den unten unterstützten Schlüsseln.
+3) Herstellerdatenblätter, PSREF oder Handbücher — ergänze Lücken ausschließlich aus Primärquellen und dokumentiere URLs in comments. Niemals raten; unsichere optionale Felder weglassen oder type: other (interfaces) / port (allgemeine Anschlüsse) verwenden. Niemals einen display-ports-Typ erfinden.
+
+Gib genau ein YAML-Dokument aus, beginnend mit ---, in einem abgegrenzten YAML-Codeblock. Nenne den Zielpfad device-types/<Manufacturer>/<model-slug>.yaml außerhalb des Blocks. Die Quellenübersicht muss außerhalb des YAML stehen, damit der Block direkt in conex eingefügt werden kann.
+
+Nur diese Schlüssel ausgeben: manufacturer, model, slug, u_height, is_full_depth, description, comments, interfaces, ports, power-ports, power-outlets, display-ports. console-ports ist beim Import ein Alias für ports; bevorzuge ports und dupliziere keine Einträge in beiden Listen. Beim Anpassen einer Vorlage alle anderen NetBox-Schlüssel entfernen.
+
+Regeln:
+- manufacturer muss dem Verzeichnisnamen entsprechen. manufacturer und model: 1–100 Zeichen. slug: 1–100 Zeichen, ^[-a-z0-9_]+$, Form <mfr-slug>-<model-slug>.
+- u_height: ganze Zahl 0–60 (0 für Laptop/Desktop/Dock/Telefon). is_full_depth: standardmäßig true, false für mobile Geräte oder halbe Tiefe.
+- Anschlussnamen müssen über alle Listen hinweg eindeutig sein, 1–50 Zeichen, nur ASCII, passend zu ^[A-Za-z0-9_.-]+$ (keine Leerzeichen oder Schrägstriche). Namen aus Vorlagen beim Anpassen normalisieren. Nirgendwo leere Zeichenketten ausgeben.
+- interfaces type: NetBox-Slug, z. B. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
+- ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port oder other.
+- display-ports type ist erforderlich: hdmi, displayport, vga oder dvi (conex-Erweiterung).
+- power-ports type: z. B. dc-terminal oder iec-60320-c14; maximum_draw nur ergänzen, wenn im Datenblatt angegeben. power-outlets verwenden den dokumentierten NetBox-Steckertyp.
+- description: eine Zeile, maximal 200 Zeichen. comments: Markdown-Quellenlinks, maximal 2000 Zeichen. Anschlussbeschreibungen: maximal 200 Zeichen.
+
+Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer in beiden Bibliotheken, unsichere Felder und Dateipfad. Als DRAFT markieren, wenn weder in den Bibliotheken noch in Primärquellen gefunden.`,
 	'import.data': 'Daten',
 	'import.fieldOptions': 'Feldoptionen',
 	'import.field': 'Feld',

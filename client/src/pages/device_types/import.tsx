@@ -1,4 +1,4 @@
-import { IconExternalLink } from '@tabler/icons-solidjs'
+import { IconCopy } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
@@ -7,7 +7,7 @@ import { create_manufacturer, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
-import { Field } from '../../components/form'
+import { Field, TextField } from '../../components/form'
 import { t } from '../../i18n'
 import { navigate } from '../../lib/router'
 
@@ -29,6 +29,11 @@ interfaces:
  * offer to rename the existing one.
  */
 export function DeviceTypeImportPage(): JSX.Element {
+	const [promptManufacturer, setPromptManufacturer] = createSignal('')
+	const [promptModel, setPromptModel] = createSignal('')
+	const [copyingPrompt, setCopyingPrompt] = createSignal(false)
+	const [promptCopied, setPromptCopied] = createSignal(false)
+	const [promptError, setPromptError] = createSignal<string | null>(null)
 	const [yamlText, setYamlText] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
 	const [importing, setImporting] = createSignal(false)
@@ -41,6 +46,32 @@ export function DeviceTypeImportPage(): JSX.Element {
 	const [renamedTypes, setRenamedTypes] = createSignal<Record<number, string>>({})
 	const [renameDraft, setRenameDraft] = createSignal<{ id: number; model: string } | null>(null)
 	const [renamingType, setRenamingType] = createSignal(false)
+
+	function resetPromptFeedback(): void {
+		setPromptCopied(false)
+		setPromptError(null)
+	}
+
+	async function handleCopyPrompt(e: SubmitEvent): Promise<void> {
+		e.preventDefault()
+		const manufacturer = promptManufacturer().trim()
+		const model = promptModel().trim()
+		if (!manufacturer || !model || copyingPrompt()) {
+			return
+		}
+		resetPromptFeedback()
+		setCopyingPrompt(true)
+		const res = await Result.tryPromise({
+			try: () => navigator.clipboard.writeText(t('import.aiPrompt', { manufacturer, model })),
+			catch: () => new Error(t('import.promptCopyFailed')),
+		})
+		setCopyingPrompt(false)
+		if (Result.isError(res)) {
+			setPromptError(res.error.message)
+			return
+		}
+		setPromptCopied(true)
+	}
 
 	async function handleCreateManufacturer(name: string): Promise<void> {
 		setError(null)
@@ -154,17 +185,67 @@ export function DeviceTypeImportPage(): JSX.Element {
 
 	return (
 		<div class="form-page device-type-import-page">
+			<form
+				class="import-prompt-form"
+				onSubmit={handleCopyPrompt}
+				aria-labelledby="device-type-prompt-title"
+				aria-describedby="device-type-prompt-hint"
+			>
+				<h3 id="device-type-prompt-title">{t('import.aiTitle')}</h3>
+				<p class="field-hint" id="device-type-prompt-hint">
+					{t('import.aiHint')}
+				</p>
+				<div class="import-prompt-controls">
+					<TextField
+						id="device-type-prompt-manufacturer"
+						label={t('entity.manufacturer.one')}
+						value={promptManufacturer()}
+						onInput={(value: string) => {
+							setPromptManufacturer(value)
+							resetPromptFeedback()
+						}}
+						maxLength={100}
+						required
+						disabled={copyingPrompt()}
+					/>
+					<TextField
+						id="device-type-prompt-model"
+						label={t('common.model')}
+						value={promptModel()}
+						onInput={(value: string) => {
+							setPromptModel(value)
+							resetPromptFeedback()
+						}}
+						maxLength={100}
+						required
+						disabled={copyingPrompt()}
+					/>
+					<button
+						type="submit"
+						class="import-copy-prompt"
+						title={
+							promptManufacturer().trim() && promptModel().trim()
+								? t('import.copyPromptFor', {
+										manufacturer: promptManufacturer().trim(),
+										model: promptModel().trim(),
+									})
+								: t('import.copyPrompt')
+						}
+						disabled={
+							copyingPrompt() || !promptManufacturer().trim() || !promptModel().trim()
+						}
+					>
+						<IconCopy size={16} aria-hidden="true" /> {t('import.copyPrompt')}
+					</button>
+				</div>
+				<InlineError message={promptError()} alert />
+				<Show when={promptCopied()}>
+					<p class="text-success" role="status">
+						{t('import.promptCopied')}
+					</p>
+				</Show>
+			</form>
 			<h2>{t('import.title')}</h2>
-			<p class="page-subtitle">
-				{t('import.libraryIntro')}{' '}
-				<a
-					href="https://github.com/serkonda7/conex-device-types"
-					target="_blank"
-					rel="noreferrer"
-				>
-					{t('import.libraryLink')} <IconExternalLink size={14} aria-hidden="true" />
-				</a>
-			</p>
 			<form class="form-stacked" onSubmit={handleImport}>
 				<Field label={t('import.data')} for="device-type-import-text">
 					<textarea
