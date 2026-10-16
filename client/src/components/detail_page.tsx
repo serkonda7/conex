@@ -147,7 +147,7 @@ export function RecordLink(props: {
 /**
  * Related-object section: `h3` with a count badge, the loading/empty gate
  * around a table of `rows` (or custom `children`), and an optional
- * "View in … →" link after the heading.
+ * "View in … →" link and `actions` after the heading.
  */
 export function RelatedSection<Row extends { id: number }>(props: {
 	id: string
@@ -160,8 +160,12 @@ export function RelatedSection<Row extends { id: number }>(props: {
 	columns?: DataTableColumn<Row>[]
 	/** Rows to show and count, derived from `rows` (e.g. reordered or narrowed). */
 	select?: (rows: Row[]) => Row[]
+	/** Row key when ids are not unique within the rows (mixed kinds); defaults to `id`. */
+	rowKey?: (row: Row) => string | number
 	customizable?: boolean
 	viewAllHref?: string
+	/** Buttons after the heading (e.g. "Add VM"). */
+	actions?: JSX.Element
 	children?: JSX.Element
 }): JSX.Element {
 	const shown = (): Row[] => {
@@ -183,6 +187,7 @@ export function RelatedSection<Row extends { id: number }>(props: {
 						<a href={href()}>{t('common.viewIn', { target: props.title })}</a>
 					)}
 				</Show>
+				{props.actions}
 			</div>
 			<Show when={!props.rows.loading} fallback={<Loading message={loadingText()} />}>
 				<Show when={count() > 0} fallback={<Empty message={props.emptyText} />}>
@@ -190,7 +195,9 @@ export function RelatedSection<Row extends { id: number }>(props: {
 						{(columns: () => DataTableColumn<Row>[]) => (
 							<DataTable
 								rows={shown}
-								getRowId={(row: Row): number => row.id}
+								getRowId={(row: Row): string | number =>
+									props.rowKey?.(row) ?? row.id
+								}
 								showColumnCustomizer={props.customizable}
 								columns={columns()}
 							/>
@@ -217,6 +224,8 @@ export function useDetailDelete(opts: {
 	remove: RemoveFn
 	setError: Setter<string | null>
 	listRoute: string
+	/** Detail path prefix when it differs from the list (`/devices/vm`). */
+	detailBase?: string
 }): () => Promise<void> {
 	return async (): Promise<void> => {
 		const name = opts.name()
@@ -232,6 +241,6 @@ export function useDetailDelete(opts: {
 		if (!res.value) {
 			return
 		}
-		forgetDeleted(`${opts.listRoute}/${opts.id}`, opts.listRoute)
+		forgetDeleted(`${opts.detailBase ?? opts.listRoute}/${opts.id}`, opts.listRoute)
 	}
 }

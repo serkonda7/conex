@@ -24,6 +24,7 @@ const OBJECT_ROUTES: Partial<Record<ChangeObjectType, string>> = {
 	location: 'locations',
 	rack: 'racks',
 	device: 'devices',
+	virtual_machine: 'devices/vm',
 	manufacturer: 'manufacturers',
 	device_type: 'device-types',
 	device_role: 'device-roles',

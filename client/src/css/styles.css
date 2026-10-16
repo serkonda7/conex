@@ -221,28 +221,29 @@ tbody tr:last-child td {
 	border-bottom: none;
 }
 
-/* Locations use the name cell as the tree view instead of a Parent column. */
-.location-tree-name {
+/* Nested lists (locations, device roles) use the name cell as the tree view
+   instead of a Parent column. */
+.tree-name {
 	position: relative;
-	padding-left: calc(var(--location-depth, 0) * 1.25rem);
+	padding-left: calc(var(--tree-depth, 0) * 1.25rem);
 	min-height: 1.25rem;
 	display: flex;
 	align-items: center;
 }
 
-.location-tree-child::before {
+.tree-child::before {
 	content: "";
 	position: absolute;
-	left: calc(var(--location-depth, 0) * 1.25rem - 0.55rem);
+	left: calc(var(--tree-depth, 0) * 1.25rem - 0.55rem);
 	top: 0;
 	bottom: 0;
 	border-left: 1px solid var(--border-strong);
 }
 
-.location-tree-child::after {
+.tree-child::after {
 	content: "";
 	position: absolute;
-	left: calc(var(--location-depth, 0) * 1.25rem - 0.55rem);
+	left: calc(var(--tree-depth, 0) * 1.25rem - 0.55rem);
 	top: 50%;
 	width: 0.4rem;
 	border-top: 1px solid var(--border-strong);
@@ -641,6 +642,11 @@ tbody tr:last-child td {
 	flex-shrink: 0;
 	/* Inline (non-flex) parents such as table cells: center on the text. */
 	vertical-align: -0.15em;
+}
+
+/* Device role list: a little more space between the role icon and the name. */
+.device-role-name .app-nav-icon {
+	margin-right: 0.25rem;
 }
 
 .app-nav a:hover,
@@ -1487,6 +1493,23 @@ tbody tr:last-child td {
 
 .combobox-option-add {
 	border-top-color: var(--border);
+}
+
+/* VM form: the host name with its select / remove buttons in one row. */
+.vm-host-row {
+	display: flex;
+	gap: 0.4rem;
+}
+
+.app-content .form-stacked .field .vm-host-row input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+}
+
+.vm-host-row button {
+	flex: 0 0 auto;
+	white-space: nowrap;
 }
 
 /* Device form: rack, face and U position share one row; face and

@@ -16,6 +16,7 @@ import {
 	racks,
 	shelves,
 	sites,
+	virtual_machines,
 } from '../schema'
 import { getDb } from './connection'
 
@@ -82,6 +83,16 @@ export async function deviceTenant(deviceId: number): Promise<Tenant> {
 		.select({ tenant_id: devices.tenant_id })
 		.from(devices)
 		.where(eq(devices.id, deviceId))
+		.limit(1)
+	return rows[0]?.tenant_id
+}
+
+/** Tenant of a virtual machine, or `undefined` when the VM is missing. */
+export async function virtualMachineTenant(vmId: number): Promise<Tenant> {
+	const rows = await getDb()
+		.select({ tenant_id: virtual_machines.tenant_id })
+		.from(virtual_machines)
+		.where(eq(virtual_machines.id, vmId))
 		.limit(1)
 	return rows[0]?.tenant_id
 }

@@ -24,11 +24,11 @@ import {
 	text,
 	useFormState,
 } from '../../lib/form'
-import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { contextTenantId, useSiteTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
+import { deviceRoleOptions } from '../device-roles/options'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 
@@ -208,11 +208,7 @@ export function DeviceAddPage(): JSX.Element {
 					required
 					value={roleId()}
 					onChange={setRoleId}
-					options={(roles() ?? []).map((role) => ({
-						value: role.id,
-						label: role.name,
-						icon: deviceRoleIcon(role.icon),
-					}))}
+					options={deviceRoleOptions(roles() ?? [])}
 					emptyLabel={t('common.selectPlaceholder')}
 					add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
 					reload={refetchRoles}

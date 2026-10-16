@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Plan: Virtual machines</title>
+    <style>
+    body {
+      margin: 0;
+      font:
+        14px / 1.55 system-ui,
+        sans-serif;
+      color: var(--foreground, #222);
+    }
+    main {
+      max-width: 900px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 4px;
+    }
+    h2 {
+      font-size: 16px;
+      margin: 28px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border, #ddd);
+    }
+    h3 {
+      font-size: 14px;
+      margin: 18px 0 6px;
+    }
+    p,
+    li {
+      margin: 4px 0;
+    }
+    ul,
+    ol {
+      padding-left: 22px;
+      margin: 6px 0;
+    }
+    .sub {
+      color: var(--muted-foreground, #666);
+      margin: 0;
+    }
+    code {
+      font:
+        12.5px ui-monospace,
+        monospace;
+      background: var(--muted, #f2f2f2);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      tab-size: 2;
+      font:
+        12.5px / 1.5 ui-monospace,
+        monospace;
+      background: var(--muted, #f4f4f4);
+      padding: 14px 16px;
+      border-radius: var(--radius, 8px);
+      overflow-x: auto;
+      margin: 8px 0;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    th,
+    td {
+      text-align: left;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border, #ddd);
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted-foreground, #666);
+      font-weight: 600;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--muted, #eee);
+      color: var(--muted-foreground, #555);
+      margin-right: 4px;
+    }
+    .decided {
+      color: var(--success, #2a7);
+    }
+    .open {
+      color: var(--warning, #c80);
+    }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Plan: Virtual machines on top of devices</h1>
+      <p class="sub">conex · drafted 2026-10-16</p>
+
+      <h2>Decisions</h2>
+      <table>
+        <tr>
+          <th>Topic</th>
+          <th>Decision</th>
+        </tr>
+        <tr>
+          <td>Data model</td>
+          <td class="decided">
+            A separate <code>virtual_machines</code> table, not a host reference
+            on <code>devices</code>
+          </td>
+        </tr>
+        <tr>
+          <td>Tenant</td>
+          <td class="decided">
+            A hosted VM always has its host's tenant. Only a hostless VM sets
+            its own tenant
+          </td>
+        </tr>
+        <tr>
+          <td>Host</td>
+          <td class="decided">Optional. Hostless means a cloud / IaaS VM</td>
+        </tr>
+        <tr>
+          <td>Fields</td>
+          <td class="decided">
+            No OS field, and no hardware data (vCPU / memory / disk) for now
+          </td>
+        </tr>
+        <tr>
+          <td>UI</td>
+          <td class="decided">
+            No separate list page. VMs are listed in the devices table
+          </td>
+        </tr>
+        <tr>
+          <td>VM pages</td>
+          <td class="decided">
+            Separate detail and add/edit pages under <code>/devices/vm/…</code>
+          </td>
+        </tr>
+        <tr>
+          <td>Names</td>
+          <td class="decided">
+            Unique per host. Hostless VMs: unique per tenant (or among hostless
+            VMs without a tenant)
+          </td>
+        </tr>
+      </table>
+
+      <h2>1. Schema</h2>
+      <p>
+        <code>server/src/schema.ts</code>, migration
+        <code>server/drizzle/0031_virtual_machines.sql</code>
+        (generated with drizzle-kit).
+      </p>
+      <pre
+      ><code>// ---------------------------------------------------------------------------
+// Virtual machines. A VM runs on a host device, or has no host (IaaS / cloud).
+// A hosted VM always carries its host's tenant: the service layer copies it on
+// create and on host change, and a host tenant change re-tenants its VMs in the
+// same transaction. Only a hostless VM sets its tenant freely. A device can't
+// be deleted while VMs run on it, so the host FK carries no cascade.
+// ---------------------------------------------------------------------------
+
+export const virtual_machines = pgTable(
+	'virtual_machines',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		// Null = hostless (cloud / IaaS).
+		host_device_id: integer('host_device_id').references(() =&gt; devices.id),
+		device_role_id: integer('device_role_id')
+			.notNull()
+			.references(() =&gt; device_roles.id),
+		status: text('status').notNull().default('active'),
+		name: text('name').notNull(),
+		tenant_id: integer('tenant_id').references(() =&gt; tenants.id),
+		employee_id: integer('employee_id'),
+		description: text('description'),
+	},
+	(table) =&gt; [
+		index('virtual_machines_host_device_id_idx').on(table.host_device_id),
+		index('virtual_machines_device_role_id_idx').on(table.device_role_id),
+		index('virtual_machines_tenant_id_idx').on(table.tenant_id),
+		index('virtual_machines_employee_id_idx').on(table.employee_id),
+		index('virtual_machines_status_idx').on(table.status),
+		index('virtual_machines_name_idx').on(table.name),
+		uniqueIndex('virtual_machines_host_name_idx').on(table.host_device_id, table.name),
+		// Hostless VMs: name unique per tenant. Two partial indexes because
+		// NULL tenants never collide in a plain unique index.
+		uniqueIndex('virtual_machines_hostless_tenant_name_idx')
+			.on(table.tenant_id, table.name)
+			.where(sql`${table.host_device_id} IS NULL AND ${table.tenant_id} IS NOT NULL`),
+		uniqueIndex('virtual_machines_hostless_untenanted_name_idx')
+			.on(table.name)
+			.where(sql`${table.host_device_id} IS NULL AND ${table.tenant_id} IS NULL`),
+		foreignKey({
+			name: 'virtual_machines_employee_tenant_fk',
+			columns: [table.employee_id, table.tenant_id],
+			foreignColumns: [employees.id, employees.tenant_id],
+		}),
+		check(
+			'virtual_machines_employee_requires_tenant',
+			sql`${table.employee_id} IS NULL OR ${table.tenant_id} IS NOT NULL`,
+		),
+	],
+)</code></pre>
+
+      <h3>Keeping the tenant in sync (service layer)</h3>
+      <p>
+        Tenants are nullable, so a composite FK to
+        <code>devices(id, tenant_id)</code>
+        can't enforce the rule: Postgres skips the check whenever a column is
+        NULL. <code>tenant_id</code> stays a real column so that list scoping,
+        <code>checkTenant</code>
+        and the employee FK work the same as for devices. The service keeps it
+        in sync:
+      </p>
+      <ul>
+        <li>
+          When a VM is created or its <code>host_device_id</code> changes,
+          <code>tenant_id</code>
+          is set to the host's tenant. A
+          <code>tenant_id</code>
+          sent by the client for a hosted VM is rejected.
+        </li>
+        <li>
+          When a host's tenant changes in <code>updateDevice</code> (including
+          the move-tenant dialog), all of its VMs get the new
+          <code>tenant_id</code>
+          in the same transaction. A VM's
+          <code>employee_id</code>
+          is cleared, because the old employee no longer belongs to the tenant.
+        </li>
+        <li>
+          When a VM is detached from its host, it keeps its current tenant,
+          which can be edited from then on.
+        </li>
+      </ul>
+
+      <h2>2. Shared contracts</h2>
+      <p><code>shared/src/schemas.ts</code></p>
+      <ul>
+        <li>
+          <code>VirtualMachineCreateSchema</code>
+          / <code>VirtualMachineUpdateSchema</code> (strict objects), plus their
+          inferred types. Status reuses <code>DeviceStatusSchema</code>.
+        </li>
+        <li>
+          <code>DeviceListQuerySchema</code>
+          gets a new <code>kind</code> filter (<code>device</code>
+          / <code>vm</code>) and a <code>host</code> filter.
+        </li>
+        <li>
+          The list row type gets a discriminator:
+          <code>{ kind: 'device', … } | { kind: 'vm', … }</code>.
+        </li>
+        <li>
+          Add <code>'virtual_machine'</code> to
+          <code>CHANGE_OBJECT_TYPES</code>
+          (changelog and audit log).
+        </li>
+      </ul>
+
+      <h2>3. Server</h2>
+      <ul>
+        <li>
+          <b><code>server/src/db/virtual_machines.ts</code></b>: get, create,
+          update and delete, all returning <code>Result</code>. Guards: host
+          exists, tenant rule (above), <code>checkEmployeeAssignment</code>,
+          role exists. A duplicate name (same host, or same tenant for hostless
+          VMs) returns a <code>ConflictError</code>. This is checked up front
+          and also mapped from the unique-index violation, like
+          <code>duplicateDeviceError</code>. Writes go through
+          <code>logCreate</code>
+          / <code>logUpdate</code> /
+          <code>logDelete</code>.
+        </li>
+        <li>
+          <b><code>server/src/db/devices.ts</code></b>:
+          <ul>
+            <li>
+              <code>listDevices</code>
+              becomes a <code>UNION ALL</code> of devices and VMs, with the same
+              sort and paging and a count across both.
+            </li>
+            <li>
+              The <code>rack</code>, <code>device_type</code>,
+              <code>site</code>
+              and <code>placed</code> filters only apply to devices, so setting
+              one hides VMs.
+            </li>
+            <li>
+              <code>deleteDevice</code>
+              returns a <code>ConflictError</code> while VMs run on the device.
+            </li>
+            <li>
+              <code>updateDevice</code>
+              re-tenants the device's VMs when its tenant changes.
+            </li>
+          </ul>
+        </li>
+        <li>
+          <b><code>server/src/db/device_roles.ts</code></b>: the role delete
+          guard also counts VMs.
+        </li>
+        <li>
+          <b><code>server/src/db/owners.ts</code></b>: add
+          <code>virtualMachineTenant(id)</code>.
+        </li>
+        <li>
+          <b><code>server/src/routes/virtual_machines.ts</code></b>: CRUD under
+          <code>/api/virtual-machines</code>, with the same middleware and authz
+          as <code>devicesApp</code> (<code>checkTenant</code>,
+          <code>resolveCreateTenant</code>, <code>checkUpdateTenant</code>).
+          Listing goes through <code>GET /api/devices</code>.
+        </li>
+        <li>
+          <b><code>server/src/db/search.ts</code></b>: VM names show up in the
+          device group, or a group of their own.
+        </li>
+      </ul>
+
+      <h2>4. Client</h2>
+      <h3>Devices table (<code>client/src/pages/devices/list.tsx</code>)</h3>
+      <table>
+        <tr>
+          <th>Column</th>
+          <th>Device</th>
+          <th>VM</th>
+        </tr>
+        <tr>
+          <td>Name, role, employee, status, tenant</td>
+          <td colspan="2">shared</td>
+        </tr>
+        <tr>
+          <td>Device ID</td>
+          <td>value</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Type</td>
+          <td>device type link</td>
+          <td>"Virtual machine" label</td>
+        </tr>
+        <tr>
+          <td>Mount</td>
+          <td>rack / U</td>
+          <td>link to the host device, or "Cloud" when hostless</td>
+        </tr>
+      </table>
+      <ul>
+        <li>
+          Row links and edit/clone links depend on the kind (<code
+            >/devices/:id</code
+          >
+          vs. <code>/devices/vm/:id</code>).
+        </li>
+        <li>
+          Row keys become <code>device-&lt;id&gt;</code> /
+          <code>vm-&lt;id&gt;</code>, because ids collide across the two tables.
+        </li>
+        <li>New kind filter (all / devices / VMs).</li>
+        <li>"Move tenant" only shows for devices and hostless VMs.</li>
+      </ul>
+      <h3>Other UI</h3>
+      <ul>
+        <li>
+          <b>VM pages:</b>
+          small detail and add/edit pages under <code>/devices/vm/…</code>,
+          built on <code>detail_page</code> / <code>form</code>. The host is
+          picked with <code>device_search.tsx</code>; empty means hostless. The
+          tenant field only shows for hostless VMs.
+        </li>
+        <li>
+          <b>Device detail:</b>
+          a "Virtual machines" card for the host, with an "Add VM" button that
+          fills in the host.
+        </li>
+        <li>
+          <b>API client:</b> <code>client/src/api/virtual_machines.ts</code>;
+          <code>api/devices.ts</code>
+          picks up the union row type.
+        </li>
+        <li><b>Routes:</b> <code>app/routes.ts</code> and breadcrumbs.</li>
+        <li>
+          <b>i18n:</b> <code>vm.*</code> keys in <code>en.ts</code> and
+          <code>de.ts</code>.
+        </li>
+      </ul>
+
+      <h2>5. Not affected</h2>
+      <p>Rack elevation, shelves, floor plans and cables never see VMs.</p>
+
+      <h2>6. Later</h2>
+      <ul>
+        <li><span class="tag">later</span>Hardware data: vCPU, memory, disk</li>
+        <li>
+          <span class="tag">later</span>VM interfaces (a
+          <code>vm_interfaces</code>
+          table, virtual only, no cables)
+        </li>
+        <li><span class="tag">later</span>VMs on the employee detail page</li>
+        <li><span class="tag">later</span>CSV import/export</li>
+        <li>
+          <span class="tag">later</span>TANSS link type (<code
+            >LinkEntityType</code
+          >
+          + <code>'virtual_machine'</code>), tickets about a VM
+        </li>
+      </ul>
+
+      <h2>7. Checks and tests</h2>
+      <ul>
+        <li>
+          <code>bun run check</code>, <code>bun run build</code>,
+          <code>bun run lint:ci</code>, <code>bun run test:e2e</code>
+        </li>
+        <li>
+          Visual snapshots that show the devices table or device detail page
+          need <code>test:visual:update</code>.
+        </li>
+        <li>New e2e tests only if requested (AGENTS.md).</li>
+      </ul>
+    </main>
+  </body>
+</html>

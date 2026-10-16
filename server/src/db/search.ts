@@ -1,6 +1,6 @@
 import { and, asc, eq, type SQL } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
-import { cables, devices, racks, sites, tenants } from '../schema'
+import { cables, devices, racks, sites, tenants, virtual_machines } from '../schema'
 import { cableInTenant } from './cables'
 import { getDb } from './connection'
 import { searchCondition } from './list'
@@ -16,6 +16,7 @@ export interface GlobalSearchResponse {
 	sites: SearchGroup<{ id: number; name: string }>
 	racks: SearchGroup<{ id: number; name: string }>
 	devices: SearchGroup<{ id: number; name: string; asset_tag: string | null }>
+	virtual_machines: SearchGroup<{ id: number; name: string }>
 	cables: SearchGroup<{ id: number; label: string | null; kind: string | null }>
 }
 
@@ -32,7 +33,7 @@ function groupOf<T>(items: T[]): SearchGroup<T> {
  * an empty query returns empty groups instead of the whole inventory.
  *
  * `scopeTenantId` limits scoped editors/viewers to their tenant, strictly:
- * the tenants group returns only the scope tenant, the sites/racks/devices
+ * the tenants group returns only the scope tenant, the sites/racks/devices/VMs
  * groups return scope rows only (shared `NULL` rows excluded), and the
  * cables group returns only cables whose both endpoint devices sit in the
  * scope (so no peer name from another tenant leaks).
@@ -49,6 +50,7 @@ export async function globalSearch(
 			sites: groupOf([]),
 			racks: groupOf([]),
 			devices: groupOf([]),
+			virtual_machines: groupOf([]),
 			cables: groupOf([]),
 		}
 	}
@@ -95,6 +97,17 @@ export async function globalSearch(
 		)
 		.orderBy(asc(devices.name), asc(devices.id))
 		.limit(GROUP_LIMIT)
+	const vmRows = await db
+		.select({ id: virtual_machines.id, name: virtual_machines.name })
+		.from(virtual_machines)
+		.where(
+			and(
+				searchCondition(query, [virtual_machines.name]),
+				inScope(virtual_machines.tenant_id),
+			),
+		)
+		.orderBy(asc(virtual_machines.name), asc(virtual_machines.id))
+		.limit(GROUP_LIMIT)
 	const cableRows = await db
 		.select({ id: cables.id, label: cables.label, kind: cables.kind })
 		.from(cables)
@@ -113,6 +126,7 @@ export async function globalSearch(
 		sites: groupOf(siteRows),
 		racks: groupOf(rackRows),
 		devices: groupOf(deviceRows),
+		virtual_machines: groupOf(vmRows),
 		cables: groupOf(cableRows),
 	}
 }

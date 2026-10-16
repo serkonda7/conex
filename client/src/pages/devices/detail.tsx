@@ -4,9 +4,11 @@ import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-
 import { delete_cable, fetch_trace } from '../../api/cables'
 import { fetch_device_role } from '../../api/device_roles'
 import {
+	type DeviceListItem,
 	type DeviceRow,
 	delete_device,
 	fetch_device,
+	fetch_device_list,
 	fetch_interfaces,
 	type InterfaceJson,
 } from '../../api/devices'
@@ -23,6 +25,7 @@ import {
 	DetailSubtitle,
 	ForeignKeyLink,
 	RecordLink,
+	RelatedSection,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
@@ -32,7 +35,7 @@ import { t, tp } from '../../i18n'
 import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
-import type { Crumb } from '../../lib/router'
+import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
@@ -95,7 +98,8 @@ function PortActions(props: {
 
 /**
  * /devices/:id — detail with network and other interfaces, plus the per-port
- * cable connect/disconnect and edit dialogs.
+ * cable connect/disconnect and edit dialogs, and the virtual machines the
+ * device hosts.
  */
 export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -106,6 +110,11 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 
 	const [device, { refetch: refetchDevice }] = createRecord(id, fetch_device, setError)
 	const [ifaces, { refetch: refetchIfaces }] = createRowsFor(id, fetch_interfaces, setError)
+	const [vms] = createRowsFor(
+		id,
+		(key: number) => fetch_device_list({ host: key, kind: 'vm' }),
+		setError,
+	)
 	const [trace, { refetch: refetchTrace }] = createRecord(
 		id,
 		(key: number) => fetch_trace(key, 4),
@@ -363,6 +372,37 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</h3>
 				{portTable(otherPorts, otherColumns)}
 			</Show>
+			<RelatedSection
+				id="device-vms"
+				title={tp('entity.virtualMachine', 2)}
+				noun="noun.virtualMachine"
+				rows={vms}
+				emptyText={t('vm.emptyOnHost')}
+				actions={
+					<Show when={can('edit') && deviceRole()?.can_host_vms === 1}>
+						<button
+							type="button"
+							onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
+						>
+							{t('vm.addVm')}
+						</button>
+					</Show>
+				}
+				columns={[
+					{
+						key: 'name',
+						label: t('common.name'),
+						getValue: (vm: DeviceListItem): JSX.Element => (
+							<a href={`/devices/vm/${vm.id}`}>{vm.name}</a>
+						),
+					},
+					{
+						key: 'description',
+						label: t('common.description'),
+						getValue: (vm: DeviceListItem): string => vm.description || '—',
+					},
+				]}
+			/>
 			<Show when={connectingIface()}>
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<ConnectPortDialog
@@ -392,7 +432,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			<Show when={movingTenant() ? device() : undefined}>
 				{(row: () => DeviceRow): JSX.Element => (
 					<MoveTenantDialog
-						device={row()}
+						row={{ kind: 'device', ...row() }}
 						on_moved={() => {
 							setMovingTenant(false)
 							void refetchDevice()

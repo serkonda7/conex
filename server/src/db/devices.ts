@@ -1,7 +1,21 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
+import {
+	and,
+	asc,
+	count,
+	eq,
+	inArray,
+	isNotNull,
+	isNull,
+	or,
+	type SQL,
+	type SQLWrapper,
+	sql,
+} from 'drizzle-orm'
+import { alias, unionAll } from 'drizzle-orm/pg-core'
 import type {
 	DeviceCreate,
+	DeviceListKind,
 	DeviceMove,
 	DeviceUpdate,
 	InterfaceCreate,
@@ -11,7 +25,6 @@ import {
 	device_roles,
 	device_types,
 	devices,
-	employees,
 	external_links,
 	interfaces,
 	locations,
@@ -19,6 +32,7 @@ import {
 	racks,
 	shelves,
 	sites,
+	virtual_machines,
 } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { expandStubs } from '../services/templates'
@@ -26,7 +40,8 @@ import { prunePlacements } from './attachments'
 import { deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { checkDeviceRoleExists } from './device_roles'
+import { checkDeviceRoleExists, deviceRoleSubtree } from './device_roles'
+import { checkEmployeeAssignment } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
@@ -40,7 +55,6 @@ import {
 	offsetOf,
 	orderOf,
 	pageOf,
-	pageRows,
 	pickDefined,
 	searchCondition,
 	tenantConditions,
@@ -48,6 +62,11 @@ import {
 } from './list'
 import { rackHeightOf, rackSpansOf } from './racks'
 import { getDeviceType, stubsOf } from './templates'
+import {
+	deviceHasVirtualMachines,
+	retenantHostedVms,
+	type VirtualMachineRow,
+} from './virtual_machines'
 
 export type DeviceRow = typeof devices.$inferSelect
 export type InterfaceRow = typeof interfaces.$inferSelect
@@ -181,26 +200,6 @@ async function checkLocation(
 	return Result.ok(undefined)
 }
 
-/** Assignments cannot expose or link contacts from another tenant. */
-async function checkEmployeeAssignment(
-	employeeId: number | null | undefined,
-	tenantId: number | null | undefined,
-): Promise<Result<undefined, Error>> {
-	if (employeeId === null || employeeId === undefined) {
-		return Result.ok(undefined)
-	}
-	if (tenantId === null || tenantId === undefined) {
-		return Result.err(new ConflictError('Select a tenant before assigning an employee'))
-	}
-	const employee = await findOne(
-		employees,
-		and(eq(employees.id, employeeId), eq(employees.tenant_id, tenantId)),
-	)
-	return employee
-		? Result.ok(undefined)
-		: Result.err(new NotFoundError('Employee not found in this tenant'))
-}
-
 /** The rack location is authoritative for a rack-mounted device. */
 async function rackLocationId(rackId: number): Promise<Result<number | null, Error>> {
 	const rack = await findOne(racks, eq(racks.id, rackId))
@@ -249,85 +248,235 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
+	/** Devices only, VMs only; `undefined` lists both. */
+	kind?: DeviceListKind
+	/** VMs running on this host device. */
+	host?: number
 	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
 }
 
-export function listDevices(params: DeviceListParams): Promise<Page<DeviceRow>> {
-	const where = and(
-		params.search
-			? or(
-					searchCondition(params.search, [
-						devices.name,
-						devices.asset_tag,
-						devices.device_id,
-						devices.serial,
-					]),
-					inArray(
-						devices.device_type_id,
-						getDb()
-							.select({ id: device_types.id })
-							.from(device_types)
-							.innerJoin(
-								manufacturers,
-								eq(manufacturers.id, device_types.manufacturer_id),
-							)
-							.where(
+/** One device list row: a physical device or a virtual machine (with its host's name). */
+export type DeviceListItem =
+	| ({ kind: 'device' } & DeviceRow)
+	| ({ kind: 'vm'; host_name: string | null } & VirtualMachineRow)
+
+const nullInt = (name: string): SQL.Aliased<number | null> =>
+	sql<number | null>`NULL::integer`.as(name)
+const nullText = (name: string): SQL.Aliased<string | null> =>
+	sql<string | null>`NULL::text`.as(name)
+
+/**
+ * Devices and virtual machines in one list (`UNION ALL`), sorted and paged
+ * together. Rack, device type, site and placed filters only apply to
+ * devices and the host filter only to VMs, so setting one hides the other
+ * kind. Sort keys are computed per branch (VMs sort by host name on
+ * `mount` and have no type).
+ */
+export async function listDevices(params: DeviceListParams): Promise<Page<DeviceListItem>> {
+	const db = getDb()
+	// A role matches its descendant roles too (nested roles).
+	const roleIds = params.role ? await deviceRoleSubtree(params.role) : undefined
+	const deviceOnly =
+		params.site !== undefined ||
+		params.rack !== undefined ||
+		params.device_type !== undefined ||
+		params.placed !== undefined
+	const deviceWhere =
+		params.kind === 'vm' || params.host !== undefined
+			? sql`false`
+			: and(
+					params.search
+						? or(
 								searchCondition(params.search, [
-									device_types.model,
-									manufacturers.name,
+									devices.name,
+									devices.asset_tag,
+									devices.device_id,
+									devices.serial,
 								]),
-							),
-					),
+								inArray(
+									devices.device_type_id,
+									db
+										.select({ id: device_types.id })
+										.from(device_types)
+										.innerJoin(
+											manufacturers,
+											eq(manufacturers.id, device_types.manufacturer_id),
+										)
+										.where(
+											searchCondition(params.search, [
+												device_types.model,
+												manufacturers.name,
+											]),
+										),
+								),
+							)
+						: undefined,
+					params.site ? eq(devices.site_id, params.site) : undefined,
+					params.rack ? eq(devices.rack_id, params.rack) : undefined,
+					roleIds ? inArray(devices.device_role_id, roleIds) : undefined,
+					params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
+					params.employee ? eq(devices.employee_id, params.employee) : undefined,
+					...tenantConditions(devices.tenant_id, params),
+					params.status ? eq(devices.status, params.status) : undefined,
+					params.placed === undefined
+						? undefined
+						: params.placed
+							? isNotNull(devices.position_u)
+							: isNull(devices.position_u),
 				)
-			: undefined,
-		params.site ? eq(devices.site_id, params.site) : undefined,
-		params.rack ? eq(devices.rack_id, params.rack) : undefined,
-		params.role ? eq(devices.device_role_id, params.role) : undefined,
-		params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
-		params.employee ? eq(devices.employee_id, params.employee) : undefined,
-		...tenantConditions(devices.tenant_id, params),
-		params.status ? eq(devices.status, params.status) : undefined,
-		params.placed === undefined
-			? undefined
-			: params.placed
-				? isNotNull(devices.position_u)
-				: isNull(devices.position_u),
-	)
-	return pageRows(devices, where, [...deviceOrder(params), asc(devices.id)], params)
+	const vmWhere =
+		params.kind === 'device' || deviceOnly
+			? sql`false`
+			: and(
+					searchCondition(params.search, [virtual_machines.name]),
+					params.host ? eq(virtual_machines.host_device_id, params.host) : undefined,
+					roleIds ? inArray(virtual_machines.device_role_id, roleIds) : undefined,
+					params.employee ? eq(virtual_machines.employee_id, params.employee) : undefined,
+					...tenantConditions(virtual_machines.tenant_id, params),
+					params.status ? eq(virtual_machines.status, params.status) : undefined,
+				)
+	const hosts = alias(devices, 'host')
+	const deviceBranch = db
+		.select({
+			kind: sql<DeviceListKind>`'device'`.as('kind'),
+			id: devices.id,
+			name: devices.name,
+			status: devices.status,
+			device_role_id: devices.device_role_id,
+			tenant_id: devices.tenant_id,
+			employee_id: devices.employee_id,
+			description: devices.description,
+			device_type_id: sql<number | null>`${devices.device_type_id}`.as('device_type_id'),
+			site_id: devices.site_id,
+			location_id: devices.location_id,
+			rack_id: devices.rack_id,
+			face: devices.face,
+			position_u: devices.position_u,
+			shelf_id: devices.shelf_id,
+			serial: devices.serial,
+			asset_tag: devices.asset_tag,
+			device_id: devices.device_id,
+			host_device_id: nullInt('host_device_id'),
+			sort_role: sql<string>`${device_roles.name}`.as('sort_role'),
+			sort_type: sql<string | null>`${device_types.model}`.as('sort_type'),
+			sort_mount: sql<string | null>`${racks.name}`.as('sort_mount'),
+		})
+		.from(devices)
+		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
+		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
+		.leftJoin(racks, eq(racks.id, devices.rack_id))
+		.where(deviceWhere)
+	const vmBranch = db
+		.select({
+			kind: sql<DeviceListKind>`'vm'`.as('kind'),
+			id: virtual_machines.id,
+			name: virtual_machines.name,
+			status: virtual_machines.status,
+			device_role_id: virtual_machines.device_role_id,
+			tenant_id: virtual_machines.tenant_id,
+			employee_id: virtual_machines.employee_id,
+			description: virtual_machines.description,
+			device_type_id: nullInt('device_type_id'),
+			site_id: nullInt('site_id'),
+			location_id: nullInt('location_id'),
+			rack_id: nullInt('rack_id'),
+			face: nullText('face'),
+			position_u: nullInt('position_u'),
+			shelf_id: nullInt('shelf_id'),
+			serial: nullText('serial'),
+			asset_tag: nullText('asset_tag'),
+			device_id: nullText('device_id'),
+			host_device_id: virtual_machines.host_device_id,
+			sort_role: sql<string>`${device_roles.name}`.as('sort_role'),
+			sort_type: nullText('sort_type'),
+			sort_mount: sql<string | null>`${hosts.name}`.as('sort_mount'),
+		})
+		.from(virtual_machines)
+		.innerJoin(device_roles, eq(device_roles.id, virtual_machines.device_role_id))
+		.leftJoin(hosts, eq(hosts.id, virtual_machines.host_device_id))
+		.where(vmWhere)
+	const rows = db.$with('device_list').as(unionAll(deviceBranch, vmBranch))
+	const items = await db
+		.with(rows)
+		.select()
+		.from(rows)
+		.orderBy(...deviceOrder(rows, params), asc(rows.kind), asc(rows.id))
+		.limit(params.limit)
+		.offset(offsetOf(params))
+	const total = (await db.with(rows).select({ n: count() }).from(rows))[0]?.n ?? 0
+	return pageOf(items.map(toListItem), total, params)
 }
 
-/** ORDER BY terms for a device list sort; related names via correlated subqueries. */
-function deviceOrder(params: DeviceListParams): SQL[] {
+/** A raw union row: the columns of both kinds, the other kind's ones null. */
+type DeviceListRow = Omit<DeviceRow, 'device_type_id'> & {
+	kind: DeviceListKind
+	device_type_id: number | null
+	host_device_id: number | null
+	sort_mount: string | null
+}
+
+/** Narrows a union row to its kind's columns. */
+function toListItem(row: DeviceListRow): DeviceListItem {
+	const shared = {
+		id: row.id,
+		name: row.name,
+		status: row.status,
+		device_role_id: row.device_role_id,
+		tenant_id: row.tenant_id,
+		employee_id: row.employee_id,
+		description: row.description,
+	}
+	if (row.kind === 'vm') {
+		return {
+			kind: 'vm',
+			...shared,
+			host_device_id: row.host_device_id,
+			host_name: row.sort_mount,
+		}
+	}
+	return {
+		kind: 'device',
+		...shared,
+		device_type_id: row.device_type_id ?? 0,
+		site_id: row.site_id,
+		location_id: row.location_id,
+		rack_id: row.rack_id,
+		face: row.face,
+		position_u: row.position_u,
+		shelf_id: row.shelf_id,
+		serial: row.serial,
+		asset_tag: row.asset_tag,
+		device_id: row.device_id,
+	}
+}
+
+/** ORDER BY terms for a device list sort over the union's sort keys. */
+function deviceOrder(
+	rows: {
+		name: SQLWrapper
+		status: SQLWrapper
+		device_id: SQLWrapper
+		position_u: SQLWrapper
+		sort_role: SQLWrapper
+		sort_type: SQLWrapper
+		sort_mount: SQLWrapper
+	},
+	params: DeviceListParams,
+): SQL[] {
 	switch (params.sort) {
 		case 'status':
-			return [orderOf(devices.status, params.order)]
+			return [orderOf(rows.status, params.order)]
 		case 'device_id':
-			return [orderOf(devices.device_id, params.order)]
+			return [orderOf(rows.device_id, params.order)]
 		case 'role':
-			return [
-				orderOf(
-					sql`(SELECT ${device_roles.name} FROM ${device_roles} WHERE ${device_roles.id} = ${devices.device_role_id})`,
-					params.order,
-				),
-			]
+			return [orderOf(rows.sort_role, params.order)]
 		case 'type':
-			return [
-				orderOf(
-					sql`(SELECT ${device_types.model} FROM ${device_types} WHERE ${device_types.id} = ${devices.device_type_id})`,
-					params.order,
-				),
-			]
+			return [orderOf(rows.sort_type, params.order)]
 		case 'mount':
-			return [
-				orderOf(
-					sql`(SELECT ${racks.name} FROM ${racks} WHERE ${racks.id} = ${devices.rack_id})`,
-					params.order,
-				),
-				orderOf(devices.position_u, params.order),
-			]
+			return [orderOf(rows.sort_mount, params.order), orderOf(rows.position_u, params.order)]
 		default:
-			return [orderOf(devices.name, params.order)]
+			return [orderOf(rows.name, params.order)]
 	}
 }
 
@@ -506,11 +655,15 @@ export async function updateDevice(
 		patch.location_id = deviceLocationId
 	}
 	if (!isPatchEmpty(patch)) {
-		// Another site or location can take the device out of its floor plan's scope.
+		// Another site or location can take the device out of its floor plan's
+		// scope; another tenant moves the VMs it hosts along.
 		const written = await tryWrite(
 			() =>
 				withTransaction(async () => {
 					await getDb().update(devices).set(patch).where(eq(devices.id, id))
+					if (patch.tenant_id !== undefined && patch.tenant_id !== node.tenant_id) {
+						await retenantHostedVms(id, patch.tenant_id)
+					}
 					if (
 						(patch.site_id !== undefined && patch.site_id !== node.site_id) ||
 						(patch.location_id !== undefined && patch.location_id !== node.location_id)
@@ -590,6 +743,11 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 	if (await deviceHasCables(id)) {
 		return Result.err(
 			new ConflictError('Device still has connected cables; disconnect them first'),
+		)
+	}
+	if (await deviceHasVirtualMachines(id)) {
+		return Result.err(
+			new ConflictError('Device still hosts virtual machines; move or delete them first'),
 		)
 	}
 	const deleted = await tryWrite(() =>

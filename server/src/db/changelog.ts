@@ -72,6 +72,7 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 		case 'location':
 		case 'rack':
 		case 'device':
+		case 'virtual_machine':
 			return ref('tenant_id')
 		case 'attachment':
 			return (

@@ -361,21 +361,29 @@ export const device_type_interfaces = pgTable(
 // P3b: device roles (NetBox-style functional roles: `Server`, `Switch`, …).
 // Shared catalog data (no tenant column): every device carries exactly one;
 // role delete is blocked while devices reference it (service layer), so the
-// FK carries no cascade.
+// FK carries no cascade. Roles nest via `parent_id`; delete is likewise
+// blocked while child roles exist.
 // ---------------------------------------------------------------------------
 
 export const device_roles = pgTable(
 	'device_roles',
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		parent_id: integer('parent_id').references((): AnyPgColumn => device_roles.id),
 		name: text('name').notNull().unique(),
 		description: text('description'),
 		icon: text('icon', { enum: DEVICE_ROLE_ICONS }),
+		// 0/1: devices of this role may host virtual machines. The built-in
+		// `pc` and `server` roles start with it set (migration).
+		can_host_vms: integer('can_host_vms').notNull().default(0),
 		// Built-in roles (`DEVICE_ROLE_KEYS`) carry their key; they are seeded
 		// by migration and can be neither renamed nor deleted.
 		key: text('key').unique(),
 	},
-	(table) => [index('device_roles_name_idx').on(table.name)],
+	(table) => [
+		index('device_roles_name_idx').on(table.name),
+		index('device_roles_parent_id_idx').on(table.parent_id),
+	],
 )
 
 // ---------------------------------------------------------------------------
@@ -507,6 +515,57 @@ export const devices = pgTable(
 		),
 		index('devices_status_idx').on(table.status),
 		index('devices_name_idx').on(table.name),
+	],
+)
+
+// ---------------------------------------------------------------------------
+// Virtual machines. A VM runs on a host device, or has no host (IaaS / cloud).
+// A hosted VM always carries its host's tenant: the service layer copies it on
+// create and on host change, and a host tenant change re-tenants its VMs in the
+// same transaction. Only a hostless VM sets its tenant freely. A device can't
+// be deleted while VMs run on it, so the host FK carries no cascade.
+// ---------------------------------------------------------------------------
+
+export const virtual_machines = pgTable(
+	'virtual_machines',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		// Null = hostless (cloud / IaaS).
+		host_device_id: integer('host_device_id').references(() => devices.id),
+		device_role_id: integer('device_role_id')
+			.notNull()
+			.references(() => device_roles.id),
+		status: text('status').notNull().default('active'),
+		name: text('name').notNull(),
+		tenant_id: integer('tenant_id').references(() => tenants.id),
+		employee_id: integer('employee_id'),
+		description: text('description'),
+	},
+	(table) => [
+		index('virtual_machines_host_device_id_idx').on(table.host_device_id),
+		index('virtual_machines_device_role_id_idx').on(table.device_role_id),
+		index('virtual_machines_tenant_id_idx').on(table.tenant_id),
+		index('virtual_machines_employee_id_idx').on(table.employee_id),
+		index('virtual_machines_status_idx').on(table.status),
+		index('virtual_machines_name_idx').on(table.name),
+		uniqueIndex('virtual_machines_host_name_idx').on(table.host_device_id, table.name),
+		// Hostless VMs: name unique per tenant. Two partial indexes because
+		// NULL tenants never collide in a plain unique index.
+		uniqueIndex('virtual_machines_hostless_tenant_name_idx')
+			.on(table.tenant_id, table.name)
+			.where(sql`${table.host_device_id} IS NULL AND ${table.tenant_id} IS NOT NULL`),
+		uniqueIndex('virtual_machines_hostless_untenanted_name_idx')
+			.on(table.name)
+			.where(sql`${table.host_device_id} IS NULL AND ${table.tenant_id} IS NULL`),
+		foreignKey({
+			name: 'virtual_machines_employee_tenant_fk',
+			columns: [table.employee_id, table.tenant_id],
+			foreignColumns: [employees.id, employees.tenant_id],
+		}),
+		check(
+			'virtual_machines_employee_requires_tenant',
+			sql`${table.employee_id} IS NULL OR ${table.tenant_id} IS NOT NULL`,
+		),
 	],
 )
 

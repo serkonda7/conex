@@ -15,6 +15,7 @@ import {
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
+import { TreeName, treeDepths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
@@ -23,34 +24,12 @@ import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 
-/** Nesting level of each location, from the parent links within `rows`. */
-function depths(rows: readonly LocationRow[]): Map<number, number> {
-	const parentOf = new Map(rows.map((l) => [l.id, l.parent_id]))
-	const out = new Map<number, number>()
-	for (const location of rows) {
-		let depth = 0
-		let parent = location.parent_id
-		// The visited set keeps a malformed response from looping forever.
-		const visited = new Set<number>([location.id])
-		while (parent !== null && parentOf.has(parent) && !visited.has(parent)) {
-			visited.add(parent)
-			depth += 1
-			parent = parentOf.get(parent) ?? null
-		}
-		out.set(location.id, depth)
-	}
-	return out
-}
-
 /** Location name indented by its depth in the site's location tree. */
 export function LocationTreeName(props: { location: LocationRow; depth: number }): JSX.Element {
 	return (
-		<div
-			class={`location-tree-name${props.depth > 0 ? ' location-tree-child' : ''}`}
-			style={{ '--location-depth': props.depth }}
-		>
+		<TreeName depth={props.depth}>
 			<a href={`/locations/${props.location.id}`}>{props.location.name}</a>
-		</div>
+		</TreeName>
 	)
 }
 
@@ -79,7 +58,7 @@ export function LocationsPage(): JSX.Element {
 	// The optional Parent column resolves names from the listed rows.
 	const parentName = useNameOf(list.rows)
 	// Show the hierarchy by indenting instead of spending a column on it.
-	const depthOf = createMemo(() => depths(list.rows()))
+	const depthOf = createMemo(() => treeDepths(list.rows()))
 
 	const columns: DataTableColumn<LocationRow>[] = [
 		{

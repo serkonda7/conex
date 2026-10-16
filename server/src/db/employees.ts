@@ -1,10 +1,10 @@
 import { Result } from 'better-result'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { EmployeeCreate, EmployeeUpdate } from 'shared/src/schemas'
-import { devices, employees, external_links } from '../schema'
+import { devices, employees, external_links, virtual_machines } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { ConflictError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 import {
 	checkTenantExists,
 	findById,
@@ -23,6 +23,26 @@ import {
 } from './list'
 
 export type EmployeeRow = typeof employees.$inferSelect
+
+/** Device and VM assignments cannot expose or link contacts from another tenant. */
+export async function checkEmployeeAssignment(
+	employeeId: number | null | undefined,
+	tenantId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
+	if (employeeId === null || employeeId === undefined) {
+		return Result.ok(undefined)
+	}
+	if (tenantId === null || tenantId === undefined) {
+		return Result.err(new ConflictError('Select a tenant before assigning an employee'))
+	}
+	const employee = await findOne(
+		employees,
+		and(eq(employees.id, employeeId), eq(employees.tenant_id, tenantId)),
+	)
+	return employee
+		? Result.ok(undefined)
+		: Result.err(new NotFoundError('Employee not found in this tenant'))
+}
 
 // ---------------------------------------------------------------------------
 // Employees: contact persons of a tenant. Integrations link them to external
@@ -122,11 +142,11 @@ export async function updateEmployee(
 	if (
 		input.tenant_id !== undefined &&
 		input.tenant_id !== current.value.tenant_id &&
-		(await findOne(devices, eq(devices.employee_id, id)))
+		(await hasAssignments(id))
 	) {
 		return Result.err(
 			new ConflictError(
-				'Employee still has assigned devices; unassign them before changing tenant',
+				'Employee still has assigned devices or virtual machines; unassign them before changing tenant',
 			),
 		)
 	}
@@ -141,14 +161,24 @@ export async function updateEmployee(
 	return await logUpdate('employee', current.value, await getEmployee(id))
 }
 
+/** Whether a device or virtual machine is assigned to the employee. */
+async function hasAssignments(id: number): Promise<boolean> {
+	return (
+		(await findOne(devices, eq(devices.employee_id, id))) !== undefined ||
+		(await findOne(virtual_machines, eq(virtual_machines.employee_id, id))) !== undefined
+	)
+}
+
 export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Error>> {
 	const current = await getEmployee(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await findOne(devices, eq(devices.employee_id, id))) {
+	if (await hasAssignments(id)) {
 		return Result.err(
-			new ConflictError('Employee still has assigned devices; unassign them first'),
+			new ConflictError(
+				'Employee still has assigned devices or virtual machines; unassign them first',
+			),
 		)
 	}
 	const deleted = await tryWrite(() =>

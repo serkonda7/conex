@@ -829,14 +829,18 @@ export const DeviceRoleIconSchema = v.picklist(DEVICE_ROLE_ICONS)
 
 export const DeviceRoleCreateSchema = v.strictObject({
 	name: NameSchema,
+	parent_id: NullableIdSchema,
 	description: DescriptionSchema,
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
+	can_host_vms: v.optional(v.boolean(), false),
 })
 
 export const DeviceRoleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
+	parent_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
+	can_host_vms: v.optional(v.boolean(), undefined),
 })
 
 export type DeviceRoleCreate = v.InferOutput<typeof DeviceRoleCreateSchema>
@@ -844,6 +848,7 @@ export type DeviceRoleUpdate = v.InferOutput<typeof DeviceRoleUpdateSchema>
 
 export const DeviceRoleListQuerySchema = v.object({
 	...ListQueryEntries,
+	parent: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
@@ -1126,6 +1131,42 @@ export type DeviceMove = v.InferOutput<typeof DeviceMoveSchema>
 export type InterfaceCreate = v.InferOutput<typeof InterfaceCreateSchema>
 export type InterfaceUpdate = v.InferOutput<typeof InterfaceUpdateSchema>
 
+// ---------------------------------------------------------------------------
+// Virtual machines (on a host device, or hostless: cloud / IaaS). A hosted
+// VM carries its host's tenant, so `tenant_id` is only accepted for
+// hostless VMs (enforced in the service layer).
+// ---------------------------------------------------------------------------
+
+export const VirtualMachineCreateSchema = v.strictObject({
+	host_device_id: NullableIdSchema,
+	device_role_id: IdSchema,
+	name: NameSchema,
+	status: v.optional(DeviceStatusSchema, 'active'),
+	tenant_id: NullableIdSchema,
+	employee_id: NullableIdSchema,
+	description: DescriptionSchema,
+})
+
+export const VirtualMachineUpdateSchema = v.strictObject({
+	host_device_id: v.optional(v.nullable(IdSchema), undefined),
+	device_role_id: v.optional(IdSchema, undefined),
+	name: v.optional(NameSchema, undefined),
+	status: v.optional(DeviceStatusSchema, undefined),
+	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	employee_id: v.optional(v.nullable(IdSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export type VirtualMachineCreate = v.InferOutput<typeof VirtualMachineCreateSchema>
+export type VirtualMachineUpdate = v.InferOutput<typeof VirtualMachineUpdateSchema>
+
+/** Row kinds of the device list: physical devices and virtual machines. */
+export const DEVICE_LIST_KINDS = ['device', 'vm'] as const
+
+export const DeviceListKindSchema = v.picklist(DEVICE_LIST_KINDS)
+
+export type DeviceListKind = v.InferOutput<typeof DeviceListKindSchema>
+
 export const DeviceListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdEntry,
@@ -1138,6 +1179,10 @@ export const DeviceListQuerySchema = v.object({
 	status: v.optional(DeviceStatusSchema, undefined),
 	/** Placed = U-mounted; unplaced = neither mounted nor rack-assigned. */
 	placed: v.optional(looseBoolean(false), undefined),
+	/** Devices only, VMs only, or both (omitted). */
+	kind: v.optional(DeviceListKindSchema, undefined),
+	/** VMs running on this host device (hides devices). */
+	host: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
@@ -1808,6 +1853,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'rack',
 	'shelf',
 	'device',
+	'virtual_machine',
 	'interface',
 	'cable',
 	'manufacturer',
