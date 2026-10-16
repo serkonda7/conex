@@ -12,7 +12,7 @@ import { parseId } from '../../lib/router'
 
 export interface MoveTenantDialogProps {
 	/** A device, or a hostless VM (a hosted VM follows its host). */
-	row: DeviceListItem
+	row: Pick<DeviceListItem, 'kind' | 'id' | 'name' | 'tenant_id'>
 	on_moved: () => void
 	on_close: () => void
 }

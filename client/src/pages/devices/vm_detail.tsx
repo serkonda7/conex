@@ -119,7 +119,7 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 			<Show when={movingTenant() ? vm() : undefined}>
 				{(row: () => VirtualMachineRow): JSX.Element => (
 					<MoveTenantDialog
-						row={{ kind: 'vm', host_name: null, ...row() }}
+						row={{ kind: 'vm', ...row() }}
 						on_moved={() => {
 							setMovingTenant(false)
 							void refetch()
