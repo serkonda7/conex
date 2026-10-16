@@ -1709,15 +1709,22 @@ th[aria-sort="descending"] .data-table-sort::after {
 	padding: 0.25rem;
 }
 
-.row-menu-danger {
+.row-menu-item {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.45rem;
 	width: 100%;
 	border: none;
 	background: transparent;
-	color: var(--error);
 	text-align: left;
+}
+
+.row-menu-item:hover {
+	background-color: var(--bg-hover);
+}
+
+.row-menu-danger {
+	color: var(--error);
 }
 
 .row-menu-danger:hover {

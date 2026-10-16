@@ -69,6 +69,16 @@ test('device add form layout', async ({ page }) => {
 	await expect(page.locator('main.app-content')).toHaveScreenshot('device-add-form.png')
 })
 
+test('ticket add form layout', async ({ page }) => {
+	await page.goto('/tickets/add')
+	await expect(page.locator('#ticket-title')).toBeVisible()
+	await expect(page.locator('#ticket-content')).toBeVisible()
+	await expect(page.locator('#ticket-device')).toBeVisible()
+	await expect(page.locator('#ticket-employee')).toBeVisible()
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('ticket-add-form.png')
+})
+
 async function visualEmployeeId(page: Page): Promise<number> {
 	const response = await page.request.get('/api/employees?search=E2E%20Visual&limit=200')
 	expect(response.ok()).toBeTruthy()

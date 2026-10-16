@@ -632,14 +632,14 @@ export const de: Messages = {
 	'device.serialPlaceholder': 'Seriennummer (optional)',
 	'device.deviceId': 'Geräte-ID',
 	'device.deviceIdPlaceholder': 'Geräte-ID (optional)',
+	'device.locationSection': 'Standort',
+	'device.moveTenant': 'Verschieben',
+	'device.moveTenantTitle': 'Gerät {name} verschieben',
+	'device.moveTenantHint': 'Beim Verschieben werden Standort, Bereich und Rack entfernt.',
 	'device.noSite': 'Kein Standort',
 	'device.noFace': 'Keine Seite',
 	'device.onShelfHint': 'Steht auf Fachboden {name} (keine eigene HE).',
-	'device.typeImmutable':
-		'Der Gerätetyp kann nach dem Anlegen nicht geändert werden: Ein Wechsel der Vorlage würde die Anschlüsse und die belegten HE ungültig machen.',
 	'device.positionEditPlaceholder': 'Position (leer zum Entfernen)',
-	'device.positionEditHint':
-		'Leer lassen, um das Gerät auszubauen (ein Rack kann zugeordnet bleiben).',
 	'device.notFound': 'Gerät nicht gefunden.',
 	'device.details': 'Gerätedetails',
 	'device.onShelf': 'Fachboden {name}',

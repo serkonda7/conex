@@ -34,5 +34,4 @@ test('adding a device from the rack elevation prefills rack context', async ({ p
 	await expect(page).toHaveURL(/\/devices\/add\?/)
 	await expect(page.locator('#device-rack')).toHaveValue('E2E Visual Rack')
 	await expect(page.locator('#device-site')).toHaveValue('E2E Site')
-	await expect(page.locator('#device-tenant')).toHaveValue('E2E Tenant')
 })

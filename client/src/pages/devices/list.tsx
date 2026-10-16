@@ -1,4 +1,5 @@
-import { createMemo, createSignal, type JSX } from 'solid-js'
+import { IconArrowsExchange } from '@tabler/icons-solidjs'
+import { createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../../api/devices'
 import { fetch_all_employees } from '../../api/employees'
@@ -17,13 +18,15 @@ import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
+import { canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
+import { MoveTenantDialog } from './move_tenant_dialog'
 
 /**
  * /devices — NetBox-style device list: search, sortable columns, rack /
  * role / tenant filters (tenant, role and device type deep-linkable via
  * `?tenant=<id>`, `?role=<id>` and `?device_type=<id>`), and icon actions with
- * delete in a row menu.
+ * clone, move to another tenant and delete in a row menu.
  */
 export function DevicesPage(): JSX.Element {
 	const [filterRack, setFilterRack] = createSignal('')
@@ -31,6 +34,7 @@ export function DevicesPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
 	const [filterType] = useQueryFilter('device_type')
 	const [filterEmployee, setFilterEmployee] = useQueryFilter('employee')
+	const [movingDevice, setMovingDevice] = createSignal<DeviceRow | null>(null)
 	const list = useEntityList({
 		noun: 'noun.device',
 		sort: 'name' as DeviceSort,
@@ -112,41 +116,69 @@ export function DevicesPage(): JSX.Element {
 	]
 
 	return (
-		<EntityListPage
-			list={list}
-			title={tp('entity.device', 2)}
-			addHref="/devices/add"
-			filters={[
-				{
-					key: 'employee',
-					label: t('device.assignedEmployee'),
-					options: idOptions(employees()),
-					value: filterEmployee,
-					onChange: setFilterEmployee,
-				},
-				{
-					key: 'rack',
-					label: tp('entity.rack', 1),
-					options: idOptions(racks()),
-					value: filterRack,
-					onChange: setFilterRack,
-				},
-				{
-					key: 'role',
-					label: tp('entity.deviceRole', 1),
-					options: idOptions(roles()),
-					value: filterRole,
-					onChange: setFilterRole,
-				},
-			]}
-			filtered={
-				filterTenant() !== '' || filterType() !== '' || tenantContext().kind !== 'all'
-			}
-			columns={columns}
-			columnsKey="devices"
-			rowName={(d: DeviceRow): string => d.name}
-			editHref={(d: DeviceRow): string => `/devices/${d.id}/edit`}
-			emptyText={t('device.empty')}
-		/>
+		<>
+			<EntityListPage
+				list={list}
+				title={tp('entity.device', 2)}
+				addHref="/devices/add"
+				filters={[
+					{
+						key: 'employee',
+						label: t('device.assignedEmployee'),
+						options: idOptions(employees()),
+						value: filterEmployee,
+						onChange: setFilterEmployee,
+					},
+					{
+						key: 'rack',
+						label: tp('entity.rack', 1),
+						options: idOptions(racks()),
+						value: filterRack,
+						onChange: setFilterRack,
+					},
+					{
+						key: 'role',
+						label: tp('entity.deviceRole', 1),
+						options: idOptions(roles()),
+						value: filterRole,
+						onChange: setFilterRole,
+					},
+				]}
+				filtered={
+					filterTenant() !== '' || filterType() !== '' || tenantContext().kind !== 'all'
+				}
+				columns={columns}
+				columnsKey="devices"
+				rowName={(d: DeviceRow): string => d.name}
+				editHref={(d: DeviceRow): string => `/devices/${d.id}/edit`}
+				cloneHref={(d: DeviceRow): string => `/devices/add?clone=${d.id}`}
+				menuActions={(d: DeviceRow) =>
+					canGlobal('edit')
+						? [
+								{
+									label: t('device.moveTenant'),
+									icon: IconArrowsExchange,
+									onSelect: (): void => {
+										setMovingDevice(d)
+									},
+								},
+							]
+						: []
+				}
+				emptyText={t('device.empty')}
+			/>
+			<Show when={movingDevice()}>
+				{(device: () => DeviceRow): JSX.Element => (
+					<MoveTenantDialog
+						device={device()}
+						on_moved={() => {
+							setMovingDevice(null)
+							list.reload()
+						}}
+						on_close={() => setMovingDevice(null)}
+					/>
+				)}
+			</Show>
+		</>
 	)
 }

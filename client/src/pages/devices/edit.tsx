@@ -4,7 +4,7 @@ import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, fetch_device, update_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
-import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
+import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
 	DescriptionField,
 	FormPage,
@@ -63,7 +63,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [sites] = createRows(fetch_sites, form.setError)
 	const [racks] = createRows(fetch_racks, form.setError)
 	const [roles] = createRows(fetch_device_roles, form.setError)
-	const [tenants] = createRows(fetch_tenants, form.setError)
 	const [types] = createRows(fetch_device_types)
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createRowsFor(
@@ -104,7 +103,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					rack_id: parseId(rackId()),
 					face: (face() || null) as DeviceFace | null,
 					position_u: parsePosition(positionU()),
-					tenant_id: parseId(tenantId()),
 					employee_id: parseId(employeeId()),
 				}),
 			navigateTo: backTo(),
@@ -130,7 +128,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				id="device-edit-type"
 				label={tp('entity.deviceType', 1)}
 				value={form.record() ? typeName(form.record()?.device_type_id) : ''}
-				hint={t('device.typeImmutable')}
 			/>
 			<SelectField
 				id="device-edit-role"
@@ -207,20 +204,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				inputmode="numeric"
 				value={positionU()}
 				onInput={setPositionU}
-				hint={<Hint>{t('device.positionEditHint')}</Hint>}
-			/>
-			<SelectField
-				id="device-edit-tenant"
-				label={tp('entity.tenant', 1)}
-				value={tenantId()}
-				onChange={(value: string): void => {
-					if (value !== tenantId()) {
-						setEmployeeId('')
-					}
-					setTenantId(value)
-				}}
-				options={row_options(tenants() ?? [])}
-				emptyLabel={t('common.noTenant')}
 			/>
 			<EmployeeAssignmentField
 				id="device-edit-employee"
