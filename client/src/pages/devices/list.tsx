@@ -21,6 +21,7 @@ import {
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
+import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
@@ -75,6 +76,16 @@ export function DevicesPage(): JSX.Element {
 	const typeName = useNameOf(types, (type) => type.model)
 	const roleName = useNameOf(roles)
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
+	const roleFilterOptions = createMemo(() => {
+		const all = roles() ?? []
+		const paths = treePaths(all)
+		const icons = treeIcons(all)
+		return all.map((r) => ({
+			value: String(r.id),
+			label: paths.get(r.id) ?? r.name,
+			icon: deviceRoleIcon(icons.get(r.id)),
+		}))
+	})
 	const rackName = useNameOf(racks)
 
 	const columns: DataTableColumn<DeviceListItem>[] = [
@@ -187,7 +198,7 @@ export function DevicesPage(): JSX.Element {
 					{
 						key: 'role',
 						label: tp('entity.deviceRole', 1),
-						options: idOptions(roles()),
+						options: roleFilterOptions(),
 						value: filterRole,
 						onChange: setFilterRole,
 					},

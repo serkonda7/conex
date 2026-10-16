@@ -644,6 +644,11 @@ tbody tr:last-child td {
 	vertical-align: -0.15em;
 }
 
+/* Device role list: a little more space between the role icon and the name. */
+.device-role-name .app-nav-icon {
+	margin-right: 0.25rem;
+}
+
 .app-nav a:hover,
 .app-nav-item:hover {
 	background-color: var(--bg-hover);

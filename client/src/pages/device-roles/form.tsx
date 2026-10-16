@@ -12,9 +12,9 @@ import {
 	DescriptionField,
 	FormPage,
 	NameField,
-	row_options,
 	SelectField,
 } from '../../components/form'
+import { treeIcons, treePaths } from '../../components/tree_name'
 import { t } from '../../i18n'
 import { deviceRoleIconOptions } from '../../i18n/labels'
 import {
@@ -25,6 +25,7 @@ import {
 	text,
 	useEntityForm,
 } from '../../lib/form'
+import { deviceRoleIcon } from '../../lib/icons'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 
@@ -68,7 +69,15 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 				}
 			}
 		}
-		return row_options(all.filter((role) => !excluded.has(role.id)))
+		const paths = treePaths(all)
+		const icons = treeIcons(all)
+		return all
+			.filter((role) => !excluded.has(role.id))
+			.map((role) => ({
+				value: role.id,
+				label: paths.get(role.id) ?? role.name,
+				icon: deviceRoleIcon(icons.get(role.id)),
+			}))
 	})
 
 	const selectedIcon = (): DeviceRoleIcon | null =>

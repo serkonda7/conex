@@ -38,9 +38,11 @@ export function DeviceRolesPage(): JSX.Element {
 					sortable: true,
 					getValue: (r: DeviceRoleListRow): JSX.Element => (
 						<TreeName depth={depthOf().get(r.id) ?? 0}>
-							<IconLabel icon={deviceRoleIcon(r.icon)}>
-								<a href={`/device-roles/${r.id}`}>{r.name}</a>
-							</IconLabel>
+							<span class="device-role-name">
+								<IconLabel icon={deviceRoleIcon(r.icon)}>
+									<a href={`/device-roles/${r.id}`}>{r.name}</a>
+								</IconLabel>
+							</span>
 						</TreeName>
 					),
 				},

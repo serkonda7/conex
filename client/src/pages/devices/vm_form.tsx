@@ -29,10 +29,10 @@ import {
 	text,
 	useEntityForm,
 } from '../../lib/form'
-import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 import { contextTenantId, useTenantDefault } from '../../lib/tenant_context'
+import { deviceRoleOptions } from '../device-roles/options'
 import { useDeviceSearch } from './device_search'
 import { EmployeeAssignmentField } from './employee_assignment'
 
@@ -221,11 +221,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					required
 					value={roleId()}
 					onChange={setRoleId}
-					options={(roles() ?? []).map((role) => ({
-						value: role.id,
-						label: role.name,
-						icon: deviceRoleIcon(role.icon),
-					}))}
+					options={deviceRoleOptions(roles() ?? [])}
 					emptyLabel={t('common.selectPlaceholder')}
 					add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
 					reload={refetchRoles}

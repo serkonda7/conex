@@ -17,10 +17,10 @@ import {
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
-import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
+import { deviceRoleOptions } from '../device-roles/options'
 import { parsePosition, validPosition } from './add'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
@@ -140,11 +140,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					required
 					value={roleId()}
 					onChange={setRoleId}
-					options={(roles() ?? []).map((role) => ({
-						value: role.id,
-						label: role.name,
-						icon: deviceRoleIcon(role.icon),
-					}))}
+					options={deviceRoleOptions(roles() ?? [])}
 					emptyLabel={t('device.rolePlaceholder')}
 					add={{ label: tp('entity.deviceRole', 1), href: '/device-roles/add' }}
 				/>
