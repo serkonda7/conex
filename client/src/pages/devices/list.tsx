@@ -160,7 +160,9 @@ export function DevicesPage(): JSX.Element {
 								<a href={`/racks/${d.rack_id}`}>{rackName(d.rack_id)}</a>
 								{' · '}
 							</Show>
-							<a href={`/shelves/${d.shelf_id}/edit`}>{shelfLabel}</a>
+							<Show when={d.rack_id !== null} fallback={shelfLabel}>
+								<a href={`/racks/${d.rack_id}`}>{shelfLabel}</a>
+							</Show>
 						</span>
 					)
 				}
