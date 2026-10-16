@@ -174,19 +174,19 @@ export function ReadOnlyField(props: {
 	id: string
 	label: string
 	value: string
-	hint: string
+	hint?: string
 }): JSX.Element {
 	return (
 		<Field
 			label={props.label}
 			for={props.id}
-			hint={<Hint id={`${props.id}-hint`}>{props.hint}</Hint>}
+			hint={props.hint ? <Hint id={`${props.id}-hint`}>{props.hint}</Hint> : undefined}
 		>
 			<input
 				id={props.id}
 				value={props.value}
 				disabled
-				aria-describedby={`${props.id}-hint`}
+				aria-describedby={props.hint ? `${props.id}-hint` : undefined}
 			/>
 		</Field>
 	)
