@@ -507,7 +507,6 @@ export const de: Messages = {
 	'serviceLevel.noServiceHours': 'Keine Servicezeiten',
 	'serviceLevel.closed': 'Geschlossen',
 	'serviceLevel.allDay': '24 Stunden',
-	'serviceLevel.allDayHint': 'Beginn und Ende leer lassen für 24 Stunden.',
 	'serviceLevel.dayOpen': 'Service am {day}',
 	'serviceLevel.windowFrom': '{day} von',
 	'serviceLevel.windowTo': '{day} bis',
@@ -515,11 +514,14 @@ export const de: Messages = {
 		'Die Servicezeit am {day} muss nach ihrem Beginn enden oder beide Felder müssen für 24 Stunden leer sein.',
 	'serviceLevel.holidayRegion': 'Feiertage',
 	'serviceLevel.holidayNationwide': 'Nur bundesweite Feiertage',
-	'serviceLevel.holidayRegionHint':
-		'Feiertage dieses Bundeslands halten die Uhr an wie geschlossene Tage.',
 	'serviceLevel.targets': 'Reaktionszeiten',
 	'serviceLevel.noTargets': 'Keine Reaktionszeiten festgelegt.',
 	'serviceLevel.noPriorities': 'Legen Sie zuerst Prioritäten an, um Reaktionszeiten festzulegen.',
+	'serviceLevel.priorityLabel': 'P{rank} - {name}',
+	'serviceLevel.unit': 'Einheit',
+	'serviceLevel.unit.days': 'Tage',
+	'serviceLevel.unit.hours': 'Stunden',
+	'serviceLevel.unit.minutes': 'Minuten',
 	'serviceLevel.response': 'Reaktion',
 	'serviceLevel.resolution': 'Lösung',
 	'serviceLevel.clock': 'Zeitbasis',
@@ -527,9 +529,8 @@ export const de: Messages = {
 	'serviceLevel.withinServiceHours': 'Innerhalb der Servicezeiten',
 	'serviceLevel.bestEffort': 'Best Effort',
 	'serviceLevel.noTarget': 'Keine Zusage',
-	'serviceLevel.targetsHint':
-		'Dauer wie 30min, 4h, 1h 30min oder 1:30; reine Zahlen sind Stunden. Ohne Reaktionszeit ist die Priorität nicht abgedeckt, ohne Lösungszeit gilt Best Effort. Die Zeiten zählen innerhalb der Servicezeiten, außer bei 24/7.',
-	'serviceLevel.durationInvalid': 'Die Zeiten von {priority} sind keine gültige Dauer.',
+	'serviceLevel.durationInvalid':
+		'Die Zeiten von {priority} müssen ganze Zahlen größer als 0 sein.',
 	'serviceLevel.responseRequired':
 		'{priority} braucht eine Reaktionszeit, wenn eine Lösungszeit angegeben ist.',
 	'serviceLevel.resolutionTooShort':

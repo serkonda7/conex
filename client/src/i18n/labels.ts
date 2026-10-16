@@ -36,6 +36,7 @@ import {
 import type { RackFormFactor } from '../api/templates'
 import type { FormOption } from '../components/form'
 import { deviceRoleIcon, locationTypeIcon } from '../lib/icons'
+import type { DurationUnit } from '../lib/service_level'
 import { type MessageKey, t } from '.'
 
 function lookup(keys: Record<string, MessageKey>, value: string): string {
@@ -432,4 +433,9 @@ export function holidayRegionOptions(): (FormOption & { value: HolidayRegion })[
 	return HOLIDAY_REGIONS.map((value) => ({ value, label: holidayRegionLabel(value) })).sort(
 		(a, b) => a.label.localeCompare(b.label),
 	)
+}
+
+/** Plural unit name of a target duration (`hours` → `Hours`). */
+export function durationUnitLabel(unit: DurationUnit): string {
+	return t(`serviceLevel.unit.${unit}`)
 }

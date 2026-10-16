@@ -19,32 +19,29 @@ export function formatMinutes(minutes: number): string {
 	return parts.join(' ')
 }
 
+export type DurationUnit = 'days' | 'hours' | 'minutes'
+
+export const DURATION_UNITS: readonly DurationUnit[] = ['days', 'hours', 'minutes']
+
+const UNIT_MINUTES: Record<DurationUnit, number> = { days: 1440, hours: 60, minutes: 1 }
+
+/** `90` → `{ value: '90', unit: 'minutes' }`; the largest unit that divides evenly. */
+export function splitMinutes(minutes: number): { value: string; unit: DurationUnit } {
+	const unit = DURATION_UNITS.find((u) => minutes % UNIT_MINUTES[u] === 0) ?? 'minutes'
+	return { value: String(minutes / UNIT_MINUTES[unit]), unit }
+}
+
 /**
- * Minutes of a typed duration: `4h`, `30min`, `1 h 30 min`, `1:30`, or a
- * plain number of hours (`4`, `0.5`). Empty input is `null`, unparsable
- * input `undefined`.
+ * Minutes of a typed whole number in `unit`. Empty input is `null`, anything
+ * that is not a positive whole number `undefined`.
  */
-export function parseDuration(raw: string): number | null | undefined {
-	const text = raw.trim().toLowerCase().replace(',', '.')
+export function toMinutes(raw: string, unit: DurationUnit): number | null | undefined {
+	const text = raw.trim()
 	if (text === '') {
 		return null
 	}
-	const clock = /^(\d+):([0-5]\d)$/.exec(text)
-	if (clock) {
-		return positive(Number(clock[1]) * 60 + Number(clock[2]))
-	}
-	if (/^\d+(\.\d+)?$/.test(text)) {
-		return positive(Math.round(Number(text) * 60))
-	}
-	const units = /^(?:(\d+(?:\.\d+)?)\s*(?:h|std)\.?)?\s*(?:(\d+)\s*(?:min|m)\.?)?$/.exec(text)
-	if (units && (units[1] !== undefined || units[2] !== undefined)) {
-		return positive(Math.round(Number(units[1] ?? 0) * 60) + Number(units[2] ?? 0))
-	}
-	return undefined
-}
-
-function positive(minutes: number): number | undefined {
-	return minutes > 0 ? minutes : undefined
+	const n = Number(text)
+	return Number.isInteger(n) && n > 0 ? n * UNIT_MINUTES[unit] : undefined
 }
 
 /** Short localized weekday name (`Mon` / `Mo`). */

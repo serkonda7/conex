@@ -25,7 +25,7 @@ import {
 	SelectField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { holidayRegionOptions } from '../../i18n/labels'
+import { durationUnitLabel, holidayRegionOptions } from '../../i18n/labels'
 import {
 	type FormValues,
 	is_add_another_submit,
@@ -35,7 +35,13 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { queryParam, useFormReturnRoute } from '../../lib/router'
-import { formatMinutes, parseDuration, weekdayLabel } from '../../lib/service_level'
+import {
+	DURATION_UNITS,
+	type DurationUnit,
+	splitMinutes,
+	toMinutes,
+	weekdayLabel,
+} from '../../lib/service_level'
 
 interface DayState {
 	open: boolean
@@ -43,11 +49,24 @@ interface DayState {
 	to: string
 }
 
+/** A typed whole number and its unit; an empty value means none. */
+interface DurationState {
+	value: string
+	unit: DurationUnit
+}
+
 /** Typed target inputs of one priority; an empty response means no target. */
 interface TargetState {
-	response: string
-	resolution: string
+	response: DurationState
+	resolution: DurationState
+	/** Not editable in the form; kept so saving does not reset stored targets. */
 	aroundTheClock: boolean
+}
+
+const EMPTY_DURATION: DurationState = { value: '', unit: 'hours' }
+
+function durationOf(minutes: number | null): DurationState {
+	return minutes === null ? EMPTY_DURATION : splitMinutes(minutes)
 }
 
 type Hours = Record<Weekday, DayState>
@@ -69,7 +88,52 @@ function hoursOf(windows: readonly ServiceWindow[]): Hours {
 	return hours
 }
 
-const EMPTY_TARGET: TargetState = { response: '', resolution: '', aroundTheClock: false }
+const EMPTY_TARGET: TargetState = {
+	response: EMPTY_DURATION,
+	resolution: EMPTY_DURATION,
+	aroundTheClock: false,
+}
+
+/** Whole number plus unit dropdown for one target duration. */
+function DurationInput(props: {
+	id: string
+	label: string
+	placeholder: string
+	value: DurationState
+	onChange: (value: DurationState) => void
+}): JSX.Element {
+	return (
+		<div class="duration-input">
+			<input
+				id={props.id}
+				type="number"
+				min="1"
+				step="1"
+				value={props.value.value}
+				placeholder={props.placeholder}
+				aria-label={props.label}
+				onInput={(e: InputEventAndTarget) =>
+					props.onChange({ ...props.value, value: e.currentTarget.value })
+				}
+			/>
+			<select
+				aria-label={`${props.label} (${t('serviceLevel.unit')})`}
+				value={props.value.unit}
+				onChange={(e: Event & { currentTarget: HTMLSelectElement }) =>
+					props.onChange({ ...props.value, unit: e.currentTarget.value as DurationUnit })
+				}
+			>
+				<For each={DURATION_UNITS}>
+					{(unit: DurationUnit): JSX.Element => (
+						<option value={unit} selected={unit === props.value.unit}>
+							{durationUnitLabel(unit)}
+						</option>
+					)}
+				</For>
+			</select>
+		</div>
+	)
+}
 
 /** Service level create (`id` omitted) or edit form. */
 function ServiceLevelForm(props: { id?: number }): JSX.Element {
@@ -93,11 +157,8 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 					row.targets.map((stored) => [
 						stored.priority_id,
 						{
-							response: formatMinutes(stored.response_minutes),
-							resolution:
-								stored.resolution_minutes === null
-									? ''
-									: formatMinutes(stored.resolution_minutes),
+							response: durationOf(stored.response_minutes),
+							resolution: durationOf(stored.resolution_minutes),
 							aroundTheClock: stored.around_the_clock,
 						},
 					]),
@@ -140,8 +201,8 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 		const out: ServiceLevelTarget[] = []
 		for (const priority of priorities() ?? []) {
 			const state = target(priority.id)
-			const response = parseDuration(state.response)
-			const resolution = parseDuration(state.resolution)
+			const response = toMinutes(state.response.value, state.response.unit)
+			const resolution = toMinutes(state.resolution.value, state.resolution.unit)
 			if (response === null) {
 				if (resolution !== null) {
 					return t('serviceLevel.responseRequired', { priority: priority.name })
@@ -275,7 +336,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 						</Field>
 					)}
 				</For>
-				<Hint>{t('serviceLevel.allDayHint')}</Hint>
 				<SelectField
 					id={`${prefix}-holiday-region`}
 					label={t('serviceLevel.holidayRegion')}
@@ -283,7 +343,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 					onChange={setHolidayRegion}
 					options={holidayRegionOptions()}
 					emptyLabel={t('serviceLevel.holidayNationwide')}
-					hint={<Hint>{t('serviceLevel.holidayRegionHint')}</Hint>}
 				/>
 			</FormSection>
 
@@ -306,54 +365,37 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 									<th>{tp('entity.priority', 1)}</th>
 									<th>{t('serviceLevel.response')}</th>
 									<th>{t('serviceLevel.resolution')}</th>
-									<th>{t('serviceLevel.aroundTheClock')}</th>
 								</tr>
 							</thead>
 							<tbody>
 								<For each={priorities()}>
 									{(priority: PriorityListRow): JSX.Element => (
 										<tr>
-											<td>{priority.name}</td>
 											<td>
-												<input
+												{t('serviceLevel.priorityLabel', {
+													rank: priority.rank,
+													name: priority.name,
+												})}
+											</td>
+											<td>
+												<DurationInput
 													id={`${prefix}-response-${priority.id}`}
-													value={target(priority.id).response}
+													label={`${t('serviceLevel.response')} ${priority.name}`}
 													placeholder={t('serviceLevel.noTarget')}
-													aria-label={`${t('serviceLevel.response')} ${priority.name}`}
-													onInput={(e: InputEventAndTarget) =>
-														patchTarget(priority.id, {
-															response: e.currentTarget.value,
-														})
+													value={target(priority.id).response}
+													onChange={(response: DurationState) =>
+														patchTarget(priority.id, { response })
 													}
 												/>
 											</td>
 											<td>
-												<input
+												<DurationInput
 													id={`${prefix}-resolution-${priority.id}`}
-													value={target(priority.id).resolution}
+													label={`${t('serviceLevel.resolution')} ${priority.name}`}
 													placeholder={t('serviceLevel.bestEffort')}
-													aria-label={`${t('serviceLevel.resolution')} ${priority.name}`}
-													onInput={(e: InputEventAndTarget) =>
-														patchTarget(priority.id, {
-															resolution: e.currentTarget.value,
-														})
-													}
-												/>
-											</td>
-											<td>
-												<input
-													id={`${prefix}-clock-${priority.id}`}
-													type="checkbox"
-													checked={target(priority.id).aroundTheClock}
-													aria-label={`${t('serviceLevel.aroundTheClock')} ${priority.name}`}
-													onChange={(
-														e: Event & {
-															currentTarget: HTMLInputElement
-														},
-													) =>
-														patchTarget(priority.id, {
-															aroundTheClock: e.currentTarget.checked,
-														})
+													value={target(priority.id).resolution}
+													onChange={(resolution: DurationState) =>
+														patchTarget(priority.id, { resolution })
 													}
 												/>
 											</td>
@@ -362,7 +404,6 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 								</For>
 							</tbody>
 						</table>
-						<Hint>{t('serviceLevel.targetsHint')}</Hint>
 					</Show>
 				</div>
 			</FormSection>

@@ -504,7 +504,6 @@ export const en = {
 	'serviceLevel.noServiceHours': 'No service hours',
 	'serviceLevel.closed': 'Closed',
 	'serviceLevel.allDay': '24 hours',
-	'serviceLevel.allDayHint': 'Leave start and end empty for 24 hours.',
 	'serviceLevel.dayOpen': 'Service on {day}',
 	'serviceLevel.windowFrom': '{day} from',
 	'serviceLevel.windowTo': '{day} until',
@@ -512,11 +511,14 @@ export const en = {
 		'Service hours on {day} must end after they start, or both be empty for 24 hours.',
 	'serviceLevel.holidayRegion': 'Holidays',
 	'serviceLevel.holidayNationwide': 'Nationwide holidays only',
-	'serviceLevel.holidayRegionHint':
-		'Public holidays of this federal state pause the clock like closed days.',
 	'serviceLevel.targets': 'Response times',
 	'serviceLevel.noTargets': 'No response times defined.',
 	'serviceLevel.noPriorities': 'Define priorities first to set response times.',
+	'serviceLevel.priorityLabel': 'P{rank} - {name}',
+	'serviceLevel.unit': 'Unit',
+	'serviceLevel.unit.days': 'Days',
+	'serviceLevel.unit.hours': 'Hours',
+	'serviceLevel.unit.minutes': 'Minutes',
 	'serviceLevel.response': 'Response',
 	'serviceLevel.resolution': 'Resolution',
 	'serviceLevel.clock': 'Clock',
@@ -524,9 +526,8 @@ export const en = {
 	'serviceLevel.withinServiceHours': 'Within service hours',
 	'serviceLevel.bestEffort': 'Best effort',
 	'serviceLevel.noTarget': 'No target',
-	'serviceLevel.targetsHint':
-		'Durations like 30min, 4h, 1h 30min or 1:30; plain numbers are hours. Without a response time the priority is not covered; without a resolution time it is best effort. Times count within the service hours unless 24/7 is checked.',
-	'serviceLevel.durationInvalid': 'Response times of {priority} are not a valid duration.',
+	'serviceLevel.durationInvalid':
+		'Response times of {priority} must be whole numbers greater than 0.',
 	'serviceLevel.responseRequired':
 		'{priority} needs a response time when it has a resolution time.',
 	'serviceLevel.resolutionTooShort':
