@@ -1,5 +1,5 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createEffect, createSignal, type JSX, Show } from 'solid-js'
+import { createEffect, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
@@ -30,6 +30,7 @@ import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { useSiteTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
+import { EmployeeAssignmentField } from './employee_assignment'
 
 /** Rack position from the field: null when blank, NaN when malformed. */
 export function parsePosition(value: string): number | null {
@@ -49,8 +50,8 @@ export function queryFace(): string {
 
 /**
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
- * pre-fills it from that device, except the name, serial, device ID and
- * U position, which must differ per device.
+ * pre-fills it from that device, except the name, serial, device ID,
+ * U position and employee assignment, which are chosen per device.
  */
 export function DeviceAddPage(): JSX.Element {
 	const form = useFormState()
@@ -60,6 +61,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
+	const [employeeId, setEmployeeId] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
@@ -102,6 +104,7 @@ export function DeviceAddPage(): JSX.Element {
 	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>
 		handleSiteChange(''),
 	)
+	createEffect(on(tenant.value, () => setEmployeeId(''), { defer: true }))
 
 	const [source] = createRecord(() => parseId(queryParam('clone')), fetch_device, form.setError)
 	createEffect(() => {
@@ -168,6 +171,7 @@ export function DeviceAddPage(): JSX.Element {
 					position_u: onShelf ? null : parsePosition(positionU()),
 					shelf_id: shelfId(),
 					tenant_id: parseId(tenant.value()),
+					employee_id: parseId(employeeId()),
 				}),
 			// Elevation deep links return to the rack they came from.
 			navigateTo:
@@ -292,6 +296,13 @@ export function DeviceAddPage(): JSX.Element {
 							<Hint>{t('location.tenantFromSite')}</Hint>
 						</Show>
 					}
+				/>
+				<EmployeeAssignmentField
+					id="device-employee"
+					tenantId={parseId(tenant.value())}
+					value={employeeId()}
+					onChange={setEmployeeId}
+					onError={form.setError}
 				/>
 			</FormSection>
 		</FormPage>

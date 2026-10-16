@@ -211,6 +211,13 @@
       "when": 1792062463531,
       "tag": "0029_service_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792139114823,
+      "tag": "0030_device_employee_assignment",
+      "breakpoints": true
     }
   ]
 }

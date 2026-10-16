@@ -1,12 +1,14 @@
 import { Result } from 'better-result'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { EmployeeCreate, EmployeeUpdate } from 'shared/src/schemas'
-import { employees, external_links } from '../schema'
+import { devices, employees, external_links } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
+import { ConflictError } from './errors'
 import {
 	checkTenantExists,
 	findById,
+	findOne,
 	insertedId,
 	isPatchEmpty,
 	type ListParams,
@@ -117,6 +119,17 @@ export async function updateEmployee(
 		]),
 		...(input.active !== undefined ? { active: input.active ? 1 : 0 } : {}),
 	}
+	if (
+		input.tenant_id !== undefined &&
+		input.tenant_id !== current.value.tenant_id &&
+		(await findOne(devices, eq(devices.employee_id, id)))
+	) {
+		return Result.err(
+			new ConflictError(
+				'Employee still has assigned devices; unassign them before changing tenant',
+			),
+		)
+	}
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(() =>
 			getDb().update(employees).set(patch).where(eq(employees.id, id)),
@@ -132,6 +145,11 @@ export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Er
 	const current = await getEmployee(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (await findOne(devices, eq(devices.employee_id, id))) {
+		return Result.err(
+			new ConflictError('Employee still has assigned devices; unassign them first'),
+		)
 	}
 	const deleted = await tryWrite(() =>
 		getDb().transaction(async (tx) => {

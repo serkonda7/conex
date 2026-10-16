@@ -5,6 +5,7 @@ import {
 	check,
 	customType,
 	doublePrecision,
+	foreignKey,
 	index,
 	integer,
 	pgTable,
@@ -260,6 +261,7 @@ export const employees = pgTable(
 	(table) => [
 		index('employees_tenant_id_idx').on(table.tenant_id),
 		index('employees_name_idx').on(table.name),
+		uniqueIndex('employees_id_tenant_id_idx').on(table.id, table.tenant_id),
 	],
 )
 
@@ -484,6 +486,8 @@ export const devices = pgTable(
 		asset_tag: text('asset_tag').unique(),
 		device_id: text('device_id').unique(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
+		// One assigned contact; the composite FK keeps both in the same tenant.
+		employee_id: integer('employee_id'),
 		description: text('description'),
 	},
 	(table) => [
@@ -493,6 +497,16 @@ export const devices = pgTable(
 		index('devices_rack_id_idx').on(table.rack_id),
 		index('devices_shelf_id_idx').on(table.shelf_id),
 		index('devices_tenant_id_idx').on(table.tenant_id),
+		index('devices_employee_id_idx').on(table.employee_id),
+		foreignKey({
+			name: 'devices_employee_tenant_fk',
+			columns: [table.employee_id, table.tenant_id],
+			foreignColumns: [employees.id, employees.tenant_id],
+		}),
+		check(
+			'devices_employee_requires_tenant',
+			sql`${table.employee_id} IS NULL OR ${table.tenant_id} IS NOT NULL`,
+		),
 		index('devices_status_idx').on(table.status),
 		index('devices_name_idx').on(table.name),
 	],

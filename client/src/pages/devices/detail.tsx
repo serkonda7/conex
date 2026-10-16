@@ -9,6 +9,7 @@ import {
 	fetch_interfaces,
 	type InterfaceJson,
 } from '../../api/devices'
+import { fetch_employee } from '../../api/employees'
 import { fetch_rack } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_device_type } from '../../api/templates'
@@ -114,6 +115,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const rackId = (): number | null | undefined => device()?.rack_id
 	const shelfId = (): number | null | undefined => device()?.shelf_id
 	const tenantId = (): number | null | undefined => device()?.tenant_id
+	const employeeId = (): number | null | undefined => device()?.employee_id
 	const [deviceType] = createRecord(typeId, fetch_device_type)
 	const [deviceRole] = createRecord(roleId, fetch_device_role, setError)
 	const [site] = createRecord(siteId, fetch_site, setError)
@@ -121,6 +123,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [rack] = createRecord(rackId, fetch_rack, setError)
 	const [shelf] = createRecord(shelfId, fetch_shelf, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
+	const [employee] = createRecord(employeeId, fetch_employee, setError)
 	const [trail] = createResource(
 		() => ({ site: site(), location: locationId() ?? null, rack: rack() }),
 		async ({ site: siteRow, location: locationKey, rack: rackRow }): Promise<Crumb[]> => [
@@ -313,6 +316,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dt>{tp('entity.tenant', 1)}</dt>
 					<dd>
 						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+					</dd>
+					<dt>{t('device.assignedEmployee')}</dt>
+					<dd>
+						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>

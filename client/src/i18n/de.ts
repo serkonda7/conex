@@ -270,6 +270,8 @@ export const de: Messages = {
 	'employee.loadingOne': 'Mitarbeiter wird geladen…',
 	'employee.notFound': 'Mitarbeiter nicht gefunden.',
 	'employee.details': 'Mitarbeiterdetails',
+	'employee.assignedDevices': 'Zugewiesene Geräte',
+	'employee.noDevices': 'Diesem Mitarbeiter sind keine Geräte zugewiesen.',
 	'employee.firstName': 'Vorname',
 	'employee.lastName': 'Nachname',
 	'employee.firstNamePlaceholder': 'Erika',
@@ -624,6 +626,9 @@ export const de: Messages = {
 	'device.positionInvalid':
 		'Die Rackposition muss eine positive ganze Zahl sein oder leer bleiben.',
 	'device.serial': 'Seriennummer',
+	'device.assignedEmployee': 'Zugewiesener Mitarbeiter',
+	'device.noEmployee': 'Keine Zuweisung',
+	'device.employeeTenantHint': 'Vor der Zuweisung eines Mitarbeiters einen Mandanten auswählen.',
 	'device.serialPlaceholder': 'Seriennummer (optional)',
 	'device.deviceId': 'Geräte-ID',
 	'device.deviceIdPlaceholder': 'Geräte-ID (optional)',

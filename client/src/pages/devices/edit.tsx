@@ -23,6 +23,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { parsePosition, validPosition } from './add'
+import { EmployeeAssignmentField } from './employee_assignment'
 
 /**
  * /devices/:id/edit — device edit form. Saves back to the device list when
@@ -40,6 +41,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [face, setFace] = createSignal('')
 	const [positionU, setPositionU] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
+	const [employeeId, setEmployeeId] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_device,
@@ -55,6 +57,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setFace(row.face ?? '')
 			setPositionU(id_value(row.position_u))
 			setTenantId(id_value(row.tenant_id))
+			setEmployeeId(id_value(row.employee_id))
 		},
 	})
 	const [sites] = createRows(fetch_sites, form.setError)
@@ -102,6 +105,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					face: (face() || null) as DeviceFace | null,
 					position_u: parsePosition(positionU()),
 					tenant_id: parseId(tenantId()),
+					employee_id: parseId(employeeId()),
 				}),
 			navigateTo: backTo(),
 		})
@@ -209,9 +213,21 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				id="device-edit-tenant"
 				label={tp('entity.tenant', 1)}
 				value={tenantId()}
-				onChange={setTenantId}
+				onChange={(value: string): void => {
+					if (value !== tenantId()) {
+						setEmployeeId('')
+					}
+					setTenantId(value)
+				}}
 				options={row_options(tenants() ?? [])}
 				emptyLabel={t('common.noTenant')}
+			/>
+			<EmployeeAssignmentField
+				id="device-edit-employee"
+				tenantId={parseId(tenantId())}
+				value={employeeId()}
+				onChange={setEmployeeId}
+				onError={form.setError}
 			/>
 		</FormPage>
 	)

@@ -1,20 +1,23 @@
 import { primaryPhone } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
+import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { delete_employee, fetch_employee } from '../../api/employees'
 import { fetch_tenant } from '../../api/tenancy'
 import { EmailList, PhoneList } from '../../components/contacts'
+import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
+	RelatedSection,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
 import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
-import { createRecord } from '../../lib/resource'
+import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { EmployeeIntegrationCards } from '../integrations/cards'
 import { EmployeeStatus } from './list'
@@ -29,6 +32,7 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [employee] = createRecord(id, fetch_employee, setError)
 	const tenantId = (): number | undefined => employee()?.tenant_id
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
+	const [devices] = createRowsFor(id, (key: number) => fetch_devices({ employee: key }), setError)
 
 	const tenantCrumbs = (): Crumb[] => {
 		const row = tenant()
@@ -91,6 +95,22 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 				<EmployeeIntegrationCards employeeId={props.id} />
 			</DetailShell>
+			<RelatedSection
+				id="employee-devices"
+				title={t('employee.assignedDevices')}
+				noun="noun.device"
+				rows={devices}
+				emptyText={t('employee.noDevices')}
+				viewAllHref={`/devices?employee=${props.id}`}
+				columns={[
+					nameColumn<DeviceRow>(t('common.name'), '/devices'),
+					{
+						key: 'device_id',
+						label: t('device.deviceId'),
+						getValue: (device: DeviceRow): string => device.device_id ?? '—',
+					},
+				]}
+			/>
 
 			<InlineError message={error()} />
 		</div>

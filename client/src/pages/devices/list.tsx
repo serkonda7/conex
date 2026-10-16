@@ -1,6 +1,7 @@
 import { createMemo, createSignal, type JSX } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, type DeviceSort, delete_device, fetch_devices } from '../../api/devices'
+import { fetch_all_employees } from '../../api/employees'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
@@ -29,6 +30,7 @@ export function DevicesPage(): JSX.Element {
 	const [filterRole, setFilterRole] = useQueryFilter('role')
 	const [filterTenant] = useQueryFilter('tenant')
 	const [filterType] = useQueryFilter('device_type')
+	const [filterEmployee, setFilterEmployee] = useQueryFilter('employee')
 	const list = useEntityList({
 		noun: 'noun.device',
 		sort: 'name' as DeviceSort,
@@ -36,6 +38,7 @@ export function DevicesPage(): JSX.Element {
 			rack: parseId(filterRack()) ?? undefined,
 			role: parseId(filterRole()) ?? undefined,
 			device_type: parseId(filterType()) ?? undefined,
+			employee: parseId(filterEmployee()) ?? undefined,
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_devices,
@@ -44,6 +47,8 @@ export function DevicesPage(): JSX.Element {
 	const [types] = createRows(fetch_device_types, list.setError)
 	const [roles] = createRows(fetch_device_roles, list.setError)
 	const [racks] = createRows(fetch_racks, list.setError)
+	const [employees] = createRows(fetch_all_employees, list.setError)
+	const employeeName = useNameOf(employees)
 	const typeName = useNameOf(types, (type) => type.model)
 	const roleName = useNameOf(roles)
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
@@ -74,6 +79,18 @@ export function DevicesPage(): JSX.Element {
 			getValue: (d: DeviceRow): string => typeName(d.device_type_id),
 		},
 		{
+			key: 'employee',
+			label: t('device.assignedEmployee'),
+			getValue: (device: DeviceRow): JSX.Element =>
+				device.employee_id === null ? (
+					<span>—</span>
+				) : (
+					<a href={`/employees/${device.employee_id}`}>
+						{employeeName(device.employee_id)}
+					</a>
+				),
+		},
+		{
 			key: 'mount',
 			label: t('device.mount'),
 			sortable: true,
@@ -100,6 +117,13 @@ export function DevicesPage(): JSX.Element {
 			title={tp('entity.device', 2)}
 			addHref="/devices/add"
 			filters={[
+				{
+					key: 'employee',
+					label: t('device.assignedEmployee'),
+					options: idOptions(employees()),
+					value: filterEmployee,
+					onChange: setFilterEmployee,
+				},
 				{
 					key: 'rack',
 					label: tp('entity.rack', 1),

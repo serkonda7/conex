@@ -1069,6 +1069,7 @@ export const DeviceCreateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: DeviceIdSchema,
 	tenant_id: NullableIdSchema,
+	employee_id: NullableIdSchema,
 	description: DescriptionSchema,
 })
 
@@ -1088,6 +1089,7 @@ export const DeviceUpdateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	employee_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
@@ -1133,6 +1135,7 @@ export const DeviceListQuerySchema = v.object({
 	rack: OptionalIdEntry,
 	role: OptionalIdEntry,
 	device_type: OptionalIdEntry,
+	employee: OptionalIdEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
