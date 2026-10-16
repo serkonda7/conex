@@ -361,21 +361,29 @@ export const device_type_interfaces = pgTable(
 // P3b: device roles (NetBox-style functional roles: `Server`, `Switch`, …).
 // Shared catalog data (no tenant column): every device carries exactly one;
 // role delete is blocked while devices reference it (service layer), so the
-// FK carries no cascade.
+// FK carries no cascade. Roles nest via `parent_id`; delete is likewise
+// blocked while child roles exist.
 // ---------------------------------------------------------------------------
 
 export const device_roles = pgTable(
 	'device_roles',
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		parent_id: integer('parent_id').references((): AnyPgColumn => device_roles.id),
 		name: text('name').notNull().unique(),
 		description: text('description'),
 		icon: text('icon', { enum: DEVICE_ROLE_ICONS }),
+		// 0/1: devices of this role may host virtual machines. The built-in
+		// `pc` and `server` roles start with it set (migration).
+		can_host_vms: integer('can_host_vms').notNull().default(0),
 		// Built-in roles (`DEVICE_ROLE_KEYS`) carry their key; they are seeded
 		// by migration and can be neither renamed nor deleted.
 		key: text('key').unique(),
 	},
-	(table) => [index('device_roles_name_idx').on(table.name)],
+	(table) => [
+		index('device_roles_name_idx').on(table.name),
+		index('device_roles_parent_id_idx').on(table.parent_id),
+	],
 )
 
 // ---------------------------------------------------------------------------

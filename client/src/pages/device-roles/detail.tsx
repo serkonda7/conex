@@ -1,11 +1,18 @@
 import { createSignal, type JSX, Show } from 'solid-js'
-import { delete_device_role, fetch_device_role } from '../../api/device_roles'
+import {
+	type DeviceRoleListRow,
+	delete_device_role,
+	fetch_device_role,
+	fetch_device_roles,
+} from '../../api/device_roles'
 import { type DeviceListItem, fetch_device_list } from '../../api/devices'
+import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
+	RecordLink,
 	RelatedSection,
 	useDetailDelete,
 } from '../../components/detail_page'
@@ -18,13 +25,20 @@ import { createRecord, createRowsFor } from '../../lib/resource'
 import { deviceListHref } from '../devices/list'
 
 /**
- * /device-roles/:id — device role detail: header with description
- * and the related devices table.
+ * /device-roles/:id — device role detail: header with description, the
+ * child roles, and the related devices table (including child roles' devices).
  */
 export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const id = (): number => props.id
 	const [role] = createRecord(id, fetch_device_role, setError)
+	const parentId = (): number | null | undefined => role()?.parent_id
+	const [parent] = createRecord(parentId, fetch_device_role, setError)
+	const [children] = createRowsFor(
+		id,
+		(key: number) => fetch_device_roles({ parent: key }),
+		setError,
+	)
 	const [devices] = createRowsFor(id, (key: number) => fetch_device_list({ role: key }), setError)
 
 	const handleDelete = useDetailDelete({
@@ -53,6 +67,10 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 				<DetailSubtitle description={role()?.description} />
 
 				<DetailCard label={t('deviceRole.details')}>
+					<dt>{t('deviceRole.parent')}</dt>
+					<dd>
+						<RecordLink id={parentId()} record={parent} base="/device-roles" />
+					</dd>
 					<dt>{t('deviceRole.icon')}</dt>
 					<dd>
 						<Show when={role()?.icon} fallback="—">
@@ -63,8 +81,20 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 							)}
 						</Show>
 					</dd>
+					<dt>{t('deviceRole.canHostVms')}</dt>
+					<dd>{role()?.can_host_vms === 1 ? t('common.yes') : t('common.no')}</dd>
 				</DetailCard>
 			</DetailShell>
+
+			<RelatedSection
+				id="device-role-children"
+				title={t('deviceRole.children')}
+				rows={children}
+				loadingText={t('deviceRole.loadingChildren')}
+				emptyText={t('deviceRole.noChildren')}
+				customizable
+				columns={[nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles')]}
+			/>
 
 			<RelatedSection
 				id="device-role-devices"

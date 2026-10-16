@@ -379,7 +379,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				rows={vms}
 				emptyText={t('vm.emptyOnHost')}
 				actions={
-					<Show when={can('edit')}>
+					<Show when={can('edit') && deviceRole()?.can_host_vms === 1}>
 						<button
 							type="button"
 							onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}

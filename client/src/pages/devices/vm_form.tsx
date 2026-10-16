@@ -1,3 +1,4 @@
+import { Result } from 'better-result'
 import { createEffect, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, fetch_device } from '../../api/devices'
@@ -35,15 +36,23 @@ import { contextTenantId, useTenantDefault } from '../../lib/tenant_context'
 import { useDeviceSearch } from './device_search'
 import { EmployeeAssignmentField } from './employee_assignment'
 
-/** Host device of a VM: picked with the device search, cleared for a cloud VM. */
+/**
+ * Host device of a VM: picked with the device search (limited to devices
+ * whose role can host VMs), cleared for a cloud VM.
+ */
 function HostField(props: {
 	id: string
 	host: DeviceRow | null | undefined
 	hostId: number | null
+	canHost: (device: DeviceRow) => boolean
 	onChange: (host: DeviceRow | null) => void
 }): JSX.Element {
 	const [selecting, setSelecting] = createSignal(false)
 	const deviceSearch = useDeviceSearch()
+	const loadHosts = async (search: string): ReturnType<typeof deviceSearch.load> => {
+		const res = await deviceSearch.load(search)
+		return Result.isError(res) ? res : Result.ok(res.value.filter(props.canHost))
+	}
 	return (
 		<Field
 			label={t('vm.host')}
@@ -73,6 +82,7 @@ function HostField(props: {
 				<ObjectSelector
 					label={t('vm.selectHostTitle')}
 					{...deviceSearch}
+					load={loadHosts}
 					on_select={(device: DeviceRow) => {
 						setSelecting(false)
 						props.onChange(device)
@@ -231,6 +241,11 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					id={`${prefix}-host`}
 					host={host()}
 					hostId={hostId()}
+					canHost={(device: DeviceRow): boolean =>
+						(roles() ?? []).some(
+							(role) => role.id === device.device_role_id && role.can_host_vms === 1,
+						)
+					}
 					onChange={handleHostChange}
 				/>
 				<Show when={hostId() === null}>

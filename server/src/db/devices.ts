@@ -40,7 +40,7 @@ import { prunePlacements } from './attachments'
 import { deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { checkDeviceRoleExists } from './device_roles'
+import { checkDeviceRoleExists, deviceRoleSubtree } from './device_roles'
 import { checkEmployeeAssignment } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
@@ -275,6 +275,8 @@ const nullText = (name: string): SQL.Aliased<string | null> =>
  */
 export async function listDevices(params: DeviceListParams): Promise<Page<DeviceListItem>> {
 	const db = getDb()
+	// A role matches its descendant roles too (nested roles).
+	const roleIds = params.role ? await deviceRoleSubtree(params.role) : undefined
 	const deviceOnly =
 		params.site !== undefined ||
 		params.rack !== undefined ||
@@ -312,7 +314,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 						: undefined,
 					params.site ? eq(devices.site_id, params.site) : undefined,
 					params.rack ? eq(devices.rack_id, params.rack) : undefined,
-					params.role ? eq(devices.device_role_id, params.role) : undefined,
+					roleIds ? inArray(devices.device_role_id, roleIds) : undefined,
 					params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
 					params.employee ? eq(devices.employee_id, params.employee) : undefined,
 					...tenantConditions(devices.tenant_id, params),
@@ -329,7 +331,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			: and(
 					searchCondition(params.search, [virtual_machines.name]),
 					params.host ? eq(virtual_machines.host_device_id, params.host) : undefined,
-					params.role ? eq(virtual_machines.device_role_id, params.role) : undefined,
+					roleIds ? inArray(virtual_machines.device_role_id, roleIds) : undefined,
 					params.employee ? eq(virtual_machines.employee_id, params.employee) : undefined,
 					...tenantConditions(virtual_machines.tenant_id, params),
 					params.status ? eq(virtual_machines.status, params.status) : undefined,

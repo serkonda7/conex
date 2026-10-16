@@ -829,14 +829,18 @@ export const DeviceRoleIconSchema = v.picklist(DEVICE_ROLE_ICONS)
 
 export const DeviceRoleCreateSchema = v.strictObject({
 	name: NameSchema,
+	parent_id: NullableIdSchema,
 	description: DescriptionSchema,
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
+	can_host_vms: v.optional(v.boolean(), false),
 })
 
 export const DeviceRoleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
+	parent_id: v.optional(v.nullable(IdSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
+	can_host_vms: v.optional(v.boolean(), undefined),
 })
 
 export type DeviceRoleCreate = v.InferOutput<typeof DeviceRoleCreateSchema>
@@ -844,6 +848,7 @@ export type DeviceRoleUpdate = v.InferOutput<typeof DeviceRoleUpdateSchema>
 
 export const DeviceRoleListQuerySchema = v.object({
 	...ListQueryEntries,
+	parent: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

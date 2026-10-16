@@ -1,4 +1,4 @@
-import { IconArrowsExchange } from '@tabler/icons-solidjs'
+import { IconArrowsExchange, IconCloudPlus } from '@tabler/icons-solidjs'
 import type { DeviceListKind } from 'shared/src/types'
 import { createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
@@ -17,6 +17,7 @@ import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
 	idOptions,
+	type RowMenuAction,
 	useEntityList,
 	useQueryFilter,
 } from '../../components/list_page'
@@ -24,8 +25,8 @@ import { t, tp } from '../../i18n'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
-import { canGlobal } from '../../lib/session'
+import { navigate, parseId } from '../../lib/router'
+import { can, canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { MoveTenantDialog } from './move_tenant_dialog'
 
@@ -202,20 +203,31 @@ export function DevicesPage(): JSX.Element {
 				cloneHref={(d: DeviceListItem): string =>
 					d.kind === 'vm' ? `/devices/vm/add?clone=${d.id}` : `/devices/add?clone=${d.id}`
 				}
-				menuActions={(d: DeviceListItem) =>
+				menuActions={(d: DeviceListItem): RowMenuAction[] => {
+					const actions: RowMenuAction[] = []
+					if (
+						can('edit') &&
+						d.kind === 'device' &&
+						roleById().get(d.device_role_id)?.can_host_vms === 1
+					) {
+						actions.push({
+							label: t('vm.addVm'),
+							icon: IconCloudPlus,
+							onSelect: (): void => navigate(`/devices/vm/add?host=${d.id}`),
+						})
+					}
 					// A hosted VM follows its host's tenant.
-					canGlobal('edit') && !(d.kind === 'vm' && d.host_device_id !== null)
-						? [
-								{
-									label: t('device.moveTenant'),
-									icon: IconArrowsExchange,
-									onSelect: (): void => {
-										setMovingRow(d)
-									},
-								},
-							]
-						: []
-				}
+					if (canGlobal('edit') && !(d.kind === 'vm' && d.host_device_id !== null)) {
+						actions.push({
+							label: t('device.moveTenant'),
+							icon: IconArrowsExchange,
+							onSelect: (): void => {
+								setMovingRow(d)
+							},
+						})
+					}
+					return actions
+				}}
 				emptyText={t('device.empty')}
 			/>
 			<Show when={movingRow()}>

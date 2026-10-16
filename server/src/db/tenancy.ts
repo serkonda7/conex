@@ -33,6 +33,7 @@ import {
 	createsCycle,
 	depthOf,
 	maxDescendantOffset,
+	sortHierarchically,
 } from '../services/hierarchy'
 import { removeAttachmentFiles } from '../storage'
 import {
@@ -698,61 +699,6 @@ export interface LocationListParams extends ListParams, TenantFilterParams {
 	order: 'asc' | 'desc'
 }
 
-/**
- * Sort locations as a preorder tree: roots and each sibling group are sorted
- * by the requested field, while every parent stays immediately before its
- * descendants. This keeps the API order aligned with the indented list view.
- */
-function sortLocationsHierarchically(
-	rows: LocationRow[],
-	sort: LocationListParams['sort'],
-	order: LocationListParams['order'],
-): LocationRow[] {
-	const children = new Map<number | null, LocationRow[]>()
-	const included = new Set(rows.map((row) => row.id))
-	for (const row of rows) {
-		// A filtered result may omit a row's parent; treat that row as a root in
-		// the returned subset rather than hiding it from the tree.
-		const parentId =
-			row.parent_id !== null && included.has(row.parent_id) ? row.parent_id : null
-		const siblings = children.get(parentId)
-		if (siblings) {
-			siblings.push(row)
-		} else {
-			children.set(parentId, [row])
-		}
-	}
-
-	const collate = (a: string, b: string): number =>
-		a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-	const direction = order === 'desc' ? -1 : 1
-	const compare = (a: LocationRow, b: LocationRow): number => {
-		const byField = collate(a[sort] ?? '', b[sort] ?? '')
-		if (byField !== 0) {
-			return byField * direction
-		}
-		// Stable tie-breakers make pagination deterministic when sibling values
-		// are equal (and match the selected direction for the name tie-breaker).
-		const byName = collate(a.name, b.name)
-		return (byName !== 0 ? byName : a.id - b.id) * direction
-	}
-
-	const sorted: LocationRow[] = []
-	const visit = (parentId: number | null): void => {
-		const siblings = children.get(parentId)
-		if (!siblings) {
-			return
-		}
-		siblings.sort(compare)
-		for (const row of siblings) {
-			sorted.push(row)
-			visit(row.id)
-		}
-	}
-	visit(null)
-	return sorted
-}
-
 export async function listLocations(params: LocationListParams): Promise<Page<LocationRow>> {
 	const where = and(
 		searchCondition(params.search, [locations.name, locations.description]),
@@ -761,7 +707,7 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 		...tenantConditions(locations.tenant_id, params),
 	)
 	const matching = await getDb().select().from(locations).where(where)
-	const ordered = sortLocationsHierarchically(matching, params.sort, params.order)
+	const ordered = sortHierarchically(matching, params.sort, params.order)
 	const offset = offsetOf(params)
 	return pageOf(ordered.slice(offset, offset + params.limit), matching.length, params)
 }

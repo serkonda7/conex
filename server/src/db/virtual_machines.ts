@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import { and, eq, isNull, type SQL } from 'drizzle-orm'
 import type { VirtualMachineCreate, VirtualMachineUpdate } from 'shared/src/schemas'
-import { devices, virtual_machines } from '../schema'
+import { device_roles, devices, virtual_machines } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { checkDeviceRoleExists } from './device_roles'
@@ -33,11 +33,25 @@ export type VirtualMachineRow = typeof virtual_machines.$inferSelect
 const NAME_IN_USE_ON_HOST = 'This host already runs a virtual machine with this name'
 const NAME_IN_USE_HOSTLESS = 'A virtual machine without host already uses this name'
 const TENANT_FROM_HOST = 'A virtual machine on a host takes its tenant from the host'
+const HOST_ROLE_CANNOT_HOST = "The host device's role cannot host virtual machines"
 
-/** Tenant of the host device, or a `NotFoundError` when it is missing. */
-async function hostTenant(hostId: number): Promise<Result<number | null, Error>> {
+/**
+ * Tenant of the host device, or a `NotFoundError` when it is missing. A newly
+ * picked host (`newHost`) must have a role that can host VMs; VMs already on
+ * a host stay valid when its role loses the flag.
+ */
+async function hostTenant(hostId: number, newHost: boolean): Promise<Result<number | null, Error>> {
 	const host = await findOne(devices, eq(devices.id, hostId))
-	return host ? Result.ok(host.tenant_id) : Result.err(new NotFoundError('Host device not found'))
+	if (!host) {
+		return Result.err(new NotFoundError('Host device not found'))
+	}
+	if (newHost) {
+		const role = await findOne(device_roles, eq(device_roles.id, host.device_role_id))
+		if (role?.can_host_vms !== 1) {
+			return Result.err(new ValidationError(HOST_ROLE_CANNOT_HOST))
+		}
+	}
+	return Result.ok(host.tenant_id)
 }
 
 /** Rows a VM name collides with: same host, or same tenant among hostless VMs. */
@@ -96,7 +110,7 @@ export async function createVirtualMachine(
 		if (input.tenant_id !== undefined) {
 			return Result.err(new ValidationError(TENANT_FROM_HOST))
 		}
-		const tenant = await hostTenant(hostId)
+		const tenant = await hostTenant(hostId, true)
 		if (Result.isError(tenant)) {
 			return tenant
 		}
@@ -152,7 +166,7 @@ export async function updateVirtualMachine(
 		if (input.tenant_id !== undefined) {
 			return Result.err(new ValidationError(TENANT_FROM_HOST))
 		}
-		const tenant = await hostTenant(hostId)
+		const tenant = await hostTenant(hostId, hostId !== node.host_device_id)
 		if (Result.isError(tenant)) {
 			return tenant
 		}

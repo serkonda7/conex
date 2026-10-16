@@ -239,6 +239,20 @@
       "when": 1792162343841,
       "tag": "0033_virtual_machines",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792163035242,
+      "tag": "0034_device_role_nesting",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792163372151,
+      "tag": "0035_device_role_can_host_vms",
+      "breakpoints": true
     }
   ]
 }
