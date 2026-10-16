@@ -243,6 +243,25 @@ if (e2eSite && e2eRackType) {
 				.returning()
 		)[0]
 	}
+	// Nested child for the device-roles list snapshot (indented tree rendering).
+	let e2eChildRole = (await db.select().from(device_roles)).find(
+		(row) => row.name === 'E2E Child Role',
+	)
+	if (!e2eChildRole) {
+		e2eChildRole = (
+			await db
+				.insert(device_roles)
+				.values({
+					name: 'E2E Child Role',
+					parent_id: e2eRole.id,
+					description: 'Nested role for screenshot coverage.',
+					icon: 'switch',
+				})
+				.returning()
+		)[0]
+	} else if (e2eChildRole.parent_id !== e2eRole.id) {
+		await getSqlClient()`UPDATE device_roles SET parent_id = ${e2eRole.id} WHERE id = ${e2eChildRole.id}`
+	}
 	let visualRack = (await db.select().from(racks)).find((row) => row.name === 'E2E Visual Rack')
 	if (!visualRack) {
 		visualRack = (

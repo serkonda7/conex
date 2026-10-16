@@ -61,6 +61,15 @@ test('device types list layout', async ({ page }) => {
 	await expect(page.locator('main.app-content')).toHaveScreenshot('device-types-list.png')
 })
 
+test('device roles list layout', async ({ page }) => {
+	await page.goto('/device-roles')
+	await expect(page.getByRole('link', { name: 'E2E Role', exact: true })).toBeVisible()
+	await expect(page.getByRole('link', { name: 'E2E Child Role', exact: true })).toBeVisible()
+	await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
+	await stabilizeForSnapshot(page)
+	await expect(page.locator('main.app-content')).toHaveScreenshot('device-roles-list.png')
+})
+
 test('device add form layout', async ({ page }) => {
 	// With a tenant in the global context the employee picker is enabled.
 	const response = await page.request.get('/api/tenants?search=E2E%20Tenant&limit=200')
