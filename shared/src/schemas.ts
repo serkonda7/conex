@@ -2169,11 +2169,13 @@ export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
 
 /**
  * New ticket in the external system for a linked tenant (company), optionally
- * attached to one of its linked devices.
+ * attached to one of its linked devices and reported by one of its linked
+ * employees.
  */
 export const TicketCreateSchema = v.strictObject({
 	tenant_id: IdSchema,
 	device_id: v.optional(IdSchema, undefined),
+	employee_id: v.optional(IdSchema, undefined),
 	title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
 	content: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(10000)), ''),
 })

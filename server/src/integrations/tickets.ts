@@ -1,7 +1,7 @@
 /**
  * Tickets in the external system. Creation: the tenant must be linked to an
- * external company; an optional device must belong to that tenant and is
- * attached to the ticket when it is linked too. Listing: the open tickets
+ * external company; an optional device or employee must belong to that tenant
+ * and is attached to the ticket when it is linked too. Listing: the open tickets
  * of a linked tenant, cached per company for `TICKET_CACHE_SECONDS`.
  */
 import { Result } from 'better-result'
@@ -14,7 +14,7 @@ import type {
 } from 'shared/src/schemas'
 import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { findOne } from '../db/list'
-import { devices, tenants } from '../schema'
+import { devices, employees, tenants } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { getIntegrationRow, providerFor } from './store'
@@ -57,6 +57,17 @@ export async function createTicket(
 		}
 		externalDeviceId = (await linkOf(provider, 'device', device.id))?.external_id
 	}
+	let externalEmployeeId: string | undefined
+	if (input.employee_id !== undefined) {
+		const employee = await findOne(employees, eq(employees.id, input.employee_id))
+		if (!employee) {
+			return Result.err(new NotFoundError('Employee not found'))
+		}
+		if (employee.tenant_id !== tenant.id) {
+			return Result.err(new ValidationError('Employee does not belong to the tenant'))
+		}
+		externalEmployeeId = (await linkOf(provider, 'employee', employee.id))?.external_id
+	}
 	const company = await linkOf(provider, 'tenant', tenant.id)
 	if (!company) {
 		return Result.err(new ValidationError('Tenant is not linked to an external company'))
@@ -72,6 +83,7 @@ export async function createTicket(
 	const created = await instance.createTicket({
 		externalTenantId: company.external_id,
 		...(externalDeviceId !== undefined ? { externalDeviceId } : {}),
+		...(externalEmployeeId !== undefined ? { externalEmployeeId } : {}),
 		title: input.title,
 		content: input.content,
 	})
