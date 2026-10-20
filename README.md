@@ -82,13 +82,20 @@ bun run docs:build
 ```
 
 
-### Git Worktrees
-Use worktrees to work on parallel branches without disturbing the current checkout:
+## Git Worktrees
 ```sh
 git worktree add ../conex-feature -b feature/my-change
 cd ../conex-feature
-# work, test, and commit as usual
-cd ../conex
-git worktree remove ../conex-feature
-git branch -d feature/my-change
+
+bun install
+
+export CONEX_CONFIG_PATH="$HOME/.config/conex/config.toml"
+export CONEX_DATABASE_URL=postgres://conex:conex@localhost:5432/conex
+bun run dev
+```
+
+One-time symlink of shared config:
+```sh
+mkdir -p ~/.config/conex
+ln -s $PWD/server/data/config.toml ~/.config/conex/config.toml
 ```
