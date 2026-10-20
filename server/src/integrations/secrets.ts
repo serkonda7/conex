@@ -15,26 +15,33 @@ const VERSION = 'v1'
 const IV_BYTES = 12
 const TAG_BYTES = 16
 
-/** AES-256-GCM: `v1.<iv>.<ciphertext+tag>`, both base64. */
-export function encryptSecrets(secrets: IntegrationSecrets): string {
+/** AES-256-GCM of a JSON value: `v1.<iv>.<ciphertext+tag>`, both base64. */
+export function encryptJson(value: unknown): string {
 	const iv = randomBytes(IV_BYTES)
 	const cipher = createCipheriv('aes-256-gcm', getIntegrationKey(), iv)
 	const body = Buffer.concat([
-		cipher.update(JSON.stringify(secrets), 'utf8'),
+		cipher.update(JSON.stringify(value), 'utf8'),
 		cipher.final(),
 		cipher.getAuthTag(),
 	])
 	return `${VERSION}.${iv.toString('base64')}.${body.toString('base64')}`
 }
 
-/** Fails when the app key changed or the value was tampered with. */
-export function decryptSecrets(stored: string): Result<IntegrationSecrets, Error> {
+/**
+ * Decrypts and validates an `encryptJson` value. Fails when the app key
+ * changed, the value was tampered with or it does not match `schema`.
+ */
+export function decryptJson<T>(
+	stored: string,
+	schema: v.GenericSchema<unknown, T>,
+): Result<T, Error> {
 	const [version, ivRaw, bodyRaw] = stored.split('.')
 	if (version !== VERSION || ivRaw === undefined || bodyRaw === undefined) {
 		return Result.err(new Error('Stored credentials have an unknown format'))
 	}
 	return Result.try({
-		try: () => {
+		// Boxed: a bare generic `T` does not satisfy `Awaited<T>`.
+		try: (): { value: T } => {
 			const body = Buffer.from(bodyRaw, 'base64')
 			const decipher = createDecipheriv(
 				'aes-256-gcm',
@@ -46,9 +53,17 @@ export function decryptSecrets(stored: string): Result<IntegrationSecrets, Error
 				decipher.update(body.subarray(0, body.length - TAG_BYTES)),
 				decipher.final(),
 			]).toString('utf8')
-			return v.parse(SecretsSchema, JSON.parse(plain))
+			return { value: v.parse(schema, JSON.parse(plain)) }
 		},
 		catch: () =>
 			new Error('Stored credentials cannot be decrypted (app key changed?); re-enter them'),
-	})
+	}).map((boxed) => boxed.value)
+}
+
+export function encryptSecrets(secrets: IntegrationSecrets): string {
+	return encryptJson(secrets)
+}
+
+export function decryptSecrets(stored: string): Result<IntegrationSecrets, Error> {
+	return decryptJson(stored, SecretsSchema)
 }
