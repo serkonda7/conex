@@ -14,11 +14,15 @@ const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
 	'login.failure': 'badge-decommissioned',
 	'password.change': 'badge-planned',
 	'password.reset': 'badge-planned',
+	'calendar_sync.config_update': 'badge-staged',
+	'calendar_sync.mapping_update': 'badge-staged',
+	'calendar_sync.mapping_delete': 'badge-staged',
+	'calendar_sync.run': 'badge-staged',
 }
 
 /**
- * /audit-log — admin-only, read-only list of login attempts and password
- * changes (newest first) with their source address. Searchable by username
+ * /audit-log — admin-only, read-only list of login attempts, password
+ * changes and calendar sync changes (newest first) with their source address. Searchable by username
  * or IP and filterable by event.
  */
 export function AuditLogPage(): JSX.Element {

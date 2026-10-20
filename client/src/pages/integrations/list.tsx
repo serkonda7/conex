@@ -19,6 +19,7 @@ import { createRows, useAction } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { formatTime } from '../../lib/time'
+import { CalendarSyncCard } from './calendar_sync'
 
 /** Login state: disabled, the last error, or when it last connected. */
 function LoginStatus(props: { integration: IntegrationJson }): JSX.Element {
@@ -232,6 +233,10 @@ export function IntegrationsPage(): JSX.Element {
 				}
 			>
 				<For each={INTEGRATION_PROVIDERS}>{card}</For>
+				{/* Builds on the TANSS integration's credentials. */}
+				<Show when={canGlobal('integrations.manage') && configured('tanss')}>
+					<CalendarSyncCard />
+				</Show>
 			</Show>
 			<InlineError message={error()} />
 		</div>

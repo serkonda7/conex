@@ -149,6 +149,10 @@ const AUDIT_EVENT_KEYS: Record<AuditEvent, MessageKey> = {
 	'login.failure': 'auditEvent.loginFailure',
 	'password.change': 'auditEvent.passwordChange',
 	'password.reset': 'auditEvent.passwordReset',
+	'calendar_sync.config_update': 'auditEvent.calendarSyncConfigUpdate',
+	'calendar_sync.mapping_update': 'auditEvent.calendarSyncMappingUpdate',
+	'calendar_sync.mapping_delete': 'auditEvent.calendarSyncMappingDelete',
+	'calendar_sync.run': 'auditEvent.calendarSyncRun',
 }
 
 /** Audit log event (`login.success`, `password.reset`, …). */

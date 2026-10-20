@@ -1070,6 +1070,57 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'ticket.fetchedAt': 'Stand: {time}',
 
 	'provider.tanss': 'TANSS',
+	'calendarSync.title': 'Outlook-Kalendersynchronisation',
+	'calendarSync.description':
+		'Überträgt feste TANSS-Termine der zugeordneten Techniker in ihre Microsoft-365-Kalender. TANSS ist führend: Änderungen in Outlook werden überschrieben.',
+	'calendarSync.loading': 'Kalendersynchronisation wird geladen…',
+	'calendarSync.loadFailed':
+		'Die Einstellungen der Kalendersynchronisation konnten nicht geladen werden',
+	'calendarSync.saveFailed':
+		'Die Einstellungen der Kalendersynchronisation konnten nicht gespeichert werden',
+	'calendarSync.settings': 'Microsoft-365-App',
+	'calendarSync.tenantId': 'Mandanten-ID',
+	'calendarSync.tenantIdHint':
+		'Verzeichnis-ID (Mandanten-ID) oder primäre Domäne des Entra-Mandanten.',
+	'calendarSync.clientId': 'Anwendungs-ID (Client-ID)',
+	'calendarSync.clientSecret': 'Geheimer Clientschlüssel',
+	'calendarSync.interval': 'Intervall (Minuten)',
+	'calendarSync.enabled': 'Aktiviert',
+	'calendarSync.testMailbox': 'Testpostfach (optional)',
+	'calendarSync.testMailboxHint':
+		'Mit Postfach liest der Test auch dessen Kalender (prüft die Zugriffsrichtlinie).',
+	'calendarSync.testOk': 'Die App kann sich anmelden.',
+	'calendarSync.testOkMailbox':
+		'Die App kann sich anmelden und den Kalender von {mailbox} lesen.',
+	'calendarSync.testFailed': 'Verbindungstest fehlgeschlagen',
+	'calendarSync.technicians': 'Techniker',
+	'calendarSync.techniciansHint':
+		'Nur Techniker mit gespeichertem, aktiviertem Postfach werden synchronisiert. Entfernen löscht die synchronisierten Termine beim nächsten Lauf; Deaktivieren pausiert die Synchronisation.',
+	'calendarSync.techniciansFailed': 'Die TANSS-Techniker konnten nicht geladen werden',
+	'calendarSync.loadingTechnicians': 'Techniker werden geladen…',
+	'calendarSync.noTechnicians': 'Keine Techniker.',
+	'calendarSync.technician': 'Techniker',
+	'calendarSync.mailbox': 'Postfach (UPN)',
+	'calendarSync.mailboxFor': 'Postfach von {name}',
+	'calendarSync.enabledFor': '{name} synchronisieren',
+	'calendarSync.map': 'Zuordnen',
+	'calendarSync.unmap': 'Entfernen',
+	'calendarSync.confirmRemove':
+		'Zuordnung von {name} entfernen? Die synchronisierten Termine werden beim nächsten Lauf aus Outlook gelöscht.',
+	'calendarSync.mappingFailed': 'Die Zuordnung konnte nicht gespeichert werden',
+	'calendarSync.runs': 'Letzte Läufe',
+	'calendarSync.runsFailed': 'Die Läufe der Kalendersynchronisation konnten nicht geladen werden',
+	'calendarSync.noRuns': 'Noch keine Läufe.',
+	'calendarSync.startedAt': 'Gestartet',
+	'calendarSync.changes': 'Änderungen',
+	'calendarSync.error': 'Fehler',
+	'calendarSync.counts':
+		'{created} erstellt, {updated} aktualisiert, {deleted} gelöscht, {failed} fehlgeschlagen',
+	'calendarSync.syncFailed': 'Kalendersynchronisation fehlgeschlagen',
+	'auditEvent.calendarSyncConfigUpdate': 'Einstellungen der Kalendersynchronisation geändert',
+	'auditEvent.calendarSyncMappingUpdate': 'Zuordnung der Kalendersynchronisation gespeichert',
+	'auditEvent.calendarSyncMappingDelete': 'Zuordnung der Kalendersynchronisation entfernt',
+	'auditEvent.calendarSyncRun': 'Kalendersynchronisation gestartet',
 	'syncState.running': 'Läuft',
 	'syncState.ok': 'OK',
 	'syncState.error': 'Fehlgeschlagen',
