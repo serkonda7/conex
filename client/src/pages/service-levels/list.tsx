@@ -10,6 +10,7 @@ import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { holidayRegionLabel } from '../../i18n/labels'
 import { formatServiceHours } from '../../lib/service_level'
+import { managedServiceTabs } from '../managed-bundles/list'
 
 /**
  * /service-levels — service level (SLA) list: search, sortable columns,
@@ -27,6 +28,7 @@ export function ServiceLevelsPage(): JSX.Element {
 		<EntityListPage
 			list={list}
 			title={tp('entity.serviceLevel', 2)}
+			tabs={managedServiceTabs('service-levels')}
 			addHref="/service-levels/add"
 			columns={[
 				nameColumn<ServiceLevelListRow>(t('common.name'), '/service-levels', {

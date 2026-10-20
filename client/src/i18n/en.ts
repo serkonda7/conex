@@ -225,6 +225,7 @@ export const en = {
 	'app.navGroup.organization': 'Organization',
 	'app.navGroup.devices': 'Devices',
 	'app.navGroup.catalog': 'Catalog',
+	'app.nav.managedService': 'Managed Service',
 	'app.navGroup.administration': 'Administration',
 	'app.tenantContext': 'Tenant context',
 	'app.tenantContextGroup': 'All of {name}',

@@ -8,6 +8,7 @@ import {
 import { descriptionColumn, nameColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
+import { managedServiceTabs } from '../managed-bundles/list'
 
 /**
  * /priorities — ticket priority list, most urgent first: search, sortable
@@ -25,6 +26,7 @@ export function PrioritiesPage(): JSX.Element {
 		<EntityListPage
 			list={list}
 			title={tp('entity.priority', 2)}
+			tabs={managedServiceTabs('priorities')}
 			addHref="/priorities/add"
 			columns={[
 				{

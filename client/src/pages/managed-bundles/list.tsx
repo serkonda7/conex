@@ -6,8 +6,27 @@ import {
 	type ManagedBundleSort,
 } from '../../api/service_catalog'
 import { descriptionColumn, nameColumn } from '../../components/data_table'
-import { EntityListPage, useEntityList } from '../../components/list_page'
+import { EntityListPage, type ListTab, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
+
+/** Managed bundles ↔ service levels ↔ priorities tabs. */
+export function managedServiceTabs(
+	active: 'managed-bundles' | 'service-levels' | 'priorities',
+): ListTab[] {
+	return [
+		{
+			label: tp('entity.managedBundle', 2),
+			href: '/managed-bundles',
+			active: active === 'managed-bundles',
+		},
+		{
+			label: tp('entity.serviceLevel', 2),
+			href: '/service-levels',
+			active: active === 'service-levels',
+		},
+		{ label: tp('entity.priority', 2), href: '/priorities', active: active === 'priorities' },
+	]
+}
 
 /**
  * /managed-bundles — managed-service bundle list: search, sortable columns,
@@ -25,6 +44,7 @@ export function ManagedBundlesPage(): JSX.Element {
 		<EntityListPage
 			list={list}
 			title={tp('entity.managedBundle', 2)}
+			tabs={managedServiceTabs('managed-bundles')}
 			addHref="/managed-bundles/add"
 			columns={[
 				nameColumn<ManagedBundleListRow>(t('common.name'), '/managed-bundles', {

@@ -226,6 +226,7 @@ export const de: Messages = {
 	'app.navGroup.organization': 'Firma',
 	'app.navGroup.devices': 'Geräte',
 	'app.navGroup.catalog': 'Katalog',
+	'app.nav.managedService': 'Managed Service',
 	'app.navGroup.administration': 'Administration',
 	'app.tenantContext': 'Mandantenkontext',
 	'app.tenantContextGroup': 'Alle aus {name}',
