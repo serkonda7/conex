@@ -23,6 +23,8 @@ import {
 	createErpClient,
 	createTanssClient,
 	TanssApiError as FacadeError,
+	getApiV1EmployeesId,
+	getApiV1EmployeesTechnicians,
 	getApiV1Manufacturers,
 	getApiV1PcsPcId,
 	getApiV1PeripheriesPeripheryId,
@@ -34,12 +36,15 @@ import {
 	putApiV1PcsPcId,
 	putApiV1Peripheries,
 	putApiV1PeripheriesPeripheryId,
+	putApiV1SupportsList,
 	putApiV1Tickets,
 	type TicketList,
 	type TnsPeripheryWithIpGuarantee,
 	type TnsPersonalComputer,
 	type TnsPersonalComputerWithDetails,
 	type TnsPersonalComputerWithIpGuarantee,
+	type TnsPlanningType,
+	type TnsSupportList,
 } from 'tanss-api'
 import * as v from 'valibot'
 
@@ -95,6 +100,21 @@ export interface TanssTicket {
 	statusName: string | null
 }
 
+/** Technician of the own company (planning resource). */
+export interface TanssTechnician {
+	id: number
+	name: string
+	/** Employee email; suggested as the Outlook mailbox. */
+	email: string | null
+}
+
+/** Appointments with the names `meta.linkedEntities` resolves for them. */
+export interface TanssAppointments {
+	supports: TnsSupportList[]
+	ticketTitles: Map<number, string>
+	companyNames: Map<number, string>
+}
+
 /** Raised for HTTP failures; `status` 401/403 means bad credentials. */
 export class TanssApiError extends Error {
 	constructor(
@@ -138,6 +158,17 @@ export interface TanssTicketInput {
 	title: string
 	content: string
 }
+
+const EmployeeResponseSchema = v.object({
+	content: v.optional(v.nullable(v.looseObject({ emailAddress: v.optional(v.unknown()) }))),
+})
+
+/**
+ * The first appointment list of a process is dumped as-is (probe for field
+ * names and recurring entries); the sync polls every few minutes, so later
+ * ones are not.
+ */
+let appointmentsDumped = false
 
 const ContentListSchema = v.object({ content: v.optional(v.nullable(v.array(v.unknown()))) })
 
@@ -578,6 +609,81 @@ export class TanssSession {
 					ticket.statusId !== undefined ? (states.get(ticket.statusId) ?? null) : null,
 			})),
 		)
+	}
+
+	/** Technicians of the own company with their email (one detail call each). */
+	async listTechnicians(): Promise<Result<TanssTechnician[], Error>> {
+		const res = await this.userCall('technician list', (client) =>
+			getApiV1EmployeesTechnicians({ client }),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const technicians: TanssTechnician[] = []
+		for (const raw of listContent(res.value)) {
+			const row = raw as { id?: unknown; name?: unknown }
+			const id = num(row.id)
+			if (id === null) {
+				continue
+			}
+			const email = await this.employeeEmail(id)
+			if (Result.isError(email)) {
+				return email
+			}
+			technicians.push({ id, name: str(row.name) ?? `#${id}`, email: email.value })
+		}
+		return Result.ok(technicians)
+	}
+
+	/** `emailAddress` of a user-API employee (technician), if set. */
+	private async employeeEmail(employeeId: number): Promise<Result<string | null, Error>> {
+		const res = await this.userCall('employee fetch', (client) =>
+			getApiV1EmployeesId({ client, path: { id: employeeId } }),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const parsed = v.safeParse(EmployeeResponseSchema, res.value)
+		return Result.ok(parsed.success ? str(parsed.output.content?.emailAddress) : null)
+	}
+
+	/**
+	 * Planned supports of the given technicians that start within
+	 * [`from`, `to`] (unix seconds); recurring appointments are requested
+	 * expanded (`fetchRecurring`).
+	 */
+	async listAppointments(
+		from: number,
+		to: number,
+		employeeIds: number[],
+		planningTypes: TnsPlanningType[],
+	): Promise<Result<TanssAppointments, Error>> {
+		const res = await this.userCall('appointment list', (client) =>
+			putApiV1SupportsList({
+				client,
+				body: {
+					timeframe: { from, to },
+					employees: employeeIds,
+					planningTypes,
+					fetchRecurring: true,
+				},
+			}),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		if (!appointmentsDumped) {
+			appointmentsDumped = true
+			const dump = await saveRawResponse(`supports-list-${from}-${to}`, res.value)
+			if (Result.isError(dump)) {
+				return dump
+			}
+		}
+		return Result.ok({
+			supports: listContent(res.value) as TnsSupportList[],
+			ticketTitles: linkedNames(res.value, 'tickets'),
+			companyNames: linkedNames(res.value, 'companies'),
+		})
 	}
 
 	/** Overwrites the given fields of an employee (ERP API; omitted fields stay). */
