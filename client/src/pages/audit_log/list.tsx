@@ -24,7 +24,7 @@ const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
 export function AuditLogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-	const [event, setEvent] = createSignal<AuditEvent | ''>('')
+	const [event, setEvent] = createSignal<AuditEvent[]>([])
 	const filters = useListFilters<AuditLogEntryJson>({
 		search,
 		setSearch,
@@ -34,8 +34,8 @@ export function AuditLogPage(): JSX.Element {
 				label: t('audit.event'),
 				options: auditEventOptions(),
 				value: event,
-				onChange: (value: string): void => {
-					setEvent(value as AuditEvent | '')
+				onChange: (value: string[]): void => {
+					setEvent(value as AuditEvent[])
 				},
 			},
 		],
@@ -45,7 +45,10 @@ export function AuditLogPage(): JSX.Element {
 		() => ({ search: debouncedSearch(), event: event() }),
 		async (q) => {
 			setError(null)
-			const res = await fetch_audit_log({ search: q.search, event: q.event || undefined })
+			const res = await fetch_audit_log({
+				search: q.search,
+				event: q.event.length > 0 ? q.event : undefined,
+			})
 			if (Result.isError(res)) {
 				setError(res.error.message)
 				return null

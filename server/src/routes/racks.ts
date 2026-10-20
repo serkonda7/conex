@@ -22,7 +22,10 @@ const baseRacksApp = makeTenantApp({
 	get: getRack,
 	update: updateRack,
 	remove: deleteRack,
-	filters: (q: { site?: number; location?: number }) => ({ site: q.site, location: q.location }),
+	filters: (q: { site?: number[]; location?: number[] }) => ({
+		site: q.site,
+		location: q.location,
+	}),
 })
 
 export const racksApp = baseRacksApp.get(

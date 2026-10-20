@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, desc, eq, lte } from 'drizzle-orm'
+import { and, desc, inArray, lte } from 'drizzle-orm'
 import type { AuditEvent, AuditLogEntryJson } from 'shared/src/schemas'
 import { audit_log } from '../schema'
 import { nowSeconds } from '../util/time'
@@ -44,7 +44,7 @@ export async function recordAudit(entry: AuditRecord): Promise<Result<unknown, E
 }
 
 export interface AuditListParams extends ListParams {
-	event?: AuditEvent
+	event?: AuditEvent[]
 }
 
 export async function listAuditLog(
@@ -57,7 +57,7 @@ export async function listAuditLog(
 			audit_log.ip,
 			audit_log.forwarded_for,
 		]),
-		params.event ? eq(audit_log.event, params.event) : undefined,
+		params.event ? inArray(audit_log.event, params.event) : undefined,
 	)
 	const page = await pageRows(
 		audit_log,

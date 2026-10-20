@@ -90,7 +90,7 @@ export function DeviceAddPage(): JSX.Element {
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),
-		(key: number) => fetch_locations({ site: key }),
+		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
 	// 0U types are not rack-mounted.

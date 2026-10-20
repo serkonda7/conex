@@ -241,10 +241,10 @@ function duplicateDeviceError(err: unknown): Error {
 
 export interface DeviceListParams extends ListParams, TenantFilterParams {
 	site?: number
-	rack?: number
-	role?: number
+	rack?: number[]
+	role?: number[]
 	device_type?: number
-	employee?: number
+	employee?: number[]
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
@@ -276,7 +276,9 @@ const nullText = (name: string): SQL.Aliased<string | null> =>
 export async function listDevices(params: DeviceListParams): Promise<Page<DeviceListItem>> {
 	const db = getDb()
 	// A role matches its descendant roles too (nested roles).
-	const roleIds = params.role ? await deviceRoleSubtree(params.role) : undefined
+	const roleIds = params.role
+		? [...new Set((await Promise.all(params.role.map(deviceRoleSubtree))).flat())]
+		: undefined
 	const deviceOnly =
 		params.site !== undefined ||
 		params.rack !== undefined ||
@@ -313,10 +315,10 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 							)
 						: undefined,
 					params.site ? eq(devices.site_id, params.site) : undefined,
-					params.rack ? eq(devices.rack_id, params.rack) : undefined,
+					params.rack ? inArray(devices.rack_id, params.rack) : undefined,
 					roleIds ? inArray(devices.device_role_id, roleIds) : undefined,
 					params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
-					params.employee ? eq(devices.employee_id, params.employee) : undefined,
+					params.employee ? inArray(devices.employee_id, params.employee) : undefined,
 					...tenantConditions(devices.tenant_id, params),
 					params.status ? eq(devices.status, params.status) : undefined,
 					params.placed === undefined
@@ -332,7 +334,9 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 					searchCondition(params.search, [virtual_machines.name]),
 					params.host ? eq(virtual_machines.host_device_id, params.host) : undefined,
 					roleIds ? inArray(virtual_machines.device_role_id, roleIds) : undefined,
-					params.employee ? eq(virtual_machines.employee_id, params.employee) : undefined,
+					params.employee
+						? inArray(virtual_machines.employee_id, params.employee)
+						: undefined,
 					...tenantConditions(virtual_machines.tenant_id, params),
 					params.status ? eq(virtual_machines.status, params.status) : undefined,
 				)

@@ -66,7 +66,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [elevation, { refetch }] = createRecord(id, fetch_elevation, setError)
 	const [rackDevices, { refetch: refetchRackDevices }] = createRowsFor(
 		id,
-		(key: number) => fetch_devices({ rack: key }),
+		(key: number) => fetch_devices({ rack: [key] }),
 		setError,
 	)
 	const unrackedDevices = (): DeviceRow[] =>

@@ -35,7 +35,7 @@ import { type PluralKey, t, tp } from '../i18n'
 import { use_visible_columns } from '../lib/column_visibility'
 import { useDismiss } from '../lib/dismiss'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
-import { navigate, queryParam } from '../lib/router'
+import { navigate, parseId, queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import {
 	type DataTableColumn,
@@ -108,22 +108,34 @@ export function useQueryFilter(key: string): [Accessor<string>, Setter<string>] 
 }
 
 /**
- * Single-choice server-side filter shown in the FilterTable's Filters tab.
- * `value` is the chosen option value as a string (`''` = any).
+ * Multi-value counterpart of {@link useQueryFilter}: seeded from a
+ * `?<key>=1,2` query, empty when absent.
+ */
+export function useQueryFilterList(key: string): [Accessor<string[]>, Setter<string[]>] {
+	return createSignal(queryParam(key).split(',').filter(Boolean))
+}
+
+/** Chosen option values as ids for a server filter; `undefined` when none is set. */
+export function idsOf(values: readonly string[]): number[] | undefined {
+	const ids = values.flatMap((v) => parseId(v) ?? [])
+	return ids.length > 0 ? ids : undefined
+}
+
+/**
+ * Multi-choice server-side filter shown in the FilterTable's Filters tab.
+ * `value` holds the chosen option values as strings (`[]` = any).
  */
 export interface ListFilter {
 	key: string
 	label: string
 	options: ComboboxOption[]
-	value: Accessor<string>
-	onChange: (value: string) => void
+	value: Accessor<string[]>
+	onChange: (value: string[]) => void
 }
 
 /**
  * Binds the search signal (FilterTable's quick search, `q`) and the
- * single-value `filters` to a server-filtered FilterTable. The table's
- * select filters hold a list; the endpoints take one id, so the most
- * recently chosen option wins.
+ * multi-value `filters` to a server-filtered FilterTable.
  */
 export function useListFilters<Row>(opts: {
 	search: Accessor<string>
@@ -150,8 +162,8 @@ export function useListFilters<Row>(opts: {
 		filterValues: () => {
 			const values: FilterTableValues = { q: opts.search() }
 			for (const f of list()) {
-				if (f.value() !== '') {
-					values[f.key] = [f.value()]
+				if (f.value().length > 0) {
+					values[f.key] = [...f.value()]
 				}
 			}
 			return values
@@ -163,14 +175,17 @@ export function useListFilters<Row>(opts: {
 			// filter (site → location), which must not be undone here.
 			const changed = list().flatMap((f: ListFilter) => {
 				const v = values[f.key]
-				const next = Array.isArray(v) ? (v.at(-1) ?? '') : (v ?? '')
-				return next === f.value() ? [] : [{ f, next }]
+				const next = Array.isArray(v) ? v : v ? [v] : []
+				const prev = f.value()
+				return next.length === prev.length && next.every((x, i) => x === prev[i])
+					? []
+					: [{ f, next }]
 			})
 			for (const { f, next } of changed) {
 				f.onChange(next)
 			}
 		},
-		filtered: () => list().some((f: ListFilter) => f.value() !== ''),
+		filtered: () => list().some((f: ListFilter) => f.value().length > 0),
 	}
 }
 

@@ -17,9 +17,11 @@ import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
 	idOptions,
+	idsOf,
 	type RowMenuAction,
 	useEntityList,
 	useQueryFilter,
+	useQueryFilterList,
 } from '../../components/list_page'
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
@@ -45,22 +47,25 @@ export function deviceListHref(row: DeviceListItem): string {
  * keyed `device-<id>` / `vm-<id>`.
  */
 export function DevicesPage(): JSX.Element {
-	const [filterRack, setFilterRack] = createSignal('')
-	const [filterRole, setFilterRole] = useQueryFilter('role')
+	const [filterRack, setFilterRack] = createSignal<string[]>([])
+	const [filterRole, setFilterRole] = useQueryFilterList('role')
 	const [filterTenant] = useQueryFilter('tenant')
 	const [filterType] = useQueryFilter('device_type')
-	const [filterEmployee, setFilterEmployee] = useQueryFilter('employee')
-	const [filterKind, setFilterKind] = useQueryFilter('kind')
+	const [filterEmployee, setFilterEmployee] = useQueryFilterList('employee')
+	const [filterKind, setFilterKind] = useQueryFilterList('kind')
 	const [movingRow, setMovingRow] = createSignal<DeviceListItem | null>(null)
 	const list = useEntityList({
 		noun: 'noun.device',
 		sort: 'name' as DeviceSort,
 		filters: () => ({
-			kind: (filterKind() || undefined) as DeviceListKind | undefined,
-			rack: parseId(filterRack()) ?? undefined,
-			role: parseId(filterRole()) ?? undefined,
+			// Both kinds chosen is the same as no filter.
+			kind: (filterKind().length === 1 ? filterKind()[0] : undefined) as
+				| DeviceListKind
+				| undefined,
+			rack: idsOf(filterRack()),
+			role: idsOf(filterRole()),
 			device_type: parseId(filterType()) ?? undefined,
-			employee: parseId(filterEmployee()) ?? undefined,
+			employee: idsOf(filterEmployee()),
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_device_list,

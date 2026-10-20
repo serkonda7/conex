@@ -45,7 +45,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 	const [tenants] = createRows(fetch_tenants, form.setError)
 	const [siblings] = createRowsFor(
 		siteId,
-		(key: number) => fetch_locations({ site: key }),
+		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
 	const [site] = createRecord(siteId, fetch_site)

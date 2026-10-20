@@ -85,8 +85,12 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [siteGroup] = createRecord(groupId, fetch_site_group, setError)
 	const [trail] = createResource(() => groupId() ?? null, siteGroupTrail)
-	const [locations] = createRowsFor(id, (key: number) => fetch_locations({ site: key }), setError)
-	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ site: key }), setError)
+	const [locations] = createRowsFor(
+		id,
+		(key: number) => fetch_locations({ site: [key] }),
+		setError,
+	)
+	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ site: [key] }), setError)
 	const [devices] = createRowsFor(id, (key: number) => fetch_devices({ site: key }), setError)
 	const tree = createMemo(() => treeOrder(locations() ?? []))
 	const depthOf = createMemo(() => new Map(tree().map((entry) => [entry.row.id, entry.depth])))

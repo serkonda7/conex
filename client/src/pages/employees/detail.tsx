@@ -32,7 +32,11 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [employee] = createRecord(id, fetch_employee, setError)
 	const tenantId = (): number | undefined => employee()?.tenant_id
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
-	const [devices] = createRowsFor(id, (key: number) => fetch_devices({ employee: key }), setError)
+	const [devices] = createRowsFor(
+		id,
+		(key: number) => fetch_devices({ employee: [key] }),
+		setError,
+	)
 
 	const tenantCrumbs = (): Crumb[] => {
 		const row = tenant()

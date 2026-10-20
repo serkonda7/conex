@@ -19,8 +19,8 @@ import { ChangeActionBadge, ChangedObjectLink, changeUser } from './common'
 export function ChangelogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
-	const [action, setAction] = createSignal<ChangeAction | ''>('')
-	const [objectType, setObjectType] = createSignal<ChangeObjectType | ''>('')
+	const [action, setAction] = createSignal<ChangeAction[]>([])
+	const [objectType, setObjectType] = createSignal<ChangeObjectType[]>([])
 	const filters = useListFilters<ObjectChangeJson>({
 		search,
 		setSearch,
@@ -30,8 +30,8 @@ export function ChangelogPage(): JSX.Element {
 				label: t('changelog.action'),
 				options: changeActionOptions(),
 				value: action,
-				onChange: (value: string): void => {
-					setAction(value as ChangeAction | '')
+				onChange: (value: string[]): void => {
+					setAction(value as ChangeAction[])
 				},
 			},
 			{
@@ -39,8 +39,8 @@ export function ChangelogPage(): JSX.Element {
 				label: t('changelog.objectType'),
 				options: changeObjectOptions(),
 				value: objectType,
-				onChange: (value: string): void => {
-					setObjectType(value as ChangeObjectType | '')
+				onChange: (value: string[]): void => {
+					setObjectType(value as ChangeObjectType[])
 				},
 			},
 		],
@@ -57,8 +57,8 @@ export function ChangelogPage(): JSX.Element {
 			setError(null)
 			const res = await fetch_changelog({
 				search: q.search,
-				action: q.action || undefined,
-				object_type: q.objectType || undefined,
+				action: q.action.length > 0 ? q.action : undefined,
+				object_type: q.objectType.length > 0 ? q.objectType : undefined,
 				...q.context,
 			})
 			if (Result.isError(res)) {

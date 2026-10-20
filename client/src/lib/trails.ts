@@ -26,7 +26,7 @@ export async function locationTrail(siteId: number, id: number | null): Promise<
 	if (id === null) {
 		return []
 	}
-	const res = await fetch_locations({ site: siteId })
+	const res = await fetch_locations({ site: [siteId] })
 	if (Result.isError(res)) {
 		return []
 	}

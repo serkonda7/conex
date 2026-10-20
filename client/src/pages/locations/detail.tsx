@@ -55,7 +55,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_locations({ parent: key }),
 		setError,
 	)
-	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ location: key }), setError)
+	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ location: [key] }), setError)
 	// Devices have no location filter on the API, so scope by site and
 	// narrow to this location client-side.
 	const [siteDevices] = createRowsFor(

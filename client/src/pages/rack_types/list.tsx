@@ -10,14 +10,14 @@ import type { DataTableColumn } from '../../components/data_table'
 import {
 	EntityListPage,
 	idOptions,
+	idsOf,
 	useEntityList,
-	useQueryFilter,
+	useQueryFilterList,
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { formFactorLabel } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
 
 /**
  * /rack-types — rack-type catalog: search, sortable columns, manufacturer
@@ -25,12 +25,12 @@ import { parseId } from '../../lib/router'
  * There is no edit page.
  */
 export function RackTypesPage(): JSX.Element {
-	const [filterManufacturer, setFilterManufacturer] = useQueryFilter('manufacturer')
+	const [filterManufacturer, setFilterManufacturer] = useQueryFilterList('manufacturer')
 	const list = useEntityList({
 		noun: 'noun.rackType',
 		sort: 'model' as DeviceTypeSort,
 		filters: () => ({
-			manufacturer: parseId(filterManufacturer()) ?? undefined,
+			manufacturer: idsOf(filterManufacturer()),
 			kind: 'rack' as const,
 		}),
 		fetch: fetch_device_types,

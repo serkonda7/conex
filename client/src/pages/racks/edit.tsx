@@ -40,7 +40,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 	const rackTypes = useDeviceTypeOptions({ kind: 'rack' }, form.setError)
 	const [siblings] = createRowsFor(
 		siteId,
-		(key: number) => fetch_locations({ site: key }),
+		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
 	const [site] = createRecord(siteId, fetch_site)
