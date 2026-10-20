@@ -117,6 +117,7 @@ export function ChangelogPage(): JSX.Element {
 				filters={filters.filters()}
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
+				savedFiltersKey="changelog"
 				manualFiltering
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.change', 2) })}
 				getRowId={(c: ObjectChangeJson): number => c.id}

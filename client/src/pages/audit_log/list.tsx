@@ -122,6 +122,7 @@ export function AuditLogPage(): JSX.Element {
 				filters={filters.filters()}
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
+				savedFiltersKey="audit-log"
 				manualFiltering
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.auditEntry', 2) })}
 				getRowId={(e: AuditLogEntryJson): number => e.id}

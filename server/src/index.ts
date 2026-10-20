@@ -21,6 +21,7 @@ import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
 import { racksApp } from './routes/racks'
 import { rolesApp } from './routes/roles'
+import { savedFiltersApp } from './routes/saved_filters'
 import { searchApp } from './routes/search'
 import { prioritiesApp, serviceLevelsApp } from './routes/service_catalog'
 import { shelvesApp } from './routes/shelves'
@@ -93,6 +94,7 @@ export function createApp() {
 			.route('/integrations', integrationsApp)
 			.route('/directory', directoryApp)
 			.route('/attachments', attachmentsApp)
+			.route('/saved-filters', savedFiltersApp)
 	)
 }
 

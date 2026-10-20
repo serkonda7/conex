@@ -145,7 +145,10 @@ function loadSavedTabs(): SavedTabs | null {
 
 /**
  * Tabs to start with: the saved ones when the reloaded URL is still shown
- * by one of them, else the saved ones plus a new tab for the URL.
+ * by one of them, else the saved ones plus a new tab for the URL. The home
+ * routes (`/` and `/dashboard`) redirect to the home tenant page on login
+ * (see DashboardPage), so they never get their own tab: materializing one
+ * would duplicate the restored home tab once the redirect runs.
  */
 function initialTabs(): SavedTabs {
 	const url = initialPath()
@@ -163,8 +166,17 @@ function initialTabs(): SavedTabs {
 	if (showing) {
 		return { tabs: saved.tabs, activeId: showing.id }
 	}
+	if (isHomeRoute(url)) {
+		return active ? saved : { tabs: saved.tabs, activeId: saved.tabs[0].id }
+	}
 	const tab = makeTab(nextTabId++, [url], 0, active?.id ?? null)
 	return { tabs: [...saved.tabs, tab], activeId: tab.id }
+}
+
+/** Home routes: the bare root and `/dashboard` redirect to the home tenant page. */
+function isHomeRoute(raw: string): boolean {
+	const segments = routeSegments(raw)
+	return segments.length === 0 || (segments.length === 1 && segments[0] === 'dashboard')
 }
 
 const initial = initialTabs()

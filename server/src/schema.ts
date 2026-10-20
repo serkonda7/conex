@@ -21,6 +21,7 @@ import {
 	type EmployeePhone,
 	HOLIDAY_REGIONS,
 	LOCATION_TYPES,
+	type SavedFilterJson,
 	type ServiceWindow,
 	type TenantEmail,
 	type TenantPhone,
@@ -891,3 +892,12 @@ export const object_changes = pgTable(
 		index('object_changes_tenant_id_idx').on(table.tenant_id),
 	],
 )
+
+// Saved FilterTable filters, shared by all users. One row per table
+// (`table_key` is the client's table key, e.g. `devices`); `filters` holds
+// the whole ordered `SavedFilterJson[]` list, replaced on every save.
+export const saved_filters = pgTable('saved_filters', {
+	table_key: text('table_key').primaryKey(),
+	filters: jsonb('filters').$type<SavedFilterJson[]>().notNull().default(sql`'[]'::jsonb`),
+	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+})

@@ -253,6 +253,13 @@
       "when": 1792163372151,
       "tag": "0035_device_role_can_host_vms",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792485632035,
+      "tag": "0036_saved_filters",
+      "breakpoints": true
     }
   ]
 }

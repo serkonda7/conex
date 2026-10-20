@@ -2,7 +2,8 @@
  * `DataTable` and `FilterTable` from solid-components with their built-in
  * English labels (column customizer, select-all checkbox, filter tabs and
  * form) replaced by localized defaults. Pages import them from here instead
- * of the package.
+ * of the package. `FilterTable` also persists its saved filters globally
+ * when given a `savedFiltersKey`.
  */
 import {
 	DataTable as BaseDataTable,
@@ -13,8 +14,10 @@ import {
 	type FilterTableProps,
 	type FilterTableValues,
 } from '@serkonda7/solid-components'
-import { type JSX, mergeProps } from 'solid-js'
+import { type JSX, mergeProps, splitProps } from 'solid-js'
 import { t } from '../i18n'
+import { use_saved_filters } from '../lib/saved_filters'
+import { InlineError } from './feedback'
 
 export type {
 	DataTableColumn,
@@ -31,6 +34,8 @@ function tableLabels(): Pick<
 	| 'columnCustomizerTitle'
 	| 'columnCustomizerShowAllLabel'
 	| 'columnCustomizerResetLabel'
+	| 'columnCustomizerMoveUpLabel'
+	| 'columnCustomizerMoveDownLabel'
 > {
 	return {
 		selectionLabel: t('table.selectAllRows'),
@@ -38,6 +43,8 @@ function tableLabels(): Pick<
 		columnCustomizerTitle: t('table.shownColumns'),
 		columnCustomizerShowAllLabel: t('table.showAll'),
 		columnCustomizerResetLabel: t('table.reset'),
+		columnCustomizerMoveUpLabel: t('table.moveUp'),
+		columnCustomizerMoveDownLabel: t('table.moveDown'),
 	}
 }
 
@@ -46,7 +53,15 @@ export function DataTable<TRow>(props: DataTableProps<TRow>): JSX.Element {
 	return <BaseDataTable {...merged} />
 }
 
-export function FilterTable<TRow>(props: FilterTableProps<TRow>): JSX.Element {
+/**
+ * `savedFiltersKey` turns on saved filters, stored on the server under that
+ * table key and shared by all users; a failed load or save shows below the table.
+ */
+export function FilterTable<TRow>(
+	props: FilterTableProps<TRow> & { savedFiltersKey?: string },
+): JSX.Element {
+	const [local, tableProps] = splitProps(props, ['savedFiltersKey'])
+	const saved = local.savedFiltersKey ? use_saved_filters(local.savedFiltersKey) : undefined
 	const merged = mergeProps(
 		tableLabels(),
 		{
@@ -59,10 +74,26 @@ export function FilterTable<TRow>(props: FilterTableProps<TRow>): JSX.Element {
 			anyLabel: t('table.any'),
 			yesLabel: t('common.yes'),
 			noLabel: t('common.no'),
+			savedFiltersLabel: t('table.savedFilters'),
+			saveLabel: t('table.saveFilter'),
+			saveNameLabel: t('table.filterName'),
+			cancelLabel: t('common.cancel'),
+			clearSavedFilterLabel: t('table.clearSavedFilter'),
 		},
-		props,
+		saved
+			? {
+					savedFilters: saved.savedFilters,
+					onSavedFiltersChange: saved.onSavedFiltersChange,
+				}
+			: {},
+		tableProps,
 	)
-	return <BaseFilterTable {...merged} />
+	return (
+		<>
+			<BaseFilterTable {...merged} />
+			{saved && <InlineError message={saved.error()} />}
+		</>
+	)
 }
 
 /**

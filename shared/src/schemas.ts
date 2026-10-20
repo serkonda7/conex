@@ -2511,3 +2511,28 @@ export interface EmployeeIntegrationStatus {
 	/** Unlinked, not ignored external employees of that company (link picker). */
 	candidates: ExternalEmployeeJson[]
 }
+
+// ---------------------------------------------------------------------------
+// Saved filters: named FilterTable filter sets, stored per table for all
+// users. `values` maps filter keys (plus the quick search `q`) to a text or
+// a list of selected options, as the table hands them out.
+// ---------------------------------------------------------------------------
+
+export const SavedFilterTableParamsSchema = v.object({
+	table: v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/)),
+})
+
+const SavedFilterValueSchema = v.union([
+	v.pipe(v.string(), v.maxLength(500)),
+	v.pipe(v.array(v.pipe(v.string(), v.maxLength(500))), v.maxLength(100)),
+])
+
+export const SavedFilterSchema = v.strictObject({
+	name: NameSchema,
+	values: v.record(v.pipe(v.string(), v.maxLength(100)), SavedFilterValueSchema),
+})
+
+/** Full list of a table's saved filters; a PUT replaces the stored list. */
+export const SavedFilterListSchema = v.pipe(v.array(SavedFilterSchema), v.maxLength(100))
+
+export type SavedFilterJson = v.InferOutput<typeof SavedFilterSchema>
