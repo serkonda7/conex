@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import { and, eq } from 'drizzle-orm'
-import type { DeviceRoleCreate, DeviceRoleUpdate } from 'shared/src/schemas'
-import { device_roles, devices, virtual_machines } from '../schema'
+import type { DeviceRoleCreate, DeviceRoleUpdate, DeviceServiceJson } from 'shared/src/schemas'
+import { device_roles, devices, managed_bundles, virtual_machines } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -18,6 +18,7 @@ import {
 	countBy,
 	exists,
 	findById,
+	findOne,
 	insertedId,
 	isPatchEmpty,
 	isTaken,
@@ -27,6 +28,7 @@ import {
 	searchCondition,
 	tryWrite,
 } from './list'
+import { tenantBundle } from './tenancy'
 
 export type DeviceRoleRow = typeof device_roles.$inferSelect
 export type DeviceRoleListRow = DeviceRoleRow & { device_count: number }
@@ -37,10 +39,11 @@ export type DeviceRoleListRow = DeviceRoleRow & { device_count: number }
 // user, writable only by global editors/admins. Every device carries exactly
 // one role, so delete is blocked while devices reference the role.
 // Built-in roles (`key` set, see `DEVICE_ROLE_KEYS`) keep their name and
-// cannot be deleted; only their description, icon, parent and VM hosting
-// flag are editable.
+// cannot be deleted; only their description, icon, parent, managed bundle
+// and VM hosting flag are editable.
 // Roles nest (NetBox 4.3-style): `parent_id` forms a tree without a depth
 // cap, and filtering devices by a role includes its descendant roles.
+// A role without a managed bundle inherits its nearest ancestor's.
 // ---------------------------------------------------------------------------
 
 const NAME_IN_USE = 'Device role name is already in use'
@@ -91,6 +94,31 @@ function roleTree(): Promise<{ id: number; parent_id: number | null }[]> {
 }
 
 /**
+ * Managed bundle of a role: its own, else the nearest ancestor's; null when
+ * no role up the tree sets one.
+ */
+export async function effectiveBundleId(roleId: number): Promise<number | null> {
+	const rows = await getDb()
+		.select({
+			id: device_roles.id,
+			parent_id: device_roles.parent_id,
+			managed_bundle_id: device_roles.managed_bundle_id,
+		})
+		.from(device_roles)
+	const byId = new Map(rows.map((r) => [r.id, r]))
+	const seen = new Set<number>()
+	let role = byId.get(roleId)
+	while (role && !seen.has(role.id)) {
+		if (role.managed_bundle_id !== null) {
+			return role.managed_bundle_id
+		}
+		seen.add(role.id)
+		role = role.parent_id === null ? undefined : byId.get(role.parent_id)
+	}
+	return null
+}
+
+/**
  * Ids of a role and all its descendant roles, so a role filter matches
  * devices of child roles too.
  */
@@ -125,6 +153,14 @@ export async function createDeviceRole(
 	if (await isTaken(device_roles, eq(device_roles.name, input.name))) {
 		return Result.err(new DuplicateError(NAME_IN_USE))
 	}
+	const bundle = await checkExists(
+		managed_bundles,
+		input.managed_bundle_id,
+		'Managed bundle not found',
+	)
+	if (Result.isError(bundle)) {
+		return bundle
+	}
 	const parentId = input.parent_id ?? null
 	if (parentId !== null) {
 		const parent = await checkDeviceRoleParent(parentId)
@@ -138,6 +174,7 @@ export async function createDeviceRole(
 		description: input.description ?? null,
 		icon: input.icon ?? null,
 		can_host_vms: input.can_host_vms ? 1 : 0,
+		managed_bundle_id: input.managed_bundle_id ?? null,
 		key: null,
 	}
 	const id = await tryWrite(
@@ -174,6 +211,14 @@ export async function updateDeviceRole(
 	) {
 		return Result.err(new ValidationError('Built-in device roles cannot be renamed'))
 	}
+	const bundle = await checkExists(
+		managed_bundles,
+		input.managed_bundle_id,
+		'Managed bundle not found',
+	)
+	if (Result.isError(bundle)) {
+		return bundle
+	}
 	if (input.parent_id != null) {
 		const parent = await checkDeviceRoleParent(input.parent_id, id)
 		if (Result.isError(parent)) {
@@ -181,7 +226,7 @@ export async function updateDeviceRole(
 		}
 	}
 	const patch = {
-		...pickDefined(input, ['name', 'parent_id', 'description', 'icon']),
+		...pickDefined(input, ['name', 'parent_id', 'description', 'icon', 'managed_bundle_id']),
 		...(input.can_host_vms !== undefined ? { can_host_vms: input.can_host_vms ? 1 : 0 } : {}),
 	}
 	if (!isPatchEmpty(patch)) {
@@ -226,4 +271,30 @@ export async function deleteDeviceRole(id: number): Promise<Result<DeviceRoleRow
 		return deleted
 	}
 	return await logDelete('device_role', current.value)
+}
+
+/**
+ * Managed service of a device or VM: the bundle its role falls under and the
+ * SLA its tenant contracted for that bundle (none without a tenant, bundle or
+ * contract).
+ */
+export async function serviceOf(
+	roleId: number,
+	tenantId: number | null,
+): Promise<DeviceServiceJson> {
+	const bundleId = await effectiveBundleId(roleId)
+	const bundle =
+		bundleId === null
+			? undefined
+			: await findOne(managed_bundles, eq(managed_bundles.id, bundleId))
+	if (!bundle) {
+		return { managed_bundle: null, service_level: null }
+	}
+	const contract = tenantId === null ? null : await tenantBundle(tenantId, bundle.id)
+	return {
+		managed_bundle: { id: bundle.id, name: bundle.name },
+		service_level: contract
+			? { id: contract.service_level_id, name: contract.service_level_name }
+			: null,
+	}
 }

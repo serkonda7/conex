@@ -6,6 +6,7 @@ import {
 	fetch_device_roles,
 } from '../../api/device_roles'
 import { type DeviceListItem, fetch_device_list } from '../../api/devices'
+import { fetch_managed_bundle } from '../../api/service_catalog'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -21,8 +22,9 @@ import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { deviceRoleIconLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { deviceListHref } from '../devices/list'
+import { effectiveBundle } from './options'
 
 /**
  * /device-roles/:id — device role detail: header with description, the
@@ -39,6 +41,11 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_device_roles({ parent: key }),
 		setError,
 	)
+	// Without an own bundle the role inherits its nearest ancestor's.
+	const [roles] = createRows(fetch_device_roles, setError)
+	const bundleRef = (): { id: number; inherited: boolean } | null =>
+		effectiveBundle(roles() ?? [], props.id)
+	const [bundle] = createRecord(() => bundleRef()?.id, fetch_managed_bundle, setError)
 	const [devices] = createRowsFor(
 		id,
 		(key: number) => fetch_device_list({ role: [key] }),
@@ -74,6 +81,23 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 					<dt>{t('deviceRole.parent')}</dt>
 					<dd>
 						<RecordLink id={parentId()} record={parent} base="/device-roles" />
+					</dd>
+					<dt>{tp('entity.managedBundle', 1)}</dt>
+					<dd>
+						<Show
+							when={bundleRef()?.inherited && bundle()}
+							fallback={
+								<RecordLink
+									id={bundleRef()?.id}
+									record={bundle}
+									base="/managed-bundles"
+								/>
+							}
+						>
+							<a href={`/managed-bundles/${bundleRef()?.id}`}>
+								{t('deviceRole.inheritedBundle', { name: bundle()?.name ?? '' })}
+							</a>
+						</Show>
 					</dd>
 					<dt>{t('deviceRole.icon')}</dt>
 					<dd>

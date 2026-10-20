@@ -260,6 +260,20 @@
       "when": 1792485632035,
       "tag": "0036_saved_filters",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792502123705,
+      "tag": "0037_builtin_network_device_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792502134249,
+      "tag": "0038_managed_bundles",
+      "breakpoints": true
     }
   ]
 }

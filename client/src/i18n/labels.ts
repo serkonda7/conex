@@ -198,6 +198,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	attachment: 'changeObject.attachment',
 	priority: 'changeObject.priority',
 	service_level: 'changeObject.serviceLevel',
+	managed_bundle: 'changeObject.managedBundle',
 }
 
 /** Changelog object type (`device`, `rack_type`, …). */

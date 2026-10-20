@@ -377,6 +377,12 @@ export const device_roles = pgTable(
 		// 0/1: devices of this role may host virtual machines. The built-in
 		// `pc` and `server` roles start with it set (migration).
 		can_host_vms: integer('can_host_vms').notNull().default(0),
+		// Managed bundle the role's devices fall under; null inherits the
+		// parent role's. Delete-blocked while referenced (service layer in
+		// `db/service_catalog.ts`).
+		managed_bundle_id: integer('managed_bundle_id').references(
+			(): AnyPgColumn => managed_bundles.id,
+		),
 		// Built-in roles (`DEVICE_ROLE_KEYS`) carry their key; they are seeded
 		// by migration and can be neither renamed nor deleted.
 		key: text('key').unique(),
@@ -384,6 +390,7 @@ export const device_roles = pgTable(
 	(table) => [
 		index('device_roles_name_idx').on(table.name),
 		index('device_roles_parent_id_idx').on(table.parent_id),
+		index('device_roles_managed_bundle_id_idx').on(table.managed_bundle_id),
 	],
 )
 
@@ -398,6 +405,13 @@ export const device_roles = pgTable(
 //   window per ISO weekday) + optional federal-state holiday calendar +
 //   one target row per priority. Targets go with their service level
 //   (cascade) and are written as a whole set.
+// - managed_bundles: managed-service bundles (`Workplace`, `Server`, …).
+//   A device falls under the bundle of its role (nearest role up the tree
+//   that sets one).
+// - tenant_bundles: the bundles a tenant has contracted, each with its
+//   SLA; a device's SLA is the one of its tenant's contract for its bundle.
+//   Written as a whole set with the tenant and gone with it (cascade);
+//   bundle and service level delete is blocked while contracts use them.
 // ---------------------------------------------------------------------------
 
 export const priorities = pgTable(
@@ -444,6 +458,32 @@ export const service_level_targets = pgTable(
 	(table) => [
 		primaryKey({ columns: [table.service_level_id, table.priority_id] }),
 		index('service_level_targets_priority_id_idx').on(table.priority_id),
+	],
+)
+
+export const managed_bundles = pgTable('managed_bundles', {
+	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+	name: text('name').notNull().unique(),
+	description: text('description'),
+})
+
+export const tenant_bundles = pgTable(
+	'tenant_bundles',
+	{
+		tenant_id: integer('tenant_id')
+			.notNull()
+			.references(() => tenants.id, { onDelete: 'cascade' }),
+		managed_bundle_id: integer('managed_bundle_id')
+			.notNull()
+			.references(() => managed_bundles.id),
+		service_level_id: integer('service_level_id')
+			.notNull()
+			.references(() => service_levels.id),
+	},
+	(table) => [
+		primaryKey({ columns: [table.tenant_id, table.managed_bundle_id] }),
+		index('tenant_bundles_managed_bundle_id_idx').on(table.managed_bundle_id),
+		index('tenant_bundles_service_level_id_idx').on(table.service_level_id),
 	],
 )
 

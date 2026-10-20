@@ -235,6 +235,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 			'device-types',
 			'device-roles',
 			'rack-types',
+			'managed-bundles',
 			'service-levels',
 			'priorities',
 		],

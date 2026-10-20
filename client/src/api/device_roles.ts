@@ -24,6 +24,7 @@ export async function fetch_device_roles(
 		client['device-roles'].$get({
 			query: to_query({
 				...paging(filters),
+				parent: filters?.parent,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),

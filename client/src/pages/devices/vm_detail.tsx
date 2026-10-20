@@ -7,6 +7,7 @@ import { fetch_tenant } from '../../api/tenancy'
 import {
 	delete_virtual_machine,
 	fetch_virtual_machine,
+	fetch_virtual_machine_service,
 	type VirtualMachineRow,
 } from '../../api/virtual_machines'
 import {
@@ -25,6 +26,7 @@ import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { canGlobal } from '../../lib/session'
+import { ManagedServiceRows } from '../managed-bundles/service_rows'
 import { MoveTenantDialog } from './move_tenant_dialog'
 
 /**
@@ -46,6 +48,12 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 	const [host] = createRecord(hostId, fetch_device, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [employee] = createRecord(employeeId, fetch_employee, setError)
+	// Keyed on the record so a tenant move refetches the SLA.
+	const [service] = createRecord(
+		() => vm(),
+		(row: VirtualMachineRow) => fetch_virtual_machine_service(row.id),
+		setError,
+	)
 
 	const crumbs = (): Crumb[] => {
 		const row = host()
@@ -114,6 +122,7 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
+					<ManagedServiceRows service={service} />
 				</DetailCard>
 			</DetailShell>
 			<Show when={movingTenant() ? vm() : undefined}>

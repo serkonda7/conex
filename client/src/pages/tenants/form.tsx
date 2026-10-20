@@ -1,11 +1,16 @@
 import { Result } from 'better-result'
-import type { TenantCreate, TenantEmail, TenantPhone } from 'shared/src/types'
-import { createSignal, type JSX } from 'solid-js'
+import type { TenantBundle, TenantCreate, TenantEmail, TenantPhone } from 'shared/src/types'
+import { createSignal, For, type JSX, Show } from 'solid-js'
+import {
+	fetch_managed_bundles,
+	fetch_service_levels,
+	type ManagedBundleListRow,
+} from '../../api/service_catalog'
 import {
 	create_tenant,
 	fetch_tenant,
 	fetch_tenant_groups,
-	type TenantRow,
+	type TenantDetail,
 	update_tenant,
 } from '../../api/tenancy'
 import {
@@ -21,6 +26,8 @@ import {
 	CommentsField,
 	DescriptionField,
 	FormPage,
+	FormSection,
+	Hint,
 	NameField,
 	row_options,
 	SelectField,
@@ -55,23 +62,32 @@ function TenantForm(props: { id?: number }): JSX.Element {
 	const [website, setWebsite] = createSignal('')
 	const [emails, setEmails] = createSignal<TenantEmail[]>([blankEmail()])
 	const [phones, setPhones] = createSignal<PhoneRow<TenantPhone>[]>([blankPhone()])
+	// Service level id per contracted bundle id; uncontracted bundles are absent.
+	const [contracts, setContracts] = createSignal<Record<number, string>>({})
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_tenant,
-		fill: (row: TenantRow) => {
+		fill: (row: TenantDetail) => {
 			setName(row.name)
 			setGroupId(id_value(row.tenant_group_id))
 			setCustomerNumber(row.customer_number ?? '')
 			setWebsite(row.website ?? '')
 			setEmails(row.emails.length > 0 ? row.emails : [blankEmail()])
 			setPhones(row.phones.length > 0 ? row.phones.map(phoneRow) : [blankPhone()])
+			setContracts(
+				Object.fromEntries(
+					row.bundles.map((b) => [b.managed_bundle_id, id_value(b.service_level_id)]),
+				),
+			)
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
 	})
 	const [groups] = createRows(fetch_tenant_groups, form.setError)
+	const [bundles] = createRows(fetch_managed_bundles, form.setError)
+	const [serviceLevels] = createRows(fetch_service_levels, form.setError)
 	const prefix = form.editing ? 'tenant-edit' : 'tenant'
 	const backTo = useFormReturnRoute('/tenants', props.id)
 
@@ -83,11 +99,17 @@ function TenantForm(props: { id?: number }): JSX.Element {
 		// Rows left blank are dropped.
 		emails: emailsOf(emails()),
 		phones: phonesOf(phones()),
+		bundles: Object.entries(contracts()).flatMap(([bundle, level]): TenantBundle[] => {
+			const serviceLevelId = parseId(level)
+			return serviceLevelId === null
+				? []
+				: [{ managed_bundle_id: Number(bundle), service_level_id: serviceLevelId }]
+		}),
 		description: text(description()),
 		comments: text(comments()),
 	})
 
-	async function create(values: FormValues): Promise<Result<TenantRow, Error>> {
+	async function create(values: FormValues): Promise<Result<TenantDetail, Error>> {
 		const res = await create_tenant(body(values))
 		if (selectAfterCreate && Result.isOk(res)) {
 			setTenantContext({ kind: 'tenant', id: res.value.id })
@@ -189,6 +211,25 @@ function TenantForm(props: { id?: number }): JSX.Element {
 					<PhoneInputs id={`${prefix}-phone-${index}`} entry={entry} update={update} />
 				)}
 			/>
+			<FormSection title={t('tenant.bundles')}>
+				<Show when={bundles() !== undefined && bundles()?.length === 0}>
+					<Hint>{t('tenant.noBundleCatalog')}</Hint>
+				</Show>
+				<For each={bundles() ?? []}>
+					{(bundle: ManagedBundleListRow): JSX.Element => (
+						<SelectField
+							id={`${prefix}-bundle-${bundle.id}`}
+							label={bundle.name}
+							value={contracts()[bundle.id] ?? ''}
+							onChange={(value: string) =>
+								setContracts({ ...contracts(), [bundle.id]: value })
+							}
+							options={row_options(serviceLevels() ?? [])}
+							emptyLabel={t('tenant.bundleNotContracted')}
+						/>
+					)}
+				</For>
+			</FormSection>
 			<DescriptionField
 				id={`${prefix}-description`}
 				value={description()}

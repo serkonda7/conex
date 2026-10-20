@@ -1,5 +1,8 @@
 import {
 	EntityParamsSchema,
+	ManagedBundleCreateSchema,
+	ManagedBundleListQuerySchema,
+	ManagedBundleUpdateSchema,
 	PriorityCreateSchema,
 	PriorityListQuerySchema,
 	PriorityUpdateSchema,
@@ -8,21 +11,26 @@ import {
 	ServiceLevelUpdateSchema,
 } from 'shared/src/schemas'
 import {
+	createManagedBundle,
 	createPriority,
 	createServiceLevel,
+	deleteManagedBundle,
 	deletePriority,
 	deleteServiceLevel,
+	getManagedBundle,
 	getPriority,
 	getServiceLevel,
+	listManagedBundles,
 	listPriorities,
 	listServiceLevels,
+	updateManagedBundle,
 	updatePriority,
 	updateServiceLevel,
 } from '../db/service_catalog'
 import { makeCatalogApp } from './crud'
 
 /**
- * Service catalog (priorities, service levels) is shared
+ * Service catalog (priorities, service levels, managed bundles) is shared
  * catalog data (no tenant column): readable by every authenticated user,
  * writable only by global editors/admins, so a tenant-scoped editor cannot
  * change the SLA terms other tenants are bound to.
@@ -49,4 +57,16 @@ export const serviceLevelsApp = makeCatalogApp({
 	get: getServiceLevel,
 	update: updateServiceLevel,
 	remove: deleteServiceLevel,
+})
+
+export const managedBundlesApp = makeCatalogApp({
+	listQuerySchema: ManagedBundleListQuerySchema,
+	createSchema: ManagedBundleCreateSchema,
+	updateSchema: ManagedBundleUpdateSchema,
+	paramSchema: EntityParamsSchema,
+	list: listManagedBundles,
+	create: createManagedBundle,
+	get: getManagedBundle,
+	update: updateManagedBundle,
+	remove: deleteManagedBundle,
 })

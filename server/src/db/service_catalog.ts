@@ -1,6 +1,8 @@
 import { Result } from 'better-result'
 import { asc, eq } from 'drizzle-orm'
 import type {
+	ManagedBundleCreate,
+	ManagedBundleUpdate,
 	PriorityCreate,
 	PriorityUpdate,
 	ServiceLevelCreate,
@@ -9,7 +11,14 @@ import type {
 	ServiceLevelUpdate,
 	ServiceWindow,
 } from 'shared/src/schemas'
-import { priorities, service_level_targets, service_levels } from '../schema'
+import {
+	device_roles,
+	managed_bundles,
+	priorities,
+	service_level_targets,
+	service_levels,
+	tenant_bundles,
+} from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
@@ -29,7 +38,8 @@ import {
 } from './list'
 
 // ---------------------------------------------------------------------------
-// Service catalog (MSP operations): priorities and service levels (SLA). Shared catalog data (no tenant column): readable by every
+// Service catalog (MSP operations): priorities, service levels (SLA) and
+// managed bundles. Shared catalog data (no tenant column): readable by every
 // authenticated user, writable only by global editors/admins.
 // ---------------------------------------------------------------------------
 
@@ -321,6 +331,13 @@ export async function deleteServiceLevel(id: number): Promise<Result<ServiceLeve
 	if (Result.isError(current)) {
 		return current
 	}
+	if (await exists(tenant_bundles, eq(tenant_bundles.service_level_id, id))) {
+		return Result.err(
+			new ConflictError(
+				'Service level is used by tenant bundle contracts; change them first',
+			),
+		)
+	}
 	// Targets go with the service level (FK cascade).
 	const deleted = await tryWrite(() =>
 		getDb().delete(service_levels).where(eq(service_levels.id, id)),
@@ -329,4 +346,123 @@ export async function deleteServiceLevel(id: number): Promise<Result<ServiceLeve
 		return deleted
 	}
 	return await logDelete('service_level', current.value)
+}
+
+// ---------------------------------------------------------------------------
+// Managed bundles
+// ---------------------------------------------------------------------------
+
+export type ManagedBundleRow = typeof managed_bundles.$inferSelect
+export type ManagedBundleListRow = ManagedBundleRow & { role_count: number; tenant_count: number }
+
+const MANAGED_BUNDLE_NAME_IN_USE = 'Managed bundle name is already in use'
+
+export interface ManagedBundleListParams extends ListParams {
+	sort: 'name' | 'description'
+	order: 'asc' | 'desc'
+}
+
+export async function listManagedBundles(
+	params: ManagedBundleListParams,
+): Promise<Page<ManagedBundleListRow>> {
+	const orderColumn =
+		params.sort === 'description' ? managed_bundles.description : managed_bundles.name
+	const page = await pageRows(
+		managed_bundles,
+		searchCondition(params.search, [managed_bundles.name, managed_bundles.description]),
+		[orderOf(orderColumn, params.order), asc(managed_bundles.id)],
+		params,
+	)
+	const ids = page.items.map((r) => r.id)
+	const roleCounts = await countBy(device_roles.managed_bundle_id, ids)
+	const tenantCounts = await countBy(tenant_bundles.managed_bundle_id, ids)
+	return {
+		...page,
+		items: page.items.map((r) => ({
+			...r,
+			role_count: roleCounts.get(r.id) ?? 0,
+			tenant_count: tenantCounts.get(r.id) ?? 0,
+		})),
+	}
+}
+
+export function getManagedBundle(id: number): Promise<Result<ManagedBundleRow, Error>> {
+	return findById(managed_bundles, id, 'Managed bundle not found')
+}
+
+export async function createManagedBundle(
+	input: ManagedBundleCreate,
+): Promise<Result<ManagedBundleRow, Error>> {
+	if (await isTaken(managed_bundles, eq(managed_bundles.name, input.name))) {
+		return Result.err(new DuplicateError(MANAGED_BUNDLE_NAME_IN_USE))
+	}
+	const row: Omit<ManagedBundleRow, 'id'> = {
+		name: input.name,
+		description: input.description ?? null,
+	}
+	const id = await tryWrite(
+		async () =>
+			insertedId(
+				await getDb()
+					.insert(managed_bundles)
+					.values(row)
+					.returning({ id: managed_bundles.id }),
+			),
+		MANAGED_BUNDLE_NAME_IN_USE,
+	)
+	if (Result.isError(id)) {
+		return id
+	}
+	return await logCreate('managed_bundle', await getManagedBundle(id.value))
+}
+
+export async function updateManagedBundle(
+	id: number,
+	input: ManagedBundleUpdate,
+): Promise<Result<ManagedBundleRow, Error>> {
+	const current = await getManagedBundle(id)
+	if (Result.isError(current)) {
+		return current
+	}
+	if (
+		input.name !== undefined &&
+		(await isTaken(managed_bundles, eq(managed_bundles.name, input.name), id))
+	) {
+		return Result.err(new DuplicateError(MANAGED_BUNDLE_NAME_IN_USE))
+	}
+	const patch = pickDefined(input, ['name', 'description'])
+	if (!isPatchEmpty(patch)) {
+		const written = await tryWrite(
+			() => getDb().update(managed_bundles).set(patch).where(eq(managed_bundles.id, id)),
+			MANAGED_BUNDLE_NAME_IN_USE,
+		)
+		if (Result.isError(written)) {
+			return written
+		}
+	}
+	return await logUpdate('managed_bundle', current.value, await getManagedBundle(id))
+}
+
+export async function deleteManagedBundle(id: number): Promise<Result<ManagedBundleRow, Error>> {
+	const current = await getManagedBundle(id)
+	if (Result.isError(current)) {
+		return current
+	}
+	if (await exists(device_roles, eq(device_roles.managed_bundle_id, id))) {
+		return Result.err(
+			new ConflictError('Managed bundle is assigned to device roles; change them first'),
+		)
+	}
+	if (await exists(tenant_bundles, eq(tenant_bundles.managed_bundle_id, id))) {
+		return Result.err(
+			new ConflictError('Managed bundle is contracted by tenants; change them first'),
+		)
+	}
+	const deleted = await tryWrite(() =>
+		getDb().delete(managed_bundles).where(eq(managed_bundles.id, id)),
+	)
+	if (Result.isError(deleted)) {
+		return deleted
+	}
+	return await logDelete('managed_bundle', current.value)
 }

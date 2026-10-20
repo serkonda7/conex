@@ -23,7 +23,7 @@ import { racksApp } from './routes/racks'
 import { rolesApp } from './routes/roles'
 import { savedFiltersApp } from './routes/saved_filters'
 import { searchApp } from './routes/search'
-import { prioritiesApp, serviceLevelsApp } from './routes/service_catalog'
+import { managedBundlesApp, prioritiesApp, serviceLevelsApp } from './routes/service_catalog'
 import { shelvesApp } from './routes/shelves'
 import { siteGroupsApp } from './routes/site_groups'
 import { sitesApp } from './routes/sites'
@@ -86,6 +86,7 @@ export function createApp() {
 			.route('/device-roles', deviceRolesApp)
 			.route('/priorities', prioritiesApp)
 			.route('/service-levels', serviceLevelsApp)
+			.route('/managed-bundles', managedBundlesApp)
 			.route('/devices', devicesApp)
 			.route('/virtual-machines', virtualMachinesApp)
 			.route('/interfaces', interfacesApp)
