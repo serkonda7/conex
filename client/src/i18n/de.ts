@@ -560,6 +560,8 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'managedBundle.editTitle': 'Managed-Paket bearbeiten',
 	'managedBundle.loadingOne': 'Managed-Paket wird geladen…',
 	'managedBundle.namePlaceholder': 'Arbeitsplatz',
+	'managedBundle.rolesHint':
+		'Die Geräterollen, für die dieses Paket gilt, werden an den Rollen selbst festgelegt. Bearbeite eine Geräterolle, um sie diesem Paket zuzuweisen.',
 	'managedBundle.notFound': 'Managed-Paket nicht gefunden.',
 	'managedBundle.details': 'Managed-Paket-Details',
 	'managedBundle.roleCount': 'Geräterollen',

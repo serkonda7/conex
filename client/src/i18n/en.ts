@@ -555,6 +555,8 @@ End outside the YAML block with: sources, upstream hit/miss for both libraries, 
 	'managedBundle.editTitle': 'Edit managed bundle',
 	'managedBundle.loadingOne': 'Loading managed bundle…',
 	'managedBundle.namePlaceholder': 'Workplace',
+	'managedBundle.rolesHint':
+		'The device roles this bundle applies to are set on the roles themselves. Edit a device role to assign it to this bundle.',
 	'managedBundle.notFound': 'Managed bundle not found.',
 	'managedBundle.details': 'Managed bundle details',
 	'managedBundle.roleCount': 'Device roles',

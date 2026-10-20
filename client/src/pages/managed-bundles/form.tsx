@@ -5,7 +5,7 @@ import {
 	type ManagedBundleRow,
 	update_managed_bundle,
 } from '../../api/service_catalog'
-import { DescriptionField, FormPage, NameField } from '../../components/form'
+import { DescriptionField, FormPage, Hint, NameField } from '../../components/form'
 import { t } from '../../i18n'
 import {
 	type FormValues,
@@ -76,6 +76,7 @@ function ManagedBundleForm(props: { id?: number }): JSX.Element {
 				value={description()}
 				onInput={setDescription}
 			/>
+			<Hint>{t('managedBundle.rolesHint')}</Hint>
 		</FormPage>
 	)
 }
