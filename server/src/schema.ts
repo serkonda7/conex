@@ -901,3 +901,64 @@ export const saved_filters = pgTable('saved_filters', {
 	filters: jsonb('filters').$type<SavedFilterJson[]>().notNull().default(sql`'[]'::jsonb`),
 	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// Calendar sync (TANSS appointments → Outlook via Microsoft Graph).
+// `calendar_sync_config` holds one row (id 1). `calendar_sync_items` is the
+// sync state and the source of truth for which Outlook event belongs to
+// which TANSS appointment; `item_key` is the support id, or
+// `<support id>@<start>` when TANSS expands a recurring appointment into
+// several entries with the same id. `mailbox_upn` is the mailbox the event
+// was written to, so a changed or removed mapping can still clean it up.
+// ---------------------------------------------------------------------------
+
+export const calendar_sync_config = pgTable('calendar_sync_config', {
+	id: integer('id').primaryKey().default(1),
+	ms_tenant_id: text('ms_tenant_id').notNull(),
+	client_id: text('client_id').notNull(),
+	// `v1.<iv>.<ciphertext+tag>` (base64) of `{ client_secret }`.
+	secret: text('secret').notNull(),
+	enabled: integer('enabled').notNull().default(0),
+	interval_minutes: integer('interval_minutes').notNull().default(5),
+	last_error: text('last_error'),
+	created_at: bigint('created_at', { mode: 'number' }).notNull(),
+	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+})
+
+export const calendar_sync_mappings = pgTable('calendar_sync_mappings', {
+	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+	tanss_employee_id: integer('tanss_employee_id').notNull().unique(),
+	mailbox_upn: text('mailbox_upn').notNull(),
+	enabled: integer('enabled').notNull().default(1),
+	created_by: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+	created_at: bigint('created_at', { mode: 'number' }).notNull(),
+})
+
+export const calendar_sync_items = pgTable(
+	'calendar_sync_items',
+	{
+		item_key: text('item_key').primaryKey(),
+		tanss_support_id: integer('tanss_support_id').notNull(),
+		tanss_employee_id: integer('tanss_employee_id').notNull(),
+		mailbox_upn: text('mailbox_upn').notNull(),
+		graph_event_id: text('graph_event_id').notNull(),
+		hash: text('hash').notNull(),
+		start_at: bigint('start_at', { mode: 'number' }).notNull(),
+		synced_at: bigint('synced_at', { mode: 'number' }).notNull(),
+	},
+	(table) => [index('calendar_sync_items_employee_idx').on(table.tanss_employee_id)],
+)
+
+export const calendar_sync_runs = pgTable(
+	'calendar_sync_runs',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		started_at: bigint('started_at', { mode: 'number' }).notNull(),
+		finished_at: bigint('finished_at', { mode: 'number' }),
+		// `running` | `ok` | `error`.
+		state: text('state').notNull(),
+		error: text('error'),
+		counts: jsonb('counts'),
+	},
+	(table) => [index('calendar_sync_runs_started_at_idx').on(table.started_at)],
+)
