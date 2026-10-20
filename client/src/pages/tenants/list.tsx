@@ -12,7 +12,7 @@ import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
-import { contextGroupId } from '../../lib/tenant_context'
+import { contextGroupId, setTenantContext } from '../../lib/tenant_context'
 
 /**
  * /tenants — NetBox-style tenant list: search, sortable columns, tenant
@@ -33,7 +33,18 @@ export function TenantsPage(): JSX.Element {
 	const groupName = useNameOf(groups)
 
 	const columns: DataTableColumn<TenantWithCounts>[] = [
-		nameColumn(tp('entity.tenant', 1), '/tenants', { sortable: true }),
+		{
+			...nameColumn<TenantWithCounts>(tp('entity.tenant', 1), '/tenants', { sortable: true }),
+			// Like picking the tenant in the top-bar dropdown: also make it the context.
+			getValue: (row: TenantWithCounts): JSX.Element => (
+				<a
+					href={`/tenants/${row.id}`}
+					onClick={() => setTenantContext({ kind: 'tenant', id: row.id })}
+				>
+					{row.name}
+				</a>
+			),
+		},
 		{
 			key: 'customer_number',
 			label: t('tenant.customerNumber'),
