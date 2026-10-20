@@ -41,7 +41,7 @@ export function LocationAddPage(): JSX.Element {
 	// Parent options belong to a site, so they follow the site picker.
 	const [parents] = createRowsFor(
 		() => parseId(siteId()),
-		(key: number) => fetch_locations({ site: key }),
+		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
 	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>

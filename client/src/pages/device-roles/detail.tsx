@@ -39,7 +39,11 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_device_roles({ parent: key }),
 		setError,
 	)
-	const [devices] = createRowsFor(id, (key: number) => fetch_device_list({ role: key }), setError)
+	const [devices] = createRowsFor(
+		id,
+		(key: number) => fetch_device_list({ role: [key] }),
+		setError,
+	)
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.deviceRole',

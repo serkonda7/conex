@@ -156,6 +156,8 @@ export const en = {
 	'noun.user.other': 'users',
 	'noun.role.one': 'role',
 	'noun.role.other': 'roles',
+	'noun.savedFilter.one': 'saved filter',
+	'noun.savedFilter.other': 'saved filters',
 	'noun.auditEntry.one': 'audit log entry',
 	'noun.auditEntry.other': 'audit log entries',
 	'noun.change.one': 'change',
@@ -185,6 +187,12 @@ export const en = {
 	'table.applyFilters': 'Search',
 	'table.clearAll': 'Clear all',
 	'table.any': 'Any',
+	'table.moveUp': 'Move up',
+	'table.moveDown': 'Move down',
+	'table.savedFilters': 'Saved filters',
+	'table.saveFilter': 'Save',
+	'table.filterName': 'Filter name',
+	'table.clearSavedFilter': 'Clear saved filter',
 
 	// app
 	'app.skipToContent': 'Skip to content',

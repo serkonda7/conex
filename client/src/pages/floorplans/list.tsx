@@ -91,6 +91,7 @@ export function FloorplansPage(): JSX.Element {
 				filters={filters.filters()}
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
+				savedFiltersKey="floorplans"
 				manualFiltering
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.floorplan', 2) })}
 				getRowId={(p: FloorplanListJson): number => p.attachment_id}

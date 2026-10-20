@@ -66,8 +66,8 @@ async function withRackHeight(row: RackRecord): Promise<RackRow> {
 const RACK_NAME_IN_USE = 'Rack name is already in use'
 
 export interface RackListParams extends ListParams, TenantFilterParams {
-	site?: number
-	location?: number
+	site?: number[]
+	location?: number[]
 	sort: 'name'
 	order: 'asc' | 'desc'
 }
@@ -75,8 +75,8 @@ export interface RackListParams extends ListParams, TenantFilterParams {
 export async function listRacks(params: RackListParams): Promise<Page<RackRow>> {
 	const where = and(
 		searchCondition(params.search, [racks.name, racks.description]),
-		params.site ? eq(racks.site_id, params.site) : undefined,
-		params.location ? eq(racks.location_id, params.location) : undefined,
+		params.site ? inArray(racks.site_id, params.site) : undefined,
+		params.location ? inArray(racks.location_id, params.location) : undefined,
 		...tenantConditions(racks.tenant_id, params),
 	)
 	const page = await pageRows(

@@ -12,8 +12,10 @@ import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
 	idOptions,
+	idsOf,
 	useEntityList,
 	useQueryFilter,
+	useQueryFilterList,
 } from '../../components/list_page'
 import { TreeName, treeDepths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
@@ -39,13 +41,13 @@ export function LocationTreeName(props: { location: LocationRow; depth: number }
  * actions with delete in a row menu.
  */
 export function LocationsPage(): JSX.Element {
-	const [filterSite, setFilterSite] = useQueryFilter('site')
+	const [filterSite, setFilterSite] = useQueryFilterList('site')
 	const [filterTenant] = useQueryFilter('tenant')
 	const list = useEntityList({
 		noun: 'noun.location',
 		sort: 'name' as LocationSort,
 		filters: () => ({
-			site: parseId(filterSite()) ?? undefined,
+			site: idsOf(filterSite()),
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_locations,

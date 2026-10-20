@@ -27,7 +27,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 	const [manufacturer] = createRecord(id, fetch_manufacturer, setError)
 	const [deviceTypes] = createRowsFor(
 		id,
-		(key: number) => fetch_device_types({ manufacturer: key }),
+		(key: number) => fetch_device_types({ manufacturer: [key] }),
 		setError,
 	)
 

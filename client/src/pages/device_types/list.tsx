@@ -7,13 +7,18 @@ import {
 	fetch_manufacturers,
 } from '../../api/templates'
 import type { DataTableColumn } from '../../components/data_table'
-import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
+import {
+	EntityListPage,
+	idsOf,
+	useEntityList,
+	useQueryFilterList,
+} from '../../components/list_page'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { yesNo } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
-import { navigate, parseId } from '../../lib/router'
+import { navigate } from '../../lib/router'
 
 /**
  * /device-types — device-type list: search (model, manufacturer, description),
@@ -23,11 +28,11 @@ import { navigate, parseId } from '../../lib/router'
  * the /device-types/import page.
  */
 export function DeviceTypesPage(): JSX.Element {
-	const [filterManufacturer] = useQueryFilter('manufacturer')
+	const [filterManufacturer] = useQueryFilterList('manufacturer')
 	const list = useEntityList({
 		noun: 'noun.deviceType',
 		sort: 'model' as DeviceTypeSort,
-		filters: () => ({ manufacturer: parseId(filterManufacturer()) ?? undefined }),
+		filters: () => ({ manufacturer: idsOf(filterManufacturer()) }),
 		fetch: fetch_device_types,
 		remove: delete_device_type,
 	})
@@ -104,7 +109,7 @@ export function DeviceTypesPage(): JSX.Element {
 					{t('deviceType.import')}
 				</button>
 			}
-			filtered={filterManufacturer() !== ''}
+			filtered={filterManufacturer().length > 0}
 			columns={columns}
 			columnsKey="device-types"
 			defaultColumns={['manufacturer', 'model', 'description', 'devices']}

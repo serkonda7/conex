@@ -182,7 +182,7 @@ export async function deleteManufacturer(id: number): Promise<Result<Manufacture
 const DEVICE_TYPE_EXISTS = 'Device type already exists'
 
 export interface DeviceTypeListParams extends ListParams {
-	manufacturer?: number
+	manufacturer?: number[]
 	kind: 'device' | 'rack'
 	sort: DeviceTypeListQuery['sort']
 	order: 'asc' | 'desc'
@@ -204,7 +204,9 @@ export async function listDeviceTypes(
 					),
 				)
 			: undefined,
-		params.manufacturer ? eq(device_types.manufacturer_id, params.manufacturer) : undefined,
+		params.manufacturer
+			? inArray(device_types.manufacturer_id, params.manufacturer)
+			: undefined,
 		// Rack types are the rows with rack-template dimensions; regular device
 		// types deliberately have no form factor. Keep this filter in the query so
 		// totals and pagination describe the selected catalog accurately.

@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Result } from 'better-result'
-import { and, desc, eq, lte } from 'drizzle-orm'
+import { and, desc, inArray, lte } from 'drizzle-orm'
 import type { ChangeAction, ChangeObjectType, ObjectChangeJson } from 'shared/src/schemas'
 import { object_changes } from '../schema'
 import { nowSeconds } from '../util/time'
@@ -176,8 +176,8 @@ export async function logDelete<T extends Snapshot>(
 }
 
 export interface ChangelogListParams extends ListParams, TenantFilterParams {
-	action?: ChangeAction
-	object_type?: ChangeObjectType
+	action?: ChangeAction[]
+	object_type?: ChangeObjectType[]
 }
 
 export async function listChangelog(
@@ -185,8 +185,8 @@ export async function listChangelog(
 ): Promise<Result<Page<ObjectChangeJson>, Error>> {
 	const where = and(
 		searchCondition(params.search, [object_changes.object_repr, object_changes.username]),
-		params.action ? eq(object_changes.action, params.action) : undefined,
-		params.object_type ? eq(object_changes.object_type, params.object_type) : undefined,
+		params.action ? inArray(object_changes.action, params.action) : undefined,
+		params.object_type ? inArray(object_changes.object_type, params.object_type) : undefined,
 		...tenantConditions(object_changes.tenant_id, params),
 	)
 	const page = await pageRows(

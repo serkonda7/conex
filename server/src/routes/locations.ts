@@ -24,5 +24,5 @@ export const locationsApp = makeTenantApp({
 	get: getLocation,
 	update: updateLocation,
 	remove: (id: number, query: DeleteQuery) => deleteLocation(id, query.confirm === 'floorplan'),
-	filters: (q: { site?: number; parent?: number }) => ({ site: q.site, parent: q.parent }),
+	filters: (q: { site?: number[]; parent?: number }) => ({ site: q.site, parent: q.parent }),
 })

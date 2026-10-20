@@ -693,7 +693,7 @@ export async function deleteSiteGroup(id: number): Promise<Result<SiteGroupRow, 
 const LOCATION_DEPTH_EXCEEDED = `Location hierarchy is limited to ${MAX_LOCATION_DEPTH} levels`
 
 export interface LocationListParams extends ListParams, TenantFilterParams {
-	site?: number
+	site?: number[]
 	parent?: number
 	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
@@ -702,7 +702,7 @@ export interface LocationListParams extends ListParams, TenantFilterParams {
 export async function listLocations(params: LocationListParams): Promise<Page<LocationRow>> {
 	const where = and(
 		searchCondition(params.search, [locations.name, locations.description]),
-		params.site ? eq(locations.site_id, params.site) : undefined,
+		params.site ? inArray(locations.site_id, params.site) : undefined,
 		params.parent ? eq(locations.parent_id, params.parent) : undefined,
 		...tenantConditions(locations.tenant_id, params),
 	)

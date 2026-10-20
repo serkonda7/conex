@@ -6,8 +6,10 @@ import { type DataTableColumn, descriptionColumn, nameColumn } from '../../compo
 import {
 	EntityListPage,
 	idOptions,
+	idsOf,
 	useEntityList,
 	useQueryFilter,
+	useQueryFilterList,
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
@@ -22,15 +24,15 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
  * icon actions with delete in a row menu.
  */
 export function RacksPage(): JSX.Element {
-	const [filterSite, setFilterSite] = useQueryFilter('site')
-	const [filterLocation, setFilterLocation] = useQueryFilter('location')
+	const [filterSite, setFilterSite] = useQueryFilterList('site')
+	const [filterLocation, setFilterLocation] = useQueryFilterList('location')
 	const [filterTenant] = useQueryFilter('tenant')
 	const list = useEntityList({
 		noun: 'noun.rack',
 		sort: 'name' as RackSort,
 		filters: () => ({
-			site: parseId(filterSite()) ?? undefined,
-			location: parseId(filterLocation()) ?? undefined,
+			site: idsOf(filterSite()),
+			location: idsOf(filterLocation()),
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_racks,
@@ -41,7 +43,7 @@ export function RacksPage(): JSX.Element {
 	// Location filter options follow the site filter; the table resolves
 	// location names from the same list.
 	const [locations] = createRowsFor(
-		() => ({ site: parseId(filterSite()) ?? undefined }),
+		() => ({ site: idsOf(filterSite()) }),
 		fetch_locations,
 		list.setError,
 	)
@@ -52,9 +54,9 @@ export function RacksPage(): JSX.Element {
 	const rackTypeName = useNameOf(rackTypes, (type) => type.model)
 
 	// Changing the site resets a location that belongs to another site.
-	function handleSiteFilter(value: string): void {
+	function handleSiteFilter(value: string[]): void {
 		setFilterSite(value)
-		setFilterLocation('')
+		setFilterLocation([])
 	}
 
 	const columns: DataTableColumn<RackRow>[] = [

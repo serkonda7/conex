@@ -158,6 +158,8 @@ export const de: Messages = {
 	'noun.user.other': 'Benutzer',
 	'noun.role.one': 'Rolle',
 	'noun.role.other': 'Rollen',
+	'noun.savedFilter.one': 'Gespeicherter Filter',
+	'noun.savedFilter.other': 'Gespeicherte Filter',
 	'noun.auditEntry.one': 'Audit-Log-Eintrag',
 	'noun.auditEntry.other': 'Audit-Log-Einträge',
 	'noun.change.one': 'Änderung',
@@ -187,6 +189,12 @@ export const de: Messages = {
 	'table.applyFilters': 'Suchen',
 	'table.clearAll': 'Alle entfernen',
 	'table.any': 'Beliebig',
+	'table.moveUp': 'Nach oben',
+	'table.moveDown': 'Nach unten',
+	'table.savedFilters': 'Gespeicherte Filter',
+	'table.saveFilter': 'Speichern',
+	'table.filterName': 'Filtername',
+	'table.clearSavedFilter': 'Gespeicherten Filter entfernen',
 
 	// app
 	'app.skipToContent': 'Zum Inhalt springen',

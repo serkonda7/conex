@@ -40,7 +40,7 @@ export function RackAddPage(): JSX.Element {
 	// Location options belong to a site, so they follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),
-		(key: number) => fetch_locations({ site: key }),
+		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
 

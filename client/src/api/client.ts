@@ -131,7 +131,7 @@ export async function post_json<T>(
 }
 
 /** Query-string value before coercion: strings pass through, numbers/booleans stringify, `undefined` omits the param. */
-export type QueryValue = string | number | boolean | undefined
+export type QueryValue = string | number | boolean | readonly (string | number)[] | undefined
 
 /**
  * Coerces one query value to its string form, preserving string literals

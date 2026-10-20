@@ -10,11 +10,10 @@
   "devDependencies": {
     "solid-devtools": "~0.34.3",
     "vite": "~8.3.4",
-    "vite-plugin-entry-shaking": "~0.5.2",
     "vite-plugin-solid": "~2.11.14"
   },
   "dependencies": {
-    "@serkonda7/solid-components": "~0.1.0",
+    "@serkonda7/solid-components": "~0.2.1",
     "@tabler/icons-solidjs": "~3.49.0",
     "better-result": "catalog:",
     "dompurify": "~3.4.17",
