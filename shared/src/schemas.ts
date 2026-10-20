@@ -1538,12 +1538,18 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 /**
  * `password.change`: a user changed their own password. `password.reset`: a
  * user manager set another account's password (`target_username`).
+ * `calendar_sync.*`: changes to the TANSS → Outlook calendar sync; mapping
+ * events carry the mailbox in `target_username`.
  */
 export const AUDIT_EVENTS = [
 	'login.success',
 	'login.failure',
 	'password.change',
 	'password.reset',
+	'calendar_sync.config_update',
+	'calendar_sync.mapping_update',
+	'calendar_sync.mapping_delete',
+	'calendar_sync.run',
 ] as const
 
 export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
@@ -2568,3 +2574,126 @@ export const SavedFilterSchema = v.strictObject({
 export const SavedFilterListSchema = v.pipe(v.array(SavedFilterSchema), v.maxLength(100))
 
 export type SavedFilterJson = v.InferOutput<typeof SavedFilterSchema>
+
+// ---------------------------------------------------------------------------
+// Calendar sync: TANSS appointments (Einsatzplanung) → Outlook calendars of
+// the mapped technicians through Microsoft Graph. One direction only; all
+// routes need `integrations.manage`. See `docs/src/integrations/calendar-sync.md`.
+// ---------------------------------------------------------------------------
+
+/** Entra tenant: directory id (GUID) or a verified domain. */
+const MsTenantIdSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1, 'Tenant ID is required'),
+	v.maxLength(200),
+	v.regex(/^[A-Za-z0-9.-]+$/, 'Must be a tenant id or domain'),
+)
+
+const MsClientIdSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.regex(
+		/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+		'Must be an application (client) id',
+	),
+)
+
+/** Mailbox user principal name (or primary SMTP address). */
+const MailboxUpnSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.maxLength(200),
+	v.email('Must be an email address / UPN'),
+)
+
+export const CALENDAR_SYNC_MIN_INTERVAL = 1
+export const CALENDAR_SYNC_MAX_INTERVAL = 1440
+
+/**
+ * Calendar sync settings. The client secret is write-only: omitted keeps
+ * the stored one. Changed credentials are verified (token request) first.
+ */
+export const CalendarSyncConfigSchema = v.strictObject({
+	ms_tenant_id: MsTenantIdSchema,
+	client_id: MsClientIdSchema,
+	client_secret: v.optional(SecretSchema, undefined),
+	enabled: v.boolean(),
+	interval_minutes: v.pipe(
+		v.number(),
+		v.integer(),
+		v.minValue(CALENDAR_SYNC_MIN_INTERVAL),
+		v.maxValue(CALENDAR_SYNC_MAX_INTERVAL),
+	),
+})
+
+/**
+ * "Test connection": the unsaved form values; a missing secret falls back
+ * to the stored one. With `mailbox_upn` the app must also reach that
+ * mailbox's calendar.
+ */
+export const CalendarSyncTestSchema = v.strictObject({
+	ms_tenant_id: MsTenantIdSchema,
+	client_id: MsClientIdSchema,
+	client_secret: v.optional(SecretSchema, undefined),
+	mailbox_upn: v.optional(MailboxUpnSchema, undefined),
+})
+
+/** Technician → mailbox mapping (`PUT /calendar-sync/mappings/:tanssEmployeeId`). */
+export const CalendarMappingSchema = v.strictObject({
+	mailbox_upn: MailboxUpnSchema,
+	enabled: v.boolean(),
+})
+
+export const CalendarMappingParamsSchema = v.object({ tanssEmployeeId: IdSchema })
+
+export type CalendarSyncConfig = v.InferOutput<typeof CalendarSyncConfigSchema>
+export type CalendarSyncTest = v.InferOutput<typeof CalendarSyncTestSchema>
+export type CalendarMapping = v.InferOutput<typeof CalendarMappingSchema>
+
+export interface CalendarSyncRunCounts {
+	created: number
+	updated: number
+	deleted: number
+	failed: number
+}
+
+export interface CalendarSyncRunJson {
+	id: number
+	/** Unix seconds. */
+	started_at: number
+	finished_at: number | null
+	state: SyncRunState
+	error: string | null
+	counts: CalendarSyncRunCounts
+}
+
+/** Settings without the secret: only whether it is set. */
+export interface CalendarSyncConfigJson {
+	/** False until the settings were saved once. */
+	configured: boolean
+	ms_tenant_id: string
+	client_id: string
+	has_secret: boolean
+	enabled: boolean
+	interval_minutes: number
+	last_error: string | null
+	updated_at: number | null
+	last_run: CalendarSyncRunJson | null
+}
+
+export interface CalendarMappingJson {
+	tanss_employee_id: number
+	mailbox_upn: string
+	enabled: boolean
+	created_at: number
+}
+
+/** TANSS technician with its mapping and the suggested mailbox (TANSS email). */
+export interface CalendarTechnicianJson {
+	tanss_employee_id: number
+	name: string
+	email: string | null
+	mapping: CalendarMappingJson | null
+}

@@ -1,6 +1,8 @@
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { runCalendarSyncIfEnabled } from './calendar_sync/run'
+import { failInterruptedCalendarSyncs } from './calendar_sync/store'
 import { initConfig, load_config_file } from './config'
 import { sweepAttachmentFiles } from './db/attachments'
 import { initDb } from './db/connection'
@@ -9,6 +11,7 @@ import { attachmentsApp } from './routes/attachments'
 import { auditLogApp } from './routes/audit_log'
 import { authApp } from './routes/auth'
 import { cablesApp } from './routes/cables'
+import { calendarSyncApp } from './routes/calendar_sync'
 import { changelogApp } from './routes/changelog'
 import { deviceRolesApp } from './routes/device_roles'
 import { deviceTypesApp } from './routes/device_types'
@@ -92,6 +95,7 @@ export function createApp() {
 			.route('/cables', cablesApp)
 			.route('/search', searchApp)
 			.route('/integrations', integrationsApp)
+			.route('/calendar-sync', calendarSyncApp)
 			.route('/directory', directoryApp)
 			.route('/attachments', attachmentsApp)
 			.route('/saved-filters', savedFiltersApp)
@@ -140,6 +144,9 @@ if (import.meta.main) {
 		console.log(`Removed ${swept.value.removed} orphaned attachment file(s)`)
 	}
 	await failInterruptedSyncs()
+	await failInterruptedCalendarSyncs()
+	// Ticks every minute; runs only when enabled and its interval has passed.
+	start_sweep(runCalendarSyncIfEnabled, 60_000)
 
 	const server = Bun.serve({
 		hostname: '0.0.0.0',
