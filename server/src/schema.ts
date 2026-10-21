@@ -11,6 +11,7 @@ import {
 	pgTable,
 	primaryKey,
 	text,
+	unique,
 	uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import {
@@ -21,6 +22,7 @@ import {
 	type EmployeePhone,
 	HOLIDAY_REGIONS,
 	LOCATION_TYPES,
+	PORT_SIDES,
 	type SavedFilterJson,
 	type ServiceWindow,
 	type TenantEmail,
@@ -347,13 +349,27 @@ export const device_type_interfaces = pgTable(
 		kind: text('kind').notNull().default('ethernet'),
 		label: text('label'),
 		description: text('description'),
+		// Pass-through side (`PORT_SIDES`); null is a normal port.
+		side: text('side', { enum: PORT_SIDES }),
+		// Positions of each expanded rear port (> 1 only on rear stubs).
+		positions: integer('positions').notNull().default(1),
+		// Front stubs: the rear stub they map onto and the first slot they
+		// take (see `services/templates.ts`). Rear stub delete is blocked
+		// while front stubs reference it (service layer).
+		rear_stub_id: integer('rear_stub_id').references(
+			(): AnyPgColumn => device_type_interfaces.id,
+		),
+		rear_position: integer('rear_position').notNull().default(1),
 	},
 	(table) => [
 		index('device_type_interfaces_type_id_idx').on(table.device_type_id),
-		uniqueIndex('device_type_interfaces_prefix_kind_idx').on(
-			table.device_type_id,
-			table.prefix,
-			table.kind,
+		index('device_type_interfaces_rear_stub_id_idx').on(table.rear_stub_id),
+		unique('device_type_interfaces_prefix_kind_idx')
+			.on(table.device_type_id, table.prefix, table.kind, table.side)
+			.nullsNotDistinct(),
+		check(
+			'device_type_interfaces_side_check',
+			sql`${table.positions} >= 1 AND ${table.rear_position} >= 1 AND (${table.side} IS NULL OR ${table.side} IN ('front', 'rear')) AND (${table.positions} = 1 OR ${table.side} IS NOT DISTINCT FROM 'rear') AND ((${table.side} IS NOT DISTINCT FROM 'front') = (${table.rear_stub_id} IS NOT NULL))`,
 		),
 	],
 )
@@ -661,10 +677,29 @@ export const interfaces = pgTable(
 		connected: integer('connected').notNull().default(0),
 		enabled: integer('enabled').notNull().default(1),
 		description: text('description'),
+		// Patch-panel pass-through side (`PORT_SIDES`); null is a normal port.
+		side: text('side', { enum: PORT_SIDES }),
+		// Positions (slots) of a rear port; above 1 only on rear ports.
+		positions: integer('positions').notNull().default(1),
+		// Front ports: the rear port (same device, service layer) and the
+		// slot on it they pass through to. Each slot has at most one front
+		// port; empty slots are allowed.
+		rear_port_id: integer('rear_port_id').references((): AnyPgColumn => interfaces.id),
+		rear_port_position: integer('rear_port_position'),
 	},
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),
-		uniqueIndex('interfaces_device_name_idx').on(table.device_id, table.name),
+		unique('interfaces_device_name_idx')
+			.on(table.device_id, table.side, table.name)
+			.nullsNotDistinct(),
+		uniqueIndex('interfaces_rear_port_position_idx').on(
+			table.rear_port_id,
+			table.rear_port_position,
+		),
+		check(
+			'interfaces_side_check',
+			sql`${table.positions} >= 1 AND (${table.side} IS NULL OR ${table.side} IN ('front', 'rear')) AND (${table.positions} = 1 OR ${table.side} IS NOT DISTINCT FROM 'rear') AND ((${table.side} IS NOT DISTINCT FROM 'front') = (${table.rear_port_id} IS NOT NULL)) AND ((${table.rear_port_id} IS NULL) = (${table.rear_port_position} IS NULL)) AND (${table.rear_port_position} IS NULL OR ${table.rear_port_position} >= 1)`,
+		),
 	],
 )
 
@@ -777,8 +812,8 @@ export const floorplan_areas = pgTable(
 	],
 )
 
-// Rack or device marker on a floor plan. Each object sits on at most one
-// plan (unique FK).
+// Rack, device or outlet (rear port) marker on a floor plan. Each object
+// sits on at most one plan (unique FK).
 export const floorplan_placements = pgTable(
 	'floorplan_placements',
 	{
@@ -792,13 +827,17 @@ export const floorplan_placements = pgTable(
 		device_id: integer('device_id')
 			.unique()
 			.references(() => devices.id, { onDelete: 'cascade' }),
+		// Single-position rear port of a patch panel (a wall outlet).
+		interface_id: integer('interface_id')
+			.unique()
+			.references(() => interfaces.id, { onDelete: 'cascade' }),
 		x: doublePrecision('x').notNull(),
 		y: doublePrecision('y').notNull(),
 	},
 	(table) => [
 		check(
 			'floorplan_placements_object_check',
-			sql`(${table.rack_id} IS NULL) <> (${table.device_id} IS NULL)`,
+			sql`num_nonnulls(${table.rack_id}, ${table.device_id}, ${table.interface_id}) = 1`,
 		),
 		index('floorplan_placements_attachment_id_idx').on(table.attachment_id),
 	],

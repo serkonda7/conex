@@ -1864,6 +1864,54 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background-color: var(--bg-hover);
 }
 
+.add-component-dropdown hr {
+	width: 100%;
+	margin: 0.25rem 0;
+	border: none;
+	border-top: 1px solid var(--border);
+}
+
+/* Patch-panel table: port name, kind, peer and actions on one line. */
+.panel-port-cell {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.panel-port-cell small,
+.panel-port-muted {
+	color: var(--text-muted);
+}
+
+/* Front/rear marker on port tiles and trace hops. */
+/* Direct cable peer with the end-to-end peers behind patch panels below it. */
+.port-peer {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.1rem;
+}
+
+.trace-end-to-end small {
+	color: var(--text-muted);
+}
+
+.port-side-badge {
+	display: inline-block;
+	padding: 0 0.3rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.25rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	line-height: 1.3;
+}
+
+.port-group-heading {
+	margin: 0.5rem 0 0.25rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
 /* "Showing X-Y of Z" result status under the table. */
 .paginator-showing {
 	margin: 0.5rem 0;
@@ -2492,6 +2540,86 @@ span.attachment-star,
 .floorplan-marker:focus-visible {
 	z-index: 1;
 	background-color: var(--bg-hover);
+}
+
+/* Outlet (patch-panel rear port): smaller socket, grey while uncabled. */
+.floorplan-marker-outlet {
+	width: 1.4rem;
+	height: 1.4rem;
+	padding: 0;
+	border-color: var(--text-muted);
+	border-radius: 0.3rem;
+	cursor: pointer;
+}
+
+.floorplan-marker-outlet.floorplan-marker-cabled {
+	border-color: var(--success);
+}
+
+.floorplan-popover {
+	position: absolute;
+	z-index: 2;
+	transform: translate(-50%, 1.1rem);
+	display: grid;
+	gap: 0.35rem;
+	min-width: 16rem;
+	max-width: 26rem;
+	padding: 0.5rem 0.65rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+	font-size: var(--font-size-sm);
+}
+
+.floorplan-popover-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.floorplan-popover-trace {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.15rem 0.5rem;
+	margin: 0;
+}
+
+.floorplan-popover-trace dt {
+	color: var(--text-muted);
+}
+
+.floorplan-popover-trace dd {
+	margin: 0;
+}
+
+.floorplan-popover-actions {
+	display: flex;
+	gap: 0.4rem;
+}
+
+.floorplan-sequence-layer {
+	position: absolute;
+	inset: 0;
+	cursor: copy;
+}
+
+.floorplan-palette-sequence {
+	margin-left: auto;
+	padding: 0 0.35rem;
+	font-size: var(--font-size-sm);
+}
+
+.floorplan-palette-sequence.active {
+	border-color: var(--primary);
+	background-color: var(--primary);
+}
+
+.floorplan-palette-group-header {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
 }
 
 /* Edit mode: editing affordances on top of the view styles. */

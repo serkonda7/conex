@@ -9,11 +9,21 @@ import {
 	GENERAL_PORT_KINDS,
 	NETBOX_INTERFACE_TYPES,
 	type NetboxInterfaceType,
+	PASS_THROUGH_PORT_TYPES,
+	type PassThroughPortType,
 	type PortKind,
+	type PortSide,
 } from 'shared/src/schemas'
 import type { MessageKey } from '../../i18n'
 
-export type ComponentClass = 'interface' | 'port' | 'power-port' | 'power-outlet' | 'display-port'
+export type ComponentClass =
+	| 'interface'
+	| 'port'
+	| 'power-port'
+	| 'power-outlet'
+	| 'display-port'
+	| 'front-port'
+	| 'rear-port'
 
 export interface ComponentClassInfo {
 	key: ComponentClass
@@ -24,8 +34,12 @@ export interface ComponentClassInfo {
 	/** Name placeholder of the add form. */
 	placeholder: string
 	/** Kinds offered by the add form; the first is the default. */
-	kinds: readonly (PortKind | NetboxInterfaceType)[]
+	kinds: readonly (PortKind | NetboxInterfaceType | PassThroughPortType)[]
+	/** Patch-panel classes: the side their stubs get. */
+	side?: PortSide
 }
+
+const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
 
 export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 	{
@@ -63,12 +77,35 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		placeholder: 'HDMI',
 		kinds: DISPLAY_PORT_KINDS,
 	},
+	{
+		key: 'front-port',
+		label: 'deviceType.component.frontPort',
+		heading: 'deviceType.component.frontPorts',
+		placeholder: 'Port',
+		kinds: PASS_THROUGH_KINDS,
+		side: 'front',
+	},
+	{
+		key: 'rear-port',
+		label: 'deviceType.component.rearPort',
+		heading: 'deviceType.component.rearPorts',
+		placeholder: 'Port',
+		kinds: PASS_THROUGH_KINDS,
+		side: 'rear',
+	},
 ]
 
-/** Component class of a stored kind; unknown kinds are interfaces. */
-export function componentClassOf(kind: string): ComponentClass {
+/**
+ * Component class of a stored stub or port: the side decides for patch-panel
+ * ports, otherwise the kind; unknown kinds are interfaces.
+ */
+export function componentClassOf(row: { kind: string; side: PortSide | null }): ComponentClass {
+	if (row.side) {
+		return row.side === 'front' ? 'front-port' : 'rear-port'
+	}
 	const match = COMPONENT_CLASSES.find(
-		(c) => c.key !== 'interface' && (c.kinds as readonly string[]).includes(kind),
+		(c) =>
+			!c.side && c.key !== 'interface' && (c.kinds as readonly string[]).includes(row.kind),
 	)
 	return match?.key ?? 'interface'
 }

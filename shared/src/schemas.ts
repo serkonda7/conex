@@ -718,6 +718,42 @@ export const PORT_KINDS = [
 
 export type PortKind = (typeof PORT_KINDS)[number]
 
+/**
+ * Patch-panel pass-through sides: front ports (incoming) map onto rear
+ * ports (outgoing, e.g. a wall outlet). A port without a side is a normal
+ * port.
+ */
+export const PORT_SIDES = ['front', 'rear'] as const
+export type PortSide = (typeof PORT_SIDES)[number]
+export const PortSideSchema = v.picklist(PORT_SIDES)
+
+/**
+ * Connector types of front and rear ports (NetBox port types) with their
+ * NetBox display names; technical identifiers, so untranslated. Copper
+ * connectors cable like network ports, every other type only to its own kind.
+ */
+export const PASS_THROUGH_PORT_TYPES = {
+	'8p8c': '8P8C',
+	'110-punch': '110 Punch',
+	lc: 'LC',
+	'lc-apc': 'LC/APC',
+	sc: 'SC',
+	'sc-apc': 'SC/APC',
+	st: 'ST',
+	fc: 'FC',
+	mpo: 'MPO',
+	mtrj: 'MTRJ',
+	splice: 'Splice',
+} as const
+
+export type PassThroughPortType = keyof typeof PASS_THROUGH_PORT_TYPES
+
+/** Pass-through types that cable like network ports (copper). */
+export const COPPER_PASS_THROUGH_TYPES: readonly PassThroughPortType[] = ['8p8c', '110-punch']
+
+/** Positions of one rear port: 1 for a plain outlet, N for a trunk (MPO). */
+export const PortPositionsSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
+
 /** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `usb-c`, `hdmi`). */
 export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
 
@@ -786,20 +822,51 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
-export const StubCreateSchema = v.strictObject({
-	prefix: InterfacePrefixSchema,
-	count: v.optional(StubCountSchema, 1),
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	label: v.optional(v.nullable(StubLabelSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
-})
+/**
+ * Template stub. `side` makes it a patch-panel stub: rear stubs carry
+ * `positions`, front stubs map onto a rear stub of the same type starting
+ * at slot `rear_position` (expansion in `server/src/services/templates.ts`).
+ */
+export const StubCreateSchema = v.pipe(
+	v.strictObject({
+		prefix: InterfacePrefixSchema,
+		count: v.optional(StubCountSchema, 1),
+		kind: v.optional(InterfaceKindSchema, 'ethernet'),
+		label: v.optional(v.nullable(StubLabelSchema), undefined),
+		description: v.optional(
+			v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+			undefined,
+		),
+		side: v.optional(v.nullable(PortSideSchema), undefined),
+		positions: v.optional(PortPositionsSchema, undefined),
+		rear_stub_id: v.optional(IdSchema, undefined),
+		rear_position: v.optional(PortPositionsSchema, undefined),
+	}),
+	v.check(
+		(s) => s.positions === undefined || s.positions === 1 || s.side === 'rear',
+		'Positions are only allowed on rear ports',
+	),
+	v.check(
+		(s) =>
+			(s.rear_stub_id === undefined && s.rear_position === undefined) || s.side === 'front',
+		'A rear port mapping is only allowed on front ports',
+	),
+	v.check(
+		(s) => s.side !== 'front' || s.rear_stub_id !== undefined,
+		'Front ports need a rear port',
+	),
+)
 
+/** Stub patch; the side is fixed after create. */
 export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
 	count: v.optional(StubCountSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	label: v.optional(v.nullable(StubLabelSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	positions: v.optional(PortPositionsSchema, undefined),
+	rear_stub_id: v.optional(IdSchema, undefined),
+	rear_position: v.optional(PortPositionsSchema, undefined),
 })
 
 export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
@@ -843,6 +910,11 @@ export interface ExpandedInterface {
 	kind: string
 	label: string | null
 	description: string | null
+	side: PortSide | null
+	positions: number
+	/** Front ports: index of their rear port in the expanded list, and the slot on it. */
+	rear_index: number | null
+	rear_port_position: number | null
 }
 
 // ---------------------------------------------------------------------------
@@ -851,7 +923,15 @@ export interface ExpandedInterface {
 // ---------------------------------------------------------------------------
 
 /** Built-in device roles: seeded by migration, never renamed or deleted. */
-export const DEVICE_ROLE_KEYS = ['pc', 'server', 'ap', 'firewall', 'cloud-key', 'switch'] as const
+export const DEVICE_ROLE_KEYS = [
+	'pc',
+	'server',
+	'ap',
+	'firewall',
+	'cloud-key',
+	'switch',
+	'patch-panel',
+] as const
 export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
 
 /** Icons a device role can show next to its name; the client maps each to a glyph. */
@@ -1194,19 +1274,48 @@ export const DeviceMoveSchema = v.pipe(
 	),
 )
 
-export const InterfaceCreateSchema = v.strictObject({
-	name: InterfaceNameSchema,
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	enabled: v.optional(v.boolean(), undefined),
-	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
-})
+/**
+ * Port create body. `side` makes it a patch-panel port: rear ports carry
+ * `positions`, front ports name a rear port of the same device and a slot
+ * on it.
+ */
+export const InterfaceCreateSchema = v.pipe(
+	v.strictObject({
+		name: InterfaceNameSchema,
+		kind: v.optional(InterfaceKindSchema, 'ethernet'),
+		enabled: v.optional(v.boolean(), undefined),
+		description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+		side: v.optional(v.nullable(PortSideSchema), undefined),
+		positions: v.optional(PortPositionsSchema, undefined),
+		rear_port_id: v.optional(IdSchema, undefined),
+		rear_port_position: v.optional(PortPositionsSchema, undefined),
+	}),
+	v.check(
+		(i) => i.positions === undefined || i.positions === 1 || i.side === 'rear',
+		'Positions are only allowed on rear ports',
+	),
+	v.check(
+		(i) =>
+			(i.rear_port_id === undefined && i.rear_port_position === undefined) ||
+			i.side === 'front',
+		'A rear port mapping is only allowed on front ports',
+	),
+	v.check(
+		(i) => i.side !== 'front' || i.rear_port_id !== undefined,
+		'Front ports need a rear port',
+	),
+)
 
+/** Port patch; the side is fixed after create. */
 export const InterfaceUpdateSchema = v.strictObject({
 	// `connected` is owned by P5 cables, never edited directly.
 	name: v.optional(InterfaceNameSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	enabled: v.optional(v.boolean(), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	positions: v.optional(PortPositionsSchema, undefined),
+	rear_port_id: v.optional(IdSchema, undefined),
+	rear_port_position: v.optional(PortPositionsSchema, undefined),
 })
 
 export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
@@ -1421,6 +1530,8 @@ export interface TracePeerInterface {
 	id: number
 	name: string
 	kind: string
+	/** Patch-panel side; `null` for a normal port. */
+	side: PortSide | null
 }
 
 export interface TracePeerDevice {
@@ -1437,7 +1548,11 @@ export interface TraceLink {
 	peer_interface: TracePeerInterface
 }
 
-/** One cable hop in a multi-hop trace path (`from` -> `to`). */
+/**
+ * One cable hop in a multi-hop trace path (`from` -> `to`). After a hop
+ * into a patch panel, the next hop's `from_interface` is the paired port
+ * the signal passed through to.
+ */
 export interface TraceHop {
 	cable_id: number
 	cable_label: string | null
@@ -1452,6 +1567,32 @@ export interface TraceHop {
 export interface TracePath {
 	hops: TraceHop[]
 	end_device: TracePeerDevice
+	/**
+	 * The path fanned out of a multi-position rear port without a known
+	 * position (NetBox split), so it is one of several possible circuits.
+	 */
+	split: boolean
+}
+
+/** One patch panel an end-to-end circuit passes through. */
+export interface TracePanelPass {
+	device: TracePeerDevice
+	in_interface: TracePeerInterface
+	/** Port the signal leaves the panel by; `null` when no front port maps the slot. */
+	out_interface: TracePeerInterface | null
+}
+
+/**
+ * End-to-end peer of a port cabled to a patch panel: the far end after
+ * every panel on the way, e.g. "→ PC-123 via PP-A 12 · PP-B 12".
+ */
+export interface TraceEndToEnd {
+	local_interface_id: number
+	/** Far end; `null` when the circuit ends at an uncabled panel port. */
+	end_device: TracePeerDevice | null
+	end_interface: TracePeerInterface | null
+	via: TracePanelPass[]
+	split: boolean
 }
 
 export interface DeviceTraceResponse {
@@ -1459,6 +1600,8 @@ export interface DeviceTraceResponse {
 	links: TraceLink[]
 	/** Shortest-path multi-hop traces (depth-limited, see TraceQuerySchema). */
 	paths: TracePath[]
+	/** End-to-end peers of the local ports cabled to a patch panel. */
+	end_to_end: TraceEndToEnd[]
 }
 
 /** Per-interface trace: all shortest paths starting at one port. */
@@ -1466,6 +1609,8 @@ export interface InterfaceTraceResponse {
 	start_device: TracePeerDevice
 	start_interface: TracePeerInterface
 	paths: TracePath[]
+	/** End-to-end peers when the port is cabled to a patch panel. */
+	end_to_end: TraceEndToEnd[]
 }
 
 /** Per-cable trace: endpoints plus onward paths from each side. */
@@ -1751,17 +1896,24 @@ const FloorplanAreaInputSchema = v.pipe(
 	),
 )
 
-/** Rack or device marker at a normalized position. */
+/**
+ * Rack, device or outlet marker at a normalized position. An outlet is a
+ * single-position rear port of a patch panel.
+ */
 const FloorplanPlacementInputSchema = v.pipe(
 	v.strictObject({
 		rack_id: v.optional(IdSchema, undefined),
 		device_id: v.optional(IdSchema, undefined),
+		interface_id: v.optional(IdSchema, undefined),
 		x: FloorplanCoordSchema,
 		y: FloorplanCoordSchema,
 	}),
 	v.check(
-		(placement) => (placement.rack_id === undefined) !== (placement.device_id === undefined),
-		'Exactly one of rack or device is required',
+		(placement) =>
+			[placement.rack_id, placement.device_id, placement.interface_id].filter(
+				(id) => id !== undefined,
+			).length === 1,
+		'Exactly one of rack, device or port is required',
 	),
 )
 
@@ -1789,14 +1941,28 @@ export interface FloorplanAreaJson {
 	target_plan_id: number | null
 }
 
-/** Marker on the wire, with its rack or device resolved for display. */
+/** Patch-panel rear port placed as an outlet: its panel and whether it is cabled. */
+export interface FloorplanPortJson {
+	/** The panel device. */
+	device_id: number
+	device_name: string
+	/** Port name on the panel (`12`). */
+	name: string
+	connected: boolean
+}
+
+/** Marker on the wire, with its rack, device or outlet resolved for display. */
 export interface FloorplanPlacementJson {
 	id: number
-	/** Exactly one of `rack_id` / `device_id` is set. */
+	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */
 	rack_id: number | null
 	device_id: number | null
+	interface_id: number | null
+	/** Outlet details; `null` for a rack or device. */
+	port: FloorplanPortJson | null
 	x: number
 	y: number
+	/** Rack or device name; `PP-A / 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null
@@ -1853,14 +2019,40 @@ export const FloorplanLinksQuerySchema = v.pipe(
 		location: OptionalIdEntry,
 		rack: OptionalIdEntry,
 		device: OptionalIdEntry,
+		interface: OptionalIdEntry,
 	}),
 	v.check(
-		(q) => [q.site, q.location, q.rack, q.device].filter((id) => id !== undefined).length === 1,
-		'Exactly one of site, location, rack or device is required',
+		(q) =>
+			[q.site, q.location, q.rack, q.device, q.interface].filter((id) => id !== undefined)
+				.length === 1,
+		'Exactly one of site, location, rack, device or interface is required',
 	),
 )
 
 export type FloorplanLinksQuery = v.InferOutput<typeof FloorplanLinksQuerySchema>
+
+/**
+ * `GET /attachments/outlets?device=`: placed outlets of a device. For a
+ * patch panel its own placed rear ports; for any other device the placed
+ * rear ports its ports are cabled to.
+ */
+export const FloorplanOutletsQuerySchema = v.object({ device: IdSchema })
+
+export type FloorplanOutletsQuery = v.InferOutput<typeof FloorplanOutletsQuerySchema>
+
+/** One placed outlet seen from a device (`FloorplanOutletsQuerySchema`). */
+export interface FloorplanOutletJson {
+	/** The device's port: the rear port itself on a panel, else the port cabled to it. */
+	local_interface_id: number
+	/** The placed rear port. */
+	interface_id: number
+	port: FloorplanPortJson
+	attachment_id: number
+	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+}
 
 /** Floor plan referencing an object, identified by its owner. */
 export interface FloorplanLinkJson {
@@ -1878,9 +2070,13 @@ export interface FloorplanLinkJson {
  * placed on another plan. Those already on this plan are included.
  */
 export interface FloorplanCandidateJson {
-	/** Exactly one of `rack_id` / `device_id` is set. */
+	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */
 	rack_id: number | null
 	device_id: number | null
+	/** Unplaced single-position rear port of a patch panel in the owner's site. */
+	interface_id: number | null
+	port: FloorplanPortJson | null
+	/** Rack or device name; `PP-A / 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null
@@ -2063,6 +2259,9 @@ export const CableImportRowSchema = v.object({
 	a_interface: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	b_device: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	b_interface: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	/** Port side when the name exists on several sides of a panel (NetBox termination type). */
+	a_side: v.optional(PortSideSchema, undefined),
+	b_side: v.optional(PortSideSchema, undefined),
 	label: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), undefined),
 	kind: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50)), undefined),
 	status: v.optional(CableStatusSchema, 'connected'),

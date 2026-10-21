@@ -3,7 +3,7 @@
  * with the overlay layers on top, and the display helpers of areas and
  * markers.
  */
-import { IconBox, IconServer } from '@tabler/icons-solidjs'
+import { IconBox, IconOutlet, IconServer } from '@tabler/icons-solidjs'
 import type { JSX } from 'solid-js'
 import {
 	type AttachmentJson,
@@ -48,21 +48,39 @@ export function areaCenter(area: FloorplanAreaJson): { x: number; y: number } {
 	}
 }
 
-/** Rack glyph for racks, the role glyph for devices (a generic one without). */
+/** Rack glyph for racks, a socket for outlets, the role glyph for devices (a generic one without). */
 export function markerIcon(
-	placement: Pick<FloorplanPlacementJson, 'rack_id' | 'role_icon'>,
+	placement: Pick<FloorplanPlacementJson, 'rack_id' | 'interface_id' | 'role_icon'>,
 ): IconComponent {
 	if (placement.rack_id !== null) {
 		return IconBox
 	}
+	if (placement.interface_id !== null) {
+		return IconOutlet
+	}
 	return deviceRoleIcon(placement.role_icon) ?? IconServer
 }
 
-/** Tooltip of a marker: the name with the device status, or "Rack". */
-export function markerTitle(placement: Pick<FloorplanPlacementJson, 'name' | 'status'>): string {
-	const detail =
-		placement.status !== null ? deviceStatusLabel(placement.status) : tp('entity.rack', 1)
+/** Tooltip of a marker: the name with the device status, "Rack", or the outlet's cabling. */
+export function markerTitle(
+	placement: Pick<FloorplanPlacementJson, 'name' | 'status' | 'port'>,
+): string {
+	const detail = placement.port
+		? t(placement.port.connected ? 'floorplan.outletCabled' : 'floorplan.outletFree')
+		: placement.status !== null
+			? deviceStatusLabel(placement.status)
+			: tp('entity.rack', 1)
 	return t('floorplan.markerTitle', { name: placement.name, detail })
+}
+
+/** Marker classes shared by the view and edit modes. */
+export function markerClasses(placement: FloorplanPlacementJson): Record<string, boolean> {
+	return {
+		'floorplan-marker-rack': placement.rack_id !== null,
+		'floorplan-marker-outlet': placement.port !== null,
+		'floorplan-marker-cabled': placement.port?.connected === true,
+		'floorplan-marker-inactive': placement.status !== null && placement.status !== 'active',
+	}
 }
 
 /** The image capped at 60vh high with the overlay layers (`children`) on top. */

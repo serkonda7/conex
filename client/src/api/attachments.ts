@@ -16,7 +16,9 @@ import type {
 	FloorplanLinkJson,
 	FloorplanListJson,
 	FloorplanListQuery,
+	FloorplanOutletJson,
 	FloorplanPlacementJson,
+	FloorplanPortJson,
 	FloorplanPut,
 } from 'shared/src/types'
 import { t } from '../i18n'
@@ -29,7 +31,9 @@ export type {
 	FloorplanJson,
 	FloorplanLinkJson,
 	FloorplanListJson,
+	FloorplanOutletJson,
 	FloorplanPlacementJson,
+	FloorplanPortJson,
 	FloorplanPut,
 }
 
@@ -122,12 +126,13 @@ export async function put_floorplan(
 	return to_result<FloorplanJson>(res, failed.update('noun.floorplan'))
 }
 
-/** What a floor-plan link lookup is about: exactly one of the four ids. */
+/** What a floor-plan link lookup is about: exactly one of the five ids. */
 export type FloorplanLinkTarget =
 	| { site: number }
 	| { location: number }
 	| { rack: number }
 	| { device: number }
+	| { interface: number }
 
 /**
  * Floor plans referencing an object: the plan a rack or device is placed on
@@ -142,9 +147,21 @@ export async function fetch_floorplan_links(
 			location: 'location' in target ? target.location : undefined,
 			rack: 'rack' in target ? target.rack : undefined,
 			device: 'device' in target ? target.device : undefined,
+			interface: 'interface' in target ? target.interface : undefined,
 		}),
 	})
 	return to_result<FloorplanLinkJson[]>(res, failed.list('noun.floorplan'))
+}
+
+/**
+ * Placed outlets of a device: a patch panel's own placed rear ports, or the
+ * placed rear ports any other device's ports are cabled to.
+ */
+export async function fetch_outlets(
+	deviceId: number,
+): Promise<Result<FloorplanOutletJson[], Error>> {
+	const res = await client.attachments.outlets.$get({ query: to_query({ device: deviceId }) })
+	return to_result<FloorplanOutletJson[]>(res, failed.list('noun.floorplan'))
 }
 
 /** Every marked floor plan, narrowed by search and tenant filters. */

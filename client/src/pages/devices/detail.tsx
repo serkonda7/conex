@@ -1,6 +1,7 @@
 import { IconArrowsExchange, IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
-import type { TraceLink } from 'shared/src/types'
+import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
+import { fetch_outlets } from '../../api/attachments'
 import { delete_cable, fetch_trace } from '../../api/cables'
 import { fetch_device_role } from '../../api/device_roles'
 import {
@@ -30,7 +31,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { FloorplanLinks } from '../../components/floorplan_links'
+import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
@@ -43,9 +44,16 @@ import { ManagedServiceRows } from '../managed-bundles/service_rows'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
+import { PanelPortTable, type PanelRow } from './panel_ports'
+import { PortPeer } from './trace_peer'
 
-/** General, power, outlet and display ports; everything else is a network port. */
-const isOtherPort = (iface: InterfaceJson): boolean => OTHER_PORT_KINDS.has(iface.kind)
+/**
+ * General, power, outlet and display ports; everything else is a network
+ * port. Patch-panel ports (with a side) are neither.
+ */
+const isOtherPort = (iface: InterfaceJson): boolean =>
+	!iface.side && OTHER_PORT_KINDS.has(iface.kind)
+const isPanelPort = (iface: InterfaceJson): boolean => iface.side !== null
 
 /** Connect or disconnect plus edit buttons of one port row. */
 function PortActions(props: {
@@ -122,6 +130,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_trace(key, 4),
 		setError,
 	)
+	const [outlets, { refetch: refetchOutlets }] = createRowsFor(id, fetch_outlets, setError)
 	const typeId = (): number | undefined => device()?.device_type_id
 	const roleId = (): number | undefined => device()?.device_role_id
 	const siteId = (): number | null | undefined => device()?.site_id
@@ -155,6 +164,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	function refetchAll(): void {
 		void refetchIfaces()
 		void refetchTrace()
+		void refetchOutlets()
 	}
 
 	const action = useAction(setError)
@@ -179,7 +189,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		open(iface)
 	}
 
-	const networkPorts = createMemo(() => (ifaces() ?? []).filter((i) => !isOtherPort(i)))
+	const networkPorts = createMemo(() =>
+		(ifaces() ?? []).filter((i) => !isOtherPort(i) && !isPanelPort(i)),
+	)
+	const panelPorts = createMemo(() => (ifaces() ?? []).filter(isPanelPort))
 	const otherPorts = createMemo(() => (ifaces() ?? []).filter(isOtherPort))
 	/** 1-based network port number: position in creation order (eth1..ethN). */
 	const portNumbers = createMemo(
@@ -189,6 +202,18 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const linksByIface = createMemo(
 		() => new Map((trace()?.links ?? []).map((link) => [link.local_interface.id, link])),
 	)
+	/** End-to-end peers behind patch panels, per local interface. */
+	const endToEndByIface = createMemo(() => {
+		const byIface = new Map<number, TraceEndToEnd[]>()
+		for (const peer of trace()?.end_to_end ?? []) {
+			byIface.set(peer.local_interface_id, [
+				...(byIface.get(peer.local_interface_id) ?? []),
+				peer,
+			])
+		}
+		return byIface
+	})
+	const endToEndOf = (ifaceId: number): TraceEndToEnd[] => endToEndByIface().get(ifaceId) ?? []
 
 	const nameColumn: DataTableColumn<InterfaceJson> = {
 		key: 'name',
@@ -198,18 +223,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const connectionColumn: DataTableColumn<InterfaceJson> = {
 		key: 'connection',
 		label: t('device.connection'),
-		getValue: (iface: InterfaceJson): JSX.Element => {
-			const link = linksByIface().get(iface.id)
-			if (!link) {
-				return <span>—</span>
-			}
-			return (
-				<span>
-					<a href={`/devices/${link.peer_device.id}`}>{link.peer_device.name}</a>:{' '}
-					<code>{link.peer_interface.name}</code>
-				</span>
-			)
-		},
+		getValue: (iface: InterfaceJson): JSX.Element => (
+			<PortPeer link={linksByIface().get(iface.id)} endToEnd={endToEndOf(iface.id)} />
+		),
 	}
 	/** Network ports get the enabled state and port number. */
 	const networkColumns: DataTableColumn<InterfaceJson>[] = [
@@ -236,6 +252,23 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		},
 		connectionColumn,
 	]
+
+	/** Floor plan an outlet (single-position rear port) is placed on. */
+	const planColumn: DataTableColumn<PanelRow> = {
+		key: 'plan',
+		label: tp('entity.floorplan', 1),
+		getValue: (row: PanelRow): JSX.Element => {
+			const outlet =
+				row.position === null
+					? (outlets() ?? []).find((o) => o.interface_id === row.rear.id)
+					: undefined
+			return outlet ? (
+				<a href={`/floorplans/${outlet.attachment_id}`}>{outlet.owner_name}</a>
+			) : (
+				<span>—</span>
+			)
+		},
+	}
 
 	const portActions = (iface: InterfaceJson): JSX.Element => (
 		<PortActions
@@ -369,12 +402,36 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						label="floorplan.onPlanOf"
 						onError={setError}
 					/>
+					<Show when={panelPorts().length === 0}>
+						<OutletLinks
+							outlets={outlets() ?? []}
+							portName={(ifaceId: number) =>
+								(ifaces() ?? []).find((i) => i.id === ifaceId)?.name
+							}
+						/>
+					</Show>
 				</DetailCard>
 			</DetailShell>
-			<h3 id="device-interfaces">
-				{t('device.networkPortsCount', { count: networkPorts().length })}
-			</h3>
-			{portTable(networkPorts, networkColumns)}
+			<Show when={panelPorts().length > 0}>
+				<h3 id="device-panel-ports">
+					{t('device.panelPortsCount', {
+						count: panelPorts().filter((p) => p.side === 'rear').length,
+					})}
+				</h3>
+				<PanelPortTable
+					ports={panelPorts()}
+					links={linksByIface()}
+					endToEnd={endToEndOf}
+					actions={portActions}
+					extraColumns={[planColumn]}
+				/>
+			</Show>
+			<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
+				<h3 id="device-interfaces">
+					{t('device.networkPortsCount', { count: networkPorts().length })}
+				</h3>
+				{portTable(networkPorts, networkColumns)}
+			</Show>
 			<Show when={otherPorts().length > 0}>
 				<h3 id="device-other-ports">
 					{t('device.otherPortsCount', { count: otherPorts().length })}
@@ -429,7 +486,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<EditPortDialog
 						device_id={props.id}
 						iface={iface()}
-						show_enabled={!isOtherPort(iface())}
+						show_enabled={!isOtherPort(iface()) && !isPanelPort(iface())}
 						on_saved={() => {
 							setEditingIface(null)
 							void refetchIfaces()

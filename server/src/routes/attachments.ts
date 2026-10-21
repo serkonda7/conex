@@ -12,6 +12,7 @@ import {
 	EntityParamsSchema,
 	FloorplanLinksQuerySchema,
 	FloorplanListQuerySchema,
+	FloorplanOutletsQuerySchema,
 	FloorplanPutSchema,
 } from 'shared/src/schemas'
 import { checkTenant, listTenantScope, requestScope, requestUser } from '../authz'
@@ -26,12 +27,13 @@ import {
 	listAttachments,
 	listFloorplanLinks,
 	listFloorplans,
+	listOutlets,
 	listPlanCandidates,
 	putPlan,
 	replaceAttachmentFile,
 	updateAttachment,
 } from '../db/attachments'
-import { deviceTenant, ownerTenant, rackTenant } from '../db/owners'
+import { deviceTenant, interfaceTenant, ownerTenant, rackTenant } from '../db/owners'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -100,9 +102,22 @@ export const attachmentsApp = new Hono()
 					? await ownerTenant({ site_id: query.site, location_id: query.location })
 					: query.rack !== undefined
 						? await rackTenant(query.rack)
-						: await deviceTenant(query.device ?? 0)
+						: query.interface !== undefined
+							? await interfaceTenant(query.interface)
+							: await deviceTenant(query.device ?? 0)
 			return (
 				checkTenant(c, tenant) ?? c.json(await listFloorplanLinks(query, requestScope(c)))
+			)
+		},
+	)
+	.get(
+		'/outlets',
+		vValidator('query', FloorplanOutletsQuerySchema, onValidationError),
+		async (c) => {
+			const { device } = c.req.valid('query')
+			return (
+				checkTenant(c, await deviceTenant(device)) ??
+				c.json(await listOutlets(device, requestScope(c)))
 			)
 		},
 	)

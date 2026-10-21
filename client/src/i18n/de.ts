@@ -46,6 +46,8 @@ export const de: Messages = {
 	'common.unitPosition': 'HE{u}',
 	'face.front': 'Vorne',
 	'face.rear': 'Hinten',
+	'portSide.front': 'Frontport',
+	'portSide.rear': 'Rückport',
 	'portKind.ethernet': 'Ethernet',
 	'portKind.port': 'Anschluss',
 	'portKind.rj45': 'RJ-45 (seriell)',
@@ -432,6 +434,30 @@ export const de: Messages = {
 	'deviceType.component.powerOutlets': 'Steckdosen ({count})',
 	'deviceType.component.displayPort': 'Bildschirmanschlüsse',
 	'deviceType.component.displayPorts': 'Bildschirmanschlüsse ({count})',
+	'deviceType.component.frontPort': 'Frontports',
+	'deviceType.component.frontPorts': 'Frontports ({count})',
+	'deviceType.component.rearPort': 'Rückports',
+	'deviceType.component.rearPorts': 'Rückports ({count})',
+	'deviceType.component.positions': 'Positionen',
+	'deviceType.component.positionsHint':
+		'1 für eine Dose; mehr für einen Trunk wie MPO (eine Position je Faser).',
+	'deviceType.component.positionsCount.one': '{count} Position',
+	'deviceType.component.positionsCount.other': '{count} Positionen',
+	'deviceType.component.rearPosition': 'Ab Position',
+	'deviceType.component.rearPositionHint':
+		'Frontports belegen ab hier fortlaufende Positionen auf den Rückports.',
+	'deviceType.component.rearPortRequired': 'Rückport auswählen.',
+	'deviceType.component.noRearPorts': 'Zuerst Rückports anlegen',
+	'deviceType.component.mapping': 'Zuordnung',
+	'deviceType.component.mapsTo': '→ {rear} ab Position {position}',
+	'deviceType.preset.patchPanel': 'Patchpanel (N Ports)',
+	'deviceType.preset.cassette': 'Kassette (N × MPO)',
+	'deviceType.preset.frontName': 'Name der Frontports',
+	'deviceType.preset.nameHint':
+		'Front- und Rückports tragen denselben Namen; Port N vorne führt auf Port N hinten.',
+	'deviceType.preset.fibers': 'Fasern',
+	'deviceType.preset.frontType': 'Fronttyp',
+	'deviceType.preset.rearName': 'Name des Rückports',
 	'deviceType.notFound': 'Gerätetyp nicht gefunden.',
 	'deviceType.details': 'Gerätetypdetails',
 	'deviceType.noDevices': 'Noch keine Geräte dieses Typs vorhanden.',
@@ -446,28 +472,6 @@ export const de: Messages = {
 	'import.promptCopied': 'Prompt in die Zwischenablage kopiert.',
 	'import.promptCopyFailed':
 		'Der Prompt konnte nicht kopiert werden. Zugriff auf die Zwischenablage erlauben und HTTPS oder localhost verwenden, dann erneut versuchen.',
-	'import.aiPrompt': `Erstelle ein conex-Gerätetyp-YAML (NetBox-devicetype-library-Format) für Hersteller „{manufacturer}“, Modell „{model}“.
-
-Quellenpriorität:
-1) https://github.com/serkonda7/conex-device-types — suche einen exakten Treffer unter device-types/<Manufacturer>/<model>.yaml und gib ihn unverändert zurück. Durchsuche auch das Verzeichnis; vorhandene Dateinamen können die Großschreibung des Modells beibehalten.
-2) https://github.com/netbox-community/devicetype-library — übernimm bei einem Treffer die Vorlage, aber nur mit den unten unterstützten Schlüsseln.
-3) Herstellerdatenblätter, PSREF oder Handbücher — ergänze Lücken ausschließlich aus Primärquellen und dokumentiere URLs in comments. Niemals raten; unsichere optionale Felder weglassen oder type: other (interfaces) / port (allgemeine Anschlüsse) verwenden. Niemals einen display-ports-Typ erfinden.
-
-Gib genau ein YAML-Dokument aus, beginnend mit ---, in einem abgegrenzten YAML-Codeblock. Nenne den Zielpfad device-types/<Manufacturer>/<model-slug>.yaml außerhalb des Blocks. Die Quellenübersicht muss außerhalb des YAML stehen, damit der Block direkt in conex eingefügt werden kann.
-
-Nur diese Schlüssel ausgeben: manufacturer, model, slug, u_height, is_full_depth, description, comments, interfaces, ports, power-ports, power-outlets, display-ports. console-ports ist beim Import ein Alias für ports; bevorzuge ports und dupliziere keine Einträge in beiden Listen. Beim Anpassen einer Vorlage alle anderen NetBox-Schlüssel entfernen.
-
-Regeln:
-- manufacturer muss dem Verzeichnisnamen entsprechen. manufacturer und model: 1–100 Zeichen. slug: 1–100 Zeichen, ^[-a-z0-9_]+$, Form <mfr-slug>-<model-slug>.
-- u_height: ganze Zahl 0–60 (0 für Laptop/Desktop/Dock/Telefon). is_full_depth: standardmäßig true, false für mobile Geräte oder halbe Tiefe.
-- Anschlussnamen müssen über alle Listen hinweg eindeutig sein, 1–50 Zeichen, nur ASCII, passend zu ^[A-Za-z0-9_.-]+$ (keine Leerzeichen oder Schrägstriche). Namen aus Vorlagen beim Anpassen normalisieren. Nirgendwo leere Zeichenketten ausgeben.
-- interfaces type: NetBox-Slug, z. B. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
-- ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port oder other.
-- display-ports type ist erforderlich: hdmi, displayport, vga oder dvi (conex-Erweiterung).
-- power-ports type: z. B. dc-terminal oder iec-60320-c14; maximum_draw nur ergänzen, wenn im Datenblatt angegeben. power-outlets verwenden den dokumentierten NetBox-Steckertyp.
-- description: eine Zeile, maximal 200 Zeichen. comments: Markdown-Quellenlinks, maximal 2000 Zeichen. Anschlussbeschreibungen: maximal 200 Zeichen.
-
-Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer in beiden Bibliotheken, unsichere Felder und Dateipfad. Als DRAFT markieren, wenn weder in den Bibliotheken noch in Primärquellen gefunden.`,
 	'import.data': 'Daten',
 	'import.fieldOptions': 'Feldoptionen',
 	'import.field': 'Feld',
@@ -483,6 +487,10 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'import.fieldPowerPorts': 'Stromeingänge',
 	'import.fieldPowerOutlets': 'Steckdosen und Stromausgänge',
 	'import.fieldDisplayPorts': 'Bildschirmanschlüsse (HDMI / DP / VGA)',
+	'import.fieldRearPorts':
+		'Rückports eines Patchpanels (Dosen): name, type (8p8c, lc, mpo, …), positions (Standard 1).',
+	'import.fieldFrontPorts':
+		'Frontports eines Patchpanels: name, type, rear_port (Name eines Rückports im selben Dokument), rear_port_position (Standard 1).',
 	'import.createManufacturer': 'Hersteller „{name}“ anlegen',
 	'import.manufacturerCreated': 'Hersteller „{name}“ angelegt. Import erneut ausführen.',
 	'import.renameExisting': 'Bestehenden umbenennen',
@@ -715,6 +723,16 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'device.onShelf': 'Fachboden {name}',
 	'device.networkPortsCount': 'Netzwerkanschlüsse ({count})',
 	'device.otherPortsCount': 'Weitere Anschlüsse ({count})',
+	'device.panelPortsCount': 'Patchpanel-Ports ({count})',
+	'device.panel.front': 'Front → Gegenstelle',
+	'device.panel.rear': 'Rück (Dose) → Gegenstelle',
+	'device.panel.positions': '{count} Positionen',
+	'device.panel.frontPorts': 'Frontports',
+	'device.panel.rearPorts': 'Rückports',
+	'device.panel.otherPorts': 'Ports',
+	'device.trace.via': 'über {via}',
+	'device.trace.split': '(eine von mehreren Fasern)',
+	'device.trace.openEnd': '→ freier Panel-Port',
 	'device.connected': 'verbunden',
 	'device.kind': 'Art',
 	'device.alreadyConnected': 'Bereits verbunden',
@@ -891,6 +909,20 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'floorplan.markerCount.other': '{count} Markierungen',
 	'floorplan.openArea': '{name} öffnen',
 	'floorplan.markerTitle': '{name} · {detail}',
+	'floorplan.outletCabled': 'Dose, belegt',
+	'floorplan.outletFree': 'Dose, frei',
+	'floorplan.outletsOf': 'Dosen von {name}',
+	'floorplan.sequence': 'Der Reihe nach',
+	'floorplan.sequenceHint':
+		'Jeder Klick in den Grundriss setzt die nächste freie Dose dieses Panels.',
+	'floorplan.sequenceActive':
+		'In den Grundriss klicken, um die nächste Dose zu setzen; Escape beendet.',
+	'floorplan.outlet': 'Dose',
+	'floorplan.outletSwitchSide': 'Panelseite',
+	'floorplan.outletDeviceSide': 'Dosenseite',
+	'floorplan.openPanel': 'Panel öffnen',
+	'floorplan.closePopover': 'Schließen',
+	'floorplan.outletOf': 'Dose: {outlet}',
 	'floorplan.pageName': 'Grundriss {name}',
 	'floorplan.notFound': 'Grundriss nicht gefunden.',
 	'floorplan.open': 'Grundriss öffnen',
