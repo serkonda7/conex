@@ -201,10 +201,14 @@ async function checkLocation(
 	return Result.ok(undefined)
 }
 
-/** The rack location is authoritative for a rack-mounted device. */
-async function rackLocationId(rackId: number): Promise<Result<number | null, Error>> {
+/** The rack site and location are authoritative for a rack-mounted device. */
+async function rackScope(
+	rackId: number,
+): Promise<Result<{ site_id: number; location_id: number | null }, Error>> {
 	const rack = await findOne(racks, eq(racks.id, rackId))
-	return rack ? Result.ok(rack.location_id) : Result.err(new NotFoundError('Rack not found'))
+	return rack
+		? Result.ok({ site_id: rack.site_id, location_id: rack.location_id })
+		: Result.err(new NotFoundError('Rack not found'))
 }
 
 const ASSET_TAG_IN_USE = 'Asset tag is already in use'
@@ -515,13 +519,14 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		is_full_depth: template.value.is_full_depth !== 0,
 	}
 	let deviceLocationId = input.location_id ?? null
-	const deviceSiteId = input.site_id ?? null
+	let deviceSiteId = input.site_id ?? null
 	if (mount.rack_id !== null) {
-		const rackLocation = await rackLocationId(mount.rack_id)
-		if (Result.isError(rackLocation)) {
-			return rackLocation
+		const scope = await rackScope(mount.rack_id)
+		if (Result.isError(scope)) {
+			return scope
 		}
-		deviceLocationId = rackLocation.value
+		deviceSiteId = scope.value.site_id
+		deviceLocationId = scope.value.location_id
 	}
 	for (const guard of [
 		await checkExists(sites, deviceSiteId, 'Site not found'),
@@ -622,19 +627,18 @@ export async function updateDevice(
 	const mountChanged = input.rack_id !== undefined || input.position_u !== undefined
 	const relocated = mountChanged && effectiveRackId !== null
 	let deviceLocationId = input.location_id !== undefined ? input.location_id : node.location_id
+	let deviceSiteId = input.site_id !== undefined ? input.site_id : node.site_id
 	if (relocated) {
-		const rackLocation = await rackLocationId(effectiveRackId)
-		if (Result.isError(rackLocation)) {
-			return rackLocation
+		const scope = await rackScope(effectiveRackId)
+		if (Result.isError(scope)) {
+			return scope
 		}
-		deviceLocationId = rackLocation.value
+		deviceSiteId = scope.value.site_id
+		deviceLocationId = scope.value.location_id
 	}
 	for (const guard of [
 		await checkExists(sites, input.site_id, 'Site not found'),
-		await checkLocation(
-			deviceLocationId,
-			input.site_id !== undefined ? input.site_id : node.site_id,
-		),
+		await checkLocation(deviceLocationId, deviceSiteId),
 		await checkTenantExists(input.tenant_id),
 		await checkEmployeeAssignment(
 			input.employee_id !== undefined ? input.employee_id : node.employee_id,
@@ -680,6 +684,9 @@ export async function updateDevice(
 		'employee_id',
 		'description',
 	])
+	if (input.site_id !== undefined || relocated) {
+		patch.site_id = deviceSiteId
+	}
 	if (input.location_id !== undefined || relocated) {
 		patch.location_id = deviceLocationId
 	}
@@ -742,16 +749,20 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 		patch.shelf_id = null
 	}
 	if (mount.rack_id !== null) {
-		const rackLocation = await rackLocationId(mount.rack_id)
-		if (Result.isError(rackLocation)) {
-			return rackLocation
+		const scope = await rackScope(mount.rack_id)
+		if (Result.isError(scope)) {
+			return scope
 		}
-		patch.location_id = rackLocation.value
+		patch.site_id = scope.value.site_id
+		patch.location_id = scope.value.location_id
 	}
 	const written = await tryWrite(() =>
 		withTransaction(async () => {
 			await getDb().update(devices).set(patch).where(eq(devices.id, id))
-			if (patch.location_id !== undefined && patch.location_id !== node.location_id) {
+			if (
+				(patch.site_id !== undefined && patch.site_id !== node.site_id) ||
+				(patch.location_id !== undefined && patch.location_id !== node.location_id)
+			) {
 				await prunePlacements()
 			}
 		}),
