@@ -1896,17 +1896,24 @@ const FloorplanAreaInputSchema = v.pipe(
 	),
 )
 
-/** Rack or device marker at a normalized position. */
+/**
+ * Rack, device or outlet marker at a normalized position. An outlet is a
+ * single-position rear port of a patch panel.
+ */
 const FloorplanPlacementInputSchema = v.pipe(
 	v.strictObject({
 		rack_id: v.optional(IdSchema, undefined),
 		device_id: v.optional(IdSchema, undefined),
+		interface_id: v.optional(IdSchema, undefined),
 		x: FloorplanCoordSchema,
 		y: FloorplanCoordSchema,
 	}),
 	v.check(
-		(placement) => (placement.rack_id === undefined) !== (placement.device_id === undefined),
-		'Exactly one of rack or device is required',
+		(placement) =>
+			[placement.rack_id, placement.device_id, placement.interface_id].filter(
+				(id) => id !== undefined,
+			).length === 1,
+		'Exactly one of rack, device or port is required',
 	),
 )
 
@@ -1934,14 +1941,28 @@ export interface FloorplanAreaJson {
 	target_plan_id: number | null
 }
 
-/** Marker on the wire, with its rack or device resolved for display. */
+/** Patch-panel rear port placed as an outlet: its panel and whether it is cabled. */
+export interface FloorplanPortJson {
+	/** The panel device. */
+	device_id: number
+	device_name: string
+	/** Port name on the panel (`12`). */
+	name: string
+	connected: boolean
+}
+
+/** Marker on the wire, with its rack, device or outlet resolved for display. */
 export interface FloorplanPlacementJson {
 	id: number
-	/** Exactly one of `rack_id` / `device_id` is set. */
+	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */
 	rack_id: number | null
 	device_id: number | null
+	interface_id: number | null
+	/** Outlet details; `null` for a rack or device. */
+	port: FloorplanPortJson | null
 	x: number
 	y: number
+	/** Rack or device name; `PP-A / 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null
@@ -1998,14 +2019,40 @@ export const FloorplanLinksQuerySchema = v.pipe(
 		location: OptionalIdEntry,
 		rack: OptionalIdEntry,
 		device: OptionalIdEntry,
+		interface: OptionalIdEntry,
 	}),
 	v.check(
-		(q) => [q.site, q.location, q.rack, q.device].filter((id) => id !== undefined).length === 1,
-		'Exactly one of site, location, rack or device is required',
+		(q) =>
+			[q.site, q.location, q.rack, q.device, q.interface].filter((id) => id !== undefined)
+				.length === 1,
+		'Exactly one of site, location, rack, device or interface is required',
 	),
 )
 
 export type FloorplanLinksQuery = v.InferOutput<typeof FloorplanLinksQuerySchema>
+
+/**
+ * `GET /attachments/outlets?device=`: placed outlets of a device. For a
+ * patch panel its own placed rear ports; for any other device the placed
+ * rear ports its ports are cabled to.
+ */
+export const FloorplanOutletsQuerySchema = v.object({ device: IdSchema })
+
+export type FloorplanOutletsQuery = v.InferOutput<typeof FloorplanOutletsQuerySchema>
+
+/** One placed outlet seen from a device (`FloorplanOutletsQuerySchema`). */
+export interface FloorplanOutletJson {
+	/** The device's port: the rear port itself on a panel, else the port cabled to it. */
+	local_interface_id: number
+	/** The placed rear port. */
+	interface_id: number
+	port: FloorplanPortJson
+	attachment_id: number
+	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+}
 
 /** Floor plan referencing an object, identified by its owner. */
 export interface FloorplanLinkJson {
@@ -2023,9 +2070,13 @@ export interface FloorplanLinkJson {
  * placed on another plan. Those already on this plan are included.
  */
 export interface FloorplanCandidateJson {
-	/** Exactly one of `rack_id` / `device_id` is set. */
+	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */
 	rack_id: number | null
 	device_id: number | null
+	/** Unplaced single-position rear port of a patch panel in the owner's site. */
+	interface_id: number | null
+	port: FloorplanPortJson | null
+	/** Rack or device name; `PP-A / 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null

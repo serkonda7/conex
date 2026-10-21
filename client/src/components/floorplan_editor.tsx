@@ -10,10 +10,13 @@
  *   (a rectangle's neighbors follow), relabelled and deleted below the
  *   stage. Dragging an edge's midpoint handle inserts a corner there; a
  *   double click on a corner handle removes it.
- * - Palette: unplaced racks and devices, grouped by location. Dragging an
- *   item onto the stage (HTML5 drag and drop) places a marker at the drop
- *   point; a click places it in the center. Markers move with pointer
- *   events and are removed with ×.
+ * - Palette: unplaced racks and devices, grouped by location, and the
+ *   unplaced outlets (patch-panel rear ports) of the site, grouped by
+ *   panel. Dragging an item onto the stage (HTML5 drag and drop) places a
+ *   marker at the drop point; a click places it in the center. Markers move
+ *   with pointer events and are removed with ×.
+ * - Place in sequence: per panel, each click on the stage places the
+ *   panel's next free outlet (Escape or the toggle ends it).
  *
  * All coordinates are clamped to 0..1.
  */
@@ -52,6 +55,7 @@ import {
 	areaCenter,
 	areaName,
 	FloorplanStage,
+	markerClasses,
 	markerIcon,
 	markerTitle,
 	percent,
@@ -165,16 +169,25 @@ function toPut(areas: FloorplanAreaJson[], placements: FloorplanPlacementJson[])
 		placements: placements.map((placement: FloorplanPlacementJson) => ({
 			...(placement.rack_id !== null
 				? { rack_id: placement.rack_id }
-				: { device_id: placement.device_id ?? undefined }),
+				: placement.interface_id !== null
+					? { interface_id: placement.interface_id }
+					: { device_id: placement.device_id ?? undefined }),
 			x: placement.x,
 			y: placement.y,
 		})),
 	}
 }
 
-function candidateKey(candidate: { rack_id: number | null; device_id: number | null }): string {
-	return candidate.rack_id !== null
-		? `rack:${candidate.rack_id}`
+function candidateKey(candidate: {
+	rack_id: number | null
+	device_id: number | null
+	interface_id: number | null
+}): string {
+	if (candidate.rack_id !== null) {
+		return `rack:${candidate.rack_id}`
+	}
+	return candidate.interface_id !== null
+		? `port:${candidate.interface_id}`
 		: `device:${candidate.device_id}`
 }
 
@@ -255,44 +268,64 @@ function AreaTargetPicker(props: {
 interface PaletteGroup {
 	name: string
 	items: FloorplanCandidateJson[]
+	/** Panel of an outlet group, for the sequence toggle; `null` for a location group. */
+	panel_id: number | null
 }
 
 /**
  * The side list of the editor: `actions` on top, then a search field plus
- * the unplaced racks and devices, grouped by location.
+ * the unplaced racks and devices, grouped by location, and the unplaced
+ * outlets, grouped by panel (in port order) with a sequence toggle each.
  */
 function Palette(props: {
 	actions: JSX.Element
 	candidates: FloorplanCandidateJson[] | undefined
 	loading: boolean
 	placed: Set<string>
+	/** Panel whose outlets the stage places in sequence, if any. */
+	sequence: number | null
+	on_sequence: (panelId: number | null) => void
 	on_drag: (key: string | null) => void
 	on_place: (candidate: FloorplanCandidateJson) => void
 }): JSX.Element {
 	const [search, setSearch] = createSignal('')
 	const groups = createMemo(() => {
 		const needle = search().trim().toLowerCase()
-		const byLocation = new Map<string, FloorplanCandidateJson[]>()
+		const byGroup = new Map<string, PaletteGroup>()
 		for (const candidate of props.candidates ?? []) {
 			if (props.placed.has(candidateKey(candidate))) {
 				continue
 			}
-			const group = candidate.location_name ?? t('floorplan.noLocation')
+			const port = candidate.port
+			const name = port
+				? t('floorplan.outletsOf', { name: port.device_name })
+				: (candidate.location_name ?? t('floorplan.noLocation'))
 			if (
 				needle &&
 				!candidate.name.toLowerCase().includes(needle) &&
-				!group.toLowerCase().includes(needle)
+				!name.toLowerCase().includes(needle)
 			) {
 				continue
 			}
-			byLocation.set(group, [...(byLocation.get(group) ?? []), candidate])
+			const key = port ? `port:${port.device_id}` : `location:${name}`
+			const group = byGroup.get(key) ?? { name, items: [], panel_id: port?.device_id ?? null }
+			group.items.push(candidate)
+			byGroup.set(key, group)
 		}
-		return [...byLocation.entries()]
-			.map(([name, items]) => ({
-				name,
-				items: items.sort((a, b) => a.name.localeCompare(b.name)),
+		// Outlets keep their port order (the server's); the rest sorts by name.
+		return [...byGroup.values()]
+			.map((group: PaletteGroup) => ({
+				...group,
+				items:
+					group.panel_id === null
+						? group.items.sort((a, b) => a.name.localeCompare(b.name))
+						: group.items,
 			}))
-			.sort((a, b) => a.name.localeCompare(b.name))
+			.sort(
+				(a, b) =>
+					Number(a.panel_id !== null) - Number(b.panel_id !== null) ||
+					a.name.localeCompare(b.name),
+			)
 	})
 
 	return (
@@ -317,7 +350,29 @@ function Palette(props: {
 					<For each={groups()}>
 						{(group: PaletteGroup) => (
 							<section>
-								<h5>{group.name}</h5>
+								<div class="floorplan-palette-group-header">
+									<h5>{group.name}</h5>
+									<Show when={group.panel_id}>
+										{(panelId: () => number) => (
+											<button
+												type="button"
+												class="floorplan-palette-sequence"
+												classList={{ active: props.sequence === panelId() }}
+												aria-pressed={props.sequence === panelId()}
+												title={t('floorplan.sequenceHint')}
+												onClick={() =>
+													props.on_sequence(
+														props.sequence === panelId()
+															? null
+															: panelId(),
+													)
+												}
+											>
+												{t('floorplan.sequence')}
+											</button>
+										)}
+									</Show>
+								</div>
 								<ul>
 									<For each={group.items}>
 										{(candidate: FloorplanCandidateJson) => (
@@ -378,6 +433,8 @@ export function FloorplanEditor(props: {
 	const [hover, setHover] = createSignal<Point | null>(null)
 	const [picking, setPicking] = createSignal(false)
 	const [dragged, setDragged] = createSignal<string | null>(null)
+	/** Panel whose next free outlet a click on the stage places. */
+	const [sequence, setSequence] = createSignal<number | null>(null)
 	const [stage, setStage] = createSignal<HTMLDivElement>()
 	const [candidates] = createRows(() => fetch_floorplan_candidates(props.attachment.id), setError)
 	const save = useAction(setError)
@@ -513,6 +570,7 @@ export function FloorplanEditor(props: {
 	const [rectDragging, setRectDragging] = createSignal(false)
 
 	function toggleDrawing(on: boolean): void {
+		setSequence(null)
 		setDrawing(on)
 		setDraft(null)
 		setHover(null)
@@ -589,6 +647,11 @@ export function FloorplanEditor(props: {
 
 	// Keys of the area tool; ignored while typing in a field.
 	const onKeyDown = (e: KeyboardEvent): void => {
+		if (sequence() !== null && e.key === 'Escape') {
+			e.preventDefault()
+			setSequence(null)
+			return
+		}
 		if (!drawing() || rectDragging() || picking() || e.target instanceof HTMLInputElement) {
 			return
 		}
@@ -659,6 +722,8 @@ export function FloorplanEditor(props: {
 				id: nextId--,
 				rack_id: candidate.rack_id,
 				device_id: candidate.device_id,
+				interface_id: candidate.interface_id,
+				port: candidate.port,
 				x: at[0],
 				y: at[1],
 				name: candidate.name,
@@ -666,6 +731,33 @@ export function FloorplanEditor(props: {
 				role_icon: candidate.role_icon,
 			},
 		])
+	}
+
+	/** Free outlets of a panel in port order. */
+	function freeOutlets(panelId: number): FloorplanCandidateJson[] {
+		return (candidates() ?? []).filter(
+			(item: FloorplanCandidateJson) =>
+				item.port?.device_id === panelId && !placed().has(candidateKey(item)),
+		)
+	}
+
+	function startSequence(panelId: number | null): void {
+		toggleDrawing(false)
+		setSequence(panelId)
+	}
+
+	/** Places the sequence panel's next free outlet at the pointer; ends with the last one. */
+	function placeNext(e: PointerEvent): void {
+		e.preventDefault()
+		e.stopPropagation()
+		const panelId = sequence()
+		const [next, ...rest] = panelId === null ? [] : freeOutlets(panelId)
+		if (next) {
+			addPlacement(next, stagePoint(e))
+		}
+		if (rest.length === 0) {
+			setSequence(null)
+		}
 	}
 
 	function onDrop(e: DragEvent): void {
@@ -817,12 +909,7 @@ export function FloorplanEditor(props: {
 							{(placement: FloorplanPlacementJson) => (
 								<div
 									class="floorplan-marker floorplan-marker-editing"
-									classList={{
-										'floorplan-marker-rack': placement.rack_id !== null,
-										'floorplan-marker-inactive':
-											placement.status !== null &&
-											placement.status !== 'active',
-									}}
+									classList={markerClasses(placement)}
 									style={{
 										left: percent(placement.x),
 										top: percent(placement.y),
@@ -855,6 +942,9 @@ export function FloorplanEditor(props: {
 								</div>
 							)}
 						</For>
+						<Show when={sequence() !== null}>
+							<div class="floorplan-sequence-layer" onPointerDown={placeNext} />
+						</Show>
 						<Show when={drawing()}>
 							{/* Covers the plan so the pointer draws instead of moving what lies below. */}
 							{/* biome-ignore lint/a11y/noStaticElementInteractions: Enter finishes the polygon from the keyboard. */}
@@ -925,11 +1015,16 @@ export function FloorplanEditor(props: {
 							<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
 								<p class="floorplan-hint">{t('floorplan.finishHint')}</p>
 							</Show>
+							<Show when={sequence() !== null}>
+								<p class="floorplan-hint">{t('floorplan.sequenceActive')}</p>
+							</Show>
 						</>
 					}
 					candidates={candidates()}
 					loading={candidates.loading}
 					placed={placed()}
+					sequence={sequence()}
+					on_sequence={startSequence}
 					on_drag={setDragged}
 					on_place={(candidate: FloorplanCandidateJson) =>
 						addPlacement(candidate, [0.5, 0.5])

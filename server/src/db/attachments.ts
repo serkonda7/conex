@@ -30,14 +30,18 @@ import type {
 	FloorplanLinkJson,
 	FloorplanLinksQuery,
 	FloorplanListJson,
+	FloorplanOutletJson,
+	FloorplanPortJson,
 	FloorplanPut,
 } from 'shared/src/schemas'
 import {
 	attachments,
+	cables,
 	device_roles,
 	devices,
 	floorplan_areas,
 	floorplan_placements,
+	interfaces,
 	locations,
 	racks,
 	sites,
@@ -87,7 +91,48 @@ export interface AttachmentUpload {
 const NOT_FOUND = 'Attachment not found'
 const FLOORPLAN_TAKEN = 'Another attachment is already marked as the floor plan'
 const NOT_MARKED = 'Only the marked floor plan can hold areas and markers'
-const ALREADY_PLACED = 'A rack or device is already placed on another floor plan'
+const ALREADY_PLACED = 'A rack, device or outlet is already placed on another floor plan'
+
+/** Panel device of a placed outlet (rear port); `devices` itself is the placed device. */
+const portDevice = alias(devices, 'port_device')
+
+/** Tenant of a placement's object: its rack, device or outlet panel. */
+const placementTenantSql: SQL<number | null> = sql<
+	number | null
+>`coalesce(${racks.tenant_id}, ${devices.tenant_id}, ${portDevice.tenant_id})`
+
+/** Outlet details of a placement or candidate row, or `null` when it is no outlet. */
+function portOf(row: {
+	port_device_id: number | null
+	port_device_name: string | null
+	port_name: string | null
+	port_connected: number | null
+}): FloorplanPortJson | null {
+	return row.port_device_id === null
+		? null
+		: {
+				device_id: row.port_device_id,
+				device_name: row.port_device_name ?? '',
+				name: row.port_name ?? '',
+				connected: row.port_connected === 1,
+			}
+}
+
+/** `PP-A / 12`: an outlet's label on plans and in palettes. */
+const outletNameSql: SQL<string> = sql<string>`${portDevice.name} || ' / ' || ${interfaces.name}`
+
+/** Outlet columns selected alongside a placement or candidate (`portOf`). */
+const portColumns: {
+	port_device_id: typeof portDevice.id
+	port_device_name: typeof portDevice.name
+	port_name: typeof interfaces.name
+	port_connected: typeof interfaces.connected
+} = {
+	port_device_id: portDevice.id,
+	port_device_name: portDevice.name,
+	port_name: interfaces.name,
+	port_connected: interfaces.connected,
+}
 
 /** Stored files are `<uuid>.<ext>`, plus `<uuid>.tmp` while being written. */
 const STORED_FILE = new RegExp(
@@ -407,29 +452,38 @@ export async function getPlan(
 			),
 		)
 		.orderBy(asc(floorplan_areas.id))
-	const placementTenant = sql<number | null>`coalesce(${racks.tenant_id}, ${devices.tenant_id})`
-	const placements = await getDb()
+	const placementRows = await getDb()
 		.select({
 			id: floorplan_placements.id,
 			rack_id: floorplan_placements.rack_id,
 			device_id: floorplan_placements.device_id,
+			interface_id: floorplan_placements.interface_id,
 			x: floorplan_placements.x,
 			y: floorplan_placements.y,
-			name: sql<string>`coalesce(${racks.name}, ${devices.name})`,
+			name: sql<string>`coalesce(${racks.name}, ${devices.name}, ${outletNameSql})`,
 			status: devices.status,
 			role_icon: device_roles.icon,
+			...portColumns,
 		})
 		.from(floorplan_placements)
 		.leftJoin(racks, eq(racks.id, floorplan_placements.rack_id))
 		.leftJoin(devices, eq(devices.id, floorplan_placements.device_id))
 		.leftJoin(device_roles, eq(device_roles.id, devices.device_role_id))
+		.leftJoin(interfaces, eq(interfaces.id, floorplan_placements.interface_id))
+		.leftJoin(portDevice, eq(portDevice.id, interfaces.device_id))
 		.where(
 			and(
 				eq(floorplan_placements.attachment_id, id),
-				scopeTenantId === undefined ? undefined : eq(placementTenant, scopeTenantId),
+				scopeTenantId === undefined ? undefined : eq(placementTenantSql, scopeTenantId),
 			),
 		)
 		.orderBy(asc(floorplan_placements.id))
+	const placements = placementRows.map(
+		({ port_device_id, port_device_name, port_name, port_connected, ...row }) => ({
+			...row,
+			port: portOf({ port_device_id, port_device_name, port_name, port_connected }),
+		}),
+	)
 	// A scoped editor must still be warned before a mark change clears
 	// hidden content. Reveal only its existence, never its targets or counts.
 	const hasHiddenContent =
@@ -542,10 +596,65 @@ export async function listPlanCandidates(
 			),
 		)
 		.orderBy(asc(devices.name), asc(devices.id))
+	// Outlets: single-position rear ports of panels anywhere in the owner's
+	// site (a multi-position rear port is a trunk, not an outlet).
+	const siteId = await siteOfOwner(owner)
+	const portRows =
+		siteId === null
+			? []
+			: await getDb()
+					.select({
+						interface_id: interfaces.id,
+						name: outletNameSql,
+						location_id: portDevice.location_id,
+						location_name: locations.name,
+						...portColumns,
+					})
+					.from(interfaces)
+					.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))
+					.leftJoin(locations, eq(locations.id, portDevice.location_id))
+					.leftJoin(
+						floorplan_placements,
+						eq(floorplan_placements.interface_id, interfaces.id),
+					)
+					.where(
+						and(
+							eq(interfaces.side, 'rear'),
+							eq(interfaces.positions, 1),
+							eq(portDevice.site_id, siteId),
+							free,
+							scopeTenantId === undefined
+								? undefined
+								: eq(portDevice.tenant_id, scopeTenantId),
+						),
+					)
+					.orderBy(asc(portDevice.name), asc(interfaces.id))
+	const none = { rack_id: null, device_id: null, interface_id: null, port: null }
 	return Result.ok([
-		...rackRows.map((row) => ({ ...row, device_id: null, status: null, role_icon: null })),
-		...deviceRows.map((row) => ({ ...row, rack_id: null })),
+		...rackRows.map((row) => ({ ...none, ...row, status: null, role_icon: null })),
+		...deviceRows.map((row) => ({ ...none, ...row })),
+		...portRows.map(
+			({ port_device_id, port_device_name, port_name, port_connected, ...row }) => ({
+				...none,
+				...row,
+				status: null,
+				role_icon: null,
+				port: portOf({ port_device_id, port_device_name, port_name, port_connected }),
+			}),
+		),
 	])
+}
+
+/** Site of a plan owner: the site itself, or the site of the owning location. */
+async function siteOfOwner(owner: AttachmentOwner): Promise<number | null> {
+	if (owner.site_id !== undefined) {
+		return owner.site_id
+	}
+	const [row] = await getDb()
+		.select({ site_id: locations.site_id })
+		.from(locations)
+		.where(eq(locations.id, owner.location_id ?? 0))
+	return row?.site_id ?? null
 }
 
 /**
@@ -605,8 +714,21 @@ async function checkPlanInput(
 	const deviceIds = input.placements.flatMap((p) =>
 		p.device_id === undefined ? [] : [p.device_id],
 	)
-	if (new Set(rackIds).size < rackIds.length || new Set(deviceIds).size < deviceIds.length) {
-		return Result.err(new ValidationError('Each rack or device can be placed only once'))
+	const interfaceIds = input.placements.flatMap((p) =>
+		p.interface_id === undefined ? [] : [p.interface_id],
+	)
+	if (
+		new Set(rackIds).size < rackIds.length ||
+		new Set(deviceIds).size < deviceIds.length ||
+		new Set(interfaceIds).size < interfaceIds.length
+	) {
+		return Result.err(
+			new ValidationError('Each rack, device or outlet can be placed only once'),
+		)
+	}
+	const outlets = await checkOutlets(owner, interfaceIds, scopeTenantId)
+	if (Result.isError(outlets)) {
+		return outlets
 	}
 	const placedRacks =
 		rackIds.length === 0
@@ -670,6 +792,9 @@ async function checkPlanInput(
 					deviceIds.length === 0
 						? sql`false`
 						: inArray(floorplan_placements.device_id, deviceIds),
+					interfaceIds.length === 0
+						? sql`false`
+						: inArray(floorplan_placements.interface_id, interfaceIds),
 				),
 			),
 		)
@@ -677,6 +802,53 @@ async function checkPlanInput(
 	return elsewhere.length > 0
 		? Result.err(new ConflictError(ALREADY_PLACED))
 		: Result.ok(undefined)
+}
+
+/**
+ * Placed outlets exist, are visible, are single-position rear ports and
+ * sit on a panel in the owner's site. Missing and invisible ports get the
+ * same message.
+ */
+async function checkOutlets(
+	owner: AttachmentOwner,
+	interfaceIds: number[],
+	scopeTenantId: number | undefined,
+): Promise<Result<undefined, Error>> {
+	if (interfaceIds.length === 0) {
+		return Result.ok(undefined)
+	}
+	const rows = await getDb()
+		.select({
+			id: interfaces.id,
+			name: outletNameSql,
+			side: interfaces.side,
+			positions: interfaces.positions,
+			tenant_id: portDevice.tenant_id,
+			site_id: portDevice.site_id,
+		})
+		.from(interfaces)
+		.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))
+		.where(inArray(interfaces.id, interfaceIds))
+	const siteId = await siteOfOwner(owner)
+	for (const portId of interfaceIds) {
+		const row = rows.find((port) => port.id === portId)
+		if (!row || !visibleTo(row.tenant_id, scopeTenantId)) {
+			return Result.err(new ValidationError(`Port #${portId} not found`))
+		}
+		if (row.side !== 'rear' || row.positions !== 1) {
+			return Result.err(
+				new ValidationError(
+					`Port "${row.name}" is not an outlet (a single-position rear port)`,
+				),
+			)
+		}
+		if (row.site_id === null || row.site_id !== siteId) {
+			return Result.err(
+				new ValidationError(`Outlet "${row.name}" is outside this floor plan's site`),
+			)
+		}
+	}
+	return Result.ok(undefined)
 }
 
 /**
@@ -706,10 +878,12 @@ async function hiddenPlanIds(
 		.from(floorplan_placements)
 		.leftJoin(racks, eq(racks.id, floorplan_placements.rack_id))
 		.leftJoin(devices, eq(devices.id, floorplan_placements.device_id))
+		.leftJoin(interfaces, eq(interfaces.id, floorplan_placements.interface_id))
+		.leftJoin(portDevice, eq(portDevice.id, interfaces.device_id))
 		.where(
 			and(
 				eq(floorplan_placements.attachment_id, id),
-				sql`coalesce(${racks.tenant_id}, ${devices.tenant_id}) is distinct from ${scopeTenantId}`,
+				sql`${placementTenantSql} is distinct from ${scopeTenantId}`,
 			),
 		)
 	return { areas: areas.map((row) => row.id), placements: placements.map((row) => row.id) }
@@ -718,7 +892,7 @@ async function hiddenPlanIds(
 /** Areas and placements of a plan as stored, for the changelog entry of a save. */
 async function planSnapshot(id: number): Promise<{
 	areas: Pick<FloorplanAreaRow, 'site_id' | 'location_id' | 'label' | 'points'>[]
-	placements: Pick<FloorplanPlacementRow, 'rack_id' | 'device_id' | 'x' | 'y'>[]
+	placements: Pick<FloorplanPlacementRow, 'rack_id' | 'device_id' | 'interface_id' | 'x' | 'y'>[]
 }> {
 	const areas = await getDb()
 		.select({
@@ -734,6 +908,7 @@ async function planSnapshot(id: number): Promise<{
 		.select({
 			rack_id: floorplan_placements.rack_id,
 			device_id: floorplan_placements.device_id,
+			interface_id: floorplan_placements.interface_id,
 			x: floorplan_placements.x,
 			y: floorplan_placements.y,
 		})
@@ -816,6 +991,7 @@ export async function putPlan(
 								attachment_id: id,
 								rack_id: placement.rack_id ?? null,
 								device_id: placement.device_id ?? null,
+								interface_id: placement.interface_id ?? null,
 								x: placement.x,
 								y: placement.y,
 							})),
@@ -842,14 +1018,32 @@ export async function putPlan(
 
 /**
  * Removes placements whose rack or device no longer lies in its plan
- * owner's scope (see `ownerLocations`), after a site, location or rack
- * change. Runs on the caller's `getDb()` (its transaction).
+ * owner's scope (see `ownerLocations`), and outlets whose panel left the
+ * owner's site, after a site, location or rack change. Runs on the
+ * caller's `getDb()` (its transaction).
  */
 export async function prunePlacements(): Promise<void> {
 	await getDb().execute(sql`
 		delete from ${floorplan_placements} fp
 		using ${attachments} a
 		where a.id = fp.attachment_id
+		and fp.interface_id is not null
+		and not exists (
+			select 1
+			from ${interfaces} i
+			join ${devices} d on d.id = i.device_id
+			where i.id = fp.interface_id
+			and d.site_id = coalesce(
+				a.site_id,
+				(select l.site_id from ${locations} l where l.id = a.location_id)
+			)
+		)
+	`)
+	await getDb().execute(sql`
+		delete from ${floorplan_placements} fp
+		using ${attachments} a
+		where a.id = fp.attachment_id
+		and fp.interface_id is null
 		and not exists (
 			select 1
 			from (
@@ -933,6 +1127,15 @@ export async function listFloorplanLinks(
 		owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
 	}
 	const visible = scopeTenantId === undefined ? undefined : eq(ownerTenant, scopeTenantId)
+	if (query.interface !== undefined) {
+		return getDb()
+			.select(columns)
+			.from(floorplan_placements)
+			.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
+			.leftJoin(sites, eq(sites.id, attachments.site_id))
+			.leftJoin(locations, eq(locations.id, attachments.location_id))
+			.where(and(eq(floorplan_placements.interface_id, query.interface), visible))
+	}
 	if (query.rack !== undefined || query.device !== undefined) {
 		return getDb()
 			.select(columns)
@@ -964,6 +1167,62 @@ export async function listFloorplanLinks(
 			),
 		)
 		.orderBy(asc(columns.owner_name), asc(attachments.id))
+}
+
+/**
+ * Placed outlets of a device (`FloorplanOutletJson`): a panel's own placed
+ * rear ports, or for any other device the placed rear ports its ports are
+ * cabled to directly. Plans whose owner lies outside `scopeTenantId`, and
+ * outlets on panels outside it, are left out.
+ */
+export async function listOutlets(
+	deviceId: number,
+	scopeTenantId?: number,
+): Promise<FloorplanOutletJson[]> {
+	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
+	const local = alias(interfaces, 'local_iface')
+	// The device's own port, or the port at the other end of the outlet's cable.
+	const localId = sql<number>`coalesce(
+		case when ${portDevice.id} = ${deviceId} then ${interfaces.id} end,
+		(select case when c.a_interface_id = ${interfaces.id} then c.b_interface_id else c.a_interface_id end
+			from ${cables} c
+			where c.a_interface_id = ${interfaces.id} or c.b_interface_id = ${interfaces.id})
+	)`
+	const rows = await getDb()
+		.select({
+			local_interface_id: localId,
+			interface_id: interfaces.id,
+			attachment_id: attachments.id,
+			site_id: attachments.site_id,
+			location_id: attachments.location_id,
+			owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
+			...portColumns,
+		})
+		.from(floorplan_placements)
+		.innerJoin(interfaces, eq(interfaces.id, floorplan_placements.interface_id))
+		.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))
+		.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
+		.leftJoin(sites, eq(sites.id, attachments.site_id))
+		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.innerJoin(local, eq(local.id, localId))
+		.where(
+			and(
+				eq(local.device_id, deviceId),
+				scopeTenantId === undefined ? undefined : eq(ownerTenant, scopeTenantId),
+				scopeTenantId === undefined ? undefined : eq(portDevice.tenant_id, scopeTenantId),
+			),
+		)
+		.orderBy(asc(interfaces.id))
+	// Inner joins: every row is an outlet, so its port columns are set.
+	return rows.map(({ port_device_id, port_device_name, port_name, port_connected, ...row }) => ({
+		...row,
+		port: {
+			device_id: port_device_id,
+			device_name: port_device_name,
+			name: port_name,
+			connected: port_connected === 1,
+		},
+	}))
 }
 
 /**
@@ -1029,12 +1288,12 @@ export async function listFloorplans(
 		.from(floorplan_placements)
 		.leftJoin(racks, eq(racks.id, floorplan_placements.rack_id))
 		.leftJoin(devices, eq(devices.id, floorplan_placements.device_id))
+		.leftJoin(interfaces, eq(interfaces.id, floorplan_placements.interface_id))
+		.leftJoin(portDevice, eq(portDevice.id, interfaces.device_id))
 		.where(
 			and(
 				inArray(floorplan_placements.attachment_id, ids),
-				scope === undefined
-					? undefined
-					: eq(sql`coalesce(${racks.tenant_id}, ${devices.tenant_id})`, scope),
+				scope === undefined ? undefined : eq(placementTenantSql, scope),
 			),
 		)
 		.groupBy(floorplan_placements.attachment_id)

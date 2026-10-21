@@ -12,6 +12,7 @@
  * stage.
  */
 import { IconPencil } from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import {
@@ -27,10 +28,12 @@ import { goTo } from '../lib/router'
 import { can } from '../lib/session'
 import { InlineError, Loading } from './feedback'
 import { FloorplanEditor } from './floorplan_editor'
+import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import {
 	areaCenter,
 	areaName,
 	FloorplanStage,
+	markerClasses,
 	markerIcon,
 	markerTitle,
 	percent,
@@ -46,6 +49,9 @@ function areaHref(area: FloorplanAreaJson): string {
 }
 
 function markerHref(placement: FloorplanPlacementJson): string {
+	if (placement.port) {
+		return `/devices/${placement.port.device_id}`
+	}
 	return placement.rack_id !== null
 		? `/racks/${placement.rack_id}`
 		: `/devices/${placement.device_id}`
@@ -104,27 +110,63 @@ function AreaLayer(props: { areas: FloorplanAreaJson[] }): JSX.Element {
 	)
 }
 
-/** Rack and device markers; the tooltip names the object and its status. */
-function MarkerLayer(props: { placements: FloorplanPlacementJson[] }): JSX.Element {
+/**
+ * Rack, device and outlet markers; the tooltip names the object and its
+ * status. An outlet opens its popover (trace and connect) instead of a link.
+ */
+function MarkerLayer(props: {
+	placements: FloorplanPlacementJson[]
+	on_changed: () => void
+}): JSX.Element {
+	const [open, setOpen] = createSignal<number | null>(null)
+	const openOutlet = (): OutletPlacement | undefined => {
+		const found = props.placements.find((p: FloorplanPlacementJson) => p.id === open())
+		return found && isOutlet(found) ? found : undefined
+	}
 	return (
-		<For each={props.placements}>
-			{(placement: FloorplanPlacementJson) => (
-				<a
-					href={markerHref(placement)}
-					class="floorplan-marker"
-					classList={{
-						'floorplan-marker-rack': placement.rack_id !== null,
-						'floorplan-marker-inactive':
-							placement.status !== null && placement.status !== 'active',
-					}}
-					style={{ left: percent(placement.x), top: percent(placement.y) }}
-					title={markerTitle(placement)}
-					aria-label={markerTitle(placement)}
-				>
-					<Dynamic component={markerIcon(placement)} size={16} />
-				</a>
-			)}
-		</For>
+		<>
+			<For each={props.placements}>
+				{(placement: FloorplanPlacementJson) => (
+					<Show
+						when={isOutlet(placement)}
+						fallback={
+							<a
+								href={markerHref(placement)}
+								class="floorplan-marker"
+								classList={markerClasses(placement)}
+								style={{ left: percent(placement.x), top: percent(placement.y) }}
+								title={markerTitle(placement)}
+								aria-label={markerTitle(placement)}
+							>
+								<Dynamic component={markerIcon(placement)} size={16} />
+							</a>
+						}
+					>
+						<button
+							type="button"
+							class="floorplan-marker"
+							classList={markerClasses(placement)}
+							style={{ left: percent(placement.x), top: percent(placement.y) }}
+							title={markerTitle(placement)}
+							aria-label={markerTitle(placement)}
+							aria-expanded={open() === placement.id}
+							onClick={() => setOpen(open() === placement.id ? null : placement.id)}
+						>
+							<Dynamic component={markerIcon(placement)} size={14} />
+						</button>
+					</Show>
+				)}
+			</For>
+			<Show when={openOutlet()}>
+				{(placement: () => OutletPlacement) => (
+					<OutletPopover
+						placement={placement()}
+						on_changed={props.on_changed}
+						on_close={() => setOpen(null)}
+					/>
+				)}
+			</Show>
+		</>
 	)
 }
 
@@ -146,6 +188,16 @@ export function FloorplanView(props: {
 		setError,
 	)
 	const [editing, setEditing] = createSignal(false)
+
+	/** Refreshes the markers in place (an outlet got cabled) without the loading state. */
+	async function reload(): Promise<void> {
+		const res = await fetch_floorplan(props.attachment.id)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		mutate(res.value)
+	}
 	const [actions, setActions] = createSignal<HTMLElement>()
 
 	return (
@@ -184,7 +236,10 @@ export function FloorplanView(props: {
 							<div class="floorplan-view">
 								<FloorplanStage attachment={props.attachment}>
 									<AreaLayer areas={loaded().areas} />
-									<MarkerLayer placements={loaded().placements} />
+									<MarkerLayer
+										placements={loaded().placements}
+										on_changed={() => void reload()}
+									/>
 								</FloorplanStage>
 							</div>
 						</Show>

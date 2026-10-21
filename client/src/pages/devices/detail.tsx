@@ -1,6 +1,7 @@
 import { IconArrowsExchange, IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
+import { fetch_outlets } from '../../api/attachments'
 import { delete_cable, fetch_trace } from '../../api/cables'
 import { fetch_device_role } from '../../api/device_roles'
 import {
@@ -30,7 +31,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { FloorplanLinks } from '../../components/floorplan_links'
+import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
@@ -43,7 +44,7 @@ import { ManagedServiceRows } from '../managed-bundles/service_rows'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
-import { PanelPortTable } from './panel_ports'
+import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PortPeer } from './trace_peer'
 
 /**
@@ -129,6 +130,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_trace(key, 4),
 		setError,
 	)
+	const [outlets, { refetch: refetchOutlets }] = createRowsFor(id, fetch_outlets, setError)
 	const typeId = (): number | undefined => device()?.device_type_id
 	const roleId = (): number | undefined => device()?.device_role_id
 	const siteId = (): number | null | undefined => device()?.site_id
@@ -162,6 +164,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	function refetchAll(): void {
 		void refetchIfaces()
 		void refetchTrace()
+		void refetchOutlets()
 	}
 
 	const action = useAction(setError)
@@ -249,6 +252,23 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		},
 		connectionColumn,
 	]
+
+	/** Floor plan an outlet (single-position rear port) is placed on. */
+	const planColumn: DataTableColumn<PanelRow> = {
+		key: 'plan',
+		label: tp('entity.floorplan', 1),
+		getValue: (row: PanelRow): JSX.Element => {
+			const outlet =
+				row.position === null
+					? (outlets() ?? []).find((o) => o.interface_id === row.rear.id)
+					: undefined
+			return outlet ? (
+				<a href={`/floorplans/${outlet.attachment_id}`}>{outlet.owner_name}</a>
+			) : (
+				<span>—</span>
+			)
+		},
+	}
 
 	const portActions = (iface: InterfaceJson): JSX.Element => (
 		<PortActions
@@ -382,6 +402,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						label="floorplan.onPlanOf"
 						onError={setError}
 					/>
+					<Show when={panelPorts().length === 0}>
+						<OutletLinks
+							outlets={outlets() ?? []}
+							portName={(ifaceId: number) =>
+								(ifaces() ?? []).find((i) => i.id === ifaceId)?.name
+							}
+						/>
+					</Show>
 				</DetailCard>
 			</DetailShell>
 			<Show when={panelPorts().length > 0}>
@@ -395,6 +423,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					links={linksByIface()}
 					endToEnd={endToEndOf}
 					actions={portActions}
+					extraColumns={[planColumn]}
 				/>
 			</Show>
 			<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
