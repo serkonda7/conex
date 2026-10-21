@@ -1,88 +1,90 @@
-# Integration Consistency Checks
+# Datenabgleich der Integrationen
 
-The consistency report compares conex with the data of the last sync from an
-external system (currently **TANSS**) and lists each difference as a *finding*.
-It covers the tenants of the selected tenant context and reloads when the
-context is switched.
+Der Abgleichbericht vergleicht conex mit den Daten der letzten Synchronisierung aus einem
+externen System (derzeit **TANSS**) und listet jede Abweichung als *Befund*. Er umfasst
+die Mandanten des ausgewählten Mandantenkontexts und lädt sich neu, wenn der Kontext
+gewechselt wird.
 
-## Sync
+## Synchronisierung
 
-- **Companies:** all on the first or a forced full sync, otherwise only those
-  changed since the last sync.
-- **Devices:** only for companies linked to a tenant.
-- **Tags:** all, every sync.
-- Unambiguous device matches are [linked automatically](#device-matching).
+- **Firmen:** bei der ersten oder einer erzwungenen vollständigen Synchronisierung alle,
+  sonst nur die seit der letzten Synchronisierung geänderten.
+- **Geräte:** nur für Firmen, die mit einem Mandanten verknüpft sind.
+- **Tags:** alle, bei jeder Synchronisierung.
+- Eindeutige Gerätezuordnungen werden [automatisch verknüpft](#gerätezuordnung).
 
-### TANSS mapping
+### TANSS-Zuordnung
 
-| conex         | TANSS            |
-| ------------- | ---------------- |
-| Tenant        | Company          |
-| Device        | PC / server / periphery |
-| Asset tag     | Inventory number |
-| Priority      | Tag (same label)  |
+| conex          | TANSS                     |
+| -------------- | ------------------------- |
+| Mandant        | Firma                     |
+| Gerät          | PC / Server / Peripherie  |
+| Inventarnummer | Inventarnummer            |
+| Priorität      | Tag (gleiche Bezeichnung) |
 
-Name, serial number, manufacturer, model and active status are compared
-one-to-one.
+Name, Seriennummer, Hersteller, Modell und Aktivstatus werden einzeln miteinander
+verglichen.
 
-A new ticket gets the tag named like its priority: the label `P<rank> - <name>`,
-e.g. `P1 - Critical` (ignoring case). If that tag does not exist in TANSS, the
-ticket is not created.
+Ein neues Ticket erhält den Tag, der zu seiner Priorität gehört: die Bezeichnung
+`P<rank> - <name>`, z. B. `P1 - Critical` (Groß-/Kleinschreibung wird ignoriert).
+Existiert dieser Tag nicht in TANSS, wird kein Ticket angelegt.
 
-## Links
+## Verknüpfungen
 
-Tenants and devices are linked to their external counterpart manually or by
-the sync. Ignored objects are not reported as missing or suggested.
+Mandanten und Geräte werden manuell oder durch die Synchronisierung mit ihrem externen
+Gegenstück verknüpft. Ignorierte Objekte werden weder als fehlend noch als Vorschlag
+gemeldet.
 
-## Findings
+## Befunde
 
-### Linked objects
+### Verknüpfte Objekte
 
-#### Tenants
+#### Mandanten
 
-| Finding                      | Meaning |
-| ---------------------------- | ------- |
-| **Company no longer exists** | Linked company was deleted. Its devices are not checked. |
-| **Company inactive**         | Linked company is inactive. |
-| **Different customer number**| Tenant and company customer numbers differ. A missing number on either side counts as a difference (only both empty is equal); comparison ignores case. |
+| Befund                         | Bedeutung                                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Firma existiert nicht mehr** | Die verknüpfte Firma wurde gelöscht. Ihre Geräte werden nicht geprüft.                                                                                                                                                                |
+| **Firma inaktiv**              | Die verknüpfte Firma ist inaktiv.                                                                                                                                                                                                     |
+| **Abweichende Kundennummer**   | Die Kundennummern von Mandant und Firma unterscheiden sich. Eine fehlende Nummer auf einer Seite zählt ebenfalls als Abweichung (nur wenn beide leer sind, sind sie gleich); beim Vergleich wird die Groß-/Kleinschreibung ignoriert. |
 
-#### Devices
+#### Geräte
 
-| Finding                      | Meaning |
-| ---------------------------- | ------- |
-| **Device no longer exists**  | Linked device was not found in the last sync. |
-| **Mismatch**                 | One finding per differing aspect: tenant (device belongs to another company than its tenant's), status (active in one system, inactive in the other), or name, serial number, asset tag, manufacturer or model (empty values are not compared). Name, manufacturer and model can be overwritten in TANSS with the conex value; the manufacturer must already exist in TANSS. |
+| Befund                         | Bedeutung                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gerät existiert nicht mehr** | Das verknüpfte Gerät wurde bei der letzten Synchronisierung nicht gefunden.                                                                                                                                                                                                                                                                                                                             |
+| **Abweichung**                 | Ein Befund je abweichendem Merkmal: Mandant (das Gerät gehört zu einer anderen Firma als sein Mandant), Status (in einem System aktiv, im anderen inaktiv) oder Name, Seriennummer, Inventarnummer, Hersteller oder Modell (leere Werte werden nicht verglichen). Name, Hersteller und Modell können in TANSS mit dem conex-Wert überschrieben werden; der Hersteller muss in TANSS bereits existieren. |
 
-### Not linked objects
+### Nicht verknüpfte Objekte
 
-#### Tenants
+#### Mandanten
 
-| Finding                      | Meaning |
-| ---------------------------- | ------- |
-| **Tenant not linked**        | Tenant has no company. Its devices are not checked. |
-| **Company missing in conex** | Active, non-private company without tenant. Global report only. |
+| Befund                      | Bedeutung                                                            |
+| --------------------------- | -------------------------------------------------------------------- |
+| **Mandant nicht verknüpft** | Der Mandant hat keine Firma. Seine Geräte werden nicht geprüft.      |
+| **Firma fehlt in conex**    | Aktive, nicht-private Firma ohne Mandanten. Nur im globalen Bericht. |
 
-#### Devices
+#### Geräte
 
-| Finding                      | Meaning |
-| ---------------------------- | ------- |
-| **Possible match**           | Devices share a serial number, asset tag or name. |
-| **Missing externally**       | Active conex device without counterpart. Can be created in the external system, which links it right away. |
-| **Missing in conex**         | Active external device without counterpart. |
+| Befund                 | Bedeutung                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Mögliche Zuordnung** | Die Geräte teilen sich Seriennummer, Inventarnummer oder Namen.                                        |
+| **Fehlt extern**       | Aktives conex-Gerät ohne Gegenstück. Kann im externen System angelegt werden, das es sofort verknüpft. |
+| **Fehlt in conex**     | Aktives externes Gerät ohne Gegenstück.                                                                |
 
-### Priorities
+### Prioritäten
 
-| Finding                      | Meaning |
-| ---------------------------- | ------- |
-| **Priority tag missing**     | No TANSS tag has the priority's label (`P<rank> - <name>`). Tickets with this priority cannot be created. Global report only, after a sync. |
+| Befund                   | Bedeutung                                                                                                                                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Prioritäts-Tag fehlt** | Kein TANSS-Tag trägt die Bezeichnung der Priorität (`P<rank> - <name>`). Tickets mit dieser Priorität können nicht angelegt werden. Nur im globalen Bericht, nach einer Synchronisierung. |
 
-## Device matching
+## Gerätezuordnung
 
-Within one tenant ↔ company, by **serial number**, then **asset tag**, then
-**name**. A serial number or asset tag that is unique on both sides is linked
-automatically; otherwise it is a *possible match*. Names are only suggested.
-Existing links are never changed.
+Innerhalb einer Zuordnung Mandant ↔ Firma zuerst nach **Seriennummer**, dann nach
+**Inventarnummer**, dann nach **Namen**. Eine Seriennummer oder Inventarnummer, die auf
+beiden Seiten eindeutig ist, wird automatisch verknüpft; andernfalls handelt es sich um
+eine *mögliche Zuordnung*. Namen werden nur vorgeschlagen. Bestehende Verknüpfungen
+werden nie geändert.
 
-Comparisons ignore case and surrounding whitespace. Serial numbers also ignore
-`-` `_` `.` `:` `/` and spaces; placeholders like `0000`, `N/A` or
-`To be filled by O.E.M.` never match.
+Bei Vergleichen werden Groß-/Kleinschreibung und umgebende Leerzeichen ignoriert. Bei
+Seriennummern werden zusätzlich `-` `_` `.` `:` `/` und Leerzeichen ignoriert;
+Platzhalter wie `0000`, `N/A` oder `To be filled by O.E.M.` stimmen nie überein.

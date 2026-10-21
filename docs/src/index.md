@@ -1,6 +1,6 @@
 # conex
 
-Network inventory for MSPs.
+Netzwerk-Inventar für MSPs.
 
 - [Racks](racks.md)
-- [Integration Consistency Checks](integrations/consistency.md)
+- [Datenabgleich der Integrationen](integrations/consistency.md)

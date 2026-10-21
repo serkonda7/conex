@@ -1,92 +1,93 @@
-# AGFEO Dashboard
+# AGFEO-Dashboard
 
-Shows conex employees as contacts in the AGFEO Dashboard (v2): incoming calls
-are resolved to a name, and the Dashboard search finds them. The optional
-service `plugins/agfeo-ldap` serves the conex contact directory read-only
-over LDAP, which the Dashboard reads with its built-in LDAP client. The
-contacts are only available in the Dashboard, not on system phones or apps.
+Zeigt die conex-Mitarbeiter im AGFEO-Dashboard (v2) als Kontakte an: eingehende Anrufe
+werden zu einem Namen aufgelöst, und die Dashboard-Suche findet sie. Der optionale Dienst
+`plugins/agfeo-ldap` stellt das conex-Kontaktverzeichnis schreibgeschützt über LDAP
+bereit, das das Dashboard mit seinem integrierten LDAP-Client liest. Die Kontakte sind
+nur im Dashboard verfügbar, nicht auf Systemtelefonen oder in Apps.
 
-## Quick start with conex-docker
+## Schnellstart mit conex-docker
 
-1. In conex, create a role with only the permission **Read contact directory
-   (telephony)** and a user `agfeo` with that role.
+1. In conex eine Rolle anlegen, die nur die Berechtigung **Kontaktverzeichnis lesen
+   (Telefonie)** hat, sowie einen Benutzer `agfeo` mit dieser Rolle.
 
-2. Start the service
+2. Dienst starten
    ```sh
    echo 'COMPOSE_PROFILES=agfeo-ldap' >> .env
    docker compose up -d --build
    ```
 
-   The image already sets `AGFEO_LDAP_CONEX_URL=http://conex:3000` and listens on `1389` inside the container, published as host port `389`.
+   Das Image setzt bereits `AGFEO_LDAP_CONEX_URL=http://conex:3000` und lauscht im
+   Container auf `1389`, veröffentlicht als Host-Port `389`.
 
-3. Check that contacts are served:
+3. Prüfen, ob Kontakte ausgeliefert werden
    ```sh
    ldapsearch -x -H ldap://localhost:389 -D agfeo -W \
      -b ou=contacts,dc=conex '(objectClass=*)' cn telephoneNumber
    ```
 
-4. In the Dashboard settings, add an account of type **LDAP**:
-   | Field                 | Value                  |
-   | --------------------- | ---------------------- |
-   | Username (bind DN)    | `agfeo`                |
-   | Password              | password of the user   |
-   | Server                | CoNex host address     |
-   | Port                  | `389`                  |
-   | LDAP search utility   | _leave default_        |
-   | Search base (base DN) | `ou=contacts,dc=conex` |
-   | Additional filter     | _leave default_        |
-   | Arguments             | _leave default_        |
+4. In den Dashboard-Einstellungen ein Konto vom Typ **LDAP** hinzufügen:
+| Feld                    | Wert                   |
+| ----------------------- | ---------------------- |
+| Benutzername (Bind-DN)  | `agfeo`                |
+| Passwort                | Passwort des Benutzers |
+| Server                  | Host-Adresse von conex |
+| Port                    | `389`                  |
+| LDAP-Suchdienstprogramm | _Standard belassen_    |
+| Suchbasis (Base-DN)     | `ou=contacts,dc=conex` |
+| Zusätzlicher Filter     | _Standard belassen_    |
+| Argumente               | _Standard belassen_    |
 
-   Then map the Dashboard fields to the [attributes](#contacts) by drag and
-   drop.
+   Danach die Dashboard-Felder per Drag-and-drop den [Attributen](#kontakte) zuordnen.
 
-## Contacts
-One entry `uid=<employee ID>,<base DN>` per **active** employee.
-A user limited to a tenant only sees that tenant's employees.
+## Kontakte
+Ein Eintrag `uid=<Mitarbeiter-ID>,<Base-DN>` pro **aktivem** Mitarbeiter.
+Ein Benutzer, der auf einen Mandanten eingeschränkt ist, sieht nur die Mitarbeiter
+dieses Mandanten.
 
-| Field of data source | Dashboard field   |
-| -------------------- | ----------------- |
-| `telephoneNumber`    | Phone (Business)  |
-| `otherTelephone`     | Phone (Business)  |
-| `homePhone`          | Phone (Private)   |
-| `otherHomePhone`     | Phone (Private)   |
-| `mobile`             | Mobile (Business) |
-| `otherMobile`        | Mobile (Business) |
-| `homeMobile`         | Mobile (Private)  |
-| `otherHomeMobile`    | Mobile (Private)  |
-| `sn`                 | Name              |
-| `givenName`          | First Name        |
-| `company`            | Company           |
-| `department`         | Department        |
+| Feld der Datenquelle | Dashboard-Feld         |
+| -------------------- | ---------------------- |
+| `telephoneNumber`    | Telefon (Geschäftlich) |
+| `otherTelephone`     | Telefon (Geschäftlich) |
+| `homePhone`          | Telefon (Privat)       |
+| `otherHomePhone`     | Telefon (Privat)       |
+| `mobile`             | Mobil (Geschäftlich)   |
+| `otherMobile`        | Mobil (Geschäftlich)   |
+| `homeMobile`         | Mobil (Privat)         |
+| `otherHomeMobile`    | Mobil (Privat)         |
+| `sn`                 | Nachname               |
+| `givenName`          | Vorname                |
+| `company`            | Firma                  |
+| `department`         | Abteilung              |
 
-Extensions are published as business or private phone numbers, completed
-with the tenant's main phone number up to its last `-` (`+49 521 44709-0` and
-extension `45` give `+495214470945`); without such a main number they are left
-out. Other phone numbers are not exported.
-
-
-## Configuration
-Environment variables of the service:
-
-| Variable                                    | Default                | Meaning                            |
-| ------------------------------------------- | ---------------------- | ---------------------------------- |
-| `AGFEO_LDAP_CONEX_URL`                      | –                      | **Required.** conex API root       |
-| `AGFEO_LDAP_BASE_DN`                        | `ou=contacts,dc=conex` | Search base                        |
-| `AGFEO_LDAP_HOST`                           | `0.0.0.0`              | Listen address                     |
-| `AGFEO_LDAP_PORT`                           | `389` (`636` with TLS) | Listen port                        |
-| `AGFEO_LDAP_TLS_CERT`, `AGFEO_LDAP_TLS_KEY` | –                      | PEM files; set both to serve LDAPS |
-| `AGFEO_LDAP_MAX_RESULTS`                    | `100`                  | Entries per search at most         |
-| `AGFEO_LDAP_DEBUG`                          | –                      | `1` logs every search              |
+Durchwahlen werden als geschäftliche oder private Telefonnummern veröffentlicht,
+ergänzt um die Hauptnummer des Mandanten bis zum letzten `-` (`+49 521 44709-0` und
+Durchwahl `45` ergeben `+495214470945`); ohne eine solche Hauptnummer bleiben sie weg.
+Andere Telefonnummern werden nicht exportiert.
 
 
-## Notes
-- **Security:** Binds are checked against conex; anonymous clients only see
-  the root DSE. Without TLS the password is sent in plain text, so use LDAPS
-  outside a trusted network.
-- **Sessions:** A successful bind is reused for 15 minutes, so not every
-  Dashboard lookup is a conex login (audit log, rate limit).
-- **Bind user:** Plain username (`agfeo`) or DN (`uid=agfeo,dc=conex`).
-- **Stale names:** The Dashboard caches resolved numbers; clear it with
-  `ctimon.exe -delcache ldap`.
-- **Troubleshooting:** `AGFEO_LDAP_DEBUG=1` logs each search with filter and
-  attributes. Failed binds are always logged with the reason.
+## Konfiguration
+Umgebungsvariablen des Dienstes:
+
+| Variable                                    | Standard               | Bedeutung                                      |
+| ------------------------------------------- | ---------------------- | ---------------------------------------------- |
+| `AGFEO_LDAP_CONEX_URL`                      | –                      | **Erforderlich.** conex-API-Wurzel             |
+| `AGFEO_LDAP_BASE_DN`                        | `ou=contacts,dc=conex` | Suchbasis                                      |
+| `AGFEO_LDAP_HOST`                           | `0.0.0.0`              | Listen-Adresse                                 |
+| `AGFEO_LDAP_PORT`                           | `389` (`636` mit TLS)  | Listen-Port                                    |
+| `AGFEO_LDAP_TLS_CERT`, `AGFEO_LDAP_TLS_KEY` | –                      | PEM-Dateien; beide setzen, um LDAPS anzubieten |
+| `AGFEO_LDAP_MAX_RESULTS`                    | `100`                  | Höchste Anzahl Einträge pro Suche              |
+| `AGFEO_LDAP_DEBUG`                          | –                      | `1` protokolliert jede Suche                   |
+
+
+## Hinweise
+- **Sicherheit:** Bindings werden gegen conex geprüft; anonyme Clients sehen nur die
+  Root-DSE. Ohne TLS wird das Passwort im Klartext gesendet, daher außerhalb eines
+  vertrauenswürdigen Netzwerks LDAPS verwenden.
+- **Sitzungen:** Eine erfolgreiche Bindung wird 15 Minuten wiederverwendet, damit nicht
+  jede Dashboard-Suche ein conex-Login ist (Audit-Log, Rate-Limit).
+- **Bind-Benutzer:** Reiner Benutzername (`agfeo`) oder DN (`uid=agfeo,dc=conex`).
+- **Veraltete Namen:** Das Dashboard merkt sich aufgelöste Nummern; mit
+  `ctimon.exe -delcache ldap` leeren.
+- **Fehlersuche:** `AGFEO_LDAP_DEBUG=1` protokolliert jede Suche mit Filter und
+  Attributen. Fehlgeschlagene Bindings werden immer mit dem Grund protokolliert.

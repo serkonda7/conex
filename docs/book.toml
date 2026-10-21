@@ -1,6 +1,7 @@
 [book]
 title = "conex"
-description = "Network inventory for MSPs."
+description = "Netzwerk-Inventar für MSPs."
+language = "de"
 
 [preprocessor.last-changed]
 command = "mdbook-last-changed"
