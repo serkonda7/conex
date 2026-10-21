@@ -1,12 +1,12 @@
-# Summary
+# Zusammenfassung
 
-[Introduction](index.md)
+[Einführung](index.md)
 
-# Inventory
+# Inventar
 
 - [Racks](racks.md)
 
-# Integrations
+# Integrationen
 
-- [Consistency Checks](integrations/consistency.md)
-- [AGFEO Dashboard](integrations/agfeo.md)
+- [Datenabgleich der Integrationen](integrations/consistency.md)
+- [AGFEO-Dashboard](integrations/agfeo.md)
