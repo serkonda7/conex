@@ -1530,6 +1530,8 @@ export interface TracePeerInterface {
 	id: number
 	name: string
 	kind: string
+	/** Patch-panel side; `null` for a normal port. */
+	side: PortSide | null
 }
 
 export interface TracePeerDevice {
@@ -1546,7 +1548,11 @@ export interface TraceLink {
 	peer_interface: TracePeerInterface
 }
 
-/** One cable hop in a multi-hop trace path (`from` -> `to`). */
+/**
+ * One cable hop in a multi-hop trace path (`from` -> `to`). After a hop
+ * into a patch panel, the next hop's `from_interface` is the paired port
+ * the signal passed through to.
+ */
 export interface TraceHop {
 	cable_id: number
 	cable_label: string | null
@@ -1561,6 +1567,32 @@ export interface TraceHop {
 export interface TracePath {
 	hops: TraceHop[]
 	end_device: TracePeerDevice
+	/**
+	 * The path fanned out of a multi-position rear port without a known
+	 * position (NetBox split), so it is one of several possible circuits.
+	 */
+	split: boolean
+}
+
+/** One patch panel an end-to-end circuit passes through. */
+export interface TracePanelPass {
+	device: TracePeerDevice
+	in_interface: TracePeerInterface
+	/** Port the signal leaves the panel by; `null` when no front port maps the slot. */
+	out_interface: TracePeerInterface | null
+}
+
+/**
+ * End-to-end peer of a port cabled to a patch panel: the far end after
+ * every panel on the way, e.g. "→ PC-123 via PP-A 12 · PP-B 12".
+ */
+export interface TraceEndToEnd {
+	local_interface_id: number
+	/** Far end; `null` when the circuit ends at an uncabled panel port. */
+	end_device: TracePeerDevice | null
+	end_interface: TracePeerInterface | null
+	via: TracePanelPass[]
+	split: boolean
 }
 
 export interface DeviceTraceResponse {
@@ -1568,6 +1600,8 @@ export interface DeviceTraceResponse {
 	links: TraceLink[]
 	/** Shortest-path multi-hop traces (depth-limited, see TraceQuerySchema). */
 	paths: TracePath[]
+	/** End-to-end peers of the local ports cabled to a patch panel. */
+	end_to_end: TraceEndToEnd[]
 }
 
 /** Per-interface trace: all shortest paths starting at one port. */
@@ -1575,6 +1609,8 @@ export interface InterfaceTraceResponse {
 	start_device: TracePeerDevice
 	start_interface: TracePeerInterface
 	paths: TracePath[]
+	/** End-to-end peers when the port is cabled to a patch panel. */
+	end_to_end: TraceEndToEnd[]
 }
 
 /** Per-cable trace: endpoints plus onward paths from each side. */

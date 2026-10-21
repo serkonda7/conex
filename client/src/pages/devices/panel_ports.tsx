@@ -1,10 +1,11 @@
-import type { TraceLink } from 'shared/src/types'
+import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, type JSX, Show } from 'solid-js'
 import type { InterfaceJson } from '../../api/devices'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { t } from '../../i18n'
 import { portKindLabel } from '../../i18n/labels'
 import { can } from '../../lib/session'
+import { PortPeer } from './trace_peer'
 
 /**
  * One row of the patch-panel table: a single-position rear port with its
@@ -65,6 +66,7 @@ export function panelRowsOf(ports: InterfaceJson[]): PanelRow[] {
 export function PanelPortTable(props: {
 	ports: InterfaceJson[]
 	links: Map<number, TraceLink>
+	endToEnd: (ifaceId: number) => TraceEndToEnd[]
 	actions: (iface: InterfaceJson) => JSX.Element
 	extraColumns?: DataTableColumn<PanelRow>[]
 }): JSX.Element {
@@ -74,22 +76,12 @@ export function PanelPortTable(props: {
 		if (!iface) {
 			return <span>—</span>
 		}
-		const link = props.links.get(iface.id)
 		return (
 			<span class="panel-port-cell">
 				<code>{iface.name}</code>
 				<small>{portKindLabel(iface.kind)}</small>
-				<span>
-					{link ? (
-						<>
-							{'→ '}
-							<a href={`/devices/${link.peer_device.id}`}>{link.peer_device.name}</a>:{' '}
-							<code>{link.peer_interface.name}</code>
-						</>
-					) : (
-						'—'
-					)}
-				</span>
+				<span aria-hidden="true">→</span>
+				<PortPeer link={props.links.get(iface.id)} endToEnd={props.endToEnd(iface.id)} />
 				<Show when={can('edit')}>{props.actions(iface)}</Show>
 			</span>
 		)

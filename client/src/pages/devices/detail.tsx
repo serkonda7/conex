@@ -1,5 +1,5 @@
 import { IconArrowsExchange, IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
-import type { TraceLink } from 'shared/src/types'
+import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import { delete_cable, fetch_trace } from '../../api/cables'
 import { fetch_device_role } from '../../api/device_roles'
@@ -44,6 +44,7 @@ import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
 import { PanelPortTable } from './panel_ports'
+import { PortPeer } from './trace_peer'
 
 /**
  * General, power, outlet and display ports; everything else is a network
@@ -198,6 +199,18 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const linksByIface = createMemo(
 		() => new Map((trace()?.links ?? []).map((link) => [link.local_interface.id, link])),
 	)
+	/** End-to-end peers behind patch panels, per local interface. */
+	const endToEndByIface = createMemo(() => {
+		const byIface = new Map<number, TraceEndToEnd[]>()
+		for (const peer of trace()?.end_to_end ?? []) {
+			byIface.set(peer.local_interface_id, [
+				...(byIface.get(peer.local_interface_id) ?? []),
+				peer,
+			])
+		}
+		return byIface
+	})
+	const endToEndOf = (ifaceId: number): TraceEndToEnd[] => endToEndByIface().get(ifaceId) ?? []
 
 	const nameColumn: DataTableColumn<InterfaceJson> = {
 		key: 'name',
@@ -207,18 +220,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const connectionColumn: DataTableColumn<InterfaceJson> = {
 		key: 'connection',
 		label: t('device.connection'),
-		getValue: (iface: InterfaceJson): JSX.Element => {
-			const link = linksByIface().get(iface.id)
-			if (!link) {
-				return <span>—</span>
-			}
-			return (
-				<span>
-					<a href={`/devices/${link.peer_device.id}`}>{link.peer_device.name}</a>:{' '}
-					<code>{link.peer_interface.name}</code>
-				</span>
-			)
-		},
+		getValue: (iface: InterfaceJson): JSX.Element => (
+			<PortPeer link={linksByIface().get(iface.id)} endToEnd={endToEndOf(iface.id)} />
+		),
 	}
 	/** Network ports get the enabled state and port number. */
 	const networkColumns: DataTableColumn<InterfaceJson>[] = [
@@ -386,7 +390,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						count: panelPorts().filter((p) => p.side === 'rear').length,
 					})}
 				</h3>
-				<PanelPortTable ports={panelPorts()} links={linksByIface()} actions={portActions} />
+				<PanelPortTable
+					ports={panelPorts()}
+					links={linksByIface()}
+					endToEnd={endToEndOf}
+					actions={portActions}
+				/>
 			</Show>
 			<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
 				<h3 id="device-interfaces">

@@ -1885,6 +1885,17 @@ th[aria-sort="descending"] .data-table-sort::after {
 }
 
 /* Front/rear marker on port tiles and trace hops. */
+/* Direct cable peer with the end-to-end peers behind patch panels below it. */
+.port-peer {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.1rem;
+}
+
+.trace-end-to-end small {
+	color: var(--text-muted);
+}
+
 .port-side-badge {
 	display: inline-block;
 	padding: 0 0.3rem;
