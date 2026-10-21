@@ -4,7 +4,7 @@ import {
 	type TenantBundleJson,
 	websiteUrl,
 } from 'shared/src/schemas'
-import { createSignal, For, type JSX, Show } from 'solid-js'
+import { createSignal, For, type JSX, type Resource, Show } from 'solid-js'
 import { type FloorplanListJson, fetch_floorplans } from '../../api/attachments'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { fetch_device_roles } from '../../api/device_roles'
@@ -24,6 +24,8 @@ import {
 	fetch_tenant_group,
 	type SiteGroupRow,
 	type SiteRow,
+	type TenantDetail,
+	type TenantGroupRow,
 } from '../../api/tenancy'
 import { EmailList, PhoneList } from '../../components/contacts'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
@@ -32,6 +34,7 @@ import {
 	DetailShell,
 	RecordLink,
 	RelatedPreview,
+	type RelatedTab,
 	RelatedTabs,
 	useDetailDelete,
 } from '../../components/detail_page'
@@ -118,6 +121,143 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/tenants',
 	})
 
+	const deviceColumns: DataTableColumn<DeviceRow>[] = [
+		nameColumn<DeviceRow>(t('common.name'), '/devices'),
+		roleColumn<DeviceRow>(roleName),
+		{
+			key: 'site',
+			label: t('tenant.siteRack'),
+			getValue: (d: DeviceRow): string => siteRackLabel(d, siteName, rackName),
+		},
+		employeeColumn<DeviceRow>(employeeName),
+	]
+	const employeeColumns: DataTableColumn<EmployeeRow>[] = [
+		nameColumn<EmployeeRow>(t('common.name'), '/employees'),
+		{
+			key: 'title',
+			label: t('employee.title'),
+			getValue: (e: EmployeeRow): string => e.title ?? '—',
+		},
+		{
+			key: 'email',
+			label: t('employee.email'),
+			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={primaryEmail(e.emails)} />,
+		},
+	]
+	const rackColumns: DataTableColumn<RackRow>[] = [
+		nameColumn<RackRow>(t('common.name'), '/racks'),
+		{
+			key: 'site',
+			label: tp('entity.site', 1),
+			getValue: (r: RackRow): string => siteName(r.site_id),
+		},
+		rackHeightColumn(),
+	]
+	const vmColumns: DataTableColumn<DeviceListItem>[] = [
+		{
+			key: 'name',
+			label: t('common.name'),
+			getValue: (vm: DeviceListItem): JSX.Element => (
+				<a href={deviceListHref(vm)}>{vm.name}</a>
+			),
+		},
+		statusColumn<DeviceListItem>(),
+		roleColumn<DeviceListItem>(roleName),
+		{
+			key: 'host',
+			label: t('vm.host'),
+			getValue: vmHost,
+		},
+		employeeColumn<DeviceListItem>(employeeName),
+	]
+	const siteGroupColumns: DataTableColumn<SiteGroupRow>[] = [
+		nameColumn<SiteGroupRow>(t('common.name'), '/site-groups'),
+	]
+
+	const tabs = (): RelatedTab[] => {
+		const result: RelatedTab[] = [
+			{
+				key: 'devices',
+				label: tp('entity.device', 2),
+				count: devicePage()?.total ?? 0,
+				viewAllHref: `/devices?tenant=${props.id}&kind=device`,
+				content: () => (
+					<RelatedPreview
+						rows={devices()}
+						loading={devicePage.loading}
+						noun="noun.device"
+						emptyText={t('tenant.noDevices')}
+						columns={deviceColumns}
+					/>
+				),
+			},
+			{
+				key: 'employees',
+				label: tp('entity.employee', 2),
+				count: employeePage()?.total ?? 0,
+				viewAllHref: `/employees?tenant=${props.id}`,
+				content: () => (
+					<RelatedPreview
+						rows={employees()}
+						loading={employeePage.loading}
+						noun="noun.employee"
+						emptyText={t('tenant.noEmployees')}
+						columns={employeeColumns}
+					/>
+				),
+			},
+			{
+				key: 'racks',
+				label: tp('entity.rack', 2),
+				count: rackPage()?.total ?? 0,
+				viewAllHref: `/racks?tenant=${props.id}`,
+				content: () => (
+					<RelatedPreview
+						rows={racks()}
+						loading={rackPage.loading}
+						noun="noun.rack"
+						emptyText={t('tenant.noRacks')}
+						columns={rackColumns}
+					/>
+				),
+			},
+			{
+				key: 'vms',
+				label: tp('entity.virtualMachine', 2),
+				count: vmPage()?.total ?? 0,
+				viewAllHref: `/devices?tenant=${props.id}&kind=vm`,
+				content: () => (
+					<RelatedPreview
+						rows={vmPage()?.items ?? []}
+						loading={vmPage.loading}
+						noun="noun.virtualMachine"
+						emptyText={t('tenant.noVms')}
+						columns={vmColumns}
+					/>
+				),
+			},
+		]
+		const groups = siteGroups() ?? []
+		if (groups.length > 0) {
+			result.push({
+				key: 'site-groups',
+				label: tp('entity.siteGroup', 2),
+				count: groups.length,
+				viewAllHref: `/site-groups?tenant=${props.id}`,
+				content: () => (
+					<RelatedPreview
+						rows={groups}
+						loading={siteGroups.loading}
+						noun="noun.siteGroup"
+						emptyText={t('tenant.noSiteGroups')}
+						columns={siteGroupColumns}
+					/>
+				),
+			})
+		}
+		return result
+	}
+
 	return (
 		<div class="tenant-detail">
 			<DetailShell
@@ -131,34 +271,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/tenants/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-
-				<div class="tenant-subheading">
-					<Show when={tenant()?.customer_number}>
-						<span class="page-subtitle">#{tenant()?.customer_number}</span>
-					</Show>
-					<Show when={groupId() !== null && groupId() !== undefined}>
-						<Show when={tenant()?.customer_number}>
-							<span class="page-subtitle">·</span>
-						</Show>
-						<RecordLink id={groupId()} record={group} base="/tenant-groups" />
-					</Show>
-					<Show
-						when={
-							(tenant()?.bundles?.length ?? 0) > 0 &&
-							(Boolean(tenant()?.customer_number) ||
-								(groupId() !== null && groupId() !== undefined))
-						}
-					>
-						<span class="page-subtitle">·</span>
-					</Show>
-					<For each={tenant()?.bundles}>
-						{(bundle: TenantBundleJson): JSX.Element => (
-							<span class="badge tenant-bundle">
-								{bundle.managed_bundle_name} · {bundle.service_level_name}
-							</span>
-						)}
-					</For>
-				</div>
+				<Subheading tenant={tenant()} group={group} />
 
 				<div class="tenant-dashboard">
 					<div>
@@ -172,199 +285,15 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							devices={devices()}
 							floorplans={floorplans() ?? []}
 						/>
-
 						<RelatedTabs
 							id="tenant-related"
 							label={t('tenant.related')}
-							tabs={[
-								{
-									key: 'devices',
-									label: tp('entity.device', 2),
-									count: devicePage()?.total ?? 0,
-									viewAllHref: `/devices?tenant=${props.id}&kind=device`,
-									content: () => (
-										<RelatedPreview
-											rows={devices()}
-											loading={devicePage.loading}
-											noun="noun.device"
-											emptyText={t('tenant.noDevices')}
-											columns={[
-												nameColumn<DeviceRow>(t('common.name'), '/devices'),
-												roleColumn<DeviceRow>(roleName),
-												{
-													key: 'site',
-													label: t('tenant.siteRack'),
-													getValue: (d: DeviceRow): string =>
-														siteRackLabel(d, siteName, rackName),
-												},
-												employeeColumn<DeviceRow>(employeeName),
-											]}
-										/>
-									),
-								},
-								{
-									key: 'employees',
-									label: tp('entity.employee', 2),
-									count: employeePage()?.total ?? 0,
-									viewAllHref: `/employees?tenant=${props.id}`,
-									content: () => (
-										<RelatedPreview
-											rows={employees()}
-											loading={employeePage.loading}
-											noun="noun.employee"
-											emptyText={t('tenant.noEmployees')}
-											columns={[
-												nameColumn<EmployeeRow>(
-													t('common.name'),
-													'/employees',
-												),
-												{
-													key: 'title',
-													label: t('employee.title'),
-													getValue: (e: EmployeeRow): string =>
-														e.title ?? '—',
-												},
-												{
-													key: 'email',
-													label: t('employee.email'),
-													getValue: (e: EmployeeRow): JSX.Element => (
-														<EmailLink email={primaryEmail(e.emails)} />
-													),
-												},
-											]}
-										/>
-									),
-								},
-								{
-									key: 'racks',
-									label: tp('entity.rack', 2),
-									count: rackPage()?.total ?? 0,
-									viewAllHref: `/racks?tenant=${props.id}`,
-									content: () => (
-										<RelatedPreview
-											rows={racks()}
-											loading={rackPage.loading}
-											noun="noun.rack"
-											emptyText={t('tenant.noRacks')}
-											columns={[
-												nameColumn<RackRow>(t('common.name'), '/racks'),
-												{
-													key: 'site',
-													label: tp('entity.site', 1),
-													getValue: (r: RackRow): string =>
-														siteName(r.site_id),
-												},
-												rackHeightColumn(),
-											]}
-										/>
-									),
-								},
-								{
-									key: 'vms',
-									label: tp('entity.virtualMachine', 2),
-									count: vmPage()?.total ?? 0,
-									viewAllHref: `/devices?tenant=${props.id}&kind=vm`,
-									content: () => (
-										<RelatedPreview
-											rows={vmPage()?.items ?? []}
-											loading={vmPage.loading}
-											noun="noun.virtualMachine"
-											emptyText={t('tenant.noVms')}
-											columns={[
-												{
-													key: 'name',
-													label: t('common.name'),
-													getValue: (vm: DeviceListItem): JSX.Element => (
-														<a href={deviceListHref(vm)}>{vm.name}</a>
-													),
-												},
-												statusColumn<DeviceListItem>(),
-												roleColumn<DeviceListItem>(roleName),
-												{
-													key: 'host',
-													label: t('vm.host'),
-													getValue: (vm: DeviceListItem): JSX.Element =>
-														vm.kind === 'vm' &&
-														vm.host_device_id !== null ? (
-															<a
-																href={`/devices/${vm.host_device_id}`}
-															>
-																{vm.host_name}
-															</a>
-														) : (
-															<span>{t('vm.cloud')}</span>
-														),
-												},
-												employeeColumn<DeviceListItem>(employeeName),
-											]}
-										/>
-									),
-								},
-								...((siteGroups()?.length ?? 0) > 0
-									? [
-											{
-												key: 'site-groups',
-												label: tp('entity.siteGroup', 2),
-												count: siteGroups()?.length ?? 0,
-												viewAllHref: `/site-groups?tenant=${props.id}`,
-												content: () => (
-													<RelatedPreview
-														rows={siteGroups() ?? []}
-														loading={siteGroups.loading}
-														noun="noun.siteGroup"
-														emptyText={t('tenant.noSiteGroups')}
-														columns={[
-															nameColumn<SiteGroupRow>(
-																t('common.name'),
-																'/site-groups',
-															),
-														]}
-													/>
-												),
-											},
-										]
-									: []),
-							]}
+							tabs={tabs()}
 						/>
 					</div>
 
 					<div>
-						<section class="card" aria-labelledby="tenant-details">
-							<div class="card-header">
-								<h3 id="tenant-details">{t('tenant.details')}</h3>
-							</div>
-							<dl class="detail-grid tenant-facts">
-								<dt>{t('tenant.website')}</dt>
-								<dd>
-									<Show when={tenant()?.website} fallback="—">
-										{(website: () => string): JSX.Element => (
-											<a
-												href={websiteUrl(website())}
-												target="_blank"
-												rel="noopener noreferrer"
-											>
-												{website()}
-											</a>
-										)}
-									</Show>
-								</dd>
-								<dt>{t('employee.emails')}</dt>
-								<dd>
-									<EmailList emails={tenant()?.emails ?? []} />
-								</dd>
-								<dt>{t('employee.phones')}</dt>
-								<dd>
-									<PhoneList phones={tenant()?.phones ?? []} />
-								</dd>
-							</dl>
-							<Show when={tenant()?.comments}>
-								<details class="tenant-comments">
-									<summary>{t('common.comments')}</summary>
-									<Markdown text={tenant()?.comments} />
-								</details>
-							</Show>
-						</section>
-
+						<DetailsCard tenant={tenant()} />
 						<Show when={can('changelog.view')}>
 							<RecentChanges
 								tenantId={props.id}
@@ -378,6 +307,81 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 
 			<InlineError message={error()} />
 		</div>
+	)
+}
+
+/** Customer number, tenant group and managed bundles. */
+function Subheading(props: {
+	tenant: TenantDetail | null | undefined
+	group: Resource<TenantGroupRow | null>
+}): JSX.Element {
+	const groupId = (): number | null | undefined => props.tenant?.tenant_group_id
+	const hasGroup = (): boolean => groupId() !== null && groupId() !== undefined
+	const hasNumber = (): boolean => Boolean(props.tenant?.customer_number)
+	const hasBundles = (): boolean => (props.tenant?.bundles?.length ?? 0) > 0
+	return (
+		<div class="tenant-subheading">
+			<Show when={hasNumber()}>
+				<span class="page-subtitle">#{props.tenant?.customer_number}</span>
+			</Show>
+			<Show when={hasGroup() && hasNumber()}>
+				<span class="page-subtitle">·</span>
+			</Show>
+			<Show when={hasGroup()}>
+				<RecordLink id={groupId()} record={props.group} base="/tenant-groups" />
+			</Show>
+			<Show when={hasBundles() && (hasNumber() || hasGroup())}>
+				<span class="page-subtitle">·</span>
+			</Show>
+			<For each={props.tenant?.bundles}>
+				{(bundle: TenantBundleJson): JSX.Element => (
+					<span class="badge tenant-bundle">
+						{bundle.managed_bundle_name} · {bundle.service_level_name}
+					</span>
+				)}
+			</For>
+		</div>
+	)
+}
+
+/** Website, emails, phones and comments. */
+function DetailsCard(props: { tenant: TenantDetail | null | undefined }): JSX.Element {
+	return (
+		<section class="card" aria-labelledby="tenant-details">
+			<div class="card-header">
+				<h3 id="tenant-details">{t('tenant.details')}</h3>
+			</div>
+			<dl class="detail-grid tenant-facts">
+				<dt>{t('tenant.website')}</dt>
+				<dd>
+					<Show when={props.tenant?.website} fallback="—">
+						{(website: () => string): JSX.Element => (
+							<a
+								href={websiteUrl(website())}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								{website()}
+							</a>
+						)}
+					</Show>
+				</dd>
+				<dt>{t('employee.emails')}</dt>
+				<dd>
+					<EmailList emails={props.tenant?.emails ?? []} />
+				</dd>
+				<dt>{t('employee.phones')}</dt>
+				<dd>
+					<PhoneList phones={props.tenant?.phones ?? []} />
+				</dd>
+			</dl>
+			<Show when={props.tenant?.comments}>
+				<details class="tenant-comments">
+					<summary>{t('common.comments')}</summary>
+					<Markdown text={props.tenant?.comments} />
+				</details>
+			</Show>
+		</section>
 	)
 }
 
@@ -416,31 +420,35 @@ function NeedsAttention(props: {
 				<ul class="tenant-rows">
 					<For each={items()}>
 						{(item: AttentionItem): JSX.Element => (
-							<li>
-								<span class="tenant-tag">
-									{providerLabel(item.entry.integration.provider)}
-								</span>
-								<span class="tenant-row-text">
-									{t('tenant.findingCount', {
-										kind: findingKindLabel(item.kind),
-										count: item.count,
-									})}
-								</span>
-								<a
-									href={tenantReportHref(
-										item.entry.integration,
-										props.tenantId,
-										item.kind,
-									)}
-								>
-									{t('tenant.review')}
-								</a>
-							</li>
+							<AttentionRow tenantId={props.tenantId} item={item} />
 						)}
 					</For>
 				</ul>
 			</section>
 		</Show>
+	)
+}
+
+function AttentionRow(props: { tenantId: number; item: AttentionItem }): JSX.Element {
+	return (
+		<li>
+			<span class="tenant-tag">{providerLabel(props.item.entry.integration.provider)}</span>
+			<span class="tenant-row-text">
+				{t('tenant.findingCount', {
+					kind: findingKindLabel(props.item.kind),
+					count: props.item.count,
+				})}
+			</span>
+			<a
+				href={tenantReportHref(
+					props.item.entry.integration,
+					props.tenantId,
+					props.item.kind,
+				)}
+			>
+				{t('tenant.review')}
+			</a>
+		</li>
 	)
 }
 
@@ -453,10 +461,6 @@ function SitesCard(props: {
 	devices: DeviceRow[]
 	floorplans: FloorplanListJson[]
 }): JSX.Element {
-	const sitePlan = (site: SiteRow): FloorplanListJson | undefined =>
-		props.floorplans.find(
-			(p: FloorplanListJson) => p.site_id === site.id && p.location_id === null,
-		)
 	return (
 		<section class="card" aria-labelledby="tenant-sites">
 			<div class="card-header">
@@ -478,49 +482,58 @@ function SitesCard(props: {
 					<div class="tenant-site-grid">
 						<For each={props.sites}>
 							{(site: SiteRow): JSX.Element => (
-								<div class="tenant-site">
-									<a class="tenant-site-name" href={`/sites/${site.id}`}>
-										{site.name}
-									</a>
-									<span class="text-muted">
-										<a href={`/racks?site=${site.id}`}>
-											{tp(
-												'tenant.siteRacks',
-												props.racks.filter(
-													(r: RackRow) => r.site_id === site.id,
-												).length,
-											)}
-										</a>
-										{' · '}
-										<a
-											href={`/devices?tenant=${props.tenantId}&site=${site.id}&kind=device`}
-										>
-											{tp(
-												'tenant.siteDevices',
-												props.devices.filter(
-													(d: DeviceRow) => d.site_id === site.id,
-												).length,
-											)}
-										</a>
-										{' · '}
-										<Show
-											when={sitePlan(site)}
-											fallback={<>{t('tenant.noFloorplan')}</>}
-										>
-											{(plan: () => FloorplanListJson) => (
-												<a href={`/floorplans/${plan().attachment_id}`}>
-													{tp('entity.floorplan', 1)}
-												</a>
-											)}
-										</Show>
-									</span>
-								</div>
+								<SiteCard
+									tenantId={props.tenantId}
+									site={site}
+									racks={props.racks}
+									devices={props.devices}
+									floorplans={props.floorplans}
+								/>
 							)}
 						</For>
 					</div>
 				</Show>
 			</Show>
 		</section>
+	)
+}
+
+function SiteCard(props: {
+	tenantId: number
+	site: SiteRow
+	racks: RackRow[]
+	devices: DeviceRow[]
+	floorplans: FloorplanListJson[]
+}): JSX.Element {
+	const rackCount = (): number =>
+		props.racks.filter((r: RackRow) => r.site_id === props.site.id).length
+	const deviceCount = (): number =>
+		props.devices.filter((d: DeviceRow) => d.site_id === props.site.id).length
+	const sitePlan = (): FloorplanListJson | undefined =>
+		props.floorplans.find(
+			(p: FloorplanListJson) => p.site_id === props.site.id && p.location_id === null,
+		)
+	return (
+		<div class="tenant-site">
+			<a class="tenant-site-name" href={`/sites/${props.site.id}`}>
+				{props.site.name}
+			</a>
+			<span class="text-muted">
+				<a href={`/racks?site=${props.site.id}`}>{tp('tenant.siteRacks', rackCount())}</a>
+				{' · '}
+				<a href={`/devices?tenant=${props.tenantId}&site=${props.site.id}&kind=device`}>
+					{tp('tenant.siteDevices', deviceCount())}
+				</a>
+				{' · '}
+				<Show when={sitePlan()} fallback={t('tenant.noFloorplan')}>
+					{(plan: () => FloorplanListJson) => (
+						<a href={`/floorplans/${plan().attachment_id}`}>
+							{tp('entity.floorplan', 1)}
+						</a>
+					)}
+				</Show>
+			</span>
+		</div>
 	)
 }
 
@@ -549,16 +562,7 @@ function RecentChanges(props: {
 					<ul class="tenant-rows tenant-changes">
 						<For each={props.changes}>
 							{(change: ObjectChangeJson): JSX.Element => (
-								<li>
-									<a class="text-muted" href={`/changelog/${change.id}`}>
-										{formatRelative(change.created_at)}
-									</a>
-									<span class="tenant-row-text">
-										<strong>{changeUser(change)}</strong>{' '}
-										<ChangeActionBadge action={change.action} />{' '}
-										<ChangedObjectLink change={change} />
-									</span>
-								</li>
+								<ChangeRow change={change} />
 							)}
 						</For>
 					</ul>
@@ -566,6 +570,29 @@ function RecentChanges(props: {
 			</Show>
 		</section>
 	)
+}
+
+function ChangeRow(props: { change: ObjectChangeJson }): JSX.Element {
+	return (
+		<li>
+			<a class="text-muted" href={`/changelog/${props.change.id}`}>
+				{formatRelative(props.change.created_at)}
+			</a>
+			<span class="tenant-row-text">
+				<strong>{changeUser(props.change)}</strong>{' '}
+				<ChangeActionBadge action={props.change.action} />{' '}
+				<ChangedObjectLink change={props.change} />
+			</span>
+		</li>
+	)
+}
+
+/** Host device link of a VM, or "Cloud" for a VM without host. */
+function vmHost(vm: DeviceListItem): JSX.Element {
+	if (vm.kind === 'vm' && vm.host_device_id !== null) {
+		return <a href={`/devices/${vm.host_device_id}`}>{vm.host_name}</a>
+	}
+	return <span>{t('vm.cloud')}</span>
 }
 
 /** Status pill of a device or VM. */

@@ -232,7 +232,7 @@ export function DevicesPage(): JSX.Element {
 					filterTenant() !== '' ||
 					filterType() !== '' ||
 					filterSite() !== '' ||
-					 tenantContext().kind !== 'all'
+					tenantContext().kind !== 'all'
 				}
 				columns={columns}
 				columnsKey="devices"
