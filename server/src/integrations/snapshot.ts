@@ -1,18 +1,18 @@
 /**
  * `external_objects`: the last fetched state of each external tenant,
- * device and employee. The report and the link pickers read from here, so
+ * device, employee and ticket tag. The report and the link pickers read from here, so
  * they work without calling the external system on every page load.
  */
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { external_objects } from '../schema'
-import type { ExternalDevice, ExternalEmployee, ExternalTenant } from './types'
+import type { ExternalDevice, ExternalEmployee, ExternalTag, ExternalTenant } from './types'
 
 /** Rows per statement; keeps statements well under the Postgres parameter cap. */
 const CHUNK = 500
 
-type ObjectType = 'tenant' | 'device' | 'employee'
+type ObjectType = 'tenant' | 'device' | 'employee' | 'tag'
 type ObjectRow = typeof external_objects.$inferInsert
 
 function chunks<T>(items: T[]): T[][] {
@@ -122,6 +122,29 @@ export async function mergeEmployees(
 	now: number,
 ): Promise<void> {
 	await upsertChunked(employeeRows(provider, changedEmployees, now))
+}
+
+/** Replaces the tag snapshot (always fetched in full). */
+export async function replaceTags(
+	provider: ProviderId,
+	tags: ExternalTag[],
+	now: number,
+): Promise<void> {
+	await getDb().delete(external_objects).where(objectsOf(provider, 'tag'))
+	await insertChunked(
+		tags.map((tag) => ({
+			provider,
+			object_type: 'tag',
+			external_id: tag.external_id,
+			external_tenant_id: null,
+			data: tag,
+			fetched_at: now,
+		})),
+	)
+}
+
+export function readTags(provider: ProviderId): Promise<ExternalTag[]> {
+	return readData<ExternalTag>(objectsOf(provider, 'tag'))
 }
 
 /** Replaces the device snapshot of one external tenant. */

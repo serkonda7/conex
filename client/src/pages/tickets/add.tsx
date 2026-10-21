@@ -1,8 +1,10 @@
 import { Result } from 'better-result'
+import { priorityLabel } from 'shared/src/priority'
 import { createEffect, createMemo, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_devices } from '../../api/devices'
 import { fetch_all_employees } from '../../api/employees'
 import { create_ticket, type IntegrationProvider } from '../../api/integrations'
+import { fetch_priorities } from '../../api/service_catalog'
 import {
 	FormPage,
 	FormSection,
@@ -14,7 +16,7 @@ import {
 import { t, tp } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { useFormState } from '../../lib/form'
-import { createRowsFor } from '../../lib/resource'
+import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam, useOpenerPath } from '../../lib/router'
 import { isScoped, sessionTenantId } from '../../lib/session'
 import { contextTenantId, contextTenantRows, homePath } from '../../lib/tenant_context'
@@ -24,9 +26,9 @@ export const TICKET_PROVIDER: IntegrationProvider = 'tanss'
 
 /**
  * /tickets/add?device=&employee= — new external ticket (`tickets.create`)
- * for the tenant selected in the top bar (scoped users: their own): optional
- * device and employee of that tenant, title and description. The query
- * preselects device and employee. The server rejects tenants without a
+ * for the tenant selected in the top bar (scoped users: their own): title,
+ * description, priority (preset to the lowest) and the optional device and
+ * employee of that tenant. The query preselects device and employee. The server rejects tenants without a
  * company link. On success the ticket
  * number is shown and the form clears for the next ticket.
  */
@@ -35,6 +37,7 @@ export function TicketAddPage(): JSX.Element {
 	const openerPath = useOpenerPath()
 	const [deviceId, setDeviceId] = createSignal(queryParam('device'))
 	const [employeeId, setEmployeeId] = createSignal(queryParam('employee'))
+	const [priorityId, setPriorityId] = createSignal('')
 	const [title, setTitle] = createSignal('')
 	const [content, setContent] = createSignal('')
 	const [createdId, setCreatedId] = createSignal<number | null>(null)
@@ -53,8 +56,22 @@ export function TicketAddPage(): JSX.Element {
 		(tenant: number) => fetch_all_employees({ tenant }),
 		form.setError,
 	)
+	const [priorities] = createRows(() => fetch_priorities({ limit: 200 }), form.setError)
 	const deviceOptions = createMemo(() => row_options(devices() ?? []))
 	const employeeOptions = createMemo(() => row_options(employees() ?? []))
+	const priorityOptions = createMemo(() =>
+		(priorities() ?? []).map((row) => ({ value: row.id, label: priorityLabel(row) })),
+	)
+	// Sorted by rank, most urgent first.
+	const lowestPriority = (): string => String(priorities()?.at(-1)?.id ?? '')
+
+	createEffect(
+		on(priorities, () => {
+			if (priorityId() === '') {
+				setPriorityId(lowestPriority())
+			}
+		}),
+	)
 
 	// Device and employee belong to one tenant; a new context drops them.
 	createEffect(
@@ -81,6 +98,7 @@ export function TicketAddPage(): JSX.Element {
 		}
 		const device = parseId(deviceId())
 		const employee = parseId(employeeId())
+		const priority = parseId(priorityId())
 		form.setError(null)
 		setCreatedId(null)
 		form.setSaving(true)
@@ -88,6 +106,7 @@ export function TicketAddPage(): JSX.Element {
 			tenant_id: tenant,
 			...(device !== null ? { device_id: device } : {}),
 			...(employee !== null ? { employee_id: employee } : {}),
+			...(priority !== null ? { priority_id: priority } : {}),
 			title: title(),
 			content: content(),
 		})
@@ -99,6 +118,7 @@ export function TicketAddPage(): JSX.Element {
 		setCreatedId(res.value.id)
 		setTitle('')
 		setContent('')
+		setPriorityId(lowestPriority())
 	}
 
 	const pageTitle = (): string => {
@@ -126,6 +146,33 @@ export function TicketAddPage(): JSX.Element {
 					</p>
 				)}
 			</Show>
+			<FormSection title={t('ticket.details')}>
+				<TextField
+					id="ticket-title"
+					label={t('ticket.title')}
+					value={title()}
+					onInput={setTitle}
+					maxLength={200}
+					required
+					autofocus
+				/>
+				<SelectField
+					id="ticket-priority"
+					label={tp('entity.priority', 1)}
+					value={priorityId()}
+					onChange={setPriorityId}
+					options={priorityOptions()}
+					disabled={priorities.loading || priorityOptions().length === 0}
+				/>
+				<TextAreaField
+					id="ticket-content"
+					label={t('ticket.content')}
+					value={content()}
+					onInput={setContent}
+					rows={8}
+					maxLength={10000}
+				/>
+			</FormSection>
 			<FormSection title={t('ticket.assignment')}>
 				<SelectField
 					id="ticket-device"
@@ -144,25 +191,6 @@ export function TicketAddPage(): JSX.Element {
 					options={employeeOptions()}
 					emptyLabel={t('common.selectPlaceholder')}
 					disabled={tenantId() === null || employees.loading}
-				/>
-			</FormSection>
-			<FormSection title={t('ticket.details')}>
-				<TextField
-					id="ticket-title"
-					label={t('ticket.title')}
-					value={title()}
-					onInput={setTitle}
-					maxLength={200}
-					required
-					autofocus
-				/>
-				<TextAreaField
-					id="ticket-content"
-					label={t('ticket.content')}
-					value={content()}
-					onInput={setContent}
-					rows={8}
-					maxLength={10000}
 				/>
 			</FormSection>
 		</FormPage>

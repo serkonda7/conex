@@ -2307,12 +2307,14 @@ export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
 /**
  * New ticket in the external system for a linked tenant (company), optionally
  * attached to one of its linked devices and reported by one of its linked
- * employees.
+ * employees. The priority is set as the external tag of the same name
+ * (TANSS); the form preselects the lowest one.
  */
 export const TicketCreateSchema = v.strictObject({
 	tenant_id: IdSchema,
 	device_id: v.optional(IdSchema, undefined),
 	employee_id: v.optional(IdSchema, undefined),
+	priority_id: v.optional(IdSchema, undefined),
 	title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
 	content: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(10000)), ''),
 })
@@ -2488,6 +2490,7 @@ export const FINDING_KINDS = [
 	'employee_suggestion',
 	'employee_stale',
 	'employee_mismatch',
+	'priority_tag_missing',
 ] as const
 
 export type FindingKind = (typeof FINDING_KINDS)[number]
@@ -2505,13 +2508,17 @@ export interface IntegrationFinding {
 	external_id: string | null
 	external_name: string | null
 	external_tenant_id: string | null
-	/** `tenant`/`status` only on `device_mismatch` and `employee_mismatch`. */
+	/**
+	 * `tenant`/`status` only on `device_mismatch` and `employee_mismatch`;
+	 * `priority` on `priority_tag_missing` (priority label in `local`).
+	 */
 	field:
 		| DeviceCompareField
 		| EmployeeCompareField
 		| 'customer_number'
 		| 'tenant'
 		| 'status'
+		| 'priority'
 		| null
 	local: string | null
 	remote: string | null

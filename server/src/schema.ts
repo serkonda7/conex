@@ -860,12 +860,12 @@ export const external_objects = pgTable(
 	'external_objects',
 	{
 		provider: text('provider').notNull(),
-		// `tenant` | `device` | `employee`.
+		// `tenant` | `device` | `employee` | `tag`.
 		object_type: text('object_type').notNull(),
 		external_id: text('external_id').notNull(),
 		external_tenant_id: text('external_tenant_id'),
 		// Normalized record (`ExternalTenantJson` / `ExternalDeviceJson` /
-		// `ExternalEmployeeJson`).
+		// `ExternalEmployeeJson` / `ExternalTag`).
 		data: jsonb('data').notNull(),
 		fetched_at: bigint('fetched_at', { mode: 'number' }).notNull(),
 	},
