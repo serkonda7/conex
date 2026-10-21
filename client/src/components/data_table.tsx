@@ -1,8 +1,9 @@
 /**
  * `DataTable` and `FilterTable` from solid-components with their built-in
- * English labels (column customizer, select-all checkbox, filter tabs and
+ * English labels (column customizer, filter tabs and
  * form) replaced by localized defaults. Pages import them from here instead
- * of the package. `FilterTable` also persists its saved filters globally
+ * of the package. Both enable column resizing by default (opt out with
+ * `resizableColumns={false}`). `FilterTable` also persists its saved filters globally
  * when given a `savedFiltersKey`.
  */
 import {
@@ -29,27 +30,21 @@ export type {
 
 function tableLabels(): Pick<
 	DataTableProps<never>,
-	| 'selectionLabel'
 	| 'columnCustomizerLabel'
 	| 'columnCustomizerTitle'
 	| 'columnCustomizerShowAllLabel'
 	| 'columnCustomizerResetLabel'
-	| 'columnCustomizerMoveUpLabel'
-	| 'columnCustomizerMoveDownLabel'
 > {
 	return {
-		selectionLabel: t('table.selectAllRows'),
 		columnCustomizerLabel: t('table.columns'),
 		columnCustomizerTitle: t('table.shownColumns'),
 		columnCustomizerShowAllLabel: t('table.showAll'),
 		columnCustomizerResetLabel: t('table.reset'),
-		columnCustomizerMoveUpLabel: t('table.moveUp'),
-		columnCustomizerMoveDownLabel: t('table.moveDown'),
 	}
 }
 
 export function DataTable<TRow>(props: DataTableProps<TRow>): JSX.Element {
-	const merged = mergeProps(tableLabels(), props)
+	const merged = mergeProps({ resizableColumns: true }, tableLabels(), props)
 	return <BaseDataTable {...merged} />
 }
 
@@ -63,6 +58,7 @@ export function FilterTable<TRow>(
 	const [local, tableProps] = splitProps(props, ['savedFiltersKey'])
 	const saved = local.savedFiltersKey ? use_saved_filters(local.savedFiltersKey) : undefined
 	const merged = mergeProps(
+		{ resizableColumns: true },
 		tableLabels(),
 		{
 			quickSearchLabel: t('common.quickSearch'),
