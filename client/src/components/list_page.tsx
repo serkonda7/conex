@@ -12,7 +12,7 @@
  */
 
 import type { ComboboxOption } from '@serkonda7/solid-components'
-import { IconCopy, IconDotsVertical, IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconCopy, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { Page, Permission } from 'shared/src/types'
 import {
@@ -44,6 +44,7 @@ import {
 	type FilterTableValues,
 } from './data_table'
 import { Empty, InlineError, Loading } from './feedback'
+import { MoreActionsButton } from './more_actions_button'
 
 /** Search text plus its debounced (trimmed) projection for list queries. */
 export function useDebouncedSearch(delay = 250): {
@@ -628,23 +629,12 @@ function ListRowActions(props: {
 				)}
 			</Show>
 			<Show when={props.has_menu}>
-				<div class="row-menu-wrap">
-					<button
-						type="button"
-						class="icon-btn"
-						aria-label={t('common.moreActionsFor', { name: props.name })}
-						aria-haspopup="menu"
-						aria-expanded={props.menu_open}
-						onClick={props.onToggleMenu}
-						onKeyDown={(e: KeyboardEvent): void => {
-							if (e.key === 'Escape') {
-								props.onCloseMenu()
-							}
-						}}
-					>
-						<IconDotsVertical size={16} />
-					</button>
-				</div>
+				<MoreActionsButton
+					name={props.name}
+					open={props.menu_open}
+					onToggle={props.onToggleMenu}
+					onClose={props.onCloseMenu}
+				/>
 			</Show>
 		</div>
 	)

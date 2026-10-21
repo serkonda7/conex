@@ -5,7 +5,7 @@
  * foreign-key link pattern, the related-object sections, and the
  * confirm-then-delete flow.
  */
-import { IconCopy, IconDotsVertical, IconPencil } from '@tabler/icons-solidjs'
+import { IconCopy, IconPencil } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Resource, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
@@ -16,6 +16,7 @@ import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, Loading } from './feedback'
 import { IconLabel } from './icon_label'
 import { RowMenu, useRowMenu } from './list_page'
+import { MoreActionsButton } from './more_actions_button'
 
 /**
  * Detail page shell: reports the object's name and ancestors to the tab
@@ -82,25 +83,14 @@ export function DetailHeader(props: {
 						)}
 					</Show>
 					<Show when={can('delete') && props.deletable !== false}>
-						<div class="row-menu-wrap">
-							<button
-								type="button"
-								class="icon-btn"
-								aria-label={t('common.moreActionsFor', { name: props.name ?? '' })}
-								aria-haspopup="menu"
-								aria-expanded={openMenu() !== null}
-								onClick={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
-									toggleMenu(e, 'detail', props.name ?? '')
-								}
-								onKeyDown={(e: KeyboardEvent): void => {
-									if (e.key === 'Escape') {
-										closeMenu()
-									}
-								}}
-							>
-								<IconDotsVertical size={16} />
-							</button>
-						</div>
+						<MoreActionsButton
+							name={props.name ?? ''}
+							open={openMenu() !== null}
+							onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+								toggleMenu(e, 'detail', props.name ?? '')
+							}
+							onClose={closeMenu}
+						/>
 					</Show>
 				</div>
 			</Show>

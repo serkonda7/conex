@@ -90,6 +90,15 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 						<RecordLink id={groupId()} record={group} base="/tenant-groups" />
 					</Show>
+					<Show
+						when={
+							(tenant()?.bundles?.length ?? 0) > 0 &&
+							(Boolean(tenant()?.customer_number) ||
+								(groupId() !== null && groupId() !== undefined))
+						}
+					>
+						<span class="page-subtitle">·</span>
+					</Show>
 					<For each={tenant()?.bundles}>
 						{(bundle: TenantBundleJson): JSX.Element => (
 							<span class="badge tenant-bundle">
