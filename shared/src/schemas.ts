@@ -2546,6 +2546,8 @@ export interface ExternalTicketJson {
  */
 export interface TicketListJson {
 	linked: boolean
+	/** Base URL of the external system (no trailing slash); null when not linked. */
+	base_url: string | null
 	fetched_at: number | null
 	tickets: ExternalTicketJson[]
 }

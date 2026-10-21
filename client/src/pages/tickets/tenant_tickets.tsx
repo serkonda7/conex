@@ -10,13 +10,18 @@ import { can } from '../../lib/session'
 import { formatTime } from '../../lib/time'
 import { TICKET_PROVIDER } from './add'
 
+/** Tickets listed before "Show all". */
+const PREVIEW_ROWS = 5
+
 /**
- * Open external tickets of a tenant on its detail page (`tickets.create`).
+ * Card with the open external tickets of a tenant on its detail page
+ * (`tickets.create`); the first few rows until "Show all".
  * The server caches the list for up to 30 minutes, so each page load
  * refreshes it at most that often.
  */
 export function TenantTickets(props: { tenantId: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
+	const [showAll, setShowAll] = createSignal(false)
 	const [list] = createRecord(
 		() => (can('tickets.create') ? props.tenantId : null),
 		(tenant: number) => fetch_tickets(TICKET_PROVIDER, tenant),
@@ -27,7 +32,20 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 		{
 			key: 'id',
 			label: '#',
-			getValue: (ticket: ExternalTicketJson): number => ticket.id,
+			getValue: (ticket: ExternalTicketJson): JSX.Element => {
+				const base = list()?.base_url
+				return base ? (
+					<a
+						href={`${base}/index.php?section=bug&sub=view&bugID=${ticket.id}`}
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						{ticket.id}
+					</a>
+				) : (
+					<span>{ticket.id}</span>
+				)
+			},
 		},
 		{
 			key: 'title',
@@ -49,38 +67,51 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 		},
 	]
 
+	const tickets = (): ExternalTicketJson[] => list()?.tickets ?? []
+	const shown = (): ExternalTicketJson[] =>
+		showAll() ? tickets() : tickets().slice(0, PREVIEW_ROWS)
+
 	return (
 		<Show when={can('tickets.create')}>
-			<h3 id="tenant-tickets">
-				{t('ticket.openTickets')} <span class="badge">{list()?.tickets.length ?? 0}</span>
-			</h3>
-			<Show
-				when={list()?.linked !== false}
-				fallback={
-					<Empty
-						message={t('ticket.notLinked', {
-							provider: providerLabel(TICKET_PROVIDER),
-						})}
+			<section class="card" aria-labelledby="tenant-tickets">
+				<div class="card-header">
+					<h3 id="tenant-tickets">
+						{t('ticket.openTickets')} <span class="badge">{tickets().length}</span>
+					</h3>
+					<Show when={list()?.fetched_at}>
+						{(time: () => number) => (
+							<span class="text-muted">
+								{t('ticket.fetchedAt', { time: formatTime(time()) })}
+							</span>
+						)}
+					</Show>
+				</div>
+				<Show
+					when={list()?.linked !== false}
+					fallback={
+						<Empty
+							message={t('ticket.notLinked', {
+								provider: providerLabel(TICKET_PROVIDER),
+							})}
+						/>
+					}
+				>
+					<DataTable
+						rows={shown}
+						getRowId={(ticket: ExternalTicketJson): number => ticket.id}
+						columns={columns}
+						loading={() => list.loading}
+						loadingContent={<Loading message={t('ticket.loading')} />}
+						emptyContent={<Empty message={t('ticket.noOpenTickets')} />}
 					/>
-				}
-			>
-				<Show when={list()?.fetched_at}>
-					{(time: () => number) => (
-						<p class="text-muted">
-							{t('ticket.fetchedAt', { time: formatTime(time()) })}
-						</p>
-					)}
+					<Show when={!showAll() && tickets().length > PREVIEW_ROWS}>
+						<button type="button" class="link-btn" onClick={() => setShowAll(true)}>
+							{t('common.showAll', { count: tickets().length })}
+						</button>
+					</Show>
 				</Show>
-				<DataTable
-					rows={() => list()?.tickets ?? []}
-					getRowId={(ticket: ExternalTicketJson): number => ticket.id}
-					columns={columns}
-					loading={() => list.loading}
-					loadingContent={<Loading message={t('ticket.loading')} />}
-					emptyContent={<Empty message={t('ticket.noOpenTickets')} />}
-				/>
-			</Show>
-			<InlineError message={error()} />
+				<InlineError message={error()} />
+			</section>
 		</Show>
 	)
 }

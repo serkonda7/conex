@@ -135,6 +135,90 @@ test('employee detail layout', async ({ page }) => {
 	await expect(page.locator('main.app-content')).toHaveScreenshot('employee-detail.png')
 })
 
+// Ticket times are formatted in the browser's zone: pin it for stable baselines.
+test.describe('tenant detail', () => {
+	test.use({ timezoneId: 'UTC' })
+
+	test('tenant detail layout', async ({ page }) => {
+		const response = await page.request.get('/api/tenants?search=E2E%20Tenant&limit=200')
+		expect(response.ok()).toBeTruthy()
+		const list = (await response.json()) as { items: { id: number; name: string }[] }
+		const tenantId = list.items.find((tenant) => tenant.name === 'E2E Tenant')?.id
+		expect(tenantId).toBeDefined()
+
+		// No integration is seeded: mock one with findings so "Needs attention" renders.
+		await page.route('**/api/integrations', async (route) => {
+			if (route.request().method() !== 'GET') {
+				return route.fallback()
+			}
+			await route.fulfill({
+				json: [
+					{
+						id: 1,
+						provider: 'tanss',
+						base_url: 'https://tanss.example.com',
+						username: 'e2e',
+						has_password: true,
+						has_erp_token: false,
+						enabled: true,
+						created_at: 0,
+						updated_at: 0,
+						last_login_ok_at: null,
+						last_error: null,
+						last_sync: null,
+					},
+				],
+			})
+		})
+		await page.route('**/api/integrations/tanss/tenant-status/*', async (route) => {
+			await route.fulfill({
+				json: {
+					link: null,
+					external: null,
+					finding_counts: { device_missing_in_conex: 3, device_mismatch: 2 },
+				},
+			})
+		})
+
+		await page.route('**/api/integrations/tanss/tickets?*', async (route) => {
+			await route.fulfill({
+				json: {
+					linked: true,
+					base_url: 'https://tanss.example.com',
+					fetched_at: 1_767_268_800,
+					tickets: [
+						{
+							id: 1001,
+							title: 'Printer offline',
+							status: 'Open',
+							created_at: 1_767_182_400,
+							modified_at: 1_767_225_600,
+						},
+						{
+							id: 1002,
+							title: 'VPN connection drops',
+							status: 'In progress',
+							created_at: 1_767_096_000,
+							modified_at: 1_767_139_200,
+						},
+					],
+				},
+			})
+		})
+
+		await page.goto(`/tenants/${tenantId}`)
+		await expect(page.locator('main.app-content h2')).toContainText('E2E Tenant')
+		await expect(page.locator('.tenant-rows .tenant-tag')).toHaveCount(2)
+		await expect(page.getByRole('link', { name: '1001' })).toBeVisible()
+		await expect(page.locator('main.app-content .skeleton')).toHaveCount(0)
+		await stabilizeForSnapshot(page)
+		await expect(page.locator('main.app-content')).toHaveScreenshot('tenant-detail.png', {
+			// Recent changes show relative times.
+			mask: [page.locator('.tenant-changes')],
+		})
+	})
+})
+
 test('employee edit form layout', async ({ page }) => {
 	const employeeId = await visualEmployeeId(page)
 	await page.goto(`/employees/${employeeId}/edit`)
