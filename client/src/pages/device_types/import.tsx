@@ -10,6 +10,7 @@ import { Empty, InlineError } from '../../components/feedback'
 import { Field, TextField } from '../../components/form'
 import { t } from '../../i18n'
 import { navigate } from '../../lib/router'
+import { buildAiPrompt } from './ai-prompt'
 
 const SAMPLE_YAML = `manufacturer: Acme
 model: Example Switch 48
@@ -62,7 +63,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 		resetPromptFeedback()
 		setCopyingPrompt(true)
 		const res = await Result.tryPromise({
-			try: () => navigator.clipboard.writeText(t('import.aiPrompt', { manufacturer, model })),
+			try: () => navigator.clipboard.writeText(buildAiPrompt(manufacturer, model)),
 			catch: () => new Error(t('import.promptCopyFailed')),
 		})
 		setCopyingPrompt(false)
