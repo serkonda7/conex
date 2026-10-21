@@ -1257,7 +1257,7 @@ tbody tr:last-child td {
 	gap: 0.25rem;
 }
 
-.duration-input input {
+.app-content .form-stacked .duration-input input {
 	width: 6rem;
 }
 
@@ -1508,7 +1508,7 @@ tbody tr:last-child td {
 	min-width: 0;
 }
 
-.vm-host-row button {
+.app-content .form-stacked .field .vm-host-row button {
 	flex: 0 0 auto;
 	white-space: nowrap;
 }

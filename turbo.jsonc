@@ -14,10 +14,7 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": [
-        "CONEX_CONFIG_PATH",
-        "CONEX_DATABASE_URL"
-      ]
+      "env": ["CONEX_CONFIG_PATH", "CONEX_DATABASE_URL"]
     },
     "build": {
       "outputs": ["dist/**"]
