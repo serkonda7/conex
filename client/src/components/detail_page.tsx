@@ -5,7 +5,7 @@
  * foreign-key link pattern, the related-object sections, and the
  * confirm-then-delete flow.
  */
-import { IconCopy, IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconCopy, IconDotsVertical, IconPencil } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { type JSX, type Resource, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
@@ -15,6 +15,7 @@ import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, Loading } from './feedback'
 import { IconLabel } from './icon_label'
+import { RowMenu, useRowMenu } from './list_page'
 
 /**
  * Detail page shell: reports the object's name and ancestors to the tab
@@ -58,8 +59,9 @@ export function DetailHeader(props: {
 	/** Leading buttons before Edit; the caller gates them on permissions. */
 	actions?: JSX.Element
 }): JSX.Element {
+	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 	return (
-		<div class="page-header">
+		<div class="page-header detail-header">
 			<h2 data-testid={props.testId}>
 				{props.name}
 				<Show when={props.extra}> {props.extra}</Show>
@@ -80,12 +82,36 @@ export function DetailHeader(props: {
 						)}
 					</Show>
 					<Show when={can('delete') && props.deletable !== false}>
-						<button type="button" class="btn-danger" onClick={props.onDelete}>
-							<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
-						</button>
+						<div class="row-menu-wrap">
+							<button
+								type="button"
+								class="icon-btn"
+								aria-label={t('common.moreActionsFor', { name: props.name ?? '' })}
+								aria-haspopup="menu"
+								aria-expanded={openMenu() !== null}
+								onClick={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+									toggleMenu(e, 'detail', props.name ?? '')
+								}
+								onKeyDown={(e: KeyboardEvent): void => {
+									if (e.key === 'Escape') {
+										closeMenu()
+									}
+								}}
+							>
+								<IconDotsVertical size={16} />
+							</button>
+						</div>
 					</Show>
 				</div>
 			</Show>
+			<RowMenu
+				menu={openMenu}
+				onClose={closeMenu}
+				cloneHref={() => undefined}
+				actions={() => []}
+				deletable={() => true}
+				onDelete={props.onDelete}
+			/>
 		</div>
 	)
 }

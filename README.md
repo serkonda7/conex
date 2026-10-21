@@ -80,6 +80,7 @@ User docs in `docs/` are published using [mdBook](https://rust-lang.github.io/md
 bun run docs:dev
 bun run docs:build
 ```
+`docs:dev` serves the book on <http://localhost:4000> (the API keeps port 3000).
 
 
 ## Git Worktrees

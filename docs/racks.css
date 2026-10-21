@@ -1,0 +1,7 @@
+/* Racks: the gallery layout lives inline in src/racks.md so that the page also
+   renders correctly in editors without the mdbook theme.
+   Here the page only gets the full width of the content area instead of the
+   default 750px column. */
+body:has(.rack-gallery) .content main {
+	max-width: none;
+}

@@ -256,7 +256,6 @@ export const TenantCreateSchema = v.strictObject({
 	emails: v.optional(TenantEmailsSchema, []),
 	phones: v.optional(TenantPhonesSchema, []),
 	bundles: v.optional(TenantBundlesSchema, []),
-	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
 
@@ -272,7 +271,6 @@ export const TenantUpdateSchema = v.strictObject({
 	phones: v.optional(TenantPhonesSchema, undefined),
 	/** Replaces the stored contracts when present. */
 	bundles: v.optional(TenantBundlesSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
@@ -481,7 +479,7 @@ export const TenantListQuerySchema = v.object({
 	...ListQueryEntries,
 	/** Only tenants of this tenant group. */
 	group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'customer_number', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'customer_number']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 

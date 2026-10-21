@@ -18,7 +18,6 @@ import {
 	DetailCard,
 	DetailHeader,
 	DetailShell,
-	DetailSubtitle,
 	RecordLink,
 	RelatedSection,
 	useDetailDelete,
@@ -33,9 +32,9 @@ import { rackHeightColumn } from '../racks/columns'
 import { TenantTickets } from '../tickets/tenant_tickets'
 
 /**
- * /tenants/:id — tenant detail: header with description, the details card
- * beside the integration cards, the open tickets and the
- * related employees/sites/site groups (if any)/racks/devices tables.
+ * /tenants/:id — tenant detail: the details card beside the integration
+ * cards, the open tickets and the related employees/sites/site groups
+ * (if any)/racks/devices tables.
  */
 export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -68,7 +67,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	})
 
 	return (
-		<div>
+		<div class="tenant-detail">
 			<DetailShell
 				name={tenant()?.name}
 				record={tenant}
@@ -80,42 +79,29 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/tenants/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>
-				<DetailSubtitle description={tenant()?.description} />
+
+				<div class="tenant-subheading">
+					<Show when={tenant()?.customer_number}>
+						<span class="page-subtitle">#{tenant()?.customer_number}</span>
+					</Show>
+					<Show when={groupId() !== null && groupId() !== undefined}>
+						<Show when={tenant()?.customer_number}>
+							<span class="page-subtitle">·</span>
+						</Show>
+						<RecordLink id={groupId()} record={group} base="/tenant-groups" />
+					</Show>
+					<For each={tenant()?.bundles}>
+						{(bundle: TenantBundleJson): JSX.Element => (
+							<span class="badge tenant-bundle">
+								{bundle.managed_bundle_name} · {bundle.service_level_name}
+							</span>
+						)}
+					</For>
+				</div>
 
 				<div class="detail-columns">
 					<div>
 						<DetailCard label={t('tenant.details')}>
-							<dt>{tp('entity.tenantGroup', 1)}</dt>
-							<dd>
-								<RecordLink id={groupId()} record={group} base="/tenant-groups" />
-							</dd>
-							<dt>{t('tenant.bundles')}</dt>
-							<dd>
-								<Show
-									when={(tenant()?.bundles.length ?? 0) > 0}
-									fallback={t('tenant.noBundles')}
-								>
-									<For each={tenant()?.bundles}>
-										{(bundle: TenantBundleJson): JSX.Element => (
-											<div>
-												<a
-													href={`/managed-bundles/${bundle.managed_bundle_id}`}
-												>
-													{bundle.managed_bundle_name}
-												</a>
-												{': '}
-												<a
-													href={`/service-levels/${bundle.service_level_id}`}
-												>
-													{bundle.service_level_name}
-												</a>
-											</div>
-										)}
-									</For>
-								</Show>
-							</dd>
-							<dt>{t('tenant.customerNumber')}</dt>
-							<dd>{tenant()?.customer_number || '—'}</dd>
 							<dt>{t('tenant.website')}</dt>
 							<dd>
 								<Show when={tenant()?.website} fallback="—">

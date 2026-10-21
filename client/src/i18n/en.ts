@@ -279,7 +279,6 @@ export const en = {
 	'tenant.noRacks': 'No racks for this tenant yet.',
 	'tenant.bundles': 'Managed bundles',
 	'tenant.bundleNotContracted': 'Not contracted',
-	'tenant.noBundles': 'No managed bundles contracted.',
 	'tenant.noBundleCatalog': 'Define managed bundles first to contract them.',
 	'tenant.noDevices': 'No devices for this tenant yet.',
 	'tenant.noEmployees': 'No employees for this tenant yet.',

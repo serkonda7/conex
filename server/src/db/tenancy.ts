@@ -84,7 +84,7 @@ export type LocationRow = typeof locations.$inferSelect
 export interface TenantListParams extends ListParams {
 	/** Only tenants of this tenant group. */
 	group?: number
-	sort: 'name' | 'customer_number' | 'description'
+	sort: 'name' | 'customer_number'
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to this
@@ -266,7 +266,6 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 		searchCondition(params.search, [
 			tenants.name,
 			tenants.customer_number,
-			tenants.description,
 			tenants.website,
 			sql`jsonb_path_query_array(${tenants.emails}, '$[*].address')::text`,
 			sql`jsonb_path_query_array(${tenants.phones}, '$[*].number')::text`,
@@ -274,12 +273,7 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 		params.group !== undefined ? eq(tenants.tenant_group_id, params.group) : undefined,
 		params.scopeTenantId !== undefined ? eq(tenants.id, params.scopeTenantId) : undefined,
 	)
-	const orderColumn =
-		params.sort === 'customer_number'
-			? tenants.customer_number
-			: params.sort === 'description'
-				? tenants.description
-				: tenants.name
+	const orderColumn = params.sort === 'customer_number' ? tenants.customer_number : tenants.name
 	const page = await pageRows(
 		tenants,
 		where,
@@ -433,7 +427,6 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantDe
 		website: input.website ?? null,
 		emails: input.emails,
 		phones: input.phones,
-		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
 	const id = await tryWrite(
@@ -472,7 +465,6 @@ export async function updateTenant(
 		'website',
 		'emails',
 		'phones',
-		'description',
 		'comments',
 	])
 	const bundles = input.bundles

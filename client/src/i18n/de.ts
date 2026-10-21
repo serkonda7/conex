@@ -280,7 +280,6 @@ export const de: Messages = {
 	'tenant.noRacks': 'Für diesen Mandanten sind noch keine Racks vorhanden.',
 	'tenant.bundles': 'Managed-Pakete',
 	'tenant.bundleNotContracted': 'Nicht vereinbart',
-	'tenant.noBundles': 'Keine Managed-Pakete vereinbart.',
 	'tenant.noBundleCatalog': 'Zuerst Managed-Pakete anlegen, um sie zu vereinbaren.',
 	'tenant.noDevices': 'Für diesen Mandanten sind noch keine Geräte vorhanden.',
 	'tenant.noEmployees': 'Für diesen Mandanten sind noch keine Mitarbeiter vorhanden.',

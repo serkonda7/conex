@@ -288,6 +288,13 @@
       "when": 1792586546643,
       "tag": "0040_device_site_from_rack",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792589891474,
+      "tag": "0041_remove_tenant_description",
+      "breakpoints": true
     }
   ]
 }

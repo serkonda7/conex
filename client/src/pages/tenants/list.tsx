@@ -6,7 +6,7 @@ import {
 	type TenantSort,
 	type TenantWithCounts,
 } from '../../api/tenancy'
-import { type DataTableColumn, descriptionColumn, nameColumn } from '../../components/data_table'
+import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
@@ -51,7 +51,6 @@ export function TenantsPage(): JSX.Element {
 			sortable: true,
 			getValue: (row: TenantWithCounts): string => row.customer_number ?? '—',
 		},
-		descriptionColumn({ sortable: true }),
 		{
 			key: 'group',
 			label: tp('entity.tenantGroup', 1),

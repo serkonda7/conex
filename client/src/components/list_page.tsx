@@ -651,7 +651,7 @@ function ListRowActions(props: {
 }
 
 /** Portal row menu with the Clone, extra action and Delete items a row offers. */
-function RowMenu(props: {
+export function RowMenu(props: {
 	menu: Accessor<RowMenuAnchor | null>
 	onClose: () => void
 	/** Clone target of the menu's row; undefined hides "Clone". */
