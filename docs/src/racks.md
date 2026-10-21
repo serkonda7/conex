@@ -2,10 +2,25 @@
 ## Racktypen
 ### Bauform
 
-| Bauform           | Abbildung                                                                     |
-| ----------------- | ----------------------------------------------------------------------------- |
-| 2-Pfosten-Gestell | <img src="./img/rack-2-post-frame.png" alt="2-Pfosten-Gestell" width="200">   |
-| 4-Pfosten-Gestell | <img src="./img/rack-4-post-frame.png" alt="4-Pfosten-Gestell" width="200">   |
-| 4-Pfosten-Schrank | <img src="./img/rack-4-post-cabinet.png" alt="4-Pfosten-Schrank" width="200"> |
-| Wandschrank       | <img src="./img/rack-wall-mounted-cabinet.png" alt="Wandschrank" width="200"> |
-| Wandgestell       | <img src="./img/rack-wall-mounted-frame.png" alt="Wandgestell" width="200">   |
+<div class="rack-gallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 1.25rem; margin: 1.5rem 0;">
+  <figure style="margin: 0; text-align: center;">
+    <img src="./img/rack-2-post-frame.png" alt="2-Pfosten-Gestell" width="240" style="width: 100%; height: 240px; object-fit: contain; box-sizing: border-box; padding: 0.5rem; background: #fff; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 4px;" />
+    <figcaption style="font-weight: 700; margin-top: 0.5rem;">2-Pfosten-Gestell</figcaption>
+  </figure>
+  <figure style="margin: 0; text-align: center;">
+    <img src="./img/rack-4-post-frame.png" alt="4-Pfosten-Gestell" width="240" style="width: 100%; height: 240px; object-fit: contain; box-sizing: border-box; padding: 0.5rem; background: #fff; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 4px;" />
+    <figcaption style="font-weight: 700; margin-top: 0.5rem;">4-Pfosten-Gestell</figcaption>
+  </figure>
+  <figure style="margin: 0; text-align: center;">
+    <img src="./img/rack-4-post-cabinet.png" alt="4-Pfosten-Schrank" width="240" style="width: 100%; height: 240px; object-fit: contain; box-sizing: border-box; padding: 0.5rem; background: #fff; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 4px;" />
+    <figcaption style="font-weight: 700; margin-top: 0.5rem;">4-Pfosten-Schrank</figcaption>
+  </figure>
+  <figure style="margin: 0; text-align: center;">
+    <img src="./img/rack-wall-mounted-cabinet.png" alt="Wandschrank" width="240" style="width: 100%; height: 240px; object-fit: contain; box-sizing: border-box; padding: 0.5rem; background: #fff; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 4px;" />
+    <figcaption style="font-weight: 700; margin-top: 0.5rem;">Wandschrank</figcaption>
+  </figure>
+  <figure style="margin: 0; text-align: center;">
+    <img src="./img/rack-wall-mounted-frame.png" alt="Wandgestell" width="240" style="width: 100%; height: 240px; object-fit: contain; box-sizing: border-box; padding: 0.5rem; background: #fff; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 4px;" />
+    <figcaption style="font-weight: 700; margin-top: 0.5rem;">Wandgestell</figcaption>
+  </figure>
+</div>

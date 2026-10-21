@@ -164,7 +164,6 @@ export const tenants = pgTable(
 		// employee addresses) and phone numbers, in display order.
 		emails: jsonb('emails').$type<TenantEmail[]>().notNull().default(sql`'[]'::jsonb`),
 		phones: jsonb('phones').$type<TenantPhone[]>().notNull().default(sql`'[]'::jsonb`),
-		description: text('description'),
 		comments: text('comments'),
 	},
 	(table) => [

@@ -4,20 +4,27 @@ import { createResource, createSignal, type JSX } from 'solid-js'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListRangeStatus, useDebouncedSearch, useListFilters } from '../../components/list_page'
+import {
+	ListRangeStatus,
+	useDebouncedSearch,
+	useListFilters,
+	useQueryFilter,
+} from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { changeActionOptions, changeObjectLabel, changeObjectOptions } from '../../i18n/labels'
+import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
 import { ChangeActionBadge, ChangedObjectLink, changeUser } from './common'
 
 /**
  * /changelog — NetBox-style history of inventory changes (newest first),
- * narrowed by the tenant context. Searchable by object name or user and
+ * narrowed by the tenant context (or `?tenant=<id>`). Searchable by object name or user and
  * filterable by action and object type; each entry links to its diff.
  */
 export function ChangelogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
+	const [filterTenant] = useQueryFilter('tenant')
 	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
 	const [action, setAction] = createSignal<ChangeAction[]>([])
 	const [objectType, setObjectType] = createSignal<ChangeObjectType[]>([])
@@ -51,7 +58,7 @@ export function ChangelogPage(): JSX.Element {
 			search: debouncedSearch(),
 			action: action(),
 			objectType: objectType(),
-			context: tenantContextFilters(),
+			context: tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		async (q) => {
 			setError(null)
@@ -102,7 +109,7 @@ export function ChangelogPage(): JSX.Element {
 	const emptyText = (): string =>
 		debouncedSearch()
 			? t('list.noMatch', { noun: tp('noun.change', 2), search: debouncedSearch() })
-			: action() || objectType() || tenantContext().kind !== 'all'
+			: action() || objectType() || filterTenant() !== '' || tenantContext().kind !== 'all'
 				? t('list.noMatchFilters', { noun: tp('noun.change', 2) })
 				: t('changelog.empty')
 

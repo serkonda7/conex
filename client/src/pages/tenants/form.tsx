@@ -24,7 +24,6 @@ import {
 } from '../../components/contacts'
 import {
 	CommentsField,
-	DescriptionField,
 	FormPage,
 	FormSection,
 	Hint,
@@ -64,7 +63,6 @@ function TenantForm(props: { id?: number }): JSX.Element {
 	const [phones, setPhones] = createSignal<PhoneRow<TenantPhone>[]>([blankPhone()])
 	// Service level id per contracted bundle id; uncontracted bundles are absent.
 	const [contracts, setContracts] = createSignal<Record<number, string>>({})
-	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
@@ -81,7 +79,6 @@ function TenantForm(props: { id?: number }): JSX.Element {
 					row.bundles.map((b) => [b.managed_bundle_id, id_value(b.service_level_id)]),
 				),
 			)
-			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
 	})
@@ -105,7 +102,6 @@ function TenantForm(props: { id?: number }): JSX.Element {
 				? []
 				: [{ managed_bundle_id: Number(bundle), service_level_id: serviceLevelId }]
 		}),
-		description: text(description()),
 		comments: text(comments()),
 	})
 
@@ -230,11 +226,6 @@ function TenantForm(props: { id?: number }): JSX.Element {
 					)}
 				</For>
 			</FormSection>
-			<DescriptionField
-				id={`${prefix}-description`}
-				value={description()}
-				onInput={setDescription}
-			/>
 			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>
 	)

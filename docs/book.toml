@@ -12,4 +12,4 @@ optional = true
 [output.html]
 site-url = "/conex/"
 git-repository-url = "https://github.com/serkonda7/conex"
-additional-css = ["last-changed.css"]
+additional-css = ["last-changed.css", "racks.css"]

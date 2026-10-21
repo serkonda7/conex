@@ -15,7 +15,7 @@
     "check": "turbo run check",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "docs:dev": "mdbook serve docs --open",
+    "docs:dev": "mdbook serve docs --open --port 4000",
     "docs:build": "mdbook build docs",
     "db:generate": "bun run --cwd server db:generate",
     "db:seed:demo": "bun scripts/seed-demo.ts",

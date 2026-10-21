@@ -27,6 +27,7 @@
 	--error: #ffa48d;
 	--error-bg: rgba(225, 71, 71, 0.16);
 	--success: #5be584;
+	--warning: #f5d76e;
 	--muted-dot: #666666;
 	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 	--font-size-sm: 0.75rem;
@@ -106,6 +107,16 @@ a {
 
 a:hover {
 	text-decoration: underline;
+}
+
+a[target="_blank"]::after,
+a[href^="http://"]::after,
+a[href^="https://"]::after {
+	content: "\2197";
+	display: inline-block;
+	margin-left: 0.15em;
+	font-size: 0.85em;
+	text-decoration: none;
 }
 
 code {
@@ -782,12 +793,188 @@ tbody tr:last-child td {
 	font-size: var(--font-size-base);
 }
 
+.tenant-subheading {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.6rem;
+	margin: 0.25rem 0 0.6rem;
+}
+
+.tenant-subheading .page-subtitle {
+	margin: 0;
+}
+
+.app-content .detail-header {
+	border-bottom: none;
+	padding-bottom: 0;
+	border-top: 1px solid var(--border);
+	padding-top: 0.6rem;
+}
+
+.tenant-bundle {
+	border-radius: 999px;
+	padding: 0.15rem 0.6rem;
+}
+
 .card {
 	background-color: var(--bg-surface);
 	border: 1px solid var(--border);
 	border-radius: 0.35rem;
 	padding: 0.7rem 0.8rem;
 	margin: 0.6rem 0;
+}
+
+/* Card title row: heading left, links/status right. */
+.card-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+
+.card-header h3 {
+	margin: 0;
+}
+
+/* Related-object tabs of a detail page: underlined tab buttons with counts,
+   a preview table and a "View all" link. */
+.related-tabs-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+	margin-bottom: 0.4rem;
+	border-bottom: 1px solid var(--border);
+}
+
+.related-tabs-bar button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-bottom: -1px;
+	padding: 0.4rem 0.6rem;
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	font: inherit;
+}
+
+.related-tabs-bar button:hover {
+	background: transparent;
+	color: var(--text);
+}
+
+.related-tabs-bar button[aria-selected="true"] {
+	color: var(--text);
+	border-bottom-color: var(--primary);
+}
+
+.related-tabs-all {
+	display: inline-block;
+	margin-top: 0.4rem;
+}
+
+/* Tenant dashboard: main column left, details/integrations/changes right. */
+.tenant-dashboard {
+	display: grid;
+	grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+	gap: 0 1rem;
+	align-items: start;
+}
+
+@media (max-width: 1100px) {
+	.tenant-dashboard {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.tenant-facts dt {
+	text-transform: none;
+	letter-spacing: normal;
+	font-size: var(--font-size-base);
+	font-weight: 400;
+}
+
+.tenant-comments {
+	margin-top: 0.5rem;
+}
+
+.tenant-comments summary {
+	cursor: pointer;
+	color: var(--text-secondary);
+}
+
+.tenant-comments .markdown {
+	margin-top: 0.4rem;
+}
+
+/* "Needs attention" and "Recent changes" rows: tag/time, text, action. */
+.tenant-rows {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.tenant-rows li {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	padding: 0.35rem 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.tenant-rows li:last-child {
+	border-bottom: none;
+}
+
+.tenant-row-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.tenant-changes li > a:first-child {
+	flex: 0 0 5.5rem;
+	white-space: nowrap;
+}
+
+.tenant-tag {
+	padding: 0 0.35rem;
+	border-radius: 0.2rem;
+	font-size: var(--font-size-sm);
+	font-weight: 700;
+	text-transform: uppercase;
+	color: var(--warning);
+	background-color: color-mix(in srgb, var(--warning) 15%, transparent);
+}
+
+.tenant-site-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+	gap: 0.5rem;
+}
+
+.tenant-site {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	padding: 0.5rem 0.6rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+}
+
+.tenant-site-name {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.tenant-site-links {
+	display: flex;
+	gap: 0.75rem;
 }
 
 .toolbar {
@@ -2338,6 +2525,12 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .section-header h3 {
 	margin: 0;
+}
+
+/* Related section inside a card (tenant dashboard): laid out like a card header. */
+.card > .section-header {
+	justify-content: space-between;
+	margin: 0 0 0.5rem;
 }
 
 /* Detail page: details card with the images section beside it; stacks when narrow. */

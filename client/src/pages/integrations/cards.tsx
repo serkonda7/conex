@@ -1,10 +1,10 @@
 /**
- * Integration cards on the tenant, device and employee detail pages: one
- * card per configured provider with the linked external object and
- * (tenants) finding counts and a report link or (devices, employees)
- * link/unlink actions and a field comparison.
+ * Integration cards on the device and employee detail pages: one card per
+ * configured provider with the linked external object, link/unlink actions
+ * and a field comparison. Also the tenant integration status behind the
+ * tenant page's "Needs attention" list.
  */
-import type { Result } from 'better-result'
+import { Result } from 'better-result'
 import type {
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
@@ -12,9 +12,10 @@ import type {
 	ExternalTenantJson,
 	FieldComparison,
 	FindingKind,
+	TenantIntegrationStatus,
 } from 'shared/src/schemas'
-import type { JSX } from 'solid-js'
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import type { JSX, Resource } from 'solid-js'
+import { createResource, createSignal, For, Show } from 'solid-js'
 import {
 	fetch_device_integration,
 	fetch_employee_integration,
@@ -27,12 +28,7 @@ import {
 import { Empty, InlineError } from '../../components/feedback'
 import { SelectField } from '../../components/form'
 import { t } from '../../i18n'
-import {
-	compareFieldLabel,
-	compareValueLabel,
-	findingKindLabel,
-	providerLabel,
-} from '../../i18n/labels'
+import { compareFieldLabel, compareValueLabel, providerLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { can } from '../../lib/session'
 
@@ -45,86 +41,42 @@ function useIntegrations(): () => IntegrationJson[] {
 	return () => (integrations() ?? []).filter((i) => i.enabled)
 }
 
-function TenantCard(props: { integration: IntegrationJson; tenantId: number }): JSX.Element {
-	const provider = (): IntegrationJson['provider'] => props.integration.provider
-	const [error, setError] = createSignal<string | null>(null)
-	const [status] = createRecord(
-		() => props.tenantId,
-		(id: number) => fetch_tenant_integration(provider(), id),
-		setError,
-	)
-	const findingCounts = createMemo(
-		() => Object.entries(status()?.finding_counts ?? {}) as [FindingKind, number][],
-	)
-
-	const reportHref = (): string =>
-		`/integrations/${props.integration.id}?tenant=${props.tenantId}`
-
-	return (
-		<section class="card" aria-label={providerLabel(provider())}>
-			<div class="page-header">
-				<h3>{providerLabel(provider())}</h3>
-				<a href={reportHref()}>{t('integration.openReport')}</a>
-			</div>
-			<dl class="detail-grid">
-				<dt>{t('integration.company')}</dt>
-				<dd>
-					<Show
-						when={status()?.link}
-						fallback={<span class="text-danger">{t('integration.notLinked')}</span>}
-					>
-						<Show
-							when={status()?.external}
-							fallback={
-								<span class="text-danger">
-									{t('integration.staleCompany', {
-										id: status()?.link?.external_id ?? '',
-									})}
-								</span>
-							}
-						>
-							{status()?.external?.name}
-							<Show when={status()?.external?.display_id}>
-								{' '}
-								<small>({status()?.external?.display_id})</small>
-							</Show>
-							<Show when={status()?.external?.active === false}>
-								{' '}
-								<span class="badge badge-decommissioned">
-									{t('integration.inactive')}
-								</span>
-							</Show>
-						</Show>
-					</Show>
-				</dd>
-				<dt>{t('integration.findings')}</dt>
-				<dd>
-					<Show when={findingCounts().length > 0} fallback={t('integration.noFindings')}>
-						<For each={findingCounts()}>
-							{([kind, count]: [FindingKind, number]): JSX.Element => (
-								<span class="badge">
-									{findingKindLabel(kind)}: {count}
-								</span>
-							)}
-						</For>
-					</Show>
-				</dd>
-			</dl>
-			<InlineError message={error()} />
-		</section>
-	)
+/** Integration status of a tenant, loaded once per configured provider. */
+export interface TenantIntegration {
+	integration: IntegrationJson
+	status: TenantIntegrationStatus | null
+	error: string | null
 }
 
-/** Integration cards for `/tenants/:id`. */
-export function TenantIntegrationCards(props: { tenantId: number }): JSX.Element {
+/**
+ * Status of every enabled integration for the tenant, for the tenant
+ * page's "Needs attention" list.
+ */
+export function useTenantIntegrations(tenantId: () => number): Resource<TenantIntegration[]> {
 	const integrations = useIntegrations()
-	return (
-		<For each={integrations()}>
-			{(integration: IntegrationJson): JSX.Element => (
-				<TenantCard integration={integration} tenantId={props.tenantId} />
-			)}
-		</For>
+	const [statuses] = createResource(
+		() => ({ tenant: tenantId(), list: integrations() }),
+		async (q): Promise<TenantIntegration[]> =>
+			Promise.all(
+				q.list.map(async (integration: IntegrationJson): Promise<TenantIntegration> => {
+					const res = await fetch_tenant_integration(integration.provider, q.tenant)
+					return Result.isError(res)
+						? { integration, status: null, error: res.error.message }
+						: { integration, status: res.value, error: null }
+				}),
+			),
 	)
+	return statuses
+}
+
+/** Integration report of the provider, narrowed to the tenant (and a finding kind). */
+export function tenantReportHref(
+	integration: IntegrationJson,
+	tenantId: number,
+	kind?: FindingKind,
+): string {
+	const base = `/integrations/${integration.id}?tenant=${tenantId}`
+	return kind === undefined ? base : `${base}&kind=${kind}`
 }
 
 function deviceLabel(d: ExternalDeviceJson): string {

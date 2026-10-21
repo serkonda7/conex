@@ -115,14 +115,22 @@ export async function listTickets(
 	}
 	const company = await linkOf(provider, 'tenant', tenant.id)
 	if (!company) {
-		return Result.ok({ linked: false, fetched_at: null, tickets: [] })
+		return Result.ok({ linked: false, base_url: null, fetched_at: null, tickets: [] })
 	}
+	const row = await getIntegrationRow(provider)
+	if (Result.isError(row)) {
+		return row
+	}
+	const base_url = row.value.base_url.replace(/\/+$/, '')
 	const key = `${provider}:${company.external_id}`
 	const cached = ticketCache.get(key)
 	if (cached && nowSeconds() - cached.fetched_at < TICKET_CACHE_SECONDS) {
-		return Result.ok({ linked: true, ...cached })
+		return Result.ok({ linked: true, base_url, ...cached })
 	}
-	const built = await enabledProvider(provider)
+	if (!row.value.enabled) {
+		return Result.err(new ValidationError('Integration is disabled'))
+	}
+	const built = providerFor(row.value)
 	if (Result.isError(built)) {
 		return built
 	}
@@ -141,5 +149,5 @@ export async function listTickets(
 		),
 	}
 	ticketCache.set(key, entry)
-	return Result.ok({ linked: true, ...entry })
+	return Result.ok({ linked: true, base_url, ...entry })
 }

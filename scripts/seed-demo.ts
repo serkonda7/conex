@@ -68,7 +68,6 @@ const dentist: typeof tenants.$inferSelect = await one(
 		.insert(tenants)
 		.values({
 			name: 'Bright Smile Dental',
-			description: 'Small dental practice.',
 		})
 		.returning(),
 )

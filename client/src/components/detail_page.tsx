@@ -2,12 +2,12 @@
  * Shared building blocks for the entity detail pages (tenant, site,
  * location, …): the tab title and breadcrumb report, the loading/empty
  * gate, the header with edit/delete actions, the detail card grid, the
- * foreign-key link pattern, the related-object sections, and the
+ * foreign-key link pattern, the related-object sections and tabs, and the
  * confirm-then-delete flow.
  */
-import { IconCopy, IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconCopy, IconPencil } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { type JSX, type Resource, type Setter, Show } from 'solid-js'
+import { createSignal, For, type JSX, type Resource, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
 import { type Crumb, forgetDeleted, navigate, usePageMeta } from '../lib/router'
@@ -15,6 +15,8 @@ import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, Loading } from './feedback'
 import { IconLabel } from './icon_label'
+import { RowMenu, useRowMenu } from './list_page'
+import { MoreActionsButton } from './more_actions_button'
 
 /**
  * Detail page shell: reports the object's name and ancestors to the tab
@@ -58,8 +60,9 @@ export function DetailHeader(props: {
 	/** Leading buttons before Edit; the caller gates them on permissions. */
 	actions?: JSX.Element
 }): JSX.Element {
+	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 	return (
-		<div class="page-header">
+		<div class="page-header detail-header">
 			<h2 data-testid={props.testId}>
 				{props.name}
 				<Show when={props.extra}> {props.extra}</Show>
@@ -80,12 +83,25 @@ export function DetailHeader(props: {
 						)}
 					</Show>
 					<Show when={can('delete') && props.deletable !== false}>
-						<button type="button" class="btn-danger" onClick={props.onDelete}>
-							<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
-						</button>
+						<MoreActionsButton
+							name={props.name ?? ''}
+							open={openMenu() !== null}
+							onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+								toggleMenu(e, 'detail', props.name ?? '')
+							}
+							onClose={closeMenu}
+						/>
 					</Show>
 				</div>
 			</Show>
+			<RowMenu
+				menu={openMenu}
+				onClose={closeMenu}
+				cloneHref={() => undefined}
+				actions={() => []}
+				deletable={() => true}
+				onDelete={props.onDelete}
+			/>
 		</div>
 	)
 }
@@ -206,6 +222,87 @@ export function RelatedSection<Row extends { id: number }>(props: {
 				</Show>
 			</Show>
 		</>
+	)
+}
+
+/** Rows a {@link RelatedPreview} shows before "View all". */
+const RELATED_PREVIEW_ROWS = 5
+
+/** One tab of {@link RelatedTabs}. */
+export interface RelatedTab {
+	key: string
+	label: string
+	/** Total number of related objects (badge and "View all" link). */
+	count: number
+	viewAllHref?: string
+	/** Panel content, usually a {@link RelatedPreview}. */
+	content: () => JSX.Element
+}
+
+/**
+ * Card of related-object tabs, each with a count badge, a preview panel and
+ * a "View all N in …" link; the first tab starts active.
+ */
+export function RelatedTabs(props: { id: string; label: string; tabs: RelatedTab[] }): JSX.Element {
+	const [active, setActive] = createSignal<string | null>(null)
+	const current = (): RelatedTab | undefined =>
+		props.tabs.find((tab: RelatedTab) => tab.key === active()) ?? props.tabs[0]
+	const tabId = (tab: RelatedTab): string => `${props.id}-${tab.key}`
+	return (
+		<section class="card related-tabs" aria-label={props.label}>
+			<div class="related-tabs-bar" role="tablist" aria-label={props.label}>
+				<For each={props.tabs}>
+					{(tab: RelatedTab): JSX.Element => (
+						<button
+							type="button"
+							role="tab"
+							id={tabId(tab)}
+							aria-selected={current()?.key === tab.key}
+							onClick={() => setActive(tab.key)}
+						>
+							{tab.label} <span class="badge">{tab.count}</span>
+						</button>
+					)}
+				</For>
+			</div>
+			<Show when={current()} keyed>
+				{(tab: RelatedTab): JSX.Element => (
+					<div role="tabpanel" aria-labelledby={tabId(tab)}>
+						{tab.content()}
+						<Show when={tab.viewAllHref}>
+							{(href: () => string) => (
+								<a class="related-tabs-all" href={href()}>
+									{t('common.viewAllIn', { count: tab.count, target: tab.label })}
+								</a>
+							)}
+						</Show>
+					</div>
+				)}
+			</Show>
+		</section>
+	)
+}
+
+/** First rows of a related-object list as a table, for a {@link RelatedTab}. */
+export function RelatedPreview<Row extends { id: number }>(props: {
+	rows: Row[]
+	loading: boolean
+	/** Plural `noun.<entity>` key for the loading text. */
+	noun: PluralKey
+	emptyText: string
+	columns: DataTableColumn<Row>[]
+	/** Row key when ids are not unique within the rows; defaults to `id`. */
+	rowKey?: (row: Row) => string | number
+}): JSX.Element {
+	return (
+		<DataTable
+			rows={() => props.rows.slice(0, RELATED_PREVIEW_ROWS)}
+			getRowId={(row: Row): string | number => props.rowKey?.(row) ?? row.id}
+			columns={props.columns}
+			loading={() => props.loading}
+			loadingContent={<Loading message={t('list.loading', { noun: tp(props.noun, 2) })} />}
+			emptyContent={<Empty message={props.emptyText} />}
+		/>
 	)
 }
 

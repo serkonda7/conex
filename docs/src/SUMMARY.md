@@ -10,3 +10,7 @@
 
 - [Datenabgleich der Integrationen](integrations/consistency.md)
 - [AGFEO-Dashboard](integrations/agfeo.md)
+
+# Datenbank
+
+- [Datenmodell](database.md)
