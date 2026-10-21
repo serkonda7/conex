@@ -6,7 +6,12 @@
  */
 import type { Result } from 'better-result'
 import type { VirtualMachineRow } from 'server/src/db/virtual_machines'
-import type { DeviceStatus, VirtualMachineCreate, VirtualMachineUpdate } from 'shared/src/types'
+import type {
+	DeviceServiceJson,
+	DeviceStatus,
+	VirtualMachineCreate,
+	VirtualMachineUpdate,
+} from 'shared/src/types'
 import { by_id, client, failed, to_result } from './client'
 
 export type { VirtualMachineRow }
@@ -14,6 +19,14 @@ export type { VirtualMachineRow }
 export async function fetch_virtual_machine(id: number): Promise<Result<VirtualMachineRow, Error>> {
 	const res = await client['virtual-machines'][':id'].$get(by_id(id))
 	return to_result<VirtualMachineRow>(res, failed.load('noun.virtualMachine'))
+}
+
+/** Managed bundle of a VM (via its role) and its tenant's SLA for it. */
+export async function fetch_virtual_machine_service(
+	id: number,
+): Promise<Result<DeviceServiceJson, Error>> {
+	const res = await client['virtual-machines'][':id'].service.$get(by_id(id))
+	return to_result<DeviceServiceJson>(res, failed.load('noun.serviceLevel'))
 }
 
 /**

@@ -1,6 +1,6 @@
 /**
- * Sync runs: fetch external tenants and employees (always all) and the
- * devices of linked tenants, store the snapshot, then auto-link devices and
+ * Sync runs: fetch external tenants, employees and ticket tags (always all)
+ * and the devices of linked tenants, store the snapshot, then auto-link devices and
  * employees (`match.ts`).
  *
  * A run is started in the background and tracked in `sync_runs`; the API
@@ -25,6 +25,7 @@ import {
 	readEmployees,
 	replaceDevices,
 	replaceEmployees,
+	replaceTags,
 	replaceTenants,
 } from './snapshot'
 import {
@@ -169,6 +170,13 @@ async function execute(
 		tenantSnapshot = await mergeTenants(provider, tenantSnapshot, now)
 		await mergeEmployees(provider, employeeSnapshot, now)
 		employeeSnapshot = await readEmployees(provider)
+	}
+	if (instance.listTags) {
+		const tags = await instance.listTags()
+		if (Result.isError(tags)) {
+			return tags
+		}
+		await replaceTags(provider, tags.value, now)
 	}
 	const known = new Set(tenantSnapshot.map((t) => t.external_id))
 

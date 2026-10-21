@@ -1,11 +1,13 @@
 /**
  * Tickets in the external system. Creation: the tenant must be linked to an
  * external company; an optional device or employee must belong to that tenant
- * and is attached to the ticket when it is linked too. Listing: the open tickets
- * of a linked tenant, cached per company for `TICKET_CACHE_SECONDS`.
+ * and is attached to the ticket when it is linked too. An optional priority
+ * is passed by its label (TANSS: the tag of the same name). Listing: the open
+ * tickets of a linked tenant, cached per company for `TICKET_CACHE_SECONDS`.
  */
 import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
+import { priorityLabel } from 'shared/src/priority'
 import type {
 	IntegrationProvider as ProviderId,
 	TicketCreate,
@@ -14,7 +16,7 @@ import type {
 } from 'shared/src/schemas'
 import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { findOne } from '../db/list'
-import { devices, employees, tenants } from '../schema'
+import { devices, employees, priorities, tenants } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { getIntegrationRow, providerFor } from './store'
@@ -68,6 +70,14 @@ export async function createTicket(
 		}
 		externalEmployeeId = (await linkOf(provider, 'employee', employee.id))?.external_id
 	}
+	let priority: string | undefined
+	if (input.priority_id !== undefined) {
+		const row = await findOne(priorities, eq(priorities.id, input.priority_id))
+		if (!row) {
+			return Result.err(new NotFoundError('Priority not found'))
+		}
+		priority = priorityLabel(row)
+	}
 	const company = await linkOf(provider, 'tenant', tenant.id)
 	if (!company) {
 		return Result.err(new ValidationError('Tenant is not linked to an external company'))
@@ -84,6 +94,7 @@ export async function createTicket(
 		externalTenantId: company.external_id,
 		...(externalDeviceId !== undefined ? { externalDeviceId } : {}),
 		...(externalEmployeeId !== undefined ? { externalEmployeeId } : {}),
+		...(priority !== undefined ? { priority } : {}),
 		title: input.title,
 		content: input.content,
 	})

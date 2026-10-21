@@ -37,6 +37,8 @@ export interface IntegrationProvider {
 	createTicket?(input: TicketInput): Promise<Result<number, Error>>
 	/** Open tickets of one external tenant; absent without a ticket system. */
 	listTickets?(externalTenantId: string): Promise<Result<ExternalTicketJson[], Error>>
+	/** Tags that tickets can carry (priorities map to them by label); absent without tags. */
+	listTags?(): Promise<Result<ExternalTag[], Error>>
 	/** Creates a device and returns it as fetched by a sync; absent when unsupported. */
 	createDevice?(input: DeviceInput): Promise<Result<ExternalDeviceJson, Error>>
 	/** Overwrites fields of a device and returns it as fetched by a sync; absent when unsupported. */
@@ -79,4 +81,12 @@ export interface TicketInput {
 	externalEmployeeId?: string
 	title: string
 	content: string
+	/** Priority label (`P<rank> - <name>`), set as the tag of the same name. */
+	priority?: string
+}
+
+/** Ticket tag of the external system. */
+export interface ExternalTag {
+	external_id: string
+	name: string
 }

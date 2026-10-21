@@ -25,6 +25,7 @@ import {
 } from '../authz'
 import { connectCable } from '../db/cables'
 import { exportDevicesCsv, importDevicesCsv } from '../db/csv_transfer'
+import { serviceOf } from '../db/device_roles'
 import {
 	addInterface,
 	createDevice,
@@ -149,6 +150,14 @@ export const devicesApp = new Hono()
 			return sendResult(c, await deleteDevice(id))
 		},
 	)
+	// Managed bundle (via the role) and the tenant's SLA for it.
+	.get('/:id/service', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const device = await loadDevice(c, c.req.valid('param').id)
+		if (device instanceof Response) {
+			return device
+		}
+		return sendResult(c, Result.ok(await serviceOf(device.device_role_id, device.tenant_id)))
+	})
 	// Explicit remount: re-validates U exactly like creation.
 	.post(
 		'/:id/move',

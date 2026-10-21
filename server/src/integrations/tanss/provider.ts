@@ -6,6 +6,7 @@ import type {
 	ExternalDevice,
 	ExternalDirectory,
 	ExternalEmployee,
+	ExternalTag,
 	ExternalTenant,
 	ExternalTicket,
 	IntegrationProvider,
@@ -141,12 +142,10 @@ function parseDeviceId(
 }
 
 /** Manufacturer id by name (case-insensitive). */
-function manufacturerIdOf(
-	manufacturers: Map<number, string>,
-	name: string | null,
-): number | undefined {
+/** Id of the manufacturer or tag named `name` (case-insensitive). */
+function idByName(names: Map<number, string>, name: string | null): number | undefined {
 	const wanted = name?.trim().toLowerCase()
-	return [...manufacturers].find(([, n]) => n.trim().toLowerCase() === wanted)?.[0]
+	return [...names].find(([, n]) => n.trim().toLowerCase() === wanted)?.[0]
 }
 
 /**
@@ -235,7 +234,7 @@ export class TanssProvider implements IntegrationProvider {
 		if (Result.isError(manufacturers)) {
 			return manufacturers
 		}
-		const manufacturerId = manufacturerIdOf(manufacturers.value, input.manufacturer)
+		const manufacturerId = idByName(manufacturers.value, input.manufacturer)
 		const created = await this.session.createPc({
 			companyId,
 			name: input.name,
@@ -274,13 +273,44 @@ export class TanssProvider implements IntegrationProvider {
 				)
 			}
 		}
-		return this.session.createTicket({
+		// Resolved first: a priority without its tag must not leave an untagged ticket.
+		let tagId: number | undefined
+		if (input.priority !== undefined) {
+			const tags = await this.session.tagNames()
+			if (Result.isError(tags)) {
+				return tags
+			}
+			tagId = idByName(tags.value, input.priority)
+			if (tagId === undefined) {
+				return Result.err(new Error(`Tag "${input.priority}" does not exist in TANSS`))
+			}
+		}
+		const created = await this.session.createTicket({
 			companyId,
 			...(link !== undefined ? { link } : {}),
 			...(remitterId !== undefined ? { remitterId } : {}),
 			title: input.title,
 			content: input.content,
 		})
+		if (Result.isError(created) || tagId === undefined) {
+			return created
+		}
+		const tagged = await this.session.tagTicket(tagId, created.value)
+		if (Result.isError(tagged)) {
+			return Result.err(
+				new Error(
+					`Ticket #${created.value} was created without priority: ${tagged.error.message}`,
+				),
+			)
+		}
+		return created
+	}
+
+	async listTags(): Promise<Result<ExternalTag[], Error>> {
+		const tags = await this.session.tagNames()
+		return tags.map((names) =>
+			[...names].map(([id, name]) => ({ external_id: String(id), name })),
+		)
 	}
 
 	async listTickets(externalTenantId: string): Promise<Result<ExternalTicket[], Error>> {
@@ -311,7 +341,7 @@ export class TanssProvider implements IntegrationProvider {
 		}
 		let manufacturerId: number | undefined
 		if (changes.manufacturer !== undefined) {
-			manufacturerId = manufacturerIdOf(manufacturers.value, changes.manufacturer)
+			manufacturerId = idByName(manufacturers.value, changes.manufacturer)
 			if (manufacturerId === undefined) {
 				return Result.err(
 					new Error(`Manufacturer "${changes.manufacturer}" does not exist in TANSS`),

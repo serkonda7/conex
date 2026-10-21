@@ -9,6 +9,7 @@ import {
 	delete_device,
 	fetch_device,
 	fetch_device_list,
+	fetch_device_service,
 	fetch_interfaces,
 	type InterfaceJson,
 } from '../../api/devices'
@@ -38,6 +39,7 @@ import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
+import { ManagedServiceRows } from '../managed-bundles/service_rows'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
@@ -136,6 +138,12 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [shelf] = createRecord(shelfId, fetch_shelf, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [employee] = createRecord(employeeId, fetch_employee, setError)
+	// Keyed on the record so a role or tenant change refetches the SLA.
+	const [service] = createRecord(
+		() => device(),
+		(row: DeviceRow) => fetch_device_service(row.id),
+		setError,
+	)
 	const [trail] = createResource(
 		() => ({ site: site(), location: locationId() ?? null, rack: rack() }),
 		async ({ site: siteRow, location: locationKey, rack: rackRow }): Promise<Crumb[]> => [
@@ -342,6 +350,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
+					<ManagedServiceRows service={service} />
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<RecordLink id={siteId()} record={site} base="/sites" />

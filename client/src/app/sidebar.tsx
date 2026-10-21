@@ -89,7 +89,7 @@ function NavItem(props: { section: Section }): JSX.Element {
 		const parent = NAV_PARENT[current.path]
 		return parent !== undefined && parent === props.section.path
 	}
-	const label = (): string => props.section.noun(2)
+	const label = (): string => props.section.navLabel?.() ?? props.section.noun(2)
 	const addHref = (): string | undefined => (props.section.add ? `${href()}/add` : undefined)
 	return (
 		<div classList={{ 'app-nav-item': true, active: active() }}>
@@ -230,14 +230,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{ label: 'app.navGroup.devices', paths: ['racks', 'devices'] },
 	{
 		label: 'app.navGroup.catalog',
-		paths: [
-			'manufacturers',
-			'device-types',
-			'device-roles',
-			'rack-types',
-			'service-levels',
-			'priorities',
-		],
+		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types', 'managed-bundles'],
 	},
 	{
 		label: 'app.navGroup.administration',
@@ -250,6 +243,8 @@ const NAV_PARENT: Record<string, string> = {
 	// The dashboard redirects to the home tenant page, so that page is "the dashboard".
 	tenants: 'dashboard',
 	'site-groups': 'sites',
+	'service-levels': 'managed-bundles',
+	priorities: 'managed-bundles',
 	'devices/vm': 'devices',
 }
 

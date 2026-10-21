@@ -22,6 +22,7 @@ import {
 	IconLock,
 	IconMap,
 	IconMapPin,
+	IconPackages,
 	IconPlugConnected,
 	IconShieldLock,
 	IconStack3,
@@ -65,6 +66,9 @@ import { LocationAddPage } from '../pages/locations/add'
 import { LocationDetailPage } from '../pages/locations/detail'
 import { LocationEditPage } from '../pages/locations/edit'
 import { LocationsPage } from '../pages/locations/list'
+import { ManagedBundleDetailPage } from '../pages/managed-bundles/detail'
+import { ManagedBundleAddPage, ManagedBundleEditPage } from '../pages/managed-bundles/form'
+import { ManagedBundlesPage } from '../pages/managed-bundles/list'
 import { ManufacturerDetailPage } from '../pages/manufacturers/detail'
 import { ManufacturerAddPage, ManufacturerEditPage } from '../pages/manufacturers/form'
 import { ManufacturersPage } from '../pages/manufacturers/list'
@@ -107,6 +111,8 @@ export interface Section {
 	parent?: string
 	/** Localized entity name for tab titles and the sidebar. */
 	noun: (count: number) => string
+	/** Sidebar label overriding the plural noun (e.g. a page that heads several tabbed lists). */
+	navLabel?: () => string
 	/** Sidebar icon; sections without one (or without a list) stay hidden. */
 	icon?: Component<{ size?: number }>
 	/** Permission needed to open the section (and see it in the sidebar); `null` = none. */
@@ -257,10 +263,22 @@ export const SECTIONS: readonly Section[] = [
 		edit: ManufacturerEditPage,
 	},
 	{
+		path: 'managed-bundles',
+		noun: (n: number): string => tp('entity.managedBundle', n),
+		permission: 'view',
+		navLabel: (): string => t('app.nav.managedService'),
+		icon: IconPackages,
+		list: ManagedBundlesPage,
+		add: ManagedBundleAddPage,
+		detail: ManagedBundleDetailPage,
+		edit: ManagedBundleEditPage,
+	},
+	{
 		path: 'service-levels',
 		noun: (n: number): string => tp('entity.serviceLevel', n),
 		permission: 'view',
 		icon: IconStopwatch,
+		hideInNav: true,
 		list: ServiceLevelsPage,
 		add: ServiceLevelAddPage,
 		detail: ServiceLevelDetailPage,
@@ -271,6 +289,7 @@ export const SECTIONS: readonly Section[] = [
 		noun: (n: number): string => tp('entity.priority', n),
 		permission: 'view',
 		icon: IconFlag,
+		hideInNav: true,
 		list: PrioritiesPage,
 		add: PriorityAddPage,
 		detail: PriorityDetailPage,

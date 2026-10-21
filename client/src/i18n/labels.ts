@@ -198,6 +198,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	attachment: 'changeObject.attachment',
 	priority: 'changeObject.priority',
 	service_level: 'changeObject.serviceLevel',
+	managed_bundle: 'changeObject.managedBundle',
 }
 
 /** Changelog object type (`device`, `rack_type`, …). */
@@ -321,6 +322,7 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	employee_suggestion: 'finding.employee_suggestion',
 	employee_stale: 'finding.employee_stale',
 	employee_mismatch: 'finding.employee_mismatch',
+	priority_tag_missing: 'finding.priority_tag_missing',
 }
 
 /** Consistency finding kind (`device_missing_in_conex`, …). */

@@ -7,8 +7,9 @@
  * and only active external ones as missing in conex; linked ones in any
  * state are still compared.
  */
-import { and, desc, eq, inArray, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
 import { normalizePhone } from 'shared/src/phone'
+import { priorityLabel } from 'shared/src/priority'
 import type {
 	DeviceCompareField,
 	DeviceIntegrationStatus,
@@ -28,7 +29,15 @@ import type {
 import { DEVICE_COMPARE_FIELDS, EMPLOYEE_COMPARE_FIELDS } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { type TenantFilterParams, tenantConditions } from '../db/list'
-import { device_types, devices, employees, manufacturers, sync_runs, tenants } from '../schema'
+import {
+	device_types,
+	devices,
+	employees,
+	manufacturers,
+	priorities,
+	sync_runs,
+	tenants,
+} from '../schema'
 import { type ExternalLinkRow, linkJson, linkOf, listLinks } from './links'
 import {
 	matchDevices,
@@ -43,6 +52,7 @@ import {
 	readDevices,
 	readEmployee,
 	readEmployees,
+	readTags,
 	readTenant,
 	readTenants,
 } from './snapshot'
@@ -226,7 +236,8 @@ export async function lastSyncedAt(provider: ProviderId): Promise<number | null>
 /**
  * Builds the report for the tenants selected by `filter`. `includeUnmapped`
  * adds external tenants that no conex tenant links to (global view only:
- * scoped users must not see other customers).
+ * scoped users must not see other customers) and priorities without a
+ * ticket tag of the same name (shared catalog data, so not per tenant).
  */
 export async function buildReport(
 	provider: ProviderId,
@@ -451,7 +462,26 @@ export async function buildReport(
 
 	findings.push(...(await employeeFindings(provider, tenantIds, tenantName, liveCompany)))
 
-	return { provider, synced_at: await lastSyncedAt(provider), findings }
+	const syncedAt = await lastSyncedAt(provider)
+	if (includeUnmapped && syncedAt !== null) {
+		findings.push(...(await priorityFindings(provider)))
+	}
+
+	return { provider, synced_at: syncedAt, findings }
+}
+
+/** Priorities whose label matches no external ticket tag (ignoring case). */
+async function priorityFindings(provider: ProviderId): Promise<IntegrationFinding[]> {
+	const tags = new Set((await readTags(provider)).map((tag) => normalizeName(tag.name)))
+	const rows = await getDb()
+		.select({ name: priorities.name, rank: priorities.rank })
+		.from(priorities)
+		.orderBy(asc(priorities.rank), asc(priorities.name))
+	return rows
+		.filter((row) => !tags.has(normalizeName(priorityLabel(row))))
+		.map((row) =>
+			finding('priority_tag_missing', { field: 'priority', local: priorityLabel(row) }),
+		)
 }
 
 /** Employee level of the report, for the tenants in `tenantIds`. */

@@ -68,7 +68,7 @@ function employeePushField(f: IntegrationFinding): EmployeePushField | null {
 }
 
 function findingKey(f: IntegrationFinding): string {
-	return [f.kind, f.tenant_id, f.device_id, f.external_id, f.field].join('|')
+	return [f.kind, f.tenant_id, f.device_id, f.external_id, f.field, f.local].join('|')
 }
 
 /** Field, conex value and external value of a mismatch; matched field of a suggestion. */
@@ -78,6 +78,14 @@ function details(f: IntegrationFinding): JSX.Element {
 	}
 	if (f.kind === 'device_suggestion' || f.kind === 'employee_suggestion') {
 		return t('integration.matchedBy', { field: compareFieldLabel(f.field) })
+	}
+	if (f.kind === 'priority_tag_missing') {
+		return (
+			<span class="finding-detail">
+				<span class="text-muted">{tp('entity.priority', 1)}</span>
+				<span>{f.local}</span>
+			</span>
+		)
 	}
 	if (
 		f.kind !== 'device_mismatch' &&

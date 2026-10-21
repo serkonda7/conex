@@ -9,6 +9,8 @@ import {
 	type SiteGroupCreate,
 	type SiteGroupUpdate,
 	type SiteUpdate,
+	type TenantBundle,
+	type TenantBundleJson,
 	type TenantCreate,
 	type TenantGroupCreate,
 	type TenantGroupUpdate,
@@ -19,9 +21,12 @@ import {
 	employees,
 	external_links,
 	locations,
+	managed_bundles,
 	racks,
+	service_levels,
 	site_groups,
 	sites,
+	tenant_bundles,
 	tenant_groups,
 	tenants,
 	users,
@@ -70,6 +75,8 @@ import {
 export type { ListParams, Page } from './list'
 export type TenantGroupRow = typeof tenant_groups.$inferSelect
 export type TenantRow = typeof tenants.$inferSelect
+/** A tenant with its contracted bundles, sorted by bundle name. */
+export type TenantDetail = TenantRow & { bundles: TenantBundleJson[] }
 export type SiteRow = typeof sites.$inferSelect
 export type SiteGroupRow = typeof site_groups.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
@@ -314,18 +321,84 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 	}
 }
 
-export function getTenant(id: number): Promise<Result<TenantRow, Error>> {
-	return findById(tenants, id, 'Tenant not found')
+async function bundlesOf(tenantId: number): Promise<TenantBundleJson[]> {
+	return await getDb()
+		.select({
+			managed_bundle_id: tenant_bundles.managed_bundle_id,
+			managed_bundle_name: managed_bundles.name,
+			service_level_id: tenant_bundles.service_level_id,
+			service_level_name: service_levels.name,
+		})
+		.from(tenant_bundles)
+		.innerJoin(managed_bundles, eq(managed_bundles.id, tenant_bundles.managed_bundle_id))
+		.innerJoin(service_levels, eq(service_levels.id, tenant_bundles.service_level_id))
+		.where(eq(tenant_bundles.tenant_id, tenantId))
+		.orderBy(asc(managed_bundles.name))
+}
+
+export async function getTenant(id: number): Promise<Result<TenantDetail, Error>> {
+	const row = await findById(tenants, id, 'Tenant not found')
+	if (Result.isError(row)) {
+		return row
+	}
+	return Result.ok({ ...row.value, bundles: await bundlesOf(id) })
+}
+
+/** The contract of `tenantId` for a bundle, if it has one. */
+export async function tenantBundle(
+	tenantId: number,
+	bundleId: number,
+): Promise<TenantBundleJson | null> {
+	return (await bundlesOf(tenantId)).find((b) => b.managed_bundle_id === bundleId) ?? null
+}
+
+/** Every contract must point at an existing bundle and service level. */
+async function checkBundles(
+	bundles: TenantBundle[] | undefined,
+): Promise<Result<undefined, Error>> {
+	for (const bundle of bundles ?? []) {
+		for (const guard of [
+			await checkExists(
+				managed_bundles,
+				bundle.managed_bundle_id,
+				'Managed bundle not found',
+			),
+			await checkExists(service_levels, bundle.service_level_id, 'Service level not found'),
+		]) {
+			if (Result.isError(guard)) {
+				return guard
+			}
+		}
+	}
+	return Result.ok(undefined)
+}
+
+/** Replaces the bundle contracts of a tenant (caller runs it in a transaction). */
+async function writeBundles(tenantId: number, bundles: TenantBundle[]): Promise<void> {
+	await getDb().delete(tenant_bundles).where(eq(tenant_bundles.tenant_id, tenantId))
+	if (bundles.length > 0) {
+		await getDb()
+			.insert(tenant_bundles)
+			.values(bundles.map((b) => ({ tenant_id: tenantId, ...b })))
+	}
 }
 
 /** FK and customer-number guards shared by tenant create/update. */
 async function checkTenantInput(
-	input: { tenant_group_id?: number | null; customer_number?: string | null },
+	input: {
+		tenant_group_id?: number | null
+		customer_number?: string | null
+		bundles?: TenantBundle[]
+	},
 	excludeTenantId?: number,
 ): Promise<Result<undefined, Error>> {
 	const group = await checkExists(tenant_groups, input.tenant_group_id, 'Tenant group not found')
 	if (Result.isError(group)) {
 		return group
+	}
+	const bundles = await checkBundles(input.bundles)
+	if (Result.isError(bundles)) {
+		return bundles
 	}
 	if (
 		typeof input.customer_number === 'string' &&
@@ -348,7 +421,7 @@ function duplicateTenantError(err: unknown): Error {
 	return errOf(err)
 }
 
-export async function createTenant(input: TenantCreate): Promise<Result<TenantRow, Error>> {
+export async function createTenant(input: TenantCreate): Promise<Result<TenantDetail, Error>> {
 	const valid = await checkTenantInput(input)
 	if (Result.isError(valid)) {
 		return valid
@@ -364,8 +437,14 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantRo
 		comments: input.comments ?? null,
 	}
 	const id = await tryWrite(
-		async () =>
-			insertedId(await getDb().insert(tenants).values(row).returning({ id: tenants.id })),
+		() =>
+			withTransaction(async () => {
+				const newId = insertedId(
+					await getDb().insert(tenants).values(row).returning({ id: tenants.id }),
+				)
+				await writeBundles(newId, input.bundles)
+				return newId
+			}),
 		duplicateTenantError,
 	)
 	if (Result.isError(id)) {
@@ -377,7 +456,7 @@ export async function createTenant(input: TenantCreate): Promise<Result<TenantRo
 export async function updateTenant(
 	id: number,
 	input: TenantUpdate,
-): Promise<Result<TenantRow, Error>> {
+): Promise<Result<TenantDetail, Error>> {
 	const current = await getTenant(id)
 	if (Result.isError(current)) {
 		return current
@@ -396,9 +475,18 @@ export async function updateTenant(
 		'description',
 		'comments',
 	])
-	if (!isPatchEmpty(patch)) {
+	const bundles = input.bundles
+	if (!isPatchEmpty(patch) || bundles !== undefined) {
 		const written = await tryWrite(
-			() => getDb().update(tenants).set(patch).where(eq(tenants.id, id)),
+			() =>
+				withTransaction(async () => {
+					if (!isPatchEmpty(patch)) {
+						await getDb().update(tenants).set(patch).where(eq(tenants.id, id))
+					}
+					if (bundles !== undefined) {
+						await writeBundles(id, bundles)
+					}
+				}),
 			duplicateTenantError,
 		)
 		if (Result.isError(written)) {
@@ -408,7 +496,7 @@ export async function updateTenant(
 	return await logUpdate('tenant', current.value, await getTenant(id))
 }
 
-export async function deleteTenant(id: number): Promise<Result<TenantRow, Error>> {
+export async function deleteTenant(id: number): Promise<Result<TenantDetail, Error>> {
 	const current = await getTenant(id)
 	if (Result.isError(current)) {
 		return current

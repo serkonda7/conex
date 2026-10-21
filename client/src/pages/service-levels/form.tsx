@@ -1,3 +1,4 @@
+import { priorityLabel } from 'shared/src/priority'
 import {
 	type HolidayRegion,
 	type ServiceLevelTarget,
@@ -371,12 +372,7 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 								<For each={priorities()}>
 									{(priority: PriorityListRow): JSX.Element => (
 										<tr>
-											<td>
-												{t('serviceLevel.priorityLabel', {
-													rank: priority.rank,
-													name: priority.name,
-												})}
-											</td>
+											<td>{priorityLabel(priority)}</td>
 											<td>
 												<DurationInput
 													id={`${prefix}-response-${priority.id}`}

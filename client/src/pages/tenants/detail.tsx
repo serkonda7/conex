@@ -1,5 +1,5 @@
-import { primaryEmail, websiteUrl } from 'shared/src/schemas'
-import { createSignal, type JSX, Show } from 'solid-js'
+import { primaryEmail, type TenantBundleJson, websiteUrl } from 'shared/src/schemas'
+import { createSignal, For, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { type EmployeeRow, fetch_employees } from '../../api/employees'
 import { fetch_racks, type RackRow } from '../../api/racks'
@@ -88,6 +88,31 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 							<dt>{tp('entity.tenantGroup', 1)}</dt>
 							<dd>
 								<RecordLink id={groupId()} record={group} base="/tenant-groups" />
+							</dd>
+							<dt>{t('tenant.bundles')}</dt>
+							<dd>
+								<Show
+									when={(tenant()?.bundles.length ?? 0) > 0}
+									fallback={t('tenant.noBundles')}
+								>
+									<For each={tenant()?.bundles}>
+										{(bundle: TenantBundleJson): JSX.Element => (
+											<div>
+												<a
+													href={`/managed-bundles/${bundle.managed_bundle_id}`}
+												>
+													{bundle.managed_bundle_name}
+												</a>
+												{': '}
+												<a
+													href={`/service-levels/${bundle.service_level_id}`}
+												>
+													{bundle.service_level_name}
+												</a>
+											</div>
+										)}
+									</For>
+								</Show>
 							</dd>
 							<dt>{t('tenant.customerNumber')}</dt>
 							<dd>{tenant()?.customer_number || '—'}</dd>

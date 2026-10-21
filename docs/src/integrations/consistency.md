@@ -10,6 +10,7 @@ context is switched.
 - **Companies:** all on the first or a forced full sync, otherwise only those
   changed since the last sync.
 - **Devices:** only for companies linked to a tenant.
+- **Tags:** all, every sync.
 - Unambiguous device matches are [linked automatically](#device-matching).
 
 ### TANSS mapping
@@ -19,9 +20,14 @@ context is switched.
 | Tenant        | Company          |
 | Device        | PC / server / periphery |
 | Asset tag     | Inventory number |
+| Priority      | Tag (same label)  |
 
 Name, serial number, manufacturer, model and active status are compared
 one-to-one.
+
+A new ticket gets the tag named like its priority: the label `P<rank> - <name>`,
+e.g. `P1 - Critical` (ignoring case). If that tag does not exist in TANSS, the
+ticket is not created.
 
 ## Links
 
@@ -63,6 +69,12 @@ the sync. Ignored objects are not reported as missing or suggested.
 | **Possible match**           | Devices share a serial number, asset tag or name. |
 | **Missing externally**       | Active conex device without counterpart. Can be created in the external system, which links it right away. |
 | **Missing in conex**         | Active external device without counterpart. |
+
+### Priorities
+
+| Finding                      | Meaning |
+| ---------------------------- | ------- |
+| **Priority tag missing**     | No TANSS tag has the priority's label (`P<rank> - <name>`). Tickets with this priority cannot be created. Global report only, after a sync. |
 
 ## Device matching
 

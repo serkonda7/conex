@@ -7,15 +7,17 @@ import {
 	fetch_device_roles,
 	update_device_role,
 } from '../../api/device_roles'
+import { fetch_managed_bundles } from '../../api/service_catalog'
 import {
 	CheckboxField,
 	DescriptionField,
 	FormPage,
 	NameField,
+	row_options,
 	SelectField,
 } from '../../components/form'
 import { treeIcons, treePaths } from '../../components/tree_name'
-import { t } from '../../i18n'
+import { t, tp } from '../../i18n'
 import { deviceRoleIconOptions } from '../../i18n/labels'
 import {
 	type FormValues,
@@ -37,6 +39,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [icon, setIcon] = createSignal('')
 	const [canHostVms, setCanHostVms] = createSignal(false)
+	const [bundleId, setBundleId] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_device_role,
@@ -46,11 +49,13 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 			setDescription(row.description ?? '')
 			setIcon(row.icon ?? '')
 			setCanHostVms(row.can_host_vms === 1)
+			setBundleId(id_value(row.managed_bundle_id))
 		},
 	})
 	const prefix = form.editing ? 'device-role-edit' : 'device-role'
 	const backTo = useFormReturnRoute('/device-roles', props.id)
 	const [roles] = createRows(fetch_device_roles, form.setError)
+	const [bundles, { refetch: refetchBundles }] = createRows(fetch_managed_bundles, form.setError)
 	// A role cannot move under itself or one of its descendants.
 	const parentOptions = createMemo(() => {
 		const all = roles() ?? []
@@ -97,6 +102,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 							description: text(description()),
 							icon: selectedIcon(),
 							can_host_vms: canHostVms(),
+							managed_bundle_id: parseId(bundleId()),
 						})
 					: update_device_role(id, {
 							name: trimmed,
@@ -104,6 +110,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 							description: text(description()) ?? null,
 							icon: selectedIcon(),
 							can_host_vms: canHostVms(),
+							managed_bundle_id: parseId(bundleId()),
 						}),
 			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
@@ -149,6 +156,20 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 				onChange={setIcon}
 				options={deviceRoleIconOptions()}
 				emptyLabel={t('deviceRole.noIcon')}
+			/>
+			<SelectField
+				id={`${prefix}-managed-bundle`}
+				label={tp('entity.managedBundle', 1)}
+				value={bundleId()}
+				onChange={setBundleId}
+				options={row_options(bundles() ?? [])}
+				emptyLabel={
+					parentId() === ''
+						? t('deviceRole.noManagedBundle')
+						: t('deviceRole.inheritBundle')
+				}
+				add={{ label: tp('entity.managedBundle', 1), href: '/managed-bundles/add' }}
+				reload={refetchBundles}
 			/>
 			<CheckboxField
 				id={`${prefix}-can-host-vms`}

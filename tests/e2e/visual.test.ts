@@ -111,6 +111,7 @@ test('ticket add form layout', async ({ page }) => {
 	await expect(page.locator('#ticket-content')).toBeVisible()
 	await expect(page.locator('#ticket-device')).toBeVisible()
 	await expect(page.locator('#ticket-employee')).toBeVisible()
+	await expect(page.locator('#ticket-priority')).toBeVisible()
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('ticket-add-form.png')
 })

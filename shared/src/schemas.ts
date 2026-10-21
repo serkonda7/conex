@@ -223,6 +223,31 @@ export function websiteUrl(website: string): string {
 	return /^https?:\/\//i.test(website) ? website : `https://${website}`
 }
 
+/** A contracted managed bundle and the SLA it comes with. */
+export const TenantBundleSchema = v.strictObject({
+	managed_bundle_id: IdSchema,
+	service_level_id: IdSchema,
+})
+
+export type TenantBundle = v.InferOutput<typeof TenantBundleSchema>
+
+/** Contracted bundles of a tenant: at most one SLA per bundle. */
+const TenantBundlesSchema = v.pipe(
+	v.array(TenantBundleSchema),
+	v.check(
+		(bundles) => new Set(bundles.map((b) => b.managed_bundle_id)).size === bundles.length,
+		'Each bundle may be contracted only once',
+	),
+)
+
+/** A stored bundle contract with its names, as returned by the API. */
+export interface TenantBundleJson {
+	managed_bundle_id: number
+	managed_bundle_name: string
+	service_level_id: number
+	service_level_name: string
+}
+
 export const TenantCreateSchema = v.strictObject({
 	name: NameSchema,
 	tenant_group_id: NullableIdSchema,
@@ -230,6 +255,7 @@ export const TenantCreateSchema = v.strictObject({
 	website: v.optional(WebsiteSchema, undefined),
 	emails: v.optional(TenantEmailsSchema, []),
 	phones: v.optional(TenantPhonesSchema, []),
+	bundles: v.optional(TenantBundlesSchema, []),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
@@ -244,6 +270,8 @@ export const TenantUpdateSchema = v.strictObject({
 	website: v.optional(v.nullable(WebsiteSchema), undefined),
 	emails: v.optional(TenantEmailsSchema, undefined),
 	phones: v.optional(TenantPhonesSchema, undefined),
+	/** Replaces the stored contracts when present. */
+	bundles: v.optional(TenantBundlesSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -823,7 +851,7 @@ export interface ExpandedInterface {
 // ---------------------------------------------------------------------------
 
 /** Built-in device roles: seeded by migration, never renamed or deleted. */
-export const DEVICE_ROLE_KEYS = ['pc', 'server'] as const
+export const DEVICE_ROLE_KEYS = ['pc', 'server', 'ap', 'firewall', 'cloud-key', 'switch'] as const
 export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
 
 /** Icons a device role can show next to its name; the client maps each to a glyph. */
@@ -856,6 +884,7 @@ export const DeviceRoleCreateSchema = v.strictObject({
 	description: DescriptionSchema,
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
 	can_host_vms: v.optional(v.boolean(), false),
+	managed_bundle_id: NullableIdSchema,
 })
 
 export const DeviceRoleUpdateSchema = v.strictObject({
@@ -864,6 +893,7 @@ export const DeviceRoleUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
 	can_host_vms: v.optional(v.boolean(), undefined),
+	managed_bundle_id: v.optional(v.nullable(IdSchema), undefined),
 })
 
 export type DeviceRoleCreate = v.InferOutput<typeof DeviceRoleCreateSchema>
@@ -1044,6 +1074,37 @@ export interface ServiceLevelTargetJson {
 	response_minutes: number
 	resolution_minutes: number | null
 	around_the_clock: boolean
+}
+
+/** Managed-service bundles (`Workplace`, `Server`, …) device roles map onto. */
+export const ManagedBundleCreateSchema = v.strictObject({
+	name: NameSchema,
+	description: DescriptionSchema,
+})
+
+export const ManagedBundleUpdateSchema = v.strictObject({
+	name: v.optional(NameSchema, undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+})
+
+export type ManagedBundleCreate = v.InferOutput<typeof ManagedBundleCreateSchema>
+export type ManagedBundleUpdate = v.InferOutput<typeof ManagedBundleUpdateSchema>
+
+export const ManagedBundleListQuerySchema = v.object({
+	...ListQueryEntries,
+	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
+export type ManagedBundleListQuery = v.InferOutput<typeof ManagedBundleListQuerySchema>
+
+/**
+ * `GET /devices/:id/service`: the bundle a device falls under (via its
+ * role) and the SLA its tenant contracted for that bundle.
+ */
+export interface DeviceServiceJson {
+	managed_bundle: { id: number; name: string } | null
+	service_level: { id: number; name: string } | null
 }
 
 // ---------------------------------------------------------------------------
@@ -1890,6 +1951,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'attachment',
 	'priority',
 	'service_level',
+	'managed_bundle',
 ] as const
 
 export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)
@@ -2245,12 +2307,14 @@ export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
 /**
  * New ticket in the external system for a linked tenant (company), optionally
  * attached to one of its linked devices and reported by one of its linked
- * employees.
+ * employees. The priority is set as the external tag of the same name
+ * (TANSS); the form preselects the lowest one.
  */
 export const TicketCreateSchema = v.strictObject({
 	tenant_id: IdSchema,
 	device_id: v.optional(IdSchema, undefined),
 	employee_id: v.optional(IdSchema, undefined),
+	priority_id: v.optional(IdSchema, undefined),
 	title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
 	content: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(10000)), ''),
 })
@@ -2426,6 +2490,7 @@ export const FINDING_KINDS = [
 	'employee_suggestion',
 	'employee_stale',
 	'employee_mismatch',
+	'priority_tag_missing',
 ] as const
 
 export type FindingKind = (typeof FINDING_KINDS)[number]
@@ -2443,13 +2508,17 @@ export interface IntegrationFinding {
 	external_id: string | null
 	external_name: string | null
 	external_tenant_id: string | null
-	/** `tenant`/`status` only on `device_mismatch` and `employee_mismatch`. */
+	/**
+	 * `tenant`/`status` only on `device_mismatch` and `employee_mismatch`;
+	 * `priority` on `priority_tag_missing` (priority label in `local`).
+	 */
 	field:
 		| DeviceCompareField
 		| EmployeeCompareField
 		| 'customer_number'
 		| 'tenant'
 		| 'status'
+		| 'priority'
 		| null
 	local: string | null
 	remote: string | null

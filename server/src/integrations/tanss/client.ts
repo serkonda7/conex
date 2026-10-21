@@ -26,9 +26,11 @@ import {
 	getApiV1Manufacturers,
 	getApiV1PcsPcId,
 	getApiV1PeripheriesPeripheryId,
+	getApiV1Tags,
 	type PutApiErpV1EmployeesIdData,
 	postApiV1Login,
 	postApiV1Pcs,
+	postApiV1TagsAssignment,
 	postApiV1Tickets,
 	putApiV1Pcs,
 	putApiV1PcsPcId,
@@ -128,6 +130,7 @@ const DeviceResponseSchema = v.object({
 /** TANSS link types (`linkTypeId` of tickets and assignments). */
 export const PC_LINK_TYPE = 1
 export const PERIPHERY_LINK_TYPE = 3
+export const TICKET_LINK_TYPE = 11
 
 export interface TanssTicketInput {
 	companyId: number
@@ -366,6 +369,20 @@ function toEmployee(raw: CustomerEmployee): TanssEmployee | null {
 	}
 }
 
+/** `id` → `name` of a list response (manufacturers, tags). */
+function idNames(data: unknown): Map<number, string> {
+	const names = new Map<number, string>()
+	for (const raw of listContent(data)) {
+		const row = raw as { id?: unknown; name?: unknown }
+		const id = num(row.id)
+		const name = str(row.name)
+		if (id !== null && name !== null) {
+			names.set(id, name)
+		}
+	}
+	return names
+}
+
 function listContent(data: unknown): unknown[] {
 	if (Array.isArray(data)) {
 		return data
@@ -516,18 +533,24 @@ export class TanssSession {
 		if (Result.isError(dump)) {
 			return dump
 		}
-		return res.map((data) => {
-			const names = new Map<number, string>()
-			for (const raw of listContent(data)) {
-				const row = raw as { id?: unknown; name?: unknown }
-				const id = num(row.id)
-				const name = str(row.name)
-				if (id !== null && name !== null) {
-					names.set(id, name)
-				}
-			}
-			return names
-		})
+		return res.map(idNames)
+	}
+
+	/** Tag id → name. */
+	async tagNames(): Promise<Result<Map<number, string>, Error>> {
+		const res = await this.userCall('tag list', (client) => getApiV1Tags({ client }))
+		return res.map(idNames)
+	}
+
+	/** Adds a tag to a ticket. */
+	async tagTicket(tagId: number, ticketId: number): Promise<Result<void, Error>> {
+		const res = await this.userCall('ticket tag', (client) =>
+			postApiV1TagsAssignment({
+				client,
+				body: { tagId, linkTypeId: TICKET_LINK_TYPE, linkId: ticketId },
+			}),
+		)
+		return res.map(() => undefined)
 	}
 
 	/** Creates a ticket and returns its TANSS id. */

@@ -8,6 +8,7 @@ import type { DeviceListItem, DeviceRow, InterfaceJson } from 'server/src/db/dev
 import type {
 	DeviceCreate,
 	DeviceListQuery,
+	DeviceServiceJson,
 	DeviceStatus,
 	DeviceUpdate,
 	InterfaceUpdate,
@@ -58,6 +59,12 @@ export function fetch_devices(
 export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices[':id'].$get(by_id(id))
 	return to_result<DeviceRow>(res, failed.load('noun.device'))
+}
+
+/** Managed bundle of a device (via its role) and its tenant's SLA for it. */
+export async function fetch_device_service(id: number): Promise<Result<DeviceServiceJson, Error>> {
+	const res = await client.devices[':id'].service.$get(by_id(id))
+	return to_result<DeviceServiceJson>(res, failed.load('noun.serviceLevel'))
 }
 
 /**

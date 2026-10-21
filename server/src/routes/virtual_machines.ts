@@ -7,6 +7,7 @@ import {
 	VirtualMachineUpdateSchema,
 } from 'shared/src/schemas'
 import { checkTenant, checkUpdateTenant, resolveCreateTenant, sendTenantRow } from '../authz'
+import { serviceOf } from '../db/device_roles'
 import { deviceTenant } from '../db/owners'
 import {
 	createVirtualMachine,
@@ -49,6 +50,17 @@ export const virtualMachinesApp = new Hono()
 	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
 		return sendTenantRow(c, await getVirtualMachine(c.req.valid('param').id))
+	})
+	// Managed bundle (via the role) and the tenant's SLA for it.
+	.get('/:id/service', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const vm = await getVirtualMachine(c.req.valid('param').id)
+		if (Result.isError(vm)) {
+			return sendResult(c, vm)
+		}
+		return (
+			checkTenant(c, vm.value.tenant_id) ??
+			sendResult(c, Result.ok(await serviceOf(vm.value.device_role_id, vm.value.tenant_id)))
+		)
 	})
 	.patch(
 		'/:id',

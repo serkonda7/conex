@@ -8,6 +8,7 @@ import type {
 	LocationRow,
 	SiteGroupRow,
 	SiteRow,
+	TenantDetail,
 	TenantGroupListItem,
 	TenantGroupRow,
 	TenantListItem,
@@ -40,6 +41,7 @@ export type {
 	LocationType,
 	SiteGroupRow,
 	SiteRow,
+	TenantDetail,
 	TenantGroupListItem,
 	TenantGroupRow,
 	TenantRow,
@@ -116,22 +118,22 @@ export async function fetch_tenants(
 	)
 }
 
-export async function fetch_tenant(id: number): Promise<Result<TenantRow, Error>> {
+export async function fetch_tenant(id: number): Promise<Result<TenantDetail, Error>> {
 	const res = await client.tenants[':id'].$get(by_id(id))
-	return to_result<TenantRow>(res, failed.load('noun.tenant'))
+	return to_result<TenantDetail>(res, failed.load('noun.tenant'))
 }
 
-export async function create_tenant(input: TenantCreate): Promise<Result<TenantRow, Error>> {
+export async function create_tenant(input: TenantCreate): Promise<Result<TenantDetail, Error>> {
 	const res = await client.tenants.$post({ json: input })
-	return to_result<TenantRow>(res, failed.create('noun.tenant'))
+	return to_result<TenantDetail>(res, failed.create('noun.tenant'))
 }
 
 export async function update_tenant(
 	id: number,
 	patch: TenantUpdate,
-): Promise<Result<TenantRow, Error>> {
+): Promise<Result<TenantDetail, Error>> {
 	const res = await client.tenants[':id'].$patch({ ...by_id(id), json: patch })
-	return to_result<TenantRow>(res, failed.update('noun.tenant'))
+	return to_result<TenantDetail>(res, failed.update('noun.tenant'))
 }
 
 export async function delete_tenant(id: number): Promise<Result<unknown, Error>> {
