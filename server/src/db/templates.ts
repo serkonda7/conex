@@ -425,14 +425,15 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 // Stub rows
 // ---------------------------------------------------------------------------
 
-const STUB_EXISTS = 'This device type already has a stub with this prefix and kind'
+const STUB_EXISTS = 'This device type already has a stub with this prefix, kind and side'
 
-/** Stub rows of a device type, in no particular order. */
+/** Stub rows of a device type, in creation order (expansion follows it). */
 export function stubsOf(deviceTypeId: number): Promise<StubRow[]> {
 	return getDb()
 		.select()
 		.from(device_type_interfaces)
 		.where(eq(device_type_interfaces.device_type_id, deviceTypeId))
+		.orderBy(asc(device_type_interfaces.id))
 }
 
 export async function listStubs(deviceTypeId: number): Promise<Result<StubRow[], Error>> {
@@ -484,6 +485,10 @@ export async function createStub(
 		kind: input.kind ?? 'ethernet',
 		label: input.label ?? null,
 		description: input.description ?? null,
+		side: input.side ?? null,
+		positions: input.positions ?? 1,
+		rear_stub_id: input.rear_stub_id ?? null,
+		rear_position: input.rear_position ?? 1,
 	}
 	const clash = await checkStubExpansion(deviceTypeId, row)
 	if (Result.isError(clash)) {
@@ -510,7 +515,26 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 	if (Result.isError(current)) {
 		return current
 	}
-	const patch = pickDefined(input, ['prefix', 'count', 'kind', 'label', 'description'])
+	const side = current.value.side
+	if (input.positions !== undefined && input.positions !== 1 && side !== 'rear') {
+		return Result.err(new ConflictError('Positions are only allowed on rear ports'))
+	}
+	if (
+		(input.rear_stub_id !== undefined || input.rear_position !== undefined) &&
+		side !== 'front'
+	) {
+		return Result.err(new ConflictError('A rear port mapping is only allowed on front ports'))
+	}
+	const patch = pickDefined(input, [
+		'prefix',
+		'count',
+		'kind',
+		'label',
+		'description',
+		'positions',
+		'rear_stub_id',
+		'rear_position',
+	])
 	const clash = await checkStubExpansion(
 		current.value.device_type_id,
 		{ ...current.value, ...patch },
@@ -539,6 +563,11 @@ export async function deleteStub(id: number): Promise<Result<StubRow, Error>> {
 	const current = await getStub(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (await exists(device_type_interfaces, eq(device_type_interfaces.rear_stub_id, id))) {
+		return Result.err(
+			new ConflictError('Front ports still map onto this rear port; delete them first'),
+		)
 	}
 	const deleted = await tryWrite(() =>
 		getDb().delete(device_type_interfaces).where(eq(device_type_interfaces.id, id)),

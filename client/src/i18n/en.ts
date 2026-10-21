@@ -44,6 +44,8 @@ export const en = {
 	'common.unitPosition': 'U{u}',
 	'face.front': 'Front',
 	'face.rear': 'Rear',
+	'portSide.front': 'Front',
+	'portSide.rear': 'Rear',
 	'portKind.ethernet': 'Ethernet',
 	'portKind.port': 'Port',
 	'portKind.rj45': 'RJ-45 (serial)',
@@ -430,6 +432,30 @@ export const en = {
 	'deviceType.component.powerOutlets': 'Power outlets ({count})',
 	'deviceType.component.displayPort': 'Display ports',
 	'deviceType.component.displayPorts': 'Display ports ({count})',
+	'deviceType.component.frontPort': 'Front ports',
+	'deviceType.component.frontPorts': 'Front ports ({count})',
+	'deviceType.component.rearPort': 'Rear ports',
+	'deviceType.component.rearPorts': 'Rear ports ({count})',
+	'deviceType.component.positions': 'Positions',
+	'deviceType.component.positionsHint':
+		'1 for an outlet; more for a trunk such as MPO (one position per fiber).',
+	'deviceType.component.positionsCount.one': '{count} position',
+	'deviceType.component.positionsCount.other': '{count} positions',
+	'deviceType.component.rearPosition': 'From position',
+	'deviceType.component.rearPositionHint':
+		'Front ports take consecutive positions on the rear ports, starting here.',
+	'deviceType.component.rearPortRequired': 'Select a rear port.',
+	'deviceType.component.noRearPorts': 'Add rear ports first',
+	'deviceType.component.mapping': 'Mapping',
+	'deviceType.component.mapsTo': '→ {rear} from position {position}',
+	'deviceType.preset.patchPanel': 'Patch panel (N ports)',
+	'deviceType.preset.cassette': 'Cassette (N × MPO)',
+	'deviceType.preset.frontName': 'Front port name',
+	'deviceType.preset.nameHint':
+		'Front and rear ports share the name; port N in front passes through to port N at the rear.',
+	'deviceType.preset.fibers': 'Fibers',
+	'deviceType.preset.frontType': 'Front type',
+	'deviceType.preset.rearName': 'Rear port name',
 	'deviceType.notFound': 'Device type not found.',
 	'deviceType.details': 'Device type details',
 	'deviceType.noDevices': 'No devices of this type yet.',
@@ -451,15 +477,16 @@ Source priority:
 
 Output one YAML document starting with --- in a fenced YAML block, plus the target path device-types/<Manufacturer>/<model-slug>.yaml outside the block. Keep the source summary outside the YAML so the block can be pasted directly into conex.
 
-Emit only: manufacturer, model, slug, u_height, is_full_depth, description, comments, interfaces, ports, power-ports, power-outlets, display-ports. console-ports is an import alias of ports; prefer ports and never duplicate entries in both. Drop all other NetBox keys when adapting a baseline.
+Emit only: manufacturer, model, slug, u_height, is_full_depth, description, comments, interfaces, ports, power-ports, power-outlets, display-ports, rear-ports, front-ports. console-ports is an import alias of ports; prefer ports and never duplicate entries in both. Drop all other NetBox keys when adapting a baseline.
 
 Rules:
 - manufacturer must equal the directory name. manufacturer and model: 1-100 characters. slug: 1-100 characters, ^[-a-z0-9_]+$, form <mfr-slug>-<model-slug>.
 - u_height: integer 0-60 (0 for laptop/desktop/dock/phone). is_full_depth: default true, false for mobile/half-depth devices.
-- Port names must be unique across all lists, 1-50 characters, ASCII only, matching ^[A-Za-z0-9_.-]+$ (no spaces or slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
+- Port names must be unique across all lists (front-ports and rear-ports may reuse each other's names), 1-50 characters, ASCII only, matching ^[A-Za-z0-9_.-]+$ (no spaces or slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
 - interfaces type: NetBox slug, e.g. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
 - ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port or other.
 - display-ports type is required: hdmi, displayport, vga or dvi (conex extension).
+- Patch panels and fiber cassettes: rear-ports {name, type, positions} (positions 1 for a plain outlet, N for an MPO trunk) and front-ports {name, type, rear_port, rear_port_position}; rear_port names a rear port of the same document. type: 8p8c, 110-punch, lc, lc-apc, sc, sc-apc, st, fc, mpo, mtrj or splice. Each slot of a rear port takes at most one front port.
 - power-ports type: e.g. dc-terminal or iec-60320-c14; add maximum_draw only if stated in the datasheet. power-outlets use the documented NetBox connector type.
 - description: one line, at most 200 characters. comments: Markdown source links, at most 2000 characters. Port descriptions: at most 200 characters.
 
@@ -479,6 +506,10 @@ End outside the YAML block with: sources, upstream hit/miss for both libraries, 
 	'import.fieldPowerPorts': 'Power inputs.',
 	'import.fieldPowerOutlets': 'Power outlets.',
 	'import.fieldDisplayPorts': 'Display ports.',
+	'import.fieldRearPorts':
+		'Patch-panel rear ports (outlets): name, type (8p8c, lc, mpo, …), positions (default 1).',
+	'import.fieldFrontPorts':
+		'Patch-panel front ports: name, type, rear_port (name of a rear port in the same document), rear_port_position (default 1).',
 	'import.createManufacturer': 'Create manufacturer "{name}"',
 	'import.manufacturerCreated': 'Manufacturer "{name}" created. Run the import again.',
 	'import.renameExisting': 'Rename existing',
@@ -708,6 +739,13 @@ End outside the YAML block with: sources, upstream hit/miss for both libraries, 
 	'device.onShelf': 'Shelf {name}',
 	'device.networkPortsCount': 'Network ports ({count})',
 	'device.otherPortsCount': 'Other ports ({count})',
+	'device.panelPortsCount': 'Patch panel ports ({count})',
+	'device.panel.front': 'Front → peer',
+	'device.panel.rear': 'Rear (outlet) → peer',
+	'device.panel.positions': '{count} positions',
+	'device.panel.frontPorts': 'Front ports',
+	'device.panel.rearPorts': 'Rear ports',
+	'device.panel.otherPorts': 'Ports',
 	'device.connected': 'connected',
 	'device.kind': 'Kind',
 	'device.alreadyConnected': 'Already connected',

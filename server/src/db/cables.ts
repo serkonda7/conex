@@ -22,6 +22,17 @@ import {
 export type CableRow = typeof cables.$inferSelect
 
 /**
+ * Pass-through group of a patch-panel port: a rear port and the front ports
+ * mapped onto it share the rear port's id. Normal ports have none.
+ */
+function passThroughGroup(iface: typeof interfaces.$inferSelect): number | null {
+	if (iface.side === 'rear') {
+		return iface.id
+	}
+	return iface.side === 'front' ? iface.rear_port_id : null
+}
+
+/**
  * Both endpoint devices of a cable sit in `tenantId` (the cable read rule of
  * `authz.ts` as SQL), so no peer name from another tenant leaks.
  */
@@ -80,7 +91,9 @@ export function getCable(id: number): Promise<Result<CableRow, Error>> {
  * endpoint is missing, which is 404):
  * - the two ends are distinct (same interface twice rejected);
  * - both interfaces exist;
- * - both interfaces are free (`connected=false`, no cable on either end).
+ * - both interfaces are free (`connected=false`, no cable on either end);
+ * - the two ends are not in the same pass-through group of a patch panel
+ *   (a front port and its own rear port, or two front ports of one rear port).
  * The insert plus both `connected=true` flips run in one transaction.
  * Same-device links are allowed when the interfaces differ (v1).
  */
@@ -98,6 +111,12 @@ export async function connectCable(input: CableCreate): Promise<Result<CableRow,
 			return Result.err(new NotFoundError(`Interface ${field} not found`))
 		}
 		ends.push(iface)
+	}
+	const [aGroup, bGroup] = ends.map(passThroughGroup)
+	if (aGroup !== null && aGroup === bGroup) {
+		return Result.err(
+			new ConflictError('Cannot connect two ports of the same pass-through on a patch panel'),
+		)
 	}
 	for (const iface of ends) {
 		if (iface.connected !== 0 || (await exists(cables, cableTouches([iface.id])))) {

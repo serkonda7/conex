@@ -26,10 +26,12 @@ import {
 	LOCATION_TYPES,
 	type LocationType,
 	NETBOX_INTERFACE_TYPES,
+	PASS_THROUGH_PORT_TYPES,
 	type Permission,
 	PHONE_TYPES,
 	type PhoneType,
 	type PortKind,
+	type PortSide,
 	RACK_FORM_FACTORS,
 	type SyncRunState,
 } from 'shared/src/schemas'
@@ -118,7 +120,20 @@ export function portKindLabel(value: string): string {
 	if (Object.hasOwn(NETBOX_INTERFACE_TYPES, value)) {
 		return NETBOX_INTERFACE_TYPES[value as keyof typeof NETBOX_INTERFACE_TYPES]
 	}
+	if (Object.hasOwn(PASS_THROUGH_PORT_TYPES, value)) {
+		return PASS_THROUGH_PORT_TYPES[value as keyof typeof PASS_THROUGH_PORT_TYPES]
+	}
 	return lookup(PORT_KIND_KEYS, value)
+}
+
+const PORT_SIDE_KEYS: Record<PortSide, MessageKey> = {
+	front: 'portSide.front',
+	rear: 'portSide.rear',
+}
+
+/** Patch-panel port side (`front` / `rear`). */
+export function portSideLabel(value: string): string {
+	return lookup(PORT_SIDE_KEYS, value)
 }
 
 const CABLE_STATUS_KEYS: Record<string, MessageKey> = {

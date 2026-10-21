@@ -8,6 +8,7 @@ import {
 	GENERAL_PORT_KINDS,
 	type ImportResponse,
 	type ImportRowResult,
+	type PortSide,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import {
@@ -43,8 +44,10 @@ const DEVICE_CSV_HEADER = [
 const CABLE_CSV_HEADER = [
 	'a_device',
 	'a_interface',
+	'a_side',
 	'b_device',
 	'b_interface',
+	'b_side',
 	'label',
 	'kind',
 	'status',
@@ -251,6 +254,10 @@ async function importDeviceTypeDefinition(
 	if (Result.isError(created)) {
 		return fail(created.error.message)
 	}
+	const passThrough = await importPassThroughPorts(created.value.id, item)
+	if (passThrough !== null) {
+		return fail(passThrough)
+	}
 	for (const [key, defaultKind] of [
 		['interfaces', 'ethernet'],
 		['ports', 'port'],
@@ -314,6 +321,89 @@ async function importDeviceTypeDefinition(
 	return { ok: true, id: created.value.id, error: null }
 }
 
+/** Mappings of one YAML component list; non-mapping entries are skipped. */
+function componentsOf(list: unknown): Record<string, unknown>[] {
+	if (!Array.isArray(list)) {
+		return []
+	}
+	return list.filter(
+		(c): c is Record<string, unknown> =>
+			Boolean(c) && typeof c === 'object' && !Array.isArray(c),
+	)
+}
+
+/** NetBox port type (`8p8c`, `lc`, `mpo`, …) as the stored kind; `other` when missing. */
+function passThroughKindOf(port: Record<string, unknown>): string {
+	const type = typeof port.type === 'string' ? port.type.trim() : ''
+	return type || 'other'
+}
+
+/**
+ * NetBox `rear-ports` (`{name, type, positions}`) and `front-ports`
+ * (`{name, type, rear_port, rear_port_position}`): each port becomes a
+ * single-port stub, a front port mapped onto the rear port of that name in
+ * the same document at an explicit position. Rear ports come first so the
+ * front ports can reference them. Answers the failure message, or null.
+ */
+async function importPassThroughPorts(
+	deviceTypeId: number,
+	item: Record<string, unknown>,
+): Promise<string | null> {
+	const rearByName = new Map<string, number>()
+	for (const port of componentsOf(item['rear-ports'])) {
+		const name = typeof port.name === 'string' ? port.name.trim() : ''
+		if (!name) {
+			continue
+		}
+		const positions = port.positions === undefined ? 1 : Number(port.positions)
+		if (!Number.isInteger(positions) || positions < 1) {
+			return `rear-ports "${name}": positions must be an integer of at least 1`
+		}
+		const stub = await createStub(deviceTypeId, {
+			prefix: name,
+			count: 1,
+			kind: passThroughKindOf(port),
+			label: typeof port.label === 'string' ? port.label : undefined,
+			description: typeof port.description === 'string' ? port.description : undefined,
+			side: 'rear',
+			positions,
+		})
+		if (Result.isError(stub)) {
+			return `rear-ports "${name}": ${stub.error.message}`
+		}
+		rearByName.set(name, stub.value.id)
+	}
+	for (const port of componentsOf(item['front-ports'])) {
+		const name = typeof port.name === 'string' ? port.name.trim() : ''
+		if (!name) {
+			continue
+		}
+		const rearName = typeof port.rear_port === 'string' ? port.rear_port.trim() : ''
+		const rearId = rearByName.get(rearName)
+		if (rearId === undefined) {
+			return `front-ports "${name}": unknown rear_port "${rearName}"`
+		}
+		const position = port.rear_port_position === undefined ? 1 : Number(port.rear_port_position)
+		if (!Number.isInteger(position) || position < 1) {
+			return `front-ports "${name}": rear_port_position must be an integer of at least 1`
+		}
+		const stub = await createStub(deviceTypeId, {
+			prefix: name,
+			count: 1,
+			kind: passThroughKindOf(port),
+			label: typeof port.label === 'string' ? port.label : undefined,
+			description: typeof port.description === 'string' ? port.description : undefined,
+			side: 'front',
+			rear_stub_id: rearId,
+			rear_position: position,
+		})
+		if (Result.isError(stub)) {
+			return `front-ports "${name}": ${stub.error.message}`
+		}
+	}
+	return null
+}
+
 /** Devices export: one row per device, names for the FK columns. */
 export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> {
 	const db = getDb()
@@ -366,7 +456,9 @@ export async function exportCablesCsv(scopeTenantId?: number): Promise<string> {
 			a_device: aDevice.name,
 			a_interface: aIface.name,
 			b_device: bDevice.name,
+			a_side: aIface.side,
 			b_interface: bIface.name,
+			b_side: bIface.side,
 			label: cables.label,
 			kind: cables.kind,
 			status: cables.status,
@@ -383,8 +475,10 @@ export async function exportCablesCsv(scopeTenantId?: number): Promise<string> {
 		rows.map((r) => [
 			r.a_device ?? '',
 			r.a_interface ?? '',
+			r.a_side,
 			r.b_device ?? '',
 			r.b_interface ?? '',
+			r.b_side,
 			r.label,
 			r.kind,
 			r.status,
@@ -510,9 +604,35 @@ export async function importCablesCsv(
 ): Promise<Result<ImportResponse, Error>> {
 	const db = getDb()
 	const deviceByName = new Map((await db.select().from(devices)).map((r) => [r.name, r]))
-	const ifaceByKey = new Map(
-		(await db.select().from(interfaces)).map((r) => [`${r.device_id}:${r.name}`, r.id]),
-	)
+	// Port names are unique per device and side, so one name may resolve to
+	// a normal, a front and a rear port of the same device.
+	const ifacesByKey = new Map<string, (typeof interfaces.$inferSelect)[]>()
+	for (const r of await db.select().from(interfaces)) {
+		const key = `${r.device_id}:${r.name}`
+		ifacesByKey.set(key, [...(ifacesByKey.get(key) ?? []), r])
+	}
+	/** Port id for one cable end, or the failure message. */
+	const resolve = (
+		end: 'a' | 'b',
+		deviceId: number,
+		deviceName: string,
+		name: string,
+		side: PortSide | undefined,
+	): number | string => {
+		const matches = (ifacesByKey.get(`${deviceId}:${name}`) ?? []).filter(
+			(r) => side === undefined || r.side === side,
+		)
+		const [match] = matches
+		if (!match) {
+			return side === undefined
+				? `Device "${deviceName}" has no interface "${name}"`
+				: `Device "${deviceName}" has no ${side} port "${name}"`
+		}
+		if (matches.length > 1) {
+			return `Interface "${name}" of device "${deviceName}" is ambiguous; set ${end}_side`
+		}
+		return match.id
+	}
 	return importCsvRows(text, CableImportRowSchema, async (input) => {
 		const aDev = deviceByName.get(input.a_device)
 		if (!aDev) {
@@ -522,13 +642,13 @@ export async function importCablesCsv(
 		if (!bDev) {
 			return `Unknown b_device "${input.b_device}"`
 		}
-		const aIfaceId = ifaceByKey.get(`${aDev.id}:${input.a_interface}`)
-		if (!aIfaceId) {
-			return `Device "${input.a_device}" has no interface "${input.a_interface}"`
+		const aIfaceId = resolve('a', aDev.id, input.a_device, input.a_interface, input.a_side)
+		if (typeof aIfaceId === 'string') {
+			return aIfaceId
 		}
-		const bIfaceId = ifaceByKey.get(`${bDev.id}:${input.b_interface}`)
-		if (!bIfaceId) {
-			return `Device "${input.b_device}" has no interface "${input.b_interface}"`
+		const bIfaceId = resolve('b', bDev.id, input.b_device, input.b_interface, input.b_side)
+		if (typeof bIfaceId === 'string') {
+			return bIfaceId
 		}
 		if (!inScope(aDev.tenant_id, scopeTenantId) || !inScope(bDev.tenant_id, scopeTenantId)) {
 			return 'Cable endpoints are outside your tenant scope'

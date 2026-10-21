@@ -43,9 +43,15 @@ import { ManagedServiceRows } from '../managed-bundles/service_rows'
 import { ConnectPortDialog, OTHER_PORT_KINDS } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
+import { PanelPortTable } from './panel_ports'
 
-/** General, power, outlet and display ports; everything else is a network port. */
-const isOtherPort = (iface: InterfaceJson): boolean => OTHER_PORT_KINDS.has(iface.kind)
+/**
+ * General, power, outlet and display ports; everything else is a network
+ * port. Patch-panel ports (with a side) are neither.
+ */
+const isOtherPort = (iface: InterfaceJson): boolean =>
+	!iface.side && OTHER_PORT_KINDS.has(iface.kind)
+const isPanelPort = (iface: InterfaceJson): boolean => iface.side !== null
 
 /** Connect or disconnect plus edit buttons of one port row. */
 function PortActions(props: {
@@ -179,7 +185,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		open(iface)
 	}
 
-	const networkPorts = createMemo(() => (ifaces() ?? []).filter((i) => !isOtherPort(i)))
+	const networkPorts = createMemo(() =>
+		(ifaces() ?? []).filter((i) => !isOtherPort(i) && !isPanelPort(i)),
+	)
+	const panelPorts = createMemo(() => (ifaces() ?? []).filter(isPanelPort))
 	const otherPorts = createMemo(() => (ifaces() ?? []).filter(isOtherPort))
 	/** 1-based network port number: position in creation order (eth1..ethN). */
 	const portNumbers = createMemo(
@@ -371,10 +380,20 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					/>
 				</DetailCard>
 			</DetailShell>
-			<h3 id="device-interfaces">
-				{t('device.networkPortsCount', { count: networkPorts().length })}
-			</h3>
-			{portTable(networkPorts, networkColumns)}
+			<Show when={panelPorts().length > 0}>
+				<h3 id="device-panel-ports">
+					{t('device.panelPortsCount', {
+						count: panelPorts().filter((p) => p.side === 'rear').length,
+					})}
+				</h3>
+				<PanelPortTable ports={panelPorts()} links={linksByIface()} actions={portActions} />
+			</Show>
+			<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
+				<h3 id="device-interfaces">
+					{t('device.networkPortsCount', { count: networkPorts().length })}
+				</h3>
+				{portTable(networkPorts, networkColumns)}
+			</Show>
 			<Show when={otherPorts().length > 0}>
 				<h3 id="device-other-ports">
 					{t('device.otherPortsCount', { count: otherPorts().length })}
@@ -429,7 +448,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<EditPortDialog
 						device_id={props.id}
 						iface={iface()}
-						show_enabled={!isOtherPort(iface())}
+						show_enabled={!isOtherPort(iface()) && !isPanelPort(iface())}
 						on_saved={() => {
 							setEditingIface(null)
 							void refetchIfaces()

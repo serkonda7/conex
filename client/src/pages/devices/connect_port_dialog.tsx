@@ -1,7 +1,10 @@
 import { Result } from 'better-result'
 import {
+	COPPER_PASS_THROUGH_TYPES,
 	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
+	PASS_THROUGH_PORT_TYPES,
+	type PortSide,
 	SERIAL_PORT_KINDS,
 	USB_PORT_KINDS,
 } from 'shared/src/schemas'
@@ -14,7 +17,7 @@ import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Modal } from '../../components/modal'
 import { ObjectSearch } from '../../components/object_selector'
 import { t } from '../../i18n'
-import { portKindLabel } from '../../i18n/labels'
+import { portKindLabel, portSideLabel } from '../../i18n/labels'
 import { useAction } from '../../lib/resource'
 import { useDeviceSearch } from './device_search'
 
@@ -29,16 +32,38 @@ export const OTHER_PORT_KINDS = new Set<string>([
 
 const POWER_PORT_KINDS = new Set(['power', 'power-outlet'])
 
+/** Patch-panel connectors (fiber, …) that only cable to their own kind; copper cables like ethernet. */
+const SAME_KIND_PASS_THROUGH = new Set<string>(
+	Object.keys(PASS_THROUGH_PORT_TYPES).filter(
+		(k) => !(COPPER_PASS_THROUGH_TYPES as readonly string[]).includes(k),
+	),
+)
+
+/** Pass-through group of a panel port (its rear port's id); see `server/src/db/cables.ts`. */
+function passThroughGroup(iface: InterfaceJson): number | null {
+	if (iface.side === 'rear') {
+		return iface.id
+	}
+	return iface.side === 'front' ? iface.rear_port_id : null
+}
+
 /** Connector families cabled across connectors (rollover, USB-A to USB-C, …). */
 const PORT_FAMILIES = [new Set<string>(SERIAL_PORT_KINDS), new Set<string>(USB_PORT_KINDS)]
 
 /**
  * Network ports pair with network ports; a power port pairs with a power port
  * or outlet (never outlet to outlet); general ports pair within their
- * connector family, a plain `port` with any general port; display only with
- * the same kind.
+ * connector family, a plain `port` with any general port; display and fiber
+ * only with the same kind. Two ports of one pass-through never pair.
  */
 function isCompatible(local: InterfaceJson, peer: InterfaceJson): boolean {
+	const group = passThroughGroup(local)
+	if (group !== null && group === passThroughGroup(peer)) {
+		return false
+	}
+	if (SAME_KIND_PASS_THROUGH.has(local.kind) || SAME_KIND_PASS_THROUGH.has(peer.kind)) {
+		return local.kind === peer.kind
+	}
 	if (POWER_PORT_KINDS.has(local.kind) && POWER_PORT_KINDS.has(peer.kind)) {
 		return local.kind === 'power' || peer.kind === 'power'
 	}
@@ -64,6 +89,14 @@ interface PortOption {
 	iface: InterfaceJson
 	link?: TraceLink
 }
+
+/** Tile groups of a peer device: its normal ports, then front and rear ports. */
+const PORT_GROUPS: readonly (PortSide | null)[] = [null, 'front', 'rear']
+
+const GROUP_HEADINGS = {
+	front: 'device.panel.frontPorts',
+	rear: 'device.panel.rearPorts',
+} as const
 
 export interface ConnectPortDialogProps {
 	/** Local port the cable starts at. */
@@ -132,6 +165,56 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 						(p.link?.peer_device.name.toLowerCase().includes(needle) ?? false),
 				)
 	})
+
+	/** Visible tiles grouped by side; empty groups are left out. */
+	const portGroups = createMemo(() =>
+		PORT_GROUPS.map((side) => ({
+			side,
+			ports: visiblePorts().filter((p) => (p.iface.side ?? null) === side),
+		})).filter((g) => g.ports.length > 0),
+	)
+
+	const portTile = ({ iface, link }: PortOption): JSX.Element => (
+		<button
+			type="button"
+			class="port-tile"
+			classList={{
+				selected: peerIface()?.id === iface.id,
+			}}
+			aria-pressed={peerIface()?.id === iface.id}
+			disabled={iface.connected}
+			title={
+				link
+					? `${link.peer_device.name}: ${link.peer_interface.name}`
+					: iface.connected
+						? t('device.alreadyConnected')
+						: undefined
+			}
+			onClick={(): void => {
+				setPeerIface(iface)
+			}}
+			onDblClick={(): void => void connect(iface)}
+		>
+			<span class="port-tile-name">
+				{iface.name}
+				<Show when={iface.side}>
+					{(side: () => PortSide): JSX.Element => (
+						<>
+							{' '}
+							<span class="port-side-badge">{portSideLabel(side())}</span>
+						</>
+					)}
+				</Show>
+			</span>
+			<small>
+				{link
+					? `→ ${link.peer_device.name}`
+					: iface.connected
+						? t('device.connected')
+						: portKindLabel(iface.kind)}
+			</small>
+		</button>
+	)
 
 	/** Device search results with already connected devices sorted last. */
 	async function loadDevices(search: string): Promise<Result<DeviceRow[], Error>> {
@@ -235,39 +318,30 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 									when={visiblePorts().length > 0}
 									fallback={<Empty message={t('common.noMatchingObjects')} />}
 								>
-									<div class="port-grid">
-										<For each={visiblePorts()}>
-											{({ iface, link }: PortOption) => (
-												<button
-													type="button"
-													class="port-tile"
-													classList={{
-														selected: peerIface()?.id === iface.id,
-													}}
-													aria-pressed={peerIface()?.id === iface.id}
-													disabled={iface.connected}
-													title={
-														link
-															? `${link.peer_device.name}: ${link.peer_interface.name}`
-															: iface.connected
-																? t('device.alreadyConnected')
-																: undefined
+									<For each={portGroups()}>
+										{(group: {
+											side: PortSide | null
+											ports: PortOption[]
+										}): JSX.Element => (
+											<>
+												<Show
+													when={
+														group.side !== null ||
+														portGroups().length > 1
 													}
-													onClick={() => setPeerIface(iface)}
-													onDblClick={() => void connect(iface)}
 												>
-													<span class="port-tile-name">{iface.name}</span>
-													<small>
-														{link
-															? `→ ${link.peer_device.name}`
-															: iface.connected
-																? t('device.connected')
-																: portKindLabel(iface.kind)}
-													</small>
-												</button>
-											)}
-										</For>
-									</div>
+													<h4 class="port-group-heading">
+														{group.side === null
+															? t('device.panel.otherPorts')
+															: t(GROUP_HEADINGS[group.side])}
+													</h4>
+												</Show>
+												<div class="port-grid">
+													<For each={group.ports}>{portTile}</For>
+												</div>
+											</>
+										)}
+									</For>
 								</Show>
 							</Show>
 						</Show>

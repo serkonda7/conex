@@ -20,6 +20,7 @@ import type {
 	DeviceUpdate,
 	InterfaceCreate,
 	InterfaceUpdate,
+	PortSide,
 } from 'shared/src/schemas'
 import {
 	device_roles,
@@ -565,14 +566,29 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 				const deviceId = insertedId(
 					await tx.insert(devices).values(values).returning({ id: devices.id }),
 				)
+				// Expansion lists rear ports before the front ports that map
+				// onto them, so their ids are known by then.
+				const ids: number[] = []
 				for (const iface of expanded.value) {
-					await tx.insert(interfaces).values({
-						device_id: deviceId,
-						name: iface.name,
-						kind: iface.kind,
-						connected: 0,
-						description: iface.description ?? iface.label,
-					})
+					const rearPortId = iface.rear_index === null ? null : ids[iface.rear_index]
+					ids.push(
+						insertedId(
+							await tx
+								.insert(interfaces)
+								.values({
+									device_id: deviceId,
+									name: iface.name,
+									kind: iface.kind,
+									connected: 0,
+									description: iface.description ?? iface.label,
+									side: iface.side,
+									positions: iface.positions,
+									rear_port_id: rearPortId ?? null,
+									rear_port_position: iface.rear_port_position,
+								})
+								.returning({ id: interfaces.id }),
+						),
+					)
 				}
 				return deviceId
 			}),
@@ -784,7 +800,7 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 // Interfaces
 // ---------------------------------------------------------------------------
 
-const INTERFACE_NAME_IN_USE = 'This device already has an interface with this name'
+const INTERFACE_NAME_IN_USE = 'This device already has an interface with this name on this side'
 
 export async function listInterfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
 	const device = await getDevice(deviceId)
@@ -874,8 +890,103 @@ export async function getInterface(
 	return Result.ok(toInterfaceJson(row))
 }
 
-function interfaceNameTaken(deviceId: number, name: string): Promise<boolean> {
-	return isTaken(interfaces, and(eq(interfaces.device_id, deviceId), eq(interfaces.name, name)))
+/** Port names are unique per device and side (normal, front, rear). */
+function interfaceNameTaken(
+	deviceId: number,
+	side: PortSide | null,
+	name: string,
+): Promise<boolean> {
+	return isTaken(
+		interfaces,
+		and(
+			eq(interfaces.device_id, deviceId),
+			side === null ? isNull(interfaces.side) : eq(interfaces.side, side),
+			eq(interfaces.name, name),
+		),
+	)
+}
+
+/**
+ * Guards the pass-through mapping of a front port: the rear port is a rear
+ * port of the same device, the position lies within its positions, and no
+ * other front port takes that slot. `excludeId` skips the port being updated.
+ */
+async function checkRearMapping(
+	deviceId: number,
+	rearPortId: number,
+	position: number,
+	excludeId?: number,
+): Promise<Result<undefined, Error>> {
+	const rear = await findOne(
+		interfaces,
+		and(eq(interfaces.id, rearPortId), eq(interfaces.device_id, deviceId)),
+	)
+	if (rear?.side !== 'rear') {
+		return Result.err(new NotFoundError('Rear port not found on this device'))
+	}
+	if (position > rear.positions) {
+		return Result.err(
+			new ConflictError(`Rear port ${rear.name} has only ${rear.positions} positions`),
+		)
+	}
+	const taken = await findOne(
+		interfaces,
+		and(eq(interfaces.rear_port_id, rearPortId), eq(interfaces.rear_port_position, position)),
+	)
+	if (taken && taken.id !== excludeId) {
+		return Result.err(
+			new ConflictError(
+				`Position ${position} of rear port ${rear.name} is taken by front port ${taken.name}`,
+			),
+		)
+	}
+	return Result.ok(undefined)
+}
+
+const REAR_SLOT_OR_NAME_TAKEN = 'Port name or rear port position is already taken'
+
+/**
+ * Pass-through fields of a port patch: positions only on rear ports (and
+ * never below a mapped front port's position), the rear mapping only on
+ * front ports.
+ */
+async function checkPassThroughPatch(
+	iface: InterfaceJson,
+	input: InterfaceUpdate,
+): Promise<Result<undefined, Error>> {
+	if (input.positions !== undefined && input.positions !== iface.positions) {
+		if (iface.side !== 'rear') {
+			return Result.err(new ConflictError('Positions are only allowed on rear ports'))
+		}
+		const beyond = await findOne(
+			interfaces,
+			and(
+				eq(interfaces.rear_port_id, iface.id),
+				sql`${interfaces.rear_port_position} > ${input.positions}`,
+			),
+		)
+		if (beyond) {
+			return Result.err(
+				new ConflictError(
+					`Front port ${beyond.name} uses position ${beyond.rear_port_position ?? ''}`,
+				),
+			)
+		}
+	}
+	if (input.rear_port_id !== undefined || input.rear_port_position !== undefined) {
+		if (iface.side !== 'front') {
+			return Result.err(
+				new ConflictError('A rear port mapping is only allowed on front ports'),
+			)
+		}
+		return checkRearMapping(
+			iface.device_id,
+			input.rear_port_id ?? iface.rear_port_id ?? 0,
+			input.rear_port_position ?? iface.rear_port_position ?? 1,
+			iface.id,
+		)
+	}
+	return Result.ok(undefined)
 }
 
 export async function addInterface(
@@ -886,8 +997,16 @@ export async function addInterface(
 	if (Result.isError(device)) {
 		return device
 	}
-	if (await interfaceNameTaken(deviceId, input.name)) {
+	const side = input.side ?? null
+	if (await interfaceNameTaken(deviceId, side, input.name)) {
 		return Result.err(new DuplicateError(INTERFACE_NAME_IN_USE))
+	}
+	const rearPosition = input.rear_port_position ?? 1
+	if (input.rear_port_id !== undefined) {
+		const mapping = await checkRearMapping(deviceId, input.rear_port_id, rearPosition)
+		if (Result.isError(mapping)) {
+			return mapping
+		}
 	}
 	const row: Omit<InterfaceRow, 'id'> = {
 		device_id: deviceId,
@@ -896,13 +1015,17 @@ export async function addInterface(
 		connected: 0,
 		enabled: input.enabled === false ? 0 : 1,
 		description: input.description ?? null,
+		side,
+		positions: input.positions ?? 1,
+		rear_port_id: input.rear_port_id ?? null,
+		rear_port_position: input.rear_port_id === undefined ? null : rearPosition,
 	}
 	const id = await tryWrite(
 		async () =>
 			insertedId(
 				await getDb().insert(interfaces).values(row).returning({ id: interfaces.id }),
 			),
-		INTERFACE_NAME_IN_USE,
+		REAR_SLOT_OR_NAME_TAKEN,
 	)
 	if (Result.isError(id)) {
 		return id
@@ -919,21 +1042,33 @@ export async function updateInterface(
 	if (Result.isError(current)) {
 		return current
 	}
+	const iface = current.value
 	if (
 		input.name !== undefined &&
-		input.name !== current.value.name &&
-		(await interfaceNameTaken(deviceId, input.name))
+		input.name !== iface.name &&
+		(await interfaceNameTaken(deviceId, iface.side, input.name))
 	) {
 		return Result.err(new DuplicateError(INTERFACE_NAME_IN_USE))
 	}
-	const patch: Partial<InterfaceRow> = pickDefined(input, ['name', 'kind', 'description'])
+	const shape = await checkPassThroughPatch(iface, input)
+	if (Result.isError(shape)) {
+		return shape
+	}
+	const patch: Partial<InterfaceRow> = pickDefined(input, [
+		'name',
+		'kind',
+		'description',
+		'positions',
+		'rear_port_id',
+		'rear_port_position',
+	])
 	if (input.enabled !== undefined) {
 		patch.enabled = input.enabled ? 1 : 0
 	}
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId)),
-			INTERFACE_NAME_IN_USE,
+			REAR_SLOT_OR_NAME_TAKEN,
 		)
 		if (Result.isError(written)) {
 			return written

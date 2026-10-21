@@ -718,6 +718,42 @@ export const PORT_KINDS = [
 
 export type PortKind = (typeof PORT_KINDS)[number]
 
+/**
+ * Patch-panel pass-through sides: front ports (incoming) map onto rear
+ * ports (outgoing, e.g. a wall outlet). A port without a side is a normal
+ * port.
+ */
+export const PORT_SIDES = ['front', 'rear'] as const
+export type PortSide = (typeof PORT_SIDES)[number]
+export const PortSideSchema = v.picklist(PORT_SIDES)
+
+/**
+ * Connector types of front and rear ports (NetBox port types) with their
+ * NetBox display names; technical identifiers, so untranslated. Copper
+ * connectors cable like network ports, every other type only to its own kind.
+ */
+export const PASS_THROUGH_PORT_TYPES = {
+	'8p8c': '8P8C',
+	'110-punch': '110 Punch',
+	lc: 'LC',
+	'lc-apc': 'LC/APC',
+	sc: 'SC',
+	'sc-apc': 'SC/APC',
+	st: 'ST',
+	fc: 'FC',
+	mpo: 'MPO',
+	mtrj: 'MTRJ',
+	splice: 'Splice',
+} as const
+
+export type PassThroughPortType = keyof typeof PASS_THROUGH_PORT_TYPES
+
+/** Pass-through types that cable like network ports (copper). */
+export const COPPER_PASS_THROUGH_TYPES: readonly PassThroughPortType[] = ['8p8c', '110-punch']
+
+/** Positions of one rear port: 1 for a plain outlet, N for a trunk (MPO). */
+export const PortPositionsSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
+
 /** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `usb-c`, `hdmi`). */
 export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
 
@@ -786,20 +822,51 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
-export const StubCreateSchema = v.strictObject({
-	prefix: InterfacePrefixSchema,
-	count: v.optional(StubCountSchema, 1),
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	label: v.optional(v.nullable(StubLabelSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
-})
+/**
+ * Template stub. `side` makes it a patch-panel stub: rear stubs carry
+ * `positions`, front stubs map onto a rear stub of the same type starting
+ * at slot `rear_position` (expansion in `server/src/services/templates.ts`).
+ */
+export const StubCreateSchema = v.pipe(
+	v.strictObject({
+		prefix: InterfacePrefixSchema,
+		count: v.optional(StubCountSchema, 1),
+		kind: v.optional(InterfaceKindSchema, 'ethernet'),
+		label: v.optional(v.nullable(StubLabelSchema), undefined),
+		description: v.optional(
+			v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+			undefined,
+		),
+		side: v.optional(v.nullable(PortSideSchema), undefined),
+		positions: v.optional(PortPositionsSchema, undefined),
+		rear_stub_id: v.optional(IdSchema, undefined),
+		rear_position: v.optional(PortPositionsSchema, undefined),
+	}),
+	v.check(
+		(s) => s.positions === undefined || s.positions === 1 || s.side === 'rear',
+		'Positions are only allowed on rear ports',
+	),
+	v.check(
+		(s) =>
+			(s.rear_stub_id === undefined && s.rear_position === undefined) || s.side === 'front',
+		'A rear port mapping is only allowed on front ports',
+	),
+	v.check(
+		(s) => s.side !== 'front' || s.rear_stub_id !== undefined,
+		'Front ports need a rear port',
+	),
+)
 
+/** Stub patch; the side is fixed after create. */
 export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
 	count: v.optional(StubCountSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	label: v.optional(v.nullable(StubLabelSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	positions: v.optional(PortPositionsSchema, undefined),
+	rear_stub_id: v.optional(IdSchema, undefined),
+	rear_position: v.optional(PortPositionsSchema, undefined),
 })
 
 export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
@@ -843,6 +910,11 @@ export interface ExpandedInterface {
 	kind: string
 	label: string | null
 	description: string | null
+	side: PortSide | null
+	positions: number
+	/** Front ports: index of their rear port in the expanded list, and the slot on it. */
+	rear_index: number | null
+	rear_port_position: number | null
 }
 
 // ---------------------------------------------------------------------------
@@ -851,7 +923,15 @@ export interface ExpandedInterface {
 // ---------------------------------------------------------------------------
 
 /** Built-in device roles: seeded by migration, never renamed or deleted. */
-export const DEVICE_ROLE_KEYS = ['pc', 'server', 'ap', 'firewall', 'cloud-key', 'switch'] as const
+export const DEVICE_ROLE_KEYS = [
+	'pc',
+	'server',
+	'ap',
+	'firewall',
+	'cloud-key',
+	'switch',
+	'patch-panel',
+] as const
 export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
 
 /** Icons a device role can show next to its name; the client maps each to a glyph. */
@@ -1194,19 +1274,48 @@ export const DeviceMoveSchema = v.pipe(
 	),
 )
 
-export const InterfaceCreateSchema = v.strictObject({
-	name: InterfaceNameSchema,
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	enabled: v.optional(v.boolean(), undefined),
-	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
-})
+/**
+ * Port create body. `side` makes it a patch-panel port: rear ports carry
+ * `positions`, front ports name a rear port of the same device and a slot
+ * on it.
+ */
+export const InterfaceCreateSchema = v.pipe(
+	v.strictObject({
+		name: InterfaceNameSchema,
+		kind: v.optional(InterfaceKindSchema, 'ethernet'),
+		enabled: v.optional(v.boolean(), undefined),
+		description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+		side: v.optional(v.nullable(PortSideSchema), undefined),
+		positions: v.optional(PortPositionsSchema, undefined),
+		rear_port_id: v.optional(IdSchema, undefined),
+		rear_port_position: v.optional(PortPositionsSchema, undefined),
+	}),
+	v.check(
+		(i) => i.positions === undefined || i.positions === 1 || i.side === 'rear',
+		'Positions are only allowed on rear ports',
+	),
+	v.check(
+		(i) =>
+			(i.rear_port_id === undefined && i.rear_port_position === undefined) ||
+			i.side === 'front',
+		'A rear port mapping is only allowed on front ports',
+	),
+	v.check(
+		(i) => i.side !== 'front' || i.rear_port_id !== undefined,
+		'Front ports need a rear port',
+	),
+)
 
+/** Port patch; the side is fixed after create. */
 export const InterfaceUpdateSchema = v.strictObject({
 	// `connected` is owned by P5 cables, never edited directly.
 	name: v.optional(InterfaceNameSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	enabled: v.optional(v.boolean(), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	positions: v.optional(PortPositionsSchema, undefined),
+	rear_port_id: v.optional(IdSchema, undefined),
+	rear_port_position: v.optional(PortPositionsSchema, undefined),
 })
 
 export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
@@ -2063,6 +2172,9 @@ export const CableImportRowSchema = v.object({
 	a_interface: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	b_device: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
 	b_interface: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+	/** Port side when the name exists on several sides of a panel (NetBox termination type). */
+	a_side: v.optional(PortSideSchema, undefined),
+	b_side: v.optional(PortSideSchema, undefined),
 	label: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), undefined),
 	kind: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50)), undefined),
 	status: v.optional(CableStatusSchema, 'connected'),

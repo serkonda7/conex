@@ -1,11 +1,13 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
+import { PASS_THROUGH_PORT_TYPES, type PassThroughPortType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
-import { create_stub } from '../../api/templates'
+import { create_stub, delete_stub, type StubRow } from '../../api/templates'
 import { InlineError } from '../../components/feedback'
 import { DescriptionField, Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
-import { t } from '../../i18n'
+import { type MessageKey, t } from '../../i18n'
 import { portKindLabel } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { text } from '../../lib/form'
@@ -14,9 +16,29 @@ import { COMPONENT_CLASSES, type ComponentClassInfo } from './components'
 
 const MAX_COUNT = 1024
 
-/** "Add components" button whose dropdown lists the component classes (NetBox-style). */
+/** Quick-add presets of patch-panel port pairs. */
+export type PassThroughPreset = 'patch-panel' | 'cassette'
+
+const PRESETS: readonly { key: PassThroughPreset; label: MessageKey }[] = [
+	{ key: 'patch-panel', label: 'deviceType.preset.patchPanel' },
+	{ key: 'cassette', label: 'deviceType.preset.cassette' },
+]
+
+const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
+
+/** Integer in `1..MAX_COUNT` from a number field, or null. */
+function parseCount(value: string): number | null {
+	const n = Number(value)
+	return Number.isInteger(n) && n >= 1 && n <= MAX_COUNT ? n : null
+}
+
+/**
+ * "Add components" button whose dropdown lists the component classes
+ * (NetBox-style), followed by the patch-panel presets.
+ */
 export function AddComponentMenu(props: {
 	onSelect: (info: ComponentClassInfo) => void
+	onPreset: (preset: PassThroughPreset) => void
 }): JSX.Element {
 	const [open, setOpen] = createSignal(false)
 	useDismiss('.add-component-menu', () => setOpen(false))
@@ -54,6 +76,22 @@ export function AddComponentMenu(props: {
 							</button>
 						)}
 					</For>
+					<hr />
+					<For each={PRESETS}>
+						{(preset: (typeof PRESETS)[number]): JSX.Element => (
+							<button
+								type="button"
+								role="menuitem"
+								class="add-component-item"
+								onClick={() => {
+									setOpen(false)
+									props.onPreset(preset.key)
+								}}
+							>
+								{t(preset.label)}
+							</button>
+						)}
+					</For>
 				</div>
 			</Show>
 		</div>
@@ -62,16 +100,23 @@ export function AddComponentMenu(props: {
 
 /**
  * Add form for one component class: a name with a count (count N > 1 expands
- * to `name1..nameN`), the class's kinds, label and description.
+ * to `name1..nameN`), the class's kinds, label and description. Rear ports
+ * add their positions, front ports the rear port they map onto and the
+ * first position they take there.
  */
 export function AddComponentDialog(props: {
 	deviceTypeId: number
 	info: ComponentClassInfo
+	/** Rear port stubs of the type, offered to front ports. */
+	rearStubs: StubRow[]
 	onSaved: () => void
 	onClose: () => void
 }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [count, setCount] = createSignal('1')
+	const [positions, setPositions] = createSignal('1')
+	const [rearStub, setRearStub] = createSignal(String(props.rearStubs[0]?.id ?? ''))
+	const [rearPosition, setRearPosition] = createSignal('1')
 	const [kind, setKind] = createSignal<string>(props.info.kinds[0] ?? 'ethernet')
 	const [label, setLabel] = createSignal('')
 	const [description, setDescription] = createSignal('')
@@ -97,8 +142,15 @@ export function AddComponentDialog(props: {
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		if (!countValid()) {
+		const side = props.info.side
+		const parsedPositions = parseCount(positions())
+		const parsedRearPosition = parseCount(rearPosition())
+		if (!countValid() || parsedPositions === null || parsedRearPosition === null) {
 			setError(t('deviceType.component.countInvalid', { max: MAX_COUNT }))
+			return
+		}
+		if (side === 'front' && !rearStub()) {
+			setError(t('deviceType.component.rearPortRequired'))
 			return
 		}
 		const ok = await save.run(() =>
@@ -108,6 +160,11 @@ export function AddComponentDialog(props: {
 				kind: kind(),
 				label: text(label()),
 				description: text(description()),
+				...(side ? { side } : {}),
+				...(side === 'rear' ? { positions: parsedPositions } : {}),
+				...(side === 'front'
+					? { rear_stub_id: Number(rearStub()), rear_position: parsedRearPosition }
+					: {}),
 			}),
 		)
 		if (ok) {
@@ -148,6 +205,58 @@ export function AddComponentDialog(props: {
 					value={count()}
 					onInput={setCount}
 				/>
+				<Show when={props.info.side === 'rear'}>
+					<TextField
+						id={`${prefix}-positions`}
+						label={t('deviceType.component.positions')}
+						type="number"
+						required
+						min={1}
+						max={MAX_COUNT}
+						step={1}
+						inputmode="numeric"
+						value={positions()}
+						onInput={setPositions}
+						hint={<Hint>{t('deviceType.component.positionsHint')}</Hint>}
+					/>
+				</Show>
+				<Show when={props.info.side === 'front'}>
+					<SelectField
+						id={`${prefix}-rear`}
+						label={t('deviceType.component.rearPort')}
+						required
+						value={rearStub()}
+						onChange={setRearStub}
+						emptyLabel={
+							props.rearStubs.length === 0
+								? t('deviceType.component.noRearPorts')
+								: undefined
+						}
+						options={props.rearStubs.map((r) => ({
+							value: String(r.id),
+							label:
+								r.count === 1
+									? r.prefix
+									: t('deviceType.component.range', {
+											first: `${r.prefix}1`,
+											last: `${r.prefix}${r.count}`,
+										}),
+						}))}
+					/>
+					<TextField
+						id={`${prefix}-rear-position`}
+						label={t('deviceType.component.rearPosition')}
+						type="number"
+						required
+						min={1}
+						max={MAX_COUNT}
+						step={1}
+						inputmode="numeric"
+						value={rearPosition()}
+						onInput={setRearPosition}
+						hint={<Hint>{t('deviceType.component.rearPositionHint')}</Hint>}
+					/>
+				</Show>
 				<SelectField
 					id={`${prefix}-kind`}
 					label={t('common.type')}
@@ -171,6 +280,126 @@ export function AddComponentDialog(props: {
 					value={description()}
 					onInput={setDescription}
 				/>
+				<div class="modal-actions">
+					<button type="submit" disabled={!name().trim() || save.pending()}>
+						{t('common.create')}
+					</button>
+					<button type="button" onClick={props.onClose}>
+						{t('common.cancel')}
+					</button>
+				</div>
+			</form>
+			<InlineError message={error()} alert />
+		</Modal>
+	)
+}
+
+/**
+ * Quick-add of a front/rear port set: a patch panel pairs N front ports
+ * with N single-position rear ports (N:N), a cassette maps N front ports
+ * onto the N positions of one MPO rear port (N:1×N). The rear stub is
+ * created first; the front stub then maps onto it from position 1.
+ */
+export function PassThroughPresetDialog(props: {
+	deviceTypeId: number
+	preset: PassThroughPreset
+	onSaved: () => void
+	onClose: () => void
+}): JSX.Element {
+	const cassette = props.preset === 'cassette'
+	const [name, setName] = createSignal('')
+	const [count, setCount] = createSignal(cassette ? '12' : '24')
+	const [kind, setKind] = createSignal<string>(cassette ? 'lc' : '8p8c')
+	const [rearName, setRearName] = createSignal('MPO')
+	const [error, setError] = createSignal<string | null>(null)
+	const save = useAction(setError)
+	const prefix = `preset-${props.preset}`
+
+	async function handleSubmit(e: SubmitEvent): Promise<void> {
+		e.preventDefault()
+		const n = parseCount(count())
+		if (n === null) {
+			setError(t('deviceType.component.countInvalid', { max: MAX_COUNT }))
+			return
+		}
+		const front = name().trim()
+		const ok = await save.run(async () => {
+			const rear = await create_stub(props.deviceTypeId, {
+				prefix: cassette ? rearName().trim() : front,
+				count: cassette ? 1 : n,
+				kind: cassette ? 'mpo' : kind(),
+				side: 'rear',
+				positions: cassette ? n : 1,
+			})
+			if (Result.isError(rear)) {
+				return rear
+			}
+			const created = await create_stub(props.deviceTypeId, {
+				prefix: front,
+				count: n,
+				kind: kind(),
+				side: 'front',
+				rear_stub_id: rear.value.id,
+				rear_position: 1,
+			})
+			if (Result.isError(created)) {
+				// Keep the template free of a half-added set.
+				await delete_stub(props.deviceTypeId, rear.value.id)
+			}
+			return created
+		})
+		if (ok) {
+			props.onSaved()
+		}
+	}
+
+	return (
+		<Modal
+			title={t(cassette ? 'deviceType.preset.cassette' : 'deviceType.preset.patchPanel')}
+			on_close={props.onClose}
+		>
+			<form class="form-stacked" onSubmit={handleSubmit}>
+				<TextField
+					id={`${prefix}-name`}
+					label={t('deviceType.preset.frontName')}
+					placeholder="Port"
+					maxLength={50}
+					required
+					autofocus
+					value={name()}
+					onInput={setName}
+					hint={<Hint>{t('deviceType.preset.nameHint')}</Hint>}
+				/>
+				<TextField
+					id={`${prefix}-count`}
+					label={t(cassette ? 'deviceType.preset.fibers' : 'deviceType.component.count')}
+					type="number"
+					required
+					min={1}
+					max={MAX_COUNT}
+					step={1}
+					inputmode="numeric"
+					value={count()}
+					onInput={setCount}
+				/>
+				<SelectField
+					id={`${prefix}-kind`}
+					label={t('deviceType.preset.frontType')}
+					required
+					value={kind()}
+					onChange={setKind}
+					options={PASS_THROUGH_KINDS.map((k) => ({ value: k, label: portKindLabel(k) }))}
+				/>
+				<Show when={cassette}>
+					<TextField
+						id={`${prefix}-rear-name`}
+						label={t('deviceType.preset.rearName')}
+						maxLength={50}
+						required
+						value={rearName()}
+						onInput={setRearName}
+					/>
+				</Show>
 				<div class="modal-actions">
 					<button type="submit" disabled={!name().trim() || save.pending()}>
 						{t('common.create')}

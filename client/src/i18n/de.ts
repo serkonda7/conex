@@ -46,6 +46,8 @@ export const de: Messages = {
 	'common.unitPosition': 'HE{u}',
 	'face.front': 'Vorne',
 	'face.rear': 'Hinten',
+	'portSide.front': 'Frontport',
+	'portSide.rear': 'Rückport',
 	'portKind.ethernet': 'Ethernet',
 	'portKind.port': 'Anschluss',
 	'portKind.rj45': 'RJ-45 (seriell)',
@@ -432,6 +434,30 @@ export const de: Messages = {
 	'deviceType.component.powerOutlets': 'Steckdosen ({count})',
 	'deviceType.component.displayPort': 'Bildschirmanschlüsse',
 	'deviceType.component.displayPorts': 'Bildschirmanschlüsse ({count})',
+	'deviceType.component.frontPort': 'Frontports',
+	'deviceType.component.frontPorts': 'Frontports ({count})',
+	'deviceType.component.rearPort': 'Rückports',
+	'deviceType.component.rearPorts': 'Rückports ({count})',
+	'deviceType.component.positions': 'Positionen',
+	'deviceType.component.positionsHint':
+		'1 für eine Dose; mehr für einen Trunk wie MPO (eine Position je Faser).',
+	'deviceType.component.positionsCount.one': '{count} Position',
+	'deviceType.component.positionsCount.other': '{count} Positionen',
+	'deviceType.component.rearPosition': 'Ab Position',
+	'deviceType.component.rearPositionHint':
+		'Frontports belegen ab hier fortlaufende Positionen auf den Rückports.',
+	'deviceType.component.rearPortRequired': 'Rückport auswählen.',
+	'deviceType.component.noRearPorts': 'Zuerst Rückports anlegen',
+	'deviceType.component.mapping': 'Zuordnung',
+	'deviceType.component.mapsTo': '→ {rear} ab Position {position}',
+	'deviceType.preset.patchPanel': 'Patchpanel (N Ports)',
+	'deviceType.preset.cassette': 'Kassette (N × MPO)',
+	'deviceType.preset.frontName': 'Name der Frontports',
+	'deviceType.preset.nameHint':
+		'Front- und Rückports tragen denselben Namen; Port N vorne führt auf Port N hinten.',
+	'deviceType.preset.fibers': 'Fasern',
+	'deviceType.preset.frontType': 'Fronttyp',
+	'deviceType.preset.rearName': 'Name des Rückports',
 	'deviceType.notFound': 'Gerätetyp nicht gefunden.',
 	'deviceType.details': 'Gerätetypdetails',
 	'deviceType.noDevices': 'Noch keine Geräte dieses Typs vorhanden.',
@@ -455,15 +481,16 @@ Quellenpriorität:
 
 Gib genau ein YAML-Dokument aus, beginnend mit ---, in einem abgegrenzten YAML-Codeblock. Nenne den Zielpfad device-types/<Manufacturer>/<model-slug>.yaml außerhalb des Blocks. Die Quellenübersicht muss außerhalb des YAML stehen, damit der Block direkt in conex eingefügt werden kann.
 
-Nur diese Schlüssel ausgeben: manufacturer, model, slug, u_height, is_full_depth, description, comments, interfaces, ports, power-ports, power-outlets, display-ports. console-ports ist beim Import ein Alias für ports; bevorzuge ports und dupliziere keine Einträge in beiden Listen. Beim Anpassen einer Vorlage alle anderen NetBox-Schlüssel entfernen.
+Nur diese Schlüssel ausgeben: manufacturer, model, slug, u_height, is_full_depth, description, comments, interfaces, ports, power-ports, power-outlets, display-ports, rear-ports, front-ports. console-ports ist beim Import ein Alias für ports; bevorzuge ports und dupliziere keine Einträge in beiden Listen. Beim Anpassen einer Vorlage alle anderen NetBox-Schlüssel entfernen.
 
 Regeln:
 - manufacturer muss dem Verzeichnisnamen entsprechen. manufacturer und model: 1–100 Zeichen. slug: 1–100 Zeichen, ^[-a-z0-9_]+$, Form <mfr-slug>-<model-slug>.
 - u_height: ganze Zahl 0–60 (0 für Laptop/Desktop/Dock/Telefon). is_full_depth: standardmäßig true, false für mobile Geräte oder halbe Tiefe.
-- Anschlussnamen müssen über alle Listen hinweg eindeutig sein, 1–50 Zeichen, nur ASCII, passend zu ^[A-Za-z0-9_.-]+$ (keine Leerzeichen oder Schrägstriche). Namen aus Vorlagen beim Anpassen normalisieren. Nirgendwo leere Zeichenketten ausgeben.
+- Anschlussnamen müssen über alle Listen hinweg eindeutig sein (front-ports und rear-ports dürfen die Namen der jeweils anderen Liste wiederverwenden), 1–50 Zeichen, nur ASCII, passend zu ^[A-Za-z0-9_.-]+$ (keine Leerzeichen oder Schrägstriche). Namen aus Vorlagen beim Anpassen normalisieren. Nirgendwo leere Zeichenketten ausgeben.
 - interfaces type: NetBox-Slug, z. B. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
 - ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port oder other.
 - display-ports type ist erforderlich: hdmi, displayport, vga oder dvi (conex-Erweiterung).
+- Patchpanels und Glasfaserkassetten: rear-ports {name, type, positions} (positions 1 für eine einfache Dose, N für einen MPO-Trunk) und front-ports {name, type, rear_port, rear_port_position}; rear_port nennt einen Rückport desselben Dokuments. type: 8p8c, 110-punch, lc, lc-apc, sc, sc-apc, st, fc, mpo, mtrj oder splice. Jede Position eines Rückports nimmt höchstens einen Frontport auf.
 - power-ports type: z. B. dc-terminal oder iec-60320-c14; maximum_draw nur ergänzen, wenn im Datenblatt angegeben. power-outlets verwenden den dokumentierten NetBox-Steckertyp.
 - description: eine Zeile, maximal 200 Zeichen. comments: Markdown-Quellenlinks, maximal 2000 Zeichen. Anschlussbeschreibungen: maximal 200 Zeichen.
 
@@ -483,6 +510,10 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'import.fieldPowerPorts': 'Stromeingänge',
 	'import.fieldPowerOutlets': 'Steckdosen und Stromausgänge',
 	'import.fieldDisplayPorts': 'Bildschirmanschlüsse (HDMI / DP / VGA)',
+	'import.fieldRearPorts':
+		'Rückports eines Patchpanels (Dosen): name, type (8p8c, lc, mpo, …), positions (Standard 1).',
+	'import.fieldFrontPorts':
+		'Frontports eines Patchpanels: name, type, rear_port (Name eines Rückports im selben Dokument), rear_port_position (Standard 1).',
 	'import.createManufacturer': 'Hersteller „{name}“ anlegen',
 	'import.manufacturerCreated': 'Hersteller „{name}“ angelegt. Import erneut ausführen.',
 	'import.renameExisting': 'Bestehenden umbenennen',
@@ -715,6 +746,13 @@ Abschließend außerhalb des YAML-Blocks angeben: Quellen, Treffer/kein Treffer 
 	'device.onShelf': 'Fachboden {name}',
 	'device.networkPortsCount': 'Netzwerkanschlüsse ({count})',
 	'device.otherPortsCount': 'Weitere Anschlüsse ({count})',
+	'device.panelPortsCount': 'Patchpanel-Ports ({count})',
+	'device.panel.front': 'Front → Gegenstelle',
+	'device.panel.rear': 'Rück (Dose) → Gegenstelle',
+	'device.panel.positions': '{count} Positionen',
+	'device.panel.frontPorts': 'Frontports',
+	'device.panel.rearPorts': 'Rückports',
+	'device.panel.otherPorts': 'Ports',
 	'device.connected': 'verbunden',
 	'device.kind': 'Art',
 	'device.alreadyConnected': 'Bereits verbunden',

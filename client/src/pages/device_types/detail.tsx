@@ -25,7 +25,12 @@ import { portKindLabel, yesNo } from '../../i18n/labels'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
-import { AddComponentDialog, AddComponentMenu } from './add_component'
+import {
+	AddComponentDialog,
+	AddComponentMenu,
+	type PassThroughPreset,
+	PassThroughPresetDialog,
+} from './add_component'
 import { COMPONENT_CLASSES, type ComponentClassInfo, componentClassOf } from './components'
 
 /**
@@ -36,6 +41,7 @@ import { COMPONENT_CLASSES, type ComponentClassInfo, componentClassOf } from './
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [adding, setAdding] = createSignal<ComponentClassInfo | null>(null)
+	const [preset, setPreset] = createSignal<PassThroughPreset | null>(null)
 	const id = (): number => props.id
 	const [deviceType] = createRecord(id, fetch_device_type, setError)
 	const manufacturerId = (): number | undefined => deviceType()?.manufacturer_id
@@ -62,7 +68,10 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	}
 
 	const stubsOf = (info: ComponentClassInfo): StubRow[] =>
-		(stubs() ?? []).filter((s) => componentClassOf(s.kind) === info.key)
+		(stubs() ?? []).filter((s) => componentClassOf(s) === info.key)
+	const rearStubs = (): StubRow[] => (stubs() ?? []).filter((row) => row.side === 'rear')
+	const stubPrefix = (stubId: number | null): string =>
+		(stubs() ?? []).find((row) => row.id === stubId)?.prefix ?? '—'
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.deviceType',
@@ -96,6 +105,22 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		},
 		descriptionColumn<StubRow>(),
 	]
+	/** Patch-panel tables add the rear positions or the front-to-rear mapping. */
+	const passThroughColumn: DataTableColumn<StubRow> = {
+		key: 'pass_through',
+		label: t('deviceType.component.mapping'),
+		getValue: (s: StubRow): string =>
+			s.side === 'rear'
+				? tp('deviceType.component.positionsCount', s.positions)
+				: t('deviceType.component.mapsTo', {
+						rear: stubPrefix(s.rear_stub_id),
+						position: s.rear_position,
+					}),
+	}
+	const columnsOf = (info: ComponentClassInfo): DataTableColumn<StubRow>[] =>
+		info.side
+			? [...stubColumns.slice(0, 3), passThroughColumn, ...stubColumns.slice(3)]
+			: stubColumns
 
 	const stubActions = (s: StubRow): JSX.Element => (
 		<button
@@ -122,7 +147,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					onDelete={handleDelete}
 					actions={
 						<Show when={can('edit')}>
-							<AddComponentMenu onSelect={setAdding} />
+							<AddComponentMenu onSelect={setAdding} onPreset={setPreset} />
 						</Show>
 					}
 				/>
@@ -166,7 +191,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 								<DataTable
 									rows={() => stubsOf(info)}
 									getRowId={(s: StubRow): number => s.id}
-									columns={stubColumns}
+									columns={columnsOf(info)}
 									showColumnCustomizer
 									rowActions={can('delete') ? stubActions : undefined}
 								/>
@@ -180,11 +205,25 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<AddComponentDialog
 						deviceTypeId={props.id}
 						info={info()}
+						rearStubs={rearStubs()}
 						onSaved={() => {
 							setAdding(null)
 							void refetchStubs()
 						}}
 						onClose={() => setAdding(null)}
+					/>
+				)}
+			</Show>
+			<Show when={preset()}>
+				{(key: () => PassThroughPreset) => (
+					<PassThroughPresetDialog
+						deviceTypeId={props.id}
+						preset={key()}
+						onSaved={() => {
+							setPreset(null)
+							void refetchStubs()
+						}}
+						onClose={() => setPreset(null)}
 					/>
 				)}
 			</Show>

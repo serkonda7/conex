@@ -423,6 +423,16 @@ export function DeviceTypeImportPage(): JSX.Element {
 							<td>—</td>
 							<td>{t('import.fieldDisplayPorts')}</td>
 						</tr>
+						<tr>
+							<td>rear-ports</td>
+							<td>—</td>
+							<td>{t('import.fieldRearPorts')}</td>
+						</tr>
+						<tr>
+							<td>front-ports</td>
+							<td>—</td>
+							<td>{t('import.fieldFrontPorts')}</td>
+						</tr>
 					</tbody>
 				</table>
 			</section>
