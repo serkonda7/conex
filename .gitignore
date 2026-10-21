@@ -10,6 +10,7 @@ docs/book/
 *.tsbuildinfo
 playwright-report/
 test-results/
+.claude/
 
 # editor files
 .vscode/
