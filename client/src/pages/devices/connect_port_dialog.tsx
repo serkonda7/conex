@@ -297,7 +297,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 							</button>
 						</div>
 						<input
-							autofocus
+							ref={(el: HTMLInputElement): void => queueMicrotask(() => el.focus())}
 							class="object-selector-search"
 							placeholder={t('device.filterPorts')}
 							aria-label={t('device.filterPorts')}
