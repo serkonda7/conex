@@ -27,6 +27,11 @@ const SAME_KIND_PASS_THROUGH = new Set<string>(
 	),
 )
 
+/** Transceiver interfaces (SFP, QSFP, …); fiber patch-panel ports cable to them. */
+const TRANSCEIVER_KINDS = new Set<string>(
+	Object.keys(NETBOX_INTERFACE_TYPES).filter((k) => k.includes('sfp')),
+)
+
 /** Wireless interface families; they only pair within their own family, never with wired ports. */
 const WIRELESS_FAMILIES = [
 	new Set<string>(Object.keys(NETBOX_INTERFACE_TYPES).filter((k) => k.startsWith('ieee802.11'))),
@@ -60,12 +65,12 @@ function isGeneralPort(kind: string): boolean {
  * Wired network ports pair with wired network ports, wireless ones only within
  * their family (WLAN, cellular); a power port pairs with a power port
  * or outlet (never outlet to outlet); general ports pair within their
- * connector family, a plain `port` with any general port; display and fiber
- * only with the same kind.
+ * connector family, a plain `port` with any general port; display only with
+ * the same kind; fiber panel ports with the same kind or a transceiver (SFP, …).
  */
 export function portKindsCompatible(local: string, peer: string): boolean {
 	if (SAME_KIND_PASS_THROUGH.has(local) || SAME_KIND_PASS_THROUGH.has(peer)) {
-		return local === peer
+		return local === peer || TRANSCEIVER_KINDS.has(local) || TRANSCEIVER_KINDS.has(peer)
 	}
 	if (WIRELESS_FAMILIES.some((f) => f.has(local) || f.has(peer))) {
 		return WIRELESS_FAMILIES.some((f) => f.has(local) && f.has(peer))
