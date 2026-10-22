@@ -1,5 +1,6 @@
 import type { Result } from 'better-result'
 import { createSignal, For, type JSX, Show } from 'solid-js'
+import { fetch_device_role } from '../../api/device_roles'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import {
 	delete_device_type,
@@ -15,6 +16,7 @@ import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
+	ForeignKeyLink,
 	RelatedSection,
 	useDetailDelete,
 } from '../../components/detail_page'
@@ -46,6 +48,9 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const [deviceType] = createRecord(id, fetch_device_type, setError)
 	const manufacturerId = (): number | undefined => deviceType()?.manufacturer_id
 	const [manufacturer] = createRecord(manufacturerId, fetch_manufacturer, setError)
+	const defaultRoleId = (): number | undefined =>
+		deviceType()?.default_device_role_id ?? undefined
+	const [defaultRole] = createRecord(defaultRoleId, fetch_device_role, setError)
 	const [stubs, { refetch: refetchStubs }] = createRowsFor(id, fetch_stubs, setError)
 	// The device list has no type filter: narrow client-side.
 	const [devices] = createRowsFor(id, () => fetch_devices(), setError)
@@ -166,6 +171,15 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<dd>{deviceType()?.u_height}</dd>
 					<dt>{t('common.fullDepth')}</dt>
 					<dd>{yesNo(deviceType()?.is_full_depth ?? 0)}</dd>
+					<dt>{t('deviceType.defaultRole')}</dt>
+					<dd>
+						<ForeignKeyLink
+							id={defaultRoleId()}
+							loading={defaultRole.loading}
+							name={defaultRole()?.name}
+							href={`/device-roles/${defaultRoleId() ?? ''}`}
+						/>
+					</dd>
 				</DetailCard>
 			</DetailShell>
 

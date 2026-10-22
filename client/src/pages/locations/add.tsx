@@ -1,15 +1,8 @@
-import { createSignal, type JSX, Show } from 'solid-js'
-import {
-	create_location,
-	fetch_locations,
-	fetch_sites,
-	fetch_tenants,
-	type LocationType,
-} from '../../api/tenancy'
+import { createEffect, createMemo, createSignal, type JSX } from 'solid-js'
+import { create_location, fetch_locations, fetch_sites, type LocationType } from '../../api/tenancy'
 import {
 	DescriptionField,
 	FormPage,
-	Hint,
 	NameField,
 	row_options,
 	SelectField,
@@ -25,7 +18,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { useSiteTenant } from '../../lib/tenant_context'
+import { contextTenantId, rowsOfTenant } from '../../lib/tenant_context'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -37,16 +30,20 @@ export function LocationAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 
 	const [sites] = createRows(fetch_sites, form.setError)
-	const [tenants] = createRows(fetch_tenants, form.setError)
 	// Parent options belong to a site, so they follow the site picker.
 	const [parents] = createRowsFor(
 		() => parseId(siteId()),
 		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
-	const { siteTenantId, siteOptions, tenant } = useSiteTenant(sites, siteId, () =>
-		handleSiteChange(''),
-	)
+	// The tenant comes from the global tenant selection, which also limits the sites.
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], contextTenantId()))
+	createEffect(() => {
+		const id = parseId(siteId())
+		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
+			handleSiteChange('')
+		}
+	})
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
@@ -65,7 +62,7 @@ export function LocationAddPage(): JSX.Element {
 					type: locationType(),
 					site_id: Number(siteId()),
 					parent_id: parseId(parentId()),
-					tenant_id: parseId(tenant.value()),
+					tenant_id: contextTenantId(),
 					description: text(description()),
 				}),
 			navigateTo: '/locations',
@@ -118,19 +115,6 @@ export function LocationAddPage(): JSX.Element {
 				onChange={setParentId}
 				options={row_options(parents() ?? [])}
 				emptyLabel={t('site.topLevel')}
-			/>
-			<SelectField
-				id="location-tenant"
-				label={tp('entity.tenant', 1)}
-				value={tenant.value()}
-				onChange={tenant.pick}
-				options={row_options(tenants() ?? [])}
-				emptyLabel={t('common.noTenant')}
-				hint={
-					<Show when={!tenant.touched() && siteTenantId() !== null}>
-						<Hint>{t('location.tenantFromSite')}</Hint>
-					</Show>
-				}
 			/>
 			<DescriptionField
 				id="location-description"

@@ -1,6 +1,6 @@
 import { createSignal, type JSX } from 'solid-js'
+import { fetch_device_roles } from '../../api/device_roles'
 import {
-	create_device_type,
 	type DeviceTypeRow,
 	fetch_device_type,
 	fetch_manufacturers,
@@ -20,13 +20,13 @@ import {
 	cleared,
 	type FormValues,
 	id_value,
-	is_add_another_submit,
 	submit_form,
 	text,
 	useEntityForm,
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
+import { parseId, useFormReturnRoute } from '../../lib/router'
+import { deviceRoleOptions } from '../device-roles/options'
 
 const MAX_HEIGHT = 60
 
@@ -38,15 +38,20 @@ interface DeviceTypeBody {
 	is_full_depth: boolean
 	description?: string
 	comments?: string
+	default_device_role_id: number | null
 }
 
-/** Device-type create (`id` omitted) or edit form. */
-function DeviceTypeForm(props: { id?: number }): JSX.Element {
+/**
+ * /device-types/:id/edit — device-type edit form. Saves back to the list when
+ * opened from it, else to the detail page. New device types are created via
+ * the /device-types/import page only.
+ */
+export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [manufacturerId, setManufacturerId] = createSignal('')
-	// `?name=` comes from the search typed into an opener's dropdown.
-	const [model, setModel] = createSignal(queryParam('name'))
+	const [model, setModel] = createSignal('')
 	const [uHeight, setUHeight] = createSignal('1')
 	const [fullDepth, setFullDepth] = createSignal(false)
+	const [defaultRoleId, setDefaultRoleId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
@@ -57,6 +62,7 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 			setModel(row.model)
 			setUHeight(String(row.u_height))
 			setFullDepth(Boolean(row.is_full_depth))
+			setDefaultRoleId(id_value(row.default_device_role_id))
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
@@ -65,7 +71,8 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 		fetch_manufacturers,
 		form.setError,
 	)
-	const prefix = form.editing ? 'device-type-edit' : 'device-type'
+	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
+	const prefix = 'device-type-edit'
 	const backTo = useFormReturnRoute('/device-types', props.id)
 
 	function validate(): string | null {
@@ -79,22 +86,14 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 		return null
 	}
 
-	function resetForNext(): void {
-		setModel('')
-		setUHeight('1')
-		setFullDepth(false)
-		setDescription('')
-		setComments('')
-	}
-
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		const id = props.id
 		const body = (values: FormValues): DeviceTypeBody => ({
 			manufacturer_id: Number(manufacturerId()),
 			model: values.name,
 			u_height: Number(uHeight()),
 			is_full_depth: fullDepth(),
+			default_device_role_id: parseId(defaultRoleId()),
 			description: text(description()),
 			comments: text(comments()),
 		})
@@ -103,19 +102,15 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 			name: model(),
 			nameError: t('deviceType.modelRequired'),
 			validate,
-			save: (values: FormValues) =>
-				id === undefined
-					? create_device_type(body(values))
-					: update_device_type(id, cleared(body(values))),
+			save: (values: FormValues) => update_device_type(props.id, cleared(body(values))),
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e) ? resetForNext : undefined,
 		})
 	}
 
 	return (
 		<FormPage
 			form={form}
-			title={form.editing ? t('deviceType.editTitle') : t('deviceType.addTitle')}
+			title={t('deviceType.editTitle')}
 			name={form.record()?.model}
 			loadingText={t('deviceType.loadingOne')}
 			cancelTo={backTo()}
@@ -125,16 +120,10 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 				id={`${prefix}-manufacturer`}
 				label={tp('entity.manufacturer', 1)}
 				required
-				autofocus={!form.editing}
 				value={manufacturerId()}
 				onChange={setManufacturerId}
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
-				add={
-					form.editing
-						? undefined
-						: { label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }
-				}
 				reload={refetchManufacturers}
 			/>
 			<TextField
@@ -165,6 +154,15 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 				checked={fullDepth()}
 				onChange={setFullDepth}
 			/>
+			<SelectField
+				id={`${prefix}-default-role`}
+				label={t('deviceType.defaultRole')}
+				value={defaultRoleId()}
+				onChange={setDefaultRoleId}
+				options={deviceRoleOptions(roles() ?? [])}
+				emptyLabel={t('deviceType.noDefaultRole')}
+				reload={refetchRoles}
+			/>
 			<DescriptionField
 				id={`${prefix}-description`}
 				value={description()}
@@ -173,14 +171,4 @@ function DeviceTypeForm(props: { id?: number }): JSX.Element {
 			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>
 	)
-}
-
-/** /device-types/add — device-type create form. */
-export function DeviceTypeAddPage(): JSX.Element {
-	return <DeviceTypeForm />
-}
-
-/** /device-types/:id/edit — device-type edit form. Saves back to the list when opened from it, else to the detail page. */
-export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
-	return <DeviceTypeForm id={props.id} />
 }

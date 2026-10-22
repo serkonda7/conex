@@ -3,13 +3,15 @@ import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
-import { create_manufacturer, update_device_type } from '../../api/templates'
+import { fetch_device_roles } from '../../api/device_roles'
+import { create_manufacturer, fetch_manufacturers, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
-import { Field, TextField } from '../../components/form'
-import { t } from '../../i18n'
-import { navigate } from '../../lib/router'
+import { Field, row_options, SelectField, TextField } from '../../components/form'
+import { t, tp } from '../../i18n'
+import { createRows } from '../../lib/resource'
+import { navigate, parseId, queryParam } from '../../lib/router'
 import { buildAiPrompt } from './ai-prompt'
 
 const SAMPLE_YAML = `manufacturer: Acme
@@ -30,8 +32,9 @@ interfaces:
  * offer to rename the existing one.
  */
 export function DeviceTypeImportPage(): JSX.Element {
-	const [promptManufacturer, setPromptManufacturer] = createSignal('')
-	const [promptModel, setPromptModel] = createSignal('')
+	const [promptManufacturerId, setPromptManufacturerId] = createSignal('')
+	// `?name=` comes from the search typed into an opener's dropdown.
+	const [promptModel, setPromptModel] = createSignal(queryParam('name'))
 	const [copyingPrompt, setCopyingPrompt] = createSignal(false)
 	const [promptCopied, setPromptCopied] = createSignal(false)
 	const [promptError, setPromptError] = createSignal<string | null>(null)
@@ -47,6 +50,17 @@ export function DeviceTypeImportPage(): JSX.Element {
 	const [renamedTypes, setRenamedTypes] = createSignal<Record<number, string>>({})
 	const [renameDraft, setRenameDraft] = createSignal<{ id: number; model: string } | null>(null)
 	const [renamingType, setRenamingType] = createSignal(false)
+	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
+		fetch_manufacturers,
+		setPromptError,
+	)
+	const [roles] = createRows(fetch_device_roles, setPromptError)
+
+	/** Name of the manufacturer picked for the AI prompt, `''` when none. */
+	function promptManufacturer(): string {
+		const id = parseId(promptManufacturerId())
+		return manufacturers()?.find((m) => m.id === id)?.name ?? ''
+	}
 
 	function resetPromptFeedback(): void {
 		setPromptCopied(false)
@@ -63,7 +77,8 @@ export function DeviceTypeImportPage(): JSX.Element {
 		resetPromptFeedback()
 		setCopyingPrompt(true)
 		const res = await Result.tryPromise({
-			try: () => navigator.clipboard.writeText(buildAiPrompt(manufacturer, model)),
+			try: () =>
+				navigator.clipboard.writeText(buildAiPrompt(manufacturer, model, roles() ?? [])),
 			catch: () => new Error(t('import.promptCopyFailed')),
 		})
 		setCopyingPrompt(false)
@@ -197,15 +212,18 @@ export function DeviceTypeImportPage(): JSX.Element {
 					{t('import.aiHint')}
 				</p>
 				<div class="import-prompt-controls">
-					<TextField
+					<SelectField
 						id="device-type-prompt-manufacturer"
-						label={t('entity.manufacturer.one')}
-						value={promptManufacturer()}
-						onInput={(value: string) => {
-							setPromptManufacturer(value)
+						label={tp('entity.manufacturer', 1)}
+						value={promptManufacturerId()}
+						onChange={(value: string) => {
+							setPromptManufacturerId(value)
 							resetPromptFeedback()
 						}}
-						maxLength={100}
+						options={row_options(manufacturers() ?? [])}
+						emptyLabel={t('deviceType.manufacturerPlaceholder')}
+						add={{ label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }}
+						reload={refetchManufacturers}
 						required
 						disabled={copyingPrompt()}
 					/>
@@ -388,6 +406,11 @@ export function DeviceTypeImportPage(): JSX.Element {
 							<td>is_full_depth</td>
 							<td>—</td>
 							<td>{t('import.fieldFullDepth')}</td>
+						</tr>
+						<tr>
+							<td>default_device_role</td>
+							<td>—</td>
+							<td>{t('import.fieldDefaultRole')}</td>
 						</tr>
 						<tr>
 							<td>description</td>

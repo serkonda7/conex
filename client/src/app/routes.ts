@@ -41,7 +41,7 @@ import { ChangeDetailPage } from '../pages/changelog/detail'
 import { ChangelogPage } from '../pages/changelog/list'
 import { DashboardPage } from '../pages/dashboard/view'
 import { DeviceTypeDetailPage } from '../pages/device_types/detail'
-import { DeviceTypeAddPage, DeviceTypeEditPage } from '../pages/device_types/form'
+import { DeviceTypeEditPage } from '../pages/device_types/form'
 import { DeviceTypeImportPage } from '../pages/device_types/import'
 import { DeviceTypesPage } from '../pages/device_types/list'
 import { DeviceRoleDetailPage } from '../pages/device-roles/detail'
@@ -247,7 +247,8 @@ export const SECTIONS: readonly Section[] = [
 		permission: 'view',
 		icon: IconCpu,
 		list: DeviceTypesPage,
-		add: DeviceTypeAddPage,
+		// Created via the import page only; its nav shortcut replaces "+ Add".
+		hideAddInNav: true,
 		import: DeviceTypeImportPage,
 		detail: DeviceTypeDetailPage,
 		edit: DeviceTypeEditPage,

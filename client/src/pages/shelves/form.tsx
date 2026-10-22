@@ -34,7 +34,7 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 	// Rack-elevation deep link
 	// (`/shelves/add?rack=<id>&position_u=<u>&face=front`) pre-fills the mount.
 	const [rackId, setRackId] = createSignal(queryParam('rack'))
-	const [face, setFace] = createSignal(queryFace())
+	const [face, setFace] = createSignal(queryFace() || 'front')
 	const [positionU, setPositionU] = createSignal(queryParam('position_u'))
 	const [name, setName] = createSignal('')
 	const [mountHeight, setMountHeight] = createSignal('1')
@@ -47,7 +47,7 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 		fill: (row: ShelfRowJson) => {
 			setRackId(String(row.rack_id))
 			setName(row.name ?? '')
-			setFace(row.face ?? '')
+			setFace(row.face ?? 'front')
 			setPositionU(String(row.position_u))
 			setMountHeight(String(row.mount_height))
 			setMountUsable(row.mount_usable)
@@ -100,7 +100,7 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 		const body = {
 			name: name().trim() || null,
 			rack_id: Number(rackId()),
-			face: (face() || null) as DeviceFace | null,
+			face: face() as DeviceFace,
 			position_u: Number(positionU()),
 			mount_height: count(mountHeight(), 1),
 			mount_usable: mountUsable(),
@@ -158,27 +158,30 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 				options={row_options(racks() ?? [])}
 				emptyLabel={t('shelf.rackPlaceholder')}
 			/>
+			<SelectField
+				id={`${prefix}-face`}
+				label={t('shelf.face')}
+				required
+				value={face()}
+				disabled={rackId() === ''}
+				onChange={setFace}
+				options={faceOptions()}
+			/>
 			<TextField
 				id={`${prefix}-name`}
 				label={t('shelf.nameOptional')}
 				placeholder={t('shelf.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-			/>
-			<SelectField
-				id={`${prefix}-face`}
-				label={t('shelf.face')}
-				value={face()}
-				disabled={rackId() === ''}
-				onChange={setFace}
-				options={faceOptions()}
-				emptyLabel={t('shelf.bothFaces')}
+				autofocus={!form.editing}
 			/>
 			<TextField
 				id={`${prefix}-position`}
 				label={t('shelf.position')}
 				placeholder={form.editing ? undefined : '10'}
-				inputmode="numeric"
+				type="number"
+				min={1}
+				max={100}
 				required
 				value={positionU()}
 				onInput={setPositionU}

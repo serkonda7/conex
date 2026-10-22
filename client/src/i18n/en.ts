@@ -390,7 +390,6 @@ export const en = {
 	'location.namePlaceholder': 'Floor 2',
 	'location.selectSiteFirst': 'Select a site first.',
 	'location.sitePlaceholder': 'Site…',
-	'location.tenantFromSite': "Defaults to the site's tenant.",
 	'location.siteImmutable': 'Site cannot be changed after creation.',
 	'location.notFound': 'Location not found.',
 	'location.details': 'Location details',
@@ -416,9 +415,7 @@ export const en = {
 	'manufacturer.noDeviceTypes': 'No device types for this manufacturer yet.',
 
 	// deviceType
-	'deviceType.import': '⭳ Import',
 	'deviceType.empty': 'No device types yet. Import the first one above.',
-	'deviceType.addTitle': 'Add a new device type',
 	'deviceType.editTitle': 'Edit device type',
 	'deviceType.loadingOne': 'Loading device type…',
 	'deviceType.manufacturerPlaceholder': 'Manufacturer…',
@@ -426,6 +423,8 @@ export const en = {
 	'deviceType.selectManufacturer': 'Select a manufacturer.',
 	'deviceType.modelRequired': 'Model is required.',
 	'deviceType.heightRange': 'Height (U) must be an integer from {min} to {max}.',
+	'deviceType.defaultRole': 'Default role',
+	'deviceType.noDefaultRole': 'No default role',
 	'deviceType.addComponents': 'Add components',
 	'deviceType.component.heading': 'Components',
 	'deviceType.component.empty': 'No components yet.',
@@ -489,6 +488,8 @@ export const en = {
 	'import.fieldModel': 'Device model name.',
 	'import.fieldUHeight': 'Rack height from 0 to 60; defaults to 1.',
 	'import.fieldFullDepth': 'Full-depth device (true/false, defaults to true).',
+	'import.fieldDefaultRole':
+		'Name (case-insensitive) of an existing device role, preselected for new devices.',
 	'import.fieldDescription': 'Optional short device-type summary.',
 	'import.fieldComments': 'Optional longer device-type notes.',
 	'import.fieldInterfaces': 'Network interfaces.',
@@ -683,7 +684,6 @@ export const en = {
 	'shelf.nameOptional': 'Name (optional)',
 	'shelf.namePlaceholder': 'shelf',
 	'shelf.face': 'Face',
-	'shelf.bothFaces': 'Both faces',
 	'shelf.faceHint': 'Which rack face the shelf is mounted on.',
 	'shelf.position': 'Position (U)',
 	'shelf.positionHint': 'Lowest U of the mount (1-based).',

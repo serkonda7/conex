@@ -807,6 +807,7 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	width: v.optional(RackWidthSchema, undefined),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
+	default_device_role_id: NullableIdSchema,
 })
 
 export const DeviceTypeUpdateSchema = v.strictObject({
@@ -818,6 +819,7 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	width: v.optional(v.nullable(RackWidthSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
+	default_device_role_id: NullableIdSchema,
 })
 
 /**

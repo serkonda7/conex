@@ -329,6 +329,12 @@ export const device_types = pgTable(
 		width: integer('width'),
 		description: text('description'),
 		comments: text('comments'),
+		// Role preselected when instantiating a device of this type. Only a
+		// form default, so deleting the role just clears it.
+		default_device_role_id: integer('default_device_role_id').references(
+			(): AnyPgColumn => device_roles.id,
+			{ onDelete: 'set null' },
+		),
 	},
 	(table) => [
 		index('device_types_manufacturer_id_idx').on(table.manufacturer_id),

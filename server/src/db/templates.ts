@@ -10,7 +10,14 @@ import type {
 	StubCreate,
 	StubUpdate,
 } from 'shared/src/schemas'
-import { device_type_interfaces, device_types, devices, manufacturers, racks } from '../schema'
+import {
+	device_roles,
+	device_type_interfaces,
+	device_types,
+	devices,
+	manufacturers,
+	racks,
+} from '../schema'
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
 import { expandStubs, type StubInput } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -250,12 +257,20 @@ function checkManufacturerExists(id: number | undefined): Promise<Result<undefin
 	return checkExists(manufacturers, id, 'Manufacturer not found')
 }
 
+function checkDefaultRoleExists(id: number | null | undefined): Promise<Result<undefined, Error>> {
+	return checkExists(device_roles, id, 'Device role not found')
+}
+
 export async function createDeviceType(
 	input: DeviceTypeCreate,
 ): Promise<Result<DeviceTypeRow, Error>> {
 	const manufacturer = await checkManufacturerExists(input.manufacturer_id)
 	if (Result.isError(manufacturer)) {
 		return manufacturer
+	}
+	const role = await checkDefaultRoleExists(input.default_device_role_id)
+	if (Result.isError(role)) {
+		return role
 	}
 	const uHeight = input.u_height ?? 1
 	if (input.form_factor !== undefined && uHeight < 1) {
@@ -272,6 +287,7 @@ export async function createDeviceType(
 		width: input.form_factor !== undefined ? 19 : (input.width ?? null),
 		description: input.description ?? null,
 		comments: input.comments ?? null,
+		default_device_role_id: input.default_device_role_id ?? null,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -345,6 +361,10 @@ export async function updateDeviceType(
 	if (Result.isError(manufacturer)) {
 		return manufacturer
 	}
+	const role = await checkDefaultRoleExists(input.default_device_role_id)
+	if (Result.isError(role)) {
+		return role
+	}
 	const effectiveUHeight = input.u_height ?? type.u_height
 	const effectiveFormFactor =
 		input.form_factor !== undefined ? input.form_factor : type.form_factor
@@ -376,6 +396,7 @@ export async function updateDeviceType(
 		'form_factor',
 		'description',
 		'comments',
+		'default_device_role_id',
 	])
 	if (input.is_full_depth !== undefined) {
 		patch.is_full_depth = input.is_full_depth ? 1 : 0
