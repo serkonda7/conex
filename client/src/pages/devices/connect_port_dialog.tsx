@@ -38,8 +38,9 @@ export interface ConnectPortDialogProps {
 
 /**
  * Two-step cable connect dialog: search and pick the peer device first, then
- * one of its free ports from a filterable tile grid (double-click a tile to
- * connect right away). Incompatible and taken ports are shown disabled.
+ * one of its free ports from a filterable tile grid (double-click a tile or
+ * press Enter on it to connect right away). Incompatible and taken ports are
+ * shown disabled.
  */
 export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	const [peerDevice, setPeerDevice] = createSignal<DeviceRow | null>(null)
@@ -139,6 +140,13 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			}
 			onClick={(): void => {
 				setPeerIface(iface)
+			}}
+			onKeyDown={(e: KeyboardEvent): void => {
+				// Enter on a focused tile connects instead of just selecting it.
+				if (e.key === 'Enter' && compatible && !iface.connected) {
+					e.preventDefault()
+					void connect(iface)
+				}
 			}}
 			onDblClick={(): void => {
 				if (compatible && !iface.connected) {
