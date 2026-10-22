@@ -104,6 +104,21 @@ export function DeviceAddPage(): JSX.Element {
 		}
 	})
 
+	// Picking a type preselects its default role, unless the user already
+	// chose a role other than the previous type's default.
+	function handleTypeChange(value: string): void {
+		const defaultRoleOf = (id: string): string =>
+			id_value(
+				(types() ?? []).find((type) => type.id === parseId(id))?.default_device_role_id,
+			)
+		const previous = defaultRoleOf(typeId())
+		setTypeId(value)
+		const next = defaultRoleOf(value)
+		if (next && (!roleId() || roleId() === previous)) {
+			setRoleId(next)
+		}
+	}
+
 	const { siteOptions, tenant } = useSiteTenant(sites, siteId, () => handleSiteChange(''))
 	createEffect(on(tenant.value, () => setEmployeeId(''), { defer: true }))
 
@@ -196,7 +211,7 @@ export function DeviceAddPage(): JSX.Element {
 					label={tp('entity.deviceType', 1)}
 					required
 					value={typeId()}
-					onChange={setTypeId}
+					onChange={handleTypeChange}
 					options={typeOptions()}
 					emptyLabel={t('common.selectPlaceholder')}
 					add={{ label: tp('entity.deviceType', 1), href: '/device-types/import' }}

@@ -1,0 +1,2 @@
+ALTER TABLE "device_types" ADD COLUMN "default_device_role_id" integer;--> statement-breakpoint
+ALTER TABLE "device_types" ADD CONSTRAINT "device_types_default_device_role_id_device_roles_id_fk" FOREIGN KEY ("default_device_role_id") REFERENCES "public"."device_roles"("id") ON DELETE set null ON UPDATE no action;

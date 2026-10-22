@@ -1,4 +1,5 @@
 import { createSignal, type JSX } from 'solid-js'
+import { fetch_device_roles } from '../../api/device_roles'
 import {
 	type DeviceTypeRow,
 	fetch_device_type,
@@ -25,6 +26,7 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
+import { deviceRoleOptions } from '../device-roles/options'
 
 const MAX_HEIGHT = 60
 
@@ -36,6 +38,7 @@ interface DeviceTypeBody {
 	is_full_depth: boolean
 	description?: string
 	comments?: string
+	default_device_role_id: number | null
 }
 
 /**
@@ -48,6 +51,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [model, setModel] = createSignal('')
 	const [uHeight, setUHeight] = createSignal('1')
 	const [fullDepth, setFullDepth] = createSignal(false)
+	const [defaultRoleId, setDefaultRoleId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
@@ -58,6 +62,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			setModel(row.model)
 			setUHeight(String(row.u_height))
 			setFullDepth(Boolean(row.is_full_depth))
+			setDefaultRoleId(id_value(row.default_device_role_id))
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
@@ -66,6 +71,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 		fetch_manufacturers,
 		form.setError,
 	)
+	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
 	const prefix = 'device-type-edit'
 	const backTo = useFormReturnRoute('/device-types', props.id)
 
@@ -87,6 +93,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			model: values.name,
 			u_height: Number(uHeight()),
 			is_full_depth: fullDepth(),
+			default_device_role_id: parseId(defaultRoleId()),
 			description: text(description()),
 			comments: text(comments()),
 		})
@@ -146,6 +153,15 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				label={t('common.fullDepth')}
 				checked={fullDepth()}
 				onChange={setFullDepth}
+			/>
+			<SelectField
+				id={`${prefix}-default-role`}
+				label={t('deviceType.defaultRole')}
+				value={defaultRoleId()}
+				onChange={setDefaultRoleId}
+				options={deviceRoleOptions(roles() ?? [])}
+				emptyLabel={t('deviceType.noDefaultRole')}
+				reload={refetchRoles}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

@@ -423,6 +423,8 @@ export const en = {
 	'deviceType.selectManufacturer': 'Select a manufacturer.',
 	'deviceType.modelRequired': 'Model is required.',
 	'deviceType.heightRange': 'Height (U) must be an integer from {min} to {max}.',
+	'deviceType.defaultRole': 'Default role',
+	'deviceType.noDefaultRole': 'No default role',
 	'deviceType.addComponents': 'Add components',
 	'deviceType.component.heading': 'Components',
 	'deviceType.component.empty': 'No components yet.',

@@ -295,6 +295,13 @@
       "when": 1792589891474,
       "tag": "0041_remove_tenant_description",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792657999866,
+      "tag": "0042_device_type_default_role",
+      "breakpoints": true
     }
   ]
 }

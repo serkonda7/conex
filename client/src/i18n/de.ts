@@ -425,6 +425,8 @@ export const de: Messages = {
 	'deviceType.selectManufacturer': 'Bitte einen Hersteller auswählen.',
 	'deviceType.modelRequired': 'Modell ist erforderlich.',
 	'deviceType.heightRange': 'Höhe (HE) muss eine ganze Zahl von {min} bis {max} sein.',
+	'deviceType.defaultRole': 'Standardrolle',
+	'deviceType.noDefaultRole': 'Keine Standardrolle',
 	'deviceType.addComponents': 'Komponenten hinzufügen',
 	'deviceType.component.heading': 'Komponenten',
 	'deviceType.component.empty': 'Noch keine Komponenten vorhanden.',
