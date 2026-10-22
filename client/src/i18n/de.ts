@@ -492,6 +492,7 @@ export const de: Messages = {
 	'import.fieldModel': 'Modell',
 	'import.fieldUHeight': 'Rackmontage: Höhe (HE); sonst 0',
 	'import.fieldFullDepth': 'Rackmontage: belegt Vorder- und Rückseite',
+	'import.fieldDefaultRole': 'Standard-Geräterolle (Name einer vorhandenen Rolle)',
 	'import.fieldDescription': 'Beschreibung',
 	'import.fieldComments': 'Kommentare',
 	'import.fieldInterfaces': 'Netzwerkschnittstellen',

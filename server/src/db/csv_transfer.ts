@@ -243,11 +243,29 @@ async function importDeviceTypeDefinition(
 			return fail('is_full_depth must be a boolean (true/false)')
 		}
 	}
+	// conex extension: optional role preselected for devices of this type,
+	// matched by name like the manufacturer.
+	let defaultRoleId: number | null = null
+	if (item.default_device_role !== undefined && item.default_device_role !== null) {
+		const roleName =
+			typeof item.default_device_role === 'string' ? item.default_device_role.trim() : ''
+		if (!roleName) {
+			return fail('default_device_role must be a device role name')
+		}
+		const role = (await getDb().select().from(device_roles)).find(
+			(row) => row.name.toLowerCase() === roleName.toLowerCase(),
+		)
+		if (!role) {
+			return fail(`Unknown default_device_role "${roleName}"`)
+		}
+		defaultRoleId = role.id
+	}
 	const created = await createDeviceType({
 		manufacturer_id: mfr.id,
 		model,
 		u_height: height,
 		is_full_depth: fullDepth,
+		default_device_role_id: defaultRoleId,
 		description: typeof item.description === 'string' ? item.description : undefined,
 		comments: typeof item.comments === 'string' ? item.comments : undefined,
 	})

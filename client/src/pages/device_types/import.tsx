@@ -3,6 +3,7 @@ import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
+import { fetch_device_roles } from '../../api/device_roles'
 import { create_manufacturer, fetch_manufacturers, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
@@ -53,6 +54,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 		fetch_manufacturers,
 		setPromptError,
 	)
+	const [roles] = createRows(fetch_device_roles, setPromptError)
 
 	/** Name of the manufacturer picked for the AI prompt, `''` when none. */
 	function promptManufacturer(): string {
@@ -75,7 +77,8 @@ export function DeviceTypeImportPage(): JSX.Element {
 		resetPromptFeedback()
 		setCopyingPrompt(true)
 		const res = await Result.tryPromise({
-			try: () => navigator.clipboard.writeText(buildAiPrompt(manufacturer, model)),
+			try: () =>
+				navigator.clipboard.writeText(buildAiPrompt(manufacturer, model, roles() ?? [])),
 			catch: () => new Error(t('import.promptCopyFailed')),
 		})
 		setCopyingPrompt(false)
@@ -403,6 +406,11 @@ export function DeviceTypeImportPage(): JSX.Element {
 							<td>is_full_depth</td>
 							<td>—</td>
 							<td>{t('import.fieldFullDepth')}</td>
+						</tr>
+						<tr>
+							<td>default_device_role</td>
+							<td>—</td>
+							<td>{t('import.fieldDefaultRole')}</td>
 						</tr>
 						<tr>
 							<td>description</td>

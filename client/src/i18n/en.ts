@@ -488,6 +488,8 @@ export const en = {
 	'import.fieldModel': 'Device model name.',
 	'import.fieldUHeight': 'Rack height from 0 to 60; defaults to 1.',
 	'import.fieldFullDepth': 'Full-depth device (true/false, defaults to true).',
+	'import.fieldDefaultRole':
+		'Name (case-insensitive) of an existing device role, preselected for new devices.',
 	'import.fieldDescription': 'Optional short device-type summary.',
 	'import.fieldComments': 'Optional longer device-type notes.',
 	'import.fieldInterfaces': 'Network interfaces.',
