@@ -1378,6 +1378,8 @@ export const DeviceListQuerySchema = v.object({
 	host: OptionalIdEntry,
 	/** Devices with a port that can be cabled to this interface (hides VMs). */
 	compatible_with: OptionalIdEntry,
+	/** Devices whose type is at least 1 U high, i.e. can be U-mounted (hides VMs). */
+	mountable: v.optional(looseBoolean(false), undefined),
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

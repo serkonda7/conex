@@ -67,7 +67,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				?.map((l) => `${l.local_interface.name} ⟷ ${l.peer_interface.name}`)
 				.join(', ')
 		},
-		{ compatible_with: props.iface.id },
+		() => ({ compatible_with: props.iface.id }),
 	)
 
 	// The depth-1 trace runs in parallel and only names the far end of taken

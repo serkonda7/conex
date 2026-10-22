@@ -76,20 +76,30 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const manufacturerName = useNameOf(manufacturers)
 	const [racks] = createRows(fetch_racks, setError)
 	const rackName = useNameOf(racks)
-	/** Shows where a candidate device is already racked. */
-	const deviceSearch = useDeviceSearch((device: DeviceRow) => {
-		if (device.rack_id === null) {
-			return undefined
-		}
-		const rackLabel = rackName(device.rack_id)
-		const place =
-			device.shelf_id !== null
-				? `${rackLabel} · ${t('elevation.onShelf')}`
-				: device.position_u !== null
-					? `${t('device.mountPosition', { rack: rackLabel, u: device.position_u })}${device.face ? ` (${faceLabel(device.face)})` : ''}`
-					: rackLabel
-		return t('device.rackedIn', { place })
-	})
+	/**
+	 * Shows where a candidate device is already racked. Candidates are limited
+	 * to the rack's tenant (when it has one); U-mounting also hides 0 U devices,
+	 * which can only sit on a shelf.
+	 */
+	const deviceSearch = useDeviceSearch(
+		(device: DeviceRow) => {
+			if (device.rack_id === null) {
+				return undefined
+			}
+			const rackLabel = rackName(device.rack_id)
+			const place =
+				device.shelf_id !== null
+					? `${rackLabel} · ${t('elevation.onShelf')}`
+					: device.position_u !== null
+						? `${t('device.mountPosition', { rack: rackLabel, u: device.position_u })}${device.face ? ` (${faceLabel(device.face)})` : ''}`
+						: rackLabel
+			return t('device.rackedIn', { place })
+		},
+		() => ({
+			tenant: rack()?.tenant_id ?? undefined,
+			mountable: targetShelf() === null ? true : undefined,
+		}),
+	)
 
 	function deviceTypeOf(typeId: number): DeviceTypeRow | undefined {
 		return deviceTypes()?.find((type) => type.id === typeId)

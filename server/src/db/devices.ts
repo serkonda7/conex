@@ -4,6 +4,7 @@ import {
 	asc,
 	count,
 	eq,
+	gte,
 	inArray,
 	isNotNull,
 	isNull,
@@ -261,6 +262,8 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	host?: number
 	/** Devices with a port that can be cabled to this interface. */
 	compatible_with?: number
+	/** Devices whose type is at least 1 U high (can be U-mounted). */
+	mountable?: boolean
 	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
 }
@@ -345,7 +348,8 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		params.rack !== undefined ||
 		params.device_type !== undefined ||
 		params.placed !== undefined ||
-		params.compatible_with !== undefined
+		params.compatible_with !== undefined ||
+		params.mountable === true
 	const compatible =
 		params.compatible_with === undefined
 			? undefined
@@ -393,6 +397,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 							? isNotNull(devices.position_u)
 							: isNull(devices.position_u),
 					compatible,
+					params.mountable ? gte(device_types.u_height, 1) : undefined,
 				)
 	const vmWhere =
 		params.kind === 'device' || deviceOnly

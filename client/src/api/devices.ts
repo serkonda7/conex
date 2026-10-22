@@ -40,6 +40,7 @@ export async function fetch_device_list(
 				kind: filters?.kind,
 				host: filters?.host,
 				compatible_with: filters?.compatible_with,
+				mountable: filters?.mountable,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),
