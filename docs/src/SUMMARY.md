@@ -5,6 +5,7 @@
 # Inventar
 
 - [Racks](racks.md)
+- [Porttypen](port-types.md)
 
 # Integrationen
 
