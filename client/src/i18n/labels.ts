@@ -37,6 +37,7 @@ import {
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
 import type { FormOption } from '../components/form'
+import { RackFormFactorSchematic } from '../components/rack_form_factor'
 import { deviceRoleIcon, locationTypeIcon } from '../lib/icons'
 import type { DurationUnit } from '../lib/service_level'
 import { type MessageKey, t } from '.'
@@ -59,9 +60,13 @@ export function formFactorLabel(value: string): string {
 	return lookup(FORM_FACTOR_KEYS, value)
 }
 
-/** `<select>` options for the rack form factors. */
-export function formFactorOptions(): { value: RackFormFactor; label: string }[] {
-	return RACK_FORM_FACTORS.map((value) => ({ value, label: formFactorLabel(value) }))
+/** `<select>` options for the rack form factors, each previewing its schematic. */
+export function formFactorOptions(): (FormOption & { value: RackFormFactor })[] {
+	return RACK_FORM_FACTORS.map((value) => ({
+		value,
+		label: formFactorLabel(value),
+		preview: () => RackFormFactorSchematic({ formFactor: value }),
+	}))
 }
 
 /** "Yes" / "No" for a boolean (or 0/1 DB flag) cell. */

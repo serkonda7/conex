@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import type { DeviceListQuery } from 'shared/src/schemas'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_device_types } from '../../api/templates'
 import type { ObjectSearchProps } from '../../components/object_selector'
@@ -15,16 +16,19 @@ type DeviceSearchProps = Pick<
  * Device picker props for `ObjectSearch` / `ObjectSelector`: results show
  * the device type next to the name and an optional caller-specific `extra`
  * line below (e.g. existing cables or the current rack placement).
+ * `filters` narrow the searched devices (e.g. to compatible peers); read
+ * on every search so they can track reactive state.
  */
 export function useDeviceSearch(
 	extra?: (device: DeviceRow) => string | undefined,
+	filters?: () => Pick<DeviceListQuery, 'compatible_with' | 'tenant' | 'mountable'>,
 ): DeviceSearchProps {
 	const [types] = createRows(fetch_device_types)
 	const typeName = useNameOf(types, (type) => type.model)
 	return {
 		placeholder: t('rack.searchDevices'),
 		load: async (search: string) => {
-			const res = await fetch_devices({ search })
+			const res = await fetch_devices({ ...filters?.(), search })
 			return Result.isError(res) ? Result.err(res.error) : Result.ok(res.value.items)
 		},
 		get_label: (device: DeviceRow) => device.name,

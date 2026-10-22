@@ -28,7 +28,8 @@ export function ObjectSearch<T extends { id: number }>(props: ObjectSearchProps<
 	return (
 		<>
 			<input
-				autofocus
+				// `autofocus` only fires on page load, not for inputs mounted later.
+				ref={(el: HTMLInputElement): void => queueMicrotask(() => el.focus())}
 				class="object-selector-search"
 				placeholder={props.placeholder ?? t('common.search')}
 				aria-label={t('common.searchObjects')}

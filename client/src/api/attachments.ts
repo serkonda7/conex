@@ -37,8 +37,8 @@ export type {
 	FloorplanPut,
 }
 
-/** Owner of an attachment: exactly one of the two ids. */
-export type AttachmentOwner = { site_id: number } | { location_id: number }
+/** Owner of an attachment: exactly one of the three ids. */
+export type AttachmentOwner = { site_id: number } | { location_id: number } | { rack_id: number }
 
 export async function fetch_attachments(
 	owner: AttachmentOwner,
@@ -47,6 +47,7 @@ export async function fetch_attachments(
 		query: to_query({
 			site: 'site_id' in owner ? owner.site_id : undefined,
 			location: 'location_id' in owner ? owner.location_id : undefined,
+			rack: 'rack_id' in owner ? owner.rack_id : undefined,
 		}),
 	})
 	return to_result<AttachmentJson[]>(res, failed.list('noun.attachment'))
@@ -67,7 +68,9 @@ export async function upload_attachment(
 			file,
 			...('site_id' in owner
 				? { site_id: String(owner.site_id) }
-				: { location_id: String(owner.location_id) }),
+				: 'location_id' in owner
+					? { location_id: String(owner.location_id) }
+					: { rack_id: String(owner.rack_id) }),
 			...(description ? { description } : {}),
 		},
 	})

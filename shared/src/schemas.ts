@@ -1376,6 +1376,10 @@ export const DeviceListQuerySchema = v.object({
 	kind: v.optional(DeviceListKindSchema, undefined),
 	/** VMs running on this host device (hides devices). */
 	host: OptionalIdEntry,
+	/** Devices with a port that can be cabled to this interface (hides VMs). */
+	compatible_with: OptionalIdEntry,
+	/** Devices whose type is at least 1 U high, i.e. can be U-mounted (hides VMs). */
+	mountable: v.optional(looseBoolean(false), undefined),
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
@@ -1785,7 +1789,7 @@ export interface AuditLogEntryJson {
 }
 
 // ---------------------------------------------------------------------------
-// Attachments: images owned by one site or location
+// Attachments: images owned by one site, location or rack
 // ---------------------------------------------------------------------------
 
 /** Accepted image types, detected server-side from the magic bytes. */
@@ -1796,12 +1800,12 @@ export type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 /** Upload limit per image file. */
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
-/** Exactly one of the two owner keys must be set. */
-function hasOneOwner(site: number | undefined, location: number | undefined): boolean {
-	return (site === undefined) !== (location === undefined)
+/** Exactly one of the three owner keys must be set. */
+function hasOneOwner(...owners: (number | undefined)[]): boolean {
+	return owners.filter((id) => id !== undefined).length === 1
 }
 
-const ONE_OWNER = 'Exactly one of site or location is required'
+const ONE_OWNER = 'Exactly one of site, location or rack is required'
 
 /** Multipart file field: presence and size; the type is checked from the bytes. */
 const AttachmentFileSchema = v.pipe(
@@ -1809,13 +1813,14 @@ const AttachmentFileSchema = v.pipe(
 	v.maxSize(ATTACHMENT_MAX_BYTES, 'Image is larger than 10 MB'),
 )
 
-/** `?site=` or `?location=`: the attachments of one owner. */
+/** `?site=`, `?location=` or `?rack=`: the attachments of one owner. */
 export const AttachmentListQuerySchema = v.pipe(
 	v.object({
 		site: OptionalIdEntry,
 		location: OptionalIdEntry,
+		rack: OptionalIdEntry,
 	}),
-	v.check((q) => hasOneOwner(q.site, q.location), ONE_OWNER),
+	v.check((q) => hasOneOwner(q.site, q.location, q.rack), ONE_OWNER),
 )
 
 /** Multipart upload body (form fields arrive as strings). */
@@ -1824,9 +1829,10 @@ export const AttachmentCreateSchema = v.pipe(
 		file: AttachmentFileSchema,
 		site_id: v.optional(IdSchema, undefined),
 		location_id: v.optional(IdSchema, undefined),
+		rack_id: v.optional(IdSchema, undefined),
 		description: DescriptionSchema,
 	}),
-	v.check((body) => hasOneOwner(body.site_id, body.location_id), ONE_OWNER),
+	v.check((body) => hasOneOwner(body.site_id, body.location_id, body.rack_id), ONE_OWNER),
 )
 
 /** Multipart body of a file replace. */
@@ -1834,7 +1840,7 @@ export const AttachmentFileReplaceSchema = v.strictObject({ file: AttachmentFile
 
 export const AttachmentUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
-	/** Marks the attachment as its owner's floor plan (unmarking the previous one). */
+	/** Marks the attachment as its site's or location's floor plan (unmarking the previous one). */
 	is_floorplan: v.optional(v.boolean(), undefined),
 })
 
@@ -1845,9 +1851,10 @@ export type AttachmentUpdate = v.InferOutput<typeof AttachmentUpdateSchema>
 /** Attachment row on the wire (the image itself is `GET /attachments/:id/file`). */
 export interface AttachmentJson {
 	id: number
-	/** Owner: exactly one of `site_id` / `location_id` is set. */
+	/** Owner: exactly one of `site_id` / `location_id` / `rack_id` is set. */
 	site_id: number | null
 	location_id: number | null
+	rack_id: number | null
 	/** Original file name. */
 	filename: string
 	mime: AttachmentMime

@@ -111,6 +111,7 @@ export function RackTypeAddPage(): JSX.Element {
 				onChange={(value: string) => setFormFactor(value as RackFormFactor | '')}
 				options={formFactorOptions()}
 				emptyLabel={t('rackType.formFactorPlaceholder')}
+				info
 			/>
 			<Field label={t('rackType.widthInches')} for="rack-type-width" required>
 				<span id="rack-type-width" class="rack-type-fixed-width">

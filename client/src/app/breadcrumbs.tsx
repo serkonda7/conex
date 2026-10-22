@@ -4,13 +4,12 @@
  * route table plus the ancestors the page reported (see `routeCrumbs`).
  */
 import { For, type JSX, Show } from 'solid-js'
-import { t } from '../i18n'
 import { type Crumb, goTo } from '../lib/router'
 
 export function Breadcrumbs(props: { crumbs: readonly Crumb[] }): JSX.Element {
 	return (
 		<Show when={props.crumbs.length > 0}>
-			<nav class="breadcrumbs" aria-label={t('app.breadcrumb')}>
+			<nav class="breadcrumbs">
 				<ol>
 					<For each={props.crumbs}>
 						{(crumb: Crumb, i: () => number): JSX.Element => {

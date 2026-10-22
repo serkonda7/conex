@@ -373,7 +373,7 @@ export const SECTIONS: readonly Section[] = [
 	},
 	{
 		path: 'changelog',
-		noun: (n: number): string => tp('entity.changelog', n),
+		noun: (): string => t('entity.changelog'),
 		icon: IconListDetails,
 		permission: 'changelog.view',
 		hideAddInNav: true,

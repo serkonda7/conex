@@ -64,14 +64,27 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setEmployeeId(id_value(row.employee_id))
 		},
 	})
-	const [sites] = createRows(fetch_sites, form.setError)
-	const [racks] = createRows(fetch_racks, form.setError)
+	// Sites, locations and racks are limited to the device's tenant; a device
+	// without one may use any. Nothing loads before the device does.
+	const tenantFilter = (): { tenant?: number } | null => {
+		if (!form.record()) {
+			return null
+		}
+		const tenant = parseId(tenantId())
+		return tenant === null ? {} : { tenant }
+	}
+	const [sites] = createRowsFor(tenantFilter, fetch_sites, form.setError)
+	const [racks] = createRowsFor(tenantFilter, fetch_racks, form.setError)
 	const [roles] = createRows(fetch_device_roles, form.setError)
 	const [types] = createRows(fetch_device_types)
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createRowsFor(
-		() => parseId(siteId()),
-		(key: number) => fetch_locations({ site: [key] }),
+		() => {
+			const site = parseId(siteId())
+			return site === null ? null : { site, ...tenantFilter() }
+		},
+		({ site, tenant }: { site: number; tenant?: number }) =>
+			fetch_locations({ site: [site], tenant }),
 		form.setError,
 	)
 	const typeName = useNameOf(types, (type) => type.model)

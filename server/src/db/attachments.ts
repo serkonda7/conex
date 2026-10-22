@@ -1,5 +1,5 @@
 /**
- * Attachments: PNG / JPEG images owned by one site or location. The row
+ * Attachments: PNG / JPEG images owned by one site, location or rack. The row
  * holds the metadata, the file lives on disk (`storage.ts`). A new file is
  * written (tmp, then renamed) before its row; a failed insert removes it
  * again. A delete removes the row first and the file after the commit, so a
@@ -76,10 +76,11 @@ export type AttachmentRow = typeof attachments.$inferSelect
 type FloorplanAreaRow = typeof floorplan_areas.$inferSelect
 type FloorplanPlacementRow = typeof floorplan_placements.$inferSelect
 
-/** Owner of an attachment: exactly one of the two ids is set. */
+/** Owner of an attachment: exactly one of the three ids is set. */
 export interface AttachmentOwner {
 	site_id?: number
 	location_id?: number
+	rack_id?: number
 }
 
 /** Uploaded file: the client's file name and the raw bytes. */
@@ -91,6 +92,7 @@ export interface AttachmentUpload {
 const NOT_FOUND = 'Attachment not found'
 const FLOORPLAN_TAKEN = 'Another attachment is already marked as the floor plan'
 const NOT_MARKED = 'Only the marked floor plan can hold areas and markers'
+const NO_RACK_FLOORPLAN = 'Rack images cannot be marked as the floor plan'
 const ALREADY_PLACED = 'A rack, device or outlet is already placed on another floor plan'
 
 /** Panel device of a placed outlet (rear port); `devices` itself is the placed device. */
@@ -150,13 +152,19 @@ function ownerCondition(owner: AttachmentOwner): SQL {
 	if (owner.location_id !== undefined) {
 		return eq(attachments.location_id, owner.location_id)
 	}
+	if (owner.rack_id !== undefined) {
+		return eq(attachments.rack_id, owner.rack_id)
+	}
 	return sql`false`
 }
 
-/** 404 when the owning site or location does not exist. */
+/** 404 when the owning site, location or rack does not exist. */
 async function checkOwner(owner: AttachmentOwner): Promise<Result<undefined, Error>> {
 	if (owner.site_id !== undefined) {
 		return checkExists(sites, owner.site_id, 'Site not found')
+	}
+	if (owner.rack_id !== undefined) {
+		return checkExists(racks, owner.rack_id, 'Rack not found')
 	}
 	return checkExists(locations, owner.location_id, 'Location not found')
 }
@@ -251,6 +259,7 @@ export async function createAttachment(
 					...stored.value,
 					site_id: owner.site_id ?? null,
 					location_id: owner.location_id ?? null,
+					rack_id: owner.rack_id ?? null,
 					description: input.description || null,
 					created_at: nowSeconds(),
 					created_by: input.created_by,
@@ -312,7 +321,7 @@ async function clearPlans(ids: number[]): Promise<void> {
  * exist only on the marked attachment, so in one transaction marking
  * unmarks the owner's previous floor plan and clears its plan, and
  * unmarking clears this attachment's plan. The client confirms that loss
- * beforehand.
+ * beforehand. Rack images cannot be marked.
  */
 export async function updateAttachment(
 	id: number,
@@ -329,10 +338,10 @@ export async function updateAttachment(
 	if (isPatchEmpty(patch)) {
 		return Result.ok(toJson(current.value))
 	}
-	const owner: AttachmentOwner = {
-		site_id: current.value.site_id ?? undefined,
-		location_id: current.value.location_id ?? undefined,
+	if (input.is_floorplan === true && current.value.rack_id !== null) {
+		return Result.err(new ValidationError(NO_RACK_FLOORPLAN))
 	}
+	const owner = ownerOf(current.value)
 	const written = await tryWrite(
 		() =>
 			withTransaction(async (): Promise<Result<AttachmentJson, Error>> => {
@@ -498,7 +507,11 @@ export async function getPlan(
 }
 
 function ownerOf(row: AttachmentRow): AttachmentOwner {
-	return { site_id: row.site_id ?? undefined, location_id: row.location_id ?? undefined }
+	return {
+		site_id: row.site_id ?? undefined,
+		location_id: row.location_id ?? undefined,
+		rack_id: row.rack_id ?? undefined,
+	}
 }
 
 /**

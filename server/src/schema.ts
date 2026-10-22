@@ -743,11 +743,12 @@ export const cables = pgTable(
 
 // ---------------------------------------------------------------------------
 // Attachments and floor plans. An attachment is an image (PNG / JPEG) owned
-// by exactly one site or location; tenant scope comes from that owner. The
+// by exactly one site, location or rack; tenant scope comes from that owner. The
 // file lives on disk (`storage.ts`, named by `storage_key`), the row only
 // holds metadata. Owner deletes remove their attachments and files in the
 // service layer, so the owner FKs carry no cascade.
-// At most one attachment per owner is marked as the floor plan. Areas
+// At most one attachment per site or location is marked as the floor plan
+// (racks have none). Areas
 // (links to other sites/locations) and placements (racks, devices) belong
 // to the marked attachment; coordinates are normalized to 0..1, so they
 // survive a file replace. Areas and placements are pure dependent data and
@@ -760,6 +761,7 @@ export const attachments = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		site_id: integer('site_id').references(() => sites.id),
 		location_id: integer('location_id').references(() => locations.id),
+		rack_id: integer('rack_id').references(() => racks.id),
 		// Original file name, for display and download.
 		filename: text('filename').notNull(),
 		// `image/png` | `image/jpeg`, detected from the magic bytes.
@@ -777,7 +779,12 @@ export const attachments = pgTable(
 	(table) => [
 		check(
 			'attachments_owner_check',
-			sql`(${table.site_id} IS NULL) <> (${table.location_id} IS NULL)`,
+			sql`num_nonnulls(${table.site_id}, ${table.location_id}, ${table.rack_id}) = 1`,
+		),
+		// Only sites and locations have floor plans.
+		check(
+			'attachments_floorplan_owner_check',
+			sql`${table.rack_id} IS NULL OR ${table.is_floorplan} = 0`,
 		),
 		uniqueIndex('attachments_site_floorplan_idx')
 			.on(table.site_id)
@@ -787,6 +794,7 @@ export const attachments = pgTable(
 			.where(sql`${table.is_floorplan} = 1`),
 		index('attachments_site_id_idx').on(table.site_id),
 		index('attachments_location_id_idx').on(table.location_id),
+		index('attachments_rack_id_idx').on(table.rack_id),
 	],
 )
 
