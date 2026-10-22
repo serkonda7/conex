@@ -390,7 +390,6 @@ export const en = {
 	'location.namePlaceholder': 'Floor 2',
 	'location.selectSiteFirst': 'Select a site first.',
 	'location.sitePlaceholder': 'Site…',
-	'location.tenantFromSite': "Defaults to the site's tenant.",
 	'location.siteImmutable': 'Site cannot be changed after creation.',
 	'location.notFound': 'Location not found.',
 	'location.details': 'Location details',

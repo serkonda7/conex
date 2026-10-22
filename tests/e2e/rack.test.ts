@@ -2,15 +2,14 @@ import { expect, test } from '@playwright/test'
 
 // Auth comes from `auth.setup.ts` storageState — no per-test login.
 
-test('selecting a site prefills the rack tenant', async ({ page }) => {
+test('rack add form has no tenant input', async ({ page }) => {
 	await page.goto('/racks/add')
 	await page.locator('#rack-site').fill('E2E Site')
 	await page.getByRole('option', { name: 'E2E Site', exact: true }).click()
 
 	await expect(page.locator('#rack-site')).toHaveAttribute('data-value', /\d+/)
 	await expect(page.locator('#rack-site')).toHaveValue('E2E Site')
-	await expect(page.locator('#rack-tenant')).toHaveAttribute('data-value', /\d+/)
-	await expect(page.locator('#rack-tenant')).toHaveValue('E2E Tenant')
+	await expect(page.locator('#rack-tenant')).toHaveCount(0)
 })
 
 test('adding a device from the rack elevation prefills rack context', async ({ page }) => {
