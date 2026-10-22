@@ -14,9 +14,10 @@ import { portKindLabel, portSideLabel } from '../../i18n/labels'
 import { useAction } from '../../lib/resource'
 import { useDeviceSearch } from './device_search'
 
-/** A candidate peer port plus, when it is taken, the cable's other end. */
+/** A peer port, whether the local port can be cabled to it, and when it is taken, the cable's other end. */
 interface PortOption {
 	iface: InterfaceJson
+	compatible: boolean
 	link?: TraceLink
 }
 
@@ -37,8 +38,8 @@ export interface ConnectPortDialogProps {
 
 /**
  * Two-step cable connect dialog: search and pick the peer device first, then
- * one of its free, compatible ports from a filterable tile grid (double-click
- * a tile to connect right away).
+ * one of its free ports from a filterable tile grid (double-click a tile to
+ * connect right away). Incompatible and taken ports are shown disabled.
  */
 export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	const [peerDevice, setPeerDevice] = createSignal<DeviceRow | null>(null)
@@ -85,10 +86,18 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				: trace.value.links.map((link) => [link.local_interface.id, link]),
 		)
 		return res.value
-			.filter((i) => i.id !== props.iface.id && portsCompatible(props.iface, i))
-			.map((iface): PortOption => ({ iface, link: links.get(iface.id) }))
+			.filter((i) => i.id !== props.iface.id)
+			.map(
+				(iface): PortOption => ({
+					iface,
+					compatible: portsCompatible(props.iface, iface),
+					link: links.get(iface.id),
+				}),
+			)
 	})
-	const freeCount = (): number => (peerPorts() ?? []).filter((p) => !p.iface.connected).length
+	const compatibleCount = (): number => (peerPorts() ?? []).filter((p) => p.compatible).length
+	const freeCount = (): number =>
+		(peerPorts() ?? []).filter((p) => p.compatible && !p.iface.connected).length
 	/** Filter matches the port name or, for taken ports, the device on the far end. */
 	const visiblePorts = createMemo(() => {
 		const needle = portFilter().trim().toLowerCase()
@@ -110,7 +119,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 		})).filter((g) => g.ports.length > 0),
 	)
 
-	const portTile = ({ iface, link }: PortOption): JSX.Element => (
+	const portTile = ({ iface, compatible, link }: PortOption): JSX.Element => (
 		<button
 			type="button"
 			class="port-tile"
@@ -118,18 +127,24 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				selected: peerIface()?.id === iface.id,
 			}}
 			aria-pressed={peerIface()?.id === iface.id}
-			disabled={iface.connected}
+			disabled={!compatible || iface.connected}
 			title={
-				link
-					? `${link.peer_device.name}: ${link.peer_interface.name}`
-					: iface.connected
-						? t('device.alreadyConnected')
-						: undefined
+				!compatible
+					? t('device.incompatiblePort')
+					: link
+						? `${link.peer_device.name}: ${link.peer_interface.name}`
+						: iface.connected
+							? t('device.alreadyConnected')
+							: undefined
 			}
 			onClick={(): void => {
 				setPeerIface(iface)
 			}}
-			onDblClick={(): void => void connect(iface)}
+			onDblClick={(): void => {
+				if (compatible && !iface.connected) {
+					void connect(iface)
+				}
+			}}
 		>
 			<span class="port-tile-name">
 				{iface.name}
@@ -143,9 +158,9 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				</Show>
 			</span>
 			<small>
-				{link
+				{compatible && link
 					? `→ ${link.peer_device.name}`
-					: iface.connected
+					: compatible && iface.connected
 						? t('device.connected')
 						: portKindLabel(iface.kind)}
 			</small>
@@ -223,7 +238,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 									<small>
 										{t('device.freePortsCount', {
 											free: freeCount(),
-											total: (peerPorts() ?? []).length,
+											total: compatibleCount(),
 										})}
 									</small>
 								</Show>

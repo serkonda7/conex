@@ -2,6 +2,7 @@ import {
 	COPPER_PASS_THROUGH_TYPES,
 	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
+	NETBOX_INTERFACE_TYPES,
 	PASS_THROUGH_PORT_TYPES,
 	type PortSide,
 	SERIAL_PORT_KINDS,
@@ -25,6 +26,12 @@ const SAME_KIND_PASS_THROUGH = new Set<string>(
 		(k) => !(COPPER_PASS_THROUGH_TYPES as readonly string[]).includes(k),
 	),
 )
+
+/** Wireless interface families; they only pair within their own family, never with wired ports. */
+const WIRELESS_FAMILIES = [
+	new Set<string>(Object.keys(NETBOX_INTERFACE_TYPES).filter((k) => k.startsWith('ieee802.11'))),
+	new Set<string>(['lte', '5g']),
+]
 
 /** Connector families cabled across connectors (rollover, USB-A to USB-C, …). */
 const PORT_FAMILIES = [new Set<string>(SERIAL_PORT_KINDS), new Set<string>(USB_PORT_KINDS)]
@@ -50,7 +57,8 @@ function isGeneralPort(kind: string): boolean {
 }
 
 /**
- * Network ports pair with network ports; a power port pairs with a power port
+ * Wired network ports pair with wired network ports, wireless ones only within
+ * their family (WLAN, cellular); a power port pairs with a power port
  * or outlet (never outlet to outlet); general ports pair within their
  * connector family, a plain `port` with any general port; display and fiber
  * only with the same kind.
@@ -58,6 +66,9 @@ function isGeneralPort(kind: string): boolean {
 export function portKindsCompatible(local: string, peer: string): boolean {
 	if (SAME_KIND_PASS_THROUGH.has(local) || SAME_KIND_PASS_THROUGH.has(peer)) {
 		return local === peer
+	}
+	if (WIRELESS_FAMILIES.some((f) => f.has(local) || f.has(peer))) {
+		return WIRELESS_FAMILIES.some((f) => f.has(local) && f.has(peer))
 	}
 	if (POWER_PORT_KINDS.has(local) && POWER_PORT_KINDS.has(peer)) {
 		return local === 'power' || peer === 'power'
