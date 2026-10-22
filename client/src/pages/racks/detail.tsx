@@ -10,6 +10,7 @@ import {
 	fetch_manufacturers,
 } from '../../api/templates'
 import { fetch_location, fetch_site, fetch_tenant } from '../../api/tenancy'
+import { AttachmentsSection, createOwnerImages } from '../../components/attachments'
 import { DataTable, type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
@@ -58,6 +59,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [location] = createRecord(locationId, fetch_location, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [rackType] = createRecord(rackTypeId, fetch_device_type, setError)
+	const images = createOwnerImages({ rack_id: props.id }, setError)
 	const [trail] = createResource(
 		() => ({ site: site(), location: locationId() ?? null }),
 		({ site: siteRow, location: locationKey }): Promise<Crumb[]> =>
@@ -344,6 +346,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								</Show>
 							</Show>
 						</section>
+
+						<AttachmentsSection id="rack-attachments" images={images} />
 					</div>
 
 					<div>

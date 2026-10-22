@@ -76,8 +76,11 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 			return ref('tenant_id')
 		case 'attachment':
 			return (
-				(await ownerTenant({ site_id: ref('site_id'), location_id: ref('location_id') })) ??
-				null
+				(await ownerTenant({
+					site_id: ref('site_id'),
+					location_id: ref('location_id'),
+					rack_id: ref('rack_id'),
+				})) ?? null
 			)
 		case 'shelf': {
 			const rack = ref('rack_id')

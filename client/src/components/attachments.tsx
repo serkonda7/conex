@@ -1,8 +1,8 @@
 /**
- * Image attachments of a site or location: a thumbnail grid (CSS-scaled
- * originals) with upload by button or drop, and a lightbox per image to
- * edit its description, mark it as the floor plan, replace the file or
- * delete it. Type and size are checked here before uploading; the server
+ * Image attachments of a site, location or rack: a thumbnail grid
+ * (CSS-scaled originals) with upload by button or drop, and a lightbox per
+ * image to edit its description, mark it as the floor plan (not for
+ * racks), replace the file or delete it. Type and size are checked here before uploading; the server
  * checks them again from the bytes. The page loads the images once
  * (`createOwnerImages`) and uses them for its link to the floor plan page.
  */
@@ -77,6 +77,8 @@ export interface OwnerImages {
 	refetch: () => void
 	/** The image marked as the floor plan, if any. */
 	floorplan: () => AttachmentJson | undefined
+	/** Whether the owner can have a floor plan (sites and locations, not racks). */
+	has_floorplan: boolean
 }
 
 /** Loads the images of `owner`; a failed fetch reports to `onError`. */
@@ -87,6 +89,7 @@ export function createOwnerImages(owner: AttachmentOwner, onError?: ErrorSink): 
 		rows,
 		refetch: () => void refetch(),
 		floorplan: () => rows()?.find((row) => row.is_floorplan),
+		has_floorplan: !('rack_id' in owner),
 	}
 }
 
@@ -170,6 +173,8 @@ function AttachmentLightbox(props: {
 	attachment: AttachmentJson
 	/** The owner's current floor plan, for the mark confirmation. */
 	floorplan: AttachmentJson | undefined
+	/** Shows the floor-plan mark action. */
+	has_floorplan: boolean
 	on_changed: () => void
 	on_deleted: () => void
 	on_close: () => void
@@ -295,15 +300,17 @@ function AttachmentLightbox(props: {
 								{t('attachment.editDescription')}
 							</IconLabel>
 						</button>
-						<button type="button" disabled={action.pending()} onClick={toggleMark}>
-							<IconLabel
-								icon={props.attachment.is_floorplan ? IconStarFilled : IconStar}
-							>
-								{props.attachment.is_floorplan
-									? t('floorplan.unmark')
-									: t('floorplan.mark')}
-							</IconLabel>
-						</button>
+						<Show when={props.has_floorplan}>
+							<button type="button" disabled={action.pending()} onClick={toggleMark}>
+								<IconLabel
+									icon={props.attachment.is_floorplan ? IconStarFilled : IconStar}
+								>
+									{props.attachment.is_floorplan
+										? t('floorplan.unmark')
+										: t('floorplan.mark')}
+								</IconLabel>
+							</button>
+						</Show>
 						<button type="button" disabled={action.pending()} onClick={replace}>
 							<IconLabel icon={IconReplace}>{t('attachment.replace')}</IconLabel>
 						</button>
@@ -326,9 +333,10 @@ function AttachmentLightbox(props: {
 }
 
 /**
- * "Images" section of a site or location detail page. `id` is the heading
- * anchor. Editors upload through the button or by dropping files onto the
- * grid, and mark the floor plan with the star on its thumbnail.
+ * "Images" section of a site, location or rack detail page. `id` is the
+ * heading anchor. Editors upload through the button or by dropping files
+ * onto the grid, and mark the floor plan with the star on its thumbnail
+ * (sites and locations only).
  */
 export function AttachmentsSection(props: { id: string; images: OwnerImages }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -457,48 +465,52 @@ export function AttachmentsSection(props: { id: string; images: OwnerImages }): 
 												{row.description || row.filename}
 											</span>
 										</button>
-										<Show
-											when={can('edit')}
-											fallback={
-												<Show when={row.is_floorplan}>
-													<span
-														class="attachment-star"
-														title={t('floorplan.badge')}
-													>
-														<IconStarFilled size={16} />
-														<span class="visually-hidden">
-															{t('floorplan.badge')}
+										<Show when={props.images.has_floorplan}>
+											<Show
+												when={can('edit')}
+												fallback={
+													<Show when={row.is_floorplan}>
+														<span
+															class="attachment-star"
+															title={t('floorplan.badge')}
+														>
+															<IconStarFilled size={16} />
+															<span class="visually-hidden">
+																{t('floorplan.badge')}
+															</span>
 														</span>
-													</span>
-												</Show>
-											}
-										>
-											<button
-												type="button"
-												class="attachment-star"
-												classList={{ marked: row.is_floorplan }}
-												disabled={mark.pending()}
-												aria-pressed={row.is_floorplan}
-												title={
-													row.is_floorplan
-														? t('floorplan.unmark')
-														: t('floorplan.mark')
+													</Show>
 												}
-												aria-label={t(
-													row.is_floorplan
-														? 'floorplan.unmarkNamed'
-														: 'floorplan.markNamed',
-													{ name: row.filename },
-												)}
-												onClick={() => void toggleMark(row)}
 											>
-												<Dynamic
-													component={
-														row.is_floorplan ? IconStarFilled : IconStar
+												<button
+													type="button"
+													class="attachment-star"
+													classList={{ marked: row.is_floorplan }}
+													disabled={mark.pending()}
+													aria-pressed={row.is_floorplan}
+													title={
+														row.is_floorplan
+															? t('floorplan.unmark')
+															: t('floorplan.mark')
 													}
-													size={16}
-												/>
-											</button>
+													aria-label={t(
+														row.is_floorplan
+															? 'floorplan.unmarkNamed'
+															: 'floorplan.markNamed',
+														{ name: row.filename },
+													)}
+													onClick={() => void toggleMark(row)}
+												>
+													<Dynamic
+														component={
+															row.is_floorplan
+																? IconStarFilled
+																: IconStar
+														}
+														size={16}
+													/>
+												</button>
+											</Show>
 										</Show>
 									</li>
 								)}
@@ -516,6 +528,7 @@ export function AttachmentsSection(props: { id: string; images: OwnerImages }): 
 					<AttachmentLightbox
 						attachment={attachment()}
 						floorplan={props.images.floorplan()}
+						has_floorplan={props.images.has_floorplan}
 						on_changed={refetch}
 						on_deleted={afterDelete}
 						on_close={() => setOpenId(null)}

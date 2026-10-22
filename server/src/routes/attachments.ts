@@ -64,9 +64,9 @@ async function uploadOf(file: File): Promise<AttachmentUpload> {
 }
 
 /**
- * Image attachments of sites and locations. Wired by hand (not
+ * Image attachments of sites, locations and racks. Wired by hand (not
  * `makeTenantApp`) for the multipart and binary endpoints. Tenant scope
- * comes from the owning site or location; the files are served only after
+ * comes from the owning site, location or rack; the files are served only after
  * that check. The floor plan of a marked attachment is further filtered to
  * the requester's scope by the service.
  */
@@ -75,7 +75,7 @@ export const attachmentsApp = new Hono()
 	.use(requirePermissionMiddleware('view'))
 	.get('/', vValidator('query', AttachmentListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
-		const owner = { site_id: query.site, location_id: query.location }
+		const owner = { site_id: query.site, location_id: query.location, rack_id: query.rack }
 		return (
 			checkTenant(c, await ownerTenant(owner)) ?? sendResult(c, await listAttachments(owner))
 		)
@@ -133,7 +133,11 @@ export const attachmentsApp = new Hono()
 		vValidator('form', AttachmentCreateSchema, onValidationError),
 		async (c) => {
 			const body = c.req.valid('form')
-			const owner = { site_id: body.site_id, location_id: body.location_id }
+			const owner = {
+				site_id: body.site_id,
+				location_id: body.location_id,
+				rack_id: body.rack_id,
+			}
 			// A missing owner answers 404 from the service; an out-of-scope one
 			// answers 403 here before anything is written.
 			return (

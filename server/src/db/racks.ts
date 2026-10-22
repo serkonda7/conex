@@ -11,7 +11,8 @@ import type {
 } from 'shared/src/schemas'
 import { device_types, devices, locations, racks, shelves, sites } from '../schema'
 import { checkBounds, faceOf, getOccupancy, type OccupantSpan } from '../services/occupancy'
-import { prunePlacements } from './attachments'
+import { removeAttachmentFiles } from '../storage'
+import { type AttachmentRow, deleteOwnerAttachments, prunePlacements } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, NotFoundError } from './errors'
@@ -367,10 +368,18 @@ export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
 	if (await exists(shelves, eq(shelves.rack_id, id))) {
 		return Result.err(new ConflictError('Rack still has shelves; move or delete them first'))
 	}
-	const deleted = await tryWrite(() => getDb().delete(racks).where(eq(racks.id, id)))
+	// Attachments go with their rack; their files only after the commit.
+	const deleted = await tryWrite(() =>
+		withTransaction(async (): Promise<AttachmentRow[]> => {
+			const removed = await deleteOwnerAttachments({ rack_id: id })
+			await getDb().delete(racks).where(eq(racks.id, id))
+			return removed
+		}),
+	)
 	if (Result.isError(deleted)) {
 		return deleted
 	}
+	await removeAttachmentFiles(deleted.value)
 	return await logDelete('rack', current.value)
 }
 
