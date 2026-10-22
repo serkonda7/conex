@@ -13,7 +13,7 @@
     "vite-plugin-solid": "~2.11.14"
   },
   "dependencies": {
-    "@serkonda7/solid-components": "~0.3.1",
+    "@serkonda7/solid-components": "~0.3.2",
     "@tabler/icons-solidjs": "~3.49.0",
     "better-result": "catalog:",
     "dompurify": "~3.4.17",

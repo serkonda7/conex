@@ -8,7 +8,7 @@
 
 import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { type JSX, onMount, Show } from 'solid-js'
+import { type JSX, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import type { FormState } from '../lib/form'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
@@ -258,6 +258,8 @@ export function SelectField(props: {
 	autofocus?: boolean
 	describedBy?: string
 	hint?: JSX.Element
+	/** Options carry a `preview`: floats the preview at the cursor. */
+	info?: boolean
 	reload?: () => unknown
 	/** Entity label and add-form path of the pinned "Add …" entry. */
 	add?: { label: string; href: string }
@@ -266,6 +268,24 @@ export function SelectField(props: {
 		// The tab shell refocuses `[data-autofocus]` when the tab is reactivated.
 		if (props.autofocus === true) {
 			document.querySelector(`#${CSS.escape(props.id)}`)?.setAttribute('data-autofocus', '')
+		}
+		if (props.info === true) {
+			const root = document.documentElement
+			const track = (e: MouseEvent): void => {
+				root.style.setProperty('--cursor-x', `${e.clientX}px`)
+				root.style.setProperty('--cursor-y', `${e.clientY}px`)
+				root.dataset.input = 'mouse'
+			}
+			const keyboard = (): void => {
+				root.dataset.input = 'keyboard'
+			}
+			document.addEventListener('mousemove', track)
+			document.addEventListener('keydown', keyboard)
+			onCleanup(() => {
+				document.removeEventListener('mousemove', track)
+				document.removeEventListener('keydown', keyboard)
+				delete root.dataset.input
+			})
 		}
 	})
 

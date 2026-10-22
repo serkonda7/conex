@@ -737,7 +737,13 @@ tbody tr:last-child td {
 
 /* Icon rail: labels, group headings and shortcuts give way to icons. */
 .app-sidebar.collapsed {
-	width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 4px);
+	/* sidebar padding + link padding + icon + borders + vertical scrollbar */
+	width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 2px + 1px + 1px + 1rem);
+	min-width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 2px + 1px + 1px + 1rem);
+}
+
+.app-sidebar.collapsed .app-nav {
+	overflow-x: hidden;
 }
 
 .app-sidebar.collapsed .app-nav-text,
@@ -1179,6 +1185,7 @@ tbody tr:last-child td {
 	.app-sidebar,
 	.app-sidebar.collapsed {
 		width: 100%;
+		min-width: 0;
 		height: auto;
 		position: static;
 		border-right: none;
@@ -1369,6 +1376,16 @@ tbody tr:last-child td {
 	font-size: var(--font-size-base);
 	font-weight: 500;
 	color: #d6d6d6;
+}
+
+/* Option previews follow the mouse cursor (shifted back into the viewport);
+   keyboard navigation keeps the package's placement beside the list. */
+:root[data-input="mouse"] .combobox-preview {
+	position: fixed;
+	top: calc(var(--cursor-y, 0px) + 1rem);
+	left: calc(var(--cursor-x, 0px) + 1rem);
+	translate: min(0px, calc(100vw - var(--cursor-x, 0px) - 1.5rem - 100%))
+		min(0px, calc(100vh - var(--cursor-y, 0px) - 1.5rem - 100%));
 }
 
 .field .required {
@@ -1630,6 +1647,12 @@ tbody tr:last-child td {
 
 .rack-type-fixed-width {
 	padding: 0.36rem 0.5rem;
+}
+
+/* Inline form factor SVG in the combobox preview, without a text baseline gap. */
+.rack-form-factor-schematic {
+	display: block;
+	line-height: 0;
 }
 
 /* Searchable `SelectField`: the solid-components `Combobox`, themed through
