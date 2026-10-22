@@ -18,14 +18,13 @@ import { t, tp } from '../../i18n'
 import { yesNo } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
-import { navigate } from '../../lib/router'
 
 /**
  * /device-types — device-type list: search (model, manufacturer, description),
  * sortable columns, manufacturer filter via `?manufacturer=<id>` (linked from
  * the manufacturer page), and icon actions
- * with delete in a row menu. New types can be added manually or imported from
- * the /device-types/import page.
+ * with delete in a row menu. "+ Add" opens the /device-types/import page,
+ * the only way to create device types.
  */
 export function DeviceTypesPage(): JSX.Element {
 	const [filterManufacturer] = useQueryFilterList('manufacturer')
@@ -99,16 +98,7 @@ export function DeviceTypesPage(): JSX.Element {
 		<EntityListPage
 			list={list}
 			title={tp('entity.deviceType', 2)}
-			addHref="/device-types/add"
-			headerActions={
-				<button
-					type="button"
-					class="btn-add"
-					onClick={() => navigate('/device-types/import')}
-				>
-					{t('deviceType.import')}
-				</button>
-			}
+			addHref="/device-types/import"
 			filtered={filterManufacturer().length > 0}
 			columns={columns}
 			columnsKey="device-types"

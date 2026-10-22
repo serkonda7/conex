@@ -416,9 +416,7 @@ export const en = {
 	'manufacturer.noDeviceTypes': 'No device types for this manufacturer yet.',
 
 	// deviceType
-	'deviceType.import': '⭳ Import',
 	'deviceType.empty': 'No device types yet. Import the first one above.',
-	'deviceType.addTitle': 'Add a new device type',
 	'deviceType.editTitle': 'Edit device type',
 	'deviceType.loadingOne': 'Loading device type…',
 	'deviceType.manufacturerPlaceholder': 'Manufacturer…',

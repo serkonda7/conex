@@ -417,10 +417,8 @@ export const de: Messages = {
 	'manufacturer.noDeviceTypes': 'Für diesen Hersteller sind noch keine Gerätetypen vorhanden.',
 
 	// deviceType
-	'deviceType.import': '⭳ Importieren',
 	'deviceType.empty':
 		'Noch keine Gerätetypen vorhanden. Importieren Sie oben den ersten Datensatz.',
-	'deviceType.addTitle': 'Neuen Gerätetyp hinzufügen',
 	'deviceType.editTitle': 'Gerätetyp bearbeiten',
 	'deviceType.loadingOne': 'Gerätetyp wird geladen…',
 	'deviceType.manufacturerPlaceholder': 'Hersteller…',

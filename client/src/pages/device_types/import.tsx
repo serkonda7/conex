@@ -9,7 +9,7 @@ import { DataTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
 import { Field, TextField } from '../../components/form'
 import { t } from '../../i18n'
-import { navigate } from '../../lib/router'
+import { navigate, queryParam } from '../../lib/router'
 import { buildAiPrompt } from './ai-prompt'
 
 const SAMPLE_YAML = `manufacturer: Acme
@@ -31,7 +31,8 @@ interfaces:
  */
 export function DeviceTypeImportPage(): JSX.Element {
 	const [promptManufacturer, setPromptManufacturer] = createSignal('')
-	const [promptModel, setPromptModel] = createSignal('')
+	// `?name=` comes from the search typed into an opener's dropdown.
+	const [promptModel, setPromptModel] = createSignal(queryParam('name'))
 	const [copyingPrompt, setCopyingPrompt] = createSignal(false)
 	const [promptCopied, setPromptCopied] = createSignal(false)
 	const [promptError, setPromptError] = createSignal<string | null>(null)

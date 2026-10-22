@@ -199,7 +199,7 @@ export function DeviceAddPage(): JSX.Element {
 					onChange={setTypeId}
 					options={typeOptions()}
 					emptyLabel={t('common.selectPlaceholder')}
-					add={{ label: tp('entity.deviceType', 1), href: '/device-types/add' }}
+					add={{ label: tp('entity.deviceType', 1), href: '/device-types/import' }}
 					reload={reloadTypes}
 				/>
 				<SelectField
