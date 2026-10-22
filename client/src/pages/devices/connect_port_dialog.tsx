@@ -50,7 +50,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	const submit = useAction(setError)
 
 	// Existing cables from the local device, keyed by peer device, so the
-	// device search can flag already connected devices and list them last.
+	// device search can flag already connected devices.
 	const localLinksPromise = fetch_trace(props.iface.device_id, 1).then((trace) => {
 		const byPeer = new Map<number, TraceLink[]>()
 		for (const link of Result.isError(trace) ? [] : trace.value.links) {
@@ -175,14 +175,6 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 		</button>
 	)
 
-	/** Device search results with already connected devices sorted last. */
-	async function loadDevices(search: string): Promise<Result<DeviceRow[], Error>> {
-		const [res, links] = await Promise.all([deviceSearch.load(search), localLinksPromise])
-		return res.map((devices) =>
-			devices.toSorted((a, b) => Number(links.has(a.id)) - Number(links.has(b.id))),
-		)
-	}
-
 	function pickDevice(device: DeviceRow): void {
 		setError(null)
 		setPeerIface(null)
@@ -233,9 +225,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			</ol>
 			<Show
 				when={peerDevice()}
-				fallback={
-					<ObjectSearch {...deviceSearch} load={loadDevices} on_select={pickDevice} />
-				}
+				fallback={<ObjectSearch {...deviceSearch} on_select={pickDevice} />}
 			>
 				{(device: () => DeviceRow): JSX.Element => (
 					<form class="connect-port-form" onSubmit={handleSubmit}>
