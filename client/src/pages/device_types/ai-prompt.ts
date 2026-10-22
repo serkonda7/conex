@@ -6,6 +6,8 @@ Source priority:
 2) https://github.com/netbox-community/devicetype-library — copy the baseline if found, keeping only the supported keys below.
 3) Manufacturer specifications, PSREF or manuals — fill gaps only from primary sources and record URLs in comments. Never guess; omit uncertain optional fields or use type: other (interfaces) / port (general ports). Never invent a display-port type.
 
+Generic manufacturer: if the manufacturer is "Generic" or a variant of it (e.g. "generisch", "-"), the device is vendor-neutral. Use manufacturer "Generic" and directory device-types/Generic/. Both libraries keep such devices under Generic/ with English model names, so translate the model to its common English term before searching (e.g. "Patchfeld 24 Port Cat6" -> "Patch Panel 24-Port Cat6", "Steckdosenleiste 8-fach" -> "Power Strip 8-Outlet", "Fachboden" -> "Shelf") and also try close English synonyms. Instead of vendor datasheets, base the ports on the common standard configuration of that device class and list any assumptions under uncertain fields.
+
 Output one YAML document starting with --- in a fenced YAML block, plus the target path device-types/<Manufacturer>/<model-slug>.yaml outside the block. Keep the source summary outside the YAML so the block can be pasted directly into conex.
 
 Write all free-text output in German: description, comments, port descriptions and the summary outside the YAML block.
