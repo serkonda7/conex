@@ -682,7 +682,6 @@ export const en = {
 	'shelf.nameOptional': 'Name (optional)',
 	'shelf.namePlaceholder': 'shelf',
 	'shelf.face': 'Face',
-	'shelf.bothFaces': 'Both faces',
 	'shelf.faceHint': 'Which rack face the shelf is mounted on.',
 	'shelf.position': 'Position (U)',
 	'shelf.positionHint': 'Lowest U of the mount (1-based).',
