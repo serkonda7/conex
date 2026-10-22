@@ -116,7 +116,7 @@ export function ChangelogPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>{tp('entity.changelog', 1)}</h2>
+				<h2>{t('entity.changelog')}</h2>
 			</div>
 
 			<FilterTable

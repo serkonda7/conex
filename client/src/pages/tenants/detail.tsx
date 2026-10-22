@@ -548,7 +548,7 @@ function RecentChanges(props: {
 			<div class="card-header">
 				<h3 id="tenant-changes">{t('tenant.recentChanges')}</h3>
 				<a href={`/changelog?tenant=${props.tenantId}`}>
-					{t('common.viewIn', { target: tp('entity.changelog', 1) })}
+					{t('common.viewIn', { target: t('entity.changelog') })}
 				</a>
 			</div>
 			<Show
