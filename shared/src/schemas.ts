@@ -1376,6 +1376,8 @@ export const DeviceListQuerySchema = v.object({
 	kind: v.optional(DeviceListKindSchema, undefined),
 	/** VMs running on this host device (hides devices). */
 	host: OptionalIdEntry,
+	/** Devices with a port that can be cabled to this interface (hides VMs). */
+	compatible_with: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

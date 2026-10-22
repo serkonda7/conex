@@ -7,12 +7,14 @@ import {
 	inArray,
 	isNotNull,
 	isNull,
+	ne,
 	or,
 	type SQL,
 	type SQLWrapper,
 	sql,
 } from 'drizzle-orm'
 import { alias, unionAll } from 'drizzle-orm/pg-core'
+import { passThroughGroup, portKindsCompatible } from 'shared/src/ports'
 import type {
 	DeviceCreate,
 	DeviceListKind,
@@ -257,6 +259,8 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	kind?: DeviceListKind
 	/** VMs running on this host device. */
 	host?: number
+	/** Devices with a port that can be cabled to this interface. */
+	compatible_with?: number
 	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
 }
@@ -270,6 +274,58 @@ const nullInt = (name: string): SQL.Aliased<number | null> =>
 	sql<number | null>`NULL::integer`.as(name)
 const nullText = (name: string): SQL.Aliased<string | null> =>
 	sql<string | null>`NULL::text`.as(name)
+
+/**
+ * Matches devices of the interface's own tenant (cables never cross
+ * tenants, see `connectCable`) with a port (other than the interface itself,
+ * and not of its own pass-through) that `portsCompatible` accepts as its
+ * peer. Kinds are free-form, so the compatible ones are picked from those in
+ * use.
+ */
+async function compatiblePortCondition(interfaceId: number): Promise<SQL | undefined> {
+	const db = getDb()
+	const [local] = await db
+		.select({
+			id: interfaces.id,
+			kind: interfaces.kind,
+			side: interfaces.side,
+			rear_port_id: interfaces.rear_port_id,
+			tenant_id: devices.tenant_id,
+		})
+		.from(interfaces)
+		.innerJoin(devices, eq(devices.id, interfaces.device_id))
+		.where(eq(interfaces.id, interfaceId))
+		.limit(1)
+	if (!local) {
+		return sql`false`
+	}
+	const kinds = (await db.selectDistinct({ kind: interfaces.kind }).from(interfaces))
+		.map((row) => row.kind)
+		.filter((kind) => portKindsCompatible(local.kind, kind))
+	if (kinds.length === 0) {
+		return sql`false`
+	}
+	const group = passThroughGroup(local)
+	const peerGroup = sql`CASE ${interfaces.side} WHEN 'rear' THEN ${interfaces.id} WHEN 'front' THEN ${interfaces.rear_port_id} END`
+	return and(
+		local.tenant_id === null
+			? isNull(devices.tenant_id)
+			: eq(devices.tenant_id, local.tenant_id),
+		inArray(
+			devices.id,
+			db
+				.select({ id: interfaces.device_id })
+				.from(interfaces)
+				.where(
+					and(
+						inArray(interfaces.kind, kinds),
+						ne(interfaces.id, local.id),
+						group === null ? undefined : sql`${peerGroup} IS DISTINCT FROM ${group}`,
+					),
+				),
+		),
+	)
+}
 
 /**
  * Devices and virtual machines in one list (`UNION ALL`), sorted and paged
@@ -288,7 +344,12 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		params.site !== undefined ||
 		params.rack !== undefined ||
 		params.device_type !== undefined ||
-		params.placed !== undefined
+		params.placed !== undefined ||
+		params.compatible_with !== undefined
+	const compatible =
+		params.compatible_with === undefined
+			? undefined
+			: await compatiblePortCondition(params.compatible_with)
 	const deviceWhere =
 		params.kind === 'vm' || params.host !== undefined
 			? sql`false`
@@ -331,6 +392,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 						: params.placed
 							? isNotNull(devices.position_u)
 							: isNull(devices.position_u),
+					compatible,
 				)
 	const vmWhere =
 		params.kind === 'device' || deviceOnly

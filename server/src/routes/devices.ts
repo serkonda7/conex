@@ -71,6 +71,12 @@ export const devicesApp = new Hono()
 		if (scope instanceof Response) {
 			return scope
 		}
+		if (query.compatible_with !== undefined) {
+			const denied = checkTenant(c, await interfaceTenant(query.compatible_with))
+			if (denied) {
+				return denied
+			}
+		}
 		return c.json(
 			await listDevices({
 				search: query.search,
@@ -85,6 +91,7 @@ export const devicesApp = new Hono()
 				placed: query.placed,
 				kind: query.kind,
 				host: query.host,
+				compatible_with: query.compatible_with,
 				sort: query.sort,
 				order: query.order,
 				...scope,

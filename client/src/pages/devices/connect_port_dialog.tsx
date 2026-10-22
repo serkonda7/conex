@@ -1,13 +1,6 @@
 import { Result } from 'better-result'
-import {
-	COPPER_PASS_THROUGH_TYPES,
-	DISPLAY_PORT_KINDS,
-	GENERAL_PORT_KINDS,
-	PASS_THROUGH_PORT_TYPES,
-	type PortSide,
-	SERIAL_PORT_KINDS,
-	USB_PORT_KINDS,
-} from 'shared/src/schemas'
+import { portsCompatible } from 'shared/src/ports'
+import type { PortSide } from 'shared/src/schemas'
 import type { InputEventAndTarget, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
@@ -20,69 +13,6 @@ import { t } from '../../i18n'
 import { portKindLabel, portSideLabel } from '../../i18n/labels'
 import { useAction } from '../../lib/resource'
 import { useDeviceSearch } from './device_search'
-
-/** Interface kinds that never connect to network ports. */
-export const OTHER_PORT_KINDS = new Set<string>([
-	'port',
-	...GENERAL_PORT_KINDS,
-	'power',
-	'power-outlet',
-	...DISPLAY_PORT_KINDS,
-])
-
-const POWER_PORT_KINDS = new Set(['power', 'power-outlet'])
-
-/** Patch-panel connectors (fiber, …) that only cable to their own kind; copper cables like ethernet. */
-const SAME_KIND_PASS_THROUGH = new Set<string>(
-	Object.keys(PASS_THROUGH_PORT_TYPES).filter(
-		(k) => !(COPPER_PASS_THROUGH_TYPES as readonly string[]).includes(k),
-	),
-)
-
-/** Pass-through group of a panel port (its rear port's id); see `server/src/db/cables.ts`. */
-function passThroughGroup(iface: InterfaceJson): number | null {
-	if (iface.side === 'rear') {
-		return iface.id
-	}
-	return iface.side === 'front' ? iface.rear_port_id : null
-}
-
-/** Connector families cabled across connectors (rollover, USB-A to USB-C, …). */
-const PORT_FAMILIES = [new Set<string>(SERIAL_PORT_KINDS), new Set<string>(USB_PORT_KINDS)]
-
-/**
- * Network ports pair with network ports; a power port pairs with a power port
- * or outlet (never outlet to outlet); general ports pair within their
- * connector family, a plain `port` with any general port; display and fiber
- * only with the same kind. Two ports of one pass-through never pair.
- */
-function isCompatible(local: InterfaceJson, peer: InterfaceJson): boolean {
-	const group = passThroughGroup(local)
-	if (group !== null && group === passThroughGroup(peer)) {
-		return false
-	}
-	if (SAME_KIND_PASS_THROUGH.has(local.kind) || SAME_KIND_PASS_THROUGH.has(peer.kind)) {
-		return local.kind === peer.kind
-	}
-	if (POWER_PORT_KINDS.has(local.kind) && POWER_PORT_KINDS.has(peer.kind)) {
-		return local.kind === 'power' || peer.kind === 'power'
-	}
-	if (isGeneralPort(local.kind) && isGeneralPort(peer.kind)) {
-		return (
-			local.kind === 'port' ||
-			peer.kind === 'port' ||
-			PORT_FAMILIES.some((f) => f.has(local.kind) && f.has(peer.kind))
-		)
-	}
-	if (OTHER_PORT_KINDS.has(local.kind) || OTHER_PORT_KINDS.has(peer.kind)) {
-		return local.kind === peer.kind
-	}
-	return true
-}
-
-function isGeneralPort(kind: string): boolean {
-	return kind === 'port' || (GENERAL_PORT_KINDS as readonly string[]).includes(kind)
-}
 
 /** A candidate peer port plus, when it is taken, the cable's other end. */
 interface PortOption {
@@ -127,10 +57,16 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 		return byPeer
 	})
 	const [localLinks] = createResource(() => localLinksPromise)
-	const deviceSearch = useDeviceSearch((device: DeviceRow) => {
-		const links = localLinks()?.get(device.id)
-		return links?.map((l) => `${l.local_interface.name} ⟷ ${l.peer_interface.name}`).join(', ')
-	})
+	// Only devices with a port the local one can be cabled to.
+	const deviceSearch = useDeviceSearch(
+		(device: DeviceRow) => {
+			const links = localLinks()?.get(device.id)
+			return links
+				?.map((l) => `${l.local_interface.name} ⟷ ${l.peer_interface.name}`)
+				.join(', ')
+		},
+		{ compatible_with: props.iface.id },
+	)
 
 	// The depth-1 trace runs in parallel and only names the far end of taken
 	// ports; if it fails the tiles fall back to a plain "connected".
@@ -149,7 +85,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				: trace.value.links.map((link) => [link.local_interface.id, link]),
 		)
 		return res.value
-			.filter((i) => i.id !== props.iface.id && isCompatible(props.iface, i))
+			.filter((i) => i.id !== props.iface.id && portsCompatible(props.iface, i))
 			.map((iface): PortOption => ({ iface, link: links.get(iface.id) }))
 	})
 	const freeCount = (): number => (peerPorts() ?? []).filter((p) => !p.iface.connected).length

@@ -93,7 +93,9 @@ export function getCable(id: number): Promise<Result<CableRow, Error>> {
  * - both interfaces exist;
  * - both interfaces are free (`connected=false`, no cable on either end);
  * - the two ends are not in the same pass-through group of a patch panel
- *   (a front port and its own rear port, or two front ports of one rear port).
+ *   (a front port and its own rear port, or two front ports of one rear port);
+ * - both devices belong to the same tenant (or both are shared): cables
+ *   never cross tenants.
  * The insert plus both `connected=true` flips run in one transaction.
  * Same-device links are allowed when the interfaces differ (v1).
  */
@@ -117,6 +119,15 @@ export async function connectCable(input: CableCreate): Promise<Result<CableRow,
 		return Result.err(
 			new ConflictError('Cannot connect two ports of the same pass-through on a patch panel'),
 		)
+	}
+	const tenants = await getDb()
+		.select({ id: devices.id, tenant_id: devices.tenant_id })
+		.from(devices)
+		.where(inArray(devices.id, [ends[0].device_id, ends[1].device_id]))
+	const tenantOf = (deviceId: number): number | null | undefined =>
+		tenants.find((d) => d.id === deviceId)?.tenant_id
+	if (tenantOf(ends[0].device_id) !== tenantOf(ends[1].device_id)) {
+		return Result.err(new ConflictError('Cannot connect devices of different tenants'))
 	}
 	for (const iface of ends) {
 		if (iface.connected !== 0 || (await exists(cables, cableTouches([iface.id])))) {
