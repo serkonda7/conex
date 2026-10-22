@@ -93,6 +93,7 @@ export function RackTypeAddPage(): JSX.Element {
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				add={{ label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }}
 				reload={refetchManufacturers}
+				autofocus
 			/>
 			<TextField
 				id="rack-type-model"
@@ -101,7 +102,6 @@ export function RackTypeAddPage(): JSX.Element {
 				value={model()}
 				onInput={setModel}
 				placeholder={t('rackType.modelPlaceholder')}
-				autofocus
 			/>
 			<SelectField
 				id="rack-type-form-factor"
