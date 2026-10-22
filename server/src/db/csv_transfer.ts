@@ -342,8 +342,9 @@ function passThroughKindOf(port: Record<string, unknown>): string {
  * NetBox `rear-ports` (`{name, type, positions}`) and `front-ports`
  * (`{name, type, rear_port, rear_port_position}`): each port becomes a
  * single-port stub, a front port mapped onto the rear port of that name in
- * the same document at an explicit position. Rear ports come first so the
- * front ports can reference them. Answers the failure message, or null.
+ * the same document at an explicit position (inline, or via NetBox 4.3+
+ * `port-mappings`). Rear ports come first so the front ports can reference
+ * them. Answers the failure message, or null.
  */
 async function importPassThroughPorts(
 	deviceTypeId: number,
@@ -373,17 +374,29 @@ async function importPassThroughPorts(
 		}
 		rearByName.set(name, stub.value.id)
 	}
+	// NetBox 4.3+ moves the mapping out of the front port into a top-level
+	// `port-mappings` list (`{front_port, front_port_position, rear_port,
+	// rear_port_position}`); the first mapping of a front port wins.
+	const mappingByFront = new Map<string, Record<string, unknown>>()
+	for (const mapping of componentsOf(item['port-mappings'])) {
+		const front = typeof mapping.front_port === 'string' ? mapping.front_port.trim() : ''
+		if (front && !mappingByFront.has(front)) {
+			mappingByFront.set(front, mapping)
+		}
+	}
 	for (const port of componentsOf(item['front-ports'])) {
 		const name = typeof port.name === 'string' ? port.name.trim() : ''
 		if (!name) {
 			continue
 		}
-		const rearName = typeof port.rear_port === 'string' ? port.rear_port.trim() : ''
+		const source = port.rear_port === undefined ? (mappingByFront.get(name) ?? port) : port
+		const rearName = typeof source.rear_port === 'string' ? source.rear_port.trim() : ''
 		const rearId = rearByName.get(rearName)
 		if (rearId === undefined) {
 			return `front-ports "${name}": unknown rear_port "${rearName}"`
 		}
-		const position = port.rear_port_position === undefined ? 1 : Number(port.rear_port_position)
+		const position =
+			source.rear_port_position === undefined ? 1 : Number(source.rear_port_position)
 		if (!Number.isInteger(position) || position < 1) {
 			return `front-ports "${name}": rear_port_position must be an integer of at least 1`
 		}
