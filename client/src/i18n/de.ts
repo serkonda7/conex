@@ -757,6 +757,12 @@ export const de: Messages = {
 	'device.panel.frontPort': 'Frontport',
 	'device.panel.rearPort': 'Rückport',
 	'device.panel.editRow': '{name} bearbeiten',
+	'device.panel.patched': 'Aufgelegt',
+	'device.panel.unpatched': 'Nicht aufgelegt: Teil des Panels, aber nicht verkabelt',
+	'device.panel.notPatched': 'Nicht aufgelegt',
+	'device.panel.notPatchedConnect':
+		'Nicht aufgelegt: Zeile als aufgelegt speichern, um ein Kabel anzuschließen',
+	'device.panel.cabledPatched': 'Verkabelte Ports bleiben aufgelegt; zuerst die Kabel trennen',
 	'device.panel.otherPorts': 'Ports',
 	'device.panel.location': 'Bereich der Dose',
 	'device.outletLocation.none': 'Kein Bereich',

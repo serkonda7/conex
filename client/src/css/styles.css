@@ -2140,6 +2140,27 @@ th[aria-sort="descending"] .data-table-sort::after {
 	color: var(--text-muted);
 }
 
+/* Connect buttons in the panel table only show on row hover (or focus). */
+.panel-port-table .icon-btn-connect {
+	opacity: 0;
+}
+
+.panel-port-table tr:hover .icon-btn-connect,
+.panel-port-table .icon-btn-connect:focus-visible {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.panel-port-table .icon-btn-connect {
+		opacity: 1;
+	}
+}
+
+/* Unpatched rows: part of the panel, but not wired up. */
+.panel-port-table tr:has(.panel-row-unpatched) > td:not(:has(.panel-row-edit)) {
+	opacity: 0.5;
+}
+
 /* Front/rear marker on port tiles and trace hops. */
 /* Direct cable peer with the end-to-end peers behind patch panels below it. */
 .port-peer {

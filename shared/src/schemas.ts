@@ -1318,6 +1318,8 @@ export const InterfaceUpdateSchema = v.strictObject({
 	rear_port_position: v.optional(PortPositionsSchema, undefined),
 	// Outlets (single-position rear ports) only: the room the cable ends in.
 	location_id: v.optional(v.nullable(IdSchema), undefined),
+	// Patch-panel ports only: wired up, or just part of the panel.
+	patched: v.optional(v.boolean(), undefined),
 })
 
 /** `PUT /devices/:id/interfaces/location`: set or clear the location of several outlets. */

@@ -1,0 +1,1 @@
+ALTER TABLE "interfaces" ADD COLUMN "patched" integer DEFAULT 1 NOT NULL;

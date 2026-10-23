@@ -79,16 +79,22 @@ export type DeviceRow = typeof devices.$inferSelect
 export type InterfaceRow = typeof interfaces.$inferSelect
 
 /**
- * Wire shape of an interface: `connected` (P5 flips it) and `enabled` read
- * as booleans.
+ * Wire shape of an interface: `connected` (P5 flips it), `enabled` and
+ * `patched` read as booleans.
  */
-export interface InterfaceJson extends Omit<InterfaceRow, 'connected' | 'enabled'> {
+export interface InterfaceJson extends Omit<InterfaceRow, 'connected' | 'enabled' | 'patched'> {
 	connected: boolean
 	enabled: boolean
+	patched: boolean
 }
 
 export function toInterfaceJson(row: InterfaceRow): InterfaceJson {
-	return { ...row, connected: row.connected !== 0, enabled: row.enabled !== 0 }
+	return {
+		...row,
+		connected: row.connected !== 0,
+		enabled: row.enabled !== 0,
+		patched: row.patched !== 0,
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +290,7 @@ const nullText = (name: string): SQL.Aliased<string | null> =>
 /**
  * Matches devices of the interface's own tenant (cables never cross
  * tenants, see `connectCable`) with a port (other than the interface itself,
- * and not of its own pass-through) that `portsCompatible` accepts as its
+ * not of its own pass-through, not unpatched) that `portsCompatible` accepts as its
  * peer. Kinds are free-form, so the compatible ones are picked from those in
  * use.
  */
@@ -326,6 +332,7 @@ async function compatiblePortCondition(interfaceId: number): Promise<SQL | undef
 					and(
 						inArray(interfaces.kind, kinds),
 						ne(interfaces.id, local.id),
+						eq(interfaces.patched, 1),
 						group === null ? undefined : sql`${peerGroup} IS DISTINCT FROM ${group}`,
 					),
 				),
@@ -1030,7 +1037,7 @@ const NOT_AN_OUTLET = 'Only outlets (single-position rear ports) have a location
 /**
  * Pass-through fields of a port patch: positions only on rear ports (and
  * never below a mapped front port's position), the rear mapping only on
- * front ports.
+ * front ports, `patched` only on panel ports and never unset while cabled.
  */
 async function checkPassThroughPatch(
 	iface: InterfaceJson,
@@ -1058,6 +1065,14 @@ async function checkPassThroughPatch(
 				),
 			)
 		}
+	}
+	if (input.patched !== undefined && iface.side === null) {
+		return Result.err(new ConflictError('Only patch-panel ports can be unpatched'))
+	}
+	if (input.patched === false && iface.patched && iface.connected) {
+		return Result.err(
+			new ConflictError(`Interface ${iface.name} is connected; disconnect it first`),
+		)
 	}
 	if (input.rear_port_id !== undefined || input.rear_port_position !== undefined) {
 		if (iface.side !== 'front') {
@@ -1106,6 +1121,7 @@ export async function addInterface(
 		rear_port_id: input.rear_port_id ?? null,
 		rear_port_position: input.rear_port_id === undefined ? null : rearPosition,
 		location_id: null,
+		patched: 1,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -1159,6 +1175,9 @@ export async function updateInterface(
 	])
 	if (input.enabled !== undefined) {
 		patch.enabled = input.enabled ? 1 : 0
+	}
+	if (input.patched !== undefined) {
+		patch.patched = input.patched ? 1 : 0
 	}
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(

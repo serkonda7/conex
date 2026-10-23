@@ -316,7 +316,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		return (
 			<button
 				type="button"
-				class="icon-btn"
+				class="icon-btn panel-row-edit"
 				title={t('device.panel.editRow', { name: name() })}
 				aria-label={t('device.panel.editRow', { name: name() })}
 				onClick={(): void => {

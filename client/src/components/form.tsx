@@ -150,15 +150,19 @@ export function CheckboxField(props: {
 	label: string
 	checked: boolean
 	onChange: (checked: boolean) => void
+	disabled?: boolean
+	/** Shown on hover, e.g. why the box is disabled. */
+	title?: string
 }): JSX.Element {
 	return (
 		<div class="field">
 			<div class="field-control">
-				<label class="field-checkbox-label">
+				<label class="field-checkbox-label" title={props.title}>
 					<input
 						id={props.id}
 						type="checkbox"
 						checked={props.checked}
+						disabled={props.disabled}
 						onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
 							props.onChange(e.currentTarget.checked)
 						}

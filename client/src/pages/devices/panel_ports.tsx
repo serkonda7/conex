@@ -56,11 +56,18 @@ export function panelRowsOf(ports: InterfaceJson[]): PanelRow[] {
 	return rows
 }
 
+/** A row is patched when its port is: the rear port, or the front port on a position row. */
+export function rowPatched(row: PanelRow): boolean {
+	return row.position === null ? row.rear.patched : (row.front?.patched ?? row.rear.patched)
+}
+
 /**
  * Patch-panel ports grouped by rear port: `# | Front → peer | Rear (outlet)
  * → peer`, plus `extraColumns` (floor plan). Multi-position rear ports
- * list their positions underneath. Unconnected ports get a connect button
- * (`onConnect`); `rowActions` (one edit button) edits both ports of a row.
+ * list their positions underneath; unpatched rows are dimmed and show a
+ * hint instead of their port names. Unconnected patched ports get a
+ * connect button on row hover (`onConnect`); `rowActions` (one edit
+ * button) edits both ports of a row.
  */
 export function PanelPortTable(props: {
 	ports: InterfaceJson[]
@@ -81,7 +88,7 @@ export function PanelPortTable(props: {
 			<span class="panel-port-cell">
 				<code>{iface.name}</code>
 				<PortPeer link={props.links.get(iface.id)} endToEnd={props.endToEnd(iface.id)} />
-				<Show when={props.onConnect && !iface.connected}>
+				<Show when={props.onConnect && iface.patched && !iface.connected}>
 					<button
 						type="button"
 						class="icon-btn icon-btn-connect"
@@ -100,14 +107,24 @@ export function PanelPortTable(props: {
 		{
 			key: 'number',
 			label: '#',
-			getValue: (row: PanelRow): string =>
-				row.position === null ? String(row.number) : `↳ ${row.position}`,
+			getValue: (row: PanelRow): JSX.Element => {
+				const label = row.position === null ? String(row.number) : `↳ ${row.position}`
+				return rowPatched(row) ? (
+					label
+				) : (
+					<span class="panel-row-unpatched" title={t('device.panel.unpatched')}>
+						{label}
+					</span>
+				)
+			},
 		},
 		{
 			key: 'front',
 			label: t('device.panel.front'),
 			getValue: (row: PanelRow): JSX.Element =>
-				row.position === null && row.rear.positions > 1 ? (
+				!rowPatched(row) ? (
+					<span class="panel-port-muted">{t('device.panel.notPatched')}</span>
+				) : row.position === null && row.rear.positions > 1 ? (
 					<span class="panel-port-muted">
 						{t('device.panel.positions', { count: row.rear.positions })}
 					</span>
@@ -119,13 +136,14 @@ export function PanelPortTable(props: {
 			key: 'rear',
 			label: t('device.panel.rear'),
 			getValue: (row: PanelRow): JSX.Element =>
-				row.position === null ? portCell(row.rear) : <span />,
+				row.position === null && rowPatched(row) ? portCell(row.rear) : <span />,
 		},
 		...(props.extraColumns ?? []),
 	]
 
 	return (
 		<DataTable
+			class="panel-port-table"
 			rows={rows}
 			getRowId={(row: PanelRow): string => row.key}
 			showColumnCustomizer

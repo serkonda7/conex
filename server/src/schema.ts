@@ -696,6 +696,9 @@ export const interfaces = pgTable(
 		// floor plan. Location delete is blocked while outlets reference it
 		// (service layer).
 		location_id: integer('location_id').references(() => locations.id),
+		// Patch-panel ports: false = only part of the panel, not wired up
+		// (yet). Informational; cables may still be connected.
+		patched: integer('patched').notNull().default(1),
 	},
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),
