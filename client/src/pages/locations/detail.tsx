@@ -1,3 +1,4 @@
+import type { LocationOutletJson } from 'shared/src/types'
 import { createResource, createSignal, type JSX, Show } from 'solid-js'
 import type { AttachmentJson } from '../../api/attachments'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
@@ -5,6 +6,7 @@ import { fetch_racks, type RackRow } from '../../api/racks'
 import {
 	delete_location,
 	fetch_location,
+	fetch_location_outlets,
 	fetch_locations,
 	fetch_site,
 	fetch_tenant,
@@ -34,7 +36,7 @@ import { rackHeightColumn } from '../racks/columns'
 
 /**
  * /locations/:id — location detail: header with parent breadcrumb,
- * detail grid, and the child-locations / racks / devices tables.
+ * detail grid, and the child-locations / racks / devices / outlets tables.
  */
 export function LocationDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -63,6 +65,9 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		(key: number) => fetch_devices({ site: key }),
 		setError,
 	)
+
+	// Outlets of this location and its descendants, wherever their panel sits.
+	const [outlets] = createRowsFor(id, fetch_location_outlets, setError)
 
 	const images = createOwnerImages({ location_id: props.id }, setError)
 
@@ -164,6 +169,54 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				emptyText={t('location.noDevices')}
 				customizable
 				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
+			/>
+
+			<RelatedSection
+				id="location-outlets"
+				title={tp('entity.outlet', 2)}
+				noun="noun.outlet"
+				rows={outlets}
+				emptyText={t('location.noOutlets')}
+				customizable
+				columns={[
+					{
+						key: 'panel',
+						label: t('location.outletPanel'),
+						getValue: (o: LocationOutletJson): JSX.Element => (
+							<a href={`/devices/${o.device_id}`}>{o.device_name}</a>
+						),
+					},
+					{
+						key: 'port',
+						label: t('location.outletPort'),
+						getValue: (o: LocationOutletJson): JSX.Element => <code>{o.name}</code>,
+					},
+					{
+						key: 'location',
+						label: tp('entity.location', 1),
+						getValue: (o: LocationOutletJson): JSX.Element => (
+							<a href={`/locations/${o.location_id}`}>{o.location_name}</a>
+						),
+					},
+					{
+						key: 'peer',
+						label: t('location.outletPeer'),
+						getValue: (o: LocationOutletJson): JSX.Element => (
+							<Show when={o.peer} fallback={<span>—</span>}>
+								{(
+									peer: () => NonNullable<LocationOutletJson['peer']>,
+								): JSX.Element => (
+									<span>
+										<a href={`/devices/${peer().device_id}`}>
+											{peer().device_name}
+										</a>{' '}
+										<code>{peer().interface_name}</code>
+									</span>
+								)}
+							</Show>
+						),
+					},
+				]}
 			/>
 
 			<InlineError message={error()} />

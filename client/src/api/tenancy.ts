@@ -18,6 +18,7 @@ import type {
 	DeleteQuery,
 	LocationCreate,
 	LocationListQuery,
+	LocationOutletJson,
 	LocationType,
 	LocationUpdate,
 	Page,
@@ -237,6 +238,14 @@ export async function update_location(
 ): Promise<Result<LocationRow, Error>> {
 	const res = await client.locations[':id'].$patch({ ...by_id(id), json: patch })
 	return to_result<LocationRow>(res, failed.update('noun.location'))
+}
+
+/** Outlets (patch-panel rear ports) located in the location or its descendants. */
+export async function fetch_location_outlets(
+	id: number,
+): Promise<Result<LocationOutletJson[], Error>> {
+	const res = await client.locations[':id'].outlets.$get(by_id(id))
+	return to_result<LocationOutletJson[]>(res, failed.list('noun.outlet'))
 }
 
 /** `opts.confirm` also deletes the location's floor-plan data (see `FloorplanImpactError`). */

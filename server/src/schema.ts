@@ -691,6 +691,11 @@ export const interfaces = pgTable(
 		// port; empty slots are allowed.
 		rear_port_id: integer('rear_port_id').references((): AnyPgColumn => interfaces.id),
 		rear_port_position: integer('rear_port_position'),
+		// Outlets (single-position rear ports): the room the installation
+		// cable ends in, independent of the panel's own location and of any
+		// floor plan. Location delete is blocked while outlets reference it
+		// (service layer).
+		location_id: integer('location_id').references(() => locations.id),
 	},
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),
@@ -700,6 +705,11 @@ export const interfaces = pgTable(
 		uniqueIndex('interfaces_rear_port_position_idx').on(
 			table.rear_port_id,
 			table.rear_port_position,
+		),
+		index('interfaces_location_id_idx').on(table.location_id),
+		check(
+			'interfaces_location_check',
+			sql`${table.location_id} IS NULL OR (${table.side} IS NOT DISTINCT FROM 'rear' AND ${table.positions} = 1)`,
 		),
 		check(
 			'interfaces_side_check',

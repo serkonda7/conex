@@ -655,6 +655,13 @@ tbody tr:last-child td {
 	vertical-align: -0.15em;
 }
 
+/* Patch panel ports heading: center the connector glyph on the title. */
+.panel-ports-heading {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
 /* Device role list: a little more space between the role icon and the name. */
 .device-role-name .app-nav-icon {
 	margin-right: 0.25rem;
@@ -2100,6 +2107,14 @@ th[aria-sort="descending"] .data-table-sort::after {
 	display: inline-flex;
 	flex-direction: column;
 	gap: 0.1rem;
+}
+
+.peer-port {
+	background: none;
+	border: none;
+	padding: 0;
+	color: var(--text-muted);
+	font-size: 0.9em;
 }
 
 .trace-end-to-end small {

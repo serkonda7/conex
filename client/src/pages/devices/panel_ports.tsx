@@ -1,10 +1,9 @@
+import { IconLinkPlus } from '@tabler/icons-solidjs'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, type JSX, Show } from 'solid-js'
 import type { InterfaceJson } from '../../api/devices'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { t } from '../../i18n'
-import { portKindLabel } from '../../i18n/labels'
-import { can } from '../../lib/session'
 import { PortPeer } from './trace_peer'
 
 /**
@@ -60,14 +59,16 @@ export function panelRowsOf(ports: InterfaceJson[]): PanelRow[] {
 /**
  * Patch-panel ports grouped by rear port: `# | Front → peer | Rear (outlet)
  * → peer`, plus `extraColumns` (floor plan). Multi-position rear ports
- * list their positions underneath. Each port cell carries its own
- * connect/disconnect and edit actions.
+ * list their positions underneath. Unconnected ports get a connect button
+ * (`onConnect`); `rowActions` (one edit button) edits both ports of a row.
  */
 export function PanelPortTable(props: {
 	ports: InterfaceJson[]
 	links: Map<number, TraceLink>
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
-	actions: (iface: InterfaceJson) => JSX.Element
+	/** Connects an unconnected port; no button without it. */
+	onConnect?: (iface: InterfaceJson) => void
+	rowActions?: (row: PanelRow) => JSX.Element
 	extraColumns?: DataTableColumn<PanelRow>[]
 }): JSX.Element {
 	const rows = createMemo(() => panelRowsOf(props.ports))
@@ -79,10 +80,18 @@ export function PanelPortTable(props: {
 		return (
 			<span class="panel-port-cell">
 				<code>{iface.name}</code>
-				<small>{portKindLabel(iface.kind)}</small>
-				<span aria-hidden="true">→</span>
 				<PortPeer link={props.links.get(iface.id)} endToEnd={props.endToEnd(iface.id)} />
-				<Show when={can('edit')}>{props.actions(iface)}</Show>
+				<Show when={props.onConnect && !iface.connected}>
+					<button
+						type="button"
+						class="icon-btn icon-btn-connect"
+						title={t('device.connectToPeer', { name: iface.name })}
+						aria-label={t('device.connectCableFor', { name: iface.name })}
+						onClick={(): void => props.onConnect?.(iface)}
+					>
+						<IconLinkPlus size={20} />
+					</button>
+				</Show>
 			</span>
 		)
 	}
@@ -121,6 +130,7 @@ export function PanelPortTable(props: {
 			getRowId={(row: PanelRow): string => row.key}
 			showColumnCustomizer
 			columns={columns()}
+			rowActions={props.rowActions}
 			empty={false}
 		/>
 	)

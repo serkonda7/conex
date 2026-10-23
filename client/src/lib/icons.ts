@@ -23,8 +23,14 @@ import {
 	IconStack2,
 	IconWifi,
 } from '@tabler/icons-solidjs'
-import type { DeviceRoleIcon, LocationType } from 'shared/src/schemas'
+import {
+	COPPER_PASS_THROUGH_TYPES,
+	type DeviceRoleIcon,
+	type LocationType,
+	type PassThroughPortType,
+} from 'shared/src/schemas'
 import type { Component } from 'solid-js'
+import { IconFiber, IconRj45 } from './port_icons'
 
 export type IconComponent = Component<{ size?: number }>
 
@@ -64,4 +70,9 @@ const DEVICE_ROLE_ICONS: Record<DeviceRoleIcon, IconComponent> = {
 /** Device role glyph, or `undefined` for roles without (or with an unknown) icon. */
 export function deviceRoleIcon(value: string | null | undefined): IconComponent | undefined {
 	return value == null ? undefined : DEVICE_ROLE_ICONS[value as DeviceRoleIcon]
+}
+
+/** Patch panel port glyph: RJ-45 for copper connectors, fiber for the rest. */
+export function panelKindIcon(kind: string): IconComponent {
+	return COPPER_PASS_THROUGH_TYPES.includes(kind as PassThroughPortType) ? IconRj45 : IconFiber
 }

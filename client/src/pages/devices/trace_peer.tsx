@@ -29,12 +29,12 @@ export function EndToEndPeer(props: { peer: TraceEndToEnd }): JSX.Element {
 			>
 				{(end: () => TracePeerDevice): JSX.Element => (
 					<>
-						{'→ '}
 						<a href={`/devices/${end().id}`}>{end().name}</a>
 						<Show when={props.peer.end_interface}>
 							{(port: () => TracePeerInterface): JSX.Element => (
 								<>
-									: <code>{port().name}</code>
+									{' '}
+									<code class="peer-port">{port().name}</code>
 								</>
 							)}
 						</Show>
@@ -62,8 +62,8 @@ export function PortPeer(props: {
 			{(link: () => TraceLink): JSX.Element => (
 				<span class="port-peer">
 					<span>
-						<a href={`/devices/${link().peer_device.id}`}>{link().peer_device.name}</a>:{' '}
-						<code>{link().peer_interface.name}</code>
+						<a href={`/devices/${link().peer_device.id}`}>{link().peer_device.name}</a>{' '}
+						<code class="peer-port">{link().peer_interface.name}</code>
 					</span>
 					<For each={props.endToEnd}>
 						{(peer: TraceEndToEnd): JSX.Element => <EndToEndPeer peer={peer} />}

@@ -36,3 +36,12 @@ Front- und Rückports bilden Patchpanels ab. Front ist die Panel-Seite, Rück di
 | Kupfer    | 8P8C (`8p8c`), 110 Punch (`110-punch`)                                                                                    |
 | Glasfaser | LC (`lc`), LC/APC (`lc-apc`), SC (`sc`), SC/APC (`sc-apc`), ST (`st`), FC (`fc`), MPO (`mpo`), MTRJ (`mtrj`)              |
 | Spleiß    | Splice (`splice`)                                                                                                         |
+
+### Bereich einer Dose
+Ein Rückport mit genau einer Position ist eine Dose. Ihr Bereich ist der Raum, in dem das Installationskabel endet. Er ist unabhängig vom Bereich des Patchpanels und darf auch an einem anderen Standort liegen.
+
+- Gesetzt wird er am Patchpanel über den Bearbeiten-Knopf der Zeile (dort auch Namen und Kabel von Front- und Rückport).
+- Der Bereich muss zum Mandanten des Patchpanels gehören oder geteilt sein.
+- Die Detailseite eines Bereichs listet seine Dosen und die seiner Unterbereiche.
+- Wird eine Dose auf dem Grundriss eines Bereichs platziert, erhält sie diesen Bereich, falls sie noch keinen hat. Liegt sie danach in einem anderen Bereich, wird sie vom Grundriss entfernt.
+- Ein Bereich mit Dosen kann nicht gelöscht werden.
