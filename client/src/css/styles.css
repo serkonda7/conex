@@ -1955,6 +1955,10 @@ th[aria-sort="descending"] .data-table-sort::after {
 	width: 2rem;
 }
 
+.cell-nowrap {
+	white-space: nowrap;
+}
+
 .cell-truncate {
 	max-width: 16rem;
 	overflow: hidden;

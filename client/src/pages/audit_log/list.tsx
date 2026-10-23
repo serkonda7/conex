@@ -8,6 +8,7 @@ import { ListRangeStatus, useDebouncedSearch, useListFilters } from '../../compo
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { formatTime } from '../../lib/time'
+import { shortUserAgent } from '../../lib/user_agent'
 
 const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
 	'login.success': 'badge-active',
@@ -61,6 +62,7 @@ export function AuditLogPage(): JSX.Element {
 		{
 			key: 'time',
 			label: t('audit.time'),
+			class: 'cell-nowrap',
 			getValue: (e: AuditLogEntryJson): string => formatTime(e.created_at),
 		},
 		{
@@ -102,7 +104,9 @@ export function AuditLogPage(): JSX.Element {
 			key: 'user_agent',
 			label: t('audit.userAgent'),
 			getValue: (e: AuditLogEntryJson): JSX.Element => (
-				<span class="text-muted">{e.user_agent ?? ''}</span>
+				<span class="text-muted" title={e.user_agent ?? ''}>
+					{e.user_agent ? shortUserAgent(e.user_agent) : ''}
+				</span>
 			),
 		},
 	]
