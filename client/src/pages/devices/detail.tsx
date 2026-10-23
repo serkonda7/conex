@@ -501,37 +501,39 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</h3>
 				{portTable(otherPorts, otherColumns)}
 			</Show>
-			<RelatedSection
-				id="device-vms"
-				title={tp('entity.virtualMachine', 2)}
-				noun="noun.virtualMachine"
-				rows={vms}
-				emptyText={t('vm.emptyOnHost')}
-				actions={
-					<Show when={can('edit') && deviceRole()?.can_host_vms === 1}>
-						<button
-							type="button"
-							onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
-						>
-							{t('vm.addVm')}
-						</button>
-					</Show>
-				}
-				columns={[
-					{
-						key: 'name',
-						label: t('common.name'),
-						getValue: (vm: DeviceListItem): JSX.Element => (
-							<a href={`/devices/vm/${vm.id}`}>{vm.name}</a>
-						),
-					},
-					{
-						key: 'description',
-						label: t('common.description'),
-						getValue: (vm: DeviceListItem): string => vm.description || '—',
-					},
-				]}
-			/>
+			<Show when={deviceRole()?.can_host_vms === 1}>
+				<RelatedSection
+					id="device-vms"
+					title={tp('entity.virtualMachine', 2)}
+					noun="noun.virtualMachine"
+					rows={vms}
+					emptyText={t('vm.emptyOnHost')}
+					actions={
+						<Show when={can('edit')}>
+							<button
+								type="button"
+								onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
+							>
+								{t('vm.addVm')}
+							</button>
+						</Show>
+					}
+					columns={[
+						{
+							key: 'name',
+							label: t('common.name'),
+							getValue: (vm: DeviceListItem): JSX.Element => (
+								<a href={`/devices/vm/${vm.id}`}>{vm.name}</a>
+							),
+						},
+						{
+							key: 'description',
+							label: t('common.description'),
+							getValue: (vm: DeviceListItem): string => vm.description || '—',
+						},
+					]}
+				/>
+			</Show>
 			<Show when={connectingIface()}>
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<ConnectPortDialog
