@@ -22,10 +22,13 @@ import type {
 	DeviceMove,
 	DeviceUpdate,
 	InterfaceCreate,
+	InterfaceLocation,
 	InterfaceUpdate,
+	LocationOutletJson,
 	PortSide,
 } from 'shared/src/schemas'
 import {
+	cables,
 	device_roles,
 	device_types,
 	devices,
@@ -84,7 +87,7 @@ export interface InterfaceJson extends Omit<InterfaceRow, 'connected' | 'enabled
 	enabled: boolean
 }
 
-function toInterfaceJson(row: InterfaceRow): InterfaceJson {
+export function toInterfaceJson(row: InterfaceRow): InterfaceJson {
 	return { ...row, connected: row.connected !== 0, enabled: row.enabled !== 0 }
 }
 
@@ -1022,6 +1025,7 @@ async function checkRearMapping(
 }
 
 const REAR_SLOT_OR_NAME_TAKEN = 'Port name or rear port position is already taken'
+const NOT_AN_OUTLET = 'Only outlets (single-position rear ports) have a location'
 
 /**
  * Pass-through fields of a port patch: positions only on rear ports (and
@@ -1035,6 +1039,10 @@ async function checkPassThroughPatch(
 	if (input.positions !== undefined && input.positions !== iface.positions) {
 		if (iface.side !== 'rear') {
 			return Result.err(new ConflictError('Positions are only allowed on rear ports'))
+		}
+		const locationId = input.location_id !== undefined ? input.location_id : iface.location_id
+		if (input.positions > 1 && locationId !== null) {
+			return Result.err(new ConflictError(NOT_AN_OUTLET))
 		}
 		const beyond = await findOne(
 			interfaces,
@@ -1097,6 +1105,7 @@ export async function addInterface(
 		positions: input.positions ?? 1,
 		rear_port_id: input.rear_port_id ?? null,
 		rear_port_position: input.rear_port_id === undefined ? null : rearPosition,
+		location_id: null,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -1132,6 +1141,13 @@ export async function updateInterface(
 	if (Result.isError(shape)) {
 		return shape
 	}
+	const relocated = input.location_id !== undefined && input.location_id !== iface.location_id
+	if (relocated) {
+		const location = await checkOutletLocation(deviceId, [iface], input.location_id ?? null)
+		if (Result.isError(location)) {
+			return location
+		}
+	}
 	const patch: Partial<InterfaceRow> = pickDefined(input, [
 		'name',
 		'kind',
@@ -1139,13 +1155,21 @@ export async function updateInterface(
 		'positions',
 		'rear_port_id',
 		'rear_port_position',
+		'location_id',
 	])
 	if (input.enabled !== undefined) {
 		patch.enabled = input.enabled ? 1 : 0
 	}
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
-			() => getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId)),
+			() =>
+				withTransaction(async () => {
+					await getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId))
+					// A new location can take a placed outlet out of its plan's scope.
+					if (relocated) {
+						await prunePlacements()
+					}
+				}),
 			REAR_SLOT_OR_NAME_TAKEN,
 		)
 		if (Result.isError(written)) {
@@ -1153,4 +1177,168 @@ export async function updateInterface(
 		}
 	}
 	return await logUpdate('interface', current.value, await getInterface(deviceId, ifaceId))
+}
+
+/**
+ * An outlet location must exist and, when both carry a tenant, share the
+ * panel's tenant (a shared panel may feed a tenant's room). `ports` must
+ * all be outlets of the panel.
+ */
+async function checkOutletLocation(
+	deviceId: number,
+	ports: InterfaceJson[],
+	locationId: number | null,
+): Promise<Result<undefined, Error>> {
+	if (ports.some((port) => port.side !== 'rear' || port.positions !== 1)) {
+		return Result.err(new ConflictError(NOT_AN_OUTLET))
+	}
+	if (locationId === null) {
+		return Result.ok(undefined)
+	}
+	const device = await getDevice(deviceId)
+	if (Result.isError(device)) {
+		return device
+	}
+	const location = await findOne(locations, eq(locations.id, locationId))
+	if (!location) {
+		return Result.err(new NotFoundError('Location not found'))
+	}
+	if (
+		location.tenant_id !== null &&
+		device.value.tenant_id !== null &&
+		location.tenant_id !== device.value.tenant_id
+	) {
+		return Result.err(
+			new ConflictError("Location belongs to another tenant than the outlet's panel"),
+		)
+	}
+	return Result.ok(undefined)
+}
+
+/**
+ * Sets or clears the location of several outlets of one panel in one
+ * transaction (one changelog entry per changed port). Returns the panel's
+ * ports in `listInterfaces` order.
+ */
+export async function setOutletLocations(
+	deviceId: number,
+	input: InterfaceLocation,
+): Promise<Result<InterfaceJson[], Error>> {
+	const current = await listInterfaces(deviceId)
+	if (Result.isError(current)) {
+		return current
+	}
+	const ids = new Set(input.interface_ids)
+	const ports = current.value.filter((port) => ids.has(port.id))
+	if (ports.length < ids.size) {
+		return Result.err(new NotFoundError('Interface not found on this device'))
+	}
+	const checked = await checkOutletLocation(deviceId, ports, input.location_id)
+	if (Result.isError(checked)) {
+		return checked
+	}
+	const changed = ports.filter((port) => port.location_id !== input.location_id)
+	if (changed.length > 0) {
+		const written = await tryWrite(() =>
+			withTransaction(async () => {
+				await getDb()
+					.update(interfaces)
+					.set({ location_id: input.location_id })
+					.where(
+						inArray(
+							interfaces.id,
+							changed.map((port) => port.id),
+						),
+					)
+				for (const port of changed) {
+					await logUpdate(
+						'interface',
+						port,
+						Result.ok({ ...port, location_id: input.location_id }),
+					)
+				}
+				await prunePlacements()
+			}),
+		)
+		if (Result.isError(written)) {
+			return written
+		}
+	}
+	return listInterfaces(deviceId)
+}
+
+/**
+ * Outlets located in a location or one of its descendants, ordered by
+ * panel name and port creation order. `scopeTenantId` keeps only outlets
+ * on panels of that tenant.
+ */
+export async function listLocationOutlets(
+	locationId: number,
+	scopeTenantId?: number,
+): Promise<LocationOutletJson[]> {
+	const peer = alias(interfaces, 'peer_iface')
+	const peerDevice = alias(devices, 'peer_device')
+	const subtree = sql`(
+		with recursive subtree(id) as (
+			select ${locationId}::integer
+			union
+			select l.id from ${locations} l join subtree on l.parent_id = subtree.id
+		)
+		select id from subtree
+	)`
+	const rows = await getDb()
+		.select({
+			id: interfaces.id,
+			name: interfaces.name,
+			connected: interfaces.connected,
+			device_id: devices.id,
+			device_name: devices.name,
+			location_id: locations.id,
+			location_name: locations.name,
+			peer_device_id: peerDevice.id,
+			peer_device_name: peerDevice.name,
+			peer_device_tenant_id: peerDevice.tenant_id,
+			peer_interface_name: peer.name,
+		})
+		.from(interfaces)
+		.innerJoin(devices, eq(devices.id, interfaces.device_id))
+		.innerJoin(locations, eq(locations.id, interfaces.location_id))
+		.leftJoin(
+			cables,
+			or(eq(cables.a_interface_id, interfaces.id), eq(cables.b_interface_id, interfaces.id)),
+		)
+		.leftJoin(
+			peer,
+			sql`${peer.id} = case when ${cables.a_interface_id} = ${interfaces.id} then ${cables.b_interface_id} else ${cables.a_interface_id} end`,
+		)
+		.leftJoin(peerDevice, eq(peerDevice.id, peer.device_id))
+		.where(
+			and(
+				sql`${interfaces.location_id} in ${subtree}`,
+				scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId),
+			),
+		)
+		.orderBy(asc(devices.name), asc(devices.id), asc(interfaces.id))
+	return rows.map(
+		({
+			peer_device_id,
+			peer_device_name,
+			peer_device_tenant_id,
+			peer_interface_name,
+			...row
+		}) => ({
+			...row,
+			connected: row.connected !== 0,
+			// A peer outside the requester's scope stays anonymous.
+			peer:
+				peer_device_id === null ||
+				(scopeTenantId !== undefined && peer_device_tenant_id !== scopeTenantId)
+					? null
+					: {
+							device_id: peer_device_id,
+							device_name: peer_device_name ?? '',
+							interface_name: peer_interface_name ?? '',
+						},
+		}),
+	)
 }

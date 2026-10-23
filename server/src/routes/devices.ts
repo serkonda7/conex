@@ -11,6 +11,7 @@ import {
 	EntityParamsSchema,
 	InterfaceConnectSchema,
 	InterfaceCreateSchema,
+	InterfaceLocationSchema,
 	InterfaceUpdateSchema,
 	TraceQuerySchema,
 } from 'shared/src/schemas'
@@ -36,6 +37,7 @@ import {
 	listDevices,
 	listInterfaces,
 	moveDevice,
+	setOutletLocations,
 	updateDevice,
 	updateInterface,
 } from '../db/devices'
@@ -200,6 +202,20 @@ export const devicesApp = new Hono()
 			return (
 				checkTenant(c, await deviceTenant(id)) ??
 				sendCreated(c, await addInterface(id, c.req.valid('json')))
+			)
+		},
+	)
+	// Bulk outlet location (single-position rear ports of a panel).
+	.put(
+		'/:id/interfaces/location',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', InterfaceLocationSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				sendResult(c, await setOutletLocations(id, c.req.valid('json')))
 			)
 		},
 	)

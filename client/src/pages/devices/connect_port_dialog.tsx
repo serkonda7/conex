@@ -38,8 +38,8 @@ export interface ConnectPortDialogProps {
 
 /**
  * Two-step cable connect dialog: search and pick the peer device first, then
- * one of its free ports from a filterable tile grid (double-click a tile or
- * press Enter on it to connect right away). Incompatible and taken ports are
+ * one of its free ports from a filterable tile grid; clicking a tile (or
+ * pressing Enter on it) connects right away. Incompatible and taken ports are
  * shown disabled.
  */
 export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
@@ -128,7 +128,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				selected: peerIface()?.id === iface.id,
 			}}
 			aria-pressed={peerIface()?.id === iface.id}
-			disabled={!compatible || iface.connected}
+			disabled={!compatible || iface.connected || submit.pending()}
 			title={
 				!compatible
 					? t('device.incompatiblePort')
@@ -139,19 +139,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 							: undefined
 			}
 			onClick={(): void => {
-				setPeerIface(iface)
-			}}
-			onKeyDown={(e: KeyboardEvent): void => {
-				// Enter on a focused tile connects instead of just selecting it.
-				if (e.key === 'Enter' && compatible && !iface.connected) {
-					e.preventDefault()
-					void connect(iface)
-				}
-			}}
-			onDblClick={(): void => {
-				if (compatible && !iface.connected) {
-					void connect(iface)
-				}
+				void connect(iface)
 			}}
 		>
 			<span class="port-tile-name">
@@ -188,14 +176,11 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 		setPeerDevice(null)
 	}
 
-	async function connect(peer: InterfaceJson | null): Promise<void> {
-		if (!peer) {
-			setError(t('device.pickPeerPort'))
-			return
-		}
+	async function connect(peer: InterfaceJson): Promise<void> {
 		if (submit.pending()) {
 			return
 		}
+		setPeerIface(peer)
 		const created = await submit.run(() =>
 			create_cable({ a_interface_id: props.iface.id, b_interface_id: peer.id }),
 		)
@@ -204,9 +189,9 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 		}
 	}
 
+	/** Tiles connect on click; Enter in the filter must not submit the form. */
 	function handleSubmit(e: SubmitEvent): void {
 		e.preventDefault()
-		void connect(peerIface())
 	}
 
 	const title = (): string => t('device.connectToPeer', { name: props.iface.name })
@@ -318,9 +303,6 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 							<div class="modal-actions">
 								<button type="button" onClick={props.on_close}>
 									{t('common.cancel')}
-								</button>
-								<button type="submit" disabled={!peerIface() || submit.pending()}>
-									{t('device.connect')}
 								</button>
 							</div>
 						</div>
