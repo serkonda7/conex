@@ -42,7 +42,7 @@ import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
-import { ManagedServiceRows } from '../managed-bundles/service_rows'
+import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
@@ -398,6 +398,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					}
 				/>
 				<DetailSubtitle description={device()?.description} />
+				<ManagedServicePill service={service} />
 
 				<DetailCard label={t('device.details')}>
 					<dt>{t('common.type')}</dt>
@@ -432,7 +433,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
-					<ManagedServiceRows service={service} />
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<RecordLink id={siteId()} record={site} base="/sites" />
