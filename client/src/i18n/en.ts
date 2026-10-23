@@ -9,6 +9,10 @@ export const en = {
 	'common.create': 'Create',
 	'common.creating': 'Creating…',
 	'common.createAndAddAnother': 'Create & Add Another',
+	'common.noTenantSelected':
+		'No tenant selected in the top bar: the new object is created without a tenant.',
+	'common.noTenantSelectedRequired':
+		'No tenant selected in the top bar. Select one to create this object.',
 	'common.save': 'Save',
 	'common.saving': 'Saving…',
 	'common.close': 'Close',
@@ -340,7 +344,6 @@ export const en = {
 	'employee.status': 'Status',
 	'employee.active': 'Active',
 	'employee.inactive': 'Inactive',
-	'employee.tenantRequired': 'Tenant is required.',
 	// tenantGroup
 	'tenantGroup.empty': 'No tenant groups yet. Add the first one above.',
 	'tenantGroup.addTitle': 'Add a new tenant group',
@@ -373,6 +376,10 @@ export const en = {
 	'site.noLocations': 'No locations yet.',
 	'site.noRacks': 'No racks at this site yet.',
 	'site.noDevices': 'No devices at this site yet.',
+	'site.related': 'Related objects',
+	'site.locationRack': 'Location / Rack',
+	'site.noEmployees': "No employees at this site's tenant yet.",
+	'site.noVms': "No virtual machines on this site's devices yet.",
 
 	// siteGroup
 	'siteGroup.empty': 'No site groups yet. Add the first one above.',
@@ -718,7 +725,6 @@ export const en = {
 	'device.assignedEmployee': 'Assigned employee',
 	'device.bundleNotContracted': 'Not contracted by the tenant',
 	'device.noEmployee': 'No assignment',
-	'device.employeeTenantHint': 'Select a tenant before assigning an employee.',
 	'device.serialPlaceholder': 'Serial number (optional)',
 	'device.deviceId': 'Device ID',
 	'device.deviceIdPlaceholder': 'Device ID (optional)',
@@ -1115,7 +1121,6 @@ export const en = {
 	'ticket.content': 'Description',
 	'ticket.assignment': 'Assignment',
 	'ticket.details': 'Details',
-	'ticket.tenantRequired': 'Select a tenant in the top bar first.',
 	'ticket.titleRequired': 'Title is required.',
 	'ticket.created': '{provider} ticket #{id} created.',
 	'ticket.createFailed': 'Failed to create ticket',

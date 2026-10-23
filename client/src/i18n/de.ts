@@ -11,6 +11,10 @@ export const de: Messages = {
 	'common.create': 'Erstellen',
 	'common.creating': 'Wird erstellt…',
 	'common.createAndAddAnother': 'Erstellen & weiteres hinzufügen',
+	'common.noTenantSelected':
+		'Kein Mandant in der oberen Leiste ausgewählt: Das neue Objekt wird ohne Mandant angelegt.',
+	'common.noTenantSelectedRequired':
+		'Kein Mandant in der oberen Leiste ausgewählt. Wähle einen aus, um das Objekt anzulegen.',
 	'common.save': 'Speichern',
 	'common.saving': 'Wird gespeichert…',
 	'common.close': 'Schließen',
@@ -341,7 +345,6 @@ export const de: Messages = {
 	'employee.status': 'Status',
 	'employee.active': 'Aktiv',
 	'employee.inactive': 'Inaktiv',
-	'employee.tenantRequired': 'Mandant ist erforderlich.',
 	// tenantGroup
 	'tenantGroup.empty': 'Noch keine Mandantengruppen vorhanden. Fügen Sie oben die erste hinzu.',
 	'tenantGroup.addTitle': 'Neue Mandantengruppe hinzufügen',
@@ -374,6 +377,10 @@ export const de: Messages = {
 	'site.noLocations': 'Noch keine Bereiche vorhanden.',
 	'site.noRacks': 'Für diesen Standort sind noch keine Racks vorhanden.',
 	'site.noDevices': 'Für diesen Standort sind noch keine Geräte vorhanden.',
+	'site.related': 'Zugehörige Objekte',
+	'site.locationRack': 'Bereich / Rack',
+	'site.noEmployees': 'Für den Mandanten dieses Standorts sind noch keine Mitarbeiter vorhanden.',
+	'site.noVms': 'Auf den Geräten dieses Standorts laufen noch keine virtuellen Maschinen.',
 
 	// siteGroup
 	'siteGroup.empty': 'Noch keine Standortgruppen vorhanden. Fügen Sie oben die erste hinzu.',
@@ -725,7 +732,6 @@ export const de: Messages = {
 	'device.assignedEmployee': 'Mitarbeiter',
 	'device.bundleNotContracted': 'Vom Mandanten nicht vereinbart',
 	'device.noEmployee': 'Keine Zuweisung',
-	'device.employeeTenantHint': 'Vor der Zuweisung eines Mitarbeiters einen Mandanten auswählen.',
 	'device.serialPlaceholder': 'Seriennummer (optional)',
 	'device.deviceId': 'Geräte-ID',
 	'device.deviceIdPlaceholder': 'Geräte-ID (optional)',
@@ -1132,7 +1138,6 @@ export const de: Messages = {
 	'ticket.content': 'Beschreibung',
 	'ticket.assignment': 'Zuordnung',
 	'ticket.details': 'Details',
-	'ticket.tenantRequired': 'Wähle zuerst oben einen Mandanten aus.',
 	'ticket.titleRequired': 'Titel ist erforderlich.',
 	'ticket.created': '{provider}-Ticket #{id} erstellt.',
 	'ticket.createFailed': 'Ticket konnte nicht erstellt werden',

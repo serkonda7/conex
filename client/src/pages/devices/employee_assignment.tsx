@@ -29,7 +29,6 @@ export function EmployeeAssignmentField(props: {
 			)}
 			emptyLabel={props.emptyLabel ?? t('device.noEmployee')}
 			disabled={props.tenantId === null || employees.loading}
-			hint={props.tenantId === null ? t('device.employeeTenantHint') : undefined}
 		/>
 	)
 }

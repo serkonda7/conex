@@ -23,6 +23,9 @@
 	--primary: #08bf08;
 	--primary-hover: #00b800;
 	--primary-contrast: #ffffff;
+	--secondary: #1a73b8;
+	--secondary-hover: #16659f;
+	--secondary-contrast: #ffffff;
 	--link: #74caff;
 	--error: #ffa48d;
 	--error-bg: rgba(225, 71, 71, 0.16);
@@ -886,6 +889,11 @@ tbody tr:last-child td {
 	border-bottom-color: var(--primary);
 }
 
+.related-tabs td:first-child,
+.related-tabs th:first-child {
+	white-space: nowrap;
+}
+
 .related-tabs-all {
 	display: inline-block;
 	margin-top: 0.4rem;
@@ -1370,6 +1378,33 @@ tbody tr:last-child td {
 	gap: 0.4rem;
 	padding-top: 0.2rem;
 	margin-left: calc(10rem + 0.75rem);
+}
+
+/* Secondary submit ("Create & Add Another") next to the primary one. */
+.form-actions .btn-secondary {
+	background-color: var(--secondary);
+	border-color: var(--secondary);
+	color: var(--secondary-contrast);
+}
+
+.form-actions .btn-secondary:hover {
+	background-color: var(--secondary-hover);
+	border-color: var(--secondary-hover);
+}
+
+.form-actions button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+/* Page-level warning atop a form (e.g. no tenant selected in the top bar). */
+.form-warning {
+	margin: 0 0 0.75rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--warning);
+	border-radius: 0.3rem;
+	color: var(--warning);
+	background-color: color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
 .field {

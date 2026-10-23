@@ -1,5 +1,5 @@
 import type { InputEventAndTarget, SiteCreate } from 'shared/src/types'
-import { createMemo, createSignal, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import {
 	create_site,
 	fetch_site,
@@ -31,7 +31,7 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
-import { useTenantDefault } from '../../lib/tenant_context'
+import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
 
 /** Street, postcode and city of one site address. */
 interface Address {
@@ -94,6 +94,8 @@ function AddressFields(props: {
 function SiteForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [groupId, setGroupId] = createSignal(queryParam('group'))
+	// Edit only: new sites get the tenant of the global tenant selection.
+	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const [physicalAddress, setPhysicalAddress] = createSignal(blankAddress())
@@ -103,7 +105,7 @@ function SiteForm(props: { id?: number }): JSX.Element {
 		load: fetch_site,
 		fill: (row: SiteRow) => {
 			setName(row.name)
-			tenant.pick(id_value(row.tenant_id))
+			setTenantId(id_value(row.tenant_id))
 			setGroupId(id_value(row.site_group_id))
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
@@ -121,18 +123,23 @@ function SiteForm(props: { id?: number }): JSX.Element {
 	})
 	const [tenants] = createRows(fetch_tenants, form.setError)
 	const [groups] = createRows(fetch_site_groups, form.setError)
-	// New sites default to the tenant of the selected group.
-	const groupTenantId = createMemo(() => {
+	const tenant = (): number | null => (form.editing ? parseId(tenantId()) : newObjectTenantId())
+	// New sites only offer the groups of their tenant.
+	const groupOptions = createMemo(() =>
+		form.editing ? (groups() ?? []) : rowsOfTenant(groups() ?? [], tenant()),
+	)
+	createEffect(() => {
 		const id = parseId(groupId())
-		return (groups() ?? []).find((g) => g.id === id)?.tenant_id ?? null
+		if (id !== null && groups() !== undefined && !groupOptions().some((g) => g.id === id)) {
+			setGroupId('')
+		}
 	})
-	const tenant = useTenantDefault(groupTenantId, () => !form.editing && groups() !== undefined)
 	const prefix = form.editing ? 'site-edit' : 'site'
 	const backTo = useFormReturnRoute('/sites', props.id)
 
 	const body = (values: FormValues): SiteCreate => ({
 		name: values.name,
-		tenant_id: parseId(tenant.value()),
+		tenant_id: tenant(),
 		site_group_id: parseId(groupId()),
 		description: text(description()),
 		comments: text(comments()),
@@ -166,6 +173,7 @@ function SiteForm(props: { id?: number }): JSX.Element {
 			name={form.record()?.name}
 			loadingText={t('site.loadingOne')}
 			cancelTo={backTo()}
+			tenant="required"
 			onSubmit={handleSubmit}
 		>
 			<NameField
@@ -175,20 +183,22 @@ function SiteForm(props: { id?: number }): JSX.Element {
 				onInput={setName}
 				autofocus={!form.editing}
 			/>
-			<SelectField
-				id={`${prefix}-tenant`}
-				label={tp('entity.tenant', 1)}
-				value={tenant.value()}
-				onChange={tenant.pick}
-				options={row_options(tenants() ?? [])}
-				emptyLabel={t('common.noTenant')}
-			/>
+			<Show when={form.editing}>
+				<SelectField
+					id={`${prefix}-tenant`}
+					label={tp('entity.tenant', 1)}
+					value={tenantId()}
+					onChange={setTenantId}
+					options={row_options(tenants() ?? [])}
+					emptyLabel={t('common.noTenant')}
+				/>
+			</Show>
 			<SelectField
 				id={`${prefix}-group`}
 				label={t('common.group')}
 				value={groupId()}
 				onChange={setGroupId}
-				options={row_options(groups() ?? [])}
+				options={row_options(groupOptions())}
 				emptyLabel={t('common.noGroup')}
 			/>
 			<DescriptionField

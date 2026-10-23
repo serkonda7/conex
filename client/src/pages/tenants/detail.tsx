@@ -588,7 +588,7 @@ function ChangeRow(props: { change: ObjectChangeJson }): JSX.Element {
 }
 
 /** Host device link of a VM, or "Cloud" for a VM without host. */
-function vmHost(vm: DeviceListItem): JSX.Element {
+export function vmHost(vm: DeviceListItem): JSX.Element {
 	if (vm.kind === 'vm' && vm.host_device_id !== null) {
 		return <a href={`/devices/${vm.host_device_id}`}>{vm.host_name}</a>
 	}
@@ -596,7 +596,7 @@ function vmHost(vm: DeviceListItem): JSX.Element {
 }
 
 /** Status pill of a device or VM. */
-function statusColumn<Row extends { status: string }>(): DataTableColumn<Row> {
+export function statusColumn<Row extends { status: string }>(): DataTableColumn<Row> {
 	return {
 		key: 'status',
 		label: t('common.status'),
@@ -606,7 +606,7 @@ function statusColumn<Row extends { status: string }>(): DataTableColumn<Row> {
 	}
 }
 
-function roleColumn<Row extends { device_role_id: number }>(
+export function roleColumn<Row extends { device_role_id: number }>(
 	roleName: (id: number) => string,
 ): DataTableColumn<Row> {
 	return {
@@ -616,7 +616,7 @@ function roleColumn<Row extends { device_role_id: number }>(
 	}
 }
 
-function employeeColumn<Row extends { employee_id: number | null }>(
+export function employeeColumn<Row extends { employee_id: number | null }>(
 	employeeName: (id: number) => string,
 ): DataTableColumn<Row> {
 	return {

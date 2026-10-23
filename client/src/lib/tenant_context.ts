@@ -8,15 +8,13 @@
  * context always reads as "all" and the selector shows a fixed label.
  */
 import { Result } from 'better-result'
-import { createEffect, createMemo, createSignal } from 'solid-js'
+import { createSignal } from 'solid-js'
 import {
 	fetch_tenant_groups,
 	fetch_tenants,
 	type TenantGroupRow,
 	type TenantRow,
 } from '../api/tenancy'
-import { id_value } from './form'
-import { parseId, queryParam } from './router'
 import { isScoped, sessionTenantId } from './session'
 
 export type TenantContext =
@@ -144,13 +142,16 @@ export function contextTenantId(): number | null {
  * else the tenant list.
  */
 export function homePath(): string {
-	const id = isScoped() ? sessionTenantId() : contextTenantId()
+	const id = newObjectTenantId()
 	return id === null ? '/tenants' : `/tenants/${id}`
 }
 
-/** `contextTenantId` as a `<select>` value (`''` = no tenant). */
-export function contextTenantValue(): string {
-	return String(contextTenantId() ?? '')
+/**
+ * Tenant of objects created on add forms, which have no tenant select: the
+ * user's own (scoped users) or the single context tenant; null otherwise.
+ */
+export function newObjectTenantId(): number | null {
+	return isScoped() ? sessionTenantId() : contextTenantId()
 }
 
 /** True when a tenant row lies inside the context (for per-page dropdowns). */
@@ -171,79 +172,4 @@ export function rowsOfTenant<T extends { tenant_id: number | null }>(
 	tenant: number | null,
 ): T[] {
 	return tenant === null ? rows : rows.filter((row) => row.tenant_id === tenant)
-}
-
-/**
- * Tenant select of a create form: follows the tenant of the selected parent
- * (site, site group, …) until the user picks one explicitly. An explicit
- * `?tenant=` counts as picked; without a parent tenant a single-tenant
- * context preselects it.
- */
-export function useTenantDefault(
-	inherited: () => number | null,
-	ready: () => boolean,
-): {
-	value: () => string
-	/** Explicit user choice: stops following the parent. */
-	pick: (value: string) => void
-	/** Whether the value was picked rather than inherited. */
-	touched: () => boolean
-	/**
-	 * Tenant picked or preselected by the context, never the inherited one:
-	 * filtering the parent options by that would hide all other parents.
-	 */
-	selected: () => number | null
-} {
-	const explicit = queryParam('tenant')
-	const [value, setValue] = createSignal(explicit || contextTenantValue())
-	const [touched, setTouched] = createSignal(explicit !== '')
-	createEffect(() => {
-		if (touched() || !ready()) {
-			return
-		}
-		setValue(id_value(inherited()) || contextTenantValue())
-	})
-	return {
-		value,
-		pick: (next: string): void => {
-			setTouched(true)
-			setValue(next)
-		},
-		touched,
-		selected: () => (touched() ? parseId(value()) : contextTenantId()),
-	}
-}
-
-/**
- * Site select of a create form whose tenant follows the site (locations,
- * racks, devices): the tenant defaults to the selected site's tenant until
- * picked explicitly, and a selected tenant only offers its own sites. A
- * selected site of another tenant (e.g. from `?site=`) is dropped through
- * `onDrop`.
- */
-export function useSiteTenant<S extends { id: number; tenant_id: number | null }>(
-	sites: () => S[] | undefined,
-	siteId: () => string,
-	onDrop: () => void,
-): {
-	site: () => S | undefined
-	/** Tenant of the selected site, which the tenant select inherits. */
-	siteTenantId: () => number | null
-	siteOptions: () => S[]
-	tenant: ReturnType<typeof useTenantDefault>
-} {
-	const site = createMemo(() => {
-		const id = parseId(siteId())
-		return (sites() ?? []).find((row) => row.id === id)
-	})
-	const siteTenantId = (): number | null => site()?.tenant_id ?? null
-	const tenant = useTenantDefault(siteTenantId, () => sites() !== undefined)
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], tenant.selected()))
-	createEffect(() => {
-		const current = site()
-		if (current !== undefined && !siteOptions().includes(current)) {
-			onDrop()
-		}
-	})
-	return { site, siteTenantId, siteOptions, tenant }
 }

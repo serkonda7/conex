@@ -1,7 +1,16 @@
+import { primaryEmail } from 'shared/src/schemas'
 import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
 import type { AttachmentJson } from '../../api/attachments'
-import { type DeviceRow, fetch_devices } from '../../api/devices'
+import { fetch_device_roles } from '../../api/device_roles'
+import {
+	type DeviceListItem,
+	type DeviceRow,
+	fetch_device_list,
+	fetch_devices,
+} from '../../api/devices'
+import { type EmployeeRow, fetch_employees } from '../../api/employees'
 import { fetch_racks, type RackRow } from '../../api/racks'
+import { fetch_device_types } from '../../api/templates'
 import {
 	delete_site,
 	fetch_locations,
@@ -11,14 +20,16 @@ import {
 	type LocationRow,
 } from '../../api/tenancy'
 import { AttachmentsSection, createOwnerImages } from '../../components/attachments'
-import { nameColumn } from '../../components/data_table'
+import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
 	DetailCard,
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
 	RecordLink,
-	RelatedSection,
+	RelatedPreview,
+	type RelatedTab,
+	RelatedTabs,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
@@ -28,10 +39,14 @@ import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { useNameOf } from '../../lib/lookup'
+import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { siteGroupTrail } from '../../lib/trails'
+import { deviceListHref } from '../devices/list'
+import { EmailLink } from '../employees/list'
 import { LocationTreeName } from '../locations/list'
 import { rackHeightColumn } from '../racks/columns'
+import { roleColumn, vmHost } from '../tenants/detail'
 
 /** The flat location list in tree preorder (siblings by name), with depths. */
 function treeOrder(rows: readonly LocationRow[]): { row: LocationRow; depth: number }[] {
@@ -91,11 +106,175 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		setError,
 	)
 	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ site: [key] }), setError)
-	const [devices] = createRowsFor(id, (key: number) => fetch_devices({ site: key }), setError)
+	// Pages, not rows: the tab counts the total beyond the first page.
+	const [devicePage] = createRecord(id, (key: number) => fetch_devices({ site: key }), setError)
+	const [employeePage] = createRecord(
+		tenantId,
+		(key: number) => fetch_employees({ tenant: key }),
+		setError,
+	)
+	const [vmPage] = createRecord(
+		tenantId,
+		(key: number) => fetch_device_list({ tenant: key, kind: 'vm' }),
+		setError,
+	)
+	const [roles] = createRows(fetch_device_roles, setError)
+	const [types] = createRows(fetch_device_types, setError)
+	const devices = (): DeviceRow[] => devicePage()?.items ?? []
+	const employees = (): EmployeeRow[] => employeePage()?.items ?? []
+	// VMs have no site of their own: they belong to the site of their host.
+	const vms = (): DeviceListItem[] => {
+		const hosts = new Set(devices().map((d) => d.id))
+		return (vmPage()?.items ?? []).filter(
+			(vm) => vm.kind === 'vm' && vm.host_device_id !== null && hosts.has(vm.host_device_id),
+		)
+	}
+	const roleName = useNameOf(roles)
+	const typeName = useNameOf(types, (row) => row.model)
+	const rackName = useNameOf(racks)
+	const locationName = useNameOf(locations)
 	const tree = createMemo(() => treeOrder(locations() ?? []))
 	const depthOf = createMemo(() => new Map(tree().map((entry) => [entry.row.id, entry.depth])))
 
 	const images = createOwnerImages({ site_id: props.id }, setError)
+
+	const deviceColumns: DataTableColumn<DeviceRow>[] = [
+		nameColumn<DeviceRow>(t('common.name'), '/devices'),
+		roleColumn<DeviceRow>(roleName),
+		{
+			key: 'type',
+			label: t('common.type'),
+			getValue: (d: DeviceRow): string => typeName(d.device_type_id),
+		},
+		{
+			key: 'place',
+			label: t('site.locationRack'),
+			getValue: (d: DeviceRow): string => {
+				const parts = [
+					d.location_id === null ? null : locationName(d.location_id),
+					d.rack_id === null ? null : rackName(d.rack_id),
+				].filter((part): part is string => part !== null)
+				return parts.length > 0 ? parts.join(' / ') : '—'
+			},
+		},
+	]
+	const locationColumns: DataTableColumn<LocationRow>[] = [
+		{
+			key: 'name',
+			label: tp('entity.location', 1),
+			getValue: (l: LocationRow): JSX.Element => (
+				<LocationTreeName location={l} depth={depthOf().get(l.id) ?? 0} />
+			),
+		},
+		{
+			key: 'type',
+			label: t('location.type'),
+			getValue: (l: LocationRow): JSX.Element => (
+				<IconLabel icon={locationTypeIcon(l.type)}>{locationTypeLabel(l.type)}</IconLabel>
+			),
+		},
+	]
+	const employeeColumns: DataTableColumn<EmployeeRow>[] = [
+		nameColumn<EmployeeRow>(t('common.name'), '/employees'),
+		{
+			key: 'title',
+			label: t('employee.title'),
+			getValue: (e: EmployeeRow): string => e.title ?? '—',
+		},
+		{
+			key: 'email',
+			label: t('employee.email'),
+			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={primaryEmail(e.emails)} />,
+		},
+	]
+	const vmColumns: DataTableColumn<DeviceListItem>[] = [
+		{
+			key: 'name',
+			label: t('common.name'),
+			getValue: (vm: DeviceListItem): JSX.Element => (
+				<a href={deviceListHref(vm)}>{vm.name}</a>
+			),
+		},
+		roleColumn<DeviceListItem>(roleName),
+		{ key: 'host', label: t('vm.host'), getValue: vmHost },
+	]
+
+	const tabs = (): RelatedTab[] => [
+		{
+			key: 'devices',
+			label: tp('entity.device', 2),
+			count: devicePage()?.total ?? 0,
+			viewAllHref: `/devices?site=${props.id}&kind=device`,
+			content: (): JSX.Element => (
+				<RelatedPreview
+					rows={devices()}
+					loading={devicePage.loading}
+					noun="noun.device"
+					emptyText={t('site.noDevices')}
+					columns={deviceColumns}
+				/>
+			),
+		},
+		{
+			key: 'locations',
+			label: tp('entity.location', 2),
+			count: locations()?.length ?? 0,
+			viewAllHref: `/locations?site=${props.id}`,
+			content: (): JSX.Element => (
+				<RelatedPreview
+					rows={tree().map((entry) => entry.row)}
+					loading={locations.loading}
+					noun="noun.location"
+					emptyText={t('site.noLocations')}
+					columns={locationColumns}
+				/>
+			),
+		},
+		{
+			key: 'racks',
+			label: tp('entity.rack', 2),
+			count: racks()?.length ?? 0,
+			viewAllHref: `/racks?site=${props.id}`,
+			content: (): JSX.Element => (
+				<RelatedPreview
+					rows={racks() ?? []}
+					loading={racks.loading}
+					noun="noun.rack"
+					emptyText={t('site.noRacks')}
+					columns={[nameColumn<RackRow>(t('common.name'), '/racks'), rackHeightColumn()]}
+				/>
+			),
+		},
+		{
+			key: 'employees',
+			label: tp('entity.employee', 2),
+			count: employeePage()?.total ?? 0,
+			viewAllHref: tenantId() ? `/employees?tenant=${tenantId()}` : undefined,
+			content: (): JSX.Element => (
+				<RelatedPreview
+					rows={employees()}
+					loading={employeePage.loading}
+					noun="noun.employee"
+					emptyText={t('site.noEmployees')}
+					columns={employeeColumns}
+				/>
+			),
+		},
+		{
+			key: 'vms',
+			label: tp('entity.virtualMachine', 2),
+			count: vms().length,
+			content: (): JSX.Element => (
+				<RelatedPreview
+					rows={vms()}
+					loading={vmPage.loading}
+					noun="noun.virtualMachine"
+					emptyText={t('site.noVms')}
+					columns={vmColumns}
+				/>
+			),
+		},
+	]
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.site',
@@ -176,51 +355,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 				</div>
 			</DetailShell>
 
-			<RelatedSection
-				id="site-locations"
-				title={tp('entity.location', 2)}
-				noun="noun.location"
-				rows={locations}
-				select={() => tree().map((entry) => entry.row)}
-				emptyText={t('site.noLocations')}
-				viewAllHref={`/locations?site=${props.id}`}
-				columns={[
-					{
-						key: 'name',
-						label: tp('entity.location', 1),
-						getValue: (l: LocationRow): JSX.Element => (
-							<LocationTreeName location={l} depth={depthOf().get(l.id) ?? 0} />
-						),
-					},
-					{
-						key: 'type',
-						label: t('location.type'),
-						getValue: (l: LocationRow): JSX.Element => (
-							<IconLabel icon={locationTypeIcon(l.type)}>
-								{locationTypeLabel(l.type)}
-							</IconLabel>
-						),
-					},
-				]}
-			/>
-
-			<RelatedSection
-				id="site-racks"
-				title={tp('entity.rack', 2)}
-				noun="noun.rack"
-				rows={racks}
-				emptyText={t('site.noRacks')}
-				columns={[nameColumn<RackRow>(t('common.name'), '/racks'), rackHeightColumn()]}
-			/>
-
-			<RelatedSection
-				id="site-devices"
-				title={tp('entity.device', 2)}
-				noun="noun.device"
-				rows={devices}
-				emptyText={t('site.noDevices')}
-				columns={[nameColumn<DeviceRow>(t('common.name'), '/devices')]}
-			/>
+			<RelatedTabs id="site-related" label={t('site.related')} tabs={tabs()} />
 
 			<InlineError message={error()} />
 		</div>

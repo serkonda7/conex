@@ -18,7 +18,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { contextTenantId, rowsOfTenant } from '../../lib/tenant_context'
+import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -37,7 +37,7 @@ export function LocationAddPage(): JSX.Element {
 		form.setError,
 	)
 	// The tenant comes from the global tenant selection, which also limits the sites.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], contextTenantId()))
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
 	createEffect(() => {
 		const id = parseId(siteId())
 		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
@@ -62,7 +62,7 @@ export function LocationAddPage(): JSX.Element {
 					type: locationType(),
 					site_id: Number(siteId()),
 					parent_id: parseId(parentId()),
-					tenant_id: contextTenantId(),
+					tenant_id: newObjectTenantId(),
 					description: text(description()),
 				}),
 			navigateTo: '/locations',
@@ -79,6 +79,7 @@ export function LocationAddPage(): JSX.Element {
 			form={form}
 			title={t('location.addTitle')}
 			cancelTo="/locations"
+			tenant="required"
 			onSubmit={handleCreate}
 		>
 			<NameField

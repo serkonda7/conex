@@ -1,5 +1,5 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createEffect, createSignal, type JSX, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
@@ -26,7 +26,7 @@ import {
 } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { contextTenantId, useSiteTenant } from '../../lib/tenant_context'
+import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 import { deviceRoleOptions } from '../device-roles/options'
 import { EmployeeAssignmentField } from './employee_assignment'
@@ -119,8 +119,16 @@ export function DeviceAddPage(): JSX.Element {
 		}
 	}
 
-	const { siteOptions, tenant } = useSiteTenant(sites, siteId, () => handleSiteChange(''))
-	createEffect(on(tenant.value, () => setEmployeeId(''), { defer: true }))
+	// The tenant comes from the global tenant selection, which also limits the sites
+	// and employees.
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
+	createEffect(() => {
+		const id = parseId(siteId())
+		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
+			handleSiteChange('')
+		}
+	})
+	createEffect(on(newObjectTenantId, () => setEmployeeId(''), { defer: true }))
 
 	const [source] = createRecord(() => parseId(queryParam('clone')), fetch_device, form.setError)
 	createEffect(() => {
@@ -134,10 +142,6 @@ export function DeviceAddPage(): JSX.Element {
 		setTypeId(id_value(row.device_type_id))
 		setRoleId(id_value(row.device_role_id))
 		setDescription(row.description ?? '')
-		// A clone keeps its tenant unless the global tenant selection decides.
-		if (contextTenantId() === null) {
-			tenant.pick(id_value(row.tenant_id))
-		}
 		setSiteId(id_value(row.site_id))
 		setLocationId(id_value(row.location_id))
 		setRackId(id_value(row.rack_id))
@@ -189,7 +193,7 @@ export function DeviceAddPage(): JSX.Element {
 					face: onShelf ? null : ((face() || null) as DeviceFace | null),
 					position_u: onShelf ? null : parsePosition(positionU()),
 					shelf_id: shelfId(),
-					tenant_id: parseId(tenant.value()),
+					tenant_id: newObjectTenantId(),
 					employee_id: parseId(employeeId()),
 				}),
 			// Elevation deep links return to the rack they came from.
@@ -203,7 +207,7 @@ export function DeviceAddPage(): JSX.Element {
 		shelf()?.name || t('common.unitPosition', { u: shelf()?.position_u ?? '' })
 
 	return (
-		<FormPage form={form} cancelTo="/devices" onSubmit={handleCreate}>
+		<FormPage form={form} cancelTo="/devices" tenant="required" onSubmit={handleCreate}>
 			<FormSection title={tp('entity.device', 1)}>
 				<NameField id="device-name" value={name()} onInput={setName} autofocus />
 				<SelectField
@@ -248,16 +252,6 @@ export function DeviceAddPage(): JSX.Element {
 					onInput={setDeviceId}
 				/>
 			</FormSection>
-			<FormSection title={t('device.assignmentSection')}>
-				<EmployeeAssignmentField
-					id="device-employee"
-					tenantId={parseId(tenant.value())}
-					value={employeeId()}
-					onChange={setEmployeeId}
-					onError={form.setError}
-					emptyLabel={t('common.selectPlaceholder')}
-				/>
-			</FormSection>
 			<FormSection title={t('device.locationSection')}>
 				<SelectField
 					id="device-site"
@@ -294,6 +288,16 @@ export function DeviceAddPage(): JSX.Element {
 							<Hint>{t('device.onShelfHint', { name: shelfName() })}</Hint>
 						</Show>
 					}
+				/>
+			</FormSection>
+			<FormSection title={t('device.assignmentSection')}>
+				<EmployeeAssignmentField
+					id="device-employee"
+					tenantId={newObjectTenantId()}
+					value={employeeId()}
+					onChange={setEmployeeId}
+					onError={form.setError}
+					emptyLabel={t('common.selectPlaceholder')}
 				/>
 			</FormSection>
 		</FormPage>

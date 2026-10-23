@@ -179,15 +179,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					onInput={setDeviceId}
 				/>
 			</FormSection>
-			<FormSection title={t('device.assignmentSection')}>
-				<EmployeeAssignmentField
-					id="device-edit-employee"
-					tenantId={parseId(tenantId())}
-					value={employeeId()}
-					onChange={setEmployeeId}
-					onError={form.setError}
-				/>
-			</FormSection>
 			<FormSection title={t('device.locationSection')}>
 				<SelectField
 					id="device-edit-site"
@@ -217,6 +208,15 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					racks={row_options(racks() ?? [])}
 					rackEmptyLabel="—"
 					faceEmptyLabel={t('device.noFace')}
+				/>
+			</FormSection>
+			<FormSection title={t('device.assignmentSection')}>
+				<EmployeeAssignmentField
+					id="device-edit-employee"
+					tenantId={parseId(tenantId())}
+					value={employeeId()}
+					onChange={setEmployeeId}
+					onError={form.setError}
 				/>
 			</FormSection>
 		</FormPage>
