@@ -1380,16 +1380,34 @@ tbody tr:last-child td {
 	margin-left: calc(10rem + 0.75rem);
 }
 
-/* Secondary submit ("Create & Add Another") next to the primary one. */
-.form-actions .btn-secondary {
-	background-color: var(--secondary);
-	border-color: var(--secondary);
-	color: var(--secondary-contrast);
+/* Primary submit joined with its outlined sibling ("Create & Add Another"),
+ * NetBox style. */
+.form-actions .btn-group {
+	display: inline-flex;
 }
 
-.form-actions .btn-secondary:hover {
-	background-color: var(--secondary-hover);
-	border-color: var(--secondary-hover);
+.form-actions .btn-group > button:not(:first-child) {
+	margin-left: -1px;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+}
+
+.form-actions .btn-group > button:not(:last-child) {
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+}
+
+.form-actions .btn-outline,
+.form-actions .btn-outline:disabled:hover {
+	background-color: transparent;
+	border-color: var(--primary);
+	color: var(--primary);
+}
+
+.form-actions .btn-outline:hover:not(:disabled) {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
 }
 
 .form-actions button:disabled {

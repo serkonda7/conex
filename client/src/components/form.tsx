@@ -344,20 +344,22 @@ function CreateActions(props: {
 			>
 				{t('common.cancel')}
 			</button>
-			<button type="submit" name="action" value="create" disabled={disabled()}>
-				{props.saving ? t('common.creating') : t('common.create')}
-			</button>
-			<Show when={props.singleton !== true}>
-				<button
-					type="submit"
-					class="btn-secondary"
-					name="action"
-					value="add-another"
-					disabled={disabled()}
-				>
-					{t('common.createAndAddAnother')}
+			<div class="btn-group">
+				<button type="submit" name="action" value="create" disabled={disabled()}>
+					{props.saving ? t('common.creating') : t('common.create')}
 				</button>
-			</Show>
+				<Show when={props.singleton !== true}>
+					<button
+						type="submit"
+						class="btn-outline"
+						name="action"
+						value="add-another"
+						disabled={disabled()}
+					>
+						{t('common.createAndAddAnother')}
+					</button>
+				</Show>
+			</div>
 		</div>
 	)
 }
