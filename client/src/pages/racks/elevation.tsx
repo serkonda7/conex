@@ -209,7 +209,7 @@ function segments_for_face(
 				first_u: blocked.first,
 				last_u: blocked.last,
 				rows,
-				plate: blocked.first === shelf.position_u,
+				plate: shelf.mount_height > 0 && blocked.first === shelf.position_u,
 			})
 			i += rows
 			continue

@@ -653,7 +653,8 @@ export const shelves = pgTable(
 		face: text('face'),
 		// Bottom-U of the mount hardware, 1-based.
 		position_u: integer('position_u').notNull(),
-		// U height of the mount hardware itself (>= 1).
+		// U height of the mount hardware itself (0 = dummy shelf; mount plus
+		// reserved height must be at least 1).
 		mount_height: integer('mount_height').notNull().default(1),
 		// When set, the mount span stays usable for device mounts; only the
 		// reserved span blocks.

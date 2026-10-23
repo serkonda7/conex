@@ -701,13 +701,15 @@ export const en = {
 	'shelf.position': 'Position (U)',
 	'shelf.positionHint': 'Lowest U of the mount (1-based).',
 	'shelf.mountHeight': 'Mount height (U)',
-	'shelf.mountHeightHint': 'Height of the mounting band itself (at least 1 U).',
+	'shelf.mountHeightHint':
+		'Height of the mounting band itself. 0 for a dummy shelf resting on a device.',
 	'shelf.mountUsable': 'Mount usable',
 	'shelf.reservedHeight': 'Reserved height (U)',
 	'shelf.reservedHeightHint': 'Extra U above the mount, always blocked (0 = none).',
 	'shelf.selectRackFirst': 'Select a rack first.',
 	'shelf.positionInvalid': 'Position must be a positive integer.',
-	'shelf.mountHeightInvalid': 'Mount height must be an integer of at least 1 U.',
+	'shelf.mountHeightInvalid': 'Mount height must be a whole number of 0 U or more.',
+	'shelf.heightRequired': 'Mount height and reserved height must add up to at least 1 U.',
 	'shelf.reservedHeightInvalid': 'Reserved height must be an integer of 0 or more.',
 
 	// device

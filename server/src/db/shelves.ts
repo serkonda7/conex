@@ -5,7 +5,7 @@ import { devices, racks, shelves } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { ConflictError, NotFoundError } from './errors'
+import { ConflictError, NotFoundError, ValidationError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	exists,
@@ -75,6 +75,11 @@ async function checkShelfMount(
 	}
 	const height = await rackHeightOf(rack)
 	const label = `Shelf "${mount.name}"`
+	if (mount.mount_height + mount.reserved_height < 1) {
+		return Result.err(
+			new ValidationError(`${label} needs a mount or reserved height of at least 1 U`),
+		)
+	}
 	// The mount hardware itself must fit even when it stays usable.
 	const mountBounds = checkBounds(
 		{ position_u: mount.position_u, height_u: mount.mount_height },

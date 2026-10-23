@@ -706,13 +706,16 @@ export const de: Messages = {
 	'shelf.position': 'Position (HE)',
 	'shelf.positionHint': 'Unterste HE der Montage.',
 	'shelf.mountHeight': 'Montagehöhe (HE)',
-	'shelf.mountHeightHint': 'Höhe des Montagebands (min. 1 HE).',
+	'shelf.mountHeightHint':
+		'Höhe des Montagebands. 0 für einen Dummy-Fachboden, der auf einem Gerät aufliegt.',
 	'shelf.mountUsable': 'Montage nutzbar',
 	'shelf.reservedHeight': 'Reservierte Höhe (HE)',
 	'shelf.reservedHeightHint': 'Zusätzliche HE über der Montage, immer blockiert (0 = keine).',
 	'shelf.selectRackFirst': 'Bitte zuerst ein Rack auswählen.',
 	'shelf.positionInvalid': 'Die Position muss eine positive ganze Zahl sein.',
-	'shelf.mountHeightInvalid': 'Die Montagehöhe muss eine ganze Zahl von mindestens 1 HE sein.',
+	'shelf.mountHeightInvalid': 'Die Montagehöhe muss eine ganze Zahl von mindestens 0 HE sein.',
+	'shelf.heightRequired':
+		'Montagehöhe und reservierte Höhe müssen zusammen mindestens 1 HE ergeben.',
 	'shelf.reservedHeightInvalid':
 		'Die reservierte Höhe muss eine ganze Zahl von mindestens 0 sein.',
 

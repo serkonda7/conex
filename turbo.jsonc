@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "globalPassThroughEnv": [
+    "CONEX_CLIENT_HOST",
     "CONEX_CLIENT_PORT",
     "CONEX_E2E_API_URL",
     "CONEX_E2E_BASE_URL",

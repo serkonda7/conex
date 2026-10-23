@@ -85,11 +85,14 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 		if (!Number.isInteger(position) || position < 1) {
 			return t('shelf.positionInvalid')
 		}
-		if (!Number.isInteger(mount) || mount < 1) {
+		if (!Number.isInteger(mount) || mount < 0) {
 			return t('shelf.mountHeightInvalid')
 		}
 		if (!Number.isInteger(reserved) || reserved < 0) {
 			return t('shelf.reservedHeightInvalid')
+		}
+		if (mount + reserved < 1) {
+			return t('shelf.heightRequired')
 		}
 		return null
 	}
@@ -191,7 +194,7 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 				id={`${prefix}-mount-height`}
 				label={t('shelf.mountHeight')}
 				type="number"
-				min={1}
+				min={0}
 				value={mountHeight()}
 				onInput={setMountHeight}
 				hint={<Hint>{t('shelf.mountHeightHint')}</Hint>}
