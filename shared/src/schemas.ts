@@ -2321,11 +2321,12 @@ export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 const LooseBooleanSchema = looseBoolean(true)
 
 /**
- * One device-type CSV row. `manufacturer` resolves to an id
- * server-side; `u_height`/`width` arrive as text and coerce through Number.
+ * One NetBox device-type YAML definition. `manufacturer` resolves to an id
+ * server-side; `u_height` may arrive as text and coerces through Number.
+ * Ports and other NetBox keys pass through untouched for the importer.
  */
-export const DeviceTypeImportRowSchema = v.object({
-	manufacturer: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+export const DeviceTypeYamlSchema = v.looseObject({
+	manufacturer: NameSchema,
 	model: NameSchema,
 	u_height: v.optional(
 		v.pipe(
@@ -2339,22 +2340,13 @@ export const DeviceTypeImportRowSchema = v.object({
 		1,
 	),
 	is_full_depth: v.optional(LooseBooleanSchema, true),
-	form_factor: v.optional(RackFormFactorSchema, undefined),
-	width: v.optional(
-		v.pipe(
-			v.union([v.string(), v.number()]),
-			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-			v.number(),
-			v.integer(),
-			v.check((n) => n === 10 || n === 19 || n === 23, 'Must be one of 10, 19, 23'),
-		),
-		undefined,
-	),
-	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
-	comments: CommentsSchema,
+	/** conex extension: device role name preselected for devices of this type. */
+	default_device_role: v.nullish(NameSchema, undefined),
+	description: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+	comments: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined),
 })
 
-export type DeviceTypeImportRow = v.InferOutput<typeof DeviceTypeImportRowSchema>
+export type DeviceTypeYaml = v.InferOutput<typeof DeviceTypeYamlSchema>
 
 /** Per-row import outcome: created id or the row's error message. */
 export interface ImportRowResult {
@@ -2362,8 +2354,6 @@ export interface ImportRowResult {
 	ok: boolean
 	id: number | null
 	error: string | null
-	/** Set when the row failed only because this manufacturer does not exist. */
-	unknown_manufacturer?: string
 	/** Set when the row failed because a device type with this model already exists. */
 	existing_device_type?: { id: number; model: string }
 }

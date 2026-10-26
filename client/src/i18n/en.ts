@@ -494,28 +494,6 @@ export const en = {
 	'import.promptCopyFailed':
 		'Could not copy the prompt. Allow clipboard access and use HTTPS or localhost, then try again.',
 	'import.data': 'Data',
-	'import.fieldOptions': 'Field options',
-	'import.field': 'Field',
-	'import.required': 'Required',
-	'import.fieldManufacturer': 'Name (case-insensitive) of an existing manufacturer.',
-	'import.fieldModel': 'Device model name.',
-	'import.fieldUHeight': 'Rack height from 0 to 60; defaults to 1.',
-	'import.fieldFullDepth': 'Full-depth device (true/false, defaults to true).',
-	'import.fieldDefaultRole':
-		'Name (case-insensitive) of an existing device role, preselected for new devices.',
-	'import.fieldDescription': 'Optional short device-type summary.',
-	'import.fieldComments': 'Optional longer device-type notes.',
-	'import.fieldInterfaces': 'Network interfaces.',
-	'import.fieldPorts': 'Serial and USB ports.',
-	'import.fieldPowerPorts': 'Power inputs.',
-	'import.fieldPowerOutlets': 'Power outlets.',
-	'import.fieldDisplayPorts': 'Display ports.',
-	'import.fieldRearPorts':
-		'Patch-panel rear ports (outlets): name, type (8p8c, lc, mpo, …), positions (default 1).',
-	'import.fieldFrontPorts':
-		'Patch-panel front ports: name, type, rear_port (name of a rear port in the same document), rear_port_position (default 1).',
-	'import.createManufacturer': 'Create manufacturer "{name}"',
-	'import.manufacturerCreated': 'Manufacturer "{name}" created. Run the import again.',
 	'import.renameExisting': 'Rename existing',
 	'import.newName': 'New name',
 	'import.rename': 'Rename',
