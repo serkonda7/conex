@@ -38,6 +38,8 @@ interface DeviceTypeBody {
 	is_full_depth: boolean
 	description?: string
 	comments?: string
+	part_number?: string
+	spec_url?: string
 	default_device_role_id: number | null
 }
 
@@ -54,6 +56,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [defaultRoleId, setDefaultRoleId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
+	const [partNumber, setPartNumber] = createSignal('')
+	const [specUrl, setSpecUrl] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_device_type,
@@ -65,6 +69,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			setDefaultRoleId(id_value(row.default_device_role_id))
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
+			setPartNumber(row.part_number ?? '')
+			setSpecUrl(row.spec_url ?? '')
 		},
 	})
 	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
@@ -96,6 +102,8 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			default_device_role_id: parseId(defaultRoleId()),
 			description: text(description()),
 			comments: text(comments()),
+			part_number: text(partNumber()),
+			spec_url: text(specUrl()),
 		})
 		await submit_form({
 			form,
@@ -162,6 +170,21 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				options={deviceRoleOptions(roles() ?? [])}
 				emptyLabel={t('deviceType.noDefaultRole')}
 				reload={refetchRoles}
+			/>
+			<TextField
+				id={`${prefix}-part-number`}
+				label={t('deviceType.partNumber')}
+				maxLength={100}
+				value={partNumber()}
+				onInput={setPartNumber}
+			/>
+			<TextField
+				id={`${prefix}-spec-url`}
+				label={t('deviceType.specUrl')}
+				placeholder={t('deviceType.specUrlPlaceholder')}
+				maxLength={200}
+				value={specUrl()}
+				onInput={setSpecUrl}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

@@ -327,6 +327,8 @@ export const device_types = pgTable(
 		// Rack-template dimensions. Null keeps existing non-rack templates valid.
 		form_factor: text('form_factor'),
 		width: integer('width'),
+		part_number: text('part_number'),
+		spec_url: text('spec_url'),
 		description: text('description'),
 		comments: text('comments'),
 		// Role preselected when instantiating a device of this type. Only a

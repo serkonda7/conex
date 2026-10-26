@@ -1,4 +1,5 @@
 import type { Result } from 'better-result'
+import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { fetch_device_role } from '../../api/device_roles'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
@@ -163,6 +164,18 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<dd>{manufacturer()?.name ?? manufacturerId() ?? '—'}</dd>
 					<dt>{t('common.model')}</dt>
 					<dd>{deviceType()?.model}</dd>
+					<dt>{t('deviceType.partNumber')}</dt>
+					<dd>{deviceType()?.part_number || '—'}</dd>
+					<dt>{t('deviceType.specUrl')}</dt>
+					<dd>
+						<Show when={deviceType()?.spec_url} fallback="—">
+							{(url: () => string): JSX.Element => (
+								<a href={websiteUrl(url())} target="_blank" rel="noopener noreferrer">
+									{url()}
+								</a>
+							)}
+						</Show>
+					</dd>
 					<dt>{t('common.comments')}</dt>
 					<dd>
 						<Markdown text={deviceType()?.comments} />

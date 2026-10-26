@@ -285,6 +285,8 @@ export async function createDeviceType(
 		// Rack types use the standard 19-inch mounting width. Keep the generic
 		// device-type API's other width options for non-rack device types.
 		width: input.form_factor !== undefined ? 19 : (input.width ?? null),
+		part_number: input.part_number || null,
+		spec_url: input.spec_url ?? null,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 		default_device_role_id: input.default_device_role_id ?? null,
@@ -394,6 +396,8 @@ export async function updateDeviceType(
 		'model',
 		'u_height',
 		'form_factor',
+		'part_number',
+		'spec_url',
 		'description',
 		'comments',
 		'default_device_role_id',
