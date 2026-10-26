@@ -13,8 +13,10 @@ export type {
 	ExternalDeviceJson as ExternalDevice,
 	ExternalEmployeeJson as ExternalEmployee,
 	ExternalTenantJson as ExternalTenant,
-	ExternalTicketJson as ExternalTicket,
 }
+
+/** Ticket as fetched from the external system; the priority is resolved locally. */
+export type ExternalTicket = Omit<ExternalTicketJson, 'priority'>
 
 /**
  * One external system mapped onto normalized records, so linking, matching
@@ -36,7 +38,7 @@ export interface IntegrationProvider {
 	/** Opens a ticket and returns its external id; absent without a ticket system. */
 	createTicket?(input: TicketInput): Promise<Result<number, Error>>
 	/** Open tickets of one external tenant; absent without a ticket system. */
-	listTickets?(externalTenantId: string): Promise<Result<ExternalTicketJson[], Error>>
+	listTickets?(externalTenantId: string): Promise<Result<ExternalTicket[], Error>>
 	/** Tags that tickets can carry (priorities map to them by label); absent without tags. */
 	listTags?(): Promise<Result<ExternalTag[], Error>>
 	/** Creates a device and returns it as fetched by a sync; absent when unsupported. */

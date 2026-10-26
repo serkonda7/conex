@@ -5,8 +5,9 @@ import {
 	type PriorityListRow,
 	type PrioritySort,
 } from '../../api/service_catalog'
-import { descriptionColumn, nameColumn } from '../../components/data_table'
+import { descriptionColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList } from '../../components/list_page'
+import { PriorityPill } from '../../components/priority_pill'
 import { t, tp } from '../../i18n'
 import { managedServiceTabs } from '../managed-bundles/list'
 
@@ -35,7 +36,16 @@ export function PrioritiesPage(): JSX.Element {
 					sortable: true,
 					getValue: (r: PriorityListRow): string => String(r.rank),
 				},
-				nameColumn<PriorityListRow>(t('common.name'), '/priorities', { sortable: true }),
+				{
+					key: 'name',
+					label: t('common.name'),
+					sortable: true,
+					getValue: (r: PriorityListRow): JSX.Element => (
+						<a href={`/priorities/${r.id}`}>
+							<PriorityPill name={r.name} color={r.color} />
+						</a>
+					),
+				},
 				descriptionColumn({ sortable: true }),
 			]}
 			columnsKey="priorities"

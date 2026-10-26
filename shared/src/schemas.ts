@@ -994,15 +994,22 @@ export type DeviceRoleListQuery = v.InferOutput<typeof DeviceRoleListQuerySchema
 // service hours plus response/resolution targets per priority).
 // ---------------------------------------------------------------------------
 
+export const DEFAULT_PRIORITY_COLOR = '#6b7280'
+
+/** Hex color as produced by `<input type="color">`: `#rrggbb`. */
+export const PriorityColorSchema = v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/))
+
 export const PriorityCreateSchema = v.strictObject({
 	name: NameSchema,
 	/** 1 = most urgent; lists and SLA matrices sort by it. */
 	rank: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)),
+	color: v.optional(PriorityColorSchema, undefined),
 	description: DescriptionSchema,
 })
 
 export const PriorityUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
+	color: v.optional(PriorityColorSchema, undefined),
 	rank: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
@@ -2577,6 +2584,10 @@ export interface ExternalTicketJson {
 	status: string | null
 	created_at: number | null
 	modified_at: number | null
+	/** Names of the tags on the ticket. */
+	tags: string[]
+	/** Local priority whose label matches one of the tags; null when none does. */
+	priority: { id: number; name: string; rank: number; color: string } | null
 }
 
 /**

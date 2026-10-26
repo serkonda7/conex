@@ -441,6 +441,7 @@ export const priorities = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		rank: integer('rank').notNull(),
+		color: text('color').notNull().default('#6b7280'),
 		description: text('description'),
 	},
 	(table) => [index('priorities_rank_idx').on(table.rank)],

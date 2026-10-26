@@ -11,6 +11,7 @@ import type {
 	ServiceLevelUpdate,
 	ServiceWindow,
 } from 'shared/src/schemas'
+import { DEFAULT_PRIORITY_COLOR } from 'shared/src/schemas'
 import {
 	device_roles,
 	managed_bundles,
@@ -83,6 +84,7 @@ export async function createPriority(input: PriorityCreate): Promise<Result<Prio
 	const row: Omit<PriorityRow, 'id'> = {
 		name: input.name,
 		rank: input.rank,
+		color: input.color ?? DEFAULT_PRIORITY_COLOR,
 		description: input.description ?? null,
 	}
 	const id = await tryWrite(
@@ -112,7 +114,7 @@ export async function updatePriority(
 	) {
 		return Result.err(new DuplicateError(PRIORITY_NAME_IN_USE))
 	}
-	const patch = pickDefined(input, ['name', 'rank', 'description'])
+	const patch = pickDefined(input, ['name', 'rank', 'color', 'description'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(priorities).set(patch).where(eq(priorities.id, id)),

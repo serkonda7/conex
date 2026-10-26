@@ -579,6 +579,8 @@ export const en = {
 	'priority.notFound': 'Priority not found.',
 	'priority.details': 'Priority details',
 	'priority.rank': 'Rank',
+	'priority.color': 'Color',
+	'priority.colorHex': 'Hex color code',
 	'priority.rankHint': '1 is the most urgent. Lists and SLA tables are sorted by rank.',
 	'priority.rankInvalid': 'Rank must be a whole number from 1 to 99.',
 	// managedBundle
@@ -1135,10 +1137,10 @@ export const en = {
 	'ticket.loading': 'Loading tickets…',
 	'ticket.openTickets': 'Open tickets',
 	'ticket.status': 'Status',
+	'ticket.priority': 'Priority',
 	'ticket.modified': 'Last change',
 	'ticket.noOpenTickets': 'No open tickets.',
 	'ticket.notLinked': 'This tenant is not linked to a {provider} company.',
-	'ticket.fetchedAt': 'As of {time}',
 
 	'provider.tanss': 'TANSS',
 	'syncState.running': 'Running',

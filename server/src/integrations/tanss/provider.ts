@@ -127,6 +127,9 @@ function toTicket({ ticket, statusName }: TanssTicket): ExternalTicket {
 		status: statusName,
 		created_at: ticket.creationDate ?? null,
 		modified_at: ticket.modified ?? ticket.lastStateChangeDate ?? null,
+		tags: ((ticket as { tags?: { name?: unknown }[] }).tags ?? [])
+			.map((tag) => text(tag.name as string | undefined))
+			.filter((name): name is string => name !== null),
 	}
 }
 

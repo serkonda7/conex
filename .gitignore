@@ -21,3 +21,4 @@ data/
 config.toml
 backups/
 *.dump
+local/

@@ -584,7 +584,9 @@ export const de: Messages = {
 	'priority.notFound': 'Priorität nicht gefunden.',
 	'priority.details': 'Prioritätsdetails',
 	'priority.rank': 'Rang',
-	'priority.rankHint': '1 ist am dringendsten. Listen und SLA-Tabellen sind nach Rang sortiert.',
+	'priority.color': 'Farbe',
+	'priority.colorHex': 'Hex-Farbcode',
+	'priority.rankHint': '1 = am dringendsten',
 	'priority.rankInvalid': 'Der Rang muss eine ganze Zahl von 1 bis 99 sein.',
 	// managedBundle
 	'managedBundle.empty': 'Noch keine Managed-Pakete vorhanden. Fügen Sie oben das erste hinzu.',
@@ -1154,10 +1156,10 @@ export const de: Messages = {
 	'ticket.loading': 'Tickets werden geladen…',
 	'ticket.openTickets': 'Offene Tickets',
 	'ticket.status': 'Status',
+	'ticket.priority': 'Priorität',
 	'ticket.modified': 'Letzte Änderung',
 	'ticket.noOpenTickets': 'Keine offenen Tickets.',
 	'ticket.notLinked': 'Dieser Mandant ist mit keiner {provider}-Firma verknüpft.',
-	'ticket.fetchedAt': 'Stand: {time}',
 
 	'provider.tanss': 'TANSS',
 	'syncState.running': 'Läuft',

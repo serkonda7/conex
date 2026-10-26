@@ -1020,6 +1020,42 @@ tbody tr:last-child td {
 	color: var(--text-secondary);
 }
 
+/* Priority pill: background is the priority color, text color is picked for contrast. */
+.priority-pill {
+	display: inline-block;
+	padding: 0.05rem 0.55rem;
+	border-radius: 999px;
+	font-weight: 600;
+	line-height: 1.4;
+	white-space: nowrap;
+}
+
+.color-field {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+/* Same specificity as the stacked-form input rule, so the narrow widths win. */
+.app-content .form-stacked .field .color-field .color-hex {
+	flex: 0 0 7rem;
+	width: 7rem;
+	min-width: 0;
+	font-family: var(--font-mono, monospace);
+}
+
+.app-content .form-stacked .field .color-field input[type="color"] {
+	flex: 0 0 3rem;
+	width: 3rem;
+	height: 2rem;
+	padding: 0;
+	cursor: pointer;
+}
+
+.color-field .priority-pill {
+	margin-left: 0.4rem;
+}
+
 /* Status pills: <span class="badge badge-active">active</span>. */
 .badge {
 	display: inline-block;
