@@ -11,6 +11,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
+import { deviceRoleLabel } from '../../i18n/labels'
 import { createRecord, createRows } from '../../lib/resource'
 
 /**
@@ -58,7 +59,11 @@ export function ManagedBundleDetailPage(props: { id: number }): JSX.Element {
 					rows.filter((role) => role.managed_bundle_id === props.id)
 				}
 				emptyText={t('managedBundle.noRoles')}
-				columns={[nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles')]}
+				columns={[
+					nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles', {
+						rowLabel: deviceRoleLabel,
+					}),
+				]}
 			/>
 
 			<InlineError message={error()} />

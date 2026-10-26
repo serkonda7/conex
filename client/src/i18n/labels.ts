@@ -16,6 +16,7 @@ import {
 	DEVICE_ROLE_ICONS,
 	type DeviceCompareField,
 	type DeviceRoleIcon,
+	type DeviceRoleKey,
 	EMPLOYEE_SALUTATIONS,
 	type EmployeeCompareField,
 	type EmployeeSalutation,
@@ -290,6 +291,35 @@ const DEVICE_ROLE_ICON_KEYS: Record<DeviceRoleIcon, MessageKey> = {
 	'patch-panel': 'deviceRoleIcon.patchPanel',
 	cloud: 'deviceRoleIcon.cloud',
 	virtual: 'deviceRoleIcon.virtual',
+}
+
+const DEVICE_ROLE_KEY_KEYS: Record<DeviceRoleKey, MessageKey> = {
+	pc: 'deviceRoleKey.pc',
+	server: 'deviceRoleKey.server',
+	ap: 'deviceRoleKey.ap',
+	firewall: 'deviceRoleKey.firewall',
+	'cloud-key': 'deviceRoleKey.cloudKey',
+	switch: 'deviceRoleKey.switch',
+	'patch-panel': 'deviceRoleKey.patchPanel',
+	printer: 'deviceRoleKey.printer',
+	modem: 'deviceRoleKey.modem',
+	telephony: 'deviceRoleKey.telephony',
+	ups: 'deviceRoleKey.ups',
+}
+
+/** Device role name: built-in roles (`key` set) are localized, custom ones keep their name. */
+export function deviceRoleLabel(role: { name: string; key?: string | null }): string
+export function deviceRoleLabel(
+	role: { name: string; key?: string | null } | null | undefined,
+): string | undefined
+export function deviceRoleLabel(
+	role: { name: string; key?: string | null } | null | undefined,
+): string | undefined {
+	if (!role) {
+		return undefined
+	}
+	const key = role.key ? DEVICE_ROLE_KEY_KEYS[role.key as DeviceRoleKey] : undefined
+	return key ? t(key) : role.name
 }
 
 /** Device role icon (`server`, `access-point`, …). */

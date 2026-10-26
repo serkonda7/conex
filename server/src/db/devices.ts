@@ -593,7 +593,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		rack_id: input.rack_id ?? null,
 		position_u: input.position_u ?? null,
 		face: input.face ?? null,
-		is_full_depth: template.value.is_full_depth !== 0,
+		is_full_depth: template.value.is_full_depth,
 	}
 	let deviceLocationId = input.location_id ?? null
 	let deviceSiteId = input.site_id ?? null
@@ -738,7 +738,7 @@ export async function updateDevice(
 			rack_id: effectiveRackId,
 			position_u: input.position_u !== undefined ? input.position_u : node.position_u,
 			face: input.face !== undefined ? input.face : faceOf(node.face),
-			is_full_depth: template.value.is_full_depth !== 0,
+			is_full_depth: template.value.is_full_depth,
 		}
 		const mountCheck = await checkPlacement(input.name ?? node.name, mount, template.value, id)
 		if (Result.isError(mountCheck)) {
@@ -811,7 +811,7 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 		rack_id: input.rack_id !== undefined ? input.rack_id : node.rack_id,
 		position_u: input.position_u !== undefined ? input.position_u : node.position_u,
 		face: faceOf(node.face),
-		is_full_depth: template.value.is_full_depth !== 0,
+		is_full_depth: template.value.is_full_depth,
 	}
 	const mountCheck = await checkPlacement(node.name, mount, template.value, id)
 	if (Result.isError(mountCheck)) {

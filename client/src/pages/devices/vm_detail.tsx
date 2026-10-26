@@ -22,6 +22,7 @@ import {
 import { InlineError } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
+import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
@@ -104,7 +105,7 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 							<ForeignKeyLink
 								id={roleId()}
 								loading={role.loading}
-								name={role()?.name}
+								name={deviceRoleLabel(role())}
 								href={`/device-roles/${roleId() ?? ''}`}
 							/>
 						</IconLabel>

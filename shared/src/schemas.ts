@@ -935,6 +935,10 @@ export const DEVICE_ROLE_KEYS = [
 	'cloud-key',
 	'switch',
 	'patch-panel',
+	'printer',
+	'modem',
+	'telephony',
+	'ups',
 ] as const
 export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
 

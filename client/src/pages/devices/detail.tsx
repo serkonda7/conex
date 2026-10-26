@@ -36,7 +36,7 @@ import { InlineError } from '../../components/feedback'
 import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
+import { deviceRoleLabel, faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
@@ -416,7 +416,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							<ForeignKeyLink
 								id={roleId()}
 								loading={deviceRole.loading}
-								name={deviceRole()?.name}
+								name={deviceRoleLabel(deviceRole())}
 								href={`/device-roles/${roleId() ?? ''}`}
 							/>
 						</IconLabel>

@@ -22,13 +22,14 @@ export function treeDepths(
 }
 
 /** Full `parent > child` path of each row, from the parent links within `rows`. */
-export function treePaths(
-	rows: readonly { id: number; parent_id: number | null; name: string }[],
+export function treePaths<T extends { id: number; parent_id: number | null; name: string }>(
+	rows: readonly T[],
+	label: (row: T) => string = (row: T): string => row.name,
 ): Map<number, string> {
 	const byId = new Map(rows.map((r) => [r.id, r]))
 	const out = new Map<number, string>()
 	for (const row of rows) {
-		const trail = [row.name]
+		const trail = [label(row)]
 		// The visited set keeps a malformed response from looping forever.
 		const visited = new Set<number>([row.id])
 		let parent = row.parent_id
@@ -38,7 +39,7 @@ export function treePaths(
 			if (!node) {
 				break
 			}
-			trail.unshift(node.name)
+			trail.unshift(label(node))
 			parent = node.parent_id
 		}
 		out.set(row.id, trail.join(' > '))

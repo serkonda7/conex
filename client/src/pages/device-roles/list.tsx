@@ -10,6 +10,7 @@ import { IconLabel } from '../../components/icon_label'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { TreeName, treeDepths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
+import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 
 /**
@@ -40,7 +41,7 @@ export function DeviceRolesPage(): JSX.Element {
 						<TreeName depth={depthOf().get(r.id) ?? 0}>
 							<span class="device-role-name">
 								<IconLabel icon={deviceRoleIcon(r.icon)}>
-									<a href={`/device-roles/${r.id}`}>{r.name}</a>
+									<a href={`/device-roles/${r.id}`}>{deviceRoleLabel(r)}</a>
 								</IconLabel>
 							</span>
 						</TreeName>
@@ -54,7 +55,7 @@ export function DeviceRolesPage(): JSX.Element {
 				},
 			]}
 			columnsKey="device-roles"
-			rowName={(r: DeviceRoleListRow): string => r.name}
+			rowName={(r: DeviceRoleListRow): string => deviceRoleLabel(r)}
 			editHref={(r: DeviceRoleListRow): string => `/device-roles/${r.id}/edit`}
 			deletable={(r: DeviceRoleListRow): boolean => r.key === null}
 			emptyText={t('deviceRole.empty')}

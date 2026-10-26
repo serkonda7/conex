@@ -119,7 +119,7 @@ if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 42U
 	})
 } else {
 	await getSqlClient()`UPDATE device_types SET manufacturer_id = ${manufacturer.id}, u_height = 42,
-		is_full_depth = 1, form_factor = '4-post cabinet', width = 19, description = NULL, comments = NULL
+		is_full_depth = true, form_factor = '4-post cabinet', width = 19, description = NULL, comments = NULL
 		WHERE model = 'E2E 42U Cabinet'`
 }
 if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 10U Cabinet')) {
@@ -332,7 +332,7 @@ if (e2eSite && e2eRackType) {
 		mount_height: 1,
 		mount_usable: 0,
 		reserved_height: 2,
-		is_full_depth: 0,
+		is_full_depth: false,
 		description: 'Half-depth shelf for screenshot coverage.',
 	}
 	const existingShelf = (await db.select().from(shelves)).find(

@@ -25,6 +25,7 @@ import {
 } from '../../components/list_page'
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
+import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
@@ -81,15 +82,15 @@ export function DevicesPage(): JSX.Element {
 	const [employees] = createRows(fetch_all_employees, list.setError)
 	const employeeName = useNameOf(employees)
 	const typeName = useNameOf(types, (type) => type.model)
-	const roleName = useNameOf(roles)
+	const roleName = useNameOf(roles, deviceRoleLabel)
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
 	const roleFilterOptions = createMemo(() => {
 		const all = roles() ?? []
-		const paths = treePaths(all)
+		const paths = treePaths(all, deviceRoleLabel)
 		const icons = treeIcons(all)
 		return all.map((r) => ({
 			value: String(r.id),
-			label: paths.get(r.id) ?? r.name,
+			label: paths.get(r.id) ?? deviceRoleLabel(r),
 			icon: deviceRoleIcon(icons.get(r.id)),
 		}))
 	})

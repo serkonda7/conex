@@ -136,7 +136,7 @@ export async function createShelf(input: ShelfCreate): Promise<Result<ShelfRow, 
 		mount_height: mount.mount_height,
 		mount_usable: mount.mount_usable ? 1 : 0,
 		reserved_height: mount.reserved_height,
-		is_full_depth: mount.is_full_depth ? 1 : 0,
+		is_full_depth: mount.is_full_depth,
 		description: input.description ?? null,
 	}
 	const id = await tryWrite(
@@ -183,7 +183,7 @@ export async function updateShelf(
 				name: input.name ?? node.name ?? 'shelf',
 				rack_id: input.rack_id ?? node.rack_id,
 				face: input.face !== undefined ? input.face : faceOf(node.face),
-				is_full_depth: input.is_full_depth ?? node.is_full_depth !== 0,
+				is_full_depth: input.is_full_depth ?? node.is_full_depth,
 				position_u: input.position_u ?? node.position_u,
 				mount_height: input.mount_height ?? node.mount_height,
 				mount_usable: input.mount_usable ?? node.mount_usable !== 0,
@@ -208,7 +208,7 @@ export async function updateShelf(
 		patch.mount_usable = input.mount_usable ? 1 : 0
 	}
 	if (input.is_full_depth !== undefined) {
-		patch.is_full_depth = input.is_full_depth ? 1 : 0
+		patch.is_full_depth = input.is_full_depth
 	}
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(

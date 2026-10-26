@@ -24,7 +24,7 @@ import {
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
-import { portKindLabel, yesNo } from '../../i18n/labels'
+import { deviceRoleLabel, portKindLabel, yesNo } from '../../i18n/labels'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
@@ -170,7 +170,11 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<Show when={deviceType()?.spec_url} fallback="—">
 							{(url: () => string): JSX.Element => (
-								<a href={websiteUrl(url())} target="_blank" rel="noopener noreferrer">
+								<a
+									href={websiteUrl(url())}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
 									{url()}
 								</a>
 							)}
@@ -189,7 +193,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						<ForeignKeyLink
 							id={defaultRoleId()}
 							loading={defaultRole.loading}
-							name={defaultRole()?.name}
+							name={deviceRoleLabel(defaultRole())}
 							href={`/device-roles/${defaultRoleId() ?? ''}`}
 						/>
 					</dd>

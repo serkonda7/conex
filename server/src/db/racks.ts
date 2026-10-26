@@ -173,7 +173,7 @@ async function deviceDetailsOf(rackId: number): Promise<MountedDevice[]> {
 		...row,
 		position_u: row.position_u as number,
 		face: faceOf(row.face),
-		is_full_depth: row.is_full_depth !== 0,
+		is_full_depth: row.is_full_depth,
 	}))
 }
 
@@ -213,7 +213,7 @@ async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
 		mount_height: row.mount_height,
 		mount_usable: row.mount_usable !== 0,
 		reserved_height: row.reserved_height,
-		is_full_depth: row.is_full_depth !== 0,
+		is_full_depth: row.is_full_depth,
 		devices: onShelves.get(row.id) ?? [],
 	}))
 }
