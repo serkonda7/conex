@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -24,7 +24,8 @@
         "noUnknownAttribute": "off" // TODO enable
       },
       "style": {
-        "useBlockStatements": "error"
+        "useBlockStatements": "error",
+        "useDomQuerySelector": "error"
       },
       "nursery": {
         "useExplicitType": "error", // TODO implicit pbjects in function param are not catched
@@ -34,7 +35,6 @@
             "allowExpressions": true
           }
         },
-        "useDomQuerySelector": "error",
         "useExhaustiveSwitchCases": "off", // off due to performance impact
         "useNullishCoalescing": "off" // off due to performance impact
       }
