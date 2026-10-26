@@ -78,7 +78,7 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 		{
 			key: 'status',
 			sortable: true,
-			label: t('ticket.status'),
+			label: t('common.status'),
 			getValue: (ticket: ExternalTicketJson): string => ticket.status ?? '—',
 		},
 		{

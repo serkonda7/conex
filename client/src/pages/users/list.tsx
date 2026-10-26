@@ -38,7 +38,7 @@ export function UsersPage(): JSX.Element {
 				},
 				{
 					key: 'role',
-					label: t('user.role'),
+					label: t('entity.role.one'),
 					getValue: (u: UserJson): string => u.role_name,
 				},
 				{

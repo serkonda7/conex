@@ -597,7 +597,7 @@ export function vmHost(vm: DeviceListItem): JSX.Element {
 	if (vm.kind === 'vm' && vm.host_device_id !== null) {
 		return <a href={`/devices/${vm.host_device_id}`}>{vm.host_name}</a>
 	}
-	return <span>{t('vm.cloud')}</span>
+	return <span>{t('deviceRoleIcon.cloud')}</span>
 }
 
 /** Status pill of a device or VM. */

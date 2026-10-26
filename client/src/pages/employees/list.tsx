@@ -101,7 +101,7 @@ export function EmployeesPage(): JSX.Element {
 		},
 		{
 			key: 'status',
-			label: t('employee.status'),
+			label: t('common.status'),
 			getValue: (e: EmployeeRow): JSX.Element => <EmployeeStatus active={e.active} />,
 		},
 		descriptionColumn(),

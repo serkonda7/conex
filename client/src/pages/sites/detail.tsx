@@ -168,7 +168,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: t('location.type'),
+			label: t('common.type'),
 			getValue: (l: LocationRow): JSX.Element => (
 				<IconLabel icon={locationTypeIcon(l.type)}>{locationTypeLabel(l.type)}</IconLabel>
 			),
@@ -314,7 +314,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 						<Show when={images.floorplan()}>
 							{(plan: () => AttachmentJson) => (
 								<>
-									<dt>{t('floorplan.title')}</dt>
+									<dt>{t('entity.floorplan.one')}</dt>
 									<dd>
 										<a href={`/floorplans/${plan().id}`}>
 											{t('floorplan.open')}

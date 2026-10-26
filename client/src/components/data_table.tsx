@@ -71,7 +71,7 @@ export function FilterTable<TRow>(
 			yesLabel: t('common.yes'),
 			noLabel: t('common.no'),
 			savedFiltersLabel: t('table.savedFilters'),
-			saveLabel: t('table.saveFilter'),
+			saveLabel: t('common.save'),
 			saveNameLabel: t('table.filterName'),
 			cancelLabel: t('common.cancel'),
 			clearSavedFilterLabel: t('table.clearSavedFilter'),

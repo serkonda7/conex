@@ -472,11 +472,11 @@ export function AttachmentsSection(props: { id: string; images: OwnerImages }): 
 													<Show when={row.is_floorplan}>
 														<span
 															class="attachment-star"
-															title={t('floorplan.badge')}
+															title={t('entity.floorplan.one')}
 														>
 															<IconStarFilled size={16} />
 															<span class="visually-hidden">
-																{t('floorplan.badge')}
+																{t('entity.floorplan.one')}
 															</span>
 														</span>
 													</Show>

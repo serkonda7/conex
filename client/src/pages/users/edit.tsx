@@ -54,7 +54,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 		>
 			<SelectField
 				id="user-edit-role"
-				label={t('user.role')}
+				label={t('entity.role.one')}
 				required
 				value={roleId()}
 				onChange={setRoleId}

@@ -112,7 +112,7 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 					</dd>
 					<dt>{t('vm.host')}</dt>
 					<dd>
-						<Show when={hostId() !== null} fallback={t('vm.cloud')}>
+						<Show when={hostId() !== null} fallback={t('deviceRoleIcon.cloud')}>
 							<RecordLink id={hostId()} record={host} base="/devices" />
 						</Show>
 					</dd>

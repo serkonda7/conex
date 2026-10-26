@@ -127,7 +127,7 @@ export function DevicesPage(): JSX.Element {
 			sortable: true,
 			getValue: (d: DeviceListItem): JSX.Element =>
 				d.kind === 'vm' ? (
-					<span>{t('vm.typeLabel')}</span>
+					<span>{t('entity.virtualMachine.one')}</span>
 				) : (
 					<a href={`/device-types/${d.device_type_id}`}>{typeName(d.device_type_id)}</a>
 				),
@@ -151,7 +151,7 @@ export function DevicesPage(): JSX.Element {
 			getValue: (d: DeviceListItem): JSX.Element => {
 				if (d.kind === 'vm') {
 					return d.host_device_id === null ? (
-						<span>{t('vm.cloud')}</span>
+						<span>{t('deviceRoleIcon.cloud')}</span>
 					) : (
 						<a href={`/devices/${d.host_device_id}`}>{d.host_name}</a>
 					)
@@ -201,8 +201,8 @@ export function DevicesPage(): JSX.Element {
 						key: 'kind',
 						label: t('vm.kind'),
 						options: [
-							{ value: 'device', label: t('vm.kindDevices') },
-							{ value: 'vm', label: t('vm.kindVms') },
+							{ value: 'device', label: t('entity.device.other') },
+							{ value: 'vm', label: t('entity.virtualMachine.other') },
 						],
 						value: filterKind,
 						onChange: setFilterKind,

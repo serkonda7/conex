@@ -43,7 +43,7 @@ export function ChangelogPage(): JSX.Element {
 			},
 			{
 				key: 'object_type',
-				label: t('changelog.objectType'),
+				label: t('common.type'),
 				options: changeObjectOptions(),
 				value: objectType,
 				onChange: (value: string[]): void => {
@@ -86,7 +86,7 @@ export function ChangelogPage(): JSX.Element {
 		},
 		{
 			key: 'user',
-			label: t('changelog.user'),
+			label: t('entity.user.one'),
 			getValue: (c: ObjectChangeJson): string => changeUser(c),
 		},
 		{
@@ -96,7 +96,7 @@ export function ChangelogPage(): JSX.Element {
 		},
 		{
 			key: 'object_type',
-			label: t('changelog.objectType'),
+			label: t('common.type'),
 			getValue: (c: ObjectChangeJson): string => changeObjectLabel(c.object_type),
 		},
 		{

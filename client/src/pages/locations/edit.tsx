@@ -92,7 +92,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 			/>
 			<SelectField
 				id="location-edit-type"
-				label={t('location.type')}
+				label={t('common.type')}
 				required
 				value={locationType()}
 				onChange={(value: string): void => {
