@@ -18,8 +18,7 @@ import { providerLabel } from '../../i18n/labels'
 import { useFormState } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam, useOpenerPath } from '../../lib/router'
-import { isScoped, sessionTenantId } from '../../lib/session'
-import { contextTenantId, contextTenantRows, homePath } from '../../lib/tenant_context'
+import { contextTenantRows, homePath, newObjectTenantId } from '../../lib/tenant_context'
 
 /** Ticket system; TANSS is the only one so far. */
 export const TICKET_PROVIDER: IntegrationProvider = 'tanss'
@@ -41,9 +40,7 @@ export function TicketAddPage(): JSX.Element {
 	const [title, setTitle] = createSignal('')
 	const [content, setContent] = createSignal('')
 	const [createdId, setCreatedId] = createSignal<number | null>(null)
-	const tenantId = createMemo((): number | null =>
-		isScoped() ? sessionTenantId() : contextTenantId(),
-	)
+	const tenantId = createMemo(newObjectTenantId)
 	const tenantName = (): string | undefined =>
 		contextTenantRows().find((row) => row.id === tenantId())?.name
 	const [devices] = createRowsFor(
@@ -88,8 +85,8 @@ export function TicketAddPage(): JSX.Element {
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		const tenant = tenantId()
+		// The form blocks submitting without a tenant.
 		if (tenant === null) {
-			form.setError(t('ticket.tenantRequired'))
 			return
 		}
 		if (!title().trim()) {
@@ -134,6 +131,7 @@ export function TicketAddPage(): JSX.Element {
 			title={pageTitle()}
 			cancelTo={openerPath() ?? homePath()}
 			singleton
+			tenant="required"
 			onSubmit={handleSubmit}
 		>
 			<Show when={createdId()}>

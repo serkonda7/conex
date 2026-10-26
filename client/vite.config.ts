@@ -7,6 +7,11 @@ import { defineConfig } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
 
 const CLIENT_PORT = Number(process.env.CONEX_CLIENT_PORT ?? 5371)
+// Vite defaults to `localhost`, which resolves to `::1` on some machines (and
+// then only IPv6 loopback is bound), making the server unreachable via
+// 127.0.0.1 for browsers and editor port forwarding. Bind all interfaces by
+// default; set CONEX_CLIENT_HOST (e.g. 127.0.0.1) to narrow it.
+const CLIENT_HOST: string | boolean = process.env.CONEX_CLIENT_HOST ?? true
 
 const rootPackage = JSON.parse(
 	readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8'),
@@ -46,6 +51,7 @@ export default defineConfig({
 	// port, API target and dep cache have to be overridable.
 	cacheDir: `node_modules/.vite-${CLIENT_PORT}`,
 	server: {
+		host: CLIENT_HOST,
 		port: CLIENT_PORT,
 		proxy: {
 			'/api': {

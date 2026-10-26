@@ -115,7 +115,11 @@ export function OutletPopover(props: {
 							</dl>
 							<div class="floorplan-popover-actions">
 								<Show
-									when={can('edit') && loaded().rear && !loaded().rear?.connected}
+									when={
+										can('edit') &&
+										loaded().rear?.patched &&
+										!loaded().rear?.connected
+									}
 								>
 									<button
 										type="button"

@@ -1,5 +1,5 @@
 import type { SiteGroupCreate } from 'shared/src/types'
-import { createSignal, type JSX } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import {
 	create_site_group,
 	fetch_site_group,
@@ -27,13 +27,13 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
-import { contextTenantValue } from '../../lib/tenant_context'
+import { newObjectTenantId } from '../../lib/tenant_context'
 
 /** Site group create (`id` omitted) or edit form. */
 function SiteGroupForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal('')
-	// A single-tenant context preselects that tenant.
-	const [tenantId, setTenantId] = createSignal(contextTenantValue())
+	// Edit only: new site groups get the tenant of the global tenant selection.
+	const [tenantId, setTenantId] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
@@ -52,7 +52,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 
 	const body = (values: FormValues): SiteGroupCreate => ({
 		name: values.name,
-		tenant_id: parseId(tenantId()),
+		tenant_id: form.editing ? parseId(tenantId()) : newObjectTenantId(),
 		description: text(description()),
 		comments: text(comments()),
 	})
@@ -83,6 +83,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 			name={form.record()?.name}
 			loadingText={t('siteGroup.loadingOne')}
 			cancelTo={backTo()}
+			tenant="required"
 			onSubmit={handleSubmit}
 		>
 			<NameField
@@ -92,14 +93,16 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 				onInput={setName}
 				autofocus={!form.editing}
 			/>
-			<SelectField
-				id={`${prefix}-tenant`}
-				label={tp('entity.tenant', 1)}
-				value={tenantId()}
-				onChange={setTenantId}
-				options={row_options(tenants() ?? [])}
-				emptyLabel={t('common.noTenant')}
-			/>
+			<Show when={form.editing}>
+				<SelectField
+					id={`${prefix}-tenant`}
+					label={tp('entity.tenant', 1)}
+					value={tenantId()}
+					onChange={setTenantId}
+					options={row_options(tenants() ?? [])}
+					emptyLabel={t('common.noTenant')}
+				/>
+			</Show>
 			<DescriptionField
 				id={`${prefix}-description`}
 				value={description()}

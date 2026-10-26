@@ -98,7 +98,8 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	})
 	const compatibleCount = (): number => (peerPorts() ?? []).filter((p) => p.compatible).length
 	const freeCount = (): number =>
-		(peerPorts() ?? []).filter((p) => p.compatible && !p.iface.connected).length
+		(peerPorts() ?? []).filter((p) => p.compatible && p.iface.patched && !p.iface.connected)
+			.length
 	/** Filter matches the port name or, for taken ports, the device on the far end. */
 	const visiblePorts = createMemo(() => {
 		const needle = portFilter().trim().toLowerCase()
@@ -128,15 +129,17 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				selected: peerIface()?.id === iface.id,
 			}}
 			aria-pressed={peerIface()?.id === iface.id}
-			disabled={!compatible || iface.connected || submit.pending()}
+			disabled={!compatible || !iface.patched || iface.connected || submit.pending()}
 			title={
 				!compatible
 					? t('device.incompatiblePort')
-					: link
-						? `${link.peer_device.name}: ${link.peer_interface.name}`
-						: iface.connected
-							? t('device.alreadyConnected')
-							: undefined
+					: !iface.patched
+						? t('device.panel.unpatched')
+						: link
+							? `${link.peer_device.name}: ${link.peer_interface.name}`
+							: iface.connected
+								? t('device.alreadyConnected')
+								: undefined
 			}
 			onClick={(): void => {
 				void connect(iface)
@@ -158,7 +161,9 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 					? `→ ${link.peer_device.name}`
 					: compatible && iface.connected
 						? t('device.connected')
-						: portKindLabel(iface.kind)}
+						: compatible && !iface.patched
+							? t('device.panel.notPatched')
+							: portKindLabel(iface.kind)}
 			</small>
 		</button>
 	)

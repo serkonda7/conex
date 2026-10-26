@@ -12,6 +12,7 @@ import { type JSX, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import type { FormState } from '../lib/form'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
+import { newObjectTenantId } from '../lib/tenant_context'
 import { InlineError, Loading } from './feedback'
 
 /** One `SelectField` entry. */
@@ -149,15 +150,19 @@ export function CheckboxField(props: {
 	label: string
 	checked: boolean
 	onChange: (checked: boolean) => void
+	disabled?: boolean
+	/** Shown on hover, e.g. why the box is disabled. */
+	title?: string
 }): JSX.Element {
 	return (
 		<div class="field">
 			<div class="field-control">
-				<label class="field-checkbox-label">
+				<label class="field-checkbox-label" title={props.title}>
 					<input
 						id={props.id}
 						type="checkbox"
 						checked={props.checked}
+						disabled={props.disabled}
 						onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
 							props.onChange(e.currentTarget.checked)
 						}
@@ -326,7 +331,10 @@ function CreateActions(props: {
 	saving: boolean
 	cancelTo: string
 	singleton?: boolean
+	/** Blocks creating (e.g. a required tenant is missing); cancel stays enabled. */
+	blocked?: boolean
 }): JSX.Element {
+	const disabled = (): boolean => props.saving || props.blocked === true
 	return (
 		<div class="form-actions">
 			<button
@@ -336,14 +344,22 @@ function CreateActions(props: {
 			>
 				{t('common.cancel')}
 			</button>
-			<button type="submit" name="action" value="create" disabled={props.saving}>
-				{props.saving ? t('common.creating') : t('common.create')}
-			</button>
-			<Show when={props.singleton !== true}>
-				<button type="submit" name="action" value="add-another" disabled={props.saving}>
-					{t('common.createAndAddAnother')}
+			<div class="btn-group">
+				<button type="submit" name="action" value="create" disabled={disabled()}>
+					{props.saving ? t('common.creating') : t('common.create')}
 				</button>
-			</Show>
+				<Show when={props.singleton !== true}>
+					<button
+						type="submit"
+						class="btn-outline"
+						name="action"
+						value="add-another"
+						disabled={disabled()}
+					>
+						{t('common.createAndAddAnother')}
+					</button>
+				</Show>
+			</div>
 		</div>
 	)
 }
@@ -377,8 +393,22 @@ function EditActions(props: {
 }
 
 /**
+ * Warning atop an add form whose new object takes its tenant from the top
+ * bar (`newObjectTenantId`) while no single tenant is selected there.
+ */
+function NoTenantWarning(props: { required: boolean }): JSX.Element {
+	return (
+		<p class="form-warning" role="status">
+			{props.required ? t('common.noTenantSelectedRequired') : t('common.noTenantSelected')}
+		</p>
+	)
+}
+
+/**
  * Add/edit page shell: heading, the stacked form with the error line and
- * the create or save actions. Edit forms (`form.editing`) wait for the
+ * the create or save actions. Create forms with `tenant` take the new
+ * object's tenant from the top bar and warn while none is selected; a
+ * `required` tenant also blocks creating. Edit forms (`form.editing`) wait for the
  * record and report its `name` for the tab title and breadcrumb bar;
  * `crumbs` are the ancestors when the form belongs to another object (e.g.
  * the rack a shelf sits in).
@@ -393,15 +423,22 @@ export function FormPage(props: {
 	loadingText?: string
 	/** Create forms: no "Create & Add Another". */
 	singleton?: boolean
+	/** Create forms: the new object gets the top-bar tenant (see above). */
+	tenant?: 'optional' | 'required'
 	/** Edit forms: adds a delete button. */
 	onDelete?: () => void
 	children: JSX.Element
 }): JSX.Element {
 	usePageMeta(() => ({ name: props.name, crumbs: props.crumbs }))
+	const tenantMissing = (): boolean =>
+		!props.form.editing && props.tenant !== undefined && newObjectTenantId() === null
 	return (
 		<div class="form-page">
 			<Show when={props.title}>
 				<h2>{props.title}</h2>
+			</Show>
+			<Show when={tenantMissing()}>
+				<NoTenantWarning required={props.tenant === 'required'} />
 			</Show>
 			<Show
 				when={props.form.loaded()}
@@ -417,6 +454,7 @@ export function FormPage(props: {
 								saving={props.form.saving()}
 								cancelTo={props.cancelTo}
 								singleton={props.singleton}
+								blocked={tenantMissing() && props.tenant === 'required'}
 							/>
 						}
 					>

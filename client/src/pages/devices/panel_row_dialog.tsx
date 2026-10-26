@@ -5,7 +5,7 @@ import { createSignal, Show } from 'solid-js'
 import { delete_cable } from '../../api/cables'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
-import { type FormOption, FormSection, TextField } from '../../components/form'
+import { CheckboxField, type FormOption, FormSection, TextField } from '../../components/form'
 import { Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
@@ -31,14 +31,16 @@ export interface PanelRowDialogProps {
 }
 
 /**
- * Edit dialog of one patch-panel row: names and cables of its front and rear
- * port, and (for an outlet) the rear port's location. Cables are connected
- * and removed right away; names and location are saved together.
+ * Edit dialog of one patch-panel row: whether it is patched, names and
+ * cables of its front and rear port, and (for an outlet) the rear port's
+ * location. Cables are connected and removed right away; the other fields
+ * are saved together (`patched` on both ports of the row).
  */
 export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 	const [frontName, setFrontName] = createSignal(props.front?.name ?? '')
 	const [rearName, setRearName] = createSignal(props.rear?.name ?? '')
 	const [location, setLocation] = createSignal(String(props.rear?.location_id ?? ''))
+	const [patched, setPatched] = createSignal((props.rear ?? props.front)?.patched ?? true)
 	const [connecting, setConnecting] = createSignal<InterfaceJson | null>(null)
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
@@ -48,6 +50,8 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 		t('device.panel.editRow', {
 			name: [props.front?.name, props.rear?.name].filter(Boolean).join(' / '),
 		})
+	/** Cabled ports must stay patched; disconnect them first. */
+	const cabled = (): boolean => Boolean(props.front?.connected || props.rear?.connected)
 	const valid = (): boolean =>
 		(!props.front || frontName().trim() !== '') && (!props.rear || rearName().trim() !== '')
 
@@ -59,6 +63,7 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 			...(isOutlet(iface) && locationId !== iface.location_id
 				? { location_id: locationId }
 				: {}),
+			...(patched() !== iface.patched ? { patched: patched() } : {}),
 		}
 	}
 
@@ -110,8 +115,12 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 							<button
 								type="button"
 								class="icon-btn icon-btn-connect"
-								disabled={iface.connected}
-								title={t('device.connectToPeer', { name: iface.name })}
+								disabled={iface.connected || !iface.patched || !patched()}
+								title={
+									iface.patched && patched()
+										? t('device.connectToPeer', { name: iface.name })
+										: t('device.panel.notPatchedConnect')
+								}
 								aria-label={t('device.connectCableFor', { name: iface.name })}
 								onClick={(): void => {
 									setError(null)
@@ -144,6 +153,18 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 		<>
 			<Modal title={title()} on_close={props.on_close}>
 				<form class="form-stacked" onSubmit={handleSave}>
+					<Show when={props.front || props.rear}>
+						<CheckboxField
+							id="panel-row-patched"
+							label={t('device.panel.patched')}
+							checked={patched()}
+							onChange={setPatched}
+							disabled={cabled() && patched()}
+							title={
+								cabled() && patched() ? t('device.panel.cabledPatched') : undefined
+							}
+						/>
+					</Show>
 					<Show when={props.front}>
 						{(front: () => InterfaceJson): JSX.Element => (
 							<FormSection title={t('device.panel.frontPort')}>

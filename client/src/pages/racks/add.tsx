@@ -18,7 +18,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { contextTenantId, rowsOfTenant } from '../../lib/tenant_context'
+import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 
 /** Id of the hint under the rack-type select. */
@@ -43,7 +43,7 @@ export function RackAddPage(): JSX.Element {
 	)
 
 	// The tenant comes from the global tenant selection, which also limits the sites.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], contextTenantId()))
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
 	createEffect(() => {
 		const id = parseId(siteId())
 		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
@@ -74,7 +74,7 @@ export function RackAddPage(): JSX.Element {
 					name: values.name,
 					site_id: Number(siteId()),
 					location_id: parseId(locationId()),
-					tenant_id: contextTenantId(),
+					tenant_id: newObjectTenantId(),
 					rack_type_id: Number(rackTypeId()),
 					description: text(description()),
 				}),
@@ -84,7 +84,13 @@ export function RackAddPage(): JSX.Element {
 	}
 
 	return (
-		<FormPage form={form} title={t('rack.addTitle')} cancelTo="/racks" onSubmit={handleCreate}>
+		<FormPage
+			form={form}
+			title={t('rack.addTitle')}
+			cancelTo="/racks"
+			tenant="required"
+			onSubmit={handleCreate}
+		>
 			<SelectField
 				id="rack-site"
 				label={tp('entity.site', 1)}

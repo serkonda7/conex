@@ -42,7 +42,7 @@ import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
-import { ManagedServiceRows } from '../managed-bundles/service_rows'
+import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
@@ -316,7 +316,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		return (
 			<button
 				type="button"
-				class="icon-btn"
+				class="icon-btn panel-row-edit"
 				title={t('device.panel.editRow', { name: name() })}
 				aria-label={t('device.panel.editRow', { name: name() })}
 				onClick={(): void => {
@@ -398,6 +398,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					}
 				/>
 				<DetailSubtitle description={device()?.description} />
+				<ManagedServicePill service={service} />
 
 				<DetailCard label={t('device.details')}>
 					<dt>{t('common.type')}</dt>
@@ -432,7 +433,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
-					<ManagedServiceRows service={service} />
 					<dt>{tp('entity.site', 1)}</dt>
 					<dd>
 						<RecordLink id={siteId()} record={site} base="/sites" />
@@ -501,37 +501,39 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</h3>
 				{portTable(otherPorts, otherColumns)}
 			</Show>
-			<RelatedSection
-				id="device-vms"
-				title={tp('entity.virtualMachine', 2)}
-				noun="noun.virtualMachine"
-				rows={vms}
-				emptyText={t('vm.emptyOnHost')}
-				actions={
-					<Show when={can('edit') && deviceRole()?.can_host_vms === 1}>
-						<button
-							type="button"
-							onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
-						>
-							{t('vm.addVm')}
-						</button>
-					</Show>
-				}
-				columns={[
-					{
-						key: 'name',
-						label: t('common.name'),
-						getValue: (vm: DeviceListItem): JSX.Element => (
-							<a href={`/devices/vm/${vm.id}`}>{vm.name}</a>
-						),
-					},
-					{
-						key: 'description',
-						label: t('common.description'),
-						getValue: (vm: DeviceListItem): string => vm.description || '—',
-					},
-				]}
-			/>
+			<Show when={deviceRole()?.can_host_vms === 1}>
+				<RelatedSection
+					id="device-vms"
+					title={tp('entity.virtualMachine', 2)}
+					noun="noun.virtualMachine"
+					rows={vms}
+					emptyText={t('vm.emptyOnHost')}
+					actions={
+						<Show when={can('edit')}>
+							<button
+								type="button"
+								onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
+							>
+								{t('vm.addVm')}
+							</button>
+						</Show>
+					}
+					columns={[
+						{
+							key: 'name',
+							label: t('common.name'),
+							getValue: (vm: DeviceListItem): JSX.Element => (
+								<a href={`/devices/vm/${vm.id}`}>{vm.name}</a>
+							),
+						},
+						{
+							key: 'description',
+							label: t('common.description'),
+							getValue: (vm: DeviceListItem): string => vm.description || '—',
+						},
+					]}
+				/>
+			</Show>
 			<Show when={connectingIface()}>
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<ConnectPortDialog

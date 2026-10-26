@@ -92,6 +92,7 @@ export function getCable(id: number): Promise<Result<CableRow, Error>> {
  * - the two ends are distinct (same interface twice rejected);
  * - both interfaces exist;
  * - both interfaces are free (`connected=false`, no cable on either end);
+ * - neither is an unpatched patch-panel port (a cable there leads nowhere);
  * - the two ends are not in the same pass-through group of a patch panel
  *   (a front port and its own rear port, or two front ports of one rear port);
  * - both devices belong to the same tenant (or both are shared): cables
@@ -130,6 +131,9 @@ export async function connectCable(input: CableCreate): Promise<Result<CableRow,
 		return Result.err(new ConflictError('Cannot connect devices of different tenants'))
 	}
 	for (const iface of ends) {
+		if (iface.patched === 0) {
+			return Result.err(new ConflictError(`Interface ${iface.name} is not patched`))
+		}
 		if (iface.connected !== 0 || (await exists(cables, cableTouches([iface.id])))) {
 			return Result.err(new ConflictError(`Interface ${iface.name} is already connected`))
 		}

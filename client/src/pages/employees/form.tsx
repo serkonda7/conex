@@ -41,7 +41,7 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
-import { useTenantDefault } from '../../lib/tenant_context'
+import { newObjectTenantId } from '../../lib/tenant_context'
 
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
 const blankPhone = (): PhoneRow<EmployeePhone> => ({ number: '', type: 'phone', scope: 'work' })
@@ -51,6 +51,8 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const [firstName, setFirstName] = createSignal('')
 	const [lastName, setLastName] = createSignal('')
 	const [salutation, setSalutation] = createSignal('')
+	// Edit only: new employees get the tenant of the global tenant selection.
+	const [editTenantId, setEditTenantId] = createSignal('')
 	const [title, setTitle] = createSignal('')
 	const [emails, setEmails] = createSignal<EmployeeEmail[]>([blankEmail()])
 	const [phones, setPhones] = createSignal<PhoneRow<EmployeePhone>[]>([blankPhone()])
@@ -64,7 +66,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			setFirstName(row.first_name ?? '')
 			setLastName(row.last_name)
 			setSalutation(row.salutation ?? '')
-			tenant.pick(id_value(row.tenant_id))
+			setEditTenantId(id_value(row.tenant_id))
 			setTitle(row.title ?? '')
 			setEmails(row.emails.length > 0 ? row.emails : [blankEmail()])
 			setPhones(row.phones.length > 0 ? row.phones.map(phoneRow) : [blankPhone()])
@@ -74,25 +76,20 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 		},
 	})
 	const [tenants] = createRows(fetch_tenants, form.setError)
-	const tenant = useTenantDefault(
-		() => null,
-		() => !form.editing,
-	)
+	const tenant = (): number | null =>
+		form.editing ? parseId(editTenantId()) : newObjectTenantId()
 	/** Company mail domain of the tenant, from its primary mail address. */
 	const domainOf = (tenantId: number | null): string | null =>
 		emailDomain(tenants()?.find((row) => row.id === tenantId)?.emails ?? [])
 	const emailPlaceholder = (): string | undefined => {
-		const domain = domainOf(parseId(tenant.value()))
+		const domain = domainOf(tenant())
 		return domain === null ? undefined : t('employee.emailPlaceholder', { domain })
 	}
 	/** Main phone number of the tenant, which extensions are dialed through. */
 	const mainNumber = (): string | null =>
-		primaryPhone(
-			tenants()?.find((row) => row.id === parseId(tenant.value()))?.phones ?? [],
-			'phone',
-		)
+		primaryPhone(tenants()?.find((row) => row.id === tenant())?.phones ?? [], 'phone')
 	const completeEmail = (index: number): void => {
-		const domain = domainOf(parseId(tenant.value()))
+		const domain = domainOf(tenant())
 		setEmails(
 			emails().map((e, i) =>
 				i === index ? { ...e, address: withEmailDomain(e.address, domain) } : e,
@@ -124,17 +121,17 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		const id = props.id
-		const tenantId = parseId(tenant.value())
+		// Never null here: the form blocks submitting without a tenant.
+		const tenantId = tenant() ?? 0
 		await submit_form({
 			form,
 			// The last name is the required name part.
 			name: lastName(),
 			nameError: t('employee.lastNameRequired'),
-			validate: () => (tenantId === null ? t('employee.tenantRequired') : null),
 			save: (values: FormValues) =>
 				id === undefined
-					? create_employee(body(values, tenantId ?? 0))
-					: update_employee(id, cleared(body(values, tenantId ?? 0))),
+					? create_employee(body(values, tenantId))
+					: update_employee(id, cleared(body(values, tenantId))),
 			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
 				? () => {
@@ -156,6 +153,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			name={form.record()?.name}
 			loadingText={t('employee.loadingOne')}
 			cancelTo={backTo()}
+			tenant="required"
 			onSubmit={handleSubmit}
 		>
 			<SelectField
@@ -184,14 +182,16 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				value={lastName()}
 				onInput={setLastName}
 			/>
-			<SelectField
-				id={`${prefix}-tenant`}
-				label={tp('entity.tenant', 1)}
-				value={tenant.value()}
-				onChange={tenant.pick}
-				options={row_options(tenants() ?? [])}
-				required
-			/>
+			<Show when={form.editing}>
+				<SelectField
+					id={`${prefix}-tenant`}
+					label={tp('entity.tenant', 1)}
+					value={editTenantId()}
+					onChange={setEditTenantId}
+					options={row_options(tenants() ?? [])}
+					required
+				/>
+			</Show>
 			<TextField
 				id={`${prefix}-title`}
 				label={t('employee.title')}
@@ -237,12 +237,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				onChange={setPhones}
 				blank={blankPhone}
 				rowHint={(entry: () => PhoneRow<EmployeePhone>): JSX.Element => (
-					<Show
-						when={
-							parseId(tenant.value()) !== null &&
-							isUndialableExtension(entry(), mainNumber())
-						}
-					>
+					<Show when={tenant() !== null && isUndialableExtension(entry(), mainNumber())}>
 						<p class="field-hint field-hint-error" role="status">
 							{t('employee.extensionNoMainNumber')}
 						</p>
@@ -284,7 +279,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	)
 }
 
-/** /employees/add — employee create form; `?tenant=` preselects the tenant. */
+/** /employees/add — employee create form for the tenant selected in the top bar. */
 export function EmployeeAddPage(): JSX.Element {
 	return <EmployeeForm />
 }

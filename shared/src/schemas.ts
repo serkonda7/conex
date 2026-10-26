@@ -592,7 +592,7 @@ export interface ElevationShelfRef {
 	face: 'front' | 'rear' | null
 	/** Bottom-U of the shelf (1-based). */
 	position_u: number
-	/** U height of the shelf mount hardware. */
+	/** U height of the shelf mount hardware (0 for a dummy shelf). */
 	mount_height: number
 	/** When true, the mount span stays usable for device mounts. */
 	mount_usable: boolean
@@ -1318,6 +1318,8 @@ export const InterfaceUpdateSchema = v.strictObject({
 	rear_port_position: v.optional(PortPositionsSchema, undefined),
 	// Outlets (single-position rear ports) only: the room the cable ends in.
 	location_id: v.optional(v.nullable(IdSchema), undefined),
+	// Patch-panel ports only: wired up, or just part of the panel.
+	patched: v.optional(v.boolean(), undefined),
 })
 
 /** `PUT /devices/:id/interfaces/location`: set or clear the location of several outlets. */
@@ -1456,8 +1458,8 @@ export type InterfaceListQuery = v.InferOutput<typeof InterfaceListQuerySchema>
 // Shelves (rack fixtures, fully separate from devices)
 // ---------------------------------------------------------------------------
 
-/** U height of the shelf mount hardware: at least 1 U. */
-export const ShelfMountHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+/** U height of the shelf mount hardware: 0 = dummy shelf without a mounting band. */
+export const ShelfMountHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
 
 /** Extra U reserved above the mount: 0 = none. */
 export const ShelfReservedHeightSchema = v.pipe(

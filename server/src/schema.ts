@@ -653,7 +653,8 @@ export const shelves = pgTable(
 		face: text('face'),
 		// Bottom-U of the mount hardware, 1-based.
 		position_u: integer('position_u').notNull(),
-		// U height of the mount hardware itself (>= 1).
+		// U height of the mount hardware itself (0 = dummy shelf; mount plus
+		// reserved height must be at least 1).
 		mount_height: integer('mount_height').notNull().default(1),
 		// When set, the mount span stays usable for device mounts; only the
 		// reserved span blocks.
@@ -696,6 +697,9 @@ export const interfaces = pgTable(
 		// floor plan. Location delete is blocked while outlets reference it
 		// (service layer).
 		location_id: integer('location_id').references(() => locations.id),
+		// Patch-panel ports: false = only part of the panel, not wired up
+		// (yet). Informational; cables may still be connected.
+		patched: integer('patched').notNull().default(1),
 	},
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),

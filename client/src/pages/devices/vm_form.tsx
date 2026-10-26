@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { createEffect, createSignal, type JSX, Show } from 'solid-js'
+import { createEffect, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_tenants } from '../../api/tenancy'
@@ -31,7 +31,7 @@ import {
 } from '../../lib/form'
 import { createRecord, createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
-import { contextTenantId, useTenantDefault } from '../../lib/tenant_context'
+import { newObjectTenantId } from '../../lib/tenant_context'
 import { deviceRoleOptions } from '../device-roles/options'
 import { useDeviceSearch } from './device_search'
 import { EmployeeAssignmentField } from './employee_assignment'
@@ -96,7 +96,8 @@ function HostField(props: {
 
 /**
  * Virtual machine create (`id` omitted) or edit form. A hosted VM has its
- * host's tenant, so the tenant select only shows without a host. Create
+ * host's tenant; a hostless one gets the global tenant selection on create,
+ * while the edit form shows a tenant select for it. Create
  * takes `?host=<id>` (from the host's detail page) and `?clone=<id>`.
  */
 function VirtualMachineForm(props: { id?: number }): JSX.Element {
@@ -105,10 +106,8 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 	const [roleId, setRoleId] = createSignal('')
 	const [hostId, setHostId] = createSignal<number | null>(parseId(queryParam('host')))
 	const [employeeId, setEmployeeId] = createSignal('')
-	const tenant = useTenantDefault(
-		() => null,
-		() => true,
-	)
+	// Edit only: see above.
+	const [tenantId, setTenantId] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_virtual_machine,
@@ -144,15 +143,18 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 		setRoleId(id_value(row.device_role_id))
 		setDescription(row.description ?? '')
 		setHostId(row.host_device_id)
-		// A clone keeps its tenant unless the global tenant selection decides.
-		if (props.id !== undefined || contextTenantId() === null) {
-			tenant.pick(id_value(row.tenant_id))
+		if (props.id !== undefined) {
+			setTenantId(id_value(row.tenant_id))
 		}
 	}
 
-	/** Tenant the VM ends up with: the host's, else the selected one. */
+	/** Tenant of a hostless VM. */
+	const ownTenantId = (): number | null =>
+		form.editing ? parseId(tenantId()) : newObjectTenantId()
+
+	/** Tenant the VM ends up with: the host's, else its own. */
 	const effectiveTenantId = (): number | null =>
-		hostId() === null ? parseId(tenant.value()) : (host()?.tenant_id ?? null)
+		hostId() === null ? ownTenantId() : (host()?.tenant_id ?? null)
 
 	function handleHostChange(device: DeviceRow | null): void {
 		setHostId(device?.id ?? null)
@@ -162,15 +164,28 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 	}
 
 	function handleTenantChange(value: string): void {
-		tenant.pick(value)
+		setTenantId(value)
 		setEmployeeId('')
 	}
+
+	// A new top-bar tenant drops the employee of a new hostless VM.
+	createEffect(
+		on(
+			newObjectTenantId,
+			() => {
+				if (!form.editing && hostId() === null) {
+					setEmployeeId('')
+				}
+			},
+			{ defer: true },
+		),
+	)
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		const id = props.id
 		const hostless = hostId() === null
-		const tenantId = parseId(tenant.value())
+		const tenant = ownTenantId()
 		await submit_form({
 			form,
 			name: name(),
@@ -182,7 +197,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 							device_role_id: Number(roleId()),
 							name: values.name,
 							description: text(description()),
-							...(hostless ? { tenant_id: tenantId } : {}),
+							...(hostless ? { tenant_id: tenant } : {}),
 							employee_id: parseId(employeeId()),
 						})
 					: update_virtual_machine(id, {
@@ -190,7 +205,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 							device_role_id: Number(roleId()),
 							name: values.name,
 							description: text(description()) ?? null,
-							...(hostless ? { tenant_id: tenantId } : {}),
+							...(hostless ? { tenant_id: tenant } : {}),
 							employee_id: parseId(employeeId()),
 						}),
 			navigateTo: backTo(),
@@ -205,6 +220,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 			name={form.record()?.name}
 			loadingText={t('vm.loadingOne')}
 			cancelTo={backTo()}
+			tenant={hostId() === null ? 'optional' : undefined}
 			onSubmit={handleSubmit}
 		>
 			<FormSection title={tp('entity.virtualMachine', 1)}>
@@ -244,11 +260,11 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					}
 					onChange={handleHostChange}
 				/>
-				<Show when={hostId() === null}>
+				<Show when={form.editing && hostId() === null}>
 					<SelectField
 						id={`${prefix}-tenant`}
 						label={tp('entity.tenant', 1)}
-						value={tenant.value()}
+						value={tenantId()}
 						onChange={handleTenantChange}
 						options={row_options(tenants() ?? [])}
 						emptyLabel={t('common.noTenant')}
