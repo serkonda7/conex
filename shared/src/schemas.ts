@@ -2346,6 +2346,10 @@ export const DeviceTypeYamlSchema = v.looseObject({
 	is_full_depth: v.optional(LooseBooleanSchema, true),
 	/** conex extension: device role name preselected for devices of this type. */
 	default_device_role: v.nullish(NameSchema, undefined),
+	/** conex extension: manufacturer article/part number. */
+	part_number: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	/** conex extension: link to the manufacturer's spec/datasheet. */
+	spec_url: v.nullish(WebsiteSchema, undefined),
 	description: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
 	comments: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined),
 })

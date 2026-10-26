@@ -266,6 +266,8 @@ async function importDeviceTypeDefinition(
 		u_height: item.u_height,
 		is_full_depth: item.is_full_depth,
 		default_device_role_id: defaultRoleId,
+		part_number: item.part_number ?? undefined,
+		spec_url: item.spec_url ?? undefined,
 		description: item.description ?? undefined,
 		comments: item.comments ?? undefined,
 	})
