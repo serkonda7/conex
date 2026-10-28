@@ -1073,8 +1073,6 @@ export const de: Messages = {
 	'integration.pickEmployee': 'Mitarbeiter auswählen…',
 	'integration.linkedTo': 'Verknüpft mit',
 	'integration.valueMismatch': 'conex: {local} · {provider}: {remote}',
-	'integration.onlyLocal': '{value} (nur in conex)',
-	'integration.onlyRemote': '{value} (nur in {provider})',
 	'integration.viewReport': 'Bericht',
 	'integration.viewTenants': 'Mandanten verknüpfen',
 	'integration.viewDevices': 'Geräte verknüpfen',

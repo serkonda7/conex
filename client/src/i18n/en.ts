@@ -1054,8 +1054,6 @@ export const en = {
 	'integration.pickEmployee': 'Choose an employee…',
 	'integration.linkedTo': 'Linked to',
 	'integration.valueMismatch': 'conex: {local} · {provider}: {remote}',
-	'integration.onlyLocal': '{value} (only in conex)',
-	'integration.onlyRemote': '{value} (only in {provider})',
 	'integration.viewReport': 'Report',
 	'integration.viewTenants': 'Link tenants',
 	'integration.viewDevices': 'Link devices',

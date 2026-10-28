@@ -91,19 +91,6 @@ function deviceLabel(d: ExternalDeviceJson): string {
 	return parts.join(' ')
 }
 
-/** Value of an equal (or one-sided) field comparison. */
-function fieldText(cmp: FieldComparison, provider: string): string {
-	const local = compareValueLabel(cmp.field, cmp.local)
-	const remote = compareValueLabel(cmp.field, cmp.remote)
-	if (local !== null && remote === null) {
-		return t('integration.onlyLocal', { value: local })
-	}
-	if (local === null && remote !== null) {
-		return t('integration.onlyRemote', { provider, value: remote })
-	}
-	return local ?? '—'
-}
-
 /** Link status of a device or employee, as the status endpoints return it. */
 interface LinkedStatus<E extends { external_id: string; name: string; active: boolean }> {
 	link: ExternalLinkJson | null
@@ -232,7 +219,9 @@ function LinkedObjectCard<E extends { external_id: string; name: string; active:
 									<dd>
 										<Show
 											when={!cmp.equal}
-											fallback={fieldText(cmp, providerLabel(provider()))}
+											fallback={
+												compareValueLabel(cmp.field, cmp.local) ?? '—'
+											}
 										>
 											<span class="text-danger">
 												{t('integration.valueMismatch', {
