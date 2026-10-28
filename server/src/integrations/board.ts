@@ -3,8 +3,8 @@
  * side, with their link state and unambiguous match suggestions. Tenants are
  * listed in full (global users only; inactive and private customers only when linked);
  * devices and employees per conex tenant, against the ones of the company
- * linked to it. Inactive devices/employees are ignored by default (hidden
- * unless toggled on, never suggested); linked ones stay visible as linked.
+ * linked to it. Inactive devices and external employees are ignored by default
+ * (hidden unless toggled on, never suggested); linked ones stay visible as linked.
  */
 import { eq, inArray } from 'drizzle-orm'
 import type {
@@ -314,9 +314,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 	const externalName = new Map(allExternal.map((e) => [e.external_id, e.name]))
 
 	const { auto, suggestions } = matchEmployees(
-		locals.filter(
-			(e) => e.active === 1 && !linkByEmployee.has(e.id) && !ignoredByEmployee.has(e.id),
-		),
+		locals.filter((e) => !linkByEmployee.has(e.id) && !ignoredByEmployee.has(e.id)),
 		externals.filter((e) => e.active && !linkByExternal.has(e.external_id)),
 	)
 	// Only offer a suggestion when the employee has exactly one candidate.
@@ -329,9 +327,8 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 		.map((e): LinkBoardLocal => {
 			const link = linkByEmployee.get(e.id)
 			const ignored = ignoredByEmployee.get(e.id)
-			const defaultIgnored = e.active !== 1 && link === undefined && ignored === undefined
 			const pairs = candidates.get(e.id) ?? []
-			const pair = pairs.length === 1 && !ignored && !defaultIgnored ? pairs[0] : undefined
+			const pair = pairs.length === 1 && !ignored ? pairs[0] : undefined
 			return {
 				id: e.id,
 				name: e.name,
@@ -341,7 +338,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 				link_id: link?.id ?? ignored?.id ?? null,
 				external_id: link?.external_id ?? null,
 				external_name: link ? (externalName.get(link.external_id) ?? null) : null,
-				ignored: ignored !== undefined || defaultIgnored,
+				ignored: ignored !== undefined,
 				suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
 			}
 		})
