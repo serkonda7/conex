@@ -16,6 +16,7 @@ import {
 	DEVICE_ROLE_ICONS,
 	type DeviceCompareField,
 	type DeviceRoleIcon,
+	type DeviceRoleKey,
 	EMPLOYEE_SALUTATIONS,
 	type EmployeeCompareField,
 	type EmployeeSalutation,
@@ -198,27 +199,27 @@ export function changeActionOptions(): { value: ChangeAction; label: string }[] 
 }
 
 const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
-	tenant_group: 'changeObject.tenantGroup',
-	tenant: 'changeObject.tenant',
-	employee: 'changeObject.employee',
-	site_group: 'changeObject.siteGroup',
-	site: 'changeObject.site',
-	location: 'changeObject.location',
-	rack: 'changeObject.rack',
-	shelf: 'changeObject.shelf',
-	device: 'changeObject.device',
-	virtual_machine: 'changeObject.virtualMachine',
+	tenant_group: 'entity.tenantGroup.one',
+	tenant: 'entity.tenant.one',
+	employee: 'entity.employee.one',
+	site_group: 'entity.siteGroup.one',
+	site: 'entity.site.one',
+	location: 'entity.location.one',
+	rack: 'entity.rack.one',
+	shelf: 'entity.shelf.one',
+	device: 'entity.device.one',
+	virtual_machine: 'entity.virtualMachine.one',
 	interface: 'changeObject.interface',
 	cable: 'changeObject.cable',
-	manufacturer: 'changeObject.manufacturer',
-	device_type: 'changeObject.deviceType',
-	rack_type: 'changeObject.rackType',
+	manufacturer: 'entity.manufacturer.one',
+	device_type: 'entity.deviceType.one',
+	rack_type: 'entity.rackType.one',
 	interface_template: 'changeObject.interfaceTemplate',
-	device_role: 'changeObject.deviceRole',
+	device_role: 'entity.deviceRole.one',
 	attachment: 'changeObject.attachment',
-	priority: 'changeObject.priority',
-	service_level: 'changeObject.serviceLevel',
-	managed_bundle: 'changeObject.managedBundle',
+	priority: 'entity.priority.one',
+	service_level: 'entity.serviceLevel.one',
+	managed_bundle: 'entity.managedBundle.one',
 }
 
 /** Changelog object type (`device`, `rack_type`, …). */
@@ -292,6 +293,35 @@ const DEVICE_ROLE_ICON_KEYS: Record<DeviceRoleIcon, MessageKey> = {
 	virtual: 'deviceRoleIcon.virtual',
 }
 
+const DEVICE_ROLE_KEY_KEYS: Record<DeviceRoleKey, MessageKey> = {
+	pc: 'deviceRoleKey.pc',
+	server: 'deviceRoleIcon.server',
+	ap: 'deviceRoleIcon.accessPoint',
+	firewall: 'deviceRoleIcon.firewall',
+	'cloud-key': 'deviceRoleKey.cloudKey',
+	switch: 'deviceRoleIcon.switch',
+	'patch-panel': 'deviceRoleIcon.patchPanel',
+	printer: 'deviceRoleIcon.printer',
+	modem: 'deviceRoleKey.modem',
+	telephony: 'deviceRoleKey.telephony',
+	ups: 'deviceRoleIcon.ups',
+}
+
+/** Device role name: built-in roles (`key` set) are localized, custom ones keep their name. */
+export function deviceRoleLabel(role: { name: string; key?: string | null }): string
+export function deviceRoleLabel(
+	role: { name: string; key?: string | null } | null | undefined,
+): string | undefined
+export function deviceRoleLabel(
+	role: { name: string; key?: string | null } | null | undefined,
+): string | undefined {
+	if (!role) {
+		return undefined
+	}
+	const key = role.key ? DEVICE_ROLE_KEY_KEYS[role.key as DeviceRoleKey] : undefined
+	return key ? t(key) : role.name
+}
+
 /** Device role icon (`server`, `access-point`, …). */
 export function deviceRoleIconLabel(value: string): string {
 	return lookup(DEVICE_ROLE_ICON_KEYS, value)
@@ -354,21 +384,21 @@ const COMPARE_FIELD_KEYS: Record<
 	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'tenant' | 'status',
 	MessageKey
 > = {
-	name: 'compareField.name',
-	customer_number: 'compareField.customer_number',
-	tenant: 'compareField.tenant',
-	status: 'compareField.status',
-	serial: 'compareField.serial',
+	name: 'common.name',
+	customer_number: 'tenant.customerNumber',
+	tenant: 'entity.tenant.one',
+	status: 'common.status',
+	serial: 'device.serial',
 	asset_tag: 'compareField.asset_tag',
-	manufacturer: 'compareField.manufacturer',
-	model: 'compareField.model',
-	first_name: 'compareField.first_name',
-	last_name: 'compareField.last_name',
-	salutation: 'compareField.salutation',
-	title: 'compareField.title',
-	email: 'compareField.email',
-	phone: 'compareField.phone',
-	mobile: 'compareField.mobile',
+	manufacturer: 'entity.manufacturer.one',
+	model: 'common.model',
+	first_name: 'employee.firstName',
+	last_name: 'employee.lastName',
+	salutation: 'employee.salutation',
+	title: 'employee.title',
+	email: 'employee.email',
+	phone: 'employee.phone',
+	mobile: 'employee.mobile',
 }
 
 /** Compared device or employee field (`serial`, `email`, …). */

@@ -25,6 +25,7 @@ import {
 } from '../../components/list_page'
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
+import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
@@ -81,15 +82,15 @@ export function DevicesPage(): JSX.Element {
 	const [employees] = createRows(fetch_all_employees, list.setError)
 	const employeeName = useNameOf(employees)
 	const typeName = useNameOf(types, (type) => type.model)
-	const roleName = useNameOf(roles)
+	const roleName = useNameOf(roles, deviceRoleLabel)
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
 	const roleFilterOptions = createMemo(() => {
 		const all = roles() ?? []
-		const paths = treePaths(all)
+		const paths = treePaths(all, deviceRoleLabel)
 		const icons = treeIcons(all)
 		return all.map((r) => ({
 			value: String(r.id),
-			label: paths.get(r.id) ?? r.name,
+			label: paths.get(r.id) ?? deviceRoleLabel(r),
 			icon: deviceRoleIcon(icons.get(r.id)),
 		}))
 	})
@@ -126,7 +127,7 @@ export function DevicesPage(): JSX.Element {
 			sortable: true,
 			getValue: (d: DeviceListItem): JSX.Element =>
 				d.kind === 'vm' ? (
-					<span>{t('vm.typeLabel')}</span>
+					<span>{t('entity.virtualMachine.one')}</span>
 				) : (
 					<a href={`/device-types/${d.device_type_id}`}>{typeName(d.device_type_id)}</a>
 				),
@@ -150,7 +151,7 @@ export function DevicesPage(): JSX.Element {
 			getValue: (d: DeviceListItem): JSX.Element => {
 				if (d.kind === 'vm') {
 					return d.host_device_id === null ? (
-						<span>{t('vm.cloud')}</span>
+						<span>{t('deviceRoleIcon.cloud')}</span>
 					) : (
 						<a href={`/devices/${d.host_device_id}`}>{d.host_name}</a>
 					)
@@ -200,8 +201,8 @@ export function DevicesPage(): JSX.Element {
 						key: 'kind',
 						label: t('vm.kind'),
 						options: [
-							{ value: 'device', label: t('vm.kindDevices') },
-							{ value: 'vm', label: t('vm.kindVms') },
+							{ value: 'device', label: t('entity.device.other') },
+							{ value: 'vm', label: t('entity.virtualMachine.other') },
 						],
 						value: filterKind,
 						onChange: setFilterKind,

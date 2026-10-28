@@ -6,19 +6,22 @@
  * tickets of a linked tenant, cached per company for `TICKET_CACHE_SECONDS`.
  */
 import { Result } from 'better-result'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { priorityLabel } from 'shared/src/priority'
 import type {
+	ExternalTicketJson,
 	IntegrationProvider as ProviderId,
 	TicketCreate,
 	TicketCreated,
 	TicketListJson,
 } from 'shared/src/schemas'
+import { getDb } from '../db/connection'
 import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { findOne } from '../db/list'
 import { devices, employees, priorities, tenants } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
+import { normalizeName } from './match'
 import { getIntegrationRow, providerFor } from './store'
 import type { ExternalTicket, IntegrationProvider } from './types'
 
@@ -104,6 +107,27 @@ export async function createTicket(
 	return Result.ok({ id: created.value })
 }
 
+/** Adds the local priority whose label matches a ticket tag (most urgent wins). */
+async function withPriorities(tickets: ExternalTicket[]): Promise<ExternalTicketJson[]> {
+	const rows = await getDb()
+		.select({
+			id: priorities.id,
+			name: priorities.name,
+			rank: priorities.rank,
+			color: priorities.color,
+		})
+		.from(priorities)
+		.orderBy(asc(priorities.rank), asc(priorities.name))
+	const byLabel = new Map(rows.map((row) => [normalizeName(priorityLabel(row)), row]))
+	return tickets.map((ticket) => ({
+		...ticket,
+		priority:
+			ticket.tags
+				.map((tag) => byLabel.get(normalizeName(tag)))
+				.find((row) => row !== undefined) ?? null,
+	}))
+}
+
 /** Open tickets of a tenant, newest change first. */
 export async function listTickets(
 	provider: ProviderId,
@@ -121,11 +145,16 @@ export async function listTickets(
 	if (Result.isError(row)) {
 		return row
 	}
-	const base_url = row.value.base_url.replace(/\/+$/, '')
+	const base_url = row.value.base_url.replace(/\/+$/, '').replace(/\/backend$/i, '')
 	const key = `${provider}:${company.external_id}`
 	const cached = ticketCache.get(key)
 	if (cached && nowSeconds() - cached.fetched_at < TICKET_CACHE_SECONDS) {
-		return Result.ok({ linked: true, base_url, ...cached })
+		return Result.ok({
+			linked: true,
+			base_url,
+			fetched_at: cached.fetched_at,
+			tickets: await withPriorities(cached.tickets),
+		})
 	}
 	if (!row.value.enabled) {
 		return Result.err(new ValidationError('Integration is disabled'))
@@ -149,5 +178,10 @@ export async function listTickets(
 		),
 	}
 	ticketCache.set(key, entry)
-	return Result.ok({ linked: true, base_url, ...entry })
+	return Result.ok({
+		linked: true,
+		base_url,
+		fetched_at: entry.fetched_at,
+		tickets: await withPriorities(entry.tickets),
+	})
 }

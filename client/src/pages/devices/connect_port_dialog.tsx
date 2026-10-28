@@ -206,7 +206,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			<ol class="connect-steps">
 				<li classList={{ active: !peerDevice(), done: Boolean(peerDevice()) }}>
 					<span class="connect-step-num">1</span>
-					{t('device.connectStepDevice')}
+					{t('entity.device.one')}
 				</li>
 				<li classList={{ active: Boolean(peerDevice()) }}>
 					<span class="connect-step-num">2</span>

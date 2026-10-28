@@ -37,7 +37,7 @@ import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
-import { locationTypeLabel } from '../../i18n/labels'
+import { deviceRoleLabel, locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
@@ -129,7 +129,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 			(vm) => vm.kind === 'vm' && vm.host_device_id !== null && hosts.has(vm.host_device_id),
 		)
 	}
-	const roleName = useNameOf(roles)
+	const roleName = useNameOf(roles, deviceRoleLabel)
 	const typeName = useNameOf(types, (row) => row.model)
 	const rackName = useNameOf(racks)
 	const locationName = useNameOf(locations)
@@ -168,7 +168,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: t('location.type'),
+			label: t('common.type'),
 			getValue: (l: LocationRow): JSX.Element => (
 				<IconLabel icon={locationTypeIcon(l.type)}>{locationTypeLabel(l.type)}</IconLabel>
 			),
@@ -314,7 +314,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 						<Show when={images.floorplan()}>
 							{(plan: () => AttachmentJson) => (
 								<>
-									<dt>{t('floorplan.title')}</dt>
+									<dt>{t('entity.floorplan.one')}</dt>
 									<dd>
 										<a href={`/floorplans/${plan().id}`}>
 											{t('floorplan.open')}

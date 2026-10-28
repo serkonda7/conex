@@ -8,6 +8,7 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
+import { PriorityPill } from '../../components/priority_pill'
 import { t } from '../../i18n'
 import { createRecord } from '../../lib/resource'
 
@@ -44,6 +45,13 @@ export function PriorityDetailPage(props: { id: number }): JSX.Element {
 				<DetailCard label={t('priority.details')}>
 					<dt>{t('priority.rank')}</dt>
 					<dd>{priority()?.rank}</dd>
+					<dt>{t('priority.color')}</dt>
+					<dd>
+						<PriorityPill
+							name={priority()?.name ?? ''}
+							color={priority()?.color ?? '#6b7280'}
+						/>
+					</dd>
 				</DetailCard>
 			</DetailShell>
 

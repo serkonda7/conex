@@ -207,7 +207,7 @@ function TenantForm(props: { id?: number }): JSX.Element {
 					<PhoneInputs id={`${prefix}-phone-${index}`} entry={entry} update={update} />
 				)}
 			/>
-			<FormSection title={t('tenant.bundles')}>
+			<FormSection title={t('entity.managedBundle.other')}>
 				<Show when={bundles() !== undefined && bundles()?.length === 0}>
 					<Hint>{t('tenant.noBundleCatalog')}</Hint>
 				</Show>

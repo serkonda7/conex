@@ -4,7 +4,7 @@ import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
-import { create_manufacturer, fetch_manufacturers, update_device_type } from '../../api/templates'
+import { fetch_manufacturers, update_device_type } from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
@@ -27,9 +27,8 @@ interfaces:
  * /device-types/import — NetBox YAML import for device types (no manual add form).
  * Posts the file text as `{ yaml }` JSON. The import is all-or-nothing: if any
  * document fails, nothing is created and the response reports per-row errors
- * below. The pasted text is kept on failure; rows failing on an unknown
- * manufacturer offer to create it, rows clashing with an existing device type
- * offer to rename the existing one.
+ * below. The pasted text is kept on failure; rows clashing with an existing
+ * device type offer to rename the existing one.
  */
 export function DeviceTypeImportPage(): JSX.Element {
 	const [promptManufacturerId, setPromptManufacturerId] = createSignal('')
@@ -44,8 +43,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 	const [results, setResults] = createSignal<ImportRowResult[] | null>(null)
 	const [created, setCreated] = createSignal(0)
 	const [failed, setFailed] = createSignal(0)
-	const [createdManufacturers, setCreatedManufacturers] = createSignal<string[]>([])
-	const [creatingManufacturer, setCreatingManufacturer] = createSignal<string | null>(null)
 	/** Existing device type ids renamed since the last import, with their new model. */
 	const [renamedTypes, setRenamedTypes] = createSignal<Record<number, string>>({})
 	const [renameDraft, setRenameDraft] = createSignal<{ id: number; model: string } | null>(null)
@@ -87,18 +84,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 			return
 		}
 		setPromptCopied(true)
-	}
-
-	async function handleCreateManufacturer(name: string): Promise<void> {
-		setError(null)
-		setCreatingManufacturer(name)
-		const res = await create_manufacturer({ name })
-		setCreatingManufacturer(null)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		setCreatedManufacturers((prev) => [...prev, name])
 	}
 
 	async function handleRenameType(e: SubmitEvent): Promise<void> {
@@ -177,7 +162,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 		e.preventDefault()
 		setError(null)
 		setResults(null)
-		setCreatedManufacturers([])
 		setRenamedTypes({})
 		setRenameDraft(null)
 		if (!yamlText().trim()) {
@@ -208,7 +192,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 				aria-describedby="device-type-prompt-hint"
 			>
 				<h3 id="device-type-prompt-title">{t('import.aiTitle')}</h3>
-				<p class="field-hint" id="device-type-prompt-hint">
+				<p class="field-hint import-prompt-hint" id="device-type-prompt-hint">
 					{t('import.aiHint')}
 				</p>
 				<div class="import-prompt-controls">
@@ -349,117 +333,13 @@ export function DeviceTypeImportPage(): JSX.Element {
 										</span>
 									)
 								}
-								const name = r.unknown_manufacturer
-								if (name === undefined) {
-									return r.error ?? '—'
-								}
-								return (
-									<span>
-										{r.error}{' '}
-										<Show
-											when={!createdManufacturers().includes(name)}
-											fallback={t('import.manufacturerCreated', { name })}
-										>
-											<button
-												type="button"
-												disabled={creatingManufacturer() !== null}
-												onClick={() => void handleCreateManufacturer(name)}
-											>
-												{t('import.createManufacturer', { name })}
-											</button>
-										</Show>
-									</span>
-								)
+								return r.error ?? '—'
 							},
 						},
 					]}
 					emptyContent={<Empty message={t('import.noRows')} />}
 				/>
 			</Show>
-			<section class="import-field-options" aria-labelledby="device-type-import-fields">
-				<h3 id="device-type-import-fields">{t('import.fieldOptions')}</h3>
-				<table class="import-field-options-table">
-					<thead>
-						<tr>
-							<th scope="col">{t('import.field')}</th>
-							<th scope="col">{t('import.required')}</th>
-							<th scope="col">{t('common.description')}</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr>
-							<td>manufacturer</td>
-							<td>{t('common.yes')}</td>
-							<td>{t('import.fieldManufacturer')}</td>
-						</tr>
-						<tr>
-							<td>model</td>
-							<td>{t('common.yes')}</td>
-							<td>{t('import.fieldModel')}</td>
-						</tr>
-						<tr>
-							<td>u_height</td>
-							<td>—</td>
-							<td>{t('import.fieldUHeight')}</td>
-						</tr>
-						<tr>
-							<td>is_full_depth</td>
-							<td>—</td>
-							<td>{t('import.fieldFullDepth')}</td>
-						</tr>
-						<tr>
-							<td>default_device_role</td>
-							<td>—</td>
-							<td>{t('import.fieldDefaultRole')}</td>
-						</tr>
-						<tr>
-							<td>description</td>
-							<td>—</td>
-							<td>{t('import.fieldDescription')}</td>
-						</tr>
-						<tr>
-							<td>comments</td>
-							<td>—</td>
-							<td>{t('import.fieldComments')}</td>
-						</tr>
-						<tr>
-							<td>interfaces</td>
-							<td>—</td>
-							<td>{t('import.fieldInterfaces')}</td>
-						</tr>
-						<tr>
-							<td>ports</td>
-							<td>—</td>
-							<td>{t('import.fieldPorts')}</td>
-						</tr>
-						<tr>
-							<td>power-ports</td>
-							<td>—</td>
-							<td>{t('import.fieldPowerPorts')}</td>
-						</tr>
-						<tr>
-							<td>power-outlets</td>
-							<td>—</td>
-							<td>{t('import.fieldPowerOutlets')}</td>
-						</tr>
-						<tr>
-							<td>display-ports</td>
-							<td>—</td>
-							<td>{t('import.fieldDisplayPorts')}</td>
-						</tr>
-						<tr>
-							<td>rear-ports</td>
-							<td>—</td>
-							<td>{t('import.fieldRearPorts')}</td>
-						</tr>
-						<tr>
-							<td>front-ports</td>
-							<td>—</td>
-							<td>{t('import.fieldFrontPorts')}</td>
-						</tr>
-					</tbody>
-				</table>
-			</section>
 		</div>
 	)
 }

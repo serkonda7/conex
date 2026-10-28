@@ -88,7 +88,7 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 							mainNumber={primaryPhone(tenant()?.phones ?? [], 'phone')}
 						/>
 					</dd>
-					<dt>{t('employee.status')}</dt>
+					<dt>{t('common.status')}</dt>
 					<dd>
 						<EmployeeStatus active={employee()?.active ?? 1} />
 					</dd>

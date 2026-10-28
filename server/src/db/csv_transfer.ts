@@ -4,10 +4,13 @@ import { alias } from 'drizzle-orm/pg-core'
 import {
 	CableImportRowSchema,
 	DeviceImportRowSchema,
+	DeviceTypeYamlSchema,
 	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
 	type ImportResponse,
 	type ImportRowResult,
+	NETBOX_INTERFACE_TYPES,
+	PASS_THROUGH_PORT_TYPES,
 	type PortSide,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
@@ -21,6 +24,7 @@ import {
 	racks,
 	sites,
 } from '../schema'
+import { collapseRuns, expandNameTemplate } from '../services/templates'
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
 import { cableInTenant, connectCable } from './cables'
@@ -118,16 +122,30 @@ export async function importDeviceTypesYaml(text: string): Promise<Result<Import
 	// Snapshot before the transaction so models created by earlier rows of
 	// this import count as in-file duplicates, not as existing types.
 	const existing = new Map(
-		(await getDb().select().from(device_types)).map((r) => [r.model, r.id]),
+		(await getDb().select().from(device_types)).map((r) => [
+			typeKey(r.manufacturer_id, r.model),
+			r.id,
+		]),
 	)
-	const seen = new Set<string>()
+	const manufacturerByName = new Map(
+		(await getDb().select().from(manufacturers)).map((r) => [matchKey(r.name), r]),
+	)
+	const roleByName = new Map(
+		(await getDb().select().from(device_roles)).map((r) => [matchKey(r.name), r.id]),
+	)
+	const lookups: DeviceTypeLookups = {
+		existing,
+		seen: new Set<string>(),
+		manufacturerByName,
+		roleByName,
+	}
 	const rows: ImportRowResult[] = []
 	try {
 		await withTransaction(async () => {
 			for (const [index, definition] of definitions.entries()) {
 				rows.push({
 					row: index + 1,
-					...(await importDeviceTypeRow(definition, existing, seen)),
+					...(await importDeviceTypeRow(definition, lookups)),
 				})
 			}
 			if (rows.some((r) => !r.ok)) {
@@ -162,12 +180,11 @@ class RowRollback extends Error {
  */
 async function importDeviceTypeRow(
 	definition: unknown,
-	existing: Map<string, number>,
-	seen: Set<string>,
+	lookups: DeviceTypeLookups,
 ): Promise<Omit<ImportRowResult, 'row'>> {
 	try {
 		return await withTransaction(async () => {
-			const result = await importDeviceTypeDefinition(definition, existing, seen)
+			const result = await importDeviceTypeDefinition(definition, lookups)
 			if (!result.ok) {
 				throw new RowRollback(result)
 			}
@@ -181,93 +198,78 @@ async function importDeviceTypeRow(
 	}
 }
 
+/** Lookups shared by all rows of one device-type YAML import. */
+interface DeviceTypeLookups {
+	/** Existing types by `typeKey`, snapshotted before the import. */
+	existing: Map<string, number>
+	/** `typeKey`s already seen in this import. */
+	seen: Set<string>
+	manufacturerByName: Map<string, typeof manufacturers.$inferSelect>
+	roleByName: Map<string, number>
+}
+
+/** Device-type identity: a model is unique per manufacturer, not globally. */
+function typeKey(manufacturerId: number, model: string): string {
+	return `${manufacturerId}:${matchKey(model)}`
+}
+
+/** Name-matching key: names match case-insensitively and ignore surrounding whitespace. */
+function matchKey(name: string): string {
+	return name.trim().toLowerCase()
+}
+
 /**
- * Creates one NetBox device-type definition with its ports. Models must be
- * unique: device CSV import resolves types by model alone.
+ * Creates one NetBox device-type definition with its ports. Models are
+ * unique per manufacturer; the same model name from another vendor is a
+ * different type.
  */
 async function importDeviceTypeDefinition(
 	definition: unknown,
-	existing: Map<string, number>,
-	seen: Set<string>,
+	lookups: DeviceTypeLookups,
 ): Promise<Omit<ImportRowResult, 'row'>> {
+	const { existing, seen } = lookups
 	const fail = (error: string): Omit<ImportRowResult, 'row'> => ({ ok: false, id: null, error })
-	if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
-		return fail('Each YAML document must be a mapping')
+	const parsed = v.safeParse(DeviceTypeYamlSchema, definition)
+	if (!parsed.success) {
+		return fail(formatValibotIssues(parsed.issues))
 	}
-	const item = definition as Record<string, unknown>
-	const manufacturer = typeof item.manufacturer === 'string' ? item.manufacturer.trim() : ''
-	const model = typeof item.model === 'string' ? item.model.trim() : ''
-	if (!manufacturer || !model) {
-		return fail('manufacturer and model are required by NetBox YAML')
+	const item = parsed.output
+	const mfr = lookups.manufacturerByName.get(matchKey(item.manufacturer))
+	if (!mfr) {
+		return fail(`Unknown manufacturer "${item.manufacturer}"`)
 	}
-	const existingId = existing.get(model)
+	const modelKey = typeKey(mfr.id, item.model)
+	const existingId = existing.get(modelKey)
 	if (existingId !== undefined) {
 		return {
 			...fail('Already exists'),
-			existing_device_type: { id: existingId, model },
+			existing_device_type: { id: existingId, model: item.model },
 		}
 	}
-	if (seen.has(model)) {
+	if (seen.has(modelKey)) {
 		return fail('Duplicate in this import')
 	}
-	seen.add(model)
-	const mfr = (await getDb().select().from(manufacturers)).find(
-		(row) => row.name.toLowerCase() === manufacturer.toLowerCase(),
-	)
-	if (!mfr) {
-		return {
-			...fail(`Unknown manufacturer "${manufacturer}"`),
-			unknown_manufacturer: manufacturer,
-		}
-	}
-	const height = item.u_height === undefined ? 1 : Number(item.u_height)
-	if (!Number.isInteger(height) || height < 0 || height > 60) {
-		return fail('u_height must be an integer between 0 and 60')
-	}
-	let fullDepth = true
-	if (item.is_full_depth !== undefined) {
-		if (typeof item.is_full_depth === 'boolean') {
-			fullDepth = item.is_full_depth
-		} else if (typeof item.is_full_depth === 'number') {
-			fullDepth = item.is_full_depth !== 0
-		} else if (typeof item.is_full_depth === 'string') {
-			const s = item.is_full_depth.trim().toLowerCase()
-			if (s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === '') {
-				fullDepth = true
-			} else if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
-				fullDepth = false
-			} else {
-				return fail('is_full_depth must be a boolean (true/false)')
-			}
-		} else {
-			return fail('is_full_depth must be a boolean (true/false)')
-		}
-	}
+	seen.add(modelKey)
 	// conex extension: optional role preselected for devices of this type,
 	// matched by name like the manufacturer.
 	let defaultRoleId: number | null = null
-	if (item.default_device_role !== undefined && item.default_device_role !== null) {
-		const roleName =
-			typeof item.default_device_role === 'string' ? item.default_device_role.trim() : ''
-		if (!roleName) {
-			return fail('default_device_role must be a device role name')
+	if (item.default_device_role) {
+		const roleId = lookups.roleByName.get(matchKey(item.default_device_role))
+		if (roleId === undefined) {
+			return fail(`Unknown default_device_role "${item.default_device_role}"`)
 		}
-		const role = (await getDb().select().from(device_roles)).find(
-			(row) => row.name.toLowerCase() === roleName.toLowerCase(),
-		)
-		if (!role) {
-			return fail(`Unknown default_device_role "${roleName}"`)
-		}
-		defaultRoleId = role.id
+		defaultRoleId = roleId
 	}
 	const created = await createDeviceType({
 		manufacturer_id: mfr.id,
-		model,
-		u_height: height,
-		is_full_depth: fullDepth,
+		model: item.model,
+		u_height: item.u_height,
+		is_full_depth: item.is_full_depth,
 		default_device_role_id: defaultRoleId,
-		description: typeof item.description === 'string' ? item.description : undefined,
-		comments: typeof item.comments === 'string' ? item.comments : undefined,
+		part_number: item.part_number ?? undefined,
+		spec_url: item.spec_url ?? undefined,
+		description: item.description ?? undefined,
+		comments: item.comments ?? undefined,
 	})
 	if (Result.isError(created)) {
 		return fail(created.error.message)
@@ -276,84 +278,120 @@ async function importDeviceTypeDefinition(
 	if (passThrough !== null) {
 		return fail(passThrough)
 	}
-	for (const [key, defaultKind] of [
-		['interfaces', 'ethernet'],
-		['ports', 'port'],
+	// Allowed NetBox `type` values per list (`null`: not checked). A missing
+	// type takes the list's default kind; a `null` default means required.
+	const componentLists: Array<[string, string | null, readonly string[] | null]> = [
+		['interfaces', 'ethernet', Object.keys(NETBOX_INTERFACE_TYPES)],
+		['ports', 'port', [...GENERAL_PORT_KINDS, 'other']],
 		// NetBox's name for general ports.
-		['console-ports', 'port'],
-		['power-ports', 'power'],
-		['power-outlets', 'power-outlet'],
-		['display-ports', null],
-	] as const) {
-		const ports = item[key]
-		if (!Array.isArray(ports)) {
-			continue
+		['console-ports', 'port', [...GENERAL_PORT_KINDS, 'other']],
+		['power-ports', 'power', null],
+		['power-outlets', 'power-outlet', null],
+		['display-ports', null, DISPLAY_PORT_KINDS],
+	]
+	const groups = new Map<
+		string,
+		{
+			key: string
+			kind: string
+			label: string | undefined
+			description: string | undefined
+			names: string[]
 		}
-		for (const component of ports) {
-			if (!component || typeof component !== 'object' || Array.isArray(component)) {
-				continue
-			}
-			const port = component as Record<string, unknown>
-			const name = typeof port.name === 'string' ? port.name.trim() : ''
+	>()
+	for (const [key, defaultKind, allowed] of componentLists) {
+		const components = componentsOf(key, item[key])
+		if (Result.isError(components)) {
+			return fail(components.error.message)
+		}
+		for (const port of components.value) {
+			const name = nameOf(port)
 			if (!name) {
-				continue
+				return fail(`${key}: entry without a name`)
 			}
 			// NetBox interface types may be a list; the first entry wins.
 			// Ports keep a known connector type (usb-c, rj-45, …) as kind;
-			// `other`, missing and unknown types fall back to `port`.
+			// `other` is stored as the plain `port`. Any other type is an error.
 			// Power ports and outlets keep their class as kind (the device
 			// detail page splits ports on it), dropping the connector type.
 			// Display ports (not a NetBox class) keep their connector type as
-			// kind, so it must be one of the known display kinds.
+			// kind.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
-			let kind: string
-			if (defaultKind === null) {
-				const displayKind = DISPLAY_PORT_KINDS.find((k) => k === type)
-				if (!displayKind) {
-					return fail(
-						`${key} "${name}": type must be one of ${DISPLAY_PORT_KINDS.join(', ')}`,
-					)
+			let kind: string | null = defaultKind
+			if (allowed !== null && type !== undefined && type !== null) {
+				if (typeof type !== 'string' || !allowed.includes(type)) {
+					return fail(`${key} "${name}": type must be one of ${allowed.join(', ')}`)
 				}
-				kind = displayKind
-			} else if (key === 'ports' || key === 'console-ports') {
-				kind = GENERAL_PORT_KINDS.find((k) => k === type) ?? defaultKind
-			} else {
-				kind =
-					key !== 'interfaces' || type === undefined || type === null
-						? defaultKind
-						: String(type)
+				kind = type === 'other' && key !== 'interfaces' ? 'port' : type
 			}
-			const stub = await createStub(created.value.id, {
-				prefix: name,
-				count: 1,
+			if (kind === null) {
+				return fail(`${key} "${name}": type is required`)
+			}
+			const names = expandNameTemplate(name)
+			if (Result.isError(names)) {
+				return fail(`${key} "${name}": ${names.error.message}`)
+			}
+			const label =
+				key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined
+			const description = typeof port.description === 'string' ? port.description : undefined
+			// A stub carries one kind, label and description, so ports only
+			// collapse into one stub when all three match.
+			const groupKey = JSON.stringify([key, kind, label ?? null, description ?? null])
+			const group = groups.get(groupKey) ?? {
+				key,
 				kind,
-				label:
-					key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined,
-				description: typeof port.description === 'string' ? port.description : undefined,
+				label,
+				description,
+				names: [],
+			}
+			group.names.push(...names.value)
+			groups.set(groupKey, group)
+		}
+	}
+	for (const group of groups.values()) {
+		for (const run of collapseRuns(group.names)) {
+			const stub = await createStub(created.value.id, {
+				prefix: run.prefix,
+				count: run.count,
+				kind: group.kind,
+				label: group.label,
+				description: group.description,
 			})
 			if (Result.isError(stub)) {
-				return fail(`${key} "${name}": ${stub.error.message}`)
+				return fail(`${group.key} "${run.prefix}": ${stub.error.message}`)
 			}
 		}
 	}
 	return { ok: true, id: created.value.id, error: null }
 }
 
-/** Mappings of one YAML component list; non-mapping entries are skipped. */
-function componentsOf(list: unknown): Record<string, unknown>[] {
-	if (!Array.isArray(list)) {
-		return []
+/** Mappings of one YAML component list; any other entry is an error. */
+function componentsOf(key: string, list: unknown): Result<Record<string, unknown>[], Error> {
+	if (list === undefined) {
+		return Result.ok([])
 	}
-	return list.filter(
-		(c): c is Record<string, unknown> =>
-			Boolean(c) && typeof c === 'object' && !Array.isArray(c),
-	)
+	if (!Array.isArray(list)) {
+		return Result.err(new Error(`${key} must be a list`))
+	}
+	const mappings: Record<string, unknown>[] = []
+	for (const entry of list) {
+		if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+			return Result.err(new Error(`${key}: entries must be mappings`))
+		}
+		mappings.push(entry as Record<string, unknown>)
+	}
+	return Result.ok(mappings)
 }
 
-/** NetBox port type (`8p8c`, `lc`, `mpo`, …) as the stored kind; `other` when missing. */
-function passThroughKindOf(port: Record<string, unknown>): string {
+/** Trimmed `name` of a YAML port entry, or an empty string when missing. */
+function nameOf(port: Record<string, unknown>): string {
+	return typeof port.name === 'string' ? port.name.trim() : ''
+}
+
+/** NetBox port type (`8p8c`, `lc`, `mpo`, …) as the stored kind; null when not a known pass-through type. */
+function passThroughKindOf(port: Record<string, unknown>): string | null {
 	const type = typeof port.type === 'string' ? port.type.trim() : ''
-	return type || 'other'
+	return Object.keys(PASS_THROUGH_PORT_TYPES).includes(type) ? type : null
 }
 
 /**
@@ -369,43 +407,73 @@ async function importPassThroughPorts(
 	item: Record<string, unknown>,
 ): Promise<string | null> {
 	const rearByName = new Map<string, number>()
-	for (const port of componentsOf(item['rear-ports'])) {
-		const name = typeof port.name === 'string' ? port.name.trim() : ''
+	const rears = componentsOf('rear-ports', item['rear-ports'])
+	if (Result.isError(rears)) {
+		return rears.error.message
+	}
+	for (const port of rears.value) {
+		const name = nameOf(port)
 		if (!name) {
-			continue
+			return 'rear-ports: entry without a name'
 		}
 		const positions = port.positions === undefined ? 1 : Number(port.positions)
 		if (!Number.isInteger(positions) || positions < 1) {
 			return `rear-ports "${name}": positions must be an integer of at least 1`
 		}
-		const stub = await createStub(deviceTypeId, {
-			prefix: name,
-			count: 1,
-			kind: passThroughKindOf(port),
-			label: typeof port.label === 'string' ? port.label : undefined,
-			description: typeof port.description === 'string' ? port.description : undefined,
-			side: 'rear',
-			positions,
-		})
-		if (Result.isError(stub)) {
-			return `rear-ports "${name}": ${stub.error.message}`
+		const kind = passThroughKindOf(port)
+		if (kind === null) {
+			return `rear-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
 		}
-		rearByName.set(name, stub.value.id)
+		const names = expandNameTemplate(name)
+		if (Result.isError(names)) {
+			return `rear-ports "${name}": ${names.error.message}`
+		}
+		for (const prefix of names.value) {
+			const stub = await createStub(deviceTypeId, {
+				prefix,
+				count: 1,
+				kind,
+				label: typeof port.label === 'string' ? port.label : undefined,
+				description: typeof port.description === 'string' ? port.description : undefined,
+				side: 'rear',
+				positions,
+			})
+			if (Result.isError(stub)) {
+				return `rear-ports "${prefix}": ${stub.error.message}`
+			}
+			rearByName.set(prefix, stub.value.id)
+		}
 	}
 	// NetBox 4.3+ moves the mapping out of the front port into a top-level
 	// `port-mappings` list (`{front_port, front_port_position, rear_port,
 	// rear_port_position}`); the first mapping of a front port wins.
 	const mappingByFront = new Map<string, Record<string, unknown>>()
-	for (const mapping of componentsOf(item['port-mappings'])) {
+	const mappings = componentsOf('port-mappings', item['port-mappings'])
+	if (Result.isError(mappings)) {
+		return mappings.error.message
+	}
+	for (const mapping of mappings.value) {
 		const front = typeof mapping.front_port === 'string' ? mapping.front_port.trim() : ''
 		if (front && !mappingByFront.has(front)) {
 			mappingByFront.set(front, mapping)
 		}
 	}
-	for (const port of componentsOf(item['front-ports'])) {
-		const name = typeof port.name === 'string' ? port.name.trim() : ''
+	const fronts = componentsOf('front-ports', item['front-ports'])
+	if (Result.isError(fronts)) {
+		return fronts.error.message
+	}
+	for (const port of fronts.value) {
+		const name = nameOf(port)
 		if (!name) {
-			continue
+			return 'front-ports: entry without a name'
+		}
+		const names = expandNameTemplate(name)
+		if (Result.isError(names)) {
+			return `front-ports "${name}": ${names.error.message}`
+		}
+		// A front port takes one rear slot, so a name template cannot expand.
+		if (names.value.length !== 1) {
+			return `front-ports "${name}": name templates are not supported on front ports`
 		}
 		const source = port.rear_port === undefined ? (mappingByFront.get(name) ?? port) : port
 		const rearName = typeof source.rear_port === 'string' ? source.rear_port.trim() : ''
@@ -418,10 +486,14 @@ async function importPassThroughPorts(
 		if (!Number.isInteger(position) || position < 1) {
 			return `front-ports "${name}": rear_port_position must be an integer of at least 1`
 		}
+		const kind = passThroughKindOf(port)
+		if (kind === null) {
+			return `front-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
+		}
 		const stub = await createStub(deviceTypeId, {
-			prefix: name,
+			prefix: names.value[0] ?? name,
 			count: 1,
-			kind: passThroughKindOf(port),
+			kind,
 			label: typeof port.label === 'string' ? port.label : undefined,
 			description: typeof port.description === 'string' ? port.description : undefined,
 			side: 'front',
@@ -575,20 +647,29 @@ export async function importDevicesCsv(
 	scopeTenantId?: number,
 ): Promise<Result<ImportResponse, Error>> {
 	const db = getDb()
-	const typeByModel = new Map((await db.select().from(device_types)).map((r) => [r.model, r.id]))
-	const roleByName = new Map((await db.select().from(device_roles)).map((r) => [r.name, r.id]))
-	const siteByName = new Map((await db.select().from(sites)).map((r) => [r.name, r]))
-	const rackByName = new Map((await db.select().from(racks)).map((r) => [r.name, r]))
+	const typesByModel = new Map<string, number[]>()
+	for (const r of await db.select().from(device_types)) {
+		typesByModel.set(matchKey(r.model), [...(typesByModel.get(matchKey(r.model)) ?? []), r.id])
+	}
+	const roleByName = new Map(
+		(await db.select().from(device_roles)).map((r) => [matchKey(r.name), r.id]),
+	)
+	const siteByName = new Map((await db.select().from(sites)).map((r) => [matchKey(r.name), r]))
+	const rackByName = new Map((await db.select().from(racks)).map((r) => [matchKey(r.name), r]))
 	return importCsvRows(text, DeviceImportRowSchema, async (input) => {
-		const typeId = typeByModel.get(input.device_type_model)
-		if (!typeId) {
+		const typeIds = typesByModel.get(matchKey(input.device_type_model)) ?? []
+		if (typeIds.length === 0) {
 			return `Unknown device_type_model "${input.device_type_model}"`
 		}
-		const roleId = roleByName.get(input.device_role_name)
+		if (typeIds.length > 1) {
+			return `Ambiguous device_type_model "${input.device_type_model}": ${typeIds.length} device types share this model`
+		}
+		const [typeId] = typeIds
+		const roleId = roleByName.get(matchKey(input.device_role_name))
 		if (!roleId) {
 			return `Unknown device_role_name "${input.device_role_name}"`
 		}
-		const site = input.site_name ? siteByName.get(input.site_name) : undefined
+		const site = input.site_name ? siteByName.get(matchKey(input.site_name)) : undefined
 		if (input.site_name) {
 			if (!site) {
 				return `Unknown site_name "${input.site_name}"`
@@ -597,7 +678,7 @@ export async function importDevicesCsv(
 				return `Site "${input.site_name}" is outside your tenant scope`
 			}
 		}
-		const rack = input.rack_name ? rackByName.get(input.rack_name) : undefined
+		const rack = input.rack_name ? rackByName.get(matchKey(input.rack_name)) : undefined
 		if (input.rack_name) {
 			if (!rack) {
 				return `Unknown rack_name "${input.rack_name}"`

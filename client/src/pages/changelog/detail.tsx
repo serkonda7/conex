@@ -78,9 +78,9 @@ export function ChangeDetailPage(props: { id: number }): JSX.Element {
 							<DetailCard label={t('changelog.summary')}>
 								<dt>{t('changelog.time')}</dt>
 								<dd>{formatTime(c().created_at)}</dd>
-								<dt>{t('changelog.user')}</dt>
+								<dt>{t('entity.user.one')}</dt>
 								<dd>{changeUser(c())}</dd>
-								<dt>{t('changelog.objectType')}</dt>
+								<dt>{t('common.type')}</dt>
 								<dd>{changeObjectLabel(c().object_type)}</dd>
 								<dt>{t('changelog.object')}</dt>
 								<dd>

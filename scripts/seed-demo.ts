@@ -480,7 +480,7 @@ await db.insert(shelves).values({
 	mount_height: 1,
 	mount_usable: 0,
 	reserved_height: 3,
-	is_full_depth: 1,
+	is_full_depth: true,
 	description: 'Fachboden für Modem und Cloud Key.',
 })
 async function addInterfaces(

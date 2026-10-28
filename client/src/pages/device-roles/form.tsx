@@ -18,7 +18,7 @@ import {
 } from '../../components/form'
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
-import { deviceRoleIconOptions } from '../../i18n/labels'
+import { deviceRoleIconOptions, deviceRoleLabel } from '../../i18n/labels'
 import {
 	type FormValues,
 	id_value,
@@ -74,13 +74,13 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 				}
 			}
 		}
-		const paths = treePaths(all)
+		const paths = treePaths(all, deviceRoleLabel)
 		const icons = treeIcons(all)
 		return all
 			.filter((role) => !excluded.has(role.id))
 			.map((role) => ({
 				value: role.id,
-				label: paths.get(role.id) ?? role.name,
+				label: paths.get(role.id) ?? deviceRoleLabel(role),
 				icon: deviceRoleIcon(icons.get(role.id)),
 			}))
 	})

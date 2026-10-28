@@ -280,11 +280,13 @@ export async function createDeviceType(
 		manufacturer_id: input.manufacturer_id,
 		model: input.model,
 		u_height: uHeight,
-		is_full_depth: (input.is_full_depth ?? true) ? 1 : 0,
+		is_full_depth: input.is_full_depth ?? true,
 		form_factor: input.form_factor ?? null,
 		// Rack types use the standard 19-inch mounting width. Keep the generic
 		// device-type API's other width options for non-rack device types.
 		width: input.form_factor !== undefined ? 19 : (input.width ?? null),
+		part_number: input.part_number || null,
+		spec_url: input.spec_url ?? null,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 		default_device_role_id: input.default_device_role_id ?? null,
@@ -329,7 +331,7 @@ async function checkMountedHeight(
 			position_u: device.position_u,
 			height_u: uHeight,
 			face: faceOf(device.face),
-			is_full_depth: type.is_full_depth !== 0,
+			is_full_depth: type.is_full_depth,
 		}
 		const bounds = checkBounds(candidate, await rackHeightOf(rack), label)
 		if (Result.isError(bounds)) {
@@ -394,12 +396,14 @@ export async function updateDeviceType(
 		'model',
 		'u_height',
 		'form_factor',
+		'part_number',
+		'spec_url',
 		'description',
 		'comments',
 		'default_device_role_id',
 	])
 	if (input.is_full_depth !== undefined) {
-		patch.is_full_depth = input.is_full_depth ? 1 : 0
+		patch.is_full_depth = input.is_full_depth
 	}
 	if (effectiveFormFactor !== null) {
 		patch.width = 19

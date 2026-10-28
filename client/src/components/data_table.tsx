@@ -71,7 +71,7 @@ export function FilterTable<TRow>(
 			yesLabel: t('common.yes'),
 			noLabel: t('common.no'),
 			savedFiltersLabel: t('table.savedFilters'),
-			saveLabel: t('table.saveFilter'),
+			saveLabel: t('common.save'),
 			saveNameLabel: t('table.filterName'),
 			cancelLabel: t('common.cancel'),
 			clearSavedFilterLabel: t('table.clearSavedFilter'),
@@ -99,13 +99,15 @@ export function FilterTable<TRow>(
 export function nameColumn<TRow extends { id: number; name: string }>(
 	label: string,
 	base: string,
-	opts?: { sortable?: boolean },
+	opts?: { sortable?: boolean; rowLabel?: (row: TRow) => string },
 ): DataTableColumn<TRow> {
 	return {
 		key: 'name',
 		label,
 		sortable: opts?.sortable,
-		getValue: (row: TRow): JSX.Element => <a href={`${base}/${row.id}`}>{row.name}</a>,
+		getValue: (row: TRow): JSX.Element => (
+			<a href={`${base}/${row.id}`}>{opts?.rowLabel ? opts.rowLabel(row) : row.name}</a>
+		),
 	}
 }
 

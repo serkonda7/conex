@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import {
 	type AnyPgColumn,
 	bigint,
+	boolean,
 	check,
 	customType,
 	doublePrecision,
@@ -33,7 +34,7 @@ import {
 // devices, cables) are added in P1-P5.
 //
 // Ids are Postgres identity integers (human readable in URLs and UIs).
-// Flags (`is_full_depth`, `connected`, ...) are 0/1 integers.
+// Flags (`connected`, ...) are 0/1 integers.
 // Session ids and auth-state values stay opaque random strings: they are
 // credentials, not entity references.
 // Roles bundle permissions (`shared/src/schemas.ts` `PERMISSIONS`); every
@@ -323,10 +324,12 @@ export const device_types = pgTable(
 		// separate table and never device types.
 		u_height: integer('u_height').notNull().default(1),
 		// NetBox `is_full_depth`: false = half-depth.
-		is_full_depth: integer('is_full_depth').notNull().default(1),
+		is_full_depth: boolean('is_full_depth').notNull().default(true),
 		// Rack-template dimensions. Null keeps existing non-rack templates valid.
 		form_factor: text('form_factor'),
 		width: integer('width'),
+		part_number: text('part_number'),
+		spec_url: text('spec_url'),
 		description: text('description'),
 		comments: text('comments'),
 		// Role preselected when instantiating a device of this type. Only a
@@ -339,6 +342,7 @@ export const device_types = pgTable(
 	(table) => [
 		index('device_types_manufacturer_id_idx').on(table.manufacturer_id),
 		index('device_types_model_idx').on(table.model),
+		uniqueIndex('device_types_manufacturer_model_idx').on(table.manufacturer_id, table.model),
 	],
 )
 
@@ -441,6 +445,7 @@ export const priorities = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		rank: integer('rank').notNull(),
+		color: text('color').notNull().default('#6b7280'),
 		description: text('description'),
 	},
 	(table) => [index('priorities_rank_idx').on(table.rank)],
@@ -662,7 +667,7 @@ export const shelves = pgTable(
 		// Extra U reserved above the mount (always blocks device mounts).
 		reserved_height: integer('reserved_height').notNull().default(0),
 		// NetBox `is_full_depth`: false = half-depth.
-		is_full_depth: integer('is_full_depth').notNull().default(1),
+		is_full_depth: boolean('is_full_depth').notNull().default(true),
 		description: text('description'),
 	},
 	(table) => [

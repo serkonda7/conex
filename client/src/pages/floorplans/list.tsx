@@ -41,7 +41,7 @@ export function FloorplansPage(): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: t('location.type'),
+			label: t('common.type'),
 			getValue: (p: FloorplanListJson): string =>
 				p.location_type === null
 					? tp('entity.site', 1)

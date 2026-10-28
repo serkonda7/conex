@@ -20,7 +20,7 @@ import {
 import { InlineError } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { deviceRoleIconLabel } from '../../i18n/labels'
+import { deviceRoleIconLabel, deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { deviceListHref } from '../devices/list'
@@ -54,7 +54,7 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.deviceRole',
-		name: () => role()?.name,
+		name: () => deviceRoleLabel(role()),
 		id: props.id,
 		remove: delete_device_role,
 		setError,
@@ -64,13 +64,13 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 	return (
 		<div>
 			<DetailShell
-				name={role()?.name}
+				name={deviceRoleLabel(role())}
 				record={role}
 				loadingText={t('deviceRole.loadingOne')}
 				emptyText={t('deviceRole.notFound')}
 			>
 				<DetailHeader
-					name={role()?.name}
+					name={deviceRoleLabel(role())}
 					editHref={`/device-roles/${props.id}/edit`}
 					onDelete={handleDelete}
 					deletable={role()?.key == null}
@@ -80,7 +80,12 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 				<DetailCard label={t('deviceRole.details')}>
 					<dt>{t('deviceRole.parent')}</dt>
 					<dd>
-						<RecordLink id={parentId()} record={parent} base="/device-roles" />
+						<RecordLink
+							id={parentId()}
+							record={parent}
+							base="/device-roles"
+							label={deviceRoleLabel}
+						/>
 					</dd>
 					<dt>{tp('entity.managedBundle', 1)}</dt>
 					<dd>
@@ -121,7 +126,11 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 				loadingText={t('deviceRole.loadingChildren')}
 				emptyText={t('deviceRole.noChildren')}
 				customizable
-				columns={[nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles')]}
+				columns={[
+					nameColumn<DeviceRoleListRow>(t('common.name'), '/device-roles', {
+						rowLabel: deviceRoleLabel,
+					}),
+				]}
 			/>
 
 			<RelatedSection

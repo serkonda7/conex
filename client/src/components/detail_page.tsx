@@ -145,16 +145,21 @@ export function ForeignKeyLink(props: {
 }
 
 /** {@link ForeignKeyLink} for a record resource: links `<base>/<id>` by name. */
-export function RecordLink(props: {
+export function RecordLink<T extends { name: string }>(props: {
 	id: number | null | undefined
-	record: Resource<{ name: string } | null>
+	record: Resource<T | null>
 	base: string
+	/** Display name; defaults to `name`. */
+	label?: (record: T) => string
 }): JSX.Element {
 	return (
 		<ForeignKeyLink
 			id={props.id}
 			loading={props.record.loading}
-			name={props.record()?.name}
+			name={(() => {
+				const record = props.record()
+				return record ? (props.label ?? ((r: T): string => r.name))(record) : undefined
+			})()}
 			href={`${props.base}/${props.id ?? ''}`}
 		/>
 	)

@@ -1,14 +1,35 @@
+import { priorityLabel } from 'shared/src/priority'
 import type { ExternalTicketJson } from 'shared/src/types'
 import { createSignal, type JSX, Show } from 'solid-js'
 import { fetch_tickets } from '../../api/integrations'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
+import { useSort } from '../../components/list_page'
+import { PriorityPill } from '../../components/priority_pill'
 import { t } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { createRecord } from '../../lib/resource'
 import { can } from '../../lib/session'
-import { formatTime } from '../../lib/time'
+import { formatRelative, formatTime } from '../../lib/time'
 import { TICKET_PROVIDER } from './add'
+
+type TicketSort = 'id' | 'title' | 'status' | 'priority' | 'modified'
+
+/** Comparable value of a ticket per sort key; null sorts last in both directions. */
+function sortValue(ticket: ExternalTicketJson, key: TicketSort): number | string | null {
+	switch (key) {
+		case 'id':
+			return ticket.id
+		case 'title':
+			return ticket.title.toLowerCase()
+		case 'status':
+			return ticket.status?.toLowerCase() ?? null
+		case 'priority':
+			return ticket.priority?.rank ?? null
+		case 'modified':
+			return ticket.modified_at ?? ticket.created_at
+	}
+}
 
 /** Tickets listed before "Show all". */
 const PREVIEW_ROWS = 5
@@ -31,6 +52,7 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 	const columns: DataTableColumn<ExternalTicketJson>[] = [
 		{
 			key: 'id',
+			sortable: true,
 			label: '#',
 			getValue: (ticket: ExternalTicketJson): JSX.Element => {
 				const base = list()?.base_url
@@ -49,25 +71,69 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 		},
 		{
 			key: 'title',
+			sortable: true,
 			label: t('ticket.title'),
 			getValue: (ticket: ExternalTicketJson): string => ticket.title,
 		},
 		{
 			key: 'status',
-			label: t('ticket.status'),
+			sortable: true,
+			label: t('common.status'),
 			getValue: (ticket: ExternalTicketJson): string => ticket.status ?? '—',
 		},
 		{
+			key: 'priority',
+			sortable: true,
+			label: t('ticket.priority'),
+			getValue: (ticket: ExternalTicketJson): JSX.Element | string =>
+				ticket.priority ? (
+					<PriorityPill
+						name={priorityLabel(ticket.priority)}
+						color={ticket.priority.color}
+					/>
+				) : (
+					'—'
+				),
+		},
+		{
 			key: 'modified',
+			sortable: true,
 			label: t('ticket.modified'),
-			getValue: (ticket: ExternalTicketJson): string => {
+			getValue: (ticket: ExternalTicketJson): JSX.Element | string => {
 				const time = ticket.modified_at ?? ticket.created_at
-				return time === null ? '—' : formatTime(time)
+				return time === null ? (
+					'—'
+				) : (
+					<span title={formatTime(time)}>{formatRelative(time)}</span>
+				)
 			},
 		},
 	]
 
-	const tickets = (): ExternalTicketJson[] => list()?.tickets ?? []
+	const { sort, order, handleSort, clearSort } = useSort<TicketSort>(undefined)
+
+	const tickets = (): ExternalTicketJson[] => {
+		const rows = list()?.tickets ?? []
+		const key = sort()
+		if (key === undefined) {
+			return rows
+		}
+		const sign = order() === 'asc' ? 1 : -1
+		return rows.toSorted((a, b) => {
+			const left = sortValue(a, key)
+			const right = sortValue(b, key)
+			if (left === right) {
+				return 0
+			}
+			if (left === null) {
+				return 1
+			}
+			if (right === null) {
+				return -1
+			}
+			return (left < right ? -1 : 1) * sign
+		})
+	}
 	const shown = (): ExternalTicketJson[] =>
 		showAll() ? tickets() : tickets().slice(0, PREVIEW_ROWS)
 
@@ -80,8 +146,8 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 					</h3>
 					<Show when={list()?.fetched_at}>
 						{(time: () => number) => (
-							<span class="text-muted">
-								{t('ticket.fetchedAt', { time: formatTime(time()) })}
+							<span class="text-muted" title={formatTime(time())}>
+								{formatRelative(time())}
 							</span>
 						)}
 					</Show>
@@ -100,6 +166,10 @@ export function TenantTickets(props: { tenantId: number }): JSX.Element {
 						rows={shown}
 						getRowId={(ticket: ExternalTicketJson): number => ticket.id}
 						columns={columns}
+						sortKey={sort}
+						sortDirection={order}
+						onSort={handleSort}
+						onSortClear={clearSort}
 						loading={() => list.loading}
 						loadingContent={<Loading message={t('ticket.loading')} />}
 						emptyContent={<Empty message={t('ticket.noOpenTickets')} />}

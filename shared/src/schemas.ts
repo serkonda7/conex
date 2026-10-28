@@ -805,6 +805,8 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	is_full_depth: v.optional(v.boolean(), true),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	width: v.optional(RackWidthSchema, undefined),
+	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	spec_url: v.optional(WebsiteSchema, undefined),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 	default_device_role_id: NullableIdSchema,
@@ -817,6 +819,8 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	is_full_depth: v.optional(v.boolean(), undefined),
 	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
 	width: v.optional(v.nullable(RackWidthSchema), undefined),
+	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 	default_device_role_id: NullableIdSchema,
@@ -931,6 +935,10 @@ export const DEVICE_ROLE_KEYS = [
 	'cloud-key',
 	'switch',
 	'patch-panel',
+	'printer',
+	'modem',
+	'telephony',
+	'ups',
 ] as const
 export type DeviceRoleKey = (typeof DEVICE_ROLE_KEYS)[number]
 
@@ -994,15 +1002,22 @@ export type DeviceRoleListQuery = v.InferOutput<typeof DeviceRoleListQuerySchema
 // service hours plus response/resolution targets per priority).
 // ---------------------------------------------------------------------------
 
+export const DEFAULT_PRIORITY_COLOR = '#6b7280'
+
+/** Hex color as produced by `<input type="color">`: `#rrggbb`. */
+export const PriorityColorSchema = v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/))
+
 export const PriorityCreateSchema = v.strictObject({
 	name: NameSchema,
 	/** 1 = most urgent; lists and SLA matrices sort by it. */
 	rank: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)),
+	color: v.optional(PriorityColorSchema, undefined),
 	description: DescriptionSchema,
 })
 
 export const PriorityUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
+	color: v.optional(PriorityColorSchema, undefined),
 	rank: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
@@ -2314,11 +2329,12 @@ export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 const LooseBooleanSchema = looseBoolean(true)
 
 /**
- * One device-type CSV row. `manufacturer` resolves to an id
- * server-side; `u_height`/`width` arrive as text and coerce through Number.
+ * One NetBox device-type YAML definition. `manufacturer` resolves to an id
+ * server-side; `u_height` may arrive as text and coerces through Number.
+ * Ports and other NetBox keys pass through untouched for the importer.
  */
-export const DeviceTypeImportRowSchema = v.object({
-	manufacturer: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+export const DeviceTypeYamlSchema = v.looseObject({
+	manufacturer: NameSchema,
 	model: NameSchema,
 	u_height: v.optional(
 		v.pipe(
@@ -2332,22 +2348,17 @@ export const DeviceTypeImportRowSchema = v.object({
 		1,
 	),
 	is_full_depth: v.optional(LooseBooleanSchema, true),
-	form_factor: v.optional(RackFormFactorSchema, undefined),
-	width: v.optional(
-		v.pipe(
-			v.union([v.string(), v.number()]),
-			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-			v.number(),
-			v.integer(),
-			v.check((n) => n === 10 || n === 19 || n === 23, 'Must be one of 10, 19, 23'),
-		),
-		undefined,
-	),
-	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
-	comments: CommentsSchema,
+	/** conex extension: device role name preselected for devices of this type. */
+	default_device_role: v.nullish(NameSchema, undefined),
+	/** conex extension: manufacturer article/part number. */
+	part_number: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	/** conex extension: link to the manufacturer's spec/datasheet. */
+	spec_url: v.nullish(WebsiteSchema, undefined),
+	description: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+	comments: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined),
 })
 
-export type DeviceTypeImportRow = v.InferOutput<typeof DeviceTypeImportRowSchema>
+export type DeviceTypeYaml = v.InferOutput<typeof DeviceTypeYamlSchema>
 
 /** Per-row import outcome: created id or the row's error message. */
 export interface ImportRowResult {
@@ -2355,8 +2366,6 @@ export interface ImportRowResult {
 	ok: boolean
 	id: number | null
 	error: string | null
-	/** Set when the row failed only because this manufacturer does not exist. */
-	unknown_manufacturer?: string
 	/** Set when the row failed because a device type with this model already exists. */
 	existing_device_type?: { id: number; model: string }
 }
@@ -2577,6 +2586,10 @@ export interface ExternalTicketJson {
 	status: string | null
 	created_at: number | null
 	modified_at: number | null
+	/** Names of the tags on the ticket. */
+	tags: string[]
+	/** Local priority whose label matches one of the tags; null when none does. */
+	priority: { id: number; name: string; rank: number; color: string } | null
 }
 
 /**

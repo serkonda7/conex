@@ -41,7 +41,12 @@ import {
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
-import { deviceStatusLabel, findingKindLabel, providerLabel } from '../../i18n/labels'
+import {
+	deviceRoleLabel,
+	deviceStatusLabel,
+	findingKindLabel,
+	providerLabel,
+} from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { can } from '../../lib/session'
@@ -98,7 +103,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const employees = (): EmployeeRow[] => employeePage()?.items ?? []
 	const siteName = useNameOf(sites)
 	const rackName = useNameOf(racks)
-	const roleName = useNameOf(roles)
+	const roleName = useNameOf(roles, deviceRoleLabel)
 	const employeeName = useNameOf(employees)
 	const [floorplans] = createRowsFor(
 		id,
@@ -592,7 +597,7 @@ export function vmHost(vm: DeviceListItem): JSX.Element {
 	if (vm.kind === 'vm' && vm.host_device_id !== null) {
 		return <a href={`/devices/${vm.host_device_id}`}>{vm.host_name}</a>
 	}
-	return <span>{t('vm.cloud')}</span>
+	return <span>{t('deviceRoleIcon.cloud')}</span>
 }
 
 /** Status pill of a device or VM. */

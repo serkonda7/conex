@@ -73,7 +73,7 @@ export function LocationsPage(): JSX.Element {
 		},
 		{
 			key: 'type',
-			label: t('location.type'),
+			label: t('common.type'),
 			getValue: (l: LocationRow): JSX.Element => (
 				<IconLabel icon={locationTypeIcon(l.type)}>{locationTypeLabel(l.type)}</IconLabel>
 			),

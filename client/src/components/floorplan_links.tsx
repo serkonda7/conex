@@ -50,7 +50,7 @@ export function OutletLinks(props: {
 }): JSX.Element {
 	return (
 		<Show when={props.outlets.length > 0}>
-			<dt>{t('floorplan.outlet')}</dt>
+			<dt>{t('entity.outlet.one')}</dt>
 			<dd>
 				<For each={props.outlets}>
 					{(outlet: FloorplanOutletJson, index: () => number) => (

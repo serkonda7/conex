@@ -98,7 +98,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 
 				<div class="detail-split">
 					<DetailCard label={t('location.details')}>
-						<dt>{t('location.type')}</dt>
+						<dt>{t('common.type')}</dt>
 						<dd>
 							<IconLabel icon={locationTypeIcon(location()?.type ?? 'other')}>
 								{locationTypeLabel(location()?.type ?? 'other')}
@@ -119,7 +119,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 						<Show when={images.floorplan()}>
 							{(plan: () => AttachmentJson) => (
 								<>
-									<dt>{t('floorplan.title')}</dt>
+									<dt>{t('entity.floorplan.one')}</dt>
 									<dd>
 										<a href={`/floorplans/${plan().id}`}>
 											{t('floorplan.open')}

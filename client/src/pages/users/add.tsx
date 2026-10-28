@@ -71,7 +71,7 @@ export function UserAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="user-role"
-				label={t('user.role')}
+				label={t('entity.role.one')}
 				required
 				value={roleId()}
 				onChange={setRoleId}

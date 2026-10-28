@@ -91,7 +91,7 @@ export function LocationAddPage(): JSX.Element {
 			/>
 			<SelectField
 				id="location-type"
-				label={t('location.type')}
+				label={t('common.type')}
 				required
 				value={locationType()}
 				onChange={(value: string): void => {

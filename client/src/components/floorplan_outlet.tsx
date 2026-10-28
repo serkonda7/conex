@@ -82,8 +82,8 @@ export function OutletPopover(props: {
 				<button
 					type="button"
 					class="icon-btn"
-					aria-label={t('floorplan.closePopover')}
-					title={t('floorplan.closePopover')}
+					aria-label={t('common.close')}
+					title={t('common.close')}
 					onClick={props.on_close}
 				>
 					<IconX size={14} />

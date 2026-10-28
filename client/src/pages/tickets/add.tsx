@@ -164,7 +164,7 @@ export function TicketAddPage(): JSX.Element {
 				/>
 				<TextAreaField
 					id="ticket-content"
-					label={t('ticket.content')}
+					label={t('common.description')}
 					value={content()}
 					onInput={setContent}
 					rows={8}

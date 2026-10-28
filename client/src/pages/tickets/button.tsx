@@ -49,7 +49,7 @@ export function CreateTicketButton(props: { scopeTenantId: number | null }): JSX
 				aria-label={t('ticket.create')}
 				onClick={() => navigate(target())}
 			>
-				<IconLabel icon={IconTicket}>{t('ticket.short')}</IconLabel>
+				<IconLabel icon={IconTicket}>{t('entity.ticket.one')}</IconLabel>
 			</button>
 		</Show>
 	)

@@ -11,16 +11,14 @@ import { by_id, client, failed, to_result } from './client'
  * Wire shape of a shelf: the 0/1 DB flags read as booleans, mirroring
  * `InterfaceJson` in `devices.ts`.
  */
-export type ShelfRowJson = Omit<ShelfRow, 'mount_usable' | 'is_full_depth'> & {
+export type ShelfRowJson = Omit<ShelfRow, 'mount_usable'> & {
 	mount_usable: boolean
-	is_full_depth: boolean
 }
 
 function to_shelf_json(row: ShelfRow): ShelfRowJson {
 	return {
 		...row,
 		mount_usable: row.mount_usable !== 0,
-		is_full_depth: row.is_full_depth !== 0,
 	}
 }
 
