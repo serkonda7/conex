@@ -19,12 +19,11 @@ import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { EmployeeIntegrationCards } from '../integrations/cards'
 import { EmployeeStatus } from './list'
 
 /**
  * /employees/:id — employee detail: tenant breadcrumb, header with
- * description, the contact details and the integration cards.
+ * description and the contact details.
  */
 export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -97,7 +96,6 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 						<Markdown text={employee()?.comments} />
 					</dd>
 				</DetailCard>
-				<EmployeeIntegrationCards employeeId={props.id} />
 			</DetailShell>
 			<RelatedSection
 				id="employee-devices"
