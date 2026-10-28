@@ -221,6 +221,8 @@ export const de: Messages = {
 	'app.languageName.en': 'English',
 	'app.languageName.de': 'Deutsch',
 	'app.mainNavigation': 'Hauptnavigation',
+	'app.openNavigation': 'Navigation öffnen',
+	'app.closeNavigation': 'Navigation schließen',
 	'app.openPages': 'Geöffnete Seiten',
 	'app.closeTab': '{title} schließen',
 	'app.allTabs': 'Alle geöffneten Seiten',

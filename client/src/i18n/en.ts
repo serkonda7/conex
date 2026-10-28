@@ -220,6 +220,8 @@ export const en = {
 	'app.languageName.en': 'English',
 	'app.languageName.de': 'Deutsch',
 	'app.mainNavigation': 'Main navigation',
+	'app.openNavigation': 'Open navigation',
+	'app.closeNavigation': 'Close navigation',
 	'app.openPages': 'Open pages',
 	'app.closeTab': 'Close {title}',
 	'app.allTabs': 'All open pages',

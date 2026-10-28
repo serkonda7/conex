@@ -2,9 +2,11 @@
  * App shell: the session gate (first-run setup, login) and, once signed in,
  * the top bar, sidebar, tab strip and one mounted page per tab.
  */
+import { IconMenu2 } from '@tabler/icons-solidjs'
 import {
 	createEffect,
 	createSignal,
+	createUniqueId,
 	For,
 	type JSX,
 	Match,
@@ -24,7 +26,7 @@ import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { RouteContent } from './route_content'
-import { Sidebar } from './sidebar'
+import { MobileSidebar, Sidebar } from './sidebar'
 import { TabBar } from './tab_bar'
 import { TenantContextSelector } from './tenant_context_selector'
 
@@ -53,6 +55,23 @@ function onLinkClick(e: MouseEvent): void {
 
 /** Signed-in layout; `user` drives the permission-dependent parts. */
 function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Element {
+	const navigationId = createUniqueId()
+	const mobileQuery = window.matchMedia('(max-width: 48rem)')
+	const [mobile, setMobile] = createSignal(mobileQuery.matches)
+	const [navigationOpen, setNavigationOpen] = createSignal(false)
+	const closeNavigation = (): void => {
+		setNavigationOpen(false)
+	}
+
+	onMount(() => {
+		const onResize = (): void => {
+			setMobile(mobileQuery.matches)
+			closeNavigation()
+		}
+		mobileQuery.addEventListener('change', onResize)
+		onCleanup(() => mobileQuery.removeEventListener('change', onResize))
+	})
+
 	// Users limited to one tenant: the context selector is fixed.
 	const isScoped = (): boolean => props.user.tenant_id !== null
 	// Tenant create is limited to global users with `edit` (server-enforced).
@@ -72,6 +91,19 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	return (
 		<>
 			<header class="app-topbar">
+				<Show when={mobile()}>
+					<button
+						type="button"
+						class="app-mobile-nav-toggle"
+						aria-label={t('app.openNavigation')}
+						aria-expanded={navigationOpen()}
+						aria-controls={navigationId}
+						aria-haspopup="dialog"
+						onClick={() => setNavigationOpen(true)}
+					>
+						<IconMenu2 size={22} aria-hidden="true" />
+					</button>
+				</Show>
 				<TenantContextSelector scoped={isScoped()} canAdd={canAddTenants()} />
 				<CreateTicketButton scopeTenantId={props.user.tenant_id} />
 				<div class="app-topbar-actions">
@@ -81,7 +113,18 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 				</div>
 			</header>
 			<div class="app-body">
-				<Sidebar user={props.user} onLogout={props.onLogout} />
+				<Show
+					when={mobile()}
+					fallback={<Sidebar user={props.user} onLogout={props.onLogout} />}
+				>
+					<MobileSidebar
+						id={navigationId}
+						user={props.user}
+						onLogout={props.onLogout}
+						open={navigationOpen()}
+						onClose={closeNavigation}
+					/>
+				</Show>
 				<div class="app-main">
 					<TabBar />
 					<main class="app-content" id="main">
