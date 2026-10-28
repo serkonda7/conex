@@ -49,6 +49,7 @@ import { MoveTenantDialog } from './move_tenant_dialog'
 import { useOutletLocationOptions } from './outlet_location'
 import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
+import { DeviceStatusBadge } from './status'
 import { PortPeer } from './trace_peer'
 
 /**
@@ -414,6 +415,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<ManagedServicePill service={service} />
 
 				<DetailCard label={t('device.details')}>
+					<dt>{t('common.status')}</dt>
+					<dd>
+						<DeviceStatusBadge status={device()?.status ?? 'active'} />
+					</dd>
 					<dt>{t('common.type')}</dt>
 					<dd>
 						<ForeignKeyLink

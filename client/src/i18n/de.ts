@@ -986,6 +986,7 @@ export const de: Messages = {
 	'elevation.onShelfTitle': 'Auf Fachboden {name} ({unit})',
 	'elevation.shelfUnit': 'Fachboden {unit}',
 	'deviceStatus.active': 'Aktiv',
+	'deviceStatus.inactive': 'Inaktiv',
 	'deviceStatus.planned': 'Geplant',
 	'deviceStatus.staged': 'Bereitgestellt',
 	'deviceStatus.decommissioned': 'Außer Betrieb',

@@ -10,6 +10,7 @@ import {
 	type VirtualMachineRow,
 } from '../../api/virtual_machines'
 import {
+	CheckboxField,
 	DescriptionField,
 	Field,
 	FormPage,
@@ -21,6 +22,7 @@ import {
 } from '../../components/form'
 import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
+import { deviceStatusLabel } from '../../i18n/labels'
 import {
 	type FormValues,
 	id_value,
@@ -35,6 +37,7 @@ import { newObjectTenantId } from '../../lib/tenant_context'
 import { deviceRoleOptions } from '../device-roles/options'
 import { useDeviceSearch } from './device_search'
 import { EmployeeAssignmentField } from './employee_assignment'
+import { inactiveStatusChange } from './status'
 
 /**
  * Host device of a VM: picked with the device search (limited to devices
@@ -103,6 +106,7 @@ function HostField(props: {
 function VirtualMachineForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
+	const [inactive, setInactive] = createSignal(false)
 	const [roleId, setRoleId] = createSignal('')
 	const [hostId, setHostId] = createSignal<number | null>(parseId(queryParam('host')))
 	const [employeeId, setEmployeeId] = createSignal('')
@@ -114,6 +118,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 		fill: (row: VirtualMachineRow) => {
 			fillFrom(row)
 			setName(row.name)
+			setInactive(row.status === 'inactive')
 			setEmployeeId(id_value(row.employee_id))
 		},
 	})
@@ -196,6 +201,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 							host_device_id: hostId(),
 							device_role_id: Number(roleId()),
 							name: values.name,
+							status: inactive() ? 'inactive' : 'active',
 							description: text(description()),
 							...(hostless ? { tenant_id: tenant } : {}),
 							employee_id: parseId(employeeId()),
@@ -204,6 +210,10 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 							host_device_id: hostId(),
 							device_role_id: Number(roleId()),
 							name: values.name,
+							status: inactiveStatusChange(
+								inactive(),
+								form.record()?.status ?? 'active',
+							),
 							description: text(description()) ?? null,
 							...(hostless ? { tenant_id: tenant } : {}),
 							employee_id: parseId(employeeId()),
@@ -246,6 +256,12 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					id={`${prefix}-description`}
 					value={description()}
 					onInput={setDescription}
+				/>
+				<CheckboxField
+					id={`${prefix}-inactive`}
+					label={deviceStatusLabel('inactive')}
+					checked={inactive()}
+					onChange={setInactive}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

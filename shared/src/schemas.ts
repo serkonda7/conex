@@ -1206,8 +1206,14 @@ export interface DeviceServiceJson {
 // P4: devices / interfaces
 // ---------------------------------------------------------------------------
 
-/** Device lifecycle label. Same closed set as racks so filters stay uniform. */
-export const DeviceStatusSchema = v.picklist(['active', 'planned', 'staged', 'decommissioned'])
+/** Device lifecycle label. */
+export const DeviceStatusSchema = v.picklist([
+	'active',
+	'inactive',
+	'planned',
+	'staged',
+	'decommissioned',
+])
 
 export type DeviceStatus = v.InferOutput<typeof DeviceStatusSchema>
 

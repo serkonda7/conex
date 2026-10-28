@@ -970,6 +970,7 @@ export const en = {
 	'elevation.onShelfTitle': 'On shelf {name} ({unit})',
 	'elevation.shelfUnit': 'Shelf {unit}',
 	'deviceStatus.active': 'Active',
+	'deviceStatus.inactive': 'Inactive',
 	'deviceStatus.planned': 'Planned',
 	'deviceStatus.staged': 'Staged',
 	'deviceStatus.decommissioned': 'Decommissioned',

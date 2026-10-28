@@ -6,6 +6,7 @@ import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
+	CheckboxField,
 	DescriptionField,
 	FormPage,
 	FormSection,
@@ -16,6 +17,7 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
+import { deviceStatusLabel } from '../../i18n/labels'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
@@ -24,6 +26,7 @@ import { deviceRoleOptions } from '../device-roles/options'
 import { parsePosition, validPosition } from './add'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
+import { inactiveStatusChange } from './status'
 
 /**
  * /devices/:id/edit — device edit form. Saves back to the device list when
@@ -38,6 +41,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
+	const [inactive, setInactive] = createSignal(false)
 	const [roleId, setRoleId] = createSignal('')
 	const [siteId, setSiteId] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
@@ -54,6 +58,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setDescription(row.description ?? '')
 			setSerial(row.serial ?? '')
 			setDeviceId(row.device_id ?? '')
+			setInactive(row.status === 'inactive')
 			setRoleId(id_value(row.device_role_id))
 			setSiteId(id_value(row.site_id))
 			setLocationId(id_value(row.location_id))
@@ -111,6 +116,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			save: (values: FormValues) =>
 				update_device(props.id, {
 					name: values.name,
+					status: inactiveStatusChange(inactive(), form.record()?.status ?? 'active'),
 					description: text(description()) ?? null,
 					serial: text(serial()) ?? null,
 					device_id: text(deviceId()) ?? null,
@@ -177,6 +183,12 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					maxLength={100}
 					value={deviceId()}
 					onInput={setDeviceId}
+				/>
+				<CheckboxField
+					id="device-edit-inactive"
+					label={deviceStatusLabel('inactive')}
+					checked={inactive()}
+					onChange={setInactive}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

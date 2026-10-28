@@ -1127,7 +1127,8 @@ tbody tr:last-child td {
 	border-color: var(--link);
 }
 
-.badge-decommissioned {
+.badge-decommissioned,
+.badge-inactive {
 	color: var(--error);
 	border-color: var(--error);
 }
