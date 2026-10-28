@@ -1038,6 +1038,9 @@ export const en = {
 	'integration.updateExternal': 'Update in {provider}',
 	'integration.updateExternalFailed': 'Failed to update the device externally',
 	'integration.updateExternalEmployeeFailed': 'Failed to update the employee externally',
+	'integration.deactivateEmployee': 'Set inactive in {provider}',
+	'integration.confirmDeactivateEmployee':
+		'Set {name} inactive in {provider}? This affects all companies this employee is assigned to.',
 	'integration.pickTenant': 'Link {provider} company',
 	'integration.searchTenants': 'Search name or customer number…',
 	'integration.alreadyLinked': 'linked',

@@ -341,3 +341,15 @@ export async function update_external_employee(
 	})
 	return to_result<ExternalEmployeeJson>(res, t('integration.updateExternalEmployeeFailed'))
 }
+
+/** Deactivates an external employee, including one not linked to conex. */
+export async function deactivate_external_employee(
+	provider: IntegrationProvider,
+	external_id: string,
+): Promise<Result<ExternalEmployeeJson, Error>> {
+	const res = await client.integrations[':provider'].employees.deactivate.$put({
+		param: { provider },
+		json: { external_id },
+	})
+	return to_result<ExternalEmployeeJson>(res, t('integration.updateExternalEmployeeFailed'))
+}

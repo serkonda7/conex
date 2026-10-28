@@ -65,3 +65,38 @@ export async function updateExternalEmployee(
 	await mergeEmployees(provider, [patched], nowSeconds())
 	return Result.ok(patched)
 }
+
+/** Deactivates an external employee and updates the snapshot after TANSS accepts it. */
+export async function deactivateExternalEmployee(
+	provider: ProviderId,
+	externalId: string,
+): Promise<Result<ExternalEmployeeJson, Error>> {
+	const external = await readEmployee(provider, externalId)
+	if (!external) {
+		return Result.err(new NotFoundError('External employee not found'))
+	}
+	const row = await getIntegrationRow(provider)
+	if (Result.isError(row)) {
+		return row
+	}
+	if (!row.value.enabled) {
+		return Result.err(new ValidationError('Integration is disabled'))
+	}
+	const built = providerFor(row.value)
+	if (Result.isError(built)) {
+		return built
+	}
+	if (!built.value.updateEmployee) {
+		return Result.err(new ValidationError('Integration does not support updating employees'))
+	}
+	if (!external.active) {
+		return Result.ok(external)
+	}
+	const updated = await built.value.updateEmployee(externalId, { active: false })
+	if (Result.isError(updated)) {
+		return Result.err(new ExternalServiceError(updated.error.message))
+	}
+	const patched: ExternalEmployeeJson = { ...external, active: false }
+	await mergeEmployees(provider, [patched], nowSeconds())
+	return Result.ok(patched)
+}

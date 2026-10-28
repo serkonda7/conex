@@ -54,6 +54,12 @@ gemeldet.
 | **Gerät existiert nicht mehr** | Das verknüpfte Gerät wurde bei der letzten Synchronisierung nicht gefunden.                                                                                                                                                                                                                                                                                                                             |
 | **Abweichung**                 | Ein Befund je abweichendem Merkmal: Mandant (das Gerät gehört zu einer anderen Firma als sein Mandant), Status (in einem System aktiv, im anderen inaktiv) oder Name, Seriennummer, Inventarnummer, Hersteller oder Modell (leere Werte werden nicht verglichen). Name, Hersteller und Modell können in TANSS mit dem conex-Wert überschrieben werden; der Hersteller muss in TANSS bereits existieren. |
 
+#### Mitarbeiter
+
+Ist ein verknüpfter Mitarbeiter in conex inaktiv, aber in TANSS aktiv, kann er im
+Bericht auch in TANSS inaktiv gesetzt werden. Dies betrifft alle Firmen, denen er in
+TANSS zugeordnet ist.
+
 ### Nicht verknüpfte Objekte
 
 #### Mandanten
@@ -70,6 +76,12 @@ gemeldet.
 | **Mögliche Zuordnung** | Die Geräte teilen sich Seriennummer, Inventarnummer oder Namen.                                        |
 | **Fehlt extern**       | Aktives conex-Gerät ohne Gegenstück. Kann im externen System angelegt werden, das es sofort verknüpft. |
 | **Fehlt in conex**     | Aktives externes Gerät ohne Gegenstück.                                                                |
+
+#### Mitarbeiter
+
+Aktive TANSS-Mitarbeiter ohne Gegenstück können in conex übernommen oder direkt in
+TANSS inaktiv gesetzt werden. Auch bei einer möglichen Zuordnung ist das Inaktivsetzen
+möglich. Es betrifft alle zugeordneten Firmen; der Zuordnungsvorschlag bleibt erhalten.
 
 ### Prioritäten
 

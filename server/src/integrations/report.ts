@@ -590,15 +590,17 @@ async function employeeFindings(
 		const base = { tenant_id: tenantId, tenant_name: tenantName.get(tenantId) ?? null }
 		const localById = new Map(tenantLocals.map((e) => [e.id, e]))
 		for (const pair of pairs) {
+			const external = externalById.get(pair.external_id)
 			findings.push(
 				finding('employee_suggestion', {
 					...base,
 					employee_id: pair.employee_id,
 					employee_name: localById.get(pair.employee_id)?.name ?? null,
 					external_id: pair.external_id,
-					external_name: externalById.get(pair.external_id)?.name ?? null,
+					external_name: external?.name ?? null,
 					external_tenant_id: company,
 					field: pair.via,
+					remote: external ? (external.active ? 'active' : 'inactive') : null,
 				}),
 			)
 		}

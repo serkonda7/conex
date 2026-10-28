@@ -13,6 +13,7 @@ import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
 	create_external_device,
+	deactivate_external_employee,
 	type ExternalTenantListItem,
 	fetch_integration,
 	fetch_integration_report,
@@ -320,6 +321,28 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			return null
 		}
 		const provider = row.provider
+		const deactivate: JSX.Element = (
+			<button
+				type="button"
+				class="btn-small"
+				disabled={action.pending()}
+				onClick={(): void => {
+					if (
+						f.external_id !== null &&
+						window.confirm(
+							t('integration.confirmDeactivateEmployee', {
+								name: f.external_name ?? f.external_id,
+								provider: providerLabel(provider),
+							}),
+						)
+					) {
+						void run(() => deactivate_external_employee(provider, f.external_id ?? ''))
+					}
+				}}
+			>
+				{t('integration.deactivateEmployee', { provider: providerLabel(provider) })}
+			</button>
+		)
 		const unlink: JSX.Element = (
 			<Show when={f.link_id !== null}>
 				<button
@@ -462,6 +485,10 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'employee_suggestion':
 				return (
 					<Show when={can('integrations.manage')}>
+						{provider === 'tanss' &&
+							f.remote === 'active' &&
+							f.external_id !== null &&
+							deactivate}
 						<button
 							type="button"
 							class="icon-btn icon-btn-connect"
@@ -485,6 +512,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'employee_missing_in_conex':
 				return (
 					<Show when={can('integrations.manage')}>
+						{provider === 'tanss' && f.external_id !== null && deactivate}
 						<Show when={can('edit') && f.tenant_id !== null}>
 							<button
 								type="button"
@@ -540,6 +568,12 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
+						{provider === 'tanss' &&
+							f.field === 'status' &&
+							f.local === 'inactive' &&
+							f.remote === 'active' &&
+							f.external_id !== null &&
+							deactivate}
 						{field !== null && (
 							<button
 								type="button"

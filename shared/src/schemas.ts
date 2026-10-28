@@ -2514,6 +2514,11 @@ export const ExternalEmployeeUpdateSchema = v.strictObject({
 	field: v.picklist(EMPLOYEE_PUSH_FIELDS),
 })
 
+/** Deactivates an external employee, whether or not they are linked to conex. */
+export const ExternalEmployeeDeactivateSchema = v.strictObject({
+	external_id: ExternalIdSchema,
+})
+
 export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
@@ -2772,6 +2777,7 @@ export interface IntegrationFinding {
 		| 'priority'
 		| null
 	local: string | null
+	/** On an employee suggestion, the external employee's active/inactive status. */
 	remote: string | null
 }
 

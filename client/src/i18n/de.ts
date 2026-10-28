@@ -1057,6 +1057,9 @@ export const de: Messages = {
 	'integration.updateExternalFailed': 'Gerät konnte extern nicht aktualisiert werden',
 	'integration.updateExternalEmployeeFailed':
 		'Mitarbeiter konnte extern nicht aktualisiert werden',
+	'integration.deactivateEmployee': 'In {provider} inaktiv setzen',
+	'integration.confirmDeactivateEmployee':
+		'{name} in {provider} inaktiv setzen? Dies betrifft alle Firmen, denen dieser Mitarbeiter zugeordnet ist.',
 	'integration.pickTenant': '{provider}-Firma verknüpfen',
 	'integration.searchTenants': 'Name oder Kundennummer suchen…',
 	'integration.alreadyLinked': 'verknüpft',
