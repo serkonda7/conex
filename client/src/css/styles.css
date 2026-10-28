@@ -3866,8 +3866,14 @@ a.rack-shelf-plate:hover {
 	white-space: nowrap;
 }
 
-.link-board-state > * + .btn-small {
+.link-board-state > * + .btn-small,
+.link-board-state > * + .icon-btn {
 	margin-left: 0.35rem;
+}
+
+.link-board-state .icon-btn,
+.integration-report .row-actions .icon-btn {
+	padding: 0.45rem;
 }
 
 .link-board-suggestion {

@@ -43,11 +43,6 @@ function externalRow(
 	}
 }
 
-function employeeDetail(title: string | null, email: string | null): string | null {
-	const text = [title, email].filter((p) => p !== null && p !== '').join(' · ')
-	return text === '' ? null : text
-}
-
 /** Suggests a name match when it is unique on both free sides. */
 function uniqueNameMatches<L, E>(
 	locals: L[],
@@ -340,7 +335,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 			return {
 				id: e.id,
 				name: e.name,
-				detail: employeeDetail(e.title, primaryEmail(e.emails)),
+				detail: primaryEmail(e.emails),
 				serial: null,
 				active: e.active === 1,
 				link_id: link?.id ?? ignored?.id ?? null,
@@ -364,7 +359,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 				{
 					external_id: e.external_id,
 					name: e.name,
-					detail: employeeDetail(e.title, e.email),
+					detail: e.email || null,
 					serial: null,
 					active: e.active,
 				},

@@ -4,6 +4,7 @@
  * and a field comparison. Also the tenant integration status behind the
  * tenant page's "Needs attention" list.
  */
+import { IconUnlink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type {
 	ExternalDeviceJson,
@@ -156,12 +157,14 @@ function LinkedObjectCard<E extends { external_id: string; name: string; active:
 					<div class="form-actions">
 						<button
 							type="button"
-							class="btn-danger"
+							class="icon-btn icon-btn-danger"
+							title={t('integration.unlink')}
+							aria-label={t('integration.unlink')}
 							onClick={() =>
 								void run(() => unlink_external(provider(), status()?.link?.id ?? 0))
 							}
 						>
-							{t('integration.unlink')}
+							<IconUnlink size={20} />
 						</button>
 					</div>
 				</Show>
