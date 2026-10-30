@@ -449,7 +449,6 @@ export const de: Messages = {
 	'deviceType.component.editTitle': '{name} bearbeiten',
 	'deviceType.component.count': 'Anzahl',
 	'deviceType.component.countInvalid': 'Die Anzahl muss eine ganze Zahl von 1 bis {max} sein.',
-	'deviceType.component.label': 'Beschriftung',
 	'deviceType.component.range': '{first} – {last}',
 	'deviceType.component.interface': 'Netzwerkschnittstellen',
 	'deviceType.component.interfaces': 'Netzwerkschnittstellen ({count})',

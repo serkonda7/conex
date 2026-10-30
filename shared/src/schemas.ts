@@ -786,7 +786,8 @@ export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 
 export const RackWidthSchema = v.picklist([10, 19, 23])
 
-export const StubLabelSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
+/** Allows descriptions merged with legacy port labels during migration. */
+export const PORT_DESCRIPTION_MAX_LENGTH = 703
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -836,9 +837,8 @@ export const StubCreateSchema = v.pipe(
 		prefix: InterfacePrefixSchema,
 		count: v.optional(StubCountSchema, 1),
 		kind: v.optional(InterfaceKindSchema, 'ethernet'),
-		label: v.optional(v.nullable(StubLabelSchema), undefined),
 		description: v.optional(
-			v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+			v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
 			undefined,
 		),
 		side: v.optional(v.nullable(PortSideSchema), undefined),
@@ -866,8 +866,10 @@ export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
 	count: v.optional(StubCountSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
-	label: v.optional(v.nullable(StubLabelSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
+		undefined,
+	),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
@@ -912,7 +914,6 @@ export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema
 export interface ExpandedInterface {
 	name: string
 	kind: string
-	label: string | null
 	description: string | null
 	side: PortSide | null
 	positions: number
@@ -1305,7 +1306,10 @@ export const InterfaceCreateSchema = v.pipe(
 		name: InterfaceNameSchema,
 		kind: v.optional(InterfaceKindSchema, 'ethernet'),
 		enabled: v.optional(v.boolean(), undefined),
-		description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+		description: v.optional(
+			v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH)),
+			undefined,
+		),
 		side: v.optional(v.nullable(PortSideSchema), undefined),
 		positions: v.optional(PortPositionsSchema, undefined),
 		rear_port_id: v.optional(IdSchema, undefined),
@@ -1333,7 +1337,10 @@ export const InterfaceUpdateSchema = v.strictObject({
 	name: v.optional(InterfaceNameSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	enabled: v.optional(v.boolean(), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
+		undefined,
+	),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_port_id: v.optional(IdSchema, undefined),
 	rear_port_position: v.optional(PortPositionsSchema, undefined),

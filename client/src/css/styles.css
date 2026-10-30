@@ -2258,6 +2258,9 @@ th[aria-sort="descending"] .data-table-sort::after {
 }
 
 .add-component-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 	width: 100%;
 	border: none;
 	background: transparent;
@@ -2269,27 +2272,17 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background-color: var(--bg-hover);
 }
 
-/* Icon hint per item; the menu sits at the page's right edge, so without a
-   mouse the preview opens to the left. */
-.add-component-item {
-	position: relative;
-}
-
-.add-component-preview {
-	display: none;
+.add-component-icon {
+	display: inline-flex;
+	flex: 0 0 1.5rem;
+	width: 1.5rem;
+	height: 1.5rem;
 	line-height: 0;
-	pointer-events: none;
 }
 
-.add-component-item:hover .add-component-preview,
-.add-component-item:focus-visible .add-component-preview {
-	display: block;
-}
-
-:root:not([data-input="mouse"]) .add-component-preview {
-	top: 0;
-	left: auto;
-	right: calc(100% + 0.4rem);
+.add-component-icon svg {
+	width: 100%;
+	height: 100%;
 }
 
 .add-component-dropdown hr {

@@ -356,7 +356,6 @@ export const device_type_interfaces = pgTable(
 		prefix: text('prefix').notNull(),
 		count: integer('count').notNull().default(1),
 		kind: text('kind').notNull().default('ethernet'),
-		label: text('label'),
 		description: text('description'),
 		// Pass-through side (`PORT_SIDES`); null is a normal port.
 		side: text('side', { enum: PORT_SIDES }),

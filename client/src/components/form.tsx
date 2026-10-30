@@ -249,8 +249,11 @@ export function DescriptionField(props: {
 	id: string
 	value: string
 	onInput: (value: string) => void
+	maxLength?: number
 }): JSX.Element {
-	return <TextField {...props} label={t('common.description')} maxLength={500} />
+	return (
+		<TextField {...props} label={t('common.description')} maxLength={props.maxLength ?? 500} />
+	)
 }
 
 /** The optional free-text comments field. */

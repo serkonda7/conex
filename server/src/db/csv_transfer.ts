@@ -294,7 +294,6 @@ async function importDeviceTypeDefinition(
 		{
 			key: string
 			kind: string
-			label: string | undefined
 			description: string | undefined
 			names: string[]
 		}
@@ -331,16 +330,12 @@ async function importDeviceTypeDefinition(
 			if (Result.isError(names)) {
 				return fail(`${key} "${name}": ${names.error.message}`)
 			}
-			const label =
-				key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined
 			const description = typeof port.description === 'string' ? port.description : undefined
-			// A stub carries one kind, label and description, so ports only
-			// collapse into one stub when all three match.
-			const groupKey = JSON.stringify([key, kind, label ?? null, description ?? null])
+			// A stub carries one kind and description, so both must match to collapse ports.
+			const groupKey = JSON.stringify([key, kind, description ?? null])
 			const group = groups.get(groupKey) ?? {
 				key,
 				kind,
-				label,
 				description,
 				names: [],
 			}
@@ -354,7 +349,6 @@ async function importDeviceTypeDefinition(
 				prefix: run.prefix,
 				count: run.count,
 				kind: group.kind,
-				label: group.label,
 				description: group.description,
 			})
 			if (Result.isError(stub)) {
@@ -433,7 +427,6 @@ async function importPassThroughPorts(
 				prefix,
 				count: 1,
 				kind,
-				label: typeof port.label === 'string' ? port.label : undefined,
 				description: typeof port.description === 'string' ? port.description : undefined,
 				side: 'rear',
 				positions,
@@ -494,7 +487,6 @@ async function importPassThroughPorts(
 			prefix: names.value[0] ?? name,
 			count: 1,
 			kind,
-			label: typeof port.label === 'string' ? port.label : undefined,
 			description: typeof port.description === 'string' ? port.description : undefined,
 			side: 'front',
 			rear_stub_id: rearId,

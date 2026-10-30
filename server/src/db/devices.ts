@@ -662,7 +662,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 									name: iface.name,
 									kind: iface.kind,
 									connected: 0,
-									description: iface.description ?? iface.label,
+									description: iface.description,
 									side: iface.side,
 									positions: iface.positions,
 									rear_port_id: rearPortId ?? null,

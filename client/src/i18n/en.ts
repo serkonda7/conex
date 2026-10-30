@@ -446,7 +446,6 @@ export const en = {
 	'deviceType.component.editTitle': 'Edit {name}',
 	'deviceType.component.count': 'Count',
 	'deviceType.component.countInvalid': 'Count must be an integer from 1 to {max}.',
-	'deviceType.component.label': 'Label',
 	'deviceType.component.range': '{first} – {last}',
 	'deviceType.component.interface': 'Interfaces',
 	'deviceType.component.interfaces': 'Interfaces ({count})',

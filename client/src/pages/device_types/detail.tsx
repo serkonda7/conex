@@ -108,11 +108,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			label: t('common.type'),
 			getValue: (s: StubRow): string => portKindLabel(s.kind),
 		},
-		{
-			key: 'label',
-			label: t('deviceType.component.label'),
-			getValue: (s: StubRow): string => s.label ?? '—',
-		},
 		descriptionColumn<StubRow>(),
 	]
 	/** Patch-panel tables add the rear positions or the front-to-rear mapping. */

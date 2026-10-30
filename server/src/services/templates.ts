@@ -14,7 +14,6 @@ export interface StubInput {
 	prefix: string
 	count: number
 	kind: string
-	label?: string | null
 	description?: string | null
 	side?: PortSide | null
 	positions?: number
@@ -173,7 +172,6 @@ export function expandStubs(stubs: StubInput[]): Result<ExpandedInterface[], Err
 			out.push({
 				name,
 				kind: stub.kind,
-				label: stub.label ?? null,
 				description: stub.description ?? null,
 				side: stub.side ?? null,
 				positions: stub.side === 'rear' ? (stub.positions ?? 1) : 1,

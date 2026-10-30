@@ -1,17 +1,15 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { PASS_THROUGH_PORT_TYPES, type PassThroughPortType } from 'shared/src/schemas'
+import {
+	PASS_THROUGH_PORT_TYPES,
+	type PassThroughPortType,
+	PORT_DESCRIPTION_MAX_LENGTH,
+} from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
 import { InlineError } from '../../components/feedback'
-import {
-	DescriptionField,
-	Hint,
-	SelectField,
-	TextField,
-	useCursorPreview,
-} from '../../components/form'
+import { DescriptionField, Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
@@ -44,10 +42,10 @@ function parseCount(value: string): number | null {
 	return Number.isInteger(n) && n >= 1 && n <= MAX_COUNT ? n : null
 }
 
-/** Connector drawing that floats at the cursor while its menu item is hovered. */
-function ItemPreview(props: { icon: ComponentClassInfo['icon'] }): JSX.Element {
+/** Connector drawing beside a component menu item. */
+function ItemIcon(props: { icon: ComponentClassInfo['icon'] }): JSX.Element {
 	return (
-		<span class="combobox-preview add-component-preview" aria-hidden="true">
+		<span class="add-component-icon" aria-hidden="true">
 			<Dynamic component={props.icon} />
 		</span>
 	)
@@ -63,7 +61,6 @@ export function AddComponentMenu(props: {
 }): JSX.Element {
 	const [open, setOpen] = createSignal(false)
 	useDismiss('.add-component-menu', () => setOpen(false))
-	useCursorPreview()
 
 	return (
 		<div class="add-component-menu">
@@ -94,8 +91,8 @@ export function AddComponentMenu(props: {
 									props.onSelect(info)
 								}}
 							>
+								<ItemIcon icon={info.icon} />
 								{t(info.label)}
-								<ItemPreview icon={info.icon} />
 							</button>
 						)}
 					</For>
@@ -111,8 +108,8 @@ export function AddComponentMenu(props: {
 									props.onPreset(preset.key)
 								}}
 							>
+								<ItemIcon icon={preset.icon} />
 								{t(preset.label)}
-								<ItemPreview icon={preset.icon} />
 							</button>
 						)}
 					</For>
@@ -124,8 +121,8 @@ export function AddComponentMenu(props: {
 
 /**
  * Add or edit form for one component class (edit when `stub` is given): a name
- * with a count (count N > 1 expands to `name1..nameN`), the class's kinds,
- * label and description. Rear ports add their positions, front ports the rear
+ * with a count (count N > 1 expands to `name1..nameN`), the class's kind,
+ * and description. Rear ports add their positions, front ports the rear
  * port they map onto and the first position they take there.
  */
 export function ComponentDialog(props: {
@@ -150,7 +147,6 @@ export function ComponentDialog(props: {
 		stub?.kind ??
 			(props.info.key === 'interface' ? '1000base-t' : (props.info.kinds[0] ?? 'port')),
 	)
-	const [label, setLabel] = createSignal(stub?.label ?? '')
 	const [description, setDescription] = createSignal(stub?.description ?? '')
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
@@ -193,7 +189,6 @@ export function ComponentDialog(props: {
 		const fields = {
 			count: parsedCount(),
 			kind: kind(),
-			label: text(label()),
 			description: text(description()),
 		}
 		const trimmed = name().trim()
@@ -322,17 +317,11 @@ export function ComponentDialog(props: {
 					class="combobox-fit"
 					options={kinds.map(portKindOption)}
 				/>
-				<TextField
-					id={`${prefix}-label`}
-					label={t('deviceType.component.label')}
-					maxLength={200}
-					value={label()}
-					onInput={setLabel}
-				/>
 				<DescriptionField
 					id={`${prefix}-description`}
 					value={description()}
 					onInput={setDescription}
+					maxLength={PORT_DESCRIPTION_MAX_LENGTH}
 				/>
 				<div class="modal-actions">
 					<button type="submit" disabled={!name().trim() || save.pending()}>

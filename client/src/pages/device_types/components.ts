@@ -41,7 +41,7 @@ export interface ComponentClassInfo {
 	label: MessageKey
 	/** Table heading with a `{count}` param. */
 	heading: MessageKey
-	/** Hover hint in the add menu: the connector's front view. */
+	/** Connector drawing in the add menu. */
 	icon: Component
 	/** Name placeholder of the add form. */
 	placeholder: string
