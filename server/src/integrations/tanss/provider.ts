@@ -400,6 +400,7 @@ export class TanssProvider implements IntegrationProvider {
 			return Result.err(new Error(`Invalid TANSS employee id ${externalId}`))
 		}
 		return this.session.updateEmployee(id, {
+			...(changes.active !== undefined ? { active: changes.active } : {}),
 			...(changes.first_name !== undefined ? { firstName: changes.first_name } : {}),
 			...(changes.last_name !== undefined ? { lastName: changes.last_name } : {}),
 			...(changes.email !== undefined ? { emailAddress: changes.email } : {}),

@@ -155,12 +155,13 @@ export function cableStatusLabel(value: string): string {
 
 const DEVICE_STATUS_KEYS: Record<string, MessageKey> = {
 	active: 'deviceStatus.active',
+	inactive: 'deviceStatus.inactive',
 	planned: 'deviceStatus.planned',
 	staged: 'deviceStatus.staged',
 	decommissioned: 'deviceStatus.decommissioned',
 }
 
-/** Device status (`active` / `planned` / `staged` / `decommissioned`). */
+/** Device status (`active` / `inactive` / `planned` / `staged` / `decommissioned`). */
 export function deviceStatusLabel(value: string): string {
 	return lookup(DEVICE_STATUS_KEYS, value)
 }

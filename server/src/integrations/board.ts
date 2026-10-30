@@ -3,8 +3,8 @@
  * side, with their link state and unambiguous match suggestions. Tenants are
  * listed in full (global users only; inactive and private customers only when linked);
  * devices and employees per conex tenant, against the ones of the company
- * linked to it. Inactive devices/employees are ignored by default (hidden
- * unless toggled on, never suggested); linked ones stay visible as linked.
+ * linked to it. Inactive devices and external employees are ignored by default
+ * (hidden unless toggled on, never suggested); linked ones stay visible as linked.
  */
 import { eq, inArray } from 'drizzle-orm'
 import type {
@@ -41,11 +41,6 @@ function externalRow(
 				? entityName(link.entity_id)
 				: null,
 	}
-}
-
-function employeeDetail(title: string | null, email: string | null): string | null {
-	const text = [title, email].filter((p) => p !== null && p !== '').join(' · ')
-	return text === '' ? null : text
 }
 
 /** Suggests a name match when it is unique on both free sides. */
@@ -319,9 +314,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 	const externalName = new Map(allExternal.map((e) => [e.external_id, e.name]))
 
 	const { auto, suggestions } = matchEmployees(
-		locals.filter(
-			(e) => e.active === 1 && !linkByEmployee.has(e.id) && !ignoredByEmployee.has(e.id),
-		),
+		locals.filter((e) => !linkByEmployee.has(e.id) && !ignoredByEmployee.has(e.id)),
 		externals.filter((e) => e.active && !linkByExternal.has(e.external_id)),
 	)
 	// Only offer a suggestion when the employee has exactly one candidate.
@@ -334,19 +327,18 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 		.map((e): LinkBoardLocal => {
 			const link = linkByEmployee.get(e.id)
 			const ignored = ignoredByEmployee.get(e.id)
-			const defaultIgnored = e.active !== 1 && link === undefined && ignored === undefined
 			const pairs = candidates.get(e.id) ?? []
-			const pair = pairs.length === 1 && !ignored && !defaultIgnored ? pairs[0] : undefined
+			const pair = pairs.length === 1 && !ignored ? pairs[0] : undefined
 			return {
 				id: e.id,
 				name: e.name,
-				detail: employeeDetail(e.title, primaryEmail(e.emails)),
+				detail: primaryEmail(e.emails),
 				serial: null,
 				active: e.active === 1,
 				link_id: link?.id ?? ignored?.id ?? null,
 				external_id: link?.external_id ?? null,
 				external_name: link ? (externalName.get(link.external_id) ?? null) : null,
-				ignored: ignored !== undefined || defaultIgnored,
+				ignored: ignored !== undefined,
 				suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
 			}
 		})
@@ -364,7 +356,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 				{
 					external_id: e.external_id,
 					name: e.name,
-					detail: employeeDetail(e.title, e.email),
+					detail: e.email || null,
 					serial: null,
 					active: e.active,
 				},

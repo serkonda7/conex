@@ -1,3 +1,4 @@
+import { IconBan, IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
@@ -12,6 +13,7 @@ import {
 	link_external,
 	unlink_external,
 } from '../../api/integrations'
+import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { useAction } from '../../lib/resource'
@@ -406,10 +408,12 @@ export function LinkBoardView(props: {
 					>
 						<button
 							type="button"
-							class="btn-small"
+							class="icon-btn icon-btn-danger"
+							title={t('integration.unlink')}
+							aria-label={t('integration.unlink')}
 							onClick={inRow(() => void unlink(row.link_id ?? 0, externalId))}
 						>
-							{t('integration.unlink')}
+							<IconUnlink size={20} />
 						</button>
 					</Show>
 				</>
@@ -421,10 +425,12 @@ export function LinkBoardView(props: {
 				<Show when={props.editable && ignoresLocal()}>
 					<button
 						type="button"
-						class="btn-small"
+						class="icon-btn"
+						title={t('integration.ignore')}
+						aria-label={t('integration.ignore')}
 						onClick={inRow(() => void ignoreLocal(row.id))}
 					>
-						{t('integration.ignore')}
+						<IconBan size={20} />
 					</button>
 				</Show>
 			)
@@ -437,19 +443,23 @@ export function LinkBoardView(props: {
 				<Show when={props.editable}>
 					<button
 						type="button"
-						class="btn-small"
+						class="icon-btn icon-btn-connect"
+						title={t('integration.confirmLink')}
+						aria-label={t('integration.confirmLink')}
 						onClick={inRow(() => void linkPairs([[row.id, suggested]]))}
 					>
-						{t('integration.confirmLink')}
+						<IconLinkPlus size={20} />
 					</button>
 				</Show>
 				<Show when={props.editable && ignoresLocal()}>
 					<button
 						type="button"
-						class="btn-small"
+						class="icon-btn"
+						title={t('integration.ignore')}
+						aria-label={t('integration.ignore')}
 						onClick={inRow(() => void ignoreLocal(row.id))}
 					>
-						{t('integration.ignore')}
+						<IconBan size={20} />
 					</button>
 				</Show>
 			</>
@@ -462,10 +472,12 @@ export function LinkBoardView(props: {
 				<Show when={props.editable}>
 					<button
 						type="button"
-						class="btn-small"
+						class="icon-btn"
+						title={t('integration.ignore')}
+						aria-label={t('integration.ignore')}
 						onClick={inRow(() => void ignore(row.external_id))}
 					>
-						{t('integration.ignore')}
+						<IconBan size={20} />
 					</button>
 				</Show>
 			)
@@ -584,7 +596,9 @@ export function LinkBoardView(props: {
 							disabled={busy()}
 							onClick={() => void linkPairs(suggestions())}
 						>
-							{tp('integration.linkSuggestions', suggestions().length)}
+							<IconLabel icon={IconLinkPlus}>
+								{tp('integration.linkSuggestions', suggestions().length)}
+							</IconLabel>
 						</button>
 					</Show>
 					<Show

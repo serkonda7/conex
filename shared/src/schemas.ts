@@ -1206,8 +1206,14 @@ export interface DeviceServiceJson {
 // P4: devices / interfaces
 // ---------------------------------------------------------------------------
 
-/** Device lifecycle label. Same closed set as racks so filters stay uniform. */
-export const DeviceStatusSchema = v.picklist(['active', 'planned', 'staged', 'decommissioned'])
+/** Device lifecycle label. */
+export const DeviceStatusSchema = v.picklist([
+	'active',
+	'inactive',
+	'planned',
+	'staged',
+	'decommissioned',
+])
 
 export type DeviceStatus = v.InferOutput<typeof DeviceStatusSchema>
 
@@ -2514,6 +2520,11 @@ export const ExternalEmployeeUpdateSchema = v.strictObject({
 	field: v.picklist(EMPLOYEE_PUSH_FIELDS),
 })
 
+/** Deactivates an external employee, whether or not they are linked to conex. */
+export const ExternalEmployeeDeactivateSchema = v.strictObject({
+	external_id: ExternalIdSchema,
+})
+
 export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
 export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
 export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
@@ -2772,6 +2783,7 @@ export interface IntegrationFinding {
 		| 'priority'
 		| null
 	local: string | null
+	/** On an employee suggestion, the external employee's active/inactive status. */
 	remote: string | null
 }
 

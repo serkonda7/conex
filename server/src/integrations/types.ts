@@ -61,7 +61,7 @@ export interface ExternalDirectory {
 /** Manufacturer is matched by name like on create. */
 export type DeviceUpdate = Partial<Record<ExternalPushField, string>>
 
-export type EmployeeUpdate = Partial<Record<EmployeePushField, string>>
+export type EmployeeUpdate = Partial<Record<EmployeePushField, string>> & { active?: boolean }
 
 export interface DeviceInput {
 	externalTenantId: string

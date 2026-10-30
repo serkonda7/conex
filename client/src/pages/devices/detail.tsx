@@ -36,7 +36,7 @@ import { InlineError } from '../../components/feedback'
 import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel, faceLabel, portKindLabel, yesNo } from '../../i18n/labels'
+import { deviceRoleLabel, faceLabel, portKindLabel } from '../../i18n/labels'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
 import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
@@ -49,6 +49,7 @@ import { MoveTenantDialog } from './move_tenant_dialog'
 import { useOutletLocationOptions } from './outlet_location'
 import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
+import { DeviceStatusBadge } from './status'
 import { PortPeer } from './trace_peer'
 
 /**
@@ -244,14 +245,27 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		{
 			key: 'enabled',
 			label: t('device.enabled'),
-			getValue: (iface: InterfaceJson): string => yesNo(iface.enabled),
+			getValue: (iface: InterfaceJson): JSX.Element => (
+				<span class="badge" classList={{ 'badge-active': iface.enabled }}>
+					{iface.enabled ? t('device.enabled') : t('device.disabled')}
+				</span>
+			),
 		},
 		{
 			key: 'port',
 			label: t('device.portNumber'),
-			getValue: (iface: InterfaceJson): string => String(portNumbers().get(iface.id) ?? '—'),
+			getValue: (iface: InterfaceJson): JSX.Element => (
+				<span classList={{ 'text-muted': !iface.enabled }}>
+					{portNumbers().get(iface.id) ?? '—'}
+				</span>
+			),
 		},
-		nameColumn,
+		{
+			...nameColumn,
+			getValue: (iface: InterfaceJson): JSX.Element => (
+				<code classList={{ 'text-muted': !iface.enabled }}>{iface.name}</code>
+			),
+		},
 		connectionColumn,
 	]
 	/** Other ports show their kind instead. */
@@ -401,6 +415,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<ManagedServicePill service={service} />
 
 				<DetailCard label={t('device.details')}>
+					<dt>{t('common.status')}</dt>
+					<dd>
+						<DeviceStatusBadge status={device()?.status ?? 'active'} />
+					</dd>
 					<dt>{t('common.type')}</dt>
 					<dd>
 						<ForeignKeyLink

@@ -83,6 +83,7 @@ test('device add form layout', async ({ page }) => {
 
 	await page.goto('/devices/add')
 	await expect(page.locator('#device-name')).toBeVisible()
+	await expect(page.locator('#device-inactive')).not.toBeChecked()
 	await expect(page.locator('#device-employee')).toBeEnabled()
 	await expect(page.locator('.form-section-title')).toHaveCount(3)
 	await stabilizeForSnapshot(page)
@@ -98,6 +99,7 @@ test('device edit form layout', async ({ page }) => {
 
 	await page.goto(`/devices/${deviceId}/edit`)
 	await expect(page.locator('#device-edit-name')).toHaveValue('E2E Edge Server')
+	await expect(page.locator('#device-edit-inactive')).not.toBeChecked()
 	await expect(page.locator('#device-edit-rack')).toHaveValue('E2E Visual Rack')
 	await expect(page.locator('#device-edit-position')).toHaveValue('9')
 	await expect(page.locator('.form-section-title')).toHaveCount(3)

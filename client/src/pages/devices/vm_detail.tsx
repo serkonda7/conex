@@ -29,6 +29,7 @@ import type { Crumb } from '../../lib/router'
 import { canGlobal } from '../../lib/session'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { MoveTenantDialog } from './move_tenant_dialog'
+import { DeviceStatusBadge } from './status'
 
 /**
  * /devices/vm/:id — virtual machine detail: role, host (or cloud), tenant
@@ -99,6 +100,10 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 				<ManagedServicePill service={service} />
 
 				<DetailCard label={t('vm.details')}>
+					<dt>{t('common.status')}</dt>
+					<dd>
+						<DeviceStatusBadge status={vm()?.status ?? 'active'} />
+					</dd>
 					<dt>{tp('entity.deviceRole', 1)}</dt>
 					<dd>
 						<IconLabel icon={deviceRoleIcon(role()?.icon)}>

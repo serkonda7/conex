@@ -11,8 +11,9 @@ import {
 	IconLogout,
 	IconPlus,
 	IconUserCircle,
+	IconX,
 } from '@tabler/icons-solidjs'
-import { createSignal, For, type JSX, Show } from 'solid-js'
+import { createEffect, createSignal, For, type JSX, onCleanup, Show } from 'solid-js'
 import type { SessionUser } from '../api/auth'
 import { type MessageKey, t } from '../i18n'
 import { useDismiss } from '../lib/dismiss'
@@ -27,6 +28,7 @@ function NavShortcut(props: {
 	icon: typeof IconPlus
 	label: string
 	class?: string
+	onNavigate?: () => void
 }): JSX.Element {
 	return (
 		<button
@@ -39,6 +41,7 @@ function NavShortcut(props: {
 				e.stopPropagation()
 				if (props.href) {
 					goTo(e, props.href)
+					props.onNavigate?.()
 				}
 			}}
 		>
@@ -74,7 +77,11 @@ function setCollapsed(next: boolean): void {
  * One section row: icon and list link plus the add/import shortcuts
  * (the shortcuts are hidden while the sidebar is collapsed).
  */
-function NavItem(props: { section: Section }): JSX.Element {
+function NavItem(props: {
+	section: Section
+	collapsed: boolean
+	onNavigate?: () => void
+}): JSX.Element {
 	const href = (): string => `/${props.section.path}`
 	const active = (): boolean => {
 		const current = routeSection(path())
@@ -97,8 +104,12 @@ function NavItem(props: { section: Section }): JSX.Element {
 				href={href()}
 				class={active() ? 'active' : ''}
 				aria-current={active() ? 'page' : undefined}
-				aria-label={collapsed() ? label() : undefined}
-				title={collapsed() ? label() : undefined}
+				aria-label={props.collapsed ? label() : undefined}
+				title={props.collapsed ? label() : undefined}
+				onClick={(e: MouseEvent): void => {
+					goTo(e, href())
+					props.onNavigate?.()
+				}}
 			>
 				<Show when={props.section.icon}>
 					{(icon: () => NonNullable<Section['icon']>): JSX.Element => {
@@ -112,11 +123,12 @@ function NavItem(props: { section: Section }): JSX.Element {
 				</Show>
 				<span class="app-nav-text">{label()}</span>
 			</a>
-			<Show when={!collapsed() && canAddInSection(props.section)}>
+			<Show when={!props.collapsed && canAddInSection(props.section)}>
 				<Show when={props.section.hideAddInNav !== true}>
 					<NavShortcut
 						href={addHref()}
 						icon={IconPlus}
+						onNavigate={props.onNavigate}
 						label={
 							addHref()
 								? t('app.navAdd', { label: label() })
@@ -130,6 +142,7 @@ function NavItem(props: { section: Section }): JSX.Element {
 						icon={IconDownload}
 						label={t('app.navImport', { label: label() })}
 						class="app-nav-import"
+						onNavigate={props.onNavigate}
 					/>
 				</Show>
 			</Show>
@@ -138,7 +151,11 @@ function NavItem(props: { section: Section }): JSX.Element {
 }
 
 /** Account button with the language switcher, password change and logout in its dropdown. */
-function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JSX.Element {
+function UserMenu(props: {
+	user: SessionUser | null
+	onLogout: () => void
+	collapsed: boolean
+}): JSX.Element {
 	const [open, setOpen] = createSignal(false)
 	const [changingPassword, setChangingPassword] = createSignal(false)
 	const name = (): string => props.user?.username ?? '…'
@@ -153,7 +170,7 @@ function UserMenu(props: { user: SessionUser | null; onLogout: () => void }): JS
 				aria-haspopup="menu"
 				aria-expanded={open()}
 				aria-label={t('app.accountNamed', { name: name() })}
-				title={collapsed() ? name() : undefined}
+				title={props.collapsed ? name() : undefined}
 				onClick={() => setOpen(!open())}
 				onKeyDown={(e: KeyboardEvent): void => {
 					if (e.key === 'Escape') {
@@ -263,40 +280,83 @@ function navSections(paths: readonly string[]): Section[] {
 }
 
 /** Labeled group; collapsed, the label gives way to a divider. */
-function NavGroupSection(props: { group: NavGroup; sections: Section[] }): JSX.Element {
+function NavGroupSection(props: {
+	group: NavGroup
+	sections: Section[]
+	collapsed: boolean
+	onNavigate?: () => void
+}): JSX.Element {
 	return (
 		<div class="app-nav-group">
 			<div class="app-nav-label">{t(props.group.label)}</div>
 			<For each={props.sections}>
-				{(section: Section): JSX.Element => <NavItem section={section} />}
+				{(section: Section): JSX.Element => (
+					<NavItem
+						section={section}
+						collapsed={props.collapsed}
+						onNavigate={props.onNavigate}
+					/>
+				)}
 			</For>
 		</div>
 	)
 }
 
-export function Sidebar(props: { user: SessionUser | null; onLogout: () => void }): JSX.Element {
+interface SidebarProps {
+	user: SessionUser | null
+	onLogout: () => void
+	mobile?: boolean
+	onClose?: () => void
+}
+
+export function Sidebar(props: SidebarProps): JSX.Element {
+	const isCollapsed = (): boolean => !props.mobile && collapsed()
 	return (
 		<aside
-			classList={{ 'app-sidebar': true, collapsed: collapsed() }}
+			classList={{ 'app-sidebar': true, collapsed: isCollapsed() }}
 			aria-label={t('app.mainNavigation')}
 		>
+			<Show when={props.mobile}>
+				<div class="app-mobile-nav-header">
+					<strong>{t('app.mainNavigation')}</strong>
+					<button
+						type="button"
+						class="app-mobile-nav-toggle"
+						aria-label={t('app.closeNavigation')}
+						onClick={props.onClose}
+					>
+						<IconX size={22} aria-hidden="true" />
+					</button>
+				</div>
+			</Show>
 			<nav class="app-nav">
 				<Show when={SECTIONS.find((section) => section.path === 'dashboard')}>
-					{(section: () => Section): JSX.Element => <NavItem section={section()} />}
+					{(section: () => Section): JSX.Element => (
+						<NavItem
+							section={section()}
+							collapsed={isCollapsed()}
+							onNavigate={props.onClose}
+						/>
+					)}
 				</Show>
 				<For each={NAV_GROUPS}>
 					{(group: NavGroup): JSX.Element => {
 						const sections = (): Section[] => navSections(group.paths)
 						return (
 							<Show when={sections().length > 0}>
-								<NavGroupSection group={group} sections={sections()} />
+								<NavGroupSection
+									group={group}
+									sections={sections()}
+									collapsed={isCollapsed()}
+									onNavigate={props.onClose}
+								/>
 							</Show>
 						)
 					}}
 				</For>
 			</nav>
 			<div class="app-sidebar-user">
-				<UserMenu user={props.user} onLogout={props.onLogout} />
+				<UserMenu user={props.user} onLogout={props.onLogout} collapsed={isCollapsed()} />
 				<button
 					type="button"
 					class="app-sidebar-toggle"
@@ -313,5 +373,46 @@ export function Sidebar(props: { user: SessionUser | null; onLogout: () => void 
 				</button>
 			</div>
 		</aside>
+	)
+}
+
+/** Native modal behavior provides focus containment, Escape and focus restoration. */
+export function MobileSidebar(
+	props: SidebarProps & { id: string; open: boolean; onClose: () => void },
+): JSX.Element {
+	let dialog: HTMLDialogElement | undefined
+
+	createEffect(() => {
+		if (props.open) {
+			dialog?.showModal()
+			const previousOverflow = document.body.style.overflow
+			document.body.style.overflow = 'hidden'
+			onCleanup(() => {
+				document.body.style.overflow = previousOverflow
+			})
+		} else {
+			dialog?.close()
+		}
+	})
+
+	return (
+		<dialog
+			ref={dialog}
+			id={props.id}
+			class="app-mobile-nav-dialog"
+			aria-label={t('app.mainNavigation')}
+			onCancel={(e: Event): void => {
+				e.preventDefault()
+				props.onClose()
+			}}
+			onClose={props.onClose}
+			onPointerDown={(e: PointerEvent): void => {
+				if (e.target === e.currentTarget) {
+					props.onClose()
+				}
+			}}
+		>
+			<Sidebar user={props.user} onLogout={props.onLogout} mobile onClose={props.onClose} />
+		</dialog>
 	)
 }

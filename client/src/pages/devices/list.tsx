@@ -33,6 +33,7 @@ import { navigate, parseId } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { MoveTenantDialog } from './move_tenant_dialog'
+import { DeviceStatusBadge } from './status'
 
 /** Detail route of a list row: `/devices/:id` or `/devices/vm/:id`. */
 export function deviceListHref(row: DeviceListItem): string {
@@ -102,6 +103,12 @@ export function DevicesPage(): JSX.Element {
 			label: tp('entity.device', 1),
 			sortable: true,
 			getValue: (d: DeviceListItem): JSX.Element => <a href={deviceListHref(d)}>{d.name}</a>,
+		},
+		{
+			key: 'status',
+			label: t('common.status'),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element => <DeviceStatusBadge status={d.status} />,
 		},
 		{
 			key: 'device_id',

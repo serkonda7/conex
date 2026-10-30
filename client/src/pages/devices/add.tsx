@@ -6,6 +6,7 @@ import { fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
+	CheckboxField,
 	DescriptionField,
 	FormPage,
 	FormSection,
@@ -16,6 +17,7 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
+import { deviceStatusLabel } from '../../i18n/labels'
 import {
 	type FormValues,
 	id_value,
@@ -51,7 +53,7 @@ export function queryFace(): string {
 /**
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
  * pre-fills it from that device, except the name, serial, device ID,
- * U position and employee assignment, which are chosen per device.
+ * U position, status and employee assignment, which are chosen per device.
  *
  * Shares its layout (sections, field order, rack mount row) with the edit
  * form in `edit.tsx`, so a device looks the same while created and edited;
@@ -65,6 +67,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
+	const [inactive, setInactive] = createSignal(false)
 	const [employeeId, setEmployeeId] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
@@ -184,6 +187,7 @@ export function DeviceAddPage(): JSX.Element {
 					device_type_id: Number(typeId()),
 					device_role_id: Number(roleId()),
 					name: values.name,
+					status: inactive() ? 'inactive' : 'active',
 					description: text(description()),
 					serial: text(serial()),
 					device_id: text(deviceId()),
@@ -250,6 +254,12 @@ export function DeviceAddPage(): JSX.Element {
 					maxLength={100}
 					value={deviceId()}
 					onInput={setDeviceId}
+				/>
+				<CheckboxField
+					id="device-inactive"
+					label={deviceStatusLabel('inactive')}
+					checked={inactive()}
+					onChange={setInactive}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

@@ -199,7 +199,9 @@ export function TenantContextSelector(props: { scoped: boolean; canAdd: boolean 
 			fallback={
 				<span class="app-tenant-context app-tenant-context-fixed">
 					<span class="visually-hidden">{t('app.tenantContext')}: </span>
-					{contextTenantRows()[0]?.name ?? '…'}
+					<span class="app-tenant-context-label">
+						{contextTenantRows()[0]?.name ?? '…'}
+					</span>
 				</span>
 			}
 		>

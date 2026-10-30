@@ -37,14 +37,14 @@ export function EndToEndPeer(props: { peer: TraceEndToEnd }): JSX.Element {
 									<code class="peer-port">{port().name}</code>
 								</>
 							)}
-						</Show>
+						</Show>{' '}
+						<small>
+							{t('device.trace.via', { via: via() })}
+							<Show when={props.peer.split}> {t('device.trace.split')}</Show>
+						</small>
 					</>
 				)}
-			</Show>{' '}
-			<small>
-				{t('device.trace.via', { via: via() })}
-				<Show when={props.peer.split}> {t('device.trace.split')}</Show>
-			</small>
+			</Show>
 		</span>
 	)
 }

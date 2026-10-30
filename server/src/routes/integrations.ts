@@ -5,6 +5,7 @@ import { type Context, Hono } from 'hono'
 import {
 	ExternalDeviceCreateSchema,
 	ExternalDeviceUpdateSchema,
+	ExternalEmployeeDeactivateSchema,
 	ExternalEmployeeImportSchema,
 	ExternalEmployeeUpdateSchema,
 	ExternalIgnoreLocalSchema,
@@ -64,7 +65,7 @@ import {
 import { getSyncRun, startSync } from '../integrations/sync'
 import { createTicket, listTickets } from '../integrations/tickets'
 import { updateExternalDevice } from '../integrations/update_device'
-import { updateExternalEmployee } from '../integrations/update_employee'
+import { deactivateExternalEmployee, updateExternalEmployee } from '../integrations/update_employee'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -693,6 +694,32 @@ export const integrationsApp = new Hono()
 				return externalDenied
 			}
 			return sendResult(c, await updateExternalDevice(provider, input.device_id, input.field))
+		},
+	)
+	.put(
+		'/:provider/employees/deactivate',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalEmployeeDeactivateSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const { external_id } = c.req.valid('json')
+			const denied = requirePermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const external = await readEmployee(provider, external_id)
+			if (!external) {
+				return notFound(c, 'External employee not found')
+			}
+			const externalDenied = await checkExternalWrite(
+				c,
+				provider,
+				external.external_tenant_ids,
+			)
+			if (externalDenied) {
+				return externalDenied
+			}
+			return sendResult(c, await deactivateExternalEmployee(provider, external_id))
 		},
 	)
 	.put(

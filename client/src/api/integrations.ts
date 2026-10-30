@@ -5,8 +5,6 @@
  */
 import { Result } from 'better-result'
 import type {
-	DeviceIntegrationStatus,
-	EmployeeIntegrationStatus,
 	EmployeePushField,
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
@@ -34,8 +32,6 @@ import { t } from '../i18n'
 import { client, failed, to_query, to_result } from './client'
 
 export type {
-	DeviceIntegrationStatus,
-	EmployeeIntegrationStatus,
 	ExternalEmployeeJson,
 	ExternalLinkJson,
 	ExternalTenantJson,
@@ -223,26 +219,6 @@ export async function fetch_tenant_integration(
 	return to_result<TenantIntegrationStatus>(res, t('integration.statusFailed'))
 }
 
-export async function fetch_device_integration(
-	provider: IntegrationProvider,
-	deviceId: number,
-): Promise<Result<DeviceIntegrationStatus, Error>> {
-	const res = await client.integrations[':provider']['device-status'][':id'].$get({
-		param: { provider, id: String(deviceId) },
-	})
-	return to_result<DeviceIntegrationStatus>(res, t('integration.statusFailed'))
-}
-
-export async function fetch_employee_integration(
-	provider: IntegrationProvider,
-	employeeId: number,
-): Promise<Result<EmployeeIntegrationStatus, Error>> {
-	const res = await client.integrations[':provider']['employee-status'][':id'].$get({
-		param: { provider, id: String(employeeId) },
-	})
-	return to_result<EmployeeIntegrationStatus>(res, t('integration.statusFailed'))
-}
-
 export async function link_external(
 	provider: IntegrationProvider,
 	entity_type: LinkEntityType,
@@ -338,6 +314,18 @@ export async function update_external_employee(
 	const res = await client.integrations[':provider'].employees.$put({
 		param: { provider },
 		json: { employee_id, field },
+	})
+	return to_result<ExternalEmployeeJson>(res, t('integration.updateExternalEmployeeFailed'))
+}
+
+/** Deactivates an external employee, including one not linked to conex. */
+export async function deactivate_external_employee(
+	provider: IntegrationProvider,
+	external_id: string,
+): Promise<Result<ExternalEmployeeJson, Error>> {
+	const res = await client.integrations[':provider'].employees.deactivate.$put({
+		param: { provider },
+		json: { external_id },
 	})
 	return to_result<ExternalEmployeeJson>(res, t('integration.updateExternalEmployeeFailed'))
 }
