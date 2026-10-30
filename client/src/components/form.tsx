@@ -18,6 +18,31 @@ import { InlineError, Loading } from './feedback'
 /** One `SelectField` entry. */
 export type FormOption = ComboboxOption
 
+/**
+ * Feeds the mouse position to the `.combobox-preview` rule in `styles.css`, so
+ * previews float at the cursor; keyboard use keeps their anchored placement.
+ */
+export function useCursorPreview(): void {
+	onMount(() => {
+		const root = document.documentElement
+		const track = (e: MouseEvent): void => {
+			root.style.setProperty('--cursor-x', `${e.clientX}px`)
+			root.style.setProperty('--cursor-y', `${e.clientY}px`)
+			root.dataset.input = 'mouse'
+		}
+		const keyboard = (): void => {
+			root.dataset.input = 'keyboard'
+		}
+		document.addEventListener('mousemove', track)
+		document.addEventListener('keydown', keyboard)
+		onCleanup(() => {
+			document.removeEventListener('mousemove', track)
+			document.removeEventListener('keydown', keyboard)
+			delete root.dataset.input
+		})
+	})
+}
+
 /** Maps list rows (`{ id, name }`) to `SelectField` options. */
 export function row_options(rows: readonly { id: number; name: string }[]): FormOption[] {
 	return rows.map((row) => ({ value: row.id, label: row.name }))
@@ -274,25 +299,10 @@ export function SelectField(props: {
 		if (props.autofocus === true) {
 			document.querySelector(`#${CSS.escape(props.id)}`)?.setAttribute('data-autofocus', '')
 		}
-		if (props.info === true) {
-			const root = document.documentElement
-			const track = (e: MouseEvent): void => {
-				root.style.setProperty('--cursor-x', `${e.clientX}px`)
-				root.style.setProperty('--cursor-y', `${e.clientY}px`)
-				root.dataset.input = 'mouse'
-			}
-			const keyboard = (): void => {
-				root.dataset.input = 'keyboard'
-			}
-			document.addEventListener('mousemove', track)
-			document.addEventListener('keydown', keyboard)
-			onCleanup(() => {
-				document.removeEventListener('mousemove', track)
-				document.removeEventListener('keydown', keyboard)
-				delete root.dataset.input
-			})
-		}
 	})
+	if (props.info === true) {
+		useCursorPreview()
+	}
 
 	function openAddForm(name: string): void {
 		const href = props.add?.href

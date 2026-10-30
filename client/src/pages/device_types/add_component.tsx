@@ -2,9 +2,16 @@ import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { PASS_THROUGH_PORT_TYPES, type PassThroughPortType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
 import { InlineError } from '../../components/feedback'
-import { DescriptionField, Hint, SelectField, TextField } from '../../components/form'
+import {
+	DescriptionField,
+	Hint,
+	SelectField,
+	TextField,
+	useCursorPreview,
+} from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
@@ -13,15 +20,20 @@ import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
 import { COMPONENT_CLASSES, type ComponentClassInfo } from './components'
+import { CassetteIcon, PatchPanelIcon } from './connector_icons'
 
 const MAX_COUNT = 1024
 
 /** Quick-add presets of patch-panel port pairs. */
 export type PassThroughPreset = 'patch-panel' | 'cassette'
 
-const PRESETS: readonly { key: PassThroughPreset; label: MessageKey }[] = [
-	{ key: 'patch-panel', label: 'deviceType.preset.patchPanel' },
-	{ key: 'cassette', label: 'deviceType.preset.cassette' },
+const PRESETS: readonly {
+	key: PassThroughPreset
+	label: MessageKey
+	icon: ComponentClassInfo['icon']
+}[] = [
+	{ key: 'patch-panel', label: 'deviceType.preset.patchPanel', icon: PatchPanelIcon },
+	{ key: 'cassette', label: 'deviceType.preset.cassette', icon: CassetteIcon },
 ]
 
 const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
@@ -30,6 +42,15 @@ const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPo
 function parseCount(value: string): number | null {
 	const n = Number(value)
 	return Number.isInteger(n) && n >= 1 && n <= MAX_COUNT ? n : null
+}
+
+/** Connector drawing that floats at the cursor while its menu item is hovered. */
+function ItemPreview(props: { icon: ComponentClassInfo['icon'] }): JSX.Element {
+	return (
+		<span class="combobox-preview add-component-preview" aria-hidden="true">
+			<Dynamic component={props.icon} />
+		</span>
+	)
 }
 
 /**
@@ -42,6 +63,7 @@ export function AddComponentMenu(props: {
 }): JSX.Element {
 	const [open, setOpen] = createSignal(false)
 	useDismiss('.add-component-menu', () => setOpen(false))
+	useCursorPreview()
 
 	return (
 		<div class="add-component-menu">
@@ -73,6 +95,7 @@ export function AddComponentMenu(props: {
 								}}
 							>
 								{t(info.label)}
+								<ItemPreview icon={info.icon} />
 							</button>
 						)}
 					</For>
@@ -89,6 +112,7 @@ export function AddComponentMenu(props: {
 								}}
 							>
 								{t(preset.label)}
+								<ItemPreview icon={preset.icon} />
 							</button>
 						)}
 					</For>

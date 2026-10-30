@@ -2261,6 +2261,29 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background-color: var(--bg-hover);
 }
 
+/* Icon hint per item; the menu sits at the page's right edge, so without a
+   mouse the preview opens to the left. */
+.add-component-item {
+	position: relative;
+}
+
+.add-component-preview {
+	display: none;
+	line-height: 0;
+	pointer-events: none;
+}
+
+.add-component-item:hover .add-component-preview,
+.add-component-item:focus-visible .add-component-preview {
+	display: block;
+}
+
+:root:not([data-input="mouse"]) .add-component-preview {
+	top: 0;
+	left: auto;
+	right: calc(100% + 0.4rem);
+}
+
 .add-component-dropdown hr {
 	width: 100%;
 	margin: 0.25rem 0;

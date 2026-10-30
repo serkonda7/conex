@@ -1,5 +1,5 @@
 # Porttypen
-## Netzwerk-Schnittstellen
+## Netzwerkschnittstellen
 
 | Gruppe     | Typen                                                                                                                                                                                                                                                                         |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -11,7 +11,7 @@
 | Mobilfunk  | LTE (`lte`), 5G (`5g`)                                                                                                                                                                                                                                                        |
 | Sonstige   | Other (`other`)                                                                                                                                                                                                                                                               |
 
-## Anschlüsse
+## USB & Seriell
 
 | Gruppe    | Typen                                                                                                                                                                                       |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,8 +23,8 @@
 
 | Klasse               | Typen                                                                       |
 | -------------------- | --------------------------------------------------------------------------- |
-| Stromanschlüsse      | Strom (`power`)                                                             |
-| Steckdosen           | Steckdose (`power-outlet`)                                                  |
+| Stromeingänge        | Strom (`power`), Gerät nimmt Strom auf (z. B. Netzteil)                     |
+| Stromausgänge        | Steckdose (`power-outlet`), Gerät gibt Strom ab (z. B. PDU)                 |
 | Bildschirmanschlüsse | HDMI (`hdmi`), DisplayPort (`displayport`), VGA (`vga`), DVI (`dvi`)        |
 
 

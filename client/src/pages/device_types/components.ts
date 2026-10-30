@@ -14,7 +14,17 @@ import {
 	type PortKind,
 	type PortSide,
 } from 'shared/src/schemas'
+import type { Component } from 'solid-js'
 import type { MessageKey } from '../../i18n'
+import {
+	HdmiIcon,
+	IecInletIcon,
+	KeystoneIcon,
+	PunchDownIcon,
+	Rj45Icon,
+	SchukoIcon,
+	UsbAIcon,
+} from './connector_icons'
 
 export type ComponentClass =
 	| 'interface'
@@ -31,6 +41,8 @@ export interface ComponentClassInfo {
 	label: MessageKey
 	/** Table heading with a `{count}` param. */
 	heading: MessageKey
+	/** Hover hint in the add menu: the connector's front view. */
+	icon: Component
 	/** Name placeholder of the add form. */
 	placeholder: string
 	/** Kinds offered by the add form; the first is the default. */
@@ -46,6 +58,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'interface',
 		label: 'deviceType.component.interface',
 		heading: 'deviceType.component.interfaces',
+		icon: Rj45Icon,
 		placeholder: 'eth',
 		kinds: ['ethernet', ...(Object.keys(NETBOX_INTERFACE_TYPES) as NetboxInterfaceType[])],
 	},
@@ -53,6 +66,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'port',
 		label: 'deviceType.component.port',
 		heading: 'deviceType.component.ports',
+		icon: UsbAIcon,
 		placeholder: 'usb',
 		kinds: ['port', ...GENERAL_PORT_KINDS],
 	},
@@ -60,6 +74,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'power-port',
 		label: 'deviceType.component.powerPort',
 		heading: 'deviceType.component.powerPorts',
+		icon: IecInletIcon,
 		placeholder: 'PSU',
 		kinds: ['power'],
 	},
@@ -67,6 +82,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'power-outlet',
 		label: 'deviceType.component.powerOutlet',
 		heading: 'deviceType.component.powerOutlets',
+		icon: SchukoIcon,
 		placeholder: 'Outlet',
 		kinds: ['power-outlet'],
 	},
@@ -74,6 +90,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'display-port',
 		label: 'deviceType.component.displayPort',
 		heading: 'deviceType.component.displayPorts',
+		icon: HdmiIcon,
 		placeholder: 'HDMI',
 		kinds: DISPLAY_PORT_KINDS,
 	},
@@ -81,6 +98,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'front-port',
 		label: 'deviceType.component.frontPort',
 		heading: 'deviceType.component.frontPorts',
+		icon: KeystoneIcon,
 		placeholder: 'Port',
 		kinds: PASS_THROUGH_KINDS,
 		side: 'front',
@@ -89,6 +107,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		key: 'rear-port',
 		label: 'deviceType.component.rearPort',
 		heading: 'deviceType.component.rearPorts',
+		icon: PunchDownIcon,
 		placeholder: 'Port',
 		kinds: PASS_THROUGH_KINDS,
 		side: 'rear',
