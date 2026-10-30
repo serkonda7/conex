@@ -293,6 +293,8 @@ export function SelectField(props: {
 	reload?: () => unknown
 	/** Entity label and add-form path of the pinned "Add …" entry. */
 	add?: { label: string; href: string }
+	/** Extra class of the combobox, e.g. `combobox-fit`. */
+	class?: string
 }): JSX.Element {
 	onMount(() => {
 		// The tab shell refocuses `[data-autofocus]` when the tab is reactivated.
@@ -316,6 +318,7 @@ export function SelectField(props: {
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
 			<Combobox
 				id={props.id}
+				class={props.class}
 				value={props.value}
 				onChange={props.onChange}
 				options={props.options}

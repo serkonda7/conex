@@ -671,32 +671,32 @@ export const USB_PORT_KINDS = [
 export const GENERAL_PORT_KINDS = [...SERIAL_PORT_KINDS, ...USB_PORT_KINDS] as const
 
 /**
- * Common NetBox interface types with NetBox's display names. They are
+ * Common NetBox interface types with their display names. These are
  * technical identifiers, so the labels stay untranslated.
  */
 export const NETBOX_INTERFACE_TYPES = {
 	virtual: 'Virtual',
 	bridge: 'Bridge',
 	lag: 'Link Aggregation Group (LAG)',
-	'100base-tx': '100BASE-TX (10/100ME)',
-	'1000base-t': '1000BASE-T (1GE)',
-	'2.5gbase-t': '2.5GBASE-T (2.5GE)',
-	'5gbase-t': '5GBASE-T (5GE)',
-	'10gbase-t': '10GBASE-T (10GE)',
-	'1000base-x-sfp': 'SFP (1GE)',
-	'10gbase-x-sfpp': 'SFP+ (10GE)',
-	'25gbase-x-sfp28': 'SFP28 (25GE)',
-	'40gbase-x-qsfpp': 'QSFP+ (40GE)',
-	'50gbase-x-sfp56': 'SFP56 (50GE)',
-	'100gbase-x-qsfp28': 'QSFP28 (100GE)',
-	'200gbase-x-qsfp56': 'QSFP56 (200GE)',
-	'400gbase-x-qsfpdd': 'QSFP-DD (400GE)',
-	'ieee802.11a': 'IEEE 802.11a',
-	'ieee802.11g': 'IEEE 802.11b/g',
-	'ieee802.11n': 'IEEE 802.11n',
-	'ieee802.11ac': 'IEEE 802.11ac',
-	'ieee802.11ax': 'IEEE 802.11ax',
-	'ieee802.11be': 'IEEE 802.11be',
+	'100base-tx': '10/100M (100BASE-TX)',
+	'1000base-t': '1G (1000BASE-T)',
+	'2.5gbase-t': '2.5G (2.5GBASE-T)',
+	'5gbase-t': '5G (5GBASE-T)',
+	'10gbase-t': '10G (10GBASE-T)',
+	'1000base-x-sfp': '1G (SFP)',
+	'10gbase-x-sfpp': '10G (SFP+)',
+	'25gbase-x-sfp28': '25G (SFP28)',
+	'40gbase-x-qsfpp': '40G (QSFP+)',
+	'50gbase-x-sfp56': '50G (SFP56)',
+	'100gbase-x-qsfp28': '100G (QSFP28)',
+	'200gbase-x-qsfp56': '200G (QSFP56)',
+	'400gbase-x-qsfpdd': '400G (QSFP-DD)',
+	'ieee802.11a': 'Wi-Fi (IEEE 802.11a, 5 GHz)',
+	'ieee802.11g': 'Wi-Fi (IEEE 802.11b/g, 2.4 GHz)',
+	'ieee802.11n': 'Wi-Fi 4 (IEEE 802.11n)',
+	'ieee802.11ac': 'Wi-Fi 5 (IEEE 802.11ac)',
+	'ieee802.11ax': 'Wi-Fi 6 (IEEE 802.11ax)',
+	'ieee802.11be': 'Wi-Fi 7 (IEEE 802.11be)',
 	lte: 'LTE',
 	'5g': '5G',
 	other: 'Other',
@@ -704,7 +704,7 @@ export const NETBOX_INTERFACE_TYPES = {
 
 export type NetboxInterfaceType = keyof typeof NETBOX_INTERFACE_TYPES
 
-/** Interface kinds offered when adding stubs; stored kinds stay free-form (NetBox types). */
+/** Common and legacy port kinds; stored kinds stay free-form (including NetBox types). */
 export const PORT_KINDS = [
 	'ethernet',
 	'port',

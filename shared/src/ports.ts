@@ -28,15 +28,18 @@ const SAME_KIND_PASS_THROUGH = new Set<string>(
 )
 
 /** Transceiver interfaces (SFP, QSFP, …); fiber patch-panel ports cable to them. */
-const TRANSCEIVER_KINDS = new Set<string>(
+export const TRANSCEIVER_KINDS = new Set<string>(
 	Object.keys(NETBOX_INTERFACE_TYPES).filter((k) => k.includes('sfp')),
 )
 
+export const WIFI_KINDS = new Set<string>(
+	Object.keys(NETBOX_INTERFACE_TYPES).filter((k) => k.startsWith('ieee802.11')),
+)
+
+export const CELLULAR_KINDS = new Set<string>(['lte', '5g'])
+
 /** Wireless interface families; they only pair within their own family, never with wired ports. */
-const WIRELESS_FAMILIES = [
-	new Set<string>(Object.keys(NETBOX_INTERFACE_TYPES).filter((k) => k.startsWith('ieee802.11'))),
-	new Set<string>(['lte', '5g']),
-]
+const WIRELESS_FAMILIES: Set<string>[] = [WIFI_KINDS, CELLULAR_KINDS]
 
 /** Connector families cabled across connectors (rollover, USB-A to USB-C, …). */
 const PORT_FAMILIES = [new Set<string>(SERIAL_PORT_KINDS), new Set<string>(USB_PORT_KINDS)]

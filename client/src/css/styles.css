@@ -1919,6 +1919,14 @@ tbody tr:last-child td {
 	box-shadow: var(--shadow);
 }
 
+/* List as wide as its labels, even past the field. */
+.combobox-fit .combobox-list {
+	right: auto;
+	width: max-content;
+	min-width: 100%;
+	max-width: calc(100vw - 2rem);
+}
+
 .combobox-option,
 .combobox-empty,
 .combobox-value {

@@ -1,5 +1,6 @@
 /** Glyphs for API enum values (location types, device role icons). */
 import {
+	IconAntennaBars5,
 	IconBatteryCharging,
 	IconBuilding,
 	IconCloud,
@@ -23,10 +24,12 @@ import {
 	IconStack2,
 	IconWifi,
 } from '@tabler/icons-solidjs'
+import { CELLULAR_KINDS, TRANSCEIVER_KINDS, WIFI_KINDS } from 'shared/src/ports'
 import {
 	COPPER_PASS_THROUGH_TYPES,
 	type DeviceRoleIcon,
 	type LocationType,
+	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
 } from 'shared/src/schemas'
 import type { Component } from 'solid-js'
@@ -75,4 +78,21 @@ export function deviceRoleIcon(value: string | null | undefined): IconComponent 
 /** Patch panel port glyph: RJ-45 for copper connectors, fiber for the rest. */
 export function panelKindIcon(kind: string): IconComponent {
 	return COPPER_PASS_THROUGH_TYPES.includes(kind as PassThroughPortType) ? IconRj45 : IconFiber
+}
+
+/** Medium glyph of a port kind (copper, fiber, Wi-Fi, cellular), if it has one. */
+export function portKindIcon(kind: string): IconComponent | undefined {
+	if (Object.hasOwn(PASS_THROUGH_PORT_TYPES, kind)) {
+		return panelKindIcon(kind)
+	}
+	if (WIFI_KINDS.has(kind)) {
+		return IconWifi
+	}
+	if (CELLULAR_KINDS.has(kind)) {
+		return IconAntennaBars5
+	}
+	if (TRANSCEIVER_KINDS.has(kind)) {
+		return IconFiber
+	}
+	return kind === 'ethernet' || kind.includes('base-t') ? IconRj45 : undefined
 }

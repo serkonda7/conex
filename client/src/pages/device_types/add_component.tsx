@@ -15,7 +15,7 @@ import {
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
-import { portKindLabel } from '../../i18n/labels'
+import { portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
@@ -146,7 +146,10 @@ export function ComponentDialog(props: {
 		String(stub?.rear_stub_id ?? props.rearStubs[0]?.id ?? ''),
 	)
 	const [rearPosition, setRearPosition] = createSignal(String(stub?.rear_position ?? 1))
-	const [kind, setKind] = createSignal<string>(stub?.kind ?? props.info.kinds[0] ?? 'ethernet')
+	const [kind, setKind] = createSignal<string>(
+		stub?.kind ??
+			(props.info.key === 'interface' ? '1000base-t' : (props.info.kinds[0] ?? 'port')),
+	)
 	const [label, setLabel] = createSignal(stub?.label ?? '')
 	const [description, setDescription] = createSignal(stub?.description ?? '')
 	const [error, setError] = createSignal<string | null>(null)
@@ -316,10 +319,8 @@ export function ComponentDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
-					options={kinds.map((k) => ({
-						value: k,
-						label: portKindLabel(k),
-					}))}
+					class="combobox-fit"
+					options={kinds.map(portKindOption)}
 				/>
 				<TextField
 					id={`${prefix}-label`}
@@ -441,7 +442,7 @@ export function PassThroughPresetDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
-					options={PASS_THROUGH_KINDS.map((k) => ({ value: k, label: portKindLabel(k) }))}
+					options={PASS_THROUGH_KINDS.map(portKindOption)}
 				/>
 				<Show when={cassette}>
 					<TextField

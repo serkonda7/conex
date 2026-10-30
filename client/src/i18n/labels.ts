@@ -39,7 +39,7 @@ import {
 import type { RackFormFactor } from '../api/templates'
 import type { FormOption } from '../components/form'
 import { RackFormFactorSchematic } from '../components/rack_form_factor'
-import { deviceRoleIcon, locationTypeIcon } from '../lib/icons'
+import { deviceRoleIcon, locationTypeIcon, portKindIcon } from '../lib/icons'
 import type { DurationUnit } from '../lib/service_level'
 import { type MessageKey, t } from '.'
 
@@ -120,7 +120,7 @@ const PORT_KIND_KEYS: Record<PortKind, MessageKey> = {
 
 /**
  * Interface kind (`ethernet`, `hdmi`, …). NetBox interface types show their
- * untranslated NetBox name; unknown types fall back to the raw value.
+ * untranslated display name; unknown types fall back to the raw value.
  */
 export function portKindLabel(value: string): string {
 	if (Object.hasOwn(NETBOX_INTERFACE_TYPES, value)) {
@@ -130,6 +130,19 @@ export function portKindLabel(value: string): string {
 		return PASS_THROUGH_PORT_TYPES[value as keyof typeof PASS_THROUGH_PORT_TYPES]
 	}
 	return lookup(PORT_KIND_KEYS, value)
+}
+
+/** Option of a port kind; a trailing `(…)` goes to the detail column, which aligns it. */
+export function portKindOption(value: string): FormOption {
+	const label = portKindLabel(value)
+	const paren = label.indexOf(' (')
+	return {
+		value,
+		icon: portKindIcon(value),
+		...(paren === -1
+			? { label }
+			: { label: label.slice(0, paren), detail: label.slice(paren + 1) }),
+	}
 }
 
 const PORT_SIDE_KEYS: Record<PortSide, MessageKey> = {

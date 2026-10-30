@@ -60,7 +60,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		heading: 'deviceType.component.interfaces',
 		icon: Rj45Icon,
 		placeholder: 'eth',
-		kinds: ['ethernet', ...(Object.keys(NETBOX_INTERFACE_TYPES) as NetboxInterfaceType[])],
+		kinds: Object.keys(NETBOX_INTERFACE_TYPES) as NetboxInterfaceType[],
 	},
 	{
 		key: 'port',

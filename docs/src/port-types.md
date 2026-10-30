@@ -3,13 +3,14 @@
 
 | Gruppe     | Typen                                                                                                                                                                                                                                                                         |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Allgemein  | Ethernet (`ethernet`)                                                                                                                                                                                                                                                         |
 | Virtuell   | Virtual (`virtual`), Bridge (`bridge`), LAG (`lag`)                                                                                                                                                                                                                           |
-| Kupfer     | 100BASE-TX (`100base-tx`), 1000BASE-T (`1000base-t`), 2.5GBASE-T (`2.5gbase-t`), 5GBASE-T (`5gbase-t`), 10GBASE-T (`10gbase-t`)                                                                                                                                               |
-| Modular    | SFP (`1000base-x-sfp`), SFP+ (`10gbase-x-sfpp`), SFP28 (`25gbase-x-sfp28`), QSFP+ (`40gbase-x-qsfpp`), SFP56 (`50gbase-x-sfp56`), QSFP28 (`100gbase-x-qsfp28`), QSFP56 (`200gbase-x-qsfp56`), QSFP-DD (`400gbase-x-qsfpdd`)                                                   |
-| WLAN       | 802.11a (`ieee802.11a`), 802.11b/g (`ieee802.11g`), 802.11n (`ieee802.11n`), 802.11ac (`ieee802.11ac`), 802.11ax (`ieee802.11ax`), 802.11be (`ieee802.11be`)                                                                                                                  |
+| Kupfer     | 10/100M (100BASE-TX) (`100base-tx`), 1G (1000BASE-T) (`1000base-t`), 2.5G (2.5GBASE-T) (`2.5gbase-t`), 5G (5GBASE-T) (`5gbase-t`), 10G (10GBASE-T) (`10gbase-t`)                                                                                                           |
+| Modular    | 1G (SFP) (`1000base-x-sfp`), 10G (SFP+) (`10gbase-x-sfpp`), 25G (SFP28) (`25gbase-x-sfp28`), 40G (QSFP+) (`40gbase-x-qsfpp`), 50G (SFP56) (`50gbase-x-sfp56`), 100G (QSFP28) (`100gbase-x-qsfp28`), 200G (QSFP56) (`200gbase-x-qsfp56`), 400G (QSFP-DD) (`400gbase-x-qsfpdd`) |
+| WLAN       | Wi-Fi (IEEE 802.11a) (`ieee802.11a`), Wi-Fi (IEEE 802.11b/g) (`ieee802.11g`), Wi-Fi 4 (IEEE 802.11n) (`ieee802.11n`), Wi-Fi 5 (IEEE 802.11ac) (`ieee802.11ac`), Wi-Fi 6 (IEEE 802.11ax) (`ieee802.11ax`), Wi-Fi 7 (IEEE 802.11be) (`ieee802.11be`)                               |
 | Mobilfunk  | LTE (`lte`), 5G (`5g`)                                                                                                                                                                                                                                                        |
 | Sonstige   | Other (`other`)                                                                                                                                                                                                                                                               |
+
+Bestehende Schnittstellen mit dem älteren Typ Ethernet (`ethernet`) bleiben erhalten.
 
 ## USB & Seriell
 
