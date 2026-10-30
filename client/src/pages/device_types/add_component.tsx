@@ -2,7 +2,7 @@ import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { PASS_THROUGH_PORT_TYPES, type PassThroughPortType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
-import { create_stub, delete_stub, type StubRow } from '../../api/templates'
+import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
 import { InlineError } from '../../components/feedback'
 import { DescriptionField, Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
@@ -10,7 +10,7 @@ import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
 import { portKindLabel } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
-import { text } from '../../lib/form'
+import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
 import { COMPONENT_CLASSES, type ComponentClassInfo } from './components'
 
@@ -99,30 +99,40 @@ export function AddComponentMenu(props: {
 }
 
 /**
- * Add form for one component class: a name with a count (count N > 1 expands
- * to `name1..nameN`), the class's kinds, label and description. Rear ports
- * add their positions, front ports the rear port they map onto and the
- * first position they take there.
+ * Add or edit form for one component class (edit when `stub` is given): a name
+ * with a count (count N > 1 expands to `name1..nameN`), the class's kinds,
+ * label and description. Rear ports add their positions, front ports the rear
+ * port they map onto and the first position they take there.
  */
-export function AddComponentDialog(props: {
+export function ComponentDialog(props: {
 	deviceTypeId: number
 	info: ComponentClassInfo
+	/** Stub to edit; omitted when adding. */
+	stub?: StubRow
 	/** Rear port stubs of the type, offered to front ports. */
 	rearStubs: StubRow[]
 	onSaved: () => void
 	onClose: () => void
 }): JSX.Element {
-	const [name, setName] = createSignal('')
-	const [count, setCount] = createSignal('1')
-	const [positions, setPositions] = createSignal('1')
-	const [rearStub, setRearStub] = createSignal(String(props.rearStubs[0]?.id ?? ''))
-	const [rearPosition, setRearPosition] = createSignal('1')
-	const [kind, setKind] = createSignal<string>(props.info.kinds[0] ?? 'ethernet')
-	const [label, setLabel] = createSignal('')
-	const [description, setDescription] = createSignal('')
+	const stub = props.stub
+	const [name, setName] = createSignal(stub?.prefix ?? '')
+	const [count, setCount] = createSignal(String(stub?.count ?? 1))
+	const [positions, setPositions] = createSignal(String(stub?.positions ?? 1))
+	const [rearStub, setRearStub] = createSignal(
+		String(stub?.rear_stub_id ?? props.rearStubs[0]?.id ?? ''),
+	)
+	const [rearPosition, setRearPosition] = createSignal(String(stub?.rear_position ?? 1))
+	const [kind, setKind] = createSignal<string>(stub?.kind ?? props.info.kinds[0] ?? 'ethernet')
+	const [label, setLabel] = createSignal(stub?.label ?? '')
+	const [description, setDescription] = createSignal(stub?.description ?? '')
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
-	const prefix = `add-${props.info.key}`
+	const prefix = `${stub ? 'edit' : 'add'}-${props.info.key}`
+	// Stored kinds are free-form: keep an imported kind selectable.
+	const kinds: readonly string[] =
+		stub && !(props.info.kinds as readonly string[]).includes(stub.kind)
+			? [stub.kind, ...props.info.kinds]
+			: props.info.kinds
 
 	const parsedCount = (): number => Number(count())
 	const countValid = (): boolean =>
@@ -153,19 +163,34 @@ export function AddComponentDialog(props: {
 			setError(t('deviceType.component.rearPortRequired'))
 			return
 		}
+		const fields = {
+			count: parsedCount(),
+			kind: kind(),
+			label: text(label()),
+			description: text(description()),
+		}
+		const trimmed = name().trim()
+		const passThrough = {
+			...(side === 'rear' ? { positions: parsedPositions } : {}),
+			...(side === 'front'
+				? { rear_stub_id: Number(rearStub()), rear_position: parsedRearPosition }
+				: {}),
+		}
 		const ok = await save.run(() =>
-			create_stub(props.deviceTypeId, {
-				prefix: name().trim(),
-				count: parsedCount(),
-				kind: kind(),
-				label: text(label()),
-				description: text(description()),
-				...(side ? { side } : {}),
-				...(side === 'rear' ? { positions: parsedPositions } : {}),
-				...(side === 'front'
-					? { rear_stub_id: Number(rearStub()), rear_position: parsedRearPosition }
-					: {}),
-			}),
+			stub
+				? update_stub(props.deviceTypeId, stub.id, {
+						...cleared(fields),
+						...passThrough,
+						// Imported names may fall outside the prefix schema: only a
+						// rename is validated against it.
+						...(trimmed === stub.prefix ? {} : { prefix: trimmed }),
+					})
+				: create_stub(props.deviceTypeId, {
+						...fields,
+						...passThrough,
+						prefix: trimmed,
+						...(side ? { side } : {}),
+					}),
 		)
 		if (ok) {
 			props.onSaved()
@@ -174,7 +199,11 @@ export function AddComponentDialog(props: {
 
 	return (
 		<Modal
-			title={t('deviceType.component.addTitle', { component: t(props.info.label) })}
+			title={
+				stub
+					? t('deviceType.component.editTitle', { name: stub.prefix })
+					: t('deviceType.component.addTitle', { component: t(props.info.label) })
+			}
 			on_close={props.onClose}
 		>
 			<form class="form-stacked" onSubmit={handleSubmit}>
@@ -263,7 +292,7 @@ export function AddComponentDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
-					options={props.info.kinds.map((k) => ({
+					options={kinds.map((k) => ({
 						value: k,
 						label: portKindLabel(k),
 					}))}
@@ -282,7 +311,7 @@ export function AddComponentDialog(props: {
 				/>
 				<div class="modal-actions">
 					<button type="submit" disabled={!name().trim() || save.pending()}>
-						{t('common.create')}
+						{stub ? t('common.save') : t('common.create')}
 					</button>
 					<button type="button" onClick={props.onClose}>
 						{t('common.cancel')}

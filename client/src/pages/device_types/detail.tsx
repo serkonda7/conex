@@ -29,8 +29,8 @@ import { createRecord, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
 import {
-	AddComponentDialog,
 	AddComponentMenu,
+	ComponentDialog,
 	type PassThroughPreset,
 	PassThroughPresetDialog,
 } from './add_component'
@@ -44,6 +44,10 @@ import { COMPONENT_CLASSES, type ComponentClassInfo, componentClassOf } from './
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [adding, setAdding] = createSignal<ComponentClassInfo | null>(null)
+	const [editing, setEditing] = createSignal<{
+		info: ComponentClassInfo
+		stub: StubRow
+	} | null>(null)
 	const [preset, setPreset] = createSignal<PassThroughPreset | null>(null)
 	const id = (): number => props.id
 	const [deviceType] = createRecord(id, fetch_device_type, setError)
@@ -128,14 +132,23 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			? [...stubColumns.slice(0, 3), passThroughColumn, ...stubColumns.slice(3)]
 			: stubColumns
 
-	const stubActions = (s: StubRow): JSX.Element => (
-		<button
-			type="button"
-			class="btn-danger"
-			onClick={(): void => void run(() => delete_stub(props.id, s.id))}
-		>
-			{t('common.delete')}
-		</button>
+	const stubActions = (info: ComponentClassInfo, s: StubRow): JSX.Element => (
+		<div class="row-actions">
+			<Show when={can('edit')}>
+				<button type="button" onClick={(): void => void setEditing({ info, stub: s })}>
+					{t('common.edit')}
+				</button>
+			</Show>
+			<Show when={can('delete')}>
+				<button
+					type="button"
+					class="btn-danger"
+					onClick={(): void => void run(() => delete_stub(props.id, s.id))}
+				>
+					{t('common.delete')}
+				</button>
+			</Show>
+		</div>
 	)
 
 	return (
@@ -224,7 +237,11 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 									getRowId={(s: StubRow): number => s.id}
 									columns={columnsOf(info)}
 									showColumnCustomizer
-									rowActions={can('delete') ? stubActions : undefined}
+									rowActions={
+										can('edit') || can('delete')
+											? (s: StubRow): JSX.Element => stubActions(info, s)
+											: undefined
+									}
 								/>
 							</>
 						)}
@@ -233,7 +250,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 			</Show>
 			<Show when={adding()}>
 				{(info: () => ComponentClassInfo) => (
-					<AddComponentDialog
+					<ComponentDialog
 						deviceTypeId={props.id}
 						info={info()}
 						rearStubs={rearStubs()}
@@ -242,6 +259,21 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							void refetchStubs()
 						}}
 						onClose={() => setAdding(null)}
+					/>
+				)}
+			</Show>
+			<Show when={editing()} keyed>
+				{(target: { info: ComponentClassInfo; stub: StubRow }) => (
+					<ComponentDialog
+						deviceTypeId={props.id}
+						info={target.info}
+						stub={target.stub}
+						rearStubs={rearStubs()}
+						onSaved={() => {
+							setEditing(null)
+							void refetchStubs()
+						}}
+						onClose={() => setEditing(null)}
 					/>
 				)}
 			</Show>

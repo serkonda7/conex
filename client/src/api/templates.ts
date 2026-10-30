@@ -20,6 +20,7 @@ import type {
 	ManufacturerUpdate,
 	Page,
 	StubCreate,
+	StubUpdate,
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
@@ -161,6 +162,18 @@ export async function create_stub(
 		json: input,
 	})
 	return to_result<StubRow>(res, t('api.createStubFailed'))
+}
+
+export async function update_stub(
+	deviceTypeId: number,
+	stubId: number,
+	patch: StubUpdate,
+): Promise<Result<StubRow, Error>> {
+	const res = await client['device-types'][':id'].stubs[':stubId'].$patch({
+		param: { id: String(deviceTypeId), stubId: String(stubId) },
+		json: patch,
+	})
+	return to_result<StubRow>(res, t('api.updateStubFailed'))
 }
 
 export async function delete_stub(
