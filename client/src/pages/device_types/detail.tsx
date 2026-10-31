@@ -13,7 +13,6 @@ import {
 } from '../../api/templates'
 import { DataTable, type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import {
-	DetailCard,
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
@@ -36,9 +35,15 @@ import {
 } from './add_component'
 import { COMPONENT_CLASSES, type ComponentClassInfo, componentClassOf } from './components'
 
+/** Domain of a spec link; the full URL can overflow its narrow spec-sheet column. */
+const specHost = (url: string): string => {
+	const target = websiteUrl(url)
+	return URL.canParse(target) ? new URL(target).hostname.replace(/^www\./, '') : url
+}
+
 /**
  * /device-types/:id — device-type detail: header with model, the "Add
- * components" menu and details grid (manufacturer, U height, description),
+ * components" menu and spec sheet (hardware, physical, usage, comments),
  * one table per component class, and the devices using this type.
  */
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
@@ -167,45 +172,72 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle description={deviceType()?.description} />
 
-				<DetailCard label={t('deviceType.details')}>
-					<dt>{tp('entity.manufacturer', 1)}</dt>
-					<dd>{manufacturer()?.name ?? manufacturerId() ?? '—'}</dd>
-					<dt>{t('common.model')}</dt>
-					<dd>{deviceType()?.model}</dd>
-					<dt>{t('deviceType.partNumber')}</dt>
-					<dd>{deviceType()?.part_number || '—'}</dd>
-					<dt>{t('deviceType.specUrl')}</dt>
-					<dd>
-						<Show when={deviceType()?.spec_url} fallback="—">
-							{(url: () => string): JSX.Element => (
-								<a
-									href={websiteUrl(url())}
-									target="_blank"
-									rel="noopener noreferrer"
-								>
-									{url()}
-								</a>
-							)}
-						</Show>
-					</dd>
-					<dt>{t('common.comments')}</dt>
-					<dd>
-						<Markdown text={deviceType()?.comments} />
-					</dd>
-					<dt>{t('common.heightU')}</dt>
-					<dd>{deviceType()?.u_height}</dd>
-					<dt>{t('common.fullDepth')}</dt>
-					<dd>{yesNo(deviceType()?.is_full_depth ?? 0)}</dd>
-					<dt>{t('deviceType.defaultRole')}</dt>
-					<dd>
-						<ForeignKeyLink
-							id={defaultRoleId()}
-							loading={defaultRole.loading}
-							name={deviceRoleLabel(defaultRole())}
-							href={`/device-roles/${defaultRoleId() ?? ''}`}
-						/>
-					</dd>
-				</DetailCard>
+				<section class="spec-sheet" aria-label={t('deviceType.details')}>
+					<section>
+						<h4>{t('deviceType.section.hardware')}</h4>
+						<dl>
+							<dt>{tp('entity.manufacturer', 1)}</dt>
+							<dd>
+								<ForeignKeyLink
+									id={manufacturerId()}
+									loading={manufacturer.loading}
+									name={manufacturer()?.name}
+									href={`/manufacturers/${manufacturerId() ?? ''}`}
+								/>
+							</dd>
+							<dt>{t('deviceType.partNumber')}</dt>
+							<dd>{deviceType()?.part_number || '—'}</dd>
+							<dt>{t('deviceType.specUrl')}</dt>
+							<dd>
+								<Show when={deviceType()?.spec_url} fallback="—">
+									{(url: () => string): JSX.Element => (
+										<a
+											href={websiteUrl(url())}
+											target="_blank"
+											rel="noopener noreferrer"
+											title={url()}
+										>
+											{specHost(url())}
+										</a>
+									)}
+								</Show>
+							</dd>
+						</dl>
+					</section>
+					<section>
+						<h4>{t('deviceType.section.physical')}</h4>
+						<dl>
+							<dt>{t('common.heightU')}</dt>
+							<dd>{deviceType()?.u_height}</dd>
+							<dt>{t('common.fullDepth')}</dt>
+							<dd>{yesNo(deviceType()?.is_full_depth ?? 0)}</dd>
+						</dl>
+					</section>
+					<section>
+						<h4>{t('deviceType.section.usage')}</h4>
+						<dl>
+							<dt>{t('deviceType.defaultRole')}</dt>
+							<dd>
+								<ForeignKeyLink
+									id={defaultRoleId()}
+									loading={defaultRole.loading}
+									name={deviceRoleLabel(defaultRole())}
+									href={`/device-roles/${defaultRoleId() ?? ''}`}
+								/>
+							</dd>
+							<dt>{tp('entity.device', 2)}</dt>
+							<dd>
+								<a href="#device-type-devices">{ofType(devices() ?? []).length}</a>
+							</dd>
+						</dl>
+					</section>
+					<Show when={deviceType()?.comments}>
+						<section class="spec-sheet-notes">
+							<h4>{t('common.comments')}</h4>
+							<Markdown text={deviceType()?.comments} />
+						</section>
+					</Show>
+				</section>
 			</DetailShell>
 
 			<Show

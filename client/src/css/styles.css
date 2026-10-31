@@ -2716,6 +2716,70 @@ th[aria-sort="descending"] .data-table-sort::after {
 	overflow-wrap: anywhere;
 }
 
+/* Device type detail: flat key-value groups split by bars, no card. */
+.spec-sheet {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	row-gap: 0.75rem;
+	margin: 0.9rem 0 1.1rem;
+	padding: 0.75rem 0;
+	border-block: 1px solid var(--border);
+}
+
+.spec-sheet > section {
+	padding: 0.1rem 1.5rem;
+	border-left: 1px solid var(--border-strong);
+}
+
+.spec-sheet > section:first-child {
+	padding-left: 0;
+	border-left: 0;
+}
+
+.spec-sheet > .spec-sheet-notes {
+	grid-column: 1 / -1;
+	padding: 0.75rem 0 0;
+	border-left: 0;
+	border-top: 1px solid var(--border);
+}
+
+.spec-sheet h4 {
+	margin: 0 0 0.3rem;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-secondary);
+}
+
+.spec-sheet dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.15rem 0.75rem;
+	margin: 0;
+}
+
+.spec-sheet dt {
+	color: var(--text-secondary);
+}
+
+.spec-sheet dd {
+	margin: 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 48rem) {
+	.spec-sheet {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.spec-sheet > section {
+		padding: 0;
+		border-left: 0;
+	}
+}
+
 /* Rendered markdown of user-written comments. */
 .markdown :is(p, ul, ol, pre, blockquote, table, hr, h3, h4, h5, h6) {
 	margin: 0;
