@@ -2,6 +2,7 @@ import { IconChevronDown, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { fetch_device_role } from '../../api/device_roles'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
@@ -29,6 +30,7 @@ import { Markdown } from '../../components/markdown'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, portKindLabel, yesNo } from '../../i18n/labels'
+import { portKindIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
@@ -57,6 +59,193 @@ const COMPONENT_GROUP_OPEN_ROWS = 16
 const specHost = (url: string): string => {
 	const target = websiteUrl(url)
 	return URL.canParse(target) ? new URL(target).hostname.replace(/^www\./, '') : url
+}
+
+const canChangeStubs = (): boolean => can('edit') || can('delete')
+
+/** Edit and delete buttons of a stub, as far as the user may use them. */
+function StubActions(props: {
+	stub: StubRow
+	onEdit: () => void
+	onDelete: () => void
+}): JSX.Element {
+	return (
+		<span class="row-actions">
+			<Show when={can('edit')}>
+				<button
+					type="button"
+					class="icon-btn"
+					title={t('deviceType.component.editTitle', { name: props.stub.prefix })}
+					aria-label={t('deviceType.component.editTitle', { name: props.stub.prefix })}
+					onClick={(): void => props.onEdit()}
+				>
+					<IconPencil size={16} />
+				</button>
+			</Show>
+			<Show when={can('delete')}>
+				<button
+					type="button"
+					class="icon-btn"
+					title={t('deviceType.component.deleteTitle', { name: props.stub.prefix })}
+					aria-label={t('deviceType.component.deleteTitle', { name: props.stub.prefix })}
+					onClick={(): void => props.onDelete()}
+				>
+					<IconTrash size={16} />
+				</button>
+			</Show>
+		</span>
+	)
+}
+
+/** Port kind with its glyph; the slot stays empty without one, so labels align. */
+function ComponentKind(props: { kind: string }): JSX.Element {
+	return (
+		<span class="component-kind">
+			<span class="component-kind-icon" aria-hidden="true">
+				<Dynamic component={portKindIcon(props.kind)} size={18} />
+			</span>
+			{portKindLabel(props.kind)}
+		</span>
+	)
+}
+
+/** One stub; `mapping` is set on patch-panel types, `children` are its actions. */
+function ComponentRow(props: {
+	stub: StubRow
+	mapping: string | undefined
+	children: JSX.Element
+}): JSX.Element {
+	return (
+		<tr>
+			<td class="component-name">{stubRange(props.stub)}</td>
+			<td class="component-count">{props.stub.count}</td>
+			<td>
+				<ComponentKind kind={props.stub.kind} />
+			</td>
+			<Show when={props.mapping !== undefined}>
+				<td>{props.mapping}</td>
+			</Show>
+			<td>{props.stub.description || '—'}</td>
+			<Show when={canChangeStubs()}>
+				<td class="component-actions">{props.children}</td>
+			</Show>
+		</tr>
+	)
+}
+
+/** Collapsible class of components; `children` are its rows. */
+function ComponentGroup(props: {
+	info: ComponentClassInfo
+	stubs: StubRow[]
+	columnCount: number
+	open: boolean
+	onToggle: () => void
+	children: JSX.Element
+}): JSX.Element {
+	return (
+		<tbody>
+			<tr>
+				<th scope="rowgroup" colSpan={props.columnCount} class="component-group">
+					<button
+						type="button"
+						class="component-group-title"
+						aria-expanded={props.open}
+						onClick={(): void => props.onToggle()}
+					>
+						<IconChevronDown
+							size={14}
+							aria-hidden="true"
+							class="component-group-chevron"
+						/>
+						<ItemIcon icon={props.info.icon} />
+						{t(props.info.label)}{' '}
+						<span class="text-muted">
+							{props.stubs.reduce((sum, s) => sum + s.count, 0)}
+						</span>
+					</button>
+				</th>
+			</tr>
+			<Show when={props.open}>{props.children}</Show>
+		</tbody>
+	)
+}
+
+/** Components of a device type, grouped by class. */
+function ComponentTable(props: {
+	stubs: StubRow[]
+	stubsOf: (info: ComponentClassInfo) => StubRow[]
+	isGroupOpen: (info: ComponentClassInfo) => boolean
+	onToggleGroup: (info: ComponentClassInfo) => void
+	onEdit: (info: ComponentClassInfo, stub: StubRow) => void
+	onDelete: (stub: StubRow) => void
+}): JSX.Element {
+	const classes = (): readonly ComponentClassInfo[] =>
+		COMPONENT_CLASSES.filter((info) => props.stubsOf(info).length > 0)
+	/** Patch-panel types add a column with the rear positions or front-to-rear mapping. */
+	const hasPassThrough = (): boolean => props.stubs.some((row) => row.side !== null)
+	const columnCount = (): number => 4 + Number(hasPassThrough()) + Number(canChangeStubs())
+	const stubPrefix = (stubId: number | null): string =>
+		props.stubs.find((row) => row.id === stubId)?.prefix ?? '—'
+	const passThrough = (s: StubRow): string => {
+		if (!s.side) {
+			return '—'
+		}
+		return s.side === 'rear'
+			? tp('deviceType.component.positionsCount', s.positions)
+			: t('deviceType.component.mapsTo', {
+					rear: stubPrefix(s.rear_stub_id),
+					position: s.rear_position,
+				})
+	}
+
+	return (
+		<div class="component-table-wrap">
+			<table class="component-table">
+				<thead>
+					<tr>
+						<th scope="col">{t('common.name')}</th>
+						<th scope="col" class="component-count">
+							{t('deviceType.component.count')}
+						</th>
+						<th scope="col">{t('common.type')}</th>
+						<Show when={hasPassThrough()}>
+							<th scope="col">{t('deviceType.component.mapping')}</th>
+						</Show>
+						<th scope="col">{t('common.description')}</th>
+						<Show when={canChangeStubs()}>
+							<th scope="col" />
+						</Show>
+					</tr>
+				</thead>
+				<For each={classes()}>
+					{(info: ComponentClassInfo) => (
+						<ComponentGroup
+							info={info}
+							stubs={props.stubsOf(info)}
+							columnCount={columnCount()}
+							open={props.isGroupOpen(info)}
+							onToggle={(): void => props.onToggleGroup(info)}
+						>
+							<For each={props.stubsOf(info)}>
+								{(s: StubRow) => (
+									<ComponentRow
+										stub={s}
+										mapping={hasPassThrough() ? passThrough(s) : undefined}
+									>
+										<StubActions
+											stub={s}
+											onEdit={(): void => props.onEdit(info, s)}
+											onDelete={(): void => props.onDelete(s)}
+										/>
+									</ComponentRow>
+								)}
+							</For>
+						</ComponentGroup>
+					)}
+				</For>
+			</table>
+		</div>
+	)
 }
 
 /**
@@ -121,8 +310,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		setGroupToggles((toggles) => ({ ...toggles, [groupKey(info)]: !open }))
 	}
 	const rearStubs = (): StubRow[] => (stubs() ?? []).filter((row) => row.side === 'rear')
-	const stubPrefix = (stubId: number | null): string =>
-		(stubs() ?? []).find((row) => row.id === stubId)?.prefix ?? '—'
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.deviceType',
@@ -174,56 +361,11 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		},
 	]
 
-	const componentClasses = (): readonly ComponentClassInfo[] =>
-		COMPONENT_CLASSES.filter((info) => stubsOf(info).length > 0)
-	/** Patch-panel types add a column with the rear positions or front-to-rear mapping. */
-	const hasPassThrough = (): boolean => (stubs() ?? []).some((row) => row.side !== null)
-	const canChange = (): boolean => can('edit') || can('delete')
-	const columnCount = (): number => 4 + Number(hasPassThrough()) + Number(canChange())
-	const passThrough = (s: StubRow): string => {
-		if (!s.side) {
-			return '—'
-		}
-		return s.side === 'rear'
-			? tp('deviceType.component.positionsCount', s.positions)
-			: t('deviceType.component.mapsTo', {
-					rear: stubPrefix(s.rear_stub_id),
-					position: s.rear_position,
-				})
-	}
-
 	async function deleteStub(s: StubRow): Promise<void> {
 		if (window.confirm(t('deviceType.component.confirmDelete', { name: s.prefix }))) {
 			await run(() => delete_stub(props.id, s.id))
 		}
 	}
-
-	const stubActions = (info: ComponentClassInfo, s: StubRow): JSX.Element => (
-		<span class="row-actions">
-			<Show when={can('edit')}>
-				<button
-					type="button"
-					class="icon-btn"
-					title={t('deviceType.component.editTitle', { name: s.prefix })}
-					aria-label={t('deviceType.component.editTitle', { name: s.prefix })}
-					onClick={(): void => void setEditing({ info, stub: s })}
-				>
-					<IconPencil size={16} />
-				</button>
-			</Show>
-			<Show when={can('delete')}>
-				<button
-					type="button"
-					class="icon-btn"
-					title={t('deviceType.component.deleteTitle', { name: s.prefix })}
-					aria-label={t('deviceType.component.deleteTitle', { name: s.prefix })}
-					onClick={(): void => void deleteStub(s)}
-				>
-					<IconTrash size={16} />
-				</button>
-			</Show>
-		</span>
-	)
 
 	return (
 		<div>
@@ -329,84 +471,16 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						when={(stubs() ?? []).length > 0}
 						fallback={<Empty message={t('deviceType.component.empty')} />}
 					>
-						<div class="component-table-wrap">
-							<table class="component-table">
-								<thead>
-									<tr>
-										<th scope="col">{t('common.name')}</th>
-										<th scope="col" class="component-count">
-											{t('deviceType.component.count')}
-										</th>
-										<th scope="col">{t('common.type')}</th>
-										<Show when={hasPassThrough()}>
-											<th scope="col">{t('deviceType.component.mapping')}</th>
-										</Show>
-										<th scope="col">{t('common.description')}</th>
-										<Show when={canChange()}>
-											<th scope="col" />
-										</Show>
-									</tr>
-								</thead>
-								<For each={componentClasses()}>
-									{(info: ComponentClassInfo) => (
-										<tbody>
-											<tr>
-												<th
-													scope="rowgroup"
-													colSpan={columnCount()}
-													class="component-group"
-												>
-													<button
-														type="button"
-														class="component-group-title"
-														aria-expanded={isGroupOpen(info)}
-														onClick={(): void => toggleGroup(info)}
-													>
-														<IconChevronDown
-															size={14}
-															aria-hidden="true"
-															class="component-group-chevron"
-														/>
-														<ItemIcon icon={info.icon} />
-														{t(info.label)}{' '}
-														<span class="text-muted">
-															{stubsOf(info).reduce(
-																(sum, s) => sum + s.count,
-																0,
-															)}
-														</span>
-													</button>
-												</th>
-											</tr>
-											<Show when={isGroupOpen(info)}>
-												<For each={stubsOf(info)}>
-													{(s: StubRow) => (
-														<tr>
-															<td class="component-name">
-																{stubRange(s)}
-															</td>
-															<td class="component-count">
-																{s.count}
-															</td>
-															<td>{portKindLabel(s.kind)}</td>
-															<Show when={hasPassThrough()}>
-																<td>{passThrough(s)}</td>
-															</Show>
-															<td>{s.description || '—'}</td>
-															<Show when={canChange()}>
-																<td class="component-actions">
-																	{stubActions(info, s)}
-																</td>
-															</Show>
-														</tr>
-													)}
-												</For>
-											</Show>
-										</tbody>
-									)}
-								</For>
-							</table>
-						</div>
+						<ComponentTable
+							stubs={stubs() ?? []}
+							stubsOf={stubsOf}
+							isGroupOpen={isGroupOpen}
+							onToggleGroup={toggleGroup}
+							onEdit={(info: ComponentClassInfo, stub: StubRow): void =>
+								void setEditing({ info, stub })
+							}
+							onDelete={(stub: StubRow): void => void deleteStub(stub)}
+						/>
 					</Show>
 				</Show>
 			</section>

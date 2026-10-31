@@ -2924,6 +2924,19 @@ th[aria-sort="descending"] .data-table-sort::after {
 	font-variant-numeric: tabular-nums;
 }
 
+.component-kind {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.component-kind-icon {
+	display: inline-flex;
+	flex: none;
+	width: 18px;
+	height: 18px;
+}
+
 .component-actions {
 	width: 1%;
 	white-space: nowrap;
