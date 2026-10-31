@@ -471,6 +471,7 @@ export const de: Messages = {
 	'deviceType.component.noRearPorts': 'Zuerst Rückports anlegen',
 	'deviceType.component.mapping': 'Zuordnung',
 	'deviceType.component.mapsTo': '→ {rear} ab Position {position}',
+	'deviceType.component.existingDevicesHint': '{count} bestehende Geräte bleiben unverändert!',
 	'deviceType.preset.patchPanel': 'Patchfeld (N Ports)',
 	'deviceType.preset.cassette': 'Kassette (N × MPO)',
 	'deviceType.preset.frontName': 'Name der Frontports',

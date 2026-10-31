@@ -468,6 +468,7 @@ export const en = {
 	'deviceType.component.noRearPorts': 'Add rear ports first',
 	'deviceType.component.mapping': 'Mapping',
 	'deviceType.component.mapsTo': '→ {rear} from position {position}',
+	'deviceType.component.existingDevicesHint': '{count} existing devices are not changed!',
 	'deviceType.preset.patchPanel': 'Patch panel (N ports)',
 	'deviceType.preset.cassette': 'Cassette (N × MPO)',
 	'deviceType.preset.frontName': 'Front port name',

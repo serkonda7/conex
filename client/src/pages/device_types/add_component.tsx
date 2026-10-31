@@ -52,6 +52,20 @@ export function ItemIcon(props: { icon: ComponentClassInfo['icon'] }): JSX.Eleme
 }
 
 /**
+ * Warning atop the component forms: stubs only apply to devices created later.
+ * Hidden when the type has no devices yet.
+ */
+function ExistingDevicesWarning(props: { count: number }): JSX.Element {
+	return (
+		<Show when={props.count > 0}>
+			<p class="form-warning" role="status">
+				{t('deviceType.component.existingDevicesHint', { count: props.count })}
+			</p>
+		</Show>
+	)
+}
+
+/**
  * "Add components" button whose dropdown lists the component classes
  * (NetBox-style), followed by the patch-panel presets.
  */
@@ -127,6 +141,8 @@ export function AddComponentMenu(props: {
  */
 export function ComponentDialog(props: {
 	deviceTypeId: number
+	/** Devices already built from the type. */
+	existingDevices: number
 	info: ComponentClassInfo
 	/** Stub to edit; omitted when adding. */
 	stub?: StubRow
@@ -229,6 +245,7 @@ export function ComponentDialog(props: {
 			on_close={props.onClose}
 		>
 			<form class="form-stacked" onSubmit={handleSubmit}>
+				<ExistingDevicesWarning count={props.existingDevices} />
 				<TextField
 					id={`${prefix}-name`}
 					label={t('common.name')}
@@ -339,6 +356,8 @@ export function ComponentDialog(props: {
  */
 export function PassThroughPresetDialog(props: {
 	deviceTypeId: number
+	/** Devices already built from the type. */
+	existingDevices: number
 	preset: PassThroughPreset
 	onSaved: () => void
 	onClose: () => void
@@ -396,6 +415,7 @@ export function PassThroughPresetDialog(props: {
 			on_close={props.onClose}
 		>
 			<form class="form-stacked" onSubmit={handleSubmit}>
+				<ExistingDevicesWarning count={props.existingDevices} />
 				<TextField
 					id={`${prefix}-name`}
 					label={t('deviceType.preset.frontName')}

@@ -388,6 +388,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				{(info: () => ComponentClassInfo) => (
 					<ComponentDialog
 						deviceTypeId={props.id}
+						existingDevices={deviceTotal()}
 						info={info()}
 						rearStubs={rearStubs()}
 						onSaved={() => {
@@ -402,6 +403,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				{(target: { info: ComponentClassInfo; stub: StubRow }) => (
 					<ComponentDialog
 						deviceTypeId={props.id}
+						existingDevices={deviceTotal()}
 						info={target.info}
 						stub={target.stub}
 						rearStubs={rearStubs()}
@@ -417,6 +419,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				{(key: () => PassThroughPreset) => (
 					<PassThroughPresetDialog
 						deviceTypeId={props.id}
+						existingDevices={deviceTotal()}
 						preset={key()}
 						onSaved={() => {
 							setPreset(null)
