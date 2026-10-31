@@ -756,12 +756,12 @@ export type PortSide = (typeof PORT_SIDES)[number]
 export const PortSideSchema = v.picklist(PORT_SIDES)
 
 /**
- * Connector types of front and rear ports (NetBox port types) with their
- * NetBox display names; technical identifiers, so untranslated. Copper
+ * Known connector types of front and rear ports (NetBox port types) with their
+ * display names. Includes legacy types for imports and existing ports. Copper
  * connectors cable like network ports, every other type only to its own kind.
  */
 export const PASS_THROUGH_PORT_TYPES = {
-	'8p8c': '8P8C',
+	'8p8c': 'RJ45 (8P8C)',
 	'110-punch': '110 Punch',
 	lc: 'LC',
 	'lc-apc': 'LC/APC',
@@ -775,6 +775,17 @@ export const PASS_THROUGH_PORT_TYPES = {
 } as const
 
 export type PassThroughPortType = keyof typeof PASS_THROUGH_PORT_TYPES
+
+/** Types offered for new ports; legacy types remain recognized on import and edit. */
+export const SELECTABLE_PASS_THROUGH_PORT_TYPES: readonly PassThroughPortType[] = [
+	'8p8c',
+	'lc',
+	'lc-apc',
+	'sc',
+	'sc-apc',
+	'mpo',
+	'splice',
+]
 
 /** Pass-through types that cable like network ports (copper). */
 export const COPPER_PASS_THROUGH_TYPES: readonly PassThroughPortType[] = ['8p8c', '110-punch']

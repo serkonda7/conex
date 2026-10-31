@@ -1,10 +1,6 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import {
-	PASS_THROUGH_PORT_TYPES,
-	type PassThroughPortType,
-	PORT_DESCRIPTION_MAX_LENGTH,
-} from 'shared/src/schemas'
+import { PORT_DESCRIPTION_MAX_LENGTH, SELECTABLE_PASS_THROUGH_PORT_TYPES } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
@@ -33,8 +29,6 @@ const PRESETS: readonly {
 	{ key: 'patch-panel', label: 'deviceType.preset.patchPanel', icon: PatchPanelIcon },
 	{ key: 'cassette', label: 'deviceType.preset.cassette', icon: CassetteIcon },
 ]
-
-const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
 
 /** Integer in `1..MAX_COUNT` from a number field, or null. */
 function parseCount(value: string): number | null {
@@ -447,7 +441,7 @@ export function PassThroughPresetDialog(props: {
 					value={kind()}
 					onChange={setKind}
 					class="combobox-port-kind"
-					options={PASS_THROUGH_KINDS.map(portKindOption)}
+					options={SELECTABLE_PASS_THROUGH_PORT_TYPES.map(portKindOption)}
 				/>
 				<Show when={cassette}>
 					<TextField

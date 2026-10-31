@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 30 30">
+  <!-- Shared connector drawings. The app references a symbol with <use>, so it inherits the text color.
+       Markdown editor previews cannot <use> an external file, so the docs embed
+       <img src="port-icons.svg#NAME-icon">, which shows only the targeted entry at the end of this file
+       on a white chip, so that it stays readable in dark themes. Every symbol needs such an entry. -->
+  <style>use { display: none; } use:target { display: inline; }</style>
+  <!-- The wifi and antenna-bars-5 drawings are from Tabler Icons.
+       MIT License, Copyright (c) 2020-2026 Paweł Kuna.
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+       IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+       FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+       AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+       LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+       OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+       SOFTWARE. -->
+  <symbol id="wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l.01 0"/><path d="M9.172 15.172a4 4 0 0 1 5.656 0"/><path d="M6.343 12.343a8 8 0 0 1 11.314 0"/><path d="M3.515 9.515c4.686 -4.687 12.284 -4.687 17 0"/></symbol>
+  <symbol id="antenna-bars-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18l0 -3"/><path d="M10 18l0 -6"/><path d="M14 18l0 -9"/><path d="M18 18l0 -12"/></symbol>
+  <symbol id="rj45" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v11h-3v4H7v-4H4z"/><path d="M8 4v4M12 4v4M16 4v4"/></symbol>
+  <symbol id="fiber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="12" r="2.5"/><circle cx="15.5" cy="12" r="2.5"/><path d="M8.5 12h.01M15.5 12h.01"/></symbol>
+  <symbol id="usb-a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="1"/><path d="M6 10.5h12"/></symbol>
+  <symbol id="usb-b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V9l4-5h6l4 5v11z"/><rect x="9.5" y="10" width="5" height="6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="usb-c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7.5" width="20" height="9" rx="4.5"/><path d="M7.5 12h9"/></symbol>
+  <symbol id="usb-mini-a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M7 11h10"/></symbol>
+  <symbol id="usb-mini-b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v4h-2v3l-3 3H8l-3-3v-3H3z"/><path d="M8 11h8"/></symbol>
+  <symbol id="usb-micro-a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 11h10"/></symbol>
+  <symbol id="usb-micro-b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v2.5L17 16H7l-4-5.5z"/><path d="M8 11h8"/></symbol>
+  <symbol id="de9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h17a1.5 1.5 0 0 1 1.5 1.8l-1.6 9a1.5 1.5 0 0 1-1.5 1.2H5.100a1.5 1.5 0 0 1-1.5-1.200l-1.6-9A1.5 1.5 0 0 1 3.5 6z"/><g stroke-width="1.75"><path d="M6 10.500h.01M9 10.500h.01M12 10.500h.01M15 10.500h.01M18 10.500h.01"/><path d="M7.5 14h.01M10.5 14h.01M13.5 14h.01M16.5 14h.01"/></g></symbol>
+  <symbol id="db25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.500h19a1.5 1.5 0 0 1 1.45 1.900l-1.5 6a1.5 1.5 0 0 1-1.45 1.100H4a1.5 1.5 0 0 1-1.45-1.100l-1.5-6A1.5 1.5 0 0 1 2.5 7.500z"/><g stroke-width="1" stroke-dasharray="0 1.5"><path d="M3.75 10.750h16.5"/><path d="M5 13.250h14"/></g></symbol>
+  <symbol id="rj11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12v10h-3v4H9v-4H6z"/><path d="M10.5 5v4M13.5 5v4"/></symbol>
+  <symbol id="rj12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12v10h-3v4H9v-4H6z"/><path stroke-width="1" d="M8 5v4M9.6 5v4M11.2 5v4M12.8 5v4M14.4 5v4M16 5v4"/></symbol>
+  <symbol id="mini-din8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 21.300a9.5 9.5 0 1 1 4 0V18h-4z"/><path stroke-width="1.75" d="M8.5 7.500h.01M12 7.500h.01M15.5 7.500h.01M7 11.500h.01M12 11.500h.01M17 11.500h.01M8.5 15h.01M15.5 15h.01"/></symbol>
+  <symbol id="power-inlet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8l5 5v13H3V8z"/><path d="M12 7.5v4M8 14v3.5M16 14v3.5"/></symbol>
+  <symbol id="schuko" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7.5 12h.01M16.5 12h.01M10 6h4M10 18h4"/></symbol>
+  <symbol id="hdmi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h20v6l-3.5 4h-13L2 13z"/><path d="M6.5 11h11"/></symbol>
+  <symbol id="displayport" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h20v10H7l-5-5z"/><path d="M7.5 12h10"/></symbol>
+  <symbol id="vga" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4.5h17a1.5 1.5 0 0 1 1.5 1.8l-1.8 12a1.5 1.5 0 0 1-1.5 1.200H5.300a1.5 1.5 0 0 1-1.5-1.200L2 6.300A1.5 1.5 0 0 1 3.5 4.500z"/><path stroke-width="1.75" d="M6 8.500h.01M9 8.500h.01M12 8.500h.01M15 8.500h.01M18 8.500h.01M6.5 12h.01M9.25 12h.01M12 12h.01M14.75 12h.01M17.5 12h.01M7 15.500h.01M9.5 15.500h.01M12 15.500h.01M14.5 15.500h.01M17 15.500h.01"/></symbol>
+  <symbol id="dvi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h20v9l-3 3H5l-3-3z"/><g stroke-width="1" stroke-dasharray="0 1.75"><path d="M4.75 9h8.750M4.75 11.500h8.750M4.75 14h8.75"/></g><path stroke-width="1.5" d="M16 11.500h4M16.5 9h.01M19.5 9h.01M16.5 14h.01M19.5 14h.01"/></symbol>
+  <symbol id="c13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8l5 5v13H3V8z"/><path d="M12 9v1.5M8 15v1.5M16 15v1.5"/></symbol>
+  <symbol id="c20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 7.5v4M6.5 15h4M13.5 15h4"/></symbol>
+  <symbol id="c19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8.5v2M7.5 15h2M14.5 15h2"/></symbol>
+  <symbol id="c8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 6a6 6 0 0 0 0 12c1.8 0 3-1.2 4.5-1.2s2.7 1.2 4.5 1.2a6 6 0 0 0 0-12c-1.8 0-3 1.2-4.5 1.2S9.3 6 7.5 6z"/><path d="M7.5 10v4M16.5 10v4"/></symbol>
+  <symbol id="c7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 6a6 6 0 0 0 0 12c1.8 0 3-1.2 4.5-1.2s2.7 1.2 4.5 1.2a6 6 0 0 0 0-12c-1.8 0-3 1.2-4.5 1.2S9.3 6 7.5 6z"/><path d="M7.5 12h.01M16.5 12h.01"/></symbol>
+  <symbol id="c6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.1 10.5a5.5 5.5 0 1 1 9.8 0a5.5 5.5 0 1 1-4.9 7.8a5.5 5.5 0 1 1-4.9-7.8z"/><path d="M12 6.5v3M7 14.5v3M17 14.5v3"/></symbol>
+  <symbol id="c5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.1 10.5a5.5 5.5 0 1 1 9.8 0a5.5 5.5 0 1 1-4.9 7.8a5.5 5.5 0 1 1-4.9-7.8z"/><path d="M12 8h.01M7 16h.01M17 16h.01"/></symbol>
+  <symbol id="dc-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="1"/><circle cx="8" cy="12" r="2.5"/><circle cx="16" cy="12" r="2.5"/></symbol>
+  <symbol id="dc-barrel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 12h.01"/></symbol>
+  <rect x="-3" y="-3" width="30" height="30" rx="4" fill="#fff"/>
+  <use id="wifi-icon" href="#wifi" width="24" height="24"/>
+  <use id="antenna-bars-5-icon" href="#antenna-bars-5" width="24" height="24"/>
+  <use id="rj45-icon" href="#rj45" width="24" height="24"/>
+  <use id="fiber-icon" href="#fiber" width="24" height="24"/>
+  <use id="usb-a-icon" href="#usb-a" width="24" height="24"/>
+  <use id="usb-b-icon" href="#usb-b" width="24" height="24"/>
+  <use id="usb-c-icon" href="#usb-c" width="24" height="24"/>
+  <use id="usb-mini-a-icon" href="#usb-mini-a" width="24" height="24"/>
+  <use id="usb-mini-b-icon" href="#usb-mini-b" width="24" height="24"/>
+  <use id="usb-micro-a-icon" href="#usb-micro-a" width="24" height="24"/>
+  <use id="usb-micro-b-icon" href="#usb-micro-b" width="24" height="24"/>
+  <use id="de9-icon" href="#de9" width="24" height="24"/>
+  <use id="db25-icon" href="#db25" width="24" height="24"/>
+  <use id="rj11-icon" href="#rj11" width="24" height="24"/>
+  <use id="rj12-icon" href="#rj12" width="24" height="24"/>
+  <use id="mini-din8-icon" href="#mini-din8" width="24" height="24"/>
+  <use id="power-inlet-icon" href="#power-inlet" width="24" height="24"/>
+  <use id="schuko-icon" href="#schuko" width="24" height="24"/>
+  <use id="hdmi-icon" href="#hdmi" width="24" height="24"/>
+  <use id="displayport-icon" href="#displayport" width="24" height="24"/>
+  <use id="vga-icon" href="#vga" width="24" height="24"/>
+  <use id="dvi-icon" href="#dvi" width="24" height="24"/>
+  <use id="c13-icon" href="#c13" width="24" height="24"/>
+  <use id="c20-icon" href="#c20" width="24" height="24"/>
+  <use id="c19-icon" href="#c19" width="24" height="24"/>
+  <use id="c8-icon" href="#c8" width="24" height="24"/>
+  <use id="c7-icon" href="#c7" width="24" height="24"/>
+  <use id="c6-icon" href="#c6" width="24" height="24"/>
+  <use id="c5-icon" href="#c5" width="24" height="24"/>
+  <use id="dc-terminal-icon" href="#dc-terminal" width="24" height="24"/>
+  <use id="dc-barrel-icon" href="#dc-barrel" width="24" height="24"/>
+</svg>

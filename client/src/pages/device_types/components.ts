@@ -8,12 +8,12 @@ import {
 	DISPLAY_PORT_KINDS,
 	NETBOX_INTERFACE_TYPES,
 	type NetboxInterfaceType,
-	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
 	POWER_INPUT_KINDS,
 	POWER_OUTLET_KINDS,
 	type PortKind,
 	type PortSide,
+	SELECTABLE_PASS_THROUGH_PORT_TYPES,
 	SERIAL_PORT_KINDS,
 	USB_PORT_KINDS,
 } from 'shared/src/schemas'
@@ -51,8 +51,6 @@ export interface ComponentClassInfo {
 	/** Patch-panel classes: the side their stubs get. */
 	side?: PortSide
 }
-
-const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
 
 const GENERIC_KINDS: Record<string, ComponentClass> = {
 	port: 'port',
@@ -101,7 +99,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		label: 'deviceType.component.frontPort',
 		icon: KeystoneIcon,
 		placeholder: 'Port',
-		kinds: PASS_THROUGH_KINDS,
+		kinds: SELECTABLE_PASS_THROUGH_PORT_TYPES,
 		side: 'front',
 	},
 	{
@@ -109,7 +107,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		label: 'deviceType.component.rearPort',
 		icon: PunchDownIcon,
 		placeholder: 'Port',
-		kinds: PASS_THROUGH_KINDS,
+		kinds: SELECTABLE_PASS_THROUGH_PORT_TYPES,
 		side: 'rear',
 	},
 ]
