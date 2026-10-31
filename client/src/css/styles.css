@@ -112,14 +112,18 @@ a:hover {
 	text-decoration: underline;
 }
 
+a[target="_blank"],
+a[href^="http://"],
+a[href^="https://"] {
+	/* Keep the non-breaking space before the marker effective in detail grids. */
+	overflow-wrap: normal;
+}
+
 a[target="_blank"]::after,
 a[href^="http://"]::after,
 a[href^="https://"]::after {
-	content: "\2197";
-	display: inline-block;
-	margin-left: 0.15em;
+	content: "\202f\2197";
 	font-size: 0.85em;
-	text-decoration: none;
 }
 
 code {
