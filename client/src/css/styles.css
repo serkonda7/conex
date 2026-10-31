@@ -20,8 +20,9 @@
 	--text-subtle: #a0a0a0;
 	--border: #3d3d3d;
 	--border-strong: #525252;
-	--primary: #08bf08;
-	--primary-hover: #00b800;
+	--primary: #058a05;
+	--primary-hover: #047a04;
+	--primary-text: #08bf08; /* --primary is too dark for text on the dark surfaces. */
 	--primary-contrast: #ffffff;
 	--secondary: #1a73b8;
 	--secondary-hover: #16659f;
@@ -480,7 +481,7 @@ tbody tr:last-child td {
 }
 
 .app-tenant-context-option.selected {
-	color: var(--primary);
+	color: var(--primary-text);
 }
 
 .app-tenant-context-empty {
@@ -506,7 +507,7 @@ tbody tr:last-child td {
 }
 
 .app-tenant-context-add.primary {
-	color: var(--primary);
+	color: var(--primary-text);
 	font-weight: 600;
 }
 
@@ -1572,7 +1573,7 @@ tbody tr:last-child td {
 .form-actions .btn-outline:disabled:hover {
 	background-color: transparent;
 	border-color: var(--primary);
-	color: var(--primary);
+	color: var(--primary-text);
 }
 
 .form-actions .btn-outline:hover:not(:disabled) {
@@ -2527,7 +2528,7 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .connect-steps li.done .connect-step-num {
 	border-color: var(--primary);
-	color: var(--primary);
+	color: var(--primary-text);
 }
 
 .app-content .connect-dialog form.connect-port-form {
@@ -2838,6 +2839,25 @@ th[aria-sort="descending"] .data-table-sort::after {
 	display: flex;
 	align-items: center;
 	gap: 0.4rem;
+	width: 100%;
+	padding: 0;
+	font-weight: inherit;
+	text-align: left;
+	background: none;
+	border: 0;
+}
+
+.component-group-title:hover {
+	background: none;
+}
+
+.component-group-chevron {
+	flex: none;
+	transition: transform 150ms ease;
+}
+
+.component-group-title[aria-expanded="false"] .component-group-chevron {
+	transform: rotate(-90deg);
 }
 
 .component-table .component-group {

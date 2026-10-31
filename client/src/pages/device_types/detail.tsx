@@ -1,4 +1,4 @@
-import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconChevronDown, IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
@@ -49,6 +49,9 @@ import {
 
 /** Devices of the type shown before "View all"; matches the preview's row cap. */
 const DEVICE_PREVIEW_ROWS = 5
+
+/** Component groups with more rows than this start collapsed. */
+const COMPONENT_GROUP_OPEN_ROWS = 16
 
 /** Domain of a spec link; the full URL can overflow its narrow spec-sheet column. */
 const specHost = (url: string): string => {
@@ -108,6 +111,15 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 
 	const stubsOf = (info: ComponentClassInfo): StubRow[] =>
 		(stubs() ?? []).filter((s) => componentClassOf(s) === info.key)
+	/** Explicit open/closed choices; kept here since refetching unmounts the table. */
+	const [groupToggles, setGroupToggles] = createSignal<Record<string, boolean>>({})
+	const groupKey = (info: ComponentClassInfo): string => `${props.id}/${info.key}`
+	const isGroupOpen = (info: ComponentClassInfo): boolean =>
+		groupToggles()[groupKey(info)] ?? stubsOf(info).length <= COMPONENT_GROUP_OPEN_ROWS
+	const toggleGroup = (info: ComponentClassInfo): void => {
+		const open = isGroupOpen(info)
+		setGroupToggles((toggles) => ({ ...toggles, [groupKey(info)]: !open }))
+	}
 	const rearStubs = (): StubRow[] => (stubs() ?? []).filter((row) => row.side === 'rear')
 	const stubPrefix = (stubId: number | null): string =>
 		(stubs() ?? []).find((row) => row.id === stubId)?.prefix ?? '—'
@@ -344,7 +356,17 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 													colSpan={columnCount()}
 													class="component-group"
 												>
-													<span class="component-group-title">
+													<button
+														type="button"
+														class="component-group-title"
+														aria-expanded={isGroupOpen(info)}
+														onClick={(): void => toggleGroup(info)}
+													>
+														<IconChevronDown
+															size={14}
+															aria-hidden="true"
+															class="component-group-chevron"
+														/>
 														<ItemIcon icon={info.icon} />
 														{t(info.label)}{' '}
 														<span class="text-muted">
@@ -353,29 +375,33 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 																0,
 															)}
 														</span>
-													</span>
+													</button>
 												</th>
 											</tr>
-											<For each={stubsOf(info)}>
-												{(s: StubRow) => (
-													<tr>
-														<td class="component-name">
-															{stubRange(s)}
-														</td>
-														<td class="component-count">{s.count}</td>
-														<td>{portKindLabel(s.kind)}</td>
-														<Show when={hasPassThrough()}>
-															<td>{passThrough(s)}</td>
-														</Show>
-														<td>{s.description || '—'}</td>
-														<Show when={canChange()}>
-															<td class="component-actions">
-																{stubActions(info, s)}
+											<Show when={isGroupOpen(info)}>
+												<For each={stubsOf(info)}>
+													{(s: StubRow) => (
+														<tr>
+															<td class="component-name">
+																{stubRange(s)}
 															</td>
-														</Show>
-													</tr>
-												)}
-											</For>
+															<td class="component-count">
+																{s.count}
+															</td>
+															<td>{portKindLabel(s.kind)}</td>
+															<Show when={hasPassThrough()}>
+																<td>{passThrough(s)}</td>
+															</Show>
+															<td>{s.description || '—'}</td>
+															<Show when={canChange()}>
+																<td class="component-actions">
+																	{stubActions(info, s)}
+																</td>
+															</Show>
+														</tr>
+													)}
+												</For>
+											</Show>
 										</tbody>
 									)}
 								</For>

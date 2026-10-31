@@ -80,6 +80,7 @@ export function AddComponentMenu(props: {
 		<div class="add-component-menu">
 			<button
 				type="button"
+				class="btn-add"
 				aria-haspopup="menu"
 				aria-expanded={open()}
 				onClick={() => setOpen(!open())}
