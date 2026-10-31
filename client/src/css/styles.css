@@ -2780,9 +2780,13 @@ th[aria-sort="descending"] .data-table-sort::after {
 	}
 }
 
-/* Device type detail: flat component table, one tinted band per class, no row lines. */
+/* Device type detail: flat component table, one tinted band per class. */
 .component-section {
 	margin: 1.1rem 0;
+}
+
+.device-preview {
+	scroll-margin-top: var(--topbar-height);
 }
 
 .component-table-wrap {
@@ -2807,8 +2811,15 @@ th[aria-sort="descending"] .data-table-sort::after {
 	background: none;
 }
 
+/* Faint row rules, lighter than the section lines. */
+.component-table tbody tr:not(:last-child),
+.device-preview tbody tr:not(:last-child) {
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
 /* Group rows shift the zebra stripes: keep rows flat, hover still applies. */
-.app-content .component-table tbody tr:not(:hover) {
+.app-content .component-table tbody tr:not(:hover),
+.app-content .device-preview tbody tr:not(:hover) {
 	background: none;
 }
 
@@ -2839,6 +2850,36 @@ th[aria-sort="descending"] .data-table-sort::after {
 	width: 1%;
 	white-space: nowrap;
 	text-align: right;
+}
+
+/* Device type detail: device preview in the same flat style. */
+.device-preview {
+	padding-top: 1.1rem;
+	border-top: 1px solid var(--border);
+}
+
+.device-preview table {
+	margin: 0;
+	border: 0;
+	background: none;
+}
+
+.device-preview thead th {
+	background: none;
+}
+
+.device-preview :is(th, td) {
+	border-bottom: 0;
+}
+
+/* Same row height as the components, whose rows hold icon buttons. */
+.device-preview :is(tbody td) {
+	padding-block: 0.6rem;
+}
+
+/* Lines up with the name column. */
+.device-preview .related-tabs-all {
+	margin-left: 0.5rem;
 }
 
 /* Rendered markdown of user-written comments. */

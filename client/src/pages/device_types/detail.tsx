@@ -4,6 +4,7 @@ import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { fetch_device_role } from '../../api/device_roles'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
+import { fetch_racks } from '../../api/racks'
 import {
 	delete_device_type,
 	delete_stub,
@@ -12,19 +13,22 @@ import {
 	fetch_stubs,
 	type StubRow,
 } from '../../api/templates'
+import { fetch_sites, fetch_tenants } from '../../api/tenancy'
+import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
 	ForeignKeyLink,
-	RelatedSection,
+	RelatedPreview,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, portKindLabel, yesNo } from '../../i18n/labels'
-import { createRecord, createRowsFor, useAction } from '../../lib/resource'
+import { useNameOf } from '../../lib/lookup'
+import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
 import {
@@ -41,6 +45,9 @@ import {
 	stubRange,
 } from './components'
 
+/** Devices of the type shown before "View all"; matches the preview's row cap. */
+const DEVICE_PREVIEW_ROWS = 5
+
 /** Domain of a spec link; the full URL can overflow its narrow spec-sheet column. */
 const specHost = (url: string): string => {
 	const target = websiteUrl(url)
@@ -53,6 +60,7 @@ const specHost = (url: string): string => {
  * the "Add components" menu, and the devices using this type.
  */
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
+	let deviceSection: HTMLElement | undefined
 	const [error, setError] = createSignal<string | null>(null)
 	const [adding, setAdding] = createSignal<ComponentClassInfo | null>(null)
 	const [editing, setEditing] = createSignal<{
@@ -68,10 +76,27 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		deviceType()?.default_device_role_id ?? undefined
 	const [defaultRole] = createRecord(defaultRoleId, fetch_device_role, setError)
 	const [stubs, { refetch: refetchStubs }] = createRowsFor(id, fetch_stubs, setError)
-	// The device list has no type filter: narrow client-side.
-	const [devices] = createRowsFor(id, () => fetch_devices(), setError)
-	const ofType = (rows: DeviceRow[]): DeviceRow[] =>
-		rows.filter((d) => d.device_type_id === props.id)
+	// Page, not rows: the total counts beyond the preview.
+	const [devicePage] = createRecord(
+		id,
+		(key: number) => fetch_devices({ device_type: key, limit: DEVICE_PREVIEW_ROWS }),
+		setError,
+	)
+	const deviceTotal = (): number => devicePage()?.total ?? 0
+	const [tenants] = createRows(fetch_tenants, setError)
+	const [sites] = createRows(fetch_sites, setError)
+	const [racks] = createRows(fetch_racks, setError)
+	const tenantName = useNameOf(tenants)
+	const siteName = useNameOf(sites)
+	const rackName = useNameOf(racks)
+
+	function scrollToDevices(e: MouseEvent): void {
+		if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+			return
+		}
+		e.preventDefault()
+		deviceSection?.scrollIntoView({ block: 'start' })
+	}
 
 	const manufacturerCrumbs = (): Crumb[] => {
 		const row = manufacturer()
@@ -102,6 +127,47 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		setError,
 		listRoute: '/device-types',
 	})
+
+	const deviceColumns: DataTableColumn<DeviceRow>[] = [
+		nameColumn<DeviceRow>(t('common.name'), '/devices'),
+		{
+			key: 'tenant',
+			label: tp('entity.tenant', 1),
+			getValue: (d: DeviceRow): JSX.Element => (
+				<Show when={d.tenant_id} fallback="—">
+					{(tenant: () => number) => (
+						<a href={`/tenants/${tenant()}`}>{tenantName(tenant())}</a>
+					)}
+				</Show>
+			),
+		},
+		{
+			key: 'site',
+			label: t('tenant.siteRack'),
+			getValue: (d: DeviceRow): JSX.Element => (
+				<Show when={d.site_id !== null || d.rack_id !== null} fallback="—">
+					<Show when={d.site_id}>
+						{(site: () => number) => (
+							<a href={`/sites/${site()}`}>{siteName(site())}</a>
+						)}
+					</Show>
+					<Show when={d.site_id !== null && d.rack_id !== null}> / </Show>
+					<Show when={d.rack_id}>
+						{(rack: () => number) => (
+							<a href={`/racks/${rack()}`}>
+								{d.position_u === null
+									? rackName(rack())
+									: t('device.mountPosition', {
+											rack: rackName(rack()),
+											u: d.position_u,
+										})}
+							</a>
+						)}
+					</Show>
+				</Show>
+			),
+		},
+	]
 
 	const componentClasses = (): readonly ComponentClassInfo[] =>
 		COMPONENT_CLASSES.filter((info) => stubsOf(info).length > 0)
@@ -225,7 +291,10 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 							<dt>{tp('entity.device', 2)}</dt>
 							<dd>
-								<a href="#device-type-devices">{ofType(devices() ?? []).length}</a>
+								{/* biome-ignore lint/a11y/useValidAnchor: Navigate to this tab's device list rather than a hidden tab's duplicate anchor. */}
+								<a href="#device-type-devices" onClick={scrollToDevices}>
+									{deviceTotal()} <span aria-hidden="true">↓</span>
+								</a>
 							</dd>
 						</dl>
 					</section>
@@ -365,24 +434,35 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					/>
 				)}
 			</Show>
-			<RelatedSection
+			<section
+				ref={deviceSection}
+				class="component-section device-preview"
 				id="device-type-devices"
-				title={tp('entity.device', 2)}
-				noun="noun.device"
-				rows={devices}
-				select={ofType}
-				emptyText={t('deviceType.noDevices')}
 			>
-				<ul>
-					<For each={ofType(devices() ?? [])}>
-						{(d: DeviceRow) => (
-							<li>
-								<a href={`/devices/${d.id}`}>{d.name}</a>
-							</li>
-						)}
-					</For>
-				</ul>
-			</RelatedSection>
+				<div class="card-header">
+					<h3>
+						{tp('entity.device', 2)} <span class="badge">{deviceTotal()}</span>
+					</h3>
+				</div>
+				<RelatedPreview
+					rows={devicePage()?.items ?? []}
+					loading={devicePage.loading}
+					noun="noun.device"
+					emptyText={t('deviceType.noDevices')}
+					columns={deviceColumns}
+				/>
+				<Show when={deviceTotal() > DEVICE_PREVIEW_ROWS}>
+					<a
+						class="related-tabs-all"
+						href={`/devices?device_type=${props.id}&kind=device`}
+					>
+						{t('common.viewAllIn', {
+							count: deviceTotal(),
+							target: tp('entity.device', 2),
+						})}
+					</a>
+				</Show>
+			</section>
 			<InlineError message={error()} />
 		</div>
 	)
