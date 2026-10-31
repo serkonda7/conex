@@ -11,6 +11,8 @@ import {
 	type ImportRowResult,
 	NETBOX_INTERFACE_TYPES,
 	PASS_THROUGH_PORT_TYPES,
+	POWER_INPUT_KINDS,
+	POWER_OUTLET_KINDS,
 	type PortSide,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
@@ -66,6 +68,8 @@ const DEVICE_TYPE_CSV_HEADER = [
 	'width',
 	'description',
 ]
+
+const POWER_CONNECTOR_KINDS = new Set<string>([...POWER_INPUT_KINDS, ...POWER_OUTLET_KINDS])
 
 /** Device-type export: one row per type, manufacturer as name for re-import. */
 export async function exportDeviceTypesCsv(): Promise<string> {
@@ -311,8 +315,9 @@ async function importDeviceTypeDefinition(
 			// NetBox interface types may be a list; the first entry wins.
 			// Ports keep a known connector type (usb-c, rj-45, …) as kind;
 			// `other` is stored as the plain `port`. Any other type is an error.
-			// Power ports and outlets keep their class as kind (the device
-			// detail page splits ports on it), dropping the connector type.
+			// Power ports and outlets keep a known connector type, prefixed
+			// with their class (`power-iec-60320-c14`); any other type falls
+			// back to the plain class, so NEMA & co. still import.
 			// Display ports (not a NetBox class) keep their connector type as
 			// kind.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
@@ -322,6 +327,9 @@ async function importDeviceTypeDefinition(
 					return fail(`${key} "${name}": type must be one of ${allowed.join(', ')}`)
 				}
 				kind = type === 'other' && key !== 'interfaces' ? 'port' : type
+			}
+			if (allowed === null && POWER_CONNECTOR_KINDS.has(`${defaultKind}-${type}`)) {
+				kind = `${defaultKind}-${type}`
 			}
 			if (kind === null) {
 				return fail(`${key} "${name}": type is required`)

@@ -142,3 +142,137 @@ export const IconMiniDin8: IconComponent = (props: { size?: number }): JSX.Eleme
 		/>
 	</PortSvg>
 )
+
+/** IEC C14 inlet: chamfered shell with three blades. */
+export const IconPowerInlet: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d="M8 3h8l5 5v13H3V8z" />
+		<path d="M12 7.5v4M8 14v3.5M16 14v3.5" />
+	</PortSvg>
+)
+
+/** Schuko socket: round recess, two pin holes, earth clips top and bottom. */
+export const IconSchuko: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<circle cx="12" cy="12" r="10" />
+		<path d="M7.5 12h.01M16.5 12h.01M10 6h4M10 18h4" />
+	</PortSvg>
+)
+
+/** HDMI socket: wide top, sides tapering in below. */
+export const IconHdmi: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d="M2 7h20v6l-3.5 4h-13L2 13z" />
+		<path d="M6.5 11h11" />
+	</PortSvg>
+)
+
+/** DisplayPort socket: rectangular shell with one chamfered corner. */
+export const IconDisplayPort: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d="M2 7h20v10H7l-5-5z" />
+		<path d="M7.5 12h10" />
+	</PortSvg>
+)
+
+/** VGA (DE-15) socket: D-shaped shell with three rows of five pins. */
+export const IconVga: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d="M3.5 4.5h17a1.5 1.5 0 0 1 1.5 1.8l-1.8 12a1.5 1.5 0 0 1-1.5 1.200H5.300a1.5 1.5 0 0 1-1.5-1.200L2 6.300A1.5 1.5 0 0 1 3.5 4.500z" />
+		<path
+			stroke-width="1.75"
+			d="M6 8.500h.01M9 8.500h.01M12 8.500h.01M15 8.500h.01M18 8.500h.01M6.5 12h.01M9.25 12h.01M12 12h.01M14.75 12h.01M17.5 12h.01M7 15.500h.01M9.5 15.500h.01M12 15.500h.01M14.5 15.500h.01M17 15.500h.01"
+		/>
+	</PortSvg>
+)
+
+/** DVI socket: pin block on the left, flat blade with its four pins on the right. */
+export const IconDvi: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d="M2 6h20v9l-3 3H5l-3-3z" />
+		<g stroke-width="1" stroke-dasharray="0 1.75">
+			<path d="M4.75 9h8.750M4.75 11.500h8.750M4.75 14h8.75" />
+		</g>
+		<path stroke-width="1.5" d="M16 11.500h4M16.5 9h.01M19.5 9h.01M16.5 14h.01M19.5 14h.01" />
+	</PortSvg>
+)
+
+const IEC_SHELL = 'M8 3h8l5 5v13H3V8z'
+const IEC_CLOVERLEAF_SHELL =
+	'M7.1 10.5a5.5 5.5 0 1 1 9.8 0a5.5 5.5 0 1 1-4.9 7.8a5.5 5.5 0 1 1-4.9-7.8z'
+const IEC_C8_SHELL =
+	'M7.5 6a6 6 0 0 0 0 12c1.8 0 3-1.2 4.5-1.2s2.7 1.2 4.5 1.2a6 6 0 0 0 0-12c-1.8 0-3 1.2-4.5 1.2S9.3 6 7.5 6z'
+
+/** IEC C13 socket: C14 outline with three contact slots. */
+export const IconC13: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d={IEC_SHELL} />
+		<path d="M12 9v1.5M8 15v1.5M16 15v1.5" />
+	</PortSvg>
+)
+
+/** IEC C20 inlet: rectangular shell, three blades. */
+export const IconC20: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<rect x="2" y="4" width="20" height="16" rx="2" />
+		<path d="M12 7.5v4M6.5 15h4M13.5 15h4" />
+	</PortSvg>
+)
+
+/** IEC C19 socket: rectangular shell, three contact slots. */
+export const IconC19: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<rect x="2" y="4" width="20" height="16" rx="2" />
+		<path d="M12 8.5v2M7.5 15h2M14.5 15h2" />
+	</PortSvg>
+)
+
+/** IEC C8 inlet: figure-eight shell, two pins. */
+export const IconC8: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d={IEC_C8_SHELL} />
+		<path d="M7.5 10v4M16.5 10v4" />
+	</PortSvg>
+)
+
+/** IEC C7 socket: figure-eight shell, two contact holes. */
+export const IconC7: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d={IEC_C8_SHELL} />
+		<path d="M7.5 12h.01M16.5 12h.01" />
+	</PortSvg>
+)
+
+/** IEC C6 inlet ("Mickey Mouse"): cloverleaf shell, three pins. */
+export const IconC6: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d={IEC_CLOVERLEAF_SHELL} />
+		<path d="M12 6.5v3M7 14.5v3M17 14.5v3" />
+	</PortSvg>
+)
+
+/** IEC C5 socket ("Mickey Mouse"): cloverleaf shell, three contact holes. */
+export const IconC5: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<path d={IEC_CLOVERLEAF_SHELL} />
+		<path d="M12 8h.01M7 16h.01M17 16h.01" />
+	</PortSvg>
+)
+
+/** DC terminal: block with two screw terminals. */
+export const IconDcTerminal: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<rect x="2" y="6" width="20" height="12" rx="1" />
+		<circle cx="8" cy="12" r="2.5" />
+		<circle cx="16" cy="12" r="2.5" />
+	</PortSvg>
+)
+
+/** DC barrel jack: round shell around the centre pin. */
+export const IconDcBarrel: IconComponent = (props: { size?: number }): JSX.Element => (
+	<PortSvg size={props.size}>
+		<circle cx="12" cy="12" r="9" />
+		<circle cx="12" cy="12" r="3.5" />
+		<path d="M12 12h.01" />
+	</PortSvg>
+)

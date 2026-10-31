@@ -10,6 +10,8 @@ import {
 	type NetboxInterfaceType,
 	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
+	POWER_INPUT_KINDS,
+	POWER_OUTLET_KINDS,
 	type PortKind,
 	type PortSide,
 	SERIAL_PORT_KINDS,
@@ -52,6 +54,12 @@ export interface ComponentClassInfo {
 
 const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
 
+const GENERIC_KINDS: Record<string, ComponentClass> = {
+	port: 'port',
+	power: 'power-port',
+	'power-outlet': 'power-outlet',
+}
+
 export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 	{
 		key: 'interface',
@@ -72,14 +80,14 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		label: 'deviceType.component.powerPort',
 		icon: IecInletIcon,
 		placeholder: 'PSU',
-		kinds: ['power'],
+		kinds: POWER_INPUT_KINDS,
 	},
 	{
 		key: 'power-outlet',
 		label: 'deviceType.component.powerOutlet',
 		icon: SchukoIcon,
 		placeholder: 'Outlet',
-		kinds: ['power-outlet'],
+		kinds: POWER_OUTLET_KINDS,
 	},
 	{
 		key: 'display-port',
@@ -108,15 +116,15 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 
 /**
  * Component class of a stored stub or port: the side decides for patch-panel
- * ports, otherwise the kind; unknown kinds are interfaces. Plain `port` (no
- * known connector, e.g. from imports) isn't offered but stays a port.
+ * ports, otherwise the kind; unknown kinds are interfaces. Generic kinds (no
+ * known connector, e.g. from imports) aren't offered but keep their class.
  */
 export function componentClassOf(row: { kind: string; side: PortSide | null }): ComponentClass {
 	if (row.side) {
 		return row.side === 'front' ? 'front-port' : 'rear-port'
 	}
-	if (row.kind === 'port') {
-		return 'port'
+	if (Object.hasOwn(GENERIC_KINDS, row.kind)) {
+		return GENERIC_KINDS[row.kind] ?? 'interface'
 	}
 	const match = COMPONENT_CLASSES.find(
 		(c) =>

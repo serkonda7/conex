@@ -671,6 +671,34 @@ export const USB_PORT_KINDS = [
 export const GENERAL_PORT_KINDS = [...SERIAL_PORT_KINDS, ...USB_PORT_KINDS] as const
 
 /**
+ * Power connectors, stored as `power-<NetBox type>`: NetBox shares type names
+ * between inputs and outlets (and with data ports), yet the kind alone decides
+ * a component's class. `power-dc-barrel` is a conex extension.
+ */
+export const POWER_INPUT_KINDS = [
+	'power-iec-60320-c14',
+	'power-iec-60320-c20',
+	'power-iec-60320-c8',
+	'power-iec-60320-c6',
+	'power-ita-ef',
+	'power-dc-terminal',
+	'power-dc-barrel',
+	'power-usb-c',
+] as const
+
+/** Outlet connectors, stored as `power-outlet-<NetBox type>`; see `POWER_INPUT_KINDS`. */
+export const POWER_OUTLET_KINDS = [
+	'power-outlet-iec-60320-c13',
+	'power-outlet-iec-60320-c19',
+	'power-outlet-iec-60320-c7',
+	'power-outlet-iec-60320-c5',
+	'power-outlet-ita-f',
+	'power-outlet-dc-terminal',
+	'power-outlet-usb-a',
+	'power-outlet-usb-c',
+] as const
+
+/**
  * Common NetBox interface types with their display names. These are
  * technical identifiers, so the labels stay untranslated.
  */
@@ -710,7 +738,9 @@ export const PORT_KINDS = [
 	'port',
 	...GENERAL_PORT_KINDS,
 	'power',
+	...POWER_INPUT_KINDS,
 	'power-outlet',
+	...POWER_OUTLET_KINDS,
 	...DISPLAY_PORT_KINDS,
 ] as const
 

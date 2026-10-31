@@ -4,6 +4,8 @@ import {
 	GENERAL_PORT_KINDS,
 	NETBOX_INTERFACE_TYPES,
 	PASS_THROUGH_PORT_TYPES,
+	POWER_INPUT_KINDS,
+	POWER_OUTLET_KINDS,
 	type PortSide,
 	SERIAL_PORT_KINDS,
 	USB_PORT_KINDS,
@@ -14,11 +16,15 @@ export const OTHER_PORT_KINDS = new Set<string>([
 	'port',
 	...GENERAL_PORT_KINDS,
 	'power',
+	...POWER_INPUT_KINDS,
 	'power-outlet',
+	...POWER_OUTLET_KINDS,
 	...DISPLAY_PORT_KINDS,
 ])
 
-const POWER_PORT_KINDS = new Set(['power', 'power-outlet'])
+const POWER_OUTPUTS = new Set<string>(['power-outlet', ...POWER_OUTLET_KINDS])
+
+const POWER_PORT_KINDS = new Set<string>(['power', ...POWER_INPUT_KINDS, ...POWER_OUTPUTS])
 
 /** Patch-panel connectors (fiber, …) that only cable to their own kind; copper cables like ethernet. */
 const SAME_KIND_PASS_THROUGH = new Set<string>(
@@ -67,7 +73,7 @@ function isGeneralPort(kind: string): boolean {
 /**
  * Wired network ports pair with wired network ports, wireless ones only within
  * their family (WLAN, cellular); a power port pairs with a power port
- * or outlet (never outlet to outlet); general ports pair within their
+ * or outlet of any connector (never outlet to outlet); general ports pair within their
  * connector family, a plain `port` with any general port; display only with
  * the same kind; fiber panel ports with the same kind or a transceiver (SFP, …).
  */
@@ -79,7 +85,7 @@ export function portKindsCompatible(local: string, peer: string): boolean {
 		return WIRELESS_FAMILIES.some((f) => f.has(local) && f.has(peer))
 	}
 	if (POWER_PORT_KINDS.has(local) && POWER_PORT_KINDS.has(peer)) {
-		return local === 'power' || peer === 'power'
+		return !(POWER_OUTPUTS.has(local) && POWER_OUTPUTS.has(peer))
 	}
 	if (isGeneralPort(local) && isGeneralPort(peer)) {
 		return (

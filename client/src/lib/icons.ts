@@ -28,20 +28,34 @@ import { CELLULAR_KINDS, TRANSCEIVER_KINDS, WIFI_KINDS } from 'shared/src/ports'
 import {
 	COPPER_PASS_THROUGH_TYPES,
 	type DeviceRoleIcon,
-	type GENERAL_PORT_KINDS,
 	type LocationType,
 	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
+	type PortKind,
 } from 'shared/src/schemas'
 import type { Component } from 'solid-js'
 import {
+	IconC5,
+	IconC6,
+	IconC7,
+	IconC8,
+	IconC13,
+	IconC19,
+	IconC20,
 	IconDb25,
+	IconDcBarrel,
+	IconDcTerminal,
 	IconDe9,
+	IconDisplayPort,
+	IconDvi,
 	IconFiber,
+	IconHdmi,
 	IconMiniDin8,
+	IconPowerInlet,
 	IconRj11,
 	IconRj12,
 	IconRj45,
+	IconSchuko,
 	IconUsbA,
 	IconUsbB,
 	IconUsbC,
@@ -49,6 +63,7 @@ import {
 	IconUsbMicroB,
 	IconUsbMiniA,
 	IconUsbMiniB,
+	IconVga,
 } from './port_icons'
 
 export type IconComponent = Component<{ size?: number }>
@@ -96,8 +111,8 @@ export function panelKindIcon(kind: string): IconComponent {
 	return COPPER_PASS_THROUGH_TYPES.includes(kind as PassThroughPortType) ? IconRj45 : IconFiber
 }
 
-/** Connector shape of each USB and serial port kind. */
-const GENERAL_PORT_ICONS: Record<(typeof GENERAL_PORT_KINDS)[number], IconComponent> = {
+/** Connector shape of each port kind with a known connector. */
+const CONNECTOR_ICONS: Record<Exclude<PortKind, 'ethernet' | 'port'>, IconComponent> = {
 	'rj-45': IconRj45,
 	'de-9': IconDe9,
 	'db-25': IconDb25,
@@ -112,6 +127,28 @@ const GENERAL_PORT_ICONS: Record<(typeof GENERAL_PORT_KINDS)[number], IconCompon
 	'usb-micro-a': IconUsbMicroA,
 	'usb-micro-b': IconUsbMicroB,
 	'usb-micro-ab': IconUsbMicroA,
+	power: IconPowerInlet,
+	'power-outlet': IconSchuko,
+	hdmi: IconHdmi,
+	displayport: IconDisplayPort,
+	vga: IconVga,
+	dvi: IconDvi,
+	'power-iec-60320-c14': IconPowerInlet,
+	'power-iec-60320-c20': IconC20,
+	'power-iec-60320-c8': IconC8,
+	'power-iec-60320-c6': IconC6,
+	'power-ita-ef': IconSchuko,
+	'power-dc-terminal': IconDcTerminal,
+	'power-dc-barrel': IconDcBarrel,
+	'power-usb-c': IconUsbC,
+	'power-outlet-iec-60320-c13': IconC13,
+	'power-outlet-iec-60320-c19': IconC19,
+	'power-outlet-iec-60320-c7': IconC7,
+	'power-outlet-iec-60320-c5': IconC5,
+	'power-outlet-ita-f': IconSchuko,
+	'power-outlet-dc-terminal': IconDcTerminal,
+	'power-outlet-usb-a': IconUsbA,
+	'power-outlet-usb-c': IconUsbC,
 }
 
 /** Glyph of a port kind (connector shape or medium), if it has one. */
@@ -119,8 +156,8 @@ export function portKindIcon(kind: string): IconComponent | undefined {
 	if (Object.hasOwn(PASS_THROUGH_PORT_TYPES, kind)) {
 		return panelKindIcon(kind)
 	}
-	if (Object.hasOwn(GENERAL_PORT_ICONS, kind)) {
-		return GENERAL_PORT_ICONS[kind as keyof typeof GENERAL_PORT_ICONS]
+	if (Object.hasOwn(CONNECTOR_ICONS, kind)) {
+		return CONNECTOR_ICONS[kind as keyof typeof CONNECTOR_ICONS]
 	}
 	if (WIFI_KINDS.has(kind)) {
 		return IconWifi
