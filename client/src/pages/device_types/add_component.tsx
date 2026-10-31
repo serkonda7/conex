@@ -326,7 +326,7 @@ export function ComponentDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
-					class="combobox-fit"
+					class="combobox-fit combobox-port-kind"
 					options={kinds.map(portKindOption)}
 				/>
 				<DescriptionField
@@ -446,6 +446,7 @@ export function PassThroughPresetDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
+					class="combobox-port-kind"
 					options={PASS_THROUGH_KINDS.map(portKindOption)}
 				/>
 				<Show when={cassette}>

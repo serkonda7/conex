@@ -28,12 +28,28 @@ import { CELLULAR_KINDS, TRANSCEIVER_KINDS, WIFI_KINDS } from 'shared/src/ports'
 import {
 	COPPER_PASS_THROUGH_TYPES,
 	type DeviceRoleIcon,
+	type GENERAL_PORT_KINDS,
 	type LocationType,
 	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
 } from 'shared/src/schemas'
 import type { Component } from 'solid-js'
-import { IconFiber, IconRj45 } from './port_icons'
+import {
+	IconDb25,
+	IconDe9,
+	IconFiber,
+	IconMiniDin8,
+	IconRj11,
+	IconRj12,
+	IconRj45,
+	IconUsbA,
+	IconUsbB,
+	IconUsbC,
+	IconUsbMicroA,
+	IconUsbMicroB,
+	IconUsbMiniA,
+	IconUsbMiniB,
+} from './port_icons'
 
 export type IconComponent = Component<{ size?: number }>
 
@@ -80,10 +96,31 @@ export function panelKindIcon(kind: string): IconComponent {
 	return COPPER_PASS_THROUGH_TYPES.includes(kind as PassThroughPortType) ? IconRj45 : IconFiber
 }
 
-/** Medium glyph of a port kind (copper, fiber, Wi-Fi, cellular), if it has one. */
+/** Connector shape of each USB and serial port kind. */
+const GENERAL_PORT_ICONS: Record<(typeof GENERAL_PORT_KINDS)[number], IconComponent> = {
+	'rj-45': IconRj45,
+	'de-9': IconDe9,
+	'db-25': IconDb25,
+	'rj-11': IconRj11,
+	'rj-12': IconRj12,
+	'mini-din-8': IconMiniDin8,
+	'usb-a': IconUsbA,
+	'usb-b': IconUsbB,
+	'usb-c': IconUsbC,
+	'usb-mini-a': IconUsbMiniA,
+	'usb-mini-b': IconUsbMiniB,
+	'usb-micro-a': IconUsbMicroA,
+	'usb-micro-b': IconUsbMicroB,
+	'usb-micro-ab': IconUsbMicroA,
+}
+
+/** Glyph of a port kind (connector shape or medium), if it has one. */
 export function portKindIcon(kind: string): IconComponent | undefined {
 	if (Object.hasOwn(PASS_THROUGH_PORT_TYPES, kind)) {
 		return panelKindIcon(kind)
+	}
+	if (Object.hasOwn(GENERAL_PORT_ICONS, kind)) {
+		return GENERAL_PORT_ICONS[kind as keyof typeof GENERAL_PORT_ICONS]
 	}
 	if (WIFI_KINDS.has(kind)) {
 		return IconWifi

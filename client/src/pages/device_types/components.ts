@@ -6,13 +6,14 @@
  */
 import {
 	DISPLAY_PORT_KINDS,
-	GENERAL_PORT_KINDS,
 	NETBOX_INTERFACE_TYPES,
 	type NetboxInterfaceType,
 	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
 	type PortKind,
 	type PortSide,
+	SERIAL_PORT_KINDS,
+	USB_PORT_KINDS,
 } from 'shared/src/schemas'
 import type { Component } from 'solid-js'
 import { type MessageKey, t } from '../../i18n'
@@ -64,7 +65,7 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 		label: 'deviceType.component.port',
 		icon: UsbAIcon,
 		placeholder: 'usb',
-		kinds: ['port', ...GENERAL_PORT_KINDS],
+		kinds: [...USB_PORT_KINDS, ...SERIAL_PORT_KINDS],
 	},
 	{
 		key: 'power-port',
@@ -107,11 +108,15 @@ export const COMPONENT_CLASSES: readonly ComponentClassInfo[] = [
 
 /**
  * Component class of a stored stub or port: the side decides for patch-panel
- * ports, otherwise the kind; unknown kinds are interfaces.
+ * ports, otherwise the kind; unknown kinds are interfaces. Plain `port` (no
+ * known connector, e.g. from imports) isn't offered but stays a port.
  */
 export function componentClassOf(row: { kind: string; side: PortSide | null }): ComponentClass {
 	if (row.side) {
 		return row.side === 'front' ? 'front-port' : 'rear-port'
+	}
+	if (row.kind === 'port') {
+		return 'port'
 	}
 	const match = COMPONENT_CLASSES.find(
 		(c) =>

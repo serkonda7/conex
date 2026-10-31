@@ -2122,6 +2122,13 @@ tbody tr:last-child td {
 	color: var(--text);
 }
 
+/* The package picks a dark text color on its accent in dark mode; text on
+   --primary is always --primary-contrast. */
+.filter-table-badge,
+.filter-table-button-primary {
+	color: var(--primary-contrast);
+}
+
 /* Keep sortable headers the same width when the active sort moves. The
    component appends an arrow to the active header and conditionally renders
    its clear button, so reserve both indicators on every sortable header. */
@@ -2288,6 +2295,52 @@ th[aria-sort="descending"] .data-table-sort::after {
 .add-component-icon svg {
 	width: 100%;
 	height: 100%;
+}
+
+/* Port kinds: connector glyphs enlarged so pins stay legible.
+   The library always asks for 14px, and iconless kinds keep the text column. */
+.combobox-port-kind {
+	--port-icon-size: 20px;
+	--port-icon-gap: 0.4rem;
+}
+
+.combobox-port-kind .combobox-icon svg,
+.combobox-port-kind .combobox-option-icon svg {
+	width: var(--port-icon-size);
+	height: var(--port-icon-size);
+}
+
+.app-content
+	.form-stacked
+	.field
+	.combobox-port-kind.combobox-with-icon
+	.combobox-input {
+	padding-left: calc(0.55rem + var(--port-icon-size) + var(--port-icon-gap));
+}
+
+.combobox-port-kind.combobox-with-icon .combobox-value {
+	left: calc(0.55rem + var(--port-icon-size) + var(--port-icon-gap) + 1px);
+}
+
+.combobox-port-kind .combobox-list .combobox-option {
+	align-items: center;
+	padding-block: 0.1rem;
+}
+
+.combobox-port-kind .combobox-list .combobox-option-label {
+	display: flex;
+	align-items: center;
+	min-height: var(--port-icon-size);
+}
+
+.combobox-port-kind .combobox-option-icon {
+	margin-right: var(--port-icon-gap);
+}
+
+.combobox-port-kind
+	.combobox-list
+	.combobox-option-label:not(:has(.combobox-option-icon)) {
+	padding-left: calc(var(--port-icon-size) + var(--port-icon-gap));
 }
 
 .add-component-dropdown hr {
@@ -3257,6 +3310,7 @@ span.attachment-star,
 .floorplan-palette-sequence.active {
 	border-color: var(--primary);
 	background-color: var(--primary);
+	color: var(--primary-contrast);
 }
 
 .floorplan-palette-group-header {
