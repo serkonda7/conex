@@ -34,7 +34,7 @@
 	--muted-dot: #666666;
 	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 	--font-size-sm: 0.75rem;
-	--font-size-base: 0.9375rem; /* 15px */
+	--font-size-base: 0.875rem; /* 14px */
 	--font-size-lg: 1rem;
 	--font-size-xl: 1.15rem;
 	--font-size-2xl: 1.3rem;
@@ -2778,6 +2778,67 @@ th[aria-sort="descending"] .data-table-sort::after {
 		padding: 0;
 		border-left: 0;
 	}
+}
+
+/* Device type detail: flat component table, one tinted band per class, no row lines. */
+.component-section {
+	margin: 1.1rem 0;
+}
+
+.component-table-wrap {
+	overflow-x: auto;
+}
+
+.component-table {
+	margin: 0;
+	border: 0;
+	background: none;
+}
+
+.component-name {
+	white-space: nowrap;
+}
+
+.component-table :is(th, td) {
+	border-bottom: 0;
+}
+
+.component-table thead th {
+	background: none;
+}
+
+/* Group rows shift the zebra stripes: keep rows flat, hover still applies. */
+.app-content .component-table tbody tr:not(:hover) {
+	background: none;
+}
+
+.component-table tbody::after {
+	content: "";
+	display: block;
+	height: 1rem;
+}
+
+.component-group-title {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.component-table .component-group {
+	background-color: var(--bg-raised);
+	border-radius: 0.25rem;
+	font-weight: 600;
+}
+
+.component-count {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.component-actions {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
 }
 
 /* Rendered markdown of user-written comments. */

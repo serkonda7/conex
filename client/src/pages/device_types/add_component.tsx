@@ -17,7 +17,7 @@ import { portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
-import { COMPONENT_CLASSES, type ComponentClassInfo } from './components'
+import { COMPONENT_CLASSES, type ComponentClassInfo, stubRange } from './components'
 import { CassetteIcon, PatchPanelIcon } from './connector_icons'
 
 const MAX_COUNT = 1024
@@ -42,8 +42,8 @@ function parseCount(value: string): number | null {
 	return Number.isInteger(n) && n >= 1 && n <= MAX_COUNT ? n : null
 }
 
-/** Connector drawing beside a component menu item. */
-function ItemIcon(props: { icon: ComponentClassInfo['icon'] }): JSX.Element {
+/** Connector drawing beside a component class name. */
+export function ItemIcon(props: { icon: ComponentClassInfo['icon'] }): JSX.Element {
 	return (
 		<span class="add-component-icon" aria-hidden="true">
 			<Dynamic component={props.icon} />
@@ -285,13 +285,7 @@ export function ComponentDialog(props: {
 						}
 						options={props.rearStubs.map((r) => ({
 							value: String(r.id),
-							label:
-								r.count === 1
-									? r.prefix
-									: t('deviceType.component.range', {
-											first: `${r.prefix}1`,
-											last: `${r.prefix}${r.count}`,
-										}),
+							label: stubRange(r),
 						}))}
 					/>
 					<TextField

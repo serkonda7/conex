@@ -1,3 +1,4 @@
+import { IconPencil, IconTrash } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
@@ -11,7 +12,6 @@ import {
 	fetch_stubs,
 	type StubRow,
 } from '../../api/templates'
-import { DataTable, type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import {
 	DetailHeader,
 	DetailShell,
@@ -30,10 +30,16 @@ import { can } from '../../lib/session'
 import {
 	AddComponentMenu,
 	ComponentDialog,
+	ItemIcon,
 	type PassThroughPreset,
 	PassThroughPresetDialog,
 } from './add_component'
-import { COMPONENT_CLASSES, type ComponentClassInfo, componentClassOf } from './components'
+import {
+	COMPONENT_CLASSES,
+	type ComponentClassInfo,
+	componentClassOf,
+	stubRange,
+} from './components'
 
 /** Domain of a spec link; the full URL can overflow its narrow spec-sheet column. */
 const specHost = (url: string): string => {
@@ -42,9 +48,9 @@ const specHost = (url: string): string => {
 }
 
 /**
- * /device-types/:id — device-type detail: header with model, the "Add
- * components" menu and spec sheet (hardware, physical, usage, comments),
- * one table per component class, and the devices using this type.
+ * /device-types/:id — device-type detail: header with model, spec sheet
+ * (hardware, physical, usage, comments), the components grouped by class with
+ * the "Add components" menu, and the devices using this type.
  */
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -97,58 +103,55 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/device-types',
 	})
 
-	const stubColumns: DataTableColumn<StubRow>[] = [
-		{
-			key: 'prefix',
-			label: t('common.name'),
-			getValue: (s: StubRow): JSX.Element => <code>{s.prefix}</code>,
-		},
-		{
-			key: 'count',
-			label: t('deviceType.component.count'),
-			getValue: (s: StubRow): number => s.count,
-		},
-		{
-			key: 'kind',
-			label: t('common.type'),
-			getValue: (s: StubRow): string => portKindLabel(s.kind),
-		},
-		descriptionColumn<StubRow>(),
-	]
-	/** Patch-panel tables add the rear positions or the front-to-rear mapping. */
-	const passThroughColumn: DataTableColumn<StubRow> = {
-		key: 'pass_through',
-		label: t('deviceType.component.mapping'),
-		getValue: (s: StubRow): string =>
-			s.side === 'rear'
-				? tp('deviceType.component.positionsCount', s.positions)
-				: t('deviceType.component.mapsTo', {
-						rear: stubPrefix(s.rear_stub_id),
-						position: s.rear_position,
-					}),
+	const componentClasses = (): readonly ComponentClassInfo[] =>
+		COMPONENT_CLASSES.filter((info) => stubsOf(info).length > 0)
+	/** Patch-panel types add a column with the rear positions or front-to-rear mapping. */
+	const hasPassThrough = (): boolean => (stubs() ?? []).some((row) => row.side !== null)
+	const canChange = (): boolean => can('edit') || can('delete')
+	const columnCount = (): number => 4 + Number(hasPassThrough()) + Number(canChange())
+	const passThrough = (s: StubRow): string => {
+		if (!s.side) {
+			return '—'
+		}
+		return s.side === 'rear'
+			? tp('deviceType.component.positionsCount', s.positions)
+			: t('deviceType.component.mapsTo', {
+					rear: stubPrefix(s.rear_stub_id),
+					position: s.rear_position,
+				})
 	}
-	const columnsOf = (info: ComponentClassInfo): DataTableColumn<StubRow>[] =>
-		info.side
-			? [...stubColumns.slice(0, 3), passThroughColumn, ...stubColumns.slice(3)]
-			: stubColumns
+
+	async function deleteStub(s: StubRow): Promise<void> {
+		if (window.confirm(t('deviceType.component.confirmDelete', { name: s.prefix }))) {
+			await run(() => delete_stub(props.id, s.id))
+		}
+	}
 
 	const stubActions = (info: ComponentClassInfo, s: StubRow): JSX.Element => (
-		<div class="row-actions">
+		<span class="row-actions">
 			<Show when={can('edit')}>
-				<button type="button" onClick={(): void => void setEditing({ info, stub: s })}>
-					{t('common.edit')}
+				<button
+					type="button"
+					class="icon-btn"
+					title={t('deviceType.component.editTitle', { name: s.prefix })}
+					aria-label={t('deviceType.component.editTitle', { name: s.prefix })}
+					onClick={(): void => void setEditing({ info, stub: s })}
+				>
+					<IconPencil size={16} />
 				</button>
 			</Show>
 			<Show when={can('delete')}>
 				<button
 					type="button"
-					class="btn-danger"
-					onClick={(): void => void run(() => delete_stub(props.id, s.id))}
+					class="icon-btn"
+					title={t('deviceType.component.deleteTitle', { name: s.prefix })}
+					aria-label={t('deviceType.component.deleteTitle', { name: s.prefix })}
+					onClick={(): void => void deleteStub(s)}
 				>
-					{t('common.delete')}
+					<IconTrash size={16} />
 				</button>
 			</Show>
-		</div>
+		</span>
 	)
 
 	return (
@@ -164,11 +167,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					name={deviceType()?.model}
 					editHref={`/device-types/${props.id}/edit`}
 					onDelete={handleDelete}
-					actions={
-						<Show when={can('edit')}>
-							<AddComponentMenu onSelect={setAdding} onPreset={setPreset} />
-						</Show>
-					}
 				/>
 				<DetailSubtitle description={deviceType()?.description} />
 
@@ -240,41 +238,91 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				</section>
 			</DetailShell>
 
-			<Show
-				when={!stubs.loading}
-				fallback={<Loading message={t('deviceType.component.loading')} />}
-			>
+			<section class="component-section" id="device-type-components">
+				<div class="card-header">
+					<h3>
+						{t('deviceType.component.heading')}{' '}
+						<span class="badge">{(stubs() ?? []).length}</span>
+					</h3>
+					<Show when={can('edit')}>
+						<AddComponentMenu onSelect={setAdding} onPreset={setPreset} />
+					</Show>
+				</div>
 				<Show
-					when={(stubs() ?? []).length > 0}
-					fallback={
-						<>
-							<h3 id="device-type-components">{t('deviceType.component.heading')}</h3>
-							<Empty message={t('deviceType.component.empty')} />
-						</>
-					}
+					when={!stubs.loading}
+					fallback={<Loading message={t('deviceType.component.loading')} />}
 				>
-					<For each={COMPONENT_CLASSES.filter((info) => stubsOf(info).length > 0)}>
-						{(info: ComponentClassInfo) => (
-							<>
-								<h3 id={`device-type-${info.key}s`}>
-									{t(info.heading, { count: stubsOf(info).length })}
-								</h3>
-								<DataTable
-									rows={() => stubsOf(info)}
-									getRowId={(s: StubRow): number => s.id}
-									columns={columnsOf(info)}
-									showColumnCustomizer
-									rowActions={
-										can('edit') || can('delete')
-											? (s: StubRow): JSX.Element => stubActions(info, s)
-											: undefined
-									}
-								/>
-							</>
-						)}
-					</For>
+					<Show
+						when={(stubs() ?? []).length > 0}
+						fallback={<Empty message={t('deviceType.component.empty')} />}
+					>
+						<div class="component-table-wrap">
+							<table class="component-table">
+								<thead>
+									<tr>
+										<th scope="col">{t('common.name')}</th>
+										<th scope="col" class="component-count">
+											{t('deviceType.component.count')}
+										</th>
+										<th scope="col">{t('common.type')}</th>
+										<Show when={hasPassThrough()}>
+											<th scope="col">{t('deviceType.component.mapping')}</th>
+										</Show>
+										<th scope="col">{t('common.description')}</th>
+										<Show when={canChange()}>
+											<th scope="col" />
+										</Show>
+									</tr>
+								</thead>
+								<For each={componentClasses()}>
+									{(info: ComponentClassInfo) => (
+										<tbody>
+											<tr>
+												<th
+													scope="rowgroup"
+													colSpan={columnCount()}
+													class="component-group"
+												>
+													<span class="component-group-title">
+														<ItemIcon icon={info.icon} />
+														{t(info.label)}{' '}
+														<span class="text-muted">
+															{stubsOf(info).reduce(
+																(sum, s) => sum + s.count,
+																0,
+															)}
+														</span>
+													</span>
+												</th>
+											</tr>
+											<For each={stubsOf(info)}>
+												{(s: StubRow) => (
+													<tr>
+														<td class="component-name">
+															{stubRange(s)}
+														</td>
+														<td class="component-count">{s.count}</td>
+														<td>{portKindLabel(s.kind)}</td>
+														<Show when={hasPassThrough()}>
+															<td>{passThrough(s)}</td>
+														</Show>
+														<td>{s.description || '—'}</td>
+														<Show when={canChange()}>
+															<td class="component-actions">
+																{stubActions(info, s)}
+															</td>
+														</Show>
+													</tr>
+												)}
+											</For>
+										</tbody>
+									)}
+								</For>
+							</table>
+						</div>
+					</Show>
 				</Show>
-			</Show>
+			</section>
 			<Show when={adding()}>
 				{(info: () => ComponentClassInfo) => (
 					<ComponentDialog
