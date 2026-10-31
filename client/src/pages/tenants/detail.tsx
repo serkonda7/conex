@@ -4,7 +4,15 @@ import {
 	type TenantBundleJson,
 	websiteUrl,
 } from 'shared/src/schemas'
-import { createSignal, For, type JSX, type Resource, Show } from 'solid-js'
+import {
+	createEffect,
+	createMemo,
+	createSignal,
+	For,
+	type JSX,
+	type Resource,
+	Show,
+} from 'solid-js'
 import { type FloorplanListJson, fetch_floorplans } from '../../api/attachments'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { fetch_device_roles } from '../../api/device_roles'
@@ -49,7 +57,9 @@ import {
 } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
+import { path, useTabPath } from '../../lib/router'
 import { can } from '../../lib/session'
+import { setTenantContext } from '../../lib/tenant_context'
 import { formatRelative } from '../../lib/time'
 import { ChangeActionBadge, ChangedObjectLink, changeUser } from '../changelog/common'
 import { deviceListHref } from '../devices/list'
@@ -75,6 +85,15 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const id = (): number => props.id
 	const [tenant] = createRecord(id, fetch_tenant, setError)
+	const loadedId = createMemo((): number | undefined => tenant()?.id)
+	const tabPath = useTabPath()
+	// Viewing a tenant makes it the context, also on switching back to this tab.
+	createEffect(() => {
+		const tenantId = loadedId()
+		if (tenantId !== undefined && path() === tabPath) {
+			setTenantContext({ kind: 'tenant', id: tenantId })
+		}
+	})
 	const groupId = (): number | null | undefined => tenant()?.tenant_group_id
 	// A group that fails to load just shows as its id.
 	const [group] = createRecord(groupId, fetch_tenant_group)
@@ -580,9 +599,7 @@ function RecentChanges(props: {
 function ChangeRow(props: { change: ObjectChangeJson }): JSX.Element {
 	return (
 		<li>
-			<a class="text-muted" href={`/changelog/${props.change.id}`}>
-				{formatRelative(props.change.created_at)}
-			</a>
+			<span class="text-muted">{formatRelative(props.change.created_at)}</span>
 			<span class="tenant-row-text">
 				<strong>{changeUser(props.change)}</strong>{' '}
 				<ChangeActionBadge action={props.change.action} />{' '}

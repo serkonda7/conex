@@ -15,3 +15,6 @@
   `client/src/i18n/en.ts` and matching entry to `de.ts`,
   then use `t('key', { param })` / `tp('plural.key', count)`.
   Enum display values go through `client/src/i18n/labels.ts`.
+- Design decisions: read `docs/design/decisions/` before UI changes and follow
+  the accepted decisions there. Record significant new design choices as a new
+  numbered file; to reverse one, add a new decision that replaces it.

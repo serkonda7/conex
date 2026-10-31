@@ -22,9 +22,11 @@ import {
 	ForeignKeyLink,
 	RelatedPreview,
 	useDetailDelete,
+	ViewAllLink,
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
+import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, portKindLabel, yesNo } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
@@ -60,7 +62,6 @@ const specHost = (url: string): string => {
  * the "Add components" menu, and the devices using this type.
  */
 export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
-	let deviceSection: HTMLElement | undefined
 	const [error, setError] = createSignal<string | null>(null)
 	const [adding, setAdding] = createSignal<ComponentClassInfo | null>(null)
 	const [editing, setEditing] = createSignal<{
@@ -89,14 +90,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const tenantName = useNameOf(tenants)
 	const siteName = useNameOf(sites)
 	const rackName = useNameOf(racks)
-
-	function scrollToDevices(e: MouseEvent): void {
-		if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
-			return
-		}
-		e.preventDefault()
-		deviceSection?.scrollIntoView({ block: 'start' })
-	}
 
 	const manufacturerCrumbs = (): Crumb[] => {
 		const row = manufacturer()
@@ -291,10 +284,9 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 							<dt>{tp('entity.device', 2)}</dt>
 							<dd>
-								{/* biome-ignore lint/a11y/useValidAnchor: Navigate to this tab's device list rather than a hidden tab's duplicate anchor. */}
-								<a href="#device-type-devices" onClick={scrollToDevices}>
-									{deviceTotal()} <span aria-hidden="true">↓</span>
-								</a>
+								<ScrollLink target="device-type-devices">
+									{deviceTotal()}
+								</ScrollLink>
 							</dd>
 						</dl>
 					</section>
@@ -434,11 +426,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					/>
 				)}
 			</Show>
-			<section
-				ref={deviceSection}
-				class="component-section device-preview"
-				id="device-type-devices"
-			>
+			<section class="component-section device-preview" id="device-type-devices">
 				<div class="card-header">
 					<h3>
 						{tp('entity.device', 2)} <span class="badge">{deviceTotal()}</span>
@@ -452,15 +440,11 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					columns={deviceColumns}
 				/>
 				<Show when={deviceTotal() > DEVICE_PREVIEW_ROWS}>
-					<a
-						class="related-tabs-all"
+					<ViewAllLink
 						href={`/devices?device_type=${props.id}&kind=device`}
-					>
-						{t('common.viewAllIn', {
-							count: deviceTotal(),
-							target: tp('entity.device', 2),
-						})}
-					</a>
+						count={deviceTotal()}
+						target={tp('entity.device', 2)}
+					/>
 				</Show>
 			</section>
 			<InlineError message={error()} />

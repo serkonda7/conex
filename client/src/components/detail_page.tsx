@@ -230,6 +230,15 @@ export function RelatedSection<Row extends { id: number }>(props: {
 	)
 }
 
+/** "View all" link under a truncated related-object list. */
+export function ViewAllLink(props: { href: string; count: number; target: string }): JSX.Element {
+	return (
+		<a class="related-tabs-all" href={props.href}>
+			{t('common.viewAllIn', { count: props.count, target: props.target })}
+		</a>
+	)
+}
+
 /** Rows a {@link RelatedPreview} shows before "View all". */
 const RELATED_PREVIEW_ROWS = 5
 
@@ -276,9 +285,7 @@ export function RelatedTabs(props: { id: string; label: string; tabs: RelatedTab
 						{tab.content()}
 						<Show when={tab.viewAllHref}>
 							{(href: () => string) => (
-								<a class="related-tabs-all" href={href()}>
-									{t('common.viewAllIn', { count: tab.count, target: tab.label })}
-								</a>
+								<ViewAllLink href={href()} count={tab.count} target={tab.label} />
 							)}
 						</Show>
 					</div>

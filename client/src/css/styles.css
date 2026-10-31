@@ -1002,7 +1002,7 @@ tbody tr:last-child td {
 	min-width: 0;
 }
 
-.tenant-changes li > a:first-child {
+.tenant-changes li > :first-child {
 	flex: 0 0 5.5rem;
 	white-space: nowrap;
 }
@@ -2785,7 +2785,8 @@ th[aria-sort="descending"] .data-table-sort::after {
 	margin: 1.1rem 0;
 }
 
-.device-preview {
+.device-preview,
+.section-header > h3 {
 	scroll-margin-top: var(--topbar-height);
 }
 
@@ -2897,10 +2898,6 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .markdown :is(h3, h4, h5, h6) {
 	font-size: var(--font-size-lg);
-}
-
-.markdown :any-link {
-	color: var(--link);
 }
 
 .markdown code {

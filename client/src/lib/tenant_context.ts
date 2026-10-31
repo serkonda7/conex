@@ -1,8 +1,8 @@
 /**
  * Global tenant context: the top-bar selection of "all tenants", one
  * tenant group, or one tenant. List pages and create
- * forms read it; detail pages and catalog data ignore it. The choice is
- * shared by all tabs and persisted to localStorage (`conex:tenant-context`).
+ * forms read it; detail pages and catalog data ignore it. Viewing a tenant's
+ * detail page selects that tenant. The choice is shared by all tabs and persisted to localStorage (`conex:tenant-context`).
  *
  * Scoped users are limited to their own tenant server-side, so for them the
  * context always reads as "all" and the selector shows a fixed label.
