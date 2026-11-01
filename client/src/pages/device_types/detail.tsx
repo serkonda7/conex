@@ -274,6 +274,13 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	)
 	const deviceTotal = (): number => (devices() ?? []).length
 	const [syncing, setSyncing] = createSignal<DeviceListDevice | null>(null)
+	/** The next differing device in list order, wrapping past the end. */
+	const nextOutOfSync = (current: DeviceListDevice): DeviceListDevice | null => {
+		const rows = devices() ?? []
+		const at = rows.findIndex((row) => row.id === current.id)
+		const others = [...rows.slice(at + 1), ...rows.slice(0, Math.max(at, 0))]
+		return others.find((row) => row.out_of_sync) ?? null
+	}
 	/** Component changes can put devices out of sync with the type. */
 	const refreshComponents = (): void => {
 		void refetchStubs()
@@ -571,12 +578,13 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					target={tp('entity.device', 2)}
 				/>
 			</section>
-			<Show when={syncing()}>
-				{(device: () => DeviceListDevice) => (
+			<Show when={syncing()} keyed>
+				{(device: DeviceListDevice) => (
 					<TemplateSyncDialog
-						device={device()}
-						on_synced={() => {
-							setSyncing(null)
+						device={device}
+						has_next={nextOutOfSync(device) !== null}
+						on_synced={(next: boolean) => {
+							setSyncing(next ? nextOutOfSync(device) : null)
 							void refetchDevices()
 						}}
 						on_close={() => setSyncing(null)}

@@ -15,6 +15,7 @@ import { createRecord, useAction } from '../../lib/resource'
 
 type Orphan = TemplateSyncPreview['orphaned'][number]
 
+const NEXT = 'next'
 const KEEP = 'keep'
 const REMOVE = 'remove'
 /** Select values of a remap target; the name follows the prefix. */
@@ -50,7 +51,10 @@ function changeText(change: TemplateSyncChange): string {
  */
 export function TemplateSyncDialog(props: {
 	device: { id: number; name: string }
-	on_synced: () => void
+	/** Another device still differs, so "Update & Next" can move on to it. */
+	has_next: boolean
+	/** `next`: the user asked to continue with the next device. */
+	on_synced: (next: boolean) => void
 	on_close: () => void
 }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -119,9 +123,10 @@ export function TemplateSyncDialog(props: {
 
 	async function handleApply(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
+		const next = (e.submitter as HTMLButtonElement | null)?.value === NEXT
 		const input = { assignments: assignments() }
 		if (await save.run(() => apply_template_sync(props.device.id, input))) {
-			props.on_synced()
+			props.on_synced(next)
 		}
 	}
 
@@ -205,13 +210,28 @@ export function TemplateSyncDialog(props: {
 								{t('device.templateSync.unchanged', { count: p().unchanged })}
 							</Hint>
 						</Show>
-						<div class="modal-actions">
-							<button type="submit" disabled={upToDate() || save.pending()}>
-								{t('device.templateSync.apply')}
-							</button>
-							<button type="button" onClick={props.on_close}>
+						<div class="form-actions template-sync-actions">
+							<button
+								type="button"
+								onClick={props.on_close}
+								disabled={save.pending()}
+							>
 								{t('common.cancel')}
 							</button>
+							<div class="btn-group">
+								<button type="submit" disabled={upToDate() || save.pending()}>
+									{t('device.templateSync.apply')}
+								</button>
+								<button
+									type="submit"
+									class="btn-outline"
+									name="action"
+									value={NEXT}
+									disabled={!props.has_next || upToDate() || save.pending()}
+								>
+									{t('device.templateSync.applyNext')}
+								</button>
+							</div>
 						</div>
 					</form>
 				)}

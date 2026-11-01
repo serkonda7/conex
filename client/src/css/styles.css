@@ -2477,6 +2477,11 @@ th[aria-sort="descending"] .data-table-sort::after {
 	overflow-y: auto;
 }
 
+.template-sync-actions {
+	justify-content: flex-end;
+	margin-left: 0;
+}
+
 .template-sync-list {
 	margin: 0;
 	padding-left: 1.1rem;
@@ -2979,6 +2984,12 @@ th[aria-sort="descending"] .data-table-sort::after {
 /* Same row height as the components, whose rows hold icon buttons. */
 .device-preview :is(tbody td) {
 	padding-block: 0.6rem;
+}
+
+/* As tall as a text line, so rows keep their height with or without it. */
+.device-preview .icon-btn {
+	display: flex;
+	margin-block: -0.4rem;
 }
 
 /* Lines up with the name column. */
