@@ -305,10 +305,12 @@ export function RelatedPreview<Row extends { id: number }>(props: {
 	columns: DataTableColumn<Row>[]
 	/** Row key when ids are not unique within the rows; defaults to `id`. */
 	rowKey?: (row: Row) => string | number
+	/** Shows every row instead of the first few. */
+	all?: boolean
 }): JSX.Element {
 	return (
 		<DataTable
-			rows={() => props.rows.slice(0, RELATED_PREVIEW_ROWS)}
+			rows={() => (props.all ? props.rows : props.rows.slice(0, RELATED_PREVIEW_ROWS))}
 			getRowId={(row: Row): string | number => props.rowKey?.(row) ?? row.id}
 			columns={props.columns}
 			loading={() => props.loading}

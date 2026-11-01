@@ -1,10 +1,10 @@
-import { IconChevronDown, IconPencil, IconTrash } from '@tabler/icons-solidjs'
+import { IconChevronDown, IconPencil, IconRefreshAlert, IconTrash } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_device_role } from '../../api/device_roles'
-import { type DeviceRow, fetch_devices } from '../../api/devices'
+import { type DeviceListDevice, fetch_all_devices_of_type } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import {
 	delete_device_type,
@@ -35,6 +35,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
+import { TemplateSyncDialog } from '../devices/template_sync_dialog'
 import {
 	AddComponentMenu,
 	ComponentDialog,
@@ -48,9 +49,6 @@ import {
 	componentClassOf,
 	stubRange,
 } from './components'
-
-/** Devices of the type shown before "View all"; matches the preview's row cap. */
-const DEVICE_PREVIEW_ROWS = 5
 
 /** Component groups with more rows than this start collapsed. */
 const COMPONENT_GROUP_OPEN_ROWS = 16
@@ -269,13 +267,18 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		deviceType()?.default_device_role_id ?? undefined
 	const [defaultRole] = createRecord(defaultRoleId, fetch_device_role, setError)
 	const [stubs, { refetch: refetchStubs }] = createRowsFor(id, fetch_stubs, setError)
-	// Page, not rows: the total counts beyond the preview.
-	const [devicePage] = createRecord(
+	const [devices, { refetch: refetchDevices }] = createRowsFor(
 		id,
-		(key: number) => fetch_devices({ device_type: key, limit: DEVICE_PREVIEW_ROWS }),
+		fetch_all_devices_of_type,
 		setError,
 	)
-	const deviceTotal = (): number => devicePage()?.total ?? 0
+	const deviceTotal = (): number => (devices() ?? []).length
+	const [syncing, setSyncing] = createSignal<DeviceListDevice | null>(null)
+	/** Component changes can put devices out of sync with the type. */
+	const refreshComponents = (): void => {
+		void refetchStubs()
+		void refetchDevices()
+	}
 	const [tenants] = createRows(fetch_tenants, setError)
 	const [sites] = createRows(fetch_sites, setError)
 	const [racks] = createRows(fetch_racks, setError)
@@ -293,7 +296,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	async function run(request: () => Promise<Result<unknown, Error>>): Promise<boolean> {
 		const ok = await action.run(request)
 		if (ok) {
-			void refetchStubs()
+			refreshComponents()
 		}
 		return ok
 	}
@@ -320,12 +323,12 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/device-types',
 	})
 
-	const deviceColumns: DataTableColumn<DeviceRow>[] = [
-		nameColumn<DeviceRow>(t('common.name'), '/devices'),
+	const deviceColumns: DataTableColumn<DeviceListDevice>[] = [
+		nameColumn<DeviceListDevice>(t('common.name'), '/devices'),
 		{
 			key: 'tenant',
 			label: tp('entity.tenant', 1),
-			getValue: (d: DeviceRow): JSX.Element => (
+			getValue: (d: DeviceListDevice): JSX.Element => (
 				<Show when={d.tenant_id} fallback="—">
 					{(tenant: () => number) => (
 						<a href={`/tenants/${tenant()}`}>{tenantName(tenant())}</a>
@@ -336,7 +339,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		{
 			key: 'site',
 			label: t('tenant.siteRack'),
-			getValue: (d: DeviceRow): JSX.Element => (
+			getValue: (d: DeviceListDevice): JSX.Element => (
 				<Show when={d.site_id !== null || d.rack_id !== null} fallback="—">
 					<Show when={d.site_id}>
 						{(site: () => number) => (
@@ -356,6 +359,25 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							</a>
 						)}
 					</Show>
+				</Show>
+			),
+		},
+		{
+			key: 'template_sync',
+			label: t('device.templateSync.column'),
+			getValue: (d: DeviceListDevice): JSX.Element => (
+				<Show when={d.out_of_sync && can('edit')}>
+					<button
+						type="button"
+						class="icon-btn"
+						title={t('device.templateSync.button')}
+						aria-label={t('device.templateSync.button')}
+						onClick={(): void => {
+							setSyncing(d)
+						}}
+					>
+						<IconRefreshAlert size={18} />
+					</button>
 				</Show>
 			),
 		},
@@ -493,7 +515,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						rearStubs={rearStubs()}
 						onSaved={() => {
 							setAdding(null)
-							void refetchStubs()
+							refreshComponents()
 						}}
 						onClose={() => setAdding(null)}
 					/>
@@ -509,7 +531,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						rearStubs={rearStubs()}
 						onSaved={() => {
 							setEditing(null)
-							void refetchStubs()
+							refreshComponents()
 						}}
 						onClose={() => setEditing(null)}
 					/>
@@ -523,7 +545,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						preset={key()}
 						onSaved={() => {
 							setPreset(null)
-							void refetchStubs()
+							refreshComponents()
 						}}
 						onClose={() => setPreset(null)}
 					/>
@@ -536,20 +558,31 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					</h3>
 				</div>
 				<RelatedPreview
-					rows={devicePage()?.items ?? []}
-					loading={devicePage.loading}
+					rows={devices() ?? []}
+					loading={devices() === undefined}
+					all
 					noun="noun.device"
 					emptyText={t('deviceType.noDevices')}
 					columns={deviceColumns}
 				/>
-				<Show when={deviceTotal() > DEVICE_PREVIEW_ROWS}>
-					<ViewAllLink
-						href={`/devices?device_type=${props.id}&kind=device`}
-						count={deviceTotal()}
-						target={tp('entity.device', 2)}
-					/>
-				</Show>
+				<ViewAllLink
+					href={`/devices?device_type=${props.id}&kind=device`}
+					count={deviceTotal()}
+					target={tp('entity.device', 2)}
+				/>
 			</section>
+			<Show when={syncing()}>
+				{(device: () => DeviceListDevice) => (
+					<TemplateSyncDialog
+						device={device()}
+						on_synced={() => {
+							setSyncing(null)
+							void refetchDevices()
+						}}
+						on_close={() => setSyncing(null)}
+					/>
+				)}
+			</Show>
 			<InlineError message={error()} />
 		</div>
 	)

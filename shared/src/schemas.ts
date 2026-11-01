@@ -963,6 +963,63 @@ export interface ExpandedInterface {
 	rear_port_position: number | null
 }
 
+/** Port fields a device type owns; everything else stays per device. */
+export const TEMPLATE_SYNC_FIELDS = ['kind', 'description', 'positions', 'rear_port'] as const
+export type TemplateSyncField = (typeof TEMPLATE_SYNC_FIELDS)[number]
+
+export interface TemplateSyncChange {
+	field: TemplateSyncField
+	from: string | null
+	to: string | null
+}
+
+/**
+ * `GET /devices/:id/template-sync`: how a device's ports differ from its
+ * device type. Ports match on side and name; `orphaned` ports have no
+ * counterpart in the type and `added` ports none on the device, so an
+ * orphaned port can be remapped onto an added port of its side.
+ */
+export interface TemplateSyncPreview {
+	unchanged: number
+	updated: {
+		interface_id: number
+		name: string
+		side: PortSide | null
+		changes: TemplateSyncChange[]
+	}[]
+	orphaned: {
+		interface_id: number
+		name: string
+		side: PortSide | null
+		kind: string
+		connected: boolean
+		/** Name of the added port this one most likely became (same side and kind). */
+		suggestion: string | null
+	}[]
+	added: { name: string; side: PortSide | null; kind: string }[]
+}
+
+/**
+ * `POST /devices/:id/template-sync`: the decision for every orphaned port.
+ * `map` carries the added port's name in `target`; `keep` leaves the port
+ * as it is; `remove` deletes it (refused while it is cabled).
+ */
+export const TemplateSyncApplySchema = v.strictObject({
+	assignments: v.pipe(
+		v.array(
+			v.strictObject({
+				interface_id: IdSchema,
+				action: v.picklist(['map', 'keep', 'remove']),
+				target: v.optional(v.string()),
+			}),
+		),
+		v.maxLength(5000),
+	),
+})
+
+export type TemplateSyncApply = v.InferOutput<typeof TemplateSyncApplySchema>
+export type TemplateSyncAssignment = TemplateSyncApply['assignments'][number]
+
 // ---------------------------------------------------------------------------
 // P3b: device roles (NetBox-style functional roles: `Server`, `Switch`, …).
 // Shared catalog data (no tenant column): every device carries exactly one.

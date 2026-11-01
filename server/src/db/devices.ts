@@ -30,6 +30,7 @@ import type {
 import {
 	cables,
 	device_roles,
+	device_type_interfaces,
 	device_types,
 	devices,
 	external_links,
@@ -42,6 +43,7 @@ import {
 	virtual_machines,
 } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
+import { isOutOfSync } from '../services/template_sync'
 import { expandStubs } from '../services/templates'
 import { prunePlacements } from './attachments'
 import { deviceHasCables } from './cables'
@@ -279,7 +281,16 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 
 /** One device list row: a physical device or a virtual machine (with its host's name). */
 export type DeviceListItem =
-	| ({ kind: 'device'; shelf_name: string | null; shelf_position_u: number | null } & DeviceRow)
+	| ({
+			kind: 'device'
+			shelf_name: string | null
+			shelf_position_u: number | null
+			/**
+			 * Ports differ from the device type (see `db/template_sync.ts`);
+			 * only computed when listing by `device_type`.
+			 */
+			out_of_sync: boolean
+	  } & DeviceRow)
 	| ({ kind: 'vm'; host_name: string | null } & VirtualMachineRow)
 
 const nullInt = (name: string): SQL.Aliased<number | null> =>
@@ -496,7 +507,57 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		.limit(params.limit)
 		.offset(offsetOf(params))
 	const total = (await db.with(rows).select({ n: count() }).from(rows))[0]?.n ?? 0
-	return pageOf(items.map(toListItem), total, params)
+	// Only the device list of a device type shows it.
+	const outOfSync = params.device_type ? await outOfSyncDevices(items) : new Set<number>()
+	return pageOf(
+		items.map((row) => toListItem(row, outOfSync)),
+		total,
+		params,
+	)
+}
+
+/** Ids of the listed devices whose ports differ from their device type. */
+async function outOfSyncDevices(
+	rows: { kind: DeviceListKind; id: number; device_type_id: number | null }[],
+): Promise<Set<number>> {
+	const listed = rows.filter((row) => row.kind === 'device')
+	if (listed.length === 0) {
+		return new Set()
+	}
+	const db = getDb()
+	const typeIds = [...new Set(listed.flatMap((row) => row.device_type_id ?? []))]
+	const stubs = await db
+		.select()
+		.from(device_type_interfaces)
+		.where(inArray(device_type_interfaces.device_type_id, typeIds))
+		.orderBy(asc(device_type_interfaces.id))
+	const ports = await db
+		.select()
+		.from(interfaces)
+		.where(
+			inArray(
+				interfaces.device_id,
+				listed.map((row) => row.id),
+			),
+		)
+		.orderBy(asc(interfaces.id))
+	const expansions = new Map(
+		typeIds.map((id) => [id, expandStubs(stubs.filter((stub) => stub.device_type_id === id))]),
+	)
+	const portsOf = Map.groupBy(ports, (port) => port.device_id)
+	const out = new Set<number>()
+	for (const { id, device_type_id } of listed) {
+		const expected = expansions.get(device_type_id ?? 0)
+		// A broken type cannot be applied, so it offers no sync either.
+		if (
+			expected &&
+			Result.isOk(expected) &&
+			isOutOfSync(expected.value, portsOf.get(id) ?? [])
+		) {
+			out.add(id)
+		}
+	}
+	return out
 }
 
 /** A raw union row: the columns of both kinds, the other kind's ones null. */
@@ -510,7 +571,7 @@ type DeviceListRow = Omit<DeviceRow, 'device_type_id'> & {
 }
 
 /** Narrows a union row to its kind's columns. */
-function toListItem(row: DeviceListRow): DeviceListItem {
+function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem {
 	const shared = {
 		id: row.id,
 		name: row.name,
@@ -540,6 +601,7 @@ function toListItem(row: DeviceListRow): DeviceListItem {
 		shelf_id: row.shelf_id,
 		shelf_name: row.shelf_name,
 		shelf_position_u: row.shelf_position_u,
+		out_of_sync: outOfSync.has(row.id),
 		serial: row.serial,
 		asset_tag: row.asset_tag,
 		device_id: row.device_id,

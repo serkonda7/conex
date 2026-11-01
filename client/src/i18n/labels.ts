@@ -35,6 +35,7 @@ import {
 	type PortSide,
 	RACK_FORM_FACTORS,
 	type SyncRunState,
+	type TemplateSyncField,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
 import type { FormOption } from '../components/form'
@@ -169,6 +170,18 @@ const PORT_SIDE_KEYS: Record<PortSide, MessageKey> = {
 /** Patch-panel port side (`front` / `rear`). */
 export function portSideLabel(value: string): string {
 	return lookup(PORT_SIDE_KEYS, value)
+}
+
+const TEMPLATE_SYNC_FIELD_KEYS: Record<TemplateSyncField, MessageKey> = {
+	kind: 'device.templateSync.field.kind',
+	description: 'device.templateSync.field.description',
+	positions: 'device.templateSync.field.positions',
+	rear_port: 'device.templateSync.field.rear_port',
+}
+
+/** Port field a device type owns (`kind`, `positions`, …). */
+export function templateSyncFieldLabel(value: string): string {
+	return lookup(TEMPLATE_SYNC_FIELD_KEYS, value)
 }
 
 const CABLE_STATUS_KEYS: Record<string, MessageKey> = {
