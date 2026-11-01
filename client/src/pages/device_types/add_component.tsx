@@ -330,11 +330,11 @@ export function ComponentDialog(props: {
 					maxLength={PORT_DESCRIPTION_MAX_LENGTH}
 				/>
 				<div class="modal-actions">
-					<button type="submit" disabled={!name().trim() || save.pending()}>
-						{stub ? t('common.save') : t('common.create')}
-					</button>
 					<button type="button" onClick={props.onClose}>
 						{t('common.cancel')}
+					</button>
+					<button type="submit" disabled={!name().trim() || save.pending()}>
+						{stub ? t('common.save') : t('common.create')}
 					</button>
 				</div>
 			</form>
@@ -454,11 +454,11 @@ export function PassThroughPresetDialog(props: {
 					/>
 				</Show>
 				<div class="modal-actions">
-					<button type="submit" disabled={!name().trim() || save.pending()}>
-						{t('common.create')}
-					</button>
 					<button type="button" onClick={props.onClose}>
 						{t('common.cancel')}
+					</button>
+					<button type="submit" disabled={!name().trim() || save.pending()}>
+						{t('common.create')}
 					</button>
 				</div>
 			</form>

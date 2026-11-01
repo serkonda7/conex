@@ -388,11 +388,11 @@ function EditActions(props: {
 }): JSX.Element {
 	return (
 		<div class="form-actions">
-			<button type="submit" disabled={props.saving}>
-				{props.saving ? t('common.saving') : t('common.save')}
-			</button>
 			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
 				{t('common.cancel')}
+			</button>
+			<button type="submit" disabled={props.saving}>
+				{props.saving ? t('common.saving') : t('common.save')}
 			</button>
 			<Show when={props.onDelete}>
 				<button
