@@ -1,6 +1,5 @@
 import { IconChevronDown, IconPencil, IconRefreshAlert, IconTrash } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
-import { websiteUrl } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_device_role } from '../../api/device_roles'
@@ -49,15 +48,10 @@ import {
 	componentClassOf,
 	stubRange,
 } from './components'
+import { SpecLink } from './spec_link'
 
 /** Component groups with more rows than this start collapsed. */
 const COMPONENT_GROUP_OPEN_ROWS = 16
-
-/** Domain of a spec link; the full URL can overflow its narrow spec-sheet column. */
-const specHost = (url: string): string => {
-	const target = websiteUrl(url)
-	return URL.canParse(target) ? new URL(target).hostname.replace(/^www\./, '') : url
-}
 
 const canChangeStubs = (): boolean => can('edit') || can('delete')
 
@@ -430,16 +424,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							<dt>{t('deviceType.specUrl')}</dt>
 							<dd>
 								<Show when={deviceType()?.spec_url} fallback="—">
-									{(url: () => string): JSX.Element => (
-										<a
-											href={websiteUrl(url())}
-											target="_blank"
-											rel="noopener noreferrer"
-											title={url()}
-										>
-											{specHost(url())}
-										</a>
-									)}
+									{(url: () => string): JSX.Element => <SpecLink url={url()} />}
 								</Show>
 							</dd>
 						</dl>

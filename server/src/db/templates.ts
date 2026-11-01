@@ -22,6 +22,7 @@ import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
 import { expandStubs, type StubInput } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
+import { deviceRoleSubtree } from './device_roles'
 import { ConflictError, DuplicateError } from './errors'
 import type { ListParams, Page } from './list'
 import {
@@ -190,6 +191,9 @@ const DEVICE_TYPE_EXISTS = 'Device type already exists'
 
 export interface DeviceTypeListParams extends ListParams {
 	manufacturer?: number[]
+	/** Default roles; a role also matches its child roles. */
+	role?: number[]
+	full_depth?: boolean
 	kind: 'device' | 'rack'
 	sort: DeviceTypeListQuery['sort']
 	order: 'asc' | 'desc'
@@ -198,10 +202,17 @@ export interface DeviceTypeListParams extends ListParams {
 export async function listDeviceTypes(
 	params: DeviceTypeListParams,
 ): Promise<Page<DeviceTypeListRow>> {
+	const roleIds = params.role
+		? [...new Set((await Promise.all(params.role.map(deviceRoleSubtree))).flat())]
+		: undefined
 	const where = and(
 		params.search
 			? or(
-					searchCondition(params.search, [device_types.model, device_types.description]),
+					searchCondition(params.search, [
+						device_types.model,
+						device_types.part_number,
+						device_types.description,
+					]),
 					inArray(
 						device_types.manufacturer_id,
 						getDb()
@@ -214,6 +225,10 @@ export async function listDeviceTypes(
 		params.manufacturer
 			? inArray(device_types.manufacturer_id, params.manufacturer)
 			: undefined,
+		roleIds ? inArray(device_types.default_device_role_id, roleIds) : undefined,
+		params.full_depth === undefined
+			? undefined
+			: eq(device_types.is_full_depth, params.full_depth),
 		// Rack types are the rows with rack-template dimensions; regular device
 		// types deliberately have no form factor. Keep this filter in the query so
 		// totals and pagination describe the selected catalog accurately.
@@ -225,6 +240,8 @@ export async function listDeviceTypes(
 	const orderColumns = {
 		model: device_types.model,
 		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`,
+		part_number: device_types.part_number,
+		role: sql`(SELECT ${device_roles.name} FROM ${device_roles} WHERE ${device_roles.id} = ${device_types.default_device_role_id})`,
 		form_factor: params.kind === 'rack' ? device_types.form_factor : device_types.model,
 		description: device_types.description,
 		comments: device_types.comments,

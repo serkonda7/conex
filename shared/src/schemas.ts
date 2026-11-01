@@ -931,11 +931,16 @@ export const ManufacturerListQuerySchema = v.object({
 export const DeviceTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdListEntry,
+	/** Default role, including its child roles. */
+	role: OptionalIdListEntry,
+	full_depth: v.optional(looseBoolean(false), undefined),
 	kind: v.optional(v.picklist(['device', 'rack']), 'device'),
 	sort: v.optional(
 		v.picklist([
 			'model',
 			'manufacturer',
+			'part_number',
+			'role',
 			'form_factor',
 			'description',
 			'comments',

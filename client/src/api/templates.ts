@@ -100,6 +100,8 @@ export async function fetch_device_types(
 			query: to_query({
 				...paging(filters),
 				manufacturer: filters?.manufacturer,
+				role: filters?.role,
+				full_depth: filters?.full_depth,
 				kind: filters?.kind,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
