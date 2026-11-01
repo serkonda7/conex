@@ -502,6 +502,7 @@ export const en = {
 	'import.aiHint': 'Copy a prompt for your AI assistant, then review and paste its YAML below.',
 	'import.copyPrompt': 'Copy AI prompt',
 	'import.copyPromptFor': 'Copy prompt to generate type with AI for {manufacturer}: {model}',
+	'import.similarTypes': '{count} similar device types may already exist:',
 	'import.promptCopied': 'Prompt copied to clipboard.',
 	'import.promptCopyFailed':
 		'Could not copy the prompt. Allow clipboard access and use HTTPS or localhost, then try again.',

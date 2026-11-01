@@ -2,9 +2,14 @@ import { IconCopy } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { ImportRowResult } from 'shared/src/types'
 import type { JSX } from 'solid-js'
-import { createSignal, Show } from 'solid-js'
+import { createMemo, createSignal, For, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
-import { fetch_manufacturers, update_device_type } from '../../api/templates'
+import {
+	type DeviceTypeListRow,
+	fetch_all_device_types,
+	fetch_manufacturers,
+	update_device_type,
+} from '../../api/templates'
 import { upload_yaml } from '../../api/transfer'
 import { DataTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
@@ -13,6 +18,10 @@ import { t, tp } from '../../i18n'
 import { createRows } from '../../lib/resource'
 import { navigate, parseId, queryParam } from '../../lib/router'
 import { buildAiPrompt } from './ai-prompt'
+import { findSimilarTypes } from './similar'
+
+/** Similar existing types linked in the hint; the hint's count covers all of them. */
+const MAX_SIMILAR_LINKS = 5
 
 const SAMPLE_YAML = `manufacturer: Acme
 model: Example Switch 48
@@ -28,7 +37,8 @@ interfaces:
  * Posts the file text as `{ yaml }` JSON. The import is all-or-nothing: if any
  * document fails, nothing is created and the response reports per-row errors
  * below. The pasted text is kept on failure; rows clashing with an existing
- * device type offer to rename the existing one.
+ * device type offer to rename the existing one. The AI prompt form hints at
+ * existing types similar to the typed model before one gets generated.
  */
 export function DeviceTypeImportPage(): JSX.Element {
 	const [promptManufacturerId, setPromptManufacturerId] = createSignal('')
@@ -52,6 +62,13 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setPromptError,
 	)
 	const [roles] = createRows(fetch_device_roles, setPromptError)
+	const [deviceTypes, { refetch: refetchDeviceTypes }] = createRows(
+		fetch_all_device_types,
+		setPromptError,
+	)
+	const similarTypes = createMemo(() =>
+		findSimilarTypes(promptModel(), parseId(promptManufacturerId()), deviceTypes() ?? []),
+	)
 
 	/** Name of the manufacturer picked for the AI prompt, `''` when none. */
 	function promptManufacturer(): string {
@@ -180,6 +197,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setResults(res.value.rows)
 		if (res.value.failed === 0) {
 			setYamlText('')
+			void refetchDeviceTypes()
 		}
 	}
 
@@ -241,6 +259,20 @@ export function DeviceTypeImportPage(): JSX.Element {
 						<IconCopy size={16} aria-hidden="true" /> {t('import.copyPrompt')}
 					</button>
 				</div>
+				<Show when={similarTypes().length > 0}>
+					<div class="field-hint" role="status">
+						{t('import.similarTypes', { count: similarTypes().length })}
+						<ul class="import-similar-types">
+							<For each={similarTypes().slice(0, MAX_SIMILAR_LINKS)}>
+								{(type: DeviceTypeListRow) => (
+									<li>
+										<a href={`/device-types/${type.id}`}>{type.model}</a>
+									</li>
+								)}
+							</For>
+						</ul>
+					</div>
+				</Show>
 				<InlineError message={promptError()} alert />
 				<Show when={promptCopied()}>
 					<p class="text-success" role="status">

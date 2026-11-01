@@ -3,7 +3,7 @@
  * the hono RPC client. Errors surface as `Result.err` with the server's
  * `{ error }` message.
  */
-import type { Result } from 'better-result'
+import { Result } from 'better-result'
 import type {
 	DeviceTypeListRow,
 	DeviceTypeRow,
@@ -107,6 +107,23 @@ export async function fetch_device_types(
 		}),
 		failed.list('noun.deviceType'),
 	)
+}
+
+/** Every page of device types, for matching across the whole catalog. */
+export async function fetch_all_device_types(
+	filters?: Partial<DeviceTypeListQuery>,
+): Promise<Result<DeviceTypeListRow[], Error>> {
+	const rows: DeviceTypeListRow[] = []
+	for (let page = 1; ; page++) {
+		const result = await fetch_device_types({ ...filters, page, limit: 200 })
+		if (Result.isError(result)) {
+			return result
+		}
+		rows.push(...result.value.items)
+		if (rows.length >= result.value.total || result.value.items.length === 0) {
+			return Result.ok(rows)
+		}
+	}
 }
 
 export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRow, Error>> {

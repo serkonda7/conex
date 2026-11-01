@@ -507,6 +507,7 @@ export const de: Messages = {
 	'import.copyPrompt': 'KI-Prompt kopieren',
 	'import.copyPromptFor':
 		'Prompt zur Gerätetyp-Erstellung mit KI für {manufacturer}: {model} kopieren',
+	'import.similarTypes': '{count} ähnliche Gerätetypen existieren möglicherweise bereits:',
 	'import.promptCopied': 'Prompt in die Zwischenablage kopiert.',
 	'import.promptCopyFailed':
 		'Der Prompt konnte nicht kopiert werden. Zugriff auf die Zwischenablage erlauben und HTTPS oder localhost verwenden, dann erneut versuchen.',
