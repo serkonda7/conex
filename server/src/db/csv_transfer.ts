@@ -7,10 +7,14 @@ import {
 	DeviceTypeYamlSchema,
 	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
+	type ImportedStub,
+	ImportedStubSchema,
 	type ImportResponse,
 	type ImportRowResult,
 	NETBOX_INTERFACE_TYPES,
 	PASS_THROUGH_PORT_TYPES,
+	POWER_INPUT_KINDS,
+	POWER_OUTLET_KINDS,
 	type PortSide,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
@@ -31,7 +35,7 @@ import { cableInTenant, connectCable } from './cables'
 import { getDb, withTransaction } from './connection'
 import { createDevice } from './devices'
 import { errOf } from './list'
-import { createDeviceType, createStub } from './templates'
+import { createDeviceType, createStub, type StubRow } from './templates'
 
 const DEVICE_CSV_HEADER = [
 	'name',
@@ -57,15 +61,9 @@ const CABLE_CSV_HEADER = [
 	'status',
 ]
 
-const DEVICE_TYPE_CSV_HEADER = [
-	'manufacturer',
-	'model',
-	'u_height',
-	'is_full_depth',
-	'form_factor',
-	'width',
-	'description',
-]
+const DEVICE_TYPE_CSV_HEADER = ['manufacturer', 'model', 'u_height', 'is_full_depth', 'description']
+
+const POWER_CONNECTOR_KINDS = new Set<string>([...POWER_INPUT_KINDS, ...POWER_OUTLET_KINDS])
 
 /** Device-type export: one row per type, manufacturer as name for re-import. */
 export async function exportDeviceTypesCsv(): Promise<string> {
@@ -76,8 +74,6 @@ export async function exportDeviceTypesCsv(): Promise<string> {
 			model: device_types.model,
 			u_height: device_types.u_height,
 			is_full_depth: device_types.is_full_depth,
-			form_factor: device_types.form_factor,
-			width: device_types.width,
 			description: device_types.description,
 			comments: device_types.comments,
 		})
@@ -91,8 +87,6 @@ export async function exportDeviceTypesCsv(): Promise<string> {
 			r.model,
 			String(r.u_height),
 			r.is_full_depth ? 'true' : 'false',
-			r.form_factor,
-			r.width === null ? null : String(r.width),
 			r.description,
 		]),
 	)
@@ -294,7 +288,6 @@ async function importDeviceTypeDefinition(
 		{
 			key: string
 			kind: string
-			label: string | undefined
 			description: string | undefined
 			names: string[]
 		}
@@ -312,8 +305,9 @@ async function importDeviceTypeDefinition(
 			// NetBox interface types may be a list; the first entry wins.
 			// Ports keep a known connector type (usb-c, rj-45, …) as kind;
 			// `other` is stored as the plain `port`. Any other type is an error.
-			// Power ports and outlets keep their class as kind (the device
-			// detail page splits ports on it), dropping the connector type.
+			// Power ports and outlets keep a known connector type, prefixed
+			// with their class (`power-iec-60320-c14`); any other type falls
+			// back to the plain class, so NEMA & co. still import.
 			// Display ports (not a NetBox class) keep their connector type as
 			// kind.
 			const type = Array.isArray(port.type) ? port.type[0] : port.type
@@ -324,6 +318,9 @@ async function importDeviceTypeDefinition(
 				}
 				kind = type === 'other' && key !== 'interfaces' ? 'port' : type
 			}
+			if (allowed === null && POWER_CONNECTOR_KINDS.has(`${defaultKind}-${type}`)) {
+				kind = `${defaultKind}-${type}`
+			}
 			if (kind === null) {
 				return fail(`${key} "${name}": type is required`)
 			}
@@ -331,16 +328,12 @@ async function importDeviceTypeDefinition(
 			if (Result.isError(names)) {
 				return fail(`${key} "${name}": ${names.error.message}`)
 			}
-			const label =
-				key === 'interfaces' && typeof port.label === 'string' ? port.label : undefined
 			const description = typeof port.description === 'string' ? port.description : undefined
-			// A stub carries one kind, label and description, so ports only
-			// collapse into one stub when all three match.
-			const groupKey = JSON.stringify([key, kind, label ?? null, description ?? null])
+			// A stub carries one kind and description, so both must match to collapse ports.
+			const groupKey = JSON.stringify([key, kind, description ?? null])
 			const group = groups.get(groupKey) ?? {
 				key,
 				kind,
-				label,
 				description,
 				names: [],
 			}
@@ -350,11 +343,10 @@ async function importDeviceTypeDefinition(
 	}
 	for (const group of groups.values()) {
 		for (const run of collapseRuns(group.names)) {
-			const stub = await createStub(created.value.id, {
+			const stub = await createImportedStub(created.value.id, {
 				prefix: run.prefix,
 				count: run.count,
 				kind: group.kind,
-				label: group.label,
 				description: group.description,
 			})
 			if (Result.isError(stub)) {
@@ -363,6 +355,18 @@ async function importDeviceTypeDefinition(
 		}
 	}
 	return { ok: true, id: created.value.id, error: null }
+}
+
+/** Creates a stub within the limits the API and edit form enforce. */
+async function createImportedStub(
+	deviceTypeId: number,
+	input: ImportedStub,
+): Promise<Result<StubRow, Error>> {
+	const parsed = v.safeParse(ImportedStubSchema, input)
+	if (!parsed.success) {
+		return Result.err(new Error(formatValibotIssues(parsed.issues)))
+	}
+	return createStub(deviceTypeId, parsed.output)
 }
 
 /** Mappings of one YAML component list; any other entry is an error. */
@@ -429,11 +433,10 @@ async function importPassThroughPorts(
 			return `rear-ports "${name}": ${names.error.message}`
 		}
 		for (const prefix of names.value) {
-			const stub = await createStub(deviceTypeId, {
+			const stub = await createImportedStub(deviceTypeId, {
 				prefix,
 				count: 1,
 				kind,
-				label: typeof port.label === 'string' ? port.label : undefined,
 				description: typeof port.description === 'string' ? port.description : undefined,
 				side: 'rear',
 				positions,
@@ -490,11 +493,10 @@ async function importPassThroughPorts(
 		if (kind === null) {
 			return `front-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
 		}
-		const stub = await createStub(deviceTypeId, {
+		const stub = await createImportedStub(deviceTypeId, {
 			prefix: names.value[0] ?? name,
 			count: 1,
 			kind,
-			label: typeof port.label === 'string' ? port.label : undefined,
 			description: typeof port.description === 'string' ? port.description : undefined,
 			side: 'front',
 			rear_stub_id: rearId,

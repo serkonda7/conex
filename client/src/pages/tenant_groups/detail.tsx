@@ -16,6 +16,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
+import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import { createRecord, createRowsFor } from '../../lib/resource'
 
@@ -52,10 +53,10 @@ export function TenantGroupDetailPage(props: { id: number }): JSX.Element {
 				<DetailSubtitle description={group()?.description} />
 
 				<div class="detail-stats">
-					<a class="detail-stat" href="#tenant-group-tenants">
+					<ScrollLink class="detail-stat" target="tenant-group-tenants">
 						<span class="detail-stat-value">{tenantCount()}</span>{' '}
 						<span class="detail-stat-label">{tp('entity.tenant', tenantCount())}</span>
-					</a>
+					</ScrollLink>
 				</div>
 
 				<DetailCard label={t('tenantGroup.details')}>

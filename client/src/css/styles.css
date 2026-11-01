@@ -20,8 +20,9 @@
 	--text-subtle: #a0a0a0;
 	--border: #3d3d3d;
 	--border-strong: #525252;
-	--primary: #08bf08;
-	--primary-hover: #00b800;
+	--primary: #058a05;
+	--primary-hover: #047a04;
+	--primary-text: #08bf08; /* --primary is too dark for text on the dark surfaces. */
 	--primary-contrast: #ffffff;
 	--secondary: #1a73b8;
 	--secondary-hover: #16659f;
@@ -34,7 +35,7 @@
 	--muted-dot: #666666;
 	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 	--font-size-sm: 0.75rem;
-	--font-size-base: 0.9375rem; /* 15px */
+	--font-size-base: 0.875rem; /* 14px */
 	--font-size-lg: 1rem;
 	--font-size-xl: 1.15rem;
 	--font-size-2xl: 1.3rem;
@@ -112,14 +113,18 @@ a:hover {
 	text-decoration: underline;
 }
 
+a[target="_blank"],
+a[href^="http://"],
+a[href^="https://"] {
+	/* Keep the non-breaking space before the marker effective in detail grids. */
+	overflow-wrap: normal;
+}
+
 a[target="_blank"]::after,
 a[href^="http://"]::after,
 a[href^="https://"]::after {
-	content: "\2197";
-	display: inline-block;
-	margin-left: 0.15em;
+	content: "\202f\2197";
 	font-size: 0.85em;
-	text-decoration: none;
 }
 
 code {
@@ -476,7 +481,7 @@ tbody tr:last-child td {
 }
 
 .app-tenant-context-option.selected {
-	color: var(--primary);
+	color: var(--primary-text);
 }
 
 .app-tenant-context-empty {
@@ -502,7 +507,7 @@ tbody tr:last-child td {
 }
 
 .app-tenant-context-add.primary {
-	color: var(--primary);
+	color: var(--primary-text);
 	font-weight: 600;
 }
 
@@ -1002,7 +1007,7 @@ tbody tr:last-child td {
 	min-width: 0;
 }
 
-.tenant-changes li > a:first-child {
+.tenant-changes li > :first-child {
 	flex: 0 0 5.5rem;
 	white-space: nowrap;
 }
@@ -1506,6 +1511,10 @@ tbody tr:last-child td {
 		"Liberation Mono", "Courier New", monospace;
 }
 
+.import-similar-types {
+	margin: 0.25rem 0 0;
+}
+
 .app-content form.form-stacked {
 	flex-direction: column;
 	align-items: stretch;
@@ -1568,7 +1577,7 @@ tbody tr:last-child td {
 .form-actions .btn-outline:disabled:hover {
 	background-color: transparent;
 	border-color: var(--primary);
-	color: var(--primary);
+	color: var(--primary-text);
 }
 
 .form-actions .btn-outline:hover:not(:disabled) {
@@ -1919,6 +1928,14 @@ tbody tr:last-child td {
 	box-shadow: var(--shadow);
 }
 
+/* List as wide as its labels, even past the field. */
+.combobox-fit .combobox-list {
+	right: auto;
+	width: max-content;
+	min-width: 100%;
+	max-width: calc(100vw - 2rem);
+}
+
 .combobox-option,
 .combobox-empty,
 .combobox-value {
@@ -2109,6 +2126,13 @@ tbody tr:last-child td {
 	color: var(--text);
 }
 
+/* The package picks a dark text color on its accent in dark mode; text on
+   --primary is always --primary-contrast. */
+.filter-table-badge,
+.filter-table-button-primary {
+	color: var(--primary-contrast);
+}
+
 /* Keep sortable headers the same width when the active sort moves. The
    component appends an arrow to the active header and conditionally renders
    its clear button, so reserve both indicators on every sortable header. */
@@ -2250,6 +2274,9 @@ th[aria-sort="descending"] .data-table-sort::after {
 }
 
 .add-component-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 	width: 100%;
 	border: none;
 	background: transparent;
@@ -2259,6 +2286,65 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .add-component-item:hover {
 	background-color: var(--bg-hover);
+}
+
+.add-component-icon {
+	display: inline-flex;
+	flex: 0 0 1.5rem;
+	width: 1.5rem;
+	height: 1.5rem;
+	line-height: 0;
+}
+
+.add-component-icon svg {
+	width: 100%;
+	height: 100%;
+}
+
+/* Port kinds: connector glyphs enlarged so pins stay legible.
+   The library always asks for 14px, and iconless kinds keep the text column. */
+.combobox-port-kind {
+	--port-icon-size: 20px;
+	--port-icon-gap: 0.4rem;
+}
+
+.combobox-port-kind .combobox-icon svg,
+.combobox-port-kind .combobox-option-icon svg {
+	width: var(--port-icon-size);
+	height: var(--port-icon-size);
+}
+
+.app-content
+	.form-stacked
+	.field
+	.combobox-port-kind.combobox-with-icon
+	.combobox-input {
+	padding-left: calc(0.55rem + var(--port-icon-size) + var(--port-icon-gap));
+}
+
+.combobox-port-kind.combobox-with-icon .combobox-value {
+	left: calc(0.55rem + var(--port-icon-size) + var(--port-icon-gap) + 1px);
+}
+
+.combobox-port-kind .combobox-list .combobox-option {
+	align-items: center;
+	padding-block: 0.1rem;
+}
+
+.combobox-port-kind .combobox-list .combobox-option-label {
+	display: flex;
+	align-items: center;
+	min-height: var(--port-icon-size);
+}
+
+.combobox-port-kind .combobox-option-icon {
+	margin-right: var(--port-icon-gap);
+}
+
+.combobox-port-kind
+	.combobox-list
+	.combobox-option-label:not(:has(.combobox-option-icon)) {
+	padding-left: calc(var(--port-icon-size) + var(--port-icon-gap));
 }
 
 .add-component-dropdown hr {
@@ -2389,6 +2475,24 @@ th[aria-sort="descending"] .data-table-sort::after {
 	margin-top: 0;
 }
 
+.app-content .modal.template-sync-dialog {
+	max-width: 36rem;
+	max-height: 85vh;
+	overflow-y: auto;
+}
+
+.template-sync-actions {
+	justify-content: flex-end;
+	margin-left: 0;
+}
+
+.template-sync-list {
+	margin: 0;
+	padding-left: 1.1rem;
+	max-height: 12rem;
+	overflow-y: auto;
+}
+
 .object-selector {
 	max-width: 34rem;
 }
@@ -2499,7 +2603,7 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .connect-steps li.done .connect-step-num {
 	border-color: var(--primary);
-	color: var(--primary);
+	color: var(--primary-text);
 }
 
 .app-content .connect-dialog form.connect-port-form {
@@ -2692,6 +2796,211 @@ th[aria-sort="descending"] .data-table-sort::after {
 	overflow-wrap: anywhere;
 }
 
+/* Device type detail: flat key-value groups split by bars, no card. */
+.spec-sheet {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	row-gap: 0.75rem;
+	margin: 0.9rem 0 1.1rem;
+	padding: 0.75rem 0;
+	border-block: 1px solid var(--border);
+}
+
+.spec-sheet > section {
+	padding: 0.1rem 1.5rem;
+	border-left: 1px solid var(--border-strong);
+}
+
+.spec-sheet > section:first-child {
+	padding-left: 0;
+	border-left: 0;
+}
+
+.spec-sheet > .spec-sheet-notes {
+	grid-column: 1 / -1;
+	padding: 0.75rem 0 0;
+	border-left: 0;
+	border-top: 1px solid var(--border);
+}
+
+.spec-sheet h4 {
+	margin: 0 0 0.3rem;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-secondary);
+}
+
+.spec-sheet dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.15rem 0.75rem;
+	margin: 0;
+}
+
+.spec-sheet dt {
+	color: var(--text-secondary);
+}
+
+.spec-sheet dd {
+	margin: 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 48rem) {
+	.spec-sheet {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.spec-sheet > section {
+		padding: 0;
+		border-left: 0;
+	}
+}
+
+/* Device type detail: flat component table, one tinted band per class. */
+.component-section {
+	margin: 1.1rem 0;
+}
+
+.device-preview,
+.section-header > h3 {
+	scroll-margin-top: var(--topbar-height);
+}
+
+.component-table-wrap {
+	overflow-x: auto;
+}
+
+.component-table {
+	margin: 0;
+	border: 0;
+	background: none;
+}
+
+.component-name {
+	white-space: nowrap;
+}
+
+.component-table :is(th, td) {
+	border-bottom: 0;
+}
+
+.component-table thead th {
+	background: none;
+}
+
+/* Faint row rules, lighter than the section lines. */
+.component-table tbody tr:not(:last-child),
+.device-preview tbody tr:not(:last-child) {
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+/* Group rows shift the zebra stripes: keep rows flat, hover still applies. */
+.app-content .component-table tbody tr:not(:hover),
+.app-content .device-preview tbody tr:not(:hover) {
+	background: none;
+}
+
+.component-table tbody::after {
+	content: "";
+	display: block;
+	height: 1rem;
+}
+
+.component-group-title {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	width: 100%;
+	padding: 0;
+	font-weight: inherit;
+	text-align: left;
+	background: none;
+	border: 0;
+}
+
+.component-group-title:hover {
+	background: none;
+}
+
+.component-group-chevron {
+	flex: none;
+	transition: transform 150ms ease;
+}
+
+.component-group-title[aria-expanded="false"] .component-group-chevron {
+	transform: rotate(-90deg);
+}
+
+.component-table .component-group {
+	background-color: var(--bg-raised);
+	border-radius: 0.25rem;
+	font-weight: 600;
+}
+
+.component-count {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.component-kind {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.component-kind-icon {
+	display: inline-flex;
+	flex: none;
+	width: 18px;
+	height: 18px;
+}
+
+.component-actions {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
+}
+
+/* Device type detail: device preview in the same flat style. */
+.device-preview {
+	padding-top: 1.1rem;
+	border-top: 1px solid var(--border);
+}
+
+.device-preview table {
+	margin: 0;
+	border: 0;
+	background: none;
+}
+
+.device-preview thead th {
+	background: none;
+}
+
+.device-preview :is(th, td) {
+	border-bottom: 0;
+}
+
+/* Same row height as the components, whose rows hold icon buttons. */
+.device-preview :is(tbody td) {
+	padding-block: 0.6rem;
+}
+
+/* As tall as a text line, so rows keep their height with or without it. */
+.device-preview .icon-btn {
+	display: flex;
+	margin-block: -0.4rem;
+}
+
+/* Lines up with the name column. */
+.device-preview .related-tabs-all {
+	margin-left: 0.5rem;
+}
+
 /* Rendered markdown of user-written comments. */
 .markdown :is(p, ul, ol, pre, blockquote, table, hr, h3, h4, h5, h6) {
 	margin: 0;
@@ -2707,10 +3016,6 @@ th[aria-sort="descending"] .data-table-sort::after {
 
 .markdown :is(h3, h4, h5, h6) {
 	font-size: var(--font-size-lg);
-}
-
-.markdown :any-link {
-	color: var(--link);
 }
 
 .markdown code {
@@ -3046,6 +3351,7 @@ span.attachment-star,
 .floorplan-palette-sequence.active {
 	border-color: var(--primary);
 	background-color: var(--primary);
+	color: var(--primary-contrast);
 }
 
 .floorplan-palette-group-header {

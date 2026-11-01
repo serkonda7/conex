@@ -23,7 +23,7 @@ async function post(page: Page, path: string, data: object): Promise<number> {
 test('device edit only offers the sites, locations and racks of its tenant', async ({ page }) => {
 	const suffix = Date.now()
 	const typeId = await findId(page, 'device-types', 'model', 'E2E 1U Switch')
-	const rackTypeId = await findId(page, 'device-types?kind=rack', 'model', 'E2E 10U Cabinet')
+	const rackTypeId = await findId(page, 'rack-types', 'model', 'E2E 10U Cabinet')
 	const roleId = await findId(page, 'device-roles', 'name', 'E2E Role')
 	const tenantId = await post(page, 'tenants', { name: `E2E Edit Tenant ${suffix}` })
 	const otherId = await post(page, 'tenants', { name: `E2E Edit Other ${suffix}` })

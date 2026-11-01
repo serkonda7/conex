@@ -13,6 +13,7 @@ import {
 	InterfaceCreateSchema,
 	InterfaceLocationSchema,
 	InterfaceUpdateSchema,
+	TemplateSyncApplySchema,
 	TraceQuerySchema,
 } from 'shared/src/schemas'
 import {
@@ -42,6 +43,7 @@ import {
 	updateInterface,
 } from '../db/devices'
 import { deviceTenant, interfaceTenant } from '../db/owners'
+import { applyTemplateSync, getTemplateSync } from '../db/template_sync'
 import { getDeviceTrace, getInterfaceTrace } from '../db/trace'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
@@ -181,6 +183,33 @@ export const devicesApp = new Hono()
 				return device
 			}
 			return sendResult(c, await moveDevice(id, c.req.valid('json')))
+		},
+	)
+	// Ports against the device type: preview, then apply with the remapping.
+	.get(
+		'/:id/template-sync',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const device = await loadDevice(c, id)
+			if (device instanceof Response) {
+				return device
+			}
+			return sendResult(c, await getTemplateSync(id))
+		},
+	)
+	.post(
+		'/:id/template-sync',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', TemplateSyncApplySchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const device = await loadDevice(c, id)
+			if (device instanceof Response) {
+				return device
+			}
+			return sendResult(c, await applyTemplateSync(id, c.req.valid('json')))
 		},
 	)
 	// Interface sub-resource (name unique per device; `connected` is P5-owned).

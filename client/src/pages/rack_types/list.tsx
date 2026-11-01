@@ -1,10 +1,10 @@
 import type { JSX } from 'solid-js'
 import {
-	type DeviceTypeListRow,
-	type DeviceTypeSort,
-	delete_device_type,
-	fetch_device_types,
+	delete_rack_type,
 	fetch_manufacturers,
+	fetch_rack_types,
+	type RackTypeListRow,
+	type RackTypeSort,
 } from '../../api/templates'
 import type { DataTableColumn } from '../../components/data_table'
 import {
@@ -22,57 +22,56 @@ import { createRows } from '../../lib/resource'
 /**
  * /rack-types — rack-type catalog: search, sortable columns, manufacturer
  * filter (deep-linkable via `?manufacturer=<id>`), and delete in a row menu.
- * There is no edit page.
  */
 export function RackTypesPage(): JSX.Element {
 	const [filterManufacturer, setFilterManufacturer] = useQueryFilterList('manufacturer')
 	const list = useEntityList({
 		noun: 'noun.rackType',
-		sort: 'model' as DeviceTypeSort,
+		sort: 'model' as RackTypeSort,
 		filters: () => ({
 			manufacturer: idsOf(filterManufacturer()),
-			kind: 'rack' as const,
 		}),
-		fetch: fetch_device_types,
-		remove: delete_device_type,
+		fetch: fetch_rack_types,
+		remove: delete_rack_type,
 	})
 	const [manufacturers] = createRows(fetch_manufacturers, list.setError)
 	const manufacturerName = useNameOf(manufacturers)
 
-	const columns: DataTableColumn<DeviceTypeListRow>[] = [
+	const columns: DataTableColumn<RackTypeListRow>[] = [
 		{
 			key: 'model',
 			label: t('common.model'),
 			sortable: true,
-			getValue: (dt: DeviceTypeListRow): string => dt.model,
+			getValue: (rt: RackTypeListRow): JSX.Element => (
+				<a href={`/rack-types/${rt.id}`}>{rt.model}</a>
+			),
 		},
 		{
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
 			sortable: true,
-			getValue: (dt: DeviceTypeListRow): string => manufacturerName(dt.manufacturer_id),
+			getValue: (rt: RackTypeListRow): string => manufacturerName(rt.manufacturer_id),
 		},
 		{
 			key: 'form_factor',
 			label: t('rackType.formFactor'),
 			sortable: true,
-			getValue: (dt: DeviceTypeListRow): string =>
-				dt.form_factor ? formFactorLabel(dt.form_factor) : '—',
+			getValue: (rt: RackTypeListRow): string => formFactorLabel(rt.form_factor),
 		},
 		{
 			key: 'width',
 			label: t('rackType.width'),
-			getValue: (dt: DeviceTypeListRow): string => (dt.width === null ? '—' : `${dt.width}″`),
+			getValue: (rt: RackTypeListRow): string => `${rt.width}″`,
 		},
 		{
 			key: 'u_height',
 			label: t('common.heightU'),
-			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
+			getValue: (rt: RackTypeListRow): string => `${rt.u_height}`,
 		},
 		{
 			key: 'racks',
 			label: tp('entity.rack', 2),
-			getValue: (dt: DeviceTypeListRow): string => String(dt.instance_count),
+			getValue: (rt: RackTypeListRow): string => String(rt.instance_count),
 		},
 	]
 
@@ -92,7 +91,8 @@ export function RackTypesPage(): JSX.Element {
 			]}
 			columns={columns}
 			columnsKey="rack-types"
-			rowName={(dt: DeviceTypeListRow): string => dt.model}
+			rowName={(rt: RackTypeListRow): string => rt.model}
+			editHref={(rt: RackTypeListRow): string => `/rack-types/${rt.id}/edit`}
 			emptyText={t('rackType.empty')}
 		/>
 	)

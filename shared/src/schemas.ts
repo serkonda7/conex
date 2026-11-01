@@ -567,6 +567,7 @@ export const RackListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdListEntry,
 	location: OptionalIdListEntry,
+	rack_type: OptionalIdListEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name']), 'name'),
@@ -671,32 +672,60 @@ export const USB_PORT_KINDS = [
 export const GENERAL_PORT_KINDS = [...SERIAL_PORT_KINDS, ...USB_PORT_KINDS] as const
 
 /**
- * Common NetBox interface types with NetBox's display names. They are
+ * Power connectors, stored as `power-<NetBox type>`: NetBox shares type names
+ * between inputs and outlets (and with data ports), yet the kind alone decides
+ * a component's class. `power-dc-barrel` is a conex extension.
+ */
+export const POWER_INPUT_KINDS = [
+	'power-iec-60320-c14',
+	'power-iec-60320-c20',
+	'power-iec-60320-c8',
+	'power-iec-60320-c6',
+	'power-ita-ef',
+	'power-dc-terminal',
+	'power-dc-barrel',
+	'power-usb-c',
+] as const
+
+/** Outlet connectors, stored as `power-outlet-<NetBox type>`; see `POWER_INPUT_KINDS`. */
+export const POWER_OUTLET_KINDS = [
+	'power-outlet-iec-60320-c13',
+	'power-outlet-iec-60320-c19',
+	'power-outlet-iec-60320-c7',
+	'power-outlet-iec-60320-c5',
+	'power-outlet-ita-f',
+	'power-outlet-dc-terminal',
+	'power-outlet-usb-a',
+	'power-outlet-usb-c',
+] as const
+
+/**
+ * Common NetBox interface types with their display names. These are
  * technical identifiers, so the labels stay untranslated.
  */
 export const NETBOX_INTERFACE_TYPES = {
 	virtual: 'Virtual',
 	bridge: 'Bridge',
 	lag: 'Link Aggregation Group (LAG)',
-	'100base-tx': '100BASE-TX (10/100ME)',
-	'1000base-t': '1000BASE-T (1GE)',
-	'2.5gbase-t': '2.5GBASE-T (2.5GE)',
-	'5gbase-t': '5GBASE-T (5GE)',
-	'10gbase-t': '10GBASE-T (10GE)',
-	'1000base-x-sfp': 'SFP (1GE)',
-	'10gbase-x-sfpp': 'SFP+ (10GE)',
-	'25gbase-x-sfp28': 'SFP28 (25GE)',
-	'40gbase-x-qsfpp': 'QSFP+ (40GE)',
-	'50gbase-x-sfp56': 'SFP56 (50GE)',
-	'100gbase-x-qsfp28': 'QSFP28 (100GE)',
-	'200gbase-x-qsfp56': 'QSFP56 (200GE)',
-	'400gbase-x-qsfpdd': 'QSFP-DD (400GE)',
-	'ieee802.11a': 'IEEE 802.11a',
-	'ieee802.11g': 'IEEE 802.11b/g',
-	'ieee802.11n': 'IEEE 802.11n',
-	'ieee802.11ac': 'IEEE 802.11ac',
-	'ieee802.11ax': 'IEEE 802.11ax',
-	'ieee802.11be': 'IEEE 802.11be',
+	'100base-tx': '10/100M (100BASE-TX)',
+	'1000base-t': '1G (1000BASE-T)',
+	'2.5gbase-t': '2.5G (2.5GBASE-T)',
+	'5gbase-t': '5G (5GBASE-T)',
+	'10gbase-t': '10G (10GBASE-T)',
+	'1000base-x-sfp': '1G (SFP)',
+	'10gbase-x-sfpp': '10G (SFP+)',
+	'25gbase-x-sfp28': '25G (SFP28)',
+	'40gbase-x-qsfpp': '40G (QSFP+)',
+	'50gbase-x-sfp56': '50G (SFP56)',
+	'100gbase-x-qsfp28': '100G (QSFP28)',
+	'200gbase-x-qsfp56': '200G (QSFP56)',
+	'400gbase-x-qsfpdd': '400G (QSFP-DD)',
+	'ieee802.11a': 'Wi-Fi (IEEE 802.11a, 5 GHz)',
+	'ieee802.11g': 'Wi-Fi (IEEE 802.11b/g, 2.4 GHz)',
+	'ieee802.11n': 'Wi-Fi 4 (IEEE 802.11n)',
+	'ieee802.11ac': 'Wi-Fi 5 (IEEE 802.11ac)',
+	'ieee802.11ax': 'Wi-Fi 6 (IEEE 802.11ax)',
+	'ieee802.11be': 'Wi-Fi 7 (IEEE 802.11be)',
 	lte: 'LTE',
 	'5g': '5G',
 	other: 'Other',
@@ -704,13 +733,15 @@ export const NETBOX_INTERFACE_TYPES = {
 
 export type NetboxInterfaceType = keyof typeof NETBOX_INTERFACE_TYPES
 
-/** Interface kinds offered when adding stubs; stored kinds stay free-form (NetBox types). */
+/** Common and legacy port kinds; stored kinds stay free-form (including NetBox types). */
 export const PORT_KINDS = [
 	'ethernet',
 	'port',
 	...GENERAL_PORT_KINDS,
 	'power',
+	...POWER_INPUT_KINDS,
 	'power-outlet',
+	...POWER_OUTLET_KINDS,
 	...DISPLAY_PORT_KINDS,
 ] as const
 
@@ -726,12 +757,12 @@ export type PortSide = (typeof PORT_SIDES)[number]
 export const PortSideSchema = v.picklist(PORT_SIDES)
 
 /**
- * Connector types of front and rear ports (NetBox port types) with their
- * NetBox display names; technical identifiers, so untranslated. Copper
+ * Known connector types of front and rear ports (NetBox port types) with their
+ * display names. Includes legacy types for imports and existing ports. Copper
  * connectors cable like network ports, every other type only to its own kind.
  */
 export const PASS_THROUGH_PORT_TYPES = {
-	'8p8c': '8P8C',
+	'8p8c': 'RJ45 (8P8C)',
 	'110-punch': '110 Punch',
 	lc: 'LC',
 	'lc-apc': 'LC/APC',
@@ -745,6 +776,17 @@ export const PASS_THROUGH_PORT_TYPES = {
 } as const
 
 export type PassThroughPortType = keyof typeof PASS_THROUGH_PORT_TYPES
+
+/** Types offered for new ports; legacy types remain recognized on import and edit. */
+export const SELECTABLE_PASS_THROUGH_PORT_TYPES: readonly PassThroughPortType[] = [
+	'8p8c',
+	'lc',
+	'lc-apc',
+	'sc',
+	'sc-apc',
+	'mpo',
+	'splice',
+]
 
 /** Pass-through types that cable like network ports (copper). */
 export const COPPER_PASS_THROUGH_TYPES: readonly PassThroughPortType[] = ['8p8c', '110-punch']
@@ -784,9 +826,11 @@ export const RACK_FORM_FACTORS = [
 
 export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 
-export const RackWidthSchema = v.picklist([10, 19, 23])
+/** Rack units a rack type provides: 1-60 U. */
+export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
-export const StubLabelSchema = v.pipe(v.string(), v.trim(), v.maxLength(200))
+/** Allows descriptions merged with legacy port labels during migration. */
+export const PORT_DESCRIPTION_MAX_LENGTH = 703
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -803,8 +847,6 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	model: NameSchema,
 	u_height: v.optional(DeviceHeightSchema, 1),
 	is_full_depth: v.optional(v.boolean(), true),
-	form_factor: v.optional(RackFormFactorSchema, undefined),
-	width: v.optional(RackWidthSchema, undefined),
 	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	spec_url: v.optional(WebsiteSchema, undefined),
 	description: DescriptionSchema,
@@ -817,8 +859,6 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	u_height: v.optional(DeviceHeightSchema, undefined),
 	is_full_depth: v.optional(v.boolean(), undefined),
-	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
-	width: v.optional(v.nullable(RackWidthSchema), undefined),
 	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
@@ -826,26 +866,49 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	default_device_role_id: NullableIdSchema,
 })
 
+export const RackTypeCreateSchema = v.strictObject({
+	manufacturer_id: IdSchema,
+	model: NameSchema,
+	form_factor: RackFormFactorSchema,
+	u_height: RackHeightSchema,
+	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	spec_url: v.optional(WebsiteSchema, undefined),
+	description: DescriptionSchema,
+	comments: CommentsSchema,
+})
+
+export const RackTypeUpdateSchema = v.strictObject({
+	manufacturer_id: v.optional(IdSchema, undefined),
+	model: v.optional(NameSchema, undefined),
+	form_factor: v.optional(RackFormFactorSchema, undefined),
+	u_height: v.optional(RackHeightSchema, undefined),
+	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
+})
+
+/** Stub fields besides the name. */
+const StubFieldEntries = {
+	count: v.optional(StubCountSchema, 1),
+	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+	description: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
+		undefined,
+	),
+	side: v.optional(v.nullable(PortSideSchema), undefined),
+	positions: v.optional(PortPositionsSchema, undefined),
+	rear_stub_id: v.optional(IdSchema, undefined),
+	rear_position: v.optional(PortPositionsSchema, undefined),
+}
+
 /**
  * Template stub. `side` makes it a patch-panel stub: rear stubs carry
  * `positions`, front stubs map onto a rear stub of the same type starting
  * at slot `rear_position` (expansion in `server/src/services/templates.ts`).
  */
 export const StubCreateSchema = v.pipe(
-	v.strictObject({
-		prefix: InterfacePrefixSchema,
-		count: v.optional(StubCountSchema, 1),
-		kind: v.optional(InterfaceKindSchema, 'ethernet'),
-		label: v.optional(v.nullable(StubLabelSchema), undefined),
-		description: v.optional(
-			v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
-			undefined,
-		),
-		side: v.optional(v.nullable(PortSideSchema), undefined),
-		positions: v.optional(PortPositionsSchema, undefined),
-		rear_stub_id: v.optional(IdSchema, undefined),
-		rear_position: v.optional(PortPositionsSchema, undefined),
-	}),
+	v.strictObject({ prefix: InterfacePrefixSchema, ...StubFieldEntries }),
 	v.check(
 		(s) => s.positions === undefined || s.positions === 1 || s.side === 'rear',
 		'Positions are only allowed on rear ports',
@@ -861,13 +924,24 @@ export const StubCreateSchema = v.pipe(
 	),
 )
 
+/**
+ * A stub from a NetBox import: the same limits, but vendor names keep any
+ * character. The importer sets the side fields itself, so they need no checks.
+ */
+export const ImportedStubSchema = v.strictObject({
+	prefix: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
+	...StubFieldEntries,
+})
+
 /** Stub patch; the side is fixed after create. */
 export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
 	count: v.optional(StubCountSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
-	label: v.optional(v.nullable(StubLabelSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
+		undefined,
+	),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
@@ -877,7 +951,10 @@ export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
 export type ManufacturerUpdate = v.InferOutput<typeof ManufacturerUpdateSchema>
 export type DeviceTypeCreate = v.InferOutput<typeof DeviceTypeCreateSchema>
 export type DeviceTypeUpdate = v.InferOutput<typeof DeviceTypeUpdateSchema>
+export type RackTypeCreate = v.InferOutput<typeof RackTypeCreateSchema>
+export type RackTypeUpdate = v.InferOutput<typeof RackTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
+export type ImportedStub = v.InferInput<typeof ImportedStubSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -888,12 +965,15 @@ export const ManufacturerListQuerySchema = v.object({
 export const DeviceTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdListEntry,
-	kind: v.optional(v.picklist(['device', 'rack']), 'device'),
+	/** Default role, including its child roles. */
+	role: OptionalIdListEntry,
+	full_depth: v.optional(looseBoolean(false), undefined),
 	sort: v.optional(
 		v.picklist([
 			'model',
 			'manufacturer',
-			'form_factor',
+			'part_number',
+			'role',
 			'description',
 			'comments',
 			'u_height',
@@ -905,14 +985,21 @@ export const DeviceTypeListQuerySchema = v.object({
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
+export const RackTypeListQuerySchema = v.object({
+	...ListQueryEntries,
+	manufacturer: OptionalIdListEntry,
+	sort: v.optional(v.picklist(['model', 'manufacturer', 'form_factor']), 'model'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
 export type ManufacturerListQuery = v.InferOutput<typeof ManufacturerListQuerySchema>
+export type RackTypeListQuery = v.InferOutput<typeof RackTypeListQuerySchema>
 export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema>
 
 /** One expanded interface name from a stub row. */
 export interface ExpandedInterface {
 	name: string
 	kind: string
-	label: string | null
 	description: string | null
 	side: PortSide | null
 	positions: number
@@ -920,6 +1007,68 @@ export interface ExpandedInterface {
 	rear_index: number | null
 	rear_port_position: number | null
 }
+
+/** Port fields a device type owns; everything else stays per device. */
+export const TEMPLATE_SYNC_FIELDS = ['kind', 'description', 'positions', 'rear_port'] as const
+export type TemplateSyncField = (typeof TEMPLATE_SYNC_FIELDS)[number]
+
+export interface TemplateSyncChange {
+	field: TemplateSyncField
+	from: string | null
+	to: string | null
+}
+
+/**
+ * `GET /devices/:id/template-sync`: how a device's ports differ from its
+ * device type. Ports match on side and name; `orphaned` ports have no
+ * counterpart in the type and `added` ports none on the device, so an
+ * orphaned port can be remapped onto an added port of its side.
+ */
+export interface TemplateSyncPreview {
+	unchanged: number
+	updated: {
+		interface_id: number
+		name: string
+		side: PortSide | null
+		changes: TemplateSyncChange[]
+	}[]
+	orphaned: {
+		interface_id: number
+		name: string
+		side: PortSide | null
+		kind: string
+		connected: boolean
+		/** Has a room or a floor plan placement, which removing the port deletes. */
+		located: boolean
+		/** Has a custom name linked to a template port that is gone. */
+		linked: boolean
+		/** Name of the added port this one most likely became (same side and kind). */
+		suggestion: string | null
+	}[]
+	added: { name: string; side: PortSide | null; kind: string }[]
+}
+
+/**
+ * `POST /devices/:id/template-sync`: the decision for every orphaned port.
+ * `map` takes on the name of the added port in `target`; `link` makes the
+ * port that template port under its own name; `keep` leaves the port as it
+ * is; `remove` deletes it (refused while it is cabled).
+ */
+export const TemplateSyncApplySchema = v.strictObject({
+	assignments: v.pipe(
+		v.array(
+			v.strictObject({
+				interface_id: IdSchema,
+				action: v.picklist(['map', 'link', 'keep', 'remove']),
+				target: v.optional(v.string()),
+			}),
+		),
+		v.maxLength(5000),
+	),
+})
+
+export type TemplateSyncApply = v.InferOutput<typeof TemplateSyncApplySchema>
+export type TemplateSyncAssignment = TemplateSyncApply['assignments'][number]
 
 // ---------------------------------------------------------------------------
 // P3b: device roles (NetBox-style functional roles: `Server`, `Switch`, …).
@@ -1305,7 +1454,10 @@ export const InterfaceCreateSchema = v.pipe(
 		name: InterfaceNameSchema,
 		kind: v.optional(InterfaceKindSchema, 'ethernet'),
 		enabled: v.optional(v.boolean(), undefined),
-		description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+		description: v.optional(
+			v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH)),
+			undefined,
+		),
 		side: v.optional(v.nullable(PortSideSchema), undefined),
 		positions: v.optional(PortPositionsSchema, undefined),
 		rear_port_id: v.optional(IdSchema, undefined),
@@ -1333,7 +1485,10 @@ export const InterfaceUpdateSchema = v.strictObject({
 	name: v.optional(InterfaceNameSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	enabled: v.optional(v.boolean(), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
+		undefined,
+	),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_port_id: v.optional(IdSchema, undefined),
 	rear_port_position: v.optional(PortPositionsSchema, undefined),

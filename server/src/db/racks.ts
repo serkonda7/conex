@@ -9,7 +9,7 @@ import type {
 	RackCreate,
 	RackUpdate,
 } from 'shared/src/schemas'
-import { device_types, devices, locations, racks, shelves, sites } from '../schema'
+import { device_types, devices, locations, rack_types, racks, shelves, sites } from '../schema'
 import { checkBounds, faceOf, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { removeAttachmentFiles } from '../storage'
 import { type AttachmentRow, deleteOwnerAttachments, prunePlacements } from './attachments'
@@ -44,9 +44,9 @@ async function withRackHeights(rows: RackRecord[]): Promise<RackRow[]> {
 	const heights = new Map<number, number>()
 	if (typeIds.length > 0) {
 		for (const row of await getDb()
-			.select({ id: device_types.id, u_height: device_types.u_height })
-			.from(device_types)
-			.where(inArray(device_types.id, typeIds))) {
+			.select({ id: rack_types.id, u_height: rack_types.u_height })
+			.from(rack_types)
+			.where(inArray(rack_types.id, typeIds))) {
 			heights.set(row.id, row.u_height)
 		}
 	}
@@ -69,6 +69,7 @@ const RACK_NAME_IN_USE = 'Rack name is already in use'
 export interface RackListParams extends ListParams, TenantFilterParams {
 	site?: number[]
 	location?: number[]
+	rack_type?: number[]
 	sort: 'name'
 	order: 'asc' | 'desc'
 }
@@ -78,6 +79,7 @@ export async function listRacks(params: RackListParams): Promise<Page<RackRow>> 
 		searchCondition(params.search, [racks.name, racks.description]),
 		params.site ? inArray(racks.site_id, params.site) : undefined,
 		params.location ? inArray(racks.location_id, params.location) : undefined,
+		params.rack_type ? inArray(racks.rack_type_id, params.rack_type) : undefined,
 		...tenantConditions(racks.tenant_id, params),
 	)
 	const page = await pageRows(
@@ -99,7 +101,7 @@ export async function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): Prom
 	if (rack.rack_type_id === null) {
 		return 0
 	}
-	return (await findOne(device_types, eq(device_types.id, rack.rack_type_id)))?.u_height ?? 0
+	return (await findOne(rack_types, eq(rack_types.id, rack.rack_type_id)))?.u_height ?? 0
 }
 
 /** Location must exist and belong to the rack's site; null clears the link. */
@@ -118,13 +120,10 @@ async function checkLocation(
 	return Result.ok(undefined)
 }
 
-/** Rack type row (a device type with a form factor); 404 otherwise. */
-async function getRackType(id: number): Promise<Result<typeof device_types.$inferSelect, Error>> {
-	const type = await findOne(device_types, eq(device_types.id, id))
-	if (!type || type.form_factor === null) {
-		return Result.err(new NotFoundError('Rack type not found'))
-	}
-	return Result.ok(type)
+export type RackTypeRow = typeof rack_types.$inferSelect
+
+export function getRackType(id: number): Promise<Result<RackTypeRow, Error>> {
+	return findById(rack_types, id, 'Rack type not found')
 }
 
 /** A U-mounted device with its type, as the elevation shows it. */
@@ -270,6 +269,23 @@ export async function rackSpansOf(rackId: number): Promise<OccupantSpan[]> {
 	return [...(await deviceSpansOf(rackId)), ...shelfSpans(await shelfDetailsOf(rackId))]
 }
 
+/**
+ * Shrinking below the topmost occupied U would strand devices outside the
+ * rack; reject with the same bounds error creation uses.
+ */
+export async function checkRackHeight(
+	rackId: number,
+	height: number,
+): Promise<Result<undefined, Error>> {
+	for (const span of await rackSpansOf(rackId)) {
+		const bounds = checkBounds(span, height, `Device "${span.name}"`)
+		if (Result.isError(bounds)) {
+			return bounds
+		}
+	}
+	return Result.ok(undefined)
+}
+
 export async function createRack(input: RackCreate): Promise<Result<RackRow, Error>> {
 	for (const guard of [
 		await checkExists(sites, input.site_id, 'Site not found'),
@@ -322,13 +338,9 @@ export async function updateRack(id: number, input: RackUpdate): Promise<Result<
 		effectiveHeight = rackType.value.u_height
 	}
 	if (effectiveHeight !== node.height_u) {
-		// Shrinking below the topmost occupied U would strand devices outside
-		// the rack; reject with the same bounds error creation uses.
-		for (const span of await rackSpansOf(id)) {
-			const bounds = checkBounds(span, effectiveHeight, `Device "${span.name}"`)
-			if (Result.isError(bounds)) {
-				return bounds
-			}
+		const fits = await checkRackHeight(id, effectiveHeight)
+		if (Result.isError(fits)) {
+			return fits
 		}
 	}
 	const patch = pickDefined(input, [

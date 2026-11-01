@@ -1,39 +1,48 @@
+/** Connector drawings shared with the port-types documentation. */
 import type { JSX } from 'solid-js'
+import portIcons from '../../../docs/src/img/port-icons.svg?url&no-inline'
 import type { IconComponent } from './icons'
 
-function PortSvg(props: { size?: number; children: JSX.Element }): JSX.Element {
-	return (
+/** Use the same SVG symbol in the app and in the documentation. */
+function portIcon(name: string): IconComponent {
+	return (props: { size?: number }): JSX.Element => (
 		<svg
-			xmlns="http://www.w3.org/2000/svg"
 			width={props.size ?? 24}
 			height={props.size ?? 24}
 			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
 			aria-hidden="true"
 		>
-			{props.children}
+			<use href={`${portIcons}#${name}`} />
 		</svg>
 	)
 }
 
-/** RJ-45 jack seen from the front: latch notch below, contact pins above. */
-export const IconRj45: IconComponent = (props: { size?: number }): JSX.Element => (
-	<PortSvg size={props.size}>
-		<path d="M4 4h16v11h-3v4H7v-4H4z" />
-		<path d="M8 4v4M12 4v4M16 4v4" />
-	</PortSvg>
-)
-
-/** Duplex LC fiber port seen from the front: housing with two ferrules. */
-export const IconFiber: IconComponent = (props: { size?: number }): JSX.Element => (
-	<PortSvg size={props.size}>
-		<rect x="3" y="5" width="18" height="14" rx="2" />
-		<circle cx="8.5" cy="12" r="2.5" />
-		<circle cx="15.5" cy="12" r="2.5" />
-		<path d="M8.5 12h.01M15.5 12h.01" />
-	</PortSvg>
-)
+export const IconRj45: IconComponent = portIcon('rj45')
+export const IconFiber: IconComponent = portIcon('fiber')
+export const IconUsbA: IconComponent = portIcon('usb-a')
+export const IconUsbB: IconComponent = portIcon('usb-b')
+export const IconUsbC: IconComponent = portIcon('usb-c')
+export const IconUsbMiniA: IconComponent = portIcon('usb-mini-a')
+export const IconUsbMiniB: IconComponent = portIcon('usb-mini-b')
+export const IconUsbMicroA: IconComponent = portIcon('usb-micro-a')
+export const IconUsbMicroB: IconComponent = portIcon('usb-micro-b')
+export const IconDe9: IconComponent = portIcon('de9')
+export const IconDb25: IconComponent = portIcon('db25')
+export const IconRj11: IconComponent = portIcon('rj11')
+export const IconRj12: IconComponent = portIcon('rj12')
+export const IconMiniDin8: IconComponent = portIcon('mini-din8')
+export const IconPowerInlet: IconComponent = portIcon('power-inlet')
+export const IconSchuko: IconComponent = portIcon('schuko')
+export const IconHdmi: IconComponent = portIcon('hdmi')
+export const IconDisplayPort: IconComponent = portIcon('displayport')
+export const IconVga: IconComponent = portIcon('vga')
+export const IconDvi: IconComponent = portIcon('dvi')
+export const IconC13: IconComponent = portIcon('c13')
+export const IconC20: IconComponent = portIcon('c20')
+export const IconC19: IconComponent = portIcon('c19')
+export const IconC8: IconComponent = portIcon('c8')
+export const IconC7: IconComponent = portIcon('c7')
+export const IconC6: IconComponent = portIcon('c6')
+export const IconC5: IconComponent = portIcon('c5')
+export const IconDcTerminal: IconComponent = portIcon('dc-terminal')
+export const IconDcBarrel: IconComponent = portIcon('dc-barrel')

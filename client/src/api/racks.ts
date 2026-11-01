@@ -28,6 +28,7 @@ export async function fetch_racks(
 				...paging(filters),
 				site: filters?.site,
 				location: filters?.location,
+				rack_type: filters?.rack_type,
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
 				sort: filters?.sort ?? 'name',

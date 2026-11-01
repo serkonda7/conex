@@ -18,6 +18,31 @@ import { InlineError, Loading } from './feedback'
 /** One `SelectField` entry. */
 export type FormOption = ComboboxOption
 
+/**
+ * Feeds the mouse position to the `.combobox-preview` rule in `styles.css`, so
+ * previews float at the cursor; keyboard use keeps their anchored placement.
+ */
+export function useCursorPreview(): void {
+	onMount(() => {
+		const root = document.documentElement
+		const track = (e: MouseEvent): void => {
+			root.style.setProperty('--cursor-x', `${e.clientX}px`)
+			root.style.setProperty('--cursor-y', `${e.clientY}px`)
+			root.dataset.input = 'mouse'
+		}
+		const keyboard = (): void => {
+			root.dataset.input = 'keyboard'
+		}
+		document.addEventListener('mousemove', track)
+		document.addEventListener('keydown', keyboard)
+		onCleanup(() => {
+			document.removeEventListener('mousemove', track)
+			document.removeEventListener('keydown', keyboard)
+			delete root.dataset.input
+		})
+	})
+}
+
 /** Maps list rows (`{ id, name }`) to `SelectField` options. */
 export function row_options(rows: readonly { id: number; name: string }[]): FormOption[] {
 	return rows.map((row) => ({ value: row.id, label: row.name }))
@@ -224,8 +249,11 @@ export function DescriptionField(props: {
 	id: string
 	value: string
 	onInput: (value: string) => void
+	maxLength?: number
 }): JSX.Element {
-	return <TextField {...props} label={t('common.description')} maxLength={500} />
+	return (
+		<TextField {...props} label={t('common.description')} maxLength={props.maxLength ?? 500} />
+	)
 }
 
 /** The optional free-text comments field. */
@@ -268,31 +296,18 @@ export function SelectField(props: {
 	reload?: () => unknown
 	/** Entity label and add-form path of the pinned "Add …" entry. */
 	add?: { label: string; href: string }
+	/** Extra class of the combobox, e.g. `combobox-fit`. */
+	class?: string
 }): JSX.Element {
 	onMount(() => {
 		// The tab shell refocuses `[data-autofocus]` when the tab is reactivated.
 		if (props.autofocus === true) {
 			document.querySelector(`#${CSS.escape(props.id)}`)?.setAttribute('data-autofocus', '')
 		}
-		if (props.info === true) {
-			const root = document.documentElement
-			const track = (e: MouseEvent): void => {
-				root.style.setProperty('--cursor-x', `${e.clientX}px`)
-				root.style.setProperty('--cursor-y', `${e.clientY}px`)
-				root.dataset.input = 'mouse'
-			}
-			const keyboard = (): void => {
-				root.dataset.input = 'keyboard'
-			}
-			document.addEventListener('mousemove', track)
-			document.addEventListener('keydown', keyboard)
-			onCleanup(() => {
-				document.removeEventListener('mousemove', track)
-				document.removeEventListener('keydown', keyboard)
-				delete root.dataset.input
-			})
-		}
 	})
+	if (props.info === true) {
+		useCursorPreview()
+	}
 
 	function openAddForm(name: string): void {
 		const href = props.add?.href
@@ -306,6 +321,7 @@ export function SelectField(props: {
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
 			<Combobox
 				id={props.id}
+				class={props.class}
 				value={props.value}
 				onChange={props.onChange}
 				options={props.options}
@@ -372,11 +388,11 @@ function EditActions(props: {
 }): JSX.Element {
 	return (
 		<div class="form-actions">
-			<button type="submit" disabled={props.saving}>
-				{props.saving ? t('common.saving') : t('common.save')}
-			</button>
 			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
 				{t('common.cancel')}
+			</button>
+			<button type="submit" disabled={props.saving}>
+				{props.saving ? t('common.saving') : t('common.save')}
 			</button>
 			<Show when={props.onDelete}>
 				<button

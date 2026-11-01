@@ -3,7 +3,8 @@
  * the hono RPC client. Errors surface as `Result.err` with the server's
  * `{ error }` message.
  */
-import type { Result } from 'better-result'
+import { Result } from 'better-result'
+import type { RackTypeListRow, RackTypeRow } from 'server/src/db/rack_types'
 import type {
 	DeviceTypeListRow,
 	DeviceTypeRow,
@@ -19,12 +20,24 @@ import type {
 	ManufacturerListQuery,
 	ManufacturerUpdate,
 	Page,
+	RackTypeCreate,
+	RackTypeListQuery,
+	RackTypeUpdate,
 	StubCreate,
+	StubUpdate,
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceTypeListRow, DeviceTypeRow, ManufacturerListRow, ManufacturerRow, StubRow }
+export type {
+	DeviceTypeListRow,
+	DeviceTypeRow,
+	ManufacturerListRow,
+	ManufacturerRow,
+	RackTypeListRow,
+	RackTypeRow,
+	StubRow,
+}
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -78,9 +91,6 @@ export async function delete_manufacturer(id: number): Promise<Result<unknown, E
 
 export type DeviceTypeSort = DeviceTypeListQuery['sort']
 
-/** NetBox rack form-factor choices, from the shared device-type contract. */
-export type RackFormFactor = NonNullable<DeviceTypeCreate['form_factor']>
-
 /**
  * Device-type create body. `u_height` / `is_full_depth` stay optional here
  * even though the shared output type marks them required: the server
@@ -99,13 +109,31 @@ export async function fetch_device_types(
 			query: to_query({
 				...paging(filters),
 				manufacturer: filters?.manufacturer,
-				kind: filters?.kind,
+				role: filters?.role,
+				full_depth: filters?.full_depth,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
 			}),
 		}),
 		failed.list('noun.deviceType'),
 	)
+}
+
+/** Every page of device types, for matching across the whole catalog. */
+export async function fetch_all_device_types(
+	filters?: Partial<DeviceTypeListQuery>,
+): Promise<Result<DeviceTypeListRow[], Error>> {
+	const rows: DeviceTypeListRow[] = []
+	for (let page = 1; ; page++) {
+		const result = await fetch_device_types({ ...filters, page, limit: 200 })
+		if (Result.isError(result)) {
+			return result
+		}
+		rows.push(...result.value.items)
+		if (rows.length >= result.value.total || result.value.items.length === 0) {
+			return Result.ok(rows)
+		}
+	}
 }
 
 export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRow, Error>> {
@@ -131,6 +159,54 @@ export async function update_device_type(
 export async function delete_device_type(id: number): Promise<Result<unknown, Error>> {
 	const res = await client['device-types'][':id'].$delete(by_id(id))
 	return to_result<unknown>(res, failed.delete('noun.deviceType'))
+}
+
+// ---------------------------------------------------------------------------
+// Rack types
+// ---------------------------------------------------------------------------
+
+export type RackTypeSort = RackTypeListQuery['sort']
+
+/** NetBox rack form-factor choices, from the shared rack-type contract. */
+export type RackFormFactor = RackTypeCreate['form_factor']
+
+export async function fetch_rack_types(
+	filters?: Partial<RackTypeListQuery>,
+): Promise<Result<Page<RackTypeListRow>, Error>> {
+	return getPage<RackTypeListRow>(
+		client['rack-types'].$get({
+			query: to_query({
+				...paging(filters),
+				manufacturer: filters?.manufacturer,
+				sort: filters?.sort ?? 'model',
+				order: filters?.order ?? 'asc',
+			}),
+		}),
+		failed.list('noun.rackType'),
+	)
+}
+
+export async function fetch_rack_type(id: number): Promise<Result<RackTypeRow, Error>> {
+	const res = await client['rack-types'][':id'].$get(by_id(id))
+	return to_result<RackTypeRow>(res, failed.load('noun.rackType'))
+}
+
+export async function create_rack_type(input: RackTypeCreate): Promise<Result<RackTypeRow, Error>> {
+	const res = await client['rack-types'].$post({ json: input })
+	return to_result<RackTypeRow>(res, failed.create('noun.rackType'))
+}
+
+export async function update_rack_type(
+	id: number,
+	patch: RackTypeUpdate,
+): Promise<Result<RackTypeRow, Error>> {
+	const res = await client['rack-types'][':id'].$patch({ ...by_id(id), json: patch })
+	return to_result<RackTypeRow>(res, failed.update('noun.rackType'))
+}
+
+export async function delete_rack_type(id: number): Promise<Result<unknown, Error>> {
+	const res = await client['rack-types'][':id'].$delete(by_id(id))
+	return to_result<unknown>(res, failed.delete('noun.rackType'))
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +237,18 @@ export async function create_stub(
 		json: input,
 	})
 	return to_result<StubRow>(res, t('api.createStubFailed'))
+}
+
+export async function update_stub(
+	deviceTypeId: number,
+	stubId: number,
+	patch: StubUpdate,
+): Promise<Result<StubRow, Error>> {
+	const res = await client['device-types'][':id'].stubs[':stubId'].$patch({
+		param: { id: String(deviceTypeId), stubId: String(stubId) },
+		json: patch,
+	})
+	return to_result<StubRow>(res, t('api.updateStubFailed'))
 }
 
 export async function delete_stub(

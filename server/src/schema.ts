@@ -282,7 +282,7 @@ export const racks = pgTable(
 			.references(() => sites.id),
 		location_id: integer('location_id').references(() => locations.id),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
-		rack_type_id: integer('rack_type_id').references(() => device_types.id),
+		rack_type_id: integer('rack_type_id').references(() => rack_types.id),
 		name: text('name').notNull(),
 		description: text('description'),
 	},
@@ -312,6 +312,30 @@ export const manufacturers = pgTable(
 	(table) => [index('manufacturers_name_idx').on(table.name)],
 )
 
+export const rack_types = pgTable(
+	'rack_types',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		manufacturer_id: integer('manufacturer_id')
+			.notNull()
+			.references(() => manufacturers.id),
+		model: text('model').notNull(),
+		form_factor: text('form_factor').notNull(),
+		// Mounting width in inches; the only supported value today is 19.
+		width: integer('width').notNull().default(19),
+		u_height: integer('u_height').notNull(),
+		part_number: text('part_number'),
+		spec_url: text('spec_url'),
+		description: text('description'),
+		comments: text('comments'),
+	},
+	(table) => [
+		index('rack_types_manufacturer_id_idx').on(table.manufacturer_id),
+		index('rack_types_model_idx').on(table.model),
+		uniqueIndex('rack_types_manufacturer_model_idx').on(table.manufacturer_id, table.model),
+	],
+)
+
 export const device_types = pgTable(
 	'device_types',
 	{
@@ -325,9 +349,6 @@ export const device_types = pgTable(
 		u_height: integer('u_height').notNull().default(1),
 		// NetBox `is_full_depth`: false = half-depth.
 		is_full_depth: boolean('is_full_depth').notNull().default(true),
-		// Rack-template dimensions. Null keeps existing non-rack templates valid.
-		form_factor: text('form_factor'),
-		width: integer('width'),
 		part_number: text('part_number'),
 		spec_url: text('spec_url'),
 		description: text('description'),
@@ -356,7 +377,6 @@ export const device_type_interfaces = pgTable(
 		prefix: text('prefix').notNull(),
 		count: integer('count').notNull().default(1),
 		kind: text('kind').notNull().default('ethernet'),
-		label: text('label'),
 		description: text('description'),
 		// Pass-through side (`PORT_SIDES`); null is a normal port.
 		side: text('side', { enum: PORT_SIDES }),
@@ -684,6 +704,9 @@ export const interfaces = pgTable(
 			.notNull()
 			.references(() => devices.id),
 		name: text('name').notNull(),
+		// Set while `name` is a custom name: the template port this port stands
+		// for, so renaming a port on a device does not detach it from its type.
+		template_name: text('template_name'),
 		kind: text('kind').notNull().default('ethernet'),
 		connected: integer('connected').notNull().default(0),
 		enabled: integer('enabled').notNull().default(1),

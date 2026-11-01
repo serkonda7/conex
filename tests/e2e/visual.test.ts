@@ -27,20 +27,20 @@ test('rack detail and elevation layout', async ({ page }) => {
 
 test('device type edit form layout', async ({ page }) => {
 	const deviceTypesResponse = await page.request.get(
-		'/api/device-types?search=E2E%2042U%20Cabinet&limit=200&kind=rack',
+		'/api/device-types?search=E2E%202U%20Server&limit=200',
 	)
 	expect(deviceTypesResponse.ok()).toBeTruthy()
 	const deviceTypes = (await deviceTypesResponse.json()) as {
 		items: { id: number; model: string }[]
 	}
 	const deviceTypeId = deviceTypes.items.find(
-		(deviceType) => deviceType.model === 'E2E 42U Cabinet',
+		(deviceType) => deviceType.model === 'E2E 2U Server',
 	)?.id
 	expect(deviceTypeId).toBeDefined()
 
 	await page.goto(`/device-types/${deviceTypeId}/edit`)
 	await expect(page.locator('#device-type-edit-full-depth')).toBeVisible()
-	await expect(page.locator('#device-type-edit-model')).toHaveValue('E2E 42U Cabinet')
+	await expect(page.locator('#device-type-edit-model')).toHaveValue('E2E 2U Server')
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('device-type-edit-form.png')
 })

@@ -35,11 +35,12 @@ import {
 	type PortSide,
 	RACK_FORM_FACTORS,
 	type SyncRunState,
+	type TemplateSyncField,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
 import type { FormOption } from '../components/form'
 import { RackFormFactorSchematic } from '../components/rack_form_factor'
-import { deviceRoleIcon, locationTypeIcon } from '../lib/icons'
+import { deviceRoleIcon, locationTypeIcon, portKindIcon } from '../lib/icons'
 import type { DurationUnit } from '../lib/service_level'
 import { type MessageKey, t } from '.'
 
@@ -112,6 +113,22 @@ const PORT_KIND_KEYS: Record<PortKind, MessageKey> = {
 	'usb-micro-ab': 'portKind.usbMicroAb',
 	power: 'portKind.power',
 	'power-outlet': 'portKind.powerOutlet',
+	'power-iec-60320-c14': 'portKind.powerC14',
+	'power-iec-60320-c20': 'portKind.powerC20',
+	'power-iec-60320-c8': 'portKind.powerC8',
+	'power-iec-60320-c6': 'portKind.powerC6',
+	'power-ita-ef': 'portKind.schukoPlug',
+	'power-dc-terminal': 'portKind.dcTerminal',
+	'power-dc-barrel': 'portKind.dcBarrel',
+	'power-usb-c': 'portKind.usbC',
+	'power-outlet-iec-60320-c13': 'portKind.powerC13',
+	'power-outlet-iec-60320-c19': 'portKind.powerC19',
+	'power-outlet-iec-60320-c7': 'portKind.powerC7',
+	'power-outlet-iec-60320-c5': 'portKind.powerC5',
+	'power-outlet-ita-f': 'portKind.schukoSocket',
+	'power-outlet-dc-terminal': 'portKind.dcTerminal',
+	'power-outlet-usb-a': 'portKind.usbA',
+	'power-outlet-usb-c': 'portKind.usbC',
 	hdmi: 'portKind.hdmi',
 	displayport: 'portKind.displayport',
 	vga: 'portKind.vga',
@@ -120,7 +137,7 @@ const PORT_KIND_KEYS: Record<PortKind, MessageKey> = {
 
 /**
  * Interface kind (`ethernet`, `hdmi`, …). NetBox interface types show their
- * untranslated NetBox name; unknown types fall back to the raw value.
+ * untranslated display name; unknown types fall back to the raw value.
  */
 export function portKindLabel(value: string): string {
 	if (Object.hasOwn(NETBOX_INTERFACE_TYPES, value)) {
@@ -132,6 +149,19 @@ export function portKindLabel(value: string): string {
 	return lookup(PORT_KIND_KEYS, value)
 }
 
+/** Option of a port kind; a trailing `(…)` goes to the detail column, which aligns it. */
+export function portKindOption(value: string): FormOption {
+	const label = portKindLabel(value)
+	const paren = label.indexOf(' (')
+	return {
+		value,
+		icon: portKindIcon(value),
+		...(paren === -1
+			? { label }
+			: { label: label.slice(0, paren), detail: label.slice(paren + 1) }),
+	}
+}
+
 const PORT_SIDE_KEYS: Record<PortSide, MessageKey> = {
 	front: 'portSide.front',
 	rear: 'portSide.rear',
@@ -140,6 +170,18 @@ const PORT_SIDE_KEYS: Record<PortSide, MessageKey> = {
 /** Patch-panel port side (`front` / `rear`). */
 export function portSideLabel(value: string): string {
 	return lookup(PORT_SIDE_KEYS, value)
+}
+
+const TEMPLATE_SYNC_FIELD_KEYS: Record<TemplateSyncField, MessageKey> = {
+	kind: 'device.templateSync.field.kind',
+	description: 'device.templateSync.field.description',
+	positions: 'device.templateSync.field.positions',
+	rear_port: 'device.templateSync.field.rear_port',
+}
+
+/** Port field a device type owns (`kind`, `positions`, …). */
+export function templateSyncFieldLabel(value: string): string {
+	return lookup(TEMPLATE_SYNC_FIELD_KEYS, value)
 }
 
 const CABLE_STATUS_KEYS: Record<string, MessageKey> = {

@@ -18,6 +18,7 @@ import {
 	interfaces,
 	locations,
 	manufacturers,
+	rack_types,
 	racks,
 	shelves,
 	site_groups,
@@ -55,7 +56,7 @@ async function one<T>(query: PromiseLike<T[]>): Promise<T> {
 // Ids restart at 1 so demo URLs stay stable across resets.
 await getSqlClient().unsafe(`
 	TRUNCATE floorplan_placements, floorplan_areas, attachments, cables, interfaces, devices,
-		shelves, racks, locations, sites, site_groups, device_type_interfaces, device_types,
+		shelves, racks, rack_types, locations, sites, site_groups, device_type_interfaces, device_types,
 		manufacturers, sessions, auth_states, users, tenants, tenant_groups, employees,
 		integrations, sync_runs, external_links, object_changes, audit_log
 	RESTART IDENTITY
@@ -247,15 +248,14 @@ const modemType: typeof device_types.$inferSelect = await one(
 		.returning(),
 )
 
-const rackType: typeof device_types.$inferSelect = await one(
+const rackType: typeof rack_types.$inferSelect = await one(
 	db
-		.insert(device_types)
+		.insert(rack_types)
 		.values({
 			manufacturer_id: apc.id,
 			model: 'NetShelter SX 24U',
 			u_height: 24,
 			form_factor: '4-post cabinet',
-			width: 19,
 		})
 		.returning(),
 )

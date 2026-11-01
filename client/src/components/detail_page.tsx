@@ -230,6 +230,15 @@ export function RelatedSection<Row extends { id: number }>(props: {
 	)
 }
 
+/** "View all" link under a truncated related-object list. */
+export function ViewAllLink(props: { href: string; count: number; target: string }): JSX.Element {
+	return (
+		<a class="related-tabs-all" href={props.href}>
+			{t('common.viewAllIn', { count: props.count, target: props.target })}
+		</a>
+	)
+}
+
 /** Rows a {@link RelatedPreview} shows before "View all". */
 const RELATED_PREVIEW_ROWS = 5
 
@@ -276,9 +285,7 @@ export function RelatedTabs(props: { id: string; label: string; tabs: RelatedTab
 						{tab.content()}
 						<Show when={tab.viewAllHref}>
 							{(href: () => string) => (
-								<a class="related-tabs-all" href={href()}>
-									{t('common.viewAllIn', { count: tab.count, target: tab.label })}
-								</a>
+								<ViewAllLink href={href()} count={tab.count} target={tab.label} />
 							)}
 						</Show>
 					</div>
@@ -298,10 +305,12 @@ export function RelatedPreview<Row extends { id: number }>(props: {
 	columns: DataTableColumn<Row>[]
 	/** Row key when ids are not unique within the rows; defaults to `id`. */
 	rowKey?: (row: Row) => string | number
+	/** Shows every row instead of the first few. */
+	all?: boolean
 }): JSX.Element {
 	return (
 		<DataTable
-			rows={() => props.rows.slice(0, RELATED_PREVIEW_ROWS)}
+			rows={() => (props.all ? props.rows : props.rows.slice(0, RELATED_PREVIEW_ROWS))}
 			getRowId={(row: Row): string | number => props.rowKey?.(row) ?? row.id}
 			columns={props.columns}
 			loading={() => props.loading}

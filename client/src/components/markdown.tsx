@@ -28,9 +28,12 @@ const ALLOWED_TAGS: string[] = [
 	'td',
 ]
 
-// Links leave the app, so open them in a new tab without exposing `window.opener`.
+// In-app and `mailto:`/`tel:` links stay plain (decision 0001).
+const NON_EXTERNAL_HREF = /^(\/(?!\/)|(mailto|tel):)/i
+
+// Other links leave the app: open them in a new tab without exposing `window.opener`.
 DOMPurify.addHook('afterSanitizeAttributes', (node: Element): void => {
-	if (node.tagName === 'A') {
+	if (node.tagName === 'A' && !NON_EXTERNAL_HREF.test(node.getAttribute('href') ?? '')) {
 		node.setAttribute('target', '_blank')
 		node.setAttribute('rel', 'noopener noreferrer')
 	}

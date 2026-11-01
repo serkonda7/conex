@@ -5,9 +5,9 @@ import { type DeviceRow, fetch_devices, update_device } from '../../api/devices'
 import { delete_rack, fetch_elevation, fetch_rack, fetch_racks } from '../../api/racks'
 import {
 	type DeviceTypeRow,
-	fetch_device_type,
 	fetch_device_types,
 	fetch_manufacturers,
+	fetch_rack_type,
 } from '../../api/templates'
 import { fetch_location, fetch_site, fetch_tenant } from '../../api/tenancy'
 import { AttachmentsSection, createOwnerImages } from '../../components/attachments'
@@ -58,7 +58,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [site] = createRecord(siteId, fetch_site, setError)
 	const [location] = createRecord(locationId, fetch_location, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
-	const [rackType] = createRecord(rackTypeId, fetch_device_type, setError)
+	const [rackType] = createRecord(rackTypeId, fetch_rack_type, setError)
 	const images = createOwnerImages({ rack_id: props.id }, setError)
 	const [trail] = createResource(
 		() => ({ site: site(), location: locationId() ?? null }),
@@ -305,7 +305,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 									id={rackTypeId()}
 									loading={rackType.loading}
 									name={rackType()?.model}
-									href={`/device-types/${rackTypeId() ?? ''}`}
+									href={`/rack-types/${rackTypeId() ?? ''}`}
 								/>
 							</dd>
 							<FloorplanLinks

@@ -3,7 +3,7 @@
  * client. Errors surface as `Result.err` with the server's `{ error }`
  * message.
  */
-import type { Result } from 'better-result'
+import { Result } from 'better-result'
 import type { DeviceListItem, DeviceRow, InterfaceJson } from 'server/src/db/devices'
 import type {
 	DeviceCreate,
@@ -13,6 +13,8 @@ import type {
 	DeviceUpdate,
 	InterfaceUpdate,
 	Page,
+	TemplateSyncApply,
+	TemplateSyncPreview,
 } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
@@ -56,6 +58,31 @@ export function fetch_devices(
 	return fetch_device_list({ ...filters, kind: 'device' }) as Promise<
 		Result<Page<DeviceRow>, Error>
 	>
+}
+
+/** A physical device row of the device list. */
+export type DeviceListDevice = Extract<DeviceListItem, { kind: 'device' }>
+
+/** Every device of a device type, across all list pages. */
+export async function fetch_all_devices_of_type(
+	deviceTypeId: number,
+): Promise<Result<DeviceListDevice[], Error>> {
+	const rows: DeviceListDevice[] = []
+	for (let page = 1; ; page++) {
+		const result = await fetch_device_list({
+			device_type: deviceTypeId,
+			kind: 'device',
+			page,
+			limit: 200,
+		})
+		if (Result.isError(result)) {
+			return result
+		}
+		rows.push(...result.value.items.filter((row) => row.kind === 'device'))
+		if (rows.length >= result.value.total || result.value.items.length === 0) {
+			return Result.ok(rows)
+		}
+	}
 }
 
 export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {
@@ -102,6 +129,20 @@ export async function delete_device(id: number): Promise<Result<unknown, Error>>
 export async function fetch_interfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
 	const res = await client.devices[':id'].interfaces.$get(by_id(deviceId))
 	return to_result<InterfaceJson[]>(res, failed.list('noun.interface'))
+}
+
+/** How a device's ports differ from its device type. */
+export async function fetch_template_sync(id: number): Promise<Result<TemplateSyncPreview, Error>> {
+	const res = await client.devices[':id']['template-sync'].$get(by_id(id))
+	return to_result<TemplateSyncPreview>(res, failed.load('noun.device'))
+}
+
+export async function apply_template_sync(
+	id: number,
+	input: TemplateSyncApply,
+): Promise<Result<InterfaceJson[], Error>> {
+	const res = await client.devices[':id']['template-sync'].$post({ ...by_id(id), json: input })
+	return to_result<InterfaceJson[]>(res, failed.update('noun.device'))
 }
 
 export async function update_interface(

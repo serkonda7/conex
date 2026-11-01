@@ -20,6 +20,7 @@ import {
 	employees,
 	locations,
 	manufacturers,
+	rack_types,
 	racks,
 	shelves,
 	sites,
@@ -109,34 +110,26 @@ let manufacturer = (await db.select().from(manufacturers)).find((row) => row.nam
 if (!manufacturer) {
 	manufacturer = (await db.insert(manufacturers).values({ name: 'E2E Maker' }).returning())[0]
 }
-if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 42U Cabinet')) {
-	await db.insert(device_types).values({
-		manufacturer_id: manufacturer.id,
-		model: 'E2E 42U Cabinet',
-		form_factor: '4-post cabinet',
-		width: 19,
-		u_height: 42,
-	})
-} else {
-	await getSqlClient()`UPDATE device_types SET manufacturer_id = ${manufacturer.id}, u_height = 42,
-		is_full_depth = true, form_factor = '4-post cabinet', width = 19, description = NULL, comments = NULL
-		WHERE model = 'E2E 42U Cabinet'`
-}
-if (!(await db.select().from(device_types)).some((row) => row.model === 'E2E 10U Cabinet')) {
-	await db.insert(device_types).values({
-		manufacturer_id: manufacturer.id,
-		model: 'E2E 10U Cabinet',
-		form_factor: '4-post cabinet',
-		width: 19,
-		u_height: 10,
-	})
-} else {
-	await getSqlClient()`UPDATE device_types SET u_height = 10, form_factor = '4-post cabinet', width = 19
-		WHERE model = 'E2E 10U Cabinet'`
+for (const [model, u_height] of [
+	['E2E 42U Cabinet', 42],
+	['E2E 10U Cabinet', 10],
+] as const) {
+	await db
+		.insert(rack_types)
+		.values({
+			manufacturer_id: manufacturer.id,
+			model,
+			form_factor: '4-post cabinet',
+			u_height,
+		})
+		.onConflictDoUpdate({
+			target: [rack_types.manufacturer_id, rack_types.model],
+			set: { u_height, form_factor: '4-post cabinet', description: null, comments: null },
+		})
 }
 
 const e2eSite = (await db.select().from(sites)).find((row) => row.name === 'E2E Site')
-const e2eRackType = (await db.select().from(device_types)).find(
+const e2eRackType = (await db.select().from(rack_types)).find(
 	(row) => row.model === 'E2E 10U Cabinet',
 )
 const e2eServerType = (await db.select().from(device_types)).find(

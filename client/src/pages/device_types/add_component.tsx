@@ -1,35 +1,62 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { PASS_THROUGH_PORT_TYPES, type PassThroughPortType } from 'shared/src/schemas'
+import { PORT_DESCRIPTION_MAX_LENGTH, SELECTABLE_PASS_THROUGH_PORT_TYPES } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
-import { create_stub, delete_stub, type StubRow } from '../../api/templates'
+import { Dynamic } from 'solid-js/web'
+import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
 import { InlineError } from '../../components/feedback'
 import { DescriptionField, Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
-import { portKindLabel } from '../../i18n/labels'
+import { portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
-import { text } from '../../lib/form'
+import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
-import { COMPONENT_CLASSES, type ComponentClassInfo } from './components'
+import { COMPONENT_CLASSES, type ComponentClassInfo, stubRange } from './components'
+import { CassetteIcon, PatchPanelIcon } from './connector_icons'
 
 const MAX_COUNT = 1024
 
 /** Quick-add presets of patch-panel port pairs. */
 export type PassThroughPreset = 'patch-panel' | 'cassette'
 
-const PRESETS: readonly { key: PassThroughPreset; label: MessageKey }[] = [
-	{ key: 'patch-panel', label: 'deviceType.preset.patchPanel' },
-	{ key: 'cassette', label: 'deviceType.preset.cassette' },
+const PRESETS: readonly {
+	key: PassThroughPreset
+	label: MessageKey
+	icon: ComponentClassInfo['icon']
+}[] = [
+	{ key: 'patch-panel', label: 'deviceType.preset.patchPanel', icon: PatchPanelIcon },
+	{ key: 'cassette', label: 'deviceType.preset.cassette', icon: CassetteIcon },
 ]
-
-const PASS_THROUGH_KINDS = Object.keys(PASS_THROUGH_PORT_TYPES) as PassThroughPortType[]
 
 /** Integer in `1..MAX_COUNT` from a number field, or null. */
 function parseCount(value: string): number | null {
 	const n = Number(value)
 	return Number.isInteger(n) && n >= 1 && n <= MAX_COUNT ? n : null
+}
+
+/** Connector drawing beside a component class name. */
+export function ItemIcon(props: { icon: ComponentClassInfo['icon'] }): JSX.Element {
+	return (
+		<span class="add-component-icon" aria-hidden="true">
+			<Dynamic component={props.icon} />
+		</span>
+	)
+}
+
+/**
+ * Warning atop the component forms: stubs only apply to devices created later.
+ * Hidden when the type has no devices yet.
+ */
+function ExistingDevicesWarning(props: { count: number }): JSX.Element {
+	return (
+		<Show when={props.count > 0}>
+			<p class="form-warning" role="status">
+				{t('deviceType.component.existingDevicesHint', { count: props.count })}
+			</p>
+		</Show>
+	)
 }
 
 /**
@@ -47,6 +74,7 @@ export function AddComponentMenu(props: {
 		<div class="add-component-menu">
 			<button
 				type="button"
+				class="btn-add"
 				aria-haspopup="menu"
 				aria-expanded={open()}
 				onClick={() => setOpen(!open())}
@@ -72,6 +100,7 @@ export function AddComponentMenu(props: {
 									props.onSelect(info)
 								}}
 							>
+								<ItemIcon icon={info.icon} />
 								{t(info.label)}
 							</button>
 						)}
@@ -88,6 +117,7 @@ export function AddComponentMenu(props: {
 									props.onPreset(preset.key)
 								}}
 							>
+								<ItemIcon icon={preset.icon} />
 								{t(preset.label)}
 							</button>
 						)}
@@ -99,30 +129,44 @@ export function AddComponentMenu(props: {
 }
 
 /**
- * Add form for one component class: a name with a count (count N > 1 expands
- * to `name1..nameN`), the class's kinds, label and description. Rear ports
- * add their positions, front ports the rear port they map onto and the
- * first position they take there.
+ * Add or edit form for one component class (edit when `stub` is given): a name
+ * with a count (count N > 1 expands to `name1..nameN`), the class's kind,
+ * and description. Rear ports add their positions, front ports the rear
+ * port they map onto and the first position they take there.
  */
-export function AddComponentDialog(props: {
+export function ComponentDialog(props: {
 	deviceTypeId: number
+	/** Devices already built from the type. */
+	existingDevices: number
 	info: ComponentClassInfo
+	/** Stub to edit; omitted when adding. */
+	stub?: StubRow
 	/** Rear port stubs of the type, offered to front ports. */
 	rearStubs: StubRow[]
 	onSaved: () => void
 	onClose: () => void
 }): JSX.Element {
-	const [name, setName] = createSignal('')
-	const [count, setCount] = createSignal('1')
-	const [positions, setPositions] = createSignal('1')
-	const [rearStub, setRearStub] = createSignal(String(props.rearStubs[0]?.id ?? ''))
-	const [rearPosition, setRearPosition] = createSignal('1')
-	const [kind, setKind] = createSignal<string>(props.info.kinds[0] ?? 'ethernet')
-	const [label, setLabel] = createSignal('')
-	const [description, setDescription] = createSignal('')
+	const stub = props.stub
+	const [name, setName] = createSignal(stub?.prefix ?? '')
+	const [count, setCount] = createSignal(String(stub?.count ?? 1))
+	const [positions, setPositions] = createSignal(String(stub?.positions ?? 1))
+	const [rearStub, setRearStub] = createSignal(
+		String(stub?.rear_stub_id ?? props.rearStubs[0]?.id ?? ''),
+	)
+	const [rearPosition, setRearPosition] = createSignal(String(stub?.rear_position ?? 1))
+	const [kind, setKind] = createSignal<string>(
+		stub?.kind ??
+			(props.info.key === 'interface' ? '1000base-t' : (props.info.kinds[0] ?? 'port')),
+	)
+	const [description, setDescription] = createSignal(stub?.description ?? '')
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
-	const prefix = `add-${props.info.key}`
+	const prefix = `${stub ? 'edit' : 'add'}-${props.info.key}`
+	// Stored kinds are free-form: keep an imported kind selectable.
+	const kinds: readonly string[] =
+		stub && !(props.info.kinds as readonly string[]).includes(stub.kind)
+			? [stub.kind, ...props.info.kinds]
+			: props.info.kinds
 
 	const parsedCount = (): number => Number(count())
 	const countValid = (): boolean =>
@@ -153,19 +197,33 @@ export function AddComponentDialog(props: {
 			setError(t('deviceType.component.rearPortRequired'))
 			return
 		}
+		const fields = {
+			count: parsedCount(),
+			kind: kind(),
+			description: text(description()),
+		}
+		const trimmed = name().trim()
+		const passThrough = {
+			...(side === 'rear' ? { positions: parsedPositions } : {}),
+			...(side === 'front'
+				? { rear_stub_id: Number(rearStub()), rear_position: parsedRearPosition }
+				: {}),
+		}
 		const ok = await save.run(() =>
-			create_stub(props.deviceTypeId, {
-				prefix: name().trim(),
-				count: parsedCount(),
-				kind: kind(),
-				label: text(label()),
-				description: text(description()),
-				...(side ? { side } : {}),
-				...(side === 'rear' ? { positions: parsedPositions } : {}),
-				...(side === 'front'
-					? { rear_stub_id: Number(rearStub()), rear_position: parsedRearPosition }
-					: {}),
-			}),
+			stub
+				? update_stub(props.deviceTypeId, stub.id, {
+						...cleared(fields),
+						...passThrough,
+						// Imported names may fall outside the prefix schema: only a
+						// rename is validated against it.
+						...(trimmed === stub.prefix ? {} : { prefix: trimmed }),
+					})
+				: create_stub(props.deviceTypeId, {
+						...fields,
+						...passThrough,
+						prefix: trimmed,
+						...(side ? { side } : {}),
+					}),
 		)
 		if (ok) {
 			props.onSaved()
@@ -174,10 +232,15 @@ export function AddComponentDialog(props: {
 
 	return (
 		<Modal
-			title={t('deviceType.component.addTitle', { component: t(props.info.label) })}
+			title={
+				stub
+					? t('deviceType.component.editTitle', { name: stub.prefix })
+					: t('deviceType.component.addTitle', { component: t(props.info.label) })
+			}
 			on_close={props.onClose}
 		>
 			<form class="form-stacked" onSubmit={handleSubmit}>
+				<ExistingDevicesWarning count={props.existingDevices} />
 				<TextField
 					id={`${prefix}-name`}
 					label={t('common.name')}
@@ -234,13 +297,7 @@ export function AddComponentDialog(props: {
 						}
 						options={props.rearStubs.map((r) => ({
 							value: String(r.id),
-							label:
-								r.count === 1
-									? r.prefix
-									: t('deviceType.component.range', {
-											first: `${r.prefix}1`,
-											last: `${r.prefix}${r.count}`,
-										}),
+							label: stubRange(r),
 						}))}
 					/>
 					<TextField
@@ -263,29 +320,21 @@ export function AddComponentDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
-					options={props.info.kinds.map((k) => ({
-						value: k,
-						label: portKindLabel(k),
-					}))}
-				/>
-				<TextField
-					id={`${prefix}-label`}
-					label={t('deviceType.component.label')}
-					maxLength={200}
-					value={label()}
-					onInput={setLabel}
+					class="combobox-fit combobox-port-kind"
+					options={kinds.map(portKindOption)}
 				/>
 				<DescriptionField
 					id={`${prefix}-description`}
 					value={description()}
 					onInput={setDescription}
+					maxLength={PORT_DESCRIPTION_MAX_LENGTH}
 				/>
 				<div class="modal-actions">
-					<button type="submit" disabled={!name().trim() || save.pending()}>
-						{t('common.create')}
-					</button>
 					<button type="button" onClick={props.onClose}>
 						{t('common.cancel')}
+					</button>
+					<button type="submit" disabled={!name().trim() || save.pending()}>
+						{stub ? t('common.save') : t('common.create')}
 					</button>
 				</div>
 			</form>
@@ -302,6 +351,8 @@ export function AddComponentDialog(props: {
  */
 export function PassThroughPresetDialog(props: {
 	deviceTypeId: number
+	/** Devices already built from the type. */
+	existingDevices: number
 	preset: PassThroughPreset
 	onSaved: () => void
 	onClose: () => void
@@ -359,6 +410,7 @@ export function PassThroughPresetDialog(props: {
 			on_close={props.onClose}
 		>
 			<form class="form-stacked" onSubmit={handleSubmit}>
+				<ExistingDevicesWarning count={props.existingDevices} />
 				<TextField
 					id={`${prefix}-name`}
 					label={t('deviceType.preset.frontName')}
@@ -388,7 +440,8 @@ export function PassThroughPresetDialog(props: {
 					required
 					value={kind()}
 					onChange={setKind}
-					options={PASS_THROUGH_KINDS.map((k) => ({ value: k, label: portKindLabel(k) }))}
+					class="combobox-port-kind"
+					options={SELECTABLE_PASS_THROUGH_PORT_TYPES.map(portKindOption)}
 				/>
 				<Show when={cassette}>
 					<TextField
@@ -401,11 +454,11 @@ export function PassThroughPresetDialog(props: {
 					/>
 				</Show>
 				<div class="modal-actions">
-					<button type="submit" disabled={!name().trim() || save.pending()}>
-						{t('common.create')}
-					</button>
 					<button type="button" onClick={props.onClose}>
 						{t('common.cancel')}
+					</button>
+					<button type="submit" disabled={!name().trim() || save.pending()}>
+						{t('common.create')}
 					</button>
 				</div>
 			</form>

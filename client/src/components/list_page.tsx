@@ -601,7 +601,7 @@ function ListPageHeader(props: {
 
 /**
  * Per-row edit button plus the row-menu toggle. `edit_href` is optional:
- * lists without an edit page (rack types) render the menu toggle only.
+ * lists without an edit page render the menu toggle only.
  * `has_menu: false` drops the menu toggle (no menu item to offer).
  * `name` is the row's display name used in the button labels.
  */
