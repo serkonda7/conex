@@ -75,7 +75,8 @@ import { ManufacturersPage } from '../pages/manufacturers/list'
 import { PriorityDetailPage } from '../pages/priorities/detail'
 import { PriorityAddPage, PriorityEditPage } from '../pages/priorities/form'
 import { PrioritiesPage } from '../pages/priorities/list'
-import { RackTypeAddPage } from '../pages/rack_types/add'
+import { RackTypeDetailPage } from '../pages/rack_types/detail'
+import { RackTypeAddPage, RackTypeEditPage } from '../pages/rack_types/form'
 import { RackTypesPage } from '../pages/rack_types/list'
 import { RackAddPage } from '../pages/racks/add'
 import { RackDetailPage } from '../pages/racks/detail'
@@ -240,6 +241,8 @@ export const SECTIONS: readonly Section[] = [
 		icon: IconTemplate,
 		list: RackTypesPage,
 		add: RackTypeAddPage,
+		detail: RackTypeDetailPage,
+		edit: RackTypeEditPage,
 	},
 	{
 		path: 'device-types',

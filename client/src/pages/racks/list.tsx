@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import { delete_rack, fetch_racks, type RackRow, type RackSort } from '../../api/racks'
-import { fetch_device_types } from '../../api/templates'
+import { fetch_rack_types } from '../../api/templates'
 import { fetch_locations, fetch_sites, fetch_tenants } from '../../api/tenancy'
 import { type DataTableColumn, descriptionColumn, nameColumn } from '../../components/data_table'
 import {
@@ -26,6 +26,7 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 export function RacksPage(): JSX.Element {
 	const [filterSite, setFilterSite] = useQueryFilterList('site')
 	const [filterLocation, setFilterLocation] = useQueryFilterList('location')
+	const [filterRackType, setFilterRackType] = useQueryFilterList('rack_type')
 	const [filterTenant] = useQueryFilter('tenant')
 	const list = useEntityList({
 		noun: 'noun.rack',
@@ -33,6 +34,7 @@ export function RacksPage(): JSX.Element {
 		filters: () => ({
 			site: idsOf(filterSite()),
 			location: idsOf(filterLocation()),
+			rack_type: idsOf(filterRackType()),
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_racks,
@@ -47,11 +49,13 @@ export function RacksPage(): JSX.Element {
 		fetch_locations,
 		list.setError,
 	)
-	const [rackTypes] = createRows(() => fetch_device_types({ kind: 'rack' }))
+	const [rackTypes] = createRows(fetch_rack_types, list.setError)
 	const siteName = useNameOf(sites)
 	const locationName = useNameOf(locations)
 	const tenantName = useNameOf(tenants)
 	const rackTypeName = useNameOf(rackTypes, (type) => type.model)
+	const rackTypeOptions = (): { value: string; label: string }[] =>
+		(rackTypes() ?? []).map((type) => ({ value: String(type.id), label: type.model }))
 
 	// Changing the site resets a location that belongs to another site.
 	function handleSiteFilter(value: string[]): void {
@@ -103,6 +107,13 @@ export function RacksPage(): JSX.Element {
 					options: idOptions(locations()),
 					value: filterLocation,
 					onChange: setFilterLocation,
+				},
+				{
+					key: 'rack_type',
+					label: tp('entity.rackType', 1),
+					options: rackTypeOptions(),
+					value: filterRackType,
+					onChange: setFilterRackType,
 				},
 			]}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}

@@ -14,7 +14,7 @@ import { t, tp } from '../../i18n'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
-import { useDeviceTypeOptions } from '../device_types/options'
+import { useRackTypeOptions } from '../rack_types/options'
 
 /** /racks/:id/edit — rack edit form. Saves back to the list when opened from it, else to the detail page. */
 export function RackEditPage(props: { id: number }): JSX.Element {
@@ -37,7 +37,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 	// The site is immutable; location options stay within it.
 	const siteId = (): number | undefined => form.record()?.site_id
 	const [tenants] = createRows(fetch_tenants, form.setError)
-	const rackTypes = useDeviceTypeOptions({ kind: 'rack' }, form.setError)
+	const rackTypes = useRackTypeOptions(form.setError)
 	const [siblings] = createRowsFor(
 		siteId,
 		(key: number) => fetch_locations({ site: [key] }),

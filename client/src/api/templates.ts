@@ -4,6 +4,7 @@
  * `{ error }` message.
  */
 import { Result } from 'better-result'
+import type { RackTypeListRow, RackTypeRow } from 'server/src/db/rack_types'
 import type {
 	DeviceTypeListRow,
 	DeviceTypeRow,
@@ -19,13 +20,24 @@ import type {
 	ManufacturerListQuery,
 	ManufacturerUpdate,
 	Page,
+	RackTypeCreate,
+	RackTypeListQuery,
+	RackTypeUpdate,
 	StubCreate,
 	StubUpdate,
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceTypeListRow, DeviceTypeRow, ManufacturerListRow, ManufacturerRow, StubRow }
+export type {
+	DeviceTypeListRow,
+	DeviceTypeRow,
+	ManufacturerListRow,
+	ManufacturerRow,
+	RackTypeListRow,
+	RackTypeRow,
+	StubRow,
+}
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -79,9 +91,6 @@ export async function delete_manufacturer(id: number): Promise<Result<unknown, E
 
 export type DeviceTypeSort = DeviceTypeListQuery['sort']
 
-/** NetBox rack form-factor choices, from the shared device-type contract. */
-export type RackFormFactor = NonNullable<DeviceTypeCreate['form_factor']>
-
 /**
  * Device-type create body. `u_height` / `is_full_depth` stay optional here
  * even though the shared output type marks them required: the server
@@ -102,7 +111,6 @@ export async function fetch_device_types(
 				manufacturer: filters?.manufacturer,
 				role: filters?.role,
 				full_depth: filters?.full_depth,
-				kind: filters?.kind,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
 			}),
@@ -151,6 +159,54 @@ export async function update_device_type(
 export async function delete_device_type(id: number): Promise<Result<unknown, Error>> {
 	const res = await client['device-types'][':id'].$delete(by_id(id))
 	return to_result<unknown>(res, failed.delete('noun.deviceType'))
+}
+
+// ---------------------------------------------------------------------------
+// Rack types
+// ---------------------------------------------------------------------------
+
+export type RackTypeSort = RackTypeListQuery['sort']
+
+/** NetBox rack form-factor choices, from the shared rack-type contract. */
+export type RackFormFactor = RackTypeCreate['form_factor']
+
+export async function fetch_rack_types(
+	filters?: Partial<RackTypeListQuery>,
+): Promise<Result<Page<RackTypeListRow>, Error>> {
+	return getPage<RackTypeListRow>(
+		client['rack-types'].$get({
+			query: to_query({
+				...paging(filters),
+				manufacturer: filters?.manufacturer,
+				sort: filters?.sort ?? 'model',
+				order: filters?.order ?? 'asc',
+			}),
+		}),
+		failed.list('noun.rackType'),
+	)
+}
+
+export async function fetch_rack_type(id: number): Promise<Result<RackTypeRow, Error>> {
+	const res = await client['rack-types'][':id'].$get(by_id(id))
+	return to_result<RackTypeRow>(res, failed.load('noun.rackType'))
+}
+
+export async function create_rack_type(input: RackTypeCreate): Promise<Result<RackTypeRow, Error>> {
+	const res = await client['rack-types'].$post({ json: input })
+	return to_result<RackTypeRow>(res, failed.create('noun.rackType'))
+}
+
+export async function update_rack_type(
+	id: number,
+	patch: RackTypeUpdate,
+): Promise<Result<RackTypeRow, Error>> {
+	const res = await client['rack-types'][':id'].$patch({ ...by_id(id), json: patch })
+	return to_result<RackTypeRow>(res, failed.update('noun.rackType'))
+}
+
+export async function delete_rack_type(id: number): Promise<Result<unknown, Error>> {
+	const res = await client['rack-types'][':id'].$delete(by_id(id))
+	return to_result<unknown>(res, failed.delete('noun.rackType'))
 }
 
 // ---------------------------------------------------------------------------

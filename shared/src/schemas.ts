@@ -567,6 +567,7 @@ export const RackListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdListEntry,
 	location: OptionalIdListEntry,
+	rack_type: OptionalIdListEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	sort: v.optional(v.picklist(['name']), 'name'),
@@ -825,7 +826,8 @@ export const RACK_FORM_FACTORS = [
 
 export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 
-export const RackWidthSchema = v.picklist([10, 19, 23])
+/** Rack units a rack type provides: 1-60 U. */
+export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
 /** Allows descriptions merged with legacy port labels during migration. */
 export const PORT_DESCRIPTION_MAX_LENGTH = 703
@@ -845,8 +847,6 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	model: NameSchema,
 	u_height: v.optional(DeviceHeightSchema, 1),
 	is_full_depth: v.optional(v.boolean(), true),
-	form_factor: v.optional(RackFormFactorSchema, undefined),
-	width: v.optional(RackWidthSchema, undefined),
 	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	spec_url: v.optional(WebsiteSchema, undefined),
 	description: DescriptionSchema,
@@ -859,13 +859,33 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	u_height: v.optional(DeviceHeightSchema, undefined),
 	is_full_depth: v.optional(v.boolean(), undefined),
-	form_factor: v.optional(v.nullable(RackFormFactorSchema), undefined),
-	width: v.optional(v.nullable(RackWidthSchema), undefined),
 	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 	default_device_role_id: NullableIdSchema,
+})
+
+export const RackTypeCreateSchema = v.strictObject({
+	manufacturer_id: IdSchema,
+	model: NameSchema,
+	form_factor: RackFormFactorSchema,
+	u_height: RackHeightSchema,
+	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
+	spec_url: v.optional(WebsiteSchema, undefined),
+	description: DescriptionSchema,
+	comments: CommentsSchema,
+})
+
+export const RackTypeUpdateSchema = v.strictObject({
+	manufacturer_id: v.optional(IdSchema, undefined),
+	model: v.optional(NameSchema, undefined),
+	form_factor: v.optional(RackFormFactorSchema, undefined),
+	u_height: v.optional(RackHeightSchema, undefined),
+	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
+	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 /**
@@ -920,6 +940,8 @@ export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>
 export type ManufacturerUpdate = v.InferOutput<typeof ManufacturerUpdateSchema>
 export type DeviceTypeCreate = v.InferOutput<typeof DeviceTypeCreateSchema>
 export type DeviceTypeUpdate = v.InferOutput<typeof DeviceTypeUpdateSchema>
+export type RackTypeCreate = v.InferOutput<typeof RackTypeCreateSchema>
+export type RackTypeUpdate = v.InferOutput<typeof RackTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export const ManufacturerListQuerySchema = v.object({
@@ -934,14 +956,12 @@ export const DeviceTypeListQuerySchema = v.object({
 	/** Default role, including its child roles. */
 	role: OptionalIdListEntry,
 	full_depth: v.optional(looseBoolean(false), undefined),
-	kind: v.optional(v.picklist(['device', 'rack']), 'device'),
 	sort: v.optional(
 		v.picklist([
 			'model',
 			'manufacturer',
 			'part_number',
 			'role',
-			'form_factor',
 			'description',
 			'comments',
 			'u_height',
@@ -953,7 +973,15 @@ export const DeviceTypeListQuerySchema = v.object({
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
+export const RackTypeListQuerySchema = v.object({
+	...ListQueryEntries,
+	manufacturer: OptionalIdListEntry,
+	sort: v.optional(v.picklist(['model', 'manufacturer', 'form_factor']), 'model'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
+})
+
 export type ManufacturerListQuery = v.InferOutput<typeof ManufacturerListQuerySchema>
+export type RackTypeListQuery = v.InferOutput<typeof RackTypeListQuerySchema>
 export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema>
 
 /** One expanded interface name from a stub row. */

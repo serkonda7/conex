@@ -59,15 +59,7 @@ const CABLE_CSV_HEADER = [
 	'status',
 ]
 
-const DEVICE_TYPE_CSV_HEADER = [
-	'manufacturer',
-	'model',
-	'u_height',
-	'is_full_depth',
-	'form_factor',
-	'width',
-	'description',
-]
+const DEVICE_TYPE_CSV_HEADER = ['manufacturer', 'model', 'u_height', 'is_full_depth', 'description']
 
 const POWER_CONNECTOR_KINDS = new Set<string>([...POWER_INPUT_KINDS, ...POWER_OUTLET_KINDS])
 
@@ -80,8 +72,6 @@ export async function exportDeviceTypesCsv(): Promise<string> {
 			model: device_types.model,
 			u_height: device_types.u_height,
 			is_full_depth: device_types.is_full_depth,
-			form_factor: device_types.form_factor,
-			width: device_types.width,
 			description: device_types.description,
 			comments: device_types.comments,
 		})
@@ -95,8 +85,6 @@ export async function exportDeviceTypesCsv(): Promise<string> {
 			r.model,
 			String(r.u_height),
 			r.is_full_depth ? 'true' : 'false',
-			r.form_factor,
-			r.width === null ? null : String(r.width),
 			r.description,
 		]),
 	)

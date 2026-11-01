@@ -19,7 +19,7 @@ import {
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
-import { useDeviceTypeOptions } from '../device_types/options'
+import { useRackTypeOptions } from '../rack_types/options'
 
 /** Id of the hint under the rack-type select. */
 const RACK_TYPE_HINT_ID = 'rack-type-hint'
@@ -34,7 +34,7 @@ export function RackAddPage(): JSX.Element {
 	const [rackTypeId, setRackTypeId] = createSignal('')
 
 	const [sites] = createRows(fetch_sites, form.setError)
-	const rackTypes = useDeviceTypeOptions({ kind: 'rack' }, form.setError)
+	const rackTypes = useRackTypeOptions(form.setError)
 	// Location options belong to a site, so they follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),

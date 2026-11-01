@@ -1,7 +1,6 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
 import type {
-	ChangeObjectType,
 	DeviceTypeCreate,
 	DeviceTypeListQuery,
 	DeviceTypeUpdate,
@@ -16,6 +15,7 @@ import {
 	device_types,
 	devices,
 	manufacturers,
+	rack_types,
 	racks,
 } from '../schema'
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
@@ -46,13 +46,8 @@ export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
 export type StubRow = typeof device_type_interfaces.$inferSelect
 export type ManufacturerListRow = ManufacturerRow & { device_count: number }
-/** `instance_count`: devices built from a device type, racks built from a rack type. */
+/** `instance_count`: devices built from the type. */
 export type DeviceTypeListRow = DeviceTypeRow & { instance_count: number }
-
-/** Rack types share the device type table; a form factor marks them. */
-function typeKindOf(row: DeviceTypeRow): ChangeObjectType {
-	return row.form_factor === null ? 'device_type' : 'rack_type'
-}
 
 // ---------------------------------------------------------------------------
 // Manufacturers
@@ -174,6 +169,11 @@ export async function deleteManufacturer(id: number): Promise<Result<Manufacture
 			new ConflictError('Manufacturer still has device types; move or delete them first'),
 		)
 	}
+	if (await exists(rack_types, eq(rack_types.manufacturer_id, id))) {
+		return Result.err(
+			new ConflictError('Manufacturer still has rack types; move or delete them first'),
+		)
+	}
 	const deleted = await tryWrite(() =>
 		getDb().delete(manufacturers).where(eq(manufacturers.id, id)),
 	)
@@ -194,7 +194,6 @@ export interface DeviceTypeListParams extends ListParams {
 	/** Default roles; a role also matches its child roles. */
 	role?: number[]
 	full_depth?: boolean
-	kind: 'device' | 'rack'
 	sort: DeviceTypeListQuery['sort']
 	order: 'asc' | 'desc'
 }
@@ -229,25 +228,17 @@ export async function listDeviceTypes(
 		params.full_depth === undefined
 			? undefined
 			: eq(device_types.is_full_depth, params.full_depth),
-		// Rack types are the rows with rack-template dimensions; regular device
-		// types deliberately have no form factor. Keep this filter in the query so
-		// totals and pagination describe the selected catalog accurately.
-		params.kind === 'rack'
-			? isNotNull(device_types.form_factor)
-			: isNull(device_types.form_factor),
 	)
-	const instances = params.kind === 'rack' ? racks.rack_type_id : devices.device_type_id
 	const orderColumns = {
 		model: device_types.model,
 		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`,
 		part_number: device_types.part_number,
 		role: sql`(SELECT ${device_roles.name} FROM ${device_roles} WHERE ${device_roles.id} = ${device_types.default_device_role_id})`,
-		form_factor: params.kind === 'rack' ? device_types.form_factor : device_types.model,
 		description: device_types.description,
 		comments: device_types.comments,
 		u_height: device_types.u_height,
 		is_full_depth: device_types.is_full_depth,
-		devices: sql`(SELECT count(*) FROM ${instances.table} WHERE ${instances} = ${device_types.id})`,
+		devices: sql`(SELECT count(*) FROM ${devices} WHERE ${devices.device_type_id} = ${device_types.id})`,
 	}
 	const orderColumn = orderColumns[params.sort]
 	const page = await pageRows(
@@ -257,7 +248,7 @@ export async function listDeviceTypes(
 		params,
 	)
 	const counts = await countBy(
-		instances,
+		devices.device_type_id,
 		page.items.map((dt) => dt.id),
 	)
 	return {
@@ -289,19 +280,11 @@ export async function createDeviceType(
 	if (Result.isError(role)) {
 		return role
 	}
-	const uHeight = input.u_height ?? 1
-	if (input.form_factor !== undefined && uHeight < 1) {
-		return Result.err(new ConflictError('Rack type must have a height of at least 1 U'))
-	}
 	const row: Omit<DeviceTypeRow, 'id'> = {
 		manufacturer_id: input.manufacturer_id,
 		model: input.model,
-		u_height: uHeight,
+		u_height: input.u_height ?? 1,
 		is_full_depth: input.is_full_depth ?? true,
-		form_factor: input.form_factor ?? null,
-		// Rack types use the standard 19-inch mounting width. Keep the generic
-		// device-type API's other width options for non-rack device types.
-		width: input.form_factor !== undefined ? 19 : (input.width ?? null),
 		part_number: input.part_number || null,
 		spec_url: input.spec_url ?? null,
 		description: input.description ?? null,
@@ -318,7 +301,7 @@ export async function createDeviceType(
 	if (Result.isError(id)) {
 		return id
 	}
-	return await logCreate(typeKindOf, await getDeviceType(id.value))
+	return await logCreate('device_type', await getDeviceType(id.value))
 }
 
 /**
@@ -385,11 +368,6 @@ export async function updateDeviceType(
 		return role
 	}
 	const effectiveUHeight = input.u_height ?? type.u_height
-	const effectiveFormFactor =
-		input.form_factor !== undefined ? input.form_factor : type.form_factor
-	if (effectiveFormFactor !== null && effectiveUHeight < 1) {
-		return Result.err(new ConflictError('Rack type must have a height of at least 1 U'))
-	}
 	// Updating a type must not break devices that already exist.
 	if (
 		type.u_height >= 1 &&
@@ -412,7 +390,6 @@ export async function updateDeviceType(
 		'manufacturer_id',
 		'model',
 		'u_height',
-		'form_factor',
 		'part_number',
 		'spec_url',
 		'description',
@@ -421,11 +398,6 @@ export async function updateDeviceType(
 	])
 	if (input.is_full_depth !== undefined) {
 		patch.is_full_depth = input.is_full_depth
-	}
-	if (effectiveFormFactor !== null) {
-		patch.width = 19
-	} else if (input.width !== undefined) {
-		patch.width = input.width
 	}
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
@@ -436,7 +408,7 @@ export async function updateDeviceType(
 			return written
 		}
 	}
-	return await logUpdate(typeKindOf, type, await getDeviceType(id))
+	return await logUpdate('device_type', type, await getDeviceType(id))
 }
 
 export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>> {
@@ -460,7 +432,7 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 	if (Result.isError(deleted)) {
 		return deleted
 	}
-	return await logDelete(typeKindOf, current.value)
+	return await logDelete('device_type', current.value)
 }
 
 // ---------------------------------------------------------------------------

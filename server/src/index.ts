@@ -19,6 +19,7 @@ import { integrationsApp } from './routes/integrations'
 import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
 import { manufacturersApp } from './routes/manufacturers'
+import { rackTypesApp } from './routes/rack_types'
 import { racksApp } from './routes/racks'
 import { rolesApp } from './routes/roles'
 import { savedFiltersApp } from './routes/saved_filters'
@@ -82,6 +83,7 @@ export function createApp() {
 			.route('/racks', racksApp)
 			.route('/shelves', shelvesApp)
 			.route('/manufacturers', manufacturersApp)
+			.route('/rack-types', rackTypesApp)
 			.route('/device-types', deviceTypesApp)
 			.route('/device-roles', deviceRolesApp)
 			.route('/priorities', prioritiesApp)
