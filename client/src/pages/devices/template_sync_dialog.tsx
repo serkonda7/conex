@@ -20,18 +20,33 @@ const KEEP = 'keep'
 const REMOVE = 'remove'
 /** Select values of a remap target; the name follows the prefix. */
 const MAP_PREFIX = 'map:'
+const LINK_PREFIX = 'link:'
+
+/** Name of the added port a choice takes, if any. */
+function targetOf(choice: string): string | null {
+	for (const prefix of [MAP_PREFIX, LINK_PREFIX]) {
+		if (choice.startsWith(prefix)) {
+			return choice.slice(prefix.length)
+		}
+	}
+	return null
+}
 
 /** Port name with its side, as front and rear ports may share a name. */
 function portLabel(port: { name: string; side: PortSide | null }): string {
 	return port.side === null ? port.name : `${port.name} (${portSideLabel(port.side)})`
 }
 
-/** A suggestion is taken as is; otherwise only an uncabled port is removed. */
+/**
+ * A suggestion is taken as is, under the port's own name if it has a custom
+ * one; otherwise a port is only removed by default when that loses nothing
+ * the user documented (cable, room, floor plan).
+ */
 function defaultChoice(orphan: Orphan): string {
 	if (orphan.suggestion !== null) {
-		return `${MAP_PREFIX}${orphan.suggestion}`
+		return `${orphan.linked ? LINK_PREFIX : MAP_PREFIX}${orphan.suggestion}`
 	}
-	return orphan.connected ? KEEP : REMOVE
+	return orphan.connected || orphan.located ? KEEP : REMOVE
 }
 
 function changeText(change: TemplateSyncChange): string {
@@ -67,12 +82,12 @@ export function TemplateSyncDialog(props: {
 	const taken = createMemo(
 		() =>
 			new Map(
-				(preview()?.orphaned ?? [])
-					.filter((orphan) => choiceOf(orphan).startsWith(MAP_PREFIX))
-					.map((orphan) => [
-						`${orphan.side}:${choiceOf(orphan).slice(MAP_PREFIX.length)}`,
-						orphan.interface_id,
-					]),
+				(preview()?.orphaned ?? []).flatMap((orphan) => {
+					const target = targetOf(choiceOf(orphan))
+					return target === null
+						? []
+						: [[`${orphan.side}:${target}`, orphan.interface_id] as const]
+				}),
 			),
 	)
 	/** Added ports of the orphan's side no other orphan is mapped to. */
@@ -85,13 +100,19 @@ export function TemplateSyncDialog(props: {
 					(owner === undefined || owner === orphan.interface_id)
 				)
 			})
-			.map((port) => ({
-				value: `${MAP_PREFIX}${port.name}`,
-				label: t('device.templateSync.mapTo', {
-					name: port.name,
-					kind: portKindLabel(port.kind),
-				}),
-			})),
+			.flatMap((port) => {
+				const params = { name: port.name, kind: portKindLabel(port.kind) }
+				return [
+					{
+						value: `${MAP_PREFIX}${port.name}`,
+						label: t('device.templateSync.mapTo', params),
+					},
+					{
+						value: `${LINK_PREFIX}${port.name}`,
+						label: t('device.templateSync.linkTo', params),
+					},
+				]
+			}),
 		{ value: KEEP, label: t('device.templateSync.keep') },
 		...(orphan.connected ? [] : [{ value: REMOVE, label: t('device.templateSync.remove') }]),
 	]
@@ -112,12 +133,13 @@ export function TemplateSyncDialog(props: {
 	const assignments = (): TemplateSyncAssignment[] =>
 		(preview()?.orphaned ?? []).map((orphan) => {
 			const choice = choiceOf(orphan)
-			return choice === KEEP || choice === REMOVE
-				? { interface_id: orphan.interface_id, action: choice }
+			const target = targetOf(choice)
+			return target === null
+				? { interface_id: orphan.interface_id, action: choice as 'keep' | 'remove' }
 				: {
 						interface_id: orphan.interface_id,
-						action: 'map',
-						target: choice.slice(MAP_PREFIX.length),
+						action: choice.startsWith(LINK_PREFIX) ? 'link' : 'map',
+						target,
 					}
 		})
 
@@ -168,6 +190,10 @@ export function TemplateSyncDialog(props: {
 												<Show when={orphan.connected}>
 													{' · '}
 													{t('device.templateSync.cabled')}
+												</Show>
+												<Show when={orphan.located}>
+													{' · '}
+													{t('device.templateSync.located')}
 												</Show>
 											</Hint>
 										}

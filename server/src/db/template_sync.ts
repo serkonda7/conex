@@ -53,7 +53,13 @@ export async function getTemplateSync(
 	if (Result.isError(state)) {
 		return state
 	}
-	return Result.ok(buildPreview(state.value.expected, state.value.ports))
+	const ids = state.value.ports.map((port) => port.id)
+	const placements = await getDb()
+		.select({ id: floorplan_placements.interface_id })
+		.from(floorplan_placements)
+		.where(inArray(floorplan_placements.interface_id, ids))
+	const placed = new Set(placements.flatMap((row) => row.id ?? []))
+	return Result.ok(buildPreview(state.value.expected, state.value.ports, placed))
 }
 
 /** A kind change must leave every cable on the device between compatible ports. */
@@ -133,8 +139,10 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 	for (const [i, target] of state.expected.entries()) {
 		const port = plan.slots[i]
 		const rearPortId = target.rear_index === null ? null : (ids[target.rear_index] ?? null)
+		const linked = port !== null && port !== undefined && plan.linked.has(port.id)
 		const fields = {
-			name: target.name,
+			name: linked ? port.name : target.name,
+			template_name: linked ? target.name : null,
 			kind: target.kind,
 			description: target.description,
 			positions: target.positions,
@@ -195,8 +203,8 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 
 /**
  * Brings a device's ports in line with its device type: matched ports take
- * the type's fields, orphaned ports follow their assignment, ports the
- * device lacks are created. Remapped ports keep their id, so cables,
+ * the type's fields (a linked port keeps its name), orphaned ports follow
+ * their assignment, ports the device lacks are created. Remapped ports keep their id, so cables,
  * floor plan placements, `enabled` and `patched` stay with them.
  */
 export async function applyTemplateSync(

@@ -704,6 +704,9 @@ export const interfaces = pgTable(
 			.notNull()
 			.references(() => devices.id),
 		name: text('name').notNull(),
+		// Set while `name` is a custom name: the template port this port stands
+		// for, so renaming a port on a device does not detach it from its type.
+		template_name: text('template_name'),
 		kind: text('kind').notNull().default('ethernet'),
 		connected: integer('connected').notNull().default(0),
 		enabled: integer('enabled').notNull().default(1),

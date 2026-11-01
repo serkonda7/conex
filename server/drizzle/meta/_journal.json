@@ -372,6 +372,13 @@
       "when": 1793520000000,
       "tag": "0052_rack_types",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1793606400000,
+      "tag": "0053_interface_template_name",
+      "breakpoints": true
     }
   ]
 }

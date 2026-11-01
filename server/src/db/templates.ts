@@ -40,7 +40,7 @@ import {
 	searchCondition,
 	tryWrite,
 } from './list'
-import { deviceSpansOf, rackHeightOf } from './racks'
+import { rackHeightOf, rackSpansOf } from './racks'
 
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
@@ -306,11 +306,12 @@ export async function createDeviceType(
 
 /**
  * Re-runs bounds and overlap checks for every mounted device of a type with
- * a new height (same loop `updateRack` uses for shrinks).
+ * a new height or depth (same loop `updateRack` uses for shrinks).
  */
-async function checkMountedHeight(
+async function checkMountedSize(
 	type: DeviceTypeRow,
 	uHeight: number,
+	isFullDepth: boolean,
 ): Promise<Result<undefined, Error>> {
 	const mounted = await getDb()
 		.select()
@@ -331,18 +332,13 @@ async function checkMountedHeight(
 			position_u: device.position_u,
 			height_u: uHeight,
 			face: faceOf(device.face),
-			is_full_depth: type.is_full_depth,
+			is_full_depth: isFullDepth,
 		}
 		const bounds = checkBounds(candidate, await rackHeightOf(rack), label)
 		if (Result.isError(bounds)) {
 			return bounds
 		}
-		const overlap = checkOverlap(
-			candidate,
-			await deviceSpansOf(device.rack_id),
-			label,
-			device.id,
-		)
+		const overlap = checkOverlap(candidate, await rackSpansOf(device.rack_id), label, device.id)
 		if (Result.isError(overlap)) {
 			return overlap
 		}
@@ -380,8 +376,9 @@ export async function updateDeviceType(
 			),
 		)
 	}
-	if (effectiveUHeight !== type.u_height) {
-		const mounted = await checkMountedHeight(type, effectiveUHeight)
+	const effectiveFullDepth = input.is_full_depth ?? type.is_full_depth
+	if (effectiveUHeight !== type.u_height || effectiveFullDepth !== type.is_full_depth) {
+		const mounted = await checkMountedSize(type, effectiveUHeight, effectiveFullDepth)
 		if (Result.isError(mounted)) {
 			return mounted
 		}

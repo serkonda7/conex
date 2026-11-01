@@ -19,9 +19,18 @@ interface PortDiff {
 	orphans: Port[]
 }
 
-/** Pairs ports with the expansion on side and name. */
+/** The name a port goes by in its template. */
+const templateName = (port: Port): string => port.template_name ?? port.name
+
+/** Pairs ports with the expansion on side and name; a linked port wins its template name. */
 function matchPorts(expected: ExpandedInterface[], ports: Port[]): PortDiff {
-	const byKey = new Map(ports.map((port) => [keyOf(port), port]))
+	const linkedLast = [
+		...ports.filter((port) => port.template_name === null),
+		...ports.filter((port) => port.template_name !== null),
+	]
+	const byKey = new Map(
+		linkedLast.map((port) => [keyOf({ side: port.side, name: templateName(port) }), port]),
+	)
 	const slots = expected.map((target) => byKey.get(keyOf(target)) ?? null)
 	const matched = new Set(slots.map((port) => port?.id))
 	return { slots, orphans: ports.filter((port) => !matched.has(port.id)) }
@@ -39,7 +48,7 @@ function changesOf(
 ): TemplateSyncChange[] {
 	const rear = ports.find((p) => p.id === port.rear_port_id)
 	const targetRear = target.rear_index === null ? undefined : expected[target.rear_index]
-	const rearFrom = rearLabel(rear?.name, port.rear_port_position)
+	const rearFrom = rearLabel(rear && templateName(rear), port.rear_port_position)
 	const rearTo = rearLabel(targetRear?.name, target.rear_port_position)
 	const changes: TemplateSyncChange[] = []
 	if (port.kind !== target.kind) {
@@ -92,7 +101,12 @@ function suggestTargets(orphans: Port[], added: ExpandedInterface[]): Map<number
 	return out
 }
 
-export function buildPreview(expected: ExpandedInterface[], ports: Port[]): TemplateSyncPreview {
+/** `placed`: ids of the ports on a floor plan. */
+export function buildPreview(
+	expected: ExpandedInterface[],
+	ports: Port[],
+	placed: Set<number>,
+): TemplateSyncPreview {
 	const { slots, orphans } = matchPorts(expected, ports)
 	const added = expected.filter((_, i) => !slots[i])
 	const suggestions = suggestTargets(orphans, added)
@@ -119,6 +133,8 @@ export function buildPreview(expected: ExpandedInterface[], ports: Port[]): Temp
 			side: port.side,
 			kind: port.kind,
 			connected: port.connected !== 0,
+			located: port.location_id !== null || placed.has(port.id),
+			linked: port.template_name !== null,
 			suggestion: suggestions.get(port.id) ?? null,
 		})),
 		added: added.map(({ name, side, kind }) => ({ name, side, kind })),
@@ -129,6 +145,8 @@ export interface SyncPlan {
 	/** Port per expanded index after remapping; null ports are created. */
 	slots: (Port | null)[]
 	removed: Port[]
+	/** Ports keeping a custom name, linked to their slot's template port. */
+	linked: Set<number>
 }
 
 const STALE = 'The device or its type changed; reopen the preview'
@@ -165,7 +183,11 @@ export function planSync(
 	) {
 		return Result.err(new Error(STALE))
 	}
-	const plan: SyncPlan = { slots: [...slots], removed: [] }
+	const plan: SyncPlan = {
+		slots: [...slots],
+		removed: [],
+		linked: new Set(slots.flatMap((port) => (port?.template_name ? [port.id] : []))),
+	}
 	const kept: Port[] = []
 	for (const port of orphans) {
 		const assignment = assignments.find((a) => a.interface_id === port.id)
@@ -188,6 +210,9 @@ export function planSync(
 				return Result.err(new Error(`Several ports are mapped to ${assignment?.target}`))
 			}
 			plan.slots[i] = port
+			if (assignment?.action === 'link') {
+				plan.linked.add(port.id)
+			}
 		}
 	}
 	for (const port of kept) {

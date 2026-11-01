@@ -888,25 +888,27 @@ export const RackTypeUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
+/** Stub fields besides the name. */
+const StubFieldEntries = {
+	count: v.optional(StubCountSchema, 1),
+	kind: v.optional(InterfaceKindSchema, 'ethernet'),
+	description: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
+		undefined,
+	),
+	side: v.optional(v.nullable(PortSideSchema), undefined),
+	positions: v.optional(PortPositionsSchema, undefined),
+	rear_stub_id: v.optional(IdSchema, undefined),
+	rear_position: v.optional(PortPositionsSchema, undefined),
+}
+
 /**
  * Template stub. `side` makes it a patch-panel stub: rear stubs carry
  * `positions`, front stubs map onto a rear stub of the same type starting
  * at slot `rear_position` (expansion in `server/src/services/templates.ts`).
  */
 export const StubCreateSchema = v.pipe(
-	v.strictObject({
-		prefix: InterfacePrefixSchema,
-		count: v.optional(StubCountSchema, 1),
-		kind: v.optional(InterfaceKindSchema, 'ethernet'),
-		description: v.optional(
-			v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
-			undefined,
-		),
-		side: v.optional(v.nullable(PortSideSchema), undefined),
-		positions: v.optional(PortPositionsSchema, undefined),
-		rear_stub_id: v.optional(IdSchema, undefined),
-		rear_position: v.optional(PortPositionsSchema, undefined),
-	}),
+	v.strictObject({ prefix: InterfacePrefixSchema, ...StubFieldEntries }),
 	v.check(
 		(s) => s.positions === undefined || s.positions === 1 || s.side === 'rear',
 		'Positions are only allowed on rear ports',
@@ -921,6 +923,15 @@ export const StubCreateSchema = v.pipe(
 		'Front ports need a rear port',
 	),
 )
+
+/**
+ * A stub from a NetBox import: the same limits, but vendor names keep any
+ * character. The importer sets the side fields itself, so they need no checks.
+ */
+export const ImportedStubSchema = v.strictObject({
+	prefix: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
+	...StubFieldEntries,
+})
 
 /** Stub patch; the side is fixed after create. */
 export const StubUpdateSchema = v.strictObject({
@@ -943,6 +954,7 @@ export type DeviceTypeUpdate = v.InferOutput<typeof DeviceTypeUpdateSchema>
 export type RackTypeCreate = v.InferOutput<typeof RackTypeCreateSchema>
 export type RackTypeUpdate = v.InferOutput<typeof RackTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
+export type ImportedStub = v.InferInput<typeof ImportedStubSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -1026,6 +1038,10 @@ export interface TemplateSyncPreview {
 		side: PortSide | null
 		kind: string
 		connected: boolean
+		/** Has a room or a floor plan placement, which removing the port deletes. */
+		located: boolean
+		/** Has a custom name linked to a template port that is gone. */
+		linked: boolean
 		/** Name of the added port this one most likely became (same side and kind). */
 		suggestion: string | null
 	}[]
@@ -1034,15 +1050,16 @@ export interface TemplateSyncPreview {
 
 /**
  * `POST /devices/:id/template-sync`: the decision for every orphaned port.
- * `map` carries the added port's name in `target`; `keep` leaves the port
- * as it is; `remove` deletes it (refused while it is cabled).
+ * `map` takes on the name of the added port in `target`; `link` makes the
+ * port that template port under its own name; `keep` leaves the port as it
+ * is; `remove` deletes it (refused while it is cabled).
  */
 export const TemplateSyncApplySchema = v.strictObject({
 	assignments: v.pipe(
 		v.array(
 			v.strictObject({
 				interface_id: IdSchema,
-				action: v.picklist(['map', 'keep', 'remove']),
+				action: v.picklist(['map', 'link', 'keep', 'remove']),
 				target: v.optional(v.string()),
 			}),
 		),

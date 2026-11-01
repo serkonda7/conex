@@ -744,9 +744,12 @@ export const en = {
 	'device.templateSync.upToDate': 'The ports match the device type.',
 	'device.templateSync.orphaned': 'Ports no longer in the device type ({count})',
 	'device.templateSync.mapTo': 'Rename to {name} ({kind})',
+	'device.templateSync.linkTo': 'Keep name, link to {name} ({kind})',
 	'device.templateSync.keep': 'Keep unchanged',
 	'device.templateSync.remove': 'Remove',
 	'device.templateSync.cabled': 'Has a cable, which stays connected.',
+	'device.templateSync.located':
+		'Has a room or floor plan position; removing the port deletes them.',
 	'device.templateSync.added': 'New ports ({count})',
 	'device.templateSync.updated': 'Changed ports ({count})',
 	'device.templateSync.change': '{field}: {from} → {to}',

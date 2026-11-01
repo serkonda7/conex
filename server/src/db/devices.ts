@@ -1174,6 +1174,7 @@ export async function addInterface(
 	const row: Omit<InterfaceRow, 'id'> = {
 		device_id: deviceId,
 		name: input.name,
+		template_name: null,
 		kind: input.kind ?? 'ethernet',
 		connected: 0,
 		enabled: input.enabled === false ? 0 : 1,
@@ -1196,6 +1197,29 @@ export async function addInterface(
 		return id
 	}
 	return await logCreate('interface', await getInterface(deviceId, id.value))
+}
+
+/**
+ * A renamed template port stays linked to the template port it stands for,
+ * until it gets that name back. Ports the template does not know stay unlinked.
+ */
+async function templateLinkAfterRename(
+	deviceId: number,
+	iface: InterfaceJson,
+	name: string,
+): Promise<Result<string | null, Error>> {
+	if (iface.template_name !== null) {
+		return Result.ok(name === iface.template_name ? null : iface.template_name)
+	}
+	const device = await getDevice(deviceId)
+	if (Result.isError(device)) {
+		return device
+	}
+	const expected = expandStubs(await stubsOf(device.value.device_type_id))
+	const known =
+		Result.isOk(expected) &&
+		expected.value.some((port) => port.side === iface.side && port.name === iface.name)
+	return Result.ok(known ? iface.name : null)
 }
 
 export async function updateInterface(
@@ -1235,6 +1259,13 @@ export async function updateInterface(
 		'rear_port_position',
 		'location_id',
 	])
+	if (input.name !== undefined && input.name !== iface.name) {
+		const link = await templateLinkAfterRename(deviceId, iface, input.name)
+		if (Result.isError(link)) {
+			return link
+		}
+		patch.template_name = link.value
+	}
 	if (input.enabled !== undefined) {
 		patch.enabled = input.enabled ? 1 : 0
 	}

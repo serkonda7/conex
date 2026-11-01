@@ -753,9 +753,12 @@ export const de: Messages = {
 	'device.templateSync.upToDate': 'Die Ports entsprechen dem Gerätetyp.',
 	'device.templateSync.orphaned': 'Ports, die der Gerätetyp nicht mehr enthält ({count})',
 	'device.templateSync.mapTo': 'Umbenennen in {name} ({kind})',
+	'device.templateSync.linkTo': 'Namen behalten, mit {name} verknüpfen ({kind})',
 	'device.templateSync.keep': 'Unverändert behalten',
 	'device.templateSync.remove': 'Entfernen',
 	'device.templateSync.cabled': 'Hat ein Kabel, das verbunden bleibt.',
+	'device.templateSync.located':
+		'Hat einen Raum oder eine Grundrissposition; Entfernen löscht diese.',
 	'device.templateSync.added': 'Neue Ports ({count})',
 	'device.templateSync.updated': 'Geänderte Ports ({count})',
 	'device.templateSync.change': '{field}: {from} → {to}',

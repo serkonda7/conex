@@ -7,6 +7,8 @@ import {
 	DeviceTypeYamlSchema,
 	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
+	type ImportedStub,
+	ImportedStubSchema,
 	type ImportResponse,
 	type ImportRowResult,
 	NETBOX_INTERFACE_TYPES,
@@ -33,7 +35,7 @@ import { cableInTenant, connectCable } from './cables'
 import { getDb, withTransaction } from './connection'
 import { createDevice } from './devices'
 import { errOf } from './list'
-import { createDeviceType, createStub } from './templates'
+import { createDeviceType, createStub, type StubRow } from './templates'
 
 const DEVICE_CSV_HEADER = [
 	'name',
@@ -341,7 +343,7 @@ async function importDeviceTypeDefinition(
 	}
 	for (const group of groups.values()) {
 		for (const run of collapseRuns(group.names)) {
-			const stub = await createStub(created.value.id, {
+			const stub = await createImportedStub(created.value.id, {
 				prefix: run.prefix,
 				count: run.count,
 				kind: group.kind,
@@ -353,6 +355,18 @@ async function importDeviceTypeDefinition(
 		}
 	}
 	return { ok: true, id: created.value.id, error: null }
+}
+
+/** Creates a stub within the limits the API and edit form enforce. */
+async function createImportedStub(
+	deviceTypeId: number,
+	input: ImportedStub,
+): Promise<Result<StubRow, Error>> {
+	const parsed = v.safeParse(ImportedStubSchema, input)
+	if (!parsed.success) {
+		return Result.err(new Error(formatValibotIssues(parsed.issues)))
+	}
+	return createStub(deviceTypeId, parsed.output)
 }
 
 /** Mappings of one YAML component list; any other entry is an error. */
@@ -419,7 +433,7 @@ async function importPassThroughPorts(
 			return `rear-ports "${name}": ${names.error.message}`
 		}
 		for (const prefix of names.value) {
-			const stub = await createStub(deviceTypeId, {
+			const stub = await createImportedStub(deviceTypeId, {
 				prefix,
 				count: 1,
 				kind,
@@ -479,7 +493,7 @@ async function importPassThroughPorts(
 		if (kind === null) {
 			return `front-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
 		}
-		const stub = await createStub(deviceTypeId, {
+		const stub = await createImportedStub(deviceTypeId, {
 			prefix: names.value[0] ?? name,
 			count: 1,
 			kind,
