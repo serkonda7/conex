@@ -25,7 +25,6 @@ export interface PanelRowDialogProps {
 	/** Location choices of an outlet (`useOutletLocationOptions`). */
 	location_options: FormOption[]
 	/** A cable was connected or removed; the dialog stays open. */
-	on_changed: () => void
 	on_saved: () => void
 	on_close: () => void
 }
@@ -81,8 +80,6 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 		})
 		for (const { iface, input } of updates) {
 			if (!(await save.run(() => update_interface(props.device_id, iface.id, input)))) {
-				// Earlier updates may have gone through; show them behind the dialog.
-				props.on_changed()
 				return
 			}
 		}
@@ -94,9 +91,7 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 	}
 
 	async function handleDisconnect(cableId: number): Promise<void> {
-		if (await cable.run(() => delete_cable(cableId))) {
-			props.on_changed()
-		}
+		await cable.run(() => delete_cable(cableId))
 	}
 
 	/** Current cable of a port with its connect or disconnect button. */
@@ -218,10 +213,7 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<ConnectPortDialog
 						iface={iface()}
-						on_connected={() => {
-							setConnecting(null)
-							props.on_changed()
-						}}
+						on_connected={() => setConnecting(null)}
 						on_close={() => setConnecting(null)}
 					/>
 				)}

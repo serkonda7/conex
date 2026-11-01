@@ -7,9 +7,10 @@
  */
 import { IconCopy, IconPencil } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { createSignal, For, type JSX, type Resource, type Setter, Show } from 'solid-js'
+import { createSignal, For, type JSX, type Setter, Show } from 'solid-js'
 import { type PluralKey, t, tp } from '../i18n'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
+import type { QueryResource } from '../lib/resource'
 import { type Crumb, forgetDeleted, navigate, usePageMeta } from '../lib/router'
 import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
@@ -27,7 +28,7 @@ import { MoreActionsButton } from './more_actions_button'
 export function DetailShell(props: {
 	name: string | undefined
 	crumbs?: readonly Crumb[]
-	record: Resource<unknown>
+	record: QueryResource<unknown>
 	loadingText: string
 	emptyText: string
 	children: JSX.Element
@@ -147,7 +148,7 @@ export function ForeignKeyLink(props: {
 /** {@link ForeignKeyLink} for a record resource: links `<base>/<id>` by name. */
 export function RecordLink<T extends { name: string }>(props: {
 	id: number | null | undefined
-	record: Resource<T | null>
+	record: QueryResource<T | null>
 	base: string
 	/** Display name; defaults to `name`. */
 	label?: (record: T) => string
@@ -173,7 +174,7 @@ export function RecordLink<T extends { name: string }>(props: {
 export function RelatedSection<Row extends { id: number }>(props: {
 	id: string
 	title: string
-	rows: Resource<Row[]>
+	rows: QueryResource<Row[]>
 	/** Plural `noun.<entity>` key for the default loading text. */
 	noun?: PluralKey
 	loadingText?: string

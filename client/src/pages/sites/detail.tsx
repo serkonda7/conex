@@ -1,5 +1,5 @@
 import { primaryEmail } from 'shared/src/schemas'
-import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
+import { createMemo, createSignal, type JSX, Show } from 'solid-js'
 import type { AttachmentJson } from '../../api/attachments'
 import { fetch_device_roles } from '../../api/device_roles'
 import {
@@ -40,7 +40,7 @@ import { t, tp } from '../../i18n'
 import { deviceRoleLabel, locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
-import { createRecord, createRows, createRowsFor } from '../../lib/resource'
+import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { siteGroupTrail } from '../../lib/trails'
 import { deviceListHref } from '../devices/list'
 import { EmailLink } from '../employees/list'
@@ -99,7 +99,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 	const groupId = (): number | null | undefined => site()?.site_group_id
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [siteGroup] = createRecord(groupId, fetch_site_group, setError)
-	const [trail] = createResource(() => groupId() ?? null, siteGroupTrail)
+	const trail = createDerived(() => groupId() ?? null, siteGroupTrail)
 	const [locations] = createRowsFor(
 		id,
 		(key: number) => fetch_locations({ site: [key] }),

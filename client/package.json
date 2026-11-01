@@ -15,6 +15,7 @@
   "dependencies": {
     "@serkonda7/solid-components": "~0.4.0",
     "@tabler/icons-solidjs": "~3.50.0",
+    "@tanstack/solid-query": "~5.105.1",
     "better-result": "catalog:",
     "dompurify": "~3.4.17",
     "hono": "catalog:",

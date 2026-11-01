@@ -1,7 +1,7 @@
 import { IconArrowsExchange, IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
 import { OTHER_PORT_KINDS } from 'shared/src/ports'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
-import { type Accessor, createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
+import { type Accessor, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_outlets } from '../../api/attachments'
 import { delete_cable, fetch_trace } from '../../api/cables'
@@ -38,7 +38,7 @@ import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, faceLabel, portKindLabel } from '../../i18n/labels'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
-import { createRecord, createRowsFor, useAction } from '../../lib/resource'
+import { createDerived, createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
@@ -124,19 +124,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [movingTenant, setMovingTenant] = createSignal(false)
 	const id = (): number => props.id
 
-	const [device, { refetch: refetchDevice }] = createRecord(id, fetch_device, setError)
-	const [ifaces, { refetch: refetchIfaces }] = createRowsFor(id, fetch_interfaces, setError)
+	const [device] = createRecord(id, fetch_device, setError)
+	const [ifaces] = createRowsFor(id, fetch_interfaces, setError)
 	const [vms] = createRowsFor(
 		id,
 		(key: number) => fetch_device_list({ host: key, kind: 'vm' }),
 		setError,
 	)
-	const [trace, { refetch: refetchTrace }] = createRecord(
-		id,
-		(key: number) => fetch_trace(key, 4),
-		setError,
-	)
-	const [outlets, { refetch: refetchOutlets }] = createRowsFor(id, fetch_outlets, setError)
+	const [trace] = createRecord(id, (key: number) => fetch_trace(key, 4), setError)
+	const [outlets] = createRowsFor(id, fetch_outlets, setError)
 	const typeId = (): number | undefined => device()?.device_type_id
 	const roleId = (): number | undefined => device()?.device_role_id
 	const siteId = (): number | null | undefined => device()?.site_id
@@ -159,7 +155,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		(row: DeviceRow) => fetch_device_service(row.id),
 		setError,
 	)
-	const [trail] = createResource(
+	const trail = createDerived(
 		() => ({ site: site(), location: locationId() ?? null, rack: rack() }),
 		async ({ site: siteRow, location: locationKey, rack: rackRow }): Promise<Crumb[]> => [
 			...(await siteTrail(siteRow, locationKey)),
@@ -167,18 +163,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		],
 	)
 
-	function refetchAll(): void {
-		void refetchIfaces()
-		void refetchTrace()
-		void refetchOutlets()
-	}
-
 	const action = useAction(setError)
 
 	async function handleDisconnect(cableId: number): Promise<void> {
-		if (await action.run(() => delete_cable(cableId))) {
-			refetchAll()
-		}
+		await action.run(() => delete_cable(cableId))
 	}
 
 	const handleDelete = useDetailDelete({
@@ -556,10 +544,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<ConnectPortDialog
 						iface={iface()}
-						on_connected={() => {
-							setConnectingIface(null)
-							refetchAll()
-						}}
+						on_connected={() => setConnectingIface(null)}
 						on_close={() => setConnectingIface(null)}
 					/>
 				)}
@@ -570,10 +555,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						device_id={props.id}
 						iface={iface()}
 						show_enabled={!isOtherPort(iface())}
-						on_saved={() => {
-							setEditingIface(null)
-							void refetchIfaces()
-						}}
+						on_saved={() => setEditingIface(null)}
 						on_close={() => setEditingIface(null)}
 					/>
 				)}
@@ -587,11 +569,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						links={linksByIface()}
 						endToEnd={endToEndOf}
 						location_options={locationOptions()}
-						on_changed={refetchAll}
-						on_saved={() => {
-							setEditingRow(null)
-							refetchAll()
-						}}
+						on_saved={() => setEditingRow(null)}
 						on_close={() => setEditingRow(null)}
 					/>
 				)}
@@ -600,10 +578,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				{(row: () => DeviceRow): JSX.Element => (
 					<MoveTenantDialog
 						row={{ kind: 'device', ...row() }}
-						on_moved={() => {
-							setMovingTenant(false)
-							void refetchDevice()
-						}}
+						on_moved={() => setMovingTenant(false)}
 						on_close={() => setMovingTenant(false)}
 					/>
 				)}

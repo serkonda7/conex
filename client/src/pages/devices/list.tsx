@@ -281,10 +281,7 @@ export function DevicesPage(): JSX.Element {
 				{(row: () => DeviceListItem): JSX.Element => (
 					<MoveTenantDialog
 						row={row()}
-						on_moved={() => {
-							setMovingRow(null)
-							list.reload()
-						}}
+						on_moved={() => setMovingRow(null)}
 						on_close={() => setMovingRow(null)}
 					/>
 				)}

@@ -1,13 +1,13 @@
 import { createEffect, createMemo, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { t } from '../i18n'
-import { activeTabId, tabPathContext } from '../lib/router'
+import { activeTabId, tabContext } from '../lib/router'
 import { Breadcrumbs } from './breadcrumbs'
 import { matchRoute, type RouteMatch, routeCrumbs } from './routes'
 
 /** Page content for one tab; `routePath` is that tab's own path. */
 export function RouteContent(props: { routePath: string; tabId: number }): JSX.Element {
-	const TabContext = tabPathContext()
+	const TabContext = tabContext()
 	// A pane remounts whenever its tab's path changes, so only a permission
 	// change can re-resolve the route: keep the page mounted unless the
 	// resolved page itself differs.
@@ -30,7 +30,7 @@ export function RouteContent(props: { routePath: string; tabId: number }): JSX.E
 		pane.querySelector<HTMLElement>('[data-autofocus]')?.focus()
 	})
 	return (
-		<TabContext.Provider value={props.routePath}>
+		<TabContext.Provider value={{ id: props.tabId, path: props.routePath }}>
 			<Show when={match()} keyed fallback={<p>{t('app.pageNotFound')}</p>}>
 				{(m: RouteMatch) => (
 					<>

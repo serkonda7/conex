@@ -16,7 +16,7 @@ import {
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIMES } from 'shared/src/schemas'
-import { createSignal, For, type JSX, type Resource, Show } from 'solid-js'
+import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
@@ -31,7 +31,7 @@ import {
 } from '../api/attachments'
 import { locale, t, tp } from '../i18n'
 import { removeConfirmingFloorplan } from '../lib/floorplan_delete'
-import { createRowsFor, type ErrorSink, useAction } from '../lib/resource'
+import { createRowsFor, type ErrorSink, type QueryResource, useAction } from '../lib/resource'
 import { can } from '../lib/session'
 import { Empty, InlineError, Loading } from './feedback'
 import { TextAreaField } from './form'
@@ -73,8 +73,7 @@ function pickFiles(multiple: boolean, onPick: (files: File[]) => void): void {
 /** The images of one owner, shared by its floor-plan and images sections. */
 export interface OwnerImages {
 	owner: AttachmentOwner
-	rows: Resource<AttachmentJson[]>
-	refetch: () => void
+	rows: QueryResource<AttachmentJson[]>
 	/** The image marked as the floor plan, if any. */
 	floorplan: () => AttachmentJson | undefined
 	/** Whether the owner can have a floor plan (sites and locations, not racks). */
@@ -83,11 +82,10 @@ export interface OwnerImages {
 
 /** Loads the images of `owner`; a failed fetch reports to `onError`. */
 export function createOwnerImages(owner: AttachmentOwner, onError?: ErrorSink): OwnerImages {
-	const [rows, { refetch }] = createRowsFor(() => owner, fetch_attachments, onError)
+	const [rows] = createRowsFor(() => owner, fetch_attachments, onError)
 	return {
 		owner,
 		rows,
-		refetch: () => void refetch(),
 		floorplan: () => rows()?.find((row) => row.is_floorplan),
 		has_floorplan: !('rack_id' in owner),
 	}
@@ -175,7 +173,6 @@ function AttachmentLightbox(props: {
 	floorplan: AttachmentJson | undefined
 	/** Shows the floor-plan mark action. */
 	has_floorplan: boolean
-	on_changed: () => void
 	on_deleted: () => void
 	on_close: () => void
 }): JSX.Element {
@@ -197,14 +194,11 @@ function AttachmentLightbox(props: {
 		)
 		if (ok) {
 			setEditing(false)
-			props.on_changed()
 		}
 	}
 
 	async function toggleMark(): Promise<void> {
-		if (await toggleFloorplan(props.attachment, props.floorplan, action)) {
-			props.on_changed()
-		}
+		await toggleFloorplan(props.attachment, props.floorplan, action)
 	}
 
 	function replace(): void {
@@ -218,9 +212,7 @@ function AttachmentLightbox(props: {
 				setError(invalid)
 				return
 			}
-			if (await action.run(() => replace_attachment_file(props.attachment.id, file))) {
-				props.on_changed()
-			}
+			await action.run(() => replace_attachment_file(props.attachment.id, file))
 		})
 	}
 
@@ -341,7 +333,6 @@ function AttachmentLightbox(props: {
 export function AttachmentsSection(props: { id: string; images: OwnerImages }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const rows = props.images.rows
-	const refetch = props.images.refetch
 	const [openId, setOpenId] = createSignal<number | null>(null)
 	const [dragging, setDragging] = createSignal(false)
 	const upload = useAction(setError)
@@ -359,9 +350,6 @@ export function AttachmentsSection(props: { id: string; images: OwnerImages }): 
 		}
 		if (invalid) {
 			setError(invalid)
-		}
-		if (valid.length > 0) {
-			refetch()
 		}
 	}
 
@@ -393,13 +381,10 @@ export function AttachmentsSection(props: { id: string; images: OwnerImages }): 
 
 	function afterDelete(): void {
 		setOpenId(null)
-		refetch()
 	}
 
 	async function toggleMark(row: AttachmentJson): Promise<void> {
-		if (await toggleFloorplan(row, props.images.floorplan(), mark)) {
-			refetch()
-		}
+		await toggleFloorplan(row, props.images.floorplan(), mark)
 	}
 
 	return (
@@ -529,7 +514,6 @@ export function AttachmentsSection(props: { id: string; images: OwnerImages }): 
 						attachment={attachment()}
 						floorplan={props.images.floorplan()}
 						has_floorplan={props.images.has_floorplan}
-						on_changed={refetch}
 						on_deleted={afterDelete}
 						on_close={() => setOpenId(null)}
 					/>

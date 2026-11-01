@@ -4,18 +4,11 @@
  * changing the search, a filter or the sort shows page 1 without an extra
  * fetch.
  */
-import { Result } from 'better-result'
+import type { Result } from 'better-result'
 import type { Page } from 'shared/src/types'
-import {
-	type Accessor,
-	batch,
-	createEffect,
-	createMemo,
-	createResource,
-	createSignal,
-	type Resource,
-} from 'solid-js'
+import { type Accessor, batch, createEffect, createMemo, createSignal } from 'solid-js'
 import type { DataTablePagination } from '../components/data_table'
+import { createRecord, type QueryResource } from './resource'
 import { historyEntryKey, useTabPath } from './router'
 
 const PAGE_SIZES = [25, 50, 100, 200]
@@ -53,12 +46,10 @@ interface ListPosition {
 const positions = new Map<string, ListPosition>()
 
 export interface PagedList<Row> {
-	page: Resource<Page<Row> | null>
+	page: QueryResource<Page<Row> | null>
 	rows: Accessor<Row[]>
 	pagination: Accessor<DataTablePagination>
 	onPaginationChange: (next: { page: number; pageSize: number }) => void
-	/** Refetches the current page. */
-	reload: () => void
 }
 
 export function usePagedList<Query extends object, Row>(opts: {
@@ -88,15 +79,15 @@ export function usePagedList<Query extends object, Row>(opts: {
 	}
 
 	const source = createMemo(() => ({ ...query(), page: pageNumber(), limit: pageSize() }))
-	const [page, { refetch }] = createResource(source, async (q) => {
-		opts.setError(null)
-		const res = await opts.fetch(q)
-		if (Result.isError(res)) {
-			opts.setError(res.error.message)
-			return null
-		}
-		return res.value
-	})
+	const [page] = createRecord(
+		source,
+		(q: Query & { page: number; limit: number }) => {
+			opts.setError(null)
+			return opts.fetch(q)
+		},
+		opts.setError,
+		{ keepPrevious: true },
+	)
 
 	// Deleting the last row of the last page, or rows gone since the list was
 	// left, can leave the current page past the end.
@@ -125,6 +116,5 @@ export function usePagedList<Query extends object, Row>(opts: {
 				goToPage(next.page)
 			})
 		},
-		reload: (): void => void refetch(),
 	}
 }

@@ -356,7 +356,7 @@ function CreateActions(props: {
 		<div class="form-actions">
 			<button
 				type="button"
-				onClick={() => navigate(props.cancelTo, { refresh: false, back: true })}
+				onClick={() => navigate(props.cancelTo, { back: true })}
 				disabled={props.saving}
 			>
 				{t('common.cancel')}

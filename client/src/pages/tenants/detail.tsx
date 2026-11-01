@@ -4,15 +4,7 @@ import {
 	type TenantBundleJson,
 	websiteUrl,
 } from 'shared/src/schemas'
-import {
-	createEffect,
-	createMemo,
-	createSignal,
-	For,
-	type JSX,
-	type Resource,
-	Show,
-} from 'solid-js'
+import { createEffect, createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import { type FloorplanListJson, fetch_floorplans } from '../../api/attachments'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { fetch_device_roles } from '../../api/device_roles'
@@ -56,7 +48,7 @@ import {
 	providerLabel,
 } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
-import { createRecord, createRows, createRowsFor } from '../../lib/resource'
+import { createRecord, createRows, createRowsFor, type QueryResource } from '../../lib/resource'
 import { path, useTabPath } from '../../lib/router'
 import { can } from '../../lib/session'
 import { setTenantContext } from '../../lib/tenant_context'
@@ -337,7 +329,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 /** Customer number, tenant group and managed bundles. */
 function Subheading(props: {
 	tenant: TenantDetail | null | undefined
-	group: Resource<TenantGroupRow | null>
+	group: QueryResource<TenantGroupRow | null>
 }): JSX.Element {
 	const groupId = (): number | null | undefined => props.tenant?.tenant_group_id
 	const hasGroup = (): boolean => groupId() !== null && groupId() !== undefined

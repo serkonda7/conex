@@ -31,7 +31,7 @@ import {
 	text,
 	useEntityForm,
 } from '../../lib/form'
-import { createRecord, createRows } from '../../lib/resource'
+import { createRecord, createRows, createSnapshot } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 import { newObjectTenantId } from '../../lib/tenant_context'
 import { deviceRoleOptions } from '../device-roles/options'
@@ -132,7 +132,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 		'/devices/vm',
 	)
 
-	const [source] = createRecord(
+	const [source] = createSnapshot(
 		() => (form.editing ? null : parseId(queryParam('clone'))),
 		fetch_virtual_machine,
 		form.setError,

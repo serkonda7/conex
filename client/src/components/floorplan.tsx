@@ -12,7 +12,6 @@
  * stage.
  */
 import { IconPencil } from '@tabler/icons-solidjs'
-import { Result } from 'better-result'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import {
@@ -114,10 +113,7 @@ function AreaLayer(props: { areas: FloorplanAreaJson[] }): JSX.Element {
  * Rack, device and outlet markers; the tooltip names the object and its
  * status. An outlet opens its popover (trace and connect) instead of a link.
  */
-function MarkerLayer(props: {
-	placements: FloorplanPlacementJson[]
-	on_changed: () => void
-}): JSX.Element {
+function MarkerLayer(props: { placements: FloorplanPlacementJson[] }): JSX.Element {
 	const [open, setOpen] = createSignal<number | null>(null)
 	const openOutlet = (): OutletPlacement | undefined => {
 		const found = props.placements.find((p: FloorplanPlacementJson) => p.id === open())
@@ -159,11 +155,7 @@ function MarkerLayer(props: {
 			</For>
 			<Show when={openOutlet()}>
 				{(placement: () => OutletPlacement) => (
-					<OutletPopover
-						placement={placement()}
-						on_changed={props.on_changed}
-						on_close={() => setOpen(null)}
-					/>
+					<OutletPopover placement={placement()} on_close={() => setOpen(null)} />
 				)}
 			</Show>
 		</>
@@ -189,15 +181,6 @@ export function FloorplanView(props: {
 	)
 	const [editing, setEditing] = createSignal(false)
 
-	/** Refreshes the markers in place (an outlet got cabled) without the loading state. */
-	async function reload(): Promise<void> {
-		const res = await fetch_floorplan(props.attachment.id)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return
-		}
-		mutate(res.value)
-	}
 	const [actions, setActions] = createSignal<HTMLElement>()
 
 	return (
@@ -236,10 +219,7 @@ export function FloorplanView(props: {
 							<div class="floorplan-view">
 								<FloorplanStage attachment={props.attachment}>
 									<AreaLayer areas={loaded().areas} />
-									<MarkerLayer
-										placements={loaded().placements}
-										on_changed={() => void reload()}
-									/>
+									<MarkerLayer placements={loaded().placements} />
 								</FloorplanStage>
 							</div>
 						</Show>

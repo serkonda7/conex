@@ -19,6 +19,7 @@
       "dependencies": {
         "@serkonda7/solid-components": "~0.4.0",
         "@tabler/icons-solidjs": "~3.50.0",
+        "@tanstack/solid-query": "~5.105.1",
         "better-result": "catalog:",
         "dompurify": "~3.4.17",
         "hono": "catalog:",
@@ -275,6 +276,10 @@
     "@tabler/icons": ["@tabler/icons@3.50.0", "", {}, "sha512-HflLxyrH1cqC7s7jzQGSjpsTAVIoaf7+/yHjbdM59rJQBMjliibp+LYhDPFxOMcwa1M8DNpOk6ENzQiWn9a1Dg=="],
 
     "@tabler/icons-solidjs": ["@tabler/icons-solidjs@3.50.0", "", { "dependencies": { "@tabler/icons": "3.50.0" }, "peerDependencies": { "solid-js": "^1.4.7" } }, "sha512-MJbDHBClRypyn80tJ3b9revDeiyB3ddQsp+NAXUA9X0kg3A0B+4RNH27R7incifFNCuW5PSwH9vMJdFhlVJwjA=="],
+
+    "@tanstack/query-core": ["@tanstack/query-core@5.105.1", "", {}, "sha512-B/rNlZoZ54w1dlddiUt9oEe1SLM+37c00SKLJEg9YH+7as3Y54P81o9Fh+2ujZ36tXPnQJ5oVe7AcyEWkyFhPg=="],
+
+    "@tanstack/solid-query": ["@tanstack/solid-query@5.105.1", "", { "dependencies": { "@tanstack/query-core": "5.105.1" }, "peerDependencies": { "solid-js": "^1.6.0" } }, "sha512-1oXL9MgrQkOZZFT2ouZn5GzFCT0c406PRBsLbi9JYdBxpuK1wHA4N6pq2USJ1JHstLjcIMgyld/pfKxgpHms4w=="],
 
     "@tanstack/solid-table": ["@tanstack/solid-table@9.3.1", "", { "dependencies": { "@tanstack/store": "^0.11.2", "@tanstack/table-core": "9.3.1" }, "peerDependencies": { "solid-js": ">=1.3" } }, "sha512-Y1qyK2R4Y65dUNS/flC9TpAcXx8EuN9eImi+QSmx7AyhyRv1xm7051FkmetCkKcpdK3aKOPxG+P1o4CpWsxoWw=="],
 

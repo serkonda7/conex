@@ -29,6 +29,7 @@ import type {
 	TicketListJson,
 } from 'shared/src/types'
 import { t } from '../i18n'
+import { invalidate_queries } from '../lib/query'
 import { client, failed, to_query, to_result } from './client'
 
 export type {
@@ -154,6 +155,8 @@ export async function wait_for_sync(
 		}
 		current = res.value
 	}
+	// The run changed data on the server without a write from this client.
+	invalidate_queries()
 	return Result.ok(current)
 }
 

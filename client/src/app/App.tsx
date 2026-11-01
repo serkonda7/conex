@@ -19,6 +19,7 @@ import { fetchMe, fetchSetupStatus, logout, type SessionUser } from '../api/auth
 import { set_unauthorized_handler } from '../api/client'
 import { Loading } from '../components/feedback'
 import { type Locale, locale, t } from '../i18n'
+import { queryClient } from '../lib/query'
 import { activeTabId, goTo, type TabState, tabs } from '../lib/router'
 import { setSessionAccess } from '../lib/session'
 import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
@@ -86,6 +87,8 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	})
 	onCleanup(() => {
 		setSessionAccess({ permissions: [], tenantId: null })
+		// Cached rows belong to the session's user and tenant scope.
+		queryClient.clear()
 	})
 
 	return (

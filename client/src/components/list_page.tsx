@@ -23,7 +23,6 @@ import {
 	type JSX,
 	onCleanup,
 	onMount,
-	type Resource,
 	type Setter,
 	Show,
 } from 'solid-js'
@@ -33,6 +32,7 @@ import { use_visible_columns } from '../lib/column_visibility'
 import { useDismiss } from '../lib/dismiss'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
 import { usePagedList } from '../lib/paged_list'
+import type { QueryResource } from '../lib/resource'
 import { navigate, parseId, queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import {
@@ -272,7 +272,7 @@ export interface EntityList<Row> {
 	order: Accessor<'asc' | 'desc'>
 	handleSort: (key: string) => void
 	clearSort: () => void
-	page: Resource<Page<Row> | null>
+	page: QueryResource<Page<Row> | null>
 	rows: Accessor<Row[]>
 	pagination: Accessor<DataTablePagination>
 	onPaginationChange: (next: { page: number; pageSize: number }) => void
@@ -283,14 +283,11 @@ export interface EntityList<Row> {
 	/** Whether the session may delete rows (`manage`, else `delete`). */
 	canDelete: () => boolean
 	handleDelete: (row: Row, name: string) => Promise<void>
-	/** Refetches the current page (after a change made outside the list). */
-	reload: () => void
 }
 
 /**
  * State of a standard list page: search, sort and the page-specific
- * `filters` form the query for `fetch`. Deletes confirm first, report through `error` and
- * refetch. Omit `sort` for endpoints without sorting; `manage` replaces the
+ * `filters` form the query for `fetch`. Deletes confirm first and report through `error`. Omit `sort` for endpoints without sorting; `manage` replaces the
  * `edit`/`delete` permissions for admin lists (users, roles). `removeOf`
  * picks the delete call per row for lists mixing kinds (devices and VMs).
  */
@@ -341,10 +338,6 @@ export function useEntityList<
 		const res = await removeConfirmingFloorplan(remove, row.id, name)
 		if (Result.isError(res)) {
 			setError(res.error.message)
-			return
-		}
-		if (res.value) {
-			paged.reload()
 		}
 	}
 
@@ -365,7 +358,6 @@ export function useEntityList<
 		canEdit,
 		canDelete,
 		handleDelete,
-		reload: paged.reload,
 	}
 }
 

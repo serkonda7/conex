@@ -62,10 +62,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setPromptError,
 	)
 	const [roles] = createRows(fetch_device_roles, setPromptError)
-	const [deviceTypes, { refetch: refetchDeviceTypes }] = createRows(
-		fetch_all_device_types,
-		setPromptError,
-	)
+	const [deviceTypes] = createRows(fetch_all_device_types, setPromptError)
 	const similarTypes = createMemo(() =>
 		findSimilarTypes(promptModel(), parseId(promptManufacturerId()), deviceTypes() ?? []),
 	)
@@ -197,7 +194,6 @@ export function DeviceTypeImportPage(): JSX.Element {
 		setResults(res.value.rows)
 		if (res.value.failed === 0) {
 			setYamlText('')
-			void refetchDeviceTypes()
 		}
 	}
 
@@ -298,7 +294,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 				<div class="form-actions">
 					<button
 						type="button"
-						onClick={() => navigate('/device-types', { refresh: false, back: true })}
+						onClick={() => navigate('/device-types', { back: true })}
 						disabled={importing()}
 					>
 						{t('common.cancel')}

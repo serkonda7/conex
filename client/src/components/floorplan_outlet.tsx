@@ -39,7 +39,6 @@ interface OutletCircuit {
 
 export function OutletPopover(props: {
 	placement: OutletPlacement
-	on_changed: () => void
 	on_close: () => void
 }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -142,7 +141,6 @@ export function OutletPopover(props: {
 						on_connected={() => {
 							setConnecting(null)
 							void refetch()
-							props.on_changed()
 						}}
 						on_close={() => setConnecting(null)}
 					/>

@@ -1,13 +1,12 @@
 /** Tenant integration status for the tenant page's "Needs attention" list. */
 import { Result } from 'better-result'
 import type { FindingKind, TenantIntegrationStatus } from 'shared/src/schemas'
-import { createResource, type Resource } from 'solid-js'
 import {
 	fetch_integrations,
 	fetch_tenant_integration,
 	type IntegrationJson,
 } from '../../api/integrations'
-import { createRowsFor } from '../../lib/resource'
+import { createDerived, createRowsFor, type QueryResource } from '../../lib/resource'
 import { can } from '../../lib/session'
 
 /** Configured, enabled integrations visible to users who can manage them. */
@@ -27,9 +26,9 @@ export interface TenantIntegration {
  * Status of every enabled integration for the tenant, for the tenant
  * page's "Needs attention" list.
  */
-export function useTenantIntegrations(tenantId: () => number): Resource<TenantIntegration[]> {
+export function useTenantIntegrations(tenantId: () => number): QueryResource<TenantIntegration[]> {
 	const integrations = useIntegrations()
-	const [statuses] = createResource(
+	return createDerived(
 		() => ({ tenant: tenantId(), list: integrations() }),
 		async (q): Promise<TenantIntegration[]> =>
 			Promise.all(
@@ -41,7 +40,6 @@ export function useTenantIntegrations(tenantId: () => number): Resource<TenantIn
 				}),
 			),
 	)
-	return statuses
 }
 
 /** Integration report of the provider, narrowed to the tenant (and a finding kind). */

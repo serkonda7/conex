@@ -3,7 +3,6 @@
  * model as label with its manufacturer as detail column.
  */
 import type { DeviceTypeListQuery } from 'shared/src/types'
-import type { Resource } from 'solid-js'
 import {
 	type DeviceTypeListRow,
 	fetch_device_types,
@@ -11,13 +10,13 @@ import {
 } from '../../api/templates'
 import type { FormOption } from '../../components/form'
 import { useNameOf } from '../../lib/lookup'
-import { createRows, type ErrorSink } from '../../lib/resource'
+import { createRows, type ErrorSink, type QueryResource } from '../../lib/resource'
 
 export function useDeviceTypeOptions(
 	filters: Partial<DeviceTypeListQuery>,
 	onError?: ErrorSink,
 ): {
-	types: Resource<DeviceTypeListRow[]>
+	types: QueryResource<DeviceTypeListRow[]>
 	options: () => FormOption[]
 	/** Refetches the types and their manufacturers (`SelectField.reload`). */
 	reload: () => Promise<void>

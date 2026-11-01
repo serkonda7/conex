@@ -30,8 +30,6 @@ export interface TabState {
 	/** Shown path, always `entries[index]`. */
 	path: string
 	openerId: number | null
-	/** Bumped to force a remount (fresh fetch) of the tab's page. */
-	gen: number
 }
 
 export interface NavigateOptions {
@@ -39,12 +37,6 @@ export interface NavigateOptions {
 	openInTab?: boolean
 	/** Replace the tab's current history entry instead of pushing. */
 	replace?: boolean
-	/**
-	 * When closing a form tab into `to`, remount the target so it refetches.
-	 * Defaults to true (save flow). Pass false for cancel/back so the
-	 * underlying page keeps its exact contents.
-	 */
-	refresh?: boolean
 	/**
 	 * Leaving a form without saving (cancel): return to the tab that opened
 	 * it as it is; `to` is only the fallback when there is no opener.
@@ -76,9 +68,8 @@ function makeTab(
 	entries: readonly string[],
 	index: number,
 	openerId: number | null,
-	gen = 0,
 ): TabState {
-	return { id, entries, index, path: entries[index] ?? DEFAULT_PATH, openerId, gen }
+	return { id, entries, index, path: entries[index] ?? DEFAULT_PATH, openerId }
 }
 
 function currentUrl(): string {
@@ -188,10 +179,7 @@ const [pageMeta, setPageMeta] = createSignal<Record<string, PageMeta>>({})
 if (typeof window !== 'undefined') {
 	createRoot(() => {
 		createEffect(() => {
-			const saved: SavedTabs = {
-				tabs: tabs().map((t) => ({ ...t, gen: 0 })),
-				activeId: activeTabId(),
-			}
+			const saved: SavedTabs = { tabs: tabs(), activeId: activeTabId() }
 			// Storage can be full or disabled; tabs then just don't survive a reload.
 			Result.try(() => window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved)))
 		})
@@ -314,7 +302,7 @@ function show(tab: TabState, url: 'push' | 'replace' = 'replace'): void {
 /** Adds `to` to the tab's history, dropping any forward entries. */
 function visit(tab: TabState, to: string, replace = false): TabState {
 	const kept = tab.entries.slice(0, replace ? tab.index : tab.index + 1)
-	const next = makeTab(tab.id, [...kept, to], kept.length, tab.openerId, tab.gen)
+	const next = makeTab(tab.id, [...kept, to], kept.length, tab.openerId)
 	scrollByTab.get(tab.id)?.splice(next.index)
 	updateTab(next)
 	return next
@@ -458,7 +446,7 @@ function showsObject(route: string, objectPath: string): boolean {
  * After the object at `objectPath` (e.g. `/devices/12`) was deleted: drop
  * it and its edit page from every tab's history and close tabs left with
  * nothing. The active tab falls back to its previous entry, else the list
- * tab at `listRoute` or its opener; tabs showing the list are refreshed.
+ * tab at `listRoute` or its opener.
  */
 export function forgetDeleted(objectPath: string, listRoute: string): void {
 	const list = tabs()
@@ -467,8 +455,7 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
 	for (const tab of list) {
 		const kept = tab.entries.flatMap((entry, i) => (showsObject(entry, objectPath) ? [] : [i]))
 		if (kept.length === tab.entries.length) {
-			const isList = barePath(tab.path) === listRoute
-			next.push(isList ? { ...tab, gen: tab.gen + 1 } : tab)
+			next.push(tab)
 			continue
 		}
 		if (kept.length === 0) {
@@ -491,7 +478,6 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
 				kept.map((i) => tab.entries[i] ?? listRoute),
 				index,
 				tab.openerId,
-				tab.gen + 1,
 			),
 		)
 	}
@@ -531,12 +517,10 @@ export function forgetDeleted(objectPath: string, listRoute: string): void {
  * closes like a dialog and the target shows in an existing tab, else in
  * the opener's history, else in place of the form.
  */
-function closeForm(form: TabState, to: string, refresh: boolean, back: boolean): void {
+function closeForm(form: TabState, to: string, back: boolean): void {
 	const others = tabs().filter((t) => t.id !== form.id)
 	const opener = others.find((t) => t.id === form.openerId)
 	if (opener && (back || isFormRoute(opener.path))) {
-		// No `gen` bump here: remounting the opener would wipe its
-		// unsaved input.
 		removeTab(form.id)
 		show(opener)
 		return
@@ -544,9 +528,7 @@ function closeForm(form: TabState, to: string, refresh: boolean, back: boolean):
 	const shown = others.find((t) => t.path === to)
 	if (shown) {
 		removeTab(form.id)
-		const next = refresh ? { ...shown, gen: shown.gen + 1 } : shown
-		updateTab(next)
-		show(next)
+		show(shown)
 		return
 	}
 	if (opener && !isFormRoute(opener.path)) {
@@ -557,7 +539,7 @@ function closeForm(form: TabState, to: string, refresh: boolean, back: boolean):
 	// Direct URL entry, or the opener is gone: turn the form tab into
 	// the target.
 	scrollByTab.delete(form.id)
-	const next = makeTab(form.id, [to], 0, form.openerId, form.gen)
+	const next = makeTab(form.id, [to], 0, form.openerId)
 	updateTab(next)
 	show(next)
 }
@@ -590,17 +572,14 @@ export function navigate(to: string, opts: NavigateOptions = {}): void {
 		openTab(to, active.id)
 		return
 	}
-	if ((to !== active.path || opts.refresh === true) && leaveBlocked(active.id)) {
+	if (to !== active.path && leaveBlocked(active.id)) {
 		return
 	}
 	if (isFormRoute(active.path)) {
-		closeForm(active, to, opts.refresh ?? true, opts.back === true)
+		closeForm(active, to, opts.back === true)
 		return
 	}
 	if (to === active.path) {
-		if (opts.refresh === true) {
-			updateTab({ ...active, gen: active.gen + 1 })
-		}
 		return
 	}
 	show(visit(active, to, opts.replace), opts.replace === true ? 'replace' : 'push')
@@ -645,7 +624,7 @@ if (typeof window !== 'undefined') {
 		}
 		if (index !== active.index) {
 			rememberScroll(active)
-			const next = makeTab(active.id, active.entries, index, active.openerId, active.gen)
+			const next = makeTab(active.id, active.entries, index, active.openerId)
 			updateTab(next)
 			show(next)
 			return
@@ -662,14 +641,20 @@ if (typeof window !== 'undefined') {
  * with no args; inside a tab pane it reads that tab's path instead of the
  * globally active one, so background tabs never cross-talk.
  */
-const TabPathContext = createContext<string | null>(null)
+const TabContext = createContext<{ id: number; path: string } | null>(null)
 
-export function tabPathContext(): ReturnType<typeof createContext<string | null>> {
-	return TabPathContext
+export function tabContext(): typeof TabContext {
+	return TabContext
 }
 
 export function useTabPath(): string {
-	return useContext(TabPathContext) ?? path()
+	return useContext(TabContext)?.path ?? path()
+}
+
+/** Whether the calling component's tab is shown; true outside a tab pane (the app shell). */
+export function usePaneVisible(): () => boolean {
+	const id = useContext(TabContext)?.id
+	return () => id === undefined || activeTabId() === id
 }
 
 /**

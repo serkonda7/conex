@@ -73,7 +73,6 @@ export function LinkBoardView(props: {
 	editable: boolean
 	on_error: (message: string | null) => void
 	/** Reloads the board from the server. */
-	on_changed: () => void
 	/** Called with the conex ids linked by one user action. */
 	on_linked?: (ids: number[]) => void
 }): JSX.Element {
@@ -275,14 +274,12 @@ export function LinkBoardView(props: {
 		if (done.length > 0) {
 			props.on_linked?.(done)
 		}
-		props.on_changed()
 	}
 
 	async function ignore(externalId: string): Promise<void> {
 		setPicked(null)
 		setIgnored((prev) => new Set(prev).add(externalId))
 		await write.run(() => ignore_external(props.provider, props.board.entity_type, externalId))
-		props.on_changed()
 	}
 
 	async function ignoreLocal(localId: number): Promise<void> {
@@ -293,7 +290,6 @@ export function LinkBoardView(props: {
 		setPicked(null)
 		setIgnoredLocal((prev) => new Set(prev).add(localId))
 		await write.run(() => ignore_local(props.provider, entityType, localId))
-		props.on_changed()
 	}
 
 	/**
@@ -328,13 +324,11 @@ export function LinkBoardView(props: {
 			),
 		)
 		setBusy(false)
-		props.on_changed()
 	}
 
 	async function unlink(linkId: number, externalId: string): Promise<void> {
 		setReleased((prev) => new Set(prev).add(externalId))
 		await write.run(() => unlink_external(props.provider, linkId))
-		props.on_changed()
 	}
 
 	async function restoreLocal(row: LinkBoardLocal): Promise<void> {
@@ -344,7 +338,6 @@ export function LinkBoardView(props: {
 		setReleasedLocal((prev) => new Set(prev).add(row.id))
 		const linkId = row.link_id
 		await write.run(() => unlink_external(props.provider, linkId))
-		props.on_changed()
 	}
 
 	/** Row click: pick it, or link it to the row picked on the other side. */

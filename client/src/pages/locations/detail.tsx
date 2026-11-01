@@ -1,5 +1,5 @@
 import type { LocationOutletJson } from 'shared/src/types'
-import { createResource, createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import type { AttachmentJson } from '../../api/attachments'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { fetch_racks, type RackRow } from '../../api/racks'
@@ -29,7 +29,7 @@ import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { createDerived, createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { siteTrail } from '../../lib/trails'
 import { rackHeightColumn } from '../racks/columns'
@@ -48,7 +48,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 	const [site] = createRecord(siteId, fetch_site, setError)
 	const [parent] = createRecord(parentId, fetch_location, setError)
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
-	const [trail] = createResource(
+	const trail = createDerived(
 		() => ({ site: site(), parent: parentId() ?? null }),
 		({ site: siteRow, parent: parentKey }): Promise<Crumb[]> => siteTrail(siteRow, parentKey),
 	)

@@ -142,7 +142,7 @@ function IntegrationDetails(props: { integration: IntegrationJson }): JSX.Elemen
 export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [syncing, setSyncing] = createSignal<IntegrationProvider | null>(null)
-	const [integrations, { refetch }] = createRows(fetch_integrations, setError)
+	const [integrations] = createRows(fetch_integrations, setError)
 	const action = useAction(setError)
 
 	const configured = (provider: IntegrationProvider): IntegrationJson | undefined =>
@@ -161,14 +161,11 @@ export function IntegrationsPage(): JSX.Element {
 			setError(started.error.message)
 			return
 		}
-		// Show the registered run while waiting for it.
-		void refetch()
 		const done = await wait_for_sync(provider, started.value)
 		setSyncing(null)
 		if (Result.isError(done)) {
 			setError(done.error.message)
 		}
-		void refetch()
 	}
 
 	async function handleDelete(integration: IntegrationJson): Promise<void> {
@@ -176,9 +173,7 @@ export function IntegrationsPage(): JSX.Element {
 		if (!window.confirm(t('integration.confirmDelete', { name }))) {
 			return
 		}
-		if (await action.run(() => delete_integration(integration.provider))) {
-			void refetch()
-		}
+		await action.run(() => delete_integration(integration.provider))
 	}
 
 	const card = (provider: IntegrationProvider): JSX.Element => (

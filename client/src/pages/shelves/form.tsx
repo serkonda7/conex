@@ -138,7 +138,7 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 			form.setError(res.error.message)
 			return
 		}
-		navigate(`/racks/${shelf.rack_id}`, { refresh: true })
+		navigate(`/racks/${shelf.rack_id}`)
 	}
 
 	return (

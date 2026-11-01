@@ -1,6 +1,6 @@
 import { Result } from 'better-result'
 import type { ElevationShelfDeviceRef, ElevationShelfRef } from 'shared/src/types'
-import { createMemo, createResource, createSignal, type JSX, Show } from 'solid-js'
+import { createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices, update_device } from '../../api/devices'
 import { delete_rack, fetch_elevation, fetch_rack, fetch_racks } from '../../api/racks'
 import {
@@ -28,7 +28,7 @@ import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
 import { faceLabel } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
-import { createRecord, createRows, createRowsFor } from '../../lib/resource'
+import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
@@ -60,13 +60,13 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [rackType] = createRecord(rackTypeId, fetch_rack_type, setError)
 	const images = createOwnerImages({ rack_id: props.id }, setError)
-	const [trail] = createResource(
+	const trail = createDerived(
 		() => ({ site: site(), location: locationId() ?? null }),
 		({ site: siteRow, location: locationKey }): Promise<Crumb[]> =>
 			siteTrail(siteRow, locationKey),
 	)
-	const [elevation, { refetch }] = createRecord(id, fetch_elevation, setError)
-	const [rackDevices, { refetch: refetchRackDevices }] = createRowsFor(
+	const [elevation] = createRecord(id, fetch_elevation, setError)
+	const [rackDevices] = createRowsFor(
 		id,
 		(key: number) => fetch_devices({ rack: [key] }),
 		setError,
@@ -219,10 +219,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	function refreshPlacement(result: Result<DeviceRow, Error>): void {
 		if (Result.isError(result)) {
 			setError(result.error.message)
-			return
 		}
-		void refetch()
-		void refetchRackDevices()
 	}
 
 	async function placeOnShelf(device: DeviceRow, shelf: ElevationShelfRef): Promise<void> {

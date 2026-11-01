@@ -132,21 +132,19 @@ function LinkBoardPanel(props: {
 	provider: IntegrationProvider
 	entity_type: 'tenant' | 'device' | 'employee'
 	tenant: number | null
-	reload: number
 	on_error: (message: string | null) => void
 }): JSX.Element {
 	const source = createMemo(() =>
 		props.entity_type === 'tenant'
-			? { entity_type: props.entity_type, tenant: undefined, reload: props.reload }
+			? { entity_type: props.entity_type, tenant: undefined }
 			: props.tenant !== null
 				? {
 						entity_type: props.entity_type,
 						tenant: props.tenant,
-						reload: props.reload,
 					}
 				: null,
 	)
-	const [board, { refetch }] = createRecord(
+	const [board] = createRecord(
 		source,
 		(s) => fetch_link_board(props.provider, s.entity_type, s.tenant),
 		props.on_error,
@@ -199,7 +197,6 @@ function LinkBoardPanel(props: {
 									tenant_id={props.tenant ?? undefined}
 									editable={editable()}
 									on_error={props.on_error}
-									on_changed={() => void refetch()}
 									on_linked={
 										props.entity_type === 'tenant'
 											? handleTenantsLinked
@@ -227,8 +224,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [kindFilter, setKindFilter] = createSignal<string>(parseKind(queryParam('kind')))
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
 	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
-	// Bumped after a full sync so an open link board reloads too.
-	const [boardReload, setBoardReload] = createSignal(0)
 	const [queryTenant, setQueryTenant] = createSignal(parseId(queryParam('tenant')))
 	createEffect(on(tenantContext, () => setQueryTenant(null), { defer: true }))
 	// Single selected tenant (scoped users: their own) of the boards and syncs.
@@ -260,11 +255,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		}
 	})
 
-	const [report, { refetch }] = createRecord(
-		source,
-		(s) => fetch_integration_report(s.provider, s),
-		setError,
-	)
+	const [report] = createRecord(source, (s) => fetch_integration_report(s.provider, s), setError)
 
 	const counts = createMemo(() => {
 		const out = new Map<FindingKind, number>()
@@ -284,9 +275,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const sync = useAction(setError)
 
 	async function run(request: () => Promise<Result<unknown, Error>>): Promise<void> {
-		if (await action.run(request)) {
-			void refetch()
-		}
+		await action.run(request)
 	}
 
 	async function handleSync(clean = false): Promise<void> {
@@ -301,8 +290,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			return
 		}
 		await sync.run(() => run_sync(row.provider, selectedTenant() ?? undefined, clean))
-		void refetch()
-		setBoardReload((n) => n + 1)
 	}
 
 	function handleLinkTenant(item: ExternalTenantListItem): void {
@@ -733,7 +720,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="tenant"
 							tenant={null}
-							reload={boardReload()}
 							on_error={setError}
 						/>
 					</Show>
@@ -742,7 +728,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="device"
 							tenant={selectedTenant()}
-							reload={boardReload()}
 							on_error={setError}
 						/>
 					</Show>
@@ -751,7 +736,6 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="employee"
 							tenant={selectedTenant()}
-							reload={boardReload()}
 							on_error={setError}
 						/>
 					</Show>

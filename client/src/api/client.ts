@@ -8,9 +8,10 @@ import { hc } from 'hono/client'
 import type { AppType } from 'server/src/index'
 import type { FloorplanImpactJson, Page } from 'shared/src/types'
 import { type PluralKey, t, tp } from '../i18n'
+import { api_fetch } from '../lib/query'
 
 /** RPC client */
-export const client = hc<AppType>('/api')
+export const client = hc<AppType>('/api', { fetch: api_fetch })
 
 export type ApiResponse = Pick<Response, 'ok' | 'status' | 'json'>
 
@@ -119,7 +120,7 @@ export async function post_json<T>(
 	network_fallback?: string,
 ): Promise<Result<T, Error>> {
 	try {
-		const res = await fetch(url, {
+		const res = await api_fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),

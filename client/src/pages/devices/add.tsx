@@ -26,7 +26,7 @@ import {
 	text,
 	useFormState,
 } from '../../lib/form'
-import { createRecord, createRows, createRowsFor } from '../../lib/resource'
+import { createRecord, createRows, createRowsFor, createSnapshot } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
@@ -133,7 +133,7 @@ export function DeviceAddPage(): JSX.Element {
 	})
 	createEffect(on(newObjectTenantId, () => setEmployeeId(''), { defer: true }))
 
-	const [source] = createRecord(() => parseId(queryParam('clone')), fetch_device, form.setError)
+	const [source] = createSnapshot(() => parseId(queryParam('clone')), fetch_device, form.setError)
 	createEffect(() => {
 		const row = source()
 		if (row) {

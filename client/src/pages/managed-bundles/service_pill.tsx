@@ -1,6 +1,7 @@
 import type { DeviceServiceJson } from 'shared/src/types'
-import { type JSX, type Resource, Show } from 'solid-js'
+import { type JSX, Show } from 'solid-js'
 import { t } from '../../i18n'
+import type { QueryResource } from '../../lib/resource'
 
 /**
  * Pill above the detail card of a device or VM: the managed bundle its role
@@ -8,7 +9,7 @@ import { t } from '../../i18n'
  * the bundle pills of the tenant page; hidden when no bundle applies.
  */
 export function ManagedServicePill(props: {
-	service: Resource<DeviceServiceJson | null>
+	service: QueryResource<DeviceServiceJson | null>
 }): JSX.Element {
 	const bundle = (): DeviceServiceJson['managed_bundle'] | undefined =>
 		props.service()?.managed_bundle

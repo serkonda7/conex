@@ -260,12 +260,8 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const defaultRoleId = (): number | undefined =>
 		deviceType()?.default_device_role_id ?? undefined
 	const [defaultRole] = createRecord(defaultRoleId, fetch_device_role, setError)
-	const [stubs, { refetch: refetchStubs }] = createRowsFor(id, fetch_stubs, setError)
-	const [devices, { refetch: refetchDevices }] = createRowsFor(
-		id,
-		fetch_all_devices_of_type,
-		setError,
-	)
+	const [stubs] = createRowsFor(id, fetch_stubs, setError)
+	const [devices] = createRowsFor(id, fetch_all_devices_of_type, setError)
 	const deviceTotal = (): number => (devices() ?? []).length
 	const [syncing, setSyncing] = createSignal<DeviceListDevice | null>(null)
 	/** The next differing device in list order, wrapping past the end. */
@@ -274,11 +270,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		const at = rows.findIndex((row) => row.id === current.id)
 		const others = [...rows.slice(at + 1), ...rows.slice(0, Math.max(at, 0))]
 		return others.find((row) => row.out_of_sync) ?? null
-	}
-	/** Component changes can put devices out of sync with the type. */
-	const refreshComponents = (): void => {
-		void refetchStubs()
-		void refetchDevices()
 	}
 	const [tenants] = createRows(fetch_tenants, setError)
 	const [sites] = createRows(fetch_sites, setError)
@@ -295,11 +286,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const action = useAction(setError)
 
 	async function run(request: () => Promise<Result<unknown, Error>>): Promise<boolean> {
-		const ok = await action.run(request)
-		if (ok) {
-			refreshComponents()
-		}
-		return ok
+		return action.run(request)
 	}
 
 	const stubsOf = (info: ComponentClassInfo): StubRow[] =>
@@ -505,10 +492,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						existingDevices={deviceTotal()}
 						info={info()}
 						rearStubs={rearStubs()}
-						onSaved={() => {
-							setAdding(null)
-							refreshComponents()
-						}}
+						onSaved={() => setAdding(null)}
 						onClose={() => setAdding(null)}
 					/>
 				)}
@@ -521,10 +505,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						info={target.info}
 						stub={target.stub}
 						rearStubs={rearStubs()}
-						onSaved={() => {
-							setEditing(null)
-							refreshComponents()
-						}}
+						onSaved={() => setEditing(null)}
 						onClose={() => setEditing(null)}
 					/>
 				)}
@@ -535,10 +516,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						deviceTypeId={props.id}
 						existingDevices={deviceTotal()}
 						preset={key()}
-						onSaved={() => {
-							setPreset(null)
-							refreshComponents()
-						}}
+						onSaved={() => setPreset(null)}
 						onClose={() => setPreset(null)}
 					/>
 				)}
@@ -570,7 +548,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						has_next={nextOutOfSync(device) !== null}
 						on_synced={(next: boolean) => {
 							setSyncing(next ? nextOutOfSync(device) : null)
-							void refetchDevices()
 						}}
 						on_close={() => setSyncing(null)}
 					/>
