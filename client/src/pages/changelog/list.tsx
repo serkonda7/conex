@@ -1,17 +1,12 @@
-import { Result } from 'better-result'
 import type { ChangeAction, ChangeObjectType } from 'shared/src/schemas'
-import { createResource, createSignal, type JSX } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
-import { Empty, InlineError, Loading } from '../../components/feedback'
-import {
-	ListRangeStatus,
-	useDebouncedSearch,
-	useListFilters,
-	useQueryFilter,
-} from '../../components/list_page'
+import { Empty, InlineError } from '../../components/feedback'
+import { ListLoading, useListFilters, useQueryFilter } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { changeActionOptions, changeObjectLabel, changeObjectOptions } from '../../i18n/labels'
+import { usePagedList } from '../../lib/paged_list'
 import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
@@ -25,7 +20,7 @@ import { ChangeActionBadge, ChangedObjectLink, changeUser } from './common'
 export function ChangelogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [filterTenant] = useQueryFilter('tenant')
-	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+	const [search, setSearch] = createSignal('')
 	const [action, setAction] = createSignal<ChangeAction[]>([])
 	const [objectType, setObjectType] = createSignal<ChangeObjectType[]>([])
 	const filters = useListFilters<ObjectChangeJson>({
@@ -53,28 +48,16 @@ export function ChangelogPage(): JSX.Element {
 		],
 	})
 
-	const [changes] = createResource(
-		() => ({
-			search: debouncedSearch(),
-			action: action(),
-			objectType: objectType(),
-			context: tenantContextFilters(parseId(filterTenant()) ?? undefined),
+	const changes = usePagedList({
+		query: () => ({
+			search: search(),
+			action: action().length > 0 ? action() : undefined,
+			object_type: objectType().length > 0 ? objectType() : undefined,
+			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
-		async (q) => {
-			setError(null)
-			const res = await fetch_changelog({
-				search: q.search,
-				action: q.action.length > 0 ? q.action : undefined,
-				object_type: q.objectType.length > 0 ? q.objectType : undefined,
-				...q.context,
-			})
-			if (Result.isError(res)) {
-				setError(res.error.message)
-				return null
-			}
-			return res.value
-		},
-	)
+		fetch: fetch_changelog,
+		setError,
+	})
 
 	const columns: DataTableColumn<ObjectChangeJson>[] = [
 		{
@@ -107,8 +90,8 @@ export function ChangelogPage(): JSX.Element {
 	]
 
 	const emptyText = (): string =>
-		debouncedSearch()
-			? t('list.noMatch', { noun: tp('noun.change', 2), search: debouncedSearch() })
+		search()
+			? t('list.noMatch', { noun: tp('noun.change', 2), search: search() })
 			: action() || objectType() || filterTenant() !== '' || tenantContext().kind !== 'all'
 				? t('list.noMatchFilters', { noun: tp('noun.change', 2) })
 				: t('changelog.empty')
@@ -120,7 +103,7 @@ export function ChangelogPage(): JSX.Element {
 			</div>
 
 			<FilterTable
-				rows={() => changes()?.items ?? []}
+				rows={changes.rows}
 				filters={filters.filters()}
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
@@ -129,14 +112,12 @@ export function ChangelogPage(): JSX.Element {
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.change', 2) })}
 				getRowId={(c: ObjectChangeJson): number => c.id}
 				columns={columns}
-				loading={() => changes.loading}
-				loadingContent={
-					<Loading message={t('list.loading', { noun: tp('noun.change', 2) })} />
-				}
+				pagination={changes.pagination}
+				onPaginationChange={changes.onPaginationChange}
+				loading={() => changes.page.loading}
+				loadingContent={<ListLoading rows={changes.rows()} noun={tp('noun.change', 2)} />}
 				emptyContent={<Empty message={emptyText()} />}
 			/>
-
-			<ListRangeStatus shown={changes()?.items.length ?? 0} total={changes()?.total ?? 0} />
 
 			<InlineError message={error()} />
 		</div>

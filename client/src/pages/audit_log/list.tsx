@@ -1,12 +1,12 @@
-import { Result } from 'better-result'
 import type { AuditEvent } from 'shared/src/schemas'
-import { createResource, createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import { type AuditLogEntryJson, fetch_audit_log } from '../../api/audit_log'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
-import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListRangeStatus, useDebouncedSearch, useListFilters } from '../../components/list_page'
+import { Empty, InlineError } from '../../components/feedback'
+import { ListLoading, useListFilters } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
+import { usePagedList } from '../../lib/paged_list'
 import { formatTime } from '../../lib/time'
 import { shortUserAgent } from '../../lib/user_agent'
 
@@ -24,7 +24,7 @@ const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
  */
 export function AuditLogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+	const [search, setSearch] = createSignal('')
 	const [event, setEvent] = createSignal<AuditEvent[]>([])
 	const filters = useListFilters<AuditLogEntryJson>({
 		search,
@@ -42,21 +42,11 @@ export function AuditLogPage(): JSX.Element {
 		],
 	})
 
-	const [entries] = createResource(
-		() => ({ search: debouncedSearch(), event: event() }),
-		async (q) => {
-			setError(null)
-			const res = await fetch_audit_log({
-				search: q.search,
-				event: q.event.length > 0 ? q.event : undefined,
-			})
-			if (Result.isError(res)) {
-				setError(res.error.message)
-				return null
-			}
-			return res.value
-		},
-	)
+	const entries = usePagedList({
+		query: () => ({ search: search(), event: event().length > 0 ? event() : undefined }),
+		fetch: fetch_audit_log,
+		setError,
+	})
 
 	const columns: DataTableColumn<AuditLogEntryJson>[] = [
 		{
@@ -112,8 +102,8 @@ export function AuditLogPage(): JSX.Element {
 	]
 
 	const emptyText = (): string =>
-		debouncedSearch()
-			? t('list.noMatch', { noun: tp('noun.auditEntry', 2), search: debouncedSearch() })
+		search()
+			? t('list.noMatch', { noun: tp('noun.auditEntry', 2), search: search() })
 			: event()
 				? t('list.noMatchFilters', { noun: tp('noun.auditEntry', 2) })
 				: t('audit.empty')
@@ -125,7 +115,7 @@ export function AuditLogPage(): JSX.Element {
 			</div>
 
 			<FilterTable
-				rows={() => entries()?.items ?? []}
+				rows={entries.rows}
 				filters={filters.filters()}
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
@@ -134,14 +124,14 @@ export function AuditLogPage(): JSX.Element {
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.auditEntry', 2) })}
 				getRowId={(e: AuditLogEntryJson): number => e.id}
 				columns={columns}
-				loading={() => entries.loading}
+				pagination={entries.pagination}
+				onPaginationChange={entries.onPaginationChange}
+				loading={() => entries.page.loading}
 				loadingContent={
-					<Loading message={t('list.loading', { noun: tp('noun.auditEntry', 2) })} />
+					<ListLoading rows={entries.rows()} noun={tp('noun.auditEntry', 2)} />
 				}
 				emptyContent={<Empty message={emptyText()} />}
 			/>
-
-			<ListRangeStatus shown={entries()?.items.length ?? 0} total={entries()?.total ?? 0} />
 
 			<InlineError message={error()} />
 		</div>

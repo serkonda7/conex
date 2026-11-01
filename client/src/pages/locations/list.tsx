@@ -1,9 +1,10 @@
-import { createMemo, type JSX } from 'solid-js'
+import type { JSX } from 'solid-js'
 import {
 	delete_location,
 	fetch_locations,
 	fetch_sites,
 	fetch_tenants,
+	type LocationListRow,
 	type LocationRow,
 	type LocationSort,
 } from '../../api/tenancy'
@@ -17,7 +18,7 @@ import {
 	useQueryFilter,
 	useQueryFilterList,
 } from '../../components/list_page'
-import { TreeName, treeDepths } from '../../components/tree_name'
+import { TreeName } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
 import { locationTypeIcon } from '../../lib/icons'
@@ -57,24 +58,20 @@ export function LocationsPage(): JSX.Element {
 	const [tenants] = createRows(fetch_tenants, list.setError)
 	const siteName = useNameOf(sites)
 	const tenantName = useNameOf(tenants)
-	// The optional Parent column resolves names from the listed rows.
-	const parentName = useNameOf(list.rows)
-	// Show the hierarchy by indenting instead of spending a column on it.
-	const depthOf = createMemo(() => treeDepths(list.rows()))
 
-	const columns: DataTableColumn<LocationRow>[] = [
+	const columns: DataTableColumn<LocationListRow>[] = [
 		{
 			key: 'name',
 			label: tp('entity.location', 1),
 			sortable: true,
-			getValue: (l: LocationRow): JSX.Element => (
-				<LocationTreeName location={l} depth={depthOf().get(l.id) ?? 0} />
+			getValue: (l: LocationListRow): JSX.Element => (
+				<LocationTreeName location={l} depth={l.depth} />
 			),
 		},
 		{
 			key: 'type',
 			label: t('common.type'),
-			getValue: (l: LocationRow): JSX.Element => (
+			getValue: (l: LocationListRow): JSX.Element => (
 				<IconLabel icon={locationTypeIcon(l.type)}>{locationTypeLabel(l.type)}</IconLabel>
 			),
 		},
@@ -86,7 +83,7 @@ export function LocationsPage(): JSX.Element {
 		{
 			key: 'parent',
 			label: t('site.parentLocation'),
-			getValue: (l: LocationRow): string => parentName(l.parent_id),
+			getValue: (l: LocationListRow): string => l.parent_name ?? '—',
 		},
 		{
 			key: 'tenant',

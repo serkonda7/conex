@@ -148,11 +148,13 @@ export function subtreeIds(nodeId: number, children: Map<number | null, number[]
  * Sort rows as a preorder tree: roots and each sibling group are sorted by
  * the requested field, while every parent stays immediately before its
  * descendants. This keeps the API order aligned with indented list views.
+ * `depth` is the row's level within `rows`, so a page cut out of the result
+ * can be indented without its ancestors.
  */
 export function sortHierarchically<
 	Row extends LocationNode & { name: string },
 	Field extends keyof Row & string,
->(rows: Row[], sort: Field, order: 'asc' | 'desc'): Row[] {
+>(rows: Row[], sort: Field, order: 'asc' | 'desc'): (Row & { depth: number })[] {
 	const children = new Map<number | null, Row[]>()
 	const included = new Set(rows.map((row) => row.id))
 	for (const row of rows) {
@@ -182,9 +184,9 @@ export function sortHierarchically<
 		return (byName !== 0 ? byName : a.id - b.id) * direction
 	}
 
-	const sorted: Row[] = []
+	const sorted: (Row & { depth: number })[] = []
 	const visited = new Set<number>()
-	const visit = (parentId: number | null): void => {
+	const visit = (parentId: number | null, depth: number): void => {
 		const siblings = children.get(parentId)
 		if (!siblings) {
 			return
@@ -196,10 +198,10 @@ export function sortHierarchically<
 				continue
 			}
 			visited.add(row.id)
-			sorted.push(row)
-			visit(row.id)
+			sorted.push({ ...row, depth })
+			visit(row.id, depth + 1)
 		}
 	}
-	visit(null)
+	visit(null, 0)
 	return sorted
 }

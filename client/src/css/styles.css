@@ -1086,18 +1086,14 @@ tbody tr:last-child td {
 	gap: 0.4rem;
 }
 
-/* Same specificity as the stacked-form input rule, so the narrow widths win. */
-.app-content .form-stacked .field .color-field .color-hex {
-	flex: 0 0 7rem;
-	width: 7rem;
-	min-width: 0;
-	font-family: var(--font-mono, monospace);
+/* Same specificity as the stacked-form input rule, so the package's layout wins. */
+.app-content .form-stacked .field .color-field .color-input-text {
+	padding-left: 2.25rem;
 }
 
-.app-content .form-stacked .field .color-field input[type="color"] {
-	flex: 0 0 3rem;
-	width: 3rem;
-	height: 2rem;
+.app-content .form-stacked .field .color-field .color-input-picker {
+	width: 1.5rem;
+	height: 1.5rem;
 	padding: 0;
 	cursor: pointer;
 }
@@ -2133,23 +2129,6 @@ tbody tr:last-child td {
 	color: var(--primary-contrast);
 }
 
-/* Keep sortable headers the same width when the active sort moves. The
-   component appends an arrow to the active header and conditionally renders
-   its clear button, so reserve both indicators on every sortable header. */
-.data-table-sort::after {
-	content: " ▲×";
-	visibility: hidden;
-}
-
-th[aria-sort="ascending"] .data-table-sort::after,
-th[aria-sort="descending"] .data-table-sort::after {
-	content: none;
-}
-
-.data-table-sort-clear {
-	margin-left: 0;
-}
-
 /* Table cell helpers. */
 .cell-checkbox {
 	width: 2rem;
@@ -2424,61 +2403,36 @@ th[aria-sort="descending"] .data-table-sort::after {
 	font-size: var(--font-size-sm);
 }
 
-/* "Showing X-Y of Z" result status under the table. */
-.paginator-showing {
-	margin: 0.5rem 0;
-	font-size: var(--font-size-base);
-	color: var(--text-secondary);
-	white-space: nowrap;
-}
-
-/* Edit dialog. The backdrop is a real button (sibling of the dialog) so
-   dismissing it stays keyboard-accessible. */
-.app-content .modal-wrap {
-	position: fixed;
-	inset: 0;
-	z-index: 20;
-	display: flex;
-	align-items: flex-start;
-	justify-content: center;
-	padding: 4rem 1rem 1rem;
-}
-
-.app-content .modal-backdrop {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	padding: 0;
-	border: none;
-	border-radius: 0;
-	background-color: rgba(0, 0, 0, 0.45);
-	cursor: default;
-}
-
-.app-content .modal-backdrop:hover {
-	background-color: rgba(0, 0, 0, 0.45);
-}
-
-.app-content .modal {
-	position: relative;
-	width: 100%;
-	max-width: 28rem;
-	background-color: var(--bg-surface);
-	border: 1px solid var(--border);
-	border-radius: 0.5rem;
+/* Dialogs: the solid-components `Modal`, themed through its variables. Dropdown
+   lists hang out of the dialog, so its box does not clip them; a body that
+   scrolls only stops scrolling while a list is open. */
+.modal {
+	--modal-width: 28rem;
+	--modal-bg: var(--bg-surface);
+	--modal-muted: var(--text-muted);
+	--modal-hover-bg: var(--bg-hover);
+	margin-block: 4rem auto;
+	max-height: calc(100dvh - 5rem);
+	overflow: visible;
 	box-shadow: var(--shadow);
-	padding: 1rem 1.1rem 1.1rem;
+}
+
+.app-content .modal-title {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.modal-body:has(.combobox-list) {
+	overflow: visible;
 }
 
 .modal h3 {
 	margin-top: 0;
 }
 
-.app-content .modal.template-sync-dialog {
-	max-width: 36rem;
-	max-height: 85vh;
-	overflow-y: auto;
+.modal.template-sync-dialog {
+	--modal-width: 36rem;
 }
 
 .template-sync-actions {
@@ -2493,18 +2447,8 @@ th[aria-sort="descending"] .data-table-sort::after {
 	overflow-y: auto;
 }
 
-.object-selector {
-	max-width: 34rem;
-}
-
-.modal-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-}
-
-.modal-header h3 {
-	margin-bottom: 0.75rem;
+.modal.object-selector {
+	--modal-width: 34rem;
 }
 
 .object-selector-search {
@@ -2558,8 +2502,8 @@ th[aria-sort="descending"] .data-table-sort::after {
 }
 
 /* Cable connect dialog: step indicator, peer card, port tile grid. */
-.app-content .modal.connect-dialog {
-	max-width: 40rem;
+.modal.connect-dialog {
+	--modal-width: 40rem;
 }
 
 .connect-steps {
@@ -3151,8 +3095,8 @@ th[aria-sort="descending"] .data-table-sort::after {
 	color: var(--text-secondary);
 }
 
-.app-content .modal.attachment-lightbox {
-	max-width: min(80rem, 100%);
+.modal.attachment-lightbox {
+	--modal-width: 80rem;
 }
 
 .attachment-full {

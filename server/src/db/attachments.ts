@@ -66,6 +66,10 @@ import {
 	findById,
 	insertedId,
 	isPatchEmpty,
+	type ListParams,
+	offsetOf,
+	type Page,
+	pageOf,
 	pickDefined,
 	searchCondition,
 	type TenantFilterParams,
@@ -1324,17 +1328,22 @@ export async function listOutlets(
 }
 
 /**
- * Every marked floor plan whose owner matches the tenant filters, ordered by
- * site and owner name. `search` matches the owner or site name. The area and
- * marker counts leave out content outside `params.scopeTenantId`, like
+ * One page of the marked floor plans whose owner matches the tenant filters,
+ * ordered by site and owner name. `search` matches the owner or site name. The
+ * area and marker counts leave out content outside `params.scopeTenantId`, like
  * `getPlan`.
  */
 export async function listFloorplans(
-	params: TenantFilterParams & { search?: string },
-): Promise<FloorplanListJson[]> {
+	params: TenantFilterParams & ListParams,
+): Promise<Page<FloorplanListJson>> {
 	const ownerSite = alias(sites, 'owner_site')
 	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
 	const ownerName = sql<string>`coalesce(${sites.name}, ${locations.name})`
+	const where = and(
+		eq(attachments.is_floorplan, 1),
+		searchCondition(params.search, [ownerName, ownerSite.name]),
+		...tenantConditions(ownerTenant, params),
+	)
 	const rows = await getDb()
 		.select({
 			attachment_id: attachments.id,
@@ -1354,16 +1363,22 @@ export async function listFloorplans(
 			eq(ownerSite.id, sql`coalesce(${attachments.site_id}, ${locations.site_id})`),
 		)
 		.leftJoin(tenants, eq(tenants.id, ownerTenant))
-		.where(
-			and(
-				eq(attachments.is_floorplan, 1),
-				searchCondition(params.search ?? '', [ownerName, ownerSite.name]),
-				...tenantConditions(ownerTenant, params),
-			),
-		)
+		.where(where)
 		.orderBy(asc(ownerSite.name), asc(ownerName), asc(attachments.id))
+		.limit(params.limit)
+		.offset(offsetOf(params))
+	const [{ total }] = await getDb()
+		.select({ total: count() })
+		.from(attachments)
+		.leftJoin(sites, eq(sites.id, attachments.site_id))
+		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.innerJoin(
+			ownerSite,
+			eq(ownerSite.id, sql`coalesce(${attachments.site_id}, ${locations.site_id})`),
+		)
+		.where(where)
 	if (rows.length === 0) {
-		return []
+		return pageOf([], total, params)
 	}
 	const ids = rows.map((row) => row.attachment_id)
 	const scope = params.scopeTenantId
@@ -1397,11 +1412,15 @@ export async function listFloorplans(
 		.groupBy(floorplan_placements.attachment_id)
 	const areas = new Map(areaCounts.map((row) => [row.id, row.n]))
 	const placements = new Map(placementCounts.map((row) => [row.id, row.n]))
-	return rows.map((row) => ({
-		...row,
-		areas: areas.get(row.attachment_id) ?? 0,
-		placements: placements.get(row.attachment_id) ?? 0,
-	}))
+	return pageOf(
+		rows.map((row) => ({
+			...row,
+			areas: areas.get(row.attachment_id) ?? 0,
+			placements: placements.get(row.attachment_id) ?? 0,
+		})),
+		total,
+		params,
+	)
 }
 
 /**

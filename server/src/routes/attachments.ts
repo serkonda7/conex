@@ -89,7 +89,14 @@ export const attachmentsApp = new Hono()
 			if (scope instanceof Response) {
 				return scope
 			}
-			return c.json(await listFloorplans({ search: query.search, ...scope }))
+			return c.json(
+				await listFloorplans({
+					search: query.search,
+					page: query.page,
+					limit: query.limit,
+					...scope,
+				}),
+			)
 		},
 	)
 	.get(

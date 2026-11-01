@@ -1,4 +1,4 @@
-import { createMemo, type JSX } from 'solid-js'
+import type { JSX } from 'solid-js'
 import {
 	type DeviceRoleListRow,
 	type DeviceRoleSort,
@@ -8,7 +8,7 @@ import {
 import { descriptionColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
 import { EntityListPage, useEntityList } from '../../components/list_page'
-import { TreeName, treeDepths } from '../../components/tree_name'
+import { TreeName } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
@@ -24,8 +24,6 @@ export function DeviceRolesPage(): JSX.Element {
 		fetch: fetch_device_roles,
 		remove: delete_device_role,
 	})
-	// Show the hierarchy by indenting instead of spending a column on it.
-	const depthOf = createMemo(() => treeDepths(list.rows()))
 
 	return (
 		<EntityListPage
@@ -38,7 +36,7 @@ export function DeviceRolesPage(): JSX.Element {
 					label: t('common.name'),
 					sortable: true,
 					getValue: (r: DeviceRoleListRow): JSX.Element => (
-						<TreeName depth={depthOf().get(r.id) ?? 0}>
+						<TreeName depth={r.depth}>
 							<span class="device-role-name">
 								<IconLabel icon={deviceRoleIcon(r.icon)}>
 									<a href={`/device-roles/${r.id}`}>{deviceRoleLabel(r)}</a>

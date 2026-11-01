@@ -1,6 +1,6 @@
 /**
  * `DataTable` and `FilterTable` from solid-components with their built-in
- * English labels (column customizer, filter tabs and
+ * English labels (column customizer, pager, filter tabs and
  * form) replaced by localized defaults. Pages import them from here instead
  * of the package. Both enable column resizing by default (opt out with
  * `resizableColumns={false}`). `FilterTable` also persists its saved filters globally
@@ -10,6 +10,7 @@ import {
 	DataTable as BaseDataTable,
 	FilterTable as BaseFilterTable,
 	type DataTableColumn,
+	type DataTablePagination,
 	type DataTableProps,
 	type FilterTableFilter,
 	type FilterTableProps,
@@ -22,6 +23,7 @@ import { InlineError } from './feedback'
 
 export type {
 	DataTableColumn,
+	DataTablePagination,
 	DataTableProps,
 	FilterTableFilter,
 	FilterTableProps,
@@ -34,12 +36,21 @@ function tableLabels(): Pick<
 	| 'columnCustomizerTitle'
 	| 'columnCustomizerShowAllLabel'
 	| 'columnCustomizerResetLabel'
+	| 'paginationLabels'
 > {
 	return {
 		columnCustomizerLabel: t('table.columns'),
 		columnCustomizerTitle: t('table.shownColumns'),
 		columnCustomizerShowAllLabel: t('table.showAll'),
 		columnCustomizerResetLabel: t('table.reset'),
+		paginationLabels: {
+			navigation: t('table.pagination'),
+			previous: t('table.previousPage'),
+			next: t('table.nextPage'),
+			pageSize: t('table.rowsPerPage'),
+			range: (first: number, last: number, total: number): string =>
+				t('list.range', { from: first, to: last, total }),
+		},
 	}
 }
 

@@ -20,9 +20,10 @@ import type {
 	FloorplanPlacementJson,
 	FloorplanPortJson,
 	FloorplanPut,
+	Page,
 } from 'shared/src/types'
 import { t } from '../i18n'
-import { by_id, client, failed, to_query, to_result } from './client'
+import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
 export type {
 	AttachmentJson,
@@ -167,12 +168,20 @@ export async function fetch_outlets(
 	return to_result<FloorplanOutletJson[]>(res, failed.list('noun.floorplan'))
 }
 
-/** Every marked floor plan, narrowed by search and tenant filters. */
+/** One page of the marked floor plans, narrowed by search and tenant filters. */
 export async function fetch_floorplans(
-	query: Partial<FloorplanListQuery>,
-): Promise<Result<FloorplanListJson[], Error>> {
-	const res = await client.attachments.floorplans.$get({ query: to_query(query) })
-	return to_result<FloorplanListJson[]>(res, failed.list('noun.floorplan'))
+	filters: Partial<FloorplanListQuery>,
+): Promise<Result<Page<FloorplanListJson>, Error>> {
+	return getPage<FloorplanListJson>(
+		client.attachments.floorplans.$get({
+			query: to_query({
+				...paging(filters),
+				tenant: filters.tenant,
+				tenant_group: filters.tenant_group,
+			}),
+		}),
+		failed.list('noun.floorplan'),
+	)
 }
 
 /** Image URL; the storage key changes with every file, so a replace busts the cache. */

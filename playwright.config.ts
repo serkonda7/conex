@@ -6,7 +6,9 @@ const clientPort: number = Number(process.env.CONEX_CLIENT_PORT ?? 5372)
 const dataDir: string = path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
 const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3300'
 const apiPort: number = Number(new URL(apiUrl).port || 3300)
-const reuse: boolean = (process.env.CONEX_E2E_REUSE_SERVERS ?? '') !== ''
+// A clean database needs a fresh seed, so it rules out any already running API.
+const resetDb: boolean = (process.env.CONEX_E2E_RESET_DB ?? '') !== ''
+const reuse: boolean = !resetDb && (process.env.CONEX_E2E_REUSE_SERVERS ?? '') !== ''
 export const e2eAuthFile: string = path.resolve('./test-results/.auth/user.json')
 
 // Dedicated database: the seed writes fixtures into it. Defaults to
@@ -63,7 +65,7 @@ export default defineConfig({
 						CONEX_SERVER_PORT: String(apiPort),
 					},
 					url: `${apiUrl}/health`,
-					reuseExistingServer: true,
+					reuseExistingServer: !resetDb,
 					timeout: 60_000,
 				},
 				{

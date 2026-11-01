@@ -1,10 +1,10 @@
 /**
  * Shared building blocks for the entity list pages (tenants, sites,
- * devices, …). `useEntityList` owns the list state (debounced search, sort,
- * the fetched page, row delete) and
+ * devices, …). `useEntityList` owns the list state (search, sort, the
+ * fetched page, row delete) and
  * `EntityListPage` renders the standard page around it: header with
- * "+ Add", filter table (quick search, filters) with row actions and row
- * menu, range status and error line.
+ * "+ Add", filter table (quick search, filters, pager) with row actions and
+ * row menu, and error line.
  *
  * Write actions (add, edit, delete) render only when the
  * session can write. `noun` options take a `noun.<entity>` plural key used
@@ -18,9 +18,6 @@ import type { Page, Permission } from 'shared/src/types'
 import {
 	type Accessor,
 	type Component,
-	createEffect,
-	createMemo,
-	createResource,
 	createSignal,
 	For,
 	type JSX,
@@ -35,40 +32,18 @@ import { type PluralKey, t, tp } from '../i18n'
 import { use_visible_columns } from '../lib/column_visibility'
 import { useDismiss } from '../lib/dismiss'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
+import { usePagedList } from '../lib/paged_list'
 import { navigate, parseId, queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import {
 	type DataTableColumn,
+	type DataTablePagination,
 	FilterTable,
 	type FilterTableFilter,
 	type FilterTableValues,
 } from './data_table'
 import { Empty, InlineError, Loading } from './feedback'
 import { MoreActionsButton } from './more_actions_button'
-
-/** Search text plus its debounced (trimmed) projection for list queries. */
-export function useDebouncedSearch(delay = 250): {
-	search: Accessor<string>
-	setSearch: Setter<string>
-	debouncedSearch: Accessor<string>
-} {
-	const [search, setSearch] = createSignal('')
-	const [debouncedSearch, setDebouncedSearch] = createSignal('')
-
-	let debounceTimer: number | undefined
-	createEffect(() => {
-		const q = search()
-		window.clearTimeout(debounceTimer)
-		debounceTimer = window.setTimeout(() => {
-			setDebouncedSearch(q.trim())
-		}, delay)
-	})
-	onCleanup(() => {
-		window.clearTimeout(debounceTimer)
-	})
-
-	return { search, setSearch, debouncedSearch }
-}
 
 /** Sortable-column state for a DataTable: toggle on repeat, reset on clear. */
 export function useSort<T extends string>(
@@ -293,14 +268,14 @@ export interface EntityList<Row> {
 	noun: PluralKey
 	search: Accessor<string>
 	setSearch: Setter<string>
-	debouncedSearch: Accessor<string>
 	sort: Accessor<string | undefined>
 	order: Accessor<'asc' | 'desc'>
 	handleSort: (key: string) => void
 	clearSort: () => void
 	page: Resource<Page<Row> | null>
 	rows: Accessor<Row[]>
-	total: Accessor<number>
+	pagination: Accessor<DataTablePagination>
+	onPaginationChange: (next: { page: number; pageSize: number }) => void
 	error: Accessor<string | null>
 	setError: Setter<string | null>
 	/** Whether the session may add/edit rows (`manage`, else `edit`). */
@@ -329,7 +304,13 @@ export function useEntityList<
 	manage?: Permission
 	filters?: () => F
 	fetch: (
-		query: { search: string; sort?: Sort; order: 'asc' | 'desc' } & F,
+		query: {
+			search: string
+			sort?: Sort
+			order: 'asc' | 'desc'
+			page: number
+			limit: number
+		} & F,
 	) => Promise<Result<Page<Row>, Error>>
 	remove: RemoveFn
 	removeOf?: (row: Row) => RemoveFn
@@ -337,23 +318,18 @@ export function useEntityList<
 	const canEdit = (): boolean => can(opts.manage ?? 'edit')
 	const canDelete = (): boolean => can(opts.manage ?? 'delete')
 	const [error, setError] = createSignal<string | null>(null)
-	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+	const [search, setSearch] = createSignal('')
 	const { sort, order, handleSort, clearSort } = useSort<Sort>(opts.sort)
 
-	const query = createMemo(() => ({
-		search: debouncedSearch(),
-		sort: sort() ?? opts.sort,
-		order: order(),
-		...(opts.filters?.() ?? ({} as F)),
-	}))
-
-	const [page, { refetch }] = createResource(query, async (q) => {
-		const res = await opts.fetch(q)
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return null
-		}
-		return res.value
+	const paged = usePagedList({
+		query: () => ({
+			search: search(),
+			sort: sort() ?? opts.sort,
+			order: order(),
+			...(opts.filters?.() ?? ({} as F)),
+		}),
+		fetch: opts.fetch,
+		setError,
 	})
 
 	async function handleDelete(row: Row, name: string): Promise<void> {
@@ -368,7 +344,7 @@ export function useEntityList<
 			return
 		}
 		if (res.value) {
-			void refetch()
+			paged.reload()
 		}
 	}
 
@@ -376,21 +352,33 @@ export function useEntityList<
 		noun: opts.noun,
 		search,
 		setSearch,
-		debouncedSearch,
 		sort,
 		order,
 		handleSort,
 		clearSort,
-		page,
-		rows: () => page()?.items ?? [],
-		total: () => page()?.total ?? 0,
+		page: paged.page,
+		rows: paged.rows,
+		pagination: paged.pagination,
+		onPaginationChange: paged.onPaginationChange,
 		error,
 		setError,
 		canEdit,
 		canDelete,
 		handleDelete,
-		reload: (): void => void refetch(),
+		reload: paged.reload,
 	}
+}
+
+/**
+ * Loading line of a paged table. Rows of the previous page stay until the next
+ * one arrives, so the line only shows without rows and the pager never jumps.
+ */
+export function ListLoading(props: { rows: readonly unknown[]; noun: string }): JSX.Element {
+	return (
+		<Show when={props.rows.length === 0}>
+			<Loading message={t('list.loading', { noun: props.noun })} />
+		</Show>
+	)
 }
 
 /** One entry of {@link ListTabs}. */
@@ -471,7 +459,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 		if (props.filtered === true || filters.filtered()) {
 			return t('list.noMatchFilters', { noun: nouns() })
 		}
-		const search = list.debouncedSearch()
+		const search = list.search()
 		return search ? t('list.noMatch', { noun: nouns(), search }) : props.emptyText
 	}
 
@@ -526,12 +514,12 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				visibleColumns={visibleColumns}
 				onVisibleColumnsChange={setVisibleColumns}
 				rowActions={list.canEdit() || list.canDelete() ? rowActions : undefined}
+				pagination={list.pagination}
+				onPaginationChange={list.onPaginationChange}
 				loading={() => list.page.loading}
-				loadingContent={<Loading message={t('list.loading', { noun: nouns() })} />}
+				loadingContent={<ListLoading rows={list.rows()} noun={nouns()} />}
 				emptyContent={<Empty message={emptyMessage()} />}
 			/>
-
-			<ListRangeStatus shown={list.rows().length} total={list.total()} />
 
 			<RowMenu
 				menu={openMenu}
@@ -723,21 +711,5 @@ export function RowMenu(props: {
 				</Portal>
 			)}
 		</Show>
-	)
-}
-
-/**
- * "Showing 1-N of M" line under the table. Lists fetch only their first
- * page, so `shown` (the rendered rows) can end before `total`.
- */
-export function ListRangeStatus(props: { shown: number; total: number }): JSX.Element {
-	return (
-		<p class="paginator-showing" role="status">
-			{t('list.range', {
-				from: props.shown === 0 ? 0 : 1,
-				to: props.shown,
-				total: props.total,
-			})}
-		</p>
 	)
 }

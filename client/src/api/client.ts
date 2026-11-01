@@ -163,7 +163,7 @@ export function to_query<T extends Record<string, QueryValue>>(
 	return out as { [K in keyof T]: CoercedQueryValue<T[K]> }
 }
 
-/** Search and paging defaults of every list endpoint (the UI shows up to 200 rows). */
+/** Search and paging defaults of every list endpoint: pickers and lookups load up to 200 rows. */
 export function paging(filters?: { search?: string; page?: number; limit?: number }): {
 	search: string
 	page: number

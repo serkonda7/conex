@@ -31,7 +31,7 @@ import {
 import { tenantBundle } from './tenancy'
 
 export type DeviceRoleRow = typeof device_roles.$inferSelect
-export type DeviceRoleListRow = DeviceRoleRow & { device_count: number }
+export type DeviceRoleListRow = DeviceRoleRow & { device_count: number; depth: number }
 
 // ---------------------------------------------------------------------------
 // Device roles (NetBox-style functional roles: `Server`, `Switch`, …).

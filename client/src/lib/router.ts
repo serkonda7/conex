@@ -673,6 +673,15 @@ export function useTabPath(): string {
 }
 
 /**
+ * Identifies the history entry a page mounts into, so it can pick up where it
+ * left off when the user comes back; null for tabs in the background.
+ */
+export function historyEntryKey(forPath: string): string | null {
+	const active = activeTab()
+	return active?.path === forPath ? `${active.id}:${active.index}:${forPath}` : null
+}
+
+/**
  * Path the tab that opened the current form tab now shows, or null when
  * the form was entered directly or its opener is gone.
  */

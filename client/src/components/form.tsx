@@ -75,7 +75,8 @@ export function Hint(props: { id?: string; children: JSX.Element }): JSX.Element
  * hint stack in the right column via `.field-control`. */
 export function Field(props: {
 	label: string
-	for: string
+	/** Id of the control; omitted for composite controls that name their own inputs. */
+	for?: string
 	required?: boolean
 	hint?: JSX.Element
 	children: JSX.Element

@@ -82,6 +82,9 @@ export type SiteRow = typeof sites.$inferSelect
 export type SiteGroupRow = typeof site_groups.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
 
+/** List row: the parent may sit on another page, so it travels with the row. */
+export type LocationListRow = LocationRow & { depth: number; parent_name: string | null }
+
 export interface TenantListParams extends ListParams {
 	/** Only tenants of this tenant group. */
 	group?: number
@@ -780,7 +783,7 @@ export interface LocationListParams extends ListParams, TenantFilterParams {
 	order: 'asc' | 'desc'
 }
 
-export async function listLocations(params: LocationListParams): Promise<Page<LocationRow>> {
+export async function listLocations(params: LocationListParams): Promise<Page<LocationListRow>> {
 	const where = and(
 		searchCondition(params.search, [locations.name, locations.description]),
 		params.site ? inArray(locations.site_id, params.site) : undefined,
@@ -790,7 +793,24 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 	const matching = await getDb().select().from(locations).where(where)
 	const ordered = sortHierarchically(matching, params.sort, params.order)
 	const offset = offsetOf(params)
-	return pageOf(ordered.slice(offset, offset + params.limit), matching.length, params)
+	const items = ordered.slice(offset, offset + params.limit)
+	const parentIds = items.flatMap((row) => row.parent_id ?? [])
+	const parents =
+		parentIds.length > 0
+			? await getDb()
+					.select({ id: locations.id, name: locations.name })
+					.from(locations)
+					.where(inArray(locations.id, parentIds))
+			: []
+	const parentName = new Map(parents.map((row) => [row.id, row.name]))
+	return pageOf(
+		items.map((row) => ({
+			...row,
+			parent_name: row.parent_id === null ? null : (parentName.get(row.parent_id) ?? null),
+		})),
+		matching.length,
+		params,
+	)
 }
 
 export function getLocation(id: number): Promise<Result<LocationRow, Error>> {

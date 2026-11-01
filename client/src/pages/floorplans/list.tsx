@@ -1,11 +1,11 @@
-import { Result } from 'better-result'
-import { createResource, createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import { type FloorplanListJson, fetch_floorplans } from '../../api/attachments'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
-import { Empty, InlineError, Loading } from '../../components/feedback'
-import { ListRangeStatus, useDebouncedSearch, useListFilters } from '../../components/list_page'
+import { Empty, InlineError } from '../../components/feedback'
+import { ListLoading, useListFilters } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
+import { usePagedList } from '../../lib/paged_list'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 
 /**
@@ -15,21 +15,14 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
  */
 export function FloorplansPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
-	const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+	const [search, setSearch] = createSignal('')
 	const filters = useListFilters<FloorplanListJson>({ search, setSearch })
 
-	const [plans] = createResource(
-		() => ({ search: debouncedSearch(), context: tenantContextFilters() }),
-		async (q) => {
-			setError(null)
-			const res = await fetch_floorplans({ search: q.search, ...q.context })
-			if (Result.isError(res)) {
-				setError(res.error.message)
-				return null
-			}
-			return res.value
-		},
-	)
+	const plans = usePagedList({
+		query: () => ({ search: search(), ...tenantContextFilters() }),
+		fetch: fetch_floorplans,
+		setError,
+	})
 
 	const columns: DataTableColumn<FloorplanListJson>[] = [
 		{
@@ -74,8 +67,8 @@ export function FloorplansPage(): JSX.Element {
 	]
 
 	const emptyText = (): string =>
-		debouncedSearch()
-			? t('list.noMatch', { noun: tp('noun.floorplan', 2), search: debouncedSearch() })
+		search()
+			? t('list.noMatch', { noun: tp('noun.floorplan', 2), search: search() })
 			: tenantContext().kind !== 'all'
 				? t('list.noMatchFilters', { noun: tp('noun.floorplan', 2) })
 				: t('floorplan.listEmpty')
@@ -87,7 +80,7 @@ export function FloorplansPage(): JSX.Element {
 			</div>
 
 			<FilterTable
-				rows={() => plans() ?? []}
+				rows={plans.rows}
 				filters={filters.filters()}
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
@@ -96,14 +89,12 @@ export function FloorplansPage(): JSX.Element {
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.floorplan', 2) })}
 				getRowId={(p: FloorplanListJson): number => p.attachment_id}
 				columns={columns}
-				loading={() => plans.loading}
-				loadingContent={
-					<Loading message={t('list.loading', { noun: tp('noun.floorplan', 2) })} />
-				}
+				pagination={plans.pagination}
+				onPaginationChange={plans.onPaginationChange}
+				loading={() => plans.page.loading}
+				loadingContent={<ListLoading rows={plans.rows()} noun={tp('noun.floorplan', 2)} />}
 				emptyContent={<Empty message={emptyText()} />}
 			/>
-
-			<ListRangeStatus shown={plans()?.length ?? 0} total={plans()?.length ?? 0} />
 
 			<InlineError message={error()} />
 		</div>

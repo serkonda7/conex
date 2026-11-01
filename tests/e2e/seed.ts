@@ -56,6 +56,15 @@ const dbName = decodeURIComponent(dbUrl.pathname.replace(/^\//, ''))
 const adminUrl = new URL(dbUrl)
 adminUrl.pathname = '/postgres'
 const admin = new SQL(adminUrl.toString())
+// Visual runs start from an empty database so leftovers from earlier runs
+// can't leak into the baselines. Attachment files go too: their rows are gone.
+if ((process.env.CONEX_E2E_RESET_DB ?? '') !== '') {
+	if (!dbName.endsWith('_e2e')) {
+		throw new Error(`Refusing to reset "${dbName}": database name must end in _e2e.`)
+	}
+	await admin.unsafe(`DROP DATABASE IF EXISTS "${dbName.replaceAll('"', '""')}" WITH (FORCE)`)
+	fs.rmSync(path.join(dataDir, 'attachments'), { recursive: true, force: true })
+}
 if ((await admin`SELECT 1 FROM pg_database WHERE datname = ${dbName}`).length === 0) {
 	await admin.unsafe(`CREATE DATABASE "${dbName.replaceAll('"', '""')}"`)
 }

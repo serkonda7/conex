@@ -21,24 +21,24 @@
     "db:seed:demo": "bun scripts/seed-demo.ts",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:reuse": "CONEX_E2E_REUSE_SERVERS=1 playwright test --project=chromium",
-    "test:visual": "playwright test --project=visual",
-    "test:visual:update": "playwright test --project=visual --update-snapshots"
+    "test:visual": "CONEX_E2E_RESET_DB=1 playwright test --project=visual",
+    "test:visual:update": "CONEX_E2E_RESET_DB=1 playwright test --project=visual --update-snapshots"
   },
   "packageManager": "bun@1.4.4",
   "catalog": {
     "drizzle-kit": "~0.31.11",
     "drizzle-orm": "~0.45.4",
-    "hono": "~4.13.14",
+    "hono": "~4.13.16",
     "@hono/valibot-validator": "~0.6.2",
     "better-result": "~3.0.1",
     "valibot": "~1.5.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@biomejs/biome": "2.6.4",
     "@fontsource-variable/noto-sans": "~5.3.0",
     "@playwright/test": "~1.64.1",
     "@types/bun": "1.4.4",
-    "@types/node": "~26.6.5",
+    "@types/node": "~26.6.6",
     "turbo": "~2.11.10"
   }
 }

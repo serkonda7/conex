@@ -1,3 +1,4 @@
+import { Modal as BaseModal } from '@serkonda7/solid-components'
 import type { JSX } from 'solid-js'
 import { t } from '../i18n'
 
@@ -9,35 +10,20 @@ export interface ModalProps {
 	children: JSX.Element
 }
 
-/** Modal dialog shell: backdrop, titled box and close button. */
+/**
+ * The solid-components `Modal`, open while mounted and with its close label
+ * localized. Pages import it from here instead of the package.
+ */
 export function Modal(props: ModalProps): JSX.Element {
 	return (
-		<div class="modal-wrap" role="presentation">
-			<button
-				type="button"
-				class="modal-backdrop"
-				aria-label={t('common.close')}
-				onClick={props.on_close}
-			/>
-			<section
-				class={props.class ? `modal ${props.class}` : 'modal'}
-				role="dialog"
-				aria-modal="true"
-				aria-label={props.title}
-			>
-				<div class="modal-header">
-					<h3>{props.title}</h3>
-					<button
-						type="button"
-						class="icon-btn"
-						aria-label={t('common.close')}
-						onClick={props.on_close}
-					>
-						×
-					</button>
-				</div>
-				{props.children}
-			</section>
-		</div>
+		<BaseModal
+			open
+			title={props.title}
+			class={props.class}
+			onClose={props.on_close}
+			closeLabel={t('common.close')}
+		>
+			{props.children}
+		</BaseModal>
 	)
 }

@@ -2301,11 +2301,12 @@ export interface FloorplanCandidateJson {
 }
 
 /**
- * `GET /attachments/floorplans?search=&tenant=&tenant_group=`: every marked
- * floor plan, filtered by its owner's tenant and searched by owner or site name.
+ * `GET /attachments/floorplans?search=&page=&limit=&tenant=&tenant_group=`:
+ * the marked floor plans, filtered by their owner's tenant and searched by
+ * owner or site name.
  */
 export const FloorplanListQuerySchema = v.object({
-	search: ListQueryEntries.search,
+	...ListQueryEntries,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 })

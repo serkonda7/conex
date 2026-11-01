@@ -5,6 +5,7 @@
  */
 import type { Result } from 'better-result'
 import type {
+	LocationListRow,
 	LocationRow,
 	SiteGroupRow,
 	SiteRow,
@@ -38,6 +39,7 @@ import type {
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
 export type {
+	LocationListRow,
 	LocationRow,
 	LocationType,
 	SiteGroupRow,
@@ -201,8 +203,8 @@ export type LocationCreateInput = Omit<LocationCreate, 'type'> & { type?: Locati
 
 export async function fetch_locations(
 	filters?: Partial<LocationListQuery>,
-): Promise<Result<Page<LocationRow>, Error>> {
-	return getPage<LocationRow>(
+): Promise<Result<Page<LocationListRow>, Error>> {
+	return getPage<LocationListRow>(
 		client.locations.$get({
 			query: to_query({
 				...paging(filters),
