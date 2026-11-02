@@ -149,16 +149,21 @@ export interface StubRun {
 /**
  * Collapses consecutive names `B1, B2, …, Bn` into one `{prefix: B, count: n}`
  * stub. Only runs that `expandStub` reproduces exactly collapse; a run that
- * starts above 1 (`Gi1/0/25…`) stays one stub per name.
+ * starts above 1 (`Gi1/0/25…`) stays one stub per name. A prefix must also not
+ * be a port name in `taken` (`Port 11…19` next to `Port 1`): stubs of a kind
+ * and side are unique by prefix, so such a run stays one stub per name too.
  */
-export function collapseRuns(names: string[]): StubRun[] {
+export function collapseRuns(
+	names: string[],
+	taken: ReadonlySet<string> = new Set(names),
+): StubRun[] {
 	const runs: StubRun[] = []
 	let i = 0
 	while (i < names.length) {
 		const first = names[i] ?? ''
 		const base = first.endsWith('1') ? first.slice(0, -1) : ''
 		let count = 0
-		if (base.length > 0 && base === base.trim()) {
+		if (base.length > 0 && base === base.trim() && !taken.has(base)) {
 			while (names[i + count] === `${base}${count + 1}`) {
 				count += 1
 			}

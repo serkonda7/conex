@@ -368,8 +368,9 @@ export async function createImportedStubs(
 			groups.set(groupKey, group)
 		}
 	}
+	const portNames = new Set([...groups.values()].flatMap((group) => group.names))
 	for (const group of groups.values()) {
-		for (const run of collapseRuns(group.names)) {
+		for (const run of collapseRuns(group.names, portNames)) {
 			const stub = await createImportedStub(deviceTypeId, {
 				prefix: run.prefix,
 				count: run.count,
