@@ -10,9 +10,14 @@ import { validateDeviceType } from '@serkonda7/conex-device-schema'
 validateDeviceType(Bun.YAML.parse(text)) // null, or why conex would refuse the definition
 ```
 
+`unknownDeviceTypeKeys(definition)` lists keys conex doesn't know. The importer ignores those,
+so `validateDeviceType` doesn't report them.
+
 The package ships TypeScript source, so it needs a runtime or bundler that reads it, such as Bun.
 
 ## Release
 
-Bump `version`, then run `bun publish` in this directory. Update the version in
-conex-device-types to validate against the new rules.
+Bump `version` and run `bun install` to update the lockfile. Once that reaches `main`,
+`.github/workflows/publish-device-schema.yml` publishes the new version through npm
+trusted publishing. Update the version in conex-device-types to validate
+against the new rules.
