@@ -2,7 +2,7 @@
 
 Zeigt die conex-Mitarbeiter im AGFEO-Dashboard (v2) als Kontakte an: eingehende Anrufe
 werden zu einem Namen aufgelöst, und die Dashboard-Suche findet sie. Der optionale Dienst
-`plugins/agfeo-ldap` stellt das conex-Kontaktverzeichnis schreibgeschützt über LDAP
+`packages/plugins/agfeo-ldap` stellt das conex-Kontaktverzeichnis schreibgeschützt über LDAP
 bereit, das das Dashboard mit seinem integrierten LDAP-Client liest. Die Kontakte sind
 nur im Dashboard verfügbar, nicht auf Systemtelefonen oder in Apps.
 

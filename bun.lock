@@ -41,12 +41,20 @@
         "valibot": "catalog:",
       },
     },
-    "plugins/agfeo-ldap": {
+    "packages/plugins/agfeo-ldap": {
       "name": "agfeo-ldap",
       "version": "0.0.0-dev",
       "dependencies": {
         "better-result": "catalog:",
         "shared": "workspace:*",
+      },
+    },
+    "packages/shared": {
+      "name": "shared",
+      "version": "0.0.0-dev",
+      "dependencies": {
+        "@serkonda7/conex-device-schema": "workspace:*",
+        "valibot": "catalog:",
       },
     },
     "server": {
@@ -64,14 +72,6 @@
       },
       "devDependencies": {
         "drizzle-kit": "catalog:",
-      },
-    },
-    "shared": {
-      "name": "shared",
-      "version": "0.0.0-dev",
-      "dependencies": {
-        "@serkonda7/conex-device-schema": "workspace:*",
-        "valibot": "catalog:",
       },
     },
   },
@@ -324,7 +324,7 @@
 
     "@types/trusted-types": ["@types/trusted-types@2.0.7", "", {}, "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw=="],
 
-    "agfeo-ldap": ["agfeo-ldap@workspace:plugins/agfeo-ldap"],
+    "agfeo-ldap": ["agfeo-ldap@workspace:packages/plugins/agfeo-ldap"],
 
     "babel-plugin-jsx-dom-expressions": ["babel-plugin-jsx-dom-expressions@0.40.10", "", { "dependencies": { "@babel/helper-module-imports": "7.18.6", "@babel/plugin-syntax-jsx": "^7.18.6", "@babel/types": "^7.20.7", "html-entities": "2.3.3", "parse5": "^7.1.2" }, "peerDependencies": { "@babel/core": "^7.20.12" } }, "sha512-lxve6Y02YiZTldB7efKpnbf1BH00XCFZNYYW235jSGsYaJNFtHrYlKV6/O+miHbjqpIr9FTe5+0no4hofAMbfA=="],
 
@@ -446,7 +446,7 @@
 
     "server": ["server@workspace:server"],
 
-    "shared": ["shared@workspace:shared"],
+    "shared": ["shared@workspace:packages/shared"],
 
     "solid-devtools": ["solid-devtools@0.34.5", "", { "dependencies": { "@babel/core": "^7.27.4", "@babel/plugin-syntax-typescript": "^7.27.1", "@babel/types": "^7.27.6", "@solid-devtools/debugger": "^0.28.1", "@solid-devtools/shared": "^0.20.0" }, "peerDependencies": { "solid-js": "^1.9.0", "vite": "^2.2.3 || ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0" }, "optionalPeers": ["vite"] }, "sha512-KNVdS9MQzzeVS++Vmg4JeU0fM6ZMuBEmkBA7SmqPS2s5UHpRjv1PNH8gShmlN9L/tki6OUAzJP3H1aKq2AcOSg=="],
 

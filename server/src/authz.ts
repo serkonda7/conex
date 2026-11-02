@@ -1,7 +1,7 @@
 /**
  * Permission-based access control plus single-tenant scoping.
  *
- * Permissions (`shared/src/schemas.ts` `PERMISSIONS`) come from the user's
+ * Permissions (`packages/shared/src/schemas.ts` `PERMISSIONS`) come from the user's
  * role: `view` / `edit` / `delete` cover all inventory and catalog
  * resources; `users.manage`, `changelog.view`, `audit_log.view` and
  * `integrations.manage` gate the admin areas; `tickets.create` allows

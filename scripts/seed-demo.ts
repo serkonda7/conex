@@ -1,5 +1,6 @@
 import path from 'node:path'
 import zlib from 'node:zlib'
+import type { DeviceRoleIcon, LocationType } from '../packages/shared/src/schemas'
 import { initConfig, load_config_file } from '../server/src/config'
 import {
 	createAttachment,
@@ -28,7 +29,6 @@ import {
 } from '../server/src/schema'
 import { initStorage } from '../server/src/storage'
 import { getTrimmedEnv, resolveInDataDir } from '../server/src/util/server_root'
-import type { DeviceRoleIcon, LocationType } from '../shared/src/schemas'
 
 const repoRoot = path.resolve(import.meta.dir, '..')
 

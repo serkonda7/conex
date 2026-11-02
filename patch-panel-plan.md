@@ -59,7 +59,7 @@ considered individually (no logical grouping as an outlet).
   as migration 0037). Only a convenience: behaviour depends on whether a port
   has `side` set, not on the role.
 
-### `shared/src/schemas.ts`
+### `packages/shared/src/schemas.ts`
 
 - `PORT_SIDES`, and new fields on `InterfaceJson` and the stub create/update
   schemas.

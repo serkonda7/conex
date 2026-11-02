@@ -40,7 +40,7 @@ import {
 // Flags (`connected`, ...) are 0/1 integers.
 // Session ids and auth-state values stay opaque random strings: they are
 // credentials, not entity references.
-// Roles bundle permissions (`shared/src/schemas.ts` `PERMISSIONS`); every
+// Roles bundle permissions (`packages/shared/src/schemas.ts` `PERMISSIONS`); every
 // user carries exactly one. Permission strings are service-enforced (no DB
 // enum, writes go through `PermissionSchema`; unknown strings are ignored
 // on load). Role delete is blocked while users reference it (service layer
