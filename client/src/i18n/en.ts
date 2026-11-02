@@ -489,6 +489,7 @@ export const en = {
 	'deviceType.component.maximumDrawInvalid':
 		'Max. power draw must be an integer from 1 to {max}.',
 	'deviceType.component.watts': '{watts} W',
+	'deviceType.component.poe': 'PoE',
 	'deviceType.component.poeMode': 'PoE mode',
 	'deviceType.component.noPoe': 'No PoE',
 	'deviceType.component.poeType': 'PoE type',

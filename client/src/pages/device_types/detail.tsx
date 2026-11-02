@@ -1,6 +1,8 @@
 import {
+	IconBolt,
 	IconChevronDown,
 	IconPencil,
+	IconPlug,
 	IconRefreshAlert,
 	IconSparkles,
 	IconTrash,
@@ -39,6 +41,7 @@ import {
 	deviceRoleLabel,
 	poeModeLabel,
 	poeTypeLabel,
+	poeTypeShortLabel,
 	portKindLabel,
 	yesNo,
 } from '../../i18n/labels'
@@ -115,26 +118,53 @@ function ComponentKind(props: { kind: string }): JSX.Element {
 	)
 }
 
-/** Maximum draw of a power input or PoE setup of an interface; null when it has neither. */
-function powerDetails(stub: StubRow): string | null {
-	if (stub.maximum_draw !== null) {
-		return t('deviceType.component.watts', { watts: stub.maximum_draw })
+const hasPowerDetails = (stub: StubRow): boolean =>
+	stub.maximum_draw !== null || stub.poe_mode !== null
+
+/**
+ * Maximum draw of a power input or PoE setup of an interface. PoE reads as an
+ * icon per direction (bolt: supplies, plug: draws) and the short type; the
+ * tooltip spells out both.
+ */
+function PowerDetails(props: { stub: StubRow }): JSX.Element {
+	const poeTitle = (mode: string): string => {
+		const type = props.stub.poe_type
+		return type === null ? poeModeLabel(mode) : `${poeModeLabel(mode)} · ${poeTypeLabel(type)}`
 	}
-	if (stub.poe_mode === null) {
-		return null
-	}
-	const mode = poeModeLabel(stub.poe_mode)
-	return stub.poe_type === null ? mode : `${mode} · ${poeTypeLabel(stub.poe_type)}`
+	return (
+		<Show
+			when={props.stub.poe_mode}
+			fallback={
+				props.stub.maximum_draw === null
+					? '—'
+					: t('deviceType.component.watts', { watts: props.stub.maximum_draw })
+			}
+		>
+			{(mode: () => string): JSX.Element => (
+				<span class="component-kind" title={poeTitle(mode())}>
+					<Dynamic
+						component={mode() === 'pse' ? IconBolt : IconPlug}
+						size={16}
+						role="img"
+						aria-label={poeModeLabel(mode())}
+					/>
+					{props.stub.poe_type === null
+						? t('deviceType.component.poe')
+						: poeTypeShortLabel(props.stub.poe_type)}
+				</span>
+			)}
+		</Show>
+	)
 }
 
 /**
- * One stub; `mapping` is set on patch-panel types, `power` on types with power
- * details, `children` are its actions.
+ * One stub; `mapping` is set on patch-panel types, `showPower` on types with
+ * power details, `children` are its actions.
  */
 function ComponentRow(props: {
 	stub: StubRow
 	mapping: string | undefined
-	power: string | undefined
+	showPower: boolean
 	children: JSX.Element
 }): JSX.Element {
 	return (
@@ -147,8 +177,10 @@ function ComponentRow(props: {
 			<Show when={props.mapping !== undefined}>
 				<td>{props.mapping}</td>
 			</Show>
-			<Show when={props.power !== undefined}>
-				<td>{props.power}</td>
+			<Show when={props.showPower}>
+				<td>
+					<PowerDetails stub={props.stub} />
+				</td>
 			</Show>
 			<td>{props.stub.description || '—'}</td>
 			<Show when={canChangeStubs()}>
@@ -209,7 +241,7 @@ function ComponentTable(props: {
 	/** Patch-panel types add a column with the rear positions or front-to-rear mapping. */
 	const hasPassThrough = (): boolean => props.stubs.some((row) => row.side !== null)
 	/** Types with a maximum draw or PoE add a column for them. */
-	const hasPower = (): boolean => props.stubs.some((row) => powerDetails(row) !== null)
+	const hasPower = (): boolean => props.stubs.some(hasPowerDetails)
 	const columnCount = (): number =>
 		4 + Number(hasPassThrough()) + Number(hasPower()) + Number(canChangeStubs())
 	const stubPrefix = (stubId: number | null): string =>
@@ -262,7 +294,7 @@ function ComponentTable(props: {
 									<ComponentRow
 										stub={s}
 										mapping={hasPassThrough() ? passThrough(s) : undefined}
-										power={hasPower() ? (powerDetails(s) ?? '—') : undefined}
+										showPower={hasPower()}
 									>
 										<StubActions
 											stub={s}

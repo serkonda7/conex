@@ -492,6 +492,7 @@ export const de: Messages = {
 	'deviceType.component.maximumDrawInvalid':
 		'Die max. Leistungsaufnahme muss eine ganze Zahl von 1 bis {max} sein.',
 	'deviceType.component.watts': '{watts} W',
+	'deviceType.component.poe': 'PoE',
 	'deviceType.component.poeMode': 'PoE-Modus',
 	'deviceType.component.noPoe': 'Kein PoE',
 	'deviceType.component.poeType': 'PoE-Typ',

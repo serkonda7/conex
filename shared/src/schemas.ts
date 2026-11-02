@@ -911,6 +911,14 @@ export const POE_TYPE_NAMES: Record<PoeType, string> = {
 	'type4-ieee802.3bt': 'PoE++ (IEEE 802.3bt, 100 W)',
 }
 
+/** Short PoE type names for tight spots; `POE_TYPE_NAMES` has the standard. */
+export const POE_TYPE_SHORT_NAMES: Record<PoeType, string> = {
+	'type1-ieee802.3af': 'PoE 15 W',
+	'type2-ieee802.3at': 'PoE+ 30 W',
+	'type3-ieee802.3bt': 'PoE++ 60 W',
+	'type4-ieee802.3bt': 'PoE++ 100 W',
+}
+
 /** Upper bound of a power input's maximum draw, in watts. */
 export const MAX_POWER_DRAW = 1_000_000
 

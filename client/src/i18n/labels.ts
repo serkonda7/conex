@@ -32,6 +32,7 @@ import {
 	PHONE_TYPES,
 	type PhoneType,
 	POE_TYPE_NAMES,
+	POE_TYPE_SHORT_NAMES,
 	type PoeMode,
 	type PoeType,
 	type PortKind,
@@ -178,6 +179,11 @@ export function poeModeLabel(value: string): string {
 /** PoE type (`type2-ieee802.3at`, …): an untranslated display name, like NetBox interface types. */
 export function poeTypeLabel(value: PoeType): string {
 	return POE_TYPE_NAMES[value]
+}
+
+/** PoE type without its standard, for table cells. */
+export function poeTypeShortLabel(value: PoeType): string {
+	return POE_TYPE_SHORT_NAMES[value]
 }
 
 /** Option of a PoE type. */
