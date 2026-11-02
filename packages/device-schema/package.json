@@ -1,0 +1,31 @@
+{
+  "name": "@serkonda7/conex-device-schema",
+  "version": "0.2.0",
+  "description": "The rules conex applies when importing device-type YAML",
+  "license": "MPL-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/serkonda7/conex.git",
+    "directory": "packages/device-schema"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "!src/*.test.ts"
+  ],
+  "scripts": {
+    "check": "bun check"
+  },
+  "engines": {
+    "node": ">= 24"
+  },
+  "dependencies": {
+    "valibot": "catalog:"
+  }
+}

@@ -32,6 +32,7 @@ import {
 	PHONE_TYPES,
 	type PhoneType,
 	POE_TYPE_NAMES,
+	POE_TYPE_SHORT_NAMES,
 	type PoeMode,
 	type PoeType,
 	type PortKind,
@@ -180,6 +181,11 @@ export function poeTypeLabel(value: PoeType): string {
 	return POE_TYPE_NAMES[value]
 }
 
+/** PoE type without its standard, for table cells. */
+export function poeTypeShortLabel(value: PoeType): string {
+	return POE_TYPE_SHORT_NAMES[value]
+}
+
 /** Option of a PoE type. */
 export function poeTypeOption(value: PoeType): FormOption {
 	return { value, ...detailedLabel(poeTypeLabel(value)) }
@@ -205,6 +211,30 @@ const TEMPLATE_SYNC_FIELD_KEYS: Record<TemplateSyncField, MessageKey> = {
 /** Port field a device type owns (`kind`, `positions`, …). */
 export function templateSyncFieldLabel(value: string): string {
 	return lookup(TEMPLATE_SYNC_FIELD_KEYS, value)
+}
+
+const DEVICE_TYPE_UPDATE_FIELD_KEYS: Record<string, MessageKey> = {
+	manufacturer: 'deviceType.aiUpdate.manufacturer',
+	model: 'common.model',
+	u_height: 'common.heightU',
+	is_full_depth: 'common.fullDepth',
+	default_device_role: 'deviceType.defaultRole',
+	part_number: 'deviceType.partNumber',
+	spec_url: 'deviceType.specUrl',
+	eol_date: 'deviceType.eolDate',
+	description: 'common.description',
+	comments: 'common.comments',
+	kind: 'device.templateSync.field.kind',
+	positions: 'device.templateSync.field.positions',
+	rear_port: 'device.templateSync.field.rear_port',
+	maximum_draw: 'deviceType.component.maximumDraw',
+	poe_mode: 'deviceType.component.poeMode',
+	poe_type: 'deviceType.component.poeType',
+}
+
+/** Device-type or port field changed by an AI update. */
+export function deviceTypeUpdateFieldLabel(value: string): string {
+	return lookup(DEVICE_TYPE_UPDATE_FIELD_KEYS, value)
 }
 
 const CABLE_STATUS_KEYS: Record<string, MessageKey> = {

@@ -16,6 +16,9 @@ import type {
 	DeviceTypeCreate,
 	DeviceTypeListQuery,
 	DeviceTypeUpdate,
+	DeviceTypeUpdateApply,
+	DeviceTypeUpdatePreview,
+	DeviceTypeYamlExport,
 	ManufacturerCreate,
 	ManufacturerListQuery,
 	ManufacturerUpdate,
@@ -153,6 +156,34 @@ export async function update_device_type(
 	patch: DeviceTypeUpdate,
 ): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'][':id'].$patch({ ...by_id(id), json: patch })
+	return to_result<DeviceTypeRow>(res, failed.update('noun.deviceType'))
+}
+
+/** The type as YAML, the base of an AI update. */
+export async function fetch_device_type_yaml(
+	id: number,
+): Promise<Result<DeviceTypeYamlExport, Error>> {
+	const res = await client['device-types'][':id'].yaml.$get(by_id(id))
+	return to_result<DeviceTypeYamlExport>(res, failed.load('noun.deviceType'))
+}
+
+/** What applying `yaml` to the type would change; writes nothing. */
+export async function preview_device_type_update(
+	id: number,
+	yaml: string,
+): Promise<Result<DeviceTypeUpdatePreview, Error>> {
+	const res = await client['device-types'][':id']['update-preview'].$post({
+		...by_id(id),
+		json: { yaml },
+	})
+	return to_result<DeviceTypeUpdatePreview>(res, t('deviceType.aiUpdate.previewFailed'))
+}
+
+export async function apply_device_type_update(
+	id: number,
+	json: DeviceTypeUpdateApply,
+): Promise<Result<DeviceTypeRow, Error>> {
+	const res = await client['device-types'][':id'].update.$post({ ...by_id(id), json })
 	return to_result<DeviceTypeRow>(res, failed.update('noun.deviceType'))
 }
 

@@ -8,6 +8,11 @@
   `getConfig()`/`getDb()` throw on missing initialization).
 - Shared contracts: Valibot schemas live in `shared/src/schemas.ts`; server
   validates with `@hono/valibot-validator`, client uses the same types.
+- Device-type import rules: `DeviceTypeYamlSchema`, the port and type constants
+  and the port rules live in `packages/device-schema`, published as
+  `@serkonda7/conex-device-schema` and re-exported by `shared/src/schemas.ts`.
+  It depends on `valibot` only, so it returns plain values instead of `Result`.
+  conex-device-types validates with a published version: release after changes.
 - DB: `drizzle-orm` + Postgres (Bun's built-in `bun:sql` driver), migrations in
   `server/drizzle/`, auto-run on startup; connection via `CONEX_DATABASE_URL`
   (see `server/src/db/connection.ts`).

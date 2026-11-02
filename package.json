@@ -7,6 +7,7 @@
     "server",
     "client",
     "shared",
+    "packages/*",
     "plugins/*"
   ],
   "scripts": {
@@ -19,6 +20,7 @@
     "docs:build": "mdbook build docs",
     "db:generate": "bun run --cwd server db:generate",
     "db:seed:demo": "bun scripts/seed-demo.ts",
+    "test": "bun test server/src shared/src packages",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:reuse": "CONEX_E2E_REUSE_SERVERS=1 playwright test --project=chromium",
     "test:visual": "CONEX_E2E_RESET_DB=1 playwright test --project=visual",

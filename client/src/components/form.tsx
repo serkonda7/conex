@@ -106,7 +106,7 @@ export function TextField(props: {
 	value: string
 	onInput: (value: string) => void
 	placeholder?: string
-	type?: 'text' | 'password' | 'number' | 'email' | 'tel'
+	type?: 'text' | 'password' | 'number' | 'email' | 'tel' | 'date'
 	maxLength?: number
 	min?: number
 	max?: number

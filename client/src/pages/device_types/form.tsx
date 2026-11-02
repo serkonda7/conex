@@ -1,3 +1,4 @@
+import { DEVICE_TYPE_DESCRIPTION_MAX_LENGTH } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import {
@@ -40,6 +41,7 @@ interface DeviceTypeBody {
 	comments?: string
 	part_number?: string
 	spec_url?: string
+	eol_date?: string
 	default_device_role_id: number | null
 }
 
@@ -58,6 +60,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 	const [comments, setComments] = createSignal('')
 	const [partNumber, setPartNumber] = createSignal('')
 	const [specUrl, setSpecUrl] = createSignal('')
+	const [eolDate, setEolDate] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_device_type,
@@ -71,6 +74,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			setComments(row.comments ?? '')
 			setPartNumber(row.part_number ?? '')
 			setSpecUrl(row.spec_url ?? '')
+			setEolDate(row.eol_date ?? '')
 		},
 	})
 	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
@@ -104,6 +108,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 			comments: text(comments()),
 			part_number: text(partNumber()),
 			spec_url: text(specUrl()),
+			eol_date: text(eolDate()),
 		})
 		await submit_form({
 			form,
@@ -186,10 +191,18 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				value={specUrl()}
 				onInput={setSpecUrl}
 			/>
+			<TextField
+				id={`${prefix}-eol-date`}
+				label={t('deviceType.eolDate')}
+				type="date"
+				value={eolDate()}
+				onInput={setEolDate}
+			/>
 			<DescriptionField
 				id={`${prefix}-description`}
 				value={description()}
 				onInput={setDescription}
+				maxLength={DEVICE_TYPE_DESCRIPTION_MAX_LENGTH}
 			/>
 			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>

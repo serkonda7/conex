@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import {
 	DeviceTypeCreateSchema,
 	DeviceTypeListQuerySchema,
+	DeviceTypeUpdateApplySchema,
 	DeviceTypeUpdateSchema,
 	EntityParamsSchema,
 	StubCreateSchema,
@@ -11,6 +12,11 @@ import {
 	YamlImportBodySchema,
 } from 'shared/src/schemas'
 import { exportDeviceTypesCsv, importDeviceTypesYaml } from '../db/csv_transfer'
+import {
+	applyDeviceTypeUpdate,
+	exportDeviceTypeYaml,
+	previewDeviceTypeUpdate,
+} from '../db/device_type_update'
 import {
 	createDeviceType,
 	createStub,
@@ -91,6 +97,34 @@ export const deviceTypesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			return sendResult(c, await deleteDeviceType(c.req.valid('param').id))
+		},
+	)
+	// Update from re-generated YAML: export, review, apply.
+	.get('/:id/yaml', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		return sendResult(c, await exportDeviceTypeYaml(c.req.valid('param').id))
+	})
+	.post(
+		'/:id/update-preview',
+		requireGlobalPermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', YamlImportBodySchema, onValidationError),
+		async (c) => {
+			return sendResult(
+				c,
+				await previewDeviceTypeUpdate(c.req.valid('param').id, c.req.valid('json').yaml),
+			)
+		},
+	)
+	.post(
+		'/:id/update',
+		requireGlobalPermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', DeviceTypeUpdateApplySchema, onValidationError),
+		async (c) => {
+			return sendResult(
+				c,
+				await applyDeviceTypeUpdate(c.req.valid('param').id, c.req.valid('json')),
+			)
 		},
 	)
 	// Stub sub-resource.

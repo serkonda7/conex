@@ -7,6 +7,13 @@ export function formatTime(seconds: number): string {
 	)
 }
 
+/** `YYYY-MM-DD` calendar date in the UI language; UTC keeps the day from shifting. */
+export function formatDate(date: string): string {
+	return new Intl.DateTimeFormat(locale(), { dateStyle: 'medium', timeZone: 'UTC' }).format(
+		new Date(date),
+	)
+}
+
 const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 	['day', 86_400],
 	['hour', 3600],

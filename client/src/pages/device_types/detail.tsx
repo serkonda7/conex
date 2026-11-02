@@ -1,4 +1,12 @@
-import { IconChevronDown, IconPencil, IconRefreshAlert, IconTrash } from '@tabler/icons-solidjs'
+import {
+	IconBolt,
+	IconChevronDown,
+	IconPencil,
+	IconPlug,
+	IconRefreshAlert,
+	IconSparkles,
+	IconTrash,
+} from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
@@ -25,6 +33,7 @@ import {
 	ViewAllLink,
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
+import { IconLabel } from '../../components/icon_label'
 import { Markdown } from '../../components/markdown'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
@@ -32,6 +41,7 @@ import {
 	deviceRoleLabel,
 	poeModeLabel,
 	poeTypeLabel,
+	poeTypeShortLabel,
 	portKindLabel,
 	yesNo,
 } from '../../i18n/labels'
@@ -40,6 +50,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
+import { formatDate } from '../../lib/time'
 import { TemplateSyncDialog } from '../devices/template_sync_dialog'
 import {
 	AddComponentMenu,
@@ -48,6 +59,7 @@ import {
 	type PassThroughPreset,
 	PassThroughPresetDialog,
 } from './add_component'
+import { AiUpdateDialog } from './ai_update_dialog'
 import {
 	COMPONENT_CLASSES,
 	type ComponentClassInfo,
@@ -107,26 +119,53 @@ function ComponentKind(props: { kind: string }): JSX.Element {
 	)
 }
 
-/** Maximum draw of a power input or PoE setup of an interface; null when it has neither. */
-function powerDetails(stub: StubRow): string | null {
-	if (stub.maximum_draw !== null) {
-		return t('deviceType.component.watts', { watts: stub.maximum_draw })
+const hasPowerDetails = (stub: StubRow): boolean =>
+	stub.maximum_draw !== null || stub.poe_mode !== null
+
+/**
+ * Maximum draw of a power input or PoE setup of an interface. PoE reads as an
+ * icon per direction (bolt: supplies, plug: draws) and the short type; the
+ * tooltip spells out both.
+ */
+function PowerDetails(props: { stub: StubRow }): JSX.Element {
+	const poeTitle = (mode: string): string => {
+		const type = props.stub.poe_type
+		return type === null ? poeModeLabel(mode) : `${poeModeLabel(mode)} · ${poeTypeLabel(type)}`
 	}
-	if (stub.poe_mode === null) {
-		return null
-	}
-	const mode = poeModeLabel(stub.poe_mode)
-	return stub.poe_type === null ? mode : `${mode} · ${poeTypeLabel(stub.poe_type)}`
+	return (
+		<Show
+			when={props.stub.poe_mode}
+			fallback={
+				props.stub.maximum_draw === null
+					? '—'
+					: t('deviceType.component.watts', { watts: props.stub.maximum_draw })
+			}
+		>
+			{(mode: () => string): JSX.Element => (
+				<span class="component-kind" title={poeTitle(mode())}>
+					<Dynamic
+						component={mode() === 'pse' ? IconBolt : IconPlug}
+						size={16}
+						role="img"
+						aria-label={poeModeLabel(mode())}
+					/>
+					{props.stub.poe_type === null
+						? t('deviceType.component.poe')
+						: poeTypeShortLabel(props.stub.poe_type)}
+				</span>
+			)}
+		</Show>
+	)
 }
 
 /**
- * One stub; `mapping` is set on patch-panel types, `power` on types with power
- * details, `children` are its actions.
+ * One stub; `mapping` is set on patch-panel types, `showPower` on types with
+ * power details, `children` are its actions.
  */
 function ComponentRow(props: {
 	stub: StubRow
 	mapping: string | undefined
-	power: string | undefined
+	showPower: boolean
 	children: JSX.Element
 }): JSX.Element {
 	return (
@@ -139,8 +178,10 @@ function ComponentRow(props: {
 			<Show when={props.mapping !== undefined}>
 				<td>{props.mapping}</td>
 			</Show>
-			<Show when={props.power !== undefined}>
-				<td>{props.power}</td>
+			<Show when={props.showPower}>
+				<td>
+					<PowerDetails stub={props.stub} />
+				</td>
 			</Show>
 			<td>{props.stub.description || '—'}</td>
 			<Show when={canChangeStubs()}>
@@ -201,7 +242,7 @@ function ComponentTable(props: {
 	/** Patch-panel types add a column with the rear positions or front-to-rear mapping. */
 	const hasPassThrough = (): boolean => props.stubs.some((row) => row.side !== null)
 	/** Types with a maximum draw or PoE add a column for them. */
-	const hasPower = (): boolean => props.stubs.some((row) => powerDetails(row) !== null)
+	const hasPower = (): boolean => props.stubs.some(hasPowerDetails)
 	const columnCount = (): number =>
 		4 + Number(hasPassThrough()) + Number(hasPower()) + Number(canChangeStubs())
 	const stubPrefix = (stubId: number | null): string =>
@@ -254,7 +295,7 @@ function ComponentTable(props: {
 									<ComponentRow
 										stub={s}
 										mapping={hasPassThrough() ? passThrough(s) : undefined}
-										power={hasPower() ? (powerDetails(s) ?? '—') : undefined}
+										showPower={hasPower()}
 									>
 										<StubActions
 											stub={s}
@@ -285,6 +326,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		stub: StubRow
 	} | null>(null)
 	const [preset, setPreset] = createSignal<PassThroughPreset | null>(null)
+	const [updatingWithAi, setUpdatingWithAi] = createSignal(false)
 	const id = (): number => props.id
 	const [deviceType] = createRecord(id, fetch_device_type, setError)
 	const manufacturerId = (): number | undefined => deviceType()?.manufacturer_id
@@ -422,6 +464,15 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					name={deviceType()?.model}
 					editHref={`/device-types/${props.id}/edit`}
 					onDelete={handleDelete}
+					actions={
+						<Show when={can('edit')}>
+							<button type="button" onClick={() => setUpdatingWithAi(true)}>
+								<IconLabel icon={IconSparkles}>
+									{t('deviceType.aiUpdate.button')}
+								</IconLabel>
+							</button>
+						</Show>
+					}
 				/>
 				<DetailSubtitle description={deviceType()?.description} />
 
@@ -444,6 +495,12 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							<dd>
 								<Show when={deviceType()?.spec_url} fallback="—">
 									{(url: () => string): JSX.Element => <SpecLink url={url()} />}
+								</Show>
+							</dd>
+							<dt>{t('deviceType.eolDate')}</dt>
+							<dd>
+								<Show when={deviceType()?.eol_date} fallback="—">
+									{(date: () => string): string => formatDate(date())}
 								</Show>
 							</dd>
 						</dl>
@@ -573,6 +630,14 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					target={tp('entity.device', 2)}
 				/>
 			</section>
+			<Show when={updatingWithAi()}>
+				<AiUpdateDialog
+					device_type_id={props.id}
+					model={deviceType()?.model ?? ''}
+					on_applied={() => setUpdatingWithAi(false)}
+					on_close={() => setUpdatingWithAi(false)}
+				/>
+			</Show>
 			<Show when={syncing()} keyed>
 				{(device: DeviceListDevice) => (
 					<TemplateSyncDialog

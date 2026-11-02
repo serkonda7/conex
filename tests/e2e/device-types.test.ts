@@ -578,6 +578,16 @@ test.describe('permissions', () => {
 				}),
 			],
 			['import', context.post('/api/device-types/import', { data: { yaml } })],
+			[
+				'preview update',
+				context.post(`/api/device-types/${typeId}/update-preview`, { data: { yaml } }),
+			],
+			[
+				'apply update',
+				context.post(`/api/device-types/${typeId}/update`, {
+					data: { yaml, revision: 'any' },
+				}),
+			],
 			['edit type', context.patch(`/api/device-types/${typeId}`, { data: { u_height: 2 } })],
 			['delete type', context.delete(`/api/device-types/${typeId}`)],
 			[
@@ -811,6 +821,330 @@ test.describe('imported device types', () => {
 				`/api/device-types?search=${encodeURIComponent(models[i] ?? '')}&page=1&limit=200`,
 			)
 			expect(((await list.json()) as { items: unknown[] }).items).toEqual([])
+		}
+	})
+})
+
+test.describe('updates from YAML', () => {
+	interface Change {
+		field: string
+		from: string | null
+		to: string | null
+	}
+
+	interface PortRef {
+		name: string
+		side: 'front' | 'rear' | null
+		kind: string
+	}
+
+	interface UpdatePreview {
+		revision: string
+		device_count: number
+		fields: Change[]
+		added_ports: PortRef[]
+		removed_ports: PortRef[]
+		changed_ports: (PortRef & { changes: Change[] })[]
+		unchanged_ports: number
+	}
+
+	interface TypeRow {
+		model: string
+		u_height: number
+		part_number: string | null
+		spec_url: string | null
+		eol_date: string | null
+		description: string | null
+	}
+
+	const switchYaml = (model: string): string =>
+		[
+			'manufacturer: E2E Maker',
+			`model: ${model}`,
+			'u_height: 1',
+			'is_full_depth: false',
+			'default_device_role: E2E Role',
+			'part_number: PN-1',
+			'spec_url: https://example.com/spec',
+			'eol_date: 2031-03-01',
+			'description: Before',
+			'interfaces:',
+			'  - name: eth[1-3]',
+			'    type: 1000base-t',
+			'    description: Uplink',
+			'    poe_mode: pse',
+			'    poe_type: type2-ieee802.3at',
+			'power-ports:',
+			'  - name: psu',
+			'    type: iec-60320-c14',
+			'    maximum_draw: 60',
+			'',
+		].join('\n')
+
+	const panelYaml = (model: string): string =>
+		[
+			'manufacturer: E2E Maker',
+			`model: ${model}`,
+			'rear-ports:',
+			'  - name: Trunk',
+			'    type: mpo',
+			'    positions: 2',
+			'front-ports:',
+			'  - name: Trunk',
+			'    type: lc',
+			'  - name: B',
+			'    type: lc',
+			'port-mappings:',
+			'  - front_port: Trunk',
+			'    front_port_position: 1',
+			'    rear_port: Trunk',
+			'    rear_port_position: 1',
+			'  - front_port: B',
+			'    front_port_position: 1',
+			'    rear_port: Trunk',
+			'    rear_port_position: 2',
+			'',
+		].join('\n')
+
+	async function importType(
+		api: APIRequestContext,
+		cleanup: Cleanup,
+		yaml: string,
+	): Promise<number> {
+		const res = await ok(await api.post('/api/device-types/import', { data: { yaml } }))
+		const body = (await res.json()) as { rows: { id: number | null; error: string | null }[] }
+		const id = body.rows[0]?.id
+		expect(id, JSON.stringify(body)).toBeTruthy()
+		cleanup.add(`device-types/${id}`)
+		return id as number
+	}
+
+	async function exported(api: APIRequestContext, typeId: number): Promise<string> {
+		const res = await ok(await api.get(`/api/device-types/${typeId}/yaml`))
+		return ((await res.json()) as { yaml: string }).yaml
+	}
+
+	async function previewUpdate(
+		api: APIRequestContext,
+		typeId: number,
+		yaml: string,
+	): Promise<UpdatePreview> {
+		const res = await ok(
+			await api.post(`/api/device-types/${typeId}/update-preview`, { data: { yaml } }),
+		)
+		return (await res.json()) as UpdatePreview
+	}
+
+	interface StubRow {
+		prefix: string
+		side: 'front' | 'rear' | null
+		description: string | null
+		poe_mode: string | null
+		poe_type: string | null
+		rear_position: number
+	}
+
+	async function stubRows(api: APIRequestContext, typeId: number): Promise<StubRow[]> {
+		const res = await ok(await api.get(`/api/device-types/${typeId}/stubs`))
+		return (await res.json()) as StubRow[]
+	}
+
+	async function typeOf(api: APIRequestContext, typeId: number): Promise<TypeRow> {
+		return (await (await ok(await api.get(`/api/device-types/${typeId}`))).json()) as TypeRow
+	}
+
+	const noChange = {
+		fields: [],
+		added_ports: [],
+		removed_ports: [],
+		changed_ports: [],
+	}
+
+	test('the export imports back as the same type and previews no change', async ({ page }) => {
+		const api = page.request
+		const cleanup = new Cleanup(api)
+		try {
+			for (const build of [switchYaml, panelYaml]) {
+				const model = unique('Round')
+				const typeId = await importType(api, cleanup, build(model))
+				const yaml = await exported(api, typeId)
+				expect(await previewUpdate(api, typeId, yaml)).toMatchObject(noChange)
+
+				const copy = unique('Copy')
+				const copyId = await importType(api, cleanup, yaml.replace(model, copy))
+				expect(await exported(api, copyId)).toBe(yaml.replace(model, copy))
+			}
+		} finally {
+			await cleanup.run()
+		}
+	})
+
+	test('an omitted key keeps its value, null clears it and a dropped port goes', async ({
+		page,
+	}) => {
+		const api = page.request
+		const cleanup = new Cleanup(api)
+		try {
+			const model = unique('Merge')
+			const typeId = await importType(api, cleanup, switchYaml(model))
+			const before = await exported(api, typeId)
+			const yaml = [
+				'description: After',
+				'spec_url: null',
+				'eol_date: 2032-01-01',
+				'interfaces:',
+				'  - name: eth1',
+				'  - name: eth2',
+				'    description: Changed',
+				'  - name: mgmt',
+				'    type: 10gbase-t',
+				'',
+			].join('\n')
+
+			const planned = await previewUpdate(api, typeId, yaml)
+			expect(planned.fields.map((change) => change.field).sort()).toEqual([
+				'description',
+				'eol_date',
+				'spec_url',
+			])
+			expect(planned.fields.find((change) => change.field === 'spec_url')?.to).toBeNull()
+			expect(planned.added_ports.map((port) => port.name)).toEqual(['mgmt'])
+			expect(planned.removed_ports.map((port) => port.name)).toEqual(['eth3'])
+			expect(planned.changed_ports.map((port) => port.name)).toEqual(['eth2'])
+			// eth1 and the untouched power port.
+			expect(planned.unchanged_ports).toBe(2)
+			expect(await exported(api, typeId)).toBe(before)
+
+			await ok(
+				await api.post(`/api/device-types/${typeId}/update`, {
+					data: { yaml, revision: planned.revision },
+				}),
+			)
+			expect(await typeOf(api, typeId)).toMatchObject({
+				model,
+				description: 'After',
+				part_number: 'PN-1',
+				spec_url: null,
+				eol_date: '2032-01-01',
+			})
+			const after = await stubRows(api, typeId)
+			expect(after.find((stub) => stub.prefix === 'eth1')).toMatchObject({
+				description: 'Uplink',
+				poe_mode: 'pse',
+				poe_type: 'type2-ieee802.3at',
+			})
+			expect(after.find((stub) => stub.prefix === 'eth2')).toMatchObject({
+				description: 'Changed',
+				poe_mode: 'pse',
+			})
+			expect(after.map((stub) => stub.prefix).sort()).toEqual(['eth1', 'eth2', 'mgmt', 'psu'])
+		} finally {
+			await cleanup.run()
+		}
+	})
+
+	test('a pass-through port can be remapped, and a clash leaves the type alone', async ({
+		page,
+	}) => {
+		const api = page.request
+		const cleanup = new Cleanup(api)
+		try {
+			const typeId = await importType(api, cleanup, panelYaml(unique('Panel')))
+			const before = await exported(api, typeId)
+			const clash = await api.post(`/api/device-types/${typeId}/update-preview`, {
+				data: {
+					yaml: [
+						'port-mappings:',
+						'  - front_port: B',
+						'    front_port_position: 1',
+						'    rear_port: Trunk',
+						'    rear_port_position: 1',
+						'',
+					].join('\n'),
+				},
+			})
+			expect(clash.ok()).toBe(false)
+			expect(await exported(api, typeId)).toBe(before)
+
+			const yaml = [
+				'port-mappings:',
+				'  - front_port: Trunk',
+				'    front_port_position: 1',
+				'    rear_port: Trunk',
+				'    rear_port_position: 2',
+				'  - front_port: B',
+				'    front_port_position: 1',
+				'    rear_port: Trunk',
+				'    rear_port_position: 1',
+				'',
+			].join('\n')
+			const planned = await previewUpdate(api, typeId, yaml)
+			expect(planned.changed_ports.map((port) => [port.name, port.side]).sort()).toEqual([
+				['B', 'front'],
+				['Trunk', 'front'],
+			])
+			await ok(
+				await api.post(`/api/device-types/${typeId}/update`, {
+					data: { yaml, revision: planned.revision },
+				}),
+			)
+			const fronts = (await stubRows(api, typeId)).filter((stub) => stub.side === 'front')
+			expect(fronts.map((stub) => [stub.prefix, stub.rear_position]).sort()).toEqual([
+				['B', 1],
+				['Trunk', 2],
+			])
+		} finally {
+			await cleanup.run()
+		}
+	})
+
+	test('a type that changed since the preview is refused', async ({ page }) => {
+		const api = page.request
+		const cleanup = new Cleanup(api)
+		try {
+			const typeId = await importType(api, cleanup, switchYaml(unique('Stale')))
+			const yaml = 'description: From the preview\n'
+			const { revision } = await previewUpdate(api, typeId, yaml)
+			await ok(
+				await api.patch(`/api/device-types/${typeId}`, { data: { description: 'Edited' } }),
+			)
+
+			const res = await api.post(`/api/device-types/${typeId}/update`, {
+				data: { yaml, revision },
+			})
+			expect(res.status()).toBe(409)
+			expect((await typeOf(api, typeId)).description).toBe('Edited')
+		} finally {
+			await cleanup.run()
+		}
+	})
+
+	test('unusable YAML is refused and writes nothing', async ({ page }) => {
+		const api = page.request
+		const cleanup = new Cleanup(api)
+		try {
+			const typeId = await importType(api, cleanup, switchYaml(unique('Refused')))
+			const before = await exported(api, typeId)
+			const cases: [string, RegExp][] = [
+				['key: [', /Invalid YAML/],
+				['- a\n- b\n', /exactly one device type/],
+				['manufacturer: E2E Nobody\n', /Unknown manufacturer/],
+				['default_device_role: E2E Nobody\n', /Unknown default_device_role/],
+				['eol_date: 2031-02-30\n', /date/i],
+				['u_height: 61\n', /u_height/],
+				['interfaces:\n  - name: eth1\n    type: nope\n', /type must be one of/],
+				['interfaces:\n  - name: a\n    poe_type: type1-ieee802.3af\n', /PoE/],
+			]
+			for (const [yaml, message] of cases) {
+				const res = await api.post(`/api/device-types/${typeId}/update-preview`, {
+					data: { yaml },
+				})
+				expect(res.ok(), yaml).toBe(false)
+				expect(await res.text(), yaml).toMatch(message)
+			}
+			expect(await exported(api, typeId)).toBe(before)
+		} finally {
+			await cleanup.run()
 		}
 	})
 })
