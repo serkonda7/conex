@@ -63,9 +63,9 @@ export async function fetch_manufacturers(
 	)
 }
 
-export async function fetch_manufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
+export async function fetch_manufacturer(id: number): Promise<Result<ManufacturerListRow, Error>> {
 	const res = await client.manufacturers[':id'].$get(by_id(id))
-	return to_result<ManufacturerRow>(res, failed.load('noun.manufacturer'))
+	return to_result<ManufacturerListRow>(res, failed.load('noun.manufacturer'))
 }
 
 export async function create_manufacturer(

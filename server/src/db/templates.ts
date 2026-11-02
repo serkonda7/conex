@@ -1,10 +1,11 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
 import type {
 	DeviceTypeCreate,
 	DeviceTypeListQuery,
 	DeviceTypeUpdate,
 	ManufacturerCreate,
+	ManufacturerListQuery,
 	ManufacturerUpdate,
 	StubCreate,
 	StubUpdate,
@@ -45,7 +46,13 @@ import { rackHeightOf, rackSpansOf } from './racks'
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
 export type StubRow = typeof device_type_interfaces.$inferSelect
-export type ManufacturerListRow = ManufacturerRow & { device_count: number }
+/** Catalog and usage counts; `past_eol_count`: device types past their EOL date. */
+export type ManufacturerListRow = ManufacturerRow & {
+	device_type_count: number
+	rack_type_count: number
+	device_count: number
+	past_eol_count: number
+}
 /** `instance_count`: devices built from the type. */
 export type DeviceTypeListRow = DeviceTypeRow & { instance_count: number }
 
@@ -56,26 +63,49 @@ export type DeviceTypeListRow = DeviceTypeRow & { instance_count: number }
 const MANUFACTURER_NAME_IN_USE = 'Manufacturer name is already in use'
 
 export interface ManufacturerListParams extends ListParams {
-	sort: 'name' | 'description'
+	sort: ManufacturerListQuery['sort']
 	order: 'asc' | 'desc'
 }
 
 export async function listManufacturers(
 	params: ManufacturerListParams,
 ): Promise<Page<ManufacturerListRow>> {
-	const orderColumn =
-		params.sort === 'description' ? manufacturers.description : manufacturers.name
+	const orderColumns = {
+		name: manufacturers.name,
+		description: manufacturers.description,
+		website: manufacturers.website,
+		device_types: sql`(SELECT count(*) FROM ${device_types} WHERE ${device_types.manufacturer_id} = ${manufacturers.id})`,
+		rack_types: sql`(SELECT count(*) FROM ${rack_types} WHERE ${rack_types.manufacturer_id} = ${manufacturers.id})`,
+		devices: sql`(SELECT count(*) FROM ${devices} INNER JOIN ${device_types} ON ${device_types.id} = ${devices.device_type_id} WHERE ${device_types.manufacturer_id} = ${manufacturers.id})`,
+		past_eol: sql`(SELECT count(*) FROM ${device_types} WHERE ${device_types.manufacturer_id} = ${manufacturers.id} AND ${device_types.eol_date} < CURRENT_DATE)`,
+	}
 	const page = await pageRows(
 		manufacturers,
 		searchCondition(params.search, [manufacturers.name]),
-		[orderOf(orderColumn, params.order), asc(manufacturers.id)],
+		[orderOf(orderColumns[params.sort], params.order), asc(manufacturers.id)],
 		params,
 	)
-	const counts = await manufacturerDeviceCounts(page.items.map((m) => m.id))
-	return {
-		...page,
-		items: page.items.map((m) => ({ ...m, device_count: counts.get(m.id) ?? 0 })),
-	}
+	const withCounts = await manufacturerCounts(page.items.map((m) => m.id))
+	return { ...page, items: page.items.map(withCounts) }
+}
+
+/** Adds the counts to rows of `ids`. */
+async function manufacturerCounts(
+	ids: number[],
+): Promise<(row: ManufacturerRow) => ManufacturerListRow> {
+	const [typeCounts, rackTypeCounts, deviceCounts, pastEolCounts] = await Promise.all([
+		countBy(device_types.manufacturer_id, ids),
+		countBy(rack_types.manufacturer_id, ids),
+		manufacturerDeviceCounts(ids),
+		manufacturerPastEolCounts(ids),
+	])
+	return (row: ManufacturerRow): ManufacturerListRow => ({
+		...row,
+		device_type_count: typeCounts.get(row.id) ?? 0,
+		rack_type_count: rackTypeCounts.get(row.id) ?? 0,
+		device_count: deviceCounts.get(row.id) ?? 0,
+		past_eol_count: pastEolCounts.get(row.id) ?? 0,
+	})
 }
 
 /** Devices per manufacturer (through their device type); ids without devices are absent. */
@@ -92,8 +122,38 @@ async function manufacturerDeviceCounts(ids: number[]): Promise<Map<number, numb
 	return new Map(rows.map((r) => [r.id, r.n]))
 }
 
+/** Device types past their EOL date per manufacturer; ids without any are absent. */
+async function manufacturerPastEolCounts(ids: number[]): Promise<Map<number, number>> {
+	if (ids.length === 0) {
+		return new Map()
+	}
+	const rows = await getDb()
+		.select({ id: device_types.manufacturer_id, n: count() })
+		.from(device_types)
+		.where(
+			and(
+				inArray(device_types.manufacturer_id, ids),
+				lt(device_types.eol_date, sql`CURRENT_DATE`),
+			),
+		)
+		.groupBy(device_types.manufacturer_id)
+	return new Map(rows.map((r) => [r.id, r.n]))
+}
+
 export function getManufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
 	return findById(manufacturers, id, 'Manufacturer not found')
+}
+
+/** The manufacturer with its counts, for the detail page. */
+export async function getManufacturerDetail(
+	id: number,
+): Promise<Result<ManufacturerListRow, Error>> {
+	const row = await getManufacturer(id)
+	if (Result.isError(row)) {
+		return row
+	}
+	const withCounts = await manufacturerCounts([id])
+	return Result.ok(withCounts(row.value))
 }
 
 /** Name uniqueness guard; `excludeId` skips the row being updated. */
@@ -120,6 +180,9 @@ export async function createManufacturer(
 	const row: Omit<ManufacturerRow, 'id'> = {
 		name: input.name,
 		description: input.description ?? null,
+		website: input.website ?? null,
+		support_url: input.support_url ?? null,
+		comments: input.comments ?? null,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -146,7 +209,7 @@ export async function updateManufacturer(
 	if (Result.isError(unique)) {
 		return unique
 	}
-	const patch = pickDefined(input, ['name', 'description'])
+	const patch = pickDefined(input, ['name', 'description', 'website', 'support_url', 'comments'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(manufacturers).set(patch).where(eq(manufacturers.id, id)),

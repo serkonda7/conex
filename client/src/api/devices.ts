@@ -34,6 +34,7 @@ export async function fetch_device_list(
 				rack: filters?.rack,
 				role: filters?.role,
 				device_type: filters?.device_type,
+				manufacturer: filters?.manufacturer,
 				employee: filters?.employee,
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,

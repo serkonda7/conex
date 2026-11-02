@@ -53,6 +53,7 @@ export function DevicesPage(): JSX.Element {
 	const [filterRole, setFilterRole] = useQueryFilterList('role')
 	const [filterTenant] = useQueryFilter('tenant')
 	const [filterType] = useQueryFilter('device_type')
+	const [filterManufacturer] = useQueryFilter('manufacturer')
 	const [filterSite] = useQueryFilter('site')
 	const [filterEmployee, setFilterEmployee] = useQueryFilterList('employee')
 	const [filterKind, setFilterKind] = useQueryFilterList('kind')
@@ -68,6 +69,7 @@ export function DevicesPage(): JSX.Element {
 			rack: idsOf(filterRack()),
 			role: idsOf(filterRole()),
 			device_type: parseId(filterType()) ?? undefined,
+			manufacturer: parseId(filterManufacturer()) ?? undefined,
 			site: parseId(filterSite()) ?? undefined,
 			employee: idsOf(filterEmployee()),
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
@@ -239,6 +241,7 @@ export function DevicesPage(): JSX.Element {
 				filtered={
 					filterTenant() !== '' ||
 					filterType() !== '' ||
+					filterManufacturer() !== '' ||
 					filterSite() !== '' ||
 					tenantContext().kind !== 'all'
 				}

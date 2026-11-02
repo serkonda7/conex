@@ -944,6 +944,10 @@ tbody tr:last-child td {
 	white-space: nowrap;
 }
 
+.related-tabs {
+	scroll-margin-top: var(--topbar-height);
+}
+
 .related-tabs-all {
 	display: inline-block;
 	margin-top: 0.4rem;
@@ -1126,6 +1130,11 @@ tbody tr:last-child td {
 .badge-staged {
 	color: var(--link);
 	border-color: var(--link);
+}
+
+.badge-warning {
+	color: var(--warning);
+	border-color: var(--warning);
 }
 
 .badge-decommissioned,

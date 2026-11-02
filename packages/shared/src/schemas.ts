@@ -682,11 +682,17 @@ export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
 	description: DescriptionSchema,
+	website: v.optional(WebsiteSchema, undefined),
+	support_url: v.optional(WebsiteSchema, undefined),
+	comments: CommentsSchema,
 })
 
 export const ManufacturerUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	website: v.optional(v.nullable(WebsiteSchema), undefined),
+	support_url: v.optional(v.nullable(WebsiteSchema), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 export const DeviceTypeCreateSchema = v.strictObject({
@@ -804,7 +810,18 @@ export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(
+		v.picklist([
+			'name',
+			'description',
+			'website',
+			'device_types',
+			'rack_types',
+			'devices',
+			'past_eol',
+		]),
+		'name',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1407,6 +1424,8 @@ export const DeviceListQuerySchema = v.object({
 	rack: OptionalIdListEntry,
 	role: OptionalIdListEntry,
 	device_type: OptionalIdEntry,
+	/** Devices whose type comes from this manufacturer (hides VMs). */
+	manufacturer: OptionalIdEntry,
 	employee: OptionalIdListEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,

@@ -5,7 +5,13 @@ import {
 	type ManufacturerRow,
 	update_manufacturer,
 } from '../../api/templates'
-import { DescriptionField, FormPage, NameField } from '../../components/form'
+import {
+	CommentsField,
+	DescriptionField,
+	FormPage,
+	NameField,
+	TextField,
+} from '../../components/form'
 import { t } from '../../i18n'
 import {
 	type FormValues,
@@ -21,12 +27,18 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 	// `?name=` comes from the search typed into an opener's dropdown.
 	const [name, setName] = createSignal(queryParam('name'))
 	const [description, setDescription] = createSignal('')
+	const [website, setWebsite] = createSignal('')
+	const [supportUrl, setSupportUrl] = createSignal('')
+	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_manufacturer,
 		fill: (row: ManufacturerRow) => {
 			setName(row.name)
 			setDescription(row.description ?? '')
+			setWebsite(row.website ?? '')
+			setSupportUrl(row.support_url ?? '')
+			setComments(row.comments ?? '')
 		},
 	})
 	const prefix = form.editing ? 'manufacturer-edit' : 'manufacturer'
@@ -40,16 +52,28 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 			name: name(),
 			save: ({ name: trimmed }: FormValues) =>
 				id === undefined
-					? create_manufacturer({ name: trimmed, description: text(description()) })
+					? create_manufacturer({
+							name: trimmed,
+							description: text(description()),
+							website: text(website()),
+							support_url: text(supportUrl()),
+							comments: text(comments()),
+						})
 					: update_manufacturer(id, {
 							name: trimmed,
 							description: text(description()) ?? null,
+							website: text(website()) ?? null,
+							support_url: text(supportUrl()) ?? null,
+							comments: text(comments()) ?? null,
 						}),
 			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
 				? (): void => {
 						setName('')
 						setDescription('')
+						setWebsite('')
+						setSupportUrl('')
+						setComments('')
 					}
 				: undefined,
 		})
@@ -76,6 +100,23 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 				value={description()}
 				onInput={setDescription}
 			/>
+			<TextField
+				id={`${prefix}-website`}
+				label={t('manufacturer.website')}
+				placeholder={t('manufacturer.websitePlaceholder')}
+				maxLength={200}
+				value={website()}
+				onInput={setWebsite}
+			/>
+			<TextField
+				id={`${prefix}-support-url`}
+				label={t('manufacturer.supportUrl')}
+				placeholder={t('manufacturer.supportUrlPlaceholder')}
+				maxLength={200}
+				value={supportUrl()}
+				onInput={setSupportUrl}
+			/>
+			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>
 	)
 }

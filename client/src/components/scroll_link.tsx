@@ -9,6 +9,8 @@ export function ScrollLink(props: {
 	/** Id of the element to scroll to. */
 	target: string
 	class?: string
+	/** Runs before scrolling, e.g. to open the tab holding the target. */
+	onFollow?: () => void
 	children: JSX.Element
 }): JSX.Element {
 	function onClick(e: MouseEvent & { currentTarget: HTMLAnchorElement }): void {
@@ -16,6 +18,7 @@ export function ScrollLink(props: {
 			return
 		}
 		e.preventDefault()
+		props.onFollow?.()
 		e.currentTarget
 			.closest('.tab-pane')
 			?.querySelector(`#${CSS.escape(props.target)}`)

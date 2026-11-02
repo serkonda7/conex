@@ -311,6 +311,9 @@ export const manufacturers = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		description: text('description'),
+		website: text('website'),
+		support_url: text('support_url'),
+		comments: text('comments'),
 	},
 	(table) => [index('manufacturers_name_idx').on(table.name)],
 )

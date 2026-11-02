@@ -51,6 +51,7 @@ import { createRecord, createRows, createRowsFor, useAction } from '../../lib/re
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
 import { formatDate } from '../../lib/time'
+import { devicePlacementColumns } from '../devices/placement_columns'
 import { TemplateSyncDialog } from '../devices/template_sync_dialog'
 import {
 	AddComponentMenu,
@@ -387,43 +388,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 
 	const deviceColumns: DataTableColumn<DeviceListDevice>[] = [
 		nameColumn<DeviceListDevice>(t('common.name'), '/devices'),
-		{
-			key: 'tenant',
-			label: tp('entity.tenant', 1),
-			getValue: (d: DeviceListDevice): JSX.Element => (
-				<Show when={d.tenant_id} fallback="—">
-					{(tenant: () => number) => (
-						<a href={`/tenants/${tenant()}`}>{tenantName(tenant())}</a>
-					)}
-				</Show>
-			),
-		},
-		{
-			key: 'site',
-			label: t('tenant.siteRack'),
-			getValue: (d: DeviceListDevice): JSX.Element => (
-				<Show when={d.site_id !== null || d.rack_id !== null} fallback="—">
-					<Show when={d.site_id}>
-						{(site: () => number) => (
-							<a href={`/sites/${site()}`}>{siteName(site())}</a>
-						)}
-					</Show>
-					<Show when={d.site_id !== null && d.rack_id !== null}> / </Show>
-					<Show when={d.rack_id}>
-						{(rack: () => number) => (
-							<a href={`/racks/${rack()}`}>
-								{d.position_u === null
-									? rackName(rack())
-									: t('device.mountPosition', {
-											rack: rackName(rack()),
-											u: d.position_u,
-										})}
-							</a>
-						)}
-					</Show>
-				</Show>
-			),
-		},
+		...devicePlacementColumns({ tenantName, siteName, rackName }),
 		{
 			key: 'template_sync',
 			label: t('device.templateSync.column'),

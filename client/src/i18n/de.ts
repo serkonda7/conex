@@ -445,6 +445,19 @@ export const de: Messages = {
 	'manufacturer.namePlaceholder': 'Musterhersteller',
 	'manufacturer.notFound': 'Hersteller nicht gefunden.',
 	'manufacturer.noDeviceTypes': 'Für diesen Hersteller sind noch keine Gerätetypen vorhanden.',
+	'manufacturer.noRackTypes': 'Für diesen Hersteller sind noch keine Racktypen vorhanden.',
+	'manufacturer.noDevices': 'Für diesen Hersteller sind noch keine Geräte vorhanden.',
+	'manufacturer.details': 'Herstellerdetails',
+	'manufacturer.related': 'Verknüpfte Objekte',
+	'manufacturer.section.contact': 'Kontakt',
+	'manufacturer.section.catalog': 'Katalog',
+	'manufacturer.website': 'Website',
+	'manufacturer.websitePlaceholder': 'example.com',
+	'manufacturer.supportUrl': 'Support',
+	'manufacturer.supportUrlPlaceholder': 'example.com/support',
+	'manufacturer.pastEol': 'EOL',
+	'manufacturer.pastEolTypes.one': '{count} Gerätetyp',
+	'manufacturer.pastEolTypes.other': '{count} Gerätetypen',
 
 	// deviceType
 	'deviceType.empty':

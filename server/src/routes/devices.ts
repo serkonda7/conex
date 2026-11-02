@@ -90,6 +90,7 @@ export const devicesApp = new Hono()
 				rack: query.rack,
 				role: query.role,
 				device_type: query.device_type,
+				manufacturer: query.manufacturer,
 				employee: query.employee,
 				status: query.status,
 				placed: query.placed,

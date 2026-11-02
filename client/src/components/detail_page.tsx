@@ -258,13 +258,25 @@ export interface RelatedTab {
  * Card of related-object tabs, each with a count badge, a preview panel and
  * a "View all N in …" link; the first tab starts active.
  */
-export function RelatedTabs(props: { id: string; label: string; tabs: RelatedTab[] }): JSX.Element {
-	const [active, setActive] = createSignal<string | null>(null)
+export function RelatedTabs(props: {
+	id: string
+	label: string
+	tabs: RelatedTab[]
+	/** Active tab key, for pages that also switch tabs from outside. */
+	active?: string | null
+	onActiveChange?: (key: string) => void
+}): JSX.Element {
+	const [ownActive, setOwnActive] = createSignal<string | null>(null)
+	const active = (): string | null | undefined => props.active ?? ownActive()
+	const setActive = (key: string): void => {
+		setOwnActive(key)
+		props.onActiveChange?.(key)
+	}
 	const current = (): RelatedTab | undefined =>
 		props.tabs.find((tab: RelatedTab) => tab.key === active()) ?? props.tabs[0]
 	const tabId = (tab: RelatedTab): string => `${props.id}-${tab.key}`
 	return (
-		<section class="card related-tabs" aria-label={props.label}>
+		<section class="card related-tabs" id={props.id} aria-label={props.label}>
 			<div class="related-tabs-bar" role="tablist" aria-label={props.label}>
 				<For each={props.tabs}>
 					{(tab: RelatedTab): JSX.Element => (
