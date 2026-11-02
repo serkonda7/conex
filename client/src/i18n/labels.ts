@@ -31,6 +31,9 @@ import {
 	type Permission,
 	PHONE_TYPES,
 	type PhoneType,
+	POE_TYPE_NAMES,
+	type PoeMode,
+	type PoeType,
 	type PortKind,
 	type PortSide,
 	RACK_FORM_FACTORS,
@@ -149,17 +152,37 @@ export function portKindLabel(value: string): string {
 	return lookup(PORT_KIND_KEYS, value)
 }
 
-/** Option of a port kind; a trailing `(…)` goes to the detail column, which aligns it. */
-export function portKindOption(value: string): FormOption {
-	const label = portKindLabel(value)
+/** Option label, with a trailing `(…)` in the detail column, which aligns and mutes it. */
+function detailedLabel(label: string): Pick<FormOption, 'label' | 'detail'> {
 	const paren = label.indexOf(' (')
-	return {
-		value,
-		icon: portKindIcon(value),
-		...(paren === -1
-			? { label }
-			: { label: label.slice(0, paren), detail: label.slice(paren + 1) }),
-	}
+	return paren === -1
+		? { label }
+		: { label: label.slice(0, paren), detail: label.slice(paren + 1) }
+}
+
+/** Option of a port kind. */
+export function portKindOption(value: string): FormOption {
+	return { value, icon: portKindIcon(value), ...detailedLabel(portKindLabel(value)) }
+}
+
+const POE_MODE_KEYS: Record<PoeMode, MessageKey> = {
+	pse: 'poeMode.pse',
+	pd: 'poeMode.pd',
+}
+
+/** PoE mode (`pse` / `pd`). */
+export function poeModeLabel(value: string): string {
+	return lookup(POE_MODE_KEYS, value)
+}
+
+/** PoE type (`type2-ieee802.3at`, …): an untranslated display name, like NetBox interface types. */
+export function poeTypeLabel(value: PoeType): string {
+	return POE_TYPE_NAMES[value]
+}
+
+/** Option of a PoE type. */
+export function poeTypeOption(value: PoeType): FormOption {
+	return { value, ...detailedLabel(poeTypeLabel(value)) }
 }
 
 const PORT_SIDE_KEYS: Record<PortSide, MessageKey> = {

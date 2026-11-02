@@ -379,6 +379,13 @@
       "when": 1793606400000,
       "tag": "0053_interface_template_name",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1793692800000,
+      "tag": "0054_stub_power",
+      "breakpoints": true
     }
   ]
 }

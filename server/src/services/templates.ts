@@ -1,5 +1,6 @@
 import { Result } from 'better-result'
-import type { ExpandedInterface, PortSide } from 'shared/src/schemas'
+import { OTHER_PORT_KINDS } from 'shared/src/ports'
+import { type ExpandedInterface, POWER_INPUT_KINDS, type PortSide } from 'shared/src/schemas'
 
 /**
  * Pure stub-expansion helpers for device templates. They operate on in-memory
@@ -19,10 +20,33 @@ export interface StubInput {
 	positions?: number
 	rear_stub_id?: number | null
 	rear_position?: number
+	maximum_draw?: number | null
+	poe_mode?: string | null
+	poe_type?: string | null
 }
 
 function invalid(message: string): Result<never, Error> {
 	return Result.err(new Error(message))
+}
+
+/**
+ * Why a stub's power fields don't fit it, or null: a maximum draw belongs on a
+ * power input, PoE on a network interface, and a PoE type needs a PoE mode.
+ */
+export function stubPowerError(stub: StubInput): string | null {
+	const powerInput =
+		stub.kind === 'power' || (POWER_INPUT_KINDS as readonly string[]).includes(stub.kind)
+	if ((stub.maximum_draw ?? null) !== null && !powerInput) {
+		return 'A maximum draw is only allowed on power inputs'
+	}
+	const poe = (stub.poe_mode ?? stub.poe_type ?? null) !== null
+	if (poe && (stub.side != null || OTHER_PORT_KINDS.has(stub.kind))) {
+		return 'PoE is only allowed on network interfaces'
+	}
+	if ((stub.poe_type ?? null) !== null && (stub.poe_mode ?? null) === null) {
+		return 'A PoE type needs a PoE mode'
+	}
+	return null
 }
 
 /**

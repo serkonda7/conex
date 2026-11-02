@@ -484,6 +484,17 @@ export const en = {
 	'deviceType.component.noRearPorts': 'Add rear ports first',
 	'deviceType.component.mapping': 'Mapping',
 	'deviceType.component.mapsTo': '→ {rear} from position {position}',
+	'deviceType.component.power': 'Power',
+	'deviceType.component.maximumDraw': 'Max. power draw (W)',
+	'deviceType.component.maximumDrawInvalid':
+		'Max. power draw must be an integer from 1 to {max}.',
+	'deviceType.component.watts': '{watts} W',
+	'deviceType.component.poeMode': 'PoE mode',
+	'deviceType.component.noPoe': 'No PoE',
+	'deviceType.component.poeType': 'PoE type',
+	'deviceType.component.noPoeType': 'Not specified',
+	'poeMode.pse': 'Supply (PSE)',
+	'poeMode.pd': 'Draw (PD)',
 	'deviceType.component.existingDevicesHint':
 		'{count} existing devices are not changed! Update them in the device list below.',
 	'deviceType.preset.patchPanel': 'Patch panel (N ports)',

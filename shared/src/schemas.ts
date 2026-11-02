@@ -888,7 +888,44 @@ export const RackTypeUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
+/** NetBox `poe_mode`: `pse` supplies power over the port, `pd` draws it. */
+export const POE_MODES = ['pse', 'pd'] as const
+
+export type PoeMode = (typeof POE_MODES)[number]
+
+/** NetBox `poe_type`: the PoE standard of a port. */
+export const POE_TYPES = [
+	'type1-ieee802.3af',
+	'type2-ieee802.3at',
+	'type3-ieee802.3bt',
+	'type4-ieee802.3bt',
+] as const
+
+export type PoeType = (typeof POE_TYPES)[number]
+
+/** Display names of the PoE types, written like the Wi-Fi interface types. */
+export const POE_TYPE_NAMES: Record<PoeType, string> = {
+	'type1-ieee802.3af': 'PoE (IEEE 802.3af, 15 W)',
+	'type2-ieee802.3at': 'PoE+ (IEEE 802.3at, 30 W)',
+	'type3-ieee802.3bt': 'PoE++ (IEEE 802.3bt, 60 W)',
+	'type4-ieee802.3bt': 'PoE++ (IEEE 802.3bt, 100 W)',
+}
+
+/** Upper bound of a power input's maximum draw, in watts. */
+export const MAX_POWER_DRAW = 1_000_000
+
+/** Power fields of a stub: `maximum_draw` on power inputs, PoE on network interfaces. */
+export const StubPowerEntries = {
+	maximum_draw: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_POWER_DRAW))),
+		undefined,
+	),
+	poe_mode: v.optional(v.nullable(v.picklist(POE_MODES)), undefined),
+	poe_type: v.optional(v.nullable(v.picklist(POE_TYPES)), undefined),
+}
+
 /** Stub fields besides the name. */
+// biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
 const StubFieldEntries = {
 	count: v.optional(StubCountSchema, 1),
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
@@ -900,6 +937,7 @@ const StubFieldEntries = {
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
+	...StubPowerEntries,
 }
 
 /**
@@ -945,6 +983,7 @@ export const StubUpdateSchema = v.strictObject({
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
+	...StubPowerEntries,
 })
 
 export type ManufacturerCreate = v.InferOutput<typeof ManufacturerCreateSchema>

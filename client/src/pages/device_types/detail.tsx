@@ -28,7 +28,13 @@ import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel, portKindLabel, yesNo } from '../../i18n/labels'
+import {
+	deviceRoleLabel,
+	poeModeLabel,
+	poeTypeLabel,
+	portKindLabel,
+	yesNo,
+} from '../../i18n/labels'
 import { portKindIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
@@ -101,10 +107,26 @@ function ComponentKind(props: { kind: string }): JSX.Element {
 	)
 }
 
-/** One stub; `mapping` is set on patch-panel types, `children` are its actions. */
+/** Maximum draw of a power input or PoE setup of an interface; null when it has neither. */
+function powerDetails(stub: StubRow): string | null {
+	if (stub.maximum_draw !== null) {
+		return t('deviceType.component.watts', { watts: stub.maximum_draw })
+	}
+	if (stub.poe_mode === null) {
+		return null
+	}
+	const mode = poeModeLabel(stub.poe_mode)
+	return stub.poe_type === null ? mode : `${mode} · ${poeTypeLabel(stub.poe_type)}`
+}
+
+/**
+ * One stub; `mapping` is set on patch-panel types, `power` on types with power
+ * details, `children` are its actions.
+ */
 function ComponentRow(props: {
 	stub: StubRow
 	mapping: string | undefined
+	power: string | undefined
 	children: JSX.Element
 }): JSX.Element {
 	return (
@@ -116,6 +138,9 @@ function ComponentRow(props: {
 			</td>
 			<Show when={props.mapping !== undefined}>
 				<td>{props.mapping}</td>
+			</Show>
+			<Show when={props.power !== undefined}>
+				<td>{props.power}</td>
 			</Show>
 			<td>{props.stub.description || '—'}</td>
 			<Show when={canChangeStubs()}>
@@ -175,7 +200,10 @@ function ComponentTable(props: {
 		COMPONENT_CLASSES.filter((info) => props.stubsOf(info).length > 0)
 	/** Patch-panel types add a column with the rear positions or front-to-rear mapping. */
 	const hasPassThrough = (): boolean => props.stubs.some((row) => row.side !== null)
-	const columnCount = (): number => 4 + Number(hasPassThrough()) + Number(canChangeStubs())
+	/** Types with a maximum draw or PoE add a column for them. */
+	const hasPower = (): boolean => props.stubs.some((row) => powerDetails(row) !== null)
+	const columnCount = (): number =>
+		4 + Number(hasPassThrough()) + Number(hasPower()) + Number(canChangeStubs())
 	const stubPrefix = (stubId: number | null): string =>
 		props.stubs.find((row) => row.id === stubId)?.prefix ?? '—'
 	const passThrough = (s: StubRow): string => {
@@ -203,6 +231,9 @@ function ComponentTable(props: {
 						<Show when={hasPassThrough()}>
 							<th scope="col">{t('deviceType.component.mapping')}</th>
 						</Show>
+						<Show when={hasPower()}>
+							<th scope="col">{t('deviceType.component.power')}</th>
+						</Show>
 						<th scope="col">{t('common.description')}</th>
 						<Show when={canChangeStubs()}>
 							<th scope="col" />
@@ -223,6 +254,7 @@ function ComponentTable(props: {
 									<ComponentRow
 										stub={s}
 										mapping={hasPassThrough() ? passThrough(s) : undefined}
+										power={hasPower() ? (powerDetails(s) ?? '—') : undefined}
 									>
 										<StubActions
 											stub={s}

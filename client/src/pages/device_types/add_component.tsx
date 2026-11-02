@@ -1,6 +1,14 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { PORT_DESCRIPTION_MAX_LENGTH, SELECTABLE_PASS_THROUGH_PORT_TYPES } from 'shared/src/schemas'
+import {
+	MAX_POWER_DRAW,
+	POE_MODES,
+	POE_TYPES,
+	PORT_DESCRIPTION_MAX_LENGTH,
+	type PoeMode,
+	type PoeType,
+	SELECTABLE_PASS_THROUGH_PORT_TYPES,
+} from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
@@ -9,7 +17,7 @@ import { DescriptionField, Hint, SelectField, TextField } from '../../components
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
-import { portKindOption } from '../../i18n/labels'
+import { poeModeLabel, poeTypeOption, portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
@@ -132,7 +140,8 @@ export function AddComponentMenu(props: {
  * Add or edit form for one component class (edit when `stub` is given): a name
  * with a count (count N > 1 expands to `name1..nameN`), the class's kind,
  * and description. Rear ports add their positions, front ports the rear
- * port they map onto and the first position they take there.
+ * port they map onto and the first position they take there, power inputs
+ * their maximum draw, and network interfaces their PoE mode and type.
  */
 export function ComponentDialog(props: {
 	deviceTypeId: number
@@ -158,10 +167,15 @@ export function ComponentDialog(props: {
 		stub?.kind ??
 			(props.info.key === 'interface' ? '1000base-t' : (props.info.kinds[0] ?? 'port')),
 	)
+	const [maximumDraw, setMaximumDraw] = createSignal(String(stub?.maximum_draw ?? ''))
+	const [poeMode, setPoeMode] = createSignal<PoeMode | ''>(stub?.poe_mode ?? '')
+	const [poeType, setPoeType] = createSignal<PoeType | ''>(stub?.poe_type ?? '')
 	const [description, setDescription] = createSignal(stub?.description ?? '')
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
 	const prefix = `${stub ? 'edit' : 'add'}-${props.info.key}`
+	const isPowerInput = props.info.key === 'power-port'
+	const isInterface = props.info.key === 'interface'
 	// Stored kinds are free-form: keep an imported kind selectable.
 	const kinds: readonly string[] =
 		stub && !(props.info.kinds as readonly string[]).includes(stub.kind)
@@ -197,10 +211,27 @@ export function ComponentDialog(props: {
 			setError(t('deviceType.component.rearPortRequired'))
 			return
 		}
+		const draw = text(maximumDraw())
+		const parsedDraw = draw === undefined ? undefined : Number(draw)
+		if (
+			isPowerInput &&
+			parsedDraw !== undefined &&
+			!(Number.isInteger(parsedDraw) && parsedDraw >= 1 && parsedDraw <= MAX_POWER_DRAW)
+		) {
+			setError(t('deviceType.component.maximumDrawInvalid', { max: MAX_POWER_DRAW }))
+			return
+		}
 		const fields = {
 			count: parsedCount(),
 			kind: kind(),
 			description: text(description()),
+			...(isPowerInput ? { maximum_draw: parsedDraw } : {}),
+			...(isInterface
+				? {
+						poe_mode: poeMode() || undefined,
+						poe_type: (poeMode() && poeType()) || undefined,
+					}
+				: {}),
 		}
 		const trimmed = name().trim()
 		const passThrough = {
@@ -323,6 +354,49 @@ export function ComponentDialog(props: {
 					class="combobox-fit combobox-port-kind"
 					options={kinds.map(portKindOption)}
 				/>
+				<Show when={isPowerInput}>
+					<TextField
+						id={`${prefix}-maximum-draw`}
+						label={t('deviceType.component.maximumDraw')}
+						type="number"
+						min={1}
+						max={MAX_POWER_DRAW}
+						step={1}
+						inputmode="numeric"
+						value={maximumDraw()}
+						onInput={setMaximumDraw}
+					/>
+				</Show>
+				<Show when={isInterface}>
+					<SelectField
+						id={`${prefix}-poe-mode`}
+						label={t('deviceType.component.poeMode')}
+						value={poeMode()}
+						onChange={(value: string): void => {
+							setPoeMode(value as PoeMode | '')
+							if (!value) {
+								setPoeType('')
+							}
+						}}
+						emptyLabel={t('deviceType.component.noPoe')}
+						options={POE_MODES.map((value) => ({
+							value,
+							label: poeModeLabel(value),
+						}))}
+					/>
+					<SelectField
+						id={`${prefix}-poe-type`}
+						label={t('deviceType.component.poeType')}
+						value={poeType()}
+						onChange={(value: string): void => {
+							setPoeType(value as PoeType | '')
+						}}
+						disabled={!poeMode()}
+						emptyLabel={t('deviceType.component.noPoeType')}
+						class="combobox-fit"
+						options={POE_TYPES.map(poeTypeOption)}
+					/>
+				</Show>
 				<DescriptionField
 					id={`${prefix}-description`}
 					value={description()}

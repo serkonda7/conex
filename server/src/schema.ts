@@ -23,6 +23,8 @@ import {
 	type EmployeePhone,
 	HOLIDAY_REGIONS,
 	LOCATION_TYPES,
+	POE_MODES,
+	POE_TYPES,
 	PORT_SIDES,
 	type SavedFilterJson,
 	type ServiceWindow,
@@ -389,6 +391,11 @@ export const device_type_interfaces = pgTable(
 			(): AnyPgColumn => device_type_interfaces.id,
 		),
 		rear_position: integer('rear_position').notNull().default(1),
+		// Power inputs: NetBox `maximum_draw`, in watts.
+		maximum_draw: integer('maximum_draw'),
+		// Network interfaces: `POE_MODES` / `POE_TYPES`; a type needs a mode.
+		poe_mode: text('poe_mode', { enum: POE_MODES }),
+		poe_type: text('poe_type', { enum: POE_TYPES }),
 	},
 	(table) => [
 		index('device_type_interfaces_type_id_idx').on(table.device_type_id),
@@ -399,6 +406,10 @@ export const device_type_interfaces = pgTable(
 		check(
 			'device_type_interfaces_side_check',
 			sql`${table.positions} >= 1 AND ${table.rear_position} >= 1 AND (${table.side} IS NULL OR ${table.side} IN ('front', 'rear')) AND (${table.positions} = 1 OR ${table.side} IS NOT DISTINCT FROM 'rear') AND ((${table.side} IS NOT DISTINCT FROM 'front') = (${table.rear_stub_id} IS NOT NULL))`,
+		),
+		check(
+			'device_type_interfaces_power_check',
+			sql`(${table.maximum_draw} IS NULL OR ${table.maximum_draw} >= 1) AND (${table.poe_type} IS NULL OR ${table.poe_mode} IS NOT NULL)`,
 		),
 	],
 )

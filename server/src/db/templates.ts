@@ -19,7 +19,7 @@ import {
 	racks,
 } from '../schema'
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
-import { expandStubs, type StubInput } from '../services/templates'
+import { expandStubs, type StubInput, stubPowerError } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { deviceRoleSubtree } from './device_roles'
@@ -473,6 +473,10 @@ async function checkStubExpansion(
 	candidate: StubInput,
 	excludeId?: number,
 ): Promise<Result<undefined, Error>> {
+	const powerError = stubPowerError(candidate)
+	if (powerError !== null) {
+		return Result.err(new ConflictError(powerError))
+	}
 	const siblings = (await stubsOf(deviceTypeId)).filter((s) => s.id !== excludeId)
 	const expanded = expandStubs([...siblings, candidate])
 	if (Result.isError(expanded)) {
@@ -499,6 +503,9 @@ export async function createStub(
 		positions: input.positions ?? 1,
 		rear_stub_id: input.rear_stub_id ?? null,
 		rear_position: input.rear_position ?? 1,
+		maximum_draw: input.maximum_draw ?? null,
+		poe_mode: input.poe_mode ?? null,
+		poe_type: input.poe_type ?? null,
 	}
 	const clash = await checkStubExpansion(deviceTypeId, row)
 	if (Result.isError(clash)) {
@@ -543,6 +550,9 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 		'positions',
 		'rear_stub_id',
 		'rear_position',
+		'maximum_draw',
+		'poe_mode',
+		'poe_type',
 	])
 	const clash = await checkStubExpansion(
 		current.value.device_type_id,

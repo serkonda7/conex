@@ -487,6 +487,17 @@ export const de: Messages = {
 	'deviceType.component.noRearPorts': 'Zuerst Rückports anlegen',
 	'deviceType.component.mapping': 'Zuordnung',
 	'deviceType.component.mapsTo': '→ {rear} ab Position {position}',
+	'deviceType.component.power': 'Leistung',
+	'deviceType.component.maximumDraw': 'Max. Leistungsaufnahme (W)',
+	'deviceType.component.maximumDrawInvalid':
+		'Die max. Leistungsaufnahme muss eine ganze Zahl von 1 bis {max} sein.',
+	'deviceType.component.watts': '{watts} W',
+	'deviceType.component.poeMode': 'PoE-Modus',
+	'deviceType.component.noPoe': 'Kein PoE',
+	'deviceType.component.poeType': 'PoE-Typ',
+	'deviceType.component.noPoeType': 'Nicht angegeben',
+	'poeMode.pse': 'Versorgung (PSE)',
+	'poeMode.pd': 'Bezug (PD)',
 	'deviceType.component.existingDevicesHint':
 		'{count} bestehende Geräte bleiben unverändert! Aktualisierung über die Geräteliste unten.',
 	'deviceType.preset.patchPanel': 'Patchfeld (N Ports)',

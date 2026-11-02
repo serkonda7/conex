@@ -16,6 +16,7 @@ import {
 	POWER_INPUT_KINDS,
 	POWER_OUTLET_KINDS,
 	type PortSide,
+	StubPowerEntries,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import {
@@ -289,6 +290,7 @@ async function importDeviceTypeDefinition(
 			key: string
 			kind: string
 			description: string | undefined
+			power: v.InferOutput<typeof ImportedPowerSchema>
 			names: string[]
 		}
 	>()
@@ -329,12 +331,25 @@ async function importDeviceTypeDefinition(
 				return fail(`${key} "${name}": ${names.error.message}`)
 			}
 			const description = typeof port.description === 'string' ? port.description : undefined
-			// A stub carries one kind and description, so both must match to collapse ports.
-			const groupKey = JSON.stringify([key, kind, description ?? null])
+			const power = v.safeParse(ImportedPowerSchema, {
+				maximum_draw: key === 'power-ports' ? port.maximum_draw : undefined,
+				poe_mode: key === 'interfaces' ? port.poe_mode : undefined,
+				// Passive PoE has no type here; such a port keeps just its mode.
+				poe_type:
+					key === 'interfaces' && !String(port.poe_type).startsWith('passive-')
+						? port.poe_type
+						: undefined,
+			})
+			if (!power.success) {
+				return fail(`${key} "${name}": ${formatValibotIssues(power.issues)}`)
+			}
+			// A stub carries one kind, description and power setup, so all must match to collapse ports.
+			const groupKey = JSON.stringify([key, kind, description ?? null, power.output])
 			const group = groups.get(groupKey) ?? {
 				key,
 				kind,
 				description,
+				power: power.output,
 				names: [],
 			}
 			group.names.push(...names.value)
@@ -348,6 +363,7 @@ async function importDeviceTypeDefinition(
 				count: run.count,
 				kind: group.kind,
 				description: group.description,
+				...group.power,
 			})
 			if (Result.isError(stub)) {
 				return fail(`${group.key} "${run.prefix}": ${stub.error.message}`)
@@ -356,6 +372,9 @@ async function importDeviceTypeDefinition(
 	}
 	return { ok: true, id: created.value.id, error: null }
 }
+
+/** NetBox `maximum_draw` of a power port and `poe_mode`/`poe_type` of an interface. */
+const ImportedPowerSchema = v.object(StubPowerEntries)
 
 /** Creates a stub within the limits the API and edit form enforce. */
 async function createImportedStub(

@@ -1,4 +1,4 @@
-import { SELECTABLE_PASS_THROUGH_PORT_TYPES } from 'shared/src/schemas'
+import { POE_MODES, POE_TYPES, SELECTABLE_PASS_THROUGH_PORT_TYPES } from 'shared/src/schemas'
 
 export interface PromptRole {
 	name: string
@@ -43,10 +43,11 @@ Rules:
 - is_full_depth: default false, true for rack-mounted devices that occupy the full depth of the rack.
 - Port names must be unique across all lists (front-ports and rear-ports may reuse each other's names), 1-50 characters, ASCII only, matching ^[A-Za-z0-9_.-]+$ (no spaces or slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
 - interfaces type: NetBox slug, e.g. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
+- interfaces PoE (only on wired interfaces, only if stated in the datasheet or baseline): poe_mode ${POE_MODES.join(' or ')} (pse supplies power, pd draws it); poe_type ${POE_TYPES.join(', ')}. poe_type needs poe_mode. For passive PoE, keep poe_mode and omit poe_type.
 - ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port or other.
 - display-ports type is required: hdmi, displayport, vga or dvi (conex extension).
 - Patch panels and fiber cassettes: rear-ports {name, type, positions} (positions 1 for a plain outlet, N for an MPO trunk), front-ports {name, type, positions: 1} and one port-mappings entry {front_port, front_port_position: 1, rear_port, rear_port_position} per front port; front_port and rear_port name ports of the same document. Common types: ${SELECTABLE_PASS_THROUGH_PORT_TYPES.join(', ')}. Legacy types 110-punch, st, fc and mtrj are also supported when needed to represent the actual hardware. Each slot of a rear port takes at most one front port.
-- power-ports type: NetBox slug, e.g. iec-60320-c14, iec-60320-c20, ita-ef, dc-terminal or usb-c, or dc-barrel (conex extension); add maximum_draw only if stated in the datasheet. power-outlets type: NetBox slug, e.g. iec-60320-c13, iec-60320-c19, ita-f, dc-terminal or usb-a. Other connector types import as a generic power port or outlet.
+- power-ports type: NetBox slug, e.g. iec-60320-c14, iec-60320-c20, ita-ef, dc-terminal or usb-c, or dc-barrel (conex extension); add maximum_draw (watts, whole number of at least 1) only if stated in the datasheet. power-outlets type: NetBox slug, e.g. iec-60320-c13, iec-60320-c19, ita-f, dc-terminal or usb-a. Other connector types import as a generic power port or outlet.
 - default_device_role (conex extension): the role preselected for devices of this type. Use the exact name of one role from the list below that clearly fits the device class (e.g. switch, firewall, patch panel, server); omit the key if none fits or the choice is ambiguous. Never invent a role name, and drop a role from an upstream file that is not in the list.
 - part_number (conex extension): the manufacturer's article/part number of this exact model, at most 100 characters; omit if not found in a primary source. spec_url (conex extension): plain URL (https://...) of the manufacturer's specification/datasheet page, at most 200 characters; omit if none is known. Never invent either.
 - description: one line, at most 200 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Port descriptions: at most 200 characters.
