@@ -1,8 +1,8 @@
 import {
 	COPPER_PASS_THROUGH_TYPES,
-	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
 	NETBOX_INTERFACE_TYPES,
+	OTHER_PORT_KINDS,
 	PASS_THROUGH_PORT_TYPES,
 	POWER_INPUT_KINDS,
 	POWER_OUTLET_KINDS,
@@ -11,16 +11,7 @@ import {
 	USB_PORT_KINDS,
 } from './schemas'
 
-/** Interface kinds that never connect to network ports. */
-export const OTHER_PORT_KINDS = new Set<string>([
-	'port',
-	...GENERAL_PORT_KINDS,
-	'power',
-	...POWER_INPUT_KINDS,
-	'power-outlet',
-	...POWER_OUTLET_KINDS,
-	...DISPLAY_PORT_KINDS,
-])
+export { OTHER_PORT_KINDS }
 
 const POWER_OUTPUTS = new Set<string>(['power-outlet', ...POWER_OUTLET_KINDS])
 

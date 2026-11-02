@@ -5,6 +5,7 @@
     "check": "bun check"
   },
   "dependencies": {
+    "@serkonda7/conex-device-schema": "workspace:*",
     "valibot": "catalog:"
   }
 }

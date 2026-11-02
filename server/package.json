@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hono/valibot-validator": "catalog:",
+    "@serkonda7/conex-device-schema": "workspace:*",
     "better-result": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

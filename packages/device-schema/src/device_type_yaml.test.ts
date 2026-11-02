@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import * as v from 'valibot'
-import { DeviceTypeYamlSchema } from './schemas'
+import { DeviceTypeYamlSchema } from './schema'
 
 const base = { manufacturer: 'Acme', model: 'X1' }
 const accepts = (entry: object): boolean =>

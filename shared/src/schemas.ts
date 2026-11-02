@@ -7,7 +7,26 @@
  * P0 placeholder: only auth + shared list contracts exist. Domain schemas
  * (tenants, sites, racks, devices, cables) are added in P1-P5.
  */
+import {
+	CalendarDateSchema,
+	DeviceHeightSchema,
+	DeviceTypeDescriptionSchema,
+	InterfaceKindSchema,
+	looseBoolean,
+	NameSchema,
+	PORT_DESCRIPTION_MAX_LENGTH,
+	type PoeType,
+	PortPositionsSchema,
+	type PortSide,
+	PortSideSchema,
+	StubFieldEntries as PortStubFieldEntries,
+	StubCountSchema,
+	StubPowerEntries,
+	WebsiteSchema,
+} from '@serkonda7/conex-device-schema'
 import * as v from 'valibot'
+
+export * from '@serkonda7/conex-device-schema'
 
 // Username identity for local auth. Stored lowercase (see
 // `server/src/util/username.ts`); 1-64 chars of letters, digits, dot,
@@ -61,8 +80,6 @@ export type ListQuery = v.InferOutput<typeof ListQuerySchema>
 // ---------------------------------------------------------------------------
 // P1: tenants / sites / locations
 // ---------------------------------------------------------------------------
-
-export const NameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100))
 
 export const DescriptionSchema = v.optional(
 	v.pipe(v.string(), v.trim(), v.maxLength(500)),
@@ -208,14 +225,6 @@ export const CustomerNumberSchema = v.optional(
 export const DeviceIdSchema = v.optional(
 	v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))),
 	undefined,
-)
-
-/** Company website: a full http(s) URL or a bare host like `acme.de`. */
-const WebsiteSchema = v.pipe(
-	v.string(),
-	v.trim(),
-	v.maxLength(200),
-	v.regex(/^(https?:\/\/)?[^\s/:]+\.[^\s/:]+(:\d+)?(\/\S*)?$/i, 'Must be a website address'),
 )
 
 /** Link target of a website: bare hosts get `https://`. */
@@ -647,156 +656,6 @@ export interface ElevationResponse {
 // P3: manufacturers / device templates
 // ---------------------------------------------------------------------------
 
-/** Display connector kinds; like power they only connect to their own kind. */
-export const DISPLAY_PORT_KINDS = ['hdmi', 'displayport', 'vga', 'dvi'] as const
-
-/** Serial connectors (NetBox console port types); they connect to each other. */
-export const SERIAL_PORT_KINDS = ['rj-45', 'de-9', 'db-25', 'rj-11', 'rj-12', 'mini-din-8'] as const
-
-/** USB connectors (NetBox console port types); they connect to each other. */
-export const USB_PORT_KINDS = [
-	'usb-a',
-	'usb-b',
-	'usb-c',
-	'usb-mini-a',
-	'usb-mini-b',
-	'usb-micro-a',
-	'usb-micro-b',
-	'usb-micro-ab',
-] as const
-
-/**
- * General-purpose port connectors (e.g. a docking station's USB-C uplink),
- * kept as the port kind. Plain `port` is a port of unknown connector.
- */
-export const GENERAL_PORT_KINDS = [...SERIAL_PORT_KINDS, ...USB_PORT_KINDS] as const
-
-/**
- * Power connectors, stored as `power-<NetBox type>`: NetBox shares type names
- * between inputs and outlets (and with data ports), yet the kind alone decides
- * a component's class. `power-dc-barrel` is a conex extension.
- */
-export const POWER_INPUT_KINDS = [
-	'power-iec-60320-c14',
-	'power-iec-60320-c20',
-	'power-iec-60320-c8',
-	'power-iec-60320-c6',
-	'power-ita-ef',
-	'power-dc-terminal',
-	'power-dc-barrel',
-	'power-usb-c',
-] as const
-
-/** Outlet connectors, stored as `power-outlet-<NetBox type>`; see `POWER_INPUT_KINDS`. */
-export const POWER_OUTLET_KINDS = [
-	'power-outlet-iec-60320-c13',
-	'power-outlet-iec-60320-c19',
-	'power-outlet-iec-60320-c7',
-	'power-outlet-iec-60320-c5',
-	'power-outlet-ita-f',
-	'power-outlet-dc-terminal',
-	'power-outlet-usb-a',
-	'power-outlet-usb-c',
-] as const
-
-/**
- * Common NetBox interface types with their display names. These are
- * technical identifiers, so the labels stay untranslated.
- */
-export const NETBOX_INTERFACE_TYPES = {
-	virtual: 'Virtual',
-	bridge: 'Bridge',
-	lag: 'Link Aggregation Group (LAG)',
-	'100base-tx': '10/100M (100BASE-TX)',
-	'1000base-t': '1G (1000BASE-T)',
-	'2.5gbase-t': '2.5G (2.5GBASE-T)',
-	'5gbase-t': '5G (5GBASE-T)',
-	'10gbase-t': '10G (10GBASE-T)',
-	'1000base-x-sfp': '1G (SFP)',
-	'10gbase-x-sfpp': '10G (SFP+)',
-	'25gbase-x-sfp28': '25G (SFP28)',
-	'40gbase-x-qsfpp': '40G (QSFP+)',
-	'50gbase-x-sfp56': '50G (SFP56)',
-	'100gbase-x-qsfp28': '100G (QSFP28)',
-	'200gbase-x-qsfp56': '200G (QSFP56)',
-	'400gbase-x-qsfpdd': '400G (QSFP-DD)',
-	'ieee802.11a': 'Wi-Fi (IEEE 802.11a, 5 GHz)',
-	'ieee802.11g': 'Wi-Fi (IEEE 802.11b/g, 2.4 GHz)',
-	'ieee802.11n': 'Wi-Fi 4 (IEEE 802.11n)',
-	'ieee802.11ac': 'Wi-Fi 5 (IEEE 802.11ac)',
-	'ieee802.11ax': 'Wi-Fi 6 (IEEE 802.11ax)',
-	'ieee802.11be': 'Wi-Fi 7 (IEEE 802.11be)',
-	lte: 'LTE',
-	'5g': '5G',
-	other: 'Other',
-} as const
-
-export type NetboxInterfaceType = keyof typeof NETBOX_INTERFACE_TYPES
-
-/** Common and legacy port kinds; stored kinds stay free-form (including NetBox types). */
-export const PORT_KINDS = [
-	'ethernet',
-	'port',
-	...GENERAL_PORT_KINDS,
-	'power',
-	...POWER_INPUT_KINDS,
-	'power-outlet',
-	...POWER_OUTLET_KINDS,
-	...DISPLAY_PORT_KINDS,
-] as const
-
-export type PortKind = (typeof PORT_KINDS)[number]
-
-/**
- * Patch-panel pass-through sides: front ports (incoming) map onto rear
- * ports (outgoing, e.g. a wall outlet). A port without a side is a normal
- * port.
- */
-export const PORT_SIDES = ['front', 'rear'] as const
-export type PortSide = (typeof PORT_SIDES)[number]
-export const PortSideSchema = v.picklist(PORT_SIDES)
-
-/**
- * Known connector types of front and rear ports (NetBox port types) with their
- * display names. Includes legacy types for imports and existing ports. Copper
- * connectors cable like network ports, every other type only to its own kind.
- */
-export const PASS_THROUGH_PORT_TYPES = {
-	'8p8c': 'RJ45 (8P8C)',
-	'110-punch': '110 Punch',
-	lc: 'LC',
-	'lc-apc': 'LC/APC',
-	sc: 'SC',
-	'sc-apc': 'SC/APC',
-	st: 'ST',
-	fc: 'FC',
-	mpo: 'MPO',
-	mtrj: 'MTRJ',
-	splice: 'Splice',
-} as const
-
-export type PassThroughPortType = keyof typeof PASS_THROUGH_PORT_TYPES
-
-/** Types offered for new ports; legacy types remain recognized on import and edit. */
-export const SELECTABLE_PASS_THROUGH_PORT_TYPES: readonly PassThroughPortType[] = [
-	'8p8c',
-	'lc',
-	'lc-apc',
-	'sc',
-	'sc-apc',
-	'mpo',
-	'splice',
-]
-
-/** Pass-through types that cable like network ports (copper). */
-export const COPPER_PASS_THROUGH_TYPES: readonly PassThroughPortType[] = ['8p8c', '110-punch']
-
-/** Positions of one rear port: 1 for a plain outlet, N for a trunk (MPO). */
-export const PortPositionsSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
-
-/** Interface kind label (e.g. `ethernet`, `fiber`, `power`, `usb-c`, `hdmi`). */
-export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50))
-
 /** Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`). */
 export const InterfacePrefixSchema = v.pipe(
 	v.string(),
@@ -805,15 +664,6 @@ export const InterfacePrefixSchema = v.pipe(
 	v.maxLength(50),
 	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
 )
-
-/** Port count of one stub row: at least 1. */
-export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
-
-/**
- * Rack units a device type consumes on mount: 0-60 U. A zero-height device
- * cannot be mounted at a rack position. Shelves live in their own table.
- */
-export const DeviceHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60))
 
 /** NetBox rack form-factor choices. */
 export const RACK_FORM_FACTORS = [
@@ -829,17 +679,6 @@ export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 /** Rack units a rack type provides: 1-60 U. */
 export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
-/** Allows descriptions merged with legacy port labels during migration. */
-export const PORT_DESCRIPTION_MAX_LENGTH = 250
-
-export const DEVICE_TYPE_DESCRIPTION_MAX_LENGTH = 250
-
-const DeviceTypeDescriptionSchema = v.pipe(
-	v.string(),
-	v.trim(),
-	v.maxLength(DEVICE_TYPE_DESCRIPTION_MAX_LENGTH),
-)
-
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
 	description: DescriptionSchema,
@@ -849,17 +688,6 @@ export const ManufacturerUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
-
-/** Calendar date as `YYYY-MM-DD`; `isoDate` alone lets dates like Feb 30 through. */
-const CalendarDateSchema = v.pipe(
-	v.string(),
-	v.trim(),
-	v.isoDate(),
-	v.check((value) => {
-		const date = new Date(value)
-		return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value)
-	}, 'Invalid calendar date'),
-)
 
 export const DeviceTypeCreateSchema = v.strictObject({
 	manufacturer_id: IdSchema,
@@ -909,21 +737,6 @@ export const RackTypeUpdateSchema = v.strictObject({
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
-/** NetBox `poe_mode`: `pse` supplies power over the port, `pd` draws it. */
-export const POE_MODES = ['pse', 'pd'] as const
-
-export type PoeMode = (typeof POE_MODES)[number]
-
-/** NetBox `poe_type`: the PoE standard of a port. */
-export const POE_TYPES = [
-	'type1-ieee802.3af',
-	'type2-ieee802.3at',
-	'type3-ieee802.3bt',
-	'type4-ieee802.3bt',
-] as const
-
-export type PoeType = (typeof POE_TYPES)[number]
-
 /** Display names of the PoE types, written like the Wi-Fi interface types. */
 export const POE_TYPE_NAMES: Record<PoeType, string> = {
 	'type1-ieee802.3af': 'PoE (IEEE 802.3af, 15 W)',
@@ -940,34 +753,9 @@ export const POE_TYPE_SHORT_NAMES: Record<PoeType, string> = {
 	'type4-ieee802.3bt': 'PoE++ 100 W',
 }
 
-/** Upper bound of a power input's maximum draw, in watts. */
-export const MAX_POWER_DRAW = 1_000_000
-
-/** Power fields of a stub: `maximum_draw` on power inputs, PoE on network interfaces. */
-export const StubPowerEntries = {
-	maximum_draw: v.optional(
-		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_POWER_DRAW))),
-		undefined,
-	),
-	poe_mode: v.optional(v.nullable(v.picklist(POE_MODES)), undefined),
-	poe_type: v.optional(v.nullable(v.picklist(POE_TYPES)), undefined),
-}
-
 /** Stub fields besides the name. */
 // biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
-const StubFieldEntries = {
-	count: v.optional(StubCountSchema, 1),
-	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	description: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
-		undefined,
-	),
-	side: v.optional(v.nullable(PortSideSchema), undefined),
-	positions: v.optional(PortPositionsSchema, undefined),
-	rear_stub_id: v.optional(IdSchema, undefined),
-	rear_position: v.optional(PortPositionsSchema, undefined),
-	...StubPowerEntries,
-}
+const StubFieldEntries = { ...PortStubFieldEntries, rear_stub_id: v.optional(IdSchema, undefined) }
 
 /**
  * Template stub. `side` makes it a patch-panel stub: rear stubs carry
@@ -991,15 +779,6 @@ export const StubCreateSchema = v.pipe(
 	),
 )
 
-/**
- * A stub from a NetBox import: the same limits, but vendor names keep any
- * character. The importer sets the side fields itself, so they need no checks.
- */
-export const ImportedStubSchema = v.strictObject({
-	prefix: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
-	...StubFieldEntries,
-})
-
 /** Stub patch; the side is fixed after create. */
 export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
@@ -1022,7 +801,6 @@ export type DeviceTypeUpdate = v.InferOutput<typeof DeviceTypeUpdateSchema>
 export type RackTypeCreate = v.InferOutput<typeof RackTypeCreateSchema>
 export type RackTypeUpdate = v.InferOutput<typeof RackTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
-export type ImportedStub = v.InferInput<typeof ImportedStubSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -1064,18 +842,6 @@ export const RackTypeListQuerySchema = v.object({
 export type ManufacturerListQuery = v.InferOutput<typeof ManufacturerListQuerySchema>
 export type RackTypeListQuery = v.InferOutput<typeof RackTypeListQuerySchema>
 export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema>
-
-/** One expanded interface name from a stub row. */
-export interface ExpandedInterface {
-	name: string
-	kind: string
-	description: string | null
-	side: PortSide | null
-	positions: number
-	/** Front ports: index of their rear port in the expanded list, and the slot on it. */
-	rear_index: number | null
-	rear_port_position: number | null
-}
 
 /** Port fields a device type owns; everything else stays per device. */
 export const TEMPLATE_SYNC_FIELDS = ['kind', 'description', 'positions', 'rear_port'] as const
@@ -1658,37 +1424,6 @@ export const DeviceListQuerySchema = v.object({
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
-
-// biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
-// biome-ignore lint/nursery/useExplicitReturnType: valibot schema inference must stay unannotated
-function looseBoolean(emptyAsTrue: boolean) {
-	return v.pipe(
-		v.union([v.string(), v.number(), v.boolean()]),
-		v.transform((raw): unknown => {
-			if (typeof raw === 'boolean') {
-				return raw
-			}
-			if (typeof raw === 'number') {
-				return raw !== 0
-			}
-			const s = raw.trim().toLowerCase()
-			if (
-				s === 'true' ||
-				s === '1' ||
-				s === 'yes' ||
-				s === 'y' ||
-				(emptyAsTrue && s === '')
-			) {
-				return true
-			}
-			if (s === 'false' || s === '0' || s === 'no' || s === 'n') {
-				return false
-			}
-			return raw
-		}),
-		v.boolean('Must be a boolean (true/false)'),
-	)
-}
 
 export const InterfaceListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -2559,47 +2294,6 @@ export const CableImportRowSchema = v.object({
 })
 
 export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
-
-/**
- * Loose boolean for CSV cells: true/false, 1/0, yes/no (case-insensitive),
- * with an empty cell defaulting to true (full depth). Unknown text falls
- * through so the trailing `v.boolean()` fails validation loudly.
- */
-const LooseBooleanSchema = looseBoolean(true)
-
-/**
- * One NetBox device-type YAML definition. `manufacturer` resolves to an id
- * server-side; `u_height` may arrive as text and coerces through Number.
- * Ports and other NetBox keys pass through untouched for the importer.
- */
-export const DeviceTypeYamlSchema = v.looseObject({
-	manufacturer: NameSchema,
-	model: NameSchema,
-	u_height: v.optional(
-		v.pipe(
-			v.union([v.string(), v.number()]),
-			v.transform((raw) => (typeof raw === 'number' ? raw : Number(raw))),
-			v.number(),
-			v.integer(),
-			v.minValue(0),
-			v.maxValue(60),
-		),
-		1,
-	),
-	is_full_depth: v.optional(LooseBooleanSchema, true),
-	/** conex extension: device role name preselected for devices of this type. */
-	default_device_role: v.nullish(NameSchema, undefined),
-	/** conex extension: manufacturer article/part number. */
-	part_number: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
-	/** conex extension: link to the manufacturer's spec/datasheet. */
-	spec_url: v.nullish(WebsiteSchema, undefined),
-	/** conex extension: last day the manufacturer supports the model. */
-	eol_date: v.nullish(CalendarDateSchema, undefined),
-	description: v.nullish(DeviceTypeDescriptionSchema, undefined),
-	comments: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined),
-})
-
-export type DeviceTypeYaml = v.InferOutput<typeof DeviceTypeYamlSchema>
 
 /** Per-row import outcome: created id or the row's error message. */
 export interface ImportRowResult {
