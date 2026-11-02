@@ -238,6 +238,7 @@ export async function listDeviceTypes(
 		comments: device_types.comments,
 		u_height: device_types.u_height,
 		is_full_depth: device_types.is_full_depth,
+		eol_date: device_types.eol_date,
 		devices: sql`(SELECT count(*) FROM ${devices} WHERE ${devices.device_type_id} = ${device_types.id})`,
 	}
 	const orderColumn = orderColumns[params.sort]
@@ -287,6 +288,7 @@ export async function createDeviceType(
 		is_full_depth: input.is_full_depth ?? true,
 		part_number: input.part_number || null,
 		spec_url: input.spec_url ?? null,
+		eol_date: input.eol_date ?? null,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 		default_device_role_id: input.default_device_role_id ?? null,
@@ -389,6 +391,7 @@ export async function updateDeviceType(
 		'u_height',
 		'part_number',
 		'spec_url',
+		'eol_date',
 		'description',
 		'comments',
 		'default_device_role_id',

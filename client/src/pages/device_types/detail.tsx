@@ -50,6 +50,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
+import { formatDate } from '../../lib/time'
 import { TemplateSyncDialog } from '../devices/template_sync_dialog'
 import {
 	AddComponentMenu,
@@ -494,6 +495,12 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							<dd>
 								<Show when={deviceType()?.spec_url} fallback="—">
 									{(url: () => string): JSX.Element => <SpecLink url={url()} />}
+								</Show>
+							</dd>
+							<dt>{t('deviceType.eolDate')}</dt>
+							<dd>
+								<Show when={deviceType()?.eol_date} fallback="—">
+									{(date: () => string): string => formatDate(date())}
 								</Show>
 							</dd>
 						</dl>

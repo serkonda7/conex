@@ -296,6 +296,7 @@ export const en = {
 	'deviceType.partNumber': 'Part number',
 	'deviceType.specUrl': 'Spec link',
 	'deviceType.specUrlPlaceholder': 'https://example.com/spec.pdf',
+	'deviceType.eolDate': 'EOL',
 	'tenant.website': 'Website',
 	'tenant.websitePlaceholder': 'acme.com',
 	'tenant.loadingOne': 'Loading tenant…',

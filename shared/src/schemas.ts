@@ -842,6 +842,17 @@ export const ManufacturerUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
+/** Calendar date as `YYYY-MM-DD`; `isoDate` alone lets dates like Feb 30 through. */
+const CalendarDateSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.isoDate(),
+	v.check((value) => {
+		const date = new Date(value)
+		return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value)
+	}, 'Invalid calendar date'),
+)
+
 export const DeviceTypeCreateSchema = v.strictObject({
 	manufacturer_id: IdSchema,
 	model: NameSchema,
@@ -849,6 +860,7 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	is_full_depth: v.optional(v.boolean(), true),
 	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	spec_url: v.optional(WebsiteSchema, undefined),
+	eol_date: v.optional(CalendarDateSchema, undefined),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 	default_device_role_id: NullableIdSchema,
@@ -861,6 +873,7 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	is_full_depth: v.optional(v.boolean(), undefined),
 	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
+	eol_date: v.optional(v.nullable(CalendarDateSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 	default_device_role_id: NullableIdSchema,
@@ -1025,6 +1038,7 @@ export const DeviceTypeListQuerySchema = v.object({
 			'comments',
 			'u_height',
 			'is_full_depth',
+			'eol_date',
 			'devices',
 		]),
 		'model',
@@ -2571,6 +2585,8 @@ export const DeviceTypeYamlSchema = v.looseObject({
 	part_number: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	/** conex extension: link to the manufacturer's spec/datasheet. */
 	spec_url: v.nullish(WebsiteSchema, undefined),
+	/** conex extension: last day the manufacturer supports the model. */
+	eol_date: v.nullish(CalendarDateSchema, undefined),
 	description: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
 	comments: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined),
 })
@@ -2607,6 +2623,7 @@ export const DEVICE_TYPE_UPDATE_FIELDS = [
 	'default_device_role',
 	'part_number',
 	'spec_url',
+	'eol_date',
 	'description',
 	'comments',
 ] as const

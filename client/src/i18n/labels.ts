@@ -221,6 +221,7 @@ const DEVICE_TYPE_UPDATE_FIELD_KEYS: Record<string, MessageKey> = {
 	default_device_role: 'deviceType.defaultRole',
 	part_number: 'deviceType.partNumber',
 	spec_url: 'deviceType.specUrl',
+	eol_date: 'deviceType.eolDate',
 	description: 'common.description',
 	comments: 'common.comments',
 	kind: 'device.templateSync.field.kind',

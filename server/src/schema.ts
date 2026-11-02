@@ -5,6 +5,7 @@ import {
 	boolean,
 	check,
 	customType,
+	date,
 	doublePrecision,
 	foreignKey,
 	index,
@@ -353,6 +354,8 @@ export const device_types = pgTable(
 		is_full_depth: boolean('is_full_depth').notNull().default(true),
 		part_number: text('part_number'),
 		spec_url: text('spec_url'),
+		// Last day the manufacturer supports the model.
+		eol_date: date('eol_date', { mode: 'string' }),
 		description: text('description'),
 		comments: text('comments'),
 		// Role preselected when instantiating a device of this type. Only a

@@ -297,6 +297,7 @@ export const de: Messages = {
 	'deviceType.partNumber': 'Artikelnummer',
 	'deviceType.specUrl': 'Link zum Datenblatt',
 	'deviceType.specUrlPlaceholder': 'https://beispiel.de/datenblatt.pdf',
+	'deviceType.eolDate': 'EOL',
 	'tenant.website': 'Website',
 	'tenant.websitePlaceholder': 'beispiel.de',
 	'tenant.loadingOne': 'Mandant wird geladen…',
