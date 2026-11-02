@@ -44,6 +44,7 @@ export async function fetch_device_list(
 				host: filters?.host,
 				compatible_with: filters?.compatible_with,
 				mountable: filters?.mountable,
+				past_eol: filters?.past_eol,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),

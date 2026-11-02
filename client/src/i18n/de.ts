@@ -456,8 +456,8 @@ export const de: Messages = {
 	'manufacturer.supportUrl': 'Support',
 	'manufacturer.supportUrlPlaceholder': 'example.com/support',
 	'manufacturer.pastEol': 'EOL',
-	'manufacturer.pastEolTypes.one': '{count} Gerätetyp',
-	'manufacturer.pastEolTypes.other': '{count} Gerätetypen',
+	'manufacturer.pastEolDevices.one': '{count} Gerät',
+	'manufacturer.pastEolDevices.other': '{count} Geräte',
 
 	// deviceType
 	'deviceType.empty':

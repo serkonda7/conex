@@ -815,6 +815,7 @@ export const ManufacturerListQuerySchema = v.object({
 			'name',
 			'description',
 			'website',
+			'support_url',
 			'device_types',
 			'rack_types',
 			'devices',
@@ -1440,6 +1441,8 @@ export const DeviceListQuerySchema = v.object({
 	compatible_with: OptionalIdEntry,
 	/** Devices whose type is at least 1 U high, i.e. can be U-mounted (hides VMs). */
 	mountable: v.optional(looseBoolean(false), undefined),
+	/** Devices whose type is past its EOL date, or the others when false (hides VMs). */
+	past_eol: v.optional(looseBoolean(false), undefined),
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

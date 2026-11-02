@@ -49,6 +49,13 @@ export function ManufacturersPage(): JSX.Element {
 						m.website ? <SpecLink url={m.website} /> : <span>—</span>,
 				},
 				{
+					key: 'support_url',
+					label: t('manufacturer.supportUrl'),
+					sortable: true,
+					getValue: (m: ManufacturerListRow): JSX.Element =>
+						m.support_url ? <SpecLink url={m.support_url} /> : <span>—</span>,
+				},
+				{
 					key: 'device_types',
 					label: tp('entity.deviceType', 2),
 					sortable: true,
@@ -87,7 +94,12 @@ export function ManufacturersPage(): JSX.Element {
 					sortable: true,
 					getValue: (m: ManufacturerListRow): JSX.Element => (
 						<Show when={m.past_eol_count > 0} fallback="0">
-							<span class="badge badge-warning">{m.past_eol_count}</span>
+							<a
+								class="badge badge-warning"
+								href={`/devices?manufacturer=${m.id}&past_eol=true`}
+							>
+								{m.past_eol_count}
+							</a>
 						</Show>
 					),
 				},

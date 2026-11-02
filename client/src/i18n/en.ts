@@ -454,8 +454,8 @@ export const en = {
 	'manufacturer.supportUrl': 'Support',
 	'manufacturer.supportUrlPlaceholder': 'example.com/support',
 	'manufacturer.pastEol': 'Past EOL',
-	'manufacturer.pastEolTypes.one': '{count} device type',
-	'manufacturer.pastEolTypes.other': '{count} device types',
+	'manufacturer.pastEolDevices.one': '{count} device',
+	'manufacturer.pastEolDevices.other': '{count} devices',
 
 	// deviceType
 	'deviceType.empty': 'No device types yet. Import the first one above.',

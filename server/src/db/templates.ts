@@ -46,7 +46,7 @@ import { rackHeightOf, rackSpansOf } from './racks'
 export type ManufacturerRow = typeof manufacturers.$inferSelect
 export type DeviceTypeRow = typeof device_types.$inferSelect
 export type StubRow = typeof device_type_interfaces.$inferSelect
-/** Catalog and usage counts; `past_eol_count`: device types past their EOL date. */
+/** Catalog and usage counts; `past_eol_count`: devices whose type is past its EOL date. */
 export type ManufacturerListRow = ManufacturerRow & {
 	device_type_count: number
 	rack_type_count: number
@@ -74,10 +74,11 @@ export async function listManufacturers(
 		name: manufacturers.name,
 		description: manufacturers.description,
 		website: manufacturers.website,
+		support_url: manufacturers.support_url,
 		device_types: sql`(SELECT count(*) FROM ${device_types} WHERE ${device_types.manufacturer_id} = ${manufacturers.id})`,
 		rack_types: sql`(SELECT count(*) FROM ${rack_types} WHERE ${rack_types.manufacturer_id} = ${manufacturers.id})`,
 		devices: sql`(SELECT count(*) FROM ${devices} INNER JOIN ${device_types} ON ${device_types.id} = ${devices.device_type_id} WHERE ${device_types.manufacturer_id} = ${manufacturers.id})`,
-		past_eol: sql`(SELECT count(*) FROM ${device_types} WHERE ${device_types.manufacturer_id} = ${manufacturers.id} AND ${device_types.eol_date} < CURRENT_DATE)`,
+		past_eol: sql`(SELECT count(*) FROM ${devices} INNER JOIN ${device_types} ON ${device_types.id} = ${devices.device_type_id} WHERE ${device_types.manufacturer_id} = ${manufacturers.id} AND ${device_types.eol_date} < CURRENT_DATE)`,
 	}
 	const page = await pageRows(
 		manufacturers,
@@ -122,14 +123,15 @@ async function manufacturerDeviceCounts(ids: number[]): Promise<Map<number, numb
 	return new Map(rows.map((r) => [r.id, r.n]))
 }
 
-/** Device types past their EOL date per manufacturer; ids without any are absent. */
+/** Devices whose type is past its EOL date per manufacturer; ids without any are absent. */
 async function manufacturerPastEolCounts(ids: number[]): Promise<Map<number, number>> {
 	if (ids.length === 0) {
 		return new Map()
 	}
 	const rows = await getDb()
 		.select({ id: device_types.manufacturer_id, n: count() })
-		.from(device_types)
+		.from(devices)
+		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
 		.where(
 			and(
 				inArray(device_types.manufacturer_id, ids),

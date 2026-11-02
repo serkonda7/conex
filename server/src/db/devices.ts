@@ -8,6 +8,7 @@ import {
 	inArray,
 	isNotNull,
 	isNull,
+	lt,
 	ne,
 	or,
 	type SQL,
@@ -276,6 +277,8 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	compatible_with?: number
 	/** Devices whose type is at least 1 U high (can be U-mounted). */
 	mountable?: boolean
+	/** Devices whose type is past its EOL date, or the others when false. */
+	past_eol?: boolean
 	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
 }
@@ -372,7 +375,8 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		params.manufacturer !== undefined ||
 		params.placed !== undefined ||
 		params.compatible_with !== undefined ||
-		params.mountable === true
+		params.mountable === true ||
+		params.past_eol !== undefined
 	const compatible =
 		params.compatible_with === undefined
 			? undefined
@@ -430,6 +434,14 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 							: isNull(devices.position_u),
 					compatible,
 					params.mountable ? gte(device_types.u_height, 1) : undefined,
+					params.past_eol === undefined
+						? undefined
+						: params.past_eol
+							? lt(device_types.eol_date, sql`CURRENT_DATE`)
+							: or(
+									isNull(device_types.eol_date),
+									gte(device_types.eol_date, sql`CURRENT_DATE`),
+								),
 				)
 	const vmWhere =
 		params.kind === 'device' || deviceOnly

@@ -14,6 +14,11 @@ export function formatDate(date: string): string {
 	)
 }
 
+/** Whether a `YYYY-MM-DD` end-of-life date has passed. */
+export function isPastEol(date: string | null | undefined): boolean {
+	return Boolean(date) && (date ?? '') < new Date().toISOString().slice(0, 10)
+}
+
 const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 	['day', 86_400],
 	['hour', 3600],

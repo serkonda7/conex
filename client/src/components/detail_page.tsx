@@ -255,7 +255,7 @@ export interface RelatedTab {
 }
 
 /**
- * Card of related-object tabs, each with a count badge, a preview panel and
+ * Related-object tabs, each with a count badge, a preview panel and
  * a "View all N in …" link; the first tab starts active.
  */
 export function RelatedTabs(props: {
@@ -276,7 +276,7 @@ export function RelatedTabs(props: {
 		props.tabs.find((tab: RelatedTab) => tab.key === active()) ?? props.tabs[0]
 	const tabId = (tab: RelatedTab): string => `${props.id}-${tab.key}`
 	return (
-		<section class="card related-tabs" id={props.id} aria-label={props.label}>
+		<section class="related-tabs" id={props.id} aria-label={props.label}>
 			<div class="related-tabs-bar" role="tablist" aria-label={props.label}>
 				<For each={props.tabs}>
 					{(tab: RelatedTab): JSX.Element => (

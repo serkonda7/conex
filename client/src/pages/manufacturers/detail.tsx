@@ -11,7 +11,7 @@ import {
 	type RackTypeListRow,
 } from '../../api/templates'
 import { fetch_sites, fetch_tenants } from '../../api/tenancy'
-import { type DataTableColumn, nameColumn } from '../../components/data_table'
+import type { DataTableColumn } from '../../components/data_table'
 import {
 	DetailHeader,
 	DetailShell,
@@ -30,7 +30,8 @@ import { deviceRoleLabel, formFactorLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
-import { formatDate } from '../../lib/time'
+import { formatDate, isPastEol } from '../../lib/time'
+import { EolPill } from '../device_types/eol_pill'
 import { SpecLink } from '../device_types/spec_link'
 import { devicePlacementColumns } from '../devices/placement_columns'
 
@@ -39,11 +40,10 @@ const DEVICE_PREVIEW_LIMIT = 5
 
 /** Date cell; a passed EOL date gets a warning badge. */
 function EolDate(props: { date: string | null }): JSX.Element {
-	const past = (): boolean => (props.date ?? '') < new Date().toISOString().slice(0, 10)
 	return (
 		<Show when={props.date} fallback="—">
 			{(date: () => string): JSX.Element => (
-				<Show when={past()} fallback={formatDate(date())}>
+				<Show when={isPastEol(date())} fallback={formatDate(date())}>
 					<span class="badge badge-warning">{formatDate(date())}</span>
 				</Show>
 			)}
@@ -175,8 +175,19 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 		},
 	]
 
+	const eolDate = (d: DeviceListDevice): string | null | undefined =>
+		deviceTypes()?.find((type) => type.id === d.device_type_id)?.eol_date
+
 	const deviceColumns: DataTableColumn<DeviceListDevice>[] = [
-		nameColumn<DeviceListDevice>(t('common.name'), '/devices'),
+		{
+			key: 'name',
+			label: t('common.name'),
+			getValue: (d: DeviceListDevice): JSX.Element => (
+				<>
+					<a href={`/devices/${d.id}`}>{d.name}</a> <EolPill date={eolDate(d)} />
+				</>
+			),
+		},
 		{
 			key: 'device_type',
 			label: tp('entity.deviceType', 1),
@@ -308,12 +319,15 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 							<dt>{t('manufacturer.pastEol')}</dt>
 							<dd>
 								<Show when={(manufacturer()?.past_eol_count ?? 0) > 0} fallback="0">
-									<span class="badge badge-warning">
+									<a
+										class="badge badge-warning"
+										href={`/devices?manufacturer=${props.id}&past_eol=true`}
+									>
 										{tp(
-											'manufacturer.pastEolTypes',
+											'manufacturer.pastEolDevices',
 											manufacturer()?.past_eol_count ?? 0,
 										)}
-									</span>
+									</a>
 								</Show>
 							</dd>
 						</dl>

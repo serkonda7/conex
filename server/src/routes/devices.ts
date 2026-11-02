@@ -98,6 +98,7 @@ export const devicesApp = new Hono()
 				host: query.host,
 				compatible_with: query.compatible_with,
 				mountable: query.mountable,
+				past_eol: query.past_eol,
 				sort: query.sort,
 				order: query.order,
 				...scope,
