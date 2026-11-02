@@ -1,1 +1,0 @@
-ALTER TABLE "priorities" DROP COLUMN "definition";

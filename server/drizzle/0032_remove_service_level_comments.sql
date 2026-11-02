@@ -1,1 +1,0 @@
-ALTER TABLE "service_levels" DROP COLUMN "comments";

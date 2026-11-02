@@ -1,6 +1,6 @@
 {
-  "id": "d40a4b03-4e88-4155-8370-620248fb1e4c",
-  "prevId": "cd437424-332f-4343-a2a5-c75ef6612600",
+  "id": "12c9a348-91f6-421f-b040-30edca3490fe",
+  "prevId": "3f56506f-0e62-42d2-9160-a511acfd1b32",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -779,12 +779,6 @@
           "notNull": true,
           "default": "'ethernet'"
         },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "description": {
           "name": "description",
           "type": "text",
@@ -942,20 +936,20 @@
         },
         "is_full_depth": {
           "name": "is_full_depth",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": 1
+          "default": true
         },
-        "form_factor": {
-          "name": "form_factor",
+        "part_number": {
+          "name": "part_number",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "width": {
-          "name": "width",
-          "type": "integer",
+        "spec_url": {
+          "name": "spec_url",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1005,6 +999,27 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "device_types_manufacturer_model_idx": {
+          "name": "device_types_manufacturer_model_idx",
+          "columns": [
+            {
+              "expression": "manufacturer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2294,6 +2309,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "template_name": {
+          "name": "template_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "kind": {
           "name": "kind",
           "type": "text",
@@ -2928,6 +2949,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#6b7280'"
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -2963,6 +2991,157 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rack_types": {
+      "name": "rack_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "rack_types_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "manufacturer_id": {
+          "name": "manufacturer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form_factor": {
+          "name": "form_factor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 19
+        },
+        "u_height": {
+          "name": "u_height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "part_number": {
+          "name": "part_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spec_url": {
+          "name": "spec_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comments": {
+          "name": "comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "rack_types_manufacturer_id_idx": {
+          "name": "rack_types_manufacturer_id_idx",
+          "columns": [
+            {
+              "expression": "manufacturer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rack_types_model_idx": {
+          "name": "rack_types_model_idx",
+          "columns": [
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rack_types_manufacturer_model_idx": {
+          "name": "rack_types_manufacturer_model_idx",
+          "columns": [
+            {
+              "expression": "manufacturer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rack_types_manufacturer_id_manufacturers_id_fk": {
+          "name": "rack_types_manufacturer_id_manufacturers_id_fk",
+          "tableFrom": "rack_types",
+          "tableTo": "manufacturers",
+          "columnsFrom": [
+            "manufacturer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3127,10 +3306,10 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "racks_rack_type_id_device_types_id_fk": {
-          "name": "racks_rack_type_id_device_types_id_fk",
+        "racks_rack_type_id_rack_types_id_fk": {
+          "name": "racks_rack_type_id_rack_types_id_fk",
           "tableFrom": "racks",
-          "tableTo": "device_types",
+          "tableTo": "rack_types",
           "columnsFrom": [
             "rack_type_id"
           ],
@@ -3591,10 +3770,10 @@
         },
         "is_full_depth": {
           "name": "is_full_depth",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": 1
+          "default": true
         },
         "description": {
           "name": "description",

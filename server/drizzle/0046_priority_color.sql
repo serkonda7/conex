@@ -1,1 +1,0 @@
-ALTER TABLE "priorities" ADD COLUMN "color" text DEFAULT '#6b7280' NOT NULL;
