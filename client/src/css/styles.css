@@ -2435,6 +2435,15 @@ tbody tr:last-child td {
 	--modal-width: 36rem;
 }
 
+.modal.ai-update-dialog {
+	--modal-width: 44rem;
+}
+
+.ai-update-yaml {
+	width: 100%;
+	font-family: monospace;
+}
+
 .template-sync-actions {
 	justify-content: flex-end;
 	margin-left: 0;

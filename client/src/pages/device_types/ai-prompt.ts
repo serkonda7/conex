@@ -16,21 +16,9 @@ function roleList(roles: readonly PromptRole[]): string {
 	return `Available device roles (name: description):\n${lines.join('\n')}`
 }
 
-export function buildAiPrompt(
-	manufacturer: string,
-	model: string,
-	roles: readonly PromptRole[],
-): string {
-	return `Generate a conex device-type YAML for manufacturer "${manufacturer}", model "${model}".
-
-Source priority:
-1) https://github.com/serkonda7/conex-device-types — look for an exact match in device-types/<Manufacturer>/<model>.yaml and return it as-is if found (apart from the German naming and comments rules below).
-2) https://github.com/netbox-community/devicetype-library — copy the baseline if found, keeping only the supported keys below.
-3) Manufacturer specifications, PSREF or manuals — fill gaps only from primary sources. Never guess; omit uncertain optional fields or use type: other (interfaces) / port (general ports). Never invent a display-port type.
-
-Generic manufacturer: if the manufacturer is "Generic" or a variant of it (e.g. "generisch", "-"), the device is vendor-neutral. Both libraries keep such devices under Generic/ with English model names, so translate the model to its common English term for searching only (e.g. "Patchfeld 24 Port Cat6" -> "Patch Panel 24-Port Cat6", "Steckdosenleiste 8-fach" -> "Power Strip 8-Outlet", "Fachboden" -> "Shelf") and also try close English synonyms. Instead of vendor datasheets, base the ports on the common standard configuration of that device class and list any assumptions under uncertain fields.
-
-Output one YAML document starting with --- in a fenced YAML block, plus the target path device-types/<Manufacturer>/<model-slug>.yaml outside the block. Keep the source summary outside the YAML so the block can be pasted directly into conex.
+/** Format and field rules shared by the prompts. */
+function outputRules(roles: readonly PromptRole[]): string {
+	return `Output one YAML document starting with --- in a fenced YAML block, plus the target path device-types/<Manufacturer>/<model-slug>.yaml outside the block. Keep the source summary outside the YAML so the block can be pasted directly into conex.
 
 Write all free-text output in German: model, manufacturer, description, comments, port descriptions and the summary outside the YAML block.
 Keep brand names and official product designations unchanged, but use German for generic terms (e.g. "Patchfeld 24-Port Cat6", "Steckdosenleiste 8-fach", "Fachboden"). For vendor-neutral devices use manufacturer "Generisch", even when the upstream file sits under Generic/.
@@ -52,7 +40,51 @@ Rules:
 - part_number (conex extension): the manufacturer's article/part number of this exact model, at most 100 characters; omit if not found in a primary source. spec_url (conex extension): plain URL (https://...) of the manufacturer's specification/datasheet page, at most 200 characters; omit if none is known. Never invent either.
 - description: one line, at most 200 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Port descriptions: at most 200 characters.
 
-${roleList(roles)}
+${roleList(roles)}`
+}
 
-End outside the YAML block with: sources, upstream hit/miss for both libraries, uncertain fields and file path.`
+const CLOSING =
+	'End outside the YAML block with: sources, upstream hit/miss for both libraries, uncertain fields and file path.'
+
+export function buildAiPrompt(
+	manufacturer: string,
+	model: string,
+	roles: readonly PromptRole[],
+): string {
+	return `Generate a conex device-type YAML for manufacturer "${manufacturer}", model "${model}".
+
+Source priority:
+1) https://github.com/serkonda7/conex-device-types — look for an exact match in device-types/<Manufacturer>/<model>.yaml and return it as-is if found (apart from the German naming and comments rules below).
+2) https://github.com/netbox-community/devicetype-library — copy the baseline if found, keeping only the supported keys below.
+3) Manufacturer specifications, PSREF or manuals — fill gaps only from primary sources. Never guess; omit uncertain optional fields or use type: other (interfaces) / port (general ports). Never invent a display-port type.
+
+Generic manufacturer: if the manufacturer is "Generic" or a variant of it (e.g. "generisch", "-"), the device is vendor-neutral. Both libraries keep such devices under Generic/ with English model names, so translate the model to its common English term for searching only (e.g. "Patchfeld 24 Port Cat6" -> "Patch Panel 24-Port Cat6", "Steckdosenleiste 8-fach" -> "Power Strip 8-Outlet", "Fachboden" -> "Shelf") and also try close English synonyms. Instead of vendor datasheets, base the ports on the common standard configuration of that device class and list any assumptions under uncertain fields.
+
+${outputRules(roles)}
+
+${CLOSING}`
+}
+
+/**
+ * Prompt to refresh an existing type, e.g. after prompt or field changes.
+ * Upstream files may predate those changes, so unlike `buildAiPrompt` nothing
+ * is returned as-is, and the identity stays fixed so the update can't drift.
+ */
+export function buildAiUpdatePrompt(currentYaml: string, roles: readonly PromptRole[]): string {
+	return `Update this existing conex device-type YAML to the rules below. It is the current state of the device type in conex.
+
+\`\`\`yaml
+${currentYaml.trim()}
+\`\`\`
+
+How to update:
+- Keep manufacturer and model exactly as they are, even if the naming rules below would change them.
+- Treat the current YAML as the baseline. Keep every value that is still correct, including hand-edited port names and descriptions, and do not reword or reorder anything without a reason.
+- Check every field against these sources and add what the rules below support but the YAML lacks: 1) https://github.com/serkonda7/conex-device-types (device-types/<Manufacturer>/<model>.yaml), 2) https://github.com/netbox-community/devicetype-library, 3) manufacturer specifications, PSREF or manuals. These files may predate the rules below, so never return one as-is; manufacturer sources win over the libraries, and the libraries never overwrite a correct value.
+- Return the complete definition with every port, not only the changes: a port left out of a list is removed. A key left out keeps its current value, so omit fields you cannot verify instead of guessing, and set a key to null only to clear a value that is wrong.
+- Keep the port-mappings format for front ports. Never guess.
+
+${outputRules(roles)}
+
+${CLOSING} Also list what you changed and why.`
 }

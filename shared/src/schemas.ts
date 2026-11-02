@@ -2472,6 +2472,14 @@ export const YamlImportBodySchema = v.strictObject({
 
 export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
 
+/** `POST /device-types/:id/update`: `revision` is the one the reviewed preview was based on. */
+export const DeviceTypeUpdateApplySchema = v.strictObject({
+	yaml: YamlImportBodySchema.entries.yaml,
+	revision: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
+})
+
+export type DeviceTypeUpdateApply = v.InferOutput<typeof DeviceTypeUpdateApplySchema>
+
 /**
  * One device CSV row (minimal columns). Device type models and rack/site
  * names resolve to ids server-side; `position_u` arrives as text and
@@ -2575,6 +2583,61 @@ export interface ImportResponse {
 	created: number
 	failed: number
 	rows: ImportRowResult[]
+}
+
+/** `GET /device-types/:id/yaml`: the type as importable YAML. */
+export interface DeviceTypeYamlExport {
+	yaml: string
+}
+
+/** Device-type fields a YAML update can change, with their value as text. */
+export const DEVICE_TYPE_UPDATE_FIELDS = [
+	'manufacturer',
+	'model',
+	'u_height',
+	'is_full_depth',
+	'default_device_role',
+	'part_number',
+	'spec_url',
+	'description',
+	'comments',
+] as const
+
+/** Port fields a YAML update can change, beyond the ones a device syncs. */
+export const DEVICE_TYPE_UPDATE_PORT_FIELDS = [
+	...TEMPLATE_SYNC_FIELDS,
+	'maximum_draw',
+	'poe_mode',
+	'poe_type',
+] as const
+
+export interface DeviceTypeUpdateChange {
+	field:
+		| (typeof DEVICE_TYPE_UPDATE_FIELDS)[number]
+		| (typeof DEVICE_TYPE_UPDATE_PORT_FIELDS)[number]
+	from: string | null
+	to: string | null
+}
+
+/** A port of a device type in an update preview; ports match on side and name. */
+export interface DeviceTypeUpdatePort {
+	name: string
+	side: PortSide | null
+	kind: string
+}
+
+/**
+ * `POST /device-types/:id/update-preview`: what applying the YAML would change.
+ * `device_count` devices use the type; port changes reach them by template sync.
+ */
+export interface DeviceTypeUpdatePreview {
+	revision: string
+	fields: DeviceTypeUpdateChange[]
+	added_ports: DeviceTypeUpdatePort[]
+	removed_ports: DeviceTypeUpdatePort[]
+	changed_ports: (DeviceTypeUpdatePort & { changes: DeviceTypeUpdateChange[] })[]
+	unchanged_ports: number
+	device_count: number
 }
 
 // ---------------------------------------------------------------------------

@@ -209,7 +209,7 @@ function typeKey(manufacturerId: number, model: string): string {
 }
 
 /** Name-matching key: names match case-insensitively and ignore surrounding whitespace. */
-function matchKey(name: string): string {
+export function matchKey(name: string): string {
 	return name.trim().toLowerCase()
 }
 
@@ -269,9 +269,21 @@ async function importDeviceTypeDefinition(
 	if (Result.isError(created)) {
 		return fail(created.error.message)
 	}
-	const passThrough = await importPassThroughPorts(created.value.id, item)
+	const failure = await createImportedStubs(created.value.id, item)
+	return failure === null ? { ok: true, id: created.value.id, error: null } : fail(failure)
+}
+
+/**
+ * Creates the stubs of a parsed YAML definition: pass-through ports first,
+ * then the component lists. Answers the failure message, or null.
+ */
+export async function createImportedStubs(
+	deviceTypeId: number,
+	item: Record<string, unknown>,
+): Promise<string | null> {
+	const passThrough = await importPassThroughPorts(deviceTypeId, item)
 	if (passThrough !== null) {
-		return fail(passThrough)
+		return passThrough
 	}
 	// Allowed NetBox `type` values per list (`null`: not checked). A missing
 	// type takes the list's default kind; a `null` default means required.
@@ -297,12 +309,12 @@ async function importDeviceTypeDefinition(
 	for (const [key, defaultKind, allowed] of componentLists) {
 		const components = componentsOf(key, item[key])
 		if (Result.isError(components)) {
-			return fail(components.error.message)
+			return components.error.message
 		}
 		for (const port of components.value) {
 			const name = nameOf(port)
 			if (!name) {
-				return fail(`${key}: entry without a name`)
+				return `${key}: entry without a name`
 			}
 			// NetBox interface types may be a list; the first entry wins.
 			// Ports keep a known connector type (usb-c, rj-45, …) as kind;
@@ -316,7 +328,7 @@ async function importDeviceTypeDefinition(
 			let kind: string | null = defaultKind
 			if (allowed !== null && type !== undefined && type !== null) {
 				if (typeof type !== 'string' || !allowed.includes(type)) {
-					return fail(`${key} "${name}": type must be one of ${allowed.join(', ')}`)
+					return `${key} "${name}": type must be one of ${allowed.join(', ')}`
 				}
 				kind = type === 'other' && key !== 'interfaces' ? 'port' : type
 			}
@@ -324,11 +336,11 @@ async function importDeviceTypeDefinition(
 				kind = `${defaultKind}-${type}`
 			}
 			if (kind === null) {
-				return fail(`${key} "${name}": type is required`)
+				return `${key} "${name}": type is required`
 			}
 			const names = expandNameTemplate(name)
 			if (Result.isError(names)) {
-				return fail(`${key} "${name}": ${names.error.message}`)
+				return `${key} "${name}": ${names.error.message}`
 			}
 			const description = typeof port.description === 'string' ? port.description : undefined
 			const power = v.safeParse(ImportedPowerSchema, {
@@ -341,7 +353,7 @@ async function importDeviceTypeDefinition(
 						: undefined,
 			})
 			if (!power.success) {
-				return fail(`${key} "${name}": ${formatValibotIssues(power.issues)}`)
+				return `${key} "${name}": ${formatValibotIssues(power.issues)}`
 			}
 			// A stub carries one kind, description and power setup, so all must match to collapse ports.
 			const groupKey = JSON.stringify([key, kind, description ?? null, power.output])
@@ -358,7 +370,7 @@ async function importDeviceTypeDefinition(
 	}
 	for (const group of groups.values()) {
 		for (const run of collapseRuns(group.names)) {
-			const stub = await createImportedStub(created.value.id, {
+			const stub = await createImportedStub(deviceTypeId, {
 				prefix: run.prefix,
 				count: run.count,
 				kind: group.kind,
@@ -366,11 +378,11 @@ async function importDeviceTypeDefinition(
 				...group.power,
 			})
 			if (Result.isError(stub)) {
-				return fail(`${group.key} "${run.prefix}": ${stub.error.message}`)
+				return `${group.key} "${run.prefix}": ${stub.error.message}`
 			}
 		}
 	}
-	return { ok: true, id: created.value.id, error: null }
+	return null
 }
 
 /** NetBox `maximum_draw` of a power port and `poe_mode`/`poe_type` of an interface. */

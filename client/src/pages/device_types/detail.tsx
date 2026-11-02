@@ -1,4 +1,10 @@
-import { IconChevronDown, IconPencil, IconRefreshAlert, IconTrash } from '@tabler/icons-solidjs'
+import {
+	IconChevronDown,
+	IconPencil,
+	IconRefreshAlert,
+	IconSparkles,
+	IconTrash,
+} from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
@@ -25,6 +31,7 @@ import {
 	ViewAllLink,
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
+import { IconLabel } from '../../components/icon_label'
 import { Markdown } from '../../components/markdown'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
@@ -48,6 +55,7 @@ import {
 	type PassThroughPreset,
 	PassThroughPresetDialog,
 } from './add_component'
+import { AiUpdateDialog } from './ai_update_dialog'
 import {
 	COMPONENT_CLASSES,
 	type ComponentClassInfo,
@@ -285,6 +293,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		stub: StubRow
 	} | null>(null)
 	const [preset, setPreset] = createSignal<PassThroughPreset | null>(null)
+	const [updatingWithAi, setUpdatingWithAi] = createSignal(false)
 	const id = (): number => props.id
 	const [deviceType] = createRecord(id, fetch_device_type, setError)
 	const manufacturerId = (): number | undefined => deviceType()?.manufacturer_id
@@ -422,6 +431,15 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					name={deviceType()?.model}
 					editHref={`/device-types/${props.id}/edit`}
 					onDelete={handleDelete}
+					actions={
+						<Show when={can('edit')}>
+							<button type="button" onClick={() => setUpdatingWithAi(true)}>
+								<IconLabel icon={IconSparkles}>
+									{t('deviceType.aiUpdate.button')}
+								</IconLabel>
+							</button>
+						</Show>
+					}
 				/>
 				<DetailSubtitle description={deviceType()?.description} />
 
@@ -573,6 +591,14 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					target={tp('entity.device', 2)}
 				/>
 			</section>
+			<Show when={updatingWithAi()}>
+				<AiUpdateDialog
+					device_type_id={props.id}
+					model={deviceType()?.model ?? ''}
+					on_applied={() => setUpdatingWithAi(false)}
+					on_close={() => setUpdatingWithAi(false)}
+				/>
+			</Show>
 			<Show when={syncing()} keyed>
 				{(device: DeviceListDevice) => (
 					<TemplateSyncDialog

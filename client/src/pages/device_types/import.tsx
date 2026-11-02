@@ -17,6 +17,7 @@ import { Field, row_options, SelectField, TextField } from '../../components/for
 import { t, tp } from '../../i18n'
 import { createRows } from '../../lib/resource'
 import { navigate, parseId, queryParam } from '../../lib/router'
+import { AiUpdateDialog } from './ai_update_dialog'
 import { buildAiPrompt } from './ai-prompt'
 import { findSimilarTypes } from './similar'
 
@@ -37,8 +38,9 @@ interfaces:
  * Posts the file text as `{ yaml }` JSON. The import is all-or-nothing: if any
  * document fails, nothing is created and the response reports per-row errors
  * below. The pasted text is kept on failure; rows clashing with an existing
- * device type offer to rename the existing one. The AI prompt form hints at
- * existing types similar to the typed model before one gets generated.
+ * device type offer to update it with the pasted YAML or to rename it. The AI
+ * prompt form hints at existing types similar to the typed model before one
+ * gets generated.
  */
 export function DeviceTypeImportPage(): JSX.Element {
 	const [promptManufacturerId, setPromptManufacturerId] = createSignal('')
@@ -57,6 +59,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 	const [renamedTypes, setRenamedTypes] = createSignal<Record<number, string>>({})
 	const [renameDraft, setRenameDraft] = createSignal<{ id: number; model: string } | null>(null)
 	const [renamingType, setRenamingType] = createSignal(false)
+	const [updatingType, setUpdatingType] = createSignal<{ id: number; model: string } | null>(null)
 	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
 		fetch_manufacturers,
 		setPromptError,
@@ -130,13 +133,24 @@ export function DeviceTypeImportPage(): JSX.Element {
 				<Show
 					when={renameDraft()?.id === props.id}
 					fallback={
-						<button
-							type="button"
-							disabled={renamingType()}
-							onClick={() => setRenameDraft({ id: props.id, model: props.model })}
-						>
-							{t('import.renameExisting')}
-						</button>
+						<>
+							<button
+								type="button"
+								disabled={renamingType()}
+								onClick={() =>
+									setUpdatingType({ id: props.id, model: props.model })
+								}
+							>
+								{t('import.updateExisting')}
+							</button>{' '}
+							<button
+								type="button"
+								disabled={renamingType()}
+								onClick={() => setRenameDraft({ id: props.id, model: props.model })}
+							>
+								{t('import.renameExisting')}
+							</button>
+						</>
 					}
 				>
 					<form class="import-rename" onSubmit={handleRenameType}>
@@ -367,6 +381,21 @@ export function DeviceTypeImportPage(): JSX.Element {
 					]}
 					emptyContent={<Empty message={t('import.noRows')} />}
 				/>
+			</Show>
+			<Show when={updatingType()} keyed>
+				{(target: { id: number; model: string }) => (
+					<AiUpdateDialog
+						device_type_id={target.id}
+						model={target.model}
+						initial_yaml={yamlText()}
+						on_applied={() => {
+							setUpdatingType(null)
+							setYamlText('')
+							setResults(null)
+						}}
+						on_close={() => setUpdatingType(null)}
+					/>
+				)}
 			</Show>
 		</div>
 	)
