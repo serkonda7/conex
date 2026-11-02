@@ -23,10 +23,10 @@ function outputRules(roles: readonly PromptRole[]): string {
 Write all free-text output in German: model, manufacturer, description, comments, port descriptions and the summary outside the YAML block.
 Keep brand names and official product designations unchanged, but use German for generic terms (e.g. "Patchfeld 24-Port Cat6", "Steckdosenleiste 8-fach", "Fachboden"). For vendor-neutral devices use manufacturer "Generisch", even when the upstream file sits under Generic/.
 
-Emit only: manufacturer, model, slug, u_height, is_full_depth, default_device_role, part_number, spec_url, eol_date, description, comments, interfaces, ports, power-ports, power-outlets, display-ports, rear-ports, front-ports, port-mappings. console-ports is an import alias of ports; prefer ports and never duplicate entries in both. Drop all other NetBox keys when adapting a baseline.
+Emit only: manufacturer, model, u_height, is_full_depth, default_device_role, part_number, spec_url, eol_date, description, comments, interfaces, ports, power-ports, power-outlets, display-ports, rear-ports, front-ports, port-mappings. console-ports is an import alias of ports; prefer ports and never duplicate entries in both. Drop all other NetBox keys when adapting a baseline.
 
 Rules:
-- manufacturer must equal the directory name of the target path (device-types/Generisch/ for vendor-neutral devices). manufacturer and model: 1-100 characters. slug: 1-100 characters, ^[-a-z0-9_]+$, form <mfr-slug>-<model-slug>.
+- manufacturer must equal the directory name of the target path (device-types/Generisch/ for vendor-neutral devices). manufacturer and model: 1-100 characters.
 - u_height: integer 0-60 (0 for laptop/desktop/dock/phone).
 - is_full_depth: default false, true for rack-mounted devices that occupy the full depth of the rack.
 - Port names must be unique across all lists (front-ports and rear-ports may reuse each other's names), 1-50 characters, ASCII only, matching ^[A-Za-z0-9_.-]+$ (no spaces or slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
@@ -39,7 +39,7 @@ Rules:
 - default_device_role (conex extension): the role preselected for devices of this type. Use the exact name of one role from the list below that clearly fits the device class (e.g. switch, firewall, patch panel, server); omit the key if none fits or the choice is ambiguous. Never invent a role name, and drop a role from an upstream file that is not in the list.
 - part_number (conex extension): the manufacturer's article/part number of this exact model, at most 100 characters; omit if not found in a primary source. spec_url (conex extension): plain URL (https://...) of the manufacturer's specification/datasheet page, at most 200 characters; omit if none is known. Never invent either.
 - eol_date (conex extension): last day the manufacturer supports this exact model (end of life / end of support), as an ISO date YYYY-MM-DD. Only set it from an official manufacturer EOL/EOS notice, lifecycle page or support policy that names this model and states a full date, or a month and year (then use the first day of that month, e.g. March 2027 becomes 2027-03-01, and say so in the summary); cite that source in the summary. Omit it otherwise: never take it from memory, resellers, forums or third-party trackers, never estimate or calculate it (e.g. from the release date, a support duration or a lifecycle policy), never carry it over from a sibling model or series, never use an end-of-sale, end-of-production or announcement date, and never turn a quarter, half-year or bare year into a day. A missing eol_date is correct; a made-up one is not.
-- description: one line, at most 200 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Port descriptions: at most 200 characters.
+- description: one line, at most 250 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Port descriptions: at most 250 characters.
 
 ${roleList(roles)}`
 }

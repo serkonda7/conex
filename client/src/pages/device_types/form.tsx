@@ -1,3 +1,4 @@
+import { DEVICE_TYPE_DESCRIPTION_MAX_LENGTH } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import {
@@ -201,6 +202,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				id={`${prefix}-description`}
 				value={description()}
 				onInput={setDescription}
+				maxLength={DEVICE_TYPE_DESCRIPTION_MAX_LENGTH}
 			/>
 			<CommentsField id={`${prefix}-comments`} value={comments()} onInput={setComments} />
 		</FormPage>

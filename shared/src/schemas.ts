@@ -830,7 +830,15 @@ export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
 
 /** Allows descriptions merged with legacy port labels during migration. */
-export const PORT_DESCRIPTION_MAX_LENGTH = 703
+export const PORT_DESCRIPTION_MAX_LENGTH = 250
+
+export const DEVICE_TYPE_DESCRIPTION_MAX_LENGTH = 250
+
+const DeviceTypeDescriptionSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.maxLength(DEVICE_TYPE_DESCRIPTION_MAX_LENGTH),
+)
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -861,7 +869,7 @@ export const DeviceTypeCreateSchema = v.strictObject({
 	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
 	spec_url: v.optional(WebsiteSchema, undefined),
 	eol_date: v.optional(CalendarDateSchema, undefined),
-	description: DescriptionSchema,
+	description: v.optional(DeviceTypeDescriptionSchema, undefined),
 	comments: CommentsSchema,
 	default_device_role_id: NullableIdSchema,
 })
@@ -874,7 +882,7 @@ export const DeviceTypeUpdateSchema = v.strictObject({
 	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	eol_date: v.optional(v.nullable(CalendarDateSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: v.optional(v.nullable(DeviceTypeDescriptionSchema), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 	default_device_role_id: NullableIdSchema,
 })
@@ -2587,7 +2595,7 @@ export const DeviceTypeYamlSchema = v.looseObject({
 	spec_url: v.nullish(WebsiteSchema, undefined),
 	/** conex extension: last day the manufacturer supports the model. */
 	eol_date: v.nullish(CalendarDateSchema, undefined),
-	description: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(500)), undefined),
+	description: v.nullish(DeviceTypeDescriptionSchema, undefined),
 	comments: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined),
 })
 
