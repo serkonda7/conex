@@ -6,7 +6,9 @@ import {
 	employee_tenants,
 	employees,
 	external_links,
+	role_permissions,
 	tenants,
+	users,
 	virtual_machines,
 } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -27,6 +29,7 @@ import {
 	tenantConditions,
 	tryWrite,
 } from './list'
+import { countGlobalManagers } from './roles'
 
 /** Employee with its tenants in membership order (first = primary). */
 export type EmployeeRow = typeof employees.$inferSelect & { tenant_ids: number[] }
@@ -221,6 +224,21 @@ export async function updateEmployee(
 				),
 			)
 		}
+		const account = await findOne(users, eq(users.employee_id, id))
+		if (account?.tenant_id != null && removed.includes(account.tenant_id)) {
+			return Result.err(
+				new ConflictError(
+					"The employee's user account is limited to a removed tenant; change its scope first",
+				),
+			)
+		}
+	}
+	if (input.active === false && current.value.active === 1 && (await isLastManager(id))) {
+		return Result.err(
+			new ConflictError(
+				'The employee has the last account able to manage users; it cannot be deactivated',
+			),
+		)
 	}
 	const patch = {
 		...pickDefined(input, [
@@ -276,10 +294,24 @@ async function hasAssignments(id: number, tenantIds?: number[]): Promise<boolean
 	)
 }
 
+/** Whether the employee's account is the last global one able to manage users. */
+async function isLastManager(id: number): Promise<boolean> {
+	const [account] = await getDb()
+		.select({ id: users.id })
+		.from(users)
+		.innerJoin(role_permissions, eq(role_permissions.role_id, users.role_id))
+		.where(and(eq(users.employee_id, id), eq(role_permissions.permission, 'users.manage')))
+		.limit(1)
+	return account !== undefined && (await countGlobalManagers({ excludeUserId: account.id })) === 0
+}
+
 export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Error>> {
 	const current = await getEmployee(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (await findOne(users, eq(users.employee_id, id))) {
+		return Result.err(new ConflictError('Employee still has a user account; delete it first'))
 	}
 	if (await hasAssignments(id)) {
 		return Result.err(

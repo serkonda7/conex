@@ -10,7 +10,8 @@
  * Tenant scope (`users.tenant_id`):
  * - `NULL` = global, unconstrained. Always the case for `users.manage`
  *   holders (enforced in `db/users.ts` / `db/roles.ts`).
- * - set = limited to that single tenant, strictly: only rows whose `tenant_id` equals the scope
+ * - set = limited to that single tenant, which must be one of the tenants of
+ *   the account's employee (`users.employee_id`, required when scoped), strictly: only rows whose `tenant_id` equals the scope
  *   are visible or writable. Reads and writes follow the same rule. In
  *   particular, unscoped (`tenant_id IS NULL`) rows are invisible to scoped
  *   users — there is no shared visibility.

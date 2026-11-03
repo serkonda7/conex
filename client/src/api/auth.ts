@@ -56,6 +56,8 @@ export interface SessionUser {
 	role: { id: number; name: string }
 	permissions: Permission[]
 	tenant_id: number | null
+	/** The employee behind the account, if linked. */
+	employee_id: number | null
 }
 
 /** Current session identity, or null when logged out/unreachable. Never throws. */
@@ -81,6 +83,7 @@ export async function fetchMe(): Promise<SessionUser | null> {
 					)
 				: [],
 			tenant_id: typeof data.tenant_id === 'number' ? data.tenant_id : null,
+			employee_id: typeof data.employee_id === 'number' ? data.employee_id : null,
 		}
 	} catch {
 		return null

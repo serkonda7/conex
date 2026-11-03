@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js'
+import { type JSX, Show } from 'solid-js'
 import { fetch_tenants } from '../../api/tenancy'
 import { delete_user, fetch_users, type UserJson } from '../../api/users'
 import { EntityListPage, useEntityList } from '../../components/list_page'
@@ -7,10 +7,10 @@ import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 
 /**
- * /users — account list (`users.manage`): search plus per-row edit/delete.
- * Role/tenant assignment lives on the dedicated add/edit pages. Password
- * hashes never leave the server, so this table shows identity and scope
- * only.
+ * /users — account list (`users.manage`): search (username or employee)
+ * plus per-row edit/delete. Role/employee/tenant assignment lives on the
+ * dedicated add/edit pages. Password hashes never leave the server, so this
+ * table shows identity and scope only.
  */
 export function UsersPage(): JSX.Element {
 	const list = useEntityList({
@@ -35,6 +35,16 @@ export function UsersPage(): JSX.Element {
 					key: 'username',
 					label: t('auth.username'),
 					getValue: (u: UserJson): string => u.username,
+				},
+				{
+					key: 'employee',
+					label: t('user.employee'),
+					getValue: (u: UserJson): JSX.Element => (
+						<Show when={u.employee_id !== null} fallback="—">
+							<a href={`/employees/${u.employee_id}`}>{u.employee_name}</a>
+							<Show when={!u.active}> ({t('user.inactive')})</Show>
+						</Show>
+					),
 				},
 				{
 					key: 'role',

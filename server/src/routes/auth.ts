@@ -6,7 +6,13 @@ import { LoginSchema, PasswordChangeSchema, SetupSchema } from 'shared/src/schem
 import { requestUser } from '../authz'
 import { isUniqueViolation } from '../db/errors'
 import { fullAccessRoleId } from '../db/roles'
-import { changeOwnPassword, createLocalUser, getUserByUsername, hasAnyUser } from '../db/users'
+import {
+	canSignIn,
+	changeOwnPassword,
+	createLocalUser,
+	getUserByUsername,
+	hasAnyUser,
+} from '../db/users'
 import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
 import { onValidationError } from '../middleware/validation'
@@ -112,7 +118,10 @@ authApp.post(
 			return jsonError(c, 'Invalid username or password', 401)
 		}
 
-		const isMatch = await Bun.password.verify(body.password, user.password_hash)
+		// Accounts of inactive employees fail like a wrong password.
+		const isMatch =
+			(await Bun.password.verify(body.password, user.password_hash)) &&
+			(await canSignIn(user))
 		if (!isMatch) {
 			await auditRequest(
 				c,
@@ -173,5 +182,6 @@ authApp.get('/me', authMiddleware, (c) => {
 		role: { id: user.role_id, name: user.role_name },
 		permissions: [...user.permissions],
 		tenant_id: user.tenant_id,
+		employee_id: user.employee_id,
 	})
 })

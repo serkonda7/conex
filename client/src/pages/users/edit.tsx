@@ -1,18 +1,19 @@
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { fetch_roles, type RoleJson } from '../../api/roles'
-import { fetch_tenants } from '../../api/tenancy'
 import { fetch_user, type UserJson, update_user } from '../../api/users'
-import { FormPage, Hint, row_options, SelectField, TextField } from '../../components/form'
+import { FormPage, row_options, SelectField, TextField } from '../../components/form'
 import { t } from '../../i18n'
 import { id_value, submit_form, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
-import { managesUsers, RoleHint } from './role_hint'
+import { AccountFields, scopeToSave } from './account_fields'
+import { RoleHint } from './role_hint'
 
-/** /users/:id/edit — role, tenant-scope, and password form (`users.manage`). */
+/** /users/:id/edit — role, employee, tenant-scope, and password form (`users.manage`). */
 export function UserEditPage(props: { id: number }): JSX.Element {
 	const [roleId, setRoleId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
+	const [employeeId, setEmployeeId] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
@@ -20,9 +21,9 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 		fill: (row: UserJson) => {
 			setRoleId(id_value(row.role_id))
 			setTenantId(id_value(row.tenant_id))
+			setEmployeeId(id_value(row.employee_id))
 		},
 	})
-	const [tenants] = createRows(fetch_tenants)
 	const [roles] = createRows(fetch_roles)
 	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
 
@@ -36,7 +37,8 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 			save: () =>
 				update_user(props.id, {
 					role_id: parseId(roleId()) ?? undefined,
-					tenant_id: managesUsers(role()) ? null : parseId(tenantId()),
+					employee_id: parseId(employeeId()),
+					tenant_id: scopeToSave(role(), employeeId(), tenantId()),
 					...(password() ? { password: password() } : {}),
 				}),
 			navigateTo: '/users',
@@ -61,17 +63,15 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				options={row_options(roles() ?? [])}
 				hint={<RoleHint role={role()} />}
 			/>
-			<Show when={!managesUsers(role())}>
-				<SelectField
-					id="user-edit-tenant"
-					label={t('user.tenantScope')}
-					value={tenantId()}
-					onChange={setTenantId}
-					options={row_options(tenants() ?? [])}
-					emptyLabel={t('common.allTenants')}
-					hint={<Hint>{t('user.tenantHint')}</Hint>}
-				/>
-			</Show>
+			<AccountFields
+				idPrefix="user-edit"
+				role={role()}
+				employeeId={employeeId()}
+				onEmployeeChange={setEmployeeId}
+				tenantId={tenantId()}
+				onTenantChange={setTenantId}
+				onError={form.setError}
+			/>
 			<TextField
 				id="user-edit-password"
 				label={t('user.newPassword')}

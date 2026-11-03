@@ -3,6 +3,7 @@ import { createSignal, For, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { delete_employee, fetch_employee } from '../../api/employees'
 import { fetch_tenant, fetch_tenants, type TenantRow } from '../../api/tenancy'
+import { fetch_users, type UserJson } from '../../api/users'
 import { EmailList, PhoneList } from '../../components/contacts'
 import { nameColumn } from '../../components/data_table'
 import {
@@ -19,12 +20,13 @@ import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { sessionTenantId } from '../../lib/session'
+import { can, sessionTenantId } from '../../lib/session'
 import { EmployeeStatus } from './list'
 
 /**
  * /employees/:id — employee detail: tenant breadcrumb, header with
- * description and the contact details.
+ * description, the contact details and, for user managers, the employee's
+ * conex account.
  */
 export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -44,6 +46,16 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 			const row = tenants()?.find((r) => r.id === tenantKey)
 			return row ? [row] : []
 		})
+	const [accounts] = createRowsFor(
+		() => can('users.manage') && props.id,
+		(key: number) => fetch_users({ employee: key }),
+		setError,
+	)
+	const account = (): UserJson | undefined => accounts()?.[0]
+	const scopeName = (scope: number | null): string =>
+		scope === null
+			? t('common.allTenants')
+			: (tenants()?.find((row) => row.id === scope)?.name ?? String(scope))
 	const [devices] = createRowsFor(
 		id,
 		(key: number) => fetch_devices({ employee: [key] }),
@@ -117,6 +129,30 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<EmployeeStatus active={employee()?.active ?? 1} />
 					</dd>
+					<Show when={can('users.manage')}>
+						<dt>{t('employee.account')}</dt>
+						<dd>
+							<Show
+								when={account()}
+								fallback={
+									<Show when={!accounts.loading}>
+										{t('employee.noAccount')}{' '}
+										<a href={`/users/add?employee=${props.id}`}>
+											{t('employee.createAccount')}
+										</a>
+									</Show>
+								}
+							>
+								{(row: () => UserJson) => (
+									<>
+										<a href={`/users/${row().id}/edit`}>{row().username}</a>
+										{` · ${row().role_name} · ${scopeName(row().tenant_id)}`}
+										<Show when={!row().active}> ({t('user.inactive')})</Show>
+									</>
+								)}
+							</Show>
+						</dd>
+					</Show>
 					<dt>{t('common.comments')}</dt>
 					<dd>
 						<Markdown text={employee()?.comments} />

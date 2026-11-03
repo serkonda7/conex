@@ -62,22 +62,44 @@ export const role_permissions = pgTable(
 	(table) => [primaryKey({ columns: [table.role_id, table.permission] })],
 )
 
-export const users = pgTable('users', {
-	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
-	username: text('username').notNull().unique(),
-	password_hash: text('password_hash'),
-	provider: text('provider').notNull().default('local'),
-	provider_id: text('provider_id').unique(),
-	// Assigned role (the first-run setup account gets a role holding every
-	// permission).
-	role_id: integer('role_id')
-		.notNull()
-		.references(() => roles.id),
-	// Tenant scope (`NULL` = global, all tenants). Always `NULL` for users
-	// whose role grants `users.manage`. Delete-blocked while referenced
-	// (service layer in `db/tenancy.ts`), so the FK carries no cascade.
-	tenant_id: integer('tenant_id').references(() => tenants.id),
-})
+export const users = pgTable(
+	'users',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		username: text('username').notNull().unique(),
+		password_hash: text('password_hash'),
+		provider: text('provider').notNull().default('local'),
+		provider_id: text('provider_id').unique(),
+		// Assigned role (the first-run setup account gets a role holding every
+		// permission).
+		role_id: integer('role_id')
+			.notNull()
+			.references(() => roles.id),
+		// Tenant scope (`NULL` = global, all tenants). Always `NULL` for users
+		// whose role grants `users.manage`. Delete-blocked while referenced
+		// (service layer in `db/tenancy.ts`), so the FK carries no cascade.
+		tenant_id: integer('tenant_id').references(() => tenants.id),
+		// The person behind the account (at most one account per employee).
+		// Required for scoped users, whose scope must be one of the employee's
+		// tenants (membership FK below); optional for global users. An
+		// inactive employee cannot sign in. Employee delete is blocked while
+		// an account exists (service layer in `db/employees.ts`).
+		employee_id: integer('employee_id')
+			.unique()
+			.references(() => employees.id),
+	},
+	(table) => [
+		foreignKey({
+			name: 'users_employee_tenant_fk',
+			columns: [table.employee_id, table.tenant_id],
+			foreignColumns: [employee_tenants.employee_id, employee_tenants.tenant_id],
+		}),
+		check(
+			'users_scope_requires_employee',
+			sql`${table.tenant_id} IS NULL OR ${table.employee_id} IS NOT NULL`,
+		),
+	],
+)
 
 export const sessions = pgTable(
 	'sessions',

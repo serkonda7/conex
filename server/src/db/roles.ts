@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, isNull, ne, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, isNull, ne, type SQL, sql } from 'drizzle-orm'
 import {
 	PERMISSIONS,
 	type Permission,
@@ -7,7 +7,7 @@ import {
 	type RoleJson,
 	type RoleUpdate,
 } from 'shared/src/schemas'
-import { role_permissions, roles, users } from '../schema'
+import { employees, role_permissions, roles, users } from '../schema'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError } from './errors'
 import {
@@ -76,7 +76,7 @@ export async function getRole(id: number): Promise<Result<RoleJson, Error>> {
 }
 
 /**
- * Number of global users whose role grants `users.manage`. `excludeUserId`
+ * Number of global users able to sign in whose role grants `users.manage`. `excludeUserId`
  * leaves one user out (demotion/delete/re-scope checks); `excludeRoleId`
  * leaves a role out (that role is about to lose the permission).
  */
@@ -86,6 +86,8 @@ export async function countGlobalManagers(
 	const conditions: SQL[] = [
 		isNull(users.tenant_id),
 		eq(role_permissions.permission, 'users.manage'),
+		// Accounts of inactive employees cannot sign in.
+		sql`not exists (select 1 from ${employees} where ${employees.id} = ${users.employee_id} and ${employees.active} = 0)`,
 	]
 	if (opts.excludeUserId !== undefined) {
 		conditions.push(ne(users.id, opts.excludeUserId))

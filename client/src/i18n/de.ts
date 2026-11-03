@@ -353,6 +353,9 @@ export const de: Messages = {
 	'employee.addEmail': 'E-Mail-Adresse hinzufügen',
 	'employee.addPhone': 'Telefonnummer hinzufügen',
 	'employee.tenants': 'Mandanten',
+	'employee.account': 'Konto',
+	'employee.noAccount': 'Kein Konto.',
+	'employee.createAccount': 'Konto anlegen →',
 	'employee.addTenant': 'Mandant hinzufügen',
 	'employee.tenantsHint':
 		'Der erste Mandant ist der primäre: Seine E-Mail-Domain ergänzt Adressen, seine Hauptnummer ergänzt Durchwahlen.',
@@ -917,7 +920,13 @@ export const de: Messages = {
 	'user.loadingOne': 'Benutzer wird geladen…',
 	'user.usernamePlaceholder': 'kollege',
 	'user.temporaryPassword': 'Temporäres Passwort',
-	'user.tenantHint': 'Beschränkt den Benutzer auf einen Mandanten. Leer bedeutet global.',
+	'user.tenantHint':
+		'Beschränkt den Benutzer auf einen Mandanten des Mitarbeiters. Leer bedeutet global.',
+	'user.employee': 'Mitarbeiter',
+	'user.noEmployee': 'Kein Mitarbeiter',
+	'user.employeeHint':
+		'Die Person hinter dem Konto. Nötig, um den Benutzer auf einen Mandanten zu beschränken; inaktive Mitarbeiter können sich nicht anmelden.',
+	'user.inactive': 'Anmeldung gesperrt',
 	'user.selectRole': 'Bitte eine Rolle auswählen.',
 	'user.roleGrants': 'Gewährt: {permissions}.',
 	'user.newPassword': 'Neues Passwort',

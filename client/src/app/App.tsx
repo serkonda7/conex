@@ -79,14 +79,18 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	const canAddTenants = (): boolean => props.user.permissions.includes('edit') && !isScoped()
 
 	createEffect(() => {
-		setSessionAccess({ permissions: props.user.permissions, tenantId: props.user.tenant_id })
+		setSessionAccess({
+			permissions: props.user.permissions,
+			tenantId: props.user.tenant_id,
+			employeeId: props.user.employee_id,
+		})
 		setTenantContextScoped(isScoped())
 		if (props.user.permissions.includes('view')) {
 			void refreshTenantContext()
 		}
 	})
 	onCleanup(() => {
-		setSessionAccess({ permissions: [], tenantId: null })
+		setSessionAccess({ permissions: [], tenantId: null, employeeId: null })
 		// Cached rows belong to the session's user and tenant scope.
 		queryClient.clear()
 	})

@@ -10,6 +10,7 @@ export interface User {
 	provider_id: string | null
 	role_id: number
 	tenant_id: number | null
+	employee_id: number | null
 }
 
 /**
@@ -25,4 +26,6 @@ export interface CurrentUser {
 	role_name: string
 	permissions: ReadonlySet<Permission>
 	tenant_id: number | null
+	/** The employee behind the account, if linked. */
+	employee_id: number | null
 }

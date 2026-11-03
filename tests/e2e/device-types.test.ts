@@ -551,11 +551,20 @@ test.describe('permissions', () => {
 		const api = page.request
 		const roleId = await create(api, cleanup, 'roles', { name: unique('Role'), permissions })
 		const username = `e2e-dt-${nextId()}`
+		// Scoped accounts belong to an employee of their tenant.
+		const employeeId =
+			tenantId === null
+				? null
+				: await create(api, cleanup, 'employees', {
+						last_name: username,
+						tenant_ids: [tenantId],
+					})
 		await create(api, cleanup, 'users', {
 			username,
 			password,
 			role_id: roleId,
 			tenant_id: tenantId,
+			employee_id: employeeId,
 		})
 		const context = await playwright.request.newContext({ baseURL })
 		await ok(await context.post('/api/auth/login', { data: { username, password } }))

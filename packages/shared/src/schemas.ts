@@ -29,14 +29,15 @@ import * as v from 'valibot'
 export * from '@serkonda7/conex-device-schema'
 
 // Username identity for local auth. Stored lowercase (see
-// `server/src/util/username.ts`); 1-64 chars of letters, digits, dot,
-// dash, or underscore so it is URL-safe and unambiguous in logs.
+// `server/src/util/username.ts`); 1-254 chars of letters, digits, dot,
+// dash, underscore or `@` (so a mail address works as the login of an
+// employee's account), unambiguous in logs.
 export const UsernameSchema = v.pipe(
 	v.string(),
 	v.trim(),
 	v.minLength(1),
-	v.maxLength(64),
-	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
+	v.maxLength(254),
+	v.regex(/^[A-Za-z0-9_.@-]+$/, 'Must be letters, digits, dot, dash, underscore, or @'),
 )
 
 // Local-login credentials. strictObject so unknown keys fail loudly instead
@@ -1790,16 +1791,22 @@ export type RoleCreate = v.InferOutput<typeof RoleCreateSchema>
 export type RoleUpdate = v.InferOutput<typeof RoleUpdateSchema>
 export type RoleListQuery = v.InferOutput<typeof RoleListQuerySchema>
 
+/**
+ * Accounts of employees carry the person (name, mail, tenants); `tenant_id`
+ * (scope) requires `employee_id` and must be one of the employee's tenants.
+ */
 export const UserCreateSchema = v.strictObject({
 	username: UsernameSchema,
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 	role_id: IdSchema,
 	tenant_id: NullableIdSchema,
+	employee_id: NullableIdSchema,
 })
 
 export const UserUpdateSchema = v.strictObject({
 	role_id: v.optional(IdSchema, undefined),
 	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	employee_id: v.optional(v.nullable(IdSchema), undefined),
 	password: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(1024)), undefined),
 })
 
@@ -1807,6 +1814,7 @@ export const UserListQuerySchema = v.object({
 	...ListQueryEntries,
 	role: OptionalIdEntry,
 	tenant: OptionalIdEntry,
+	employee: OptionalIdEntry,
 })
 
 /** Public user shape: password hashes never leave the server. */
@@ -1816,6 +1824,11 @@ export interface UserJson {
 	role_id: number
 	role_name: string
 	tenant_id: number | null
+	/** Linked employee (the person behind the account), if any. */
+	employee_id: number | null
+	employee_name: string | null
+	/** False when the linked employee is inactive: the account cannot sign in. */
+	active: boolean
 }
 
 export type UserCreate = v.InferOutput<typeof UserCreateSchema>

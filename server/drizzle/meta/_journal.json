@@ -50,6 +50,13 @@
       "when": 1793698738275,
       "tag": "0058_employee_tenants",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793700143674,
+      "tag": "0059_user_employee",
+      "breakpoints": true
     }
   ]
 }

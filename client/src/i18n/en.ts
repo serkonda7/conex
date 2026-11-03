@@ -352,6 +352,9 @@ export const en = {
 	'employee.addEmail': 'Add email address',
 	'employee.addPhone': 'Add phone number',
 	'employee.tenants': 'Tenants',
+	'employee.account': 'Account',
+	'employee.noAccount': 'No account.',
+	'employee.createAccount': 'Create account →',
 	'employee.addTenant': 'Add tenant',
 	'employee.tenantsHint':
 		'The first tenant is the primary one: its mail domain completes addresses and its main number completes extensions.',
@@ -906,7 +909,12 @@ export const en = {
 	'user.loadingOne': 'Loading user…',
 	'user.usernamePlaceholder': 'teammate',
 	'user.temporaryPassword': 'Temporary password',
-	'user.tenantHint': 'Limit the user to a single tenant. Empty means global.',
+	'user.tenantHint': "Limit the user to one of the employee's tenants. Empty means global.",
+	'user.employee': 'Employee',
+	'user.noEmployee': 'No employee',
+	'user.employeeHint':
+		'The person behind the account. Needed to limit the user to a tenant; inactive employees cannot sign in.',
+	'user.inactive': 'cannot sign in',
 	'user.selectRole': 'Select a role.',
 	'user.roleGrants': 'Grants: {permissions}.',
 	'user.newPassword': 'New password',
