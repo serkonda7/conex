@@ -7,7 +7,7 @@ import {
 import {
 	createDeviceRole,
 	deleteDeviceRole,
-	getDeviceRole,
+	getDeviceRoleDetail,
 	listDeviceRoles,
 	updateDeviceRole,
 } from '../db/device_roles'
@@ -31,7 +31,7 @@ export const deviceRolesApp = makeCatalogApp({
 	}),
 	list: listDeviceRoles,
 	create: createDeviceRole,
-	get: getDeviceRole,
+	get: getDeviceRoleDetail,
 	update: updateDeviceRole,
 	remove: deleteDeviceRole,
 })

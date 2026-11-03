@@ -1,5 +1,6 @@
 import { Result } from 'better-result'
-import { and, eq } from 'drizzle-orm'
+import { and, count, eq, inArray } from 'drizzle-orm'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 import type { DeviceRoleCreate, DeviceRoleUpdate, DeviceServiceJson } from 'shared/src/schemas'
 import { device_roles, device_types, devices, managed_bundles, virtual_machines } from '../schema'
 import {
@@ -119,6 +120,48 @@ export async function listDeviceRoles(
 
 export function getDeviceRole(id: number): Promise<Result<DeviceRoleRow, Error>> {
 	return findById(device_roles, id, 'Device role not found')
+}
+
+/**
+ * Device role detail: `child_count` counts direct child roles; device type and
+ * device (incl. VM) counts cover the role's subtree, like the `role` filters of
+ * the device type and device lists. `managed_bundle` as in the list rows.
+ */
+export type DeviceRoleDetail = DeviceRoleRow & {
+	child_count: number
+	device_type_count: number
+	device_count: number
+	managed_bundle: { id: number; name: string; inherited: boolean } | null
+}
+
+/** The device role with its counts and effective bundle, for the detail page. */
+export async function getDeviceRoleDetail(id: number): Promise<Result<DeviceRoleDetail, Error>> {
+	const row = await getDeviceRole(id)
+	if (Result.isError(row)) {
+		return row
+	}
+	const db = getDb()
+	const ids = await deviceRoleSubtree(id)
+	const countIn = async (column: PgColumn): Promise<number> => {
+		const [res] = await db.select({ n: count() }).from(column.table).where(inArray(column, ids))
+		return res?.n ?? 0
+	}
+	const [children, typeCount, deviceCount, vmCount, tree] = await Promise.all([
+		db.select({ n: count() }).from(device_roles).where(eq(device_roles.parent_id, id)),
+		countIn(device_types.default_device_role_id),
+		countIn(devices.device_role_id),
+		countIn(virtual_machines.device_role_id),
+		bundleTree(),
+	])
+	const ref = resolveBundle(tree, id)
+	const bundle = ref ? await findOne(managed_bundles, eq(managed_bundles.id, ref.id)) : undefined
+	return Result.ok({
+		...row.value,
+		child_count: children[0]?.n ?? 0,
+		device_type_count: typeCount,
+		device_count: deviceCount + vmCount,
+		managed_bundle: ref && bundle ? { ...ref, name: bundle.name } : null,
+	})
 }
 
 export function checkDeviceRoleExists(roleId: number): Promise<Result<undefined, Error>> {
