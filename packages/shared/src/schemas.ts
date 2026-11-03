@@ -1227,7 +1227,7 @@ export type ManagedBundleUpdate = v.InferOutput<typeof ManagedBundleUpdateSchema
 
 export const ManagedBundleListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'role_count', 'tenant_count']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 

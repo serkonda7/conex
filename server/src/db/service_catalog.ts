@@ -1,7 +1,8 @@
 import { Result } from 'better-result'
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import type {
 	ManagedBundleCreate,
+	ManagedBundleListQuery,
 	ManagedBundleUpdate,
 	PriorityCreate,
 	PriorityUpdate,
@@ -360,19 +361,23 @@ export type ManagedBundleListRow = ManagedBundleRow & { role_count: number; tena
 const MANAGED_BUNDLE_NAME_IN_USE = 'Managed bundle name is already in use'
 
 export interface ManagedBundleListParams extends ListParams {
-	sort: 'name' | 'description'
+	sort: ManagedBundleListQuery['sort']
 	order: 'asc' | 'desc'
 }
 
 export async function listManagedBundles(
 	params: ManagedBundleListParams,
 ): Promise<Page<ManagedBundleListRow>> {
-	const orderColumn =
-		params.sort === 'description' ? managed_bundles.description : managed_bundles.name
+	const orderColumns = {
+		name: managed_bundles.name,
+		description: managed_bundles.description,
+		role_count: sql`(SELECT count(*) FROM ${device_roles} WHERE ${device_roles.managed_bundle_id} = ${managed_bundles.id})`,
+		tenant_count: sql`(SELECT count(*) FROM ${tenant_bundles} WHERE ${tenant_bundles.managed_bundle_id} = ${managed_bundles.id})`,
+	}
 	const page = await pageRows(
 		managed_bundles,
 		searchCondition(params.search, [managed_bundles.name, managed_bundles.description]),
-		[orderOf(orderColumn, params.order), asc(managed_bundles.id)],
+		[orderOf(orderColumns[params.sort], params.order), asc(managed_bundles.id)],
 		params,
 	)
 	const ids = page.items.map((r) => r.id)
