@@ -1121,6 +1121,11 @@ tbody tr:last-child td {
 	color: var(--text-secondary);
 }
 
+.bool-yes {
+	color: var(--success);
+	vertical-align: middle;
+}
+
 .badge-active,
 .badge-connected {
 	color: var(--success);

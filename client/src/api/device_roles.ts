@@ -25,6 +25,8 @@ export async function fetch_device_roles(
 			query: to_query({
 				...paging(filters),
 				parent: filters?.parent,
+				can_host_vms: filters?.can_host_vms,
+				bundle: filters?.bundle,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),

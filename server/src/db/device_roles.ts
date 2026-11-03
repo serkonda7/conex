@@ -31,11 +31,16 @@ import {
 import { tenantBundle } from './tenancy'
 
 export type DeviceRoleRow = typeof device_roles.$inferSelect
-/** `device_type_count`: device types with the role as their default role. */
+/**
+ * `device_type_count`: device types with the role as their default role.
+ * `managed_bundle`: the role's effective bundle (own, else inherited from
+ * the nearest ancestor), null when no role up the tree sets one.
+ */
 export type DeviceRoleListRow = DeviceRoleRow & {
 	device_count: number
 	device_type_count: number
 	depth: number
+	managed_bundle: { id: number; name: string; inherited: boolean } | null
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +60,9 @@ const NAME_IN_USE = 'Device role name is already in use'
 
 export interface DeviceRoleListParams extends ListParams {
 	parent?: number
+	can_host_vms?: boolean
+	/** Effective managed bundle (own or inherited) is one of these. */
+	bundle?: number[]
 	sort: 'name' | 'description'
 	order: 'asc' | 'desc'
 }
@@ -65,8 +73,32 @@ export async function listDeviceRoles(
 	const where = and(
 		searchCondition(params.search, [device_roles.name, device_roles.description]),
 		params.parent ? eq(device_roles.parent_id, params.parent) : undefined,
+		params.can_host_vms !== undefined
+			? eq(device_roles.can_host_vms, params.can_host_vms ? 1 : 0)
+			: undefined,
 	)
-	const matching = await getDb().select().from(device_roles).where(where)
+	const db = getDb()
+	const rows = await db.select().from(device_roles).where(where)
+	const tree = await bundleTree()
+	const bundleNames = new Map(
+		(
+			await db
+				.select({ id: managed_bundles.id, name: managed_bundles.name })
+				.from(managed_bundles)
+		).map((b) => [b.id, b.name]),
+	)
+	const withBundle = rows.map((r) => {
+		const ref = resolveBundle(tree, r.id)
+		const name = ref ? bundleNames.get(ref.id) : undefined
+		return {
+			...r,
+			managed_bundle: ref && name !== undefined ? { ...ref, name } : null,
+		}
+	})
+	const bundleIds = params.bundle ? new Set(params.bundle) : null
+	const matching = bundleIds
+		? withBundle.filter((r) => r.managed_bundle && bundleIds.has(r.managed_bundle.id))
+		: withBundle
 	const ordered = sortHierarchically(matching, params.sort, params.order)
 	const offset = offsetOf(params)
 	const items = ordered.slice(offset, offset + params.limit)
@@ -105,6 +137,17 @@ function roleTree(): Promise<{ id: number; parent_id: number | null }[]> {
  * no role up the tree sets one.
  */
 export async function effectiveBundleId(roleId: number): Promise<number | null> {
+	return resolveBundle(await bundleTree(), roleId)?.id ?? null
+}
+
+interface BundleNode {
+	id: number
+	parent_id: number | null
+	managed_bundle_id: number | null
+}
+
+/** Parent links and own bundle of every device role, keyed by id. */
+async function bundleTree(): Promise<Map<number, BundleNode>> {
 	const rows = await getDb()
 		.select({
 			id: device_roles.id,
@@ -112,12 +155,19 @@ export async function effectiveBundleId(roleId: number): Promise<number | null> 
 			managed_bundle_id: device_roles.managed_bundle_id,
 		})
 		.from(device_roles)
-	const byId = new Map(rows.map((r) => [r.id, r]))
+	return new Map(rows.map((r) => [r.id, r]))
+}
+
+/** Nearest bundle up the tree from `roleId`; `inherited` when not the role's own. */
+function resolveBundle(
+	byId: Map<number, BundleNode>,
+	roleId: number,
+): { id: number; inherited: boolean } | null {
 	const seen = new Set<number>()
 	let role = byId.get(roleId)
 	while (role && !seen.has(role.id)) {
 		if (role.managed_bundle_id !== null) {
-			return role.managed_bundle_id
+			return { id: role.managed_bundle_id, inherited: role.id !== roleId }
 		}
 		seen.add(role.id)
 		role = role.parent_id === null ? undefined : byId.get(role.parent_id)

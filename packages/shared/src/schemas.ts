@@ -1004,6 +1004,9 @@ export type DeviceRoleUpdate = v.InferOutput<typeof DeviceRoleUpdateSchema>
 export const DeviceRoleListQuerySchema = v.object({
 	...ListQueryEntries,
 	parent: OptionalIdEntry,
+	can_host_vms: v.optional(looseBoolean(false), undefined),
+	/** Effective managed bundle (own or inherited from an ancestor role). */
+	bundle: OptionalIdListEntry,
 	sort: v.optional(v.picklist(['name', 'description']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
