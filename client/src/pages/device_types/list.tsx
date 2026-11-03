@@ -158,6 +158,7 @@ export function DeviceTypesPage(): JSX.Element {
 		},
 		{
 			key: 'spec_url',
+			sortable: true,
 			label: t('deviceType.specUrl'),
 			getValue: (dt: DeviceTypeListRow): JSX.Element =>
 				dt.spec_url ? <SpecLink url={dt.spec_url} /> : <span>—</span>,

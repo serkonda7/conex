@@ -132,6 +132,7 @@ export function DeviceRolesPage(): JSX.Element {
 				{
 					key: 'can_host_vms',
 					label: t('deviceRole.canHostVms'),
+					sortable: true,
 					getValue: (r: DeviceRoleListRow): JSX.Element => (
 						<Show when={r.can_host_vms === 1} fallback="—">
 							<IconCheck class="bool-yes" size={18} aria-label={t('common.yes')} />
@@ -141,6 +142,7 @@ export function DeviceRolesPage(): JSX.Element {
 				{
 					key: 'managed_bundle',
 					label: tp('entity.managedBundle', 1),
+					sortable: true,
 					getValue: bundleCell,
 				},
 				{

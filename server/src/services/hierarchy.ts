@@ -154,7 +154,11 @@ export function subtreeIds(nodeId: number, children: Map<number | null, number[]
 export function sortHierarchically<
 	Row extends LocationNode & { name: string },
 	Field extends keyof Row & string,
->(rows: Row[], sort: Field, order: 'asc' | 'desc'): (Row & { depth: number })[] {
+>(
+	rows: Row[],
+	sort: Field | ((row: Row) => unknown),
+	order: 'asc' | 'desc',
+): (Row & { depth: number })[] {
 	const children = new Map<number | null, Row[]>()
 	const included = new Set(rows.map((row) => row.id))
 	for (const row of rows) {
@@ -173,8 +177,9 @@ export function sortHierarchically<
 	const collate = (a: string, b: string): number =>
 		a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
 	const direction = order === 'desc' ? -1 : 1
+	const sortValue = typeof sort === 'function' ? sort : (row: Row): unknown => row[sort]
 	const compare = (a: Row, b: Row): number => {
-		const byField = collate(String(a[sort] ?? ''), String(b[sort] ?? ''))
+		const byField = collate(String(sortValue(a) ?? ''), String(sortValue(b) ?? ''))
 		if (byField !== 0) {
 			return byField * direction
 		}

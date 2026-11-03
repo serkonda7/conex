@@ -850,6 +850,7 @@ export const DeviceTypeListQuerySchema = v.object({
 			'comments',
 			'u_height',
 			'is_full_depth',
+			'spec_url',
 			'eol_date',
 			'devices',
 		]),
@@ -861,7 +862,33 @@ export const DeviceTypeListQuerySchema = v.object({
 export const RackTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdListEntry,
-	sort: v.optional(v.picklist(['model', 'manufacturer', 'form_factor']), 'model'),
+	form_factor: v.optional(
+		v.pipe(CsvListSchema, v.array(RackFormFactorSchema), v.transform(emptyAsUndefined)),
+		undefined,
+	),
+	/** Rack units (`u_height`). */
+	height: v.optional(
+		v.pipe(
+			CsvListSchema,
+			v.array(
+				v.pipe(v.union([v.string(), v.number()]), v.transform(Number), RackHeightSchema),
+			),
+			v.transform(emptyAsUndefined),
+		),
+		undefined,
+	),
+	sort: v.optional(
+		v.picklist([
+			'model',
+			'manufacturer',
+			'form_factor',
+			'u_height',
+			'description',
+			'comments',
+			'racks',
+		]),
+		'model',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1003,7 +1030,7 @@ export const DeviceRoleListQuerySchema = v.object({
 	can_host_vms: v.optional(looseBoolean(false), undefined),
 	/** Effective managed bundle (own or inherited from an ancestor role). */
 	bundle: OptionalIdListEntry,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'can_host_vms', 'managed_bundle']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 

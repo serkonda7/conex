@@ -1,6 +1,7 @@
 import {
 	EntityParamsSchema,
 	RackTypeCreateSchema,
+	type RackTypeListQuery,
 	RackTypeListQuerySchema,
 	RackTypeUpdateSchema,
 } from 'shared/src/schemas'
@@ -24,5 +25,9 @@ export const rackTypesApp = makeCatalogApp({
 	get: getRackType,
 	update: updateRackType,
 	remove: deleteRackType,
-	filters: (q: { manufacturer?: number[] }) => ({ manufacturer: q.manufacturer }),
+	filters: (q: RackTypeListQuery) => ({
+		manufacturer: q.manufacturer,
+		form_factor: q.form_factor,
+		height: q.height,
+	}),
 })

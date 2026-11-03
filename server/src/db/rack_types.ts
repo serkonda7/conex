@@ -29,6 +29,8 @@ const RACK_TYPE_EXISTS = 'Rack type already exists'
 
 export interface RackTypeListParams extends ListParams {
 	manufacturer?: number[]
+	form_factor?: RackTypeListQuery['form_factor']
+	height?: number[]
 	sort: RackTypeListQuery['sort']
 	order: 'asc' | 'desc'
 }
@@ -48,11 +50,17 @@ export async function listRackTypes(params: RackTypeListParams): Promise<Page<Ra
 				)
 			: undefined,
 		params.manufacturer ? inArray(rack_types.manufacturer_id, params.manufacturer) : undefined,
+		params.form_factor ? inArray(rack_types.form_factor, params.form_factor) : undefined,
+		params.height ? inArray(rack_types.u_height, params.height) : undefined,
 	)
 	const orderColumns = {
 		model: rack_types.model,
 		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${rack_types.manufacturer_id})`,
 		form_factor: rack_types.form_factor,
+		u_height: rack_types.u_height,
+		description: rack_types.description,
+		comments: rack_types.comments,
+		racks: sql`(SELECT count(*) FROM ${racks} WHERE ${racks.rack_type_id} = ${rack_types.id})`,
 	}
 	const page = await pageRows(
 		rack_types,

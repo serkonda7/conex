@@ -325,6 +325,7 @@ export async function listDeviceTypes(
 		comments: device_types.comments,
 		u_height: device_types.u_height,
 		is_full_depth: device_types.is_full_depth,
+		spec_url: device_types.spec_url,
 		eol_date: device_types.eol_date,
 		devices: sql`(SELECT count(*) FROM ${devices} WHERE ${devices.device_type_id} = ${device_types.id})`,
 	}

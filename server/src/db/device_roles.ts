@@ -1,7 +1,12 @@
 import { Result } from 'better-result'
 import { and, count, eq, inArray } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
-import type { DeviceRoleCreate, DeviceRoleUpdate, DeviceServiceJson } from 'shared/src/schemas'
+import type {
+	DeviceRoleCreate,
+	DeviceRoleListQuery,
+	DeviceRoleUpdate,
+	DeviceServiceJson,
+} from 'shared/src/schemas'
 import { device_roles, device_types, devices, managed_bundles, virtual_machines } from '../schema'
 import {
 	buildChildrenMap,
@@ -68,7 +73,7 @@ export interface DeviceRoleListParams extends ListParams {
 	can_host_vms?: boolean
 	/** Effective managed bundle (own or inherited) is one of these. */
 	bundle?: number[]
-	sort: 'name' | 'description'
+	sort: DeviceRoleListQuery['sort']
 	order: 'asc' | 'desc'
 }
 
@@ -104,7 +109,13 @@ export async function listDeviceRoles(
 	const matching = bundleIds
 		? withBundle.filter((r) => r.managed_bundle && bundleIds.has(r.managed_bundle.id))
 		: withBundle
-	const ordered = sortHierarchically(matching, params.sort, params.order)
+	const ordered = sortHierarchically(
+		matching,
+		params.sort === 'managed_bundle'
+			? (r: (typeof matching)[number]): string => r.managed_bundle?.name ?? ''
+			: params.sort,
+		params.order,
+	)
 	const linked = withTreeLinks(ordered)
 	const offset = offsetOf(params)
 	const items = linked.slice(offset, offset + params.limit)

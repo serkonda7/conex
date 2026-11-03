@@ -210,6 +210,8 @@ export async function fetch_rack_types(
 			query: to_query({
 				...paging(filters),
 				manufacturer: filters?.manufacturer,
+				form_factor: filters?.form_factor,
+				height: filters?.height,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
 			}),
