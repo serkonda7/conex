@@ -28,6 +28,7 @@ import {
 import {
 	checkListTenantParam,
 	checkTenant,
+	checkTenants,
 	forbidden,
 	listTenantScope,
 	requestScope,
@@ -37,7 +38,7 @@ import {
 	requirePermission,
 } from '../authz'
 import { exists } from '../db/list'
-import { deviceTenant, employeeTenant } from '../db/owners'
+import { deviceTenant, employeeTenants } from '../db/owners'
 import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
 import { createExternalDevice } from '../integrations/create_device'
 import { importExternalEmployees } from '../integrations/import_employees'
@@ -102,13 +103,21 @@ async function loadDeviceTenant(c: Context, deviceId: number): Promise<number | 
 	return checkTenant(c, tenant) ?? tenant
 }
 
-/** Tenant of an employee in the requester's scope, or the 404/403 response. */
+/**
+ * Tenant an employee is handled under: the requester's own for a scoped
+ * requester, else the primary one; or the 404/403 response.
+ */
 async function loadEmployeeTenant(c: Context, employeeId: number): Promise<number | Response> {
-	const tenant = await employeeTenant(employeeId)
-	if (tenant === undefined) {
+	const memberships = await employeeTenants(employeeId)
+	if (memberships === undefined) {
 		return notFound(c, 'Employee not found')
 	}
-	return checkTenant(c, tenant) ?? tenant
+	return (
+		checkTenants(c, memberships) ??
+		requestScope(c) ??
+		memberships[0] ??
+		notFound(c, 'Employee not found')
+	)
 }
 
 /**
@@ -795,11 +804,10 @@ export const integrationsApp = new Hono()
 					return denied
 				}
 				if (row.entity_id !== null) {
-					const owner =
+					const scopeDenied =
 						row.entity_type === 'employee'
-							? await employeeTenant(row.entity_id)
-							: await deviceTenant(row.entity_id)
-					const scopeDenied = checkTenant(c, owner ?? null)
+							? checkTenants(c, (await employeeTenants(row.entity_id)) ?? [])
+							: checkTenant(c, (await deviceTenant(row.entity_id)) ?? null)
 					if (scopeDenied) {
 						return scopeDenied
 					}

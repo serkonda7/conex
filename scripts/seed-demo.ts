@@ -57,7 +57,7 @@ async function one<T>(query: PromiseLike<T[]>): Promise<T> {
 await getSqlClient().unsafe(`
 	TRUNCATE floorplan_placements, floorplan_areas, attachments, cables, interfaces, devices,
 		shelves, racks, rack_types, locations, sites, site_groups, device_type_interfaces, device_types,
-		manufacturers, sessions, auth_states, users, tenants, tenant_groups, employees,
+		manufacturers, sessions, auth_states, users, tenants, tenant_groups, employee_tenants, employees,
 		integrations, sync_runs, external_links, object_changes, audit_log
 	RESTART IDENTITY
 `)

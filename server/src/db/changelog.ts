@@ -66,7 +66,11 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 	switch (objectType) {
 		case 'tenant':
 			return row.id
-		case 'employee':
+		// Primary tenant: a change log entry carries one tenant.
+		case 'employee': {
+			const ids = fields.tenant_ids
+			return Array.isArray(ids) && typeof ids[0] === 'number' ? ids[0] : null
+		}
 		case 'site_group':
 		case 'site':
 		case 'location':

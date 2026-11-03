@@ -28,10 +28,12 @@ import type {
 } from 'shared/src/schemas'
 import { DEVICE_COMPARE_FIELDS, EMPLOYEE_COMPARE_FIELDS } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
+import { employeeTenantIds, memberCondition } from '../db/employees'
 import { type TenantFilterParams, tenantConditions } from '../db/list'
 import {
 	device_types,
 	devices,
+	employee_tenants,
 	employees,
 	manufacturers,
 	priorities,
@@ -128,7 +130,8 @@ export interface LocalEmployeeRow {
 	emails: EmployeeEmail[]
 	phones: EmployeePhone[]
 	active: number
-	tenant_id: number
+	/** Membership order: first = primary tenant. */
+	tenant_ids: number[]
 }
 
 export async function localEmployees(where: SQL | undefined): Promise<LocalEmployeeRow[]> {
@@ -143,7 +146,7 @@ export async function localEmployees(where: SQL | undefined): Promise<LocalEmplo
 			emails: employees.emails,
 			phones: employees.phones,
 			active: employees.active,
-			tenant_id: employees.tenant_id,
+			tenant_ids: employeeTenantIds,
 		})
 		.from(employees)
 		.where(where)
@@ -493,7 +496,12 @@ async function employeeFindings(
 ): Promise<IntegrationFinding[]> {
 	const findings: IntegrationFinding[] = []
 	const locals =
-		tenantIds.length > 0 ? await localEmployees(inArray(employees.tenant_id, tenantIds)) : []
+		tenantIds.length > 0
+			? await localEmployees(
+					memberCondition([inArray(employee_tenants.tenant_id, tenantIds)]),
+				)
+			: []
+	const reported = new Set(tenantIds)
 	const linkByEmployee = new Map<number, ExternalLinkRow>()
 	const ignoredLocal = new Set<number>()
 	const takenExternal = new Set<string>()
@@ -515,22 +523,36 @@ async function employeeFindings(
 
 	const unlinkedByTenant = new Map<number, LocalEmployeeRow[]>()
 	for (const employee of locals) {
-		const tenantId = employee.tenant_id
+		const memberships = employee.tenant_ids.filter((t) => reported.has(t))
+		const link = linkByEmployee.get(employee.id)
+		if (!link) {
+			// Matched against the company of every reported tenant it belongs to.
+			if (!ignoredLocal.has(employee.id)) {
+				for (const tenantId of memberships) {
+					if (liveCompany.has(tenantId)) {
+						const list = unlinkedByTenant.get(tenantId) ?? []
+						list.push(employee)
+						unlinkedByTenant.set(tenantId, list)
+					}
+				}
+			}
+			continue
+		}
+		// Linked: reported once, under the first reported tenant whose company
+		// the external employee belongs to (else the first reported tenant).
+		const externalCompanies = externalById.get(link.external_id)?.external_tenant_ids ?? []
+		const tenantId =
+			memberships.find((t) => externalCompanies.includes(liveCompany.get(t) ?? '')) ??
+			memberships[0]
+		if (tenantId === undefined) {
+			continue
+		}
 		const company = liveCompany.get(tenantId)
 		const base = {
 			tenant_id: tenantId,
 			tenant_name: tenantName.get(tenantId) ?? null,
 			employee_id: employee.id,
 			employee_name: employee.name,
-		}
-		const link = linkByEmployee.get(employee.id)
-		if (!link) {
-			if (company !== undefined && !ignoredLocal.has(employee.id)) {
-				const list = unlinkedByTenant.get(tenantId) ?? []
-				list.push(employee)
-				unlinkedByTenant.set(tenantId, list)
-			}
-			continue
 		}
 		const linked = { ...base, link_id: link.id, external_id: link.external_id }
 		const external = externalById.get(link.external_id)
@@ -578,6 +600,11 @@ async function employeeFindings(
 		}
 	}
 
+	// An employee of several tenants is matched in each; it is missing only
+	// when no tenant found a match, and then reported once.
+	const suggestedPairs = new Set<string>()
+	const suggestedEmployees = new Set<number>()
+	const unmatched = new Map<number, { tenantId: number; company: string }>()
 	for (const [tenantId, company] of liveCompany) {
 		const tenantLocals = unlinkedByTenant.get(tenantId) ?? []
 		const candidates = externals.filter(
@@ -585,11 +612,16 @@ async function employeeFindings(
 		)
 		const { auto, suggestions } = matchEmployees(tenantLocals, candidates)
 		const pairs = [...auto, ...suggestions]
-		const suggestedLocal = new Set(pairs.map((p) => p.employee_id))
 		const suggestedExternal = new Set(pairs.map((p) => p.external_id))
 		const base = { tenant_id: tenantId, tenant_name: tenantName.get(tenantId) ?? null }
 		const localById = new Map(tenantLocals.map((e) => [e.id, e]))
 		for (const pair of pairs) {
+			suggestedEmployees.add(pair.employee_id)
+			const key = `${pair.employee_id}:${pair.external_id}`
+			if (suggestedPairs.has(key)) {
+				continue
+			}
+			suggestedPairs.add(key)
 			const external = externalById.get(pair.external_id)
 			findings.push(
 				finding('employee_suggestion', {
@@ -605,15 +637,8 @@ async function employeeFindings(
 			)
 		}
 		for (const employee of tenantLocals) {
-			if (employee.active === 1 && !suggestedLocal.has(employee.id)) {
-				findings.push(
-					finding('employee_missing_in_external', {
-						...base,
-						employee_id: employee.id,
-						employee_name: employee.name,
-						external_tenant_id: company,
-					}),
-				)
+			if (employee.active === 1 && !unmatched.has(employee.id)) {
+				unmatched.set(employee.id, { tenantId, company })
 			}
 		}
 		for (const external of candidates) {
@@ -627,6 +652,20 @@ async function employeeFindings(
 					}),
 				)
 			}
+		}
+	}
+	const employeeById = new Map(locals.map((e) => [e.id, e]))
+	for (const [employeeId, { tenantId, company }] of unmatched) {
+		if (!suggestedEmployees.has(employeeId)) {
+			findings.push(
+				finding('employee_missing_in_external', {
+					tenant_id: tenantId,
+					tenant_name: tenantName.get(tenantId) ?? null,
+					employee_id: employeeId,
+					employee_name: employeeById.get(employeeId)?.name ?? null,
+					external_tenant_id: company,
+				}),
+			)
 		}
 	}
 	return findings

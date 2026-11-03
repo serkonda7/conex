@@ -1,6 +1,6 @@
 import { emailDomain, primaryPhone, withEmailDomain } from 'shared/src/schemas'
 import type { ContactScope, EmployeeCreate, EmployeeEmail, EmployeePhone } from 'shared/src/types'
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, For, type JSX, Show } from 'solid-js'
 import {
 	create_employee,
 	type EmployeeRow,
@@ -23,7 +23,9 @@ import {
 	CheckboxField,
 	CommentsField,
 	DescriptionField,
+	type FormOption,
 	FormPage,
+	Hint,
 	row_options,
 	SelectField,
 	TextField,
@@ -33,7 +35,6 @@ import { contactScopeOptions, employeeSalutationOptions } from '../../i18n/label
 import {
 	cleared,
 	type FormValues,
-	id_value,
 	is_add_another_submit,
 	submit_form,
 	text,
@@ -41,9 +42,18 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
+import { isScoped } from '../../lib/session'
 import { newObjectTenantId } from '../../lib/tenant_context'
 
+/** One row of the tenant list; `id` is the select value ('' = none chosen). */
+interface TenantEntry {
+	id: string
+}
+
+type SelectEvent = Event & { currentTarget: HTMLSelectElement }
+
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
+const blankTenant = (): TenantEntry => ({ id: '' })
 const blankPhone = (): PhoneRow<EmployeePhone> => ({ number: '', type: 'phone', scope: 'work' })
 
 /** Employee create (`id` omitted) or edit form. */
@@ -52,7 +62,8 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const [lastName, setLastName] = createSignal('')
 	const [salutation, setSalutation] = createSignal('')
 	// Edit only: new employees get the tenant of the global tenant selection.
-	const [editTenantId, setEditTenantId] = createSignal('')
+	// First = primary tenant.
+	const [editTenants, setEditTenants] = createSignal<TenantEntry[]>([])
 	const [title, setTitle] = createSignal('')
 	const [emails, setEmails] = createSignal<EmployeeEmail[]>([blankEmail()])
 	const [phones, setPhones] = createSignal<PhoneRow<EmployeePhone>[]>([blankPhone()])
@@ -66,7 +77,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			setFirstName(row.first_name ?? '')
 			setLastName(row.last_name)
 			setSalutation(row.salutation ?? '')
-			setEditTenantId(id_value(row.tenant_id))
+			setEditTenants(row.tenant_ids.map((id) => ({ id: String(id) })))
 			setTitle(row.title ?? '')
 			setEmails(row.emails.length > 0 ? row.emails : [blankEmail()])
 			setPhones(row.phones.length > 0 ? row.phones.map(phoneRow) : [blankPhone()])
@@ -76,8 +87,19 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 		},
 	})
 	const [tenants] = createRows(fetch_tenants, form.setError)
+	/** Chosen tenants, in order, without blanks and repeats. */
+	const editTenantIds = (): number[] => [
+		...new Set(
+			editTenants()
+				.map((row) => parseId(row.id))
+				.filter((id): id is number => id !== null),
+		),
+	]
+	// Scoped users cannot change memberships and only see their own tenant.
+	const editsTenants = (): boolean => form.editing && !isScoped()
+	/** Tenant whose mail domain and main number apply: the primary one. */
 	const tenant = (): number | null =>
-		form.editing ? parseId(editTenantId()) : newObjectTenantId()
+		editsTenants() ? (editTenantIds()[0] ?? null) : newObjectTenantId()
 	/** Company mail domain of the tenant, from its primary mail address. */
 	const domainOf = (tenantId: number | null): string | null =>
 		emailDomain(tenants()?.find((row) => row.id === tenantId)?.emails ?? [])
@@ -99,11 +121,10 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const prefix = form.editing ? 'employee-edit' : 'employee'
 	const backTo = useFormReturnRoute('/employees', props.id)
 
-	const body = (values: FormValues, tenantId: number): EmployeeCreate => ({
+	const body = (values: FormValues, tenantId: number): Omit<EmployeeCreate, 'tenant_ids'> => ({
 		first_name: text(firstName()),
 		last_name: values.name,
 		salutation: (salutation() || null) as EmployeeCreate['salutation'],
-		tenant_id: tenantId,
 		title: text(title()),
 		// Rows left blank are dropped; addresses without a domain get the tenant's.
 		emails: emailsOf(
@@ -130,8 +151,11 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			nameError: t('employee.lastNameRequired'),
 			save: (values: FormValues) =>
 				id === undefined
-					? create_employee(body(values, tenantId))
-					: update_employee(id, cleared(body(values, tenantId))),
+					? create_employee({ ...body(values, tenantId), tenant_ids: [tenantId] })
+					: update_employee(id, {
+							...cleared(body(values, tenantId)),
+							...(editsTenants() ? { tenant_ids: editTenantIds() } : {}),
+						}),
 			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
 				? () => {
@@ -182,14 +206,35 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				value={lastName()}
 				onInput={setLastName}
 			/>
-			<Show when={form.editing}>
-				<SelectField
+			<Show when={editsTenants()}>
+				<ContactListField
 					id={`${prefix}-tenant`}
-					label={tp('entity.tenant', 1)}
-					value={editTenantId()}
-					onChange={setEditTenantId}
-					options={row_options(tenants() ?? [])}
-					required
+					label={t('employee.tenants')}
+					addLabel={t('employee.addTenant')}
+					rows={editTenants()}
+					onChange={setEditTenants}
+					blank={blankTenant}
+					hint={<Hint>{t('employee.tenantsHint')}</Hint>}
+					row={(
+						entry: () => TenantEntry,
+						update: (patch: Partial<TenantEntry>) => void,
+						index: number,
+					): JSX.Element => (
+						<select
+							id={`${prefix}-tenant-${index}`}
+							aria-label={tp('entity.tenant', 1)}
+							value={entry().id}
+							required={index === 0}
+							onChange={(e: SelectEvent) => update({ id: e.currentTarget.value })}
+						>
+							<option value="">{t('common.selectPlaceholder')}</option>
+							<For each={row_options(tenants() ?? [])}>
+								{(o: FormOption): JSX.Element => (
+									<option value={o.value}>{o.label}</option>
+								)}
+							</For>
+						</select>
+					)}
 				/>
 			</Show>
 			<TextField

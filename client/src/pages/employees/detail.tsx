@@ -1,8 +1,8 @@
 import { primaryPhone } from 'shared/src/schemas'
-import { createSignal, type JSX } from 'solid-js'
+import { createSignal, For, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices } from '../../api/devices'
 import { delete_employee, fetch_employee } from '../../api/employees'
-import { fetch_tenant } from '../../api/tenancy'
+import { fetch_tenant, fetch_tenants, type TenantRow } from '../../api/tenancy'
 import { EmailList, PhoneList } from '../../components/contacts'
 import { nameColumn } from '../../components/data_table'
 import {
@@ -17,8 +17,9 @@ import { InlineError } from '../../components/feedback'
 import { Markdown } from '../../components/markdown'
 import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
-import { createRecord, createRowsFor } from '../../lib/resource'
+import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
+import { sessionTenantId } from '../../lib/session'
 import { EmployeeStatus } from './list'
 
 /**
@@ -29,8 +30,20 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const id = (): number => props.id
 	const [employee] = createRecord(id, fetch_employee, setError)
-	const tenantId = (): number | undefined => employee()?.tenant_id
+	/** Tenant the page is shown under: the user's own when scoped, else the primary one. */
+	const tenantId = (): number | undefined => {
+		const ids = employee()?.tenant_ids
+		const own = sessionTenantId()
+		return own !== null && ids?.includes(own) ? own : ids?.[0]
+	}
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
+	const [tenants] = createRows(fetch_tenants, setError)
+	/** Tenants of the employee the user can see, in membership order. */
+	const memberTenants = (): TenantRow[] =>
+		(employee()?.tenant_ids ?? []).flatMap((tenantKey) => {
+			const row = tenants()?.find((r) => r.id === tenantKey)
+			return row ? [row] : []
+		})
 	const [devices] = createRowsFor(
 		id,
 		(key: number) => fetch_devices({ employee: [key] }),
@@ -68,6 +81,19 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 				<DetailSubtitle description={employee()?.description} />
 
 				<DetailCard label={t('employee.details')}>
+					<dt>{t('employee.tenants')}</dt>
+					<dd>
+						<Show when={memberTenants().length > 0} fallback="—">
+							<For each={memberTenants()}>
+								{(row: TenantRow, index: () => number): JSX.Element => (
+									<>
+										{index() > 0 ? ', ' : ''}
+										<a href={`/tenants/${row.id}`}>{row.name}</a>
+									</>
+								)}
+							</For>
+						</Show>
+					</dd>
 					<dt>{t('employee.salutation')}</dt>
 					<dd>
 						{employee()?.salutation

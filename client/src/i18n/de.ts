@@ -352,6 +352,10 @@ export const de: Messages = {
 	'employee.phones': 'Telefonnummern',
 	'employee.addEmail': 'E-Mail-Adresse hinzufügen',
 	'employee.addPhone': 'Telefonnummer hinzufügen',
+	'employee.tenants': 'Mandanten',
+	'employee.addTenant': 'Mandant hinzufügen',
+	'employee.tenantsHint':
+		'Der erste Mandant ist der primäre: Seine E-Mail-Domain ergänzt Adressen, seine Hauptnummer ergänzt Durchwahlen.',
 	'employee.reorderEntry': 'Ziehen zum Sortieren',
 	'employee.removeEntry': 'Entfernen',
 	'employee.phoneNumber': 'Telefonnummer',

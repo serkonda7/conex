@@ -360,12 +360,23 @@ export const LocationUpdateSchema = v.strictObject({
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 })
 
-/** Employees always belong to a tenant (contact persons of a customer). */
+/**
+ * Tenants of an employee, in order: the first is the primary tenant (mail
+ * domain, main number for extensions).
+ */
+const EmployeeTenantIdsSchema = v.pipe(
+	v.array(IdSchema),
+	v.minLength(1, 'An employee needs at least one tenant'),
+	v.maxLength(50),
+	v.check((ids) => new Set(ids).size === ids.length, 'Tenants must be unique'),
+)
+
+/** Employees always belong to at least one tenant (contact persons of customers). */
 export const EmployeeCreateSchema = v.strictObject({
 	first_name: v.optional(NameSchema, undefined),
 	last_name: NameSchema,
 	salutation: v.optional(v.nullable(EmployeeSalutationSchema), undefined),
-	tenant_id: IdSchema,
+	tenant_ids: EmployeeTenantIdsSchema,
 	title: v.optional(ContactFieldSchema, undefined),
 	emails: v.optional(EmployeeEmailsSchema, []),
 	phones: v.optional(EmployeePhonesSchema, []),
@@ -378,7 +389,7 @@ export const EmployeeUpdateSchema = v.strictObject({
 	first_name: v.optional(v.nullable(NameSchema), undefined),
 	last_name: v.optional(NameSchema, undefined),
 	salutation: v.optional(v.nullable(EmployeeSalutationSchema), undefined),
-	tenant_id: v.optional(IdSchema, undefined),
+	tenant_ids: v.optional(EmployeeTenantIdsSchema, undefined),
 	title: v.optional(v.nullable(ContactFieldSchema), undefined),
 	emails: v.optional(EmployeeEmailsSchema, undefined),
 	phones: v.optional(EmployeePhonesSchema, undefined),

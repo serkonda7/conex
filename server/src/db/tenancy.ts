@@ -18,7 +18,7 @@ import {
 } from 'shared/src/schemas'
 import {
 	devices,
-	employees,
+	employee_tenants,
 	external_links,
 	interfaces,
 	locations,
@@ -512,9 +512,9 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 			'Tenant still has virtual machines; move or delete them first',
 		],
 		[
-			employees,
-			eq(employees.tenant_id, id),
-			'Tenant still has employees; move or delete them first',
+			employee_tenants,
+			eq(employee_tenants.tenant_id, id),
+			'Tenant still has employees; remove them from the tenant or delete them first',
 		],
 		[users, eq(users.tenant_id, id), 'Tenant still has users; reassign them before deleting'],
 	])

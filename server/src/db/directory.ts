@@ -7,7 +7,7 @@ import {
 	primaryPhone,
 	type TenantPhone,
 } from 'shared/src/schemas'
-import { employees, tenants } from '../schema'
+import { employee_tenants, employees, tenants } from '../schema'
 import { getDb } from './connection'
 
 // ---------------------------------------------------------------------------
@@ -38,7 +38,10 @@ function numbers(
 		.filter((n): n is string => !!n)
 }
 
-/** All active employees, or those of one tenant for a scoped requester. */
+/**
+ * All active employees under their primary tenant, or those of one tenant
+ * (under that tenant) for a scoped requester.
+ */
 export async function listDirectoryContacts(tenantScope?: number): Promise<DirectoryContact[]> {
 	const rows = await getDb()
 		.select({
@@ -54,13 +57,17 @@ export async function listDirectoryContacts(tenantScope?: number): Promise<Direc
 			tenant_phones: tenants.phones,
 		})
 		.from(employees)
-		.innerJoin(tenants, eq(tenants.id, employees.tenant_id))
-		.where(
+		.innerJoin(
+			employee_tenants,
 			and(
-				eq(employees.active, 1),
-				tenantScope !== undefined ? eq(employees.tenant_id, tenantScope) : undefined,
+				eq(employee_tenants.employee_id, employees.id),
+				tenantScope !== undefined
+					? eq(employee_tenants.tenant_id, tenantScope)
+					: eq(employee_tenants.position, 0),
 			),
 		)
+		.innerJoin(tenants, eq(tenants.id, employee_tenants.tenant_id))
+		.where(eq(employees.active, 1))
 		.orderBy(asc(employees.name), asc(employees.id))
 	return rows.map(({ emails, phones, tenant_phones, ...row }) => {
 		const business = numbers(phones, tenant_phones, 'phone', 'work')

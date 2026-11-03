@@ -78,6 +78,8 @@ export function ContactListField<T>(props: {
 	row: (entry: () => T, update: (patch: Partial<T>) => void, index: number) => JSX.Element
 	/** Note shown below a row, e.g. why its value is unusable. */
 	rowHint?: (entry: () => T) => JSX.Element
+	/** Note shown below the whole list. */
+	hint?: JSX.Element
 }): JSX.Element {
 	/** Row whose handle is pressed; only that row is draggable, not its inputs. */
 	const [grabbed, setGrabbed] = createSignal<number | null>(null)
@@ -101,7 +103,7 @@ export function ContactListField<T>(props: {
 		list?.querySelectorAll<HTMLElement>('.contact-handle')[to]?.focus()
 	}
 	return (
-		<Field label={props.label} for={`${props.id}-0`}>
+		<Field label={props.label} for={`${props.id}-0`} hint={props.hint}>
 			<div
 				class="contact-rows"
 				classList={{ 'contact-rows-sortable': props.rows.length > 1 }}

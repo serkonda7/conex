@@ -29,7 +29,7 @@ function createInput(
 		first_name: external.first_name?.slice(0, 100),
 		last_name: external.last_name.slice(0, 100),
 		salutation: external.salutation,
-		tenant_id: tenantId,
+		tenant_ids: [tenantId],
 		title: external.title?.slice(0, 200),
 		emails: external.email ? [{ address: external.email, scope: 'work' }] : [],
 		phones: [

@@ -16,6 +16,8 @@
  *   users — there is no shared visibility.
  * - Tenant-less catalog data (manufacturers, device types + stubs) is
  *   readable by everyone but writable only by global editors/admins.
+ * - Employees belong to several tenants: any of them grants access (see
+ *   `routes/employees.ts`).
  * - Tenant-less child rows inherit their parent's tenant (`db/owners.ts`):
  *   interfaces follow their device, cables follow both endpoint devices
  *   (both endpoints must sit in the scoped tenant).
@@ -105,6 +107,12 @@ export function checkTenant(c: Context, tenant: number | null | undefined): Resp
 		return null
 	}
 	return forbidden(c)
+}
+
+/** Single-object scope gate for a row in several tenants: any of them grants access. */
+export function checkTenants(c: Context, tenants: readonly number[]): Response | null {
+	const scope = scopeTenantId(requestUser(c))
+	return scope === null || tenants.includes(scope) ? null : forbidden(c)
 }
 
 /** Single-object scope gate for a cable, given its endpoint tenants. */

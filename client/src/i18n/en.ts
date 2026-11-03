@@ -351,6 +351,10 @@ export const en = {
 	'employee.phones': 'Phone numbers',
 	'employee.addEmail': 'Add email address',
 	'employee.addPhone': 'Add phone number',
+	'employee.tenants': 'Tenants',
+	'employee.addTenant': 'Add tenant',
+	'employee.tenantsHint':
+		'The first tenant is the primary one: its mail domain completes addresses and its main number completes extensions.',
 	'employee.reorderEntry': 'Drag to reorder',
 	'employee.removeEntry': 'Remove',
 	'employee.phoneNumber': 'Phone number',
