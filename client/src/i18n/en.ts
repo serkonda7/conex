@@ -33,7 +33,7 @@ export const en = {
 	'common.noDescription': 'No description.',
 	'common.viewIn': 'View in {target} →',
 	'common.showAll': 'Show all {count}',
-	'common.viewAllIn': 'View all {count} in {target} →',
+	'common.openIn': 'Open {target} →',
 	'common.editNamed': 'Edit: {name}',
 	'common.moreActionsFor': 'More actions for {name}',
 	'common.actionsFor': 'Actions for {name}',

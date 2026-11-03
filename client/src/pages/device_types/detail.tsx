@@ -591,7 +591,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<ViewAllLink
 					href={`/devices?device_type=${props.id}&kind=device`}
-					count={deviceTotal()}
 					target={tp('entity.device', 2)}
 				/>
 			</section>

@@ -35,7 +35,7 @@ export const de: Messages = {
 	'common.noDescription': 'Keine Beschreibung.',
 	'common.viewIn': '{target} →',
 	'common.showAll': 'Alle {count} anzeigen',
-	'common.viewAllIn': 'Alle {count} {target} zeigen →',
+	'common.openIn': '{target} öffnen →',
 	'common.editNamed': 'Bearbeiten: {name}',
 	'common.moreActionsFor': 'Weitere Aktionen für {name}',
 	'common.actionsFor': 'Aktionen für {name}',
