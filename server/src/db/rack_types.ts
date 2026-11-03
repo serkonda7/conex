@@ -37,11 +37,7 @@ export async function listRackTypes(params: RackTypeListParams): Promise<Page<Ra
 	const where = and(
 		params.search
 			? or(
-					searchCondition(params.search, [
-						rack_types.model,
-						rack_types.part_number,
-						rack_types.description,
-					]),
+					searchCondition(params.search, [rack_types.model, rack_types.description]),
 					inArray(
 						rack_types.manufacturer_id,
 						getDb()
@@ -88,8 +84,6 @@ export async function createRackType(input: RackTypeCreate): Promise<Result<Rack
 		model: input.model,
 		form_factor: input.form_factor,
 		u_height: input.u_height,
-		part_number: input.part_number || null,
-		spec_url: input.spec_url ?? null,
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
@@ -136,8 +130,6 @@ export async function updateRackType(
 		'model',
 		'form_factor',
 		'u_height',
-		'part_number',
-		'spec_url',
 		'description',
 		'comments',
 	])

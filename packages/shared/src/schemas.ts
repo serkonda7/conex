@@ -726,8 +726,6 @@ export const RackTypeCreateSchema = v.strictObject({
 	model: NameSchema,
 	form_factor: RackFormFactorSchema,
 	u_height: RackHeightSchema,
-	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
-	spec_url: v.optional(WebsiteSchema, undefined),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
@@ -737,8 +735,6 @@ export const RackTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	u_height: v.optional(RackHeightSchema, undefined),
-	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
-	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })

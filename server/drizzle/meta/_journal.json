@@ -36,6 +36,13 @@
       "when": 1793623757000,
       "tag": "0056_manufacturer_details",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793695300566,
+      "tag": "0057_rack_type_drop_part_spec",
+      "breakpoints": true
     }
   ]
 }

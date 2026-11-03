@@ -330,8 +330,6 @@ export const rack_types = pgTable(
 		// Mounting width in inches; the only supported value today is 19.
 		width: integer('width').notNull().default(19),
 		u_height: integer('u_height').notNull(),
-		part_number: text('part_number'),
-		spec_url: text('spec_url'),
 		description: text('description'),
 		comments: text('comments'),
 	},

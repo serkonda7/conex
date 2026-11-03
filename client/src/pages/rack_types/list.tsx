@@ -14,6 +14,7 @@ import {
 	useEntityList,
 	useQueryFilterList,
 } from '../../components/list_page'
+import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { formFactorLabel } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
@@ -50,7 +51,11 @@ export function RackTypesPage(): JSX.Element {
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
 			sortable: true,
-			getValue: (rt: RackTypeListRow): string => manufacturerName(rt.manufacturer_id),
+			getValue: (rt: RackTypeListRow): JSX.Element => (
+				<a href={`/manufacturers/${rt.manufacturer_id}`}>
+					{manufacturerName(rt.manufacturer_id)}
+				</a>
+			),
 		},
 		{
 			key: 'form_factor',
@@ -69,9 +74,22 @@ export function RackTypesPage(): JSX.Element {
 			getValue: (rt: RackTypeListRow): string => `${rt.u_height}`,
 		},
 		{
+			key: 'description',
+			label: t('common.description'),
+			getValue: (rt: RackTypeListRow): string => rt.description ?? '—',
+		},
+		{
+			key: 'comments',
+			label: t('common.comments'),
+			class: 'cell-truncate',
+			getValue: (rt: RackTypeListRow): JSX.Element => <Markdown text={rt.comments} inline />,
+		},
+		{
 			key: 'racks',
 			label: tp('entity.rack', 2),
-			getValue: (rt: RackTypeListRow): string => String(rt.instance_count),
+			getValue: (rt: RackTypeListRow): JSX.Element => (
+				<a href={`/racks?rack_type=${rt.id}`}>{rt.instance_count}</a>
+			),
 		},
 	]
 
@@ -91,6 +109,15 @@ export function RackTypesPage(): JSX.Element {
 			]}
 			columns={columns}
 			columnsKey="rack-types"
+			defaultColumns={[
+				'model',
+				'manufacturer',
+				'form_factor',
+				'u_height',
+				'description',
+				'comments',
+				'racks',
+			]}
 			rowName={(rt: RackTypeListRow): string => rt.model}
 			editHref={(rt: RackTypeListRow): string => `/rack-types/${rt.id}/edit`}
 			emptyText={t('rackType.empty')}

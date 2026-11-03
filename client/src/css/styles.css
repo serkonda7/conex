@@ -1150,6 +1150,7 @@ tbody tr:last-child td {
 
 .bool-yes {
 	color: var(--success);
+	stroke-width: 3;
 	vertical-align: middle;
 }
 

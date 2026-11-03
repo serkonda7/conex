@@ -17,7 +17,6 @@ import { t, tp } from '../../i18n'
 import { formFactorLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { SpecLink } from '../device_types/spec_link'
 
 /** /rack-types/:id — rack type detail: specification and the racks of this type. */
 export function RackTypeDetailPage(props: { id: number }): JSX.Element {
@@ -70,14 +69,6 @@ export function RackTypeDetailPage(props: { id: number }): JSX.Element {
 									name={manufacturer()?.name}
 									href={`/manufacturers/${manufacturerId() ?? ''}`}
 								/>
-							</dd>
-							<dt>{t('deviceType.partNumber')}</dt>
-							<dd>{rackType()?.part_number || '—'}</dd>
-							<dt>{t('deviceType.specUrl')}</dt>
-							<dd>
-								<Show when={rackType()?.spec_url} fallback="—">
-									{(url: () => string): JSX.Element => <SpecLink url={url()} />}
-								</Show>
 							</dd>
 						</dl>
 					</section>

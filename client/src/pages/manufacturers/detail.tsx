@@ -152,11 +152,6 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 			),
 		},
 		{
-			key: 'part_number',
-			label: t('deviceType.partNumber'),
-			getValue: (rt: RackTypeListRow): string => rt.part_number || '—',
-		},
-		{
 			key: 'form_factor',
 			label: t('rackType.formFactor'),
 			getValue: (rt: RackTypeListRow): string => formFactorLabel(rt.form_factor),
