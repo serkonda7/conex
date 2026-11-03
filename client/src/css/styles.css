@@ -268,6 +268,27 @@ tbody tr:last-child td {
 	border-top: 1px solid var(--border-strong);
 }
 
+/* Collapse chevron slot of collapsible trees; one tree level wide. */
+.tree-toggle {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.25rem;
+}
+
+.tree-toggle-btn {
+	display: inline-flex;
+	padding: 0.1rem;
+	background: none;
+	border: none;
+	color: var(--text-muted);
+}
+
+.tree-toggle-btn:hover {
+	color: var(--text);
+}
+
 .app-shell {
 	display: flex;
 	flex-direction: column;

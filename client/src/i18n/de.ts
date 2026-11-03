@@ -607,6 +607,8 @@ export const de: Messages = {
 	'deviceRole.section.hierarchy': 'Hierarchie',
 	'deviceRole.section.properties': 'Eigenschaften',
 	'deviceRole.noChildren': 'Noch keine untergeordneten Rollen vorhanden.',
+	'tree.collapse': '{name} einklappen',
+	'tree.expand': '{name} ausklappen',
 	'deviceRoleKey.pc': 'PC',
 	'deviceRoleKey.cloudKey': 'Cloud Key',
 	'deviceRoleKey.modem': 'Modem',

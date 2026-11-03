@@ -601,6 +601,8 @@ export const en = {
 	'deviceRole.section.hierarchy': 'Hierarchy',
 	'deviceRole.section.properties': 'Properties',
 	'deviceRole.noChildren': 'No child roles yet.',
+	'tree.collapse': 'Collapse {name}',
+	'tree.expand': 'Expand {name}',
 	'deviceRoleKey.pc': 'PC',
 	'deviceRoleKey.cloudKey': 'Cloud Key',
 	'deviceRoleKey.modem': 'Modem',
