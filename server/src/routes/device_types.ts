@@ -51,6 +51,7 @@ export const deviceTypesApp = new Hono()
 				manufacturer: query.manufacturer,
 				role: query.role,
 				full_depth: query.full_depth,
+				eol: query.eol,
 				sort: query.sort,
 				order: query.order,
 			}),

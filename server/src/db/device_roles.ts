@@ -1,7 +1,7 @@
 import { Result } from 'better-result'
 import { and, eq } from 'drizzle-orm'
 import type { DeviceRoleCreate, DeviceRoleUpdate, DeviceServiceJson } from 'shared/src/schemas'
-import { device_roles, devices, managed_bundles, virtual_machines } from '../schema'
+import { device_roles, device_types, devices, managed_bundles, virtual_machines } from '../schema'
 import {
 	buildChildrenMap,
 	buildParentMap,
@@ -31,7 +31,12 @@ import {
 import { tenantBundle } from './tenancy'
 
 export type DeviceRoleRow = typeof device_roles.$inferSelect
-export type DeviceRoleListRow = DeviceRoleRow & { device_count: number; depth: number }
+/** `device_type_count`: device types with the role as their default role. */
+export type DeviceRoleListRow = DeviceRoleRow & {
+	device_count: number
+	device_type_count: number
+	depth: number
+}
 
 // ---------------------------------------------------------------------------
 // Device roles (NetBox-style functional roles: `Server`, `Switch`, …).
@@ -68,10 +73,12 @@ export async function listDeviceRoles(
 	const ids = items.map((r) => r.id)
 	const counts = await countBy(devices.device_role_id, ids)
 	const vmCounts = await countBy(virtual_machines.device_role_id, ids)
+	const typeCounts = await countBy(device_types.default_device_role_id, ids)
 	return pageOf(
 		items.map((r) => ({
 			...r,
 			device_count: (counts.get(r.id) ?? 0) + (vmCounts.get(r.id) ?? 0),
+			device_type_count: typeCounts.get(r.id) ?? 0,
 		})),
 		matching.length,
 		params,

@@ -1,7 +1,21 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
+import {
+	and,
+	asc,
+	count,
+	eq,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	or,
+	type SQL,
+	sql,
+} from 'drizzle-orm'
 import type {
 	DeviceTypeCreate,
+	DeviceTypeEolFilter,
 	DeviceTypeListQuery,
 	DeviceTypeUpdate,
 	ManufacturerCreate,
@@ -259,6 +273,8 @@ export interface DeviceTypeListParams extends ListParams {
 	/** Default roles; a role also matches its child roles. */
 	role?: number[]
 	full_depth?: boolean
+	/** EOL states; a type matches any of them. */
+	eol?: DeviceTypeEolFilter[]
 	sort: DeviceTypeListQuery['sort']
 	order: 'asc' | 'desc'
 }
@@ -269,6 +285,11 @@ export async function listDeviceTypes(
 	const roleIds = params.role
 		? [...new Set((await Promise.all(params.role.map(deviceRoleSubtree))).flat())]
 		: undefined
+	const eolConditions: Record<DeviceTypeEolFilter, SQL> = {
+		past: lt(device_types.eol_date, sql`CURRENT_DATE`),
+		announced: gte(device_types.eol_date, sql`CURRENT_DATE`),
+		none: isNull(device_types.eol_date),
+	}
 	const where = and(
 		params.search
 			? or(
@@ -293,6 +314,7 @@ export async function listDeviceTypes(
 		params.full_depth === undefined
 			? undefined
 			: eq(device_types.is_full_depth, params.full_depth),
+		params.eol ? or(...params.eol.map((e) => eolConditions[e])) : undefined,
 	)
 	const orderColumns = {
 		model: device_types.model,

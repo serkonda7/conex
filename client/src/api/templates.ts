@@ -114,6 +114,7 @@ export async function fetch_device_types(
 				manufacturer: filters?.manufacturer,
 				role: filters?.role,
 				full_depth: filters?.full_depth,
+				eol: filters?.eol,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
 			}),

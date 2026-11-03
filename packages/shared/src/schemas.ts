@@ -808,6 +808,10 @@ export type RackTypeCreate = v.InferOutput<typeof RackTypeCreateSchema>
 export type RackTypeUpdate = v.InferOutput<typeof RackTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
+/** EOL state of a device type; several values match any of them. */
+export const DEVICE_TYPE_EOL_FILTERS = ['past', 'announced', 'none'] as const
+export type DeviceTypeEolFilter = (typeof DEVICE_TYPE_EOL_FILTERS)[number]
+
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
 	sort: v.optional(
@@ -832,6 +836,14 @@ export const DeviceTypeListQuerySchema = v.object({
 	/** Default role, including its child roles. */
 	role: OptionalIdListEntry,
 	full_depth: v.optional(looseBoolean(false), undefined),
+	eol: v.optional(
+		v.pipe(
+			CsvListSchema,
+			v.array(v.picklist(DEVICE_TYPE_EOL_FILTERS)),
+			v.transform(emptyAsUndefined),
+		),
+		undefined,
+	),
 	sort: v.optional(
 		v.picklist([
 			'model',
