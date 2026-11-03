@@ -8,6 +8,7 @@ import {
 	inArray,
 	isNotNull,
 	isNull,
+	lt,
 	ne,
 	or,
 	type SQL,
@@ -263,6 +264,7 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	rack?: number[]
 	role?: number[]
 	device_type?: number
+	manufacturer?: number
 	employee?: number[]
 	status?: string
 	/** Placed = U-mounted; unplaced = position empty. */
@@ -275,6 +277,8 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	compatible_with?: number
 	/** Devices whose type is at least 1 U high (can be U-mounted). */
 	mountable?: boolean
+	/** Devices whose type is past its EOL date, or the others when false. */
+	past_eol?: boolean
 	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
 }
@@ -353,7 +357,7 @@ async function compatiblePortCondition(interfaceId: number): Promise<SQL | undef
 
 /**
  * Devices and virtual machines in one list (`UNION ALL`), sorted and paged
- * together. Rack, device type, site and placed filters only apply to
+ * together. Rack, device type, manufacturer, site and placed filters only apply to
  * devices and the host filter only to VMs, so setting one hides the other
  * kind. Sort keys are computed per branch (VMs sort by host name on
  * `mount` and have no type).
@@ -368,9 +372,11 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		params.site !== undefined ||
 		params.rack !== undefined ||
 		params.device_type !== undefined ||
+		params.manufacturer !== undefined ||
 		params.placed !== undefined ||
 		params.compatible_with !== undefined ||
-		params.mountable === true
+		params.mountable === true ||
+		params.past_eol !== undefined
 	const compatible =
 		params.compatible_with === undefined
 			? undefined
@@ -409,6 +415,15 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 					params.rack ? inArray(devices.rack_id, params.rack) : undefined,
 					roleIds ? inArray(devices.device_role_id, roleIds) : undefined,
 					params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,
+					params.manufacturer
+						? inArray(
+								devices.device_type_id,
+								db
+									.select({ id: device_types.id })
+									.from(device_types)
+									.where(eq(device_types.manufacturer_id, params.manufacturer)),
+							)
+						: undefined,
 					params.employee ? inArray(devices.employee_id, params.employee) : undefined,
 					...tenantConditions(devices.tenant_id, params),
 					params.status ? eq(devices.status, params.status) : undefined,
@@ -419,6 +434,14 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 							: isNull(devices.position_u),
 					compatible,
 					params.mountable ? gte(device_types.u_height, 1) : undefined,
+					params.past_eol === undefined
+						? undefined
+						: params.past_eol
+							? lt(device_types.eol_date, sql`CURRENT_DATE`)
+							: or(
+									isNull(device_types.eol_date),
+									gte(device_types.eol_date, sql`CURRENT_DATE`),
+								),
 				)
 	const vmWhere =
 		params.kind === 'device' || deviceOnly

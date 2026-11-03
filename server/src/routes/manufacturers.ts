@@ -7,7 +7,7 @@ import {
 import {
 	createManufacturer,
 	deleteManufacturer,
-	getManufacturer,
+	getManufacturerDetail,
 	listManufacturers,
 	updateManufacturer,
 } from '../db/templates'
@@ -25,7 +25,7 @@ export const manufacturersApp = makeCatalogApp({
 	paramSchema: EntityParamsSchema,
 	list: listManufacturers,
 	create: createManufacturer,
-	get: getManufacturer,
+	get: getManufacturerDetail,
 	update: updateManufacturer,
 	remove: deleteManufacturer,
 })

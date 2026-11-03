@@ -36,8 +36,6 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 	const [description, setDescription] = createSignal('')
 	const [formFactor, setFormFactor] = createSignal<RackFormFactor | ''>('')
 	const [height, setHeight] = createSignal('1')
-	const [partNumber, setPartNumber] = createSignal('')
-	const [specUrl, setSpecUrl] = createSignal('')
 	const [comments, setComments] = createSignal('')
 	const form = useEntityForm({
 		id: props.id,
@@ -47,8 +45,6 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 			setModel(row.model)
 			setFormFactor(row.form_factor as RackFormFactor)
 			setHeight(String(row.u_height))
-			setPartNumber(row.part_number ?? '')
-			setSpecUrl(row.spec_url ?? '')
 			setDescription(row.description ?? '')
 			setComments(row.comments ?? '')
 		},
@@ -79,8 +75,6 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 		setDescription('')
 		setFormFactor('')
 		setHeight('1')
-		setPartNumber('')
-		setSpecUrl('')
 		setComments('')
 	}
 
@@ -102,15 +96,11 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 				return id === undefined
 					? create_rack_type({
 							...body,
-							part_number: text(partNumber()),
-							spec_url: text(specUrl()),
 							description: text(description()),
 							comments: text(comments()),
 						})
 					: update_rack_type(id, {
 							...body,
-							part_number: text(partNumber()) ?? null,
-							spec_url: text(specUrl()) ?? null,
 							description: text(description()) ?? null,
 							comments: text(comments()) ?? null,
 						})
@@ -172,21 +162,6 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 				value={height()}
 				onInput={setHeight}
 				placeholder="42"
-			/>
-			<TextField
-				id={`${prefix}-part-number`}
-				label={t('deviceType.partNumber')}
-				maxLength={100}
-				value={partNumber()}
-				onInput={setPartNumber}
-			/>
-			<TextField
-				id={`${prefix}-spec-url`}
-				label={t('deviceType.specUrl')}
-				placeholder={t('deviceType.specUrlPlaceholder')}
-				maxLength={200}
-				value={specUrl()}
-				onInput={setSpecUrl}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

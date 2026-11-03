@@ -42,6 +42,7 @@ import { createDerived, createRecord, createRowsFor, useAction } from '../../lib
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
+import { EolPill } from '../device_types/eol_pill'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
@@ -414,7 +415,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							loading={deviceType.loading}
 							name={deviceType()?.model}
 							href={`/device-types/${typeId() ?? ''}`}
-						/>
+						/>{' '}
+						<EolPill date={deviceType()?.eol_date} />
 					</dd>
 					<dt>{tp('entity.deviceRole', 1)}</dt>
 					<dd>

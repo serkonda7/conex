@@ -63,9 +63,9 @@ export async function fetch_manufacturers(
 	)
 }
 
-export async function fetch_manufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
+export async function fetch_manufacturer(id: number): Promise<Result<ManufacturerListRow, Error>> {
 	const res = await client.manufacturers[':id'].$get(by_id(id))
-	return to_result<ManufacturerRow>(res, failed.load('noun.manufacturer'))
+	return to_result<ManufacturerListRow>(res, failed.load('noun.manufacturer'))
 }
 
 export async function create_manufacturer(
@@ -114,6 +114,7 @@ export async function fetch_device_types(
 				manufacturer: filters?.manufacturer,
 				role: filters?.role,
 				full_depth: filters?.full_depth,
+				eol: filters?.eol,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
 			}),
@@ -209,6 +210,8 @@ export async function fetch_rack_types(
 			query: to_query({
 				...paging(filters),
 				manufacturer: filters?.manufacturer,
+				form_factor: filters?.form_factor,
+				height: filters?.height,
 				sort: filters?.sort ?? 'model',
 				order: filters?.order ?? 'asc',
 			}),

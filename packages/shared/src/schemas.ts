@@ -682,11 +682,17 @@ export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
 	description: DescriptionSchema,
+	website: v.optional(WebsiteSchema, undefined),
+	support_url: v.optional(WebsiteSchema, undefined),
+	comments: CommentsSchema,
 })
 
 export const ManufacturerUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	website: v.optional(v.nullable(WebsiteSchema), undefined),
+	support_url: v.optional(v.nullable(WebsiteSchema), undefined),
+	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
 export const DeviceTypeCreateSchema = v.strictObject({
@@ -720,8 +726,6 @@ export const RackTypeCreateSchema = v.strictObject({
 	model: NameSchema,
 	form_factor: RackFormFactorSchema,
 	u_height: RackHeightSchema,
-	part_number: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)), undefined),
-	spec_url: v.optional(WebsiteSchema, undefined),
 	description: DescriptionSchema,
 	comments: CommentsSchema,
 })
@@ -731,8 +735,6 @@ export const RackTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	u_height: v.optional(RackHeightSchema, undefined),
-	part_number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
-	spec_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
@@ -802,9 +804,25 @@ export type RackTypeCreate = v.InferOutput<typeof RackTypeCreateSchema>
 export type RackTypeUpdate = v.InferOutput<typeof RackTypeUpdateSchema>
 export type StubCreate = v.InferOutput<typeof StubCreateSchema>
 export type StubUpdate = v.InferOutput<typeof StubUpdateSchema>
+/** EOL state of a device type; several values match any of them. */
+export const DEVICE_TYPE_EOL_FILTERS = ['past', 'announced', 'none'] as const
+export type DeviceTypeEolFilter = (typeof DEVICE_TYPE_EOL_FILTERS)[number]
+
 export const ManufacturerListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(
+		v.picklist([
+			'name',
+			'description',
+			'website',
+			'support_url',
+			'device_types',
+			'rack_types',
+			'devices',
+			'past_eol',
+		]),
+		'name',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -814,6 +832,14 @@ export const DeviceTypeListQuerySchema = v.object({
 	/** Default role, including its child roles. */
 	role: OptionalIdListEntry,
 	full_depth: v.optional(looseBoolean(false), undefined),
+	eol: v.optional(
+		v.pipe(
+			CsvListSchema,
+			v.array(v.picklist(DEVICE_TYPE_EOL_FILTERS)),
+			v.transform(emptyAsUndefined),
+		),
+		undefined,
+	),
 	sort: v.optional(
 		v.picklist([
 			'model',
@@ -824,6 +850,7 @@ export const DeviceTypeListQuerySchema = v.object({
 			'comments',
 			'u_height',
 			'is_full_depth',
+			'spec_url',
 			'eol_date',
 			'devices',
 		]),
@@ -835,7 +862,33 @@ export const DeviceTypeListQuerySchema = v.object({
 export const RackTypeListQuerySchema = v.object({
 	...ListQueryEntries,
 	manufacturer: OptionalIdListEntry,
-	sort: v.optional(v.picklist(['model', 'manufacturer', 'form_factor']), 'model'),
+	form_factor: v.optional(
+		v.pipe(CsvListSchema, v.array(RackFormFactorSchema), v.transform(emptyAsUndefined)),
+		undefined,
+	),
+	/** Rack units (`u_height`). */
+	height: v.optional(
+		v.pipe(
+			CsvListSchema,
+			v.array(
+				v.pipe(v.union([v.string(), v.number()]), v.transform(Number), RackHeightSchema),
+			),
+			v.transform(emptyAsUndefined),
+		),
+		undefined,
+	),
+	sort: v.optional(
+		v.picklist([
+			'model',
+			'manufacturer',
+			'form_factor',
+			'u_height',
+			'description',
+			'comments',
+			'racks',
+		]),
+		'model',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -974,7 +1027,10 @@ export type DeviceRoleUpdate = v.InferOutput<typeof DeviceRoleUpdateSchema>
 export const DeviceRoleListQuerySchema = v.object({
 	...ListQueryEntries,
 	parent: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	can_host_vms: v.optional(looseBoolean(false), undefined),
+	/** Effective managed bundle (own or inherited from an ancestor role). */
+	bundle: OptionalIdListEntry,
+	sort: v.optional(v.picklist(['name', 'description', 'can_host_vms', 'managed_bundle']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1171,7 +1227,7 @@ export type ManagedBundleUpdate = v.InferOutput<typeof ManagedBundleUpdateSchema
 
 export const ManagedBundleListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'role_count', 'tenant_count']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1407,6 +1463,8 @@ export const DeviceListQuerySchema = v.object({
 	rack: OptionalIdListEntry,
 	role: OptionalIdListEntry,
 	device_type: OptionalIdEntry,
+	/** Devices whose type comes from this manufacturer (hides VMs). */
+	manufacturer: OptionalIdEntry,
 	employee: OptionalIdListEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
@@ -1421,6 +1479,8 @@ export const DeviceListQuerySchema = v.object({
 	compatible_with: OptionalIdEntry,
 	/** Devices whose type is at least 1 U high, i.e. can be U-mounted (hides VMs). */
 	mountable: v.optional(looseBoolean(false), undefined),
+	/** Devices whose type is past its EOL date, or the others when false (hides VMs). */
+	past_eol: v.optional(looseBoolean(false), undefined),
 	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })

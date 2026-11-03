@@ -268,6 +268,27 @@ tbody tr:last-child td {
 	border-top: 1px solid var(--border-strong);
 }
 
+/* Collapse chevron slot of collapsible trees; one tree level wide. */
+.tree-toggle {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.25rem;
+}
+
+.tree-toggle-btn {
+	display: inline-flex;
+	padding: 0.1rem;
+	background: none;
+	border: none;
+	color: var(--text-muted);
+}
+
+.tree-toggle-btn:hover {
+	color: var(--text);
+}
+
 .app-shell {
 	display: flex;
 	flex-direction: column;
@@ -871,6 +892,12 @@ tbody tr:last-child td {
 	margin: 0;
 }
 
+.detail-header-icon {
+	display: inline-flex;
+	vertical-align: -0.1em;
+	margin-right: 0.4rem;
+}
+
 .app-content .detail-header {
 	border-bottom: none;
 	padding-bottom: 0;
@@ -942,6 +969,11 @@ tbody tr:last-child td {
 .related-tabs td:first-child,
 .related-tabs th:first-child {
 	white-space: nowrap;
+}
+
+.related-tabs {
+	margin: 0.6rem 0;
+	scroll-margin-top: var(--topbar-height);
 }
 
 .related-tabs-all {
@@ -1116,6 +1148,12 @@ tbody tr:last-child td {
 	color: var(--text-secondary);
 }
 
+.bool-yes {
+	color: var(--success);
+	stroke-width: 3;
+	vertical-align: middle;
+}
+
 .badge-active,
 .badge-connected {
 	color: var(--success);
@@ -1126,6 +1164,11 @@ tbody tr:last-child td {
 .badge-staged {
 	color: var(--link);
 	border-color: var(--link);
+}
+
+.badge-warning {
+	color: var(--warning);
+	border-color: var(--warning);
 }
 
 .badge-decommissioned,

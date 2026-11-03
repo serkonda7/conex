@@ -54,11 +54,13 @@ export function ManagedBundlesPage(): JSX.Element {
 				{
 					key: 'role_count',
 					label: t('managedBundle.roleCount'),
+					sortable: true,
 					getValue: (r: ManagedBundleListRow): string => String(r.role_count),
 				},
 				{
 					key: 'tenant_count',
 					label: t('managedBundle.tenantCount'),
+					sortable: true,
 					getValue: (r: ManagedBundleListRow): string => String(r.tenant_count),
 				},
 			]}

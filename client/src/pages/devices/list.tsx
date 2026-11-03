@@ -42,7 +42,7 @@ export function deviceListHref(row: DeviceListItem): string {
 
 /**
  * /devices — NetBox-style device list of devices and virtual machines:
- * search, sortable columns, kind / rack / role / tenant filters (tenant,
+ * search, sortable columns, kind / rack / role / EOL / tenant filters (tenant,
  * role and device type deep-linkable via `?tenant=<id>`, `?role=<id>` and
  * `?device_type=<id>`), and icon actions with clone, move to another tenant
  * and delete in a row menu. Ids collide across the two kinds, so rows are
@@ -53,9 +53,11 @@ export function DevicesPage(): JSX.Element {
 	const [filterRole, setFilterRole] = useQueryFilterList('role')
 	const [filterTenant] = useQueryFilter('tenant')
 	const [filterType] = useQueryFilter('device_type')
+	const [filterManufacturer] = useQueryFilter('manufacturer')
 	const [filterSite] = useQueryFilter('site')
 	const [filterEmployee, setFilterEmployee] = useQueryFilterList('employee')
 	const [filterKind, setFilterKind] = useQueryFilterList('kind')
+	const [filterPastEol, setFilterPastEol] = useQueryFilterList('past_eol')
 	const [movingRow, setMovingRow] = createSignal<DeviceListItem | null>(null)
 	const list = useEntityList({
 		noun: 'noun.device',
@@ -68,8 +70,11 @@ export function DevicesPage(): JSX.Element {
 			rack: idsOf(filterRack()),
 			role: idsOf(filterRole()),
 			device_type: parseId(filterType()) ?? undefined,
+			manufacturer: parseId(filterManufacturer()) ?? undefined,
 			site: parseId(filterSite()) ?? undefined,
 			employee: idsOf(filterEmployee()),
+			// Both values chosen is the same as no filter.
+			past_eol: filterPastEol().length === 1 ? filterPastEol()[0] === 'true' : undefined,
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_device_list,
@@ -235,10 +240,21 @@ export function DevicesPage(): JSX.Element {
 						value: filterRole,
 						onChange: setFilterRole,
 					},
+					{
+						key: 'past_eol',
+						label: t('manufacturer.pastEol'),
+						options: [
+							{ value: 'true', label: t('common.yes') },
+							{ value: 'false', label: t('common.no') },
+						],
+						value: filterPastEol,
+						onChange: setFilterPastEol,
+					},
 				]}
 				filtered={
 					filterTenant() !== '' ||
 					filterType() !== '' ||
+					filterManufacturer() !== '' ||
 					filterSite() !== '' ||
 					tenantContext().kind !== 'all'
 				}

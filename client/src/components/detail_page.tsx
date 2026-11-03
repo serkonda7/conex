@@ -8,8 +8,10 @@
 import { IconCopy, IconPencil } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { createSignal, For, type JSX, type Setter, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
+import type { IconComponent } from '../lib/icons'
 import type { QueryResource } from '../lib/resource'
 import { type Crumb, forgetDeleted, navigate, usePageMeta } from '../lib/router'
 import { can } from '../lib/session'
@@ -46,10 +48,12 @@ export function DetailShell(props: {
 /**
  * Title header with the Edit / Clone / Delete actions, each shown only with
  * the matching permission.
- * `extra` follows the name inside the heading (e.g. the rack height).
+ * `icon` precedes and `extra` follows the name inside the heading (e.g. the
+ * device role icon, the rack height).
  */
 export function DetailHeader(props: {
 	name: string | undefined
+	icon?: IconComponent
 	extra?: JSX.Element
 	testId?: string
 	editHref: string
@@ -65,6 +69,13 @@ export function DetailHeader(props: {
 	return (
 		<div class="page-header detail-header">
 			<h2 data-testid={props.testId}>
+				<Show when={props.icon}>
+					{(icon: () => IconComponent): JSX.Element => (
+						<span aria-hidden="true" class="detail-header-icon">
+							<Dynamic component={icon()} size={20} />
+						</span>
+					)}
+				</Show>
 				{props.name}
 				<Show when={props.extra}> {props.extra}</Show>
 			</h2>
@@ -231,16 +242,19 @@ export function RelatedSection<Row extends { id: number }>(props: {
 	)
 }
 
-/** "View all" link under a truncated related-object list. */
-export function ViewAllLink(props: { href: string; count: number; target: string }): JSX.Element {
+/**
+ * "Open X" link under a truncated related-object list. No count: the target
+ * list may be narrowed further (e.g. by the selected tenant).
+ */
+export function ViewAllLink(props: { href: string; target: string }): JSX.Element {
 	return (
 		<a class="related-tabs-all" href={props.href}>
-			{t('common.viewAllIn', { count: props.count, target: props.target })}
+			{t('common.openIn', { target: props.target })}
 		</a>
 	)
 }
 
-/** Rows a {@link RelatedPreview} shows before "View all". */
+/** Rows a {@link RelatedPreview} shows before "Open X". */
 const RELATED_PREVIEW_ROWS = 5
 
 /** One tab of {@link RelatedTabs}. */
@@ -255,16 +269,28 @@ export interface RelatedTab {
 }
 
 /**
- * Card of related-object tabs, each with a count badge, a preview panel and
+ * Related-object tabs, each with a count badge, a preview panel and
  * a "View all N in …" link; the first tab starts active.
  */
-export function RelatedTabs(props: { id: string; label: string; tabs: RelatedTab[] }): JSX.Element {
-	const [active, setActive] = createSignal<string | null>(null)
+export function RelatedTabs(props: {
+	id: string
+	label: string
+	tabs: RelatedTab[]
+	/** Active tab key, for pages that also switch tabs from outside. */
+	active?: string | null
+	onActiveChange?: (key: string) => void
+}): JSX.Element {
+	const [ownActive, setOwnActive] = createSignal<string | null>(null)
+	const active = (): string | null | undefined => props.active ?? ownActive()
+	const setActive = (key: string): void => {
+		setOwnActive(key)
+		props.onActiveChange?.(key)
+	}
 	const current = (): RelatedTab | undefined =>
 		props.tabs.find((tab: RelatedTab) => tab.key === active()) ?? props.tabs[0]
 	const tabId = (tab: RelatedTab): string => `${props.id}-${tab.key}`
 	return (
-		<section class="card related-tabs" aria-label={props.label}>
+		<section class="related-tabs" id={props.id} aria-label={props.label}>
 			<div class="related-tabs-bar" role="tablist" aria-label={props.label}>
 				<For each={props.tabs}>
 					{(tab: RelatedTab): JSX.Element => (
@@ -286,7 +312,7 @@ export function RelatedTabs(props: { id: string; label: string; tabs: RelatedTab
 						{tab.content()}
 						<Show when={tab.viewAllHref}>
 							{(href: () => string) => (
-								<ViewAllLink href={href()} count={tab.count} target={tab.label} />
+								<ViewAllLink href={href()} target={tab.label} />
 							)}
 						</Show>
 					</div>

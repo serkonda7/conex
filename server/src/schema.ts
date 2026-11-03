@@ -311,6 +311,9 @@ export const manufacturers = pgTable(
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 		name: text('name').notNull().unique(),
 		description: text('description'),
+		website: text('website'),
+		support_url: text('support_url'),
+		comments: text('comments'),
 	},
 	(table) => [index('manufacturers_name_idx').on(table.name)],
 )
@@ -327,8 +330,6 @@ export const rack_types = pgTable(
 		// Mounting width in inches; the only supported value today is 19.
 		width: integer('width').notNull().default(19),
 		u_height: integer('u_height').notNull(),
-		part_number: text('part_number'),
-		spec_url: text('spec_url'),
 		description: text('description'),
 		comments: text('comments'),
 	},

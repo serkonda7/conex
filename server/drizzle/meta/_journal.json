@@ -19,15 +19,29 @@
     {
       "idx": 54,
       "version": "7",
-      "when": 1793692800000,
+      "when": 1793610000000,
       "tag": "0054_stub_power",
       "breakpoints": true
     },
     {
       "idx": 55,
       "version": "7",
-      "when": 1793779200000,
+      "when": 1793621612000,
       "tag": "0055_device_type_eol_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1793623757000,
+      "tag": "0056_manufacturer_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793695300566,
+      "tag": "0057_rack_type_drop_part_spec",
       "breakpoints": true
     }
   ]

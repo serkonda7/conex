@@ -7,7 +7,7 @@ import {
 import {
 	createDeviceRole,
 	deleteDeviceRole,
-	getDeviceRole,
+	getDeviceRoleDetail,
 	listDeviceRoles,
 	updateDeviceRole,
 } from '../db/device_roles'
@@ -24,10 +24,14 @@ export const deviceRolesApp = makeCatalogApp({
 	createSchema: DeviceRoleCreateSchema,
 	updateSchema: DeviceRoleUpdateSchema,
 	paramSchema: EntityParamsSchema,
-	filters: (q: { parent?: number }) => ({ parent: q.parent }),
+	filters: (q: { parent?: number; can_host_vms?: boolean; bundle?: number[] }) => ({
+		parent: q.parent,
+		can_host_vms: q.can_host_vms,
+		bundle: q.bundle,
+	}),
 	list: listDeviceRoles,
 	create: createDeviceRole,
-	get: getDeviceRole,
+	get: getDeviceRoleDetail,
 	update: updateDeviceRole,
 	remove: deleteDeviceRole,
 })

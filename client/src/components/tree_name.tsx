@@ -1,4 +1,5 @@
-import type { JSX } from 'solid-js'
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-solidjs'
+import { type JSX, Show } from 'solid-js'
 
 /** Full `parent > child` path of each row, from the parent links within `rows`. */
 export function treePaths<T extends { id: number; parent_id: number | null; name: string }>(
@@ -54,13 +55,53 @@ export function treeIcons(
 	return out
 }
 
-/** Name cell indented by its depth, with tree guides for child rows. */
-export function TreeName(props: { depth: number; children: JSX.Element }): JSX.Element {
+/** Collapse toggle of a tree row; rows without children keep its space empty. */
+export interface TreeToggle {
+	hasChildren: boolean
+	collapsed: boolean
+	/** Accessible name of the button (`Collapse Server`). */
+	label: string
+	onToggle: () => void
+}
+
+/**
+ * Name cell indented by its depth, with tree guides for child rows. With
+ * `toggle` every row gets a chevron slot, so child guides line up under
+ * their parent's chevron.
+ */
+export function TreeName(props: {
+	depth: number
+	toggle?: TreeToggle
+	children: JSX.Element
+}): JSX.Element {
 	return (
 		<div
 			class={`tree-name${props.depth > 0 ? ' tree-child' : ''}`}
 			style={{ '--tree-depth': props.depth }}
 		>
+			<Show when={props.toggle}>
+				{(toggle: () => TreeToggle): JSX.Element => (
+					<span class="tree-toggle">
+						<Show when={toggle().hasChildren}>
+							<button
+								type="button"
+								class="tree-toggle-btn"
+								aria-expanded={!toggle().collapsed}
+								aria-label={toggle().label}
+								title={toggle().label}
+								onClick={(): void => toggle().onToggle()}
+							>
+								<Show
+									when={toggle().collapsed}
+									fallback={<IconChevronDown size={14} />}
+								>
+									<IconChevronRight size={14} />
+								</Show>
+							</button>
+						</Show>
+					</span>
+				)}
+			</Show>
 			{props.children}
 		</div>
 	)

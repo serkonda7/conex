@@ -14,6 +14,7 @@ import {
 	CONTACT_SCOPES,
 	type ContactScope,
 	DEVICE_ROLE_ICONS,
+	DEVICE_TYPE_EOL_FILTERS,
 	type DeviceCompareField,
 	type DeviceRoleIcon,
 	type DeviceRoleKey,
@@ -78,6 +79,28 @@ export function formFactorOptions(): (FormOption & { value: RackFormFactor })[] 
 /** "Yes" / "No" for a boolean (or 0/1 DB flag) cell. */
 export function yesNo(value: boolean | number): string {
 	return value ? t('common.yes') : t('common.no')
+}
+
+const DEVICE_TYPE_EOL_KEYS: Record<(typeof DEVICE_TYPE_EOL_FILTERS)[number], MessageKey> = {
+	past: 'deviceType.eol.past',
+	announced: 'deviceType.eol.announced',
+	none: 'deviceType.eol.none',
+}
+
+/** Filter options for a device type's EOL state (past, announced, none). */
+export function deviceTypeEolOptions(): { value: string; label: string }[] {
+	return DEVICE_TYPE_EOL_FILTERS.map((value) => ({
+		value,
+		label: t(DEVICE_TYPE_EOL_KEYS[value]),
+	}))
+}
+
+/** Yes / no filter options; both chosen is the same as none. */
+export function yesNoOptions(): { value: 'true' | 'false'; label: string }[] {
+	return [
+		{ value: 'true', label: t('common.yes') },
+		{ value: 'false', label: t('common.no') },
+	]
 }
 
 const FACE_KEYS: Record<'front' | 'rear', MessageKey> = {
