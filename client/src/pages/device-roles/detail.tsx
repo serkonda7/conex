@@ -28,7 +28,7 @@ import { InlineError } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
-import { deviceRoleIconLabel, deviceRoleLabel } from '../../i18n/labels'
+import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
@@ -264,6 +264,7 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={deviceRoleLabel(role())}
+					icon={deviceRoleIcon(role()?.icon)}
 					editHref={`/device-roles/${props.id}/edit`}
 					onDelete={handleDelete}
 					deletable={role()?.key == null}
@@ -297,16 +298,6 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 					<section>
 						<h4>{t('deviceRole.section.properties')}</h4>
 						<dl>
-							<dt>{t('deviceRole.icon')}</dt>
-							<dd>
-								<Show when={role()?.icon} fallback="—">
-									{(icon: () => string): JSX.Element => (
-										<IconLabel icon={deviceRoleIcon(icon())}>
-											{deviceRoleIconLabel(icon())}
-										</IconLabel>
-									)}
-								</Show>
-							</dd>
 							<dt>{t('deviceRole.canHostVms')}</dt>
 							<dd>{role()?.can_host_vms === 1 ? t('common.yes') : t('common.no')}</dd>
 							<dt>{tp('entity.managedBundle', 1)}</dt>
