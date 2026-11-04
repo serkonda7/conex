@@ -1097,7 +1097,7 @@ export const en = {
 	'floorplan.hideGrid': 'Hide the metric grid',
 	'floorplan.meters': '{value} m',
 	'floorplan.centimeters': '{value} cm',
-	'floorplan.gridStep': 'Grid {step}',
+	'floorplan.gridSize': 'Grid size',
 	'floorplan.pointerPosition': 'x {x} · y {y}',
 	'floorplan.origin': 'Origin',
 	'floorplan.setScale': 'Set scale',

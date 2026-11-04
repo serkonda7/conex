@@ -1112,7 +1112,7 @@ export const de: Messages = {
 	'floorplan.hideGrid': 'Metrisches Raster ausblenden',
 	'floorplan.meters': '{value} m',
 	'floorplan.centimeters': '{value} cm',
-	'floorplan.gridStep': 'Raster {step}',
+	'floorplan.gridSize': 'Raster',
 	'floorplan.pointerPosition': 'x {x} · y {y}',
 	'floorplan.origin': 'Nullpunkt',
 	'floorplan.setScale': 'Maßstab festlegen',

@@ -3282,11 +3282,15 @@ span.attachment-star,
    overlay pieces scale back by --floorplan-inv-zoom to keep their size, so
    they anchor at their top left (transform-origin 0 0) and center with
    translate(-50%, -50%) after the counter-scale. */
-.floorplan-viewport {
-	position: relative;
+/* The viewport with the stage bar below, as wide as the image. */
+.floorplan-frame {
 	width: fit-content;
 	max-width: 100%;
 	margin: 0.6rem 0;
+}
+
+.floorplan-viewport {
+	position: relative;
 	border: 1px solid var(--border);
 	border-radius: 0.35rem;
 	overflow: hidden;
@@ -3310,13 +3314,20 @@ span.attachment-star,
 	--floorplan-inv-zoom: 1;
 }
 
-.floorplan-zoom-controls {
-	position: absolute;
-	top: 0.4rem;
-	right: 0.4rem;
-	z-index: 3;
+/* Zoom, grid size and pointer position below the image. */
+.floorplan-stage-bar {
+	/* Wraps within the image's width instead of widening the frame. */
+	contain: inline-size;
 	display: flex;
-	flex-direction: column;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem 0.9rem;
+	margin-top: 0.4rem;
+	font-size: var(--font-size-sm);
+}
+
+.floorplan-zoom-controls {
+	display: flex;
 	gap: 0.2rem;
 }
 
@@ -3327,7 +3338,17 @@ span.attachment-star,
 	height: 1.9rem;
 	padding: 0;
 	background-color: var(--bg-surface);
-	box-shadow: var(--shadow);
+}
+
+.floorplan-grid-size {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	color: var(--text-muted);
+}
+
+.floorplan-grid-size select {
+	font-size: inherit;
 }
 
 /* Area colors per layer (site, location types). */
@@ -3937,24 +3958,10 @@ span.attachment-star,
 }
 
 .floorplan-readout {
-	position: absolute;
-	bottom: 0.4rem;
-	left: 0.4rem;
-	z-index: 3;
-	display: flex;
-	gap: 0.6rem;
-	padding: 0.1rem 0.45rem;
-	border-radius: 0.25rem;
-	font-size: var(--font-size-sm);
+	/* Right-aligned so the changing width does not move the other controls. */
+	margin-left: auto;
 	font-variant-numeric: tabular-nums;
-	color: var(--text);
-	background-color: color-mix(in srgb, var(--bg-surface) 85%, transparent);
-	box-shadow: var(--shadow);
-	pointer-events: none;
-}
-
-.floorplan-readout:empty {
-	display: none;
+	color: var(--text-muted);
 }
 
 .floorplan-scale-line {

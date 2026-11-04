@@ -4,7 +4,7 @@
  * doubles as the legend; hidden layers are kept per browser in
  * `localStorage` and shared by the view and the editor. The last toggles show
  * the names of the markers on the plan and, on a plan with a scale, the
- * metric grid, kept the same way.
+ * metric grid, kept the same way, as is the grid size chosen below the stage.
  */
 
 import { IconBox, IconGrid4x4, IconOutlet, IconServer, IconTag } from '@tabler/icons-solidjs'
@@ -146,6 +146,38 @@ export function toggleGrid(): void {
 	setGrid(next)
 	try {
 		window.localStorage.setItem(GRID_STORAGE_KEY, String(next))
+	} catch {
+		// Storage unavailable: the choice applies until reload.
+	}
+}
+
+/** Grid sizes to choose from, in meters. */
+export const GRID_SIZES = [0.5, 1, 5] as const
+export type GridSize = (typeof GRID_SIZES)[number]
+export const DEFAULT_GRID_SIZE: GridSize = 1
+
+const GRID_SIZE_STORAGE_KEY = 'conex:floorplan-grid-size'
+
+function loadGridSize(): GridSize {
+	try {
+		const raw = Number(window.localStorage.getItem(GRID_SIZE_STORAGE_KEY))
+		return GRID_SIZES.find((size) => size === raw) ?? DEFAULT_GRID_SIZE
+	} catch {
+		return DEFAULT_GRID_SIZE
+	}
+}
+
+const [gridSizeSignal, setGridSizeSignal] = createSignal<GridSize>(loadGridSize())
+
+/** Chosen grid size, the same for every plan. */
+export function gridSize(): GridSize {
+	return gridSizeSignal()
+}
+
+export function setGridSize(size: GridSize): void {
+	setGridSizeSignal(size)
+	try {
+		window.localStorage.setItem(GRID_SIZE_STORAGE_KEY, String(size))
 	} catch {
 		// Storage unavailable: the choice applies until reload.
 	}
