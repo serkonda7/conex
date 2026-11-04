@@ -1287,8 +1287,6 @@ export const en = {
 
 	'provider.tanss': 'TANSS',
 	'calendarSync.title': 'Outlook calendar sync',
-	'calendarSync.description':
-		'Copies fixed TANSS appointments of the mapped technicians into their Microsoft 365 calendars. TANSS is the master: changes made in Outlook are overwritten.',
 	'calendarSync.loading': 'Loading calendar sync…',
 	'calendarSync.loadFailed': 'Failed to load the calendar sync settings',
 	'calendarSync.saveFailed': 'Failed to save the calendar sync settings',
@@ -1298,6 +1296,8 @@ export const en = {
 	'calendarSync.clientId': 'Application (client) ID',
 	'calendarSync.clientSecret': 'Client secret',
 	'calendarSync.interval': 'Interval (minutes)',
+	'calendarSync.intervalLabel': 'Interval',
+	'calendarSync.everyMinutes': 'Every {minutes} min',
 	'calendarSync.enabled': 'Enabled',
 	'calendarSync.testMailbox': 'Test mailbox (optional)',
 	'calendarSync.testMailboxHint':
@@ -1305,7 +1305,8 @@ export const en = {
 	'calendarSync.testOk': 'The app can sign in.',
 	'calendarSync.testOkMailbox': 'The app can sign in and read the calendar of {mailbox}.',
 	'calendarSync.testFailed': 'Connection test failed',
-	'calendarSync.technicians': 'Technicians',
+	'calendarSync.techniciansTitle': 'Outlook technician mapping',
+	'calendarSync.openTechnicians': 'Technician mapping →',
 	'calendarSync.techniciansHint':
 		'Only technicians with a saved, enabled mailbox are synced. Removing a mapping deletes its synced events on the next run; disabling it pauses the sync.',
 	'calendarSync.techniciansFailed': 'Failed to load the TANSS technicians',

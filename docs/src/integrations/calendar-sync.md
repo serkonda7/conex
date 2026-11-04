@@ -24,7 +24,7 @@ Ein-Wege Synchronisation von TANSS-Terminen (Einsatzplanung) in die persönliche
    kopieren. Ablaufdatum in den Kalender eintragen, danach stoppt die Synchronisation.
 
 Keine API-Berechtigung in Entra hinzufügen: die Kalenderrechte vergibt Schritt 2,
-beschränkt auf die Techniker.
+beschränkt auf die Techniker (Ausnahme: [ohne RBAC](#alternative-ohne-rbac-nicht-empfohlen)).
 
 
 ## 2. Zugriff auf Techniker-Postfächer erlauben
@@ -62,18 +62,28 @@ Weitere Techniker später hinzufügen:
 Add-DistributionGroupMember -Identity $Group -Member <upn>
 ```
 
+### Alternative: ohne RBAC (nicht empfohlen)
+Statt der PowerShell-Befehle in Entra unter der App-Registrierung:
+
+1. **API-Berechtigungen → Berechtigung hinzufügen → Microsoft Graph →
+   Anwendungsberechtigungen → `Calendars.ReadWrite`**
+2. **Administratorzustimmung für &lt;Mandant&gt; erteilen**
+
+Die App kann dann **alle Kalender des Mandanten** lesen und schreiben. Auch ein
+Testpostfach außerhalb der Techniker ist dann erfolgreich.
+
 
 ## 3. conex einrichten
 **Integrationen → Outlook-Kalendersynchronisation** (Berechtigung
 `integrations.manage`):
 
-1. **Mandanten-ID**, **Anwendungs-ID (Client-ID)** und **Geheimer Clientschlüssel**
-   eintragen.
+1. **Einrichten** klicken (später **Bearbeiten**), dann **Mandanten-ID**,
+   **Anwendungs-ID (Client-ID)** und **Geheimer Clientschlüssel** eintragen.
 2. **Testpostfach** eines Technikers eintragen → **Verbindung testen** muss
    erfolgreich sein. Ein Postfach außerhalb der Gruppe muss fehlschlagen.
 3. **Intervall (Minuten)** setzen, **Aktiviert** anhaken, **Speichern**.
-4. In der Tabelle **Techniker** das Postfach prüfen und **Zuordnen** klicken.
-5. **Jetzt synchronisieren**; Ergebnis und Fehler stehen unter **Letzte Läufe**.
+4. Unter **Technikerzuordnung →** das Postfach prüfen und **Zuordnen** klicken.
+5. **Jetzt synchronisieren**
 
 
 ## Fehlerbehebung

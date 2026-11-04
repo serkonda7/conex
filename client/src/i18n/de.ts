@@ -1308,8 +1308,6 @@ export const de: Messages = {
 
 	'provider.tanss': 'TANSS',
 	'calendarSync.title': 'Outlook-Kalendersynchronisation',
-	'calendarSync.description':
-		'Überträgt feste TANSS-Termine der zugeordneten Techniker in ihre Microsoft-365-Kalender. TANSS ist führend: Änderungen in Outlook werden überschrieben.',
 	'calendarSync.loading': 'Kalendersynchronisation wird geladen…',
 	'calendarSync.loadFailed':
 		'Die Einstellungen der Kalendersynchronisation konnten nicht geladen werden',
@@ -1322,6 +1320,8 @@ export const de: Messages = {
 	'calendarSync.clientId': 'Anwendungs-ID (Client-ID)',
 	'calendarSync.clientSecret': 'Geheimer Clientschlüssel',
 	'calendarSync.interval': 'Intervall (Minuten)',
+	'calendarSync.intervalLabel': 'Intervall',
+	'calendarSync.everyMinutes': 'Alle {minutes} Min.',
 	'calendarSync.enabled': 'Aktiviert',
 	'calendarSync.testMailbox': 'Testpostfach (optional)',
 	'calendarSync.testMailboxHint':
@@ -1330,7 +1330,8 @@ export const de: Messages = {
 	'calendarSync.testOkMailbox':
 		'Die App kann sich anmelden und den Kalender von {mailbox} lesen.',
 	'calendarSync.testFailed': 'Verbindungstest fehlgeschlagen',
-	'calendarSync.technicians': 'Techniker',
+	'calendarSync.techniciansTitle': 'Outlook-Technikerzuordnung',
+	'calendarSync.openTechnicians': 'Technikerzuordnung →',
 	'calendarSync.techniciansHint':
 		'Nur Techniker mit gespeichertem, aktiviertem Postfach werden synchronisiert. Entfernen löscht die synchronisierten Termine beim nächsten Lauf; Deaktivieren pausiert die Synchronisation.',
 	'calendarSync.techniciansFailed': 'Die TANSS-Techniker konnten nicht geladen werden',

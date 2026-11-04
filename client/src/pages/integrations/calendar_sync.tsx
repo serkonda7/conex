@@ -1,10 +1,13 @@
 /**
  * Calendar sync card on the integrations page (TANSS appointments →
- * Outlook): Microsoft 365 app credentials with a connection test, the
- * technician → mailbox mappings and the recent runs with "Sync now".
- * Global `integrations.manage` only, like the routes.
+ * Outlook), laid out like the provider cards: "Sync now" / "Edit" in the
+ * header and a summary of the Microsoft 365 app, which "Edit" swaps for the
+ * settings form with its connection test, and the recent runs. The
+ * technician → mailbox mappings live on their own page
+ * (/integrations/calendar-sync), linked from the card like the TANSS
+ * consistency report. Global `integrations.manage` only, like the routes.
  */
-import { IconRefresh } from '@tabler/icons-solidjs'
+import { IconPencil, IconRefresh } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { CALENDAR_SYNC_MAX_INTERVAL, CALENDAR_SYNC_MIN_INTERVAL } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -29,12 +32,14 @@ import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
 import { syncStateLabel } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
+import { usePageMeta } from '../../lib/router'
 import { formatTime } from '../../lib/time'
 
 /** Credentials, schedule and the connection test. */
 function SettingsForm(props: {
 	config: CalendarSyncConfigJson
 	onSaved: (config: CalendarSyncConfigJson) => void
+	onCancel: () => void
 }): JSX.Element {
 	const [tenantId, setTenantId] = createSignal(props.config.ms_tenant_id)
 	const [clientId, setClientId] = createSignal(props.config.client_id)
@@ -187,6 +192,9 @@ function SettingsForm(props: {
 				<button type="submit" disabled={action.pending()}>
 					{action.pending() ? t('common.saving') : t('common.save')}
 				</button>
+				<button type="button" onClick={() => props.onCancel()}>
+					{t('common.cancel')}
+				</button>
 			</div>
 		</form>
 	)
@@ -271,13 +279,19 @@ function TechnicianRow(props: {
 	)
 }
 
-/** TANSS technicians with their mailbox mapping. */
-function TechniciansTable(): JSX.Element {
+/**
+ * /integrations/calendar-sync — TANSS technicians with their mailbox
+ * mapping, opened from the calendar sync card.
+ */
+export function CalendarSyncTechniciansPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [technicians, { refetch }] = createRows(fetch_calendar_technicians, setError)
+	usePageMeta(() => ({ name: t('calendarSync.techniciansTitle') }))
 	return (
-		<>
-			<h4>{t('calendarSync.technicians')}</h4>
+		<div>
+			<div class="page-header">
+				<h2>{t('calendarSync.techniciansTitle')}</h2>
+			</div>
 			<p class="field-hint">{t('calendarSync.techniciansHint')}</p>
 			<Show
 				when={!technicians.loading || technicians() !== undefined}
@@ -311,7 +325,7 @@ function TechniciansTable(): JSX.Element {
 				</Show>
 			</Show>
 			<InlineError message={error()} />
-		</>
+		</div>
 	)
 }
 
@@ -353,6 +367,72 @@ function RunsTable(props: { runs: CalendarSyncRunJson[] }): JSX.Element {
 	)
 }
 
+/** Enabled state, or the last error of the sync. */
+function SyncState(props: { config: CalendarSyncConfigJson }): JSX.Element {
+	return (
+		<Show when={props.config.enabled} fallback={t('integration.disabled')}>
+			<Show when={props.config.last_error} fallback={t('integration.enabled')}>
+				<span class="text-danger">{props.config.last_error}</span>
+			</Show>
+		</Show>
+	)
+}
+
+/** State, time, error and counts of the latest run. */
+function LastRun(props: { run: CalendarSyncRunJson }): JSX.Element {
+	return (
+		<>
+			<div>
+				{syncStateLabel(props.run.state)}
+				{' ('}
+				{formatTime(props.run.finished_at ?? props.run.started_at)}
+				{')'}
+				<Show when={props.run.error}>
+					{' · '}
+					<span class="text-danger">{props.run.error}</span>
+				</Show>
+			</div>
+			<Show when={props.run.state !== 'running'}>
+				<div>{t('calendarSync.counts', { ...props.run.counts })}</div>
+			</Show>
+		</>
+	)
+}
+
+/** Summary of the saved settings and the latest run. */
+function SyncDetails(props: {
+	config: CalendarSyncConfigJson
+	lastRun: CalendarSyncRunJson | undefined
+}): JSX.Element {
+	return (
+		<>
+			<dl class="detail-grid">
+				<dt>{t('calendarSync.tenantId')}</dt>
+				<dd>{props.config.ms_tenant_id}</dd>
+				<dt>{t('calendarSync.clientId')}</dt>
+				<dd>{props.config.client_id}</dd>
+				<dt>{t('calendarSync.intervalLabel')}</dt>
+				<dd>
+					{t('calendarSync.everyMinutes', { minutes: props.config.interval_minutes })}
+				</dd>
+				<dt>{t('common.status')}</dt>
+				<dd>
+					<SyncState config={props.config} />
+				</dd>
+				<dt>{t('integration.lastSync')}</dt>
+				<dd>
+					<Show when={props.lastRun} fallback={t('integration.neverSynced')}>
+						{(run: () => CalendarSyncRunJson) => <LastRun run={run()} />}
+					</Show>
+				</dd>
+			</dl>
+			<p>
+				<a href="/integrations/calendar-sync">{t('calendarSync.openTechnicians')}</a>
+			</p>
+		</>
+	)
+}
+
 export function CalendarSyncCard(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [syncing, setSyncing] = createSignal(false)
@@ -389,6 +469,8 @@ export function CalendarSyncCard(): JSX.Element {
 		await follow(started.value.id)
 	}
 
+	const [editing, setEditing] = createSignal(false)
+
 	const canSync = (): boolean => {
 		const c = config()
 		return c?.configured === true && c.enabled && !syncing()
@@ -398,36 +480,79 @@ export function CalendarSyncCard(): JSX.Element {
 		<section class="card" aria-label={t('calendarSync.title')}>
 			<div class="page-header">
 				<h3>{t('calendarSync.title')}</h3>
-				<div class="form-actions">
-					<button type="button" disabled={!canSync()} onClick={() => void handleSync()}>
-						<IconLabel icon={IconRefresh}>
-							{syncing() ? t('integration.syncing') : t('integration.syncNow')}
-						</IconLabel>
-					</button>
-				</div>
+				<Show when={config()}>
+					{(c: () => CalendarSyncConfigJson): JSX.Element => (
+						<Show
+							when={c().configured}
+							fallback={
+								<Show when={!editing()}>
+									<button
+										type="button"
+										class="btn-add"
+										onClick={(): void => {
+											setEditing(true)
+										}}
+									>
+										{t('integration.setUp')}
+									</button>
+								</Show>
+							}
+						>
+							<div class="form-actions">
+								<button
+									type="button"
+									disabled={!canSync()}
+									onClick={() => void handleSync()}
+								>
+									<IconLabel icon={IconRefresh}>
+										{syncing()
+											? t('integration.syncing')
+											: t('integration.syncNow')}
+									</IconLabel>
+								</button>
+								<button
+									type="button"
+									disabled={editing()}
+									onClick={(): void => {
+										setEditing(true)
+									}}
+								>
+									<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
+								</button>
+							</div>
+						</Show>
+					)}
+				</Show>
 			</div>
-			<p class="field-hint">{t('calendarSync.description')}</p>
 			<Show when={config()} fallback={<Loading message={t('calendarSync.loading')} />}>
 				{(c: () => CalendarSyncConfigJson): JSX.Element => (
 					<>
-						<Show when={c().last_error}>
-							<p class="text-danger" role="alert">
-								{c().last_error}
-							</p>
+						<Show
+							when={editing()}
+							fallback={
+								<Show
+									when={c().configured}
+									fallback={<Empty message={t('integration.notConfigured')} />}
+								>
+									<SyncDetails config={c()} lastRun={runs()?.[0]} />
+								</Show>
+							}
+						>
+							<h4>{t('calendarSync.settings')}</h4>
+							<SettingsForm
+								config={c()}
+								onSaved={(saved: CalendarSyncConfigJson): void => {
+									mutate(saved)
+									setEditing(false)
+								}}
+								onCancel={(): void => {
+									setEditing(false)
+								}}
+							/>
 						</Show>
-						<h4>{t('calendarSync.settings')}</h4>
-						<SettingsForm
-							config={c()}
-							onSaved={(saved: CalendarSyncConfigJson): void => {
-								mutate(saved)
-							}}
-						/>
-						<TechniciansTable />
 					</>
 				)}
 			</Show>
-			<h4>{t('calendarSync.runs')}</h4>
-			<RunsTable runs={runs() ?? []} />
 			<InlineError message={error()} />
 		</section>
 	)
