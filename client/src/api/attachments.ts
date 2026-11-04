@@ -17,9 +17,11 @@ import type {
 	FloorplanListJson,
 	FloorplanListQuery,
 	FloorplanOutletJson,
+	FloorplanOutletPortJson,
 	FloorplanPlacementJson,
 	FloorplanPortJson,
 	FloorplanPut,
+	FloorplanScale,
 	Page,
 } from 'shared/src/types'
 import { t } from '../i18n'
@@ -33,9 +35,11 @@ export type {
 	FloorplanLinkJson,
 	FloorplanListJson,
 	FloorplanOutletJson,
+	FloorplanOutletPortJson,
 	FloorplanPlacementJson,
 	FloorplanPortJson,
 	FloorplanPut,
+	FloorplanScale,
 }
 
 /** Owner of an attachment: exactly one of the three ids. */

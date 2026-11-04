@@ -329,6 +329,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	device: 'entity.device.one',
 	virtual_machine: 'entity.virtualMachine.one',
 	interface: 'changeObject.interface',
+	panel_jack: 'entity.jack.one',
 	cable: 'changeObject.cable',
 	manufacturer: 'entity.manufacturer.one',
 	device_type: 'entity.deviceType.one',

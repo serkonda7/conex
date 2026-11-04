@@ -50,7 +50,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
-import { formatDate } from '../../lib/time'
+import { formatDate, isPastEol } from '../../lib/time'
 import { devicePlacementColumns } from '../devices/placement_columns'
 import { TemplateSyncDialog } from '../devices/template_sync_dialog'
 import {
@@ -67,6 +67,7 @@ import {
 	componentClassOf,
 	stubRange,
 } from './components'
+import { EolPill } from './eol_pill'
 import { SpecLink } from './spec_link'
 
 /** Component groups with more rows than this start collapsed. */
@@ -465,7 +466,14 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							<dt>{t('deviceType.eolDate')}</dt>
 							<dd>
 								<Show when={deviceType()?.eol_date} fallback="—">
-									{(date: () => string): string => formatDate(date())}
+									{(date: () => string): JSX.Element => (
+										<Show
+											when={isPastEol(date())}
+											fallback={formatDate(date())}
+										>
+											<EolPill date={date()} />
+										</Show>
+									)}
 								</Show>
 							</dd>
 						</dl>

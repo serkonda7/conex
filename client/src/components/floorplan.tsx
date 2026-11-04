@@ -9,11 +9,10 @@
  *
  * The stage and its layers are separate pieces so the edit mode
  * (`FloorplanEditor`) can swap the view layers for editable ones on the same
- * stage.
+ * stage. Beside the stage, the object list reaches every area and marker.
  */
 import { IconPencil } from '@tabler/icons-solidjs'
-import { createSignal, For, type JSX, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import {
 	type AttachmentJson,
 	type FloorplanAreaJson,
@@ -27,15 +26,23 @@ import { goTo } from '../lib/router'
 import { can } from '../lib/session'
 import { InlineError, Loading } from './feedback'
 import { FloorplanEditor } from './floorplan_editor'
+import { areaLayer, LayerBar, layerVisible, markerLayer } from './floorplan_layers'
+import { focusObject, ObjectList, type PlanObject, sameObject } from './floorplan_objects'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import {
 	areaCenter,
 	areaName,
+	createStageZoom,
+	declutter,
 	FloorplanStage,
+	type MarkerCluster,
+	MarkerGlyph,
+	MarkerName,
 	markerClasses,
-	markerIcon,
 	markerTitle,
 	percent,
+	type ShownMarker,
+	type StageZoom,
 } from './floorplan_stage'
 import { IconLabel } from './icon_label'
 
@@ -60,7 +67,12 @@ function markerHref(placement: FloorplanPlacementJson): string {
  * Area polygons with their labels. The polygons react to the pointer only;
  * the label is the focusable link of each area.
  */
-function AreaLayer(props: { areas: FloorplanAreaJson[] }): JSX.Element {
+function AreaLayer(props: {
+	areas: FloorplanAreaJson[]
+	selected: PlanObject | null
+}): JSX.Element {
+	const isSelected = (area: FloorplanAreaJson): boolean =>
+		sameObject(props.selected, { kind: 'area', id: area.id })
 	return (
 		<>
 			<svg
@@ -75,7 +87,8 @@ function AreaLayer(props: { areas: FloorplanAreaJson[] }): JSX.Element {
 						// would create an HTML anchor, which SVG does not render.
 						// biome-ignore lint/a11y/noStaticElementInteractions: The adjacent area label provides the keyboard-accessible link.
 						<g
-							class="floorplan-area"
+							class={`floorplan-area floorplan-layer-${areaLayer(area)}`}
+							classList={{ selected: isSelected(area) }}
 							onClick={(e: MouseEvent) => goTo(e, areaHref(area))}
 							onAuxClick={(e: MouseEvent) => {
 								if (e.button === 1) {
@@ -95,10 +108,12 @@ function AreaLayer(props: { areas: FloorplanAreaJson[] }): JSX.Element {
 					<a
 						href={areaHref(area)}
 						class="floorplan-area-label"
+						classList={{ selected: isSelected(area) }}
 						style={{
 							left: percent(areaCenter(area).x),
 							top: percent(areaCenter(area).y),
 						}}
+						draggable={false}
 						aria-label={t('floorplan.openArea', { name: areaName(area) })}
 					>
 						{areaName(area)}
@@ -112,46 +127,75 @@ function AreaLayer(props: { areas: FloorplanAreaJson[] }): JSX.Element {
 /**
  * Rack, device and outlet markers; the tooltip names the object and its
  * status. An outlet opens its popover (trace and connect) instead of a link.
+ * Markers too close to tell apart merge into a count bubble that zooms in;
+ * at full zoom they spread around it instead.
  */
-function MarkerLayer(props: { placements: FloorplanPlacementJson[] }): JSX.Element {
+function MarkerLayer(props: {
+	placements: FloorplanPlacementJson[]
+	zoom: StageZoom
+	selected: PlanObject | null
+}): JSX.Element {
 	const [open, setOpen] = createSignal<number | null>(null)
 	const openOutlet = (): OutletPlacement | undefined => {
 		const found = props.placements.find((p: FloorplanPlacementJson) => p.id === open())
 		return found && isOutlet(found) ? found : undefined
 	}
+	const selectedId = (): number | null =>
+		props.selected?.kind === 'marker' ? props.selected.id : null
+	const shown = createMemo(() => declutter(props.placements, props.zoom, selectedId() ?? open()))
+	const style = (item: ShownMarker): JSX.CSSProperties => ({
+		left: percent(item.x),
+		top: percent(item.y),
+		'--floorplan-dx': `${item.dx}px`,
+		'--floorplan-dy': `${item.dy}px`,
+	})
 	return (
 		<>
-			<For each={props.placements}>
-				{(placement: FloorplanPlacementJson) => (
+			<For each={shown().markers}>
+				{(item: ShownMarker) => (
 					<Show
-						when={isOutlet(placement)}
+						when={isOutlet(item.placement)}
 						fallback={
 							<a
-								href={markerHref(placement)}
+								href={markerHref(item.placement)}
 								class="floorplan-marker"
-								classList={markerClasses(placement)}
-								style={{ left: percent(placement.x), top: percent(placement.y) }}
-								title={markerTitle(placement)}
-								aria-label={markerTitle(placement)}
+								classList={{
+									...markerClasses(item.placement),
+									selected: selectedId() === item.placement.id,
+								}}
+								style={style(item)}
+								draggable={false}
+								title={markerTitle(item.placement)}
+								aria-label={markerTitle(item.placement)}
 							>
-								<Dynamic component={markerIcon(placement)} size={16} />
+								<MarkerGlyph placement={item.placement} size={16} />
+								<MarkerName placement={item.placement} />
 							</a>
 						}
 					>
 						<button
 							type="button"
 							class="floorplan-marker"
-							classList={markerClasses(placement)}
-							style={{ left: percent(placement.x), top: percent(placement.y) }}
-							title={markerTitle(placement)}
-							aria-label={markerTitle(placement)}
-							aria-expanded={open() === placement.id}
-							onClick={() => setOpen(open() === placement.id ? null : placement.id)}
+							classList={{
+								...markerClasses(item.placement),
+								selected: selectedId() === item.placement.id,
+							}}
+							style={style(item)}
+							title={markerTitle(item.placement)}
+							aria-label={markerTitle(item.placement)}
+							aria-expanded={open() === item.placement.id}
+							onClick={() =>
+								setOpen(open() === item.placement.id ? null : item.placement.id)
+							}
 						>
-							<Dynamic component={markerIcon(placement)} size={14} />
+							<MarkerGlyph placement={item.placement} size={14} />
+							<MarkerName placement={item.placement} />
 						</button>
 					</Show>
 				)}
+			</For>
+			<For each={shown().clusters}>
+				{(cluster: MarkerCluster) => <ClusterBubble cluster={cluster} zoom={props.zoom} />}
 			</For>
 			<Show when={openOutlet()}>
 				{(placement: () => OutletPlacement) => (
@@ -159,6 +203,98 @@ function MarkerLayer(props: { placements: FloorplanPlacementJson[] }): JSX.Eleme
 				)}
 			</Show>
 		</>
+	)
+}
+
+/** Count bubble of a marker cluster; a click zooms in on its members. */
+function ClusterBubble(props: { cluster: MarkerCluster; zoom: StageZoom }): JSX.Element {
+	const label = (): string =>
+		t('floorplan.clusterZoom', {
+			count: props.cluster.members.length,
+			names: props.cluster.members.map((p: FloorplanPlacementJson) => p.name).join(', '),
+		})
+	return (
+		<button
+			type="button"
+			class="floorplan-cluster"
+			style={{ left: percent(props.cluster.x), top: percent(props.cluster.y) }}
+			title={label()}
+			aria-label={label()}
+			onPointerDown={(e: PointerEvent) => e.stopPropagation()}
+			onClick={() => {
+				const xs = props.cluster.members.map((p: FloorplanPlacementJson) => p.x)
+				const ys = props.cluster.members.map((p: FloorplanPlacementJson) => p.y)
+				props.zoom.focus(
+					{
+						x0: Math.min(...xs),
+						y0: Math.min(...ys),
+						x1: Math.max(...xs),
+						y1: Math.max(...ys),
+					},
+					props.zoom.scale() * 2,
+				)
+			}}
+		>
+			{props.cluster.members.length}
+		</button>
+	)
+}
+
+/** The read-only plan: layer bar, zoomable stage and the object list beside it. */
+function PlanViewer(props: {
+	attachment: AttachmentJson
+	plan: FloorplanJson
+	zoom: StageZoom
+}): JSX.Element {
+	const zoom = props.zoom
+	const [selected, setSelected] = createSignal<PlanObject | null>(null)
+	const [search, setSearch] = createSignal('')
+	const areas = (): FloorplanAreaJson[] =>
+		props.plan.areas.filter((area: FloorplanAreaJson) => layerVisible(areaLayer(area)))
+	const placements = (): FloorplanPlacementJson[] =>
+		props.plan.placements.filter((p: FloorplanPlacementJson) => layerVisible(markerLayer(p)))
+	return (
+		<div class="floorplan-layout">
+			<div>
+				<LayerBar
+					areas={props.plan.areas}
+					placements={props.plan.placements}
+					empty_hint={t('floorplan.empty')}
+					has_scale={props.plan.scale !== null}
+				/>
+				<FloorplanStage
+					attachment={props.attachment}
+					zoom={zoom}
+					calibration={{ scale: props.plan.scale, origin: props.plan.origin }}
+				>
+					<AreaLayer areas={areas()} selected={selected()} />
+					<MarkerLayer placements={placements()} zoom={zoom} selected={selected()} />
+				</FloorplanStage>
+			</div>
+			<aside class="floorplan-palette" aria-label={t('floorplan.objects')}>
+				<h4>{t('floorplan.objects')}</h4>
+				<input
+					type="search"
+					class="floorplan-palette-search"
+					placeholder={t('floorplan.objectSearch')}
+					aria-label={t('floorplan.objectSearch')}
+					value={search()}
+					onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
+						setSearch(e.currentTarget.value)
+					}
+				/>
+				<ObjectList
+					areas={props.plan.areas}
+					placements={props.plan.placements}
+					search={search()}
+					selected={selected()}
+					on_select={(object: PlanObject) => {
+						setSelected(object)
+						focusObject(zoom, object, props.plan.areas, props.plan.placements)
+					}}
+				/>
+			</aside>
+		</div>
 	)
 }
 
@@ -180,6 +316,8 @@ export function FloorplanView(props: {
 		setError,
 	)
 	const [editing, setEditing] = createSignal(false)
+	// Shared by the view and the editor, so switching modes keeps zoom and pan.
+	const zoom = createStageZoom()
 
 	const [actions, setActions] = createSignal<HTMLElement>()
 
@@ -207,6 +345,7 @@ export function FloorplanView(props: {
 								<FloorplanEditor
 									attachment={props.attachment}
 									plan={loaded()}
+									zoom={zoom}
 									on_saved={(saved: FloorplanJson) => {
 										mutate(saved)
 										setEditing(false)
@@ -216,12 +355,7 @@ export function FloorplanView(props: {
 								/>
 							}
 						>
-							<div class="floorplan-view">
-								<FloorplanStage attachment={props.attachment}>
-									<AreaLayer areas={loaded().areas} />
-									<MarkerLayer placements={loaded().placements} />
-								</FloorplanStage>
-							</div>
+							<PlanViewer attachment={props.attachment} plan={loaded()} zoom={zoom} />
 						</Show>
 					)}
 				</Show>

@@ -38,6 +38,7 @@ import {
 	interfaces,
 	locations,
 	manufacturers,
+	panel_jacks,
 	racks,
 	shelves,
 	sites,
@@ -957,6 +958,7 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 	const deleted = await tryWrite(() =>
 		getDb().transaction(async (tx) => {
 			await tx.delete(interfaces).where(eq(interfaces.device_id, id))
+			await tx.delete(panel_jacks).where(eq(panel_jacks.device_id, id))
 			await tx
 				.delete(external_links)
 				.where(
@@ -1132,6 +1134,11 @@ async function checkPassThroughPatch(
 		if (iface.side !== 'rear') {
 			return Result.err(new ConflictError('Positions are only allowed on rear ports'))
 		}
+		if (input.positions > 1 && iface.jack_id !== null) {
+			return Result.err(
+				new ConflictError(`Port ${iface.name} is in a jack; ungroup the jack first`),
+			)
+		}
 		const locationId = input.location_id !== undefined ? input.location_id : iface.location_id
 		if (input.positions > 1 && locationId !== null) {
 			return Result.err(new ConflictError(NOT_AN_OUTLET))
@@ -1207,6 +1214,7 @@ export async function addInterface(
 		rear_port_id: input.rear_port_id ?? null,
 		rear_port_position: input.rear_port_id === undefined ? null : rearPosition,
 		location_id: null,
+		jack_id: null,
 		patched: 1,
 	}
 	const id = await tryWrite(
@@ -1300,8 +1308,10 @@ export async function updateInterface(
 			() =>
 				withTransaction(async () => {
 					await getDb().update(interfaces).set(patch).where(eq(interfaces.id, ifaceId))
-					// A new location can take a placed outlet out of its plan's scope.
 					if (relocated) {
+						// The ports of a jack share its location.
+						await relocateJackSiblings([iface], input.location_id ?? null)
+						// A new location can take a placed outlet out of its plan's scope.
 						await prunePlacements()
 					}
 				}),
@@ -1351,6 +1361,45 @@ async function checkOutletLocation(
 }
 
 /**
+ * Gives the other ports of the jacks of `ports` the location `locationId`
+ * (one changelog entry per changed port). Runs on the caller's `getDb()`.
+ */
+async function relocateJackSiblings(
+	ports: InterfaceJson[],
+	locationId: number | null,
+): Promise<void> {
+	const jackIds = [...new Set(ports.flatMap((port) => port.jack_id ?? []))]
+	if (jackIds.length === 0) {
+		return
+	}
+	const siblings = await getDb()
+		.select()
+		.from(interfaces)
+		.where(
+			and(
+				inArray(interfaces.jack_id, jackIds),
+				sql`${interfaces.location_id} is distinct from ${locationId}`,
+			),
+		)
+	if (siblings.length === 0) {
+		return
+	}
+	await getDb()
+		.update(interfaces)
+		.set({ location_id: locationId })
+		.where(
+			inArray(
+				interfaces.id,
+				siblings.map((port) => port.id),
+			),
+		)
+	for (const port of siblings) {
+		const before = toInterfaceJson(port)
+		await logUpdate('interface', before, Result.ok({ ...before, location_id: locationId }))
+	}
+}
+
+/**
  * Sets or clears the location of several outlets of one panel in one
  * transaction (one changelog entry per changed port). Returns the panel's
  * ports in `listInterfaces` order.
@@ -1364,10 +1413,15 @@ export async function setOutletLocations(
 		return current
 	}
 	const ids = new Set(input.interface_ids)
-	const ports = current.value.filter((port) => ids.has(port.id))
-	if (ports.length < ids.size) {
+	const requested = current.value.filter((port) => ids.has(port.id))
+	if (requested.length < ids.size) {
 		return Result.err(new NotFoundError('Interface not found on this device'))
 	}
+	// The ports of a jack share its location.
+	const jackIds = new Set(requested.flatMap((port) => port.jack_id ?? []))
+	const ports = current.value.filter(
+		(port) => ids.has(port.id) || (port.jack_id !== null && jackIds.has(port.jack_id)),
+	)
 	const checked = await checkOutletLocation(deviceId, ports, input.location_id)
 	if (Result.isError(checked)) {
 		return checked

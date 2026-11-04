@@ -23,8 +23,9 @@ import { deviceRoleLabel, deviceTypeEolOptions, yesNo, yesNoOptions } from '../.
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
-import { formatDate } from '../../lib/time'
+import { formatDate, isPastEol } from '../../lib/time'
 import { deviceRoleOptions } from '../device-roles/options'
+import { EolPill } from './eol_pill'
 import { SpecLink } from './spec_link'
 
 /**
@@ -167,8 +168,14 @@ export function DeviceTypesPage(): JSX.Element {
 			key: 'eol_date',
 			sortable: true,
 			label: t('deviceType.eolDate'),
-			getValue: (dt: DeviceTypeListRow): string =>
-				dt.eol_date ? formatDate(dt.eol_date) : '—',
+			getValue: (dt: DeviceTypeListRow): JSX.Element =>
+				isPastEol(dt.eol_date) ? (
+					<EolPill date={dt.eol_date} />
+				) : dt.eol_date ? (
+					formatDate(dt.eol_date)
+				) : (
+					'—'
+				),
 		},
 		{
 			key: 'devices',

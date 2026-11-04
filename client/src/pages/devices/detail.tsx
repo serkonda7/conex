@@ -14,6 +14,7 @@ import {
 	fetch_device_list,
 	fetch_device_service,
 	fetch_interfaces,
+	fetch_jacks,
 	type InterfaceJson,
 } from '../../api/devices'
 import { fetch_employee } from '../../api/employees'
@@ -46,6 +47,7 @@ import { EolPill } from '../device_types/eol_pill'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
+import { JackDialog } from './jack_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
 import { useOutletLocationOptions } from './outlet_location'
 import { PanelPortTable, type PanelRow } from './panel_ports'
@@ -122,6 +124,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [connectingIface, setConnectingIface] = createSignal<InterfaceJson | null>(null)
 	const [editingIface, setEditingIface] = createSignal<InterfaceJson | null>(null)
 	const [editingRow, setEditingRow] = createSignal<PanelRow | null>(null)
+	const [managingJacks, setManagingJacks] = createSignal(false)
 	const [movingTenant, setMovingTenant] = createSignal(false)
 	const id = (): number => props.id
 
@@ -188,6 +191,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		(ifaces() ?? []).filter((i) => !isOtherPort(i) && !isPanelPort(i)),
 	)
 	const panelPorts = createMemo(() => (ifaces() ?? []).filter(isPanelPort))
+	const [jacks] = createRowsFor(() => panelPorts().length > 0 && props.id, fetch_jacks, setError)
+	const jackNames = createMemo(() => new Map((jacks() ?? []).map((jack) => [jack.id, jack.name])))
 	const locationOptions = useOutletLocationOptions(tenantId, setError)
 	const locationLabels = createMemo(
 		() => new Map(locationOptions().map((option) => [Number(option.value), option.label])),
@@ -281,6 +286,20 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<a href={`/floorplans/${outlet.attachment_id}`}>{outlet.owner_name}</a>
 			) : (
 				<span>—</span>
+			)
+		},
+	}
+
+	/** Jack an outlet sits in with other outlets of the panel. */
+	const jackColumn: DataTableColumn<PanelRow> = {
+		key: 'jack',
+		label: t('device.panel.jack'),
+		getValue: (row: PanelRow): JSX.Element => {
+			const jackId = row.position === null ? row.rear.jack_id : null
+			return jackId === null ? (
+				<span>—</span>
+			) : (
+				<span class="badge">{jackNames().get(jackId) ?? `#${jackId}`}</span>
 			)
 		},
 	}
@@ -470,20 +489,33 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</DetailCard>
 			</DetailShell>
 			<Show when={panelPorts().length > 0}>
-				<h3 id="device-panel-ports" class="panel-ports-heading">
-					<span>
-						{t('device.panelPortsCount', {
-							count: panelPorts().filter((p) => p.side === 'rear').length,
-						})}
-					</span>
-					<Show when={panelPorts()[0]?.kind}>
-						{(kind: Accessor<string>) => (
-							<span aria-hidden="true" class="app-nav-icon">
-								<Dynamic component={panelKindIcon(kind())} size={18} />
-							</span>
-						)}
+				<div class="section-header">
+					<h3 id="device-panel-ports" class="panel-ports-heading">
+						<span>
+							{t('device.panelPortsCount', {
+								count: panelPorts().filter((p) => p.side === 'rear').length,
+							})}
+						</span>
+						<Show when={panelPorts()[0]?.kind}>
+							{(kind: Accessor<string>) => (
+								<span aria-hidden="true" class="app-nav-icon">
+									<Dynamic component={panelKindIcon(kind())} size={18} />
+								</span>
+							)}
+						</Show>
+					</h3>
+					<Show when={can('edit')}>
+						<button
+							type="button"
+							onClick={() => {
+								setError(null)
+								setManagingJacks(true)
+							}}
+						>
+							{t('device.panel.manageJacks')}
+						</button>
 					</Show>
-				</h3>
+				</div>
 				<PanelPortTable
 					ports={panelPorts()}
 					links={linksByIface()}
@@ -494,7 +526,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							: undefined
 					}
 					rowActions={can('edit') ? panelRowActions : undefined}
-					extraColumns={[locationColumn, planColumn]}
+					extraColumns={[jackColumn, locationColumn, planColumn]}
 				/>
 			</Show>
 			<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
@@ -575,6 +607,15 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						on_close={() => setEditingRow(null)}
 					/>
 				)}
+			</Show>
+			<Show when={managingJacks()}>
+				<JackDialog
+					device_id={props.id}
+					device_name={device()?.name ?? ''}
+					ports={panelPorts()}
+					jacks={jacks() ?? []}
+					on_close={() => setManagingJacks(false)}
+				/>
 			</Show>
 			<Show when={movingTenant() ? device() : undefined}>
 				{(row: () => DeviceRow): JSX.Element => (

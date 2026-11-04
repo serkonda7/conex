@@ -1,14 +1,19 @@
 /**
- * Popover of an outlet marker (a patch-panel rear port on a floor plan):
- * the circuit through the panel, i.e. what its front port is cabled to
- * (switch side, through further panels) and what the outlet itself is
- * cabled to (end device), plus a connect action for a free outlet.
+ * Popover of an outlet marker (a patch-panel rear port, or a jack of
+ * several, on a floor plan): per port the circuit through the panel, i.e.
+ * what its front port is cabled to (switch side, through further panels)
+ * and what the port itself is cabled to (end device), plus a connect
+ * action for a free port.
  */
 import { IconX } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
-import { createResource, createSignal, type JSX, Show } from 'solid-js'
-import type { FloorplanPlacementJson, FloorplanPortJson } from '../api/attachments'
+import { createResource, createSignal, For, type JSX, Show } from 'solid-js'
+import type {
+	FloorplanOutletPortJson,
+	FloorplanPlacementJson,
+	FloorplanPortJson,
+} from '../api/attachments'
 import { fetch_trace } from '../api/cables'
 import { fetch_interfaces, type InterfaceJson } from '../api/devices'
 import { t } from '../i18n'
@@ -21,18 +26,16 @@ import { percent } from './floorplan_stage'
 /** An outlet placement: its port details are set. */
 export type OutletPlacement = FloorplanPlacementJson & {
 	port: FloorplanPortJson
-	interface_id: number
 }
 
-/** True when a placement is an outlet. */
+/** True when a placement is an outlet (a rear port or a jack). */
 export function isOutlet(placement: FloorplanPlacementJson): placement is OutletPlacement {
-	return placement.port !== null && placement.interface_id !== null
+	return placement.port !== null
 }
 
-/** The outlet, its paired front port (position 1) and the panel's cable peers. */
+/** The outlet's panel ports and cable peers. */
 interface OutletCircuit {
-	rear: InterfaceJson | undefined
-	front: InterfaceJson | undefined
+	ports: InterfaceJson[]
 	links: Map<number, TraceLink>
 	endToEnd: (ifaceId: number | undefined) => TraceEndToEnd[]
 }
@@ -44,6 +47,7 @@ export function OutletPopover(props: {
 	const [error, setError] = createSignal<string | null>(null)
 	const [connecting, setConnecting] = createSignal<InterfaceJson | null>(null)
 	const panelId = (): number => props.placement.port.device_id
+	const isJack = (): boolean => props.placement.port.ports.length > 1
 
 	const [circuit, { refetch }] = createResource(
 		panelId,
@@ -53,15 +57,9 @@ export function OutletPopover(props: {
 				setError(ports.error.message)
 				return undefined
 			}
-			const rear = ports.value.find((p) => p.id === props.placement.interface_id)
-			const front = ports.value.find(
-				(p) =>
-					p.side === 'front' && p.rear_port_id === rear?.id && p.rear_port_position === 1,
-			)
 			const value = Result.isError(trace) ? undefined : trace.value
 			return {
-				rear,
-				front,
+				ports: ports.value,
 				links: new Map((value?.links ?? []).map((link) => [link.local_interface.id, link])),
 				endToEnd: (ifaceId: number | undefined): TraceEndToEnd[] =>
 					(value?.end_to_end ?? []).filter((peer) => peer.local_interface_id === ifaceId),
@@ -92,41 +90,74 @@ export function OutletPopover(props: {
 				<Show when={circuit()}>
 					{(loaded: () => OutletCircuit) => (
 						<>
-							<dl class="floorplan-popover-trace">
-								<dt>{t('floorplan.outletSwitchSide')}</dt>
-								<dd>
-									<PortPeer
-										link={
-											loaded().front
-												? loaded().links.get(loaded().front?.id ?? 0)
-												: undefined
-										}
-										endToEnd={loaded().endToEnd(loaded().front?.id)}
-									/>
-								</dd>
-								<dt>{t('floorplan.outletDeviceSide')}</dt>
-								<dd>
-									<PortPeer
-										link={loaded().links.get(props.placement.interface_id)}
-										endToEnd={loaded().endToEnd(props.placement.interface_id)}
-									/>
-								</dd>
-							</dl>
+							<For each={props.placement.port.ports}>
+								{(item: FloorplanOutletPortJson) => {
+									const rear = (): InterfaceJson | undefined =>
+										loaded().ports.find((p) => p.id === item.id)
+									/** Front port on the rear port's (only) position. */
+									const front = (): InterfaceJson | undefined =>
+										loaded().ports.find(
+											(p) =>
+												p.side === 'front' &&
+												p.rear_port_id === item.id &&
+												p.rear_port_position === 1,
+										)
+									return (
+										<section class="floorplan-popover-port">
+											<Show when={isJack()}>
+												<h4>
+													<code>{item.name}</code>
+												</h4>
+											</Show>
+											<dl class="floorplan-popover-trace">
+												<dt>{t('floorplan.outletSwitchSide')}</dt>
+												<dd>
+													<PortPeer
+														link={
+															front()
+																? loaded().links.get(
+																		front()?.id ?? 0,
+																	)
+																: undefined
+														}
+														endToEnd={loaded().endToEnd(front()?.id)}
+													/>
+												</dd>
+												<dt>{t('floorplan.outletDeviceSide')}</dt>
+												<dd>
+													<PortPeer
+														link={loaded().links.get(item.id)}
+														endToEnd={loaded().endToEnd(item.id)}
+													/>
+												</dd>
+											</dl>
+											<Show
+												when={
+													can('edit') &&
+													rear()?.patched &&
+													!rear()?.connected
+												}
+											>
+												<div class="floorplan-popover-actions">
+													<button
+														type="button"
+														onClick={() =>
+															setConnecting(rear() ?? null)
+														}
+													>
+														{isJack()
+															? t('device.connectCableFor', {
+																	name: item.name,
+																})
+															: t('device.connect')}
+													</button>
+												</div>
+											</Show>
+										</section>
+									)
+								}}
+							</For>
 							<div class="floorplan-popover-actions">
-								<Show
-									when={
-										can('edit') &&
-										loaded().rear?.patched &&
-										!loaded().rear?.connected
-									}
-								>
-									<button
-										type="button"
-										onClick={() => setConnecting(loaded().rear ?? null)}
-									>
-										{t('device.connect')}
-									</button>
-								</Show>
 								<a href={`/devices/${panelId()}`}>{t('floorplan.openPanel')}</a>
 							</div>
 						</>

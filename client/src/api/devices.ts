@@ -13,12 +13,15 @@ import type {
 	DeviceUpdate,
 	InterfaceUpdate,
 	Page,
+	PanelJackCreate,
+	PanelJackJson,
+	PanelJackUpdate,
 	TemplateSyncApply,
 	TemplateSyncPreview,
 } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceListItem, DeviceRow, InterfaceJson }
+export type { DeviceListItem, DeviceRow, InterfaceJson, PanelJackJson }
 
 export type DeviceSort = DeviceListQuery['sort']
 
@@ -157,4 +160,43 @@ export async function update_interface(
 		json: input,
 	})
 	return to_result<InterfaceJson>(res, failed.update('noun.interface'))
+}
+
+// ---------------------------------------------------------------------------
+// Jacks (outlets of a patch panel grouped behind one faceplate)
+// ---------------------------------------------------------------------------
+
+export async function fetch_jacks(deviceId: number): Promise<Result<PanelJackJson[], Error>> {
+	const res = await client.devices[':id'].jacks.$get(by_id(deviceId))
+	return to_result<PanelJackJson[]>(res, failed.list('noun.jack'))
+}
+
+export async function create_jack(
+	deviceId: number,
+	input: PanelJackCreate,
+): Promise<Result<PanelJackJson, Error>> {
+	const res = await client.devices[':id'].jacks.$post({ ...by_id(deviceId), json: input })
+	return to_result<PanelJackJson>(res, failed.create('noun.jack'))
+}
+
+export async function update_jack(
+	deviceId: number,
+	jackId: number,
+	input: PanelJackUpdate,
+): Promise<Result<PanelJackJson, Error>> {
+	const res = await client.devices[':id'].jacks[':jackId'].$patch({
+		param: { id: String(deviceId), jackId: String(jackId) },
+		json: input,
+	})
+	return to_result<PanelJackJson>(res, failed.update('noun.jack'))
+}
+
+export async function delete_jack(
+	deviceId: number,
+	jackId: number,
+): Promise<Result<PanelJackJson, Error>> {
+	const res = await client.devices[':id'].jacks[':jackId'].$delete({
+		param: { id: String(deviceId), jackId: String(jackId) },
+	})
+	return to_result<PanelJackJson>(res, failed.delete('noun.jack'))
 }

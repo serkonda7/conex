@@ -90,7 +90,8 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 			const rack = ref('rack_id')
 			return rack === null ? null : ((await rackTenant(rack)) ?? null)
 		}
-		case 'interface': {
+		case 'interface':
+		case 'panel_jack': {
 			const device = ref('device_id')
 			return device === null ? null : ((await deviceTenant(device)) ?? null)
 		}
