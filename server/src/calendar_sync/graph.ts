@@ -286,7 +286,7 @@ export interface GraphEvent {
 	start: { dateTime: string; timeZone: 'UTC' }
 	end: { dateTime: string; timeZone: 'UTC' }
 	location: { displayName: string }
-	showAs: 'busy'
+	showAs: 'busy' | 'oof'
 	isReminderOn: boolean
 	categories: string[]
 	singleValueExtendedProperties: { id: string; value: string }[]

@@ -1,5 +1,5 @@
 # Outlook-Kalendersynchronisation
-Ein-Wege Synchronisation von TANSS-Terminen (Einsatzplanung) in die persönlichen M365 Kalender.
+Ein-Wege Synchronisation von TANSS-Terminen und Abwesenheiten (Einsatzplanung) in die persönlichen M365 Kalender.
 
 **Voraussetzung:**
 - [TANSS-Integration](consistency.md)
@@ -12,6 +12,10 @@ Ein-Wege Synchronisation von TANSS-Terminen (Einsatzplanung) in die persönliche
   `TANSS`).
 - Betreff `<Firma>: <Tickettitel> [#<Ticketnummer>]` (ohne Ticket: erste Zeile des
   Termintexts), Ort ist die Adresse der Firma, Inhalt Ticket-Link und Termintext.
+- Anfahrt und Abfahrt eines Termins werden als eigene Termine direkt davor bzw.
+  danach eingetragen (Betreff `Anfahrt` / `Abfahrt`).
+- Abwesenheiten werden mit Status *Abwesend* eingetragen, Betreff ist die erste Zeile
+  des Texts (sonst `Absence`).
 - In TANSS gelöschte Termine werden in Outlook gelöscht. Ist TANSS nicht erreichbar,
   wird nichts gelöscht.
 - Zuordnung entfernen löscht die synchronisierten Termine des Technikers; deaktivieren pausiert nur.

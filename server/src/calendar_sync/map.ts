@@ -6,9 +6,12 @@ import { createHash } from 'node:crypto'
 import type { TnsSupportList } from 'tanss-api'
 import { type GraphEvent, TANSS_CATEGORY, TANSS_ID_PROPERTY } from './graph'
 
-/** One appointment as it should look in Outlook. */
+/** One Outlook event: an appointment, an absence or a drive time. */
 export interface CalendarItem {
-	/** Sync state key: the support id, or `<id>@<start>` for expanded recurrences. */
+	/**
+	 * Sync state key: the support id, or `<id>@<start>` for expanded
+	 * recurrences; drive times append `:approach` / `:departure`.
+	 */
 	key: string
 	tanssId: number
 	techId: number
@@ -18,6 +21,8 @@ export interface CalendarItem {
 	title: string
 	location: string
 	body: string
+	/** Absences are shown as out of office, everything else as busy. */
+	showAs: 'busy' | 'oof'
 }
 
 /**
@@ -57,6 +62,13 @@ export function plainText(html: string): string {
 		.trim()
 }
 
+/** Subject fallback of an absence without text. */
+const ABSENCE_SUBJECT = 'Absence'
+
+/** Subjects of the drive time events. */
+const APPROACH_TITLE = 'Anfahrt'
+const DEPARTURE_TITLE = 'Abfahrt'
+
 /**
  * `<company>: <ticket title> [#<ticket>]`. Without a ticket title the first
  * text line stands in for it; parts that are unknown are left out.
@@ -82,7 +94,7 @@ function subjectOf(support: TnsSupportList, names: LinkedNames, company: string 
 	if (company) {
 		return rest ? `${company}: ${rest}` : company
 	}
-	return rest || 'TANSS'
+	return rest || (support.planningType === 'ABSENCE' ? ABSENCE_SUBJECT : 'TANSS')
 }
 
 /**
@@ -118,37 +130,66 @@ function bodyOf(support: TnsSupportList, tanssBaseUrl: string): string {
 }
 
 /**
- * Normalizes one support; null when it lacks an id, start or technician.
- * `key` defaults to the support id (see `CalendarItem.key`).
+ * Normalizes one support into its event plus, for appointments, the drive
+ * time before (`durationApproach`) and after (`durationDeparture`) as
+ * separate events. Empty when it lacks an id, start or technician. `key`
+ * defaults to the support id (see `CalendarItem.key`).
  */
-export function toCalendarItem(
+export function toCalendarItems(
 	support: TnsSupportList,
 	names: LinkedNames,
 	tanssBaseUrl: string,
 	key: string = String(support.id),
-): CalendarItem | null {
+): CalendarItem[] {
 	if (!support.id || !support.date || !support.employeeId) {
-		return null
+		return []
 	}
+	const absence = support.planningType === 'ABSENCE'
 	const company = support.companyId ? (names.companyNames.get(support.companyId) ?? null) : null
 	const minutes = Math.max(support.duration ?? 0, 0)
-	return {
+	const main: CalendarItem = {
 		key,
 		tanssId: support.id,
 		techId: support.employeeId,
 		start: support.date,
 		end: support.date + minutes * 60,
 		title: subjectOf(support, names, company),
-		location: locationOf(support, names, company),
+		location: absence ? '' : locationOf(support, names, company),
 		body: bodyOf(support, tanssBaseUrl),
+		showAs: absence ? 'oof' : 'busy',
 	}
+	if (absence) {
+		return [main]
+	}
+	const items = [main]
+	const approach = Math.max(support.durationApproach ?? 0, 0)
+	if (approach > 0) {
+		items.unshift({
+			...main,
+			key: `${key}:approach`,
+			start: main.start - approach * 60,
+			end: main.start,
+			title: APPROACH_TITLE,
+		})
+	}
+	const departure = Math.max(support.durationDeparture ?? 0, 0)
+	if (departure > 0) {
+		items.push({
+			...main,
+			key: `${key}:departure`,
+			start: main.end,
+			end: main.end + departure * 60,
+			title: DEPARTURE_TITLE,
+		})
+	}
+	return items
 }
 
 /** Change detection: covers every field written to Outlook. */
 export function hash(item: CalendarItem): string {
-	const { key, tanssId, start, end, title, location, body } = item
+	const { key, tanssId, start, end, title, location, body, showAs } = item
 	return createHash('sha256')
-		.update(JSON.stringify([key, tanssId, start, end, title, location, body]))
+		.update(JSON.stringify([key, tanssId, start, end, title, location, body, showAs]))
 		.digest('hex')
 }
 
@@ -164,7 +205,7 @@ export function toGraphEvent(item: CalendarItem): GraphEvent {
 		start: { dateTime: utcDateTime(item.start), timeZone: 'UTC' },
 		end: { dateTime: utcDateTime(item.end), timeZone: 'UTC' },
 		location: { displayName: item.location },
-		showAs: 'busy',
+		showAs: item.showAs,
 		isReminderOn: false,
 		categories: [TANSS_CATEGORY],
 		singleValueExtendedProperties: [{ id: TANSS_ID_PROPERTY, value: item.key }],

@@ -1,6 +1,6 @@
 /**
- * Calendar sync runs: fetch the planned TANSS appointments of the mapped
- * technicians, diff them against `calendar_sync_items` and apply the
+ * Calendar sync runs: fetch the planned TANSS appointments and absences of
+ * the mapped technicians (appointments with their drive times), diff them against `calendar_sync_items` and apply the
  * difference to the technicians' Outlook calendars.
  *
  * - new → create; content changed → update; moved to another mailbox
@@ -25,7 +25,7 @@ import { getIntegrationRow } from '../integrations/store'
 import { type TanssAppointments, TanssSession } from '../integrations/tanss/client'
 import { nowSeconds } from '../util/time'
 import { GraphClient, isGraphNotFound } from './graph'
-import { type CalendarItem, hash, type LinkedNames, toCalendarItem, toGraphEvent } from './map'
+import { type CalendarItem, hash, type LinkedNames, toCalendarItems, toGraphEvent } from './map'
 import {
 	deleteItems,
 	EMPTY_COUNTS,
@@ -45,7 +45,7 @@ import {
 } from './store'
 
 /** Synced planning types; a setting for this comes after the MVP. */
-const PLANNING_TYPES: TnsPlanningType[] = ['APPOINTMENT_FIX']
+const PLANNING_TYPES: TnsPlanningType[] = ['APPOINTMENT_FIX', 'ABSENCE']
 
 const DAY_S = 24 * 60 * 60
 const WINDOW_PAST_DAYS = 7
@@ -89,7 +89,7 @@ export async function tanssSession(): Promise<
 	})
 }
 
-/** Supports of the active technicians with a synced planning type. */
+/** Supports (appointments and absences) of the active technicians with a synced planning type. */
 function relevantSupports(appointments: TanssAppointments, techIds: Set<number>): TnsSupportList[] {
 	return appointments.supports.filter(
 		(s) =>
@@ -129,7 +129,10 @@ async function resolveNames(
 	supports: TnsSupportList[],
 ): Promise<LinkedNames> {
 	const ticketIds = supports.flatMap((s) => (s.ticketId ? [s.ticketId] : []))
-	const companyIds = supports.flatMap((s) => (s.companyId ? [s.companyId] : []))
+	// Absences have no location, so their company address is not needed.
+	const companyIds = supports.flatMap((s) =>
+		s.companyId && s.planningType !== 'ABSENCE' ? [s.companyId] : [],
+	)
 	const [ticketTitles, companyAddresses] = await Promise.all([
 		fetchEach(ticketIds, 'ticket', (id) => session.ticketTitle(id)),
 		fetchEach(companyIds, 'company', (id) => session.companyAddress(id)),
@@ -143,9 +146,9 @@ async function resolveNames(
 }
 
 /**
- * Calendar items of the given supports. TANSS may return a recurring
- * appointment as several entries with the same support id; those are keyed
- * by id and start.
+ * Calendar items of the given supports, drive times included. TANSS may
+ * return a recurring appointment as several entries with the same support
+ * id; those are keyed by id and start.
  */
 function normalize(
 	supports: TnsSupportList[],
@@ -164,8 +167,7 @@ function normalize(
 			s.id !== undefined && (occurrences.get(s.id) ?? 0) > 1
 				? `${s.id}@${s.date}`
 				: String(s.id)
-		const item = toCalendarItem(s, names, baseUrl, key)
-		if (item) {
+		for (const item of toCalendarItems(s, names, baseUrl, key)) {
 			items.set(item.key, item)
 		}
 	}
