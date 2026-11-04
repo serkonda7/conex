@@ -1300,12 +1300,11 @@ export const en = {
 	'calendarSync.everyMinutes': 'Every {minutes} min',
 	'calendarSync.enabled': 'Enabled',
 	'calendarSync.testMailbox': 'Test mailbox (optional)',
-	'calendarSync.testMailboxHint':
-		'With a mailbox, the test also reads its calendar (checks the access policy).',
 	'calendarSync.testOk': 'The app can sign in.',
 	'calendarSync.testOkMailbox': 'The app can sign in and read the calendar of {mailbox}.',
 	'calendarSync.testFailed': 'Connection test failed',
 	'calendarSync.techniciansTitle': 'Outlook technician mapping',
+	'calendarSync.technicianCount': '{active} of {total} technicians mapped and active',
 	'calendarSync.openTechnicians': 'Technician mapping →',
 	'calendarSync.techniciansHint':
 		'Only technicians with a saved, enabled mailbox are synced. Removing a mapping deletes its synced events on the next run; disabling it pauses the sync.',

@@ -1324,13 +1324,12 @@ export const de: Messages = {
 	'calendarSync.everyMinutes': 'Alle {minutes} Min.',
 	'calendarSync.enabled': 'Aktiviert',
 	'calendarSync.testMailbox': 'Testpostfach (optional)',
-	'calendarSync.testMailboxHint':
-		'Mit Postfach liest der Test auch dessen Kalender (prüft die Zugriffsrichtlinie).',
 	'calendarSync.testOk': 'Die App kann sich anmelden.',
 	'calendarSync.testOkMailbox':
 		'Die App kann sich anmelden und den Kalender von {mailbox} lesen.',
 	'calendarSync.testFailed': 'Verbindungstest fehlgeschlagen',
 	'calendarSync.techniciansTitle': 'Outlook-Technikerzuordnung',
+	'calendarSync.technicianCount': '{active} / {total} Konten',
 	'calendarSync.openTechnicians': 'Technikerzuordnung →',
 	'calendarSync.techniciansHint':
 		'Nur Techniker mit gespeichertem, aktiviertem Postfach werden synchronisiert. Entfernen löscht die synchronisierten Termine beim nächsten Lauf; Deaktivieren pausiert die Synchronisation.',

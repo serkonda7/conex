@@ -31,7 +31,7 @@ import { CheckboxField, Field, Hint, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
 import { syncStateLabel } from '../../i18n/labels'
-import { createRecord, createRows, useAction } from '../../lib/resource'
+import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import { usePageMeta } from '../../lib/router'
 import { formatTime } from '../../lib/time'
 
@@ -160,7 +160,6 @@ function SettingsForm(props: {
 			<Field
 				label={t('integration.connection')}
 				for="calendar-sync-test-mailbox"
-				hint={<Hint>{t('calendarSync.testMailboxHint')}</Hint>}
 			>
 				<div class="input-with-button">
 					<input
@@ -367,14 +366,36 @@ function RunsTable(props: { runs: CalendarSyncRunJson[] }): JSX.Element {
 	)
 }
 
-/** Enabled state, or the last error of the sync. */
-function SyncState(props: { config: CalendarSyncConfigJson }): JSX.Element {
+/**
+ * Enabled state (or the last error) of the sync, and how many technicians
+ * have an enabled mailbox mapping.
+ */
+function SyncState(props: {
+	config: CalendarSyncConfigJson
+	technicians: CalendarTechnicianJson[] | undefined
+}): JSX.Element {
+	const active = (): number =>
+		(props.technicians ?? []).filter((tech) => tech.mapping?.enabled === true).length
 	return (
-		<Show when={props.config.enabled} fallback={t('integration.disabled')}>
-			<Show when={props.config.last_error} fallback={t('integration.enabled')}>
-				<span class="text-danger">{props.config.last_error}</span>
+		<>
+			<div>
+				<Show when={props.config.enabled} fallback={t('integration.disabled')}>
+					<Show when={props.config.last_error} fallback={t('integration.enabled')}>
+						<span class="text-danger">{props.config.last_error}</span>
+					</Show>
+				</Show>
+			</div>
+			<Show when={props.technicians}>
+				{(techs: () => CalendarTechnicianJson[]) => (
+					<div>
+						{t('calendarSync.technicianCount', {
+							active: active(),
+							total: techs().length,
+						})}
+					</div>
+				)}
 			</Show>
-		</Show>
+		</>
 	)
 }
 
@@ -403,6 +424,7 @@ function LastRun(props: { run: CalendarSyncRunJson }): JSX.Element {
 function SyncDetails(props: {
 	config: CalendarSyncConfigJson
 	lastRun: CalendarSyncRunJson | undefined
+	technicians: CalendarTechnicianJson[] | undefined
 }): JSX.Element {
 	return (
 		<>
@@ -417,7 +439,7 @@ function SyncDetails(props: {
 				</dd>
 				<dt>{t('common.status')}</dt>
 				<dd>
-					<SyncState config={props.config} />
+					<SyncState config={props.config} technicians={props.technicians} />
 				</dd>
 				<dt>{t('integration.lastSync')}</dt>
 				<dd>
@@ -470,6 +492,12 @@ export function CalendarSyncCard(): JSX.Element {
 	}
 
 	const [editing, setEditing] = createSignal(false)
+	// Shares the cache with the technician page, so its changes show here.
+	const [technicians] = createRowsFor(
+		() => config()?.configured === true,
+		fetch_calendar_technicians,
+		setError,
+	)
 
 	const canSync = (): boolean => {
 		const c = config()
@@ -534,7 +562,13 @@ export function CalendarSyncCard(): JSX.Element {
 									when={c().configured}
 									fallback={<Empty message={t('integration.notConfigured')} />}
 								>
-									<SyncDetails config={c()} lastRun={runs()?.[0]} />
+									<SyncDetails
+										config={c()}
+										lastRun={runs()?.[0]}
+										technicians={
+											technicians.loading ? undefined : technicians()
+										}
+									/>
 								</Show>
 							}
 						>
