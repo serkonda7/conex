@@ -1733,13 +1733,16 @@ export type TraceQuery = v.InferOutput<typeof TraceQuerySchema>
  * covers both configuring providers and running syncs / links;
  * `tickets.create` opens tickets in the external ticket system (TANSS);
  * `contacts.directory` reads the contact directory (`/directory/contacts`),
- * e.g. for the AGFEO Dashboard LDAP plugin.
+ * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
+ * tenants of existing employees (with `edit`), which also changes the
+ * tenant scope of the employee's account.
  */
 export const PERMISSIONS = [
 	'view',
 	'edit',
 	'delete',
 	'users.manage',
+	'employees.tenants',
 	'changelog.view',
 	'audit_log.view',
 	'integrations.manage',
@@ -1759,8 +1762,8 @@ const PermissionListSchema = v.pipe(
 /**
  * Roles bundle permissions and are assigned to users (one role per user).
  * Users whose role grants `users.manage` are always global (no tenant
- * scope); everyone else with a `tenant_id` is strictly limited to that
- * single tenant (null-tenant rows are invisible to them).
+ * scope); everyone else with tenants is strictly limited to them
+ * (null-tenant rows are invisible to them).
  */
 export const RoleCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -1794,20 +1797,28 @@ export type RoleListQuery = v.InferOutput<typeof RoleListQuerySchema>
 /**
  * Accounts of employees carry the person (name, mail, tenants) and sign in
  * with the employee's primary mail address, so `username` is only given
- * (and required) without `employee_id`. `tenant_id` (scope) requires
- * `employee_id` and must be one of the employee's tenants.
+ * (and required) without `employee_id`. Their tenant scope is exactly the
+ * employee's tenants. Accounts without employee carry their own scope in
+ * `tenant_ids` (empty = global); it must be empty with `employee_id` and for
+ * roles granting `users.manage`.
  */
+const UserTenantIdsSchema = v.pipe(
+	v.array(IdSchema),
+	v.maxLength(500),
+	v.transform((ids) => [...new Set(ids)]),
+)
+
 export const UserCreateSchema = v.strictObject({
 	username: v.optional(UsernameSchema, undefined),
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 	role_id: IdSchema,
-	tenant_id: NullableIdSchema,
+	tenant_ids: v.optional(UserTenantIdsSchema, []),
 	employee_id: NullableIdSchema,
 })
 
 export const UserUpdateSchema = v.strictObject({
 	role_id: v.optional(IdSchema, undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
+	tenant_ids: v.optional(UserTenantIdsSchema, undefined),
 	employee_id: v.optional(v.nullable(IdSchema), undefined),
 	password: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(1024)), undefined),
 })
@@ -1825,7 +1836,11 @@ export interface UserJson {
 	username: string
 	role_id: number
 	role_name: string
-	tenant_id: number | null
+	/**
+	 * Tenant scope: the employee's tenants for linked accounts, else the
+	 * account's own; empty = global (all tenants).
+	 */
+	tenant_ids: number[]
 	/** Linked employee (the person behind the account), if any. */
 	employee_id: number | null
 	employee_name: string | null

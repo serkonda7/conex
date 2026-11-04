@@ -20,7 +20,7 @@ import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
-import { can, sessionTenantId } from '../../lib/session'
+import { can, sessionTenantIds } from '../../lib/session'
 import { EmployeeStatus } from './list'
 
 /**
@@ -32,11 +32,10 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const id = (): number => props.id
 	const [employee] = createRecord(id, fetch_employee, setError)
-	/** Tenant the page is shown under: the user's own when scoped, else the primary one. */
+	/** Tenant the page is shown under: the first one in the user's scope (primary for global users). */
 	const tenantId = (): number | undefined => {
-		const ids = employee()?.tenant_ids
-		const own = sessionTenantId()
-		return own !== null && ids?.includes(own) ? own : ids?.[0]
+		const scope = sessionTenantIds()
+		return employee()?.tenant_ids.find((member) => scope === null || scope.includes(member))
 	}
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
 	const [tenants] = createRows(fetch_tenants, setError)
@@ -52,10 +51,6 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 		setError,
 	)
 	const account = (): UserJson | undefined => accounts()?.[0]
-	const scopeName = (scope: number | null): string =>
-		scope === null
-			? t('common.allTenants')
-			: (tenants()?.find((row) => row.id === scope)?.name ?? String(scope))
 	const [devices] = createRowsFor(
 		id,
 		(key: number) => fetch_devices({ employee: [key] }),
@@ -151,7 +146,6 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 								{(row: () => UserJson) => (
 									<>
 										<a href={`/users/${row().id}/edit`}>{row().role_name}</a>
-										{` (${scopeName(row().tenant_id)})`}
 										<Show when={!row().active}> ({t('user.inactive')})</Show>
 									</>
 								)}

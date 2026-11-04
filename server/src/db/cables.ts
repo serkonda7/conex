@@ -12,6 +12,7 @@ import {
 	findById,
 	findOne,
 	insertedId,
+	inTenants,
 	isPatchEmpty,
 	pageRows,
 	pickDefined,
@@ -33,12 +34,12 @@ function passThroughGroup(iface: typeof interfaces.$inferSelect): number | null 
 }
 
 /**
- * Both endpoint devices of a cable sit in `tenantId` (the cable read rule of
+ * Both endpoint devices of a cable sit in `tenantIds` (the cable read rule of
  * `authz.ts` as SQL), so no peer name from another tenant leaks.
  */
-export function cableInTenant(tenantId: number): SQL {
+export function cableInTenants(tenantIds: readonly number[]): SQL {
 	const endIn = (end: PgColumn): SQL =>
-		sql`EXISTS (SELECT 1 FROM ${interfaces} AS scope_i JOIN ${devices} AS scope_d ON scope_d.id = scope_i.device_id WHERE scope_i.id = ${end} AND scope_d.tenant_id = ${tenantId})`
+		sql`EXISTS (SELECT 1 FROM ${interfaces} AS scope_i JOIN ${devices} AS scope_d ON scope_d.id = scope_i.device_id WHERE scope_i.id = ${end} AND ${inTenants(sql`scope_d.tenant_id`, tenantIds)})`
 	return sql`(${endIn(cables.a_interface_id)} AND ${endIn(cables.b_interface_id)})`
 }
 
@@ -57,11 +58,11 @@ export interface CableListParams extends ListParams {
 	device?: number
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to cables
-	 * whose both endpoint devices sit in the scope tenant (strict — shared
+	 * whose both endpoint devices sit in scope tenants (strict — shared
 	 * endpoints excluded), so no peer name from another tenant leaks.
 	 * `undefined` means unconstrained.
 	 */
-	scopeTenantId?: number
+	scopeTenantIds?: readonly number[]
 }
 
 export function listCables(params: CableListParams): Promise<Page<CableRow>> {
@@ -77,7 +78,7 @@ export function listCables(params: CableListParams): Promise<Page<CableRow>> {
 						.where(eq(interfaces.device_id, params.device)),
 				)
 			: undefined,
-		params.scopeTenantId !== undefined ? cableInTenant(params.scopeTenantId) : undefined,
+		params.scopeTenantIds !== undefined ? cableInTenants(params.scopeTenantIds) : undefined,
 	)
 	return pageRows(cables, where, [asc(cables.id)], params)
 }

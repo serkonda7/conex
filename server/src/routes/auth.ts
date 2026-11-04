@@ -81,12 +81,7 @@ authApp.post(
 		try {
 			const password_hash = await Bun.password.hash(body.password)
 			// First account owns the instance: a global role with every permission.
-			const user = await createLocalUser(
-				username,
-				password_hash,
-				await fullAccessRoleId(),
-				null,
-			)
+			const user = await createLocalUser(username, password_hash, await fullAccessRoleId())
 			await startSession(c, user)
 			return c.json({ success: true }, 201)
 		} catch (error: unknown) {
@@ -181,7 +176,7 @@ authApp.get('/me', authMiddleware, (c) => {
 		username: user.username,
 		role: { id: user.role_id, name: user.role_name },
 		permissions: [...user.permissions],
-		tenant_id: user.tenant_id,
+		tenant_ids: user.tenant_ids,
 		employee_id: user.employee_id,
 	})
 })

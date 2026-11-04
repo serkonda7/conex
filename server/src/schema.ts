@@ -62,42 +62,45 @@ export const role_permissions = pgTable(
 	(table) => [primaryKey({ columns: [table.role_id, table.permission] })],
 )
 
-export const users = pgTable(
-	'users',
+export const users = pgTable('users', {
+	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+	username: text('username').notNull().unique(),
+	password_hash: text('password_hash'),
+	provider: text('provider').notNull().default('local'),
+	provider_id: text('provider_id').unique(),
+	// Assigned role (the first-run setup account gets a role holding every
+	// permission).
+	role_id: integer('role_id')
+		.notNull()
+		.references(() => roles.id),
+	// The person behind the account (at most one account per employee).
+	// Its tenant scope is exactly the employee's tenants (`employee_tenants`,
+	// read live), so `user_tenants` stays empty. An inactive employee
+	// cannot sign in. Never set for users whose role grants
+	// `users.manage` (they are global). Employee delete is blocked while
+	// an account exists (service layer in `db/employees.ts`).
+	employee_id: integer('employee_id')
+		.unique()
+		.references(() => employees.id),
+})
+
+// Tenant scope of accounts without employee: none = global (all tenants),
+// otherwise limited to these tenants. Always empty for `users.manage`
+// holders and employee-linked accounts (service layer in `db/users.ts`).
+// Tenant delete is blocked while referenced (`db/tenancy.ts`).
+export const user_tenants = pgTable(
+	'user_tenants',
 	{
-		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
-		username: text('username').notNull().unique(),
-		password_hash: text('password_hash'),
-		provider: text('provider').notNull().default('local'),
-		provider_id: text('provider_id').unique(),
-		// Assigned role (the first-run setup account gets a role holding every
-		// permission).
-		role_id: integer('role_id')
+		user_id: integer('user_id')
 			.notNull()
-			.references(() => roles.id),
-		// Tenant scope (`NULL` = global, all tenants). Always `NULL` for users
-		// whose role grants `users.manage`. Delete-blocked while referenced
-		// (service layer in `db/tenancy.ts`), so the FK carries no cascade.
-		tenant_id: integer('tenant_id').references(() => tenants.id),
-		// The person behind the account (at most one account per employee).
-		// Required for scoped users, whose scope must be one of the employee's
-		// tenants (membership FK below); optional for global users. An
-		// inactive employee cannot sign in. Employee delete is blocked while
-		// an account exists (service layer in `db/employees.ts`).
-		employee_id: integer('employee_id')
-			.unique()
-			.references(() => employees.id),
+			.references(() => users.id, { onDelete: 'cascade' }),
+		tenant_id: integer('tenant_id')
+			.notNull()
+			.references(() => tenants.id),
 	},
 	(table) => [
-		foreignKey({
-			name: 'users_employee_tenant_fk',
-			columns: [table.employee_id, table.tenant_id],
-			foreignColumns: [employee_tenants.employee_id, employee_tenants.tenant_id],
-		}),
-		check(
-			'users_scope_requires_employee',
-			sql`${table.tenant_id} IS NULL OR ${table.employee_id} IS NOT NULL`,
-		),
+		primaryKey({ columns: [table.user_id, table.tenant_id] }),
+		index('user_tenants_tenant_id_idx').on(table.tenant_id),
 	],
 )
 

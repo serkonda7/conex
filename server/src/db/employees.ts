@@ -251,14 +251,6 @@ export async function updateEmployee(
 				),
 			)
 		}
-		const account = await findOne(users, eq(users.employee_id, id))
-		if (account?.tenant_id != null && removed.includes(account.tenant_id)) {
-			return Result.err(
-				new ConflictError(
-					"The employee's user account is limited to a removed tenant; change its scope first",
-				),
-			)
-		}
 	}
 	if (input.active === false && current.value.active === 1 && (await isLastManager(id))) {
 		return Result.err(

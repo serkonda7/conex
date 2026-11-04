@@ -59,6 +59,7 @@ import {
 	checkTenantExists,
 	findById,
 	findOne,
+	inScope,
 	insertedId,
 	isPatchEmpty,
 	isTaken,
@@ -66,6 +67,7 @@ import {
 	orderOf,
 	pageOf,
 	pickDefined,
+	scopeCondition,
 	searchCondition,
 	tenantConditions,
 	tryWrite,
@@ -999,7 +1001,7 @@ export interface InterfaceListParams extends ListParams {
 	 * interfaces whose device sits in the scope tenant (strict — shared
 	 * `NULL` rows are excluded). `undefined` means unconstrained.
 	 */
-	scopeTenantId?: number
+	scopeTenantIds?: readonly number[]
 }
 
 /** One interface row for the global list view, with its device's name. */
@@ -1023,9 +1025,7 @@ export async function listAllInterfaces(
 		params.connected !== undefined
 			? eq(interfaces.connected, params.connected ? 1 : 0)
 			: undefined,
-		params.scopeTenantId !== undefined
-			? eq(devices.tenant_id, params.scopeTenantId)
-			: undefined,
+		scopeCondition(devices.tenant_id, params.scopeTenantIds),
 	)
 	const rows = await db
 		.select({ iface: interfaces, device_name: devices.name })
@@ -1404,12 +1404,12 @@ export async function setOutletLocations(
 
 /**
  * Outlets located in a location or one of its descendants, ordered by
- * panel name and port creation order. `scopeTenantId` keeps only outlets
- * on panels of that tenant.
+ * panel name and port creation order. `scopeTenantIds` keeps only outlets
+ * on panels of those tenants.
  */
 export async function listLocationOutlets(
 	locationId: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<LocationOutletJson[]> {
 	const peer = alias(interfaces, 'peer_iface')
 	const peerDevice = alias(devices, 'peer_device')
@@ -1450,7 +1450,7 @@ export async function listLocationOutlets(
 		.where(
 			and(
 				sql`${interfaces.location_id} in ${subtree}`,
-				scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId),
+				scopeCondition(devices.tenant_id, scopeTenantIds),
 			),
 		)
 		.orderBy(asc(devices.name), asc(devices.id), asc(interfaces.id))
@@ -1466,8 +1466,7 @@ export async function listLocationOutlets(
 			connected: row.connected !== 0,
 			// A peer outside the requester's scope stays anonymous.
 			peer:
-				peer_device_id === null ||
-				(scopeTenantId !== undefined && peer_device_tenant_id !== scopeTenantId)
+				peer_device_id === null || !inScope(peer_device_tenant_id, scopeTenantIds)
 					? null
 					: {
 							device_id: peer_device_id,

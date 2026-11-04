@@ -22,8 +22,8 @@ export function UsersPage(): JSX.Element {
 	// Tenant id → name for the scope column (user managers are global).
 	const [tenants] = createRows(fetch_tenants)
 	const tenantName = useNameOf(tenants)
-	const scopeOf = (id: number | null): string =>
-		id === null ? t('common.allTenants') : tenantName(id)
+	const scopeOf = (ids: readonly number[]): string =>
+		ids.length === 0 ? t('common.allTenants') : ids.map(tenantName).join(', ')
 
 	return (
 		<EntityListPage
@@ -54,7 +54,7 @@ export function UsersPage(): JSX.Element {
 				{
 					key: 'tenant',
 					label: t('user.tenantScope'),
-					getValue: (u: UserJson): string => scopeOf(u.tenant_id),
+					getValue: (u: UserJson): string => scopeOf(u.tenant_ids),
 				},
 			]}
 			columnsKey="users"

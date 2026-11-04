@@ -71,7 +71,7 @@ export function LoginPage(props: { onLogin: (user: SessionUser) => void }): JSX.
 			username: username().trim(),
 			role: { id: 0, name: '' },
 			permissions: [],
-			tenant_id: null,
+			tenant_ids: null,
 			employee_id: null,
 		}
 		props.onLogin((await fetchMe()) ?? fallback)
@@ -145,7 +145,7 @@ export function SetupPage(props: {
 				username: name,
 				role: { id: 0, name: '' },
 				permissions: [],
-				tenant_id: null,
+				tenant_ids: null,
 				employee_id: null,
 			},
 		)

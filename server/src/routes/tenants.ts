@@ -33,7 +33,7 @@ export const tenantsApp = new Hono()
 				group: query.group,
 				sort: query.sort,
 				order: query.order,
-				scopeTenantId: requestScope(c),
+				scopeTenantIds: requestScope(c),
 			}),
 		)
 	})

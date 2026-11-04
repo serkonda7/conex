@@ -1,10 +1,10 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, type SQL, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { PasswordChange, UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
-import { employee_tenants, employees, roles, users } from '../schema'
+import { employee_tenants, employees, roles, tenants, user_tenants, users } from '../schema'
 import type { CurrentUser, User } from '../types'
 import { normalize_username } from '../util/username'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import {
 	ConflictError,
 	DuplicateError,
@@ -13,7 +13,6 @@ import {
 	ValidationError,
 } from './errors'
 import {
-	checkTenantExists,
 	findOne,
 	isPatchEmpty,
 	type ListParams,
@@ -44,8 +43,37 @@ export async function canSignIn(user: User): Promise<boolean> {
 }
 
 /**
+ * Tenant scope of `user`, null when global: exactly the employee's tenants
+ * (membership order) for employee-linked accounts, else the account's
+ * `user_tenants` (none = global).
+ */
+async function scopeOf(user: User): Promise<number[] | null> {
+	if (user.employee_id !== null) {
+		const rows = await getDb()
+			.select({ id: employee_tenants.tenant_id })
+			.from(employee_tenants)
+			.where(eq(employee_tenants.employee_id, user.employee_id))
+			.orderBy(asc(employee_tenants.position))
+		return rows.map((row) => row.id)
+	}
+	const ids = await ownTenantIds(user.id)
+	return ids.length > 0 ? ids : null
+}
+
+/** The account's own `user_tenants`, by tenant id. */
+async function ownTenantIds(userId: number): Promise<number[]> {
+	const rows = await getDb()
+		.select({ id: user_tenants.tenant_id })
+		.from(user_tenants)
+		.where(eq(user_tenants.user_id, userId))
+		.orderBy(asc(user_tenants.tenant_id))
+	return rows.map((row) => row.id)
+}
+
+/**
  * Requester identity for `authMiddleware`: the user row plus its role's
- * name and permissions, read live so role edits apply immediately.
+ * name and permissions and its tenant scope, read live so role and
+ * membership edits apply immediately.
  */
 export async function getCurrentUser(username: string): Promise<CurrentUser | null> {
 	const user = await getUserByUsername(username)
@@ -59,7 +87,7 @@ export async function getCurrentUser(username: string): Promise<CurrentUser | nu
 		role_id: user.role_id,
 		role_name: role?.name ?? '',
 		permissions: new Set(await rolePermissions(user.role_id)),
-		tenant_id: user.tenant_id,
+		tenant_ids: await scopeOf(user),
 		employee_id: user.employee_id,
 	}
 }
@@ -69,7 +97,6 @@ export async function createLocalUser(
 	username: string,
 	passwordHash: string,
 	roleId: number,
-	tenantId: number | null = null,
 	employeeId: number | null = null,
 ): Promise<User> {
 	const normalizedUsername = normalize_username(username)
@@ -82,7 +109,6 @@ export async function createLocalUser(
 				provider: 'local',
 				provider_id: null,
 				role_id: roleId,
-				tenant_id: tenantId,
 				employee_id: employeeId,
 			})
 			.returning({ id: users.id })
@@ -97,7 +123,6 @@ export async function createLocalUser(
 		provider: 'local',
 		provider_id: null,
 		role_id: roleId,
-		tenant_id: tenantId,
 		employee_id: employeeId,
 	}
 }
@@ -113,15 +138,43 @@ export async function hasAnyUser(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * A user with its role and employee name, as the management API returns it
- * (join `roles`, left join `employees`).
+ * Tenant scope ids of the selected user (`scopeOf` in SQL): the employee's
+ * memberships when linked, else its `user_tenants`.
+ */
+// jsonb, not an int array: Bun's driver returns int arrays as `Int32Array`.
+// Qualified by hand: interpolated columns render unqualified in subqueries.
+const userTenantIds: SQL<number[]> = sql<number[]>`coalesce(case
+	when ${users}."employee_id" is not null then (
+		select jsonb_agg("et"."tenant_id" order by "et"."position")
+		from ${employee_tenants} as "et" where "et"."employee_id" = ${users}."employee_id"
+	)
+	else (
+		select jsonb_agg("ut"."tenant_id" order by "ut"."tenant_id")
+		from ${user_tenants} as "ut" where "ut"."user_id" = ${users}."id"
+	)
+end, '[]'::jsonb)`
+
+/** Users whose scope includes `tenantId` (global users excluded). */
+function userInTenant(tenantId: number): SQL {
+	return sql`(exists (
+		select 1 from ${employee_tenants} as "fe"
+		where "fe"."employee_id" = ${users}."employee_id" and "fe"."tenant_id" = ${tenantId}
+	) or exists (
+		select 1 from ${user_tenants} as "fu"
+		where "fu"."user_id" = ${users}."id" and "fu"."tenant_id" = ${tenantId}
+	))`
+}
+
+/**
+ * A user with its role, employee name and scope, as the management API
+ * returns it (join `roles`, left join `employees`).
  */
 const USER_JSON_COLUMNS: {
 	id: typeof users.id
 	username: typeof users.username
 	role_id: typeof users.role_id
 	role_name: typeof roles.name
-	tenant_id: typeof users.tenant_id
+	tenant_ids: SQL<number[]>
 	employee_id: typeof users.employee_id
 	employee_name: SQL<string | null>
 	active: SQL<boolean>
@@ -130,7 +183,7 @@ const USER_JSON_COLUMNS: {
 	username: users.username,
 	role_id: users.role_id,
 	role_name: roles.name,
-	tenant_id: users.tenant_id,
+	tenant_ids: userTenantIds,
 	employee_id: users.employee_id,
 	employee_name: sql<string | null>`${employees.name}`,
 	active: sql<boolean>`coalesce(${employees.active}, 1) = 1`,
@@ -161,7 +214,13 @@ async function roleManagesUsers(roleId: number): Promise<boolean> {
 const USERNAME_IN_USE = 'Username is already in use'
 
 const MANAGER_GLOBAL =
-	'Users with the users.manage permission are global and cannot be limited to a tenant'
+	'Users with the users.manage permission are global and cannot be limited to tenants'
+
+const MANAGER_UNLINKED =
+	'Users with the users.manage permission are global and cannot be linked to an employee, whose tenants would limit them'
+
+const SCOPE_FOLLOWS_EMPLOYEE =
+	"Accounts of employees are limited to the employee's tenants; change those on the employee instead"
 
 export interface UserListParams extends ListParams {
 	role?: number
@@ -175,7 +234,7 @@ export async function listUsers(params: UserListParams): Promise<UserPage> {
 	const where = and(
 		searchCondition(params.search, [users.username, employees.name]),
 		params.role ? eq(users.role_id, params.role) : undefined,
-		params.tenant ? eq(users.tenant_id, params.tenant) : undefined,
+		params.tenant ? userInTenant(params.tenant) : undefined,
 		params.employee ? eq(users.employee_id, params.employee) : undefined,
 	)
 	const rows = await selectUserJson(where, params.limit, offsetOf(params))
@@ -197,14 +256,49 @@ export async function getUserResult(id: number): Promise<Result<UserJson, Error>
 
 /** FK guards shared by user create/update. */
 async function checkUserInput(input: {
-	tenant_id?: number | null
+	tenant_ids?: readonly number[]
 	role_id?: number
 }): Promise<Result<undefined, Error>> {
-	const tenantCheck = await checkTenantExists(input.tenant_id)
-	if (Result.isError(tenantCheck) || input.role_id === undefined) {
-		return tenantCheck
+	const ids = input.tenant_ids ?? []
+	if (
+		ids.length > 0 &&
+		(await getDb().$count(tenants, inArray(tenants.id, [...ids]))) !== ids.length
+	) {
+		return Result.err(new NotFoundError('Tenant not found'))
 	}
-	return checkRoleExists(input.role_id)
+	return input.role_id === undefined ? Result.ok(undefined) : checkRoleExists(input.role_id)
+}
+
+/**
+ * Scope rules: user managers are global (no own tenants, no employee) and
+ * employee-linked accounts take the employee's tenants (no own tenants).
+ */
+function checkScope(
+	manages: boolean,
+	employeeId: number | null,
+	tenantIds: readonly number[],
+): Result<undefined, Error> {
+	if (manages && employeeId !== null) {
+		return Result.err(new ConflictError(MANAGER_UNLINKED))
+	}
+	if (manages && tenantIds.length > 0) {
+		return Result.err(new ConflictError(MANAGER_GLOBAL))
+	}
+	if (employeeId !== null && tenantIds.length > 0) {
+		return Result.err(new ValidationError(SCOPE_FOLLOWS_EMPLOYEE))
+	}
+	return Result.ok(undefined)
+}
+
+/** Replaces the account's own tenants (`user_tenants`) with `tenantIds`. */
+async function writeOwnTenants(userId: number, tenantIds: readonly number[]): Promise<void> {
+	const db = getDb()
+	await db.delete(user_tenants).where(eq(user_tenants.user_id, userId))
+	if (tenantIds.length > 0) {
+		await db
+			.insert(user_tenants)
+			.values(tenantIds.map((tenant_id) => ({ user_id: userId, tenant_id })))
+	}
 }
 
 /** Login of an employee's account: its primary mail address, null without one. */
@@ -227,19 +321,15 @@ async function checkUsernameFree(
 const NO_LOGIN_MAIL = 'The employee needs a mail address to sign in with; add one first'
 
 /**
- * Employee link rules: a scoped account belongs to an employee of that
- * tenant, and an employee has at most one account (`userId` excluded).
- * Returns the employee's login (`loginOf`), null without employee.
+ * Employee link rule: an employee has at most one account (`userId`
+ * excluded). Returns the employee's login (`loginOf`), null without employee.
  */
 async function checkEmployeeLink(
 	employeeId: number | null,
-	tenantId: number | null,
 	userId?: number,
 ): Promise<Result<string | null, Error>> {
 	if (employeeId === null) {
-		return tenantId === null
-			? Result.ok(null)
-			: Result.err(new ValidationError('Tenant-scoped users must be linked to an employee'))
+		return Result.ok(null)
 	}
 	const employee = await findOne(employees, eq(employees.id, employeeId))
 	if (!employee) {
@@ -248,20 +338,6 @@ async function checkEmployeeLink(
 	const owner = await findOne(users, eq(users.employee_id, employeeId))
 	if (owner && owner.id !== userId) {
 		return Result.err(new DuplicateError(EMPLOYEE_IN_USE))
-	}
-	if (
-		tenantId !== null &&
-		!(await findOne(
-			employee_tenants,
-			and(
-				eq(employee_tenants.employee_id, employeeId),
-				eq(employee_tenants.tenant_id, tenantId),
-			),
-		))
-	) {
-		return Result.err(
-			new ConflictError("The tenant scope must be one of the employee's tenants"),
-		)
 	}
 	return Result.ok(loginOf(employee.emails))
 }
@@ -324,11 +400,12 @@ export async function createUser(input: UserCreate): Promise<Result<UserJson, Er
 	if (Result.isError(valid)) {
 		return valid
 	}
-	if (input.tenant_id != null && (await roleManagesUsers(input.role_id))) {
-		return Result.err(new ConflictError(MANAGER_GLOBAL))
-	}
 	const employeeId = input.employee_id ?? null
-	const link = await checkEmployeeLink(employeeId, input.tenant_id ?? null)
+	const scope = checkScope(await roleManagesUsers(input.role_id), employeeId, input.tenant_ids)
+	if (Result.isError(scope)) {
+		return scope
+	}
+	const link = await checkEmployeeLink(employeeId)
 	if (Result.isError(link)) {
 		return link
 	}
@@ -345,15 +422,19 @@ export async function createUser(input: UserCreate): Promise<Result<UserJson, Er
 	if (Result.isError(free)) {
 		return free
 	}
+	const passwordHash = await Bun.password.hash(input.password)
 	const user = await tryWrite(
-		async () =>
-			createLocalUser(
-				username,
-				await Bun.password.hash(input.password),
-				input.role_id,
-				input.tenant_id ?? null,
-				employeeId,
-			),
+		() =>
+			withTransaction(async () => {
+				const created = await createLocalUser(
+					username,
+					passwordHash,
+					input.role_id,
+					employeeId,
+				)
+				await writeOwnTenants(created.id, input.tenant_ids)
+				return created
+			}),
 		duplicateOf,
 	)
 	if (Result.isError(user)) {
@@ -372,14 +453,17 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 		return valid
 	}
 	const effectiveRole = input.role_id ?? current.role_id
-	const effectiveTenant = input.tenant_id !== undefined ? input.tenant_id : current.tenant_id
 	const effectiveEmployee =
 		input.employee_id !== undefined ? input.employee_id : current.employee_id
+	// Linking an employee drops the account's own tenants.
+	const effectiveTenants =
+		input.tenant_ids ?? (effectiveEmployee === null ? await ownTenantIds(id) : [])
 	const willManage = await roleManagesUsers(effectiveRole)
-	if (willManage && effectiveTenant !== null) {
-		return Result.err(new ConflictError(MANAGER_GLOBAL))
+	const scope = checkScope(willManage, effectiveEmployee, effectiveTenants)
+	if (Result.isError(scope)) {
+		return scope
 	}
-	const link = await checkEmployeeLink(effectiveEmployee, effectiveTenant, id)
+	const link = await checkEmployeeLink(effectiveEmployee, id)
 	if (Result.isError(link)) {
 		return link
 	}
@@ -395,11 +479,8 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 			return free
 		}
 	}
-	// Linking a manager to an inactive employee locks the account out too.
-	const keepsManaging =
-		willManage && (await canSignIn({ ...current, employee_id: effectiveEmployee }))
 	if (
-		!keepsManaging &&
+		!willManage &&
 		(await roleManagesUsers(current.role_id)) &&
 		(await countGlobalManagers({ excludeUserId: id })) === 0
 	) {
@@ -407,18 +488,23 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 			new ConflictError('At least one global user must keep the users.manage permission'),
 		)
 	}
-	const written = await tryWrite(async () => {
-		const patch: Partial<User> = {
-			...pickDefined(input, ['role_id', 'tenant_id', 'employee_id']),
-			...(username !== undefined ? { username } : {}),
-		}
-		if (input.password !== undefined) {
-			patch.password_hash = await Bun.password.hash(input.password)
-		}
-		if (!isPatchEmpty(patch)) {
-			await getDb().update(users).set(patch).where(eq(users.id, id))
-		}
-	}, duplicateOf)
+	const patch: Partial<User> = {
+		...pickDefined(input, ['role_id', 'employee_id']),
+		...(username !== undefined ? { username } : {}),
+	}
+	if (input.password !== undefined) {
+		patch.password_hash = await Bun.password.hash(input.password)
+	}
+	const written = await tryWrite(
+		() =>
+			withTransaction(async () => {
+				if (!isPatchEmpty(patch)) {
+					await getDb().update(users).set(patch).where(eq(users.id, id))
+				}
+				await writeOwnTenants(id, effectiveTenants)
+			}),
+		duplicateOf,
+	)
 	if (Result.isError(written)) {
 		return written
 	}

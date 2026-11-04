@@ -23,10 +23,40 @@ import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
 
 const OTHER_TENANTS = 'Forbidden: the employee also belongs to tenants outside your scope'
+const TENANTS_PERMISSION = 'Forbidden: employees.tenants permission required to change tenants'
 
 /** Same tenants in the same order. */
 function sameTenants(a: readonly number[], b: readonly number[]): boolean {
 	return a.length === b.length && a.every((id, i) => id === b[i])
+}
+
+/** Every one of `ids` lies in `scope` (`undefined` = global). */
+function allInScope(ids: readonly number[], scope: readonly number[] | undefined): boolean {
+	return scope === undefined || ids.every((id) => scope.includes(id))
+}
+
+/**
+ * Membership change gate: tenants of an employee also scope its account,
+ * so changing them needs `employees.tenants`. Scoped requesters may only
+ * add or remove their own tenants; the others stay as they are, in order.
+ */
+function checkTenantChange(
+	c: Context,
+	current: readonly number[],
+	next: readonly number[],
+): Response | null {
+	if (sameTenants(current, next)) {
+		return null
+	}
+	if (!can(requestUser(c), 'employees.tenants')) {
+		return forbidden(c, TENANTS_PERMISSION)
+	}
+	const scope = requestScope(c)
+	if (scope === undefined) {
+		return null
+	}
+	const outside = (ids: readonly number[]): number[] => ids.filter((id) => !scope.includes(id))
+	return sameTenants(outside(current), outside(next)) ? null : forbidden(c, OTHER_TENANTS)
 }
 
 /** Loads an employee the requester may access: 404 when missing, 403 when out of scope. */
@@ -40,9 +70,10 @@ async function loadEmployee(c: Context, id: number): Promise<EmployeeRow | Respo
 
 /**
  * Employees belong to one or more tenants (`tenant_ids`); a membership in
- * the requester's tenant grants access. Scoped requesters create employees
- * in their own tenant only and cannot change memberships or delete
- * employees that other tenants share.
+ * one of the requester's tenants grants access. Scoped requesters create
+ * employees in their own tenants only and cannot delete employees that
+ * other tenants share. Changing the tenants of an existing employee needs
+ * `employees.tenants` (see `checkTenantChange`).
  */
 export const employeesApp = new Hono()
 	.use(authMiddleware)
@@ -71,8 +102,7 @@ export const employeesApp = new Hono()
 		vValidator('json', EmployeeCreateSchema, onValidationError),
 		async (c) => {
 			const body = c.req.valid('json')
-			const scope = requestScope(c)
-			if (scope !== undefined && !sameTenants(body.tenant_ids, [scope])) {
+			if (!allInScope(body.tenant_ids, requestScope(c))) {
 				return forbidden(c)
 			}
 			return sendCreated(c, await createEmployee(body))
@@ -94,12 +124,12 @@ export const employeesApp = new Hono()
 			if (current instanceof Response) {
 				return current
 			}
-			if (
-				requestScope(c) !== undefined &&
-				body.tenant_ids !== undefined &&
-				!sameTenants(body.tenant_ids, current.tenant_ids)
-			) {
-				return forbidden(c)
+			const denied =
+				body.tenant_ids === undefined
+					? null
+					: checkTenantChange(c, current.tenant_ids, body.tenant_ids)
+			if (denied) {
+				return denied
 			}
 			return sendResult(
 				c,
@@ -120,8 +150,7 @@ export const employeesApp = new Hono()
 			if (current instanceof Response) {
 				return current
 			}
-			const scope = requestScope(c)
-			if (scope !== undefined && !sameTenants(current.tenant_ids, [scope])) {
+			if (!allInScope(current.tenant_ids, requestScope(c))) {
 				return forbidden(c, OTHER_TENANTS)
 			}
 			return sendResult(c, await deleteEmployee(id))

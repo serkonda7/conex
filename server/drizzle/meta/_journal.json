@@ -57,6 +57,13 @@
       "when": 1793700143674,
       "tag": "0059_user_employee",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793778905718,
+      "tag": "0060_user_tenants",
+      "breakpoints": true
     }
   ]
 }

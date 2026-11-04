@@ -23,10 +23,10 @@ import {
 } from '../schema'
 import { parseCsv, rowsToObjects, toCsv } from '../util/csv'
 import { formatValibotIssues } from '../util/valibot'
-import { cableInTenant, connectCable } from './cables'
+import { cableInTenants, connectCable } from './cables'
 import { getDb, withTransaction } from './connection'
 import { createDevice } from './devices'
-import { errOf } from './list'
+import { errOf, inScope, scopeCondition } from './list'
 import { createDeviceType, createStub } from './templates'
 
 const DEVICE_CSV_HEADER = [
@@ -290,9 +290,9 @@ export async function createImportedStubs(
 }
 
 /** Devices export: one row per device, names for the FK columns. */
-export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> {
+export async function exportDevicesCsv(scopeTenantIds?: readonly number[]): Promise<string> {
 	const db = getDb()
-	const scopeCond = scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId)
+	const scopeCond = scopeCondition(devices.tenant_id, scopeTenantIds)
 	const rows = await db
 		.select({
 			name: devices.name,
@@ -329,7 +329,7 @@ export async function exportDevicesCsv(scopeTenantId?: number): Promise<string> 
 }
 
 /** Cables export: endpoint device/interface names plus label/kind/status. */
-export async function exportCablesCsv(scopeTenantId?: number): Promise<string> {
+export async function exportCablesCsv(scopeTenantIds?: readonly number[]): Promise<string> {
 	const aIface = alias(interfaces, 'a_iface')
 	const bIface = alias(interfaces, 'b_iface')
 	const aDevice = alias(devices, 'a_device')
@@ -353,7 +353,7 @@ export async function exportCablesCsv(scopeTenantId?: number): Promise<string> {
 		.leftJoin(aDevice, eq(aDevice.id, aIface.device_id))
 		.leftJoin(bIface, eq(bIface.id, cables.b_interface_id))
 		.leftJoin(bDevice, eq(bDevice.id, bIface.device_id))
-		.where(scopeTenantId === undefined ? undefined : cableInTenant(scopeTenantId))
+		.where(scopeTenantIds === undefined ? undefined : cableInTenants(scopeTenantIds))
 		.orderBy(cables.id)
 	return toCsv(
 		CABLE_CSV_HEADER,
@@ -411,22 +411,18 @@ async function importCsvRows<S extends v.GenericSchema>(
 	return Result.ok(importResult(rows))
 }
 
-/** Strict scope check: exactly the scope tenant, no shared rows. */
-function inScope(tenant: number | null, scope: number | undefined): boolean {
-	return scope === undefined || tenant === scope
-}
-
 /**
  * Devices import: resolves names to ids and creates the device (stub
  * expansion included).
  *
- * `scopeTenantId` serves scoped editors: rows referencing a site/rack
+ * `scopeTenantIds` serves scoped editors: rows referencing a site/rack
  * outside the scope (or shared rows they may not claim) fail per-row, and
- * created devices are forced into the scope tenant.
+ * created devices go to the rack's or site's tenant, or to the only scope
+ * tenant; with several scope tenants a row needs a site or rack.
  */
 export async function importDevicesCsv(
 	text: string,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<ImportResponse, Error>> {
 	const db = getDb()
 	const typesByModel = new Map<string, number[]>()
@@ -456,7 +452,7 @@ export async function importDevicesCsv(
 			if (!site) {
 				return `Unknown site_name "${input.site_name}"`
 			}
-			if (!inScope(site.tenant_id, scopeTenantId)) {
+			if (!inScope(site.tenant_id, scopeTenantIds)) {
 				return `Site "${input.site_name}" is outside your tenant scope`
 			}
 		}
@@ -465,8 +461,18 @@ export async function importDevicesCsv(
 			if (!rack) {
 				return `Unknown rack_name "${input.rack_name}"`
 			}
-			if (!inScope(rack.tenant_id, scopeTenantId)) {
+			if (!inScope(rack.tenant_id, scopeTenantIds)) {
 				return `Rack "${input.rack_name}" is outside your tenant scope`
+			}
+		}
+		let tenantId: number | undefined
+		if (scopeTenantIds !== undefined) {
+			tenantId =
+				rack?.tenant_id ??
+				site?.tenant_id ??
+				(scopeTenantIds.length === 1 ? scopeTenantIds[0] : undefined)
+			if (tenantId === undefined) {
+				return 'A site_name or rack_name is required to choose one of your tenants'
 			}
 		}
 		return createDevice({
@@ -479,7 +485,7 @@ export async function importDevicesCsv(
 			position_u: input.position_u,
 			asset_tag: input.asset_tag,
 			device_id: input.device_id,
-			...(scopeTenantId !== undefined ? { tenant_id: scopeTenantId } : {}),
+			...(tenantId !== undefined ? { tenant_id: tenantId } : {}),
 		})
 	})
 }
@@ -488,13 +494,13 @@ export async function importDevicesCsv(
  * Cables import: resolves device/interface names to ids and connects the
  * free ports.
  *
- * `scopeTenantId` serves scoped editors: rows whose endpoint devices are
- * not both in the scope tenant fail per-row, mirroring the cable write
+ * `scopeTenantIds` serves scoped editors: rows whose endpoint devices are
+ * not both in scope tenants fail per-row, mirroring the cable write
  * rule in `authz.ts`.
  */
 export async function importCablesCsv(
 	text: string,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<ImportResponse, Error>> {
 	const db = getDb()
 	const deviceByName = new Map((await db.select().from(devices)).map((r) => [r.name, r]))
@@ -544,7 +550,7 @@ export async function importCablesCsv(
 		if (typeof bIfaceId === 'string') {
 			return bIfaceId
 		}
-		if (!inScope(aDev.tenant_id, scopeTenantId) || !inScope(bDev.tenant_id, scopeTenantId)) {
+		if (!inScope(aDev.tenant_id, scopeTenantIds) || !inScope(bDev.tenant_id, scopeTenantIds)) {
 			return 'Cable endpoints are outside your tenant scope'
 		}
 		return connectCable({

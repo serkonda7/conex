@@ -358,6 +358,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	edit: 'permission.edit',
 	delete: 'permission.delete',
 	'users.manage': 'permission.usersManage',
+	'employees.tenants': 'permission.employeesTenants',
 	'changelog.view': 'permission.changelogView',
 	'audit_log.view': 'permission.auditLogView',
 	'integrations.manage': 'permission.integrationsManage',

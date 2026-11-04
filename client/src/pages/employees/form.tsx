@@ -43,7 +43,7 @@ import {
 } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
-import { isScoped } from '../../lib/session'
+import { can, sessionTenantIds } from '../../lib/session'
 import { newObjectTenantId } from '../../lib/tenant_context'
 
 /** One row of the tenant list; `id` is the select value ('' = none chosen). */
@@ -65,6 +65,8 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	// Edit only: new employees get the tenant of the global tenant selection.
 	// First = primary tenant.
 	const [editTenants, setEditTenants] = createSignal<TenantEntry[]>([])
+	// Memberships outside a scoped user's tenants: kept as they are.
+	const [hiddenTenants, setHiddenTenants] = createSignal<number[]>([])
 	const [title, setTitle] = createSignal('')
 	const [emails, setEmails] = createSignal<EmployeeEmail[]>([blankEmail()])
 	const [phones, setPhones] = createSignal<PhoneRow<EmployeePhone>[]>([blankPhone()])
@@ -78,7 +80,10 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			setFirstName(row.first_name ?? '')
 			setLastName(row.last_name)
 			setSalutation(row.salutation ?? '')
-			setEditTenants(row.tenant_ids.map((id) => ({ id: String(id) })))
+			const scope = sessionTenantIds()
+			const visible = (id: number): boolean => scope === null || scope.includes(id)
+			setEditTenants(row.tenant_ids.filter(visible).map((id) => ({ id: String(id) })))
+			setHiddenTenants(row.tenant_ids.filter((id) => !visible(id)))
 			setTitle(row.title ?? '')
 			setEmails(row.emails.length > 0 ? row.emails : [blankEmail()])
 			setPhones(row.phones.length > 0 ? row.phones.map(phoneRow) : [blankPhone()])
@@ -96,11 +101,22 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				.filter((id): id is number => id !== null),
 		),
 	]
-	// Scoped users cannot change memberships and only see their own tenant.
-	const editsTenants = (): boolean => form.editing && !isScoped()
+	// Memberships also scope the employee's account: `employees.tenants` only.
+	const editsTenants = (): boolean => form.editing && can('employees.tenants')
+	/** Memberships to save: hidden ones keep their place when primary, else go last. */
+	const savedTenantIds = (): number[] => {
+		const hidden = hiddenTenants()
+		const primary = form.record()?.tenant_ids[0]
+		const first = primary !== undefined && hidden.includes(primary) ? [primary] : []
+		return [...first, ...editTenantIds(), ...hidden.filter((id) => id !== primary)]
+	}
 	/** Tenant whose mail domain and main number apply: the primary one. */
 	const tenant = (): number | null =>
-		editsTenants() ? (editTenantIds()[0] ?? null) : newObjectTenantId()
+		editsTenants()
+			? (savedTenantIds()[0] ?? null)
+			: form.editing
+				? (form.record()?.tenant_ids[0] ?? null)
+				: newObjectTenantId()
 	/** Company mail domain of the tenant, from its primary mail address. */
 	const domainOf = (tenantId: number | null): string | null =>
 		emailDomain(tenants()?.find((row) => row.id === tenantId)?.emails ?? [])
@@ -157,7 +173,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 					? create_employee({ ...body(values, tenantId), tenant_ids: [tenantId] })
 					: update_employee(id, {
 							...cleared(body(values, tenantId)),
-							...(editsTenants() ? { tenant_ids: editTenantIds() } : {}),
+							...(editsTenants() ? { tenant_ids: savedTenantIds() } : {}),
 						}),
 			navigateTo: backTo(),
 			onSuccess: is_add_another_submit(e)
@@ -217,7 +233,6 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 					rows={editTenants()}
 					onChange={setEditTenants}
 					blank={blankTenant}
-					hint={<Hint>{t('employee.tenantsHint')}</Hint>}
 					row={(
 						entry: () => TenantEntry,
 						update: (patch: Partial<TenantEntry>) => void,

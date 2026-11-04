@@ -55,7 +55,8 @@ export interface SessionUser {
 	username: string
 	role: { id: number; name: string }
 	permissions: Permission[]
-	tenant_id: number | null
+	/** Tenants the user is limited to; null when global. */
+	tenant_ids: number[] | null
 	/** The employee behind the account, if linked. */
 	employee_id: number | null
 }
@@ -82,7 +83,9 @@ export async function fetchMe(): Promise<SessionUser | null> {
 						(PERMISSIONS as readonly unknown[]).includes(p),
 					)
 				: [],
-			tenant_id: typeof data.tenant_id === 'number' ? data.tenant_id : null,
+			tenant_ids: Array.isArray(data.tenant_ids)
+				? data.tenant_ids.filter((id: unknown): id is number => typeof id === 'number')
+				: null,
 			employee_id: typeof data.employee_id === 'number' ? data.employee_id : null,
 		}
 	} catch {

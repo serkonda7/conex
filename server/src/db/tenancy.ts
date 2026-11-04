@@ -30,7 +30,7 @@ import {
 	tenant_bundles,
 	tenant_groups,
 	tenants,
-	users,
+	user_tenants,
 	virtual_machines,
 } from '../schema'
 import {
@@ -58,6 +58,7 @@ import {
 	exists,
 	findById,
 	insertedId,
+	inTenants,
 	isPatchEmpty,
 	isTaken,
 	type ListParams,
@@ -67,6 +68,7 @@ import {
 	pageOf,
 	pageRows,
 	pickDefined,
+	scopeCondition,
 	searchCondition,
 	type TenantFilterParams,
 	tenantConditions,
@@ -91,11 +93,11 @@ export interface TenantListParams extends ListParams {
 	sort: 'name' | 'customer_number'
 	order: 'asc' | 'desc'
 	/**
-	 * Tenant scope for scoped editors/viewers: restricts the list to this
-	 * tenant only (exact id match — tenants have no shared `NULL` row).
+	 * Tenant scope for scoped editors/viewers: restricts the list to these
+	 * tenants only (tenants have no shared `NULL` row).
 	 * `undefined` means unconstrained (admin or global user).
 	 */
-	scopeTenantId?: number
+	scopeTenantIds?: readonly number[]
 }
 
 /** One tenant row for the list view, with NetBox-style related-object counts. */
@@ -129,9 +131,9 @@ export interface TenantGroupListParams extends ListParams {
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to the
-	 * group containing this tenant. `undefined` means unconstrained.
+	 * groups containing one of these tenants. `undefined` means unconstrained.
 	 */
-	scopeTenantId?: number
+	scopeTenantIds?: readonly number[]
 }
 
 /** One tenant group row for the list view, with its member count. */
@@ -144,8 +146,8 @@ export async function listTenantGroups(
 ): Promise<Page<TenantGroupListItem>> {
 	const where = and(
 		searchCondition(params.search, [tenant_groups.name, tenant_groups.description]),
-		params.scopeTenantId !== undefined
-			? sql`${tenant_groups.id} IN (SELECT ${tenants.tenant_group_id} FROM ${tenants} WHERE ${tenants.id} = ${params.scopeTenantId})`
+		params.scopeTenantIds !== undefined
+			? sql`${tenant_groups.id} IN (SELECT ${tenants.tenant_group_id} FROM ${tenants} WHERE ${inTenants(tenants.id, params.scopeTenantIds)})`
 			: undefined,
 	)
 	const orderColumn =
@@ -275,7 +277,7 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 			sql`jsonb_path_query_array(${tenants.phones}, '$[*].number')::text`,
 		]),
 		params.group !== undefined ? eq(tenants.tenant_group_id, params.group) : undefined,
-		params.scopeTenantId !== undefined ? eq(tenants.id, params.scopeTenantId) : undefined,
+		scopeCondition(tenants.id, params.scopeTenantIds),
 	)
 	const orderColumn = params.sort === 'customer_number' ? tenants.customer_number : tenants.name
 	const page = await pageRows(
@@ -516,7 +518,11 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 			eq(employee_tenants.tenant_id, id),
 			'Tenant still has employees; remove them from the tenant or delete them first',
 		],
-		[users, eq(users.tenant_id, id), 'Tenant still has users; reassign them before deleting'],
+		[
+			user_tenants,
+			eq(user_tenants.tenant_id, id),
+			'Tenant still has users; reassign them before deleting',
+		],
 	])
 	if (Result.isError(blocked)) {
 		return blocked

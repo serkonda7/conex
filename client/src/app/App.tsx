@@ -73,24 +73,29 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 		onCleanup(() => mobileQuery.removeEventListener('change', onResize))
 	})
 
-	// Users limited to one tenant: the context selector is fixed.
-	const isScoped = (): boolean => props.user.tenant_id !== null
+	// Users limited to tenants; with a single one the context selector is fixed.
+	const isScoped = (): boolean => props.user.tenant_ids !== null
+	const singleTenant = (): number | null => {
+		const ids = props.user.tenant_ids
+		return ids?.length === 1 ? (ids[0] ?? null) : null
+	}
+	const fixedContext = (): boolean => isScoped() && (props.user.tenant_ids?.length ?? 0) <= 1
 	// Tenant create is limited to global users with `edit` (server-enforced).
 	const canAddTenants = (): boolean => props.user.permissions.includes('edit') && !isScoped()
 
 	createEffect(() => {
 		setSessionAccess({
 			permissions: props.user.permissions,
-			tenantId: props.user.tenant_id,
+			tenantIds: props.user.tenant_ids,
 			employeeId: props.user.employee_id,
 		})
-		setTenantContextScoped(isScoped())
+		setTenantContextScoped(fixedContext())
 		if (props.user.permissions.includes('view')) {
 			void refreshTenantContext()
 		}
 	})
 	onCleanup(() => {
-		setSessionAccess({ permissions: [], tenantId: null, employeeId: null })
+		setSessionAccess({ permissions: [], tenantIds: null, employeeId: null })
 		// Cached rows belong to the session's user and tenant scope.
 		queryClient.clear()
 	})
@@ -111,8 +116,8 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 						<IconMenu2 size={22} aria-hidden="true" />
 					</button>
 				</Show>
-				<TenantContextSelector scoped={isScoped()} canAdd={canAddTenants()} />
-				<CreateTicketButton scopeTenantId={props.user.tenant_id} />
+				<TenantContextSelector scoped={fixedContext()} canAdd={canAddTenants()} />
+				<CreateTicketButton scopeTenantId={singleTenant()} />
 				<div class="app-topbar-actions">
 					<a href={homePath()} class="app-topbar-brand">
 						{APP_TITLE}

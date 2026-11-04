@@ -214,7 +214,25 @@ export interface TenantFilterParams {
 	/** Member tenants of the requested tenant group; empty matches nothing. */
 	tenantIds?: number[]
 	/** Tenant scope of a scoped editor/viewer; `undefined` = unconstrained. */
-	scopeTenantId?: number
+	scopeTenantIds?: readonly number[]
+}
+
+/** `column` is one of `tenantIds` (`false` for none; `NULL` never matches). */
+export function inTenants(column: SQLWrapper, tenantIds: readonly number[]): SQL {
+	return tenantIds.length > 0 ? inArray(column, [...tenantIds]) : sql`false`
+}
+
+/** Scope condition: `undefined` (unconstrained) without scope, else `inTenants`. */
+export function scopeCondition(
+	column: SQLWrapper,
+	scope: readonly number[] | undefined,
+): SQL | undefined {
+	return scope === undefined ? undefined : inTenants(column, scope)
+}
+
+/** JS twin of `scopeCondition` for a loaded row's tenant. */
+export function inScope(tenant: number | null, scope: readonly number[] | undefined): boolean {
+	return scope === undefined || (tenant !== null && scope.includes(tenant))
 }
 
 /** WHERE conditions for `TenantFilterParams` on a row's `tenant_id` column (or expression). */
@@ -224,12 +242,10 @@ export function tenantConditions(column: SQLWrapper, params: TenantFilterParams)
 		conditions.push(eq(column, params.tenant))
 	}
 	if (params.tenantIds !== undefined) {
-		conditions.push(
-			params.tenantIds.length > 0 ? inArray(column, params.tenantIds) : sql`false`,
-		)
+		conditions.push(inTenants(column, params.tenantIds))
 	}
-	if (params.scopeTenantId !== undefined) {
-		conditions.push(eq(column, params.scopeTenantId))
+	if (params.scopeTenantIds !== undefined) {
+		conditions.push(inTenants(column, params.scopeTenantIds))
 	}
 	return conditions
 }

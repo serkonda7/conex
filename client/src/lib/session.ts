@@ -9,19 +9,17 @@ import type { Permission } from 'shared/src/types'
 import { createSignal } from 'solid-js'
 
 const [permissions, setPermissions] = createSignal<ReadonlySet<Permission>>(new Set())
-const [scoped, setScoped] = createSignal(false)
-const [tenantId, setTenantId] = createSignal<number | null>(null)
+const [tenantIds, setTenantIds] = createSignal<readonly number[] | null>(null)
 const [employeeId, setEmployeeId] = createSignal<number | null>(null)
 
 /** Records the signed-in user's permissions, tenant scope and employee (cleared on sign-out). */
 export function setSessionAccess(next: {
 	permissions: readonly Permission[]
-	tenantId: number | null
+	tenantIds: readonly number[] | null
 	employeeId: number | null
 }): void {
 	setPermissions(new Set(next.permissions))
-	setScoped(next.tenantId !== null)
-	setTenantId(next.tenantId)
+	setTenantIds(next.tenantIds)
 	setEmployeeId(next.employeeId)
 }
 
@@ -30,14 +28,20 @@ export function can(permission: Permission): boolean {
 	return permissions().has(permission)
 }
 
-/** True when the user is limited to one tenant. */
+/** True when the user is limited to tenants. */
 export function isScoped(): boolean {
-	return scoped()
+	return tenantIds() !== null
 }
 
-/** Tenant a scoped user is limited to; null for global users. */
+/** Tenants a scoped user is limited to; null for global users. */
+export function sessionTenantIds(): readonly number[] | null {
+	return tenantIds()
+}
+
+/** The only tenant of a user limited to exactly one; null otherwise. */
 export function sessionTenantId(): number | null {
-	return tenantId()
+	const ids = tenantIds()
+	return ids?.length === 1 ? (ids[0] ?? null) : null
 }
 
 /** Employee the signed-in account belongs to; null when not linked. */
@@ -47,5 +51,5 @@ export function sessionEmployeeId(): number | null {
 
 /** `permission` on shared data (catalog, tenants, tenant links): global users only. */
 export function canGlobal(permission: Permission): boolean {
-	return can(permission) && !scoped()
+	return can(permission) && !isScoped()
 }

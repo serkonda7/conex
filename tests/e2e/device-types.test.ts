@@ -551,8 +551,8 @@ test.describe('permissions', () => {
 		const api = page.request
 		const roleId = await create(api, cleanup, 'roles', { name: unique('Role'), permissions })
 		const name = `e2e-dt-${nextId()}`
-		// Scoped accounts belong to an employee of their tenant and sign in
-		// with its primary mail address.
+		// Scoped accounts here belong to an employee of their tenant (which
+		// scopes them) and sign in with its primary mail address.
 		const username = tenantId === null ? name : `${name}@example.com`
 		const employeeId =
 			tenantId === null
@@ -566,7 +566,6 @@ test.describe('permissions', () => {
 			...(employeeId === null ? { username } : {}),
 			password,
 			role_id: roleId,
-			tenant_id: tenantId,
 			employee_id: employeeId,
 		})
 		const context = await playwright.request.newContext({ baseURL })

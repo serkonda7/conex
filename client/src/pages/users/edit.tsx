@@ -13,7 +13,10 @@ import {
 	LoginField,
 	loginOf,
 	ScopeField,
+	scopeError,
 	scopeToSave,
+	type TenantEntry,
+	tenantEntries,
 	useAccountData,
 } from './account_fields'
 import { RoleHint } from './role_hint'
@@ -21,11 +24,11 @@ import { RoleHint } from './role_hint'
 /**
  * /users/:id/edit — employee, role, tenant-scope, and password form
  * (`users.manage`). Linking an employee makes its primary mail address the
- * username.
+ * username and its tenants the account's scope.
  */
 export function UserEditPage(props: { id: number }): JSX.Element {
 	const [roleId, setRoleId] = createSignal('')
-	const [tenantId, setTenantId] = createSignal('')
+	const [tenants, setTenants] = createSignal<TenantEntry[]>([])
 	const [employeeId, setEmployeeId] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const form = useEntityForm({
@@ -33,7 +36,8 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 		load: fetch_user,
 		fill: (row: UserJson) => {
 			setRoleId(id_value(row.role_id))
-			setTenantId(id_value(row.tenant_id))
+			// Accounts of employees take the employee's tenants instead.
+			setTenants(row.employee_id === null ? tenantEntries(row.tenant_ids) : [])
 			setEmployeeId(id_value(row.employee_id))
 		},
 	})
@@ -54,12 +58,12 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 					? t('user.employeeNoMail')
 					: parseId(roleId()) === null
 						? t('user.selectRole')
-						: null,
+						: scopeError(role(), employeeId()),
 			save: () =>
 				update_user(props.id, {
 					role_id: parseId(roleId()) ?? undefined,
 					employee_id: parseId(employeeId()),
-					tenant_id: scopeToSave(role(), employeeId(), tenantId()),
+					tenant_ids: scopeToSave(role(), employeeId(), tenants()),
 					...(password() ? { password: password() } : {}),
 				}),
 			navigateTo: '/users',
@@ -80,8 +84,6 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				data={data}
 				employeeId={employeeId()}
 				onEmployeeChange={setEmployeeId}
-				tenantId={tenantId()}
-				onTenantChange={setTenantId}
 				ownLogin={form.record()?.username}
 			/>
 			<LoginField idPrefix="user-edit" employee={employee()} />
@@ -99,8 +101,8 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				data={data}
 				role={role()}
 				employee={employee()}
-				tenantId={tenantId()}
-				onTenantChange={setTenantId}
+				tenants={tenants()}
+				onTenantsChange={setTenants}
 			/>
 			<TextField
 				id="user-edit-password"

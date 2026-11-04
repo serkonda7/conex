@@ -15,7 +15,7 @@ import type {
 import { cables, devices, interfaces } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
-import { exists } from './list'
+import { exists, inScope } from './list'
 
 type DeviceRow = typeof devices.$inferSelect
 type InterfaceRow = typeof interfaces.$inferSelect
@@ -55,11 +55,11 @@ interface Graph {
  * Scoped editors/viewers see only cables with both endpoint devices in
  * their tenant, so no peer name from another tenant leaks into traces.
  */
-async function loadGraph(scopeTenantId?: number): Promise<Graph> {
+async function loadGraph(scopeTenantIds?: readonly number[]): Promise<Graph> {
 	const db = getDb()
 	const deviceById = new Map<number, DeviceRow>()
 	for (const d of await db.select().from(devices)) {
-		if (scopeTenantId !== undefined && d.tenant_id !== scopeTenantId) {
+		if (!inScope(d.tenant_id, scopeTenantIds)) {
 			continue
 		}
 		deviceById.set(d.id, d)
@@ -380,9 +380,9 @@ async function deviceNotFound(deviceId: number): Promise<NotFoundError> {
 export async function getDeviceTrace(
 	deviceId: number,
 	depth: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<DeviceTraceResponse, Error>> {
-	const graph = await loadGraph(scopeTenantId)
+	const graph = await loadGraph(scopeTenantIds)
 	if (!graph.deviceById.has(deviceId)) {
 		if (!(await exists(devices, eq(devices.id, deviceId)))) {
 			return Result.err(new NotFoundError('Device not found'))
@@ -420,9 +420,9 @@ export async function getInterfaceTrace(
 	deviceId: number,
 	ifaceId: number,
 	depth: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<InterfaceTraceResponse, Error>> {
-	const graph = await loadGraph(scopeTenantId)
+	const graph = await loadGraph(scopeTenantIds)
 	const device = graph.deviceById.get(deviceId)
 	if (!device) {
 		return Result.err(await deviceNotFound(deviceId))
@@ -442,9 +442,9 @@ export async function getInterfaceTrace(
 export async function getCableTrace(
 	cableId: number,
 	depth: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<CableTraceResponse, Error>> {
-	const graph = await loadGraph(scopeTenantId)
+	const graph = await loadGraph(scopeTenantIds)
 	const cable = graph.cableById.get(cableId)
 	if (!cable) {
 		return Result.err(

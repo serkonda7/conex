@@ -362,8 +362,6 @@ export const en = {
 	'employee.loginAddressHint':
 		'The employee signs in with this address, so it cannot be changed or removed. To sign in with another address, move that one to the top.',
 	'employee.addTenant': 'Add tenant',
-	'employee.tenantsHint':
-		'The first tenant is the primary one: its mail domain completes addresses and its main number completes extensions.',
 	'employee.reorderEntry': 'Drag to reorder',
 	'employee.removeEntry': 'Remove',
 	'employee.phoneNumber': 'Phone number',
@@ -909,6 +907,11 @@ export const en = {
 
 	// user
 	'user.tenantScope': 'Tenant scope',
+	'user.tenantsHint': 'Leave empty for access to all tenants.',
+	'user.scopeFollowsEmployee':
+		"The account has access to the employee's tenants. Change them on the employee.",
+	'user.managerNoEmployee':
+		'Users who manage users have access to all tenants and cannot be linked to an employee.',
 	'user.empty': 'No users yet. Add the first one above.',
 	'user.addTitle': 'Add a new user',
 	'user.editTitle': 'Edit user',
@@ -937,6 +940,7 @@ export const en = {
 	'permission.edit': 'Create and edit inventory and catalog',
 	'permission.delete': 'Delete inventory and catalog',
 	'permission.usersManage': 'Manage users and roles',
+	'permission.employeesTenants': 'Change employee tenants (and their account access)',
 	'permission.changelogView': 'View changelog',
 	'permission.auditLogView': 'View audit log',
 	'permission.integrationsManage': 'Manage and sync integrations',

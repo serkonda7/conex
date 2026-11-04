@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { extensionNumber, normalizePhone } from 'shared/src/phone'
 import {
 	type DirectoryContact,
@@ -9,6 +9,7 @@ import {
 } from 'shared/src/schemas'
 import { employee_tenants, employees, tenants } from '../schema'
 import { getDb } from './connection'
+import { inTenants } from './list'
 
 // ---------------------------------------------------------------------------
 // Contact directory: active employees with their tenant, shaped for
@@ -39,10 +40,12 @@ function numbers(
 }
 
 /**
- * All active employees under their primary tenant, or those of one tenant
- * (under that tenant) for a scoped requester.
+ * All active employees under their primary tenant; for a scoped requester
+ * those of its tenants, each under its first tenant in scope.
  */
-export async function listDirectoryContacts(tenantScope?: number): Promise<DirectoryContact[]> {
+export async function listDirectoryContacts(
+	tenantScope?: readonly number[],
+): Promise<DirectoryContact[]> {
 	const rows = await getDb()
 		.select({
 			id: employees.id,
@@ -62,7 +65,11 @@ export async function listDirectoryContacts(tenantScope?: number): Promise<Direc
 			and(
 				eq(employee_tenants.employee_id, employees.id),
 				tenantScope !== undefined
-					? eq(employee_tenants.tenant_id, tenantScope)
+					? sql`${employee_tenants.position} = (
+						select min("st"."position") from ${employee_tenants} as "st"
+						where "st"."employee_id" = ${employees}."id"
+							and ${inTenants(sql`"st"."tenant_id"`, tenantScope)}
+					)`
 					: eq(employee_tenants.position, 0),
 			),
 		)

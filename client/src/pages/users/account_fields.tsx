@@ -1,15 +1,17 @@
-import { createEffect, type JSX, on, Show } from 'solid-js'
+import { For, type JSX, Show } from 'solid-js'
 import { type EmployeeRow, fetch_all_employees } from '../../api/employees'
 import type { RoleJson } from '../../api/roles'
 import { fetch_tenants, type TenantRow } from '../../api/tenancy'
+import { ContactListField } from '../../components/contacts'
 import {
 	Field,
 	type FormOption,
+	Hint,
 	ReadOnlyField,
 	row_options,
 	SelectField,
 } from '../../components/form'
-import { t } from '../../i18n'
+import { t, tp } from '../../i18n'
 import { createRows, type ErrorSink, type QueryResource } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 import { managesUsers } from './role_hint'
@@ -39,20 +41,15 @@ export function employeeOf(data: AccountData, employeeId: string): EmployeeRow |
 /**
  * Employee picker of an account. Employees with another account are left
  * out (`ownLogin`: the edited account's username keeps its employee); each
- * option shows the address the account would sign in with. Picking another
- * employee moves the scope to its primary tenant (least access) unless the
- * current one still fits.
+ * option shows the address the account would sign in with. The account
+ * then gets exactly the employee's tenants.
  */
 export function EmployeeField(props: {
 	idPrefix: string
 	data: AccountData
 	employeeId: string
 	onEmployeeChange: (value: string) => void
-	tenantId: string
-	onTenantChange: (value: string) => void
 	ownLogin?: string
-	/** Treat the initial `employeeId` as picked (scope default). */
-	applyPreselection?: boolean
 }): JSX.Element {
 	const options = (): FormOption[] => {
 		const free = (props.data.employees() ?? []).filter(
@@ -65,33 +62,12 @@ export function EmployeeField(props: {
 		}))
 	}
 
-	function handleEmployee(value: string): void {
-		const next = employeeOf(props.data, value)
-		props.onEmployeeChange(value)
-		const scope = parseId(props.tenantId)
-		if (!next) {
-			props.onTenantChange('')
-		} else if (scope === null || !next.tenant_ids.includes(scope)) {
-			props.onTenantChange(String(next.tenant_ids[0] ?? ''))
-		}
-	}
-
-	if (props.applyPreselection === true) {
-		createEffect(
-			on(props.data.employees, (rows) => {
-				if (rows && props.employeeId !== '') {
-					handleEmployee(props.employeeId)
-				}
-			}),
-		)
-	}
-
 	return (
 		<SelectField
 			id={`${props.idPrefix}-employee`}
 			label={t('user.employee')}
 			value={props.employeeId}
-			onChange={handleEmployee}
+			onChange={props.onEmployeeChange}
 			options={options()}
 			emptyLabel={t('user.noEmployee')}
 			disabled={props.data.employees.loading}
@@ -136,42 +112,98 @@ export function LoginField(props: {
 	)
 }
 
-/** Tenant scope: one of the employee's tenants; user managers and accounts without employee are global. */
+/** One row of the tenant list; `id` is the select value ('' = none chosen). */
+export interface TenantEntry {
+	id: string
+}
+
+const blankTenant = (): TenantEntry => ({ id: '' })
+
+type SelectEvent = Event & { currentTarget: HTMLSelectElement }
+
+/** Tenant rows of an account's own tenants, for the scope list. */
+export function tenantEntries(ids: readonly number[]): TenantEntry[] {
+	return ids.map((id) => ({ id: String(id) }))
+}
+
+/**
+ * Tenant scope. User managers are global (no field). Accounts of employees
+ * get exactly the employee's tenants (read only, changed on the employee);
+ * other accounts list their own tenants, none meaning all tenants.
+ */
 export function ScopeField(props: {
 	idPrefix: string
 	data: AccountData
 	role: RoleJson | undefined
 	employee: EmployeeRow | undefined
-	tenantId: string
-	onTenantChange: (value: string) => void
+	tenants: TenantEntry[]
+	onTenantsChange: (rows: TenantEntry[]) => void
 }): JSX.Element {
-	/** Tenants of the selected employee, in membership order. */
-	const scopeOptions = (): FormOption[] =>
-		row_options(
-			(props.employee?.tenant_ids ?? []).flatMap((id) => {
-				const row = props.data.tenants()?.find((r) => r.id === id)
-				return row ? [row] : []
-			}),
-		)
+	const tenantName = (id: number): string =>
+		props.data.tenants()?.find((row) => row.id === id)?.name ?? `#${id}`
 	return (
-		<Show when={!managesUsers(props.role) && props.employee}>
-			<SelectField
-				id={`${props.idPrefix}-tenant`}
-				label={t('user.tenantScope')}
-				value={props.tenantId}
-				onChange={props.onTenantChange}
-				options={scopeOptions()}
-				emptyLabel={t('common.allTenants')}
-			/>
+		<Show when={!managesUsers(props.role)}>
+			<Show
+				when={props.employee}
+				fallback={
+					<ContactListField
+						id={`${props.idPrefix}-tenant`}
+						label={t('user.tenantScope')}
+						addLabel={t('employee.addTenant')}
+						rows={props.tenants}
+						onChange={props.onTenantsChange}
+						blank={blankTenant}
+						hint={<Hint>{t('user.tenantsHint')}</Hint>}
+						row={(
+							entry: () => TenantEntry,
+							update: (patch: Partial<TenantEntry>) => void,
+							index: number,
+						): JSX.Element => (
+							<select
+								id={`${props.idPrefix}-tenant-${index}`}
+								aria-label={tp('entity.tenant', 1)}
+								value={entry().id}
+								onChange={(e: SelectEvent) => update({ id: e.currentTarget.value })}
+							>
+								<option value="">{t('common.selectPlaceholder')}</option>
+								<For each={row_options(props.data.tenants() ?? [])}>
+									{(o: FormOption): JSX.Element => (
+										<option value={o.value}>{o.label}</option>
+									)}
+								</For>
+							</select>
+						)}
+					/>
+				}
+			>
+				{(employee: () => EmployeeRow) => (
+					<ReadOnlyField
+						id={`${props.idPrefix}-tenant`}
+						label={t('user.tenantScope')}
+						value={employee().tenant_ids.map(tenantName).join(', ')}
+						hint={t('user.scopeFollowsEmployee')}
+					/>
+				)}
+			</Show>
 		</Show>
 	)
 }
 
-/** Scope to save: global for user managers and accounts without employee. */
+/** Own tenants to save: none for user managers and accounts of employees. */
 export function scopeToSave(
 	role: RoleJson | undefined,
 	employeeId: string,
-	tenantId: string,
-): number | null {
-	return managesUsers(role) || parseId(employeeId) === null ? null : parseId(tenantId)
+	tenants: readonly TenantEntry[],
+): number[] {
+	if (managesUsers(role) || parseId(employeeId) !== null) {
+		return []
+	}
+	return [
+		...new Set(tenants.map((row) => parseId(row.id)).filter((id): id is number => id !== null)),
+	]
+}
+
+/** Validation of the role/employee pair: user managers stay global, so no employee. */
+export function scopeError(role: RoleJson | undefined, employeeId: string): string | null {
+	return managesUsers(role) && parseId(employeeId) !== null ? t('user.managerNoEmployee') : null
 }

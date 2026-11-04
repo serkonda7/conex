@@ -363,8 +363,6 @@ export const de: Messages = {
 	'employee.loginAddressHint':
 		'Der Mitarbeiter meldet sich mit dieser Adresse an, daher kann sie nicht geändert oder entfernt werden. Für eine andere Anmeldeadresse diese nach oben verschieben.',
 	'employee.addTenant': 'Mandant hinzufügen',
-	'employee.tenantsHint':
-		'Der erste Mandant ist der primäre: Seine E-Mail-Domain ergänzt Adressen, seine Hauptnummer ergänzt Durchwahlen.',
 	'employee.reorderEntry': 'Ziehen zum Sortieren',
 	'employee.removeEntry': 'Entfernen',
 	'employee.phoneNumber': 'Telefonnummer',
@@ -920,6 +918,11 @@ export const de: Messages = {
 
 	// user
 	'user.tenantScope': 'Mandantenzuordnung',
+	'user.tenantsHint': 'Leer lassen für Zugriff auf alle Mandanten.',
+	'user.scopeFollowsEmployee':
+		'Das Konto hat Zugriff auf die Mandanten des Mitarbeiters. Diese beim Mitarbeiter ändern.',
+	'user.managerNoEmployee':
+		'Benutzer, die Benutzer verwalten, haben Zugriff auf alle Mandanten und können nicht mit einem Mitarbeiter verknüpft werden.',
 	'user.empty': 'Noch keine Benutzer vorhanden. Fügen Sie oben den ersten hinzu.',
 	'user.addTitle': 'Neuen Benutzer hinzufügen',
 	'user.editTitle': 'Benutzer bearbeiten',
@@ -948,6 +951,7 @@ export const de: Messages = {
 	'permission.edit': 'Objekte anlegen und bearbeiten',
 	'permission.delete': 'Objekte löschen',
 	'permission.usersManage': 'Benutzer und Rollen verwalten',
+	'permission.employeesTenants': 'Mandantenzuweisung ändern',
 	'permission.changelogView': 'Änderungsprotokoll anzeigen',
 	'permission.auditLogView': 'Audit-Log anzeigen',
 	'permission.integrationsManage': 'Integrationen verwalten',

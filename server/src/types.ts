@@ -9,15 +9,15 @@ export interface User {
 	provider: string
 	provider_id: string | null
 	role_id: number
-	tenant_id: number | null
 	employee_id: number | null
 }
 
 /**
  * Authenticated requester attached to the context by `authMiddleware`.
  * `permissions` come from the user's role, loaded per request.
- * `tenant_id = null` means global (all tenants); a number limits the user
- * to that single tenant (never set for `users.manage` holders).
+ * `tenant_ids = null` means global (all tenants); a list limits the user
+ * to those tenants (never set for `users.manage` holders). Employee-linked
+ * accounts get exactly the employee's tenants (possibly none).
  */
 export interface CurrentUser {
 	id: number
@@ -25,7 +25,7 @@ export interface CurrentUser {
 	role_id: number
 	role_name: string
 	permissions: ReadonlySet<Permission>
-	tenant_id: number | null
+	tenant_ids: readonly number[] | null
 	/** The employee behind the account, if linked. */
 	employee_id: number | null
 }

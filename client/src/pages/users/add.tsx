@@ -13,7 +13,9 @@ import {
 	LoginField,
 	loginOf,
 	ScopeField,
+	scopeError,
 	scopeToSave,
+	type TenantEntry,
 	useAccountData,
 } from './account_fields'
 import { RoleHint } from './role_hint'
@@ -33,7 +35,7 @@ export function UserAddPage(): JSX.Element {
 	const [employeeId, setEmployeeId] = createSignal(
 		fromEmployee === null ? '' : String(fromEmployee),
 	)
-	const [tenantId, setTenantId] = createSignal('')
+	const [tenants, setTenants] = createSignal<TenantEntry[]>([])
 	const [roles] = createRows(fetch_roles, form.setError)
 	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
 	const data = useAccountData(form.setError)
@@ -46,7 +48,7 @@ export function UserAddPage(): JSX.Element {
 		if (!password()) {
 			return t('auth.passwordRequired')
 		}
-		return parseId(roleId()) === null ? t('user.selectRole') : null
+		return parseId(roleId()) === null ? t('user.selectRole') : scopeError(role(), employeeId())
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -63,14 +65,14 @@ export function UserAddPage(): JSX.Element {
 					password: password(),
 					role_id: parseId(roleId()) ?? 0,
 					employee_id: parseId(employeeId()),
-					tenant_id: scopeToSave(role(), employeeId(), tenantId()),
+					tenant_ids: scopeToSave(role(), employeeId(), tenants()),
 				}),
 			navigateTo: fromEmployee === null ? '/users' : `/employees/${fromEmployee}`,
 			onSuccess: is_add_another_submit(e)
 				? () => {
 						setUsername('')
 						setEmployeeId('')
-						setTenantId('')
+						setTenants([])
 					}
 				: undefined,
 		})
@@ -88,9 +90,6 @@ export function UserAddPage(): JSX.Element {
 				data={data}
 				employeeId={employeeId()}
 				onEmployeeChange={setEmployeeId}
-				tenantId={tenantId()}
-				onTenantChange={setTenantId}
-				applyPreselection
 			/>
 			<LoginField idPrefix="user" employee={employee()}>
 				<TextField
@@ -128,8 +127,8 @@ export function UserAddPage(): JSX.Element {
 				data={data}
 				role={role()}
 				employee={employee()}
-				tenantId={tenantId()}
-				onTenantChange={setTenantId}
+				tenants={tenants()}
+				onTenantsChange={setTenants}
 			/>
 		</FormPage>
 	)

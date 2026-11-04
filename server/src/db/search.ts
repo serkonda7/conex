@@ -1,9 +1,9 @@
-import { and, asc, eq, type SQL } from 'drizzle-orm'
+import { and, asc, type SQL } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
 import { cables, devices, racks, sites, tenants, virtual_machines } from '../schema'
-import { cableInTenant } from './cables'
+import { cableInTenants } from './cables'
 import { getDb } from './connection'
-import { searchCondition } from './list'
+import { scopeCondition, searchCondition } from './list'
 
 export interface SearchGroup<T> {
 	items: T[]
@@ -32,15 +32,15 @@ function groupOf<T>(items: T[]): SearchGroup<T> {
  * group — no row-level isolation applies. Each group caps at 10 hits;
  * an empty query returns empty groups instead of the whole inventory.
  *
- * `scopeTenantId` limits scoped editors/viewers to their tenant, strictly:
- * the tenants group returns only the scope tenant, the sites/racks/devices/VMs
+ * `scopeTenantIds` limits scoped editors/viewers to their tenants, strictly:
+ * the tenants group returns only the scope tenants, the sites/racks/devices/VMs
  * groups return scope rows only (shared `NULL` rows excluded), and the
  * cables group returns only cables whose both endpoint devices sit in the
  * scope (so no peer name from another tenant leaks).
  */
 export async function globalSearch(
 	q: string,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<GlobalSearchResponse> {
 	const query = q.trim()
 	if (!query) {
@@ -55,8 +55,7 @@ export async function globalSearch(
 		}
 	}
 	const db = getDb()
-	const inScope = (column: PgColumn): SQL | undefined =>
-		scopeTenantId === undefined ? undefined : eq(column, scopeTenantId)
+	const inScope = (column: PgColumn): SQL | undefined => scopeCondition(column, scopeTenantIds)
 
 	const tenantRows = await db
 		.select({ id: tenants.id, name: tenants.name })
@@ -114,7 +113,7 @@ export async function globalSearch(
 		.where(
 			and(
 				searchCondition(query, [cables.label, cables.kind]),
-				scopeTenantId === undefined ? undefined : cableInTenant(scopeTenantId),
+				scopeTenantIds === undefined ? undefined : cableInTenants(scopeTenantIds),
 			),
 		)
 		.orderBy(asc(cables.id))
