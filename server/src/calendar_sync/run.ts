@@ -17,7 +17,7 @@
  */
 import { Result } from 'better-result'
 import type { CalendarSyncRunCounts, CalendarSyncRunJson } from 'shared/src/schemas'
-import type { TnsPlanningType } from 'tanss-api'
+import type { TnsPlanningType, TnsSupportList } from 'tanss-api'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { errOf } from '../db/list'
 import { decryptSecrets } from '../integrations/secrets'
@@ -25,7 +25,7 @@ import { getIntegrationRow } from '../integrations/store'
 import { type TanssAppointments, TanssSession } from '../integrations/tanss/client'
 import { nowSeconds } from '../util/time'
 import { GraphClient, isGraphNotFound } from './graph'
-import { type CalendarItem, hash, toCalendarItem, toGraphEvent } from './map'
+import { type CalendarItem, hash, type LinkedNames, toCalendarItem, toGraphEvent } from './map'
 import {
 	deleteItems,
 	EMPTY_COUNTS,
@@ -89,22 +89,69 @@ export async function tanssSession(): Promise<
 	})
 }
 
-/**
- * Calendar items of the active technicians. TANSS may return a recurring
- * appointment as several entries with the same support id; those are keyed
- * by id and start.
- */
-function normalize(
-	appointments: TanssAppointments,
-	baseUrl: string,
-	techIds: Set<number>,
-): CalendarItem[] {
-	const supports = appointments.supports.filter(
+/** Supports of the active technicians with a synced planning type. */
+function relevantSupports(appointments: TanssAppointments, techIds: Set<number>): TnsSupportList[] {
+	return appointments.supports.filter(
 		(s) =>
 			s.employeeId !== undefined &&
 			techIds.has(s.employeeId) &&
 			(s.planningType === undefined || PLANNING_TYPES.includes(s.planningType)),
 	)
+}
+
+/**
+ * Fetches one value per distinct id. A failed fetch is logged and left out
+ * (the event then falls back, see `map.ts`), so it does not stop the run.
+ */
+async function fetchEach(
+	ids: Iterable<number>,
+	what: string,
+	fetch: (id: number) => Promise<Result<string | null, Error>>,
+): Promise<Map<number, string>> {
+	const values = new Map<number, string>()
+	await Promise.all(
+		[...new Set(ids)].map(async (id) => {
+			const res = await fetch(id)
+			if (Result.isError(res)) {
+				console.warn(`Calendar sync: ${what} ${id}: ${res.error.message}`)
+			} else if (res.value !== null) {
+				values.set(id, res.value)
+			}
+		}),
+	)
+	return values
+}
+
+/** Ticket titles and company addresses of the supports (the list carries neither). */
+async function resolveNames(
+	session: TanssSession,
+	appointments: TanssAppointments,
+	supports: TnsSupportList[],
+): Promise<LinkedNames> {
+	const ticketIds = supports.flatMap((s) => (s.ticketId ? [s.ticketId] : []))
+	const companyIds = supports.flatMap((s) => (s.companyId ? [s.companyId] : []))
+	const [ticketTitles, companyAddresses] = await Promise.all([
+		fetchEach(ticketIds, 'ticket', (id) => session.ticketTitle(id)),
+		fetchEach(companyIds, 'company', (id) => session.companyAddress(id)),
+	])
+	for (const [id, title] of appointments.ticketTitles) {
+		if (!ticketTitles.has(id)) {
+			ticketTitles.set(id, title)
+		}
+	}
+	return { ticketTitles, companyNames: appointments.companyNames, companyAddresses }
+}
+
+/**
+ * Calendar items of the given supports. TANSS may return a recurring
+ * appointment as several entries with the same support id; those are keyed
+ * by id and start.
+ */
+function normalize(
+	supports: TnsSupportList[],
+	names: LinkedNames,
+	baseUrl: string,
+): CalendarItem[] {
 	const occurrences = new Map<number, number>()
 	for (const s of supports) {
 		if (s.id !== undefined) {
@@ -117,7 +164,7 @@ function normalize(
 			s.id !== undefined && (occurrences.get(s.id) ?? 0) > 1
 				? `${s.id}@${s.date}`
 				: String(s.id)
-		const item = toCalendarItem(s, appointments, baseUrl, key)
+		const item = toCalendarItem(s, names, baseUrl, key)
 		if (item) {
 			items.set(item.key, item)
 		}
@@ -250,7 +297,9 @@ async function execute(): Promise<Result<Tally, Error>> {
 		if (Result.isError(appointments)) {
 			return appointments
 		}
-		desired = normalize(appointments.value, tanss.value.baseUrl, active)
+		const supports = relevantSupports(appointments.value, active)
+		const names = await resolveNames(tanss.value.session, appointments.value, supports)
+		desired = normalize(supports, names, tanss.value.baseUrl)
 	}
 
 	const tally = new Tally()

@@ -29,6 +29,7 @@ import {
 	getApiV1PcsPcId,
 	getApiV1PeripheriesPeripheryId,
 	getApiV1Tags,
+	getApiV1TicketsTicketId,
 	type PutApiErpV1EmployeesIdData,
 	postApiV1Login,
 	postApiV1Pcs,
@@ -161,6 +162,24 @@ export interface TanssTicketInput {
 	title: string
 	content: string
 }
+
+/** Single ticket (user API); only the title is read. */
+const TicketTitleResponseSchema = v.object({
+	content: v.optional(v.nullable(v.looseObject({ title: v.optional(v.unknown()) }))),
+})
+
+/** Single company (ERP API); only the address is read. */
+const CompanyAddressResponseSchema = v.object({
+	content: v.optional(
+		v.nullable(
+			v.looseObject({
+				street: v.optional(v.unknown()),
+				postcode: v.optional(v.unknown()),
+				city: v.optional(v.unknown()),
+			}),
+		),
+	),
+})
 
 const EmployeeResponseSchema = v.object({
 	content: v.optional(v.nullable(v.looseObject({ emailAddress: v.optional(v.unknown()) }))),
@@ -668,6 +687,36 @@ export class TanssSession {
 		}
 		const parsed = v.safeParse(EmployeeResponseSchema, res.value)
 		return Result.ok(parsed.success ? str(parsed.output.content?.emailAddress) : null)
+	}
+
+	/** Title of a ticket; null when it has none. */
+	async ticketTitle(ticketId: number): Promise<Result<string | null, Error>> {
+		const res = await this.userCall('ticket fetch', (client) =>
+			getApiV1TicketsTicketId({ client, path: { ticketId } }),
+		)
+		if (Result.isError(res)) {
+			return res
+		}
+		const parsed = v.safeParse(TicketTitleResponseSchema, res.value)
+		return Result.ok(parsed.success ? str(parsed.output.content?.title) : null)
+	}
+
+	/** Postal address of a company (`street, postcode city`); null when it has none. */
+	async companyAddress(companyId: number): Promise<Result<string | null, Error>> {
+		const res = await call('company fetch', async () => ({
+			data: await this.erp.companies.get(companyId),
+		}))
+		if (Result.isError(res)) {
+			return res
+		}
+		const parsed = v.safeParse(CompanyAddressResponseSchema, res.value)
+		const company = parsed.success ? parsed.output.content : null
+		if (!company) {
+			return Result.ok(null)
+		}
+		const place = [str(company.postcode), str(company.city)].filter((p) => p !== null).join(' ')
+		const parts = [str(company.street), place].filter((p) => p !== null && p !== '')
+		return Result.ok(parts.length > 0 ? parts.join(', ') : null)
 	}
 
 	/**

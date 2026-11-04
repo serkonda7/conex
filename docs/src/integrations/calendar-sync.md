@@ -10,6 +10,8 @@ Ein-Wege Synchronisation von TANSS-Terminen (Einsatzplanung) in die persönliche
 - Zeitraum: letzte 7, nächste 60 Tage
 - Termine landen im Hauptkalender (Status *Beschäftigt*, ohne Erinnerung, Kategorie
   `TANSS`).
+- Betreff `<Firma>: <Tickettitel> [#<Ticketnummer>]` (ohne Ticket: erste Zeile des
+  Termintexts), Ort ist die Adresse der Firma, Inhalt Ticket-Link und Termintext.
 - In TANSS gelöschte Termine werden in Outlook gelöscht. Ist TANSS nicht erreichbar,
   wird nichts gelöscht.
 - Zuordnung entfernen löscht die synchronisierten Termine des Technikers; deaktivieren pausiert nur.

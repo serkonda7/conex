@@ -20,10 +20,14 @@ export interface CalendarItem {
 	body: string
 }
 
-/** Names resolved from `meta.linkedEntities` of the list response. */
+/**
+ * Names resolved for the supports: company names from `meta.linkedEntities`
+ * of the list response, ticket titles and company addresses fetched per id.
+ */
 export interface LinkedNames {
 	ticketTitles: Map<number, string>
 	companyNames: Map<number, string>
+	companyAddresses: Map<number, string>
 }
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -53,40 +57,43 @@ export function plainText(html: string): string {
 		.trim()
 }
 
-/** `outlookTitle`, else `[#ticket] ticket title (company)`, else the first text line. */
+/**
+ * `<company>: <ticket title> [#<ticket>]`. Without a ticket title the first
+ * text line stands in for it; parts that are unknown are left out.
+ */
 function subjectOf(support: TnsSupportList, names: LinkedNames, company: string | null): string {
-	const outlookTitle = text(support.outlookTitle)
-	if (outlookTitle) {
-		return outlookTitle
-	}
 	const ticketId = support.ticketId ? support.ticketId : null
+	let title = ticketId !== null ? text(names.ticketTitles.get(ticketId)) : null
+	if (!title) {
+		title =
+			plainText(support.text ?? '')
+				.split('\n')[0]
+				?.trim()
+				.slice(0, 120) || null
+	}
 	const parts: string[] = []
+	if (title) {
+		parts.push(title)
+	}
 	if (ticketId !== null) {
 		parts.push(`[#${ticketId}]`)
-		const title = names.ticketTitles.get(ticketId)
-		if (title) {
-			parts.push(title)
-		}
 	}
-	if (parts.length <= 1) {
-		const firstLine = plainText(support.text ?? '')
-			.split('\n')[0]
-			?.trim()
-		if (firstLine) {
-			parts.push(firstLine.slice(0, 120))
-		}
-	}
+	const rest = parts.join(' ')
 	if (company) {
-		parts.push(`(${company})`)
+		return rest ? `${company}: ${rest}` : company
 	}
-	return parts.length > 0 ? parts.join(' ') : 'TANSS'
+	return rest || 'TANSS'
 }
 
 /**
- * `outlookLocation`, else the support location; on-site appointments name
- * the company (the list response carries no address).
+ * The company address, else `outlookLocation`, else the support location
+ * (on-site appointments name the company).
  */
-function locationOf(support: TnsSupportList, company: string | null): string {
+function locationOf(support: TnsSupportList, names: LinkedNames, company: string | null): string {
+	const address = support.companyId ? text(names.companyAddresses.get(support.companyId)) : null
+	if (address) {
+		return address
+	}
 	const outlookLocation = text(support.outlookLocation)
 	if (outlookLocation) {
 		return outlookLocation
@@ -132,7 +139,7 @@ export function toCalendarItem(
 		start: support.date,
 		end: support.date + minutes * 60,
 		title: subjectOf(support, names, company),
-		location: locationOf(support, company),
+		location: locationOf(support, names, company),
 		body: bodyOf(support, tanssBaseUrl),
 	}
 }

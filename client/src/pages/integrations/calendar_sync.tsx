@@ -157,10 +157,7 @@ function SettingsForm(props: {
 				checked={enabled()}
 				onChange={setEnabled}
 			/>
-			<Field
-				label={t('integration.connection')}
-				for="calendar-sync-test-mailbox"
-			>
+			<Field label={t('integration.connection')} for="calendar-sync-test-mailbox">
 				<div class="input-with-button">
 					<input
 						id="calendar-sync-test-mailbox"
