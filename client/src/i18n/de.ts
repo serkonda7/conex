@@ -1114,6 +1114,7 @@ export const de: Messages = {
 	'floorplan.centimeters': '{value} cm',
 	'floorplan.gridSize': 'Raster',
 	'floorplan.pointerPosition': 'x {x} · y {y}',
+	'floorplan.panHint': 'Strg + Ziehen oder mittlere Maustaste zum Verschieben',
 	'floorplan.origin': 'Nullpunkt',
 	'floorplan.setScale': 'Maßstab festlegen',
 	'floorplan.setOrigin': 'Nullpunkt festlegen',

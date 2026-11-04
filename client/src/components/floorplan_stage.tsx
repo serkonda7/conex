@@ -11,6 +11,10 @@
  * A plan with a scale draws a metric grid through its origin (toggled in the
  * layer bar) and shows the pointer's position in meters. The zoom buttons,
  * the grid size and the pointer position sit in a bar below the image.
+ *
+ * Areas and markers of the editor take a press for their own drag, so while
+ * zoomed in, Ctrl + drag and the middle mouse button pan anywhere; elements
+ * with `data-pan-hint` show that hint next to the cursor.
  */
 import {
 	IconBox,
@@ -560,7 +564,8 @@ function ZoomControls(props: { zoom: StageZoom }): JSX.Element {
 /**
  * The image capped at 60vh high with the overlay layers (`children`) on
  * top, in a viewport that zooms (buttons, Ctrl + wheel, pinch) and pans (drag
- * on the plan while zoomed in).
+ * on the plan while zoomed in; Ctrl + drag or the middle button on areas
+ * and markers too).
  */
 export function FloorplanStage(props: {
 	attachment: AttachmentJson
@@ -580,12 +585,28 @@ export function FloorplanStage(props: {
 	let travelled = 0
 	/** Pointer position over the plan in meters, while there is a scale. */
 	const [pointer, setPointer] = createSignal<[number, number] | null>(null)
+	/** Pointer over the viewport, so Ctrl only shows the grab cursor when aimed at the plan. */
+	let hovered = false
+	const [ctrlHeld, setCtrlHeld] = createSignal(false)
+	/** A Ctrl or middle-button pan is in progress. */
+	const [forcedPan, setForcedPan] = createSignal(false)
+	/** Cursor position (client px) over a `data-pan-hint` element while zoomed in. */
+	const [hint, setHint] = createSignal<{ x: number; y: number } | null>(null)
+	const zoomed = (): boolean => props.zoom.scale() > MIN_ZOOM
 	const scaled = (): (PlanCalibration & { scale: FloorplanScale }) | undefined => {
 		const calibration = props.calibration
 		return calibration?.scale ? { ...calibration, scale: calibration.scale } : undefined
 	}
 
 	const trackPointer = (e: PointerEvent): void => {
+		setHint(
+			zoomed() &&
+				e.buttons === 0 &&
+				!e.ctrlKey &&
+				(e.target as Element).closest('[data-pan-hint]')
+				? { x: e.clientX, y: e.clientY }
+				: null,
+		)
 		const calibration = scaled()
 		const box = stage.getBoundingClientRect()
 		if (!calibration || box.width === 0 || box.height === 0) {
@@ -634,6 +655,46 @@ export function FloorplanStage(props: {
 		}
 	}
 
+	/**
+	 * Capture phase, ahead of the editor's drag handlers: Ctrl + press or a
+	 * middle-button press pans instead of reaching the area or marker below.
+	 */
+	const onPointerDownCapture = (e: PointerEvent): void => {
+		const middle = e.pointerType === 'mouse' && e.button === 1
+		if (!zoomed() || !(middle || e.ctrlKey)) {
+			return
+		}
+		if ((e.target as Element).closest('.floorplan-popover')) {
+			return
+		}
+		e.preventDefault()
+		e.stopPropagation()
+		pointers.set(e.pointerId, local(e))
+		// Pans from the first move; the click after release is swallowed.
+		travelled = PAN_THRESHOLD
+		setForcedPan(true)
+		setHint(null)
+	}
+
+	// Ctrl only switches the cursor; the press itself checks `ctrlKey`, and
+	// Ctrl shortcuts keep working.
+	const onKeyDown = (e: KeyboardEvent): void => {
+		if (e.key === 'Control' && hovered && zoomed()) {
+			setCtrlHeld(true)
+			setHint(null)
+		}
+	}
+
+	const onKeyUp = (e: KeyboardEvent): void => {
+		if (e.key === 'Control') {
+			setCtrlHeld(false)
+		}
+	}
+
+	const onBlur = (): void => {
+		setCtrlHeld(false)
+	}
+
 	const onPointerMove = (e: PointerEvent): void => {
 		const last = pointers.get(e.pointerId)
 		if (!last) {
@@ -659,6 +720,9 @@ export function FloorplanStage(props: {
 
 	const onPointerUp = (e: PointerEvent): void => {
 		pointers.delete(e.pointerId)
+		if (pointers.size === 0) {
+			setForcedPan(false)
+		}
 	}
 
 	// A press that panned does not also click the area or marker below.
@@ -674,6 +738,10 @@ export function FloorplanStage(props: {
 		// Non-passive, so Ctrl + wheel does not also zoom the page.
 		viewport.addEventListener('wheel', onWheel, { passive: false })
 		viewport.addEventListener('click', onClickCapture, true)
+		viewport.addEventListener('pointerdown', onPointerDownCapture, true)
+		window.addEventListener('keydown', onKeyDown)
+		window.addEventListener('keyup', onKeyUp)
+		window.addEventListener('blur', onBlur)
 		window.addEventListener('pointermove', onPointerMove)
 		window.addEventListener('pointerup', onPointerUp)
 		window.addEventListener('pointercancel', onPointerUp)
@@ -685,6 +753,10 @@ export function FloorplanStage(props: {
 			observer.disconnect()
 			viewport.removeEventListener('wheel', onWheel)
 			viewport.removeEventListener('click', onClickCapture, true)
+			viewport.removeEventListener('pointerdown', onPointerDownCapture, true)
+			window.removeEventListener('keydown', onKeyDown)
+			window.removeEventListener('keyup', onKeyUp)
+			window.removeEventListener('blur', onBlur)
 			window.removeEventListener('pointermove', onPointerMove)
 			window.removeEventListener('pointerup', onPointerUp)
 			window.removeEventListener('pointercancel', onPointerUp)
@@ -695,11 +767,18 @@ export function FloorplanStage(props: {
 		<div class="floorplan-frame">
 			<div
 				class="floorplan-viewport"
-				classList={{ zoomed: props.zoom.scale() > MIN_ZOOM }}
+				classList={{ zoomed: zoomed() }}
 				ref={viewport}
 				onPointerDown={onPointerDown}
 				onPointerMove={trackPointer}
-				onPointerLeave={() => setPointer(null)}
+				onPointerEnter={() => {
+					hovered = true
+				}}
+				onPointerLeave={() => {
+					hovered = false
+					setPointer(null)
+					setHint(null)
+				}}
 			>
 				<div
 					class="floorplan-stage"
@@ -738,6 +817,20 @@ export function FloorplanStage(props: {
 					</Show>
 					{props.children}
 				</div>
+				<Show when={zoomed() && (ctrlHeld() || forcedPan())}>
+					<div class="floorplan-pan-cover" classList={{ panning: forcedPan() }} />
+				</Show>
+				<Show when={hint()}>
+					{(at: Accessor<{ x: number; y: number }>) => (
+						<span
+							class="floorplan-pan-hint"
+							style={{ '--cursor-x': `${at().x}px`, '--cursor-y': `${at().y}px` }}
+							aria-hidden="true"
+						>
+							{t('floorplan.panHint')}
+						</span>
+					)}
+				</Show>
 			</div>
 			<div class="floorplan-stage-bar">
 				<ZoomControls zoom={props.zoom} />

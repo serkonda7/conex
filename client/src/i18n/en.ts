@@ -1099,6 +1099,7 @@ export const en = {
 	'floorplan.centimeters': '{value} cm',
 	'floorplan.gridSize': 'Grid size',
 	'floorplan.pointerPosition': 'x {x} · y {y}',
+	'floorplan.panHint': 'Ctrl + drag or middle mouse button to pan',
 	'floorplan.origin': 'Origin',
 	'floorplan.setScale': 'Set scale',
 	'floorplan.setOrigin': 'Set origin',

@@ -1091,6 +1091,7 @@ export function FloorplanEditor(props: {
 									<g
 										class={`floorplan-area floorplan-area-editing floorplan-layer-${areaLayer(area)}`}
 										classList={{ selected: selected() === area.id }}
+										data-pan-hint
 										onPointerDown={(e: PointerEvent) => dragArea(e, area)}
 									>
 										<polygon points={svgPoints(area.points)} />
@@ -1184,6 +1185,7 @@ export function FloorplanEditor(props: {
 										top: percent(placement.y),
 									}}
 									title={markerTitle(placement)}
+									data-pan-hint
 									onPointerDown={(e: PointerEvent) => dragMarker(e, placement)}
 								>
 									<MarkerGlyph placement={placement} size={16} />
