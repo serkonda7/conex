@@ -1433,6 +1433,48 @@ export type InterfaceCreate = v.InferOutput<typeof InterfaceCreateSchema>
 export type InterfaceUpdate = v.InferOutput<typeof InterfaceUpdateSchema>
 export type InterfaceLocation = v.InferOutput<typeof InterfaceLocationSchema>
 
+/** Jack names also allow slashes and the separator used for generated names. */
+const JackNameSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1),
+	v.maxLength(100),
+	v.regex(
+		/^[A-Za-z0-9_.+\x2f-]+$/,
+		'Must be letters, digits, dot, dash, underscore, slash, or plus',
+	),
+)
+
+/**
+ * `POST /devices/:id/jacks`: groups outlets (single-position rear ports
+ * of the panel, in no jack yet) into one jack. Their locations must agree:
+ * ports without one take the others'. A placed port's marker becomes the
+ * jack's; the other ports' markers are removed.
+ */
+export const PanelJackCreateSchema = v.strictObject({
+	name: JackNameSchema,
+	interface_ids: v.pipe(v.array(IdSchema), v.minLength(2), v.maxLength(48)),
+})
+
+export type PanelJackCreate = v.InferOutput<typeof PanelJackCreateSchema>
+
+/** `PATCH /devices/:id/jacks/:jackId`: rename a jack. */
+export const PanelJackUpdateSchema = v.strictObject({
+	name: JackNameSchema,
+})
+
+export type PanelJackUpdate = v.InferOutput<typeof PanelJackUpdateSchema>
+
+export const DeviceJackParamsSchema = v.object({ id: IdSchema, jackId: IdSchema })
+
+/** Jack of a patch panel; its ports carry `jack_id`, in port order. */
+export interface PanelJackJson {
+	id: number
+	device_id: number
+	name: string
+	interface_ids: number[]
+}
+
 // ---------------------------------------------------------------------------
 // Virtual machines (on a host device, or hostless: cloud / IaaS). A hosted
 // VM carries its host's tenant, so `tenant_id` is only accepted for
@@ -2016,22 +2058,26 @@ const FloorplanAreaInputSchema = v.pipe(
 
 /**
  * Rack, device or outlet marker at a normalized position. An outlet is a
- * single-position rear port of a patch panel.
+ * single-position rear port of a patch panel outside any jack, or a jack.
  */
 const FloorplanPlacementInputSchema = v.pipe(
 	v.strictObject({
 		rack_id: v.optional(IdSchema, undefined),
 		device_id: v.optional(IdSchema, undefined),
 		interface_id: v.optional(IdSchema, undefined),
+		jack_id: v.optional(IdSchema, undefined),
 		x: FloorplanCoordSchema,
 		y: FloorplanCoordSchema,
 	}),
 	v.check(
 		(placement) =>
-			[placement.rack_id, placement.device_id, placement.interface_id].filter(
-				(id) => id !== undefined,
-			).length === 1,
-		'Exactly one of rack, device or port is required',
+			[
+				placement.rack_id,
+				placement.device_id,
+				placement.interface_id,
+				placement.jack_id,
+			].filter((id) => id !== undefined).length === 1,
+		'Exactly one of rack, device, port or jack is required',
 	),
 )
 
@@ -2059,23 +2105,38 @@ export interface FloorplanAreaJson {
 	target_plan_id: number | null
 }
 
-/** Patch-panel rear port placed as an outlet: its panel and whether it is cabled. */
-export interface FloorplanPortJson {
-	/** The panel device. */
-	device_id: number
-	device_name: string
+/** One rear port of an outlet. */
+export interface FloorplanOutletPortJson {
+	id: number
 	/** Port name on the panel (`12`). */
 	name: string
 	connected: boolean
 }
 
+/**
+ * Outlet on a floor plan: a patch-panel rear port, or a jack of several,
+ * with its panel and whether it is cabled.
+ */
+export interface FloorplanPortJson {
+	/** The panel device. */
+	device_id: number
+	device_name: string
+	/** Port name on the panel (`12`), or the jack's name. */
+	name: string
+	/** Some port of the outlet is cabled. */
+	connected: boolean
+	/** The outlet's ports in port order: one, or those of the jack. */
+	ports: FloorplanOutletPortJson[]
+}
+
 /** Marker on the wire, with its rack, device or outlet resolved for display. */
 export interface FloorplanPlacementJson {
 	id: number
-	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */
+	/** Exactly one of `rack_id` / `device_id` / `interface_id` / `jack_id` is set. */
 	rack_id: number | null
 	device_id: number | null
 	interface_id: number | null
+	jack_id: number | null
 	/** Outlet details; `null` for a rack or device. */
 	port: FloorplanPortJson | null
 	x: number
@@ -2162,8 +2223,9 @@ export type FloorplanOutletsQuery = v.InferOutput<typeof FloorplanOutletsQuerySc
 export interface FloorplanOutletJson {
 	/** The device's port: the rear port itself on a panel, else the port cabled to it. */
 	local_interface_id: number
-	/** The placed rear port. */
+	/** The rear port: placed itself, or through its jack. */
 	interface_id: number
+	/** The placed outlet: the port, or its jack. */
 	port: FloorplanPortJson
 	attachment_id: number
 	/** Owner of the plan: exactly one of `site_id` / `location_id` is set. */
@@ -2190,11 +2252,13 @@ export interface FloorplanLinkJson {
  * view manages them. A legacy marker of one stays on the plan until removed.
  */
 export interface FloorplanCandidateJson {
-	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */
+	/** Exactly one of `rack_id` / `device_id` / `interface_id` / `jack_id` is set. */
 	rack_id: number | null
 	device_id: number | null
-	/** Unplaced single-position rear port of a patch panel in the owner's site. */
+	/** Unplaced single-position rear port of a patch panel in the owner's site, in no jack. */
 	interface_id: number | null
+	/** Unplaced jack of such ports. */
+	jack_id: number | null
 	port: FloorplanPortJson | null
 	/** Rack or device name; `PP-A / 12` for an outlet. */
 	name: string
@@ -2259,6 +2323,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'device',
 	'virtual_machine',
 	'interface',
+	'panel_jack',
 	'cable',
 	'manufacturer',
 	'device_type',

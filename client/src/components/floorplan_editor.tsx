@@ -39,7 +39,7 @@ import {
 	Show,
 	Switch,
 } from 'solid-js'
-import { Dynamic, Portal } from 'solid-js/web'
+import { Portal } from 'solid-js/web'
 import {
 	type AttachmentJson,
 	type FloorplanAreaJson,
@@ -64,9 +64,9 @@ import {
 	areaName,
 	createStageZoom,
 	FloorplanStage,
+	MarkerGlyph,
 	MarkerName,
 	markerClasses,
-	markerIcon,
 	markerTitle,
 	percent,
 } from './floorplan_stage'
@@ -179,9 +179,11 @@ function toPut(areas: FloorplanAreaJson[], placements: FloorplanPlacementJson[])
 		placements: placements.map((placement: FloorplanPlacementJson) => ({
 			...(placement.rack_id !== null
 				? { rack_id: placement.rack_id }
-				: placement.interface_id !== null
-					? { interface_id: placement.interface_id }
-					: { device_id: placement.device_id ?? undefined }),
+				: placement.jack_id !== null
+					? { jack_id: placement.jack_id }
+					: placement.interface_id !== null
+						? { interface_id: placement.interface_id }
+						: { device_id: placement.device_id ?? undefined }),
 			x: placement.x,
 			y: placement.y,
 		})),
@@ -192,9 +194,13 @@ function candidateKey(candidate: {
 	rack_id: number | null
 	device_id: number | null
 	interface_id: number | null
+	jack_id: number | null
 }): string {
 	if (candidate.rack_id !== null) {
 		return `rack:${candidate.rack_id}`
+	}
+	if (candidate.jack_id !== null) {
+		return `jack:${candidate.jack_id}`
 	}
 	return candidate.interface_id !== null
 		? `port:${candidate.interface_id}`
@@ -399,10 +405,7 @@ function Palette(props: {
 												onDragEnd={() => props.on_drag(null)}
 												onClick={() => props.on_place(candidate)}
 											>
-												<Dynamic
-													component={markerIcon(candidate)}
-													size={14}
-												/>
+												<MarkerGlyph placement={candidate} size={14} />
 												<span>{candidate.name}</span>
 											</button>
 										</li>
@@ -773,6 +776,7 @@ export function FloorplanEditor(props: {
 				rack_id: candidate.rack_id,
 				device_id: candidate.device_id,
 				interface_id: candidate.interface_id,
+				jack_id: candidate.jack_id,
 				port: candidate.port,
 				x: at[0],
 				y: at[1],
@@ -978,7 +982,7 @@ export function FloorplanEditor(props: {
 									title={markerTitle(placement)}
 									onPointerDown={(e: PointerEvent) => dragMarker(e, placement)}
 								>
-									<Dynamic component={markerIcon(placement)} size={16} />
+									<MarkerGlyph placement={placement} size={16} />
 									<MarkerName placement={placement} />
 									<button
 										type="button"

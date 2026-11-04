@@ -751,6 +751,22 @@ export const shelves = pgTable(
 	],
 )
 
+// Jack (wall outlet) of a patch panel: single-position rear ports of one
+// panel grouped behind one faceplate (`interfaces.jack_id`), e.g. a double
+// jack with two ports. Its ports share one location (service layer) and the
+// jack takes their place on a floor plan. Defined per device, not per type.
+export const panel_jacks = pgTable(
+	'panel_jacks',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		device_id: integer('device_id')
+			.notNull()
+			.references(() => devices.id),
+		name: text('name').notNull(),
+	},
+	(table) => [unique('panel_jacks_device_name_idx').on(table.device_id, table.name)],
+)
+
 export const interfaces = pgTable(
 	'interfaces',
 	{
@@ -783,9 +799,17 @@ export const interfaces = pgTable(
 		// Patch-panel ports: false = only part of the panel, not wired up
 		// (yet). Informational; cables may still be connected.
 		patched: integer('patched').notNull().default(1),
+		// Outlets only: the jack the port sits in with others of its panel
+		// (same device, service layer). The jack's ports share `location_id`.
+		jack_id: integer('jack_id').references(() => panel_jacks.id),
 	},
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),
+		index('interfaces_jack_id_idx').on(table.jack_id),
+		check(
+			'interfaces_jack_check',
+			sql`${table.jack_id} IS NULL OR (${table.side} IS NOT DISTINCT FROM 'rear' AND ${table.positions} = 1)`,
+		),
 		unique('interfaces_device_name_idx')
 			.on(table.device_id, table.side, table.name)
 			.nullsNotDistinct(),
@@ -922,7 +946,7 @@ export const floorplan_areas = pgTable(
 	],
 )
 
-// Rack, device or outlet (rear port) marker on a floor plan. Each object
+// Rack, device or outlet (rear port or jack) marker on a floor plan. Each object
 // sits on at most one plan (unique FK).
 export const floorplan_placements = pgTable(
 	'floorplan_placements',
@@ -937,17 +961,21 @@ export const floorplan_placements = pgTable(
 		device_id: integer('device_id')
 			.unique()
 			.references(() => devices.id, { onDelete: 'cascade' }),
-		// Single-position rear port of a patch panel (a wall outlet).
+		// Single-position rear port of a patch panel (a wall outlet) outside
+		// any jack, or a jack of such ports.
 		interface_id: integer('interface_id')
 			.unique()
 			.references(() => interfaces.id, { onDelete: 'cascade' }),
+		jack_id: integer('jack_id')
+			.unique()
+			.references(() => panel_jacks.id, { onDelete: 'cascade' }),
 		x: doublePrecision('x').notNull(),
 		y: doublePrecision('y').notNull(),
 	},
 	(table) => [
 		check(
 			'floorplan_placements_object_check',
-			sql`num_nonnulls(${table.rack_id}, ${table.device_id}, ${table.interface_id}) = 1`,
+			sql`num_nonnulls(${table.rack_id}, ${table.device_id}, ${table.interface_id}, ${table.jack_id}) = 1`,
 		),
 		index('floorplan_placements_attachment_id_idx').on(table.attachment_id),
 	],

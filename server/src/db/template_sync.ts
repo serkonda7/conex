@@ -16,6 +16,7 @@ import {
 	toInterfaceJson,
 } from './devices'
 import { ConflictError } from './errors'
+import { removeEmptyJacks } from './jacks'
 import { insertedId, tryWrite } from './list'
 import { stubsOf } from './templates'
 
@@ -172,7 +173,7 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 		const outletLost = target.positions > 1 && port.positions === 1
 		await db
 			.update(interfaces)
-			.set({ ...fields, ...(outletLost ? { location_id: null } : {}) })
+			.set({ ...fields, ...(outletLost ? { location_id: null, jack_id: null } : {}) })
 			.where(eq(interfaces.id, port.id))
 		if (outletLost) {
 			await db
@@ -193,6 +194,7 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 	for (const port of plan.removed) {
 		await logDelete('interface', toInterfaceJson(port))
 	}
+	await removeEmptyJacks(deviceId)
 	for (const port of updated) {
 		await logUpdate('interface', toInterfaceJson(port), await getInterface(deviceId, port.id))
 	}

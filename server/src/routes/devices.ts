@@ -5,6 +5,7 @@ import {
 	CsvImportBodySchema,
 	DeviceCreateSchema,
 	DeviceIfaceParamsSchema,
+	DeviceJackParamsSchema,
 	DeviceListQuerySchema,
 	DeviceMoveSchema,
 	DeviceUpdateSchema,
@@ -13,6 +14,8 @@ import {
 	InterfaceCreateSchema,
 	InterfaceLocationSchema,
 	InterfaceUpdateSchema,
+	PanelJackCreateSchema,
+	PanelJackUpdateSchema,
 	TemplateSyncApplySchema,
 	TraceQuerySchema,
 } from 'shared/src/schemas'
@@ -42,6 +45,7 @@ import {
 	updateDevice,
 	updateInterface,
 } from '../db/devices'
+import { createJack, deleteJack, listJacks, updateJack } from '../db/jacks'
 import { deviceTenant, interfaceTenant } from '../db/owners'
 import { applyTemplateSync, getTemplateSync } from '../db/template_sync'
 import { getDeviceTrace, getInterfaceTrace } from '../db/trace'
@@ -233,6 +237,49 @@ export const devicesApp = new Hono()
 			return (
 				checkTenant(c, await deviceTenant(id)) ??
 				sendCreated(c, await addInterface(id, c.req.valid('json')))
+			)
+		},
+	)
+	// Jacks: outlets of a panel grouped behind one faceplate.
+	.get('/:id/jacks', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
+		const id = c.req.valid('param').id
+		return checkTenant(c, await deviceTenant(id)) ?? sendResult(c, await listJacks(id))
+	})
+	.post(
+		'/:id/jacks',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', PanelJackCreateSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				sendCreated(c, await createJack(id, c.req.valid('json')))
+			)
+		},
+	)
+	.patch(
+		'/:id/jacks/:jackId',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', DeviceJackParamsSchema, onValidationError),
+		vValidator('json', PanelJackUpdateSchema, onValidationError),
+		async (c) => {
+			const param = c.req.valid('param')
+			return (
+				checkTenant(c, await deviceTenant(param.id)) ??
+				sendResult(c, await updateJack(param.id, param.jackId, c.req.valid('json')))
+			)
+		},
+	)
+	.delete(
+		'/:id/jacks/:jackId',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', DeviceJackParamsSchema, onValidationError),
+		async (c) => {
+			const param = c.req.valid('param')
+			return (
+				checkTenant(c, await deviceTenant(param.id)) ??
+				sendResult(c, await deleteJack(param.id, param.jackId))
 			)
 		},
 	)

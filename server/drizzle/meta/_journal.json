@@ -64,6 +64,13 @@
       "when": 1793778905718,
       "tag": "0060_user_tenants",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793788362488,
+      "tag": "0061_panel_jacks",
+      "breakpoints": true
     }
   ]
 }

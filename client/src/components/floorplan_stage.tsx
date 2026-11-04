@@ -16,12 +16,15 @@ import {
 	IconZoomOut,
 	IconZoomReset,
 } from '@tabler/icons-solidjs'
-import { type Accessor, createSignal, type JSX, onCleanup, onMount, Show } from 'solid-js'
+import { type Accessor, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
 	attachment_file_url,
 	type FloorplanAreaJson,
+	type FloorplanOutletPortJson,
 	type FloorplanPlacementJson,
+	type FloorplanPortJson,
 } from '../api/attachments'
 import { t, tp } from '../i18n'
 import { deviceStatusLabel } from '../i18n/labels'
@@ -63,15 +66,31 @@ export function areaCenter(area: FloorplanAreaJson): { x: number; y: number } {
 
 /** Rack glyph for racks, a socket for outlets, the role glyph for devices (a generic one without). */
 export function markerIcon(
-	placement: Pick<FloorplanPlacementJson, 'rack_id' | 'interface_id' | 'role_icon'>,
+	placement: Pick<FloorplanPlacementJson, 'rack_id' | 'port' | 'role_icon'>,
 ): IconComponent {
 	if (placement.rack_id !== null) {
 		return IconBox
 	}
-	if (placement.interface_id !== null) {
+	if (placement.port !== null) {
 		return IconOutlet
 	}
 	return deviceRoleIcon(placement.role_icon) ?? IconServer
+}
+
+/** True when an outlet is a jack of several ports. */
+export function isJack(port: FloorplanPortJson | null): boolean {
+	return port !== null && port.ports.length > 1
+}
+
+/** Cabling of an outlet: a single port's, or how many ports of a jack are cabled. */
+function outletDetail(port: FloorplanPortJson): string {
+	if (!isJack(port)) {
+		return t(port.connected ? 'floorplan.outletCabled' : 'floorplan.outletFree')
+	}
+	return t('floorplan.jackCabled', {
+		count: port.ports.length,
+		cabled: port.ports.filter((p: FloorplanOutletPortJson) => p.connected).length,
+	})
 }
 
 /** Tooltip of a marker: the name with the device status, "Rack", or the outlet's cabling. */
@@ -79,11 +98,42 @@ export function markerTitle(
 	placement: Pick<FloorplanPlacementJson, 'name' | 'status' | 'port'>,
 ): string {
 	const detail = placement.port
-		? t(placement.port.connected ? 'floorplan.outletCabled' : 'floorplan.outletFree')
+		? outletDetail(placement.port)
 		: placement.status !== null
 			? deviceStatusLabel(placement.status)
 			: tp('entity.rack', 1)
 	return t('floorplan.markerTitle', { name: placement.name, detail })
+}
+
+/**
+ * Glyph inside a marker: the object's icon, or for a jack one socket per
+ * port, each coloured by its cabling.
+ */
+export function MarkerGlyph(props: {
+	placement: Pick<FloorplanPlacementJson, 'rack_id' | 'port' | 'role_icon'>
+	size: number
+}): JSX.Element {
+	return (
+		<Show
+			when={isJack(props.placement.port) ? (props.placement.port ?? undefined) : undefined}
+			fallback={<Dynamic component={markerIcon(props.placement)} size={props.size} />}
+		>
+			{(port: Accessor<FloorplanPortJson>) => (
+				<span class="floorplan-jack-ports">
+					<For each={port().ports}>
+						{(item: FloorplanOutletPortJson) => (
+							<span
+								class="floorplan-jack-port"
+								classList={{ 'floorplan-jack-port-cabled': item.connected }}
+							>
+								<IconOutlet size={props.size} />
+							</span>
+						)}
+					</For>
+				</span>
+			)}
+		</Show>
+	)
 }
 
 /** Name label right of a marker, while names are shown (`markerNamesVisible`). */
@@ -102,7 +152,11 @@ export function markerClasses(placement: FloorplanPlacementJson): Record<string,
 	return {
 		'floorplan-marker-rack': placement.rack_id !== null,
 		'floorplan-marker-outlet': placement.port !== null,
-		'floorplan-marker-cabled': placement.port?.connected === true,
+		'floorplan-marker-jack': isJack(placement.port),
+		// A jack only counts as cabled with all its ports cabled.
+		'floorplan-marker-cabled':
+			placement.port?.ports.every((port: FloorplanOutletPortJson) => port.connected) ===
+				true && placement.port.ports.length > 0,
 		'floorplan-marker-inactive': placement.status !== null && placement.status !== 'active',
 	}
 }

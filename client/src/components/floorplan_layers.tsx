@@ -31,13 +31,11 @@ export function areaLayer(area: Pick<FloorplanAreaJson, 'site_id' | 'target_type
 	return `area-${area.site_id !== null ? 'site' : (area.target_type ?? 'other')}`
 }
 
-export function markerLayer(
-	placement: Pick<FloorplanPlacementJson, 'rack_id' | 'interface_id'>,
-): Layer {
+export function markerLayer(placement: Pick<FloorplanPlacementJson, 'rack_id' | 'port'>): Layer {
 	if (placement.rack_id !== null) {
 		return 'marker-rack'
 	}
-	return placement.interface_id !== null ? 'marker-outlet' : 'marker-device'
+	return placement.port !== null ? 'marker-outlet' : 'marker-device'
 }
 
 /** Name of a layer, plural ("Rooms"). */

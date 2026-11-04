@@ -13,7 +13,6 @@
  */
 import { IconPencil } from '@tabler/icons-solidjs'
 import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
 	type FloorplanAreaJson,
@@ -37,9 +36,9 @@ import {
 	declutter,
 	FloorplanStage,
 	type MarkerCluster,
+	MarkerGlyph,
 	MarkerName,
 	markerClasses,
-	markerIcon,
 	markerTitle,
 	percent,
 	type ShownMarker,
@@ -169,7 +168,7 @@ function MarkerLayer(props: {
 								title={markerTitle(item.placement)}
 								aria-label={markerTitle(item.placement)}
 							>
-								<Dynamic component={markerIcon(item.placement)} size={16} />
+								<MarkerGlyph placement={item.placement} size={16} />
 								<MarkerName placement={item.placement} />
 							</a>
 						}
@@ -189,7 +188,7 @@ function MarkerLayer(props: {
 								setOpen(open() === item.placement.id ? null : item.placement.id)
 							}
 						>
-							<Dynamic component={markerIcon(item.placement)} size={14} />
+							<MarkerGlyph placement={item.placement} size={14} />
 							<MarkerName placement={item.placement} />
 						</button>
 					</Show>

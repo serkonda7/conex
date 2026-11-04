@@ -736,6 +736,72 @@ tbody tr:last-child td {
 	gap: 0.35rem;
 }
 
+/* Jack dialog: existing jacks, then the free outlets to group. */
+.jack-dialog-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	margin-bottom: 1rem;
+}
+
+.jack-dialog-section h3 {
+	margin: 0;
+}
+
+.jack-list {
+	display: grid;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.jack-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.jack-row-name {
+	width: 10rem;
+}
+
+.jack-row-ports {
+	display: flex;
+	flex: 1;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+	min-width: 0;
+	overflow-x: auto;
+}
+
+.jack-outlets {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.jack-outlet-list {
+	display: grid;
+	grid-auto-flow: column;
+	grid-template-rows: repeat(var(--jack-outlet-rows), auto);
+	grid-auto-columns: minmax(5.5rem, max-content);
+	gap: 0.25rem 0.75rem;
+	overflow-x: auto;
+}
+
+@media (max-width: 42rem) {
+	.jack-outlet-list {
+		grid-template-rows: repeat(var(--jack-outlet-rows-narrow), auto);
+	}
+}
+
+.jack-row-ports code,
+.jack-outlets code {
+	white-space: nowrap;
+}
+
 /* Device role list: a little more space between the role icon and the name. */
 .device-role-name .app-nav-icon {
 	margin-right: 0.25rem;
@@ -2045,7 +2111,8 @@ tbody tr:last-child td {
 	width: 7rem;
 }
 
-.app-content .form-stacked .field .field-checkbox-label input {
+.app-content .form-stacked .field .field-checkbox-label input,
+.app-content .form-stacked .jack-outlet-list .field-checkbox-label input {
 	flex: none;
 	width: auto;
 }
@@ -2492,6 +2559,10 @@ tbody tr:last-child td {
 
 .modal.template-sync-dialog {
 	--modal-width: 36rem;
+}
+
+.modal.jack-dialog {
+	--modal-width: 40rem;
 }
 
 .modal.ai-update-dialog {
@@ -3486,6 +3557,42 @@ span.attachment-star,
 
 .floorplan-marker-outlet.floorplan-marker-cabled {
 	border-color: var(--success);
+}
+
+/* Jack: one socket per port in one marker, each coloured by its cabling. */
+.floorplan-marker-jack {
+	width: auto;
+	padding: 0 0.1rem;
+}
+
+.floorplan-jack-ports {
+	display: flex;
+	align-items: center;
+}
+
+.floorplan-jack-port {
+	display: grid;
+	place-items: center;
+	color: var(--text-muted);
+}
+
+.floorplan-jack-port-cabled {
+	color: var(--success);
+}
+
+.floorplan-popover-port {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.floorplan-popover-port + .floorplan-popover-port {
+	padding-top: 0.35rem;
+	border-top: 1px solid var(--border);
+}
+
+.floorplan-popover-port h4 {
+	margin: 0;
+	font-size: inherit;
 }
 
 .floorplan-popover {
