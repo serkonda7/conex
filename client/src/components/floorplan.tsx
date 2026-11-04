@@ -37,6 +37,7 @@ import {
 	declutter,
 	FloorplanStage,
 	type MarkerCluster,
+	MarkerName,
 	markerClasses,
 	markerIcon,
 	markerTitle,
@@ -169,6 +170,7 @@ function MarkerLayer(props: {
 								aria-label={markerTitle(item.placement)}
 							>
 								<Dynamic component={markerIcon(item.placement)} size={16} />
+								<MarkerName placement={item.placement} />
 							</a>
 						}
 					>
@@ -188,6 +190,7 @@ function MarkerLayer(props: {
 							}
 						>
 							<Dynamic component={markerIcon(item.placement)} size={14} />
+							<MarkerName placement={item.placement} />
 						</button>
 					</Show>
 				)}

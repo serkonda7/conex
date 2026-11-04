@@ -2,10 +2,11 @@
  * Layers of a floor plan: areas by their target's kind (site or location
  * type) and markers by what they place (rack, device, outlet). The toggle bar
  * doubles as the legend; hidden layers are kept per browser in
- * `localStorage` and shared by the view and the editor.
+ * `localStorage` and shared by the view and the editor. A last toggle shows
+ * the names of the markers on the plan, kept the same way.
  */
 
-import { IconBox, IconOutlet, IconServer } from '@tabler/icons-solidjs'
+import { IconBox, IconOutlet, IconServer, IconTag } from '@tabler/icons-solidjs'
 import { LOCATION_TYPES, type LocationType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
@@ -97,6 +98,33 @@ export function showLayers(layers: readonly Layer[]): void {
 	saveHidden(next)
 }
 
+const NAMES_STORAGE_KEY = 'conex:floorplan-marker-names'
+
+function loadMarkerNames(): boolean {
+	try {
+		return window.localStorage.getItem(NAMES_STORAGE_KEY) === 'true'
+	} catch {
+		return false
+	}
+}
+
+const [markerNames, setMarkerNames] = createSignal(loadMarkerNames())
+
+/** Whether markers show their rack, device or outlet name beside them. */
+export function markerNamesVisible(): boolean {
+	return markerNames()
+}
+
+export function toggleMarkerNames(): void {
+	const next = !markerNames()
+	setMarkerNames(next)
+	try {
+		window.localStorage.setItem(NAMES_STORAGE_KEY, String(next))
+	} catch {
+		// Storage unavailable: the choice applies until reload.
+	}
+}
+
 /** Layers with content on the plan, in display order, with their object counts. */
 export function presentLayers(
 	areas: FloorplanAreaJson[],
@@ -183,6 +211,22 @@ export function LayerBar(props: {
 							</button>
 						)}
 					</For>
+					<Show when={props.placements.length > 0}>
+						<button
+							type="button"
+							class="floorplan-layer-toggle floorplan-names-toggle"
+							aria-pressed={markerNamesVisible()}
+							title={t(
+								markerNamesVisible()
+									? 'floorplan.hideMarkerNames'
+									: 'floorplan.showMarkerNames',
+							)}
+							onClick={toggleMarkerNames}
+						>
+							<IconTag size={12} aria-hidden="true" />
+							<span>{t('floorplan.markerNames')}</span>
+						</button>
+					</Show>
 				</fieldset>
 			</Show>
 			<Show when={allHidden()}>

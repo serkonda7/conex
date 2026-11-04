@@ -64,6 +64,7 @@ import {
 	areaName,
 	createStageZoom,
 	FloorplanStage,
+	MarkerName,
 	markerClasses,
 	markerIcon,
 	markerTitle,
@@ -978,6 +979,7 @@ export function FloorplanEditor(props: {
 									onPointerDown={(e: PointerEvent) => dragMarker(e, placement)}
 								>
 									<Dynamic component={markerIcon(placement)} size={16} />
+									<MarkerName placement={placement} />
 									<button
 										type="button"
 										class="floorplan-marker-remove"

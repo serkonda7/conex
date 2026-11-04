@@ -26,6 +26,7 @@ import {
 import { t, tp } from '../i18n'
 import { deviceStatusLabel } from '../i18n/labels'
 import { deviceRoleIcon, type IconComponent } from '../lib/icons'
+import { markerNamesVisible } from './floorplan_layers'
 
 /** Percent offset of a normalized coordinate, for `left` / `top`. */
 export function percent(value: number): string {
@@ -83,6 +84,17 @@ export function markerTitle(
 			? deviceStatusLabel(placement.status)
 			: tp('entity.rack', 1)
 	return t('floorplan.markerTitle', { name: placement.name, detail })
+}
+
+/** Name label right of a marker, while names are shown (`markerNamesVisible`). */
+export function MarkerName(props: { placement: FloorplanPlacementJson }): JSX.Element {
+	return (
+		<Show when={markerNamesVisible()}>
+			<span class="floorplan-marker-name" aria-hidden="true">
+				{props.placement.name}
+			</span>
+		</Show>
+	)
 }
 
 /** Marker classes shared by the view and edit modes. */

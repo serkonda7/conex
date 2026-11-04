@@ -3430,6 +3430,26 @@ span.attachment-star,
 	outline-offset: 1px;
 }
 
+/* Name right of a marker; scales with it, so it keeps its screen size. */
+.floorplan-marker-name {
+	position: absolute;
+	top: 50%;
+	left: calc(100% + 0.25rem);
+	transform: translateY(-50%);
+	max-width: 12rem;
+	padding: 0 0.3rem;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--text);
+	background-color: rgba(0, 0, 0, 0.6);
+	border-radius: 0.25rem;
+	pointer-events: none;
+}
+
 /* Count bubble of markers too close to tell apart; a click zooms in. */
 .floorplan-cluster {
 	position: absolute;
