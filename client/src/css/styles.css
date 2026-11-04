@@ -155,6 +155,11 @@ textarea {
 	border-radius: 0.3rem;
 }
 
+/* The floor-plan grid size follows the smaller stage-bar text. */
+.floorplan-grid-size select {
+	font-size: inherit;
+}
+
 textarea {
 	resize: vertical;
 	min-height: 4.5rem;
@@ -3375,10 +3380,6 @@ span.attachment-star,
 	align-items: center;
 	gap: 0.4rem;
 	color: var(--text-muted);
-}
-
-.floorplan-grid-size select {
-	font-size: inherit;
 }
 
 /* Area colors per layer (site, location types). */
