@@ -1867,6 +1867,22 @@ tbody tr:last-child td {
 	border: 1px solid transparent;
 }
 
+/* Rows that cannot be removed (an account's sign-in address) show a lock instead. */
+.contact-locked {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	align-self: stretch;
+	width: 2.25rem;
+	color: var(--text-muted);
+	cursor: help;
+}
+
+.app-content .form-stacked .field .contact-inputs input:read-only {
+	background-color: var(--bg-raised);
+	color: var(--text-muted);
+}
+
 .contact-remove:hover {
 	background-color: var(--bg-raised);
 	border-color: var(--border-strong);

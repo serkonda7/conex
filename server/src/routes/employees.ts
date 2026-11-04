@@ -8,7 +8,7 @@ import {
 	EmployeeUpdateSchema,
 	EntityParamsSchema,
 } from 'shared/src/schemas'
-import { checkTenants, forbidden, listTenantScope, requestScope } from '../authz'
+import { can, checkTenants, forbidden, listTenantScope, requestScope, requestUser } from '../authz'
 import {
 	createEmployee,
 	deleteEmployee,
@@ -101,7 +101,12 @@ export const employeesApp = new Hono()
 			) {
 				return forbidden(c)
 			}
-			return sendResult(c, await updateEmployee(id, body))
+			return sendResult(
+				c,
+				await updateEmployee(id, body, {
+					mayChangeLogin: can(requestUser(c), 'users.manage'),
+				}),
+			)
 		},
 	)
 	.delete(

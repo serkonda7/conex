@@ -191,7 +191,7 @@ function UserMenu(props: {
 				</span>
 			</button>
 			<Show when={open()}>
-				<div class="app-user-dropdown" role="menu" aria-label={t('app.account')}>
+				<div class="app-user-dropdown" role="menu">
 					<div class="app-user-language">
 						<LanguageSwitcher />
 					</div>

@@ -7,12 +7,22 @@ import { t } from '../../i18n'
 import { type FormValues, is_add_another_submit, submit_form, useFormState } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { AccountFields, scopeToSave, suggestedUsername } from './account_fields'
+import {
+	EmployeeField,
+	employeeOf,
+	LoginField,
+	loginOf,
+	ScopeField,
+	scopeToSave,
+	useAccountData,
+} from './account_fields'
 import { RoleHint } from './role_hint'
 
 /**
- * /users/add?employee= — account create form (`users.manage`). Opened from
- * an employee page, the employee is preselected and the form returns there.
+ * /users/add?employee= — account create form (`users.manage`). Accounts of
+ * employees sign in with the employee's primary mail address; others get a
+ * username. Opened from an employee page, the employee is preselected and
+ * the form returns there.
  */
 export function UserAddPage(): JSX.Element {
 	const form = useFormState()
@@ -26,18 +36,13 @@ export function UserAddPage(): JSX.Element {
 	const [tenantId, setTenantId] = createSignal('')
 	const [roles] = createRows(fetch_roles, form.setError)
 	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
-	/** Username last filled in from an employee; replaced while untouched. */
-	let suggested = ''
-
-	function handleEmployee(value: string, employee: EmployeeRow | undefined): void {
-		setEmployeeId(value)
-		if (username() === suggested) {
-			suggested = suggestedUsername(employee)
-			setUsername(suggested)
-		}
-	}
+	const data = useAccountData(form.setError)
+	const employee = (): EmployeeRow | undefined => employeeOf(data, employeeId())
 
 	function validate(): string | null {
+		if (employee() && !loginOf(employee())) {
+			return t('user.employeeNoMail')
+		}
 		if (!password()) {
 			return t('auth.passwordRequired')
 		}
@@ -48,12 +53,13 @@ export function UserAddPage(): JSX.Element {
 		e.preventDefault()
 		await submit_form({
 			form,
-			name: username(),
+			name: employee() ? '' : username(),
+			optionalName: employee() !== undefined,
 			nameError: t('auth.usernameRequired'),
 			validate,
 			save: (values: FormValues) =>
 				create_user({
-					username: values.name,
+					...(employee() ? {} : { username: values.name }),
 					password: password(),
 					role_id: parseId(roleId()) ?? 0,
 					employee_id: parseId(employeeId()),
@@ -65,7 +71,6 @@ export function UserAddPage(): JSX.Element {
 						setUsername('')
 						setEmployeeId('')
 						setTenantId('')
-						suggested = ''
 					}
 				: undefined,
 		})
@@ -78,26 +83,27 @@ export function UserAddPage(): JSX.Element {
 			cancelTo={fromEmployee === null ? '/users' : `/employees/${fromEmployee}`}
 			onSubmit={handleCreate}
 		>
-			<AccountFields
+			<EmployeeField
 				idPrefix="user"
-				role={role()}
+				data={data}
 				employeeId={employeeId()}
-				onEmployeeChange={handleEmployee}
+				onEmployeeChange={setEmployeeId}
 				tenantId={tenantId()}
 				onTenantChange={setTenantId}
-				onError={form.setError}
 				applyPreselection
 			/>
-			<TextField
-				id="user-username"
-				label={t('auth.username')}
-				required
-				placeholder={t('user.usernamePlaceholder')}
-				maxLength={254}
-				autocomplete="off"
-				value={username()}
-				onInput={setUsername}
-			/>
+			<LoginField idPrefix="user" employee={employee()}>
+				<TextField
+					id="user-username"
+					label={t('auth.username')}
+					required
+					placeholder={t('user.usernamePlaceholder')}
+					maxLength={254}
+					autocomplete="off"
+					value={username()}
+					onInput={setUsername}
+				/>
+			</LoginField>
 			<TextField
 				id="user-password"
 				label={t('auth.password')}
@@ -116,6 +122,14 @@ export function UserAddPage(): JSX.Element {
 				onChange={setRoleId}
 				options={row_options(roles() ?? [])}
 				hint={<RoleHint role={role()} />}
+			/>
+			<ScopeField
+				idPrefix="user"
+				data={data}
+				role={role()}
+				employee={employee()}
+				tenantId={tenantId()}
+				onTenantChange={setTenantId}
 			/>
 		</FormPage>
 	)

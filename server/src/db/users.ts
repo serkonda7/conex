@@ -5,7 +5,13 @@ import { employee_tenants, employees, roles, users } from '../schema'
 import type { CurrentUser, User } from '../types'
 import { normalize_username } from '../util/username'
 import { getDb } from './connection'
-import { ConflictError, DuplicateError, NotFoundError, ValidationError } from './errors'
+import {
+	ConflictError,
+	DuplicateError,
+	ForbiddenError,
+	NotFoundError,
+	ValidationError,
+} from './errors'
 import {
 	checkTenantExists,
 	findOne,
@@ -201,21 +207,42 @@ async function checkUserInput(input: {
 	return checkRoleExists(input.role_id)
 }
 
+/** Login of an employee's account: its primary mail address, null without one. */
+export function loginOf(emails: readonly { address: string }[]): string | null {
+	const address = emails[0]?.address
+	return address ? normalize_username(address) : null
+}
+
+/** `username` must not belong to another account (`userId` excluded). */
+async function checkUsernameFree(
+	username: string,
+	userId?: number,
+): Promise<Result<undefined, Error>> {
+	const owner = await getUserByUsername(username)
+	return owner && owner.id !== userId
+		? Result.err(new DuplicateError(`${username} is already the username of another account`))
+		: Result.ok(undefined)
+}
+
+const NO_LOGIN_MAIL = 'The employee needs a mail address to sign in with; add one first'
+
 /**
  * Employee link rules: a scoped account belongs to an employee of that
  * tenant, and an employee has at most one account (`userId` excluded).
+ * Returns the employee's login (`loginOf`), null without employee.
  */
 async function checkEmployeeLink(
 	employeeId: number | null,
 	tenantId: number | null,
 	userId?: number,
-): Promise<Result<undefined, Error>> {
+): Promise<Result<string | null, Error>> {
 	if (employeeId === null) {
 		return tenantId === null
-			? Result.ok(undefined)
+			? Result.ok(null)
 			: Result.err(new ValidationError('Tenant-scoped users must be linked to an employee'))
 	}
-	if (!(await findOne(employees, eq(employees.id, employeeId)))) {
+	const employee = await findOne(employees, eq(employees.id, employeeId))
+	if (!employee) {
 		return Result.err(new NotFoundError('Employee not found'))
 	}
 	const owner = await findOne(users, eq(users.employee_id, employeeId))
@@ -236,7 +263,50 @@ async function checkEmployeeLink(
 			new ConflictError("The tenant scope must be one of the employee's tenants"),
 		)
 	}
-	return Result.ok(undefined)
+	return Result.ok(loginOf(employee.emails))
+}
+
+/**
+ * Login change of employee `employeeId`'s account when its mail addresses
+ * change from `before` to `after`: the account follows the primary address.
+ * The address in use cannot be removed, a new one must be free, and only
+ * user managers (`mayChange`) move the login. Null when the login stays.
+ */
+export async function nextLogin(
+	employeeId: number,
+	before: readonly { address: string }[],
+	after: readonly { address: string }[],
+	mayChange: boolean,
+): Promise<Result<{ userId: number; username: string } | null, Error>> {
+	const account = await findOne(users, eq(users.employee_id, employeeId))
+	if (!account) {
+		return Result.ok(null)
+	}
+	const has = (list: readonly { address: string }[]): boolean =>
+		list.some((e) => normalize_username(e.address) === account.username)
+	if (has(before) && !has(after)) {
+		return Result.err(
+			new ConflictError(
+				`${account.username} is used to sign in and cannot be removed; move another address to the top and save first`,
+			),
+		)
+	}
+	const next = loginOf(after)
+	if (next === null || next === account.username) {
+		return Result.ok(null)
+	}
+	if (!mayChange) {
+		return Result.err(
+			new ForbiddenError(
+				'Only user managers can change the primary mail address, which the employee signs in with',
+			),
+		)
+	}
+	const free = await checkUsernameFree(next, account.id)
+	if (Result.isError(free)) {
+		return free
+	}
+	return Result.ok({ userId: account.id, username: next })
 }
 
 const EMPLOYEE_IN_USE = 'Employee already has a user account'
@@ -248,14 +318,8 @@ function duplicateOf(err: unknown): Error {
 	)
 }
 
+/** Accounts of employees sign in with the employee's primary mail address (`loginOf`). */
 export async function createUser(input: UserCreate): Promise<Result<UserJson, Error>> {
-	const username = normalize_username(input.username)
-	if (!username) {
-		return Result.err(new ConflictError('Username and password are required.'))
-	}
-	if (await getUserByUsername(username)) {
-		return Result.err(new DuplicateError(USERNAME_IN_USE))
-	}
 	const valid = await checkUserInput(input)
 	if (Result.isError(valid)) {
 		return valid
@@ -263,9 +327,23 @@ export async function createUser(input: UserCreate): Promise<Result<UserJson, Er
 	if (input.tenant_id != null && (await roleManagesUsers(input.role_id))) {
 		return Result.err(new ConflictError(MANAGER_GLOBAL))
 	}
-	const link = await checkEmployeeLink(input.employee_id ?? null, input.tenant_id ?? null)
+	const employeeId = input.employee_id ?? null
+	const link = await checkEmployeeLink(employeeId, input.tenant_id ?? null)
 	if (Result.isError(link)) {
 		return link
+	}
+	if (employeeId !== null && link.value === null) {
+		return Result.err(new ValidationError(NO_LOGIN_MAIL))
+	}
+	const username = link.value ?? normalize_username(input.username ?? '')
+	if (!username) {
+		return Result.err(
+			new ValidationError('A username is required for accounts without employee'),
+		)
+	}
+	const free = await checkUsernameFree(username)
+	if (Result.isError(free)) {
+		return free
 	}
 	const user = await tryWrite(
 		async () =>
@@ -274,7 +352,7 @@ export async function createUser(input: UserCreate): Promise<Result<UserJson, Er
 				await Bun.password.hash(input.password),
 				input.role_id,
 				input.tenant_id ?? null,
-				input.employee_id ?? null,
+				employeeId,
 			),
 		duplicateOf,
 	)
@@ -305,6 +383,18 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 	if (Result.isError(link)) {
 		return link
 	}
+	// A newly linked employee needs a mail address; accounts linked before
+	// usernames followed the mail address keep theirs until it gets one.
+	if (effectiveEmployee !== current.employee_id && effectiveEmployee !== null && !link.value) {
+		return Result.err(new ValidationError(NO_LOGIN_MAIL))
+	}
+	const username = link.value !== null && link.value !== current.username ? link.value : undefined
+	if (username !== undefined) {
+		const free = await checkUsernameFree(username, id)
+		if (Result.isError(free)) {
+			return free
+		}
+	}
 	// Linking a manager to an inactive employee locks the account out too.
 	const keepsManaging =
 		willManage && (await canSignIn({ ...current, employee_id: effectiveEmployee }))
@@ -318,7 +408,10 @@ export async function updateUser(id: number, input: UserUpdate): Promise<Result<
 		)
 	}
 	const written = await tryWrite(async () => {
-		const patch: Partial<User> = pickDefined(input, ['role_id', 'tenant_id', 'employee_id'])
+		const patch: Partial<User> = {
+			...pickDefined(input, ['role_id', 'tenant_id', 'employee_id']),
+			...(username !== undefined ? { username } : {}),
+		}
 		if (input.password !== undefined) {
 			patch.password_hash = await Bun.password.hash(input.password)
 		}

@@ -116,7 +116,7 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 					<dd>{employee()?.title || '—'}</dd>
 					<dt>{t('employee.emails')}</dt>
 					<dd>
-						<EmailList emails={employee()?.emails ?? []} />
+						<EmailList emails={employee()?.emails ?? []} login={employee()?.login} />
 					</dd>
 					<dt>{t('employee.phones')}</dt>
 					<dd>
@@ -130,23 +130,28 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 						<EmployeeStatus active={employee()?.active ?? 1} />
 					</dd>
 					<Show when={can('users.manage')}>
-						<dt>{t('employee.account')}</dt>
+						<dt>{account() ? t('employee.loginRole') : t('employee.account')}</dt>
 						<dd>
 							<Show
 								when={account()}
 								fallback={
 									<Show when={!accounts.loading}>
-										{t('employee.noAccount')}{' '}
-										<a href={`/users/add?employee=${props.id}`}>
-											{t('employee.createAccount')}
-										</a>
+										<Show
+											when={(employee()?.emails.length ?? 0) > 0}
+											fallback={t('employee.noAccountNoMail')}
+										>
+											{t('employee.noAccount')}{' '}
+											<a href={`/users/add?employee=${props.id}`}>
+												{t('employee.createAccount')}
+											</a>
+										</Show>
 									</Show>
 								}
 							>
 								{(row: () => UserJson) => (
 									<>
-										<a href={`/users/${row().id}/edit`}>{row().username}</a>
-										{` · ${row().role_name} · ${scopeName(row().tenant_id)}`}
+										<a href={`/users/${row().id}/edit`}>{row().role_name}</a>
+										{` (${scopeName(row().tenant_id)})`}
 										<Show when={!row().active}> ({t('user.inactive')})</Show>
 									</>
 								)}

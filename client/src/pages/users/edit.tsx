@@ -1,4 +1,5 @@
 import { createSignal, type JSX } from 'solid-js'
+import type { EmployeeRow } from '../../api/employees'
 import { fetch_roles, type RoleJson } from '../../api/roles'
 import { fetch_user, type UserJson, update_user } from '../../api/users'
 import { FormPage, row_options, SelectField, TextField } from '../../components/form'
@@ -6,10 +7,22 @@ import { t } from '../../i18n'
 import { id_value, submit_form, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId } from '../../lib/router'
-import { AccountFields, scopeToSave } from './account_fields'
+import {
+	EmployeeField,
+	employeeOf,
+	LoginField,
+	loginOf,
+	ScopeField,
+	scopeToSave,
+	useAccountData,
+} from './account_fields'
 import { RoleHint } from './role_hint'
 
-/** /users/:id/edit — role, employee, tenant-scope, and password form (`users.manage`). */
+/**
+ * /users/:id/edit — employee, role, tenant-scope, and password form
+ * (`users.manage`). Linking an employee makes its primary mail address the
+ * username.
+ */
 export function UserEditPage(props: { id: number }): JSX.Element {
 	const [roleId, setRoleId] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
@@ -26,6 +39,8 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 	})
 	const [roles] = createRows(fetch_roles)
 	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
+	const data = useAccountData(form.setError)
+	const employee = (): EmployeeRow | undefined => employeeOf(data, employeeId())
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -33,7 +48,13 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 			form,
 			name: '',
 			optionalName: true,
-			validate: () => (parseId(roleId()) === null ? t('user.selectRole') : null),
+			validate: () =>
+				// Accounts linked before logins followed the mail address may keep theirs.
+				employee() && !loginOf(employee()) && employee()?.id !== form.record()?.employee_id
+					? t('user.employeeNoMail')
+					: parseId(roleId()) === null
+						? t('user.selectRole')
+						: null,
 			save: () =>
 				update_user(props.id, {
 					role_id: parseId(roleId()) ?? undefined,
@@ -54,6 +75,16 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 			cancelTo="/users"
 			onSubmit={handleSave}
 		>
+			<EmployeeField
+				idPrefix="user-edit"
+				data={data}
+				employeeId={employeeId()}
+				onEmployeeChange={setEmployeeId}
+				tenantId={tenantId()}
+				onTenantChange={setTenantId}
+				ownLogin={form.record()?.username}
+			/>
+			<LoginField idPrefix="user-edit" employee={employee()} />
 			<SelectField
 				id="user-edit-role"
 				label={t('entity.role.one')}
@@ -63,14 +94,13 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				options={row_options(roles() ?? [])}
 				hint={<RoleHint role={role()} />}
 			/>
-			<AccountFields
+			<ScopeField
 				idPrefix="user-edit"
+				data={data}
 				role={role()}
-				employeeId={employeeId()}
-				onEmployeeChange={setEmployeeId}
+				employee={employee()}
 				tenantId={tenantId()}
 				onTenantChange={setTenantId}
-				onError={form.setError}
 			/>
 			<TextField
 				id="user-edit-password"

@@ -12,6 +12,7 @@ import {
 	ContactListField,
 	EmailInput,
 	emailsOf,
+	isLogin,
 	isUndialableExtension,
 	PhoneInputs,
 	type PhoneRow,
@@ -118,6 +119,8 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			),
 		)
 	}
+	/** The account's sign-in address cannot be edited or removed here. */
+	const isLoginRow = (e: EmployeeEmail): boolean => isLogin(e.address, form.record()?.login)
 	const prefix = form.editing ? 'employee-edit' : 'employee'
 	const backTo = useFormReturnRoute('/employees', props.id)
 
@@ -252,6 +255,14 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				rows={emails()}
 				onChange={setEmails}
 				blank={blankEmail}
+				locked={(entry: () => EmployeeEmail) =>
+					isLoginRow(entry()) ? t('employee.loginLocked') : undefined
+				}
+				rowHint={(entry: () => EmployeeEmail): JSX.Element => (
+					<Show when={isLoginRow(entry())}>
+						<Hint>{t('employee.loginAddressHint')}</Hint>
+					</Show>
+				)}
 				row={(
 					entry: () => EmployeeEmail,
 					update: (patch: Partial<EmployeeEmail>) => void,
@@ -262,6 +273,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 							id={`${prefix}-email-${index}`}
 							placeholder={emailPlaceholder()}
 							value={entry().address}
+							readOnly={isLoginRow(entry())}
 							onInput={(address: string) => update({ address })}
 							onComplete={() => completeEmail(index)}
 						/>

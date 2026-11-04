@@ -82,7 +82,7 @@ export function LoginPage(props: { onLogin: (user: SessionUser) => void }): JSX.
 			<form onSubmit={handleLogin}>
 				<AuthInput
 					id="login-username"
-					label={t('auth.username')}
+					label={t('auth.usernameOrEmail')}
 					type="text"
 					autocomplete="username"
 					value={username()}

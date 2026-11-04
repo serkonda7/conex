@@ -30,14 +30,14 @@ export * from '@serkonda7/conex-device-schema'
 
 // Username identity for local auth. Stored lowercase (see
 // `server/src/util/username.ts`); 1-254 chars of letters, digits, dot,
-// dash, underscore or `@` (so a mail address works as the login of an
-// employee's account), unambiguous in logs.
+// dash, underscore, plus or `@` (accounts of employees sign in with their
+// primary mail address), unambiguous in logs.
 export const UsernameSchema = v.pipe(
 	v.string(),
 	v.trim(),
 	v.minLength(1),
 	v.maxLength(254),
-	v.regex(/^[A-Za-z0-9_.@-]+$/, 'Must be letters, digits, dot, dash, underscore, or @'),
+	v.regex(/^[A-Za-z0-9_.+@-]+$/, 'Must be letters, digits, dot, dash, underscore, plus, or @'),
 )
 
 // Local-login credentials. strictObject so unknown keys fail loudly instead
@@ -1792,11 +1792,13 @@ export type RoleUpdate = v.InferOutput<typeof RoleUpdateSchema>
 export type RoleListQuery = v.InferOutput<typeof RoleListQuerySchema>
 
 /**
- * Accounts of employees carry the person (name, mail, tenants); `tenant_id`
- * (scope) requires `employee_id` and must be one of the employee's tenants.
+ * Accounts of employees carry the person (name, mail, tenants) and sign in
+ * with the employee's primary mail address, so `username` is only given
+ * (and required) without `employee_id`. `tenant_id` (scope) requires
+ * `employee_id` and must be one of the employee's tenants.
  */
 export const UserCreateSchema = v.strictObject({
-	username: UsernameSchema,
+	username: v.optional(UsernameSchema, undefined),
 	password: v.pipe(v.string(), v.minLength(1), v.maxLength(1024)),
 	role_id: IdSchema,
 	tenant_id: NullableIdSchema,

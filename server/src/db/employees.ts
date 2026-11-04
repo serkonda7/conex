@@ -13,7 +13,7 @@ import {
 } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, NotFoundError } from './errors'
+import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
 	findOne,
 	insertedId,
@@ -30,9 +30,16 @@ import {
 	tryWrite,
 } from './list'
 import { countGlobalManagers } from './roles'
+import { nextLogin } from './users'
 
-/** Employee with its tenants in membership order (first = primary). */
-export type EmployeeRow = typeof employees.$inferSelect & { tenant_ids: number[] }
+/**
+ * Employee with its tenants in membership order (first = primary) and the
+ * username of its account (`login`, its primary mail address), if any.
+ */
+export type EmployeeRow = typeof employees.$inferSelect & {
+	tenant_ids: number[]
+	login: string | null
+}
 
 /** Tenant ids of the selected employee, in membership order. */
 // jsonb, not an int array: Bun's driver returns int arrays as `Int32Array`.
@@ -42,10 +49,17 @@ export const employeeTenantIds: SQL<number[]> = sql<number[]>`coalesce((
 	where ${employee_tenants.employee_id} = ${employees.id}
 ), '[]'::jsonb)`
 
+/** Username of the selected employee's account, null without one. */
+// Qualified by hand: interpolated columns render unqualified, and `id` would bind to `users`.
+const employeeLogin: SQL<string | null> = sql<string | null>`(
+	select "u"."username" from ${users} as "u" where "u"."employee_id" = ${employees}."id"
+)`
+
 /** Columns of an `EmployeeRow`. */
 export const employeeColumns: ReturnType<typeof getTableColumns<typeof employees>> & {
 	tenant_ids: SQL<number[]>
-} = { ...getTableColumns(employees), tenant_ids: employeeTenantIds }
+	login: SQL<string | null>
+} = { ...getTableColumns(employees), tenant_ids: employeeTenantIds, login: employeeLogin }
 
 /**
  * Employees with a membership matching all `conditions` (on
@@ -202,13 +216,26 @@ export async function createEmployee(input: EmployeeCreate): Promise<Result<Empl
 	return await logCreate('employee', await getEmployee(id.value))
 }
 
+/**
+ * The account of an employee signs in with its primary mail address, which
+ * follows the mail list (see `nextLogin`); only user managers
+ * (`mayChangeLogin`) change it.
+ */
 export async function updateEmployee(
 	id: number,
 	input: EmployeeUpdate,
+	opts: { mayChangeLogin: boolean },
 ): Promise<Result<EmployeeRow, Error>> {
 	const current = await getEmployee(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	const login =
+		input.emails === undefined
+			? Result.ok(null)
+			: await nextLogin(id, current.value.emails, input.emails, opts.mayChangeLogin)
+	if (Result.isError(login)) {
+		return login
 	}
 	const tenantIds = input.tenant_ids
 	if (tenantIds !== undefined) {
@@ -256,16 +283,28 @@ export async function updateEmployee(
 	const membershipsChanged =
 		tenantIds !== undefined &&
 		JSON.stringify(tenantIds) !== JSON.stringify(current.value.tenant_ids)
+	const nextAccount = login.value
 	if (!isPatchEmpty(patch) || membershipsChanged) {
-		const written = await tryWrite(() =>
-			withTransaction(async () => {
-				if (!isPatchEmpty(patch)) {
-					await getDb().update(employees).set(patch).where(eq(employees.id, id))
-				}
-				if (membershipsChanged) {
-					await writeMemberships(id, tenantIds)
-				}
-			}),
+		const written = await tryWrite(
+			() =>
+				withTransaction(async () => {
+					if (!isPatchEmpty(patch)) {
+						await getDb().update(employees).set(patch).where(eq(employees.id, id))
+					}
+					if (membershipsChanged) {
+						await writeMemberships(id, tenantIds)
+					}
+					if (nextAccount) {
+						await getDb()
+							.update(users)
+							.set({ username: nextAccount.username })
+							.where(eq(users.id, nextAccount.userId))
+					}
+				}),
+			() =>
+				new DuplicateError(
+					`${nextAccount?.username ?? 'The address'} is already the username of another account`,
+				),
 		)
 		if (Result.isError(written)) {
 			return written

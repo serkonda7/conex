@@ -550,17 +550,20 @@ test.describe('permissions', () => {
 	): Promise<{ context: APIRequestContext; username: string }> {
 		const api = page.request
 		const roleId = await create(api, cleanup, 'roles', { name: unique('Role'), permissions })
-		const username = `e2e-dt-${nextId()}`
-		// Scoped accounts belong to an employee of their tenant.
+		const name = `e2e-dt-${nextId()}`
+		// Scoped accounts belong to an employee of their tenant and sign in
+		// with its primary mail address.
+		const username = tenantId === null ? name : `${name}@example.com`
 		const employeeId =
 			tenantId === null
 				? null
 				: await create(api, cleanup, 'employees', {
-						last_name: username,
+						last_name: name,
 						tenant_ids: [tenantId],
+						emails: [{ address: username, scope: 'work' }],
 					})
 		await create(api, cleanup, 'users', {
-			username,
+			...(employeeId === null ? { username } : {}),
 			password,
 			role_id: roleId,
 			tenant_id: tenantId,
