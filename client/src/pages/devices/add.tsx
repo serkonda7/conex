@@ -2,7 +2,7 @@ import type { DeviceFace } from 'shared/src/types'
 import { createEffect, createMemo, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
-import { fetch_racks } from '../../api/racks'
+import { fetch_rack, fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
@@ -89,7 +89,13 @@ export function DeviceAddPage(): JSX.Element {
 	} = useDeviceTypeOptions({}, form.setError)
 	const [roles, { refetch: refetchRoles }] = createRows(fetch_device_roles, form.setError)
 	const [sites] = createRows(fetch_sites, form.setError)
-	const [racks] = createRows(fetch_racks, form.setError)
+	const [racks] = createRowsFor(
+		() => ({ tenant: newObjectTenantId() ?? undefined }),
+		fetch_racks,
+		form.setError,
+	)
+	// A deep-linked or cloned rack may be outside the first page of options.
+	const [selectedRack] = createRecord(() => parseId(rackId()), fetch_rack, form.setError)
 	// Locations belong to a site, so the options follow the site picker.
 	const [locations] = createRowsFor(
 		() => parseId(siteId()),
@@ -122,13 +128,21 @@ export function DeviceAddPage(): JSX.Element {
 		}
 	}
 
-	// The tenant comes from the global tenant selection, which also limits the sites
-	// and employees.
+	// The tenant comes from the global tenant selection, which also limits the sites,
+	// racks and employees.
 	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
 	createEffect(() => {
 		const id = parseId(siteId())
 		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
 			handleSiteChange('')
+		}
+	})
+	createEffect(() => {
+		const rack = selectedRack()
+		const tenant = newObjectTenantId()
+		if (rack && rack.id === parseId(rackId()) && tenant !== null && rack.tenant_id !== tenant) {
+			setShelfId(null)
+			handleRackChange('')
 		}
 	})
 	createEffect(on(newObjectTenantId, () => setEmployeeId(''), { defer: true }))
