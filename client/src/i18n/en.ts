@@ -1054,6 +1054,9 @@ export const en = {
 	'floorplan.open': 'Open floor plan',
 	'floorplan.edit': 'Edit floor plan',
 	'floorplan.drawArea': 'Draw area',
+	'floorplan.snap': 'Snap and align',
+	'floorplan.snapHint':
+		'Snap areas to the corners and edges of other areas and align markers with other markers and area centers. Hold Alt to place freely.',
 	'floorplan.finishHint': 'Press Enter to finish the area.',
 	'floorplan.closePolygon': 'Finish the area',
 	'floorplan.selectTarget': 'Select area target',

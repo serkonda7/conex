@@ -25,12 +25,22 @@
  *   point of the coordinates, a handle moves it. Both are saved with the
  *   plan and drive the grid and the pointer readout.
  *
+ * - Snap (toggle, on by default; Alt skips it for one drag): area corners
+ *   snap to the corners and edges of the other areas, markers align with
+ *   other markers and area centers along guide lines (`floorplan_snap`).
+ *
  * Hidden layers are not drawn and so cannot be edited on the stage; placing
  * or selecting an object of one shows it again.
  *
  * All coordinates are clamped to 0..1.
  */
-import { IconCurrentLocation, IconPencilPlus, IconRulerMeasure, IconX } from '@tabler/icons-solidjs'
+import {
+	IconCurrentLocation,
+	IconMagnet,
+	IconPencilPlus,
+	IconRulerMeasure,
+	IconX,
+} from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import {
 	createMemo,
@@ -65,6 +75,15 @@ import { tenantContextFilters } from '../lib/tenant_context'
 import { InlineError, Loading } from './feedback'
 import { areaLayer, LayerBar, layerVisible, markerLayer, showLayer } from './floorplan_layers'
 import { focusObject, ObjectList, type PlanObject } from './floorplan_objects'
+import {
+	alignPoint,
+	type Guide,
+	type Metric,
+	snapEnabled,
+	snapPoint,
+	snapShift,
+	toggleSnap,
+} from './floorplan_snap'
 import {
 	areaCenter,
 	areaName,
@@ -528,6 +547,10 @@ export function FloorplanEditor(props: {
 	const [scaleDraft, setScaleDraft] = createSignal<{ a: Point; b: Point | null } | null>(null)
 	/** Scale points awaiting their distance in the dialog. */
 	const [askDistance, setAskDistance] = createSignal<{ a: Point; b: Point } | null>(null)
+	/** Alignment guides of the marker being dragged. */
+	const [guides, setGuides] = createSignal<Guide[]>([])
+	/** Point an area corner or edge snapped to, while drawing or dragging. */
+	const [snapMark, setSnapMark] = createSignal<Point | null>(null)
 	const [candidates] = createRows(() => fetch_floorplan_candidates(props.attachment.id), setError)
 	const save = useAction(setError)
 
@@ -594,13 +617,38 @@ export function FloorplanEditor(props: {
 		]
 	}
 
+	/** Screen px per plan unit at the current zoom. */
+	function metric(): Metric {
+		const { width, height } = zoom.size()
+		return { sx: width * zoom.scale(), sy: height * zoom.scale() }
+	}
+
+	/** True when a pointer event should snap: snapping is on and Alt is not held. */
+	function snapping(e: { altKey: boolean }): boolean {
+		return snapEnabled() && !e.altKey
+	}
+
+	/** Corners of the shown areas other than `exclude`, as snap targets. */
+	function snapPolygons(exclude: number | null = null): Point[][] {
+		return shownAreas()
+			.filter((area: FloorplanAreaJson) => area.id !== exclude)
+			.map((area: FloorplanAreaJson) => area.points)
+	}
+
+	/** `at` snapped onto the other areas while snapping, marking the snap point. */
+	function snapped(e: { altKey: boolean }, at: Point, exclude: number | null = null): Point {
+		const to = snapping(e) ? snapPoint(metric(), at, snapPolygons(exclude)) : null
+		setSnapMark(to)
+		return to ?? at
+	}
+
 	/**
 	 * Starts a pointer drag: `move` gets the distance from the start in plan
-	 * coordinates until the button is released.
+	 * coordinates (and the event) until the button is released.
 	 */
 	function startDrag(
 		e: PointerEvent,
-		move: (dx: number, dy: number) => void,
+		move: (dx: number, dy: number, ev: PointerEvent) => void,
 		end?: () => void,
 	): void {
 		e.preventDefault()
@@ -608,12 +656,14 @@ export function FloorplanEditor(props: {
 		const start = stagePoint(e)
 		const onMove = (ev: PointerEvent): void => {
 			const at = stagePoint(ev)
-			move(at[0] - start[0], at[1] - start[1])
+			move(at[0] - start[0], at[1] - start[1], ev)
 		}
 		const onUp = (): void => {
 			window.removeEventListener('pointermove', onMove)
 			window.removeEventListener('pointerup', onUp)
 			window.removeEventListener('pointercancel', onUp)
+			setGuides([])
+			setSnapMark(null)
 			end?.()
 		}
 		window.addEventListener('pointermove', onMove)
@@ -637,19 +687,28 @@ export function FloorplanEditor(props: {
 		setSelected(area.id)
 		setSelectedMarker(null)
 		const origin = area.points
-		startDrag(e, (dx: number, dy: number) =>
-			patchArea(area.id, { points: shiftPoints(origin, dx, dy) }),
-		)
+		startDrag(e, (dx: number, dy: number, ev: PointerEvent) => {
+			const shift = snapping(ev)
+				? snapShift(metric(), origin, dx, dy, snapPolygons(area.id))
+				: { dx, dy, at: null }
+			setSnapMark(shift.at)
+			patchArea(area.id, { points: shiftPoints(origin, shift.dx, shift.dy) })
+		})
 	}
 
 	function dragCorner(e: PointerEvent, area: FloorplanAreaJson, index: number): void {
 		const origin = area.points
-		startDrag(e, (dx: number, dy: number) =>
+		startDrag(e, (dx: number, dy: number, ev: PointerEvent) =>
 			patchArea(area.id, {
-				points: moveCorner(origin, index, [
-					clamp01(origin[index][0] + dx),
-					clamp01(origin[index][1] + dy),
-				]),
+				points: moveCorner(
+					origin,
+					index,
+					snapped(
+						ev,
+						[clamp01(origin[index][0] + dx), clamp01(origin[index][1] + dy)],
+						area.id,
+					),
+				),
 			}),
 		)
 	}
@@ -679,9 +738,24 @@ export function FloorplanEditor(props: {
 		setSelected(null)
 		setSelectedMarker(placement.id)
 		const [x, y] = [placement.x, placement.y]
-		startDrag(e, (dx: number, dy: number) =>
-			patchPlacement(placement.id, { x: clamp01(x + dx), y: clamp01(y + dy) }),
-		)
+		// Other markers and the area centers, as they stand when the drag starts.
+		const targets: Point[] = [
+			...shownPlacements()
+				.filter((p: FloorplanPlacementJson) => p.id !== placement.id)
+				.map((p: FloorplanPlacementJson): Point => [p.x, p.y]),
+			...shownAreas().map((area: FloorplanAreaJson): Point => {
+				const center = areaCenter(area)
+				return [center.x, center.y]
+			}),
+		]
+		startDrag(e, (dx: number, dy: number, ev: PointerEvent) => {
+			const at: Point = [clamp01(x + dx), clamp01(y + dy)]
+			const aligned = snapping(ev)
+				? alignPoint(metric(), at, targets)
+				: { point: at, guides: [] }
+			setGuides(aligned.guides)
+			patchPlacement(placement.id, { x: aligned.point[0], y: aligned.point[1] })
+		})
 	}
 
 	/** True while a rectangle is dragged out; a draft otherwise is a polygon in progress. */
@@ -705,10 +779,11 @@ export function FloorplanEditor(props: {
 			addPolygonPoint(e)
 			return
 		}
-		const from = stagePoint(e)
+		const pressed = stagePoint(e)
+		const from = snapped(e, pressed)
 		startDrag(
 			e,
-			(dx: number, dy: number) => {
+			(dx: number, dy: number, ev: PointerEvent) => {
 				if (
 					!rectDragging() &&
 					Math.abs(dx) < MIN_AREA_SIZE &&
@@ -718,7 +793,12 @@ export function FloorplanEditor(props: {
 				}
 				setRectDragging(true)
 				setHover(null)
-				setDraft(rectPoints(from, [clamp01(from[0] + dx), clamp01(from[1] + dy)]))
+				setDraft(
+					rectPoints(
+						from,
+						snapped(ev, [clamp01(pressed[0] + dx), clamp01(pressed[1] + dy)]),
+					),
+				)
 			},
 			() => {
 				if (!rectDragging()) {
@@ -740,7 +820,8 @@ export function FloorplanEditor(props: {
 	function addPolygonPoint(e: PointerEvent): void {
 		e.preventDefault()
 		e.stopPropagation()
-		const at = stagePoint(e)
+		const at = snapped(e, stagePoint(e))
+		setSnapMark(null)
 		const points = draft() ?? []
 		// The second click of a double click lands on the corner just added.
 		if (points.length > 0 && samePoint(points[points.length - 1], at)) {
@@ -1103,6 +1184,17 @@ export function FloorplanEditor(props: {
 									<polygon class="floorplan-draft" points={svgPoints(points())} />
 								)}
 							</Show>
+							<For each={guides()}>
+								{(guide: Guide) => (
+									<line
+										class="floorplan-guide"
+										x1={guide.axis === 'x' ? guide.at : guide.from}
+										x2={guide.axis === 'x' ? guide.at : guide.to}
+										y1={guide.axis === 'x' ? guide.from : guide.at}
+										y2={guide.axis === 'x' ? guide.to : guide.at}
+									/>
+								)}
+							</For>
 							<Show when={scaleLine()}>
 								{(line: () => { a: Point; b: Point }) => (
 									<line
@@ -1253,6 +1345,15 @@ export function FloorplanEditor(props: {
 								/>
 							)}
 						</Show>
+						<Show when={snapMark()}>
+							{(point: () => Point) => (
+								<span
+									class="floorplan-snap-mark"
+									style={{ left: percent(point()[0]), top: percent(point()[1]) }}
+									aria-hidden="true"
+								/>
+							)}
+						</Show>
 						<Show when={sequence() !== null}>
 							<div class="floorplan-sequence-layer" onPointerDown={placeNext} />
 						</Show>
@@ -1275,10 +1376,20 @@ export function FloorplanEditor(props: {
 							<div
 								class="floorplan-draw-layer"
 								onPointerDown={drawStart}
-								onPointerMove={(e: PointerEvent) =>
-									draft() !== null && !rectDragging() && setHover(stagePoint(e))
-								}
-								onPointerLeave={() => setHover(null)}
+								onPointerMove={(e: PointerEvent) => {
+									if (rectDragging()) {
+										return
+									}
+									// The snap mark shows ahead of the first corner too.
+									const at = snapped(e, stagePoint(e))
+									if (draft() !== null) {
+										setHover(at)
+									}
+								}}
+								onPointerLeave={() => {
+									setHover(null)
+									setSnapMark(null)
+								}}
 								onDblClick={finishPolygon}
 							/>
 							<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
@@ -1332,6 +1443,16 @@ export function FloorplanEditor(props: {
 							onClick={() => toggleDrawing(!drawing())}
 						>
 							<IconLabel icon={IconPencilPlus}>{t('floorplan.drawArea')}</IconLabel>
+						</button>
+						<button
+							type="button"
+							class="floorplan-draw-toggle floorplan-snap-toggle"
+							aria-pressed={snapEnabled()}
+							classList={{ active: snapEnabled() }}
+							title={t('floorplan.snapHint')}
+							onClick={toggleSnap}
+						>
+							<IconLabel icon={IconMagnet}>{t('floorplan.snap')}</IconLabel>
 						</button>
 						<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
 							<p class="floorplan-hint">{t('floorplan.finishHint')}</p>

@@ -1068,6 +1068,9 @@ export const de: Messages = {
 	'floorplan.open': 'Grundriss öffnen',
 	'floorplan.edit': 'Grundriss bearbeiten',
 	'floorplan.drawArea': 'Bereich zeichnen',
+	'floorplan.snap': 'Einrasten und ausrichten',
+	'floorplan.snapHint':
+		'Bereiche an Ecken und Kanten anderer Bereiche einrasten und Marker an anderen Markern und Bereichsmitten ausrichten. Alt gedrückt halten, um frei zu platzieren.',
 	'floorplan.finishHint': 'Enter drücken, um den Bereich abzuschließen.',
 	'floorplan.closePolygon': 'Bereich abschließen',
 	'floorplan.selectTarget': 'Ziel des Bereichs wählen',

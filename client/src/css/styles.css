@@ -3855,6 +3855,30 @@ span.attachment-star,
 	width: 100%;
 }
 
+.floorplan-snap-toggle {
+	margin-top: 0.4rem;
+}
+
+/* Snapping: alignment guides of a dragged marker and the point an area snapped to. */
+.floorplan-guide {
+	stroke: var(--primary);
+	stroke-width: 1;
+	stroke-dasharray: 4 3;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.floorplan-snap-mark {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	width: 0.7rem;
+	height: 0.7rem;
+	border: 2px solid var(--primary);
+	border-radius: 50%;
+	pointer-events: none;
+}
+
 .floorplan-palette h4,
 .floorplan-palette h5 {
 	margin: 0 0 0.4rem;
