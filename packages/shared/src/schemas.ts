@@ -2186,6 +2186,8 @@ export interface FloorplanLinkJson {
  * place on this plan. They lie in the owner's scope (its site, or the
  * location and its descendants), are visible to the requester and are not
  * placed on another plan. Those already on this plan are included.
+ * Devices in a rack (`devices.rack_id` set) are never candidates: the rack
+ * view manages them. A legacy marker of one stays on the plan until removed.
  */
 export interface FloorplanCandidateJson {
 	/** Exactly one of `rack_id` / `device_id` / `interface_id` is set. */

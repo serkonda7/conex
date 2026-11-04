@@ -575,7 +575,7 @@ function visibleTo(tenant: number | null, scopeTenantIds: readonly number[] | un
 	return inScope(tenant, scopeTenantIds)
 }
 
-/** Racks and devices the editor may place on a plan (`FloorplanCandidateJson`). */
+/** Racks, unracked devices and outlets the editor may place on a plan (`FloorplanCandidateJson`). */
 export async function listPlanCandidates(
 	id: number,
 	scopeTenantIds?: readonly number[],
@@ -622,6 +622,8 @@ export async function listPlanCandidates(
 		.where(
 			and(
 				containedIn(devices, owner, locationIds),
+				// Racked devices are managed in the rack view, not on plans.
+				isNull(devices.rack_id),
 				free,
 				scopeCondition(devices.tenant_id, scopeTenantIds),
 			),

@@ -17,6 +17,11 @@
  *   with pointer events and are removed with ×.
  * - Place in sequence: per panel, each click on the stage places the
  *   panel's next free outlet (Escape or the toggle ends it).
+ * - On the plan: the object list (second tab of the side panel) selects,
+ *   renames and deletes areas and markers; it shares the palette's search.
+ *
+ * Hidden layers are not drawn and so cannot be edited on the stage; placing
+ * or selecting an object of one shows it again.
  *
  * All coordinates are clamped to 0..1.
  */
@@ -45,15 +50,19 @@ import {
 	fetch_floorplan_candidates,
 	put_floorplan,
 } from '../api/attachments'
+import type { LocationType } from '../api/tenancy'
 import { fetch_locations, fetch_sites } from '../api/tenancy'
 import { t, tp } from '../i18n'
 import { createRows, useAction } from '../lib/resource'
 import { useLeaveGuard } from '../lib/router'
 import { tenantContextFilters } from '../lib/tenant_context'
 import { InlineError, Loading } from './feedback'
+import { areaLayer, LayerBar, layerVisible, markerLayer, showLayer } from './floorplan_layers'
+import { focusObject, ObjectList, type PlanObject } from './floorplan_objects'
 import {
 	areaCenter,
 	areaName,
+	createStageZoom,
 	FloorplanStage,
 	markerClasses,
 	markerIcon,
@@ -197,6 +206,14 @@ interface AreaTarget {
 	kind: TargetKind
 	id: number
 	name: string
+	/** Location type of a location target, for its layer. */
+	type: LocationType | null
+}
+
+interface TargetRow {
+	id: number
+	name: string
+	type?: LocationType
 }
 
 /** Modal to pick the site or location a new area links to. */
@@ -215,9 +232,9 @@ function AreaTargetPicker(props: {
 				(kindOf === 'site' ? area.site_id : area.location_id) === id,
 		)
 
-	const load = async (search: string): Promise<Result<{ id: number; name: string }[], Error>> => {
+	const load = async (search: string): Promise<Result<TargetRow[], Error>> => {
 		const filters = { search, ...tenantContextFilters() }
-		const res: Result<{ items: { id: number; name: string }[] }, Error> =
+		const res: Result<{ items: TargetRow[] }, Error> =
 			kind() === 'site' ? await fetch_sites(filters) : await fetch_locations(filters)
 		if (Result.isError(res)) {
 			return Result.err(res.error)
@@ -253,8 +270,13 @@ function AreaTargetPicker(props: {
 							<ObjectSearch
 								load={load}
 								get_label={(row: { name: string }) => row.name}
-								on_select={(row: { id: number; name: string }) =>
-									props.on_select({ kind: option, id: row.id, name: row.name })
+								on_select={(row: TargetRow) =>
+									props.on_select({
+										kind: option,
+										id: row.id,
+										name: row.name,
+										type: row.type ?? null,
+									})
 								}
 							/>
 						</Match>
@@ -273,12 +295,12 @@ interface PaletteGroup {
 }
 
 /**
- * The side list of the editor: `actions` on top, then a search field plus
- * the unplaced racks and devices, grouped by location, and the unplaced
- * outlets, grouped by panel (in port order) with a sequence toggle each.
+ * Palette tab of the side panel: the unplaced racks and devices, grouped by
+ * location, and the unplaced outlets, grouped by panel (in port order) with
+ * a sequence toggle each, filtered by `search`.
  */
 function Palette(props: {
-	actions: JSX.Element
+	search: string
 	candidates: FloorplanCandidateJson[] | undefined
 	loading: boolean
 	placed: Set<string>
@@ -288,9 +310,8 @@ function Palette(props: {
 	on_drag: (key: string | null) => void
 	on_place: (candidate: FloorplanCandidateJson) => void
 }): JSX.Element {
-	const [search, setSearch] = createSignal('')
 	const groups = createMemo(() => {
-		const needle = search().trim().toLowerCase()
+		const needle = props.search.trim().toLowerCase()
 		const byGroup = new Map<string, PaletteGroup>()
 		for (const candidate of props.candidates ?? []) {
 			if (props.placed.has(candidateKey(candidate))) {
@@ -329,87 +350,73 @@ function Palette(props: {
 	})
 
 	return (
-		<aside class="floorplan-palette" aria-label={t('floorplan.palette')}>
-			<div class="floorplan-palette-actions">{props.actions}</div>
-			<h4>{t('floorplan.palette')}</h4>
-			<input
-				type="search"
-				class="floorplan-palette-search"
-				placeholder={t('floorplan.paletteSearch')}
-				aria-label={t('floorplan.paletteSearch')}
-				value={search()}
-				onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
-					setSearch(e.currentTarget.value)
-				}
-			/>
-			<Show when={!props.loading} fallback={<Loading message={t('common.loading')} />}>
-				<Show
-					when={groups().length > 0}
-					fallback={<p class="floorplan-hint">{t('floorplan.paletteEmpty')}</p>}
-				>
-					<For each={groups()}>
-						{(group: PaletteGroup) => (
-							<section>
-								<div class="floorplan-palette-group-header">
-									<h5>{group.name}</h5>
-									<Show when={group.panel_id}>
-										{(panelId: () => number) => (
+		<Show when={!props.loading} fallback={<Loading message={t('common.loading')} />}>
+			<Show
+				when={groups().length > 0}
+				fallback={<p class="floorplan-hint">{t('floorplan.paletteEmpty')}</p>}
+			>
+				<For each={groups()}>
+					{(group: PaletteGroup) => (
+						<section>
+							<div class="floorplan-palette-group-header">
+								<h5>{group.name}</h5>
+								<Show when={group.panel_id}>
+									{(panelId: () => number) => (
+										<button
+											type="button"
+											class="floorplan-palette-sequence"
+											classList={{ active: props.sequence === panelId() }}
+											aria-pressed={props.sequence === panelId()}
+											title={t('floorplan.sequenceHint')}
+											onClick={() =>
+												props.on_sequence(
+													props.sequence === panelId() ? null : panelId(),
+												)
+											}
+										>
+											{t('floorplan.sequence')}
+										</button>
+									)}
+								</Show>
+							</div>
+							<ul>
+								<For each={group.items}>
+									{(candidate: FloorplanCandidateJson) => (
+										<li>
 											<button
 												type="button"
-												class="floorplan-palette-sequence"
-												classList={{ active: props.sequence === panelId() }}
-												aria-pressed={props.sequence === panelId()}
-												title={t('floorplan.sequenceHint')}
-												onClick={() =>
-													props.on_sequence(
-														props.sequence === panelId()
-															? null
-															: panelId(),
+												class="floorplan-palette-item"
+												draggable="true"
+												title={t('floorplan.placeHint')}
+												onDragStart={(e: DragEvent) => {
+													e.dataTransfer?.setData(
+														'text/plain',
+														candidateKey(candidate),
 													)
-												}
+													props.on_drag(candidateKey(candidate))
+												}}
+												onDragEnd={() => props.on_drag(null)}
+												onClick={() => props.on_place(candidate)}
 											>
-												{t('floorplan.sequence')}
+												<Dynamic
+													component={markerIcon(candidate)}
+													size={14}
+												/>
+												<span>{candidate.name}</span>
 											</button>
-										)}
-									</Show>
-								</div>
-								<ul>
-									<For each={group.items}>
-										{(candidate: FloorplanCandidateJson) => (
-											<li>
-												<button
-													type="button"
-													class="floorplan-palette-item"
-													draggable="true"
-													title={t('floorplan.placeHint')}
-													onDragStart={(e: DragEvent) => {
-														e.dataTransfer?.setData(
-															'text/plain',
-															candidateKey(candidate),
-														)
-														props.on_drag(candidateKey(candidate))
-													}}
-													onDragEnd={() => props.on_drag(null)}
-													onClick={() => props.on_place(candidate)}
-												>
-													<Dynamic
-														component={markerIcon(candidate)}
-														size={14}
-													/>
-													<span>{candidate.name}</span>
-												</button>
-											</li>
-										)}
-									</For>
-								</ul>
-							</section>
-						)}
-					</For>
-				</Show>
+										</li>
+									)}
+								</For>
+							</ul>
+						</section>
+					)}
+				</For>
 			</Show>
-		</aside>
+		</Show>
 	)
 }
+
+type SideTab = 'palette' | 'objects'
 
 /** Edit mode of one floor plan; replaces the view until saved or cancelled. */
 export function FloorplanEditor(props: {
@@ -426,6 +433,10 @@ export function FloorplanEditor(props: {
 		props.plan.placements,
 	)
 	const [selected, setSelected] = createSignal<number | null>(null)
+	const [selectedMarker, setSelectedMarker] = createSignal<number | null>(null)
+	const [tab, setTab] = createSignal<SideTab>('palette')
+	const [search, setSearch] = createSignal('')
+	const zoom = createStageZoom()
 	const [drawing, setDrawing] = createSignal(false)
 	/** Area being drawn (rectangle or polygon corners), then held while its target is picked. */
 	const [draft, setDraft] = createSignal<Point[] | null>(null)
@@ -452,8 +463,28 @@ export function FloorplanEditor(props: {
 			),
 	)
 	const selectedArea = createMemo(() =>
-		areas().find((area: FloorplanAreaJson) => area.id === selected()),
+		areas().find(
+			(area: FloorplanAreaJson) => area.id === selected() && layerVisible(areaLayer(area)),
+		),
 	)
+	const shownAreas = (): FloorplanAreaJson[] =>
+		areas().filter((area: FloorplanAreaJson) => layerVisible(areaLayer(area)))
+	const shownPlacements = (): FloorplanPlacementJson[] =>
+		placements().filter((p: FloorplanPlacementJson) => layerVisible(markerLayer(p)))
+	const selectedObject = (): PlanObject | null => {
+		const area = selected()
+		if (area !== null) {
+			return { kind: 'area', id: area }
+		}
+		const marker = selectedMarker()
+		return marker !== null ? { kind: 'marker', id: marker } : null
+	}
+
+	function selectObject(object: PlanObject): void {
+		setSelected(object.kind === 'area' ? object.id : null)
+		setSelectedMarker(object.kind === 'marker' ? object.id : null)
+		focusObject(zoom, object, areas(), placements())
+	}
 
 	// The browser asks before a reload or tab close would drop the draft.
 	const warnUnload = (e: BeforeUnloadEvent): void => {
@@ -519,6 +550,7 @@ export function FloorplanEditor(props: {
 
 	function dragArea(e: PointerEvent, area: FloorplanAreaJson): void {
 		setSelected(area.id)
+		setSelectedMarker(null)
 		const origin = area.points
 		startDrag(e, (dx: number, dy: number) =>
 			patchArea(area.id, { points: shiftPoints(origin, dx, dy) }),
@@ -560,6 +592,7 @@ export function FloorplanEditor(props: {
 
 	function dragMarker(e: PointerEvent, placement: FloorplanPlacementJson): void {
 		setSelected(null)
+		setSelectedMarker(placement.id)
 		const [x, y] = [placement.x, placement.y]
 		startDrag(e, (dx: number, dy: number) =>
 			patchPlacement(placement.id, { x: clamp01(x + dx), y: clamp01(y + dy) }),
@@ -698,10 +731,16 @@ export function FloorplanEditor(props: {
 				label: null,
 				points,
 				target_name: target.name,
-				target_type: null,
+				target_type: target.type,
 				target_plan_id: null,
 			},
 		])
+		showLayer(
+			areaLayer({
+				site_id: target.kind === 'site' ? target.id : null,
+				target_type: target.type,
+			}),
+		)
 		setSelected(id)
 	}
 
@@ -712,10 +751,20 @@ export function FloorplanEditor(props: {
 		setSelected(null)
 	}
 
+	function removeMarker(id: number): void {
+		setPlacements((all: FloorplanPlacementJson[]) =>
+			all.filter((p: FloorplanPlacementJson) => p.id !== id),
+		)
+		if (selectedMarker() === id) {
+			setSelectedMarker(null)
+		}
+	}
+
 	function addPlacement(candidate: FloorplanCandidateJson, at: Point): void {
 		if (placed().has(candidateKey(candidate))) {
 			return
 		}
+		showLayer(markerLayer(candidate))
 		setPlacements((all: FloorplanPlacementJson[]) => [
 			...all,
 			{
@@ -743,6 +792,9 @@ export function FloorplanEditor(props: {
 
 	function startSequence(panelId: number | null): void {
 		toggleDrawing(false)
+		if (panelId !== null) {
+			showLayer('marker-outlet')
+		}
 		setSequence(panelId)
 	}
 
@@ -813,13 +865,18 @@ export function FloorplanEditor(props: {
 				)}
 			</Show>
 			<InlineError message={error()} />
-			<div class="floorplan-edit-layout">
+			<div class="floorplan-layout">
 				<div>
+					<LayerBar areas={areas()} placements={placements()} />
 					<FloorplanStage
 						attachment={props.attachment}
+						zoom={zoom}
 						ref={setStage}
 						handlers={{
-							onPointerDown: () => setSelected(null),
+							onPointerDown: () => {
+								setSelected(null)
+								setSelectedMarker(null)
+							},
 							onDragOver: (e: DragEvent) => {
 								if (dragged() !== null) {
 									e.preventDefault()
@@ -834,10 +891,10 @@ export function FloorplanEditor(props: {
 							preserveAspectRatio="none"
 							aria-hidden="true"
 						>
-							<For each={areas()}>
+							<For each={shownAreas()}>
 								{(area: FloorplanAreaJson) => (
 									<g
-										class="floorplan-area floorplan-area-editing"
+										class={`floorplan-area floorplan-area-editing floorplan-layer-${areaLayer(area)}`}
 										classList={{ selected: selected() === area.id }}
 										onPointerDown={(e: PointerEvent) => dragArea(e, area)}
 									>
@@ -851,7 +908,7 @@ export function FloorplanEditor(props: {
 								)}
 							</Show>
 						</svg>
-						<For each={areas()}>
+						<For each={shownAreas()}>
 							{(area: FloorplanAreaJson) => (
 								<span
 									class="floorplan-area-label floorplan-area-label-static"
@@ -905,11 +962,14 @@ export function FloorplanEditor(props: {
 								</>
 							)}
 						</Show>
-						<For each={placements()}>
+						<For each={shownPlacements()}>
 							{(placement: FloorplanPlacementJson) => (
 								<div
 									class="floorplan-marker floorplan-marker-editing"
-									classList={markerClasses(placement)}
+									classList={{
+										...markerClasses(placement),
+										selected: selectedMarker() === placement.id,
+									}}
 									style={{
 										left: percent(placement.x),
 										top: percent(placement.y),
@@ -928,14 +988,7 @@ export function FloorplanEditor(props: {
 											name: placement.name,
 										})}
 										onPointerDown={(e: PointerEvent) => e.stopPropagation()}
-										onClick={() =>
-											setPlacements((all: FloorplanPlacementJson[]) =>
-												all.filter(
-													(p: FloorplanPlacementJson) =>
-														p.id !== placement.id,
-												),
-											)
-										}
+										onClick={() => removeMarker(placement.id)}
 									>
 										<IconX size={10} />
 									</button>
@@ -998,38 +1051,96 @@ export function FloorplanEditor(props: {
 						)}
 					</Show>
 				</div>
-				<Palette
-					actions={
-						<>
-							<button
-								type="button"
-								class="floorplan-draw-toggle"
-								aria-pressed={drawing()}
-								classList={{ active: drawing() }}
-								onClick={() => toggleDrawing(!drawing())}
-							>
-								<IconLabel icon={IconPencilPlus}>
-									{t('floorplan.drawArea')}
-								</IconLabel>
-							</button>
-							<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
-								<p class="floorplan-hint">{t('floorplan.finishHint')}</p>
-							</Show>
-							<Show when={sequence() !== null}>
-								<p class="floorplan-hint">{t('floorplan.sequenceActive')}</p>
-							</Show>
-						</>
-					}
-					candidates={candidates()}
-					loading={candidates.loading}
-					placed={placed()}
-					sequence={sequence()}
-					on_sequence={startSequence}
-					on_drag={setDragged}
-					on_place={(candidate: FloorplanCandidateJson) =>
-						addPlacement(candidate, [0.5, 0.5])
-					}
-				/>
+				<aside class="floorplan-palette" aria-label={t('floorplan.palette')}>
+					<div class="floorplan-palette-actions">
+						<button
+							type="button"
+							class="floorplan-draw-toggle"
+							aria-pressed={drawing()}
+							classList={{ active: drawing() }}
+							onClick={() => toggleDrawing(!drawing())}
+						>
+							<IconLabel icon={IconPencilPlus}>{t('floorplan.drawArea')}</IconLabel>
+						</button>
+						<Show when={(draft()?.length ?? 0) >= 3 && !rectDragging()}>
+							<p class="floorplan-hint">{t('floorplan.finishHint')}</p>
+						</Show>
+						<Show when={sequence() !== null}>
+							<p class="floorplan-hint">{t('floorplan.sequenceActive')}</p>
+						</Show>
+					</div>
+					<div class="floorplan-kinds floorplan-side-tabs">
+						<button
+							type="button"
+							class="floorplan-side-tab"
+							aria-pressed={tab() === 'palette'}
+							classList={{ active: tab() === 'palette' }}
+							onClick={() => setTab('palette')}
+						>
+							{t('floorplan.paletteTab')}
+						</button>
+						<button
+							type="button"
+							class="floorplan-side-tab"
+							aria-pressed={tab() === 'objects'}
+							classList={{ active: tab() === 'objects' }}
+							onClick={() => setTab('objects')}
+						>
+							{t('floorplan.objectsTab', {
+								count: areas().length + placements().length,
+							})}
+						</button>
+					</div>
+					<input
+						type="search"
+						class="floorplan-palette-search"
+						placeholder={
+							tab() === 'palette'
+								? t('floorplan.paletteSearch')
+								: t('floorplan.objectSearch')
+						}
+						aria-label={
+							tab() === 'palette'
+								? t('floorplan.paletteSearch')
+								: t('floorplan.objectSearch')
+						}
+						value={search()}
+						onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
+							setSearch(e.currentTarget.value)
+						}
+					/>
+					<Show
+						when={tab() === 'palette'}
+						fallback={
+							<ObjectList
+								areas={areas()}
+								placements={placements()}
+								search={search()}
+								selected={selectedObject()}
+								on_select={selectObject}
+								actions={{
+									rename_area: (id: number, label: string) =>
+										patchArea(id, { label }),
+									delete_area: deleteArea,
+									remove_marker: removeMarker,
+								}}
+							/>
+						}
+					>
+						<Palette
+							search={search()}
+							candidates={candidates()}
+							loading={candidates.loading}
+							placed={placed()}
+							sequence={sequence()}
+							on_sequence={startSequence}
+							on_drag={setDragged}
+							on_place={(candidate: FloorplanCandidateJson) =>
+								addPlacement(candidate, zoom.viewCenter())
+							}
+						/>
+					</Show>
+				</aside>
 			</div>
 			<Show when={picking()}>
 				<AreaTargetPicker
