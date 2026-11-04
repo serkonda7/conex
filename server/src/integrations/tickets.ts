@@ -6,7 +6,7 @@
  * tickets of a linked tenant, cached per company for `TICKET_CACHE_SECONDS`.
  */
 import { Result } from 'better-result'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { priorityLabel } from 'shared/src/priority'
 import type {
 	ExternalTicketJson,
@@ -18,7 +18,7 @@ import type {
 import { getDb } from '../db/connection'
 import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { findOne } from '../db/list'
-import { devices, employees, priorities, tenants } from '../schema'
+import { devices, employee_tenants, employees, priorities, tenants } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { normalizeName } from './match'
@@ -68,7 +68,14 @@ export async function createTicket(
 		if (!employee) {
 			return Result.err(new NotFoundError('Employee not found'))
 		}
-		if (employee.tenant_id !== tenant.id) {
+		const membership = await findOne(
+			employee_tenants,
+			and(
+				eq(employee_tenants.employee_id, employee.id),
+				eq(employee_tenants.tenant_id, tenant.id),
+			),
+		)
+		if (!membership) {
 			return Result.err(new ValidationError('Employee does not belong to the tenant'))
 		}
 		externalEmployeeId = (await linkOf(provider, 'employee', employee.id))?.external_id

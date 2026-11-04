@@ -15,6 +15,7 @@ import type {
 } from 'shared/src/schemas'
 import { primaryEmail } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
+import { memberOf } from '../db/employees'
 import { devices, employees, tenant_groups, tenants } from '../schema'
 import { type ExternalLinkRow, linkOf, listLinks } from './links'
 import { group, matchDevices, matchEmployees, normalizeName } from './match'
@@ -275,7 +276,7 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 
 /** Like {@link deviceBoard}: employees of one tenant against its company's. */
 export async function employeeBoard(provider: ProviderId, tenantId: number): Promise<LinkBoard> {
-	const locals = (await localEmployees(eq(employees.tenant_id, tenantId))).sort((a, b) =>
+	const locals = (await localEmployees(memberOf(tenantId))).sort((a, b) =>
 		a.name.localeCompare(b.name),
 	)
 	const tenantLink = await linkOf(provider, 'tenant', tenantId)

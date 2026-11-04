@@ -96,8 +96,13 @@ export function EmployeesPage(): JSX.Element {
 		},
 		{
 			key: 'tenant',
-			label: tp('entity.tenant', 1),
-			getValue: (e: EmployeeRow): string => tenantName(e.tenant_id),
+			label: t('employee.tenants'),
+			// Tenants outside the user's scope are not listed.
+			getValue: (e: EmployeeRow): string =>
+				e.tenant_ids
+					.filter((id) => tenants()?.some((row) => row.id === id))
+					.map(tenantName)
+					.join(', ') || '—',
 		},
 		{
 			key: 'status',

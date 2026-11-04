@@ -25,7 +25,9 @@ export function EmployeeAssignmentField(props: {
 			value={props.value}
 			onChange={props.onChange}
 			options={row_options(
-				(employees() ?? []).filter((row) => row.tenant_id === props.tenantId),
+				(employees() ?? []).filter(
+					(row) => props.tenantId !== null && row.tenant_ids.includes(props.tenantId),
+				),
 			)}
 			emptyLabel={props.emptyLabel ?? t('device.noEmployee')}
 			disabled={props.tenantId === null || employees.loading}

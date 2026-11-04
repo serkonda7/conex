@@ -65,7 +65,7 @@ export const cablesApp = new Hono()
 				status: query.status,
 				interface: query.interface,
 				device: query.device,
-				scopeTenantId: requestScope(c),
+				scopeTenantIds: requestScope(c),
 			}),
 		)
 	})

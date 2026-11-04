@@ -17,6 +17,7 @@ import {
 	device_roles,
 	device_types,
 	devices,
+	employee_tenants,
 	employees,
 	locations,
 	manufacturers,
@@ -349,7 +350,6 @@ if (e2eSite && e2eRackType) {
 
 // Employee with several mail addresses and phone numbers for the visual suite.
 const visualEmployee: typeof employees.$inferInsert = {
-	tenant_id: tenant.id,
 	salutation: 'ms',
 	first_name: 'Erika',
 	last_name: 'E2E Visual',
@@ -374,7 +374,16 @@ const existingEmployee = (await db.select().from(employees)).find(
 if (existingEmployee) {
 	await getSqlClient()`DELETE FROM employees WHERE id = ${existingEmployee.id}`
 }
-await db.insert(employees).values(visualEmployee)
+const [insertedEmployee]: { id: number }[] = await db
+	.insert(employees)
+	.values(visualEmployee)
+	.returning({ id: employees.id })
+if (!insertedEmployee) {
+	throw new Error('Insert returned no employee')
+}
+await db
+	.insert(employee_tenants)
+	.values({ employee_id: insertedEmployee.id, tenant_id: tenant.id, position: 0 })
 
 if (!(await getUserByUsername(username))) {
 	await createLocalUser(username, await Bun.password.hash(password), await fullAccessRoleId())

@@ -18,8 +18,8 @@ function openDeviceId(): number | null {
 
 /**
  * Top-bar "Ticket" button next to the tenant context (`tickets.create`):
- * opens `/tickets/add` in its own tab, which uses the user's own tenant
- * (scoped users) or the selected tenant context. The device open in the
+ * opens `/tickets/add` in its own tab, which uses the user's only tenant
+ * or the selected tenant context. The device open in the
  * active tab is preselected, along with the employee it is assigned to, when
  * it belongs to that tenant.
  */

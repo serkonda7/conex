@@ -1,28 +1,81 @@
 import { Result } from 'better-result'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, notInArray, type SQL, sql } from 'drizzle-orm'
 import type { EmployeeCreate, EmployeeUpdate } from 'shared/src/schemas'
-import { devices, employees, external_links, virtual_machines } from '../schema'
-import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
-import { ConflictError, NotFoundError } from './errors'
 import {
-	checkTenantExists,
-	findById,
+	devices,
+	employee_tenants,
+	employees,
+	external_links,
+	role_permissions,
+	tenants,
+	users,
+	virtual_machines,
+} from '../schema'
+import { logCreate, logDelete, logUpdate } from './changelog'
+import { getDb, withTransaction } from './connection'
+import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import {
 	findOne,
 	insertedId,
 	isPatchEmpty,
 	type ListParams,
+	offsetOf,
 	orderOf,
 	type Page,
-	pageRows,
+	pageOf,
 	pickDefined,
 	searchCondition,
 	type TenantFilterParams,
 	tenantConditions,
 	tryWrite,
 } from './list'
+import { countGlobalManagers } from './roles'
+import { nextLogin } from './users'
 
-export type EmployeeRow = typeof employees.$inferSelect
+/**
+ * Employee with its tenants in membership order (first = primary) and the
+ * username of its account (`login`, its primary mail address), if any.
+ */
+export type EmployeeRow = typeof employees.$inferSelect & {
+	tenant_ids: number[]
+	login: string | null
+}
+
+/** Tenant ids of the selected employee, in membership order. */
+// jsonb, not an int array: Bun's driver returns int arrays as `Int32Array`.
+export const employeeTenantIds: SQL<number[]> = sql<number[]>`coalesce((
+	select jsonb_agg(${employee_tenants.tenant_id} order by ${employee_tenants.position})
+	from ${employee_tenants}
+	where ${employee_tenants.employee_id} = ${employees.id}
+), '[]'::jsonb)`
+
+/** Username of the selected employee's account, null without one. */
+// Qualified by hand: interpolated columns render unqualified, and `id` would bind to `users`.
+const employeeLogin: SQL<string | null> = sql<string | null>`(
+	select "u"."username" from ${users} as "u" where "u"."employee_id" = ${employees}."id"
+)`
+
+/** Columns of an `EmployeeRow`. */
+export const employeeColumns: ReturnType<typeof getTableColumns<typeof employees>> & {
+	tenant_ids: SQL<number[]>
+	login: SQL<string | null>
+} = { ...getTableColumns(employees), tenant_ids: employeeTenantIds, login: employeeLogin }
+
+/**
+ * Employees with a membership matching all `conditions` (on
+ * `employee_tenants` columns); `undefined` when there are none.
+ */
+export function memberCondition(conditions: SQL[]): SQL | undefined {
+	if (conditions.length === 0) {
+		return undefined
+	}
+	return sql`exists (select 1 from ${employee_tenants} where ${employee_tenants.employee_id} = ${employees.id} and ${and(...conditions)})`
+}
+
+/** Employees belonging to `tenantId`. */
+export function memberOf(tenantId: number): SQL | undefined {
+	return memberCondition([eq(employee_tenants.tenant_id, tenantId)])
+}
 
 /** Device and VM assignments cannot expose or link contacts from another tenant. */
 export async function checkEmployeeAssignment(
@@ -35,17 +88,17 @@ export async function checkEmployeeAssignment(
 	if (tenantId === null || tenantId === undefined) {
 		return Result.err(new ConflictError('Select a tenant before assigning an employee'))
 	}
-	const employee = await findOne(
-		employees,
-		and(eq(employees.id, employeeId), eq(employees.tenant_id, tenantId)),
+	const membership = await findOne(
+		employee_tenants,
+		and(eq(employee_tenants.employee_id, employeeId), eq(employee_tenants.tenant_id, tenantId)),
 	)
-	return employee
+	return membership
 		? Result.ok(undefined)
 		: Result.err(new NotFoundError('Employee not found in this tenant'))
 }
 
 // ---------------------------------------------------------------------------
-// Employees: contact persons of a tenant. Integrations link them to external
+// Employees: contact persons of tenants. Integrations link them to external
 // contacts (`external_links`, entity type `employee`).
 // ---------------------------------------------------------------------------
 
@@ -55,7 +108,7 @@ export interface EmployeeListParams extends ListParams, TenantFilterParams {
 	order: 'asc' | 'desc'
 }
 
-export function listEmployees(params: EmployeeListParams): Promise<Page<EmployeeRow>> {
+export async function listEmployees(params: EmployeeListParams): Promise<Page<EmployeeRow>> {
 	const where = and(
 		searchCondition(params.search, [
 			employees.name,
@@ -64,7 +117,7 @@ export function listEmployees(params: EmployeeListParams): Promise<Page<Employee
 			sql`jsonb_path_query_array(${employees.phones}, '$[*].number')::text`,
 		]),
 		params.active !== undefined ? eq(employees.active, params.active ? 1 : 0) : undefined,
-		...tenantConditions(employees.tenant_id, params),
+		memberCondition(tenantConditions(employee_tenants.tenant_id, params)),
 	)
 	const orderColumn = {
 		name: employees.name,
@@ -74,26 +127,70 @@ export function listEmployees(params: EmployeeListParams): Promise<Page<Employee
 		// Primary (first) address.
 		email: sql`${employees.emails}->0->>'address'`,
 	}[params.sort]
-	return pageRows(
-		employees,
-		where,
-		[orderOf(orderColumn, params.order), asc(employees.name), asc(employees.id)],
-		params,
-	)
+	const db = getDb()
+	const items = await db
+		.select(employeeColumns)
+		.from(employees)
+		.where(where)
+		.orderBy(orderOf(orderColumn, params.order), asc(employees.name), asc(employees.id))
+		.limit(params.limit)
+		.offset(offsetOf(params))
+	return pageOf(items, await db.$count(employees, where), params)
 }
 
-export function getEmployee(id: number): Promise<Result<EmployeeRow, Error>> {
-	return findById(employees, id, 'Employee not found')
+export async function getEmployee(id: number): Promise<Result<EmployeeRow, Error>> {
+	const [row] = await getDb()
+		.select(employeeColumns)
+		.from(employees)
+		.where(eq(employees.id, id))
+		.limit(1)
+	return row ? Result.ok(row) : Result.err(new NotFoundError('Employee not found'))
+}
+
+/** Every id in `tenantIds` must name an existing tenant. */
+async function checkTenantsExist(tenantIds: readonly number[]): Promise<Result<undefined, Error>> {
+	const found = await getDb().$count(tenants, inArray(tenants.id, [...tenantIds]))
+	return found === new Set(tenantIds).size
+		? Result.ok(undefined)
+		: Result.err(new NotFoundError('Tenant not found'))
+}
+
+/**
+ * Sets the memberships of an employee to `tenantIds`, in order. Kept
+ * memberships are updated in place, so assignments referencing them stay valid.
+ */
+async function writeMemberships(employeeId: number, tenantIds: readonly number[]): Promise<void> {
+	const db = getDb()
+	await db
+		.delete(employee_tenants)
+		.where(
+			and(
+				eq(employee_tenants.employee_id, employeeId),
+				notInArray(employee_tenants.tenant_id, [...tenantIds]),
+			),
+		)
+	await db
+		.insert(employee_tenants)
+		.values(
+			tenantIds.map((tenant_id, position) => ({
+				employee_id: employeeId,
+				tenant_id,
+				position,
+			})),
+		)
+		.onConflictDoUpdate({
+			target: [employee_tenants.employee_id, employee_tenants.tenant_id],
+			set: { position: sql`excluded.position` },
+		})
 }
 
 export async function createEmployee(input: EmployeeCreate): Promise<Result<EmployeeRow, Error>> {
-	const tenant = await checkTenantExists(input.tenant_id)
+	const tenant = await checkTenantsExist(input.tenant_ids)
 	if (Result.isError(tenant)) {
 		return tenant
 	}
 	// `name` is generated from first + last name.
 	const row: Omit<typeof employees.$inferInsert, 'id'> = {
-		tenant_id: input.tenant_id,
 		first_name: input.first_name ?? null,
 		last_name: input.last_name,
 		salutation: input.salutation ?? null,
@@ -104,8 +201,14 @@ export async function createEmployee(input: EmployeeCreate): Promise<Result<Empl
 		description: input.description ?? null,
 		comments: input.comments ?? null,
 	}
-	const id = await tryWrite(async () =>
-		insertedId(await getDb().insert(employees).values(row).returning({ id: employees.id })),
+	const id = await tryWrite(() =>
+		withTransaction(async () => {
+			const created = insertedId(
+				await getDb().insert(employees).values(row).returning({ id: employees.id }),
+			)
+			await writeMemberships(created, input.tenant_ids)
+			return created
+		}),
 	)
 	if (Result.isError(id)) {
 		return id
@@ -113,24 +216,54 @@ export async function createEmployee(input: EmployeeCreate): Promise<Result<Empl
 	return await logCreate('employee', await getEmployee(id.value))
 }
 
+/**
+ * The account of an employee signs in with its primary mail address, which
+ * follows the mail list (see `nextLogin`); only user managers
+ * (`mayChangeLogin`) change it.
+ */
 export async function updateEmployee(
 	id: number,
 	input: EmployeeUpdate,
+	opts: { mayChangeLogin: boolean },
 ): Promise<Result<EmployeeRow, Error>> {
 	const current = await getEmployee(id)
 	if (Result.isError(current)) {
 		return current
 	}
-	const tenant = await checkTenantExists(input.tenant_id)
-	if (Result.isError(tenant)) {
-		return tenant
+	const login =
+		input.emails === undefined
+			? Result.ok(null)
+			: await nextLogin(id, current.value.emails, input.emails, opts.mayChangeLogin)
+	if (Result.isError(login)) {
+		return login
+	}
+	const tenantIds = input.tenant_ids
+	if (tenantIds !== undefined) {
+		const tenant = await checkTenantsExist(tenantIds)
+		if (Result.isError(tenant)) {
+			return tenant
+		}
+		const removed = current.value.tenant_ids.filter((t) => !tenantIds.includes(t))
+		if (removed.length > 0 && (await hasAssignments(id, removed))) {
+			return Result.err(
+				new ConflictError(
+					'Employee still has assigned devices or virtual machines in a removed tenant; unassign them first',
+				),
+			)
+		}
+	}
+	if (input.active === false && current.value.active === 1 && (await isLastManager(id))) {
+		return Result.err(
+			new ConflictError(
+				'The employee has the last account able to manage users; it cannot be deactivated',
+			),
+		)
 	}
 	const patch = {
 		...pickDefined(input, [
 			'first_name',
 			'last_name',
 			'salutation',
-			'tenant_id',
 			'title',
 			'emails',
 			'phones',
@@ -139,20 +272,31 @@ export async function updateEmployee(
 		]),
 		...(input.active !== undefined ? { active: input.active ? 1 : 0 } : {}),
 	}
-	if (
-		input.tenant_id !== undefined &&
-		input.tenant_id !== current.value.tenant_id &&
-		(await hasAssignments(id))
-	) {
-		return Result.err(
-			new ConflictError(
-				'Employee still has assigned devices or virtual machines; unassign them before changing tenant',
-			),
-		)
-	}
-	if (!isPatchEmpty(patch)) {
-		const written = await tryWrite(() =>
-			getDb().update(employees).set(patch).where(eq(employees.id, id)),
+	const membershipsChanged =
+		tenantIds !== undefined &&
+		JSON.stringify(tenantIds) !== JSON.stringify(current.value.tenant_ids)
+	const nextAccount = login.value
+	if (!isPatchEmpty(patch) || membershipsChanged) {
+		const written = await tryWrite(
+			() =>
+				withTransaction(async () => {
+					if (!isPatchEmpty(patch)) {
+						await getDb().update(employees).set(patch).where(eq(employees.id, id))
+					}
+					if (membershipsChanged) {
+						await writeMemberships(id, tenantIds)
+					}
+					if (nextAccount) {
+						await getDb()
+							.update(users)
+							.set({ username: nextAccount.username })
+							.where(eq(users.id, nextAccount.userId))
+					}
+				}),
+			() =>
+				new DuplicateError(
+					`${nextAccount?.username ?? 'The address'} is already the username of another account`,
+				),
 		)
 		if (Result.isError(written)) {
 			return written
@@ -161,18 +305,44 @@ export async function updateEmployee(
 	return await logUpdate('employee', current.value, await getEmployee(id))
 }
 
-/** Whether a device or virtual machine is assigned to the employee. */
-async function hasAssignments(id: number): Promise<boolean> {
+/** Whether a device or virtual machine is assigned to the employee (in one of `tenantIds`). */
+async function hasAssignments(id: number, tenantIds?: number[]): Promise<boolean> {
 	return (
-		(await findOne(devices, eq(devices.employee_id, id))) !== undefined ||
-		(await findOne(virtual_machines, eq(virtual_machines.employee_id, id))) !== undefined
+		(await findOne(
+			devices,
+			and(
+				eq(devices.employee_id, id),
+				tenantIds ? inArray(devices.tenant_id, tenantIds) : undefined,
+			),
+		)) !== undefined ||
+		(await findOne(
+			virtual_machines,
+			and(
+				eq(virtual_machines.employee_id, id),
+				tenantIds ? inArray(virtual_machines.tenant_id, tenantIds) : undefined,
+			),
+		)) !== undefined
 	)
+}
+
+/** Whether the employee's account is the last global one able to manage users. */
+async function isLastManager(id: number): Promise<boolean> {
+	const [account] = await getDb()
+		.select({ id: users.id })
+		.from(users)
+		.innerJoin(role_permissions, eq(role_permissions.role_id, users.role_id))
+		.where(and(eq(users.employee_id, id), eq(role_permissions.permission, 'users.manage')))
+		.limit(1)
+	return account !== undefined && (await countGlobalManagers({ excludeUserId: account.id })) === 0
 }
 
 export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Error>> {
 	const current = await getEmployee(id)
 	if (Result.isError(current)) {
 		return current
+	}
+	if (await findOne(users, eq(users.employee_id, id))) {
+		return Result.err(new ConflictError('Employee still has a user account; delete it first'))
 	}
 	if (await hasAssignments(id)) {
 		return Result.err(

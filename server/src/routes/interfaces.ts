@@ -31,7 +31,7 @@ export const interfacesApp = new Hono()
 				limit: query.limit,
 				device: query.device,
 				connected: query.connected,
-				scopeTenantId: requestScope(c),
+				scopeTenantIds: requestScope(c),
 			}),
 		)
 	})

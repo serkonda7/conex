@@ -14,7 +14,12 @@ export async function fetch_users(
 ): Promise<Result<Page<UserJson>, Error>> {
 	return getPage<UserJson>(
 		client.users.$get({
-			query: to_query({ ...paging(filters), role: filters?.role, tenant: filters?.tenant }),
+			query: to_query({
+				...paging(filters),
+				role: filters?.role,
+				tenant: filters?.tenant,
+				employee: filters?.employee,
+			}),
 		}),
 		failed.list('noun.user'),
 	)

@@ -1,4 +1,4 @@
-import { IconMenu2, IconPlus, IconTrash } from '@tabler/icons-solidjs'
+import { IconLock, IconMenu2, IconPlus, IconTrash } from '@tabler/icons-solidjs'
 import { extensionNumber, inferPhoneType } from 'shared/src/phone'
 import type {
 	ContactScope,
@@ -78,6 +78,10 @@ export function ContactListField<T>(props: {
 	row: (entry: () => T, update: (patch: Partial<T>) => void, index: number) => JSX.Element
 	/** Note shown below a row, e.g. why its value is unusable. */
 	rowHint?: (entry: () => T) => JSX.Element
+	/** Note shown below the whole list. */
+	hint?: JSX.Element
+	/** Why a row cannot be removed (shown on its lock), undefined when it can. */
+	locked?: (entry: () => T) => string | undefined
 }): JSX.Element {
 	/** Row whose handle is pressed; only that row is draggable, not its inputs. */
 	const [grabbed, setGrabbed] = createSignal<number | null>(null)
@@ -101,7 +105,7 @@ export function ContactListField<T>(props: {
 		list?.querySelectorAll<HTMLElement>('.contact-handle')[to]?.focus()
 	}
 	return (
-		<Field label={props.label} for={`${props.id}-0`}>
+		<Field label={props.label} for={`${props.id}-0`} hint={props.hint}>
 			<div
 				class="contact-rows"
 				classList={{ 'contact-rows-sortable': props.rows.length > 1 }}
@@ -156,17 +160,35 @@ export function ContactListField<T>(props: {
 										index,
 									)}
 								</div>
-								<button
-									type="button"
-									class="contact-remove"
-									aria-label={t('employee.removeEntry')}
-									title={t('employee.removeEntry')}
-									onClick={() =>
-										props.onChange(props.rows.filter((_, i) => i !== index))
+								<Show
+									when={props.locked?.(entry)}
+									fallback={
+										<button
+											type="button"
+											class="contact-remove"
+											aria-label={t('employee.removeEntry')}
+											title={t('employee.removeEntry')}
+											onClick={() =>
+												props.onChange(
+													props.rows.filter((_, i) => i !== index),
+												)
+											}
+										>
+											<IconTrash size={16} />
+										</button>
 									}
 								>
-									<IconTrash size={16} />
-								</button>
+									{(reason: () => string) => (
+										<span
+											class="contact-locked"
+											role="img"
+											aria-label={reason()}
+											title={reason()}
+										>
+											<IconLock size={16} aria-hidden="true" />
+										</span>
+									)}
+								</Show>
 							</div>
 							{props.rowHint?.(entry)}
 						</>
@@ -196,10 +218,12 @@ export function EmailInput(props: {
 	placeholder?: string
 	onInput: (address: string) => void
 	onComplete?: () => void
+	readOnly?: boolean
 }): JSX.Element {
 	return (
 		<input
 			id={props.id}
+			readOnly={props.readOnly}
 			type="email"
 			autocomplete="off"
 			maxLength={200}
@@ -254,9 +278,13 @@ export function PhoneInputs<P extends TenantPhone>(props: {
 	)
 }
 
-/** Mail addresses, one per line with their scope (if any); the first is primary. */
+/**
+ * Mail addresses, one per line with their scope (if any); the first is
+ * primary. `login` (an account's username) is marked as the sign-in address.
+ */
 export function EmailList(props: {
 	emails: (TenantEmail & { scope?: ContactScope })[]
+	login?: string | null
 }): JSX.Element {
 	return (
 		<Show when={props.emails.length > 0} fallback="—">
@@ -265,10 +293,17 @@ export function EmailList(props: {
 					{(e: TenantEmail & { scope?: ContactScope }): JSX.Element => (
 						<li>
 							<EmailLink email={e.address} />
-							<Show when={e.scope}>
-								{(scope: () => ContactScope): JSX.Element => (
-									<span class="text-muted">{contactScopeLabel(scope())}</span>
-								)}
+							<Show when={e.scope || isLogin(e.address, props.login)}>
+								<span class="text-muted">
+									{[
+										e.scope ? contactScopeLabel(e.scope) : null,
+										isLogin(e.address, props.login)
+											? t('employee.loginAddress')
+											: null,
+									]
+										.filter(Boolean)
+										.join(' · ')}
+								</span>
 							</Show>
 						</li>
 					)}
@@ -276,6 +311,11 @@ export function EmailList(props: {
 			</ul>
 		</Show>
 	)
+}
+
+/** Whether `address` is the account username `login` (stored lowercase). */
+export function isLogin(address: string, login: string | null | undefined): boolean {
+	return login != null && address.trim().toLowerCase() === login
 }
 
 /** Extension that can't be completed to a full number with `mainNumber`. */

@@ -18,6 +18,7 @@ import { providerLabel } from '../../i18n/labels'
 import { useFormState } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam, useOpenerPath } from '../../lib/router'
+import { sessionEmployeeId } from '../../lib/session'
 import { contextTenantRows, homePath, newObjectTenantId } from '../../lib/tenant_context'
 
 /** Ticket system; TANSS is the only one so far. */
@@ -27,7 +28,8 @@ export const TICKET_PROVIDER: IntegrationProvider = 'tanss'
  * /tickets/add?device=&employee= — new external ticket (`tickets.create`)
  * for the tenant selected in the top bar (scoped users: their own): title,
  * description, priority (preset to the lowest) and the optional device and
- * employee of that tenant. The query preselects device and employee. The server rejects tenants without a
+ * employee of that tenant. The query preselects device and employee; without
+ * one, the requester's own employee is the contact when it belongs to the tenant. The server rejects tenants without a
  * company link. On success the ticket
  * number is shown and the form clears for the next ticket.
  */
@@ -66,6 +68,16 @@ export function TicketAddPage(): JSX.Element {
 		on(priorities, () => {
 			if (priorityId() === '') {
 				setPriorityId(lowestPriority())
+			}
+		}),
+	)
+
+	// The requester is the default contact.
+	createEffect(
+		on(employees, (rows) => {
+			const own = sessionEmployeeId()
+			if (employeeId() === '' && own !== null && rows?.some((row) => row.id === own)) {
+				setEmployeeId(String(own))
 			}
 		}),
 	)

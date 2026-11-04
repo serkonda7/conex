@@ -12,6 +12,7 @@ import {
 	findById,
 	findOne,
 	insertedId,
+	inTenants,
 	isPatchEmpty,
 	orderOf,
 	pageRows,
@@ -29,16 +30,16 @@ export interface ShelfListParams extends ListParams {
 	rack?: number
 	sort: 'name'
 	order: 'asc' | 'desc'
-	/** Tenant scope (own tenant only, strict) resolved via the rack; `undefined` = unconstrained. */
-	scopeTenantId?: number
+	/** Tenant scope (own tenants only, strict) resolved via the rack; `undefined` = unconstrained. */
+	scopeTenantIds?: readonly number[]
 }
 
 export function listShelves(params: ShelfListParams): Promise<Page<ShelfRow>> {
 	const where = and(
 		searchCondition(params.search, [shelves.name, shelves.description]),
 		params.rack ? eq(shelves.rack_id, params.rack) : undefined,
-		params.scopeTenantId !== undefined
-			? sql`EXISTS (SELECT 1 FROM ${racks} AS scope_r WHERE scope_r.id = ${shelves.rack_id} AND scope_r.tenant_id = ${params.scopeTenantId})`
+		params.scopeTenantIds !== undefined
+			? sql`EXISTS (SELECT 1 FROM ${racks} AS scope_r WHERE scope_r.id = ${shelves.rack_id} AND ${inTenants(sql`scope_r.tenant_id`, params.scopeTenantIds)})`
 			: undefined,
 	)
 	return pageRows(shelves, where, [orderOf(shelves.name, params.order), asc(shelves.id)], params)

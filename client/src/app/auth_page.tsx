@@ -71,7 +71,8 @@ export function LoginPage(props: { onLogin: (user: SessionUser) => void }): JSX.
 			username: username().trim(),
 			role: { id: 0, name: '' },
 			permissions: [],
-			tenant_id: null,
+			tenant_ids: null,
+			employee_id: null,
 		}
 		props.onLogin((await fetchMe()) ?? fallback)
 	}
@@ -81,7 +82,7 @@ export function LoginPage(props: { onLogin: (user: SessionUser) => void }): JSX.
 			<form onSubmit={handleLogin}>
 				<AuthInput
 					id="login-username"
-					label={t('auth.username')}
+					label={t('auth.usernameOrEmail')}
 					type="text"
 					autocomplete="username"
 					value={username()}
@@ -144,7 +145,8 @@ export function SetupPage(props: {
 				username: name,
 				role: { id: 0, name: '' },
 				permissions: [],
-				tenant_id: null,
+				tenant_ids: null,
+				employee_id: null,
 			},
 		)
 	}

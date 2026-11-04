@@ -73,11 +73,36 @@ export const users = pgTable('users', {
 	role_id: integer('role_id')
 		.notNull()
 		.references(() => roles.id),
-	// Tenant scope (`NULL` = global, all tenants). Always `NULL` for users
-	// whose role grants `users.manage`. Delete-blocked while referenced
-	// (service layer in `db/tenancy.ts`), so the FK carries no cascade.
-	tenant_id: integer('tenant_id').references(() => tenants.id),
+	// The person behind the account (at most one account per employee).
+	// Its tenant scope is exactly the employee's tenants (`employee_tenants`,
+	// read live), so `user_tenants` stays empty. An inactive employee
+	// cannot sign in. Never set for users whose role grants
+	// `users.manage` (they are global). Employee delete is blocked while
+	// an account exists (service layer in `db/employees.ts`).
+	employee_id: integer('employee_id')
+		.unique()
+		.references(() => employees.id),
 })
+
+// Tenant scope of accounts without employee: none = global (all tenants),
+// otherwise limited to these tenants. Always empty for `users.manage`
+// holders and employee-linked accounts (service layer in `db/users.ts`).
+// Tenant delete is blocked while referenced (`db/tenancy.ts`).
+export const user_tenants = pgTable(
+	'user_tenants',
+	{
+		user_id: integer('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		tenant_id: integer('tenant_id')
+			.notNull()
+			.references(() => tenants.id),
+	},
+	(table) => [
+		primaryKey({ columns: [table.user_id, table.tenant_id] }),
+		index('user_tenants_tenant_id_idx').on(table.tenant_id),
+	],
+)
 
 export const sessions = pgTable(
 	'sessions',
@@ -234,10 +259,9 @@ export const locations = pgTable(
 	],
 )
 
-// Employees: contact persons of a tenant (NetBox-style contacts). Every
-// employee belongs to exactly one tenant; tenant delete is blocked while
-// employees reference it (service layer), so the FK carries no cascade.
-// `active` is 0/1 like the other flags; inactive employees stay listed but
+// Employees: contact persons of tenants (NetBox-style contacts). The tenants
+// an employee belongs to are rows of `employee_tenants`, at least one per
+// employee (service layer). `active` is 0/1 like the other flags; inactive employees stay listed but
 // are never reported as missing in an external system. `name` is generated
 // from first + last name, so lists, search and the changelog treat employees
 // like every other named row.
@@ -245,9 +269,6 @@ export const employees = pgTable(
 	'employees',
 	{
 		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
-		tenant_id: integer('tenant_id')
-			.notNull()
-			.references(() => tenants.id),
 		first_name: text('first_name'),
 		last_name: text('last_name').notNull(),
 		name: text('name')
@@ -264,10 +285,29 @@ export const employees = pgTable(
 		description: text('description'),
 		comments: text('comments'),
 	},
+	(table) => [index('employees_name_idx').on(table.name)],
+)
+
+// Tenant memberships of employees, ordered by `position` (0 = primary
+// tenant: its mail domain completes addresses, its main number completes
+// extensions). Memberships go with their employee (cascade); tenant delete
+// is blocked while memberships exist (service layer). Device and VM
+// assignments reference a membership, so a contact never belongs to another
+// tenant than the object it is assigned to.
+export const employee_tenants = pgTable(
+	'employee_tenants',
+	{
+		employee_id: integer('employee_id')
+			.notNull()
+			.references(() => employees.id, { onDelete: 'cascade' }),
+		tenant_id: integer('tenant_id')
+			.notNull()
+			.references(() => tenants.id),
+		position: integer('position').notNull().default(0),
+	},
 	(table) => [
-		index('employees_tenant_id_idx').on(table.tenant_id),
-		index('employees_name_idx').on(table.name),
-		uniqueIndex('employees_id_tenant_id_idx').on(table.id, table.tenant_id),
+		primaryKey({ columns: [table.employee_id, table.tenant_id] }),
+		index('employee_tenants_tenant_id_idx').on(table.tenant_id),
 	],
 )
 
@@ -594,7 +634,7 @@ export const devices = pgTable(
 		asset_tag: text('asset_tag').unique(),
 		device_id: text('device_id').unique(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
-		// One assigned contact; the composite FK keeps both in the same tenant.
+		// One assigned contact; the composite FK requires its membership in the tenant.
 		employee_id: integer('employee_id'),
 		description: text('description'),
 	},
@@ -609,7 +649,7 @@ export const devices = pgTable(
 		foreignKey({
 			name: 'devices_employee_tenant_fk',
 			columns: [table.employee_id, table.tenant_id],
-			foreignColumns: [employees.id, employees.tenant_id],
+			foreignColumns: [employee_tenants.employee_id, employee_tenants.tenant_id],
 		}),
 		check(
 			'devices_employee_requires_tenant',
@@ -662,7 +702,7 @@ export const virtual_machines = pgTable(
 		foreignKey({
 			name: 'virtual_machines_employee_tenant_fk',
 			columns: [table.employee_id, table.tenant_id],
-			foreignColumns: [employees.id, employees.tenant_id],
+			foreignColumns: [employee_tenants.employee_id, employee_tenants.tenant_id],
 		}),
 		check(
 			'virtual_machines_employee_requires_tenant',

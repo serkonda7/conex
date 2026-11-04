@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { extensionNumber, normalizePhone } from 'shared/src/phone'
 import {
 	type DirectoryContact,
@@ -7,8 +7,9 @@ import {
 	primaryPhone,
 	type TenantPhone,
 } from 'shared/src/schemas'
-import { employees, tenants } from '../schema'
+import { employee_tenants, employees, tenants } from '../schema'
 import { getDb } from './connection'
+import { inTenants } from './list'
 
 // ---------------------------------------------------------------------------
 // Contact directory: active employees with their tenant, shaped for
@@ -38,8 +39,13 @@ function numbers(
 		.filter((n): n is string => !!n)
 }
 
-/** All active employees, or those of one tenant for a scoped requester. */
-export async function listDirectoryContacts(tenantScope?: number): Promise<DirectoryContact[]> {
+/**
+ * All active employees under their primary tenant; for a scoped requester
+ * those of its tenants, each under its first tenant in scope.
+ */
+export async function listDirectoryContacts(
+	tenantScope?: readonly number[],
+): Promise<DirectoryContact[]> {
 	const rows = await getDb()
 		.select({
 			id: employees.id,
@@ -54,13 +60,21 @@ export async function listDirectoryContacts(tenantScope?: number): Promise<Direc
 			tenant_phones: tenants.phones,
 		})
 		.from(employees)
-		.innerJoin(tenants, eq(tenants.id, employees.tenant_id))
-		.where(
+		.innerJoin(
+			employee_tenants,
 			and(
-				eq(employees.active, 1),
-				tenantScope !== undefined ? eq(employees.tenant_id, tenantScope) : undefined,
+				eq(employee_tenants.employee_id, employees.id),
+				tenantScope !== undefined
+					? sql`${employee_tenants.position} = (
+						select min("st"."position") from ${employee_tenants} as "st"
+						where "st"."employee_id" = ${employees}."id"
+							and ${inTenants(sql`"st"."tenant_id"`, tenantScope)}
+					)`
+					: eq(employee_tenants.position, 0),
 			),
 		)
+		.innerJoin(tenants, eq(tenants.id, employee_tenants.tenant_id))
+		.where(eq(employees.active, 1))
 		.orderBy(asc(employees.name), asc(employees.id))
 	return rows.map(({ emails, phones, tenant_phones, ...row }) => {
 		const business = numbers(phones, tenant_phones, 'phone', 'work')

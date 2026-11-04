@@ -28,7 +28,10 @@ import {
 import {
 	checkListTenantParam,
 	checkTenant,
+	checkTenants,
+	defaultTenant,
 	forbidden,
+	isScoped,
 	listTenantScope,
 	requestScope,
 	requestUser,
@@ -37,7 +40,7 @@ import {
 	requirePermission,
 } from '../authz'
 import { exists } from '../db/list'
-import { deviceTenant, employeeTenant } from '../db/owners'
+import { deviceTenant, employeeTenants } from '../db/owners'
 import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
 import { createExternalDevice } from '../integrations/create_device'
 import { importExternalEmployees } from '../integrations/import_employees'
@@ -102,19 +105,27 @@ async function loadDeviceTenant(c: Context, deviceId: number): Promise<number | 
 	return checkTenant(c, tenant) ?? tenant
 }
 
-/** Tenant of an employee in the requester's scope, or the 404/403 response. */
+/**
+ * Tenant an employee is handled under: its first one in the requester's
+ * scope (the primary one for global requesters); or the 404/403 response.
+ */
 async function loadEmployeeTenant(c: Context, employeeId: number): Promise<number | Response> {
-	const tenant = await employeeTenant(employeeId)
-	if (tenant === undefined) {
+	const memberships = await employeeTenants(employeeId)
+	if (memberships === undefined) {
 		return notFound(c, 'Employee not found')
 	}
-	return checkTenant(c, tenant) ?? tenant
+	const scope = requestScope(c)
+	return (
+		checkTenants(c, memberships) ??
+		memberships.find((id) => scope === undefined || scope.includes(id)) ??
+		notFound(c, 'Employee not found')
+	)
 }
 
 /**
  * Write gate for an external device or employee (an ignored one has no
  * conex object to scope by): scoped editors may only touch objects of the
- * company linked to their own tenant. Employees may belong to several
+ * companies linked to their tenants. Employees may belong to several
  * companies; any of them counts.
  */
 async function checkExternalWrite(
@@ -126,25 +137,23 @@ async function checkExternalWrite(
 	if (scope === undefined) {
 		return null
 	}
-	const own = await linkOf(provider, 'tenant', scope)
 	const ids = Array.isArray(externalTenantIds) ? externalTenantIds : [externalTenantIds]
-	if (!own || !ids.includes(own.external_id)) {
-		return forbidden(c)
-	}
-	return null
+	return (await scopeCompany(provider, scope, ids)) === null ? forbidden(c) : null
 }
 
-/** Company an employee link is filed under: the tenant's, when assigned to it. */
-async function employeeCompany(
+/** First company among `externalTenantIds` linked to one of the `tenantIds`, null for none. */
+async function scopeCompany(
 	provider: ProviderId,
-	tenantId: number,
-	externalTenantIds: string[],
-	fallback: string | null,
+	tenantIds: readonly number[],
+	externalTenantIds: readonly (string | null)[],
 ): Promise<string | null> {
-	const company = await linkOf(provider, 'tenant', tenantId)
-	return company && externalTenantIds.includes(company.external_id)
-		? company.external_id
-		: fallback
+	for (const tenantId of tenantIds) {
+		const company = await linkOf(provider, 'tenant', tenantId)
+		if (company && externalTenantIds.includes(company.external_id)) {
+			return company.external_id
+		}
+	}
+	return null
 }
 
 /**
@@ -234,8 +243,15 @@ export const integrationsApp = new Hono()
 			if (scopeDenied) {
 				return scopeDenied
 			}
-			const tenant = requestScope(c) ?? query.tenant ?? null
-			return sendResult(c, await startSync(c.req.valid('param').provider, tenant, clean), 202)
+			const tenant = defaultTenant(c, query.tenant)
+			if (tenant === undefined && isScoped(c)) {
+				return jsonError(c, 'tenant is required', 400)
+			}
+			return sendResult(
+				c,
+				await startSync(c.req.valid('param').provider, tenant ?? null, clean),
+				202,
+			)
 		},
 	)
 	.post(
@@ -262,7 +278,7 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			const tenant = requestScope(c) ?? query.tenant
+			const tenant = defaultTenant(c, query.tenant)
 			if (tenant === undefined) {
 				return jsonError(c, 'tenant is required', 400)
 			}
@@ -370,7 +386,7 @@ export const integrationsApp = new Hono()
 					c.json(await tenantBoard(provider))
 				)
 			}
-			const tenantId = query.tenant ?? requestScope(c)
+			const tenantId = defaultTenant(c, query.tenant)
 			if (tenantId === undefined) {
 				return jsonError(c, `tenant is required for the ${query.entity_type} board`, 400)
 			}
@@ -480,12 +496,9 @@ export const integrationsApp = new Hono()
 				if (externalDenied) {
 					return externalDenied
 				}
-				const company = await employeeCompany(
-					provider,
-					tenant,
-					external.external_tenant_ids,
-					external.external_tenant_id,
-				)
+				const company =
+					(await scopeCompany(provider, [tenant], external.external_tenant_ids)) ??
+					external.external_tenant_id
 				const res = await setLink(
 					provider,
 					{ ...input, external_tenant_id: company },
@@ -562,17 +575,13 @@ export const integrationsApp = new Hono()
 				if (externalDenied) {
 					return externalDenied
 				}
-				// Filed under the scoped user's company, so they can restore it.
+				// Filed under a company of the scoped user, so they can restore it.
 				const scope = requestScope(c)
 				const company =
 					scope === undefined
 						? external.external_tenant_id
-						: await employeeCompany(
-								provider,
-								scope,
-								external.external_tenant_ids,
-								external.external_tenant_id,
-							)
+						: ((await scopeCompany(provider, scope, external.external_tenant_ids)) ??
+							external.external_tenant_id)
 				const res = await ignoreExternal(
 					provider,
 					'employee',
@@ -795,11 +804,10 @@ export const integrationsApp = new Hono()
 					return denied
 				}
 				if (row.entity_id !== null) {
-					const owner =
+					const scopeDenied =
 						row.entity_type === 'employee'
-							? await employeeTenant(row.entity_id)
-							: await deviceTenant(row.entity_id)
-					const scopeDenied = checkTenant(c, owner ?? null)
+							? checkTenants(c, (await employeeTenants(row.entity_id)) ?? [])
+							: checkTenant(c, (await deviceTenant(row.entity_id)) ?? null)
 					if (scopeDenied) {
 						return scopeDenied
 					}

@@ -17,8 +17,9 @@ import { auditRequest } from '../util/audit'
 import { sendCreated, sendResult } from '../util/result_response'
 
 /**
- * User management (`users.manage`): create accounts with a role, change
- * roles, (re)scope users to a single tenant, reset passwords, and delete
+ * User management (`users.manage`): create accounts with a role, link them
+ * to an employee, change roles, (re)scope users to a single tenant of their
+ * employee, reset passwords, and delete
  * accounts. The last global user able to manage users can neither lose
  * that permission nor be deleted, and nobody can delete their own account
  * (enforced in `db/users.ts`).
@@ -35,6 +36,7 @@ export const usersApp = new Hono()
 				limit: query.limit,
 				role: query.role,
 				tenant: query.tenant,
+				employee: query.employee,
 			}),
 		)
 	})

@@ -226,9 +226,9 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
 	const [queryTenant, setQueryTenant] = createSignal(parseId(queryParam('tenant')))
 	createEffect(on(tenantContext, () => setQueryTenant(null), { defer: true }))
-	// Single selected tenant (scoped users: their own) of the boards and syncs.
+	// Single selected tenant (the user's only one, if so) of the boards and syncs.
 	const selectedTenant = (): number | null =>
-		queryTenant() ?? (isScoped() ? sessionTenantId() : contextTenantId())
+		queryTenant() ?? sessionTenantId() ?? contextTenantId()
 	const views = (): { id: View; label: string }[] => [
 		{ id: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.

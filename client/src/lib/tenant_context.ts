@@ -4,8 +4,9 @@
  * forms read it; detail pages and catalog data ignore it. Viewing a tenant's
  * detail page selects that tenant. The choice is shared by all tabs and persisted to localStorage (`conex:tenant-context`).
  *
- * Scoped users are limited to their own tenant server-side, so for them the
- * context always reads as "all" and the selector shows a fixed label.
+ * Scoped users are limited to their tenants server-side, which also limits
+ * the selector's tenants and groups. With a single tenant the context always
+ * reads as "all" and the selector shows a fixed label.
  */
 import { Result } from 'better-result'
 import { createSignal } from 'solid-js'
@@ -15,7 +16,7 @@ import {
 	type TenantGroupRow,
 	type TenantRow,
 } from '../api/tenancy'
-import { isScoped, sessionTenantId } from './session'
+import { sessionTenantId } from './session'
 
 export type TenantContext =
 	| { kind: 'all' }
@@ -60,7 +61,7 @@ const [groups, setGroups] = createSignal<TenantGroupRow[]>([])
 /** Tenants and tenant groups offered by the selector. */
 export { groups as contextGroups, tenants as contextTenantRows }
 
-/** Effective context; always "all" for scoped users. */
+/** Effective context; always "all" for users limited to a single tenant. */
 export function tenantContext(): TenantContext {
 	return scoped() ? ALL : selected()
 }
@@ -78,7 +79,7 @@ export function setTenantContext(next: TenantContext): void {
 	}
 }
 
-/** Marks the session as tenant-scoped (see module doc). */
+/** Marks the session as limited to a single tenant (see module doc). */
 export function setTenantContextScoped(value: boolean): void {
 	setScoped(value)
 }
@@ -138,8 +139,8 @@ export function contextTenantId(): number | null {
 
 /**
  * Target of the dashboard nav entry and the top bar title: the detail page
- * of the user's own tenant (scoped users) or of the single context tenant,
- * else the tenant list.
+ * of the user's only tenant or of the single context tenant, else the
+ * tenant list.
  */
 export function homePath(): string {
 	const id = newObjectTenantId()
@@ -148,10 +149,10 @@ export function homePath(): string {
 
 /**
  * Tenant of objects created on add forms, which have no tenant select: the
- * user's own (scoped users) or the single context tenant; null otherwise.
+ * user's only tenant or the single context tenant; null otherwise.
  */
 export function newObjectTenantId(): number | null {
-	return isScoped() ? sessionTenantId() : contextTenantId()
+	return sessionTenantId() ?? contextTenantId()
 }
 
 /** True when a tenant row lies inside the context (for per-page dropdowns). */

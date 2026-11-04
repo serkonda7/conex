@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNotNull, isNull, ne, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm'
 import {
 	PERMISSIONS,
 	type Permission,
@@ -7,7 +7,7 @@ import {
 	type RoleJson,
 	type RoleUpdate,
 } from 'shared/src/schemas'
-import { role_permissions, roles, users } from '../schema'
+import { role_permissions, roles, user_tenants, users } from '../schema'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError } from './errors'
 import {
@@ -76,7 +76,7 @@ export async function getRole(id: number): Promise<Result<RoleJson, Error>> {
 }
 
 /**
- * Number of global users whose role grants `users.manage`. `excludeUserId`
+ * Number of global users able to sign in whose role grants `users.manage`. `excludeUserId`
  * leaves one user out (demotion/delete/re-scope checks); `excludeRoleId`
  * leaves a role out (that role is about to lose the permission).
  */
@@ -84,7 +84,9 @@ export async function countGlobalManagers(
 	opts: { excludeUserId?: number; excludeRoleId?: number } = {},
 ): Promise<number> {
 	const conditions: SQL[] = [
-		isNull(users.tenant_id),
+		// Global: no employee (whose tenants would scope it) and no own tenants.
+		isNull(users.employee_id),
+		sql`not exists (select 1 from ${user_tenants} where ${user_tenants.user_id} = ${users.id})`,
 		eq(role_permissions.permission, 'users.manage'),
 	]
 	if (opts.excludeUserId !== undefined) {
@@ -103,6 +105,9 @@ export async function countGlobalManagers(
 	)[0]
 	return row?.n ?? 0
 }
+
+/** Users limited to tenants: linked to an employee or with own tenants. */
+const scopedUser: SQL = sql`(${users.employee_id} is not null or exists (select 1 from ${user_tenants} where ${user_tenants.user_id} = ${users.id}))`
 
 async function replacePermissions(roleId: number, permissions: Permission[]): Promise<void> {
 	const db = getDb()
@@ -160,11 +165,11 @@ export async function updateRole(id: number, input: RoleUpdate): Promise<Result<
 		if (
 			grantsManage &&
 			!current.value.permissions.includes('users.manage') &&
-			(await exists(users, and(eq(users.role_id, id), isNotNull(users.tenant_id))))
+			(await exists(users, and(eq(users.role_id, id), scopedUser)))
 		) {
 			return Result.err(
 				new ConflictError(
-					'Role is assigned to tenant-scoped users; users.manage requires global users',
+					'Role is assigned to tenant-scoped or employee-linked users; users.manage requires global users',
 				),
 			)
 		}

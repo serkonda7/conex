@@ -550,12 +550,23 @@ test.describe('permissions', () => {
 	): Promise<{ context: APIRequestContext; username: string }> {
 		const api = page.request
 		const roleId = await create(api, cleanup, 'roles', { name: unique('Role'), permissions })
-		const username = `e2e-dt-${nextId()}`
+		const name = `e2e-dt-${nextId()}`
+		// Scoped accounts here belong to an employee of their tenant (which
+		// scopes them) and sign in with its primary mail address.
+		const username = tenantId === null ? name : `${name}@example.com`
+		const employeeId =
+			tenantId === null
+				? null
+				: await create(api, cleanup, 'employees', {
+						last_name: name,
+						tenant_ids: [tenantId],
+						emails: [{ address: username, scope: 'work' }],
+					})
 		await create(api, cleanup, 'users', {
-			username,
+			...(employeeId === null ? { username } : {}),
 			password,
 			role_id: roleId,
-			tenant_id: tenantId,
+			employee_id: employeeId,
 		})
 		const context = await playwright.request.newContext({ baseURL })
 		await ok(await context.post('/api/auth/login', { data: { username, password } }))

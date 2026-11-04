@@ -11,6 +11,7 @@ import { Result } from 'better-result'
 import { and, eq } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId, SyncRunJson } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
+import { memberOf } from '../db/employees'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { checkTenantExists, errOf } from '../db/list'
 import { devices, employees, sync_runs } from '../schema'
@@ -130,7 +131,7 @@ async function autoLinkEmployees(
 		await getDb()
 			.select({ id: employees.id, name: employees.name, emails: employees.emails })
 			.from(employees)
-			.where(eq(employees.tenant_id, tenantId))
+			.where(memberOf(tenantId))
 	).filter((e) => !linkedLocal.has(e.id))
 	const externals = snapshot.filter(
 		(e) =>

@@ -41,7 +41,7 @@ export const tenantGroupsApp = new Hono()
 				limit: query.limit,
 				sort: query.sort,
 				order: query.order,
-				scopeTenantId: requestScope(c),
+				scopeTenantIds: requestScope(c),
 			}),
 		)
 	})
@@ -58,8 +58,12 @@ export const tenantGroupsApp = new Hono()
 		}
 		const scope = requestScope(c)
 		if (scope !== undefined) {
-			const own = await getTenant(scope)
-			if (Result.isError(own) || own.value.tenant_group_id !== result.value.id) {
+			const own = await Promise.all(scope.map((id) => getTenant(id)))
+			if (
+				!own.some(
+					(row) => Result.isOk(row) && row.value.tenant_group_id === result.value.id,
+				)
+			) {
 				return forbidden(c)
 			}
 		}

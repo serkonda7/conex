@@ -64,13 +64,16 @@ import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } f
 import {
 	checkExists,
 	findById,
+	inScope,
 	insertedId,
+	inTenants,
 	isPatchEmpty,
 	type ListParams,
 	offsetOf,
 	type Page,
 	pageOf,
 	pickDefined,
+	scopeCondition,
 	searchCondition,
 	type TenantFilterParams,
 	tenantConditions,
@@ -421,13 +424,13 @@ export async function updateAttachment(
 
 /**
  * Areas and placements of an attachment with their targets and objects
- * resolved. `scopeTenantId` (a scoped requester) leaves out areas whose
+ * resolved. `scopeTenantIds` (a scoped requester) leaves out areas whose
  * target and placements whose rack or device belong to another tenant.
  * An unmarked attachment has an empty plan.
  */
 export async function getPlan(
 	id: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<FloorplanJson, Error>> {
 	const found = await getAttachmentRow(id)
 	if (Result.isError(found)) {
@@ -468,10 +471,7 @@ export async function getPlan(
 			),
 		)
 		.where(
-			and(
-				eq(floorplan_areas.attachment_id, id),
-				scopeTenantId === undefined ? undefined : eq(areaTenant, scopeTenantId),
-			),
+			and(eq(floorplan_areas.attachment_id, id), scopeCondition(areaTenant, scopeTenantIds)),
 		)
 		.orderBy(asc(floorplan_areas.id))
 	const placementRows = await getDb()
@@ -496,7 +496,7 @@ export async function getPlan(
 		.where(
 			and(
 				eq(floorplan_placements.attachment_id, id),
-				scopeTenantId === undefined ? undefined : eq(placementTenantSql, scopeTenantId),
+				scopeCondition(placementTenantSql, scopeTenantIds),
 			),
 		)
 		.orderBy(asc(floorplan_placements.id))
@@ -509,7 +509,7 @@ export async function getPlan(
 	// A scoped editor must still be warned before a mark change clears
 	// hidden content. Reveal only its existence, never its targets or counts.
 	const hasHiddenContent =
-		scopeTenantId !== undefined &&
+		scopeTenantIds !== undefined &&
 		((await getDb().$count(floorplan_areas, eq(floorplan_areas.attachment_id, id))) >
 			areas.length ||
 			(await getDb().$count(
@@ -566,14 +566,19 @@ function containedIn(
 		: inArray(columns.location_id, locationIds)
 }
 
-function visibleTo(tenant: number | null, scopeTenantId: number | undefined): boolean {
-	return scopeTenantId === undefined || tenant === scopeTenantId
+/** SQL twin of `!visibleTo`: shared (`NULL`) tenants lie outside too. */
+function outsideScope(tenant: SQL, scopeTenantIds: readonly number[]): SQL {
+	return sql`not coalesce(${inTenants(tenant, scopeTenantIds)}, false)`
+}
+
+function visibleTo(tenant: number | null, scopeTenantIds: readonly number[] | undefined): boolean {
+	return inScope(tenant, scopeTenantIds)
 }
 
 /** Racks and devices the editor may place on a plan (`FloorplanCandidateJson`). */
 export async function listPlanCandidates(
 	id: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<FloorplanCandidateJson[], Error>> {
 	const found = await getAttachmentRow(id)
 	if (Result.isError(found)) {
@@ -597,7 +602,7 @@ export async function listPlanCandidates(
 			and(
 				containedIn(racks, owner, locationIds),
 				free,
-				scopeTenantId === undefined ? undefined : eq(racks.tenant_id, scopeTenantId),
+				scopeCondition(racks.tenant_id, scopeTenantIds),
 			),
 		)
 		.orderBy(asc(racks.name), asc(racks.id))
@@ -618,7 +623,7 @@ export async function listPlanCandidates(
 			and(
 				containedIn(devices, owner, locationIds),
 				free,
-				scopeTenantId === undefined ? undefined : eq(devices.tenant_id, scopeTenantId),
+				scopeCondition(devices.tenant_id, scopeTenantIds),
 			),
 		)
 		.orderBy(asc(devices.name), asc(devices.id))
@@ -662,9 +667,7 @@ export async function listPlanCandidates(
 										inArray(interfaces.location_id, locationIds),
 									),
 							free,
-							scopeTenantId === undefined
-								? undefined
-								: eq(portDevice.tenant_id, scopeTenantId),
+							scopeCondition(portDevice.tenant_id, scopeTenantIds),
 						),
 					)
 					.orderBy(asc(portDevice.name), asc(interfaces.id))
@@ -706,7 +709,7 @@ async function checkPlanInput(
 	id: number,
 	owner: AttachmentOwner,
 	input: FloorplanPut,
-	scopeTenantId: number | undefined,
+	scopeTenantIds: readonly number[] | undefined,
 ): Promise<Result<undefined, Error>> {
 	const siteIds = input.areas.flatMap((area) =>
 		area.site_id === undefined ? [] : [area.site_id],
@@ -743,7 +746,7 @@ async function checkPlanInput(
 	] as const) {
 		for (const targetId of ids) {
 			const row = rows.find((target) => target.id === targetId)
-			if (!row || !visibleTo(row.tenant_id, scopeTenantId)) {
+			if (!row || !visibleTo(row.tenant_id, scopeTenantIds)) {
 				return Result.err(new ValidationError(`${noun} #${targetId} not found`))
 			}
 		}
@@ -766,7 +769,7 @@ async function checkPlanInput(
 		)
 	}
 	const scope = await ownerLocations(owner)
-	const outlets = await checkOutlets(owner, scope, interfaceIds, scopeTenantId)
+	const outlets = await checkOutlets(owner, scope, interfaceIds, scopeTenantIds)
 	if (Result.isError(outlets)) {
 		return outlets
 	}
@@ -802,7 +805,7 @@ async function checkPlanInput(
 	] as const) {
 		for (const objectId of ids) {
 			const row = rows.find((object) => object.id === objectId)
-			if (!row || !visibleTo(row.tenant_id, scopeTenantId)) {
+			if (!row || !visibleTo(row.tenant_id, scopeTenantIds)) {
 				return Result.err(new ValidationError(`${noun} #${objectId} not found`))
 			}
 			const contained =
@@ -853,7 +856,7 @@ async function checkOutlets(
 	owner: AttachmentOwner,
 	scope: number[] | null,
 	interfaceIds: number[],
-	scopeTenantId: number | undefined,
+	scopeTenantIds: readonly number[] | undefined,
 ): Promise<Result<undefined, Error>> {
 	if (interfaceIds.length === 0) {
 		return Result.ok(undefined)
@@ -875,7 +878,7 @@ async function checkOutlets(
 	const siteId = await siteOfOwner(owner)
 	for (const portId of interfaceIds) {
 		const row = rows.find((port) => port.id === portId)
-		if (!row || !visibleTo(row.tenant_id, scopeTenantId)) {
+		if (!row || !visibleTo(row.tenant_id, scopeTenantIds)) {
 			return Result.err(new ValidationError(`Port #${portId} not found`))
 		}
 		if (row.side !== 'rear' || row.positions !== 1) {
@@ -903,9 +906,9 @@ async function checkOutlets(
  */
 async function hiddenPlanIds(
 	id: number,
-	scopeTenantId: number | undefined,
+	scopeTenantIds: readonly number[] | undefined,
 ): Promise<{ areas: number[]; placements: number[] }> {
-	if (scopeTenantId === undefined) {
+	if (scopeTenantIds === undefined) {
 		return { areas: [], placements: [] }
 	}
 	const areas = await getDb()
@@ -916,7 +919,10 @@ async function hiddenPlanIds(
 		.where(
 			and(
 				eq(floorplan_areas.attachment_id, id),
-				sql`coalesce(${sites.tenant_id}, ${locations.tenant_id}) is distinct from ${scopeTenantId}`,
+				outsideScope(
+					sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`,
+					scopeTenantIds,
+				),
 			),
 		)
 	const placements = await getDb()
@@ -929,7 +935,7 @@ async function hiddenPlanIds(
 		.where(
 			and(
 				eq(floorplan_placements.attachment_id, id),
-				sql`${placementTenantSql} is distinct from ${scopeTenantId}`,
+				outsideScope(placementTenantSql, scopeTenantIds),
 			),
 		)
 	return { areas: areas.map((row) => row.id), placements: placements.map((row) => row.id) }
@@ -1011,7 +1017,7 @@ async function locateOutlets(owner: AttachmentOwner, input: FloorplanPut): Promi
 export async function putPlan(
 	id: number,
 	input: FloorplanPut,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<Result<FloorplanJson, Error>> {
 	const written = await tryWrite(
 		() =>
@@ -1029,12 +1035,12 @@ export async function putPlan(
 					return Result.err(new ConflictError(NOT_MARKED))
 				}
 				const owner = ownerOf(row)
-				const checked = await checkPlanInput(id, owner, input, scopeTenantId)
+				const checked = await checkPlanInput(id, owner, input, scopeTenantIds)
 				if (Result.isError(checked)) {
 					return checked
 				}
 				const before = await planSnapshot(id)
-				const hidden = await hiddenPlanIds(id, scopeTenantId)
+				const hidden = await hiddenPlanIds(id, scopeTenantIds)
 				await getDb()
 					.delete(floorplan_areas)
 					.where(
@@ -1099,7 +1105,7 @@ export async function putPlan(
 	if (Result.isError(written.value)) {
 		return written.value
 	}
-	return getPlan(id, scopeTenantId)
+	return getPlan(id, scopeTenantIds)
 }
 
 /**
@@ -1215,11 +1221,11 @@ export async function checkFloorplanDelete(
 /**
  * Plans referencing an object (`FloorplanLinkJson`): the one placing a rack
  * or device, or those with an area linking to a site or location. Plans
- * whose owner lies outside `scopeTenantId` are left out.
+ * whose owner lies outside `scopeTenantIds` are left out.
  */
 export async function listFloorplanLinks(
 	query: FloorplanLinksQuery,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<FloorplanLinkJson[]> {
 	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
 	const columns = {
@@ -1228,7 +1234,7 @@ export async function listFloorplanLinks(
 		location_id: attachments.location_id,
 		owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
 	}
-	const visible = scopeTenantId === undefined ? undefined : eq(ownerTenant, scopeTenantId)
+	const visible = scopeCondition(ownerTenant, scopeTenantIds)
 	if (query.interface !== undefined) {
 		return getDb()
 			.select(columns)
@@ -1274,12 +1280,12 @@ export async function listFloorplanLinks(
 /**
  * Placed outlets of a device (`FloorplanOutletJson`): a panel's own placed
  * rear ports, or for any other device the placed rear ports its ports are
- * cabled to directly. Plans whose owner lies outside `scopeTenantId`, and
+ * cabled to directly. Plans whose owner lies outside `scopeTenantIds`, and
  * outlets on panels outside it, are left out.
  */
 export async function listOutlets(
 	deviceId: number,
-	scopeTenantId?: number,
+	scopeTenantIds?: readonly number[],
 ): Promise<FloorplanOutletJson[]> {
 	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
 	const local = alias(interfaces, 'local_iface')
@@ -1310,8 +1316,8 @@ export async function listOutlets(
 		.where(
 			and(
 				eq(local.device_id, deviceId),
-				scopeTenantId === undefined ? undefined : eq(ownerTenant, scopeTenantId),
-				scopeTenantId === undefined ? undefined : eq(portDevice.tenant_id, scopeTenantId),
+				scopeCondition(ownerTenant, scopeTenantIds),
+				scopeCondition(portDevice.tenant_id, scopeTenantIds),
 			),
 		)
 		.orderBy(asc(interfaces.id))
@@ -1330,7 +1336,7 @@ export async function listOutlets(
 /**
  * One page of the marked floor plans whose owner matches the tenant filters,
  * ordered by site and owner name. `search` matches the owner or site name. The
- * area and marker counts leave out content outside `params.scopeTenantId`, like
+ * area and marker counts leave out content outside `params.scopeTenantIds`, like
  * `getPlan`.
  */
 export async function listFloorplans(
@@ -1381,7 +1387,7 @@ export async function listFloorplans(
 		return pageOf([], total, params)
 	}
 	const ids = rows.map((row) => row.attachment_id)
-	const scope = params.scopeTenantId
+	const scope = params.scopeTenantIds
 	const areaCounts = await getDb()
 		.select({ id: floorplan_areas.attachment_id, n: count() })
 		.from(floorplan_areas)
@@ -1390,9 +1396,7 @@ export async function listFloorplans(
 		.where(
 			and(
 				inArray(floorplan_areas.attachment_id, ids),
-				scope === undefined
-					? undefined
-					: eq(sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`, scope),
+				scopeCondition(sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`, scope),
 			),
 		)
 		.groupBy(floorplan_areas.attachment_id)
@@ -1406,7 +1410,7 @@ export async function listFloorplans(
 		.where(
 			and(
 				inArray(floorplan_placements.attachment_id, ids),
-				scope === undefined ? undefined : eq(placementTenantSql, scope),
+				scopeCondition(placementTenantSql, scope),
 			),
 		)
 		.groupBy(floorplan_placements.attachment_id)

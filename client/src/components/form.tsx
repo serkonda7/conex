@@ -12,6 +12,7 @@ import { type JSX, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import type { FormState } from '../lib/form'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
+import { isScoped } from '../lib/session'
 import { newObjectTenantId } from '../lib/tenant_context'
 import { InlineError, Loading } from './feedback'
 
@@ -449,13 +450,15 @@ export function FormPage(props: {
 	usePageMeta(() => ({ name: props.name, crumbs: props.crumbs }))
 	const tenantMissing = (): boolean =>
 		!props.form.editing && props.tenant !== undefined && newObjectTenantId() === null
+	// Scoped users cannot create shared objects: they pick one of their tenants.
+	const tenantRequired = (): boolean => props.tenant === 'required' || isScoped()
 	return (
 		<div class="form-page">
 			<Show when={props.title}>
 				<h2>{props.title}</h2>
 			</Show>
 			<Show when={tenantMissing()}>
-				<NoTenantWarning required={props.tenant === 'required'} />
+				<NoTenantWarning required={tenantRequired()} />
 			</Show>
 			<Show
 				when={props.form.loaded()}
@@ -471,7 +474,7 @@ export function FormPage(props: {
 								saving={props.form.saving()}
 								cancelTo={props.cancelTo}
 								singleton={props.singleton}
-								blocked={tenantMissing() && props.tenant === 'required'}
+								blocked={tenantMissing() && tenantRequired()}
 							/>
 						}
 					>

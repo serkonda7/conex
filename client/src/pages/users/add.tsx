@@ -1,64 +1,108 @@
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
+import type { EmployeeRow } from '../../api/employees'
 import { fetch_roles, type RoleJson } from '../../api/roles'
-import { fetch_tenants } from '../../api/tenancy'
 import { create_user } from '../../api/users'
-import { FormPage, Hint, row_options, SelectField, TextField } from '../../components/form'
+import { FormPage, row_options, SelectField, TextField } from '../../components/form'
 import { t } from '../../i18n'
 import { type FormValues, is_add_another_submit, submit_form, useFormState } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
-import { managesUsers, RoleHint } from './role_hint'
+import { parseId, queryParam } from '../../lib/router'
+import {
+	EmployeeField,
+	employeeOf,
+	LoginField,
+	loginOf,
+	ScopeField,
+	scopeError,
+	scopeToSave,
+	type TenantEntry,
+	useAccountData,
+} from './account_fields'
+import { RoleHint } from './role_hint'
 
-/** /users/add — account create form (`users.manage`). */
+/**
+ * /users/add?employee= — account create form (`users.manage`). Accounts of
+ * employees sign in with the employee's primary mail address; others get a
+ * username. Opened from an employee page, the employee is preselected and
+ * the form returns there.
+ */
 export function UserAddPage(): JSX.Element {
 	const form = useFormState()
+	const fromEmployee = parseId(queryParam('employee'))
 	const [username, setUsername] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const [roleId, setRoleId] = createSignal('')
-	const [tenantId, setTenantId] = createSignal('')
-	const [tenants] = createRows(fetch_tenants, form.setError)
+	const [employeeId, setEmployeeId] = createSignal(
+		fromEmployee === null ? '' : String(fromEmployee),
+	)
+	const [tenants, setTenants] = createSignal<TenantEntry[]>([])
 	const [roles] = createRows(fetch_roles, form.setError)
 	const role = (): RoleJson | undefined => roles()?.find((r) => r.id === parseId(roleId()))
+	const data = useAccountData(form.setError)
+	const employee = (): EmployeeRow | undefined => employeeOf(data, employeeId())
 
 	function validate(): string | null {
+		if (employee() && !loginOf(employee())) {
+			return t('user.employeeNoMail')
+		}
 		if (!password()) {
 			return t('auth.passwordRequired')
 		}
-		return parseId(roleId()) === null ? t('user.selectRole') : null
+		return parseId(roleId()) === null ? t('user.selectRole') : scopeError(role(), employeeId())
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_form({
 			form,
-			name: username(),
+			name: employee() ? '' : username(),
+			optionalName: employee() !== undefined,
 			nameError: t('auth.usernameRequired'),
 			validate,
 			save: (values: FormValues) =>
 				create_user({
-					username: values.name,
+					...(employee() ? {} : { username: values.name }),
 					password: password(),
 					role_id: parseId(roleId()) ?? 0,
-					tenant_id: managesUsers(role()) ? null : parseId(tenantId()),
+					employee_id: parseId(employeeId()),
+					tenant_ids: scopeToSave(role(), employeeId(), tenants()),
 				}),
-			navigateTo: '/users',
-			onSuccess: is_add_another_submit(e) ? () => setUsername('') : undefined,
+			navigateTo: fromEmployee === null ? '/users' : `/employees/${fromEmployee}`,
+			onSuccess: is_add_another_submit(e)
+				? () => {
+						setUsername('')
+						setEmployeeId('')
+						setTenants([])
+					}
+				: undefined,
 		})
 	}
 
 	return (
-		<FormPage form={form} title={t('user.addTitle')} cancelTo="/users" onSubmit={handleCreate}>
-			<TextField
-				id="user-username"
-				label={t('auth.username')}
-				required
-				placeholder={t('user.usernamePlaceholder')}
-				maxLength={64}
-				autocomplete="off"
-				autofocus
-				value={username()}
-				onInput={setUsername}
+		<FormPage
+			form={form}
+			title={t('user.addTitle')}
+			cancelTo={fromEmployee === null ? '/users' : `/employees/${fromEmployee}`}
+			onSubmit={handleCreate}
+		>
+			<EmployeeField
+				idPrefix="user"
+				data={data}
+				employeeId={employeeId()}
+				onEmployeeChange={setEmployeeId}
 			/>
+			<LoginField idPrefix="user" employee={employee()}>
+				<TextField
+					id="user-username"
+					label={t('auth.username')}
+					required
+					placeholder={t('user.usernamePlaceholder')}
+					maxLength={254}
+					autocomplete="off"
+					value={username()}
+					onInput={setUsername}
+				/>
+			</LoginField>
 			<TextField
 				id="user-password"
 				label={t('auth.password')}
@@ -78,17 +122,14 @@ export function UserAddPage(): JSX.Element {
 				options={row_options(roles() ?? [])}
 				hint={<RoleHint role={role()} />}
 			/>
-			<Show when={!managesUsers(role())}>
-				<SelectField
-					id="user-tenant"
-					label={t('user.tenantScope')}
-					value={tenantId()}
-					onChange={setTenantId}
-					options={row_options(tenants() ?? [])}
-					emptyLabel={t('common.allTenants')}
-					hint={<Hint>{t('user.tenantHint')}</Hint>}
-				/>
-			</Show>
+			<ScopeField
+				idPrefix="user"
+				data={data}
+				role={role()}
+				employee={employee()}
+				tenants={tenants()}
+				onTenantsChange={setTenants}
+			/>
 		</FormPage>
 	)
 }

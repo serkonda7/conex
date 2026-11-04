@@ -5,11 +5,12 @@
  * `undefined` means the row (or its parent) does not exist; callers then
  * fall through to the normal 404 path instead of inventing a 403.
  */
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import {
 	attachments,
 	type cables,
 	devices,
+	employee_tenants,
 	employees,
 	interfaces,
 	locations,
@@ -105,14 +106,21 @@ export async function virtualMachineTenant(vmId: number): Promise<Tenant> {
 	return rows[0]?.tenant_id
 }
 
-/** Tenant of an employee, or `undefined` when the employee is missing. */
-export async function employeeTenant(employeeId: number): Promise<number | undefined> {
+/**
+ * Tenants of an employee in membership order (first = primary), or
+ * `undefined` when the employee is missing.
+ */
+export async function employeeTenants(employeeId: number): Promise<number[] | undefined> {
 	const rows = await getDb()
-		.select({ tenant_id: employees.tenant_id })
+		.select({ id: employees.id, tenant_id: employee_tenants.tenant_id })
 		.from(employees)
+		.leftJoin(employee_tenants, eq(employee_tenants.employee_id, employees.id))
 		.where(eq(employees.id, employeeId))
-		.limit(1)
-	return rows[0]?.tenant_id
+		.orderBy(asc(employee_tenants.position))
+	if (rows.length === 0) {
+		return undefined
+	}
+	return rows.map((r) => r.tenant_id).filter((t): t is number => t !== null)
 }
 
 /** Tenant of a shelf, inherited from its rack; `undefined` when either is missing. */
