@@ -1,6 +1,6 @@
 {
-  "id": "01b7c723-48c0-4575-99e8-f9e7f4c77d21",
-  "prevId": "9c360393-7d60-4076-9b4e-4e64b392bb59",
+  "id": "e9a4e245-a1df-40b8-aae4-32168dddd7a3",
+  "prevId": "3ec1a09b-fb8a-4922-b6b4-840db9c51d11",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -33,6 +33,12 @@
         },
         "location_id": {
           "name": "location_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rack_id": {
+          "name": "rack_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -161,6 +167,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "attachments_rack_id_idx": {
+          "name": "attachments_rack_id_idx",
+          "columns": [
+            {
+              "expression": "rack_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -183,6 +204,19 @@
           "tableTo": "locations",
           "columnsFrom": [
             "location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "attachments_rack_id_racks_id_fk": {
+          "name": "attachments_rack_id_racks_id_fk",
+          "tableFrom": "attachments",
+          "tableTo": "racks",
+          "columnsFrom": [
+            "rack_id"
           ],
           "columnsTo": [
             "id"
@@ -218,7 +252,11 @@
       "checkConstraints": {
         "attachments_owner_check": {
           "name": "attachments_owner_check",
-          "value": "(\"attachments\".\"site_id\" IS NULL) <> (\"attachments\".\"location_id\" IS NULL)"
+          "value": "num_nonnulls(\"attachments\".\"site_id\", \"attachments\".\"location_id\", \"attachments\".\"rack_id\") = 1"
+        },
+        "attachments_floorplan_owner_check": {
+          "name": "attachments_floorplan_owner_check",
+          "value": "\"attachments\".\"rack_id\" IS NULL OR \"attachments\".\"is_floorplan\" = 0"
         }
       },
       "isRLSEnabled": false
@@ -891,6 +929,12 @@
           "notNull": true,
           "default": 0
         },
+        "managed_bundle_id": {
+          "name": "managed_bundle_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "key": {
           "name": "key",
           "type": "text",
@@ -928,6 +972,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "device_roles_managed_bundle_id_idx": {
+          "name": "device_roles_managed_bundle_id_idx",
+          "columns": [
+            {
+              "expression": "managed_bundle_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -937,6 +996,19 @@
           "tableTo": "device_roles",
           "columnsFrom": [
             "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "device_roles_managed_bundle_id_managed_bundles_id_fk": {
+          "name": "device_roles_managed_bundle_id_managed_bundles_id_fk",
+          "tableFrom": "device_roles",
+          "tableTo": "managed_bundles",
+          "columnsFrom": [
+            "managed_bundle_id"
           ],
           "columnsTo": [
             "id"
@@ -1013,14 +1085,52 @@
           "notNull": true,
           "default": "'ethernet'"
         },
-        "label": {
-          "name": "label",
+        "description": {
+          "name": "description",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "description": {
-          "name": "description",
+        "side": {
+          "name": "side",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "positions": {
+          "name": "positions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "rear_stub_id": {
+          "name": "rear_stub_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rear_position": {
+          "name": "rear_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "maximum_draw": {
+          "name": "maximum_draw",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_mode": {
+          "name": "poe_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_type": {
+          "name": "poe_type",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1042,29 +1152,17 @@
           "method": "btree",
           "with": {}
         },
-        "device_type_interfaces_prefix_kind_idx": {
-          "name": "device_type_interfaces_prefix_kind_idx",
+        "device_type_interfaces_rear_stub_id_idx": {
+          "name": "device_type_interfaces_rear_stub_id_idx",
           "columns": [
             {
-              "expression": "device_type_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "prefix",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kind",
+              "expression": "rear_stub_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1083,12 +1181,45 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "device_type_interfaces_rear_stub_id_device_type_interfaces_id_fk": {
+          "name": "device_type_interfaces_rear_stub_id_device_type_interfaces_id_fk",
+          "tableFrom": "device_type_interfaces",
+          "tableTo": "device_type_interfaces",
+          "columnsFrom": [
+            "rear_stub_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "device_type_interfaces_prefix_kind_idx": {
+          "name": "device_type_interfaces_prefix_kind_idx",
+          "nullsNotDistinct": true,
+          "columns": [
+            "device_type_id",
+            "prefix",
+            "kind",
+            "side"
+          ]
+        }
+      },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "device_type_interfaces_side_check": {
+          "name": "device_type_interfaces_side_check",
+          "value": "\"device_type_interfaces\".\"positions\" >= 1 AND \"device_type_interfaces\".\"rear_position\" >= 1 AND (\"device_type_interfaces\".\"side\" IS NULL OR \"device_type_interfaces\".\"side\" IN ('front', 'rear')) AND (\"device_type_interfaces\".\"positions\" = 1 OR \"device_type_interfaces\".\"side\" IS NOT DISTINCT FROM 'rear') AND ((\"device_type_interfaces\".\"side\" IS NOT DISTINCT FROM 'front') = (\"device_type_interfaces\".\"rear_stub_id\" IS NOT NULL))"
+        },
+        "device_type_interfaces_power_check": {
+          "name": "device_type_interfaces_power_check",
+          "value": "(\"device_type_interfaces\".\"maximum_draw\" IS NULL OR \"device_type_interfaces\".\"maximum_draw\" >= 1) AND (\"device_type_interfaces\".\"poe_type\" IS NULL OR \"device_type_interfaces\".\"poe_mode\" IS NOT NULL)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.device_types": {
@@ -1133,20 +1264,26 @@
         },
         "is_full_depth": {
           "name": "is_full_depth",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": 1
+          "default": true
         },
-        "form_factor": {
-          "name": "form_factor",
+        "part_number": {
+          "name": "part_number",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "width": {
-          "name": "width",
-          "type": "integer",
+        "spec_url": {
+          "name": "spec_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "eol_date": {
+          "name": "eol_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": false
         },
@@ -1159,6 +1296,12 @@
         "comments": {
           "name": "comments",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_device_role_id": {
+          "name": "default_device_role_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
@@ -1193,6 +1336,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "device_types_manufacturer_model_idx": {
+          "name": "device_types_manufacturer_model_idx",
+          "columns": [
+            {
+              "expression": "manufacturer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1207,6 +1371,19 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "device_types_default_device_role_id_device_roles_id_fk": {
+          "name": "device_types_default_device_role_id_device_roles_id_fk",
+          "tableFrom": "device_types",
+          "tableTo": "device_roles",
+          "columnsFrom": [
+            "default_device_role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -1567,13 +1744,13 @@
         "devices_employee_tenant_fk": {
           "name": "devices_employee_tenant_fk",
           "tableFrom": "devices",
-          "tableTo": "employees",
+          "tableTo": "employee_tenants",
           "columnsFrom": [
             "employee_id",
             "tenant_id"
           ],
           "columnsTo": [
-            "id",
+            "employee_id",
             "tenant_id"
           ],
           "onDelete": "no action",
@@ -1606,6 +1783,89 @@
       },
       "isRLSEnabled": false
     },
+    "public.employee_tenants": {
+      "name": "employee_tenants",
+      "schema": "",
+      "columns": {
+        "employee_id": {
+          "name": "employee_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "employee_tenants_tenant_id_idx": {
+          "name": "employee_tenants_tenant_id_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "employee_tenants_employee_id_employees_id_fk": {
+          "name": "employee_tenants_employee_id_employees_id_fk",
+          "tableFrom": "employee_tenants",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "employee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "employee_tenants_tenant_id_tenants_id_fk": {
+          "name": "employee_tenants_tenant_id_tenants_id_fk",
+          "tableFrom": "employee_tenants",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "employee_tenants_employee_id_tenant_id_pk": {
+          "name": "employee_tenants_employee_id_tenant_id_pk",
+          "columns": [
+            "employee_id",
+            "tenant_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.employees": {
       "name": "employees",
       "schema": "",
@@ -1626,12 +1886,6 @@
             "cache": "1",
             "cycle": false
           }
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
         },
         "first_name": {
           "name": "first_name",
@@ -1702,21 +1956,6 @@
         }
       },
       "indexes": {
-        "employees_tenant_id_idx": {
-          "name": "employees_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "employees_name_idx": {
           "name": "employees_name_idx",
           "columns": [
@@ -1731,44 +1970,9 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "employees_id_tenant_id_idx": {
-          "name": "employees_id_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
-      "foreignKeys": {
-        "employees_tenant_id_tenants_id_fk": {
-          "name": "employees_tenant_id_tenants_id_fk",
-          "tableFrom": "employees",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2158,6 +2362,51 @@
       },
       "isRLSEnabled": false
     },
+    "public.floorplan_calibrations": {
+      "name": "floorplan_calibrations",
+      "schema": "",
+      "columns": {
+        "attachment_id": {
+          "name": "attachment_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "scale": {
+          "name": "scale",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "origin": {
+          "name": "origin",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "floorplan_calibrations_attachment_id_attachments_id_fk": {
+          "name": "floorplan_calibrations_attachment_id_attachments_id_fk",
+          "tableFrom": "floorplan_calibrations",
+          "tableTo": "attachments",
+          "columnsFrom": [
+            "attachment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.floorplan_placements": {
       "name": "floorplan_placements",
       "schema": "",
@@ -2193,6 +2442,18 @@
         },
         "device_id": {
           "name": "device_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interface_id": {
+          "name": "interface_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jack_id": {
+          "name": "jack_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -2266,6 +2527,32 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "floorplan_placements_interface_id_interfaces_id_fk": {
+          "name": "floorplan_placements_interface_id_interfaces_id_fk",
+          "tableFrom": "floorplan_placements",
+          "tableTo": "interfaces",
+          "columnsFrom": [
+            "interface_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "floorplan_placements_jack_id_panel_jacks_id_fk": {
+          "name": "floorplan_placements_jack_id_panel_jacks_id_fk",
+          "tableFrom": "floorplan_placements",
+          "tableTo": "panel_jacks",
+          "columnsFrom": [
+            "jack_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2283,13 +2570,27 @@
           "columns": [
             "device_id"
           ]
+        },
+        "floorplan_placements_interface_id_unique": {
+          "name": "floorplan_placements_interface_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "interface_id"
+          ]
+        },
+        "floorplan_placements_jack_id_unique": {
+          "name": "floorplan_placements_jack_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "jack_id"
+          ]
         }
       },
       "policies": {},
       "checkConstraints": {
         "floorplan_placements_object_check": {
           "name": "floorplan_placements_object_check",
-          "value": "(\"floorplan_placements\".\"rack_id\" IS NULL) <> (\"floorplan_placements\".\"device_id\" IS NULL)"
+          "value": "num_nonnulls(\"floorplan_placements\".\"rack_id\", \"floorplan_placements\".\"device_id\", \"floorplan_placements\".\"interface_id\", \"floorplan_placements\".\"jack_id\") = 1"
         }
       },
       "isRLSEnabled": false
@@ -2440,6 +2741,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "template_name": {
+          "name": "template_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "kind": {
           "name": "kind",
           "type": "text",
@@ -2466,6 +2773,50 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "side": {
+          "name": "side",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "positions": {
+          "name": "positions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "rear_port_id": {
+          "name": "rear_port_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rear_port_position": {
+          "name": "rear_port_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "patched": {
+          "name": "patched",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "jack_id": {
+          "name": "jack_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2484,23 +2835,53 @@
           "method": "btree",
           "with": {}
         },
-        "interfaces_device_name_idx": {
-          "name": "interfaces_device_name_idx",
+        "interfaces_jack_id_idx": {
+          "name": "interfaces_jack_id_idx",
           "columns": [
             {
-              "expression": "device_id",
+              "expression": "jack_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "interfaces_rear_port_position_idx": {
+          "name": "interfaces_rear_port_position_idx",
+          "columns": [
+            {
+              "expression": "rear_port_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "name",
+              "expression": "rear_port_position",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "interfaces_location_id_idx": {
+          "name": "interfaces_location_id_idx",
+          "columns": [
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2519,12 +2900,74 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "interfaces_rear_port_id_interfaces_id_fk": {
+          "name": "interfaces_rear_port_id_interfaces_id_fk",
+          "tableFrom": "interfaces",
+          "tableTo": "interfaces",
+          "columnsFrom": [
+            "rear_port_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "interfaces_location_id_locations_id_fk": {
+          "name": "interfaces_location_id_locations_id_fk",
+          "tableFrom": "interfaces",
+          "tableTo": "locations",
+          "columnsFrom": [
+            "location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "interfaces_jack_id_panel_jacks_id_fk": {
+          "name": "interfaces_jack_id_panel_jacks_id_fk",
+          "tableFrom": "interfaces",
+          "tableTo": "panel_jacks",
+          "columnsFrom": [
+            "jack_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "interfaces_device_name_idx": {
+          "name": "interfaces_device_name_idx",
+          "nullsNotDistinct": true,
+          "columns": [
+            "device_id",
+            "side",
+            "name"
+          ]
+        }
+      },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "interfaces_jack_check": {
+          "name": "interfaces_jack_check",
+          "value": "\"interfaces\".\"jack_id\" IS NULL OR (\"interfaces\".\"side\" IS NOT DISTINCT FROM 'rear' AND \"interfaces\".\"positions\" = 1)"
+        },
+        "interfaces_location_check": {
+          "name": "interfaces_location_check",
+          "value": "\"interfaces\".\"location_id\" IS NULL OR (\"interfaces\".\"side\" IS NOT DISTINCT FROM 'rear' AND \"interfaces\".\"positions\" = 1)"
+        },
+        "interfaces_side_check": {
+          "name": "interfaces_side_check",
+          "value": "\"interfaces\".\"positions\" >= 1 AND (\"interfaces\".\"side\" IS NULL OR \"interfaces\".\"side\" IN ('front', 'rear')) AND (\"interfaces\".\"positions\" = 1 OR \"interfaces\".\"side\" IS NOT DISTINCT FROM 'rear') AND ((\"interfaces\".\"side\" IS NOT DISTINCT FROM 'front') = (\"interfaces\".\"rear_port_id\" IS NOT NULL)) AND ((\"interfaces\".\"rear_port_id\" IS NULL) = (\"interfaces\".\"rear_port_position\" IS NULL)) AND (\"interfaces\".\"rear_port_position\" IS NULL OR \"interfaces\".\"rear_port_position\" >= 1)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.locations": {
@@ -2665,6 +3108,56 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.managed_bundles": {
+      "name": "managed_bundles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "managed_bundles_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "managed_bundles_name_unique": {
+          "name": "managed_bundles_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.manufacturers": {
       "name": "manufacturers",
       "schema": "",
@@ -2694,6 +3187,24 @@
         },
         "description": {
           "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "support_url": {
+          "name": "support_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comments": {
+          "name": "comments",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2893,6 +3404,71 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.panel_jacks": {
+      "name": "panel_jacks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "panel_jacks_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "panel_jacks_device_id_devices_id_fk": {
+          "name": "panel_jacks_device_id_devices_id_fk",
+          "tableFrom": "panel_jacks",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "panel_jacks_device_name_idx": {
+          "name": "panel_jacks_device_name_idx",
+          "nullsNotDistinct": false,
+          "columns": [
+            "device_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.priorities": {
       "name": "priorities",
       "schema": "",
@@ -2925,6 +3501,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#6b7280'"
         },
         "description": {
           "name": "description",
@@ -2961,6 +3544,145 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rack_types": {
+      "name": "rack_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "rack_types_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "manufacturer_id": {
+          "name": "manufacturer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form_factor": {
+          "name": "form_factor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 19
+        },
+        "u_height": {
+          "name": "u_height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comments": {
+          "name": "comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "rack_types_manufacturer_id_idx": {
+          "name": "rack_types_manufacturer_id_idx",
+          "columns": [
+            {
+              "expression": "manufacturer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rack_types_model_idx": {
+          "name": "rack_types_model_idx",
+          "columns": [
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rack_types_manufacturer_model_idx": {
+          "name": "rack_types_manufacturer_model_idx",
+          "columns": [
+            {
+              "expression": "manufacturer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rack_types_manufacturer_id_manufacturers_id_fk": {
+          "name": "rack_types_manufacturer_id_manufacturers_id_fk",
+          "tableFrom": "rack_types",
+          "tableTo": "manufacturers",
+          "columnsFrom": [
+            "manufacturer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3125,10 +3847,10 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "racks_rack_type_id_device_types_id_fk": {
-          "name": "racks_rack_type_id_device_types_id_fk",
+        "racks_rack_type_id_rack_types_id_fk": {
+          "name": "racks_rack_type_id_rack_types_id_fk",
           "tableFrom": "racks",
-          "tableTo": "device_types",
+          "tableTo": "rack_types",
           "columnsFrom": [
             "rack_type_id"
           ],
@@ -3589,10 +4311,10 @@
         },
         "is_full_depth": {
           "name": "is_full_depth",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": 1
+          "default": true
         },
         "description": {
           "name": "description",
@@ -4030,6 +4752,116 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.tenant_bundles": {
+      "name": "tenant_bundles",
+      "schema": "",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "managed_bundle_id": {
+          "name": "managed_bundle_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "service_level_id": {
+          "name": "service_level_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "tenant_bundles_managed_bundle_id_idx": {
+          "name": "tenant_bundles_managed_bundle_id_idx",
+          "columns": [
+            {
+              "expression": "managed_bundle_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "tenant_bundles_service_level_id_idx": {
+          "name": "tenant_bundles_service_level_id_idx",
+          "columns": [
+            {
+              "expression": "service_level_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tenant_bundles_tenant_id_tenants_id_fk": {
+          "name": "tenant_bundles_tenant_id_tenants_id_fk",
+          "tableFrom": "tenant_bundles",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tenant_bundles_managed_bundle_id_managed_bundles_id_fk": {
+          "name": "tenant_bundles_managed_bundle_id_managed_bundles_id_fk",
+          "tableFrom": "tenant_bundles",
+          "tableTo": "managed_bundles",
+          "columnsFrom": [
+            "managed_bundle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tenant_bundles_service_level_id_service_levels_id_fk": {
+          "name": "tenant_bundles_service_level_id_service_levels_id_fk",
+          "tableFrom": "tenant_bundles",
+          "tableTo": "service_levels",
+          "columnsFrom": [
+            "service_level_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "tenant_bundles_tenant_id_managed_bundle_id_pk": {
+          "name": "tenant_bundles_tenant_id_managed_bundle_id_pk",
+          "columns": [
+            "tenant_id",
+            "managed_bundle_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.tenant_groups": {
       "name": "tenant_groups",
       "schema": "",
@@ -4153,12 +4985,6 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "comments": {
           "name": "comments",
           "type": "text",
@@ -4227,6 +5053,82 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.user_tenants": {
+      "name": "user_tenants",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "user_tenants_tenant_id_idx": {
+          "name": "user_tenants_tenant_id_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_tenants_user_id_users_id_fk": {
+          "name": "user_tenants_user_id_users_id_fk",
+          "tableFrom": "user_tenants",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_tenants_tenant_id_tenants_id_fk": {
+          "name": "user_tenants_tenant_id_tenants_id_fk",
+          "tableFrom": "user_tenants",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_tenants_user_id_tenant_id_pk": {
+          "name": "user_tenants_user_id_tenant_id_pk",
+          "columns": [
+            "user_id",
+            "tenant_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -4279,8 +5181,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "employee_id": {
+          "name": "employee_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -4301,12 +5203,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "users_tenant_id_tenants_id_fk": {
-          "name": "users_tenant_id_tenants_id_fk",
+        "users_employee_id_employees_id_fk": {
+          "name": "users_employee_id_employees_id_fk",
           "tableFrom": "users",
-          "tableTo": "tenants",
+          "tableTo": "employees",
           "columnsFrom": [
-            "tenant_id"
+            "employee_id"
           ],
           "columnsTo": [
             "id"
@@ -4329,6 +5231,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "provider_id"
+          ]
+        },
+        "users_employee_id_unique": {
+          "name": "users_employee_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "employee_id"
           ]
         }
       },
@@ -4595,13 +5504,13 @@
         "virtual_machines_employee_tenant_fk": {
           "name": "virtual_machines_employee_tenant_fk",
           "tableFrom": "virtual_machines",
-          "tableTo": "employees",
+          "tableTo": "employee_tenants",
           "columnsFrom": [
             "employee_id",
             "tenant_id"
           ],
           "columnsTo": [
-            "id",
+            "employee_id",
             "tenant_id"
           ],
           "onDelete": "no action",
