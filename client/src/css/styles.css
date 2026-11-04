@@ -6,6 +6,9 @@
 
 /* MakerWorld-inspired dark palette. */
 :root {
+	/* Label column of .field rows; offsets below it align to the controls.
+	   Forms with longer labels override it locally. */
+	--label-width: 10rem;
 	color-scheme: dark;
 	--bg-base: #1c1c1c;
 	--bg-default: #222225;
@@ -1644,7 +1647,7 @@ tbody tr:last-child td {
 }
 
 .form-section-title {
-	margin: 0 0 0.6rem calc(10rem + 0.75rem);
+	margin: 0 0 0.6rem calc(var(--label-width) + 0.75rem);
 	padding: 0;
 	font-size: var(--font-size-lg);
 	font-weight: 600;
@@ -1663,7 +1666,7 @@ tbody tr:last-child td {
 	display: flex;
 	gap: 0.4rem;
 	padding-top: 0.2rem;
-	margin-left: calc(10rem + 0.75rem);
+	margin-left: calc(var(--label-width) + 0.75rem);
 }
 
 /* Primary submit joined with its outlined sibling ("Create & Add Another"),
@@ -1713,7 +1716,7 @@ tbody tr:last-child td {
 
 .field {
 	display: grid;
-	grid-template-columns: 10rem minmax(0, 1fr);
+	grid-template-columns: var(--label-width) minmax(0, 1fr);
 	gap: 0.25rem 0.75rem;
 	align-items: start;
 }
@@ -1795,7 +1798,7 @@ tbody tr:last-child td {
 	display: flex;
 	flex-direction: column;
 	gap: 0.25rem;
-	margin-left: calc(10rem + 0.75rem);
+	margin-left: calc(var(--label-width) + 0.75rem);
 }
 
 .service-targets {
@@ -2077,18 +2080,21 @@ tbody tr:last-child td {
 }
 
 /* VM form: the host name with its select / remove buttons in one row. */
-.vm-host-row {
+.vm-host-row,
+.input-with-button {
 	display: flex;
 	gap: 0.4rem;
 }
 
-.app-content .form-stacked .field .vm-host-row input {
+.app-content .form-stacked .field .vm-host-row input,
+.app-content .form-stacked .field .input-with-button input {
 	flex: 1 1 auto;
 	width: auto;
 	min-width: 0;
 }
 
-.app-content .form-stacked .field .vm-host-row button {
+.app-content .form-stacked .field .vm-host-row button,
+.app-content .form-stacked .field .input-with-button button {
 	flex: 0 0 auto;
 	white-space: nowrap;
 }
@@ -4879,4 +4885,10 @@ a.rack-shelf-plate:hover {
 
 .app-content .changelog-diff .diff-added {
 	background-color: color-mix(in srgb, var(--success) 16%, transparent);
+}
+
+/* Calendar sync: the German labels ("Anwendungs-ID (Client-ID)") need a
+   wider label column. */
+.calendar-sync-form {
+	--label-width: 12rem;
 }

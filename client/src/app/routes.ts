@@ -59,6 +59,7 @@ import { EmployeesPage } from '../pages/employees/list'
 import { FloorplanDetailPage } from '../pages/floorplans/detail'
 import { FloorplansPage } from '../pages/floorplans/list'
 import { IntegrationAddPage } from '../pages/integrations/add'
+import { CalendarSyncTechniciansPage } from '../pages/integrations/calendar_sync'
 import { IntegrationEditPage } from '../pages/integrations/edit'
 import { IntegrationsPage } from '../pages/integrations/list'
 import { IntegrationReportPage } from '../pages/integrations/report'
@@ -108,7 +109,7 @@ import { UsersPage } from '../pages/users/list'
 export interface Section {
 	/** Leading URL segment(s) (`/devices/…`, `/devices/vm/…`). */
 	path: string
-	/** Section whose list heads the breadcrumbs of a section without its own list. */
+	/** Section whose list heads the breadcrumbs of a section without its own list, or of a sub-page. */
 	parent?: string
 	/** Localized entity name for tab titles and the sidebar. */
 	noun: (count: number) => string
@@ -341,6 +342,15 @@ export const SECTIONS: readonly Section[] = [
 		edit: IntegrationEditPage,
 	},
 	{
+		// Technician mapping of the calendar sync, linked from its card.
+		path: 'integrations/calendar-sync',
+		parent: 'integrations',
+		noun: (): string => t('calendarSync.techniciansTitle'),
+		permission: 'integrations.manage',
+		hideInNav: true,
+		list: CalendarSyncTechniciansPage,
+	},
+	{
 		// Reached from the top-bar ticket button.
 		path: 'tickets',
 		noun: (n: number): string => tp('entity.ticket', n),
@@ -504,7 +514,11 @@ export function tabTitle(raw: string): string {
 export function routeCrumbs(raw: string, match: RouteMatch): Crumb[] {
 	const { section } = match
 	if (match.kind === 'list') {
-		return []
+		// A sub-page listed under another section's list (calendar sync technicians).
+		const parent = SECTIONS.find((s) => s.path === section.parent)
+		return parent?.list
+			? [{ label: parent.noun(2), href: `/${parent.path}` }, { label: tabTitle(raw) }]
+			: []
 	}
 	const meta = pageMetaFor(raw)
 	const head = section.list ? section : SECTIONS.find((s) => s.path === section.parent)
