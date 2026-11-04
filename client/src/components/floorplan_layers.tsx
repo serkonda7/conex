@@ -2,11 +2,12 @@
  * Layers of a floor plan: areas by their target's kind (site or location
  * type) and markers by what they place (rack, device, outlet). The toggle bar
  * doubles as the legend; hidden layers are kept per browser in
- * `localStorage` and shared by the view and the editor. A last toggle shows
- * the names of the markers on the plan, kept the same way.
+ * `localStorage` and shared by the view and the editor. The last toggles show
+ * the names of the markers on the plan and, on a plan with a scale, the
+ * metric grid, kept the same way.
  */
 
-import { IconBox, IconOutlet, IconServer, IconTag } from '@tabler/icons-solidjs'
+import { IconBox, IconGrid4x4, IconOutlet, IconServer, IconTag } from '@tabler/icons-solidjs'
 import { LOCATION_TYPES, type LocationType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
@@ -123,6 +124,33 @@ export function toggleMarkerNames(): void {
 	}
 }
 
+const GRID_STORAGE_KEY = 'conex:floorplan-grid'
+
+function loadGrid(): boolean {
+	try {
+		return window.localStorage.getItem(GRID_STORAGE_KEY) !== 'false'
+	} catch {
+		return true
+	}
+}
+
+const [grid, setGrid] = createSignal(loadGrid())
+
+/** Whether a plan with a scale shows its metric grid (on by default). */
+export function gridVisible(): boolean {
+	return grid()
+}
+
+export function toggleGrid(): void {
+	const next = !grid()
+	setGrid(next)
+	try {
+		window.localStorage.setItem(GRID_STORAGE_KEY, String(next))
+	} catch {
+		// Storage unavailable: the choice applies until reload.
+	}
+}
+
 /** Layers with content on the plan, in display order, with their object counts. */
 export function presentLayers(
 	areas: FloorplanAreaJson[],
@@ -179,6 +207,8 @@ export function LayerBar(props: {
 	placements: FloorplanPlacementJson[]
 	/** Hint for a plan without areas or markers; none in the editor. */
 	empty_hint?: string
+	/** The plan has a scale, so it can show the grid. */
+	has_scale?: boolean
 }): JSX.Element {
 	const present = (): { layer: Layer; count: number }[] =>
 		presentLayers(props.areas, props.placements)
@@ -186,7 +216,7 @@ export function LayerBar(props: {
 		present().length > 0 && present().every(({ layer }) => !layerVisible(layer))
 	return (
 		<>
-			<Show when={present().length > 0}>
+			<Show when={present().length > 0 || props.has_scale}>
 				<fieldset class="floorplan-layers">
 					<legend class="visually-hidden">{t('floorplan.layers')}</legend>
 					<For each={present()}>
@@ -223,6 +253,18 @@ export function LayerBar(props: {
 						>
 							<IconTag size={12} aria-hidden="true" />
 							<span>{t('floorplan.markerNames')}</span>
+						</button>
+					</Show>
+					<Show when={props.has_scale}>
+						<button
+							type="button"
+							class="floorplan-layer-toggle floorplan-names-toggle"
+							aria-pressed={gridVisible()}
+							title={t(gridVisible() ? 'floorplan.hideGrid' : 'floorplan.showGrid')}
+							onClick={toggleGrid}
+						>
+							<IconGrid4x4 size={12} aria-hidden="true" />
+							<span>{t('floorplan.grid')}</span>
 						</button>
 					</Show>
 				</fieldset>

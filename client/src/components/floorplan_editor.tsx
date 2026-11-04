@@ -19,13 +19,18 @@
  *   panel's next free outlet (Escape or the toggle ends it).
  * - On the plan: the object list (second tab of the side panel) selects,
  *   renames and deletes areas and markers; it shares the palette's search.
+ * - Scale: click (or drag between) two points a known distance apart, then
+ *   enter the distance in centimeters. The points stay as handles to adjust;
+ *   the distance label reopens the dialog. Origin: a click sets the zero
+ *   point of the coordinates, a handle moves it. Both are saved with the
+ *   plan and drive the grid and the pointer readout.
  *
  * Hidden layers are not drawn and so cannot be edited on the stage; placing
  * or selecting an object of one shows it again.
  *
  * All coordinates are clamped to 0..1.
  */
-import { IconPencilPlus, IconX } from '@tabler/icons-solidjs'
+import { IconCurrentLocation, IconPencilPlus, IconRulerMeasure, IconX } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import {
 	createMemo,
@@ -47,6 +52,7 @@ import {
 	type FloorplanJson,
 	type FloorplanPlacementJson,
 	type FloorplanPut,
+	type FloorplanScale,
 	fetch_floorplan_candidates,
 	put_floorplan,
 } from '../api/attachments'
@@ -62,14 +68,17 @@ import { focusObject, ObjectList, type PlanObject } from './floorplan_objects'
 import {
 	areaCenter,
 	areaName,
-	createStageZoom,
 	FloorplanStage,
+	formatCentimeters,
 	MarkerGlyph,
 	MarkerName,
 	markerClasses,
 	markerTitle,
 	percent,
+	pixelDistance,
+	type StageZoom,
 } from './floorplan_stage'
+import { TextField } from './form'
 import { IconLabel } from './icon_label'
 import { Modal } from './modal'
 import { ObjectSearch } from './object_selector'
@@ -84,6 +93,9 @@ const MAX_AREA_POINTS = 100
 
 /** Corners closer than this (fraction of the plan) count as the same one. */
 const SAME_POINT = 0.002
+
+/** Shortest distance (image px) between the two scale points. */
+const MIN_SCALE_PX = 5
 
 function clamp01(value: number): number {
 	return Math.min(1, Math.max(0, value))
@@ -167,8 +179,15 @@ function shiftPoints(points: Point[], dx: number, dy: number): Point[] {
 }
 
 /** The wire form of a draft; also what "changed" is measured on. */
-function toPut(areas: FloorplanAreaJson[], placements: FloorplanPlacementJson[]): FloorplanPut {
+function toPut(
+	areas: FloorplanAreaJson[],
+	placements: FloorplanPlacementJson[],
+	scale: FloorplanScale | null,
+	origin: Point | null,
+): FloorplanPut {
 	return {
+		scale,
+		origin,
 		areas: areas.map((area: FloorplanAreaJson) => ({
 			...(area.site_id !== null
 				? { site_id: area.site_id }
@@ -293,6 +312,55 @@ function AreaTargetPicker(props: {
 		</Modal>
 	)
 }
+
+/** Modal asking the real distance between the two scale points. */
+function ScaleDistanceDialog(props: {
+	centimeters: number | null
+	on_save: (centimeters: number) => void
+	on_close: () => void
+}): JSX.Element {
+	const [value, setValue] = createSignal(
+		props.centimeters === null ? '' : String(props.centimeters),
+	)
+	const parsed = (): number => Number(value())
+	const valid = (): boolean =>
+		/^\d+$/.test(value().trim()) && parsed() >= 1 && parsed() <= 10_000_000
+	return (
+		<Modal title={t('floorplan.scaleTitle')} on_close={props.on_close}>
+			<form
+				class="form-stacked"
+				onSubmit={(e: SubmitEvent) => {
+					e.preventDefault()
+					if (valid()) {
+						props.on_save(parsed())
+					}
+				}}
+			>
+				<TextField
+					id="floorplan-scale-centimeters"
+					label={t('floorplan.scaleDistance')}
+					value={value()}
+					onInput={setValue}
+					inputmode="numeric"
+					hint={t('floorplan.scaleDistanceHint')}
+					required
+					autofocus
+				/>
+				<div class="modal-actions">
+					<button type="button" onClick={props.on_close}>
+						{t('common.cancel')}
+					</button>
+					<button type="submit" disabled={!valid()}>
+						{t('common.save')}
+					</button>
+				</div>
+			</form>
+		</Modal>
+	)
+}
+
+/** Calibration tool active on the stage. */
+type CalibrationTool = 'scale' | 'origin'
 
 interface PaletteGroup {
 	name: string
@@ -426,6 +494,8 @@ type SideTab = 'palette' | 'objects'
 export function FloorplanEditor(props: {
 	attachment: AttachmentJson
 	plan: FloorplanJson
+	/** Zoom and pan, shared with the view so switching modes keeps them. */
+	zoom: StageZoom
 	on_saved: (plan: FloorplanJson) => void
 	on_cancel: () => void
 	/** Page header slot the Cancel / Save buttons render into, in place of the Edit button. */
@@ -440,7 +510,7 @@ export function FloorplanEditor(props: {
 	const [selectedMarker, setSelectedMarker] = createSignal<number | null>(null)
 	const [tab, setTab] = createSignal<SideTab>('palette')
 	const [search, setSearch] = createSignal('')
-	const zoom = createStageZoom()
+	const zoom = props.zoom
 	const [drawing, setDrawing] = createSignal(false)
 	/** Area being drawn (rectangle or polygon corners), then held while its target is picked. */
 	const [draft, setDraft] = createSignal<Point[] | null>(null)
@@ -451,14 +521,25 @@ export function FloorplanEditor(props: {
 	/** Panel whose next free outlet a click on the stage places. */
 	const [sequence, setSequence] = createSignal<number | null>(null)
 	const [stage, setStage] = createSignal<HTMLDivElement>()
+	const [planScale, setScale] = createSignal<FloorplanScale | null>(props.plan.scale)
+	const [planOrigin, setOrigin] = createSignal<Point | null>(props.plan.origin)
+	const [tool, setTool] = createSignal<CalibrationTool | null>(null)
+	/** Scale points being picked: the first one, then the second while the pointer moves. */
+	const [scaleDraft, setScaleDraft] = createSignal<{ a: Point; b: Point | null } | null>(null)
+	/** Scale points awaiting their distance in the dialog. */
+	const [askDistance, setAskDistance] = createSignal<{ a: Point; b: Point } | null>(null)
 	const [candidates] = createRows(() => fetch_floorplan_candidates(props.attachment.id), setError)
 	const save = useAction(setError)
 
 	// Items added in the editor have no id yet: negative ones never clash.
 	let nextId = -1
 
-	const initial = JSON.stringify(toPut(props.plan.areas, props.plan.placements))
-	const dirty = createMemo(() => JSON.stringify(toPut(areas(), placements())) !== initial)
+	const initial = JSON.stringify(
+		toPut(props.plan.areas, props.plan.placements, props.plan.scale, props.plan.origin),
+	)
+	const dirty = createMemo(
+		() => JSON.stringify(toPut(areas(), placements(), planScale(), planOrigin())) !== initial,
+	)
 
 	const placed = createMemo(
 		() =>
@@ -608,6 +689,8 @@ export function FloorplanEditor(props: {
 
 	function toggleDrawing(on: boolean): void {
 		setSequence(null)
+		setTool(null)
+		setScaleDraft(null)
 		setDrawing(on)
 		setDraft(null)
 		setHover(null)
@@ -684,6 +767,11 @@ export function FloorplanEditor(props: {
 
 	// Keys of the area tool; ignored while typing in a field.
 	const onKeyDown = (e: KeyboardEvent): void => {
+		if (tool() !== null && e.key === 'Escape' && askDistance() === null) {
+			e.preventDefault()
+			selectTool(null)
+			return
+		}
 		if (sequence() !== null && e.key === 'Escape') {
 			e.preventDefault()
 			setSequence(null)
@@ -795,6 +883,100 @@ export function FloorplanEditor(props: {
 		)
 	}
 
+	function selectTool(next: CalibrationTool | null): void {
+		toggleDrawing(false)
+		setTool(next)
+	}
+
+	/** True if the scale points lie far enough apart on the image. */
+	function scaleSpan(a: Point, b: Point): boolean {
+		return pixelDistance(props.attachment, a, b) >= MIN_SCALE_PX
+	}
+
+	/**
+	 * Pointer down while a tool is active: the origin tool sets the origin;
+	 * the scale tool takes a first point (a drag ends on the second) or the
+	 * second one, then asks the distance.
+	 */
+	function calibrateStart(e: PointerEvent): void {
+		e.preventDefault()
+		e.stopPropagation()
+		const at = stagePoint(e)
+		if (tool() === 'origin') {
+			setOrigin(at)
+			setTool(null)
+			return
+		}
+		const first = scaleDraft()?.a
+		if (first) {
+			if (scaleSpan(first, at)) {
+				setScaleDraft(null)
+				setTool(null)
+				setAskDistance({ a: first, b: at })
+			}
+			return
+		}
+		setScaleDraft({ a: at, b: null })
+		startDrag(
+			e,
+			(dx: number, dy: number) =>
+				setScaleDraft({ a: at, b: [clamp01(at[0] + dx), clamp01(at[1] + dy)] }),
+			() => {
+				const b = scaleDraft()?.b
+				if (b && scaleSpan(at, b)) {
+					setScaleDraft(null)
+					setTool(null)
+					setAskDistance({ a: at, b })
+				} else {
+					setScaleDraft({ a: at, b: null })
+				}
+			},
+		)
+	}
+
+	function saveDistance(centimeters: number): void {
+		const points = askDistance()
+		setAskDistance(null)
+		if (points) {
+			setScale({ ...points, centimeters })
+		}
+	}
+
+	/** Drags scale point `end`; the distance stays. */
+	function dragScalePoint(e: PointerEvent, end: 'a' | 'b'): void {
+		const current = planScale()
+		if (!current) {
+			return
+		}
+		const from = current[end]
+		const other = end === 'a' ? current.b : current.a
+		startDrag(e, (dx: number, dy: number) => {
+			const to: Point = [clamp01(from[0] + dx), clamp01(from[1] + dy)]
+			if (scaleSpan(to, other)) {
+				setScale({ ...current, [end]: to })
+			}
+		})
+	}
+
+	function dragOrigin(e: PointerEvent): void {
+		const from = planOrigin()
+		if (from) {
+			startDrag(e, (dx: number, dy: number) =>
+				setOrigin([clamp01(from[0] + dx), clamp01(from[1] + dy)]),
+			)
+		}
+	}
+
+	/** The scale line as drawn: the saved one, or the one being picked (to the pointer). */
+	const scaleLine = (): { a: Point; b: Point } | null => {
+		const pending = scaleDraft()
+		if (pending) {
+			const b = pending.b ?? hover()
+			return b ? { a: pending.a, b } : null
+		}
+		return planScale()
+	}
+
 	function startSequence(panelId: number | null): void {
 		toggleDrawing(false)
 		if (panelId !== null) {
@@ -832,7 +1014,10 @@ export function FloorplanEditor(props: {
 	async function onSave(): Promise<void> {
 		let saved: FloorplanJson | undefined
 		const ok = await save.run(async () => {
-			const res = await put_floorplan(props.attachment.id, toPut(areas(), placements()))
+			const res = await put_floorplan(
+				props.attachment.id,
+				toPut(areas(), placements(), planScale(), planOrigin()),
+			)
 			if (Result.isOk(res)) {
 				saved = res.value
 			}
@@ -872,10 +1057,15 @@ export function FloorplanEditor(props: {
 			<InlineError message={error()} />
 			<div class="floorplan-layout">
 				<div>
-					<LayerBar areas={areas()} placements={placements()} />
+					<LayerBar
+						areas={areas()}
+						placements={placements()}
+						has_scale={planScale() !== null}
+					/>
 					<FloorplanStage
 						attachment={props.attachment}
 						zoom={zoom}
+						calibration={{ scale: planScale(), origin: planOrigin() }}
 						ref={setStage}
 						handlers={{
 							onPointerDown: () => {
@@ -910,6 +1100,20 @@ export function FloorplanEditor(props: {
 							<Show when={draftPreview()}>
 								{(points: () => Point[]) => (
 									<polygon class="floorplan-draft" points={svgPoints(points())} />
+								)}
+							</Show>
+							<Show when={scaleLine()}>
+								{(line: () => { a: Point; b: Point }) => (
+									<line
+										class="floorplan-scale-line"
+										classList={{
+											'floorplan-scale-line-draft': scaleDraft() !== null,
+										}}
+										x1={line().a[0]}
+										y1={line().a[1]}
+										x2={line().b[0]}
+										y2={line().b[1]}
+									/>
 								)}
 							</Show>
 						</svg>
@@ -1001,8 +1205,67 @@ export function FloorplanEditor(props: {
 								</div>
 							)}
 						</For>
+						<Show when={planScale()}>
+							{(current: () => FloorplanScale) => (
+								<>
+									<For each={['a', 'b'] as const}>
+										{(end: 'a' | 'b') => (
+											<div
+												class="floorplan-handle floorplan-handle-scale"
+												style={{
+													left: percent(current()[end][0]),
+													top: percent(current()[end][1]),
+												}}
+												title={t('floorplan.scalePoint')}
+												onPointerDown={(e: PointerEvent) =>
+													dragScalePoint(e, end)
+												}
+											/>
+										)}
+									</For>
+									<button
+										type="button"
+										class="floorplan-scale-label"
+										style={{
+											left: percent((current().a[0] + current().b[0]) / 2),
+											top: percent((current().a[1] + current().b[1]) / 2),
+										}}
+										title={t('floorplan.scaleEdit')}
+										onPointerDown={(e: PointerEvent) => e.stopPropagation()}
+										onClick={() =>
+											setAskDistance({ a: current().a, b: current().b })
+										}
+									>
+										{formatCentimeters(current().centimeters)}
+									</button>
+								</>
+							)}
+						</Show>
+						<Show when={planOrigin()}>
+							{(point: () => Point) => (
+								<div
+									class="floorplan-handle floorplan-handle-origin"
+									style={{ left: percent(point()[0]), top: percent(point()[1]) }}
+									title={t('floorplan.origin')}
+									onPointerDown={dragOrigin}
+								/>
+							)}
+						</Show>
 						<Show when={sequence() !== null}>
 							<div class="floorplan-sequence-layer" onPointerDown={placeNext} />
+						</Show>
+						<Show when={tool() !== null}>
+							{/* Covers the plan so the pointer picks points instead of moving what lies below. */}
+							<div
+								class="floorplan-draw-layer"
+								onPointerDown={calibrateStart}
+								onPointerMove={(e: PointerEvent) => {
+									const pending = scaleDraft()
+									if (pending && !pending.b) {
+										setHover(stagePoint(e))
+									}
+								}}
+							/>
 						</Show>
 						<Show when={drawing()}>
 							{/* Covers the plan so the pointer draws instead of moving what lies below. */}
@@ -1073,6 +1336,72 @@ export function FloorplanEditor(props: {
 						</Show>
 						<Show when={sequence() !== null}>
 							<p class="floorplan-hint">{t('floorplan.sequenceActive')}</p>
+						</Show>
+						<div class="floorplan-calibration">
+							<button
+								type="button"
+								aria-pressed={tool() === 'scale'}
+								classList={{ active: tool() === 'scale' }}
+								onClick={() => selectTool(tool() === 'scale' ? null : 'scale')}
+							>
+								<IconLabel icon={IconRulerMeasure}>
+									{t('floorplan.setScale')}
+								</IconLabel>
+							</button>
+							<button
+								type="button"
+								aria-pressed={tool() === 'origin'}
+								classList={{ active: tool() === 'origin' }}
+								onClick={() => selectTool(tool() === 'origin' ? null : 'origin')}
+							>
+								<IconLabel icon={IconCurrentLocation}>
+									{t('floorplan.setOrigin')}
+								</IconLabel>
+							</button>
+						</div>
+						<Switch>
+							<Match when={tool() === 'scale'}>
+								<p class="floorplan-hint">
+									{t(
+										scaleDraft()
+											? 'floorplan.scaleSecondHint'
+											: 'floorplan.scaleHint',
+									)}
+								</p>
+							</Match>
+							<Match when={tool() === 'origin'}>
+								<p class="floorplan-hint">{t('floorplan.originHint')}</p>
+							</Match>
+						</Switch>
+						<Show when={planScale()}>
+							{(current: () => FloorplanScale) => (
+								<p class="floorplan-calibration-state">
+									<span>
+										{t('floorplan.scaleState', {
+											distance: formatCentimeters(current().centimeters),
+										})}
+									</span>
+									<button
+										type="button"
+										class="floorplan-link-button"
+										onClick={() => setScale(null)}
+									>
+										{t('floorplan.remove')}
+									</button>
+								</p>
+							)}
+						</Show>
+						<Show when={planOrigin()}>
+							<p class="floorplan-calibration-state">
+								<span>{t('floorplan.originState')}</span>
+								<button
+									type="button"
+									class="floorplan-link-button"
+									onClick={() => setOrigin(null)}
+								>
+									{t('floorplan.remove')}
+								</button>
+							</p>
 						</Show>
 					</div>
 					<div class="floorplan-kinds floorplan-side-tabs">
@@ -1148,6 +1477,13 @@ export function FloorplanEditor(props: {
 					</Show>
 				</aside>
 			</div>
+			<Show when={askDistance()}>
+				<ScaleDistanceDialog
+					centimeters={planScale()?.centimeters ?? null}
+					on_save={saveDistance}
+					on_close={() => setAskDistance(null)}
+				/>
+			</Show>
 			<Show when={picking()}>
 				<AreaTargetPicker
 					attachment={props.attachment}

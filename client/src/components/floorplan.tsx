@@ -241,8 +241,12 @@ function ClusterBubble(props: { cluster: MarkerCluster; zoom: StageZoom }): JSX.
 }
 
 /** The read-only plan: layer bar, zoomable stage and the object list beside it. */
-function PlanViewer(props: { attachment: AttachmentJson; plan: FloorplanJson }): JSX.Element {
-	const zoom = createStageZoom()
+function PlanViewer(props: {
+	attachment: AttachmentJson
+	plan: FloorplanJson
+	zoom: StageZoom
+}): JSX.Element {
+	const zoom = props.zoom
 	const [selected, setSelected] = createSignal<PlanObject | null>(null)
 	const [search, setSearch] = createSignal('')
 	const areas = (): FloorplanAreaJson[] =>
@@ -256,8 +260,13 @@ function PlanViewer(props: { attachment: AttachmentJson; plan: FloorplanJson }):
 					areas={props.plan.areas}
 					placements={props.plan.placements}
 					empty_hint={t('floorplan.empty')}
+					has_scale={props.plan.scale !== null}
 				/>
-				<FloorplanStage attachment={props.attachment} zoom={zoom}>
+				<FloorplanStage
+					attachment={props.attachment}
+					zoom={zoom}
+					calibration={{ scale: props.plan.scale, origin: props.plan.origin }}
+				>
 					<AreaLayer areas={areas()} selected={selected()} />
 					<MarkerLayer placements={placements()} zoom={zoom} selected={selected()} />
 				</FloorplanStage>
@@ -307,6 +316,8 @@ export function FloorplanView(props: {
 		setError,
 	)
 	const [editing, setEditing] = createSignal(false)
+	// Shared by the view and the editor, so switching modes keeps zoom and pan.
+	const zoom = createStageZoom()
 
 	const [actions, setActions] = createSignal<HTMLElement>()
 
@@ -334,6 +345,7 @@ export function FloorplanView(props: {
 								<FloorplanEditor
 									attachment={props.attachment}
 									plan={loaded()}
+									zoom={zoom}
 									on_saved={(saved: FloorplanJson) => {
 										mutate(saved)
 										setEditing(false)
@@ -343,7 +355,7 @@ export function FloorplanView(props: {
 								/>
 							}
 						>
-							<PlanViewer attachment={props.attachment} plan={loaded()} />
+							<PlanViewer attachment={props.attachment} plan={loaded()} zoom={zoom} />
 						</Show>
 					)}
 				</Show>

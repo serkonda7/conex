@@ -71,6 +71,13 @@
       "when": 1793788362488,
       "tag": "0061_panel_jacks",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793795694605,
+      "tag": "0062_floorplan_calibrations",
+      "breakpoints": true
     }
   ]
 }

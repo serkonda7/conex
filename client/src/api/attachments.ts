@@ -21,6 +21,7 @@ import type {
 	FloorplanPlacementJson,
 	FloorplanPortJson,
 	FloorplanPut,
+	FloorplanScale,
 	Page,
 } from 'shared/src/types'
 import { t } from '../i18n'
@@ -38,6 +39,7 @@ export type {
 	FloorplanPlacementJson,
 	FloorplanPortJson,
 	FloorplanPut,
+	FloorplanScale,
 }
 
 /** Owner of an attachment: exactly one of the three ids. */

@@ -3907,6 +3907,106 @@ span.attachment-star,
 	font-size: var(--font-size-sm);
 }
 
+/* Scale and origin: the metric grid under the overlays, the origin
+   crosshair, the pointer readout and the editor's calibration tools. */
+.floorplan-grid {
+	pointer-events: none;
+}
+
+.floorplan-grid line {
+	/* Neutral grey reads on light and dark plan images alike. */
+	stroke: rgba(128, 128, 128, 0.45);
+	stroke-width: 1;
+	vector-effect: non-scaling-stroke;
+}
+
+.floorplan-grid line.floorplan-grid-axis {
+	stroke: color-mix(in srgb, var(--primary) 70%, transparent);
+	stroke-width: 1.5;
+}
+
+.floorplan-origin {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	width: 1rem;
+	height: 1rem;
+	border: 2px solid var(--primary);
+	border-radius: 50%;
+	pointer-events: none;
+}
+
+.floorplan-readout {
+	position: absolute;
+	bottom: 0.4rem;
+	left: 0.4rem;
+	z-index: 3;
+	display: flex;
+	gap: 0.6rem;
+	padding: 0.1rem 0.45rem;
+	border-radius: 0.25rem;
+	font-size: var(--font-size-sm);
+	font-variant-numeric: tabular-nums;
+	color: var(--text);
+	background-color: color-mix(in srgb, var(--bg-surface) 85%, transparent);
+	box-shadow: var(--shadow);
+	pointer-events: none;
+}
+
+.floorplan-readout:empty {
+	display: none;
+}
+
+.floorplan-scale-line {
+	stroke: var(--primary);
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+}
+
+.floorplan-scale-line-draft {
+	stroke-dasharray: 4 3;
+}
+
+.floorplan-handle-scale {
+	border-radius: 50%;
+	cursor: move;
+}
+
+.floorplan-handle-origin {
+	width: 1rem;
+	height: 1rem;
+	border-radius: 50%;
+	background-color: transparent;
+	cursor: move;
+}
+
+.floorplan-scale-label {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -150%);
+	padding: 0 0.35rem;
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+	border-color: var(--primary);
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.floorplan-calibration {
+	display: grid;
+	gap: 0.4rem;
+	margin-top: 0.4rem;
+}
+
+.floorplan-calibration-state {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.4rem;
+	margin: 0.4rem 0 0;
+	font-size: var(--font-size-sm);
+}
+
 /* Two-column detail layout: facts/stats left, main content right. */
 .detail-columns {
 	display: grid;

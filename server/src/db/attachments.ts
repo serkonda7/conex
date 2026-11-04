@@ -41,6 +41,7 @@ import {
 	device_roles,
 	devices,
 	floorplan_areas,
+	floorplan_calibrations,
 	floorplan_placements,
 	interfaces,
 	locations,
@@ -390,6 +391,9 @@ async function clearPlans(ids: number[]): Promise<void> {
 	await getDb()
 		.delete(floorplan_placements)
 		.where(inArray(floorplan_placements.attachment_id, ids))
+	await getDb()
+		.delete(floorplan_calibrations)
+		.where(inArray(floorplan_calibrations.attachment_id, ids))
 }
 
 /**
@@ -501,6 +505,8 @@ export async function getPlan(
 			attachment_id: id,
 			areas: [],
 			placements: [],
+			scale: null,
+			origin: null,
 			has_hidden_content: false,
 		})
 	}
@@ -579,7 +585,23 @@ export async function getPlan(
 				floorplan_placements,
 				eq(floorplan_placements.attachment_id, id),
 			)) > placements.length)
-	return Result.ok({ attachment_id: id, areas, placements, has_hidden_content: hasHiddenContent })
+	const calibration = await planCalibration(id)
+	return Result.ok({
+		attachment_id: id,
+		areas,
+		placements,
+		...calibration,
+		has_hidden_content: hasHiddenContent,
+	})
+}
+
+/** Scale and origin of a plan; `null` each while unset. */
+async function planCalibration(id: number): Promise<Pick<FloorplanJson, 'scale' | 'origin'>> {
+	const [row] = await getDb()
+		.select({ scale: floorplan_calibrations.scale, origin: floorplan_calibrations.origin })
+		.from(floorplan_calibrations)
+		.where(eq(floorplan_calibrations.attachment_id, id))
+	return { scale: row?.scale ?? null, origin: row?.origin ?? null }
 }
 
 function ownerOf(row: AttachmentRow): AttachmentOwner {
@@ -1060,13 +1082,15 @@ async function hiddenPlanIds(
 }
 
 /** Areas and placements of a plan as stored, for the changelog entry of a save. */
-async function planSnapshot(id: number): Promise<{
-	areas: Pick<FloorplanAreaRow, 'site_id' | 'location_id' | 'label' | 'points'>[]
-	placements: Pick<
-		FloorplanPlacementRow,
-		'rack_id' | 'device_id' | 'interface_id' | 'jack_id' | 'x' | 'y'
-	>[]
-}> {
+async function planSnapshot(id: number): Promise<
+	{
+		areas: Pick<FloorplanAreaRow, 'site_id' | 'location_id' | 'label' | 'points'>[]
+		placements: Pick<
+			FloorplanPlacementRow,
+			'rack_id' | 'device_id' | 'interface_id' | 'jack_id' | 'x' | 'y'
+		>[]
+	} & Pick<FloorplanJson, 'scale' | 'origin'>
+> {
 	const areas = await getDb()
 		.select({
 			site_id: floorplan_areas.site_id,
@@ -1089,7 +1113,7 @@ async function planSnapshot(id: number): Promise<{
 		.from(floorplan_placements)
 		.where(eq(floorplan_placements.attachment_id, id))
 		.orderBy(asc(floorplan_placements.id))
-	return { areas, placements }
+	return { areas, placements, ...(await planCalibration(id)) }
 }
 
 /**
@@ -1219,6 +1243,16 @@ export async function putPlan(
 								y: placement.y,
 							})),
 						)
+				}
+				await getDb()
+					.delete(floorplan_calibrations)
+					.where(eq(floorplan_calibrations.attachment_id, id))
+				if (input.scale !== null || input.origin !== null) {
+					await getDb().insert(floorplan_calibrations).values({
+						attachment_id: id,
+						scale: input.scale,
+						origin: input.origin,
+					})
 				}
 				await locateOutlets(owner, input)
 				const after = await planSnapshot(id)

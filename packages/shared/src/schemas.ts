@@ -2081,10 +2081,40 @@ const FloorplanPlacementInputSchema = v.pipe(
 	),
 )
 
-/** `PUT /attachments/:id/plan`: the full set of areas and placements, replaced atomically. */
+/**
+ * Scale of a plan: two points on it and their real distance in whole
+ * centimeters. The length per image pixel follows with the image's size, so the scale
+ * survives a file replace with the same proportions.
+ */
+export const FloorplanScaleSchema = v.pipe(
+	v.strictObject({
+		a: v.tuple([FloorplanCoordSchema, FloorplanCoordSchema]),
+		b: v.tuple([FloorplanCoordSchema, FloorplanCoordSchema]),
+		centimeters: v.pipe(
+			v.number('Distance must be a number'),
+			v.integer('Distance must be whole centimeters'),
+			v.minValue(1, 'Distance must be at least 1 cm'),
+			v.maxValue(10_000_000, 'Distance must be at most 10000000 cm'),
+		),
+	}),
+	v.check(
+		(scale) => scale.a[0] !== scale.b[0] || scale.a[1] !== scale.b[1],
+		'The two scale points must differ',
+	),
+)
+
+export type FloorplanScale = v.InferOutput<typeof FloorplanScaleSchema>
+
+/**
+ * `PUT /attachments/:id/plan`: the full set of areas and placements, plus the
+ * scale and origin, replaced atomically. A missing scale or origin clears it.
+ */
 export const FloorplanPutSchema = v.strictObject({
 	areas: v.pipe(v.array(FloorplanAreaInputSchema), v.maxLength(500)),
 	placements: v.pipe(v.array(FloorplanPlacementInputSchema), v.maxLength(2000)),
+	scale: v.optional(v.nullable(FloorplanScaleSchema), null),
+	/** Zero point of the plan's coordinates (x right, y up), in normalized coordinates. */
+	origin: v.optional(v.nullable(v.tuple([FloorplanCoordSchema, FloorplanCoordSchema])), null),
 })
 
 export type FloorplanPut = v.InferOutput<typeof FloorplanPutSchema>
@@ -2157,6 +2187,10 @@ export interface FloorplanJson {
 	attachment_id: number
 	areas: FloorplanAreaJson[]
 	placements: FloorplanPlacementJson[]
+	/** Real-world scale; `null` until set. */
+	scale: FloorplanScale | null
+	/** Zero point of the coordinates (x right, y up); `null` is the top-left corner. */
+	origin: FloorplanPoint | null
 	/** Warn before clearing a plan even when some content is outside the scope. */
 	has_hidden_content: boolean
 }

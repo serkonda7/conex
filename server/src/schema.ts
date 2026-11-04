@@ -981,6 +981,21 @@ export const floorplan_placements = pgTable(
 	],
 )
 
+// Real-world scale and coordinate origin of a floor plan, at most one row
+// per plan. `scale` is two normalized points and their distance in centimeters;
+// `origin` the normalized zero point. A row exists while either is set.
+export const floorplan_calibrations = pgTable('floorplan_calibrations', {
+	attachment_id: integer('attachment_id')
+		.primaryKey()
+		.references(() => attachments.id, { onDelete: 'cascade' }),
+	scale: jsonb('scale').$type<{
+		a: [number, number]
+		b: [number, number]
+		centimeters: number
+	}>(),
+	origin: jsonb('origin').$type<[number, number]>(),
+})
+
 // ---------------------------------------------------------------------------
 // Integrations: read-only links to external systems (TANSS; UniFi and
 // servereye later). One row per provider in `integrations`; secrets are

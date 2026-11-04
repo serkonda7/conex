@@ -7,6 +7,9 @@
  * so coordinates stay normalized (0..1) and the editor's pointer mapping
  * (`getBoundingClientRect` of the stage) keeps working. Markers, labels and
  * handles scale back by `--floorplan-inv-zoom` to keep their screen size.
+ *
+ * A plan with a scale draws a metric grid through its origin (toggled in the
+ * layer bar) and shows the pointer's position in meters.
  */
 import {
 	IconBox,
@@ -16,7 +19,17 @@ import {
 	IconZoomOut,
 	IconZoomReset,
 } from '@tabler/icons-solidjs'
-import { type Accessor, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
+import {
+	type Accessor,
+	createEffect,
+	createMemo,
+	createSignal,
+	For,
+	type JSX,
+	onCleanup,
+	onMount,
+	Show,
+} from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
@@ -25,11 +38,12 @@ import {
 	type FloorplanOutletPortJson,
 	type FloorplanPlacementJson,
 	type FloorplanPortJson,
+	type FloorplanScale,
 } from '../api/attachments'
-import { t, tp } from '../i18n'
+import { locale, t, tp } from '../i18n'
 import { deviceStatusLabel } from '../i18n/labels'
 import { deviceRoleIcon, type IconComponent } from '../lib/icons'
-import { markerNamesVisible } from './floorplan_layers'
+import { gridVisible, markerNamesVisible } from './floorplan_layers'
 
 /** Percent offset of a normalized coordinate, for `left` / `top`. */
 export function percent(value: number): string {
@@ -365,6 +379,162 @@ export function declutter(
 	return { markers, clusters }
 }
 
+/** Scale and origin of a plan, as the stage draws them. */
+export interface PlanCalibration {
+	scale: FloorplanScale | null
+	origin: [number, number] | null
+}
+
+type ImageSize = Pick<AttachmentJson, 'width_px' | 'height_px'>
+
+/** Distance between two normalized points in image pixels. */
+export function pixelDistance(image: ImageSize, a: [number, number], b: [number, number]): number {
+	return Math.hypot((b[0] - a[0]) * image.width_px, (b[1] - a[1]) * image.height_px)
+}
+
+/** Meters per image pixel of a scale. */
+export function metersPerPixel(image: ImageSize, scale: FloorplanScale): number {
+	return scale.centimeters / 100 / pixelDistance(image, scale.a, scale.b)
+}
+
+/** Position of a normalized point in meters from the origin (top left without one), y up. */
+export function planMeters(
+	image: ImageSize,
+	calibration: PlanCalibration & { scale: FloorplanScale },
+	point: [number, number],
+): [number, number] {
+	const mpp = metersPerPixel(image, calibration.scale)
+	const [ox, oy] = calibration.origin ?? [0, 0]
+	return [(point[0] - ox) * image.width_px * mpp, (oy - point[1]) * image.height_px * mpp]
+}
+
+/** A length in meters for display, with up to two decimals. */
+export function formatMeters(value: number): string {
+	return t('floorplan.meters', {
+		value: new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(value),
+	})
+}
+
+/** A recorded distance in centimeters for display. */
+export function formatCentimeters(value: number): string {
+	return t('floorplan.centimeters', { value: new Intl.NumberFormat(locale()).format(value) })
+}
+
+/** Smallest on-screen spacing (px) of grid lines. */
+const GRID_MIN_PX = 28
+
+/** Most grid lines per axis, a guard against degenerate scales. */
+const GRID_MAX_LINES = 500
+
+/** Grid step for `pxPerMeter` on screen: the smallest 1, 2, 5 × 10ⁿ m step of at least `GRID_MIN_PX`. */
+function gridStep(pxPerMeter: number): number | null {
+	if (!(pxPerMeter > 0) || !Number.isFinite(pxPerMeter)) {
+		return null
+	}
+	const raw = GRID_MIN_PX / pxPerMeter
+	const magnitude = 10 ** Math.floor(Math.log10(raw))
+	const step = [1, 2, 5, 10].map((f) => f * magnitude).find((value) => value >= raw)
+	return step ?? 10 * magnitude
+}
+
+/** Normalized positions of lines `step` apart through `origin`, within 0..1, with their index. */
+function gridLines(origin: number, step: number): { at: number; index: number }[] {
+	if (!(step > 0) || 1 / step > GRID_MAX_LINES) {
+		return []
+	}
+	const lines: { at: number; index: number }[] = []
+	for (let index = Math.ceil(-origin / step); origin + index * step <= 1; index++) {
+		lines.push({ at: origin + index * step, index })
+	}
+	return lines
+}
+
+/**
+ * Metric grid through the origin, its step adapting to the zoom; the axes
+ * through a set origin are drawn stronger, with a crosshair at the origin.
+ */
+function GridLayer(props: {
+	attachment: AttachmentJson
+	calibration: PlanCalibration & { scale: FloorplanScale }
+	zoom: StageZoom
+	on_step: (step: number | null) => void
+}): JSX.Element {
+	const metersWide = (): number =>
+		props.attachment.width_px * metersPerPixel(props.attachment, props.calibration.scale)
+	const metersHigh = (): number =>
+		props.attachment.height_px * metersPerPixel(props.attachment, props.calibration.scale)
+	const step = createMemo((): number | null =>
+		gridStep((props.zoom.size().width * props.zoom.scale()) / metersWide()),
+	)
+	createEffect(() => props.on_step(step()))
+	onCleanup(() => props.on_step(null))
+	const origin = (): [number, number] => props.calibration.origin ?? [0, 0]
+	const columns = (): { at: number; index: number }[] => {
+		const value = step()
+		return value === null ? [] : gridLines(origin()[0], value / metersWide())
+	}
+	const rows = (): { at: number; index: number }[] => {
+		const value = step()
+		return value === null ? [] : gridLines(origin()[1], value / metersHigh())
+	}
+	const axis = (index: number): boolean => index === 0 && props.calibration.origin !== null
+	return (
+		<svg
+			class="floorplan-overlay floorplan-grid"
+			viewBox="0 0 1 1"
+			preserveAspectRatio="none"
+			aria-hidden="true"
+		>
+			<For each={columns()}>
+				{(line: { at: number; index: number }) => (
+					<line
+						classList={{ 'floorplan-grid-axis': axis(line.index) }}
+						x1={line.at}
+						x2={line.at}
+						y1={0}
+						y2={1}
+					/>
+				)}
+			</For>
+			<For each={rows()}>
+				{(line: { at: number; index: number }) => (
+					<line
+						classList={{ 'floorplan-grid-axis': axis(line.index) }}
+						x1={0}
+						x2={1}
+						y1={line.at}
+						y2={line.at}
+					/>
+				)}
+			</For>
+		</svg>
+	)
+}
+
+/** Grid step and pointer position in meters, in the stage's bottom corner. */
+function MeasureReadout(props: {
+	step: number | null
+	pointer: [number, number] | null
+}): JSX.Element {
+	return (
+		<div class="floorplan-readout" aria-live="off">
+			<Show when={props.step !== null && gridVisible()}>
+				<span>{t('floorplan.gridStep', { step: formatMeters(props.step ?? 0) })}</span>
+			</Show>
+			<Show when={props.pointer}>
+				{(pointer: Accessor<[number, number]>) => (
+					<span>
+						{t('floorplan.pointerPosition', {
+							x: formatMeters(pointer()[0]),
+							y: formatMeters(pointer()[1]),
+						})}
+					</span>
+				)}
+			</Show>
+		</div>
+	)
+}
+
 /** Zoom in / out / fit buttons in the stage's corner. */
 function ZoomControls(props: { zoom: StageZoom }): JSX.Element {
 	return (
@@ -417,12 +587,37 @@ export function FloorplanStage(props: {
 	ref?: (el: HTMLDivElement) => void
 	/** Extra handlers of the stage (the edit mode's drop target and deselect). */
 	handlers?: JSX.HTMLAttributes<HTMLDivElement>
+	/** Scale and origin; with a scale the stage draws the grid and measures the pointer. */
+	calibration?: PlanCalibration
 }): JSX.Element {
 	let viewport!: HTMLDivElement
 	let stage!: HTMLDivElement
 	/** Active pointers on the viewport, for pan and pinch. */
 	const pointers = new Map<number, { x: number; y: number }>()
 	let travelled = 0
+	const [gridStepShown, setGridStepShown] = createSignal<number | null>(null)
+	/** Pointer position over the plan in meters, while there is a scale. */
+	const [pointer, setPointer] = createSignal<[number, number] | null>(null)
+	const scaled = (): (PlanCalibration & { scale: FloorplanScale }) | undefined => {
+		const calibration = props.calibration
+		return calibration?.scale ? { ...calibration, scale: calibration.scale } : undefined
+	}
+
+	const trackPointer = (e: PointerEvent): void => {
+		const calibration = scaled()
+		const box = stage.getBoundingClientRect()
+		if (!calibration || box.width === 0 || box.height === 0) {
+			setPointer(null)
+			return
+		}
+		const x = (e.clientX - box.left) / box.width
+		const y = (e.clientY - box.top) / box.height
+		setPointer(
+			x < 0 || x > 1 || y < 0 || y > 1
+				? null
+				: planMeters(props.attachment, calibration, [x, y]),
+		)
+	}
 
 	const local = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
 		const box = viewport.getBoundingClientRect()
@@ -520,6 +715,8 @@ export function FloorplanStage(props: {
 			classList={{ zoomed: props.zoom.scale() > MIN_ZOOM }}
 			ref={viewport}
 			onPointerDown={onPointerDown}
+			onPointerMove={trackPointer}
+			onPointerLeave={() => setPointer(null)}
 		>
 			<div
 				class="floorplan-stage"
@@ -542,9 +739,31 @@ export function FloorplanStage(props: {
 					height={props.attachment.height_px}
 					draggable={false}
 				/>
+				<Show when={gridVisible() && scaled()}>
+					{(calibration: Accessor<PlanCalibration & { scale: FloorplanScale }>) => (
+						<GridLayer
+							attachment={props.attachment}
+							calibration={calibration()}
+							zoom={props.zoom}
+							on_step={setGridStepShown}
+						/>
+					)}
+				</Show>
+				<Show when={props.calibration?.origin}>
+					{(origin: Accessor<[number, number]>) => (
+						<span
+							class="floorplan-origin"
+							style={{ left: percent(origin()[0]), top: percent(origin()[1]) }}
+							title={t('floorplan.origin')}
+						/>
+					)}
+				</Show>
 				{props.children}
 			</div>
 			<ZoomControls zoom={props.zoom} />
+			<Show when={scaled()}>
+				<MeasureReadout step={gridStepShown()} pointer={pointer()} />
+			</Show>
 		</div>
 	)
 }
