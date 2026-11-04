@@ -100,7 +100,10 @@ function SettingsForm(props: {
 	}
 
 	return (
-		<form onSubmit={(e: SubmitEvent) => void handleSave(e)}>
+		<form
+			class="form-stacked calendar-sync-form"
+			onSubmit={(e: SubmitEvent) => void handleSave(e)}
+		>
 			<TextField
 				id="calendar-sync-tenant-id"
 				label={t('calendarSync.tenantId')}
@@ -154,7 +157,7 @@ function SettingsForm(props: {
 				for="calendar-sync-test-mailbox"
 				hint={<Hint>{t('calendarSync.testMailboxHint')}</Hint>}
 			>
-				<div class="form-actions">
+				<div class="input-with-button">
 					<input
 						id="calendar-sync-test-mailbox"
 						type="email"
