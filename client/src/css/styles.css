@@ -2950,6 +2950,7 @@ tbody tr:last-child td {
 }
 
 .device-preview,
+.flat-table,
 .section-header > h3 {
 	scroll-margin-top: var(--topbar-height);
 }
@@ -2978,13 +2979,13 @@ tbody tr:last-child td {
 
 /* Faint row rules, lighter than the section lines. */
 .component-table tbody tr:not(:last-child),
-.device-preview tbody tr:not(:last-child) {
+:is(.device-preview, .flat-table) tbody tr:not(:last-child) {
 	border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 
 /* Group rows shift the zebra stripes: keep rows flat, hover still applies. */
 .app-content .component-table tbody tr:not(:hover),
-.app-content .device-preview tbody tr:not(:hover) {
+.app-content :is(.device-preview, .flat-table) tbody tr:not(:hover) {
 	background: none;
 }
 
@@ -3055,29 +3056,35 @@ tbody tr:last-child td {
 	border-top: 1px solid var(--border);
 }
 
-.device-preview table {
+:is(.device-preview, .flat-table) table {
 	margin: 0;
 	border: 0;
 	background: none;
 }
 
-.device-preview thead th {
+:is(.device-preview, .flat-table) thead th {
 	background: none;
 }
 
-.device-preview :is(th, td) {
+:is(.device-preview, .flat-table) :is(th, td) {
 	border-bottom: 0;
 }
 
 /* Same row height as the components, whose rows hold icon buttons. */
-.device-preview :is(tbody td) {
+:is(.device-preview, .flat-table) :is(tbody td) {
 	padding-block: 0.6rem;
 }
 
 /* As tall as a text line, so rows keep their height with or without it. */
-.device-preview .icon-btn {
+:is(.device-preview, .flat-table) .icon-btn {
 	display: flex;
 	margin-block: -0.4rem;
+}
+
+/* Device detail: port and VM sections, split by the same rule. */
+.detail-sections > section + section {
+	padding-top: 1.1rem;
+	border-top: 1px solid var(--border);
 }
 
 /* Lines up with the name column. */

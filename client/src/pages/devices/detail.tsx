@@ -22,20 +22,20 @@ import { fetch_rack } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_device_type } from '../../api/templates'
 import { fetch_location, fetch_site, fetch_tenant } from '../../api/tenancy'
-import { DataTable, type DataTableColumn } from '../../components/data_table'
+import { DataTable, type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
-	DetailCard,
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
 	ForeignKeyLink,
 	RecordLink,
-	RelatedSection,
+	RelatedPreview,
 	useDetailDelete,
 } from '../../components/detail_page'
-import { InlineError } from '../../components/feedback'
+import { Empty, InlineError } from '../../components/feedback'
 import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
+import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, faceLabel, portKindLabel } from '../../i18n/labels'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
@@ -222,7 +222,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	})
 	const endToEndOf = (ifaceId: number): TraceEndToEnd[] => endToEndByIface().get(ifaceId) ?? []
 
-	const nameColumn: DataTableColumn<InterfaceJson> = {
+	const portNameColumn: DataTableColumn<InterfaceJson> = {
 		key: 'name',
 		label: t('common.name'),
 		getValue: (iface: InterfaceJson): JSX.Element => <code>{iface.name}</code>,
@@ -255,7 +255,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			),
 		},
 		{
-			...nameColumn,
+			...portNameColumn,
 			getValue: (iface: InterfaceJson): JSX.Element => (
 				<code classList={{ 'text-muted': !iface.enabled }}>{iface.name}</code>
 			),
@@ -264,7 +264,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	]
 	/** Other ports show their kind instead. */
 	const otherColumns: DataTableColumn<InterfaceJson>[] = [
-		nameColumn,
+		portNameColumn,
 		{
 			key: 'kind',
 			label: t('device.kind'),
@@ -365,6 +365,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		/>
 	)
 
+	/** Id of the topmost port section, the target of the port count. */
+	const firstPortSection = (): string =>
+		panelPorts().length > 0 ? 'device-panel-ports' : 'device-interfaces'
+
 	const shelfLabel = (): string =>
 		t('device.onShelf', {
 			name: shelf()?.name || t('common.unitPosition', { u: shelf()?.position_u ?? '' }),
@@ -422,158 +426,198 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<DetailSubtitle description={device()?.description} />
 				<ManagedServicePill service={service} />
 
-				<DetailCard label={t('device.details')}>
-					<dt>{t('common.status')}</dt>
-					<dd>
-						<DeviceStatusBadge status={device()?.status ?? 'active'} />
-					</dd>
-					<dt>{t('common.type')}</dt>
-					<dd>
-						<ForeignKeyLink
-							id={typeId()}
-							loading={deviceType.loading}
-							name={deviceType()?.model}
-							href={`/device-types/${typeId() ?? ''}`}
-						/>{' '}
-						<EolPill date={deviceType()?.eol_date} />
-					</dd>
-					<dt>{tp('entity.deviceRole', 1)}</dt>
-					<dd>
-						<IconLabel icon={deviceRoleIcon(deviceRole()?.icon)}>
-							<ForeignKeyLink
-								id={roleId()}
-								loading={deviceRole.loading}
-								name={deviceRoleLabel(deviceRole())}
-								href={`/device-roles/${roleId() ?? ''}`}
+				<section class="spec-sheet" aria-label={t('device.details')}>
+					<section>
+						<h4>{t('device.section.hardware')}</h4>
+						<dl>
+							<dt>{t('common.status')}</dt>
+							<dd>
+								<DeviceStatusBadge status={device()?.status ?? 'active'} />
+							</dd>
+							<dt>{t('common.type')}</dt>
+							<dd>
+								<ForeignKeyLink
+									id={typeId()}
+									loading={deviceType.loading}
+									name={deviceType()?.model}
+									href={`/device-types/${typeId() ?? ''}`}
+								/>{' '}
+								<EolPill date={deviceType()?.eol_date} />
+							</dd>
+							<dt>{tp('entity.deviceRole', 1)}</dt>
+							<dd>
+								<IconLabel icon={deviceRoleIcon(deviceRole()?.icon)}>
+									<ForeignKeyLink
+										id={roleId()}
+										loading={deviceRole.loading}
+										name={deviceRoleLabel(deviceRole())}
+										href={`/device-roles/${roleId() ?? ''}`}
+									/>
+								</IconLabel>
+							</dd>
+							<dt>{t('device.serial')}</dt>
+							<dd>{device()?.serial || '—'}</dd>
+							<dt>{t('device.deviceId')}</dt>
+							<dd>{device()?.device_id || '—'}</dd>
+						</dl>
+					</section>
+					<section>
+						<h4>{t('device.locationSection')}</h4>
+						<dl>
+							<dt>{tp('entity.site', 1)}</dt>
+							<dd>
+								<RecordLink id={siteId()} record={site} base="/sites" />
+							</dd>
+							<dt>{tp('entity.location', 1)}</dt>
+							<dd>
+								<RecordLink id={locationId()} record={location} base="/locations" />
+							</dd>
+							<dt>{tp('entity.rack', 1)}</dt>
+							<dd>
+								<RecordLink id={rackId()} record={rack} base="/racks" />
+								<Mount />
+							</dd>
+							<FloorplanLinks
+								target={{ device: props.id }}
+								label="floorplan.onPlanOf"
+								onError={setError}
 							/>
-						</IconLabel>
-					</dd>
-					<dt>{t('device.serial')}</dt>
-					<dd>{device()?.serial ?? '—'}</dd>
-					<dt>{t('device.deviceId')}</dt>
-					<dd>{device()?.device_id ?? '—'}</dd>
-					<dt>{tp('entity.tenant', 1)}</dt>
-					<dd>
-						<RecordLink id={tenantId()} record={tenant} base="/tenants" />
-					</dd>
-					<dt>{t('device.assignedEmployee')}</dt>
-					<dd>
-						<RecordLink id={employeeId()} record={employee} base="/employees" />
-					</dd>
-					<dt>{tp('entity.site', 1)}</dt>
-					<dd>
-						<RecordLink id={siteId()} record={site} base="/sites" />
-					</dd>
-					<dt>{tp('entity.location', 1)}</dt>
-					<dd>
-						<RecordLink id={locationId()} record={location} base="/locations" />
-					</dd>
-					<dt>{tp('entity.rack', 1)}</dt>
-					<dd>
-						<RecordLink id={rackId()} record={rack} base="/racks" />
-						<Mount />
-					</dd>
-					<FloorplanLinks
-						target={{ device: props.id }}
-						label="floorplan.onPlanOf"
-						onError={setError}
-					/>
-					<Show when={panelPorts().length === 0}>
-						<OutletLinks
-							outlets={outlets() ?? []}
-							portName={(ifaceId: number) =>
-								(ifaces() ?? []).find((i) => i.id === ifaceId)?.name
-							}
-						/>
-					</Show>
-				</DetailCard>
+							<Show when={panelPorts().length === 0}>
+								<OutletLinks
+									outlets={outlets() ?? []}
+									portName={(ifaceId: number) =>
+										(ifaces() ?? []).find((i) => i.id === ifaceId)?.name
+									}
+								/>
+							</Show>
+						</dl>
+					</section>
+					<section>
+						<h4>{t('device.assignmentSection')}</h4>
+						<dl>
+							<dt>{tp('entity.tenant', 1)}</dt>
+							<dd>
+								<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+							</dd>
+							<dt>{t('device.assignedEmployee')}</dt>
+							<dd>
+								<RecordLink id={employeeId()} record={employee} base="/employees" />
+							</dd>
+							<dt>{t('device.section.ports')}</dt>
+							<dd>
+								<ScrollLink target={firstPortSection()}>
+									{(ifaces() ?? []).length}
+								</ScrollLink>
+							</dd>
+						</dl>
+					</section>
+				</section>
 			</DetailShell>
-			<Show when={panelPorts().length > 0}>
-				<div class="section-header">
-					<h3 id="device-panel-ports" class="panel-ports-heading">
-						<span>
-							{t('device.panelPortsCount', {
-								count: panelPorts().filter((p) => p.side === 'rear').length,
-							})}
-						</span>
-						<Show when={panelPorts()[0]?.kind}>
-							{(kind: Accessor<string>) => (
-								<span aria-hidden="true" class="app-nav-icon">
-									<Dynamic component={panelKindIcon(kind())} size={18} />
+			<div class="detail-sections">
+				<Show when={panelPorts().length > 0}>
+					<section class="component-section flat-table" id="device-panel-ports">
+						<div class="card-header">
+							<h3 class="panel-ports-heading">
+								<Show when={panelPorts()[0]?.kind}>
+									{(kind: Accessor<string>) => (
+										<span aria-hidden="true" class="app-nav-icon">
+											<Dynamic component={panelKindIcon(kind())} size={18} />
+										</span>
+									)}
+								</Show>
+								{t('device.panelPorts')}{' '}
+								<span class="badge">
+									{panelPorts().filter((p) => p.side === 'rear').length}
 								</span>
-							)}
-						</Show>
-					</h3>
-					<Show when={can('edit')}>
-						<button
-							type="button"
-							onClick={() => {
-								setError(null)
-								setManagingJacks(true)
-							}}
+							</h3>
+							<Show when={can('edit')}>
+								<button
+									type="button"
+									onClick={() => {
+										setError(null)
+										setManagingJacks(true)
+									}}
+								>
+									{t('device.panel.manageJacks')}
+								</button>
+							</Show>
+						</div>
+						<PanelPortTable
+							ports={panelPorts()}
+							links={linksByIface()}
+							endToEnd={endToEndOf}
+							onConnect={
+								can('edit')
+									? (iface: InterfaceJson): void =>
+											openDialog(setConnectingIface, iface)
+									: undefined
+							}
+							rowActions={can('edit') ? panelRowActions : undefined}
+							extraColumns={[jackColumn, locationColumn, planColumn]}
+						/>
+					</section>
+				</Show>
+				<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
+					<section class="component-section flat-table" id="device-interfaces">
+						<div class="card-header">
+							<h3>
+								{t('device.networkPorts')}{' '}
+								<span class="badge">{networkPorts().length}</span>
+							</h3>
+						</div>
+						<Show
+							when={networkPorts().length > 0}
+							fallback={<Empty message={t('device.noPorts')} />}
 						>
-							{t('device.panel.manageJacks')}
-						</button>
-					</Show>
-				</div>
-				<PanelPortTable
-					ports={panelPorts()}
-					links={linksByIface()}
-					endToEnd={endToEndOf}
-					onConnect={
-						can('edit')
-							? (iface: InterfaceJson): void => openDialog(setConnectingIface, iface)
-							: undefined
-					}
-					rowActions={can('edit') ? panelRowActions : undefined}
-					extraColumns={[jackColumn, locationColumn, planColumn]}
-				/>
-			</Show>
-			<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
-				<h3 id="device-interfaces">
-					{t('device.networkPortsCount', { count: networkPorts().length })}
-				</h3>
-				{portTable(networkPorts, networkColumns)}
-			</Show>
-			<Show when={otherPorts().length > 0}>
-				<h3 id="device-other-ports">
-					{t('device.otherPortsCount', { count: otherPorts().length })}
-				</h3>
-				{portTable(otherPorts, otherColumns)}
-			</Show>
-			<Show when={deviceRole()?.can_host_vms === 1}>
-				<RelatedSection
-					id="device-vms"
-					title={tp('entity.virtualMachine', 2)}
-					noun="noun.virtualMachine"
-					rows={vms}
-					emptyText={t('vm.emptyOnHost')}
-					actions={
-						<Show when={can('edit')}>
-							<button
-								type="button"
-								onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
-							>
-								{t('vm.addVm')}
-							</button>
+							{portTable(networkPorts, networkColumns)}
 						</Show>
-					}
-					columns={[
-						{
-							key: 'name',
-							label: t('common.name'),
-							getValue: (vm: DeviceListItem): JSX.Element => (
-								<a href={`/devices/vm/${vm.id}`}>{vm.name}</a>
-							),
-						},
-						{
-							key: 'description',
-							label: t('common.description'),
-							getValue: (vm: DeviceListItem): string => vm.description || '—',
-						},
-					]}
-				/>
-			</Show>
+					</section>
+				</Show>
+				<Show when={otherPorts().length > 0}>
+					<section class="component-section flat-table" id="device-other-ports">
+						<div class="card-header">
+							<h3>
+								{t('device.otherPorts')}{' '}
+								<span class="badge">{otherPorts().length}</span>
+							</h3>
+						</div>
+						{portTable(otherPorts, otherColumns)}
+					</section>
+				</Show>
+				<Show when={deviceRole()?.can_host_vms === 1}>
+					<section class="component-section flat-table" id="device-vms">
+						<div class="card-header">
+							<h3>
+								{tp('entity.virtualMachine', 2)}{' '}
+								<span class="badge">{(vms() ?? []).length}</span>
+							</h3>
+							<Show when={can('edit')}>
+								<button
+									type="button"
+									onClick={() => navigate(`/devices/vm/add?host=${props.id}`)}
+								>
+									{t('vm.addVm')}
+								</button>
+							</Show>
+						</div>
+						<RelatedPreview
+							rows={vms() ?? []}
+							loading={vms.loading}
+							all
+							noun="noun.virtualMachine"
+							emptyText={t('vm.emptyOnHost')}
+							columns={[
+								nameColumn<DeviceListItem>(t('common.name'), '/devices/vm'),
+								{
+									key: 'description',
+									label: t('common.description'),
+									getValue: (vm: DeviceListItem): string => vm.description || '—',
+								},
+							]}
+						/>
+					</section>
+				</Show>
+			</div>
 			<Show when={connectingIface()}>
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<ConnectPortDialog
