@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import { and, asc, count, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { PasswordChange, UserCreate, UserJson, UserUpdate } from 'shared/src/schemas'
 import { employee_tenants, employees, roles, tenants, user_tenants, users } from '../schema'
-import type { CurrentUser, User } from '../types'
+import type { User } from '../types'
 import { normalize_username } from '../util/username'
 import { getDb, withTransaction } from './connection'
 import {
@@ -42,24 +42,6 @@ export async function canSignIn(user: User): Promise<boolean> {
 	return employee?.active === 1
 }
 
-/**
- * Tenant scope of `user`, null when global: exactly the employee's tenants
- * (membership order) for employee-linked accounts, else the account's
- * `user_tenants` (none = global).
- */
-async function scopeOf(user: User): Promise<number[] | null> {
-	if (user.employee_id !== null) {
-		const rows = await getDb()
-			.select({ id: employee_tenants.tenant_id })
-			.from(employee_tenants)
-			.where(eq(employee_tenants.employee_id, user.employee_id))
-			.orderBy(asc(employee_tenants.position))
-		return rows.map((row) => row.id)
-	}
-	const ids = await ownTenantIds(user.id)
-	return ids.length > 0 ? ids : null
-}
-
 /** The account's own `user_tenants`, by tenant id. */
 async function ownTenantIds(userId: number): Promise<number[]> {
 	const rows = await getDb()
@@ -68,28 +50,6 @@ async function ownTenantIds(userId: number): Promise<number[]> {
 		.where(eq(user_tenants.user_id, userId))
 		.orderBy(asc(user_tenants.tenant_id))
 	return rows.map((row) => row.id)
-}
-
-/**
- * Requester identity for `authMiddleware`: the user row plus its role's
- * name and permissions and its tenant scope, read live so role and
- * membership edits apply immediately.
- */
-export async function getCurrentUser(username: string): Promise<CurrentUser | null> {
-	const user = await getUserByUsername(username)
-	if (!user || !(await canSignIn(user))) {
-		return null
-	}
-	const role = await findOne(roles, eq(roles.id, user.role_id))
-	return {
-		id: user.id,
-		username: user.username,
-		role_id: user.role_id,
-		role_name: role?.name ?? '',
-		permissions: new Set(await rolePermissions(user.role_id)),
-		tenant_ids: await scopeOf(user),
-		employee_id: user.employee_id,
-	}
 }
 
 /** Direct local-user insert (first-run setup and the `/users` route). */
@@ -138,8 +98,8 @@ export async function hasAnyUser(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * Tenant scope ids of the selected user (`scopeOf` in SQL): the employee's
- * memberships when linked, else its `user_tenants`.
+ * Tenant scope ids of the selected user (`authenticate` in `sessions.ts`
+ * in SQL): the employee's memberships when linked, else its `user_tenants`.
  */
 // jsonb, not an int array: Bun's driver returns int arrays as `Int32Array`.
 // Qualified by hand: interpolated columns render unqualified in subqueries.

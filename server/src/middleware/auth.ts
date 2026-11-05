@@ -2,9 +2,8 @@ import { getCookie } from 'hono/cookie'
 import { createMiddleware } from 'hono/factory'
 import { verify } from 'hono/jwt'
 import { runAsActor } from '../db/changelog'
-import { getCurrentUser } from '../db/users'
 import { getSigningKey } from '../keys'
-import { touchSession } from '../sessions'
+import { authenticate } from '../sessions'
 import type { CurrentUser } from '../types'
 import { jsonError } from '../util/http'
 
@@ -31,17 +30,13 @@ export const authMiddleware = createMiddleware<{
 	try {
 		const payload = (await verify(token, secret, JWT_ALGO)) as JwtPayload
 
-		if (!(await touchSession(payload.jti))) {
-			return jsonError(c, 'Unauthorized: Session invalidated', 401)
-		}
-
-		// Permission checks run per request against the live user and role
-		// rows (not a JWT claim) so role changes, permission edits and tenant
-		// re-scopes take effect immediately. Usernames are immutable, so the
-		// `sub` lookup cannot go stale.
-		const user = await getCurrentUser(payload.sub)
+		// One statement validates the session and loads the live user, role
+		// and scope rows (not JWT claims), so role changes, permission edits
+		// and tenant re-scopes take effect immediately. Usernames are
+		// immutable, so the `sub` check cannot go stale.
+		const user = await authenticate(payload.jti, payload.sub)
 		if (!user) {
-			return jsonError(c, 'Unauthorized', 401)
+			return jsonError(c, 'Unauthorized: Session invalidated', 401)
 		}
 
 		c.set('jwtPayload', payload)

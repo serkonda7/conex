@@ -8,7 +8,7 @@
 
 import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { type JSX, onCleanup, onMount, Show } from 'solid-js'
+import { type JSX, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import type { FormState } from '../lib/form'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
@@ -18,31 +18,6 @@ import { InlineError, Loading } from './feedback'
 
 /** One `SelectField` entry. */
 export type FormOption = ComboboxOption
-
-/**
- * Feeds the mouse position to the `.combobox-preview` rule in `styles.css`, so
- * previews float at the cursor; keyboard use keeps their anchored placement.
- */
-export function useCursorPreview(): void {
-	onMount(() => {
-		const root = document.documentElement
-		const track = (e: MouseEvent): void => {
-			root.style.setProperty('--cursor-x', `${e.clientX}px`)
-			root.style.setProperty('--cursor-y', `${e.clientY}px`)
-			root.dataset.input = 'mouse'
-		}
-		const keyboard = (): void => {
-			root.dataset.input = 'keyboard'
-		}
-		document.addEventListener('mousemove', track)
-		document.addEventListener('keydown', keyboard)
-		onCleanup(() => {
-			document.removeEventListener('mousemove', track)
-			document.removeEventListener('keydown', keyboard)
-			delete root.dataset.input
-		})
-	})
-}
 
 /** Maps list rows (`{ id, name }`) to `SelectField` options. */
 export function row_options(rows: readonly { id: number; name: string }[]): FormOption[] {
@@ -307,9 +282,6 @@ export function SelectField(props: {
 			document.querySelector(`#${CSS.escape(props.id)}`)?.setAttribute('data-autofocus', '')
 		}
 	})
-	if (props.info === true) {
-		useCursorPreview()
-	}
 
 	function openAddForm(name: string): void {
 		const href = props.add?.href
@@ -337,6 +309,7 @@ export function SelectField(props: {
 				addLabel={props.add ? t('app.navAdd', { label: props.add.label }) : undefined}
 				searchLabel={t('common.search')}
 				noMatchesLabel={t('common.noMatchingObjects')}
+				previewAtCursor={props.info}
 			/>
 		</Field>
 	)

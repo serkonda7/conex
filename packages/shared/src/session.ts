@@ -8,5 +8,12 @@
 /** A session ends this long after its last authenticated request. */
 export const SESSION_IDLE_TIMEOUT_S = 4 * 60 * 60
 
+/**
+ * The server refreshes a session's `last_seen_at` at most this often, so
+ * read requests do not write. Validity adds this as slack: the session
+ * never ends before the idle timeout, at most this much after it.
+ */
+export const SESSION_TOUCH_INTERVAL_S = 60
+
 /** A session ends this long after login, no matter how active it was. */
 export const SESSION_ABSOLUTE_TIMEOUT_S = 5 * 24 * 60 * 60

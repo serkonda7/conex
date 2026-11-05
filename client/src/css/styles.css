@@ -1727,16 +1727,6 @@ tbody tr:last-child td {
 	color: #d6d6d6;
 }
 
-/* Option previews follow the mouse cursor (shifted back into the viewport);
-   keyboard navigation keeps the package's placement beside the list. */
-:root[data-input="mouse"] .combobox-preview {
-	position: fixed;
-	top: calc(var(--cursor-y, 0px) + 1rem);
-	left: calc(var(--cursor-x, 0px) + 1rem);
-	translate: min(0px, calc(100vw - var(--cursor-x, 0px) - 1.5rem - 100%))
-		min(0px, calc(100vh - var(--cursor-y, 0px) - 1.5rem - 100%));
-}
-
 .field .required {
 	color: var(--error);
 }

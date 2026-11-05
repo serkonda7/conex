@@ -1,16 +1,31 @@
-import { and, eq, gt, lte, ne, or } from 'drizzle-orm'
+import { and, eq, gt, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { sign } from 'hono/jwt'
 import type { CookieOptions } from 'hono/utils/cookie'
-import { SESSION_ABSOLUTE_TIMEOUT_S, SESSION_IDLE_TIMEOUT_S } from 'shared/src/session'
+import { PERMISSIONS } from 'shared/src/schemas'
+import {
+	SESSION_ABSOLUTE_TIMEOUT_S,
+	SESSION_IDLE_TIMEOUT_S,
+	SESSION_TOUCH_INTERVAL_S,
+} from 'shared/src/session'
 import { getConfig } from './config'
 import { pruneAuditLog } from './db/audit'
 import { pruneChangelog } from './db/changelog'
 import { getDb } from './db/connection'
 import { getSigningKey } from './keys'
 import { JWT_ALGO, type JwtPayload } from './middleware/auth'
-import { auth_states, sessions } from './schema'
-import type { User } from './types'
+import {
+	auth_states,
+	employee_tenants,
+	employees,
+	role_permissions,
+	roles,
+	sessions,
+	user_tenants,
+	users,
+} from './schema'
+import type { CurrentUser, User } from './types'
 import { nowSeconds } from './util/time'
+import { normalize_username } from './util/username'
 
 export function getSessionCookieOpts(): CookieOptions {
 	return {
@@ -41,29 +56,97 @@ export async function createSession(userId: number): Promise<string> {
 	return id
 }
 
+/** Oldest `last_seen_at` of a live session (idle timeout plus touch slack). */
+function idleCutoff(now: number): number {
+	return now - (SESSION_IDLE_TIMEOUT_S + SESSION_TOUCH_INTERVAL_S)
+}
+
 /**
- * Validates the session and refreshes its idle window in one UPDATE.
- * Returns false when the session is missing or expired (an expired row is
- * removed as a side effect).
+ * Requester identity for `authMiddleware` in one statement: validates the
+ * session (live, owned by `sub`, employee active), refreshes its idle window
+ * at most every `SESSION_TOUCH_INTERVAL_S`, and loads the role name,
+ * permissions and tenant scope live, so role and membership edits apply on
+ * the next request. Null when any check fails; invalid sessions are left to
+ * `sweepExpired`.
+ *
+ * Tenant scope: the employee's tenants in membership order (`[]` when none)
+ * for employee-linked accounts, else the account's `user_tenants`, where
+ * none (`jsonb_agg` over no rows) = null = global.
  */
-export async function touchSession(sid: string): Promise<boolean> {
+export async function authenticate(sid: string, sub: string): Promise<CurrentUser | null> {
+	const db = getDb()
 	const now = nowSeconds()
-	const touched = await getDb()
-		.update(sessions)
-		.set({ last_seen_at: now })
+	const live = and(
+		eq(sessions.id, sid),
+		gt(sessions.expires_at, now),
+		gt(sessions.last_seen_at, idleCutoff(now)),
+	)
+	const session = db
+		.$with('s')
+		.as(db.select({ user_id: sessions.user_id }).from(sessions).where(live))
+	// Runs although unreferenced; matches no row (and writes nothing) while
+	// `last_seen_at` is recent.
+	const touch = db.$with('touch').as(
+		db
+			.update(sessions)
+			.set({ last_seen_at: now })
+			.where(and(live, lte(sessions.last_seen_at, now - SESSION_TOUCH_INTERVAL_S)))
+			.returning({ id: sessions.id }),
+	)
+	// jsonb, not arrays: Bun's driver may return int arrays as `Int32Array`.
+	const permissions = db
+		.select({ list: sql`jsonb_agg(${role_permissions.permission})` })
+		.from(role_permissions)
+		.where(eq(role_permissions.role_id, users.role_id))
+	const employeeScope = db
+		.select({
+			list: sql`jsonb_agg(${employee_tenants.tenant_id} order by ${employee_tenants.position})`,
+		})
+		.from(employee_tenants)
+		.where(eq(employee_tenants.employee_id, users.employee_id))
+	const ownScope = db
+		.select({
+			list: sql`jsonb_agg(${user_tenants.tenant_id} order by ${user_tenants.tenant_id})`,
+		})
+		.from(user_tenants)
+		.where(eq(user_tenants.user_id, users.id))
+	const rows = await db
+		.with(session, touch)
+		.select({
+			id: users.id,
+			username: users.username,
+			role_id: users.role_id,
+			role_name: roles.name,
+			employee_id: users.employee_id,
+			permissions: sql<string[]>`coalesce((${permissions}), '[]'::jsonb)`,
+			tenant_ids: sql<number[] | null>`case when ${users.employee_id} is not null
+				then coalesce((${employeeScope}), '[]'::jsonb) else (${ownScope}) end`,
+		})
+		.from(session)
+		.innerJoin(users, eq(users.id, session.user_id))
+		.innerJoin(roles, eq(roles.id, users.role_id))
+		.leftJoin(employees, eq(employees.id, users.employee_id))
 		.where(
 			and(
-				eq(sessions.id, sid),
-				gt(sessions.expires_at, now),
-				gt(sessions.last_seen_at, now - SESSION_IDLE_TIMEOUT_S),
+				eq(users.username, normalize_username(sub)),
+				or(isNull(users.employee_id), eq(employees.active, 1)),
 			),
 		)
-		.returning({ id: sessions.id })
-	if (touched.length > 0) {
-		return true
+	const row = rows[0]
+	if (!row) {
+		return null
 	}
-	await invalidateSession(sid)
-	return false
+	// Catalog order; unknown stored strings are dropped (as `rolePermissions`).
+	const granted = new Set(row.permissions)
+	return {
+		id: row.id,
+		username: row.username,
+		role_id: row.role_id,
+		role_name: row.role_name,
+		permissions: new Set(PERMISSIONS.filter((p) => granted.has(p))),
+		tenant_ids: row.tenant_ids,
+		employee_id: row.employee_id,
+	}
 }
 
 export async function invalidateSession(sid: string): Promise<void> {
@@ -85,7 +168,7 @@ export async function sweepExpired(): Promise<number> {
 	const now = nowSeconds()
 	const expiredSessions = or(
 		lte(sessions.expires_at, now),
-		lte(sessions.last_seen_at, now - SESSION_IDLE_TIMEOUT_S),
+		lte(sessions.last_seen_at, idleCutoff(now)),
 	)
 	const removed = await getDb().transaction(async (tx) => {
 		const sessionsRemoved = (
