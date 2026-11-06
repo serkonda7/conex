@@ -214,6 +214,7 @@ function ComponentTable(props: {
 	return (
 		<DataTable
 			class="component-table"
+			columnLines
 			rows={() => props.stubs}
 			getRowId={(s: StubRow): number => s.id}
 			columns={columns()}
@@ -497,6 +498,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					rows={devices() ?? []}
 					loading={devices() === undefined}
 					all
+					columnLines
 					noun="noun.device"
 					emptyText={t('deviceType.noDevices')}
 					columns={deviceColumns}

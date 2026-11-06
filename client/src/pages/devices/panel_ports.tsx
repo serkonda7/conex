@@ -86,7 +86,7 @@ export function PanelPortTable(props: {
 		}
 		return (
 			<span class="panel-port-cell">
-				<code>{iface.name}</code>
+				<span>{iface.name}</span>
 				<PortPeer link={props.links.get(iface.id)} endToEnd={props.endToEnd(iface.id)} />
 				<Show when={props.onConnect && iface.patched && !iface.connected}>
 					<button
@@ -144,6 +144,7 @@ export function PanelPortTable(props: {
 	return (
 		<DataTable
 			class="panel-port-table"
+			columnLines
 			rows={rows}
 			getRowId={(row: PanelRow): string => row.key}
 			showColumnCustomizer

@@ -34,7 +34,7 @@ export function DevicePortTable(props: {
 			class: 'component-name',
 			getValue: (iface: InterfaceJson): JSX.Element => (
 				<>
-					<code classList={{ 'text-muted': !iface.enabled }}>{iface.name}</code>
+					<span classList={{ 'text-muted': !iface.enabled }}>{iface.name}</span>
 					<Show when={!iface.enabled}>
 						{' '}
 						<span class="badge">{t('device.disabled')}</span>
@@ -45,7 +45,7 @@ export function DevicePortTable(props: {
 		{
 			key: 'port',
 			label: t('device.portNumber'),
-			class: 'component-count text-muted',
+			class: 'component-count',
 			getValue: (iface: InterfaceJson): JSX.Element => portNumbers().get(iface.id) ?? '',
 		},
 		{
@@ -69,6 +69,7 @@ export function DevicePortTable(props: {
 	return (
 		<DataTable
 			class="component-table"
+			columnLines
 			rows={() => props.ports}
 			getRowId={(iface: InterfaceJson): number => iface.id}
 			columns={columns}

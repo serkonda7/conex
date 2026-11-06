@@ -526,6 +526,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							rows={vms() ?? []}
 							loading={vms.loading}
 							all
+							columnLines
 							noun="noun.virtualMachine"
 							emptyText={t('vm.emptyOnHost')}
 							columns={[
