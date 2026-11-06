@@ -145,12 +145,10 @@ export const devicesApp = new Hono()
 		async (c) => {
 			const id = c.req.valid('param').id
 			const body = c.req.valid('json')
-			const current = await getDevice(id)
-			if (Result.isError(current)) {
-				return sendResult(c, current)
-			}
+			// A missing device skips the gate and answers 404 from `updateDevice`.
+			const current = await deviceTenant(id)
 			return (
-				checkUpdateTenant(c, current.value.tenant_id, body.tenant_id) ??
+				(current === undefined ? null : checkUpdateTenant(c, current, body.tenant_id)) ??
 				sendResult(c, await updateDevice(id, body))
 			)
 		},
@@ -161,11 +159,7 @@ export const devicesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const device = await loadDevice(c, id)
-			if (device instanceof Response) {
-				return device
-			}
-			return sendResult(c, await deleteDevice(id))
+			return checkTenant(c, await deviceTenant(id)) ?? sendResult(c, await deleteDevice(id))
 		},
 	)
 	// Managed bundle (via the role) and the tenant's SLA for it.
@@ -184,11 +178,10 @@ export const devicesApp = new Hono()
 		vValidator('json', DeviceMoveSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const device = await loadDevice(c, id)
-			if (device instanceof Response) {
-				return device
-			}
-			return sendResult(c, await moveDevice(id, c.req.valid('json')))
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				sendResult(c, await moveDevice(id, c.req.valid('json')))
+			)
 		},
 	)
 	// Ports against the device type: preview, then apply with the remapping.
@@ -197,11 +190,9 @@ export const devicesApp = new Hono()
 		vValidator('param', EntityParamsSchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const device = await loadDevice(c, id)
-			if (device instanceof Response) {
-				return device
-			}
-			return sendResult(c, await getTemplateSync(id))
+			return (
+				checkTenant(c, await deviceTenant(id)) ?? sendResult(c, await getTemplateSync(id))
+			)
 		},
 	)
 	.post(
@@ -211,11 +202,10 @@ export const devicesApp = new Hono()
 		vValidator('json', TemplateSyncApplySchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			const device = await loadDevice(c, id)
-			if (device instanceof Response) {
-				return device
-			}
-			return sendResult(c, await applyTemplateSync(id, c.req.valid('json')))
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				sendResult(c, await applyTemplateSync(id, c.req.valid('json')))
+			)
 		},
 	)
 	// Interface sub-resource (name unique per device; `connected` is P5-owned).

@@ -11,6 +11,7 @@ import {
 	asc,
 	count,
 	eq,
+	getTableColumns,
 	inArray,
 	isNull,
 	ne,
@@ -66,6 +67,7 @@ import { toInterfaceJson } from './devices'
 import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
 import {
 	checkExists,
+	countWhere,
 	findById,
 	inScope,
 	insertedId,
@@ -311,6 +313,34 @@ export function getAttachmentRow(id: number): Promise<Result<AttachmentRow, Erro
 	return findById(attachments, id, NOT_FOUND)
 }
 
+/**
+ * Raw row plus the tenant of its owning site, location or rack (`null` when
+ * the owner is shared or gone, as `ownerTenant ?? null`), in one statement
+ * for the access gate.
+ */
+export async function getAttachmentWithTenant(
+	id: number,
+): Promise<Result<{ row: AttachmentRow; tenant: number | null }, Error>> {
+	const [found] = await getDb()
+		.select({
+			...getTableColumns(attachments),
+			owner_tenant: sql<
+				number | null
+			>`coalesce(${sites.tenant_id}, ${locations.tenant_id}, ${racks.tenant_id})`,
+		})
+		.from(attachments)
+		.leftJoin(sites, eq(sites.id, attachments.site_id))
+		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.leftJoin(racks, eq(racks.id, attachments.rack_id))
+		.where(eq(attachments.id, id))
+		.limit(1)
+	if (!found) {
+		return Result.err(new NotFoundError(NOT_FOUND))
+	}
+	const { owner_tenant, ...row } = found
+	return Result.ok({ row, tenant: owner_tenant })
+}
+
 export async function getAttachment(id: number): Promise<Result<AttachmentJson, Error>> {
 	return (await getAttachmentRow(id)).map(toJson)
 }
@@ -496,11 +526,21 @@ export async function getPlan(
 	id: number,
 	scopeTenantIds?: readonly number[],
 ): Promise<Result<FloorplanJson, Error>> {
-	const found = await getAttachmentRow(id)
-	if (Result.isError(found)) {
-		return found
+	// The mark and the calibration in one read.
+	const [plan] = await getDb()
+		.select({
+			is_floorplan: attachments.is_floorplan,
+			scale: floorplan_calibrations.scale,
+			origin: floorplan_calibrations.origin,
+		})
+		.from(attachments)
+		.leftJoin(floorplan_calibrations, eq(floorplan_calibrations.attachment_id, attachments.id))
+		.where(eq(attachments.id, id))
+		.limit(1)
+	if (!plan) {
+		return Result.err(new NotFoundError(NOT_FOUND))
 	}
-	if (found.value.is_floorplan === 0) {
+	if (plan.is_floorplan === 0) {
 		return Result.ok({
 			attachment_id: id,
 			areas: [],
@@ -512,7 +552,7 @@ export async function getPlan(
 	}
 	const areaTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
 	const targetPlan = alias(attachments, 'target_plan')
-	const areas = await getDb()
+	const areasQuery = getDb()
 		.select({
 			id: floorplan_areas.id,
 			site_id: floorplan_areas.site_id,
@@ -540,7 +580,7 @@ export async function getPlan(
 			and(eq(floorplan_areas.attachment_id, id), scopeCondition(areaTenant, scopeTenantIds)),
 		)
 		.orderBy(asc(floorplan_areas.id))
-	const placementRows = await getDb()
+	const placementsQuery = getDb()
 		.select({
 			id: floorplan_placements.id,
 			rack_id: floorplan_placements.rack_id,
@@ -568,6 +608,22 @@ export async function getPlan(
 			),
 		)
 		.orderBy(asc(floorplan_placements.id))
+	// Totals before scoping, only needed to warn a scoped editor.
+	const totalsQuery =
+		scopeTenantIds === undefined
+			? Promise.resolve([])
+			: getDb()
+					.select({
+						areas: countWhere(floorplan_areas.attachment_id, attachments.id),
+						placements: countWhere(floorplan_placements.attachment_id, attachments.id),
+					})
+					.from(attachments)
+					.where(eq(attachments.id, id))
+	const [areas, placementRows, [totals]] = await Promise.all([
+		areasQuery,
+		placementsQuery,
+		totalsQuery,
+	])
 	const portsOf = await outletPorts(placementRows)
 	const placements = placementRows.map(
 		({ port_device_id, port_device_name, port_name, ...row }) => ({
@@ -578,19 +634,14 @@ export async function getPlan(
 	// A scoped editor must still be warned before a mark change clears
 	// hidden content. Reveal only its existence, never its targets or counts.
 	const hasHiddenContent =
-		scopeTenantIds !== undefined &&
-		((await getDb().$count(floorplan_areas, eq(floorplan_areas.attachment_id, id))) >
-			areas.length ||
-			(await getDb().$count(
-				floorplan_placements,
-				eq(floorplan_placements.attachment_id, id),
-			)) > placements.length)
-	const calibration = await planCalibration(id)
+		totals !== undefined &&
+		(totals.areas > areas.length || totals.placements > placements.length)
 	return Result.ok({
 		attachment_id: id,
 		areas,
 		placements,
-		...calibration,
+		scale: plan.scale ?? null,
+		origin: plan.origin ?? null,
 		has_hidden_content: hasHiddenContent,
 	})
 }

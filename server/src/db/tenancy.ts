@@ -1,6 +1,6 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, type SQL, sql } from 'drizzle-orm'
-import type { PgTable } from 'drizzle-orm/pg-core'
+import { and, asc, eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
+import { alias, type PgTable } from 'drizzle-orm/pg-core'
 import {
 	type LocationCreate,
 	type LocationUpdate,
@@ -54,6 +54,7 @@ import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
 	checkExists,
 	checkTenantExists,
+	countWhere,
 	errOf,
 	exists,
 	findById,
@@ -152,33 +153,13 @@ export async function listTenantGroups(
 	)
 	const orderColumn =
 		params.sort === 'description' ? tenant_groups.description : tenant_groups.name
-	const page = await pageRows(
+	return await pageRows(
 		tenant_groups,
 		where,
 		[orderOf(orderColumn, params.order), asc(tenant_groups.id)],
 		params,
+		{ tenant_count: countWhere(tenants.tenant_group_id, tenant_groups.id) },
 	)
-	const counts = new Map<number, number>()
-	if (page.items.length > 0) {
-		for (const row of await getDb()
-			.select({ group: tenants.tenant_group_id, n: count() })
-			.from(tenants)
-			.where(
-				inArray(
-					tenants.tenant_group_id,
-					page.items.map((g) => g.id),
-				),
-			)
-			.groupBy(tenants.tenant_group_id)) {
-			if (row.group !== null) {
-				counts.set(row.group, row.n)
-			}
-		}
-	}
-	return {
-		...page,
-		items: page.items.map((g) => ({ ...g, tenant_count: counts.get(g.id) ?? 0 })),
-	}
 }
 
 export function getTenantGroup(id: number): Promise<Result<TenantGroupRow, Error>> {
@@ -187,15 +168,24 @@ export function getTenantGroup(id: number): Promise<Result<TenantGroupRow, Error
 
 /** Ids of the tenants in a group; 404 when the group does not exist. */
 export async function resolveTenantGroupIds(groupId: number): Promise<Result<number[], Error>> {
-	const group = await getTenantGroup(groupId)
-	if (Result.isError(group)) {
-		return group
-	}
+	// One row per member, or a single null-tenant row for an empty group.
 	const rows = await getDb()
 		.select({ id: tenants.id })
-		.from(tenants)
-		.where(eq(tenants.tenant_group_id, groupId))
-	return Result.ok(rows.map((r) => r.id))
+		.from(tenant_groups)
+		.leftJoin(tenants, eq(tenants.tenant_group_id, tenant_groups.id))
+		.where(eq(tenant_groups.id, groupId))
+	if (rows.length === 0) {
+		return Result.err(new NotFoundError('Tenant group not found'))
+	}
+	return Result.ok(rows.flatMap((r) => r.id ?? []))
+}
+
+/** True when one of `tenantIds` belongs to the tenant group. */
+export function tenantGroupHasAny(groupId: number, tenantIds: readonly number[]): Promise<boolean> {
+	return exists(
+		tenants,
+		and(eq(tenants.tenant_group_id, groupId), inTenants(tenants.id, tenantIds)),
+	)
 }
 
 export async function createTenantGroup(
@@ -280,48 +270,22 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 		scopeCondition(tenants.id, params.scopeTenantIds),
 	)
 	const orderColumn = params.sort === 'customer_number' ? tenants.customer_number : tenants.name
-	const page = await pageRows(
+	// NetBox-style related-object counts for the list view, selected with
+	// the page so this stays one statement instead of O(page size).
+	return await pageRows(
 		tenants,
 		where,
 		[orderOf(orderColumn, params.order), asc(tenants.id)],
 		params,
+		{
+			site_count: countWhere(sites.tenant_id, tenants.id),
+			rack_count: countWhere(racks.tenant_id, tenants.id),
+			device_count: countWhere(devices.tenant_id, tenants.id),
+		},
 	)
-
-	// NetBox-style related-object counts for the list view. One grouped
-	// query per table keeps this O(1) queries instead of O(page size).
-	const ids = page.items.map((t) => t.id)
-	const countsOf = async (
-		table: typeof sites | typeof racks | typeof devices,
-	): Promise<Map<number, number>> => {
-		const counts = new Map<number, number>()
-		if (ids.length > 0) {
-			for (const row of await getDb()
-				.select({ tenant_id: table.tenant_id, n: count() })
-				.from(table)
-				.where(inArray(table.tenant_id, ids))
-				.groupBy(table.tenant_id)) {
-				if (row.tenant_id !== null) {
-					counts.set(row.tenant_id, row.n)
-				}
-			}
-		}
-		return counts
-	}
-	const siteCounts = await countsOf(sites)
-	const rackCounts = await countsOf(racks)
-	const deviceCounts = await countsOf(devices)
-	return {
-		...page,
-		items: page.items.map((t) => ({
-			...t,
-			site_count: siteCounts.get(t.id) ?? 0,
-			rack_count: rackCounts.get(t.id) ?? 0,
-			device_count: deviceCounts.get(t.id) ?? 0,
-		})),
-	}
 }
 
-async function bundlesOf(tenantId: number): Promise<TenantBundleJson[]> {
+async function bundlesOf(tenantId: number, bundleId?: number): Promise<TenantBundleJson[]> {
 	return await getDb()
 		.select({
 			managed_bundle_id: tenant_bundles.managed_bundle_id,
@@ -332,7 +296,12 @@ async function bundlesOf(tenantId: number): Promise<TenantBundleJson[]> {
 		.from(tenant_bundles)
 		.innerJoin(managed_bundles, eq(managed_bundles.id, tenant_bundles.managed_bundle_id))
 		.innerJoin(service_levels, eq(service_levels.id, tenant_bundles.service_level_id))
-		.where(eq(tenant_bundles.tenant_id, tenantId))
+		.where(
+			and(
+				eq(tenant_bundles.tenant_id, tenantId),
+				bundleId === undefined ? undefined : eq(tenant_bundles.managed_bundle_id, bundleId),
+			),
+		)
 		.orderBy(asc(managed_bundles.name))
 }
 
@@ -349,7 +318,7 @@ export async function tenantBundle(
 	tenantId: number,
 	bundleId: number,
 ): Promise<TenantBundleJson | null> {
-	return (await bundlesOf(tenantId)).find((b) => b.managed_bundle_id === bundleId) ?? null
+	return (await bundlesOf(tenantId, bundleId))[0] ?? null
 }
 
 /** Every contract must point at an existing bundle and service level. */
@@ -796,27 +765,15 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 		params.parent ? eq(locations.parent_id, params.parent) : undefined,
 		...tenantConditions(locations.tenant_id, params),
 	)
-	const matching = await getDb().select().from(locations).where(where)
+	const parent = alias(locations, 'parent')
+	const matching = await getDb()
+		.select({ ...getTableColumns(locations), parent_name: parent.name })
+		.from(locations)
+		.leftJoin(parent, eq(parent.id, locations.parent_id))
+		.where(where)
 	const ordered = sortHierarchically(matching, params.sort, params.order)
 	const offset = offsetOf(params)
-	const items = ordered.slice(offset, offset + params.limit)
-	const parentIds = items.flatMap((row) => row.parent_id ?? [])
-	const parents =
-		parentIds.length > 0
-			? await getDb()
-					.select({ id: locations.id, name: locations.name })
-					.from(locations)
-					.where(inArray(locations.id, parentIds))
-			: []
-	const parentName = new Map(parents.map((row) => [row.id, row.name]))
-	return pageOf(
-		items.map((row) => ({
-			...row,
-			parent_name: row.parent_id === null ? null : (parentName.get(row.parent_id) ?? null),
-		})),
-		matching.length,
-		params,
-	)
+	return pageOf(ordered.slice(offset, offset + params.limit), matching.length, params)
 }
 
 export function getLocation(id: number): Promise<Result<LocationRow, Error>> {

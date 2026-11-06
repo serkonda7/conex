@@ -14,12 +14,12 @@ import {
 	type CableRow,
 	connectCable,
 	deleteCable,
-	getCable,
+	getCableWithTenants,
 	listCables,
 	updateCable,
 } from '../db/cables'
 import { exportCablesCsv, importCablesCsv } from '../db/csv_transfer'
-import { cableTenants, deviceTenant, interfaceTenant } from '../db/owners'
+import { deviceTenant, interfaceTenant } from '../db/owners'
 import { getCableTrace } from '../db/trace'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
@@ -29,11 +29,11 @@ import { sendCreated, sendResult } from '../util/result_response'
 
 /** Loads a cable the requester may access: the row, or the 404/403 response. */
 async function loadCable(c: Context, id: number): Promise<CableRow | Response> {
-	const cable = await getCable(id)
-	if (Result.isError(cable)) {
-		return sendResult(c, cable)
+	const found = await getCableWithTenants(id)
+	if (Result.isError(found)) {
+		return sendResult(c, found)
 	}
-	return checkCable(c, await cableTenants(cable.value)) ?? cable.value
+	return checkCable(c, found.value.tenants) ?? found.value.cable
 }
 
 /**

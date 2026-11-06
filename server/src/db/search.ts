@@ -57,67 +57,70 @@ export async function globalSearch(
 	const db = getDb()
 	const inScope = (column: PgColumn): SQL | undefined => scopeCondition(column, scopeTenantIds)
 
-	const tenantRows = await db
-		.select({ id: tenants.id, name: tenants.name })
-		.from(tenants)
-		.where(
-			and(
-				searchCondition(query, [tenants.name, tenants.customer_number]),
-				inScope(tenants.id),
-			),
-		)
-		.orderBy(asc(tenants.name), asc(tenants.id))
-		.limit(GROUP_LIMIT)
-	const siteRows = await db
-		.select({ id: sites.id, name: sites.name })
-		.from(sites)
-		.where(and(searchCondition(query, [sites.name]), inScope(sites.tenant_id)))
-		.orderBy(asc(sites.name), asc(sites.id))
-		.limit(GROUP_LIMIT)
-	const rackRows = await db
-		.select({ id: racks.id, name: racks.name })
-		.from(racks)
-		.where(and(searchCondition(query, [racks.name]), inScope(racks.tenant_id)))
-		.orderBy(asc(racks.name), asc(racks.id))
-		.limit(GROUP_LIMIT)
-	const deviceRows = await db
-		.select({ id: devices.id, name: devices.name, asset_tag: devices.asset_tag })
-		.from(devices)
-		.where(
-			and(
-				searchCondition(query, [
-					devices.name,
-					devices.asset_tag,
-					devices.device_id,
-					devices.serial,
-				]),
-				inScope(devices.tenant_id),
-			),
-		)
-		.orderBy(asc(devices.name), asc(devices.id))
-		.limit(GROUP_LIMIT)
-	const vmRows = await db
-		.select({ id: virtual_machines.id, name: virtual_machines.name })
-		.from(virtual_machines)
-		.where(
-			and(
-				searchCondition(query, [virtual_machines.name]),
-				inScope(virtual_machines.tenant_id),
-			),
-		)
-		.orderBy(asc(virtual_machines.name), asc(virtual_machines.id))
-		.limit(GROUP_LIMIT)
-	const cableRows = await db
-		.select({ id: cables.id, label: cables.label, kind: cables.kind })
-		.from(cables)
-		.where(
-			and(
-				searchCondition(query, [cables.label, cables.kind]),
-				scopeTenantIds === undefined ? undefined : cableInTenants(scopeTenantIds),
-			),
-		)
-		.orderBy(asc(cables.id))
-		.limit(GROUP_LIMIT)
+	// Independent groups: run them concurrently.
+	const [tenantRows, siteRows, rackRows, deviceRows, vmRows, cableRows] = await Promise.all([
+		db
+			.select({ id: tenants.id, name: tenants.name })
+			.from(tenants)
+			.where(
+				and(
+					searchCondition(query, [tenants.name, tenants.customer_number]),
+					inScope(tenants.id),
+				),
+			)
+			.orderBy(asc(tenants.name), asc(tenants.id))
+			.limit(GROUP_LIMIT),
+		db
+			.select({ id: sites.id, name: sites.name })
+			.from(sites)
+			.where(and(searchCondition(query, [sites.name]), inScope(sites.tenant_id)))
+			.orderBy(asc(sites.name), asc(sites.id))
+			.limit(GROUP_LIMIT),
+		db
+			.select({ id: racks.id, name: racks.name })
+			.from(racks)
+			.where(and(searchCondition(query, [racks.name]), inScope(racks.tenant_id)))
+			.orderBy(asc(racks.name), asc(racks.id))
+			.limit(GROUP_LIMIT),
+		db
+			.select({ id: devices.id, name: devices.name, asset_tag: devices.asset_tag })
+			.from(devices)
+			.where(
+				and(
+					searchCondition(query, [
+						devices.name,
+						devices.asset_tag,
+						devices.device_id,
+						devices.serial,
+					]),
+					inScope(devices.tenant_id),
+				),
+			)
+			.orderBy(asc(devices.name), asc(devices.id))
+			.limit(GROUP_LIMIT),
+		db
+			.select({ id: virtual_machines.id, name: virtual_machines.name })
+			.from(virtual_machines)
+			.where(
+				and(
+					searchCondition(query, [virtual_machines.name]),
+					inScope(virtual_machines.tenant_id),
+				),
+			)
+			.orderBy(asc(virtual_machines.name), asc(virtual_machines.id))
+			.limit(GROUP_LIMIT),
+		db
+			.select({ id: cables.id, label: cables.label, kind: cables.kind })
+			.from(cables)
+			.where(
+				and(
+					searchCondition(query, [cables.label, cables.kind]),
+					scopeTenantIds === undefined ? undefined : cableInTenants(scopeTenantIds),
+				),
+			)
+			.orderBy(asc(cables.id))
+			.limit(GROUP_LIMIT),
+	])
 
 	return {
 		q: query,

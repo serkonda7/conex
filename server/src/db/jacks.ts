@@ -5,46 +5,50 @@
  * is placed instead of its ports (`attachments.ts`).
  */
 import { Result } from 'better-result'
-import { and, asc, eq, inArray, notExists } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, notExists, type SQL, sql } from 'drizzle-orm'
 import type { PanelJackCreate, PanelJackJson, PanelJackUpdate } from 'shared/src/schemas'
-import { floorplan_placements, interfaces, panel_jacks } from '../schema'
+import { devices, floorplan_placements, interfaces, panel_jacks } from '../schema'
 import { prunePlacements } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { getDevice, toInterfaceJson } from './devices'
 import { ConflictError, NotFoundError } from './errors'
-import { insertedId, tryWrite } from './list'
+import { exists, insertedId, subquery, tryWrite } from './list'
 
 const NOT_FOUND = 'Jack not found'
 const NAME_TAKEN = 'This panel already has a jack with this name'
 
-type JackRow = typeof panel_jacks.$inferSelect
-
-async function toJson(row: JackRow): Promise<PanelJackJson> {
-	const ports = await getDb()
-		.select({ id: interfaces.id })
+/**
+ * Jack columns plus the ids of its ports in port order, in one statement.
+ * jsonb, not arrays: Bun's driver may return int arrays as `Int32Array`.
+ */
+const jackColumns: ReturnType<typeof getTableColumns<typeof panel_jacks>> & {
+	interface_ids: SQL<number[]>
+} = {
+	...getTableColumns(panel_jacks),
+	interface_ids: sql<number[]>`coalesce((${subquery
+		.select({ list: sql`jsonb_agg(${interfaces.id} order by ${interfaces.id})` })
 		.from(interfaces)
-		.where(eq(interfaces.jack_id, row.id))
-		.orderBy(asc(interfaces.id))
-	return { ...row, interface_ids: ports.map((port) => port.id) }
+		.where(eq(interfaces.jack_id, panel_jacks.id))}), '[]'::jsonb)`,
 }
 
 async function getJack(deviceId: number, jackId: number): Promise<Result<PanelJackJson, Error>> {
 	const [row] = await getDb()
-		.select()
+		.select(jackColumns)
 		.from(panel_jacks)
 		.where(and(eq(panel_jacks.id, jackId), eq(panel_jacks.device_id, deviceId)))
-	return row ? Result.ok(await toJson(row)) : Result.err(new NotFoundError(NOT_FOUND))
+	return row ? Result.ok(row) : Result.err(new NotFoundError(NOT_FOUND))
 }
 
 /** Jacks of a panel in port order (by their first port). */
 export async function listJacks(deviceId: number): Promise<Result<PanelJackJson[], Error>> {
-	const device = await getDevice(deviceId)
-	if (Result.isError(device)) {
-		return device
+	if (!(await exists(devices, eq(devices.id, deviceId)))) {
+		return Result.err(new NotFoundError('Device not found'))
 	}
-	const rows = await getDb().select().from(panel_jacks).where(eq(panel_jacks.device_id, deviceId))
-	const jacks = await Promise.all(rows.map(toJson))
+	const jacks = await getDb()
+		.select(jackColumns)
+		.from(panel_jacks)
+		.where(eq(panel_jacks.device_id, deviceId))
 	return Result.ok(
 		jacks.sort((a, b) => (a.interface_ids[0] ?? Infinity) - (b.interface_ids[0] ?? Infinity)),
 	)

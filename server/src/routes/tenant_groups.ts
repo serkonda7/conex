@@ -11,9 +11,9 @@ import { forbidden, requestScope } from '../authz'
 import {
 	createTenantGroup,
 	deleteTenantGroup,
-	getTenant,
 	getTenantGroup,
 	listTenantGroups,
+	tenantGroupHasAny,
 	updateTenantGroup,
 } from '../db/tenancy'
 import { authMiddleware } from '../middleware/auth'
@@ -57,15 +57,8 @@ export const tenantGroupsApp = new Hono()
 			return sendResult(c, result)
 		}
 		const scope = requestScope(c)
-		if (scope !== undefined) {
-			const own = await Promise.all(scope.map((id) => getTenant(id)))
-			if (
-				!own.some(
-					(row) => Result.isOk(row) && row.value.tenant_group_id === result.value.id,
-				)
-			) {
-				return forbidden(c)
-			}
+		if (scope !== undefined && !(await tenantGroupHasAny(result.value.id, scope))) {
+			return forbidden(c)
 		}
 		return c.json(result.value)
 	})

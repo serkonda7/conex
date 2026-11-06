@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, isNotNull, sql } from 'drizzle-orm'
 import type {
 	ElevationDeviceRef,
 	ElevationResponse,
@@ -22,13 +22,13 @@ import {
 	checkTenantExists,
 	exists,
 	findById,
-	findOne,
 	insertedId,
 	isPatchEmpty,
 	orderOf,
 	pageRows,
 	pickDefined,
 	searchCondition,
+	subquery,
 	tenantConditions,
 	tryWrite,
 } from './list'
@@ -37,27 +37,12 @@ type RackRecord = typeof racks.$inferSelect
 /** Rack height is computed from the linked rack type, not stored on racks. */
 export type RackRow = Omit<RackRecord, 'height_u'> & { height_u: number }
 
-async function withRackHeights(rows: RackRecord[]): Promise<RackRow[]> {
-	const typeIds = [
-		...new Set(rows.map((r) => r.rack_type_id).filter((id): id is number => id !== null)),
-	]
-	const heights = new Map<number, number>()
-	if (typeIds.length > 0) {
-		for (const row of await getDb()
-			.select({ id: rack_types.id, u_height: rack_types.u_height })
-			.from(rack_types)
-			.where(inArray(rack_types.id, typeIds))) {
-			heights.set(row.id, row.u_height)
-		}
-	}
-	return rows.map((row) => ({
-		...row,
-		height_u: row.rack_type_id === null ? 0 : (heights.get(row.rack_type_id) ?? 0),
-	}))
-}
-
-async function withRackHeight(row: RackRecord): Promise<RackRow> {
-	return (await withRackHeights([row]))[0] as RackRow
+/** Height of the outer rack row: its rack type's, 0 without one. */
+const rackHeight = {
+	height_u: sql<number>`coalesce((${subquery
+		.select({ u_height: rack_types.u_height })
+		.from(rack_types)
+		.where(eq(rack_types.id, racks.rack_type_id))}), 0)`.mapWith(Number),
 }
 
 // ---------------------------------------------------------------------------
@@ -82,18 +67,22 @@ export async function listRacks(params: RackListParams): Promise<Page<RackRow>> 
 		params.rack_type ? inArray(racks.rack_type_id, params.rack_type) : undefined,
 		...tenantConditions(racks.tenant_id, params),
 	)
-	const page = await pageRows(
+	return await pageRows(
 		racks,
 		where,
 		[orderOf(racks.name, params.order), asc(racks.id)],
 		params,
+		rackHeight,
 	)
-	return { ...page, items: await withRackHeights(page.items) }
 }
 
 export async function getRack(id: number): Promise<Result<RackRow, Error>> {
-	const row = await findById(racks, id, 'Rack not found')
-	return Result.isOk(row) ? Result.ok(await withRackHeight(row.value)) : row
+	const [row] = await getDb()
+		.select({ ...getTableColumns(racks), ...rackHeight })
+		.from(racks)
+		.where(eq(racks.id, id))
+		.limit(1)
+	return row ? Result.ok(row) : Result.err(new NotFoundError('Rack not found'))
 }
 
 /** Authoritative rack height in U, supplied by the rack type. */
@@ -101,7 +90,12 @@ export async function rackHeightOf(rack: Pick<RackRecord, 'rack_type_id'>): Prom
 	if (rack.rack_type_id === null) {
 		return 0
 	}
-	return (await findOne(rack_types, eq(rack_types.id, rack.rack_type_id)))?.u_height ?? 0
+	const [row] = await getDb()
+		.select({ u_height: rack_types.u_height })
+		.from(rack_types)
+		.where(eq(rack_types.id, rack.rack_type_id))
+		.limit(1)
+	return row?.u_height ?? 0
 }
 
 /** Location must exist and belong to the rack's site; null clears the link. */
@@ -176,26 +170,47 @@ async function deviceDetailsOf(rackId: number): Promise<MountedDevice[]> {
 	}))
 }
 
-/** Full shelf mount details for one rack, ordered by bottom-U. */
-async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
+/** Shelf mount columns of one rack, ordered by bottom-U (no devices). */
+async function shelfMountsOf(rackId: number): Promise<Omit<ElevationShelfRef, 'devices'>[]> {
 	const rows = await getDb()
-		.select()
+		.select({
+			id: shelves.id,
+			name: shelves.name,
+			face: shelves.face,
+			position_u: shelves.position_u,
+			mount_height: shelves.mount_height,
+			mount_usable: shelves.mount_usable,
+			reserved_height: shelves.reserved_height,
+			is_full_depth: shelves.is_full_depth,
+		})
 		.from(shelves)
 		.where(eq(shelves.rack_id, rackId))
 		.orderBy(asc(shelves.position_u))
+	return rows.map((row) => ({
+		...row,
+		face: faceOf(row.face),
+		mount_usable: row.mount_usable !== 0,
+	}))
+}
+
+/** Full shelf mount details for one rack, ordered by bottom-U. */
+async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
 	const onShelves = new Map<number, ElevationShelfDeviceRef[]>()
-	const shelved = await getDb()
-		.select({
-			id: devices.id,
-			name: devices.name,
-			status: devices.status,
-			shelf_id: devices.shelf_id,
-			device_type_model: device_types.model,
-		})
-		.from(devices)
-		.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
-		.where(and(eq(devices.rack_id, rackId), isNotNull(devices.shelf_id)))
-		.orderBy(asc(devices.name), asc(devices.id))
+	const [mounts, shelved] = await Promise.all([
+		shelfMountsOf(rackId),
+		getDb()
+			.select({
+				id: devices.id,
+				name: devices.name,
+				status: devices.status,
+				shelf_id: devices.shelf_id,
+				device_type_model: device_types.model,
+			})
+			.from(devices)
+			.innerJoin(device_types, eq(devices.device_type_id, device_types.id))
+			.where(and(eq(devices.rack_id, rackId), isNotNull(devices.shelf_id)))
+			.orderBy(asc(devices.name), asc(devices.id)),
+	])
 	for (const { shelf_id, ...device } of shelved) {
 		if (shelf_id === null) {
 			continue
@@ -204,17 +219,7 @@ async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
 		list.push(device)
 		onShelves.set(shelf_id, list)
 	}
-	return rows.map((row) => ({
-		id: row.id,
-		name: row.name,
-		face: faceOf(row.face),
-		position_u: row.position_u,
-		mount_height: row.mount_height,
-		mount_usable: row.mount_usable !== 0,
-		reserved_height: row.reserved_height,
-		is_full_depth: row.is_full_depth,
-		devices: onShelves.get(row.id) ?? [],
-	}))
+	return mounts.map((mount) => ({ ...mount, devices: onShelves.get(mount.id) ?? [] }))
 }
 
 /**
@@ -245,7 +250,7 @@ export function shelfBlockedRange(shelf: {
 }
 
 /** U-blocking spans of shelves (at most one span per shelf). */
-function shelfSpans(details: ElevationShelfRef[]): OccupantSpan[] {
+function shelfSpans(details: Omit<ElevationShelfRef, 'devices'>[]): OccupantSpan[] {
 	const spans: OccupantSpan[] = []
 	for (const s of details) {
 		const blocked = shelfBlockedRange(s)
@@ -266,7 +271,8 @@ function shelfSpans(details: ElevationShelfRef[]): OccupantSpan[] {
 
 /** All U-consuming spans of one rack: devices plus shelf blockers. */
 export async function rackSpansOf(rackId: number): Promise<OccupantSpan[]> {
-	return [...(await deviceSpansOf(rackId)), ...shelfSpans(await shelfDetailsOf(rackId))]
+	// Sequential: mount checks may run inside a transaction.
+	return [...(await deviceSpansOf(rackId)), ...shelfSpans(await shelfMountsOf(rackId))]
 }
 
 /**
@@ -402,8 +408,7 @@ export async function getElevation(id: number): Promise<Result<ElevationResponse
 		return current
 	}
 	const rack = current.value
-	const details = await deviceDetailsOf(id)
-	const shelfDetails = await shelfDetailsOf(id)
+	const [details, shelfDetails] = await Promise.all([deviceDetailsOf(id), shelfDetailsOf(id)])
 	const blockers = shelfSpans(shelfDetails)
 	const occupancy = getOccupancy(rack.height_u, [...details.map(spanOf), ...blockers])
 	if (Result.isError(occupancy)) {

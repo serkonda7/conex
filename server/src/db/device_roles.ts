@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, count, eq, inArray } from 'drizzle-orm'
+import { and, count, eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
 import type {
 	DeviceRoleCreate,
@@ -21,10 +21,9 @@ import { ConflictError, DuplicateError, NotFoundError, ValidationError } from '.
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
-	countBy,
+	countWhere,
 	exists,
 	findById,
-	findOne,
 	insertedId,
 	isPatchEmpty,
 	isTaken,
@@ -32,6 +31,7 @@ import {
 	pageOf,
 	pickDefined,
 	searchCondition,
+	subquery,
 	tryWrite,
 } from './list'
 import { tenantBundle } from './tenancy'
@@ -87,24 +87,23 @@ export async function listDeviceRoles(
 			? eq(device_roles.can_host_vms, params.can_host_vms ? 1 : 0)
 			: undefined,
 	)
-	const db = getDb()
-	const rows = await db.select().from(device_roles).where(where)
-	const tree = await bundleTree()
-	const bundleNames = new Map(
-		(
-			await db
-				.select({ id: managed_bundles.id, name: managed_bundles.name })
-				.from(managed_bundles)
-		).map((b) => [b.id, b.name]),
-	)
-	const withBundle = rows.map((r) => {
-		const ref = resolveBundle(tree, r.id)
-		const name = ref ? bundleNames.get(ref.id) : undefined
-		return {
-			...r,
-			managed_bundle: ref && name !== undefined ? { ...ref, name } : null,
-		}
-	})
+	// Every role, flagged by the filter: bundles inherit through roles the
+	// filter drops, so the tree is read once and filtered here.
+	const all = await getDb()
+		.select({
+			...getTableColumns(device_roles),
+			bundle_name: managed_bundles.name,
+			matches: sql<boolean>`coalesce(${where ?? sql`true`}, false)`,
+		})
+		.from(device_roles)
+		.leftJoin(managed_bundles, eq(managed_bundles.id, device_roles.managed_bundle_id))
+	const tree = new Map(all.map((r) => [r.id, r]))
+	const withBundle = all
+		.filter((r) => r.matches)
+		.map(({ bundle_name: _name, matches: _matches, ...r }) => {
+			const ref = resolveBundle(tree, r.id)
+			return { ...r, managed_bundle: bundleRefOf(tree, ref) }
+		})
 	const bundleIds = params.bundle ? new Set(params.bundle) : null
 	const matching = bundleIds
 		? withBundle.filter((r) => r.managed_bundle && bundleIds.has(r.managed_bundle.id))
@@ -120,15 +119,29 @@ export async function listDeviceRoles(
 	const offset = offsetOf(params)
 	const items = linked.slice(offset, offset + params.limit)
 	const ids = items.map((r) => r.id)
-	const counts = await countBy(devices.device_role_id, ids)
-	const vmCounts = await countBy(virtual_machines.device_role_id, ids)
-	const typeCounts = await countBy(device_types.default_device_role_id, ids)
+	const counts = new Map(
+		(ids.length === 0
+			? []
+			: await getDb()
+					.select({
+						id: device_roles.id,
+						devices: countWhere(devices.device_role_id, device_roles.id),
+						vms: countWhere(virtual_machines.device_role_id, device_roles.id),
+						types: countWhere(device_types.default_device_role_id, device_roles.id),
+					})
+					.from(device_roles)
+					.where(inArray(device_roles.id, ids))
+		).map((r) => [r.id, r]),
+	)
 	return pageOf(
-		items.map((r) => ({
-			...r,
-			device_count: (counts.get(r.id) ?? 0) + (vmCounts.get(r.id) ?? 0),
-			device_type_count: typeCounts.get(r.id) ?? 0,
-		})),
+		items.map((r) => {
+			const n = counts.get(r.id)
+			return {
+				...r,
+				device_count: (n?.devices ?? 0) + (n?.vms ?? 0),
+				device_type_count: n?.types ?? 0,
+			}
+		}),
 		matching.length,
 		params,
 	)
@@ -176,31 +189,34 @@ export type DeviceRoleDetail = DeviceRoleRow & {
 
 /** The device role with its counts and effective bundle, for the detail page. */
 export async function getDeviceRoleDetail(id: number): Promise<Result<DeviceRoleDetail, Error>> {
-	const row = await getDeviceRole(id)
-	if (Result.isError(row)) {
-		return row
+	const tree = await roleNodes()
+	if (!tree.has(id)) {
+		return Result.err(new NotFoundError('Device role not found'))
 	}
-	const db = getDb()
-	const ids = await deviceRoleSubtree(id)
-	const countIn = async (column: PgColumn): Promise<number> => {
-		const [res] = await db.select({ n: count() }).from(column.table).where(inArray(column, ids))
-		return res?.n ?? 0
+	const ids = subtreeIds(id, buildChildrenMap([...tree.values()]))
+	const countIn = (column: PgColumn): SQL<number> =>
+		sql<number>`(${subquery.select({ n: count() }).from(column.table).where(inArray(column, ids))})`.mapWith(
+			Number,
+		)
+	const [row] = await getDb()
+		.select({
+			...getTableColumns(device_roles),
+			child_count: countWhere(device_roles.parent_id, sql`${id}`),
+			device_type_count: countIn(device_types.default_device_role_id),
+			device_count: countIn(devices.device_role_id),
+			vm_count: countIn(virtual_machines.device_role_id),
+		})
+		.from(device_roles)
+		.where(eq(device_roles.id, id))
+		.limit(1)
+	if (!row) {
+		return Result.err(new NotFoundError('Device role not found'))
 	}
-	const [children, typeCount, deviceCount, vmCount, tree] = await Promise.all([
-		db.select({ n: count() }).from(device_roles).where(eq(device_roles.parent_id, id)),
-		countIn(device_types.default_device_role_id),
-		countIn(devices.device_role_id),
-		countIn(virtual_machines.device_role_id),
-		bundleTree(),
-	])
-	const ref = resolveBundle(tree, id)
-	const bundle = ref ? await findOne(managed_bundles, eq(managed_bundles.id, ref.id)) : undefined
+	const { vm_count, ...role } = row
 	return Result.ok({
-		...row.value,
-		child_count: children[0]?.n ?? 0,
-		device_type_count: typeCount,
-		device_count: deviceCount + vmCount,
-		managed_bundle: ref && bundle ? { ...ref, name: bundle.name } : null,
+		...role,
+		device_count: role.device_count + vm_count,
+		managed_bundle: bundleRefOf(tree, resolveBundle(tree, id)),
 	})
 }
 
@@ -215,42 +231,50 @@ function roleTree(): Promise<{ id: number; parent_id: number | null }[]> {
 		.from(device_roles)
 }
 
-/**
- * Managed bundle of a role: its own, else the nearest ancestor's; null when
- * no role up the tree sets one.
- */
-export async function effectiveBundleId(roleId: number): Promise<number | null> {
-	return resolveBundle(await bundleTree(), roleId)?.id ?? null
-}
-
 interface BundleNode {
 	id: number
 	parent_id: number | null
 	managed_bundle_id: number | null
+	/** Name of the role's own bundle. */
+	bundle_name: string | null
 }
 
-/** Parent links and own bundle of every device role, keyed by id. */
-async function bundleTree(): Promise<Map<number, BundleNode>> {
+/** Parent links and own bundle (with its name) of every device role, keyed by id. */
+async function roleNodes(): Promise<Map<number, BundleNode>> {
 	const rows = await getDb()
 		.select({
 			id: device_roles.id,
 			parent_id: device_roles.parent_id,
 			managed_bundle_id: device_roles.managed_bundle_id,
+			bundle_name: managed_bundles.name,
 		})
 		.from(device_roles)
+		.leftJoin(managed_bundles, eq(managed_bundles.id, device_roles.managed_bundle_id))
 	return new Map(rows.map((r) => [r.id, r]))
 }
 
-/** Nearest bundle up the tree from `roleId`; `inherited` when not the role's own. */
+/** `resolveBundle` result with the bundle's name, read off the role that sets it. */
+function bundleRefOf(
+	byId: Map<number, BundleNode>,
+	ref: { id: number; inherited: boolean; owner: number } | null,
+): { id: number; name: string; inherited: boolean } | null {
+	const name = ref ? byId.get(ref.owner)?.bundle_name : null
+	return ref && name != null ? { id: ref.id, name, inherited: ref.inherited } : null
+}
+
+/**
+ * Nearest bundle up the tree from `roleId`; `inherited` when not the role's
+ * own, `owner` is the role that sets it.
+ */
 function resolveBundle(
 	byId: Map<number, BundleNode>,
 	roleId: number,
-): { id: number; inherited: boolean } | null {
+): { id: number; inherited: boolean; owner: number } | null {
 	const seen = new Set<number>()
 	let role = byId.get(roleId)
 	while (role && !seen.has(role.id)) {
 		if (role.managed_bundle_id !== null) {
-			return { id: role.managed_bundle_id, inherited: role.id !== roleId }
+			return { id: role.managed_bundle_id, inherited: role.id !== roleId, owner: role.id }
 		}
 		seen.add(role.id)
 		role = role.parent_id === null ? undefined : byId.get(role.parent_id)
@@ -259,11 +283,12 @@ function resolveBundle(
 }
 
 /**
- * Ids of a role and all its descendant roles, so a role filter matches
- * devices of child roles too.
+ * Ids of the roles and all their descendant roles, so a role filter matches
+ * devices of child roles too. Reads the role tree once for all of them.
  */
-export async function deviceRoleSubtree(roleId: number): Promise<number[]> {
-	return subtreeIds(roleId, buildChildrenMap(await roleTree()))
+export async function deviceRoleSubtrees(roleIds: readonly number[]): Promise<number[]> {
+	const children = buildChildrenMap(await roleTree())
+	return [...new Set(roleIds.flatMap((id) => subtreeIds(id, children)))]
 }
 
 /**
@@ -422,11 +447,8 @@ export async function serviceOf(
 	roleId: number,
 	tenantId: number | null,
 ): Promise<DeviceServiceJson> {
-	const bundleId = await effectiveBundleId(roleId)
-	const bundle =
-		bundleId === null
-			? undefined
-			: await findOne(managed_bundles, eq(managed_bundles.id, bundleId))
+	const tree = await roleNodes()
+	const bundle = bundleRefOf(tree, resolveBundle(tree, roleId))
 	if (!bundle) {
 		return { managed_bundle: null, service_level: null }
 	}

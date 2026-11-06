@@ -1,5 +1,16 @@
 import { Result } from 'better-result'
-import { and, asc, count, eq, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm'
+import {
+	and,
+	asc,
+	count,
+	eq,
+	getTableColumns,
+	inArray,
+	isNull,
+	ne,
+	type SQL,
+	sql,
+} from 'drizzle-orm'
 import {
 	PERMISSIONS,
 	type Permission,
@@ -9,11 +20,12 @@ import {
 } from 'shared/src/schemas'
 import { role_permissions, roles, user_tenants, users } from '../schema'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, DuplicateError } from './errors'
+import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
 	checkExists,
+	countWhere,
+	type ExtraRow,
 	exists,
-	findById,
 	insertedId,
 	isPatchEmpty,
 	isTaken,
@@ -22,6 +34,7 @@ import {
 	pageRows,
 	pickDefined,
 	searchCondition,
+	subquery,
 	tryWrite,
 } from './list'
 
@@ -46,17 +59,27 @@ export async function rolePermissions(roleId: number): Promise<Permission[]> {
 	return PERMISSIONS.filter((p) => granted.has(p))
 }
 
-function userCount(roleId: number): Promise<number> {
-	return getDb().$count(users, eq(users.role_id, roleId))
+/**
+ * Granted permissions and user count of the outer role row, selected with
+ * it. jsonb, not arrays: Bun's driver may return arrays as typed arrays.
+ */
+const roleExtras: { granted: SQL<string[]>; user_count: SQL<number> } = {
+	granted: sql<string[]>`coalesce((${subquery
+		.select({ list: sql`jsonb_agg(${role_permissions.permission})` })
+		.from(role_permissions)
+		.where(eq(role_permissions.role_id, roles.id))}), '[]'::jsonb)`,
+	user_count: countWhere(users.role_id, roles.id),
 }
 
-async function toRoleJson(row: typeof roles.$inferSelect): Promise<RoleJson> {
+function toRoleJson(row: typeof roles.$inferSelect & ExtraRow<typeof roleExtras>): RoleJson {
+	// Catalog order; unknown stored strings are dropped (as `rolePermissions`).
+	const granted = new Set(row.granted)
 	return {
 		id: row.id,
 		name: row.name,
 		description: row.description,
-		permissions: await rolePermissions(row.id),
-		user_count: await userCount(row.id),
+		permissions: PERMISSIONS.filter((p) => granted.has(p)),
+		user_count: row.user_count,
 	}
 }
 
@@ -66,13 +89,18 @@ export async function listRoles(params: ListParams): Promise<Page<RoleJson>> {
 		searchCondition(params.search, [roles.name, roles.description]),
 		[asc(roles.name), asc(roles.id)],
 		params,
+		roleExtras,
 	)
-	return { ...page, items: await Promise.all(page.items.map(toRoleJson)) }
+	return { ...page, items: page.items.map(toRoleJson) }
 }
 
 export async function getRole(id: number): Promise<Result<RoleJson, Error>> {
-	const row = await findById(roles, id, 'Role not found')
-	return Result.isOk(row) ? Result.ok(await toRoleJson(row.value)) : row
+	const [row] = await getDb()
+		.select({ ...getTableColumns(roles), ...roleExtras })
+		.from(roles)
+		.where(eq(roles.id, id))
+		.limit(1)
+	return row ? Result.ok(toRoleJson(row)) : Result.err(new NotFoundError('Role not found'))
 }
 
 /**

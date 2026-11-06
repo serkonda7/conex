@@ -51,13 +51,14 @@ import { prunePlacements } from './attachments'
 import { deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { checkDeviceRoleExists, deviceRoleSubtree } from './device_roles'
+import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
 import { checkEmployeeAssignment } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
 	checkTenantExists,
+	exists,
 	findById,
 	findOne,
 	inScope,
@@ -368,9 +369,7 @@ async function compatiblePortCondition(interfaceId: number): Promise<SQL | undef
 export async function listDevices(params: DeviceListParams): Promise<Page<DeviceListItem>> {
 	const db = getDb()
 	// A role matches its descendant roles too (nested roles).
-	const roleIds = params.role
-		? [...new Set((await Promise.all(params.role.map(deviceRoleSubtree))).flat())]
-		: undefined
+	const roleIds = params.role ? await deviceRoleSubtrees(params.role) : undefined
 	const deviceOnly =
 		params.site !== undefined ||
 		params.rack !== undefined ||
@@ -980,9 +979,8 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 const INTERFACE_NAME_IN_USE = 'This device already has an interface with this name on this side'
 
 export async function listInterfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
-	const device = await getDevice(deviceId)
-	if (Result.isError(device)) {
-		return device
+	if (!(await exists(devices, eq(devices.id, deviceId)))) {
+		return Result.err(new NotFoundError('Device not found'))
 	}
 	const rows = await getDb()
 		.select()

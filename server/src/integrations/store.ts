@@ -4,7 +4,7 @@
  * returned: the JSON shape only says whether they are set.
  */
 import { Result } from 'better-result'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import type {
 	IntegrationCreate,
 	IntegrationJson,
@@ -60,7 +60,7 @@ async function lastSync(provider: string): Promise<SyncRunJson | null> {
 	return row ? syncRunJson(row) : null
 }
 
-async function toJson(row: IntegrationRow): Promise<IntegrationJson> {
+async function toJson(row: IntegrationRow, last?: SyncRunJson | null): Promise<IntegrationJson> {
 	const secrets = decryptSecrets(row.secrets)
 	return {
 		id: row.id,
@@ -74,13 +74,28 @@ async function toJson(row: IntegrationRow): Promise<IntegrationJson> {
 		updated_at: row.updated_at,
 		last_login_ok_at: row.last_login_ok_at,
 		last_error: Result.isError(secrets) ? secrets.error.message : row.last_error,
-		last_sync: await lastSync(row.provider),
+		last_sync: last === undefined ? await lastSync(row.provider) : last,
 	}
 }
 
 export async function listIntegrations(): Promise<IntegrationJson[]> {
 	const rows = await getDb().select().from(integrations).orderBy(integrations.provider)
-	return Promise.all(rows.map(toJson))
+	if (rows.length === 0) {
+		return []
+	}
+	// Latest run per provider in one statement (as `lastSync` does for one).
+	const runs = await getDb()
+		.selectDistinctOn([sync_runs.provider])
+		.from(sync_runs)
+		.where(
+			inArray(
+				sync_runs.provider,
+				rows.map((row) => row.provider),
+			),
+		)
+		.orderBy(sync_runs.provider, desc(sync_runs.started_at), desc(sync_runs.id))
+	const lastOf = new Map(runs.map((run) => [run.provider, syncRunJson(run)]))
+	return Promise.all(rows.map((row) => toJson(row, lastOf.get(row.provider) ?? null)))
 }
 
 export async function getIntegrationRow(

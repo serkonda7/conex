@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { asc, eq, sql } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import type {
 	ManagedBundleCreate,
 	ManagedBundleListQuery,
@@ -26,7 +26,7 @@ import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import {
-	countBy,
+	countWhere,
 	exists,
 	findById,
 	insertedId,
@@ -171,20 +171,13 @@ export async function listServiceLevels(
 ): Promise<Page<ServiceLevelListRow>> {
 	const orderColumn =
 		params.sort === 'description' ? service_levels.description : service_levels.name
-	const page = await pageRows(
+	return await pageRows(
 		service_levels,
 		searchCondition(params.search, [service_levels.name, service_levels.description]),
 		[orderOf(orderColumn, params.order), asc(service_levels.id)],
 		params,
+		{ target_count: countWhere(service_level_targets.service_level_id, service_levels.id) },
 	)
-	const counts = await countBy(
-		service_level_targets.service_level_id,
-		page.items.map((r) => r.id),
-	)
-	return {
-		...page,
-		items: page.items.map((r) => ({ ...r, target_count: counts.get(r.id) ?? 0 })),
-	}
 }
 
 async function targetsOf(serviceLevelId: number): Promise<ServiceLevelTargetJson[]> {
@@ -368,29 +361,22 @@ export interface ManagedBundleListParams extends ListParams {
 export async function listManagedBundles(
 	params: ManagedBundleListParams,
 ): Promise<Page<ManagedBundleListRow>> {
+	const counts = {
+		role_count: countWhere(device_roles.managed_bundle_id, managed_bundles.id),
+		tenant_count: countWhere(tenant_bundles.managed_bundle_id, managed_bundles.id),
+	}
 	const orderColumns = {
 		name: managed_bundles.name,
 		description: managed_bundles.description,
-		role_count: sql`(SELECT count(*) FROM ${device_roles} WHERE ${device_roles.managed_bundle_id} = ${managed_bundles.id})`,
-		tenant_count: sql`(SELECT count(*) FROM ${tenant_bundles} WHERE ${tenant_bundles.managed_bundle_id} = ${managed_bundles.id})`,
+		...counts,
 	}
-	const page = await pageRows(
+	return await pageRows(
 		managed_bundles,
 		searchCondition(params.search, [managed_bundles.name, managed_bundles.description]),
 		[orderOf(orderColumns[params.sort], params.order), asc(managed_bundles.id)],
 		params,
+		counts,
 	)
-	const ids = page.items.map((r) => r.id)
-	const roleCounts = await countBy(device_roles.managed_bundle_id, ids)
-	const tenantCounts = await countBy(tenant_bundles.managed_bundle_id, ids)
-	return {
-		...page,
-		items: page.items.map((r) => ({
-			...r,
-			role_count: roleCounts.get(r.id) ?? 0,
-			tenant_count: tenantCounts.get(r.id) ?? 0,
-		})),
-	}
 }
 
 export function getManagedBundle(id: number): Promise<Result<ManagedBundleRow, Error>> {
