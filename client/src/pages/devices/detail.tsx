@@ -22,7 +22,7 @@ import { fetch_rack } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_device_type } from '../../api/templates'
 import { fetch_location, fetch_site, fetch_tenant } from '../../api/tenancy'
-import { DataTable, type DataTableColumn, nameColumn } from '../../components/data_table'
+import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
 	DetailHeader,
 	DetailShell,
@@ -37,7 +37,7 @@ import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel, faceLabel, portKindLabel } from '../../i18n/labels'
+import { deviceRoleLabel, faceLabel } from '../../i18n/labels'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
 import { createDerived, createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
@@ -52,12 +52,12 @@ import { MoveTenantDialog } from './move_tenant_dialog'
 import { useOutletLocationOptions } from './outlet_location'
 import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
+import { DevicePortTable } from './port_table'
 import { DeviceStatusBadge } from './status'
-import { PortPeer } from './trace_peer'
 
 /**
- * General, power, outlet and display ports; everything else is a network
- * port. Patch-panel ports (with a side) are neither.
+ * General, power, outlet and display ports have no enabled state; patch-panel
+ * ports (with a side) are not one.
  */
 const isOtherPort = (iface: InterfaceJson): boolean =>
 	!iface.side && OTHER_PORT_KINDS.has(iface.kind)
@@ -85,7 +85,7 @@ function PortActions(props: {
 						aria-label={t('device.connectCableFor', { name: name() })}
 						onClick={props.onConnect}
 					>
-						<IconLinkPlus size={20} />
+						<IconLinkPlus size={16} />
 					</button>
 				}
 			>
@@ -97,7 +97,7 @@ function PortActions(props: {
 						aria-label={t('device.disconnectPort', { name: name() })}
 						onClick={() => props.onDisconnect(link().cable_id)}
 					>
-						<IconUnlink size={20} />
+						<IconUnlink size={16} />
 					</button>
 				)}
 			</Show>
@@ -108,7 +108,7 @@ function PortActions(props: {
 				aria-label={t('device.editPort', { name: name() })}
 				onClick={props.onEdit}
 			>
-				<IconPencil size={20} />
+				<IconPencil size={16} />
 			</button>
 		</span>
 	)
@@ -187,9 +187,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		open(iface)
 	}
 
-	const networkPorts = createMemo(() =>
-		(ifaces() ?? []).filter((i) => !isOtherPort(i) && !isPanelPort(i)),
-	)
+	/** Ports outside the patch-panel table, grouped by class. */
+	const ports = createMemo(() => (ifaces() ?? []).filter((i) => !isPanelPort(i)))
 	const panelPorts = createMemo(() => (ifaces() ?? []).filter(isPanelPort))
 	const [jacks] = createRowsFor(() => panelPorts().length > 0 && props.id, fetch_jacks, setError)
 	const jackNames = createMemo(() => new Map((jacks() ?? []).map((jack) => [jack.id, jack.name])))
@@ -200,11 +199,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	/** Current state of a port of the row being edited (its cable may change meanwhile). */
 	const currentIface = (iface: InterfaceJson | null): InterfaceJson | null =>
 		iface && ((ifaces() ?? []).find((i) => i.id === iface.id) ?? iface)
-	const otherPorts = createMemo(() => (ifaces() ?? []).filter(isOtherPort))
-	/** 1-based network port number: position in creation order (eth1..ethN). */
-	const portNumbers = createMemo(
-		() => new Map(networkPorts().map((iface, index) => [iface.id, index + 1])),
-	)
 	/** Direct cable peer per local interface, from the trace links. */
 	const linksByIface = createMemo(
 		() => new Map((trace()?.links ?? []).map((link) => [link.local_interface.id, link])),
@@ -221,57 +215,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		return byIface
 	})
 	const endToEndOf = (ifaceId: number): TraceEndToEnd[] => endToEndByIface().get(ifaceId) ?? []
-
-	const portNameColumn: DataTableColumn<InterfaceJson> = {
-		key: 'name',
-		label: t('common.name'),
-		getValue: (iface: InterfaceJson): JSX.Element => <code>{iface.name}</code>,
-	}
-	const connectionColumn: DataTableColumn<InterfaceJson> = {
-		key: 'connection',
-		label: t('device.connection'),
-		getValue: (iface: InterfaceJson): JSX.Element => (
-			<PortPeer link={linksByIface().get(iface.id)} endToEnd={endToEndOf(iface.id)} />
-		),
-	}
-	/** Network ports get the enabled state and port number. */
-	const networkColumns: DataTableColumn<InterfaceJson>[] = [
-		{
-			key: 'enabled',
-			label: t('device.enabled'),
-			getValue: (iface: InterfaceJson): JSX.Element => (
-				<span class="badge" classList={{ 'badge-active': iface.enabled }}>
-					{iface.enabled ? t('device.enabled') : t('device.disabled')}
-				</span>
-			),
-		},
-		{
-			key: 'port',
-			label: t('device.portNumber'),
-			getValue: (iface: InterfaceJson): JSX.Element => (
-				<span classList={{ 'text-muted': !iface.enabled }}>
-					{portNumbers().get(iface.id) ?? '—'}
-				</span>
-			),
-		},
-		{
-			...portNameColumn,
-			getValue: (iface: InterfaceJson): JSX.Element => (
-				<code classList={{ 'text-muted': !iface.enabled }}>{iface.name}</code>
-			),
-		},
-		connectionColumn,
-	]
-	/** Other ports show their kind instead. */
-	const otherColumns: DataTableColumn<InterfaceJson>[] = [
-		portNameColumn,
-		{
-			key: 'kind',
-			label: t('device.kind'),
-			getValue: (iface: InterfaceJson): string => portKindLabel(iface.kind),
-		},
-		connectionColumn,
-	]
 
 	/** Floor plan an outlet (single-position rear port) is placed on. */
 	const planColumn: DataTableColumn<PanelRow> = {
@@ -350,20 +293,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 			</button>
 		)
 	}
-
-	const portTable = (
-		rows: () => InterfaceJson[],
-		columns: DataTableColumn<InterfaceJson>[],
-	): JSX.Element => (
-		<DataTable
-			rows={rows}
-			getRowId={(iface: InterfaceJson): number => iface.id}
-			showColumnCustomizer
-			columns={columns}
-			rowActions={can('edit') ? portActions : undefined}
-			empty={false}
-		/>
-	)
 
 	/** Id of the topmost port section, the target of the port count. */
 	const firstPortSection = (): string =>
@@ -557,31 +486,24 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						/>
 					</section>
 				</Show>
-				<Show when={networkPorts().length > 0 || panelPorts().length === 0}>
-					<section class="component-section flat-table" id="device-interfaces">
+				<Show when={ports().length > 0 || panelPorts().length === 0}>
+					<section class="component-section" id="device-interfaces">
 						<div class="card-header">
 							<h3>
-								{t('device.networkPorts')}{' '}
-								<span class="badge">{networkPorts().length}</span>
+								{t('device.ports')} <span class="badge">{ports().length}</span>
 							</h3>
 						</div>
 						<Show
-							when={networkPorts().length > 0}
+							when={ports().length > 0}
 							fallback={<Empty message={t('device.noPorts')} />}
 						>
-							{portTable(networkPorts, networkColumns)}
+							<DevicePortTable
+								ports={ports()}
+								links={linksByIface()}
+								endToEnd={endToEndOf}
+								actions={can('edit') ? portActions : undefined}
+							/>
 						</Show>
-					</section>
-				</Show>
-				<Show when={otherPorts().length > 0}>
-					<section class="component-section flat-table" id="device-other-ports">
-						<div class="card-header">
-							<h3>
-								{t('device.otherPorts')}{' '}
-								<span class="badge">{otherPorts().length}</span>
-							</h3>
-						</div>
-						{portTable(otherPorts, otherColumns)}
 					</section>
 				</Show>
 				<Show when={deviceRole()?.can_host_vms === 1}>

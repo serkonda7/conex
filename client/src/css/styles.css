@@ -2955,11 +2955,7 @@ tbody tr:last-child td {
 	scroll-margin-top: var(--topbar-height);
 }
 
-.component-table-wrap {
-	overflow-x: auto;
-}
-
-.component-table {
+.component-table table {
 	margin: 0;
 	border: 0;
 	background: none;
@@ -2989,41 +2985,24 @@ tbody tr:last-child td {
 	background: none;
 }
 
-.component-table tbody::after {
+/* Gap after each class group. */
+.component-table tbody.data-table-group::after {
 	content: "";
 	display: block;
 	height: 1rem;
 }
 
-.component-group-title {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	width: 100%;
+.component-table .data-table-group-toggle,
+.component-table .data-table-group-toggle:hover {
 	padding: 0;
-	font-weight: inherit;
-	text-align: left;
 	background: none;
 	border: 0;
 }
 
-.component-group-title:hover {
-	background: none;
-}
-
-.component-group-chevron {
-	flex: none;
-	transition: transform 150ms ease;
-}
-
-.component-group-title[aria-expanded="false"] .component-group-chevron {
-	transform: rotate(-90deg);
-}
-
-.component-table .component-group {
-	background-color: var(--bg-raised);
-	border-radius: 0.25rem;
-	font-weight: 600;
+.component-table .data-table-actions {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
 }
 
 .component-count {
@@ -3079,6 +3058,16 @@ tbody tr:last-child td {
 :is(.device-preview, .flat-table) .icon-btn {
 	display: flex;
 	margin-block: -0.4rem;
+}
+
+/* Class band of a component group. */
+.app-content .component-table .data-table-group-row th {
+	background-color: var(--bg-raised);
+	border-radius: 0.25rem;
+	text-transform: none;
+	letter-spacing: normal;
+	font-size: inherit;
+	color: inherit;
 }
 
 /* Device detail: port and VM sections, split by the same rule. */

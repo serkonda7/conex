@@ -1,6 +1,6 @@
 /**
  * `DataTable` and `FilterTable` from solid-components with their built-in
- * English labels (column customizer, pager, filter tabs and
+ * English labels (actions header, column customizer, pager, filter tabs and
  * form) replaced by localized defaults. Pages import them from here instead
  * of the package. Both enable column resizing by default (opt out with
  * `resizableColumns={false}`). `FilterTable` also persists its saved filters globally
@@ -32,6 +32,7 @@ export type {
 
 function tableLabels(): Pick<
 	DataTableProps<never>,
+	| 'actionsLabel'
 	| 'columnCustomizerLabel'
 	| 'columnCustomizerTitle'
 	| 'columnCustomizerShowAllLabel'
@@ -39,6 +40,7 @@ function tableLabels(): Pick<
 	| 'paginationLabels'
 > {
 	return {
+		actionsLabel: t('table.actions'),
 		columnCustomizerLabel: t('table.columns'),
 		columnCustomizerTitle: t('table.shownColumns'),
 		columnCustomizerShowAllLabel: t('table.showAll'),
