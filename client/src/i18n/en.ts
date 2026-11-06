@@ -1324,10 +1324,6 @@ export const en = {
 	'calendarSync.mappingFailed': 'Failed to save the mapping',
 	'calendarSync.runs': 'Recent runs',
 	'calendarSync.runsFailed': 'Failed to load the calendar sync runs',
-	'calendarSync.noRuns': 'No runs yet.',
-	'calendarSync.startedAt': 'Started',
-	'calendarSync.changes': 'Changes',
-	'calendarSync.error': 'Error',
 	'calendarSync.counts':
 		'{created} created, {updated} updated, {deleted} deleted, {failed} failed',
 	'calendarSync.syncFailed': 'Calendar sync failed',

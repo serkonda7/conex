@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { tablerIcons } from '@serkonda7/solid-components/vite'
 import devtools from 'solid-devtools/vite'
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
 
 const CLIENT_PORT = Number(process.env.CONEX_CLIENT_PORT ?? 5371)
@@ -53,6 +53,13 @@ export default defineConfig({
 	server: {
 		host: CLIENT_HOST,
 		port: CLIENT_PORT,
+		// TEMP: serve the locally linked @serkonda7/solid-components; remove with the link.
+		fs: {
+			allow: [
+				searchForWorkspaceRoot(process.cwd()),
+				resolve(import.meta.dirname, '../../solid-components'),
+			],
+		},
 		proxy: {
 			'/api': {
 				target: process.env.CONEX_API_URL ?? 'http://localhost:3000',

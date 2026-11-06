@@ -1349,10 +1349,6 @@ export const de: Messages = {
 	'calendarSync.mappingFailed': 'Die Zuordnung konnte nicht gespeichert werden',
 	'calendarSync.runs': 'Letzte Läufe',
 	'calendarSync.runsFailed': 'Die Läufe der Kalendersynchronisation konnten nicht geladen werden',
-	'calendarSync.noRuns': 'Noch keine Läufe.',
-	'calendarSync.startedAt': 'Gestartet',
-	'calendarSync.changes': 'Änderungen',
-	'calendarSync.error': 'Fehler',
 	'calendarSync.counts':
 		'{created} erstellt, {updated} aktualisiert, {deleted} gelöscht, {failed} fehlgeschlagen',
 	'calendarSync.syncFailed': 'Kalendersynchronisation fehlgeschlagen',
