@@ -32,79 +32,213 @@ import {
 	IconUsers,
 } from '@tabler/icons-solidjs'
 import type { Permission } from 'shared/src/types'
-import type { Component } from 'solid-js'
+import { type Component, lazy } from 'solid-js'
 import { t, tp } from '../i18n'
 import { type Crumb, pageMetaFor, parseId, routeSegments } from '../lib/router'
 import { can } from '../lib/session'
-import { AuditLogPage } from '../pages/audit_log/list'
-import { ChangeDetailPage } from '../pages/changelog/detail'
-import { ChangelogPage } from '../pages/changelog/list'
 import { DashboardPage } from '../pages/dashboard/view'
-import { DeviceTypeDetailPage } from '../pages/device_types/detail'
-import { DeviceTypeEditPage } from '../pages/device_types/form'
-import { DeviceTypeImportPage } from '../pages/device_types/import'
-import { DeviceTypesPage } from '../pages/device_types/list'
-import { DeviceRoleDetailPage } from '../pages/device-roles/detail'
-import { DeviceRoleAddPage, DeviceRoleEditPage } from '../pages/device-roles/form'
-import { DeviceRolesPage } from '../pages/device-roles/list'
-import { DeviceAddPage } from '../pages/devices/add'
-import { DeviceDetailPage } from '../pages/devices/detail'
-import { DeviceEditPage } from '../pages/devices/edit'
-import { DevicesPage } from '../pages/devices/list'
-import { VirtualMachineDetailPage } from '../pages/devices/vm_detail'
-import { VirtualMachineAddPage, VirtualMachineEditPage } from '../pages/devices/vm_form'
-import { EmployeeDetailPage } from '../pages/employees/detail'
-import { EmployeeAddPage, EmployeeEditPage } from '../pages/employees/form'
-import { EmployeesPage } from '../pages/employees/list'
-import { FloorplanDetailPage } from '../pages/floorplans/detail'
-import { FloorplansPage } from '../pages/floorplans/list'
-import { IntegrationAddPage } from '../pages/integrations/add'
-import { CalendarSyncTechniciansPage } from '../pages/integrations/calendar_sync'
-import { IntegrationEditPage } from '../pages/integrations/edit'
-import { IntegrationsPage } from '../pages/integrations/list'
-import { IntegrationReportPage } from '../pages/integrations/report'
-import { LocationAddPage } from '../pages/locations/add'
-import { LocationDetailPage } from '../pages/locations/detail'
-import { LocationEditPage } from '../pages/locations/edit'
-import { LocationsPage } from '../pages/locations/list'
-import { ManagedBundleDetailPage } from '../pages/managed-bundles/detail'
-import { ManagedBundleAddPage, ManagedBundleEditPage } from '../pages/managed-bundles/form'
-import { ManagedBundlesPage } from '../pages/managed-bundles/list'
-import { ManufacturerDetailPage } from '../pages/manufacturers/detail'
-import { ManufacturerAddPage, ManufacturerEditPage } from '../pages/manufacturers/form'
-import { ManufacturersPage } from '../pages/manufacturers/list'
-import { PriorityDetailPage } from '../pages/priorities/detail'
-import { PriorityAddPage, PriorityEditPage } from '../pages/priorities/form'
-import { PrioritiesPage } from '../pages/priorities/list'
-import { RackTypeDetailPage } from '../pages/rack_types/detail'
-import { RackTypeAddPage, RackTypeEditPage } from '../pages/rack_types/form'
-import { RackTypesPage } from '../pages/rack_types/list'
-import { RackAddPage } from '../pages/racks/add'
-import { RackDetailPage } from '../pages/racks/detail'
-import { RackEditPage } from '../pages/racks/edit'
-import { RacksPage } from '../pages/racks/list'
-import { RoleAddPage, RoleEditPage } from '../pages/roles/form'
-import { RolesPage } from '../pages/roles/list'
-import { ServiceLevelDetailPage } from '../pages/service-levels/detail'
-import { ServiceLevelAddPage, ServiceLevelEditPage } from '../pages/service-levels/form'
-import { ServiceLevelsPage } from '../pages/service-levels/list'
-import { ShelfAddPage, ShelfEditPage } from '../pages/shelves/form'
-import { SiteGroupDetailPage } from '../pages/site_groups/detail'
-import { SiteGroupAddPage, SiteGroupEditPage } from '../pages/site_groups/form'
-import { SiteGroupsPage } from '../pages/site_groups/list'
-import { SiteDetailPage } from '../pages/sites/detail'
-import { SiteAddPage, SiteEditPage } from '../pages/sites/form'
-import { SitesPage } from '../pages/sites/list'
-import { TenantGroupDetailPage } from '../pages/tenant_groups/detail'
-import { TenantGroupAddPage, TenantGroupEditPage } from '../pages/tenant_groups/form'
-import { TenantGroupsPage } from '../pages/tenant_groups/list'
-import { TenantDetailPage } from '../pages/tenants/detail'
-import { TenantAddPage, TenantEditPage } from '../pages/tenants/form'
-import { TenantsPage } from '../pages/tenants/list'
-import { TicketAddPage } from '../pages/tickets/add'
-import { UserAddPage } from '../pages/users/add'
-import { UserEditPage } from '../pages/users/edit'
-import { UsersPage } from '../pages/users/list'
+
+/**
+ * Loads a page module on first render, so each page (and its heavy
+ * dependencies, e.g. the floorplan editor or the markdown renderer) ships as
+ * its own chunk. Kept module-level: the route match compares page identity.
+ */
+function lazyPage<P extends object>(load: () => Promise<Component<P>>): Component<P> {
+	return lazy(async () => ({ default: await load() }))
+}
+
+const AuditLogPage = lazyPage(() => import('../pages/audit_log/list').then((m) => m.AuditLogPage))
+const ChangeDetailPage = lazyPage(() =>
+	import('../pages/changelog/detail').then((m) => m.ChangeDetailPage),
+)
+const ChangelogPage = lazyPage(() => import('../pages/changelog/list').then((m) => m.ChangelogPage))
+const DeviceTypeDetailPage = lazyPage(() =>
+	import('../pages/device_types/detail').then((m) => m.DeviceTypeDetailPage),
+)
+const DeviceTypeEditPage = lazyPage(() =>
+	import('../pages/device_types/form').then((m) => m.DeviceTypeEditPage),
+)
+const DeviceTypeImportPage = lazyPage(() =>
+	import('../pages/device_types/import').then((m) => m.DeviceTypeImportPage),
+)
+const DeviceTypesPage = lazyPage(() =>
+	import('../pages/device_types/list').then((m) => m.DeviceTypesPage),
+)
+const DeviceRoleDetailPage = lazyPage(() =>
+	import('../pages/device-roles/detail').then((m) => m.DeviceRoleDetailPage),
+)
+const DeviceRoleAddPage = lazyPage(() =>
+	import('../pages/device-roles/form').then((m) => m.DeviceRoleAddPage),
+)
+const DeviceRoleEditPage = lazyPage(() =>
+	import('../pages/device-roles/form').then((m) => m.DeviceRoleEditPage),
+)
+const DeviceRolesPage = lazyPage(() =>
+	import('../pages/device-roles/list').then((m) => m.DeviceRolesPage),
+)
+const DeviceAddPage = lazyPage(() => import('../pages/devices/add').then((m) => m.DeviceAddPage))
+const DeviceDetailPage = lazyPage(() =>
+	import('../pages/devices/detail').then((m) => m.DeviceDetailPage),
+)
+const DeviceEditPage = lazyPage(() => import('../pages/devices/edit').then((m) => m.DeviceEditPage))
+const DevicesPage = lazyPage(() => import('../pages/devices/list').then((m) => m.DevicesPage))
+const VirtualMachineDetailPage = lazyPage(() =>
+	import('../pages/devices/vm_detail').then((m) => m.VirtualMachineDetailPage),
+)
+const VirtualMachineAddPage = lazyPage(() =>
+	import('../pages/devices/vm_form').then((m) => m.VirtualMachineAddPage),
+)
+const VirtualMachineEditPage = lazyPage(() =>
+	import('../pages/devices/vm_form').then((m) => m.VirtualMachineEditPage),
+)
+const EmployeeDetailPage = lazyPage(() =>
+	import('../pages/employees/detail').then((m) => m.EmployeeDetailPage),
+)
+const EmployeeAddPage = lazyPage(() =>
+	import('../pages/employees/form').then((m) => m.EmployeeAddPage),
+)
+const EmployeeEditPage = lazyPage(() =>
+	import('../pages/employees/form').then((m) => m.EmployeeEditPage),
+)
+const EmployeesPage = lazyPage(() => import('../pages/employees/list').then((m) => m.EmployeesPage))
+const FloorplanDetailPage = lazyPage(() =>
+	import('../pages/floorplans/detail').then((m) => m.FloorplanDetailPage),
+)
+const FloorplansPage = lazyPage(() =>
+	import('../pages/floorplans/list').then((m) => m.FloorplansPage),
+)
+const IntegrationAddPage = lazyPage(() =>
+	import('../pages/integrations/add').then((m) => m.IntegrationAddPage),
+)
+const CalendarSyncTechniciansPage = lazyPage(() =>
+	import('../pages/integrations/calendar_sync').then((m) => m.CalendarSyncTechniciansPage),
+)
+const IntegrationEditPage = lazyPage(() =>
+	import('../pages/integrations/edit').then((m) => m.IntegrationEditPage),
+)
+const IntegrationsPage = lazyPage(() =>
+	import('../pages/integrations/list').then((m) => m.IntegrationsPage),
+)
+const IntegrationReportPage = lazyPage(() =>
+	import('../pages/integrations/report').then((m) => m.IntegrationReportPage),
+)
+const LocationAddPage = lazyPage(() =>
+	import('../pages/locations/add').then((m) => m.LocationAddPage),
+)
+const LocationDetailPage = lazyPage(() =>
+	import('../pages/locations/detail').then((m) => m.LocationDetailPage),
+)
+const LocationEditPage = lazyPage(() =>
+	import('../pages/locations/edit').then((m) => m.LocationEditPage),
+)
+const LocationsPage = lazyPage(() => import('../pages/locations/list').then((m) => m.LocationsPage))
+const ManagedBundleDetailPage = lazyPage(() =>
+	import('../pages/managed-bundles/detail').then((m) => m.ManagedBundleDetailPage),
+)
+const ManagedBundleAddPage = lazyPage(() =>
+	import('../pages/managed-bundles/form').then((m) => m.ManagedBundleAddPage),
+)
+const ManagedBundleEditPage = lazyPage(() =>
+	import('../pages/managed-bundles/form').then((m) => m.ManagedBundleEditPage),
+)
+const ManagedBundlesPage = lazyPage(() =>
+	import('../pages/managed-bundles/list').then((m) => m.ManagedBundlesPage),
+)
+const ManufacturerDetailPage = lazyPage(() =>
+	import('../pages/manufacturers/detail').then((m) => m.ManufacturerDetailPage),
+)
+const ManufacturerAddPage = lazyPage(() =>
+	import('../pages/manufacturers/form').then((m) => m.ManufacturerAddPage),
+)
+const ManufacturerEditPage = lazyPage(() =>
+	import('../pages/manufacturers/form').then((m) => m.ManufacturerEditPage),
+)
+const ManufacturersPage = lazyPage(() =>
+	import('../pages/manufacturers/list').then((m) => m.ManufacturersPage),
+)
+const PriorityDetailPage = lazyPage(() =>
+	import('../pages/priorities/detail').then((m) => m.PriorityDetailPage),
+)
+const PriorityAddPage = lazyPage(() =>
+	import('../pages/priorities/form').then((m) => m.PriorityAddPage),
+)
+const PriorityEditPage = lazyPage(() =>
+	import('../pages/priorities/form').then((m) => m.PriorityEditPage),
+)
+const PrioritiesPage = lazyPage(() =>
+	import('../pages/priorities/list').then((m) => m.PrioritiesPage),
+)
+const RackTypeDetailPage = lazyPage(() =>
+	import('../pages/rack_types/detail').then((m) => m.RackTypeDetailPage),
+)
+const RackTypeAddPage = lazyPage(() =>
+	import('../pages/rack_types/form').then((m) => m.RackTypeAddPage),
+)
+const RackTypeEditPage = lazyPage(() =>
+	import('../pages/rack_types/form').then((m) => m.RackTypeEditPage),
+)
+const RackTypesPage = lazyPage(() =>
+	import('../pages/rack_types/list').then((m) => m.RackTypesPage),
+)
+const RackAddPage = lazyPage(() => import('../pages/racks/add').then((m) => m.RackAddPage))
+const RackDetailPage = lazyPage(() => import('../pages/racks/detail').then((m) => m.RackDetailPage))
+const RackEditPage = lazyPage(() => import('../pages/racks/edit').then((m) => m.RackEditPage))
+const RacksPage = lazyPage(() => import('../pages/racks/list').then((m) => m.RacksPage))
+const RoleAddPage = lazyPage(() => import('../pages/roles/form').then((m) => m.RoleAddPage))
+const RoleEditPage = lazyPage(() => import('../pages/roles/form').then((m) => m.RoleEditPage))
+const RolesPage = lazyPage(() => import('../pages/roles/list').then((m) => m.RolesPage))
+const ServiceLevelDetailPage = lazyPage(() =>
+	import('../pages/service-levels/detail').then((m) => m.ServiceLevelDetailPage),
+)
+const ServiceLevelAddPage = lazyPage(() =>
+	import('../pages/service-levels/form').then((m) => m.ServiceLevelAddPage),
+)
+const ServiceLevelEditPage = lazyPage(() =>
+	import('../pages/service-levels/form').then((m) => m.ServiceLevelEditPage),
+)
+const ServiceLevelsPage = lazyPage(() =>
+	import('../pages/service-levels/list').then((m) => m.ServiceLevelsPage),
+)
+const ShelfAddPage = lazyPage(() => import('../pages/shelves/form').then((m) => m.ShelfAddPage))
+const ShelfEditPage = lazyPage(() => import('../pages/shelves/form').then((m) => m.ShelfEditPage))
+const SiteGroupDetailPage = lazyPage(() =>
+	import('../pages/site_groups/detail').then((m) => m.SiteGroupDetailPage),
+)
+const SiteGroupAddPage = lazyPage(() =>
+	import('../pages/site_groups/form').then((m) => m.SiteGroupAddPage),
+)
+const SiteGroupEditPage = lazyPage(() =>
+	import('../pages/site_groups/form').then((m) => m.SiteGroupEditPage),
+)
+const SiteGroupsPage = lazyPage(() =>
+	import('../pages/site_groups/list').then((m) => m.SiteGroupsPage),
+)
+const SiteDetailPage = lazyPage(() => import('../pages/sites/detail').then((m) => m.SiteDetailPage))
+const SiteAddPage = lazyPage(() => import('../pages/sites/form').then((m) => m.SiteAddPage))
+const SiteEditPage = lazyPage(() => import('../pages/sites/form').then((m) => m.SiteEditPage))
+const SitesPage = lazyPage(() => import('../pages/sites/list').then((m) => m.SitesPage))
+const TenantGroupDetailPage = lazyPage(() =>
+	import('../pages/tenant_groups/detail').then((m) => m.TenantGroupDetailPage),
+)
+const TenantGroupAddPage = lazyPage(() =>
+	import('../pages/tenant_groups/form').then((m) => m.TenantGroupAddPage),
+)
+const TenantGroupEditPage = lazyPage(() =>
+	import('../pages/tenant_groups/form').then((m) => m.TenantGroupEditPage),
+)
+const TenantGroupsPage = lazyPage(() =>
+	import('../pages/tenant_groups/list').then((m) => m.TenantGroupsPage),
+)
+const TenantDetailPage = lazyPage(() =>
+	import('../pages/tenants/detail').then((m) => m.TenantDetailPage),
+)
+const TenantAddPage = lazyPage(() => import('../pages/tenants/form').then((m) => m.TenantAddPage))
+const TenantEditPage = lazyPage(() => import('../pages/tenants/form').then((m) => m.TenantEditPage))
+const TenantsPage = lazyPage(() => import('../pages/tenants/list').then((m) => m.TenantsPage))
+const TicketAddPage = lazyPage(() => import('../pages/tickets/add').then((m) => m.TicketAddPage))
+const UserAddPage = lazyPage(() => import('../pages/users/add').then((m) => m.UserAddPage))
+const UserEditPage = lazyPage(() => import('../pages/users/edit').then((m) => m.UserEditPage))
+const UsersPage = lazyPage(() => import('../pages/users/list').then((m) => m.UsersPage))
 
 export interface Section {
 	/** Leading URL segment(s) (`/devices/…`, `/devices/vm/…`). */
