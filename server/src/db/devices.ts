@@ -26,6 +26,7 @@ import type {
 	InterfaceLocation,
 	InterfaceUpdate,
 	LocationOutletJson,
+	PoeType,
 	PortSide,
 } from 'shared/src/schemas'
 import {
@@ -46,7 +47,7 @@ import {
 } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { isOutOfSync } from '../services/template_sync'
-import { expandStubs } from '../services/templates'
+import { expandStub, expandStubs } from '../services/templates'
 import { prunePlacements } from './attachments'
 import { deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -93,6 +94,11 @@ export interface InterfaceJson extends Omit<InterfaceRow, 'connected' | 'enabled
 	connected: boolean
 	enabled: boolean
 	patched: boolean
+}
+
+/** A port of a device's port list, with the PoE type of its device-type stub. */
+export interface DevicePortJson extends InterfaceJson {
+	poe_type: PoeType | null
 }
 
 export function toInterfaceJson(row: InterfaceRow): InterfaceJson {
@@ -977,10 +983,33 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 
 const INTERFACE_NAME_IN_USE = 'This device already has an interface with this name on this side'
 
-export async function listInterfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
-	if (!(await exists(devices, eq(devices.id, deviceId)))) {
+/**
+ * PoE type per template port name of a device type's normal (non pass-through)
+ * stubs; ports match on `template_name ?? name`.
+ */
+async function poeTypesOf(deviceTypeId: number): Promise<Map<string, PoeType>> {
+	const byName = new Map<string, PoeType>()
+	for (const stub of await stubsOf(deviceTypeId)) {
+		if (stub.side !== null || stub.poe_type === null) {
+			continue
+		}
+		const names = expandStub(stub.prefix, stub.count)
+		for (const name of Result.isOk(names) ? names.value : []) {
+			byName.set(name, stub.poe_type)
+		}
+	}
+	return byName
+}
+
+export async function listInterfaces(deviceId: number): Promise<Result<DevicePortJson[], Error>> {
+	const [device] = await getDb()
+		.select({ device_type_id: devices.device_type_id })
+		.from(devices)
+		.where(eq(devices.id, deviceId))
+	if (!device) {
 		return Result.err(new NotFoundError('Device not found'))
 	}
+	const poeTypes = await poeTypesOf(device.device_type_id)
 	const rows = await getDb()
 		.select()
 		.from(interfaces)
@@ -989,7 +1018,13 @@ export async function listInterfaces(deviceId: number): Promise<Result<Interface
 		// sequentially, so the list reads back in natural port order
 		// (lexicographic name order would put eth10 before eth2).
 		.orderBy(asc(interfaces.id))
-	return Result.ok(rows.map(toInterfaceJson))
+	return Result.ok(
+		rows.map((row) => ({
+			...toInterfaceJson(row),
+			poe_type:
+				row.side === null ? (poeTypes.get(row.template_name ?? row.name) ?? null) : null,
+		})),
+	)
 }
 
 export interface InterfaceListParams extends ListParams {
