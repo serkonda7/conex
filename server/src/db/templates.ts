@@ -35,7 +35,7 @@ import {
 	racks,
 } from '../schema'
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
-import { expandStubs, type StubInput, stubPowerError } from '../services/templates'
+import { expandStubs, type StubInput, stubPowerError, stubPrefix } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
 import { deviceRoleSubtrees } from './device_roles'
@@ -486,8 +486,6 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 // Stub rows
 // ---------------------------------------------------------------------------
 
-const STUB_EXISTS = 'This device type already has a stub with this prefix, kind and side'
-
 /** Stub rows of a device type, in creation order (expansion follows it). */
 export function stubsOf(deviceTypeId: number): Promise<StubRow[]> {
 	return getDb()
@@ -545,8 +543,10 @@ export async function createStub(
 	}
 	const row: Omit<StubRow, 'id'> = {
 		device_type_id: deviceTypeId,
-		prefix: input.prefix,
+		prefix: stubPrefix(input.prefix, input.count ?? 1),
 		count: input.count ?? 1,
+		digits: input.digits ?? 1,
+		start: input.start ?? 1,
 		kind: input.kind ?? 'ethernet',
 		side: input.side ?? null,
 		positions: input.positions ?? 1,
@@ -560,15 +560,13 @@ export async function createStub(
 	if (Result.isError(clash)) {
 		return clash
 	}
-	const id = await tryWrite(
-		async () =>
-			insertedId(
-				await getDb()
-					.insert(device_type_interfaces)
-					.values(row)
-					.returning({ id: device_type_interfaces.id }),
-			),
-		STUB_EXISTS,
+	const id = await tryWrite(async () =>
+		insertedId(
+			await getDb()
+				.insert(device_type_interfaces)
+				.values(row)
+				.returning({ id: device_type_interfaces.id }),
+		),
 	)
 	if (Result.isError(id)) {
 		return id
@@ -591,9 +589,10 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 	) {
 		return Result.err(new ConflictError('A rear port mapping is only allowed on front ports'))
 	}
-	const patch = pickDefined(input, [
-		'prefix',
+	const picked = pickDefined(input, [
 		'count',
+		'digits',
+		'start',
 		'kind',
 		'positions',
 		'rear_stub_id',
@@ -602,6 +601,12 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 		'poe_mode',
 		'poe_type',
 	])
+	// A single port keeps no separator space, also when only the count drops to 1.
+	const prefix = stubPrefix(
+		input.prefix ?? current.value.prefix,
+		picked.count ?? current.value.count,
+	)
+	const patch = prefix === current.value.prefix ? picked : { ...picked, prefix }
 	const clash = await checkStubExpansion(
 		current.value.device_type_id,
 		{ ...current.value, ...patch },
@@ -611,13 +616,11 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 		return clash
 	}
 	if (!isPatchEmpty(patch)) {
-		const written = await tryWrite(
-			() =>
-				getDb()
-					.update(device_type_interfaces)
-					.set(patch)
-					.where(eq(device_type_interfaces.id, id)),
-			STUB_EXISTS,
+		const written = await tryWrite(() =>
+			getDb()
+				.update(device_type_interfaces)
+				.set(patch)
+				.where(eq(device_type_interfaces.id, id)),
 		)
 		if (Result.isError(written)) {
 			return written

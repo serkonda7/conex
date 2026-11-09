@@ -20,7 +20,10 @@ import {
 	PortSideSchema,
 	StubFieldEntries as PortStubFieldEntries,
 	StubCountSchema,
+	StubDigitsSchema,
 	StubPowerEntries,
+	StubStartSchema,
+	trimStubPrefix,
 	WebsiteSchema,
 } from '@serkonda7/conex-device-schema'
 import * as v from 'valibot'
@@ -671,10 +674,14 @@ export interface ElevationResponse {
 const PORT_NAME_PATTERN = /^[A-Za-z0-9ÄÖÜäöüß_.?\- ]+$/
 const PORT_NAME_MESSAGE = 'Must be letters, digits, space, dot, dash, underscore, or question mark'
 
-/** Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`). */
+/**
+ * Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to
+ * `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`, `Port ` x8 with 2
+ * digits from 17 -> `Port 17..Port 24`). One trailing space stays as the separator.
+ */
 export const InterfacePrefixSchema = v.pipe(
 	v.string(),
-	v.trim(),
+	v.transform(trimStubPrefix),
 	v.minLength(1),
 	v.maxLength(50),
 	v.regex(PORT_NAME_PATTERN, PORT_NAME_MESSAGE),
@@ -800,6 +807,8 @@ export const StubCreateSchema = v.pipe(
 export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
 	count: v.optional(StubCountSchema, undefined),
+	digits: v.optional(StubDigitsSchema, undefined),
+	start: v.optional(StubStartSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),

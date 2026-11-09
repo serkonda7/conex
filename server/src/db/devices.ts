@@ -993,7 +993,7 @@ async function poeTypesOf(deviceTypeId: number): Promise<Map<string, PoeType>> {
 		if (stub.side !== null || stub.poe_type === null) {
 			continue
 		}
-		const names = expandStub(stub.prefix, stub.count)
+		const names = expandStub(stub)
 		for (const name of Result.isOk(names) ? names.value : []) {
 			byName.set(name, stub.poe_type)
 		}

@@ -92,6 +92,20 @@
       "when": 1794237293427,
       "tag": "0064_drop_port_descriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1794238907784,
+      "tag": "0065_stub_digits",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1794239417681,
+      "tag": "0066_stub_start",
+      "breakpoints": true
     }
   ]
 }

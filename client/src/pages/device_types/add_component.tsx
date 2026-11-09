@@ -2,11 +2,14 @@ import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import {
 	MAX_POWER_DRAW,
+	MAX_STUB_DIGITS,
+	MAX_STUB_START,
 	POE_MODES,
 	POE_TYPES,
 	type PoeMode,
 	type PoeType,
 	SELECTABLE_PASS_THROUGH_PORT_TYPES,
+	trimStubPrefix,
 } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
@@ -20,10 +23,13 @@ import { poeModeLabel, poeTypeOption, portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
-import { COMPONENT_CLASSES, type ComponentClassInfo, stubRange } from './components'
+import { COMPONENT_CLASSES, type ComponentClassInfo, sortableDigits, stubRange } from './components'
 import { CassetteIcon, PatchPanelIcon } from './connector_icons'
 
 const MAX_COUNT = 1024
+
+/** Digits of the numbering select: none, then up to the widest count. */
+const DIGIT_CHOICES = Array.from({ length: MAX_STUB_DIGITS }, (_, i) => i + 1)
 
 /** Quick-add presets of patch-panel port pairs. */
 export type PassThroughPreset = 'patch-panel' | 'cassette'
@@ -157,6 +163,9 @@ export function ComponentDialog(props: {
 	const stub = props.stub
 	const [name, setName] = createSignal(stub?.prefix ?? '')
 	const [count, setCount] = createSignal(String(stub?.count ?? 1))
+	const [start, setStart] = createSignal(String(stub?.start ?? 1))
+	/** Picked digits; unset on a new component, which then pads to the last number's width. */
+	const [pickedDigits, setPickedDigits] = createSignal<number | null>(stub?.digits ?? null)
 	const [positions, setPositions] = createSignal(String(stub?.positions ?? 1))
 	const [rearStub, setRearStub] = createSignal(
 		String(stub?.rear_stub_id ?? props.rearStubs[0]?.id ?? ''),
@@ -184,17 +193,25 @@ export function ComponentDialog(props: {
 	const countValid = (): boolean =>
 		Number.isInteger(parsedCount()) && parsedCount() >= 1 && parsedCount() <= MAX_COUNT
 
+	const parsedStart = (): number => Number(start())
+	const startValid = (): boolean =>
+		Number.isInteger(parsedStart()) && parsedStart() >= 0 && parsedStart() <= MAX_STUB_START
+	const digits = (): number =>
+		pickedDigits() ??
+		(countValid() && startValid() ? sortableDigits(parsedStart() + parsedCount() - 1) : 1)
+	/** One trailing space stays: it separates name and number (`Port 01`). */
+	const prefixInput = (): string => trimStubPrefix(name())
+
 	/** Names the current input expands to, shown under the name field. */
-	const preview = (): string | undefined => {
-		const trimmed = name().trim()
-		if (!trimmed || !countValid()) {
-			return undefined
-		}
-		const n = parsedCount()
-		return n === 1
-			? trimmed
-			: t('deviceType.component.range', { first: `${trimmed}1`, last: `${trimmed}${n}` })
-	}
+	const preview = (): string | undefined =>
+		prefixInput().trim() && countValid() && startValid()
+			? stubRange({
+					prefix: prefixInput(),
+					count: parsedCount(),
+					digits: digits(),
+					start: parsedStart(),
+				})
+			: undefined
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -203,6 +220,10 @@ export function ComponentDialog(props: {
 		const parsedRearPosition = parseCount(rearPosition())
 		if (!countValid() || parsedPositions === null || parsedRearPosition === null) {
 			setError(t('deviceType.component.countInvalid', { max: MAX_COUNT }))
+			return
+		}
+		if (!startValid()) {
+			setError(t('deviceType.component.startInvalid', { max: MAX_STUB_START }))
 			return
 		}
 		if (side === 'front' && !rearStub()) {
@@ -221,6 +242,8 @@ export function ComponentDialog(props: {
 		}
 		const fields = {
 			count: parsedCount(),
+			digits: digits(),
+			start: parsedStart(),
 			kind: kind(),
 			...(isPowerInput ? { maximum_draw: parsedDraw } : {}),
 			...(isInterface
@@ -230,7 +253,7 @@ export function ComponentDialog(props: {
 					}
 				: {}),
 		}
-		const trimmed = name().trim()
+		const trimmed = prefixInput()
 		const passThrough = {
 			...(side === 'rear' ? { positions: parsedPositions } : {}),
 			...(side === 'front'
@@ -296,6 +319,36 @@ export function ComponentDialog(props: {
 					value={count()}
 					onInput={setCount}
 				/>
+				<Show when={countValid() && parsedCount() > 1}>
+					<TextField
+						id={`${prefix}-start`}
+						label={t('deviceType.component.start')}
+						type="number"
+						required
+						min={0}
+						max={MAX_STUB_START}
+						step={1}
+						inputmode="numeric"
+						value={start()}
+						onInput={setStart}
+					/>
+					<SelectField
+						id={`${prefix}-digits`}
+						label={t('deviceType.component.digits')}
+						value={String(digits())}
+						onChange={(value: string): void => {
+							setPickedDigits(Number(value))
+						}}
+						options={DIGIT_CHOICES.map((n) => ({
+							value: String(n),
+							label: t('deviceType.component.digitsExample', {
+								first: '1'.padStart(n, '0'),
+								second: '2'.padStart(n, '0'),
+							}),
+						}))}
+						hint={<Hint>{t('deviceType.component.digitsHint')}</Hint>}
+					/>
+				</Show>
 				<Show when={props.info.side === 'rear'}>
 					<TextField
 						id={`${prefix}-positions`}
@@ -438,11 +491,13 @@ export function PassThroughPresetDialog(props: {
 			setError(t('deviceType.component.countInvalid', { max: MAX_COUNT }))
 			return
 		}
-		const front = name().trim()
+		const front = trimStubPrefix(name())
+		const digits = sortableDigits(n)
 		const ok = await save.run(async () => {
 			const rear = await create_stub(props.deviceTypeId, {
 				prefix: cassette ? rearName().trim() : front,
 				count: cassette ? 1 : n,
+				digits: cassette ? 1 : digits,
 				kind: cassette ? 'mpo' : kind(),
 				side: 'rear',
 				positions: cassette ? n : 1,
@@ -453,6 +508,7 @@ export function PassThroughPresetDialog(props: {
 			const created = await create_stub(props.deviceTypeId, {
 				prefix: front,
 				count: n,
+				digits,
 				kind: kind(),
 				side: 'front',
 				rear_stub_id: rear.value.id,

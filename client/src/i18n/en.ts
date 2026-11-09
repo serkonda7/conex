@@ -497,6 +497,12 @@ export const en = {
 	'deviceType.component.confirmDelete': 'Delete component "{name}"?',
 	'deviceType.component.count': 'Count',
 	'deviceType.component.countInvalid': 'Count must be an integer from 1 to {max}.',
+	'deviceType.component.start': 'First number',
+	'deviceType.component.startInvalid': 'First number must be an integer from 0 to {max}.',
+	'deviceType.component.digits': 'Numbering',
+	'deviceType.component.digitsExample': '{first}, {second}, …',
+	'deviceType.component.digitsHint':
+		'Leading zeros keep the names in order when sorted alphabetically (Port 09 before Port 10).',
 	'deviceType.component.range': '{first} – {last}',
 	'deviceType.component.interface': 'Interfaces',
 	'deviceType.component.port': 'Ports',

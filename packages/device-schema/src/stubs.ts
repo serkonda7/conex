@@ -2,7 +2,7 @@ import { OTHER_PORT_KINDS, POWER_INPUT_KINDS, type PortSide } from './constants'
 
 /**
  * Pure stub-expansion helpers for device templates. They operate on in-memory
- * rows so the `{prefix, count} -> prefix1..prefix{count}` math works without a
+ * rows so the `{prefix, count, digits} -> prefix1..prefix{count}` math works without a
  * database. Failures are plain values: this package depends on valibot alone.
  */
 
@@ -24,6 +24,10 @@ export interface StubInput {
 	id?: number
 	prefix: string
 	count: number
+	/** Minimum digits of the index, zero-padded (`2`: `eth01..eth24`). */
+	digits?: number
+	/** First index (`17`: `Port 17..`, `0`: `eth0..`). */
+	start?: number
 	kind: string
 	side?: PortSide | null
 	positions?: number
@@ -63,25 +67,57 @@ export function stubPowerError(stub: StubInput): string | null {
 }
 
 /**
- * Expands one stub row into concrete interface names:
- * `{prefix: "eth", count: 24}` -> `eth1..eth24`.
- * A single-port stub keeps its name verbatim (`Port 1` stays `Port 1`);
- * only multi-port stubs append a 1-based index.
+ * The prefix a stub stores: a single port keeps its name verbatim, so only a
+ * multi-port stub keeps one trailing space as the separator (`Port ` ->
+ * `Port 1..Port 24`).
  */
-export function expandStub(prefix: string, count: number): Checked<string[]> {
-	const trimmed = prefix.trim()
-	if (trimmed.length === 0) {
+export function stubPrefix(prefix: string, count: number): string {
+	return count === 1 ? prefix.trim() : trimStubPrefix(prefix)
+}
+
+/** Trims a stub prefix but keeps one trailing space, the separator of a multi-port stub. */
+export function trimStubPrefix(prefix: string): string {
+	return prefix.trimStart().replace(/\s+$/, ' ')
+}
+
+/** Upper bound on the digits of a stub index. */
+export const MAX_STUB_DIGITS = 4
+
+/** Upper bound on the first index of a stub. */
+export const MAX_STUB_START = 9999
+
+/**
+ * Expands one stub row into concrete interface names:
+ * `{prefix: "eth", count: 24}` -> `eth1..eth24`, with `digits: 2`
+ * `eth01..eth24`, with `start: 17, count: 8` `eth17..eth24`. A single-port
+ * stub keeps its name verbatim (`Port 1` stays `Port 1`); only multi-port
+ * stubs append an index.
+ */
+export function expandStub(
+	prefix: string,
+	count: number,
+	digits = 1,
+	start = 1,
+): Checked<string[]> {
+	const head = stubPrefix(prefix, count)
+	if (head.trim().length === 0) {
 		return invalid('Stub prefix must not be empty')
 	}
 	if (!Number.isInteger(count) || count < 1) {
 		return invalid('Stub count must be an integer of at least 1')
 	}
+	if (!Number.isInteger(digits) || digits < 1 || digits > MAX_STUB_DIGITS) {
+		return invalid(`Stub digits must be an integer from 1 to ${MAX_STUB_DIGITS}`)
+	}
+	if (!Number.isInteger(start) || start < 0 || start > MAX_STUB_START) {
+		return invalid(`Stub start must be an integer from 0 to ${MAX_STUB_START}`)
+	}
 	if (count === 1) {
-		return valid([trimmed])
+		return valid([head])
 	}
 	const names: string[] = []
-	for (let i = 1; i <= count; i += 1) {
-		names.push(`${trimmed}${i}`)
+	for (let i = start; i < start + count; i += 1) {
+		names.push(`${head}${String(i).padStart(digits, '0')}`)
 	}
 	return valid(names)
 }
@@ -157,37 +193,39 @@ export function expandNameTemplate(name: string): Checked<string[]> {
 export interface StubRun {
 	prefix: string
 	count: number
+	digits: number
+	start: number
 }
 
+/** A run prefix: no leading space, at most one trailing space as the separator. */
+const RUN_PREFIX = /^\S(.*\S)? ?$/
+
 /**
- * Collapses consecutive names `B1, B2, …, Bn` into one `{prefix: B, count: n}`
- * stub. Only runs that `expandStub` reproduces exactly collapse; a run that
- * starts above 1 (`Gi1/0/25…`) stays one stub per name. A prefix must also not
- * be a port name in `taken` (`Port 11…19` next to `Port 1`): stubs of a kind
- * and side are unique by prefix, so such a run stays one stub per name too.
+ * Collapses consecutive names `B17, B18, …, Bn` (also zero-padded, `B01,
+ * B02, …`) into one `{prefix: B, count, digits, start}` stub, the digits
+ * taken from the first name. Only runs that `expandStub` reproduces exactly
+ * collapse; any other name stays a stub of its own.
  */
-export function collapseRuns(
-	names: string[],
-	taken: ReadonlySet<string> = new Set(names),
-): StubRun[] {
+export function collapseRuns(names: string[]): StubRun[] {
 	const runs: StubRun[] = []
 	let i = 0
 	while (i < names.length) {
 		const first = names[i] ?? ''
-		const base = first.endsWith('1') ? first.slice(0, -1) : ''
-		let count = 0
-		if (base.length > 0 && base === base.trim() && !taken.has(base)) {
-			while (names[i + count] === `${base}${count + 1}`) {
+		let run: StubRun = { prefix: first, count: 1, digits: 1, start: 1 }
+		const [, prefix = '', index = ''] = /^(.*?)(\d+)$/.exec(first) ?? []
+		const start = Number(index)
+		if (RUN_PREFIX.test(prefix) && index.length <= MAX_STUB_DIGITS && start <= MAX_STUB_START) {
+			const digits = index.length
+			let count = 1
+			while (names[i + count] === `${prefix}${String(start + count).padStart(digits, '0')}`) {
 				count += 1
 			}
+			if (count >= 2) {
+				run = { prefix, count, digits, start }
+			}
 		}
-		if (count >= 2) {
-			runs.push({ prefix: base, count })
-			i += count
-		} else {
-			runs.push({ prefix: first, count: 1 })
-			i += 1
-		}
+		runs.push(run)
+		i += run.count
 	}
 	return runs
 }
@@ -224,7 +262,7 @@ export function expandStubs(stubs: StubInput[]): Checked<ExpandedInterface[]> {
 	}
 	const expanded: [StubInput, string[]][] = []
 	for (const stub of stubs) {
-		const names = expandStub(stub.prefix, stub.count)
+		const names = expandStub(stub.prefix, stub.count, stub.digits, stub.start)
 		if (!names.ok) {
 			return names
 		}

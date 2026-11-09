@@ -9,7 +9,7 @@ import {
 import { Result } from 'better-result'
 
 export type { StubInput, StubRun } from '@serkonda7/conex-device-schema'
-export { collapseRuns, stubPowerError } from '@serkonda7/conex-device-schema'
+export { collapseRuns, stubPowerError, stubPrefix } from '@serkonda7/conex-device-schema'
 
 /**
  * The package's pure stub helpers as `Result`s for service code; the math and
@@ -20,8 +20,10 @@ function toResult<T>(checked: Checked<T>): Result<T, Error> {
 	return checked.ok ? Result.ok(checked.value) : Result.err(new Error(checked.error))
 }
 
-export function expandStub(prefix: string, count: number): Result<string[], Error> {
-	return toResult(expandPackageStub(prefix, count))
+export function expandStub(
+	stub: Pick<StubInput, 'prefix' | 'count' | 'digits' | 'start'>,
+): Result<string[], Error> {
+	return toResult(expandPackageStub(stub.prefix, stub.count, stub.digits, stub.start))
 }
 
 export function expandNameTemplate(name: string): Result<string[], Error> {

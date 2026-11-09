@@ -1,0 +1,2 @@
+ALTER TABLE "device_type_interfaces" ADD COLUMN "digits" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE "device_type_interfaces" ADD CONSTRAINT "device_type_interfaces_digits_check" CHECK ("device_type_interfaces"."digits" BETWEEN 1 AND 4);

@@ -422,6 +422,10 @@ export const device_type_interfaces = pgTable(
 			.references(() => device_types.id),
 		prefix: text('prefix').notNull(),
 		count: integer('count').notNull().default(1),
+		// Minimum digits of the index, zero-padded (2: `eth01..eth24`).
+		digits: integer('digits').notNull().default(1),
+		// First index (0: `eth0..`, 17: `Port 17..`).
+		start: integer('start').notNull().default(1),
 		kind: text('kind').notNull().default('ethernet'),
 		// Pass-through side (`PORT_SIDES`); null is a normal port.
 		side: text('side', { enum: PORT_SIDES }),
@@ -443,9 +447,6 @@ export const device_type_interfaces = pgTable(
 	(table) => [
 		index('device_type_interfaces_type_id_idx').on(table.device_type_id),
 		index('device_type_interfaces_rear_stub_id_idx').on(table.rear_stub_id),
-		unique('device_type_interfaces_prefix_kind_idx')
-			.on(table.device_type_id, table.prefix, table.kind, table.side)
-			.nullsNotDistinct(),
 		check(
 			'device_type_interfaces_side_check',
 			sql`${table.positions} >= 1 AND ${table.rear_position} >= 1 AND (${table.side} IS NULL OR ${table.side} IN ('front', 'rear')) AND (${table.positions} = 1 OR ${table.side} IS NOT DISTINCT FROM 'rear') AND ((${table.side} IS NOT DISTINCT FROM 'front') = (${table.rear_stub_id} IS NOT NULL))`,
@@ -454,6 +455,8 @@ export const device_type_interfaces = pgTable(
 			'device_type_interfaces_power_check',
 			sql`(${table.maximum_draw} IS NULL OR ${table.maximum_draw} >= 1) AND (${table.poe_type} IS NULL OR ${table.poe_mode} IS NOT NULL)`,
 		),
+		check('device_type_interfaces_digits_check', sql`${table.digits} BETWEEN 1 AND 4`),
+		check('device_type_interfaces_start_check', sql`${table.start} BETWEEN 0 AND 9999`),
 	],
 )
 

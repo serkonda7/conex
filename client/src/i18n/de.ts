@@ -500,6 +500,13 @@ export const de: Messages = {
 	'deviceType.component.confirmDelete': 'Komponente „{name}“ löschen?',
 	'deviceType.component.count': 'Anzahl',
 	'deviceType.component.countInvalid': 'Die Anzahl muss eine ganze Zahl von 1 bis {max} sein.',
+	'deviceType.component.start': 'Erste Nummer',
+	'deviceType.component.startInvalid':
+		'Die erste Nummer muss eine ganze Zahl von 0 bis {max} sein.',
+	'deviceType.component.digits': 'Nummerierung',
+	'deviceType.component.digitsExample': '{first}, {second}, …',
+	'deviceType.component.digitsHint':
+		'Führende Nullen halten die Namen bei alphabetischer Sortierung in Reihenfolge (Port 09 vor Port 10).',
 	'deviceType.component.range': '{first} – {last}',
 	'deviceType.component.interface': 'Netzwerkschnittstellen',
 	'deviceType.component.port': 'USB & Seriell',

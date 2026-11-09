@@ -45,26 +45,26 @@ describe('collapseRuns', () => {
 		const list = ['eth1', 'eth2', 'eth3', 'mgmt']
 		const runs = collapseRuns(list)
 		expect(runs).toEqual([
-			{ prefix: 'eth', count: 3 },
-			{ prefix: 'mgmt', count: 1 },
+			{ prefix: 'eth', count: 3, digits: 1, start: 1 },
+			{ prefix: 'mgmt', count: 1, digits: 1, start: 1 },
 		])
 		const rebuilt = runs.flatMap((run) => {
-			const expanded = expandStub(run.prefix, run.count)
+			const expanded = expandStub(run)
 			return Result.isOk(expanded) ? expanded.value : []
 		})
 		expect(rebuilt).toEqual(list)
 	})
 
-	test('leaves a run that starts above 1 as single names', () => {
-		expect(collapseRuns(['Gi25', 'Gi26']).map((run) => run.count)).toEqual([1, 1])
+	test('collapses a run that starts above 1 from its first number', () => {
+		expect(collapseRuns(['Gi25', 'Gi26'])).toEqual([
+			{ prefix: 'Gi', count: 2, digits: 2, start: 25 },
+		])
 	})
 
-	test('does not collapse onto a prefix that is a port name', () => {
-		const list = ['Port 11', 'Port 12']
-		expect(collapseRuns(list, new Set(['Port']))).toEqual([{ prefix: 'Port 1', count: 2 }])
-		expect(collapseRuns(list, new Set(['Port 1']))).toEqual([
-			{ prefix: 'Port 11', count: 1 },
-			{ prefix: 'Port 12', count: 1 },
+	test('keeps the separator space and the padding of a run', () => {
+		expect(collapseRuns(['Port 09', 'Port 10', 'Port 11', 'Port 1'])).toEqual([
+			{ prefix: 'Port ', count: 3, digits: 2, start: 9 },
+			{ prefix: 'Port 1', count: 1, digits: 1, start: 1 },
 		])
 	})
 })

@@ -284,12 +284,13 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 			groups.set(groupKey, group)
 		}
 	}
-	const portNames = new Set([...groups.values()].flatMap((group) => group.names))
 	for (const group of groups.values()) {
-		for (const run of collapseRuns(group.names, portNames)) {
+		for (const run of collapseRuns(group.names)) {
 			const stub = plan.add(group.key, {
 				prefix: run.prefix,
 				count: run.count,
+				...(run.digits > 1 ? { digits: run.digits } : {}),
+				...(run.start === 1 ? {} : { start: run.start }),
 				kind: group.kind,
 				...group.power,
 			})

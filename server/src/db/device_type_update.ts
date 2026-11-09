@@ -79,7 +79,7 @@ function portsOf(stubs: Awaited<ReturnType<typeof stubsOf>>): Result<TypePort[],
 	}
 	const stubByPort = new Map(
 		stubs.flatMap((stub) => {
-			const names = expandStub(stub.prefix, stub.count)
+			const names = expandStub(stub)
 			return Result.isOk(names)
 				? names.value.map((name) => [keyOf({ side: stub.side, name }), stub] as const)
 				: []

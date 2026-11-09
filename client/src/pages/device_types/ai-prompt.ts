@@ -30,6 +30,7 @@ Rules:
 - u_height: integer 0-60 (0 for laptop/desktop/dock/phone).
 - is_full_depth: default false, true for rack-mounted devices that occupy the full depth of the rack.
 - Port names must be unique across all lists (front-ports and rear-ports may reuse each other's names), 1-50 characters, matching ^[A-Za-z0-9ÄÖÜäöüß_.? -]+$ (letters incl. German umlauts and ß, digits, spaces, dot, dash, underscore, question mark; no slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
+- Port numbering: names must sort correctly as plain text, so pad every number in a numbered series with leading zeros to the digit count of its highest number: 24 ports are "Port 01" to "Port 24", 48 interfaces "eth01" to "eth48", never "Port 1, Port 10, Port 11, ..., Port 2". Series of at most 9 stay unpadded ("LAN 1" to "LAN 4"). Apply this to every port list, interfaces in particular, also when the baseline or datasheet numbers without padding. Keep one consistent scheme per series (same prefix, separator and width), also when its ports differ in type or PoE (16 PoE+ and 8 PoE++ ports are "Port 01" to "Port 16" and "Port 17" to "Port 24"), list ports in their numbering order, and name a rear port after the front ports it serves (e.g. "Rear 01").
 - interfaces type: NetBox slug, e.g. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
 - interfaces PoE (only on wired interfaces, only if stated in the datasheet or baseline): poe_mode ${POE_MODES.join(' or ')} (pse supplies power, pd draws it); poe_type ${POE_TYPES.join(', ')}. poe_type needs poe_mode. For passive PoE, keep poe_mode and omit poe_type.
 - ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port or other.
@@ -80,7 +81,7 @@ ${currentYaml.trim()}
 
 How to update:
 - Keep manufacturer and model exactly as they are, even if the naming rules below would change them.
-- Treat the current YAML as the baseline. Keep every value that is still correct, including hand-edited port names, and do not reword or reorder anything without a reason.
+- Treat the current YAML as the baseline. Keep every value that is still correct, including hand-edited port names, and do not reword or reorder anything without a reason. Do renumber generic numbered series that break the port numbering rule below (e.g. "Port 1" becomes "Port 01" in a series of 24).
 - Check every field against these sources and add what the rules below support but the YAML lacks: 1) https://github.com/serkonda7/conex-device-types (device-types/<Manufacturer>/<model>.yaml), 2) https://github.com/netbox-community/devicetype-library, 3) manufacturer specifications, PSREF or manuals. These files may predate the rules below, so never return one as-is; manufacturer sources win over the libraries, and the libraries never overwrite a correct value.
 - Return the complete definition with every port, not only the changes: a port left out of a list is removed. A key left out keeps its current value, so omit fields you cannot verify instead of guessing, and set a key to null only to clear a value that is wrong.
 - Keep the port-mappings format for front ports. Never guess.
