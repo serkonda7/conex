@@ -3,7 +3,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 // Keep E2E services separate from the normal client (5371) and API (3000).
 const clientPort: number = Number(process.env.CONEX_CLIENT_PORT ?? 5372)
-const dataDir: string = path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
+const clientDistDir: string = path.resolve('./test-results/e2e-client')
+const dataDir: string =path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
 const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3300'
 const apiPort: number = Number(new URL(apiUrl).port || 3300)
 // A clean database needs a fresh seed, so it rules out any already running API.
@@ -69,7 +70,10 @@ export default defineConfig({
 					timeout: 60_000,
 				},
 				{
-					command: 'cd client && bunx vite',
+					// Serve a production build: every test gets a fresh browser context, and
+					// the dev server's hundreds of unbundled modules per page load make the
+					// suites ~40% slower.
+					command: `cd client && bunx vite build --outDir ${clientDistDir} --emptyOutDir && bunx vite preview --outDir ${clientDistDir} --port ${clientPort} --strictPort`,
 					env: { CONEX_CLIENT_PORT: String(clientPort), CONEX_API_URL: apiUrl },
 					url: process.env.CONEX_E2E_BASE_URL ?? `http://localhost:${clientPort}`,
 					reuseExistingServer: true,

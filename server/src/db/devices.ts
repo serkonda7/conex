@@ -59,7 +59,6 @@ import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
 	checkTenantExists,
-	exists,
 	findById,
 	findOne,
 	inScope,
