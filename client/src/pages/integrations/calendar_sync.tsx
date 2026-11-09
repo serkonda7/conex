@@ -325,44 +325,6 @@ export function CalendarSyncTechniciansPage(): JSX.Element {
 	)
 }
 
-/** Recent runs, newest first. */
-function RunsTable(props: { runs: CalendarSyncRunJson[] }): JSX.Element {
-	return (
-		<Show when={props.runs.length > 0} fallback={<Empty message={t('calendarSync.noRuns')} />}>
-			<table>
-				<thead>
-					<tr>
-						<th>{t('calendarSync.startedAt')}</th>
-						<th>{t('common.status')}</th>
-						<th>{t('calendarSync.changes')}</th>
-						<th>{t('calendarSync.error')}</th>
-					</tr>
-				</thead>
-				<tbody>
-					<For each={props.runs}>
-						{(run: CalendarSyncRunJson): JSX.Element => (
-							<tr>
-								<td>{formatTime(run.started_at)}</td>
-								<td>{syncStateLabel(run.state)}</td>
-								<td>
-									<Show when={run.state !== 'running'}>
-										{t('calendarSync.counts', { ...run.counts })}
-									</Show>
-								</td>
-								<td>
-									<Show when={run.error}>
-										<span class="text-danger">{run.error}</span>
-									</Show>
-								</td>
-							</tr>
-						)}
-					</For>
-				</tbody>
-			</table>
-		</Show>
-	)
-}
-
 /**
  * Enabled state (or the last error) of the sync, and how many technicians
  * have an enabled mailbox mapping.

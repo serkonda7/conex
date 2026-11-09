@@ -1,5 +1,6 @@
 import { Result } from 'better-result'
-import { eq } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import type {
 	CableTraceResponse,
 	DeviceTraceResponse,
@@ -15,11 +16,30 @@ import type {
 import { cables, devices, interfaces } from '../schema'
 import { getDb } from './connection'
 import { NotFoundError } from './errors'
-import { exists, inScope } from './list'
+import { exists, scopeCondition, subquery } from './list'
 
-type DeviceRow = typeof devices.$inferSelect
-type InterfaceRow = typeof interfaces.$inferSelect
-type CableRow = typeof cables.$inferSelect
+/** The columns a trace reads of each table. */
+type DeviceRow = { id: number; name: string }
+type InterfaceRow = Pick<
+	typeof interfaces.$inferSelect,
+	| 'id'
+	| 'device_id'
+	| 'name'
+	| 'kind'
+	| 'side'
+	| 'rear_port_id'
+	| 'rear_port_position'
+	| 'positions'
+>
+type CableRow = Pick<
+	typeof cables.$inferSelect,
+	'id' | 'label' | 'status' | 'a_interface_id' | 'b_interface_id'
+>
+
+const aEnd = alias(interfaces, 'a_end')
+const bEnd = alias(interfaces, 'b_end')
+const aEndDevice = alias(devices, 'a_device')
+const bEndDevice = alias(devices, 'b_device')
 
 interface AdjEntry {
 	cable: CableRow
@@ -50,26 +70,81 @@ interface Graph {
 }
 
 /**
- * Loads the L1 graph into memory (inventories are small) and drops every
- * cable whose endpoints are not both visible under the tenant scope.
- * Scoped editors/viewers see only cables with both endpoint devices in
+ * Loads the L1 graph into memory (inventories are small) with every cable
+ * whose endpoints are not both visible under the tenant scope dropped in
+ * SQL. Scoped editors/viewers see only cables with both endpoint devices in
  * their tenant, so no peer name from another tenant leaks into traces.
+ * Ports load only when a trace can reach them: cabled ports, patch-panel
+ * ports (pass-throughs) and the `startIfaceId` an interface trace begins at.
  */
-async function loadGraph(scopeTenantIds?: readonly number[]): Promise<Graph> {
+async function loadGraph(
+	scopeTenantIds?: readonly number[],
+	startIfaceId?: number,
+): Promise<Graph> {
 	const db = getDb()
-	const deviceById = new Map<number, DeviceRow>()
-	for (const d of await db.select().from(devices)) {
-		if (!inScope(d.tenant_id, scopeTenantIds)) {
-			continue
-		}
-		deviceById.set(d.id, d)
-	}
+	const cabled = sql`EXISTS (${subquery
+		.select({ one: sql`1` })
+		.from(cables)
+		.where(
+			or(eq(cables.a_interface_id, interfaces.id), eq(cables.b_interface_id, interfaces.id)),
+		)})`
+	const [deviceRows, ifaceRows, cableRows]: [DeviceRow[], InterfaceRow[], CableRow[]] =
+		await Promise.all([
+			db
+				.select({ id: devices.id, name: devices.name })
+				.from(devices)
+				.where(scopeCondition(devices.tenant_id, scopeTenantIds)),
+			db
+				.select({
+					id: interfaces.id,
+					device_id: interfaces.device_id,
+					name: interfaces.name,
+					kind: interfaces.kind,
+					side: interfaces.side,
+					rear_port_id: interfaces.rear_port_id,
+					rear_port_position: interfaces.rear_port_position,
+					positions: interfaces.positions,
+				})
+				.from(interfaces)
+				.innerJoin(devices, eq(devices.id, interfaces.device_id))
+				.where(
+					and(
+						scopeCondition(devices.tenant_id, scopeTenantIds),
+						or(
+							isNotNull(interfaces.side),
+							cabled,
+							startIfaceId === undefined
+								? undefined
+								: eq(interfaces.id, startIfaceId),
+						),
+					),
+				),
+			db
+				.select({
+					id: cables.id,
+					label: cables.label,
+					status: cables.status,
+					a_interface_id: cables.a_interface_id,
+					b_interface_id: cables.b_interface_id,
+				})
+				.from(cables)
+				.innerJoin(aEnd, eq(aEnd.id, cables.a_interface_id))
+				.innerJoin(aEndDevice, eq(aEndDevice.id, aEnd.device_id))
+				.innerJoin(bEnd, eq(bEnd.id, cables.b_interface_id))
+				.innerJoin(bEndDevice, eq(bEndDevice.id, bEnd.device_id))
+				.where(
+					and(
+						scopeCondition(aEndDevice.tenant_id, scopeTenantIds),
+						scopeCondition(bEndDevice.tenant_id, scopeTenantIds),
+					),
+				)
+				// Walks expand cables in id order, so traces are stable.
+				.orderBy(asc(cables.id)),
+		])
+	const deviceById = new Map(deviceRows.map((d) => [d.id, d]))
 	const ifaceById = new Map<number, InterfaceRow>()
 	const frontBySlot = new Map<string, InterfaceRow>()
-	for (const i of await db.select().from(interfaces)) {
-		if (!deviceById.has(i.device_id)) {
-			continue
-		}
+	for (const i of ifaceRows) {
 		ifaceById.set(i.id, i)
 		if (i.side === 'front' && i.rear_port_id !== null) {
 			frontBySlot.set(`${i.rear_port_id}:${i.rear_port_position ?? 1}`, i)
@@ -86,13 +161,10 @@ async function loadGraph(scopeTenantIds?: readonly number[]): Promise<Graph> {
 			adj.set(deviceId, [entry])
 		}
 	}
-	for (const cable of await db.select().from(cables)) {
+	for (const cable of cableRows) {
 		const a = ifaceById.get(cable.a_interface_id)
 		const b = ifaceById.get(cable.b_interface_id)
 		if (!a || !b) {
-			continue
-		}
-		if (!deviceById.has(a.device_id) || !deviceById.has(b.device_id)) {
 			continue
 		}
 		cableById.set(cable.id, cable)
@@ -422,7 +494,7 @@ export async function getInterfaceTrace(
 	depth: number,
 	scopeTenantIds?: readonly number[],
 ): Promise<Result<InterfaceTraceResponse, Error>> {
-	const graph = await loadGraph(scopeTenantIds)
+	const graph = await loadGraph(scopeTenantIds, ifaceId)
 	const device = graph.deviceById.get(deviceId)
 	if (!device) {
 		return Result.err(await deviceNotFound(deviceId))

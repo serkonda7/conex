@@ -4,25 +4,25 @@
 	box-sizing: border-box;
 }
 
-/* MakerWorld-inspired dark palette. */
+/* MakerWorld-inspired dark palette; neutrals carry a faint blue-slate tint. */
 :root {
 	/* Label column of .field rows; offsets below it align to the controls.
 	   Forms with longer labels override it locally. */
 	--label-width: 10rem;
 	color-scheme: dark;
-	--bg-base: #1c1c1c;
-	--bg-default: #222225;
-	--bg-surface: #242424;
-	--bg-raised: #2e2e2e;
-	--bg-input: #2d2d31;
-	--bg-code: #333333;
-	--bg-hover: #3d3d3d;
+	--bg-base: #1b1c1f;
+	--bg-default: #212327;
+	--bg-surface: #232528;
+	--bg-raised: #2c2e33;
+	--bg-input: #2c2e34;
+	--bg-code: #32343a;
+	--bg-hover: #3b3e44;
 	--text: #f5f5f5;
-	--text-secondary: #b8b8b8;
-	--text-muted: #969696;
-	--text-subtle: #a0a0a0;
-	--border: #3d3d3d;
-	--border-strong: #525252;
+	--text-secondary: #b7b9bd;
+	--text-muted: #95979d;
+	--text-subtle: #9fa2a7;
+	--border: #3b3e44;
+	--border-strong: #50535a;
 	--primary: #058a05;
 	--primary-hover: #047a04;
 	--primary-text: #08bf08; /* --primary is too dark for text on the dark surfaces. */
@@ -35,7 +35,7 @@
 	--error-bg: rgba(225, 71, 71, 0.16);
 	--success: #5be584;
 	--warning: #f5d76e;
-	--muted-dot: #666666;
+	--muted-dot: #64686f;
 	--shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 	--font-size-sm: 0.75rem;
 	--font-size-base: 0.875rem; /* 14px */
@@ -2318,6 +2318,12 @@ tbody tr:last-child td {
 	padding: 0.45rem;
 }
 
+/* Component tables: connect, disconnect and edit share one size; the
+   color alone marks the cable action. */
+.component-section .icon-btn {
+	padding: 0.3rem;
+}
+
 .row-menu-wrap {
 	position: relative;
 	display: inline-flex;
@@ -2950,15 +2956,12 @@ tbody tr:last-child td {
 }
 
 .device-preview,
+.flat-table,
 .section-header > h3 {
 	scroll-margin-top: var(--topbar-height);
 }
 
-.component-table-wrap {
-	overflow-x: auto;
-}
-
-.component-table {
+.component-table table {
 	margin: 0;
 	border: 0;
 	background: none;
@@ -2972,57 +2975,39 @@ tbody tr:last-child td {
 	border-bottom: 0;
 }
 
-.component-table thead th {
-	background: none;
-}
-
 /* Faint row rules, lighter than the section lines. */
 .component-table tbody tr:not(:last-child),
-.device-preview tbody tr:not(:last-child) {
+:is(.device-preview, .flat-table) tbody tr:not(:last-child) {
 	border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 
-/* Group rows shift the zebra stripes: keep rows flat, hover still applies. */
-.app-content .component-table tbody tr:not(:hover),
-.app-content .device-preview tbody tr:not(:hover) {
-	background: none;
+/* Group heading rows shift the zebra stripes: count data rows from the heading. */
+.app-content tbody.data-table-group tr:nth-child(even):not(:hover) {
+	background-color: transparent;
 }
 
-.component-table tbody::after {
-	content: "";
-	display: block;
-	height: 1rem;
+.app-content
+	tbody.data-table-group
+	tr:nth-child(odd):not(.data-table-group-row, :hover) {
+	background-color: color-mix(in srgb, var(--bg-hover) 45%, transparent);
 }
 
-.component-group-title {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	width: 100%;
+/* Full-strength rule between class groups, above each following band. */
+.component-table tbody.data-table-group + tbody.data-table-group {
+	border-top: 1px solid var(--border);
+}
+
+.component-table .data-table-group-toggle,
+.component-table .data-table-group-toggle:hover {
 	padding: 0;
-	font-weight: inherit;
-	text-align: left;
 	background: none;
 	border: 0;
 }
 
-.component-group-title:hover {
-	background: none;
-}
-
-.component-group-chevron {
-	flex: none;
-	transition: transform 150ms ease;
-}
-
-.component-group-title[aria-expanded="false"] .component-group-chevron {
-	transform: rotate(-90deg);
-}
-
-.component-table .component-group {
-	background-color: var(--bg-raised);
-	border-radius: 0.25rem;
-	font-weight: 600;
+.component-table .data-table-actions {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
 }
 
 .component-count {
@@ -3055,29 +3040,40 @@ tbody tr:last-child td {
 	border-top: 1px solid var(--border);
 }
 
-.device-preview table {
+:is(.device-preview, .flat-table) table {
 	margin: 0;
 	border: 0;
 	background: none;
 }
 
-.device-preview thead th {
-	background: none;
-}
-
-.device-preview :is(th, td) {
+:is(.device-preview, .flat-table) :is(th, td) {
 	border-bottom: 0;
 }
 
 /* Same row height as the components, whose rows hold icon buttons. */
-.device-preview :is(tbody td) {
+:is(.device-preview, .flat-table) :is(tbody td) {
 	padding-block: 0.6rem;
 }
 
 /* As tall as a text line, so rows keep their height with or without it. */
-.device-preview .icon-btn {
+:is(.device-preview, .flat-table) .icon-btn {
 	display: flex;
 	margin-block: -0.4rem;
+}
+
+/* Class band of a component group. */
+.app-content .component-table .data-table-group-row th {
+	background-color: var(--bg-raised);
+	text-transform: none;
+	letter-spacing: normal;
+	font-size: inherit;
+	color: inherit;
+}
+
+/* Device detail: port and VM sections, split by the same rule. */
+.detail-sections > section + section {
+	padding-top: 1.1rem;
+	border-top: 1px solid var(--border);
 }
 
 /* Lines up with the name column. */

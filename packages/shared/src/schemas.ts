@@ -14,14 +14,16 @@ import {
 	InterfaceKindSchema,
 	looseBoolean,
 	NameSchema,
-	PORT_DESCRIPTION_MAX_LENGTH,
 	type PoeType,
 	PortPositionsSchema,
 	type PortSide,
 	PortSideSchema,
 	StubFieldEntries as PortStubFieldEntries,
 	StubCountSchema,
+	StubDigitsSchema,
 	StubPowerEntries,
+	StubStartSchema,
+	trimStubPrefix,
 	WebsiteSchema,
 } from '@serkonda7/conex-device-schema'
 import * as v from 'valibot'
@@ -668,13 +670,21 @@ export interface ElevationResponse {
 // P3: manufacturers / device templates
 // ---------------------------------------------------------------------------
 
-/** Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`). */
+/** Characters of a port name: ASCII letters, German umlauts and ß, digits, `_.-?` and spaces. */
+const PORT_NAME_PATTERN = /^[A-Za-z0-9ÄÖÜäöüß_.?\- ]+$/
+const PORT_NAME_MESSAGE = 'Must be letters, digits, space, dot, dash, underscore, or question mark'
+
+/**
+ * Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to
+ * `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`, `Port ` x8 with 2
+ * digits from 17 -> `Port 17..Port 24`). One trailing space stays as the separator.
+ */
 export const InterfacePrefixSchema = v.pipe(
 	v.string(),
-	v.trim(),
+	v.transform(trimStubPrefix),
 	v.minLength(1),
 	v.maxLength(50),
-	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
+	v.regex(PORT_NAME_PATTERN, PORT_NAME_MESSAGE),
 )
 
 /** NetBox rack form-factor choices. */
@@ -797,11 +807,9 @@ export const StubCreateSchema = v.pipe(
 export const StubUpdateSchema = v.strictObject({
 	prefix: v.optional(InterfacePrefixSchema, undefined),
 	count: v.optional(StubCountSchema, undefined),
+	digits: v.optional(StubDigitsSchema, undefined),
+	start: v.optional(StubStartSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
-	description: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
-		undefined,
-	),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
@@ -909,7 +917,7 @@ export type RackTypeListQuery = v.InferOutput<typeof RackTypeListQuerySchema>
 export type DeviceTypeListQuery = v.InferOutput<typeof DeviceTypeListQuerySchema>
 
 /** Port fields a device type owns; everything else stays per device. */
-export const TEMPLATE_SYNC_FIELDS = ['kind', 'description', 'positions', 'rear_port'] as const
+export const TEMPLATE_SYNC_FIELDS = ['kind', 'positions', 'rear_port'] as const
 export type TemplateSyncField = (typeof TEMPLATE_SYNC_FIELDS)[number]
 
 export interface TemplateSyncChange {
@@ -1275,7 +1283,7 @@ export const InterfaceNameSchema = v.pipe(
 	v.trim(),
 	v.minLength(1),
 	v.maxLength(100),
-	v.regex(/^[A-Za-z0-9_.-]+$/, 'Must be letters, digits, dot, dash, or underscore'),
+	v.regex(PORT_NAME_PATTERN, PORT_NAME_MESSAGE),
 )
 
 const OptionalNullableIdEntry = v.optional(v.nullable(IdSchema), undefined)
@@ -1357,10 +1365,6 @@ export const InterfaceCreateSchema = v.pipe(
 		name: InterfaceNameSchema,
 		kind: v.optional(InterfaceKindSchema, 'ethernet'),
 		enabled: v.optional(v.boolean(), undefined),
-		description: v.optional(
-			v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH)),
-			undefined,
-		),
 		side: v.optional(v.nullable(PortSideSchema), undefined),
 		positions: v.optional(PortPositionsSchema, undefined),
 		rear_port_id: v.optional(IdSchema, undefined),
@@ -1388,10 +1392,6 @@ export const InterfaceUpdateSchema = v.strictObject({
 	name: v.optional(InterfaceNameSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, undefined),
 	enabled: v.optional(v.boolean(), undefined),
-	description: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
-		undefined,
-	),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_port_id: v.optional(IdSchema, undefined),
 	rear_port_position: v.optional(PortPositionsSchema, undefined),

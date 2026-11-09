@@ -334,12 +334,15 @@ export function RelatedPreview<Row extends { id: number }>(props: {
 	rowKey?: (row: Row) => string | number
 	/** Shows every row instead of the first few. */
 	all?: boolean
+	/** Draws a line between columns. */
+	columnLines?: boolean
 }): JSX.Element {
 	return (
 		<DataTable
 			rows={() => (props.all ? props.rows : props.rows.slice(0, RELATED_PREVIEW_ROWS))}
 			getRowId={(row: Row): string | number => props.rowKey?.(row) ?? row.id}
 			columns={props.columns}
+			columnLines={props.columnLines}
 			loading={() => props.loading}
 			loadingContent={<Loading message={t('list.loading', { noun: tp(props.noun, 2) })} />}
 			emptyContent={<Empty message={props.emptyText} />}

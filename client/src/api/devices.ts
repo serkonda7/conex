@@ -4,7 +4,12 @@
  * message.
  */
 import { Result } from 'better-result'
-import type { DeviceListItem, DeviceRow, InterfaceJson } from 'server/src/db/devices'
+import type {
+	DeviceListItem,
+	DevicePortJson,
+	DeviceRow,
+	InterfaceJson,
+} from 'server/src/db/devices'
 import type {
 	DeviceCreate,
 	DeviceListQuery,
@@ -21,7 +26,7 @@ import type {
 } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
-export type { DeviceListItem, DeviceRow, InterfaceJson, PanelJackJson }
+export type { DeviceListItem, DevicePortJson, DeviceRow, InterfaceJson, PanelJackJson }
 
 export type DeviceSort = DeviceListQuery['sort']
 
@@ -131,9 +136,9 @@ export async function delete_device(id: number): Promise<Result<unknown, Error>>
 // Interfaces
 // ---------------------------------------------------------------------------
 
-export async function fetch_interfaces(deviceId: number): Promise<Result<InterfaceJson[], Error>> {
+export async function fetch_interfaces(deviceId: number): Promise<Result<DevicePortJson[], Error>> {
 	const res = await client.devices[':id'].interfaces.$get(by_id(deviceId))
-	return to_result<InterfaceJson[]>(res, failed.list('noun.interface'))
+	return to_result<DevicePortJson[]>(res, failed.list('noun.interface'))
 }
 
 /** How a device's ports differ from its device type. */

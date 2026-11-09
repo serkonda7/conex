@@ -22,7 +22,7 @@ import {
 	createAttachment,
 	deleteAttachment,
 	getAttachment,
-	getAttachmentRow,
+	getAttachmentWithTenant,
 	getPlan,
 	listAttachments,
 	listFloorplanLinks,
@@ -52,11 +52,11 @@ const uploadLimit = bodyLimit({
 
 /** Loads an attachment the requester may access (via its owner): the row, or the 404/403 response. */
 async function loadAttachment(c: Context, id: number): Promise<AttachmentRow | Response> {
-	const row = await getAttachmentRow(id)
-	if (Result.isError(row)) {
-		return sendResult(c, row)
+	const found = await getAttachmentWithTenant(id)
+	if (Result.isError(found)) {
+		return sendResult(c, found)
 	}
-	return checkTenant(c, (await ownerTenant(row.value)) ?? null) ?? row.value
+	return checkTenant(c, found.value.tenant) ?? found.value.row
 }
 
 async function uploadOf(file: File): Promise<AttachmentUpload> {

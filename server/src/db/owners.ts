@@ -5,7 +5,7 @@
  * `undefined` means the row (or its parent) does not exist; callers then
  * fall through to the normal 404 path instead of inventing a 403.
  */
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, inArray } from 'drizzle-orm'
 import {
 	attachments,
 	type cables,
@@ -149,8 +149,12 @@ export async function interfaceTenant(interfaceId: number): Promise<Tenant> {
 export async function cableTenants(
 	cable: Pick<typeof cables.$inferSelect, 'a_interface_id' | 'b_interface_id'>,
 ): Promise<[number | null, number | null]> {
-	return [
-		(await interfaceTenant(cable.a_interface_id)) ?? null,
-		(await interfaceTenant(cable.b_interface_id)) ?? null,
-	]
+	const rows = await getDb()
+		.select({ id: interfaces.id, tenant_id: devices.tenant_id })
+		.from(interfaces)
+		.innerJoin(devices, eq(devices.id, interfaces.device_id))
+		.where(inArray(interfaces.id, [cable.a_interface_id, cable.b_interface_id]))
+	const tenantOf = (id: number): number | null =>
+		rows.find((row) => row.id === id)?.tenant_id ?? null
+	return [tenantOf(cable.a_interface_id), tenantOf(cable.b_interface_id)]
 }

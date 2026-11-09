@@ -1,6 +1,16 @@
 import { Result } from 'better-result'
-import { and, asc, eq, inArray, or, type SQL, type SQLWrapper, sql } from 'drizzle-orm'
-import type { PgColumn } from 'drizzle-orm/pg-core'
+import {
+	and,
+	asc,
+	eq,
+	getTableColumns,
+	inArray,
+	or,
+	type SQL,
+	type SQLWrapper,
+	sql,
+} from 'drizzle-orm'
+import { alias, type PgColumn } from 'drizzle-orm/pg-core'
 import type { CableCreate, CableUpdate } from 'shared/src/schemas'
 import { cables, devices, interfaces } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -85,6 +95,38 @@ export function listCables(params: CableListParams): Promise<Page<CableRow>> {
 
 export function getCable(id: number): Promise<Result<CableRow, Error>> {
 	return findById(cables, id, 'Cable not found')
+}
+
+const aEnd = alias(interfaces, 'a_end')
+const bEnd = alias(interfaces, 'b_end')
+const aDevice = alias(devices, 'a_device')
+const bDevice = alias(devices, 'b_device')
+
+/**
+ * The cable with the tenants of both endpoint devices (`null` for a missing
+ * end, as `cableTenants`), in one statement for the access gate.
+ */
+export async function getCableWithTenants(
+	id: number,
+): Promise<Result<{ cable: CableRow; tenants: [number | null, number | null] }, Error>> {
+	const [row] = await getDb()
+		.select({
+			...getTableColumns(cables),
+			a_tenant: aDevice.tenant_id,
+			b_tenant: bDevice.tenant_id,
+		})
+		.from(cables)
+		.leftJoin(aEnd, eq(aEnd.id, cables.a_interface_id))
+		.leftJoin(aDevice, eq(aDevice.id, aEnd.device_id))
+		.leftJoin(bEnd, eq(bEnd.id, cables.b_interface_id))
+		.leftJoin(bDevice, eq(bDevice.id, bEnd.device_id))
+		.where(eq(cables.id, id))
+		.limit(1)
+	if (!row) {
+		return Result.err(new NotFoundError('Cable not found'))
+	}
+	const { a_tenant, b_tenant, ...cable } = row
+	return Result.ok({ cable, tenants: [a_tenant, b_tenant] })
 }
 
 /**

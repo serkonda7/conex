@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import {
 	EntityParamsSchema,
 	RackCreateSchema,
@@ -7,6 +6,7 @@ import {
 	RackUpdateSchema,
 } from 'shared/src/schemas'
 import { checkTenant } from '../authz'
+import { rackTenant } from '../db/owners'
 import { createRack, deleteRack, getElevation, getRack, listRacks, updateRack } from '../db/racks'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
@@ -34,10 +34,7 @@ export const racksApp = baseRacksApp.get(
 	vValidator('param', EntityParamsSchema, onValidationError),
 	async (c) => {
 		const id = c.req.valid('param').id
-		const rack = await getRack(id)
-		if (Result.isError(rack)) {
-			return sendResult(c, rack)
-		}
-		return checkTenant(c, rack.value.tenant_id) ?? sendResult(c, await getElevation(id))
+		// A missing rack passes the gate and answers 404 from `getElevation`.
+		return checkTenant(c, await rackTenant(id)) ?? sendResult(c, await getElevation(id))
 	},
 )

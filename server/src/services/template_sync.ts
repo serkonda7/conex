@@ -54,9 +54,6 @@ function changesOf(
 	if (port.kind !== target.kind) {
 		changes.push({ field: 'kind', from: port.kind, to: target.kind })
 	}
-	if (port.description !== target.description) {
-		changes.push({ field: 'description', from: port.description, to: target.description })
-	}
 	if (port.positions !== target.positions) {
 		changes.push({
 			field: 'positions',

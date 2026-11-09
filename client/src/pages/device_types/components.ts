@@ -6,6 +6,8 @@
  */
 import {
 	DISPLAY_PORT_KINDS,
+	expandStub,
+	MAX_STUB_DIGITS,
 	NETBOX_INTERFACE_TYPES,
 	type NetboxInterfaceType,
 	type PassThroughPortType,
@@ -132,11 +134,23 @@ export function componentClassOf(row: { kind: string; side: PortSide | null }): 
 }
 
 /** Port names a stub expands to: the prefix alone, or the first and last name. */
-export function stubRange(stub: { prefix: string; count: number }): string {
-	return stub.count === 1
-		? stub.prefix
-		: t('deviceType.component.range', {
-				first: `${stub.prefix}1`,
-				last: `${stub.prefix}${stub.count}`,
-			})
+export function stubRange(stub: {
+	prefix: string
+	count: number
+	digits?: number
+	start?: number
+}): string {
+	const names = expandStub(stub.prefix, stub.count, stub.digits, stub.start)
+	if (!names.ok || names.value.length === 1) {
+		return names.ok ? (names.value[0] ?? stub.prefix) : stub.prefix
+	}
+	return t('deviceType.component.range', {
+		first: names.value[0] ?? '',
+		last: names.value.at(-1) ?? '',
+	})
+}
+
+/** Digits that keep names numbered up to `last` in order when sorted as text. */
+export function sortableDigits(last: number): number {
+	return Math.min(String(last).length, MAX_STUB_DIGITS)
 }

@@ -4,9 +4,9 @@ import {
 	MAX_POWER_DRAW,
 	POE_MODES,
 	POE_TYPES,
-	PORT_DESCRIPTION_MAX_LENGTH,
 	PORT_SIDES,
 } from './constants'
+import { MAX_STUB_DIGITS, MAX_STUB_START, trimStubPrefix } from './stubs'
 
 export const NameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100))
 
@@ -71,6 +71,22 @@ export const InterfaceKindSchema = v.pipe(v.string(), v.trim(), v.minLength(1), 
 /** Port count of one stub row: at least 1. */
 export const StubCountSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
 
+/** Minimum digits of a stub index, zero-padded; 1 pads nothing. */
+export const StubDigitsSchema = v.pipe(
+	v.number(),
+	v.integer(),
+	v.minValue(1),
+	v.maxValue(MAX_STUB_DIGITS),
+)
+
+/** First index of a multi-port stub: `0` for `eth0..`, `17` for `Port 17..`. */
+export const StubStartSchema = v.pipe(
+	v.number(),
+	v.integer(),
+	v.minValue(0),
+	v.maxValue(MAX_STUB_START),
+)
+
 /**
  * Rack units a device type consumes on mount: 0-60 U. A zero-height device
  * cannot be mounted at a rack position. Shelves live in their own table.
@@ -97,11 +113,9 @@ export const StubPowerEntries = {
 // biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
 export const StubFieldEntries = {
 	count: v.optional(StubCountSchema, 1),
+	digits: v.optional(StubDigitsSchema, undefined),
+	start: v.optional(StubStartSchema, undefined),
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	description: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
-		undefined,
-	),
 	side: v.optional(v.nullable(PortSideSchema), undefined),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
@@ -113,7 +127,7 @@ export const StubFieldEntries = {
  * names keep any character.
  */
 export const ImportedStubSchema = v.strictObject({
-	prefix: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
+	prefix: v.pipe(v.string(), v.transform(trimStubPrefix), v.minLength(1), v.maxLength(50)),
 	...StubFieldEntries,
 })
 

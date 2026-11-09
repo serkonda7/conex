@@ -226,7 +226,6 @@ export function portSideLabel(value: string): string {
 
 const TEMPLATE_SYNC_FIELD_KEYS: Record<TemplateSyncField, MessageKey> = {
 	kind: 'device.templateSync.field.kind',
-	description: 'device.templateSync.field.description',
 	positions: 'device.templateSync.field.positions',
 	rear_port: 'device.templateSync.field.rear_port',
 }

@@ -3,7 +3,7 @@ import { DeviceTypeYamlSchema } from './schema'
 /** NetBox keys conex knows and ignores on import. */
 const IGNORED_KEYS = ['weight', 'weight_unit', 'airflow', 'module-bays']
 
-const COMPONENT_KEYS = ['name', 'type', 'description']
+const COMPONENT_KEYS = ['name', 'type']
 
 /** Keys of each list's entries, as `planDeviceTypePorts` reads them. */
 const LIST_KEYS: Record<string, readonly string[]> = {

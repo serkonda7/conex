@@ -8,7 +8,7 @@ import { ConflictError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
-	countBy,
+	countWhere,
 	exists,
 	insertedId,
 	isPatchEmpty,
@@ -35,6 +35,9 @@ export interface RackTypeListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
+/** Racks built from the outer rack type row. */
+const instanceCount = countWhere(racks.rack_type_id, rack_types.id)
+
 export async function listRackTypes(params: RackTypeListParams): Promise<Page<RackTypeListRow>> {
 	const where = and(
 		params.search
@@ -60,22 +63,15 @@ export async function listRackTypes(params: RackTypeListParams): Promise<Page<Ra
 		u_height: rack_types.u_height,
 		description: rack_types.description,
 		comments: rack_types.comments,
-		racks: sql`(SELECT count(*) FROM ${racks} WHERE ${racks.rack_type_id} = ${rack_types.id})`,
+		racks: instanceCount,
 	}
-	const page = await pageRows(
+	return await pageRows(
 		rack_types,
 		where,
 		[orderOf(orderColumns[params.sort], params.order), asc(rack_types.id)],
 		params,
+		{ instance_count: instanceCount },
 	)
-	const counts = await countBy(
-		racks.rack_type_id,
-		page.items.map((type) => type.id),
-	)
-	return {
-		...page,
-		items: page.items.map((type) => ({ ...type, instance_count: counts.get(type.id) ?? 0 })),
-	}
 }
 
 function checkManufacturerExists(id: number | undefined): Promise<Result<undefined, Error>> {

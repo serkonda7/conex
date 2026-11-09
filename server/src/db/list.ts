@@ -5,6 +5,7 @@ import {
 	count,
 	desc,
 	eq,
+	getTableColumns,
 	type InferSelectModel,
 	inArray,
 	ne,
@@ -13,7 +14,7 @@ import {
 	type SQLWrapper,
 	sql,
 } from 'drizzle-orm'
-import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
+import { type PgColumn, type PgTable, QueryBuilder } from 'drizzle-orm/pg-core'
 import { tenants } from '../schema'
 import { getDb } from './connection'
 import { DuplicateError, isUniqueViolation, NotFoundError } from './errors'
@@ -58,36 +59,54 @@ export function orderOf(column: SQLWrapper, order: 'asc' | 'desc'): SQL {
 	return order === 'desc' ? desc(column) : asc(column)
 }
 
-/** One page of `table` rows plus the total match count. */
-export async function pageRows<T extends PgTable>(
+/** Computed columns selected next to a table's own (correlated subqueries, joins). */
+export type ExtraColumns = Record<string, SQL | SQL.Aliased>
+
+/** Row shape of `ExtraColumns`. */
+export type ExtraRow<X extends ExtraColumns> = {
+	[K in keyof X]: X[K] extends SQL<infer U> | SQL.Aliased<infer U> ? U : never
+}
+
+/**
+ * One page of `table` rows plus the total match count. `extra` columns
+ * (e.g. `countWhere` counts) are selected in the same statement, so a list
+ * with related counts needs no follow-up query per page.
+ */
+export async function pageRows<T extends PgTable, X extends ExtraColumns = Record<never, never>>(
 	table: T,
 	where: SQL | undefined,
 	orderBy: SQL[],
 	params: ListParams,
-): Promise<Page<InferSelectModel<T>>> {
+	extra?: X,
+): Promise<Page<InferSelectModel<T> & ExtraRow<X>>> {
 	const db = getDb()
-	const items = await db
-		.select()
-		.from(table as PgTable)
-		.where(where)
-		.orderBy(...orderBy)
-		.limit(params.limit)
-		.offset(offsetOf(params))
-	const total = await db.$count(table, where)
-	return pageOf(items as InferSelectModel<T>[], total, params)
+	const [items, total] = await Promise.all([
+		db
+			.select({ ...getTableColumns(table as PgTable), ...extra })
+			.from(table as PgTable)
+			.where(where)
+			.orderBy(...orderBy)
+			.limit(params.limit)
+			.offset(offsetOf(params)),
+		db.$count(table, where),
+	])
+	return pageOf(items as (InferSelectModel<T> & ExtraRow<X>)[], total, params)
 }
 
-/** Rows of `column`'s table per value in `ids`; ids without rows are absent. */
-export async function countBy(column: PgColumn, ids: number[]): Promise<Map<number, number>> {
-	if (ids.length === 0) {
-		return new Map()
-	}
-	const rows = await getDb()
-		.select({ id: column, n: count() })
+/** Builds subqueries without a connection (they run inside the outer statement). */
+export const subquery: QueryBuilder = new QueryBuilder()
+
+/**
+ * `(SELECT count(*) FROM <column's table> WHERE column = outer AND where)`
+ * for a select list or ORDER BY. Built as a nested query so its columns stay
+ * qualified: drizzle renders top-level columns of a single-table select
+ * unqualified, which would rebind `outer` inside the subquery.
+ */
+export function countWhere(column: PgColumn, outer: SQLWrapper, where?: SQL): SQL<number> {
+	return sql<number>`(${subquery
+		.select({ n: count() })
 		.from(column.table)
-		.where(inArray(column, ids))
-		.groupBy(column)
-	return new Map(rows.map((r) => [r.id as number, r.n]))
+		.where(and(eq(column, outer), where))})`.mapWith(Number)
 }
 
 /** True when a patch object carries no columns to write. */

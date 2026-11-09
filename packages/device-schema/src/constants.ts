@@ -170,7 +170,4 @@ export type PoeType = (typeof POE_TYPES)[number]
 /** Upper bound of a power input's maximum draw, in watts. */
 export const MAX_POWER_DRAW = 1_000_000
 
-/** Allows descriptions merged with legacy port labels during migration. */
-export const PORT_DESCRIPTION_MAX_LENGTH = 250
-
 export const DEVICE_TYPE_DESCRIPTION_MAX_LENGTH = 250

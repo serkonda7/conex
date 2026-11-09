@@ -4,6 +4,7 @@ import {
 	asc,
 	count,
 	eq,
+	getTableColumns,
 	gte,
 	inArray,
 	isNotNull,
@@ -34,15 +35,15 @@ import {
 	racks,
 } from '../schema'
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
-import { expandStubs, type StubInput, stubPowerError } from '../services/templates'
+import { expandStubs, type StubInput, stubPowerError, stubPrefix } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { deviceRoleSubtree } from './device_roles'
-import { ConflictError, DuplicateError } from './errors'
+import { deviceRoleSubtrees } from './device_roles'
+import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
-	countBy,
+	countWhere,
 	exists,
 	findById,
 	findOne,
@@ -53,6 +54,7 @@ import {
 	pageRows,
 	pickDefined,
 	searchCondition,
+	subquery,
 	tryWrite,
 } from './list'
 import { rackHeightOf, rackSpansOf } from './racks'
@@ -81,6 +83,23 @@ export interface ManufacturerListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
+/** Devices built from a type of the outer manufacturer row, optionally narrowed. */
+function manufacturerDevices(where?: SQL): SQL<number> {
+	return sql<number>`(${subquery
+		.select({ n: count() })
+		.from(devices)
+		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
+		.where(and(eq(device_types.manufacturer_id, manufacturers.id), where))})`.mapWith(Number)
+}
+
+/** Catalog and usage counts of the outer manufacturer row (`ManufacturerListRow`). */
+const manufacturerCounts = {
+	device_type_count: countWhere(device_types.manufacturer_id, manufacturers.id),
+	rack_type_count: countWhere(rack_types.manufacturer_id, manufacturers.id),
+	device_count: manufacturerDevices(),
+	past_eol_count: manufacturerDevices(lt(device_types.eol_date, sql`CURRENT_DATE`)),
+}
+
 export async function listManufacturers(
 	params: ManufacturerListParams,
 ): Promise<Page<ManufacturerListRow>> {
@@ -89,71 +108,18 @@ export async function listManufacturers(
 		description: manufacturers.description,
 		website: manufacturers.website,
 		support_url: manufacturers.support_url,
-		device_types: sql`(SELECT count(*) FROM ${device_types} WHERE ${device_types.manufacturer_id} = ${manufacturers.id})`,
-		rack_types: sql`(SELECT count(*) FROM ${rack_types} WHERE ${rack_types.manufacturer_id} = ${manufacturers.id})`,
-		devices: sql`(SELECT count(*) FROM ${devices} INNER JOIN ${device_types} ON ${device_types.id} = ${devices.device_type_id} WHERE ${device_types.manufacturer_id} = ${manufacturers.id})`,
-		past_eol: sql`(SELECT count(*) FROM ${devices} INNER JOIN ${device_types} ON ${device_types.id} = ${devices.device_type_id} WHERE ${device_types.manufacturer_id} = ${manufacturers.id} AND ${device_types.eol_date} < CURRENT_DATE)`,
+		device_types: manufacturerCounts.device_type_count,
+		rack_types: manufacturerCounts.rack_type_count,
+		devices: manufacturerCounts.device_count,
+		past_eol: manufacturerCounts.past_eol_count,
 	}
-	const page = await pageRows(
+	return await pageRows(
 		manufacturers,
 		searchCondition(params.search, [manufacturers.name]),
 		[orderOf(orderColumns[params.sort], params.order), asc(manufacturers.id)],
 		params,
+		manufacturerCounts,
 	)
-	const withCounts = await manufacturerCounts(page.items.map((m) => m.id))
-	return { ...page, items: page.items.map(withCounts) }
-}
-
-/** Adds the counts to rows of `ids`. */
-async function manufacturerCounts(
-	ids: number[],
-): Promise<(row: ManufacturerRow) => ManufacturerListRow> {
-	const [typeCounts, rackTypeCounts, deviceCounts, pastEolCounts] = await Promise.all([
-		countBy(device_types.manufacturer_id, ids),
-		countBy(rack_types.manufacturer_id, ids),
-		manufacturerDeviceCounts(ids),
-		manufacturerPastEolCounts(ids),
-	])
-	return (row: ManufacturerRow): ManufacturerListRow => ({
-		...row,
-		device_type_count: typeCounts.get(row.id) ?? 0,
-		rack_type_count: rackTypeCounts.get(row.id) ?? 0,
-		device_count: deviceCounts.get(row.id) ?? 0,
-		past_eol_count: pastEolCounts.get(row.id) ?? 0,
-	})
-}
-
-/** Devices per manufacturer (through their device type); ids without devices are absent. */
-async function manufacturerDeviceCounts(ids: number[]): Promise<Map<number, number>> {
-	if (ids.length === 0) {
-		return new Map()
-	}
-	const rows = await getDb()
-		.select({ id: device_types.manufacturer_id, n: count() })
-		.from(devices)
-		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
-		.where(inArray(device_types.manufacturer_id, ids))
-		.groupBy(device_types.manufacturer_id)
-	return new Map(rows.map((r) => [r.id, r.n]))
-}
-
-/** Devices whose type is past its EOL date per manufacturer; ids without any are absent. */
-async function manufacturerPastEolCounts(ids: number[]): Promise<Map<number, number>> {
-	if (ids.length === 0) {
-		return new Map()
-	}
-	const rows = await getDb()
-		.select({ id: device_types.manufacturer_id, n: count() })
-		.from(devices)
-		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
-		.where(
-			and(
-				inArray(device_types.manufacturer_id, ids),
-				lt(device_types.eol_date, sql`CURRENT_DATE`),
-			),
-		)
-		.groupBy(device_types.manufacturer_id)
-	return new Map(rows.map((r) => [r.id, r.n]))
 }
 
 export function getManufacturer(id: number): Promise<Result<ManufacturerRow, Error>> {
@@ -164,12 +130,12 @@ export function getManufacturer(id: number): Promise<Result<ManufacturerRow, Err
 export async function getManufacturerDetail(
 	id: number,
 ): Promise<Result<ManufacturerListRow, Error>> {
-	const row = await getManufacturer(id)
-	if (Result.isError(row)) {
-		return row
-	}
-	const withCounts = await manufacturerCounts([id])
-	return Result.ok(withCounts(row.value))
+	const [row] = await getDb()
+		.select({ ...getTableColumns(manufacturers), ...manufacturerCounts })
+		.from(manufacturers)
+		.where(eq(manufacturers.id, id))
+		.limit(1)
+	return row ? Result.ok(row) : Result.err(new NotFoundError('Manufacturer not found'))
 }
 
 /** Name uniqueness guard; `excludeId` skips the row being updated. */
@@ -279,12 +245,13 @@ export interface DeviceTypeListParams extends ListParams {
 	order: 'asc' | 'desc'
 }
 
+/** Devices built from the outer device type row. */
+const instanceCount = countWhere(devices.device_type_id, device_types.id)
+
 export async function listDeviceTypes(
 	params: DeviceTypeListParams,
 ): Promise<Page<DeviceTypeListRow>> {
-	const roleIds = params.role
-		? [...new Set((await Promise.all(params.role.map(deviceRoleSubtree))).flat())]
-		: undefined
+	const roleIds = params.role ? await deviceRoleSubtrees(params.role) : undefined
 	const eolConditions: Record<DeviceTypeEolFilter, SQL> = {
 		past: lt(device_types.eol_date, sql`CURRENT_DATE`),
 		announced: gte(device_types.eol_date, sql`CURRENT_DATE`),
@@ -327,23 +294,15 @@ export async function listDeviceTypes(
 		is_full_depth: device_types.is_full_depth,
 		spec_url: device_types.spec_url,
 		eol_date: device_types.eol_date,
-		devices: sql`(SELECT count(*) FROM ${devices} WHERE ${devices.device_type_id} = ${device_types.id})`,
+		devices: instanceCount,
 	}
-	const orderColumn = orderColumns[params.sort]
-	const page = await pageRows(
+	return await pageRows(
 		device_types,
 		where,
-		[orderOf(orderColumn, params.order), asc(device_types.id)],
+		[orderOf(orderColumns[params.sort], params.order), asc(device_types.id)],
 		params,
+		{ instance_count: instanceCount },
 	)
-	const counts = await countBy(
-		devices.device_type_id,
-		page.items.map((dt) => dt.id),
-	)
-	return {
-		...page,
-		items: page.items.map((dt) => ({ ...dt, instance_count: counts.get(dt.id) ?? 0 })),
-	}
 }
 
 export function getDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>> {
@@ -527,8 +486,6 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 // Stub rows
 // ---------------------------------------------------------------------------
 
-const STUB_EXISTS = 'This device type already has a stub with this prefix, kind and side'
-
 /** Stub rows of a device type, in creation order (expansion follows it). */
 export function stubsOf(deviceTypeId: number): Promise<StubRow[]> {
 	return getDb()
@@ -586,10 +543,11 @@ export async function createStub(
 	}
 	const row: Omit<StubRow, 'id'> = {
 		device_type_id: deviceTypeId,
-		prefix: input.prefix,
+		prefix: stubPrefix(input.prefix, input.count ?? 1),
 		count: input.count ?? 1,
+		digits: input.digits ?? 1,
+		start: input.start ?? 1,
 		kind: input.kind ?? 'ethernet',
-		description: input.description ?? null,
 		side: input.side ?? null,
 		positions: input.positions ?? 1,
 		rear_stub_id: input.rear_stub_id ?? null,
@@ -602,15 +560,13 @@ export async function createStub(
 	if (Result.isError(clash)) {
 		return clash
 	}
-	const id = await tryWrite(
-		async () =>
-			insertedId(
-				await getDb()
-					.insert(device_type_interfaces)
-					.values(row)
-					.returning({ id: device_type_interfaces.id }),
-			),
-		STUB_EXISTS,
+	const id = await tryWrite(async () =>
+		insertedId(
+			await getDb()
+				.insert(device_type_interfaces)
+				.values(row)
+				.returning({ id: device_type_interfaces.id }),
+		),
 	)
 	if (Result.isError(id)) {
 		return id
@@ -633,11 +589,11 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 	) {
 		return Result.err(new ConflictError('A rear port mapping is only allowed on front ports'))
 	}
-	const patch = pickDefined(input, [
-		'prefix',
+	const picked = pickDefined(input, [
 		'count',
+		'digits',
+		'start',
 		'kind',
-		'description',
 		'positions',
 		'rear_stub_id',
 		'rear_position',
@@ -645,6 +601,12 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 		'poe_mode',
 		'poe_type',
 	])
+	// A single port keeps no separator space, also when only the count drops to 1.
+	const prefix = stubPrefix(
+		input.prefix ?? current.value.prefix,
+		picked.count ?? current.value.count,
+	)
+	const patch = prefix === current.value.prefix ? picked : { ...picked, prefix }
 	const clash = await checkStubExpansion(
 		current.value.device_type_id,
 		{ ...current.value, ...patch },
@@ -654,13 +616,11 @@ export async function updateStub(id: number, input: StubUpdate): Promise<Result<
 		return clash
 	}
 	if (!isPatchEmpty(patch)) {
-		const written = await tryWrite(
-			() =>
-				getDb()
-					.update(device_type_interfaces)
-					.set(patch)
-					.where(eq(device_type_interfaces.id, id)),
-			STUB_EXISTS,
+		const written = await tryWrite(() =>
+			getDb()
+				.update(device_type_interfaces)
+				.set(patch)
+				.where(eq(device_type_interfaces.id, id)),
 		)
 		if (Result.isError(written)) {
 			return written
