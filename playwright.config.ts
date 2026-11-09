@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
 // Keep E2E services separate from the normal client (5371) and API (3000).
 const clientPort: number = Number(process.env.CONEX_CLIENT_PORT ?? 5372)
 const clientDistDir: string = path.resolve('./test-results/e2e-client')
-const dataDir: string =path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
+const dataDir: string = path.resolve(process.env.CONEX_E2E_DATA_DIR ?? './test-results/e2e-data')
 const apiUrl: string = process.env.CONEX_E2E_API_URL ?? 'http://localhost:3300'
 const apiPort: number = Number(new URL(apiUrl).port || 3300)
 // A clean database needs a fresh seed, so it rules out any already running API.
