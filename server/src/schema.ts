@@ -423,7 +423,6 @@ export const device_type_interfaces = pgTable(
 		prefix: text('prefix').notNull(),
 		count: integer('count').notNull().default(1),
 		kind: text('kind').notNull().default('ethernet'),
-		description: text('description'),
 		// Pass-through side (`PORT_SIDES`); null is a normal port.
 		side: text('side', { enum: PORT_SIDES }),
 		// Positions of each expanded rear port (> 1 only on rear stubs).
@@ -781,7 +780,6 @@ export const interfaces = pgTable(
 		kind: text('kind').notNull().default('ethernet'),
 		connected: integer('connected').notNull().default(0),
 		enabled: integer('enabled').notNull().default(1),
-		description: text('description'),
 		// Patch-panel pass-through side (`PORT_SIDES`); null is a normal port.
 		side: text('side', { enum: PORT_SIDES }),
 		// Positions (slots) of a rear port; above 1 only on rear ports.

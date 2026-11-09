@@ -4,7 +4,6 @@ import {
 	MAX_POWER_DRAW,
 	POE_MODES,
 	POE_TYPES,
-	PORT_DESCRIPTION_MAX_LENGTH,
 	type PoeMode,
 	type PoeType,
 	SELECTABLE_PASS_THROUGH_PORT_TYPES,
@@ -13,7 +12,7 @@ import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/templates'
 import { InlineError } from '../../components/feedback'
-import { DescriptionField, Hint, SelectField, TextField } from '../../components/form'
+import { Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
@@ -138,8 +137,8 @@ export function AddComponentMenu(props: {
 
 /**
  * Add or edit form for one component class (edit when `stub` is given): a name
- * with a count (count N > 1 expands to `name1..nameN`), the class's kind,
- * and description. Rear ports add their positions, front ports the rear
+ * with a count (count N > 1 expands to `name1..nameN`) and the class's
+ * kind. Rear ports add their positions, front ports the rear
  * port they map onto and the first position they take there, power inputs
  * their maximum draw, and network interfaces their PoE mode and type.
  */
@@ -170,7 +169,6 @@ export function ComponentDialog(props: {
 	const [maximumDraw, setMaximumDraw] = createSignal(String(stub?.maximum_draw ?? ''))
 	const [poeMode, setPoeMode] = createSignal<PoeMode | ''>(stub?.poe_mode ?? '')
 	const [poeType, setPoeType] = createSignal<PoeType | ''>(stub?.poe_type ?? '')
-	const [description, setDescription] = createSignal(stub?.description ?? '')
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
 	const prefix = `${stub ? 'edit' : 'add'}-${props.info.key}`
@@ -224,7 +222,6 @@ export function ComponentDialog(props: {
 		const fields = {
 			count: parsedCount(),
 			kind: kind(),
-			description: text(description()),
 			...(isPowerInput ? { maximum_draw: parsedDraw } : {}),
 			...(isInterface
 				? {
@@ -397,12 +394,6 @@ export function ComponentDialog(props: {
 						options={POE_TYPES.map(poeTypeOption)}
 					/>
 				</Show>
-				<DescriptionField
-					id={`${prefix}-description`}
-					value={description()}
-					onInput={setDescription}
-					maxLength={PORT_DESCRIPTION_MAX_LENGTH}
-				/>
 				<div class="modal-actions">
 					<button type="button" onClick={props.onClose}>
 						{t('common.cancel')}

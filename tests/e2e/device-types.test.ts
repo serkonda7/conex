@@ -16,7 +16,7 @@ interface Port {
 	enabled: boolean
 	connected: boolean
 	location_id: number | null
-	description: string | null
+	kind: string
 	template_name: string | null
 }
 
@@ -356,7 +356,7 @@ test.describe('template sync', () => {
 			// A template change reaches the port without touching its name.
 			await ok(
 				await api.patch(`/api/device-types/${typeId}/stubs/${stubId}`, {
-					data: { description: 'Access port' },
+					data: { kind: '10gbase-t' },
 				}),
 			)
 			expect((await preview(api, deviceId)).orphaned).toEqual([])
@@ -364,7 +364,7 @@ test.describe('template sync', () => {
 			const synced = portNamed(await portsOf(api, deviceId), 'Uplink-Core')
 			expect(synced.id).toBe(port.id)
 			expect(synced.connected).toBe(true)
-			expect(synced.description).toBe('Access port')
+			expect(synced.kind).toBe('10gbase-t')
 			expect(await portsOf(api, deviceId)).toHaveLength(4)
 
 			// Renaming the stub moves the link and keeps the custom name.
@@ -740,7 +740,6 @@ test.describe('imported device types', () => {
 		id: number
 		prefix: string
 		count: number
-		description: string | null
 		positions: number
 	}
 
@@ -780,13 +779,12 @@ test.describe('imported device types', () => {
 				await page.goto(`/device-types/${typeId}`)
 				await page.getByRole('button', { name: `${name} bearbeiten` }).click()
 				const dialog = page.getByRole('dialog')
-				await dialog.getByLabel('Beschreibung').fill(`Edited ${name}`)
 				await dialog.getByRole('button', { name: 'Speichern' }).click()
 				await expect(dialog).toBeHidden()
 			}
-			expect((await stubsOf(api, typeId)).map((stub) => stub.description).sort()).toEqual([
-				'Edited Büro 1',
-				'Edited Gi1/0/',
+			expect((await stubsOf(api, typeId)).map((stub) => stub.prefix).sort()).toEqual([
+				'Büro 1',
+				'Gi1/0/',
 			])
 
 			const deviceId = await createDevice(api, cleanup, typeId)
@@ -810,9 +808,8 @@ test.describe('imported device types', () => {
 			[
 				`model: ${models[0]}`,
 				'interfaces:',
-				'  - name: eth0',
+				`  - name: ${'x'.repeat(80)}`,
 				'    type: 1000base-t',
-				`    description: ${'x'.repeat(800)}`,
 			],
 			[
 				`model: ${models[1]}`,
@@ -827,7 +824,7 @@ test.describe('imported device types', () => {
 			const res = await ok(await api.post('/api/device-types/import', { data: { yaml } }))
 			const body = (await res.json()) as ImportResponse
 			expect(body.created).toBe(0)
-			expect(body.rows[0]?.error).toMatch(i === 0 ? /description/ : /positions/)
+			expect(body.rows[0]?.error).toMatch(i === 0 ? /prefix/ : /positions/)
 			const list = await api.get(
 				`/api/device-types?search=${encodeURIComponent(models[i] ?? '')}&page=1&limit=200`,
 			)
@@ -882,7 +879,6 @@ test.describe('updates from YAML', () => {
 			'interfaces:',
 			'  - name: eth[1-3]',
 			'    type: 1000base-t',
-			'    description: Uplink',
 			'    poe_mode: pse',
 			'    poe_type: type2-ieee802.3at',
 			'power-ports:',
@@ -949,7 +945,7 @@ test.describe('updates from YAML', () => {
 	interface StubRow {
 		prefix: string
 		side: 'front' | 'rear' | null
-		description: string | null
+		kind: string
 		poe_mode: string | null
 		poe_type: string | null
 		rear_position: number
@@ -1006,7 +1002,7 @@ test.describe('updates from YAML', () => {
 				'interfaces:',
 				'  - name: eth1',
 				'  - name: eth2',
-				'    description: Changed',
+				'    type: 10gbase-t',
 				'  - name: mgmt',
 				'    type: 10gbase-t',
 				'',
@@ -1040,12 +1036,12 @@ test.describe('updates from YAML', () => {
 			})
 			const after = await stubRows(api, typeId)
 			expect(after.find((stub) => stub.prefix === 'eth1')).toMatchObject({
-				description: 'Uplink',
+				kind: '1000base-t',
 				poe_mode: 'pse',
 				poe_type: 'type2-ieee802.3at',
 			})
 			expect(after.find((stub) => stub.prefix === 'eth2')).toMatchObject({
-				description: 'Changed',
+				kind: '10gbase-t',
 				poe_mode: 'pse',
 			})
 			expect(after.map((stub) => stub.prefix).sort()).toEqual(['eth1', 'eth2', 'mgmt', 'psu'])

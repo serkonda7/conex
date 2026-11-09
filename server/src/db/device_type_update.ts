@@ -150,7 +150,6 @@ function portEntry(port: TypePort, list: PortList): YamlEntry {
 		name: port.name,
 		type: yamlTypeOf(port, list),
 		positions: port.side === 'rear' ? port.positions : undefined,
-		description: port.description,
 		maximum_draw: port.maximum_draw,
 		poe_mode: port.poe_mode,
 		poe_type: port.poe_type,

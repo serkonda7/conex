@@ -9,7 +9,7 @@ import { PortPeer } from './trace_peer'
 
 /**
  * Ports of a device (no patch-panel ports) grouped by component class like
- * the device-type components, with kind glyph, cable peer and description.
+ * the device-type components, with kind glyph and cable peer.
  * Interfaces get their 1-based port number (creation order, eth1..ethN);
  * disabled ones are dimmed. `actions` renders the buttons of a row.
  */
@@ -59,11 +59,6 @@ export function DevicePortTable(props: {
 			getValue: (iface: InterfaceJson): JSX.Element => (
 				<PortPeer link={props.links.get(iface.id)} endToEnd={props.endToEnd(iface.id)} />
 			),
-		},
-		{
-			key: 'description',
-			label: t('common.description'),
-			getValue: (iface: InterfaceJson): string => iface.description || '—',
 		},
 	]
 	return (

@@ -838,7 +838,6 @@ export const de: Messages = {
 	'device.templateSync.updated': 'Geänderte Ports ({count})',
 	'device.templateSync.change': '{field}: {from} → {to}',
 	'device.templateSync.field.kind': 'Typ',
-	'device.templateSync.field.description': 'Beschreibung',
 	'device.templateSync.field.positions': 'Positionen',
 	'device.templateSync.field.rear_port': 'Rückseitiger Port',
 	'device.templateSync.unchanged': '{count} Ports bleiben unverändert.',

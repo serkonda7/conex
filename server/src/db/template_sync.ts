@@ -145,7 +145,6 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 			name: linked ? port.name : target.name,
 			template_name: linked ? target.name : null,
 			kind: target.kind,
-			description: target.description,
 			positions: target.positions,
 			rear_port_id: rearPortId,
 			rear_port_position: target.rear_port_position,

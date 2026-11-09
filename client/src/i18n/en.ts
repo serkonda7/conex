@@ -829,7 +829,6 @@ export const en = {
 	'device.templateSync.updated': 'Changed ports ({count})',
 	'device.templateSync.change': '{field}: {from} → {to}',
 	'device.templateSync.field.kind': 'Type',
-	'device.templateSync.field.description': 'Description',
 	'device.templateSync.field.positions': 'Positions',
 	'device.templateSync.field.rear_port': 'Rear port',
 	'device.templateSync.unchanged': '{count} ports stay unchanged.',

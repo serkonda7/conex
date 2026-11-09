@@ -204,11 +204,6 @@ function ComponentTable(props: {
 					},
 				]
 			: []),
-		{
-			key: 'description',
-			label: t('common.description'),
-			getValue: (s: StubRow): string => s.description || '—',
-		},
 	])
 
 	return (

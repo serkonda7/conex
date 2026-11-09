@@ -20,7 +20,7 @@ function roleList(roles: readonly PromptRole[]): string {
 function outputRules(roles: readonly PromptRole[]): string {
 	return `Output one YAML document starting with --- in a fenced YAML block, plus the target path device-types/<Manufacturer>/<model-slug>.yaml outside the block. Keep the source summary outside the YAML so the block can be pasted directly into conex.
 
-Write all free-text output in German: model, manufacturer, description, comments, port descriptions and the summary outside the YAML block.
+Write all free-text output in German: model, manufacturer, description, comments and the summary outside the YAML block.
 Keep brand names and official product designations unchanged, but use German for generic terms (e.g. "Patchfeld 24-Port Cat6", "Steckdosenleiste 8-fach", "Fachboden"). For vendor-neutral devices use manufacturer "Generisch", even when the upstream file sits under Generic/.
 
 Emit only: manufacturer, model, u_height, is_full_depth, default_device_role, part_number, spec_url, eol_date, description, comments, interfaces, ports, power-ports, power-outlets, display-ports, rear-ports, front-ports, port-mappings. console-ports is an import alias of ports; prefer ports and never duplicate entries in both. Drop all other NetBox keys when adapting a baseline.
@@ -29,7 +29,7 @@ Rules:
 - manufacturer must equal the directory name of the target path (device-types/Generisch/ for vendor-neutral devices). manufacturer and model: 1-100 characters.
 - u_height: integer 0-60 (0 for laptop/desktop/dock/phone).
 - is_full_depth: default false, true for rack-mounted devices that occupy the full depth of the rack.
-- Port names must be unique across all lists (front-ports and rear-ports may reuse each other's names), 1-50 characters, ASCII only, matching ^[A-Za-z0-9_.-]+$ (no spaces or slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
+- Port names must be unique across all lists (front-ports and rear-ports may reuse each other's names), 1-50 characters, matching ^[A-Za-z0-9ÄÖÜäöüß_.? -]+$ (letters incl. German umlauts and ß, digits, spaces, dot, dash, underscore, question mark; no slashes). Normalize source port names when adapting a baseline. No empty strings anywhere.
 - interfaces type: NetBox slug, e.g. 1000base-t, 10gbase-t, 1000base-x-sfp, 10gbase-x-sfpp, 25gbase-x-sfp28, 40gbase-x-qsfpp, 100gbase-x-qsfp28, ieee802.11ac, ieee802.11ax, ieee802.11be, lte, 5g, other.
 - interfaces PoE (only on wired interfaces, only if stated in the datasheet or baseline): poe_mode ${POE_MODES.join(' or ')} (pse supplies power, pd draws it); poe_type ${POE_TYPES.join(', ')}. poe_type needs poe_mode. For passive PoE, keep poe_mode and omit poe_type.
 - ports type: rj-45, de-9, db-25, rj-11, rj-12, mini-din-8, usb-a, usb-b, usb-c, usb-mini-a, usb-mini-b, usb-micro-a, usb-micro-b, usb-micro-ab, port or other.
@@ -39,7 +39,7 @@ Rules:
 - default_device_role (conex extension): the role preselected for devices of this type. Use the exact name of one role from the list below that clearly fits the device class (e.g. switch, firewall, patch panel, server); omit the key if none fits or the choice is ambiguous. Never invent a role name, and drop a role from an upstream file that is not in the list.
 - part_number (conex extension): the manufacturer's article/part number of this exact model, at most 100 characters; omit if not found in a primary source. spec_url (conex extension): plain URL (https://...) of the manufacturer's specification/datasheet page, at most 200 characters; omit if none is known. Never invent either.
 - eol_date (conex extension): last day the manufacturer supports this exact model (end of life / end of support), as an ISO date YYYY-MM-DD. Only set it from an official manufacturer EOL/EOS notice, lifecycle page or support policy that names this model and states a full date, or a month and year (then use the first day of that month, e.g. March 2027 becomes 2027-03-01, and say so in the summary); cite that source in the summary. Omit it otherwise: never take it from memory, resellers, forums or third-party trackers, never estimate or calculate it (e.g. from the release date, a support duration or a lifecycle policy), never carry it over from a sibling model or series, never use an end-of-sale, end-of-production or announcement date, and never turn a quarter, half-year or bare year into a day. A missing eol_date is correct; a made-up one is not.
-- description: one line, at most 250 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Port descriptions: omit by default, at most 250 characters; add one only for information the name, type and other fields do not already convey (e.g. "Management", "Uplink", "nur Konsole"). Never write a description that just restates the port name, type, speed, connector, PoE or position (e.g. "Port 1", "RJ45 1 GbE", "SFP+ Port 49", "Stromanschluss C14").
+- description: one line, at most 250 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Ports have no description: never emit one, and drop port descriptions from a baseline. Put information a port name must carry into the name itself (e.g. "Management", "Uplink").
 
 ${roleList(roles)}`
 }
@@ -80,7 +80,7 @@ ${currentYaml.trim()}
 
 How to update:
 - Keep manufacturer and model exactly as they are, even if the naming rules below would change them.
-- Treat the current YAML as the baseline. Keep every value that is still correct, including hand-edited port names and descriptions (but drop port descriptions that only repeat other fields of the port), and do not reword or reorder anything without a reason.
+- Treat the current YAML as the baseline. Keep every value that is still correct, including hand-edited port names, and do not reword or reorder anything without a reason.
 - Check every field against these sources and add what the rules below support but the YAML lacks: 1) https://github.com/serkonda7/conex-device-types (device-types/<Manufacturer>/<model>.yaml), 2) https://github.com/netbox-community/devicetype-library, 3) manufacturer specifications, PSREF or manuals. These files may predate the rules below, so never return one as-is; manufacturer sources win over the libraries, and the libraries never overwrite a correct value.
 - Return the complete definition with every port, not only the changes: a port left out of a list is removed. A key left out keeps its current value, so omit fields you cannot verify instead of guessing, and set a key to null only to clear a value that is wrong.
 - Keep the port-mappings format for front ports. Never guess.

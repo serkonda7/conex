@@ -132,7 +132,6 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 				prefix,
 				count: 1,
 				kind,
-				description: typeof port.description === 'string' ? port.description : undefined,
 				side: 'rear',
 				positions,
 			})
@@ -192,7 +191,6 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 			prefix: names.value[0] ?? name,
 			count: 1,
 			kind,
-			description: typeof port.description === 'string' ? port.description : undefined,
 			side: 'front',
 			rear_index: rearIndex,
 			rear_position: position,
@@ -222,7 +220,6 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 		{
 			key: string
 			kind: string
-			description: string | undefined
 			power: v.InferOutput<typeof ImportedPowerSchema>
 			names: string[]
 		}
@@ -263,7 +260,6 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 			if (!names.ok) {
 				return `${key} "${name}": ${names.error}`
 			}
-			const description = typeof port.description === 'string' ? port.description : undefined
 			const power = v.safeParse(ImportedPowerSchema, {
 				maximum_draw: key === 'power-ports' ? port.maximum_draw : undefined,
 				poe_mode: key === 'interfaces' ? port.poe_mode : undefined,
@@ -276,12 +272,11 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 			if (!power.success) {
 				return `${key} "${name}": ${formatValibotIssues(power.issues)}`
 			}
-			// A stub carries one kind, description and power setup, so all must match to collapse ports.
-			const groupKey = JSON.stringify([key, kind, description ?? null, power.output])
+			// A stub carries one kind and power setup, so both must match to collapse ports.
+			const groupKey = JSON.stringify([key, kind, power.output])
 			const group = groups.get(groupKey) ?? {
 				key,
 				kind,
-				description,
 				power: power.output,
 				names: [],
 			}
@@ -296,7 +291,6 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 				prefix: run.prefix,
 				count: run.count,
 				kind: group.kind,
-				description: group.description,
 				...group.power,
 			})
 			if (!stub.ok) {

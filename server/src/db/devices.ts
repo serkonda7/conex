@@ -749,7 +749,6 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 									name: iface.name,
 									kind: iface.kind,
 									connected: 0,
-									description: iface.description,
 									side: iface.side,
 									positions: iface.positions,
 									rear_port_id: rearPortId ?? null,
@@ -1206,7 +1205,6 @@ export async function addInterface(
 		kind: input.kind ?? 'ethernet',
 		connected: 0,
 		enabled: input.enabled === false ? 0 : 1,
-		description: input.description ?? null,
 		side,
 		positions: input.positions ?? 1,
 		rear_port_id: input.rear_port_id ?? null,
@@ -1282,7 +1280,6 @@ export async function updateInterface(
 	const patch: Partial<InterfaceRow> = pickDefined(input, [
 		'name',
 		'kind',
-		'description',
 		'positions',
 		'rear_port_id',
 		'rear_port_position',

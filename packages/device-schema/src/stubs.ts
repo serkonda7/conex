@@ -12,7 +12,6 @@ export type Checked<T> = { ok: true; value: T } | { ok: false; error: string }
 export interface ExpandedInterface {
 	name: string
 	kind: string
-	description: string | null
 	side: PortSide | null
 	positions: number
 	/** Front ports: index of their rear port in the expanded list, and the slot on it. */
@@ -26,7 +25,6 @@ export interface StubInput {
 	prefix: string
 	count: number
 	kind: string
-	description?: string | null
 	side?: PortSide | null
 	positions?: number
 	rear_stub_id?: number | null
@@ -216,7 +214,6 @@ export function expandStubs(stubs: StubInput[]): Checked<ExpandedInterface[]> {
 			out.push({
 				name,
 				kind: stub.kind,
-				description: stub.description ?? null,
 				side: stub.side ?? null,
 				positions: stub.side === 'rear' ? (stub.positions ?? 1) : 1,
 				rear_index: null,

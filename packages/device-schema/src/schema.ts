@@ -4,7 +4,6 @@ import {
 	MAX_POWER_DRAW,
 	POE_MODES,
 	POE_TYPES,
-	PORT_DESCRIPTION_MAX_LENGTH,
 	PORT_SIDES,
 } from './constants'
 
@@ -98,10 +97,6 @@ export const StubPowerEntries = {
 export const StubFieldEntries = {
 	count: v.optional(StubCountSchema, 1),
 	kind: v.optional(InterfaceKindSchema, 'ethernet'),
-	description: v.optional(
-		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(PORT_DESCRIPTION_MAX_LENGTH))),
-		undefined,
-	),
 	side: v.optional(v.nullable(PortSideSchema), undefined),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
