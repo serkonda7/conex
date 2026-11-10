@@ -91,6 +91,7 @@ export const devicesApp = new Hono()
 				page: query.page,
 				limit: query.limit,
 				site: query.site,
+				location: query.location,
 				rack: query.rack,
 				role: query.role,
 				device_type: query.device_type,

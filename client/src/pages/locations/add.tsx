@@ -26,7 +26,7 @@ export function LocationAddPage(): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationType, setLocationType] = createSignal<LocationType>('other')
-	const [parentId, setParentId] = createSignal('')
+	const [parentId, setParentId] = createSignal(queryParam('parent'))
 	const [description, setDescription] = createSignal('')
 
 	const [sites] = createRows(fetch_sites, form.setError)

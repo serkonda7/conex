@@ -2950,6 +2950,68 @@ tbody tr:last-child td {
 	}
 }
 
+/* Location detail: site, ancestors, the location and its children, indented by depth. */
+.location-tree {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.location-tree li {
+	margin: 0;
+	padding-left: calc(var(--tree-depth, 0) * 1rem);
+}
+
+/* Location detail: read-only floor plan thumbnail linking to the plan. */
+.floorplan-preview {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	overflow: hidden;
+	background-color: var(--bg-raised);
+	vertical-align: top;
+}
+
+.floorplan-preview:hover {
+	border-color: var(--border-strong);
+}
+
+.floorplan-preview img {
+	display: block;
+	max-width: 100%;
+	max-height: 20rem;
+}
+
+.floorplan-preview-area {
+	fill: color-mix(in srgb, var(--link) 10%, transparent);
+	stroke: var(--link);
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+}
+
+.floorplan-preview-area.current {
+	fill: color-mix(in srgb, var(--primary-text) 28%, transparent);
+	stroke: var(--primary-text);
+	stroke-width: 2.5;
+}
+
+.floorplan-preview-dot {
+	position: absolute;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	transform: translate(-50%, -50%);
+	background-color: var(--text-secondary);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.floorplan-preview-dot.rack {
+	border-radius: 1px;
+	background-color: var(--link);
+}
+
 /* Device type detail: flat component table, one tinted band per class. */
 .component-section {
 	margin: 1.1rem 0;

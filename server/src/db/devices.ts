@@ -270,6 +270,8 @@ function duplicateDeviceError(err: unknown): Error {
 
 export interface DeviceListParams extends ListParams, TenantFilterParams {
 	site?: number
+	/** Devices directly in this location. */
+	location?: number
 	rack?: number[]
 	role?: number[]
 	device_type?: number
@@ -377,6 +379,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 	const roleIds = params.role ? await deviceRoleSubtrees(params.role) : undefined
 	const deviceOnly =
 		params.site !== undefined ||
+		params.location !== undefined ||
 		params.rack !== undefined ||
 		params.device_type !== undefined ||
 		params.manufacturer !== undefined ||
@@ -419,6 +422,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 							)
 						: undefined,
 					params.site ? eq(devices.site_id, params.site) : undefined,
+					params.location ? eq(devices.location_id, params.location) : undefined,
 					params.rack ? inArray(devices.rack_id, params.rack) : undefined,
 					roleIds ? inArray(devices.device_role_id, roleIds) : undefined,
 					params.device_type ? eq(devices.device_type_id, params.device_type) : undefined,

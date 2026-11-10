@@ -1518,6 +1518,8 @@ export type DeviceListKind = v.InferOutput<typeof DeviceListKindSchema>
 export const DeviceListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdEntry,
+	/** Devices directly in this location (hides VMs). */
+	location: OptionalIdEntry,
 	rack: OptionalIdListEntry,
 	role: OptionalIdListEntry,
 	device_type: OptionalIdEntry,
