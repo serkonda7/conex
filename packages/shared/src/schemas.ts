@@ -529,7 +529,11 @@ export const LocationListQuerySchema = v.object({
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	parent: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	type: v.optional(
+		v.pipe(CsvListSchema, v.array(LocationTypeSchema), v.transform(emptyAsUndefined)),
+		undefined,
+	),
+	sort: v.optional(v.picklist(['name', 'description', 'type', 'site']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1514,6 +1518,8 @@ export type DeviceListKind = v.InferOutput<typeof DeviceListKindSchema>
 export const DeviceListQuerySchema = v.object({
 	...ListQueryEntries,
 	site: OptionalIdEntry,
+	/** Devices directly in this location (hides VMs). */
+	location: OptionalIdEntry,
 	rack: OptionalIdListEntry,
 	role: OptionalIdListEntry,
 	device_type: OptionalIdEntry,

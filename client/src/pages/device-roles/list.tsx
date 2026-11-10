@@ -13,28 +13,9 @@ import { EntityListPage, idOptions, idsOf, useEntityList } from '../../component
 import { TreeName } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel } from '../../i18n/labels'
+import { createCollapsedTree } from '../../lib/collapsed_tree'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRows } from '../../lib/resource'
-
-const COLLAPSED_KEY = 'conex:collapsed:device-roles'
-
-/** Collapsed role ids kept in `localStorage`; ids of deleted roles are harmless. */
-function loadCollapsed(): number[] {
-	try {
-		const raw: unknown = JSON.parse(window.localStorage.getItem(COLLAPSED_KEY) ?? '[]')
-		return Array.isArray(raw) ? raw.filter((id): id is number => Number.isInteger(id)) : []
-	} catch {
-		return []
-	}
-}
-
-function saveCollapsed(ids: readonly number[]): void {
-	try {
-		window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(ids))
-	} catch {
-		// Storage unavailable: the collapse still applies until the page closes.
-	}
-}
 
 /**
  * /device-roles — device role list: search, sortable columns, nested roles
@@ -44,14 +25,7 @@ function saveCollapsed(ids: readonly number[]): void {
 export function DeviceRolesPage(): JSX.Element {
 	const [filterCanHostVms, setFilterCanHostVms] = createSignal<string[]>([])
 	const [filterBundle, setFilterBundle] = createSignal<string[]>([])
-	const [collapsed, setCollapsed] = createSignal<number[]>(loadCollapsed())
-	function toggleCollapsed(id: number): void {
-		const next = collapsed().includes(id)
-			? collapsed().filter((c) => c !== id)
-			: [...collapsed(), id]
-		setCollapsed(next)
-		saveCollapsed(next)
-	}
+	const tree = createCollapsedTree('device-roles')
 	const list = useEntityList({
 		noun: 'noun.deviceRole',
 		sort: 'name' as DeviceRoleSort,
@@ -64,10 +38,8 @@ export function DeviceRolesPage(): JSX.Element {
 		fetch: fetch_device_roles,
 		remove: delete_device_role,
 	})
-	// Collapsing hides rows of the current page only, so it keeps the page.
-	const isCollapsed = (id: number): boolean => collapsed().includes(id)
-	const shown = (): DeviceRoleListRow[] =>
-		list.rows().filter((r) => !r.ancestor_ids.some(isCollapsed))
+	const isCollapsed = tree.isCollapsed
+	const shown = (): DeviceRoleListRow[] => tree.visible(list.rows())
 	const [bundles] = createRows(fetch_managed_bundles, list.setError)
 	const bundleCell = (r: DeviceRoleListRow): JSX.Element => (
 		<Show when={r.managed_bundle} fallback="—">
@@ -117,7 +89,7 @@ export function DeviceRolesPage(): JSX.Element {
 								label: t(isCollapsed(r.id) ? 'tree.expand' : 'tree.collapse', {
 									name: deviceRoleLabel(r),
 								}),
-								onToggle: (): void => toggleCollapsed(r.id),
+								onToggle: (): void => tree.toggle(r.id),
 							}}
 						>
 							<span class="device-role-name">

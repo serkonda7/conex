@@ -14,6 +14,7 @@ import {
 	createsCycle,
 	sortHierarchically,
 	subtreeIds,
+	withTreeLinks,
 } from '../services/hierarchy'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
@@ -145,30 +146,6 @@ export async function listDeviceRoles(
 		matching.length,
 		params,
 	)
-}
-
-/**
- * Rows of a depth-first ordered tree with their `child_count` and
- * `ancestor_ids` (root first), both within `rows`.
- */
-function withTreeLinks<Row extends { id: number; depth: number }>(
-	rows: Row[],
-): (Row & { child_count: number; ancestor_ids: number[] })[] {
-	const out: (Row & { child_count: number; ancestor_ids: number[] })[] = []
-	const stack: (typeof out)[number][] = []
-	for (const row of rows) {
-		while (stack.length > row.depth) {
-			stack.pop()
-		}
-		const parent = stack.at(-1)
-		if (parent) {
-			parent.child_count++
-		}
-		const node = { ...row, child_count: 0, ancestor_ids: stack.map((a) => a.id) }
-		out.push(node)
-		stack.push(node)
-	}
-	return out
 }
 
 export function getDeviceRole(id: number): Promise<Result<DeviceRoleRow, Error>> {

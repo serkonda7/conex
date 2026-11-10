@@ -39,6 +39,7 @@ export async function fetch_device_list(
 			query: to_query({
 				...paging(filters),
 				site: filters?.site,
+				location: filters?.location,
 				rack: filters?.rack,
 				role: filters?.role,
 				device_type: filters?.device_type,
