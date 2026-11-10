@@ -4,6 +4,7 @@ import {
 	type DeleteQuery,
 	EntityParamsSchema,
 	LocationCreateSchema,
+	type LocationListQuery,
 	LocationListQuerySchema,
 	LocationUpdateSchema,
 } from 'shared/src/schemas'
@@ -30,7 +31,7 @@ const baseLocationsApp = makeTenantApp({
 	get: getLocation,
 	update: updateLocation,
 	remove: (id: number, query: DeleteQuery) => deleteLocation(id, query.confirm === 'floorplan'),
-	filters: (q: { site?: number[]; parent?: number }) => ({ site: q.site, parent: q.parent }),
+	filters: (q: LocationListQuery) => ({ site: q.site, parent: q.parent, type: q.type }),
 })
 
 /** Outlets in the location or its descendants, on panels the requester may see. */

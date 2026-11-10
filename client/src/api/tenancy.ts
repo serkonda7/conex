@@ -212,6 +212,7 @@ export async function fetch_locations(
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
 				parent: filters?.parent,
+				type: filters?.type,
 				sort: filters?.sort ?? 'name',
 				order: filters?.order ?? 'asc',
 			}),

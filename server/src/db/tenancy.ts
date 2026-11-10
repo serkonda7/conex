@@ -1,8 +1,10 @@
 import { Result } from 'better-result'
 import { and, asc, eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
-import { alias, type PgTable } from 'drizzle-orm/pg-core'
+import type { PgTable } from 'drizzle-orm/pg-core'
 import {
+	LOCATION_TYPES,
 	type LocationCreate,
+	type LocationType,
 	type LocationUpdate,
 	MAX_LOCATION_DEPTH,
 	type SiteCreate,
@@ -40,6 +42,7 @@ import {
 	depthOf,
 	maxDescendantOffset,
 	sortHierarchically,
+	withTreeLinks,
 } from '../services/hierarchy'
 import { removeAttachmentFiles } from '../storage'
 import {
@@ -85,8 +88,16 @@ export type SiteRow = typeof sites.$inferSelect
 export type SiteGroupRow = typeof site_groups.$inferSelect
 export type LocationRow = typeof locations.$inferSelect
 
-/** List row: the parent may sit on another page, so it travels with the row. */
-export type LocationListRow = LocationRow & { depth: number; parent_name: string | null }
+/**
+ * List row: `child_count` and `ancestor_ids` (root first) refer to the
+ * filtered tree, so the client can collapse rows across pages.
+ */
+export type LocationListRow = LocationRow & {
+	site_name: string
+	depth: number
+	child_count: number
+	ancestor_ids: number[]
+}
 
 export interface TenantListParams extends ListParams {
 	/** Only tenants of this tenant group. */
@@ -754,7 +765,8 @@ const LOCATION_DEPTH_EXCEEDED = `Location hierarchy is limited to ${MAX_LOCATION
 export interface LocationListParams extends ListParams, TenantFilterParams {
 	site?: number[]
 	parent?: number
-	sort: 'name' | 'description'
+	type?: LocationType[]
+	sort: 'name' | 'description' | 'type' | 'site'
 	order: 'asc' | 'desc'
 }
 
@@ -763,17 +775,27 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 		searchCondition(params.search, [locations.name, locations.description]),
 		params.site ? inArray(locations.site_id, params.site) : undefined,
 		params.parent ? eq(locations.parent_id, params.parent) : undefined,
+		params.type ? inArray(locations.type, params.type) : undefined,
 		...tenantConditions(locations.tenant_id, params),
 	)
-	const parent = alias(locations, 'parent')
 	const matching = await getDb()
-		.select({ ...getTableColumns(locations), parent_name: parent.name })
+		.select({ ...getTableColumns(locations), site_name: sites.name })
 		.from(locations)
-		.leftJoin(parent, eq(parent.id, locations.parent_id))
+		.innerJoin(sites, eq(sites.id, locations.site_id))
 		.where(where)
-	const ordered = sortHierarchically(matching, params.sort, params.order)
+	const ordered = sortHierarchically(
+		matching,
+		// Types sort in their natural order (building before floor before room).
+		params.sort === 'type'
+			? (l: (typeof matching)[number]): number => LOCATION_TYPES.indexOf(l.type)
+			: params.sort === 'site'
+				? 'site_name'
+				: params.sort,
+		params.order,
+	)
+	const linked = withTreeLinks(ordered)
 	const offset = offsetOf(params)
-	return pageOf(ordered.slice(offset, offset + params.limit), matching.length, params)
+	return pageOf(linked.slice(offset, offset + params.limit), matching.length, params)
 }
 
 export function getLocation(id: number): Promise<Result<LocationRow, Error>> {
