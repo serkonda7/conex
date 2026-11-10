@@ -3138,6 +3138,29 @@ tbody tr:last-child td {
 	border-top: 1px solid var(--border);
 }
 
+/* Detail overview: stacked spec sheet left, floor plan and images right; stacks when narrow. */
+.detail-overview {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
+	gap: 0 2rem;
+	align-items: start;
+}
+
+/* Spec sheet as one column: groups split by horizontal rules instead of bars. */
+.spec-sheet.stacked {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.spec-sheet.stacked > section {
+	padding: 0;
+	border-left: 0;
+}
+
+.spec-sheet.stacked > section + section {
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
 /* Lines up with the name column. */
 .device-preview .related-tabs-all {
 	margin-left: 0.5rem;

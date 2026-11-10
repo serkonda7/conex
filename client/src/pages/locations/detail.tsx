@@ -27,26 +27,23 @@ import {
 	DetailSubtitle,
 	RecordLink,
 	RelatedPreview,
+	type RelatedTab,
+	RelatedTabs,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { Empty, InlineError } from '../../components/feedback'
 import { FloorplanPreview } from '../../components/floorplan_preview'
 import { IconLabel } from '../../components/icon_label'
-import { ScrollLink } from '../../components/scroll_link'
 import type { PluralKey } from '../../i18n'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, locationTypeLabel } from '../../i18n/labels'
 import { deviceRoleIcon, locationTypeIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
-import { type Crumb, navigate } from '../../lib/router'
-import { can } from '../../lib/session'
+import type { Crumb } from '../../lib/router'
 import { siteTrail } from '../../lib/trails'
 import { DeviceStatusBadge } from '../devices/status'
 import { rackHeightColumn } from '../racks/columns'
-
-/** Child locations listed in the hierarchy before "N more". */
-const HIERARCHY_CHILDREN = 6
 
 /** A location name with its type icon, linked unless it is the current one. */
 function LocationName(props: { location: LocationListRow; current?: boolean }): JSX.Element {
@@ -63,8 +60,8 @@ function LocationName(props: { location: LocationListRow; current?: boolean }): 
 }
 
 /**
- * The site, the location's ancestors, the location itself and its first
- * children, indented by depth. More children link to the sub-location table.
+ * The site, the location's ancestors, the location itself and its
+ * children, indented by depth.
  */
 function LocationHierarchy(props: {
 	id: number
@@ -103,69 +100,49 @@ function LocationHierarchy(props: {
 					</li>
 				)}
 			</For>
-			<For each={children().slice(0, HIERARCHY_CHILDREN)}>
+			<For each={children()}>
 				{(child: LocationListRow) => (
 					<li style={indent(path().length + 1)}>
 						<LocationName location={child} />
 					</li>
 				)}
 			</For>
-			<Show when={children().length > HIERARCHY_CHILDREN}>
-				<li style={indent(path().length + 1)}>
-					<ScrollLink target="location-children">
-						{t('location.moreChildren', {
-							count: children().length - HIERARCHY_CHILDREN,
-						})}
-					</ScrollLink>
-				</li>
-			</Show>
 		</ul>
 	)
 }
 
-/** Flat related-object table with its heading, count and optional add button. */
-function LocationSection<Row extends { id: number }>(props: {
-	id: string
-	title: string
-	rows: Row[] | undefined
-	loading: boolean
+/** One flat related-object tab listing all its rows. */
+function locationTab<Row extends { id: number }>(opts: {
+	key: string
+	label: string
+	rows: () => Row[] | undefined
+	loading: () => boolean
 	noun: PluralKey
 	emptyText: string
 	columns: DataTableColumn<Row>[]
-	addLabel?: string
-	addHref?: string
-}): JSX.Element {
-	return (
-		<section class="component-section flat-table" id={props.id}>
-			<div class="card-header">
-				<h3>
-					{props.title} <span class="badge">{(props.rows ?? []).length}</span>
-				</h3>
-				<Show when={can('edit') && props.addHref}>
-					{(href: () => string) => (
-						<button type="button" onClick={() => navigate(href())}>
-							{props.addLabel}
-						</button>
-					)}
-				</Show>
-			</div>
+}): RelatedTab {
+	return {
+		key: opts.key,
+		label: opts.label,
+		count: (opts.rows() ?? []).length,
+		content: (): JSX.Element => (
 			<RelatedPreview
-				rows={props.rows ?? []}
-				loading={props.loading}
+				rows={opts.rows() ?? []}
+				loading={opts.loading()}
 				all
 				columnLines
-				noun={props.noun}
-				emptyText={props.emptyText}
-				columns={props.columns}
+				noun={opts.noun}
+				emptyText={opts.emptyText}
+				columns={opts.columns}
 			/>
-		</section>
-	)
+		),
+	}
 }
 
 /**
  * /locations/:id — location detail: header with the type icon, spec sheet
  * (general, hierarchy, floor plans), the floor plan preview and images, and
- * flat tables of the sub-locations, racks, devices and outlets.
+ * tabs with the racks, devices and outlets.
  */
 export function LocationDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -184,11 +161,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 	const [siteLocations] = createRowsFor(
 		siteId,
 		(key: number) => fetch_locations({ site: [key], limit: 200 }),
-		setError,
-	)
-	const [children] = createRowsFor(
-		id,
-		(key: number) => fetch_locations({ parent: key, limit: 200 }),
 		setError,
 	)
 	const [racks] = createRowsFor(
@@ -239,31 +211,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		setError,
 		listRoute: '/locations',
 	})
-
-	/** Add-form link carrying this location (and its site). */
-	const addHref = (base: string, param: 'location' | 'parent'): string => {
-		const params = new URLSearchParams({ [param]: String(props.id) })
-		const siteKey = siteId()
-		if (siteKey !== undefined) {
-			params.set('site', String(siteKey))
-		}
-		return `${base}?${params.toString()}`
-	}
-
-	const childColumns: DataTableColumn<LocationListRow>[] = [
-		{
-			key: 'name',
-			label: t('common.name'),
-			class: 'component-name',
-			getValue: (l: LocationListRow): JSX.Element => <LocationName location={l} />,
-		},
-		{
-			key: 'type',
-			label: t('common.type'),
-			getValue: (l: LocationListRow): string => locationTypeLabel(l.type),
-		},
-		descriptionColumn<LocationListRow>(),
-	]
 
 	const rackColumns: DataTableColumn<RackRow>[] = [
 		{
@@ -363,6 +310,36 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		},
 	]
 
+	const tabs = (): RelatedTab[] => [
+		locationTab({
+			key: 'racks',
+			label: tp('entity.rack', 2),
+			rows: racks,
+			loading: () => racks.loading,
+			noun: 'noun.rack',
+			emptyText: t('location.noRacks'),
+			columns: rackColumns,
+		}),
+		locationTab({
+			key: 'devices',
+			label: tp('entity.device', 2),
+			rows: devices,
+			loading: () => deviceItems.loading,
+			noun: 'noun.device',
+			emptyText: t('location.noDevices'),
+			columns: deviceColumns,
+		}),
+		locationTab({
+			key: 'outlets',
+			label: tp('entity.outlet', 2),
+			rows: outlets,
+			loading: () => outlets.loading,
+			noun: 'noun.outlet',
+			emptyText: t('location.noOutlets'),
+			columns: outletColumns,
+		}),
+	]
+
 	return (
 		<div>
 			<DetailShell
@@ -380,130 +357,88 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 				/>
 				<DetailSubtitle description={location()?.description} />
 
-				<section class="spec-sheet" aria-label={t('location.details')}>
-					<section>
-						<h4>{t('location.section.general')}</h4>
-						<dl>
-							<dt>{t('common.type')}</dt>
-							<dd>{locationTypeLabel(location()?.type ?? 'other')}</dd>
-							<dt>{tp('entity.site', 1)}</dt>
-							<dd>
-								<RecordLink id={siteId()} record={site} base="/sites" />
-							</dd>
-							<dt>{tp('entity.tenant', 1)}</dt>
-							<dd>
-								<RecordLink id={tenantId()} record={tenant} base="/tenants" />
-							</dd>
-						</dl>
-					</section>
-					<section>
-						<h4>{t('location.section.hierarchy')}</h4>
-						<LocationHierarchy
-							id={props.id}
-							site={trail()?.[0]}
-							locations={siteLocations() ?? []}
-						/>
-					</section>
-					<section>
-						<h4>{tp('entity.floorplan', 2)}</h4>
-						<dl>
-							<dt>{t('location.ownFloorplan')}</dt>
-							<dd>
-								<Show when={images.floorplan()} fallback="—">
-									{(plan: () => AttachmentJson) => (
-										<a href={`/floorplans/${plan().id}`}>
-											{t('location.openFloorplan')}
-										</a>
-									)}
-								</Show>
-							</dd>
-							<dt>{t('floorplan.linkedFrom')}</dt>
-							<dd>
-								<Show when={(planLinks() ?? []).length > 0} fallback="—">
-									<For each={planLinks()}>
-										{(link: FloorplanLinkJson, index: () => number) => (
-											<>
-												<Show when={index() > 0}>{', '}</Show>
-												<a href={`/floorplans/${link.attachment_id}`}>
-													{link.owner_name}
-												</a>
-											</>
+				<div class="detail-overview">
+					<section class="spec-sheet stacked" aria-label={t('location.details')}>
+						<section>
+							<h4>{t('location.section.general')}</h4>
+							<dl>
+								<dt>{t('common.type')}</dt>
+								<dd>{locationTypeLabel(location()?.type ?? 'other')}</dd>
+								<dt>{tp('entity.tenant', 1)}</dt>
+								<dd>
+									<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+								</dd>
+							</dl>
+						</section>
+						<section>
+							<h4>{t('location.section.hierarchy')}</h4>
+							<LocationHierarchy
+								id={props.id}
+								site={trail()?.[0]}
+								locations={siteLocations() ?? []}
+							/>
+						</section>
+						<section>
+							<h4>{tp('entity.floorplan', 2)}</h4>
+							<dl>
+								<dt>{t('location.ownFloorplan')}</dt>
+								<dd>
+									<Show when={images.floorplan()} fallback="—">
+										{(plan: () => AttachmentJson) => (
+											<a href={`/floorplans/${plan().id}`}>
+												{t('location.openFloorplan')}
+											</a>
 										)}
-									</For>
-								</Show>
-							</dd>
-						</dl>
+									</Show>
+								</dd>
+								<dt>{t('floorplan.linkedFrom')}</dt>
+								<dd>
+									<Show when={(planLinks() ?? []).length > 0} fallback="—">
+										<For each={planLinks()}>
+											{(link: FloorplanLinkJson, index: () => number) => (
+												<>
+													<Show when={index() > 0}>{', '}</Show>
+													<a href={`/floorplans/${link.attachment_id}`}>
+														{link.owner_name}
+													</a>
+												</>
+											)}
+										</For>
+									</Show>
+								</dd>
+							</dl>
+						</section>
 					</section>
-				</section>
 
-				<div class="detail-split">
-					<section aria-labelledby="location-floorplan">
-						<div class="section-header">
-							<h3 id="location-floorplan">{tp('entity.floorplan', 1)}</h3>
-						</div>
-						<Show
-							when={previewPlan()}
-							fallback={<Empty message={t('location.noFloorplan')} />}
-						>
-							{(plan: () => AttachmentJson) => (
-								<FloorplanPreview
-									attachment={plan()}
-									highlight={props.id}
-									onError={setError}
-								/>
-							)}
-						</Show>
-					</section>
 					<div>
+						<section aria-labelledby="location-floorplan">
+							<div class="section-header">
+								<h3 id="location-floorplan">{tp('entity.floorplan', 1)}</h3>
+							</div>
+							<Show
+								when={previewPlan()}
+								fallback={<Empty message={t('location.noFloorplan')} />}
+							>
+								{(plan: () => AttachmentJson) => (
+									<FloorplanPreview
+										attachment={plan()}
+										highlight={props.id}
+										onError={setError}
+									/>
+								)}
+							</Show>
+						</section>
 						<AttachmentsSection id="location-attachments" images={images} />
 					</div>
 				</div>
-			</DetailShell>
 
-			<div class="detail-sections">
-				<LocationSection
-					id="location-children"
-					title={t('location.children')}
-					rows={children()}
-					loading={children.loading}
-					noun="noun.location"
-					emptyText={t('location.noChildren')}
-					columns={childColumns}
-					addLabel={t('location.addChild')}
-					addHref={addHref('/locations/add', 'parent')}
+				<RelatedTabs
+					id="location-related"
+					label={t('location.related')}
+					class="flat-table"
+					tabs={tabs()}
 				/>
-				<LocationSection
-					id="location-racks"
-					title={tp('entity.rack', 2)}
-					rows={racks()}
-					loading={racks.loading}
-					noun="noun.rack"
-					emptyText={t('location.noRacks')}
-					columns={rackColumns}
-					addLabel={t('location.addRack')}
-					addHref={addHref('/racks/add', 'location')}
-				/>
-				<LocationSection
-					id="location-devices"
-					title={tp('entity.device', 2)}
-					rows={devices()}
-					loading={deviceItems.loading}
-					noun="noun.device"
-					emptyText={t('location.noDevices')}
-					columns={deviceColumns}
-					addLabel={t('location.addDevice')}
-					addHref={addHref('/devices/add', 'location')}
-				/>
-				<LocationSection
-					id="location-outlets"
-					title={tp('entity.outlet', 2)}
-					rows={outlets()}
-					loading={outlets.loading}
-					noun="noun.outlet"
-					emptyText={t('location.noOutlets')}
-					columns={outletColumns}
-				/>
-			</div>
+			</DetailShell>
 
 			<InlineError message={error()} />
 		</div>

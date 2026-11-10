@@ -279,6 +279,8 @@ export function RelatedTabs(props: {
 	/** Active tab key, for pages that also switch tabs from outside. */
 	active?: string | null
 	onActiveChange?: (key: string) => void
+	/** Extra classes of the section (e.g. `flat-table`). */
+	class?: string
 }): JSX.Element {
 	const [ownActive, setOwnActive] = createSignal<string | null>(null)
 	const active = (): string | null | undefined => props.active ?? ownActive()
@@ -290,7 +292,11 @@ export function RelatedTabs(props: {
 		props.tabs.find((tab: RelatedTab) => tab.key === active()) ?? props.tabs[0]
 	const tabId = (tab: RelatedTab): string => `${props.id}-${tab.key}`
 	return (
-		<section class="related-tabs" id={props.id} aria-label={props.label}>
+		<section
+			class={props.class ? `related-tabs ${props.class}` : 'related-tabs'}
+			id={props.id}
+			aria-label={props.label}
+		>
 			<div class="related-tabs-bar" role="tablist" aria-label={props.label}>
 				<For each={props.tabs}>
 					{(tab: RelatedTab): JSX.Element => (
