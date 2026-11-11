@@ -1440,6 +1440,28 @@ export function FloorplanEditor(props: {
 				{(mount: () => HTMLElement) => (
 					<Portal mount={mount()}>
 						<div class="modal-actions">
+							<div class="floorplan-history">
+								<button
+									type="button"
+									class="floorplan-history-button"
+									aria-label={t('floorplan.undo')}
+									title={t('floorplan.undoHint')}
+									disabled={undoStack().length === 0}
+									onClick={undo}
+								>
+									<IconArrowBackUp size={16} />
+								</button>
+								<button
+									type="button"
+									class="floorplan-history-button"
+									aria-label={t('floorplan.redo')}
+									title={t('floorplan.redoHint')}
+									disabled={redoStack().length === 0}
+									onClick={redo}
+								>
+									<IconArrowForwardUp size={16} />
+								</button>
+							</div>
 							<button type="button" onClick={onCancel} disabled={save.pending()}>
 								{t('common.cancel')}
 							</button>
@@ -1824,28 +1846,6 @@ export function FloorplanEditor(props: {
 						>
 							<IconLabel icon={IconPencilPlus}>{t('floorplan.drawArea')}</IconLabel>
 						</button>
-						<div class="floorplan-history">
-							<button
-								type="button"
-								class="icon-btn"
-								aria-label={t('floorplan.undo')}
-								title={t('floorplan.undoHint')}
-								disabled={undoStack().length === 0}
-								onClick={undo}
-							>
-								<IconArrowBackUp size={16} />
-							</button>
-							<button
-								type="button"
-								class="icon-btn"
-								aria-label={t('floorplan.redo')}
-								title={t('floorplan.redoHint')}
-								disabled={redoStack().length === 0}
-								onClick={redo}
-							>
-								<IconArrowForwardUp size={16} />
-							</button>
-						</div>
 						<button
 							type="button"
 							class="floorplan-draw-toggle floorplan-snap-toggle"

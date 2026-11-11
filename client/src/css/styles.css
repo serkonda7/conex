@@ -3668,7 +3668,7 @@ span.attachment-star,
 	height: 1.75rem;
 	color: var(--text);
 	background-color: var(--bg-surface);
-	border: 2px solid var(--primary);
+	border: 0;
 	border-radius: 999px;
 	box-shadow: var(--shadow);
 }
@@ -3678,7 +3678,6 @@ span.attachment-star,
 }
 
 .floorplan-marker-inactive {
-	border-style: dashed;
 	opacity: 0.75;
 }
 
@@ -3738,34 +3737,31 @@ span.attachment-star,
 	background-color: var(--primary-hover);
 }
 
-/* Outlet (patch-panel rear port): smaller socket, grey while uncabled. */
+/* Outlet (patch-panel rear port): smaller socket, filled grey while free
+   and green once cabled. */
 .floorplan-marker-outlet {
 	width: 1.4rem;
 	height: 1.4rem;
 	padding: 0;
-	border-color: var(--text-muted);
 	border-radius: 0.3rem;
 	cursor: pointer;
 }
 
-.status-colors .floorplan-marker-outlet.floorplan-marker-cabled {
-	border-color: var(--success);
+.floorplan-marker-outlet:not(.floorplan-marker-jack) {
+	color: var(--bg-base);
+	background-color: var(--text-muted);
 }
 
-/* Device markers by status, while status colours are on. */
-.status-colors .floorplan-marker-status-active {
-	border-color: var(--success);
+.floorplan-marker-outlet.floorplan-marker-cabled:not(.floorplan-marker-jack) {
+	background-color: var(--success);
 }
 
-.status-colors .floorplan-marker-status-planned {
-	border-color: var(--link);
+.floorplan-marker-outlet:hover,
+.floorplan-marker-outlet:focus-visible {
+	filter: brightness(1.15);
 }
 
-.status-colors .floorplan-marker-status-inactive {
-	border-color: var(--error);
-}
-
-/* Jack: one socket per port in one marker, each coloured by its cabling. */
+/* Jack: one socket per port in one marker, each filled by its cabling. */
 .floorplan-marker-jack {
 	width: auto;
 	padding: 0 0.1rem;
@@ -3779,21 +3775,23 @@ span.attachment-star,
 .floorplan-jack-port {
 	display: grid;
 	place-items: center;
-	color: var(--text-muted);
+	margin: 0 0.05rem;
+	color: var(--bg-base);
+	background-color: var(--text-muted);
+	border-radius: 0.2rem;
 }
 
-.status-colors .floorplan-jack-port-cabled {
-	color: var(--success);
+.floorplan-jack-port-cabled {
+	background-color: var(--success);
 }
 
-/* Legend of the status colours, below the layer bar. */
+/* Legend of the outlets' cabling colours, at the right end of the layer bar. */
 .floorplan-status-legend {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.25rem 0.75rem;
-	contain: inline-size;
-	margin: 0 0 0.4rem;
+	margin-left: auto;
 	font-size: var(--font-size-sm);
 	color: var(--text-secondary);
 }
@@ -3818,23 +3816,14 @@ span.attachment-star,
 }
 
 .floorplan-status-dot {
-	width: 0.6rem;
-	height: 0.6rem;
-	border-radius: 999px;
-	border: 2px solid var(--text-muted);
+	width: 0.7rem;
+	height: 0.7rem;
+	border-radius: 0.2rem;
+	background-color: var(--text-muted);
 }
 
-.floorplan-status-dot.floorplan-status-active,
 .floorplan-status-dot.floorplan-status-cabled {
-	border-color: var(--success);
-}
-
-.floorplan-status-dot.floorplan-status-planned {
-	border-color: var(--link);
-}
-
-.floorplan-status-dot.floorplan-status-inactive {
-	border-color: var(--error);
+	background-color: var(--success);
 }
 
 .floorplan-popover-port {
@@ -4083,10 +4072,15 @@ span.attachment-star,
 	margin-top: 0.4rem;
 }
 
+/* Undo and redo, left of Cancel in the page header. */
 .floorplan-history {
 	display: flex;
 	gap: 0.25rem;
-	margin-bottom: 0.4rem;
+}
+
+.floorplan-history-button {
+	display: inline-grid;
+	place-items: center;
 }
 
 /* Selection box of a Shift + drag on the plan. */
