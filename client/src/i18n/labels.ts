@@ -462,6 +462,7 @@ export function deviceRoleIconOptions(): (FormOption & { value: DeviceRoleIcon }
 
 const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {
 	tanss: 'provider.tanss',
+	m365: 'provider.m365',
 }
 
 /** Integration provider name (`tanss` → TANSS). */
@@ -471,6 +472,7 @@ export function providerLabel(value: string): string {
 
 const EXTERNAL_TENANT_KEYS: Record<IntegrationProvider, PluralKey> = {
 	tanss: 'externalTenant.tanss',
+	m365: 'externalTenant.m365',
 }
 
 /**
@@ -505,6 +507,7 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	tenant_stale: 'finding.tenant_stale',
 	tenant_inactive: 'finding.tenant_inactive',
 	tenant_customer_number_mismatch: 'finding.tenant_customer_number_mismatch',
+	tenant_domain_unverified: 'finding.tenant_domain_unverified',
 	device_missing_in_conex: 'finding.device_missing_in_conex',
 	device_missing_in_external: 'finding.device_missing_in_external',
 	device_suggestion: 'finding.device_suggestion',
@@ -515,6 +518,7 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	employee_suggestion: 'finding.employee_suggestion',
 	employee_stale: 'finding.employee_stale',
 	employee_mismatch: 'finding.employee_mismatch',
+	employee_inactive_in_external: 'finding.employee_inactive_in_external',
 	priority_tag_missing: 'finding.priority_tag_missing',
 }
 
@@ -526,11 +530,12 @@ export function findingKindLabel(value: string, provider: string): string {
 }
 
 const COMPARE_FIELD_KEYS: Record<
-	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'tenant' | 'status',
+	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'domain' | 'tenant' | 'status',
 	MessageKey
 > = {
 	name: 'common.name',
 	customer_number: 'tenant.customerNumber',
+	domain: 'compareField.domain',
 	tenant: 'entity.tenant.one',
 	status: 'common.status',
 	serial: 'device.serial',

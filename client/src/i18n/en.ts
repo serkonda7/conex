@@ -1315,6 +1315,65 @@ export const en = {
 	'integration.showIgnored': 'Show ignored',
 	'integration.noRows': 'No entries.',
 
+	// Microsoft 365
+	'noun.m365Tenant.one': 'Entra tenant',
+	'noun.m365Tenant.other': 'Entra tenants',
+	'integration.syncCountsEmployees': '{tenantCount} {tenants}, {employees} employees',
+	'integration.deactivateInConex': 'Set inactive in conex',
+	'integration.confirmDeactivateInConex': 'Set "{name}" inactive in conex?',
+	'provider.m365': 'Microsoft 365',
+	'externalTenant.m365.one': 'Entra tenant',
+	'externalTenant.m365.other': 'Entra tenants',
+	'finding.tenant_domain_unverified': 'Mail domain not verified in {tenant}',
+	'finding.employee_inactive_in_external': 'Inactive externally, still active in conex',
+	'compareField.domain': 'Mail domain',
+	'm365.clientId': 'Application (client) ID',
+	'm365.clientIdHint': "Of the MSP's multi-tenant app registration in Entra ID.",
+	'm365.clientIdRequired': 'Application (client) ID is required.',
+	'm365.homeTenant': 'Home tenant',
+	'm365.homeTenantHint':
+		"The MSP's own tenant (ID or domain) the app is registered in; used by Test connection.",
+	'm365.homeTenantRequired': 'Home tenant is required.',
+	'm365.clientSecret': 'Client secret',
+	'm365.clientSecretRequired': 'Client secret is required.',
+	'm365.secretExpires': 'Secret expires',
+	'm365.secretExpiresHint':
+		'Optional; conex warns 30 days ahead. An expired secret stops the sync for every customer.',
+	'm365.secretExpired': 'expired',
+	'm365.secretExpiresSoon.one': 'expires in {count} day',
+	'm365.secretExpiresSoon.other': 'expires in {count} days',
+	'm365.licensedOnly': 'Licensed users only',
+	'm365.licensedOnlyHint':
+		'Skips shared and room mailboxes and service accounts without a license.',
+	'm365.testOk': 'The app can sign in to its home tenant.',
+	'm365.consentedTenants': 'Consented customer tenants',
+	'm365.noConsentedTenants':
+		'No customer has consented yet. Create a consent link on a tenant page.',
+	'm365.tenantsFailed': 'Failed to load the consented Entra tenants',
+	'm365.removeTenant': 'Remove',
+	'm365.confirmRemoveTenant':
+		'Remove "{name}" from conex? Its links are reported as stale after the next sync. The consent itself stays in the customer\'s Entra ID.',
+	'm365.notConnected': 'Not connected to an Entra tenant.',
+	'm365.createConsentLink': 'Create consent link',
+	'm365.consentLinkFailed': 'Failed to create the consent link',
+	'm365.openConsentLink': 'Open consent link',
+	'm365.copyConsentLink': 'Copy link',
+	'm365.copied': 'Copied',
+	'm365.copyFailed': 'Copying failed; open the link and copy it from the address bar.',
+	'm365.consentLinkHint':
+		"Open it yourself or send it to the customer's global admin. Valid until {date}. The app must allow the redirect URI {uri}.",
+	'm365.manualConnect': 'Already consented: tenant ID or domain',
+	'm365.manualConnectHint':
+		'For consent given another way; conex checks that it can read the tenant.',
+	'm365.check': 'Check and connect',
+	'm365.checking': 'Checking…',
+	'm365.connectFailed': 'Failed to connect the Entra tenant',
+	'm365.entraTenant': 'Entra tenant',
+	'm365.defaultDomain': 'Default domain',
+	'm365.disconnect': 'Disconnect',
+	'm365.confirmDisconnect':
+		'Disconnect this tenant from its Entra tenant? Employee links stay until the next sync reports them.',
+
 	// tickets
 	'ticket.create': 'Create ticket',
 	'ticket.createTitle': 'New ticket',

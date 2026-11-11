@@ -1338,6 +1338,66 @@ export const de: Messages = {
 	'integration.showIgnored': 'Ignorierte anzeigen',
 	'integration.noRows': 'Keine Einträge.',
 
+	// Microsoft 365
+	'noun.m365Tenant.one': 'Entra-Mandant',
+	'noun.m365Tenant.other': 'Entra-Mandanten',
+	'integration.syncCountsEmployees': '{tenantCount} {tenants}, {employees} Mitarbeiter',
+	'integration.deactivateInConex': 'In conex inaktiv setzen',
+	'integration.confirmDeactivateInConex': '„{name}“ in conex inaktiv setzen?',
+	'provider.m365': 'Microsoft 365',
+	'externalTenant.m365.one': 'Entra-Mandant',
+	'externalTenant.m365.other': 'Entra-Mandanten',
+	'finding.tenant_domain_unverified': 'Mail-Domain im {tenant} nicht verifiziert',
+	'finding.employee_inactive_in_external': 'Extern inaktiv, in conex noch aktiv',
+	'compareField.domain': 'Mail-Domain',
+	'm365.clientId': 'Anwendungs-ID (Client-ID)',
+	'm365.clientIdHint':
+		'Der mehrinstanzenfähigen App-Registrierung des Dienstleisters in Entra ID.',
+	'm365.clientIdRequired': 'Anwendungs-ID ist erforderlich.',
+	'm365.homeTenant': 'Heimat-Mandant',
+	'm365.homeTenantHint':
+		'Der eigene Mandant (ID oder Domain), in dem die App registriert ist; für „Verbindung testen“.',
+	'm365.homeTenantRequired': 'Heimat-Mandant ist erforderlich.',
+	'm365.clientSecret': 'Geheimer Clientschlüssel',
+	'm365.clientSecretRequired': 'Geheimer Clientschlüssel ist erforderlich.',
+	'm365.secretExpires': 'Schlüssel läuft ab',
+	'm365.secretExpiresHint':
+		'Optional; conex warnt 30 Tage vorher. Ein abgelaufener Schlüssel stoppt den Abgleich für alle Kunden.',
+	'm365.secretExpired': 'abgelaufen',
+	'm365.secretExpiresSoon.one': 'läuft in {count} Tag ab',
+	'm365.secretExpiresSoon.other': 'läuft in {count} Tagen ab',
+	'm365.licensedOnly': 'Nur lizenzierte Benutzer',
+	'm365.licensedOnlyHint':
+		'Lässt freigegebene Postfächer, Raumpostfächer und Dienstkonten ohne Lizenz weg.',
+	'm365.testOk': 'Die App kann sich im Heimat-Mandanten anmelden.',
+	'm365.consentedTenants': 'Kunden-Mandanten mit Zustimmung',
+	'm365.noConsentedTenants':
+		'Noch kein Kunde hat zugestimmt. Einen Zustimmungslink gibt es auf der Mandantenseite.',
+	'm365.tenantsFailed': 'Entra-Mandanten konnten nicht geladen werden',
+	'm365.removeTenant': 'Entfernen',
+	'm365.confirmRemoveTenant':
+		'„{name}“ aus conex entfernen? Nach dem nächsten Abgleich gelten seine Verknüpfungen als veraltet. Die Zustimmung selbst bleibt im Entra ID des Kunden bestehen.',
+	'm365.notConnected': 'Mit keinem Entra-Mandanten verbunden.',
+	'm365.createConsentLink': 'Zustimmungslink erstellen',
+	'm365.consentLinkFailed': 'Zustimmungslink konnte nicht erstellt werden',
+	'm365.openConsentLink': 'Zustimmungslink öffnen',
+	'm365.copyConsentLink': 'Link kopieren',
+	'm365.copied': 'Kopiert',
+	'm365.copyFailed': 'Kopieren fehlgeschlagen; Link öffnen und aus der Adresszeile kopieren.',
+	'm365.consentLinkHint':
+		'Selbst öffnen oder an den globalen Administrator des Kunden senden. Gültig bis {date}. Die App muss die Umleitungs-URI {uri} erlauben.',
+	'm365.manualConnect': 'Zustimmung schon erteilt: Mandanten-ID oder Domain',
+	'm365.manualConnectHint':
+		'Für eine auf anderem Weg erteilte Zustimmung; conex prüft, ob es den Mandanten lesen kann.',
+	'm365.check': 'Prüfen und verbinden',
+	'm365.checking': 'Prüfe…',
+	'm365.connectFailed': 'Entra-Mandant konnte nicht verbunden werden',
+	'm365.entraTenant': 'Entra-Mandant',
+	'm365.defaultDomain': 'Standard-Domain',
+	'm365.disconnect': 'Trennen',
+	'm365.confirmDisconnect':
+		'Diesen Mandanten von seinem Entra-Mandanten trennen? Mitarbeiter-Verknüpfungen bleiben, bis der nächste Abgleich sie meldet.',
+
 	// tickets
 	'ticket.create': 'Ticket erstellen',
 	'ticket.createTitle': 'Neues Ticket',

@@ -378,6 +378,7 @@ export async function deleteIntegration(
 			await db.delete(external_objects).where(eq(external_objects.provider, provider))
 			await db.delete(sync_runs).where(eq(sync_runs.provider, provider))
 			await db.delete(integrations).where(eq(integrations.provider, provider))
+			await providerDefinition(provider).deleteData?.()
 		})
 	} catch (e) {
 		return Result.err(errOf(e))

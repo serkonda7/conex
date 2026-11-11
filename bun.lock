@@ -65,6 +65,7 @@
         "@hono/valibot-validator": "catalog:",
         "@microsoft/msgraph-sdk": "1.0.0-preview.92",
         "@microsoft/msgraph-sdk-core": "1.0.0-preview.17",
+        "@microsoft/msgraph-sdk-organization": "1.0.0-preview.92",
         "@microsoft/msgraph-sdk-users": "1.0.0-preview.92",
         "@serkonda7/conex-device-schema": "workspace:*",
         "better-result": "catalog:",
@@ -263,6 +264,8 @@
     "@microsoft/msgraph-sdk": ["@microsoft/msgraph-sdk@1.0.0-preview.92", "", { "dependencies": { "@microsoft/msgraph-sdk-core": "^1.0.0-preview.17", "tslib": "^2.6.2" } }, "sha512-eDMs4B20ouUnBjkJCweClSzPPC24jDSer/7/MDH/oL1Z2W8PUhaL/KEN7PxvEJl1xGIJb/3SPyoZ0iIaZ+cmzA=="],
 
     "@microsoft/msgraph-sdk-core": ["@microsoft/msgraph-sdk-core@1.0.0-preview.17", "", { "dependencies": { "@azure/core-auth": "^1.9.0", "@microsoft/kiota-authentication-azure": "^1.0.0-preview.82", "@microsoft/kiota-bundle": "^1.0.0-preview.82", "tslib": "^2.6.2" } }, "sha512-zg4adBwEIwJBjM3IHi8xmz6Hyumz/IyEdCiX4JLWd+v4Jo9qIexZ0+IPEhi8xbgMwdrJ0h82D1CKGRe1vcsCBw=="],
+
+    "@microsoft/msgraph-sdk-organization": ["@microsoft/msgraph-sdk-organization@1.0.0-preview.92", "", { "dependencies": { "@microsoft/msgraph-sdk": "^1.0.0-preview.42", "tslib": "^2.6.2" } }, "sha512-K1LIz6lZbB0lBkXKf/FyO4bw/oizBHA1Z0CISTc1/Xe9oSXZ2EeNgxyjlirJ94x8fb8bB0qM/m6kK4uY9hjkJQ=="],
 
     "@microsoft/msgraph-sdk-users": ["@microsoft/msgraph-sdk-users@1.0.0-preview.92", "", { "dependencies": { "@microsoft/msgraph-sdk": "^1.0.0-preview.42", "tslib": "^2.6.2" } }, "sha512-eJ+FmY8aG321ephvgulJpkyf9OElAsPTlPERP9xtCXHvSJF2QghMSN6A9LFruBw/ZM7qi3QU7GWaIgrLxIjAKw=="],
 

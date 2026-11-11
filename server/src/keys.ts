@@ -22,3 +22,8 @@ export function getSigningKey(): string {
 export function getIntegrationKey(): Buffer {
 	return derive('conex:integrations:v1', 32)
 }
+
+/** Signs the `state` of M365 admin consent links (`integrations/m365/consent.ts`). */
+export function getConsentStateKey(): Buffer {
+	return derive('conex:m365-consent:v1', 32)
+}

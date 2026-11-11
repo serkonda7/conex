@@ -4,11 +4,16 @@ import { FormPage, SelectField } from '../../components/form'
 import { t } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { submit_form, useEntityForm } from '../../lib/form'
-import { IntegrationFormFields, secrets, useIntegrationForm } from './form_fields'
+import {
+	fillIntegrationForm,
+	IntegrationFormFields,
+	updateBody,
+	useIntegrationForm,
+} from './form_fields'
 
 /**
  * /integrations/:id/edit — `integrations.manage` only. Blank secrets keep the stored ones;
- * changing URL or credentials logs in again before saving.
+ * changing the connection settings or credentials logs in again before saving.
  */
 export function IntegrationEditPage(props: { id: number }): JSX.Element {
 	const fields = useIntegrationForm()
@@ -17,8 +22,7 @@ export function IntegrationEditPage(props: { id: number }): JSX.Element {
 		id: props.id,
 		load: fetch_integration,
 		fill: (row: IntegrationJson) => {
-			fields.setBaseUrl(row.base_url ?? '')
-			fields.setUsername(row.username ?? '')
+			fillIntegrationForm(fields, row)
 			setEnabled(row.enabled ? '1' : '0')
 		},
 	})
@@ -31,13 +35,7 @@ export function IntegrationEditPage(props: { id: number }): JSX.Element {
 			name: '',
 			optionalName: true,
 			save: () =>
-				update_integration(provider(), {
-					provider: provider(),
-					base_url: fields.baseUrl().trim(),
-					username: fields.username().trim(),
-					...secrets(fields),
-					enabled: enabled() === '1',
-				}),
+				update_integration(provider(), updateBody(provider(), fields, enabled() === '1')),
 			navigateTo: '/integrations',
 		})
 	}

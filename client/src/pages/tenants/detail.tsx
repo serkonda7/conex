@@ -61,6 +61,7 @@ import {
 	tenantReportHref,
 	useTenantIntegrations,
 } from '../integrations/cards'
+import { M365TenantCard } from '../integrations/m365'
 import { rackHeightColumn } from '../racks/columns'
 import { TenantTickets } from '../tickets/tenant_tickets'
 
@@ -293,6 +294,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					<div>
 						<NeedsAttention tenantId={props.id} integrations={integrations() ?? []} />
 						<TenantTickets tenantId={props.id} />
+						<M365TenantCard tenantId={props.id} />
 						<SitesCard
 							tenantId={props.id}
 							sites={sites() ?? []}

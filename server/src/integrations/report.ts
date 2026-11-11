@@ -11,6 +11,10 @@
  * 'many'`); its devices and employees are then matched against the union of
  * them. Levels the provider does not support (employees, customer numbers,
  * priority tags) produce no findings.
+ *
+ * An external employee that is inactive while the linked conex employee is
+ * still active is its own finding (`employee_inactive_in_external`): the
+ * offboarding signal, resolved by deactivating the employee in conex.
  */
 import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
 import { normalizePhone } from 'shared/src/phone'
@@ -32,7 +36,7 @@ import type {
 	IntegrationProvider as ProviderId,
 	TenantIntegrationStatus,
 } from 'shared/src/schemas'
-import { DEVICE_COMPARE_FIELDS, EMPLOYEE_COMPARE_FIELDS } from 'shared/src/schemas'
+import { DEVICE_COMPARE_FIELDS, EMPLOYEE_COMPARE_FIELDS, emailDomain } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { employeeTenantIds, memberCondition } from '../db/employees'
 import { type TenantFilterParams, tenantConditions } from '../db/list'
@@ -256,7 +260,12 @@ export async function buildReport(
 ): Promise<IntegrationReport> {
 	const findings: IntegrationFinding[] = []
 	const tenantRows = await getDb()
-		.select({ id: tenants.id, name: tenants.name, customer_number: tenants.customer_number })
+		.select({
+			id: tenants.id,
+			name: tenants.name,
+			customer_number: tenants.customer_number,
+			emails: tenants.emails,
+		})
 		.from(tenants)
 		.where(and(...tenantConditions(tenants.id, filter)))
 		.orderBy(tenants.name)
@@ -302,6 +311,23 @@ export async function buildReport(
 			const withName = { ...linked, external_name: external.name }
 			if (!external.active) {
 				findings.push(finding('tenant_inactive', withName))
+			}
+			// Mail domain of the tenant's primary address among the verified ones (M365).
+			const domain = emailDomain(tenant.emails)?.toLowerCase() ?? null
+			if (
+				external.domains !== undefined &&
+				external.domains.length > 0 &&
+				domain !== null &&
+				!external.domains.includes(domain)
+			) {
+				findings.push(
+					finding('tenant_domain_unverified', {
+						...withName,
+						field: 'domain',
+						local: domain,
+						remote: external.domains.join(', '),
+					}),
+				)
 			}
 			if (!capabilities.customer_numbers) {
 				continue
@@ -606,7 +632,16 @@ async function employeeFindings(
 				}),
 			)
 		}
-		if ((employee.active === 1) !== external.active) {
+		if (employee.active === 1 && !external.active) {
+			findings.push(
+				finding('employee_inactive_in_external', {
+					...withExternal,
+					field: 'status',
+					local: 'active',
+					remote: 'inactive',
+				}),
+			)
+		} else if ((employee.active === 1) !== external.active) {
 			findings.push(
 				finding('employee_mismatch', {
 					...withExternal,

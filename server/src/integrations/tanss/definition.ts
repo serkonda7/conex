@@ -19,6 +19,7 @@ export const tanssDefinition: ProviderDefinition<'tanss'> = {
 	id: 'tanss',
 	capabilities: {
 		employees: true,
+		devices: true,
 		tickets: true,
 		push: true,
 		create_device: true,

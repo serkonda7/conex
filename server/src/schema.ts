@@ -1131,6 +1131,18 @@ export const sync_runs = pgTable(
 	(table) => [index('sync_runs_provider_idx').on(table.provider, table.started_at)],
 )
 
+// Microsoft 365: customer Entra tenants whose admin consented to the MSP's
+// multi-tenant app. Graph cannot list them, so this table is what the sync
+// fetches; consent is proven by reading `/organization` before a row is added.
+export const m365_tenants = pgTable('m365_tenants', {
+	ms_tenant_id: text('ms_tenant_id').primaryKey(),
+	display_name: text('display_name'),
+	default_domain: text('default_domain'),
+	consented_at: bigint('consented_at', { mode: 'number' }).notNull(),
+	last_ok_at: bigint('last_ok_at', { mode: 'number' }),
+	last_error: text('last_error'),
+})
+
 // ---------------------------------------------------------------------------
 // Changelog (NetBox-style): one row per create/update/delete of an
 // inventory object, written by the service layer. `object_type` and

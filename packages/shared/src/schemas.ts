@@ -2623,12 +2623,12 @@ export interface DeviceTypeUpdatePreview {
 }
 
 // ---------------------------------------------------------------------------
-// Integrations (TANSS; UniFi and Microsoft 365 next). External systems are
+// Integrations (TANSS, Microsoft 365; UniFi next). External systems are
 // sources: conex links its tenants/devices/employees to external objects and
 // reports where the data disagrees. See `docs/integrations.md`.
 // ---------------------------------------------------------------------------
 
-export const INTEGRATION_PROVIDERS = ['tanss'] as const
+export const INTEGRATION_PROVIDERS = ['tanss', 'm365'] as const
 
 export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
 
@@ -2655,11 +2655,59 @@ const SecretSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(4096))
  */
 export interface IntegrationSecretFields {
 	tanss: readonly ['password', 'erp_token']
+	m365: readonly ['client_secret']
 }
 
 export const INTEGRATION_SECRET_FIELDS: IntegrationSecretFields = {
 	tanss: ['password', 'erp_token'],
+	m365: ['client_secret'],
 }
+
+/** Entra tenant id (a GUID). */
+export const EntraTenantGuidSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'Must be a GUID'),
+)
+
+/** Entra tenant id or one of its domains (`contoso.onmicrosoft.com`). */
+const EntraTenantSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.regex(
+		/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|([a-z0-9-]+\.)+[a-z]{2,})$/,
+		'Must be a tenant id or domain',
+	),
+	v.maxLength(253),
+)
+
+/** Application (client) id of the MSP's multi-tenant Entra app. */
+const EntraClientIdSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'Must be a GUID'),
+)
+
+/** Expiry date of the client secret (`YYYY-MM-DD`); empty = unknown. */
+const SecretExpirySchema = v.union([v.literal(''), CalendarDateSchema])
+
+/**
+ * Plain settings of the M365 integration (stored in `integrations.settings`).
+ * `home_tenant` is the MSP's own tenant (id or domain), where "Test
+ * connection" gets a token.
+ */
+export const M365SettingsSchema = v.object({
+	client_id: EntraClientIdSchema,
+	home_tenant: EntraTenantSchema,
+	/** Only users with a license (skips shared/room mailboxes and service accounts). */
+	licensed_only: v.optional(v.boolean(), true),
+	secret_expires: v.optional(SecretExpirySchema, ''),
+})
+
+export type M365Settings = v.InferOutput<typeof M365SettingsSchema>
 
 export type IntegrationSecretField<P extends IntegrationProvider = IntegrationProvider> =
 	IntegrationSecretFields[P][number]
@@ -2676,6 +2724,14 @@ export const IntegrationCreateSchema = v.variant('provider', [
 		password: SecretSchema,
 		erp_token: SecretSchema,
 	}),
+	v.strictObject({
+		provider: v.literal('m365'),
+		client_id: EntraClientIdSchema,
+		home_tenant: EntraTenantSchema,
+		licensed_only: v.optional(v.boolean(), true),
+		secret_expires: v.optional(SecretExpirySchema, ''),
+		client_secret: SecretSchema,
+	}),
 ])
 
 /**
@@ -2691,6 +2747,15 @@ export const IntegrationUpdateSchema = v.variant('provider', [
 		erp_token: v.optional(SecretSchema, undefined),
 		enabled: v.optional(v.boolean(), undefined),
 	}),
+	v.strictObject({
+		provider: v.literal('m365'),
+		client_id: v.optional(EntraClientIdSchema, undefined),
+		home_tenant: v.optional(EntraTenantSchema, undefined),
+		licensed_only: v.optional(v.boolean(), undefined),
+		secret_expires: v.optional(SecretExpirySchema, undefined),
+		client_secret: v.optional(SecretSchema, undefined),
+		enabled: v.optional(v.boolean(), undefined),
+	}),
 ])
 
 /**
@@ -2704,6 +2769,14 @@ export const IntegrationTestSchema = v.variant('provider', [
 		username: IntegrationUsernameSchema,
 		password: v.optional(SecretSchema, undefined),
 		erp_token: v.optional(SecretSchema, undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('m365'),
+		client_id: EntraClientIdSchema,
+		home_tenant: EntraTenantSchema,
+		licensed_only: v.optional(v.boolean(), undefined),
+		secret_expires: v.optional(SecretExpirySchema, undefined),
+		client_secret: v.optional(SecretSchema, undefined),
 	}),
 ])
 
@@ -2904,6 +2977,8 @@ export interface SyncRunJson {
 export interface IntegrationCapabilities {
 	/** Syncs employees (contacts / users); without them the report has no employee level. */
 	employees: boolean
+	/** Syncs devices; without them the report has no device level. */
+	devices: boolean
 	/** Opens and lists tickets, with priorities as ticket tags. */
 	tickets: boolean
 	/** Overwrites external device/employee fields with conex values (and deactivates employees). */
@@ -2948,6 +3023,11 @@ export interface ExternalTenantJson {
 	private: boolean
 	/** Headquarter company of a branch. */
 	headquarter_id: string | null
+	/**
+	 * Verified mail domains (M365), compared with the tenant's primary mail
+	 * address; absent for providers without them.
+	 */
+	domains?: string[]
 }
 
 /** External tenant plus the conex tenant it is linked to (picker rows). */
@@ -3034,6 +3114,7 @@ export const FINDING_KINDS = [
 	'tenant_stale',
 	'tenant_inactive',
 	'tenant_customer_number_mismatch',
+	'tenant_domain_unverified',
 	'device_missing_in_conex',
 	'device_missing_in_external',
 	'device_suggestion',
@@ -3044,6 +3125,7 @@ export const FINDING_KINDS = [
 	'employee_suggestion',
 	'employee_stale',
 	'employee_mismatch',
+	'employee_inactive_in_external',
 	'priority_tag_missing',
 ] as const
 
@@ -3070,6 +3152,7 @@ export interface IntegrationFinding {
 		| DeviceCompareField
 		| EmployeeCompareField
 		| 'customer_number'
+		| 'domain'
 		| 'tenant'
 		| 'status'
 		| 'priority'
@@ -3170,6 +3253,61 @@ export interface EmployeeIntegrationStatus {
 	/** Unlinked, not ignored external employees of those tenants (link picker). */
 	candidates: ExternalEmployeeJson[]
 }
+
+// ---------------------------------------------------------------------------
+// Microsoft 365: customer Entra tenants that consented to the MSP's
+// multi-tenant app. The app cannot ask Graph which tenants consented, so
+// conex keeps the list (`m365_tenants`); it feeds the sync.
+// ---------------------------------------------------------------------------
+
+/** Consented customer tenant and the outcome of its last fetch. */
+export interface M365TenantJson {
+	ms_tenant_id: string
+	display_name: string | null
+	default_domain: string | null
+	consented_at: number
+	last_ok_at: number | null
+	last_error: string | null
+	/** conex tenant linked to it, null when none. */
+	linked_tenant_id: number | null
+}
+
+/** Admin consent link for one conex tenant; `?tenant=` and the client's origin. */
+export const M365ConsentLinkQuerySchema = v.object({
+	tenant: IdSchema,
+	/** `window.location.origin`; ignored when `frontendUrl` is configured. */
+	origin: v.optional(v.pipe(v.string(), v.url(), v.maxLength(500)), undefined),
+})
+
+export interface M365ConsentLinkJson {
+	url: string
+	/** The redirect URI to register in the app (`…/api/integrations/m365/consent`). */
+	redirect_uri: string
+	/** Unix seconds; the link's signed state expires then. */
+	expires_at: number
+}
+
+/**
+ * Connects a conex tenant to an Entra tenant whose admin already consented
+ * (another way than the consent link): proven by reading `/organization`.
+ */
+export const M365ConnectSchema = v.strictObject({
+	tenant_id: IdSchema,
+	ms_tenant: EntraTenantSchema,
+})
+
+export type M365Connect = v.InferOutput<typeof M365ConnectSchema>
+
+export const M365TenantParamsSchema = v.object({ ms_tenant_id: EntraTenantGuidSchema })
+
+/** Query Entra appends to the consent redirect (all optional, nothing trusted). */
+export const M365ConsentCallbackQuerySchema = v.object({
+	tenant: v.optional(v.pipe(v.string(), v.maxLength(253)), undefined),
+	state: v.optional(v.pipe(v.string(), v.maxLength(500)), undefined),
+	admin_consent: v.optional(v.pipe(v.string(), v.maxLength(10)), undefined),
+	error: v.optional(v.pipe(v.string(), v.maxLength(200)), undefined),
+	error_description: v.optional(v.pipe(v.string(), v.maxLength(2000)), undefined),
+})
 
 // ---------------------------------------------------------------------------
 // Saved filters: named FilterTable filter sets, stored per table for all

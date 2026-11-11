@@ -1,44 +1,42 @@
+import { INTEGRATION_PROVIDERS } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
-import { create_integration } from '../../api/integrations'
+import { create_integration, type IntegrationProvider } from '../../api/integrations'
 import { FormPage } from '../../components/form'
 import { t } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { submit_form, useFormState } from '../../lib/form'
-import { IntegrationFormFields, useIntegrationForm } from './form_fields'
+import { queryParam } from '../../lib/router'
+import {
+	createBody,
+	IntegrationFormFields,
+	useIntegrationForm,
+	validateIntegrationForm,
+} from './form_fields'
+
+/** `?provider=` of the add page; TANSS when missing or unknown. */
+function parseProvider(raw: string): IntegrationProvider {
+	return (INTEGRATION_PROVIDERS as readonly string[]).includes(raw)
+		? (raw as IntegrationProvider)
+		: 'tanss'
+}
 
 /**
- * /integrations/add — TANSS setup (`integrations.manage`). Saving logs in to TANSS
+ * /integrations/add?provider= — provider setup (`integrations.manage`). Saving logs in
  * first; the integration is only stored when the credentials work.
  */
 export function IntegrationAddPage(): JSX.Element {
 	const form = useFormState()
 	const fields = useIntegrationForm()
-
-	function validate(): string | null {
-		if (fields.username().trim() === '') {
-			return t('auth.usernameRequired')
-		}
-		if (fields.password() === '') {
-			return t('auth.passwordRequired')
-		}
-		return fields.erpToken() === '' ? t('integration.erpTokenRequired') : null
-	}
+	const provider = parseProvider(queryParam('provider'))
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		await submit_form({
 			form,
-			name: fields.baseUrl(),
-			nameError: t('integration.baseUrlRequired'),
-			validate,
-			save: () =>
-				create_integration({
-					provider: 'tanss',
-					base_url: fields.baseUrl().trim(),
-					username: fields.username().trim(),
-					password: fields.password(),
-					erp_token: fields.erpToken(),
-				}),
+			name: '',
+			optionalName: true,
+			validate: () => validateIntegrationForm(provider, fields),
+			save: () => create_integration(createBody(provider, fields)),
 			navigateTo: '/integrations',
 		})
 	}
@@ -46,12 +44,12 @@ export function IntegrationAddPage(): JSX.Element {
 	return (
 		<FormPage
 			form={form}
-			title={t('integration.addTitle', { name: providerLabel('tanss') })}
+			title={t('integration.addTitle', { name: providerLabel(provider) })}
 			cancelTo="/integrations"
 			singleton
 			onSubmit={handleCreate}
 		>
-			<IntegrationFormFields provider="tanss" form={fields} editing={false} />
+			<IntegrationFormFields provider={provider} form={fields} editing={false} />
 		</FormPage>
 	)
 }

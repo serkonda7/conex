@@ -134,6 +134,13 @@
       "when": 1794405400949,
       "tag": "0070_integration_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1794408250504,
+      "tag": "0071_m365_tenants",
+      "breakpoints": true
     }
   ]
 }

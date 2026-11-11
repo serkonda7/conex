@@ -1,5 +1,5 @@
 /**
- * Integrations API wrappers (TANSS; more providers later): configuration,
+ * Integrations API wrappers (TANSS, Microsoft 365): configuration,
  * sync runs, links and the consistency report. Errors surface as
  * `Result.err` with the server's `{ error }` message.
  */
@@ -22,6 +22,8 @@ import type {
 	LinkBoardExternal,
 	LinkBoardLocal,
 	LinkEntityType,
+	M365ConsentLinkJson,
+	M365TenantJson,
 	SyncRunJson,
 	TenantIntegrationStatus,
 	TicketCreate,
@@ -43,6 +45,8 @@ export type {
 	LinkBoard,
 	LinkBoardExternal,
 	LinkBoardLocal,
+	M365ConsentLinkJson,
+	M365TenantJson,
 	SyncRunJson,
 	TenantIntegrationStatus,
 	TicketListJson,
@@ -331,4 +335,37 @@ export async function deactivate_external_employee(
 		json: { external_id },
 	})
 	return to_result<ExternalEmployeeJson>(res, t('integration.updateExternalEmployeeFailed'))
+}
+
+/** Customer Entra tenants that consented to the MSP's app. */
+export async function fetch_m365_tenants(): Promise<Result<M365TenantJson[], Error>> {
+	const res = await client.integrations.m365.consented.$get()
+	return to_result<M365TenantJson[]>(res, t('m365.tenantsFailed'))
+}
+
+/** Admin consent link that connects the customer's Entra tenant to `tenant`. */
+export async function fetch_m365_consent_link(
+	tenant: number,
+): Promise<Result<M365ConsentLinkJson, Error>> {
+	const res = await client.integrations.m365['consent-link'].$get({
+		query: { tenant: String(tenant), origin: window.location.origin },
+	})
+	return to_result<M365ConsentLinkJson>(res, t('m365.consentLinkFailed'))
+}
+
+/** Connects `tenant` to an Entra tenant (id or domain) whose admin already consented. */
+export async function connect_m365_tenant(
+	tenant_id: number,
+	ms_tenant: string,
+): Promise<Result<{ ms_tenant_id: string }, Error>> {
+	const res = await client.integrations.m365.connect.$post({ json: { tenant_id, ms_tenant } })
+	return to_result<{ ms_tenant_id: string }>(res, t('m365.connectFailed'))
+}
+
+/** Forgets a consented Entra tenant (the next sync drops it). */
+export async function delete_m365_tenant(ms_tenant_id: string): Promise<Result<unknown, Error>> {
+	const res = await client.integrations.m365.consented[':ms_tenant_id'].$delete({
+		param: { ms_tenant_id },
+	})
+	return to_result<unknown>(res, failed.delete('noun.m365Tenant'))
 }

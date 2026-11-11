@@ -81,6 +81,11 @@ export interface ProviderDefinition<P extends ProviderId = ProviderId> {
 	 * hardware). Absent: every device is.
 	 */
 	coversDevice?(device: { manufacturer: string }): boolean
+	/**
+	 * Removes provider-specific tables when the integration is deleted
+	 * (runs inside the delete transaction).
+	 */
+	deleteData?(): Promise<void>
 	/** Provider instance; fails when required configuration is missing. */
 	build(
 		config: IntegrationConfig,

@@ -11,6 +11,7 @@ import {
 } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { update_employee } from '../../api/employees'
 import {
 	create_external_device,
 	deactivate_external_employee,
@@ -92,7 +93,9 @@ function details(f: IntegrationFinding): JSX.Element {
 	if (
 		f.kind !== 'device_mismatch' &&
 		f.kind !== 'employee_mismatch' &&
-		f.kind !== 'tenant_customer_number_mismatch'
+		f.kind !== 'employee_inactive_in_external' &&
+		f.kind !== 'tenant_customer_number_mismatch' &&
+		f.kind !== 'tenant_domain_unverified'
 	) {
 		return ''
 	}
@@ -100,7 +103,7 @@ function details(f: IntegrationFinding): JSX.Element {
 		value === 'active' ? t('integration.active') : t('integration.inactive')
 	const status = f.field === 'status'
 	const local = status
-		? f.kind === 'employee_mismatch'
+		? f.kind !== 'device_mismatch'
 			? activeLabel(f.local)
 			: deviceStatusLabel(f.local ?? '')
 		: (compareValueLabel(f.field, f.local) ?? '—')
@@ -235,7 +238,9 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		{ id: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.
 		...(isScoped() ? [] : [{ id: 'tenants' as const, label: t('integration.viewTenants') }]),
-		{ id: 'devices', label: t('integration.viewDevices') },
+		...(integration()?.capabilities.devices === false
+			? []
+			: [{ id: 'devices' as const, label: t('integration.viewDevices') }]),
 		...(integration()?.capabilities.employees === false
 			? []
 			: [{ id: 'employees' as const, label: t('integration.viewEmployees') }]),
@@ -575,6 +580,31 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				)
 			case 'employee_stale':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
+			case 'employee_inactive_in_external':
+				return (
+					<Show when={can('edit') && f.employee_id !== null}>
+						<button
+							type="button"
+							class="btn-small"
+							disabled={action.pending()}
+							onClick={(): void => {
+								if (
+									window.confirm(
+										t('integration.confirmDeactivateInConex', {
+											name: f.employee_name ?? '',
+										}),
+									)
+								) {
+									void run(() =>
+										update_employee(f.employee_id ?? 0, { active: false }),
+									)
+								}
+							}}
+						>
+							{t('integration.deactivateInConex')}
+						</button>
+					</Show>
+				)
 			case 'employee_mismatch': {
 				const field = caps.push ? employeePushField(f) : null
 				return (

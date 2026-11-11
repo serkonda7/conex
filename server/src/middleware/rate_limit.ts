@@ -57,3 +57,34 @@ export function rate_limit(): MiddlewareHandler {
 		}
 	}
 }
+
+/**
+ * Fixed-window limiter for public endpoints, keyed by client IP, with its
+ * own buckets (independent of the login limiter). Every request counts.
+ */
+export function ip_rate_limit(maxRequests: number, windowSeconds: number): MiddlewareHandler {
+	const own = new Map<string, Bucket>()
+	return async (c: Context, next: Next): Promise<Response | undefined> => {
+		const now = Date.now()
+		const ip = client_ip(c)
+		let bucket = own.get(ip)
+		if (!bucket || bucket.resetAt <= now) {
+			while (own.size >= MAX_BUCKETS) {
+				const oldest = own.keys().next().value
+				if (oldest === undefined) {
+					break
+				}
+				own.delete(oldest)
+			}
+			bucket = { count: 0, resetAt: now + windowSeconds * 1000 }
+			own.set(ip, bucket)
+		}
+		bucket.count++
+		if (bucket.count > maxRequests) {
+			return jsonError(c, 'Too many requests', 429, {
+				'Retry-After': String(Math.ceil((bucket.resetAt - now) / 1000)),
+			})
+		}
+		await next()
+	}
+}

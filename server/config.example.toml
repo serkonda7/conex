@@ -3,6 +3,10 @@
 # Local `bun run dev` auto-creates `data/config.toml` with a random appKey
 # on first start, so this file is only needed as a reference / for production.
 
+# Public address of conex (no trailing slash). The Microsoft 365 consent
+# link redirects to <frontendUrl>/api/integrations/m365/consent.
+# frontendUrl = "https://conex.example.com"
+
 [auth]
 # Minimum 32 chars. Generate one with: openssl rand -hex 48
 appKey = "REPLACE-ME-with-at-least-32-chars-long-random-secret"

@@ -46,6 +46,7 @@ gemeldet.
 | **Firma existiert nicht mehr** | Die verknüpfte Firma wurde gelöscht. Ihre Geräte werden nicht geprüft.                                                                                                                                                                |
 | **Firma inaktiv**              | Die verknüpfte Firma ist inaktiv.                                                                                                                                                                                                     |
 | **Abweichende Kundennummer**   | Die Kundennummern von Mandant und Firma unterscheiden sich. Eine fehlende Nummer auf einer Seite zählt ebenfalls als Abweichung (nur wenn beide leer sind, sind sie gleich); beim Vergleich wird die Groß-/Kleinschreibung ignoriert. |
+| **Mail-Domain nicht verifiziert** | Nur Microsoft 365: Die Domain der ersten Mail-Adresse des Mandanten ist keine verifizierte Domain des Entra-Mandanten. |
 
 #### Geräte
 
@@ -59,6 +60,10 @@ gemeldet.
 Ist ein verknüpfter Mitarbeiter in conex inaktiv, aber in TANSS aktiv, kann er im
 Bericht auch in TANSS inaktiv gesetzt werden. Dies betrifft alle Firmen, denen er in
 TANSS zugeordnet ist.
+
+Ist er umgekehrt extern inaktiv, in conex aber noch aktiv, meldet der Bericht
+**Extern inaktiv, in conex noch aktiv** (bei Microsoft 365: Konto deaktiviert, also
+ein Offboarding). **In conex inaktiv setzen** behebt den Befund.
 
 ### Nicht verknüpfte Objekte
 

@@ -20,6 +20,7 @@ import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { formatTime } from '../../lib/time'
 import { CalendarSyncCard } from './calendar_sync'
+import { M365Details } from './m365'
 
 /** Login state: disabled, the last error, or when it last connected. */
 function LoginStatus(props: { integration: IntegrationJson }): JSX.Element {
@@ -37,7 +38,7 @@ function LoginStatus(props: { integration: IntegrationJson }): JSX.Element {
 }
 
 /** State, time, error and counts of the last sync run. */
-function SyncStatus(props: { run: SyncRunJson }): JSX.Element {
+function SyncStatus(props: { run: SyncRunJson; integration: IntegrationJson }): JSX.Element {
 	return (
 		<>
 			<div>
@@ -52,11 +53,23 @@ function SyncStatus(props: { run: SyncRunJson }): JSX.Element {
 			</div>
 			<Show when={props.run.state === 'ok'}>
 				<div>
-					{t('integration.syncCounts', {
-						tenantCount: props.run.counts.tenants,
-						tenants: externalTenantLabel(props.run.provider, props.run.counts.tenants),
-						devices: props.run.counts.devices,
-					})}
+					{props.integration.capabilities.devices
+						? t('integration.syncCounts', {
+								tenantCount: props.run.counts.tenants,
+								tenants: externalTenantLabel(
+									props.run.provider,
+									props.run.counts.tenants,
+								),
+								devices: props.run.counts.devices,
+							})
+						: t('integration.syncCountsEmployees', {
+								tenantCount: props.run.counts.tenants,
+								tenants: externalTenantLabel(
+									props.run.provider,
+									props.run.counts.tenants,
+								),
+								employees: props.run.counts.employees,
+							})}
 				</div>
 			</Show>
 		</>
@@ -130,10 +143,15 @@ function IntegrationDetails(props: { integration: IntegrationJson }): JSX.Elemen
 						when={props.integration.last_sync}
 						fallback={t('integration.neverSynced')}
 					>
-						{(run: () => SyncRunJson) => <SyncStatus run={run()} />}
+						{(run: () => SyncRunJson) => (
+							<SyncStatus run={run()} integration={props.integration} />
+						)}
 					</Show>
 				</dd>
 			</dl>
+			<Show when={props.integration.provider === 'm365'}>
+				<M365Details integration={props.integration} />
+			</Show>
 			<p>
 				<a href={`/integrations/${props.integration.id}`}>{t('integration.openReport')}</a>
 			</p>
@@ -194,7 +212,9 @@ export function IntegrationsPage(): JSX.Element {
 							<button
 								type="button"
 								class="btn-add"
-								onClick={(): void => navigate('/integrations/add')}
+								onClick={(): void =>
+									navigate(`/integrations/add?provider=${provider}`)
+								}
 							>
 								{t('integration.setUp')}
 							</button>
