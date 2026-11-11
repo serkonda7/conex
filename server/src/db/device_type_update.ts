@@ -295,8 +295,14 @@ function mergeMappings(current: unknown, incoming: unknown[]): unknown[] {
 	return [...incoming, ...kept]
 }
 
-/** The update over the current definition: an omitted key keeps its value. */
-function mergeDefinition(current: YamlEntry, rawUpdate: YamlEntry): YamlEntry {
+/**
+ * The update over the current definition: an omitted key keeps its value,
+ * except `description` and `comments`, which an update without them clears.
+ */
+function mergeDefinition(
+	{ description: _description, comments: _comments, ...current }: YamlEntry,
+	rawUpdate: YamlEntry,
+): YamlEntry {
 	const { 'console-ports': consolePorts, ...update } = rawUpdate
 	if (Array.isArray(consolePorts)) {
 		update.ports = [...(Array.isArray(update.ports) ? update.ports : []), ...consolePorts]

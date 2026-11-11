@@ -863,6 +863,7 @@ test.describe('updates from YAML', () => {
 		spec_url: string | null
 		eol_date: string | null
 		description: string | null
+		comments: string | null
 	}
 
 	const switchYaml = (model: string): string =>
@@ -876,6 +877,7 @@ test.describe('updates from YAML', () => {
 			'spec_url: https://example.com/spec',
 			'eol_date: 2031-03-01',
 			'description: Before',
+			'comments: Racked by hand',
 			'interfaces:',
 			'  - name: eth[1-3]',
 			'    type: 1000base-t',
@@ -986,7 +988,7 @@ test.describe('updates from YAML', () => {
 		}
 	})
 
-	test('an omitted key keeps its value, null clears it and a dropped port goes', async ({
+	test('an omitted key keeps its value (comments and description clear), null clears it and a dropped port goes', async ({
 		page,
 	}) => {
 		const api = page.request
@@ -1010,6 +1012,7 @@ test.describe('updates from YAML', () => {
 
 			const planned = await previewUpdate(api, typeId, yaml)
 			expect(planned.fields.map((change) => change.field).sort()).toEqual([
+				'comments',
 				'description',
 				'eol_date',
 				'spec_url',
@@ -1030,6 +1033,7 @@ test.describe('updates from YAML', () => {
 			expect(await typeOf(api, typeId)).toMatchObject({
 				model,
 				description: 'After',
+				comments: null,
 				part_number: 'PN-1',
 				spec_url: null,
 				eol_date: '2032-01-01',
