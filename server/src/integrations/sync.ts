@@ -18,6 +18,7 @@ import { devices, employees, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
 import { listLinks, setLink } from './links'
 import { matchDevices, matchEmployees } from './match'
+import { providerDefinition } from './registry'
 import {
 	hasEmployees,
 	mergeEmployees,
@@ -153,11 +154,14 @@ async function execute(
 	clean: boolean,
 ): Promise<Result<Counts, Error>> {
 	const now = nowSeconds()
-	// Snapshots from before employees were synced need one full fetch.
-	const modifiedSince =
-		clean || !(await hasEmployees(provider))
-			? null
-			: await lastSuccessfulSyncStartedAt(provider)
+	const definition = providerDefinition(provider)
+	// Non-incremental providers always replace the snapshot. Snapshots from
+	// before employees were synced need one full fetch.
+	const full =
+		clean ||
+		!definition.incremental ||
+		(definition.capabilities.employees && !(await hasEmployees(provider)))
+	const modifiedSince = full ? null : await lastSuccessfulSyncStartedAt(provider)
 	const directory = await instance.listTenants(modifiedSince ?? undefined)
 	if (Result.isError(directory)) {
 		return directory
@@ -193,6 +197,8 @@ async function execute(
 		employees: employeeSnapshot.length,
 		auto_linked: 0,
 	}
+	// Several links per tenant (UniFi sites) are fetched and auto-linked one
+	// by one; `linkState` keeps a device from being linked twice.
 	for (const link of tenantLinks) {
 		// Stale links (company gone) are reported, not fetched.
 		if (link.entity_id === null || !known.has(link.external_id)) {
@@ -210,12 +216,14 @@ async function execute(
 			link.external_id,
 			fetched.value,
 		)
-		counts.auto_linked += await autoLinkEmployees(
-			provider,
-			link.entity_id,
-			link.external_id,
-			employeeSnapshot,
-		)
+		if (definition.capabilities.employees) {
+			counts.auto_linked += await autoLinkEmployees(
+				provider,
+				link.entity_id,
+				link.external_id,
+				employeeSnapshot,
+			)
+		}
 	}
 	if (tenantId === null) {
 		await pruneDevices(

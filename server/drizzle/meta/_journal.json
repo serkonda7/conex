@@ -127,6 +127,13 @@
       "when": 1794396991689,
       "tag": "0069_index_housekeeping",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1794405400949,
+      "tag": "0070_integration_settings",
+      "breakpoints": true
     }
   ]
 }

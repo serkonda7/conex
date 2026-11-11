@@ -11,7 +11,7 @@ import { getDb } from '../db/connection'
 import { DuplicateError, ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { device_roles, devices } from '../schema'
 import { nowSeconds } from '../util/time'
-import { linkJson, linkOf, setLink } from './links'
+import { linkJson, linkOf, setLink, tenantLinks } from './links'
 import { localDevices } from './report'
 import { upsertDevice } from './snapshot'
 import { enabledProvider } from './store'
@@ -28,10 +28,15 @@ export async function createExternalDevice(
 	if (await linkOf(provider, 'device', device.id)) {
 		return Result.err(new DuplicateError('Device is already linked'))
 	}
-	const company =
-		device.tenant_id !== null ? await linkOf(provider, 'tenant', device.tenant_id) : null
+	const links = device.tenant_id !== null ? await tenantLinks(provider, device.tenant_id) : []
+	const company = links[0]
 	if (!company) {
 		return Result.err(new ValidationError("The device's tenant is not linked yet"))
+	}
+	if (links.length > 1) {
+		return Result.err(
+			new ValidationError("The device's tenant is linked to several external tenants"),
+		)
 	}
 	const [role] = await getDb()
 		.select({ key: device_roles.key })

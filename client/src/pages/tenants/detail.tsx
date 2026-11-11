@@ -451,7 +451,7 @@ function AttentionRow(props: { tenantId: number; item: AttentionItem }): JSX.Ele
 			<span class="tenant-tag">{providerLabel(props.item.entry.integration.provider)}</span>
 			<span class="tenant-row-text">
 				{t('tenant.findingCount', {
-					kind: findingKindLabel(props.item.kind),
+					kind: findingKindLabel(props.item.kind, props.item.entry.integration.provider),
 					count: props.item.count,
 				})}
 			</span>

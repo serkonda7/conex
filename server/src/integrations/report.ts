@@ -6,6 +6,11 @@
  * Only `active` conex devices/employees are reported as missing externally,
  * and only active external ones as missing in conex; linked ones in any
  * state are still compared.
+ *
+ * A conex tenant may link to several external tenants (`tenant_cardinality:
+ * 'many'`); its devices and employees are then matched against the union of
+ * them. Levels the provider does not support (employees, customer numbers,
+ * priority tags) produce no findings.
  */
 import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
 import { normalizePhone } from 'shared/src/phone'
@@ -19,6 +24,7 @@ import type {
 	EmployeePhone,
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
+	ExternalTenantJson,
 	FieldComparison,
 	FindingKind,
 	IntegrationFinding,
@@ -40,7 +46,7 @@ import {
 	sync_runs,
 	tenants,
 } from '../schema'
-import { type ExternalLinkRow, linkJson, linkOf, listLinks } from './links'
+import { type ExternalLinkRow, linkJson, linkOf, listLinks, tenantLinks } from './links'
 import {
 	matchDevices,
 	matchEmployees,
@@ -49,6 +55,7 @@ import {
 	normalizeSerial,
 	normalizeTag,
 } from './match'
+import { providerDefinition } from './registry'
 import {
 	readDevice,
 	readDevices,
@@ -256,50 +263,59 @@ export async function buildReport(
 	const tenantName = new Map(tenantRows.map((t) => [t.id, t.name]))
 	const externalTenants = await readTenants(provider)
 
+	const { capabilities, coversDevice } = providerDefinition(provider)
+
 	// Tenant level ----------------------------------------------------------
-	const tenantLinks = await listLinks(provider, 'tenant')
-	const linkByTenant = new Map<number, ExternalLinkRow>()
-	const tenantRowByExternal = new Map<string, ExternalLinkRow>()
-	for (const link of tenantLinks) {
-		tenantRowByExternal.set(link.external_id, link)
+	const tenantLinkRows = await listLinks(provider, 'tenant')
+	const tenantRowByExternal = new Map(tenantLinkRows.map((link) => [link.external_id, link]))
+	const linksByTenant = new Map<number, ExternalLinkRow[]>()
+	for (const link of tenantLinkRows.toSorted((a, b) => a.id - b.id)) {
 		if (link.state === 'linked' && link.entity_id !== null) {
-			linkByTenant.set(link.entity_id, link)
+			linksByTenant.set(link.entity_id, [...(linksByTenant.get(link.entity_id) ?? []), link])
 		}
 	}
-	// conex tenant → linked external tenant id, when the company still exists.
-	const liveCompany = new Map<number, string>()
+	// conex tenant → linked external tenant ids that still exist.
+	const liveCompanies = new Map<number, string[]>()
 	for (const tenant of tenantRows) {
-		const link = linkByTenant.get(tenant.id)
+		const links = linksByTenant.get(tenant.id) ?? []
 		const base = { tenant_id: tenant.id, tenant_name: tenant.name }
-		if (!link) {
+		if (links.length === 0) {
 			findings.push(finding('tenant_unlinked', base))
 			continue
 		}
-		const external = externalTenants.get(link.external_id)
-		const linked = { ...base, link_id: link.id, external_id: link.external_id }
-		if (!external) {
-			findings.push(finding('tenant_stale', linked))
-			continue
-		}
-		liveCompany.set(tenant.id, external.external_id)
-		const withName = { ...linked, external_name: external.name }
-		if (!external.active) {
-			findings.push(finding('tenant_inactive', withName))
-		}
-		const localNumber = tenant.customer_number?.trim() || null
-		const remoteNumber = external.display_id?.trim() || null
-		// Customer numbers identify the company: a missing number on either
-		// side counts as a difference (only both-empty is equal). Compared
-		// case-insensitively, like asset tags.
-		if ((localNumber?.toUpperCase() ?? null) !== (remoteNumber?.toUpperCase() ?? null)) {
-			findings.push(
-				finding('tenant_customer_number_mismatch', {
-					...withName,
-					field: 'customer_number',
-					local: tenant.customer_number,
-					remote: external.display_id,
-				}),
-			)
+		for (const link of links) {
+			const external = externalTenants.get(link.external_id)
+			const linked = { ...base, link_id: link.id, external_id: link.external_id }
+			if (!external) {
+				findings.push(finding('tenant_stale', linked))
+				continue
+			}
+			liveCompanies.set(tenant.id, [
+				...(liveCompanies.get(tenant.id) ?? []),
+				external.external_id,
+			])
+			const withName = { ...linked, external_name: external.name }
+			if (!external.active) {
+				findings.push(finding('tenant_inactive', withName))
+			}
+			if (!capabilities.customer_numbers) {
+				continue
+			}
+			const localNumber = tenant.customer_number?.trim() || null
+			const remoteNumber = external.display_id?.trim() || null
+			// Customer numbers identify the company: a missing number on either
+			// side counts as a difference (only both-empty is equal). Compared
+			// case-insensitively, like asset tags.
+			if ((localNumber?.toUpperCase() ?? null) !== (remoteNumber?.toUpperCase() ?? null)) {
+				findings.push(
+					finding('tenant_customer_number_mismatch', {
+						...withName,
+						field: 'customer_number',
+						local: tenant.customer_number,
+						remote: external.display_id,
+					}),
+				)
+			}
 		}
 	}
 	if (includeUnmapped) {
@@ -352,7 +368,7 @@ export async function buildReport(
 		if (!link) {
 			if (
 				tenantId !== null &&
-				liveCompany.has(tenantId) &&
+				liveCompanies.has(tenantId) &&
 				!ignoredLocalDevices.has(device.id)
 			) {
 				const list = unlinkedByTenant.get(tenantId) ?? []
@@ -366,7 +382,7 @@ export async function buildReport(
 		if (!external) {
 			// Only stale when the device's company was fetched; otherwise the
 			// snapshot simply does not cover it (tenant unlinked/stale).
-			if (tenantId !== null && liveCompany.has(tenantId)) {
+			if (tenantId !== null && liveCompanies.has(tenantId)) {
 				findings.push(finding('device_stale', linked))
 			}
 			continue
@@ -376,13 +392,13 @@ export async function buildReport(
 			external_name: external.name,
 			external_tenant_id: external.external_tenant_id,
 		}
-		const company = tenantId !== null ? liveCompany.get(tenantId) : undefined
-		if (company !== external.external_tenant_id) {
+		const companies = tenantId !== null ? (liveCompanies.get(tenantId) ?? []) : []
+		if (!companies.includes(external.external_tenant_id)) {
 			findings.push(
 				finding('device_mismatch', {
 					...withExternal,
 					field: 'tenant',
-					local: company ?? null,
+					local: companies.length > 0 ? companies.join(', ') : null,
 					remote: external.external_tenant_id,
 				}),
 			)
@@ -411,11 +427,13 @@ export async function buildReport(
 		}
 	}
 
-	for (const [tenantId, company] of liveCompany) {
+	for (const [tenantId, companies] of liveCompanies) {
 		const tenantLocals = unlinkedByTenant.get(tenantId) ?? []
 		const candidates = externalDevices.filter(
-			(d) => d.external_tenant_id === company && !takenExternal.has(d.external_id),
+			(d) => companies.includes(d.external_tenant_id) && !takenExternal.has(d.external_id),
 		)
+		// Filed under the only linked external tenant; ambiguous with several.
+		const company = companies.length === 1 ? (companies[0] ?? null) : null
 		const { auto, suggestions } = matchDevices(tenantLocals, candidates)
 		const pairs = [...auto, ...suggestions]
 		const suggestedLocal = new Set(pairs.map((p) => p.device_id))
@@ -432,13 +450,17 @@ export async function buildReport(
 					device_name: device?.name ?? null,
 					external_id: pair.external_id,
 					external_name: external?.name ?? null,
-					external_tenant_id: company,
+					external_tenant_id: external?.external_tenant_id ?? company,
 					field: pair.via === 'name' ? 'name' : pair.via,
 				}),
 			)
 		}
 		for (const device of tenantLocals) {
-			if (device.status === 'active' && !suggestedLocal.has(device.id)) {
+			if (
+				device.status === 'active' &&
+				!suggestedLocal.has(device.id) &&
+				(coversDevice?.(device) ?? true)
+			) {
 				findings.push(
 					finding('device_missing_in_external', {
 						...base,
@@ -456,17 +478,19 @@ export async function buildReport(
 						...base,
 						external_id: external.external_id,
 						external_name: external.name,
-						external_tenant_id: company,
+						external_tenant_id: external.external_tenant_id,
 					}),
 				)
 			}
 		}
 	}
 
-	findings.push(...(await employeeFindings(provider, tenantIds, tenantName, liveCompany)))
+	if (capabilities.employees) {
+		findings.push(...(await employeeFindings(provider, tenantIds, tenantName, liveCompanies)))
+	}
 
 	const syncedAt = await lastSyncedAt(provider)
-	if (includeUnmapped && syncedAt !== null) {
+	if (includeUnmapped && syncedAt !== null && capabilities.tickets) {
 		findings.push(...(await priorityFindings(provider)))
 	}
 
@@ -492,7 +516,7 @@ async function employeeFindings(
 	provider: ProviderId,
 	tenantIds: number[],
 	tenantName: Map<number, string>,
-	liveCompany: Map<number, string>,
+	liveCompanies: Map<number, string[]>,
 ): Promise<IntegrationFinding[]> {
 	const findings: IntegrationFinding[] = []
 	const locals =
@@ -529,7 +553,7 @@ async function employeeFindings(
 			// Matched against the company of every reported tenant it belongs to.
 			if (!ignoredLocal.has(employee.id)) {
 				for (const tenantId of memberships) {
-					if (liveCompany.has(tenantId)) {
+					if (liveCompanies.has(tenantId)) {
 						const list = unlinkedByTenant.get(tenantId) ?? []
 						list.push(employee)
 						unlinkedByTenant.set(tenantId, list)
@@ -542,12 +566,13 @@ async function employeeFindings(
 		// the external employee belongs to (else the first reported tenant).
 		const externalCompanies = externalById.get(link.external_id)?.external_tenant_ids ?? []
 		const tenantId =
-			memberships.find((t) => externalCompanies.includes(liveCompany.get(t) ?? '')) ??
-			memberships[0]
+			memberships.find((t) =>
+				(liveCompanies.get(t) ?? []).some((c) => externalCompanies.includes(c)),
+			) ?? memberships[0]
 		if (tenantId === undefined) {
 			continue
 		}
-		const company = liveCompany.get(tenantId)
+		const companies = liveCompanies.get(tenantId) ?? []
 		const base = {
 			tenant_id: tenantId,
 			tenant_name: tenantName.get(tenantId) ?? null,
@@ -566,12 +591,12 @@ async function employeeFindings(
 			external_name: external.name,
 			external_tenant_id: external.external_tenant_id,
 		}
-		if (company === undefined || !external.external_tenant_ids.includes(company)) {
+		if (!companies.some((c) => external.external_tenant_ids.includes(c))) {
 			findings.push(
 				finding('employee_mismatch', {
 					...withExternal,
 					field: 'tenant',
-					local: company ?? null,
+					local: companies.length > 0 ? companies.join(', ') : null,
 					remote: external.external_tenant_id,
 				}),
 			)
@@ -604,12 +629,19 @@ async function employeeFindings(
 	// when no tenant found a match, and then reported once.
 	const suggestedPairs = new Set<string>()
 	const suggestedEmployees = new Set<number>()
-	const unmatched = new Map<number, { tenantId: number; company: string }>()
-	for (const [tenantId, company] of liveCompany) {
+	const unmatched = new Map<number, { tenantId: number; company: string | null }>()
+	for (const [tenantId, companies] of liveCompanies) {
 		const tenantLocals = unlinkedByTenant.get(tenantId) ?? []
 		const candidates = externals.filter(
-			(e) => e.external_tenant_ids.includes(company) && !takenExternal.has(e.external_id),
+			(e) =>
+				e.external_tenant_ids.some((c) => companies.includes(c)) &&
+				!takenExternal.has(e.external_id),
 		)
+		// Filed under the only linked external tenant; ambiguous with several.
+		const company = companies.length === 1 ? (companies[0] ?? null) : null
+		// The linked external tenant an external employee belongs to.
+		const companyOf = (e: ExternalEmployee | undefined): string | null =>
+			e?.external_tenant_ids.find((c) => companies.includes(c)) ?? company
 		const { auto, suggestions } = matchEmployees(tenantLocals, candidates)
 		const pairs = [...auto, ...suggestions]
 		const suggestedExternal = new Set(pairs.map((p) => p.external_id))
@@ -630,7 +662,7 @@ async function employeeFindings(
 					employee_name: localById.get(pair.employee_id)?.name ?? null,
 					external_id: pair.external_id,
 					external_name: external?.name ?? null,
-					external_tenant_id: company,
+					external_tenant_id: companyOf(external),
 					field: pair.via,
 					remote: external ? (external.active ? 'active' : 'inactive') : null,
 				}),
@@ -648,7 +680,7 @@ async function employeeFindings(
 						...base,
 						external_id: external.external_id,
 						external_name: external.name,
-						external_tenant_id: company,
+						external_tenant_id: companyOf(external),
 					}),
 				)
 			}
@@ -671,19 +703,41 @@ async function employeeFindings(
 	return findings
 }
 
-/** Tenant detail card: link, linked company and finding counts. */
+/** Tenant detail card: links, linked external tenants and finding counts. */
 export async function tenantStatus(
 	provider: ProviderId,
 	tenantId: number,
 ): Promise<TenantIntegrationStatus> {
-	const link = await linkOf(provider, 'tenant', tenantId)
-	const external = link ? await readTenant(provider, link.external_id) : null
+	const links = await Promise.all(
+		(await tenantLinks(provider, tenantId)).map(async (link) => ({
+			link: linkJson(link),
+			external: await readTenant(provider, link.external_id),
+		})),
+	)
 	const report = await buildReport(provider, { tenant: tenantId }, false)
 	const finding_counts: Partial<Record<FindingKind, number>> = {}
 	for (const f of report.findings) {
 		finding_counts[f.kind] = (finding_counts[f.kind] ?? 0) + 1
 	}
-	return { link: link ? linkJson(link) : null, external, finding_counts }
+	return { links, finding_counts }
+}
+
+/** Linked external tenants of a conex tenant that still exist in the snapshot. */
+export async function linkedExternalTenants(
+	provider: ProviderId,
+	tenantId: number | null,
+): Promise<ExternalTenantJson[]> {
+	if (tenantId === null) {
+		return []
+	}
+	const out: ExternalTenantJson[] = []
+	for (const link of await tenantLinks(provider, tenantId)) {
+		const external = await readTenant(provider, link.external_id)
+		if (external) {
+			out.push(external)
+		}
+	}
+	return out
 }
 
 /** Device detail card: link, field comparison and link candidates. */
@@ -694,13 +748,17 @@ export async function deviceStatus(
 ): Promise<DeviceIntegrationStatus> {
 	const [local] = await localDevices(eq(devices.id, deviceId))
 	const link = await linkOf(provider, 'device', deviceId)
-	const tenantLink = tenantId !== null ? await linkOf(provider, 'tenant', tenantId) : null
-	const external_tenant = tenantLink ? await readTenant(provider, tenantLink.external_id) : null
+	const external_tenants = await linkedExternalTenants(provider, tenantId)
 	const external = link ? await readDevice(provider, link.external_id) : null
 	let candidates: ExternalDeviceJson[] = []
-	if (external_tenant) {
+	if (external_tenants.length > 0) {
 		const taken = new Set((await listLinks(provider, 'device')).map((l) => l.external_id))
-		candidates = (await readDevices(provider, [external_tenant.external_id]))
+		candidates = (
+			await readDevices(
+				provider,
+				external_tenants.map((t) => t.external_id),
+			)
+		)
 			.filter((d) => !taken.has(d.external_id))
 			.sort((a, b) => a.name.localeCompare(b.name))
 	}
@@ -708,7 +766,7 @@ export async function deviceStatus(
 		link: link ? linkJson(link) : null,
 		external,
 		fields: local && external ? compareFields(local, external) : [],
-		external_tenant,
+		external_tenants,
 		candidates,
 	}
 }
@@ -721,21 +779,25 @@ export async function employeeStatus(
 ): Promise<EmployeeIntegrationStatus> {
 	const [local] = await localEmployees(eq(employees.id, employeeId))
 	const link = await linkOf(provider, 'employee', employeeId)
-	const tenantLink = await linkOf(provider, 'tenant', tenantId)
-	const external_tenant = tenantLink ? await readTenant(provider, tenantLink.external_id) : null
+	const external_tenants = await linkedExternalTenants(provider, tenantId)
 	const external = link ? await readEmployee(provider, link.external_id) : null
 	let candidates: ExternalEmployeeJson[] = []
-	if (external_tenant) {
+	if (external_tenants.length > 0) {
 		const taken = new Set((await listLinks(provider, 'employee')).map((l) => l.external_id))
-		candidates = (await readEmployees(provider, external_tenant.external_id))
-			.filter((e) => !taken.has(e.external_id))
+		const companies = new Set(external_tenants.map((t) => t.external_id))
+		candidates = (await readEmployees(provider))
+			.filter(
+				(e) =>
+					e.external_tenant_ids.some((c) => companies.has(c)) &&
+					!taken.has(e.external_id),
+			)
 			.sort((a, b) => a.name.localeCompare(b.name))
 	}
 	return {
 		link: link ? linkJson(link) : null,
 		external,
 		fields: local && external ? compareEmployeeFields(local, external) : [],
-		external_tenant,
+		external_tenants,
 		candidates,
 	}
 }

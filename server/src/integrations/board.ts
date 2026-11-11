@@ -2,8 +2,8 @@
  * Link board: conex objects and external objects of one link level side by
  * side, with their link state and unambiguous match suggestions. Tenants are
  * listed in full (global users only; inactive and private customers only when linked);
- * devices and employees per conex tenant, against the ones of the company
- * linked to it. Inactive devices and external employees are ignored by default
+ * devices and employees per conex tenant, against the ones of the external
+ * tenants linked to it. Inactive devices and external employees are ignored by default
  * (hidden unless toggled on, never suggested); linked ones stay visible as linked.
  */
 import { eq, inArray } from 'drizzle-orm'
@@ -17,10 +17,10 @@ import { primaryEmail } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { memberOf } from '../db/employees'
 import { devices, employees, tenant_groups, tenants } from '../schema'
-import { type ExternalLinkRow, linkOf, listLinks } from './links'
+import { type ExternalLinkRow, listLinks } from './links'
 import { group, matchDevices, matchEmployees, normalizeName } from './match'
-import { lastSyncedAt, localDevices, localEmployees } from './report'
-import { readDevices, readEmployees, readTenant, readTenants } from './snapshot'
+import { lastSyncedAt, linkedExternalTenants, localDevices, localEmployees } from './report'
+import { readDevices, readEmployees, readTenants } from './snapshot'
 
 function joinDetail(...parts: (string | null)[]): string | null {
 	const text = parts.filter((p) => p !== null && p !== '').join(' ')
@@ -192,7 +192,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 		provider,
 		entity_type: 'tenant',
 		synced_at: await lastSyncedAt(provider),
-		external_tenant: null,
+		external_tenants: [],
 		local,
 		external,
 	}
@@ -202,13 +202,13 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 	const locals = (await localDevices(eq(devices.tenant_id, tenantId))).sort((a, b) =>
 		a.name.localeCompare(b.name),
 	)
-	const tenantLink = await linkOf(provider, 'tenant', tenantId)
-	const company = tenantLink ? await readTenant(provider, tenantLink.external_id) : null
-	const externals = company
-		? (await readDevices(provider, [company.external_id])).sort((a, b) =>
-				a.name.localeCompare(b.name),
-			)
-		: []
+	const companies = await linkedExternalTenants(provider, tenantId)
+	const externals = (
+		await readDevices(
+			provider,
+			companies.map((c) => c.external_id),
+		)
+	).sort((a, b) => a.name.localeCompare(b.name))
 	const {
 		byExternal: linkByExternal,
 		linked: linkByDevice,
@@ -290,25 +290,23 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 		provider,
 		entity_type: 'device',
 		synced_at: await lastSyncedAt(provider),
-		external_tenant: company,
+		external_tenants: companies,
 		local,
 		external,
 	}
 }
 
-/** Like {@link deviceBoard}: employees of one tenant against its company's. */
+/** Like {@link deviceBoard}: employees of one tenant against its external tenants'. */
 export async function employeeBoard(provider: ProviderId, tenantId: number): Promise<LinkBoard> {
 	const locals = (await localEmployees(memberOf(tenantId))).sort((a, b) =>
 		a.name.localeCompare(b.name),
 	)
-	const tenantLink = await linkOf(provider, 'tenant', tenantId)
-	const company = tenantLink ? await readTenant(provider, tenantLink.external_id) : null
+	const companies = await linkedExternalTenants(provider, tenantId)
+	const companyIds = new Set(companies.map((c) => c.external_id))
 	const allExternal = await readEmployees(provider)
-	const externals = company
-		? allExternal
-				.filter((e) => e.external_tenant_ids.includes(company.external_id))
-				.sort((a, b) => a.name.localeCompare(b.name))
-		: []
+	const externals = allExternal
+		.filter((e) => e.external_tenant_ids.some((c) => companyIds.has(c)))
+		.sort((a, b) => a.name.localeCompare(b.name))
 	const {
 		byExternal: linkByExternal,
 		linked: linkByEmployee,
@@ -371,7 +369,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 		provider,
 		entity_type: 'employee',
 		synced_at: await lastSyncedAt(provider),
-		external_tenant: company,
+		external_tenants: companies,
 		local,
 		external,
 	}

@@ -14,7 +14,7 @@ import {
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { providerLabel, syncStateLabel } from '../../i18n/labels'
+import { externalTenantLabel, providerLabel, syncStateLabel } from '../../i18n/labels'
 import { createRows, useAction } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
@@ -53,7 +53,8 @@ function SyncStatus(props: { run: SyncRunJson }): JSX.Element {
 			<Show when={props.run.state === 'ok'}>
 				<div>
 					{t('integration.syncCounts', {
-						tenants: props.run.counts.tenants,
+						tenantCount: props.run.counts.tenants,
+						tenants: externalTenantLabel(props.run.provider, props.run.counts.tenants),
 						devices: props.run.counts.devices,
 					})}
 				</div>
@@ -111,10 +112,14 @@ function IntegrationDetails(props: { integration: IntegrationJson }): JSX.Elemen
 	return (
 		<>
 			<dl class="detail-grid">
-				<dt>{t('integration.baseUrl')}</dt>
-				<dd>{props.integration.base_url}</dd>
-				<dt>{t('integration.username')}</dt>
-				<dd>{props.integration.username}</dd>
+				<Show when={props.integration.base_url}>
+					<dt>{t('integration.baseUrl')}</dt>
+					<dd>{props.integration.base_url}</dd>
+				</Show>
+				<Show when={props.integration.username}>
+					<dt>{t('integration.username')}</dt>
+					<dd>{props.integration.username}</dd>
+				</Show>
 				<dt>{t('integration.lastLogin')}</dt>
 				<dd>
 					<LoginStatus integration={props.integration} />
@@ -151,7 +156,8 @@ export function IntegrationsPage(): JSX.Element {
 
 	async function handleSync(provider: IntegrationProvider, clean: boolean): Promise<void> {
 		const name = providerLabel(provider)
-		if (clean && !window.confirm(t('integration.confirmFullSync', { name }))) {
+		const tenants = externalTenantLabel(provider, 2)
+		if (clean && !window.confirm(t('integration.confirmFullSync', { name, tenants }))) {
 			return
 		}
 		setError(null)

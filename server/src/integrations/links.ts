@@ -2,10 +2,12 @@
  * `external_links`: which conex tenant/device/employee is which external object, plus
  * external objects marked as intentionally absent (`ignored`). An external
  * object has at most one row per entity type; linking or ignoring it again
- * replaces that row. Route handlers do the RBAC/scope checks.
+ * replaces that row. A conex entity has at most one link per provider,
+ * except tenants of a provider with `tenant_cardinality: 'many'` (UniFi:
+ * several sites per tenant). Route handlers do the RBAC/scope checks.
  */
 import { Result } from 'better-result'
-import { and, eq, or } from 'drizzle-orm'
+import { and, asc, eq, or } from 'drizzle-orm'
 import type {
 	ExternalLinkJson,
 	LinkEntityType,
@@ -16,6 +18,7 @@ import { NotFoundError } from '../db/errors'
 import { tryWrite } from '../db/list'
 import { external_links } from '../schema'
 import { nowSeconds } from '../util/time'
+import { providerDefinition } from './registry'
 
 export type ExternalLinkRow = typeof external_links.$inferSelect
 
@@ -60,7 +63,11 @@ export async function getLink(
 	return row ? Result.ok(row) : Result.err(new NotFoundError('Link not found'))
 }
 
-/** The `linked` row of one conex entity, if any. */
+/**
+ * The `linked` row of one conex entity, if any. For tenants of a provider
+ * with many links per tenant use {@link tenantLinks}; this returns the
+ * oldest of them.
+ */
 export async function linkOf(
 	provider: ProviderId,
 	entityType: LinkEntityType,
@@ -79,9 +86,29 @@ export async function linkOf(
 						eq(external_links.state, 'linked'),
 					),
 				)
+				.orderBy(asc(external_links.id))
 				.limit(1)
 		)[0] ?? null
 	)
+}
+
+/** Every `linked` row of a conex tenant, oldest first (at most one unless cardinality `many`). */
+export async function tenantLinks(
+	provider: ProviderId,
+	tenantId: number,
+): Promise<ExternalLinkRow[]> {
+	return getDb()
+		.select()
+		.from(external_links)
+		.where(
+			and(
+				eq(external_links.provider, provider),
+				eq(external_links.entity_type, 'tenant'),
+				eq(external_links.entity_id, tenantId),
+				eq(external_links.state, 'linked'),
+			),
+		)
+		.orderBy(asc(external_links.id))
 }
 
 export interface LinkInput {
@@ -94,11 +121,24 @@ export interface LinkInput {
 type NewLink = Omit<ExternalLinkRow, 'id' | 'created_at'>
 
 /**
+ * Whether a new row for `link` replaces the other rows of its conex entity:
+ * always, except tenant links of a provider that allows many per tenant.
+ */
+function replacesEntityRows(link: NewLink): boolean {
+	return !(
+		link.entity_type === 'tenant' &&
+		link.state === 'linked' &&
+		providerDefinition(link.provider as ProviderId).capabilities.tenant_cardinality === 'many'
+	)
+}
+
+/**
  * Writes a link row, replacing every other row of the same provider and
- * entity type for the same conex entity or the same external object
- * (one-to-one per provider).
+ * entity type for the same external object and, unless the entity may have
+ * many links (see {@link replacesEntityRows}), for the same conex entity.
  */
 async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error>> {
+	const byEntity = replacesEntityRows(link)
 	return tryWrite(() =>
 		withTransaction(async () => {
 			const db = getDb()
@@ -110,7 +150,7 @@ async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error
 						eq(external_links.entity_type, link.entity_type),
 						or(
 							eq(external_links.external_id, link.external_id),
-							link.entity_id === null
+							link.entity_id === null || !byEntity
 								? undefined
 								: eq(external_links.entity_id, link.entity_id),
 						),
@@ -131,8 +171,9 @@ async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error
 }
 
 /**
- * Links an entity to an external object. The entity's previous link and any
- * other row for the external object are replaced (one-to-one per provider).
+ * Links an entity to an external object. Any other row for the external
+ * object is replaced, and so is the entity's previous link (one-to-one per
+ * provider, except tenants of a `many` provider, which keep their other links).
  */
 export function setLink(
 	provider: ProviderId,

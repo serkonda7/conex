@@ -53,6 +53,7 @@ import {
 	linkOf,
 	listLinks,
 	setLink,
+	tenantLinks,
 } from '../integrations/links'
 import { buildReport, deviceStatus, employeeStatus, tenantStatus } from '../integrations/report'
 import { readDevice, readEmployee, readTenant, readTenants } from '../integrations/snapshot'
@@ -141,16 +142,20 @@ async function checkExternalWrite(
 	return (await scopeCompany(provider, scope, ids)) === null ? forbidden(c) : null
 }
 
-/** First company among `externalTenantIds` linked to one of the `tenantIds`, null for none. */
+/**
+ * First external tenant among `externalTenantIds` linked to one of the
+ * `tenantIds`, null for none.
+ */
 async function scopeCompany(
 	provider: ProviderId,
 	tenantIds: readonly number[],
 	externalTenantIds: readonly (string | null)[],
 ): Promise<string | null> {
 	for (const tenantId of tenantIds) {
-		const company = await linkOf(provider, 'tenant', tenantId)
-		if (company && externalTenantIds.includes(company.external_id)) {
-			return company.external_id
+		for (const link of await tenantLinks(provider, tenantId)) {
+			if (externalTenantIds.includes(link.external_id)) {
+				return link.external_id
+			}
 		}
 	}
 	return null

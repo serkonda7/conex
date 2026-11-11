@@ -17,8 +17,8 @@ export function IntegrationEditPage(props: { id: number }): JSX.Element {
 		id: props.id,
 		load: fetch_integration,
 		fill: (row: IntegrationJson) => {
-			fields.setBaseUrl(row.base_url)
-			fields.setUsername(row.username)
+			fields.setBaseUrl(row.base_url ?? '')
+			fields.setUsername(row.username ?? '')
 			setEnabled(row.enabled ? '1' : '0')
 		},
 	})
@@ -32,6 +32,7 @@ export function IntegrationEditPage(props: { id: number }): JSX.Element {
 			optionalName: true,
 			save: () =>
 				update_integration(provider(), {
+					provider: provider(),
 					base_url: fields.baseUrl().trim(),
 					username: fields.username().trim(),
 					...secrets(fields),

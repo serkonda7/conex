@@ -20,11 +20,12 @@ import type { CalendarSyncRunCounts, CalendarSyncRunJson } from 'shared/src/sche
 import type { TnsPlanningType, TnsSupportList } from 'tanss-api'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { errOf } from '../db/list'
-import { decryptSecrets } from '../integrations/secrets'
-import { getIntegrationRow } from '../integrations/store'
+import { credentialsOf, getIntegrationRow } from '../integrations/store'
 import { type TanssAppointments, TanssSession } from '../integrations/tanss/client'
+import { tanssCredentials } from '../integrations/tanss/definition'
+import { GraphClient, isGraphNotFound } from '../microsoft/graph'
 import { nowSeconds } from '../util/time'
-import { GraphClient, isGraphNotFound } from './graph'
+import { CalendarClient } from './calendar'
 import { type CalendarItem, hash, type LinkedNames, toCalendarItems, toGraphEvent } from './map'
 import {
 	deleteItems,
@@ -75,18 +76,13 @@ export async function tanssSession(): Promise<
 	if (row.value.enabled !== 1) {
 		return Result.err(new ConflictError('The TANSS integration is disabled'))
 	}
-	const secrets = decryptSecrets(row.value.secrets)
-	if (Result.isError(secrets)) {
-		return secrets
+	const creds = credentialsOf(row.value, 'tanss').andThen(({ config, secrets }) =>
+		tanssCredentials(config, secrets),
+	)
+	if (Result.isError(creds)) {
+		return creds
 	}
-	return Result.ok({
-		session: new TanssSession({
-			base_url: row.value.base_url,
-			username: row.value.username,
-			...secrets.value,
-		}),
-		baseUrl: row.value.base_url,
-	})
+	return Result.ok({ session: new TanssSession(creds.value), baseUrl: creds.value.base_url })
 }
 
 /** Supports (appointments and absences) of the active technicians with a synced planning type. */
@@ -196,7 +192,7 @@ class Tally {
 
 /** Creates the event and stores its item row. */
 async function create(
-	graph: GraphClient,
+	graph: CalendarClient,
 	item: CalendarItem,
 	mailbox: string,
 	tally: Tally,
@@ -220,7 +216,7 @@ async function create(
 }
 
 /** Deletes an event; one that is already gone counts as deleted. */
-async function remove(graph: GraphClient, row: ItemRow, tally: Tally): Promise<boolean> {
+async function remove(graph: CalendarClient, row: ItemRow, tally: Tally): Promise<boolean> {
 	const deleted = await graph.deleteEvent(row.mailbox_upn, row.graph_event_id)
 	if (Result.isError(deleted) && !isGraphNotFound(deleted.error)) {
 		tally.fail(row.mailbox_upn, deleted.error)
@@ -230,7 +226,7 @@ async function remove(graph: GraphClient, row: ItemRow, tally: Tally): Promise<b
 }
 
 async function apply(
-	graph: GraphClient,
+	graph: CalendarClient,
 	item: CalendarItem,
 	mailbox: string,
 	row: ItemRow | undefined,
@@ -279,7 +275,7 @@ async function execute(): Promise<Result<Tally, Error>> {
 	if (Result.isError(tanss)) {
 		return tanss
 	}
-	const graph = new GraphClient(creds.value)
+	const graph = new CalendarClient(new GraphClient(creds.value))
 	const window = syncWindow(nowSeconds())
 	const mappings = new Map<number, MappingRow>(
 		(await listMappings()).map((m) => [m.tanss_employee_id, m]),

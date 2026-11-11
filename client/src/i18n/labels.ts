@@ -47,7 +47,7 @@ import type { FormOption } from '../components/form'
 import { RackFormFactorSchematic } from '../components/rack_form_factor'
 import { deviceRoleIcon, locationTypeIcon, portKindIcon } from '../lib/icons'
 import type { DurationUnit } from '../lib/service_level'
-import { type MessageKey, t } from '.'
+import { type MessageKey, type PluralKey, t, tp } from '.'
 
 function lookup(keys: Record<string, MessageKey>, value: string): string {
 	const key = keys[value]
@@ -469,6 +469,25 @@ export function providerLabel(value: string): string {
 	return lookup(PROVIDER_KEYS, value)
 }
 
+const EXTERNAL_TENANT_KEYS: Record<IntegrationProvider, PluralKey> = {
+	tanss: 'externalTenant.tanss',
+}
+
+/**
+ * What the provider calls the external side of a conex tenant, lowercase
+ * where the language allows (TANSS: company, UniFi: site, M365: tenant).
+ */
+export function externalTenantLabel(provider: string, count = 1): string {
+	const key = EXTERNAL_TENANT_KEYS[provider as IntegrationProvider]
+	return key ? tp(key, count) : provider
+}
+
+/** {@link externalTenantLabel} for the start of a sentence or label. */
+function externalTenantTitle(provider: string): string {
+	const label = externalTenantLabel(provider)
+	return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
 const SYNC_STATE_KEYS: Record<SyncRunState, MessageKey> = {
 	running: 'syncState.running',
 	ok: 'syncState.ok',
@@ -500,8 +519,10 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 }
 
 /** Consistency finding kind (`device_missing_in_conex`, …). */
-export function findingKindLabel(value: string): string {
-	return lookup(FINDING_KEYS, value)
+/** Finding kind; tenant-level kinds name the provider's external tenant (company, site…). */
+export function findingKindLabel(value: string, provider: string): string {
+	const key = FINDING_KEYS[value as FindingKind]
+	return key ? t(key, { tenant: externalTenantTitle(provider) }) : value
 }
 
 const COMPARE_FIELD_KEYS: Record<

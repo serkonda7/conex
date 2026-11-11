@@ -1048,9 +1048,13 @@ export const floorplan_calibrations = pgTable('floorplan_calibrations', {
 export const integrations = pgTable('integrations', {
 	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 	provider: text('provider').notNull().unique(),
-	base_url: text('base_url').notNull(),
-	username: text('username').notNull(),
-	// `v1.<iv>.<ciphertext+tag>` (base64) of the JSON secrets object.
+	// NULL for providers without a configurable server / login user.
+	base_url: text('base_url'),
+	username: text('username'),
+	// Provider-specific plain settings (validated per provider).
+	settings: jsonb('settings').$type<Record<string, unknown>>().notNull().default({}),
+	// `v1.<iv>.<ciphertext+tag>` (base64) of the JSON secrets object
+	// (fields per provider: `INTEGRATION_SECRET_FIELDS`).
 	secrets: text('secrets').notNull(),
 	enabled: integer('enabled').notNull().default(1),
 	created_by: integer('created_by').references(() => users.id, { onDelete: 'set null' }),

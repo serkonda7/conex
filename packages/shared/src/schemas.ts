@@ -2623,8 +2623,8 @@ export interface DeviceTypeUpdatePreview {
 }
 
 // ---------------------------------------------------------------------------
-// Integrations (TANSS; UniFi and servereye later). External systems are
-// read-only sources: conex links its tenants/devices to external objects and
+// Integrations (TANSS; UniFi and Microsoft 365 next). External systems are
+// sources: conex links its tenants/devices/employees to external objects and
 // reports where the data disagrees. See `docs/integrations.md`.
 // ---------------------------------------------------------------------------
 
@@ -2648,36 +2648,64 @@ const IntegrationUsernameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v
 const SecretSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(4096))
 
 /**
- * Integration create body. Saving logs in to the external system first; the
- * row is only stored when the credentials work.
+ * Secret fields per provider: write-only, encrypted at rest and only
+ * reported back as set / not set (`IntegrationJson.secrets_set`). Every
+ * other body field except `provider` and `enabled` is plain configuration:
+ * `base_url` and `username` have columns, the rest is stored in `settings`.
  */
-export const IntegrationCreateSchema = v.strictObject({
-	provider: IntegrationProviderSchema,
-	base_url: BaseUrlSchema,
-	username: IntegrationUsernameSchema,
-	password: SecretSchema,
-	erp_token: SecretSchema,
-})
+export interface IntegrationSecretFields {
+	tanss: readonly ['password', 'erp_token']
+}
 
-/** Integration patch: omitted secrets keep the stored ones. */
-export const IntegrationUpdateSchema = v.strictObject({
-	base_url: v.optional(BaseUrlSchema, undefined),
-	username: v.optional(IntegrationUsernameSchema, undefined),
-	password: v.optional(SecretSchema, undefined),
-	erp_token: v.optional(SecretSchema, undefined),
-	enabled: v.optional(v.boolean(), undefined),
-})
+export const INTEGRATION_SECRET_FIELDS: IntegrationSecretFields = {
+	tanss: ['password', 'erp_token'],
+}
+
+export type IntegrationSecretField<P extends IntegrationProvider = IntegrationProvider> =
+	IntegrationSecretFields[P][number]
+
+/**
+ * Integration create body, one variant per provider. Saving logs in to the
+ * external system first; the row is only stored when the credentials work.
+ */
+export const IntegrationCreateSchema = v.variant('provider', [
+	v.strictObject({
+		provider: v.literal('tanss'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: SecretSchema,
+		erp_token: SecretSchema,
+	}),
+])
+
+/**
+ * Integration patch: omitted fields keep the stored values (secrets too).
+ * `provider` selects the variant and must match the route.
+ */
+export const IntegrationUpdateSchema = v.variant('provider', [
+	v.strictObject({
+		provider: v.literal('tanss'),
+		base_url: v.optional(BaseUrlSchema, undefined),
+		username: v.optional(IntegrationUsernameSchema, undefined),
+		password: v.optional(SecretSchema, undefined),
+		erp_token: v.optional(SecretSchema, undefined),
+		enabled: v.optional(v.boolean(), undefined),
+	}),
+])
 
 /**
  * "Test connection" body: the unsaved form values. Missing secrets fall back
  * to the stored ones of an existing integration.
  */
-export const IntegrationTestSchema = v.strictObject({
-	base_url: BaseUrlSchema,
-	username: IntegrationUsernameSchema,
-	password: v.optional(SecretSchema, undefined),
-	erp_token: v.optional(SecretSchema, undefined),
-})
+export const IntegrationTestSchema = v.variant('provider', [
+	v.strictObject({
+		provider: v.literal('tanss'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: v.optional(SecretSchema, undefined),
+		erp_token: v.optional(SecretSchema, undefined),
+	}),
+])
 
 export type IntegrationCreate = v.InferOutput<typeof IntegrationCreateSchema>
 export type IntegrationUpdate = v.InferOutput<typeof IntegrationUpdateSchema>
@@ -2869,14 +2897,38 @@ export interface SyncRunJson {
 	counts: { tenants: number; devices: number; employees: number; auto_linked: number }
 }
 
+/**
+ * What a provider supports, so the client gates features on it instead of
+ * on the provider id. Static per provider.
+ */
+export interface IntegrationCapabilities {
+	/** Syncs employees (contacts / users); without them the report has no employee level. */
+	employees: boolean
+	/** Opens and lists tickets, with priorities as ticket tags. */
+	tickets: boolean
+	/** Overwrites external device/employee fields with conex values (and deactivates employees). */
+	push: boolean
+	/** Creates conex devices in the external system. */
+	create_device: boolean
+	/** External tenants carry a customer number that is compared with the conex one. */
+	customer_numbers: boolean
+	/** How many external tenants one conex tenant may link to. */
+	tenant_cardinality: 'one' | 'many'
+}
+
 /** Integration without secrets: only whether they are set. */
 export interface IntegrationJson {
 	id: number
 	provider: IntegrationProvider
-	base_url: string
-	username: string
-	has_password: boolean
-	has_erp_token: boolean
+	/** Null for providers without a configurable server. */
+	base_url: string | null
+	/** Null for providers that do not log in with a user. */
+	username: string | null
+	/** Provider-specific plain settings. */
+	settings: Record<string, unknown>
+	/** Per secret field of the provider: whether a value is stored. */
+	secrets_set: Record<string, boolean>
+	capabilities: IntegrationCapabilities
 	enabled: boolean
 	created_at: number
 	updated_at: number
@@ -2885,10 +2937,10 @@ export interface IntegrationJson {
 	last_sync: SyncRunJson | null
 }
 
-/** Normalized external tenant (TANSS company). */
+/** Normalized external tenant (TANSS company, UniFi site, Entra tenant). */
 export interface ExternalTenantJson {
 	external_id: string
-	/** TANSS customer number. */
+	/** Customer number (TANSS); null for providers without one. */
 	display_id: string | null
 	name: string
 	active: boolean
@@ -3081,16 +3133,19 @@ export interface LinkBoard {
 	entity_type: LinkEntityType
 	/** Finish time of the last successful sync (unix seconds), null = never. */
 	synced_at: number | null
-	/** Device/employee board: company linked to the tenant (null = not linked). */
-	external_tenant: ExternalTenantJson | null
+	/** Device/employee board: external tenants linked to the tenant (empty = not linked). */
+	external_tenants: ExternalTenantJson[]
 	local: LinkBoardLocal[]
 	external: LinkBoardExternal[]
 }
 
 /** Integration card on the tenant detail page. */
 export interface TenantIntegrationStatus {
-	link: ExternalLinkJson | null
-	external: ExternalTenantJson | null
+	/**
+	 * Linked external tenants (at most one unless the provider's
+	 * `tenant_cardinality` is `many`); `external` is null when it no longer exists.
+	 */
+	links: { link: ExternalLinkJson; external: ExternalTenantJson | null }[]
 	finding_counts: Partial<Record<FindingKind, number>>
 }
 
@@ -3099,9 +3154,9 @@ export interface DeviceIntegrationStatus {
 	link: ExternalLinkJson | null
 	external: ExternalDeviceJson | null
 	fields: FieldComparison[]
-	/** Company linked to the device's tenant, if any. */
-	external_tenant: ExternalTenantJson | null
-	/** Unlinked, not ignored external devices of that company (link picker). */
+	/** External tenants linked to the device's tenant. */
+	external_tenants: ExternalTenantJson[]
+	/** Unlinked, not ignored external devices of those tenants (link picker). */
 	candidates: ExternalDeviceJson[]
 }
 
@@ -3110,9 +3165,9 @@ export interface EmployeeIntegrationStatus {
 	link: ExternalLinkJson | null
 	external: ExternalEmployeeJson | null
 	fields: FieldComparison[]
-	/** Company linked to the employee's tenant, if any. */
-	external_tenant: ExternalTenantJson | null
-	/** Unlinked, not ignored external employees of that company (link picker). */
+	/** External tenants linked to the employee's tenant. */
+	external_tenants: ExternalTenantJson[]
+	/** Unlinked, not ignored external employees of those tenants (link picker). */
 	candidates: ExternalEmployeeJson[]
 }
 

@@ -59,6 +59,7 @@ export function IntegrationFormFields(props: {
 		setTesting(true)
 		setTestResult(null)
 		const res = await test_integration(props.provider, {
+			provider: props.provider,
 			base_url: f.baseUrl().trim(),
 			username: f.username().trim(),
 			...secrets(f),

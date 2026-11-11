@@ -1,11 +1,12 @@
 /**
- * Minimal Microsoft Graph client for the calendar sync: plain `fetch`, no
- * SDK, every call returns a `Result`.
+ * Minimal Microsoft Graph client shared by the calendar sync and the M365
+ * integration: plain `fetch`, no SDK, every call returns a `Result`.
  *
- * Auth is the OAuth 2.0 client-credentials flow of an Entra app with the
- * application permission `Calendars.ReadWrite`; tokens are cached per
- * tenant/app/secret until shortly before they expire. Throttled requests
- * (429, 503, 504) are retried a few times, honouring `Retry-After`.
+ * Auth is the OAuth 2.0 client-credentials flow of an Entra app; each feature
+ * brings its own app registration and permissions (least privilege). Tokens
+ * are cached per tenant/app/secret until shortly before they expire.
+ * Throttled requests (429, 503, 504) are retried a few times, honouring
+ * `Retry-After`.
  */
 import { createHash } from 'node:crypto'
 import { Result } from 'better-result'
@@ -29,7 +30,7 @@ export class GraphApiError extends Error {
 	}
 }
 
-/** True for a 404 (event or mailbox gone). */
+/** True for a 404 (resource gone). */
 export function isGraphNotFound(error: Error): boolean {
 	return error instanceof GraphApiError && error.status === 404
 }
@@ -37,12 +38,6 @@ export function isGraphNotFound(error: Error): boolean {
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 const LOGIN_BASE = 'https://login.microsoftonline.com'
 const SCOPE = 'https://graph.microsoft.com/.default'
-
-/** Fixed property set of the `conexTanssId` extended property. */
-export const TANSS_ID_PROPERTY = 'String {5b0f9a3e-6c1d-4f4e-9a8b-2f1c7d3e8a51} Name conexTanssId'
-
-/** Category on every synced event. */
-export const TANSS_CATEGORY = 'TANSS'
 
 const MAX_ATTEMPTS = 4
 const MAX_RETRY_DELAY_MS = 30_000
@@ -54,7 +49,14 @@ const TokenResponseSchema = v.object({
 	expires_in: v.pipe(v.union([v.number(), v.string()]), v.transform(Number), v.number()),
 })
 
-const EventResponseSchema = v.object({ id: v.pipe(v.string(), v.minLength(1)) })
+/** One page of a Graph collection; `@odata.nextLink` is absolute. */
+const PageSchema = v.object({
+	value: v.array(v.unknown()),
+	'@odata.nextLink': v.optional(v.string()),
+})
+
+/** Upper bound for `getAll`, against a server that keeps returning next links. */
+const MAX_PAGES = 1000
 
 const ErrorBodySchema = v.object({
 	error: v.union([
@@ -142,6 +144,15 @@ async function send(
 	}
 }
 
+export interface GraphRequestOptions {
+	body?: unknown
+	/**
+	 * Sends `ConsistencyLevel: eventual`, which advanced queries need
+	 * (`$count`, `$search`, `endsWith`, `ne` filters on directory objects).
+	 */
+	eventual?: boolean
+}
+
 /** One app registration in one Entra tenant. */
 export class GraphClient {
 	constructor(private readonly creds: GraphCredentials) {}
@@ -188,23 +199,29 @@ export class GraphClient {
 		return Result.ok(access_token)
 	}
 
-	/** Authenticated Graph request; one fresh token on 401. */
-	private async request(
+	/**
+	 * Authenticated Graph request; one fresh token on 401. `path` is relative
+	 * to the v1.0 endpoint, or an absolute Graph URL (`@odata.nextLink`).
+	 */
+	async request(
 		what: string,
 		method: string,
 		path: string,
-		body?: unknown,
+		options: GraphRequestOptions = {},
 	): Promise<Result<Response, Error>> {
+		const { body, eventual } = options
+		const url = path.startsWith('https://') ? path : `${GRAPH_BASE}${path}`
 		for (let attempt = 0; attempt < 2; attempt++) {
 			const token = await this.token()
 			if (Result.isError(token)) {
 				return token
 			}
-			const res = await send(what, `${GRAPH_BASE}${path}`, {
+			const res = await send(what, url, {
 				method,
 				headers: {
 					authorization: `Bearer ${token.value}`,
 					...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+					...(eventual ? { consistencylevel: 'eventual' } : {}),
 				},
 				body: body !== undefined ? JSON.stringify(body) : undefined,
 			})
@@ -223,71 +240,66 @@ export class GraphClient {
 		return Result.err(new GraphApiError(`Microsoft Graph ${what} failed: unauthorized`, 401))
 	}
 
-	/** Reads the mailbox's main calendar: proves permission and scoping for `upn`. */
-	async verify(upn: string): Promise<Result<void, Error>> {
-		const res = await this.request(
-			`calendar check for ${upn}`,
-			'GET',
-			`/users/${encodeURIComponent(upn)}/calendar?$select=id`,
-		)
-		return res.map(() => undefined)
-	}
-
-	/** Creates an event in the main calendar and returns its id. */
-	async createEvent(upn: string, event: GraphEvent): Promise<Result<string, Error>> {
-		const res = await this.request(
-			`event create for ${upn}`,
-			'POST',
-			`/users/${encodeURIComponent(upn)}/events`,
-			event,
-		)
+	/** GET of one resource, validated against `schema`. */
+	async getJson<T>(
+		what: string,
+		path: string,
+		schema: v.GenericSchema<unknown, T>,
+		options: Omit<GraphRequestOptions, 'body'> = {},
+	): Promise<Result<T, Error>> {
+		const res = await this.request(what, 'GET', path, options)
 		if (Result.isError(res)) {
 			return res
 		}
-		const parsed = v.safeParse(EventResponseSchema, await res.value.json().catch(() => null))
-		if (!parsed.success) {
-			return Result.err(
-				new GraphApiError('Microsoft Graph event create returned no event id', null),
+		const parsed = v.safeParse(schema, await res.value.json().catch(() => null))
+		return parsed.success
+			? Result.ok(parsed.output)
+			: Result.err(
+					new GraphApiError(`Microsoft Graph ${what} returned an unexpected body`, null),
+				)
+	}
+
+	/**
+	 * Every item of a collection: follows `@odata.nextLink` and validates each
+	 * item against `schema` (an invalid item fails the whole call).
+	 */
+	async getAll<T>(
+		what: string,
+		path: string,
+		schema: v.GenericSchema<unknown, T>,
+		options: Omit<GraphRequestOptions, 'body'> = {},
+	): Promise<Result<T[], Error>> {
+		const items: T[] = []
+		let next: string | undefined = path
+		for (let page = 0; next !== undefined; page++) {
+			if (page >= MAX_PAGES) {
+				return Result.err(
+					new GraphApiError(`Microsoft Graph ${what} returned too many pages`, null),
+				)
+			}
+			const res: Result<v.InferOutput<typeof PageSchema>, Error> = await this.getJson(
+				what,
+				next,
+				PageSchema,
+				options,
 			)
+			if (Result.isError(res)) {
+				return res
+			}
+			for (const raw of res.value.value) {
+				const item = v.safeParse(schema, raw)
+				if (!item.success) {
+					return Result.err(
+						new GraphApiError(
+							`Microsoft Graph ${what} returned an unexpected item`,
+							null,
+						),
+					)
+				}
+				items.push(item.output)
+			}
+			next = res.value['@odata.nextLink']
 		}
-		return Result.ok(parsed.output.id)
+		return Result.ok(items)
 	}
-
-	/** Overwrites the given event fields; 404 when the user deleted the event. */
-	async updateEvent(
-		upn: string,
-		eventId: string,
-		event: GraphEvent,
-	): Promise<Result<void, Error>> {
-		const res = await this.request(
-			`event update for ${upn}`,
-			'PATCH',
-			`/users/${encodeURIComponent(upn)}/events/${encodeURIComponent(eventId)}`,
-			event,
-		)
-		return res.map(() => undefined)
-	}
-
-	async deleteEvent(upn: string, eventId: string): Promise<Result<void, Error>> {
-		const res = await this.request(
-			`event delete for ${upn}`,
-			'DELETE',
-			`/users/${encodeURIComponent(upn)}/events/${encodeURIComponent(eventId)}`,
-		)
-		return res.map(() => undefined)
-	}
-}
-
-/** The `event` resource fields the sync writes. */
-export interface GraphEvent {
-	subject: string
-	body: { contentType: 'text' | 'html'; content: string }
-	/** `dateTime` without offset, interpreted in `timeZone`. */
-	start: { dateTime: string; timeZone: 'UTC' }
-	end: { dateTime: string; timeZone: 'UTC' }
-	location: { displayName: string }
-	showAs: 'busy' | 'oof'
-	isReminderOn: boolean
-	categories: string[]
-	singleValueExtendedProperties: { id: string; value: string }[]
 }

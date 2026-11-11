@@ -40,6 +40,7 @@ import {
 	compareFieldLabel,
 	compareValueLabel,
 	deviceStatusLabel,
+	externalTenantLabel,
 	findingKindLabel,
 	providerLabel,
 } from '../../i18n/labels'
@@ -181,12 +182,13 @@ function LinkBoardPanel(props: {
 							<Show
 								when={
 									current().entity_type === 'tenant' ||
-									current().external_tenant !== null
+									current().external_tenants.length > 0
 								}
 								fallback={
 									<Empty
 										message={t('integration.boardTenantNotLinked', {
 											provider: providerLabel(props.provider),
+											tenants: externalTenantLabel(props.provider, 2),
 										})}
 									/>
 								}
@@ -234,7 +236,9 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		// The tenant board lists every external company: global users only.
 		...(isScoped() ? [] : [{ id: 'tenants' as const, label: t('integration.viewTenants') }]),
 		{ id: 'devices', label: t('integration.viewDevices') },
-		{ id: 'employees', label: t('integration.viewEmployees') },
+		...(integration()?.capabilities.employees === false
+			? []
+			: [{ id: 'employees' as const, label: t('integration.viewEmployees') }]),
 	]
 
 	const [integration] = createRecord(() => props.id, fetch_integration, setError)
@@ -285,7 +289,12 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		}
 		if (
 			clean &&
-			!window.confirm(t('integration.confirmFullSync', { name: providerLabel(row.provider) }))
+			!window.confirm(
+				t('integration.confirmFullSync', {
+					name: providerLabel(row.provider),
+					tenants: externalTenantLabel(row.provider, 2),
+				}),
+			)
 		) {
 			return
 		}
@@ -308,6 +317,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			return null
 		}
 		const provider = row.provider
+		const caps = row.capabilities
 		const deactivate: JSX.Element = (
 			<button
 				type="button"
@@ -320,6 +330,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							t('integration.confirmDeactivateEmployee', {
 								name: f.external_name ?? f.external_id,
 								provider: providerLabel(provider),
+								tenants: externalTenantLabel(provider, 2),
 							}),
 						)
 					) {
@@ -422,15 +433,21 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'device_missing_in_external':
 				return (
 					<Show when={can('integrations.manage')}>
-						<button
-							type="button"
-							class="btn-small"
-							onClick={() =>
-								void run(() => create_external_device(provider, f.device_id ?? 0))
-							}
-						>
-							{t('integration.createExternal', { provider: providerLabel(provider) })}
-						</button>
+						<Show when={caps.create_device}>
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										create_external_device(provider, f.device_id ?? 0),
+									)
+								}
+							>
+								{t('integration.createExternal', {
+									provider: providerLabel(provider),
+								})}
+							</button>
+						</Show>
 						<button
 							type="button"
 							class="icon-btn"
@@ -447,7 +464,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'device_stale':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
 			case 'device_mismatch': {
-				const field = pushField(f)
+				const field = caps.push ? pushField(f) : null
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
@@ -472,10 +489,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'employee_suggestion':
 				return (
 					<Show when={can('integrations.manage')}>
-						{provider === 'tanss' &&
-							f.remote === 'active' &&
-							f.external_id !== null &&
-							deactivate}
+						{caps.push && f.remote === 'active' && f.external_id !== null && deactivate}
 						<button
 							type="button"
 							class="icon-btn icon-btn-connect"
@@ -499,7 +513,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'employee_missing_in_conex':
 				return (
 					<Show when={can('integrations.manage')}>
-						{provider === 'tanss' && f.external_id !== null && deactivate}
+						{caps.push && f.external_id !== null && deactivate}
 						<Show when={can('edit') && f.tenant_id !== null}>
 							<button
 								type="button"
@@ -551,11 +565,11 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'employee_stale':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
 			case 'employee_mismatch': {
-				const field = employeePushField(f)
+				const field = caps.push ? employeePushField(f) : null
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{provider === 'tanss' &&
+						{caps.push &&
 							f.field === 'status' &&
 							f.local === 'inactive' &&
 							f.remote === 'active' &&
@@ -593,7 +607,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			key: 'kind',
 			label: t('integration.finding'),
 			getValue: (f: IntegrationFinding): JSX.Element => (
-				<span class="badge">{findingKindLabel(f.kind)}</span>
+				<span class="badge">{findingKindLabel(f.kind, integration()?.provider ?? '')}</span>
 			),
 		},
 		{
@@ -752,7 +766,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 								options={FINDING_KINDS.filter((kind) => counts().has(kind)).map(
 									(kind) => ({
 										value: kind,
-										label: `${findingKindLabel(kind)} (${counts().get(kind) ?? 0})`,
+										label: `${findingKindLabel(kind, integration()?.provider ?? '')} (${counts().get(kind) ?? 0})`,
 									}),
 								)}
 							/>
@@ -786,6 +800,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			<Show when={linkingTenant() !== null && integration()}>
 				<ExternalTenantPicker
 					provider={integration()?.provider ?? 'tanss'}
+					customer_numbers={integration()?.capabilities.customer_numbers ?? false}
 					on_select={handleLinkTenant}
 					on_close={() => setLinkingTenant(null)}
 				/>

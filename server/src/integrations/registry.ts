@@ -1,15 +1,15 @@
 import type { IntegrationProvider as ProviderId } from 'shared/src/schemas'
-import type { TanssCredentials } from './tanss/client'
-import { TanssProvider } from './tanss/provider'
-import type { IntegrationProvider } from './types'
+import { tanssDefinition } from './tanss/definition'
+import type { ProviderDefinition } from './types'
 
 /**
- * Provider factory keyed by provider id. UniFi and servereye plug in here
- * with their own credential shapes once they exist.
+ * Every provider by id. UniFi and Microsoft 365 plug in here with a
+ * definition of their own (credentials, capabilities, report hooks).
  */
-export function buildProvider(provider: ProviderId, creds: TanssCredentials): IntegrationProvider {
-	switch (provider) {
-		case 'tanss':
-			return new TanssProvider(creds)
-	}
+const DEFINITIONS: { [P in ProviderId]: ProviderDefinition<P> } = {
+	tanss: tanssDefinition,
+}
+
+export function providerDefinition<P extends ProviderId>(provider: P): ProviderDefinition<P> {
+	return DEFINITIONS[provider]
 }

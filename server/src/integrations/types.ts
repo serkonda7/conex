@@ -6,8 +6,10 @@ import type {
 	ExternalPushField,
 	ExternalTenantJson,
 	ExternalTicketJson,
+	IntegrationCapabilities,
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
+import type { IntegrationSecrets } from './secrets'
 
 export type {
 	ExternalDeviceJson as ExternalDevice,
@@ -25,13 +27,12 @@ export type ExternalTicket = Omit<ExternalTicketJson, 'priority'>
  */
 export interface IntegrationProvider {
 	id: ProviderId
-	/** TANSS: one company per tenant; UniFi (later): many sites per tenant. */
-	tenantCardinality: 'one' | 'many'
 	/** Logs in with every stored credential; used before saving. */
 	verify(): Promise<Result<void, Error>>
 	/**
-	 * Tenants plus their employees. With `modifiedSince` only records
-	 * changed since then (both lists come from one call in TANSS).
+	 * Tenants plus their employees. With `modifiedSince` (only passed when the
+	 * definition is `incremental`) only records changed since then (both
+	 * lists come from one call in TANSS).
 	 */
 	listTenants(modifiedSince?: number): Promise<Result<ExternalDirectory, Error>>
 	fetchDevices(externalTenantId: string): Promise<Result<ExternalDeviceJson[], Error>>
@@ -50,6 +51,41 @@ export interface IntegrationProvider {
 	): Promise<Result<ExternalDeviceJson, Error>>
 	/** Overwrites fields of an employee; absent when unsupported. */
 	updateEmployee?(externalId: string, changes: EmployeeUpdate): Promise<Result<void, Error>>
+}
+
+/** Plain (non-secret) configuration of an integration row. */
+export interface IntegrationConfig {
+	base_url: string | null
+	username: string | null
+	settings: Record<string, unknown>
+}
+
+/**
+ * Static description of one provider: what it supports and how its stored
+ * configuration becomes an {@link IntegrationProvider}. The optional
+ * provider methods must agree with `capabilities` (routes check both).
+ */
+export interface ProviderDefinition<P extends ProviderId = ProviderId> {
+	id: P
+	capabilities: IntegrationCapabilities
+	/**
+	 * `listTenants(modifiedSince)` returns only changes, merged into the
+	 * snapshot; otherwise every sync replaces the tenant and employee snapshot.
+	 */
+	incremental: boolean
+	/** Name of each secret field in "… is required" errors. */
+	secretLabels: Record<keyof IntegrationSecrets<P>, string>
+	/**
+	 * Whether a conex device is expected to exist in the external system;
+	 * limits `device_missing_in_external` (UniFi only knows Ubiquiti
+	 * hardware). Absent: every device is.
+	 */
+	coversDevice?(device: { manufacturer: string }): boolean
+	/** Provider instance; fails when required configuration is missing. */
+	build(
+		config: IntegrationConfig,
+		secrets: IntegrationSecrets<P>,
+	): Result<IntegrationProvider, Error>
 }
 
 export interface ExternalDirectory {

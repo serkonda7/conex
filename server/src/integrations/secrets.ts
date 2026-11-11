@@ -1,15 +1,37 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { Result } from 'better-result'
+import {
+	INTEGRATION_SECRET_FIELDS,
+	type IntegrationSecretField,
+	type IntegrationProvider as ProviderId,
+} from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getIntegrationKey } from '../keys'
 
-/** Credentials of one integration; only ever decrypted server-side. */
-export interface IntegrationSecrets {
-	password: string
-	erp_token: string
+/**
+ * Secrets of one integration, keyed by the provider's secret fields; only
+ * ever decrypted server-side. An empty string means "not set".
+ */
+export type IntegrationSecrets<P extends ProviderId = ProviderId> = Record<
+	IntegrationSecretField<P>,
+	string
+>
+
+/** Validates the stored secrets object of `provider` (unknown keys are dropped). */
+function secretsSchema<P extends ProviderId>(
+	provider: P,
+): v.GenericSchema<unknown, IntegrationSecrets<P>> {
+	const fields: readonly string[] = INTEGRATION_SECRET_FIELDS[provider]
+	return v.object(
+		Object.fromEntries(fields.map((field) => [field, v.optional(v.string(), '')])),
+	) as unknown as v.GenericSchema<unknown, IntegrationSecrets<P>>
 }
 
-const SecretsSchema = v.object({ password: v.string(), erp_token: v.string() })
+/** Every secret field of `provider` set to "not set". */
+export function emptySecrets<P extends ProviderId>(provider: P): IntegrationSecrets<P> {
+	const fields: readonly string[] = INTEGRATION_SECRET_FIELDS[provider]
+	return Object.fromEntries(fields.map((field) => [field, ''])) as IntegrationSecrets<P>
+}
 
 const VERSION = 'v1'
 const IV_BYTES = 12
@@ -64,6 +86,10 @@ export function encryptSecrets(secrets: IntegrationSecrets): string {
 	return encryptJson(secrets)
 }
 
-export function decryptSecrets(stored: string): Result<IntegrationSecrets, Error> {
-	return decryptJson(stored, SecretsSchema)
+/** Decrypts the secrets of a `provider` integration row. */
+export function decryptSecrets<P extends ProviderId>(
+	provider: P,
+	stored: string,
+): Result<IntegrationSecrets<P>, Error> {
+	return decryptJson(stored, secretsSchema(provider))
 }
