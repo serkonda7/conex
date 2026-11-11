@@ -9,7 +9,11 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@azure/identity": "~4.14.1",
     "@hono/valibot-validator": "catalog:",
+    "@microsoft/msgraph-sdk": "1.0.0-preview.92",
+    "@microsoft/msgraph-sdk-core": "1.0.0-preview.17",
+    "@microsoft/msgraph-sdk-users": "1.0.0-preview.92",
     "@serkonda7/conex-device-schema": "workspace:*",
     "better-result": "catalog:",
     "drizzle-orm": "catalog:",

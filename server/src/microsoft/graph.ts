@@ -1,16 +1,26 @@
 /**
- * Minimal Microsoft Graph client shared by the calendar sync and the M365
- * integration: plain `fetch`, no SDK, every call returns a `Result`.
+ * Microsoft Graph access shared by the calendar sync and the M365
+ * integration, on top of `@microsoft/msgraph-sdk`. Every call returns a
+ * `Result`; SDK and auth failures become a `GraphApiError`.
  *
  * Auth is the OAuth 2.0 client-credentials flow of an Entra app; each feature
- * brings its own app registration and permissions (least privilege). Tokens
- * are cached per tenant/app/secret until shortly before they expire.
- * Throttled requests (429, 503, 504) are retried a few times, honouring
- * `Retry-After`.
+ * brings its own app registration and permissions (least privilege). One
+ * credential (and with it MSAL's token cache) is kept per tenant/app/secret.
+ * The SDK's default middleware retries throttled requests (429, 503, 504),
+ * honouring `Retry-After`.
+ *
+ * The fluent API only exposes the resources whose package is imported, e.g.
+ * `import '@microsoft/msgraph-sdk-users'` for `api.users`.
  */
 import { createHash } from 'node:crypto'
+import { AuthenticationError, ClientSecretCredential } from '@azure/identity'
+import {
+	createGraphServiceClient,
+	GraphRequestAdapter,
+	type GraphServiceClient,
+} from '@microsoft/msgraph-sdk'
+import { GraphAzureIdentityAuthenticationProvider } from '@microsoft/msgraph-sdk-core'
 import { Result } from 'better-result'
-import * as v from 'valibot'
 
 export interface GraphCredentials {
 	ms_tenant_id: string
@@ -35,271 +45,180 @@ export function isGraphNotFound(error: Error): boolean {
 	return error instanceof GraphApiError && error.status === 404
 }
 
-const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
-const LOGIN_BASE = 'https://login.microsoftonline.com'
 const SCOPE = 'https://graph.microsoft.com/.default'
 
-const MAX_ATTEMPTS = 4
-const MAX_RETRY_DELAY_MS = 30_000
-/** Renew tokens this long before they expire. */
-const TOKEN_MARGIN_S = 120
-
-const TokenResponseSchema = v.object({
-	access_token: v.pipe(v.string(), v.minLength(1)),
-	expires_in: v.pipe(v.union([v.number(), v.string()]), v.transform(Number), v.number()),
-})
-
-/** One page of a Graph collection; `@odata.nextLink` is absolute. */
-const PageSchema = v.object({
-	value: v.array(v.unknown()),
-	'@odata.nextLink': v.optional(v.string()),
-})
+/**
+ * Request headers for advanced queries (`$count`, `$search`, `endsWith`,
+ * `ne` filters on directory objects).
+ */
+export const EVENTUAL_CONSISTENCY = { ConsistencyLevel: 'eventual' }
 
 /** Upper bound for `getAll`, against a server that keeps returning next links. */
 const MAX_PAGES = 1000
 
-const ErrorBodySchema = v.object({
-	error: v.union([
-		v.object({ code: v.optional(v.string()), message: v.optional(v.string()) }),
-		v.string(),
-	]),
-	error_description: v.optional(v.string()),
-})
+const credentials = new Map<string, ClientSecretCredential>()
 
-interface CachedToken {
-	token: string
-	expiresAt: number
-}
-
-const tokens = new Map<string, CachedToken>()
-
-function cacheKey(creds: GraphCredentials): string {
-	return createHash('sha256')
+/** Cached per tenant/app/secret, so tokens outlive one `GraphClient`. */
+function credentialOf(creds: GraphCredentials): ClientSecretCredential {
+	const key = createHash('sha256')
 		.update(`${creds.ms_tenant_id}\n${creds.client_id}\n${creds.client_secret}`)
 		.digest('hex')
-}
-
-function errMessage(e: unknown): string {
-	return e instanceof Error ? e.message : String(e)
-}
-
-/** `{ error: { code, message } }` (Graph) or `{ error, error_description }` (token endpoint). */
-async function errorOf(what: string, res: Response): Promise<GraphApiError> {
-	const body = await res.json().catch(() => null)
-	const parsed = v.safeParse(ErrorBodySchema, body)
-	let code: string | null = null
-	let detail = `HTTP ${res.status}`
-	if (parsed.success) {
-		const { error, error_description } = parsed.output
-		if (typeof error === 'string') {
-			code = error
-			detail = error_description?.split(/\r?\n/)[0] ?? error
-		} else {
-			code = error.code ?? null
-			detail = error.message ?? error.code ?? detail
-		}
+	let credential = credentials.get(key)
+	if (!credential) {
+		credential = new ClientSecretCredential(
+			creds.ms_tenant_id,
+			creds.client_id,
+			creds.client_secret,
+		)
+		credentials.set(key, credential)
 	}
-	return new GraphApiError(`Microsoft Graph ${what} failed: ${detail}`, res.status, code)
+	return credential
 }
 
-/** Seconds (or HTTP date) of `Retry-After`, as a capped delay in ms. */
-function retryDelayMs(res: Response, attempt: number): number {
-	const header = res.headers.get('retry-after')
-	let ms = 2 ** attempt * 1000
-	if (header !== null) {
-		const seconds = Number(header)
-		if (Number.isFinite(seconds)) {
-			ms = seconds * 1000
-		} else {
-			const at = Date.parse(header)
-			if (!Number.isNaN(at)) {
-				ms = at - Date.now()
-			}
-		}
+/** First line of a message; Entra error descriptions append trace ids and timestamps. */
+function firstLine(text: string): string {
+	return text.split(/\r?\n/)[0] ?? text
+}
+
+/**
+ * Entra's answer inside MSAL's `ServerError` (wrapped as the `cause` of
+ * `AuthenticationRequiredError`). `errorMessage` reads
+ * `Error(s): … - Description: AADSTS…: <text> Trace ID: …`.
+ */
+function msalError(what: string, e: Error): GraphApiError | null {
+	const cause: unknown = e.cause
+	if (!(cause instanceof Error) || !('errorCode' in cause) || !('errorMessage' in cause)) {
+		return null
 	}
-	return Math.min(Math.max(ms, 0), MAX_RETRY_DELAY_MS)
+	const code = typeof cause.errorCode === 'string' && cause.errorCode ? cause.errorCode : null
+	const raw = typeof cause.errorMessage === 'string' ? cause.errorMessage : ''
+	const detail =
+		raw.match(/Description: (.*?)(?:\s+Trace ID:|\r?\n|$)/s)?.[1] ||
+		firstLine(raw) ||
+		code ||
+		e.message
+	const status = 'status' in cause && typeof cause.status === 'number' ? cause.status : null
+	return new GraphApiError(`Microsoft Graph ${what} failed: ${detail}`, status, code)
 }
 
-/** `fetch` with retries on throttling; network errors become a `GraphApiError`. */
-async function send(
-	what: string,
-	url: string,
-	init: RequestInit,
-): Promise<Result<Response, GraphApiError>> {
-	for (let attempt = 1; ; attempt++) {
-		const res = await Result.tryPromise({
-			try: () => fetch(url, init),
-			catch: (e: unknown) =>
-				new GraphApiError(`Microsoft Graph ${what} failed: ${errMessage(e)}`, null),
-		})
-		if (Result.isError(res)) {
-			return res
-		}
-		const status = res.value.status
-		if ((status === 429 || status === 503 || status === 504) && attempt < MAX_ATTEMPTS) {
-			await Bun.sleep(retryDelayMs(res.value, attempt))
-			continue
-		}
-		return res
+/** Graph `ODataError`/`ApiError`, Entra/MSAL auth errors, or a network failure. */
+function toGraphError(what: string, e: unknown): GraphApiError {
+	if (e instanceof GraphApiError) {
+		return e
 	}
+	const msal = e instanceof Error ? msalError(what, e) : null
+	if (msal) {
+		return msal
+	}
+	if (e instanceof AuthenticationError) {
+		const { error, errorDescription } = e.errorResponse
+		const detail = errorDescription ? firstLine(errorDescription) : error
+		return new GraphApiError(
+			`Microsoft Graph ${what} failed: ${detail}`,
+			e.statusCode,
+			error || null,
+		)
+	}
+	if (e instanceof Error) {
+		const status =
+			'responseStatusCode' in e && typeof e.responseStatusCode === 'number'
+				? e.responseStatusCode
+				: null
+		// ODataError carries Graph's `{ error: { code, message } }` as `errorEscaped`.
+		const main =
+			'errorEscaped' in e && typeof e.errorEscaped === 'object' && e.errorEscaped !== null
+				? (e.errorEscaped as { code?: string | null; message?: string | null })
+				: null
+		const detail =
+			main?.message || main?.code || e.message || (status ? `HTTP ${status}` : e.name)
+		return new GraphApiError(
+			`Microsoft Graph ${what} failed: ${firstLine(detail)}`,
+			status,
+			main?.code ?? null,
+		)
+	}
+	return new GraphApiError(`Microsoft Graph ${what} failed: ${String(e)}`, null)
 }
 
-export interface GraphRequestOptions {
-	body?: unknown
-	/**
-	 * Sends `ConsistencyLevel: eventual`, which advanced queries need
-	 * (`$count`, `$search`, `endsWith`, `ne` filters on directory objects).
-	 */
-	eventual?: boolean
+/** One page of a collection as the SDK returns it. */
+interface Page<T> {
+	value?: T[] | null
+	odataNextLink?: string | null
+}
+
+/** A collection request builder (`api.users`, `api.users.byUserId(id).events`, …). */
+interface CollectionRequestBuilder<T, C> {
+	get(config?: C): Promise<Page<T> | undefined>
+	withUrl(rawUrl: string): CollectionRequestBuilder<T, C>
 }
 
 /** One app registration in one Entra tenant. */
 export class GraphClient {
-	constructor(private readonly creds: GraphCredentials) {}
+	readonly api: GraphServiceClient
+	private readonly credential: ClientSecretCredential
 
-	/** Access token from the cache or a new client-credentials request. */
+	constructor(creds: GraphCredentials) {
+		this.credential = credentialOf(creds)
+		const auth = new GraphAzureIdentityAuthenticationProvider(this.credential, [SCOPE])
+		this.api = createGraphServiceClient(new GraphRequestAdapter(auth))
+	}
+
+	/** Access token from MSAL's cache or a new client-credentials request. */
 	async token(): Promise<Result<string, Error>> {
-		const key = cacheKey(this.creds)
-		const cached = tokens.get(key)
-		if (cached && cached.expiresAt > Date.now() / 1000) {
-			return Result.ok(cached.token)
-		}
-		const res = await send(
-			'token request',
-			`${LOGIN_BASE}/${encodeURIComponent(this.creds.ms_tenant_id)}/oauth2/v2.0/token`,
-			{
-				method: 'POST',
-				headers: { 'content-type': 'application/x-www-form-urlencoded' },
-				body: new URLSearchParams({
-					client_id: this.creds.client_id,
-					client_secret: this.creds.client_secret,
-					scope: SCOPE,
-					grant_type: 'client_credentials',
-				}),
+		return Result.tryPromise({
+			try: async () => {
+				const token = await this.credential.getToken(SCOPE)
+				if (!token?.token) {
+					throw new GraphApiError(
+						'Microsoft Graph token request returned no access token',
+						null,
+					)
+				}
+				return token.token
 			},
-		)
-		if (Result.isError(res)) {
-			return res
-		}
-		if (!res.value.ok) {
-			return Result.err(await errorOf('token request', res.value))
-		}
-		const body = await res.value.json().catch(() => null)
-		const parsed = v.safeParse(TokenResponseSchema, body)
-		if (!parsed.success) {
-			return Result.err(
-				new GraphApiError('Microsoft Graph token request returned no access token', null),
-			)
-		}
-		const { access_token, expires_in } = parsed.output
-		tokens.set(key, {
-			token: access_token,
-			expiresAt: Date.now() / 1000 + expires_in - TOKEN_MARGIN_S,
+			catch: (e: unknown) => toGraphError('token request', e),
 		})
-		return Result.ok(access_token)
+	}
+
+	/** Runs one SDK call; `what` names it in error messages. */
+	async call<T>(
+		what: string,
+		fn: (api: GraphServiceClient) => Promise<T>,
+	): Promise<Result<T, GraphApiError>> {
+		return Result.tryPromise({
+			try: () => fn(this.api),
+			catch: (e: unknown) => toGraphError(what, e),
+		})
 	}
 
 	/**
-	 * Authenticated Graph request; one fresh token on 401. `path` is relative
-	 * to the v1.0 endpoint, or an absolute Graph URL (`@odata.nextLink`).
+	 * Every item of a collection: follows `@odata.nextLink`. `config` (query
+	 * parameters, headers) applies to the first page; next links already carry
+	 * the query, later pages only get its headers and options.
 	 */
-	async request(
+	async getAll<T, C extends { headers?: unknown; options?: unknown }>(
 		what: string,
-		method: string,
-		path: string,
-		options: GraphRequestOptions = {},
-	): Promise<Result<Response, Error>> {
-		const { body, eventual } = options
-		const url = path.startsWith('https://') ? path : `${GRAPH_BASE}${path}`
-		for (let attempt = 0; attempt < 2; attempt++) {
-			const token = await this.token()
-			if (Result.isError(token)) {
-				return token
-			}
-			const res = await send(what, url, {
-				method,
-				headers: {
-					authorization: `Bearer ${token.value}`,
-					...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-					...(eventual ? { consistencylevel: 'eventual' } : {}),
-				},
-				body: body !== undefined ? JSON.stringify(body) : undefined,
-			})
-			if (Result.isError(res)) {
-				return res
-			}
-			if (res.value.status === 401 && attempt === 0) {
-				tokens.delete(cacheKey(this.creds))
-				continue
-			}
-			if (!res.value.ok) {
-				return Result.err(await errorOf(what, res.value))
-			}
-			return Result.ok(res.value)
-		}
-		return Result.err(new GraphApiError(`Microsoft Graph ${what} failed: unauthorized`, 401))
-	}
-
-	/** GET of one resource, validated against `schema`. */
-	async getJson<T>(
-		what: string,
-		path: string,
-		schema: v.GenericSchema<unknown, T>,
-		options: Omit<GraphRequestOptions, 'body'> = {},
-	): Promise<Result<T, Error>> {
-		const res = await this.request(what, 'GET', path, options)
-		if (Result.isError(res)) {
-			return res
-		}
-		const parsed = v.safeParse(schema, await res.value.json().catch(() => null))
-		return parsed.success
-			? Result.ok(parsed.output)
-			: Result.err(
-					new GraphApiError(`Microsoft Graph ${what} returned an unexpected body`, null),
-				)
-	}
-
-	/**
-	 * Every item of a collection: follows `@odata.nextLink` and validates each
-	 * item against `schema` (an invalid item fails the whole call).
-	 */
-	async getAll<T>(
-		what: string,
-		path: string,
-		schema: v.GenericSchema<unknown, T>,
-		options: Omit<GraphRequestOptions, 'body'> = {},
-	): Promise<Result<T[], Error>> {
+		builder: CollectionRequestBuilder<T, C>,
+		config?: C,
+	): Promise<Result<T[], GraphApiError>> {
 		const items: T[] = []
-		let next: string | undefined = path
-		for (let page = 0; next !== undefined; page++) {
-			if (page >= MAX_PAGES) {
+		let page = await this.call(what, () => builder.get(config))
+		for (let n = 1; ; n++) {
+			if (Result.isError(page)) {
+				return page
+			}
+			items.push(...(page.value?.value ?? []))
+			const next = page.value?.odataNextLink
+			if (!next) {
+				return Result.ok(items)
+			}
+			if (n >= MAX_PAGES) {
 				return Result.err(
 					new GraphApiError(`Microsoft Graph ${what} returned too many pages`, null),
 				)
 			}
-			const res: Result<v.InferOutput<typeof PageSchema>, Error> = await this.getJson(
-				what,
-				next,
-				PageSchema,
-				options,
-			)
-			if (Result.isError(res)) {
-				return res
-			}
-			for (const raw of res.value.value) {
-				const item = v.safeParse(schema, raw)
-				if (!item.success) {
-					return Result.err(
-						new GraphApiError(
-							`Microsoft Graph ${what} returned an unexpected item`,
-							null,
-						),
-					)
-				}
-				items.push(item.output)
-			}
-			next = res.value['@odata.nextLink']
+			const rest = { headers: config?.headers, options: config?.options } as C
+			page = await this.call(what, () => builder.withUrl(next).get(rest))
 		}
-		return Result.ok(items)
 	}
 }

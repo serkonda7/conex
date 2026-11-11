@@ -3,8 +3,8 @@
  * The app registration needs the application permission
  * `Calendars.ReadWrite` (scoped to the technicians' mailboxes).
  */
+import '@microsoft/msgraph-sdk-users'
 import { Result } from 'better-result'
-import * as v from 'valibot'
 import { GraphApiError, type GraphClient } from '../microsoft/graph'
 
 /** Fixed property set of the `conexTanssId` extended property. */
@@ -13,9 +13,7 @@ export const TANSS_ID_PROPERTY = 'String {5b0f9a3e-6c1d-4f4e-9a8b-2f1c7d3e8a51} 
 /** Category on every synced event. */
 export const TANSS_CATEGORY = 'TANSS'
 
-const EventResponseSchema = v.object({ id: v.pipe(v.string(), v.minLength(1)) })
-
-/** The `event` resource fields the sync writes. */
+/** The `event` resource fields the sync writes (a subset of the SDK's `Event`). */
 export interface GraphEvent {
 	subject: string
 	body: { contentType: 'text' | 'html'; content: string }
@@ -35,32 +33,27 @@ export class CalendarClient {
 
 	/** Reads the mailbox's main calendar: proves permission and scoping for `upn`. */
 	async verify(upn: string): Promise<Result<void, Error>> {
-		const res = await this.graph.request(
-			`calendar check for ${upn}`,
-			'GET',
-			`/users/${encodeURIComponent(upn)}/calendar?$select=id`,
+		const res = await this.graph.call(`calendar check for ${upn}`, (api) =>
+			api.users.byUserId(upn).calendar.get({ queryParameters: { select: ['id'] } }),
 		)
 		return res.map(() => undefined)
 	}
 
 	/** Creates an event in the main calendar and returns its id. */
 	async createEvent(upn: string, event: GraphEvent): Promise<Result<string, Error>> {
-		const res = await this.graph.request(
-			`event create for ${upn}`,
-			'POST',
-			`/users/${encodeURIComponent(upn)}/events`,
-			{ body: event },
+		const res = await this.graph.call(`event create for ${upn}`, (api) =>
+			api.users.byUserId(upn).events.post(event),
 		)
 		if (Result.isError(res)) {
 			return res
 		}
-		const parsed = v.safeParse(EventResponseSchema, await res.value.json().catch(() => null))
-		if (!parsed.success) {
+		const id = res.value?.id
+		if (!id) {
 			return Result.err(
 				new GraphApiError('Microsoft Graph event create returned no event id', null),
 			)
 		}
-		return Result.ok(parsed.output.id)
+		return Result.ok(id)
 	}
 
 	/** Overwrites the given event fields; 404 when the user deleted the event. */
@@ -69,20 +62,15 @@ export class CalendarClient {
 		eventId: string,
 		event: GraphEvent,
 	): Promise<Result<void, Error>> {
-		const res = await this.graph.request(
-			`event update for ${upn}`,
-			'PATCH',
-			`/users/${encodeURIComponent(upn)}/events/${encodeURIComponent(eventId)}`,
-			{ body: event },
+		const res = await this.graph.call(`event update for ${upn}`, (api) =>
+			api.users.byUserId(upn).events.byEventId(eventId).patch(event),
 		)
 		return res.map(() => undefined)
 	}
 
 	async deleteEvent(upn: string, eventId: string): Promise<Result<void, Error>> {
-		const res = await this.graph.request(
-			`event delete for ${upn}`,
-			'DELETE',
-			`/users/${encodeURIComponent(upn)}/events/${encodeURIComponent(eventId)}`,
+		const res = await this.graph.call(`event delete for ${upn}`, (api) =>
+			api.users.byUserId(upn).events.byEventId(eventId).delete(),
 		)
 		return res.map(() => undefined)
 	}
