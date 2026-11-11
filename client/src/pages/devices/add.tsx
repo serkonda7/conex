@@ -1,5 +1,5 @@
 import type { DeviceFace } from 'shared/src/types'
-import { createEffect, createMemo, createSignal, type JSX, on, Show } from 'solid-js'
+import { createEffect, createSignal, type JSX, on, Show } from 'solid-js'
 import { fetch_device_roles } from '../../api/device_roles'
 import { create_device, type DeviceRow, fetch_device } from '../../api/devices'
 import { fetch_rack, fetch_racks } from '../../api/racks'
@@ -28,7 +28,7 @@ import {
 } from '../../lib/form'
 import { createRecord, createRows, createRowsFor, createSnapshot } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
+import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 import { deviceRoleOptions } from '../device-roles/options'
 import { EmployeeAssignmentField } from './employee_assignment'
@@ -130,13 +130,7 @@ export function DeviceAddPage(): JSX.Element {
 
 	// The tenant comes from the global tenant selection, which also limits the sites,
 	// racks and employees.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
-	createEffect(() => {
-		const id = parseId(siteId())
-		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
-			handleSiteChange('')
-		}
-	})
+	const siteOptions = useNewObjectSites(sites, siteId, () => handleSiteChange(''))
 	createEffect(() => {
 		const rack = selectedRack()
 		const tenant = newObjectTenantId()

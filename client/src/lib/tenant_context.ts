@@ -9,13 +9,14 @@
  * reads as "all" and the selector shows a fixed label.
  */
 import { Result } from 'better-result'
-import { createSignal } from 'solid-js'
+import { type Accessor, createEffect, createMemo, createSignal } from 'solid-js'
 import {
 	fetch_tenant_groups,
 	fetch_tenants,
 	type TenantGroupRow,
 	type TenantRow,
 } from '../api/tenancy'
+import { parseId } from './router'
 import { sessionTenantId } from './session'
 
 export type TenantContext =
@@ -173,4 +174,23 @@ export function rowsOfTenant<T extends { tenant_id: number | null }>(
 	tenant: number | null,
 ): T[] {
 	return tenant === null ? rows : rows.filter((row) => row.tenant_id === tenant)
+}
+
+/**
+ * Site options of a new object's site picker: the sites of the global tenant
+ * selection. When that selection drops the picked site, `onDropped` resets it.
+ */
+export function useNewObjectSites<T extends { id: number; tenant_id: number | null }>(
+	sites: Accessor<T[] | undefined>,
+	siteId: Accessor<string>,
+	onDropped: () => void,
+): Accessor<T[]> {
+	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
+	createEffect(() => {
+		const id = parseId(siteId())
+		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
+			onDropped()
+		}
+	})
+	return siteOptions
 }

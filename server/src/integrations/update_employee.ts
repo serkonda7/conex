@@ -18,7 +18,7 @@ import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { compareEmployeeFields, localEmployees } from './report'
 import { mergeEmployees, readEmployee } from './snapshot'
-import { getIntegrationRow, providerFor } from './store'
+import { enabledProvider } from './store'
 
 export async function updateExternalEmployee(
 	provider: ProviderId,
@@ -41,14 +41,7 @@ export async function updateExternalEmployee(
 	if (value == null) {
 		return Result.err(new ValidationError(`Employee has no ${field}`))
 	}
-	const row = await getIntegrationRow(provider)
-	if (Result.isError(row)) {
-		return row
-	}
-	if (!row.value.enabled) {
-		return Result.err(new ValidationError('Integration is disabled'))
-	}
-	const built = providerFor(row.value)
+	const built = await enabledProvider(provider)
 	if (Result.isError(built)) {
 		return built
 	}
@@ -75,14 +68,7 @@ export async function deactivateExternalEmployee(
 	if (!external) {
 		return Result.err(new NotFoundError('External employee not found'))
 	}
-	const row = await getIntegrationRow(provider)
-	if (Result.isError(row)) {
-		return row
-	}
-	if (!row.value.enabled) {
-		return Result.err(new ValidationError('Integration is disabled'))
-	}
-	const built = providerFor(row.value)
+	const built = await enabledProvider(provider)
 	if (Result.isError(built)) {
 		return built
 	}

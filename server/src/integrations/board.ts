@@ -63,6 +63,69 @@ function uniqueNameMatches<L, E>(
 	return out
 }
 
+/** The links of one entity type, by external id and by linked / ignored conex id. */
+function indexLinks(links: ExternalLinkRow[]): {
+	byExternal: Map<string, ExternalLinkRow>
+	linked: Map<number, ExternalLinkRow>
+	ignored: Map<number, ExternalLinkRow>
+} {
+	const linked = new Map<number, ExternalLinkRow>()
+	const ignored = new Map<number, ExternalLinkRow>()
+	for (const link of links) {
+		if (link.entity_id === null) {
+			continue
+		}
+		if (link.state === 'linked') {
+			linked.set(link.entity_id, link)
+		} else if (link.state === 'ignored') {
+			ignored.set(link.entity_id, link)
+		}
+	}
+	return { byExternal: new Map(links.map((l) => [l.external_id, l])), linked, ignored }
+}
+
+/**
+ * Adds to `localName` the names of conex objects linked to `externals` that
+ * are not on this board (other tenant / company), looked up by `fetchNames`.
+ */
+async function addForeignNames(
+	localName: Map<number, string>,
+	externals: { external_id: string }[],
+	linkByExternal: Map<string, ExternalLinkRow>,
+	fetchNames: (ids: number[]) => Promise<{ id: number; name: string }[]>,
+): Promise<void> {
+	const foreignIds = externals
+		.map((e) => linkByExternal.get(e.external_id)?.entity_id)
+		.filter((id): id is number => id !== null && id !== undefined && !localName.has(id))
+	if (foreignIds.length > 0) {
+		for (const row of await fetchNames(foreignIds)) {
+			localName.set(row.id, row.name)
+		}
+	}
+}
+
+/** Match candidates per conex id, for offering only unambiguous suggestions. */
+function candidatesBy<P>(pairs: P[], idOf: (pair: P) => number): Map<number, P[]> {
+	const candidates = new Map<number, P[]>()
+	for (const pair of pairs) {
+		candidates.set(idOf(pair), [...(candidates.get(idOf(pair)) ?? []), pair])
+	}
+	return candidates
+}
+
+/** Unlinked first, then linked, then ignored; by name within each. */
+function compareLocal(a: LinkBoardLocal, b: LinkBoardLocal): number {
+	const order = (l: LinkBoardLocal): number => (l.ignored ? 2 : l.external_id === null ? 0 : 1)
+	return order(a) - order(b) || a.name.localeCompare(b.name)
+}
+
+/** Unlinked first, then linked, then ignored; by name within each. */
+function compareExternal(a: LinkBoardExternal, b: LinkBoardExternal): number {
+	const order = (e: LinkBoardExternal): number =>
+		e.state === 'ignored' ? 2 : e.state === 'linked' ? 1 : 0
+	return order(a) - order(b) || a.name.localeCompare(b.name)
+}
+
 export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 	const rows = await getDb()
 		.select({ id: tenants.id, name: tenants.name, group: tenant_groups.name })
@@ -74,14 +137,9 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 		a.name.localeCompare(b.name),
 	)
 	const externalById = new Map(allExternal.map((e) => [e.external_id, e]))
-	const links = await listLinks(provider, 'tenant')
-	const linkByExternal = new Map(links.map((l) => [l.external_id, l]))
-	const linkByTenant = new Map<number, ExternalLinkRow>()
-	for (const link of links) {
-		if (link.state === 'linked' && link.entity_id !== null) {
-			linkByTenant.set(link.entity_id, link)
-		}
-	}
+	const { byExternal: linkByExternal, linked: linkByTenant } = indexLinks(
+		await listLinks(provider, 'tenant'),
+	)
 	// Inactive and private customers are not offered for linking; ones
 	// already linked stay listed so they can be unlinked.
 	const externals = allExternal.filter(
@@ -114,13 +172,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 				suggestion: suggested ? { external_id: suggested.external_id, via: 'name' } : null,
 			}
 		})
-		.sort(
-			(a, b) =>
-				(a.external_id === null ? 0 : 1) - (b.external_id === null ? 0 : 1) ||
-				a.name.localeCompare(b.name),
-		)
-	const externalStateOrder = (state: LinkBoardExternal['state']): number =>
-		state === 'ignored' ? 2 : state === 'linked' ? 1 : 0
+		.sort(compareLocal)
 	const external = externals
 		.map((e) =>
 			externalRow(
@@ -135,11 +187,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 				(id) => tenantName.get(id) ?? null,
 			),
 		)
-		.sort(
-			(a, b) =>
-				externalStateOrder(a.state) - externalStateOrder(b.state) ||
-				a.name.localeCompare(b.name),
-		)
+		.sort(compareExternal)
 	return {
 		provider,
 		entity_type: 'tenant',
@@ -161,31 +209,19 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 				a.name.localeCompare(b.name),
 			)
 		: []
-	const links = await listLinks(provider, 'device')
-	const linkByExternal = new Map(links.map((l) => [l.external_id, l]))
-	const linkByDevice = new Map<number, ExternalLinkRow>()
-	const ignoredByDevice = new Map<number, ExternalLinkRow>()
-	for (const link of links) {
-		if (link.state === 'linked' && link.entity_id !== null) {
-			linkByDevice.set(link.entity_id, link)
-		} else if (link.state === 'ignored' && link.entity_id !== null) {
-			ignoredByDevice.set(link.entity_id, link)
-		}
-	}
+	const {
+		byExternal: linkByExternal,
+		linked: linkByDevice,
+		ignored: ignoredByDevice,
+	} = indexLinks(await listLinks(provider, 'device'))
 
-	// Names of linked objects outside this board (other tenant / company).
 	const localName = new Map(locals.map((d) => [d.id, d.name]))
-	const foreignIds = externals
-		.map((e) => linkByExternal.get(e.external_id)?.entity_id)
-		.filter((id): id is number => id !== null && id !== undefined && !localName.has(id))
-	if (foreignIds.length > 0) {
-		for (const row of await getDb()
+	await addForeignNames(localName, externals, linkByExternal, (ids) =>
+		getDb()
 			.select({ id: devices.id, name: devices.name })
 			.from(devices)
-			.where(inArray(devices.id, foreignIds))) {
-			localName.set(row.id, row.name)
-		}
-	}
+			.where(inArray(devices.id, ids)),
+	)
 	const externalById = new Map(externals.map((e) => [e.external_id, e]))
 	const foreignExternal = locals
 		.map((d) => linkByDevice.get(d.id)?.external_id)
@@ -206,10 +242,7 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 		externals.filter((e) => e.active && !linkByExternal.has(e.external_id)),
 	)
 	// Only offer a suggestion when the device has exactly one candidate.
-	const candidates = new Map<number, typeof auto>()
-	for (const pair of [...auto, ...suggestions]) {
-		candidates.set(pair.device_id, [...(candidates.get(pair.device_id) ?? []), pair])
-	}
+	const candidates = candidatesBy([...auto, ...suggestions], (pair) => pair.device_id)
 
 	const local: LinkBoardLocal[] = locals
 		.map((d): LinkBoardLocal => {
@@ -234,14 +267,7 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 				suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
 			}
 		})
-		.sort(
-			(a, b) =>
-				(a.ignored ? 2 : a.external_id === null ? 0 : 1) -
-					(b.ignored ? 2 : b.external_id === null ? 0 : 1) ||
-				a.name.localeCompare(b.name),
-		)
-	const externalStateOrder = (state: LinkBoardExternal['state']): number =>
-		state === 'ignored' ? 2 : state === 'linked' ? 1 : 0
+		.sort(compareLocal)
 	const external = externals
 		.map((e) => {
 			const row = externalRow(
@@ -259,11 +285,7 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 			// restore button); linked ones stay visible as linked.
 			return row.state === null && !e.active ? { ...row, state: 'ignored' as const } : row
 		})
-		.sort(
-			(a, b) =>
-				externalStateOrder(a.state) - externalStateOrder(b.state) ||
-				a.name.localeCompare(b.name),
-		)
+		.sort(compareExternal)
 	return {
 		provider,
 		entity_type: 'device',
@@ -287,31 +309,19 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 				.filter((e) => e.external_tenant_ids.includes(company.external_id))
 				.sort((a, b) => a.name.localeCompare(b.name))
 		: []
-	const links = await listLinks(provider, 'employee')
-	const linkByExternal = new Map(links.map((l) => [l.external_id, l]))
-	const linkByEmployee = new Map<number, ExternalLinkRow>()
-	const ignoredByEmployee = new Map<number, ExternalLinkRow>()
-	for (const link of links) {
-		if (link.state === 'linked' && link.entity_id !== null) {
-			linkByEmployee.set(link.entity_id, link)
-		} else if (link.state === 'ignored' && link.entity_id !== null) {
-			ignoredByEmployee.set(link.entity_id, link)
-		}
-	}
+	const {
+		byExternal: linkByExternal,
+		linked: linkByEmployee,
+		ignored: ignoredByEmployee,
+	} = indexLinks(await listLinks(provider, 'employee'))
 
-	// Names of linked objects outside this board (other tenant / company).
 	const localName = new Map(locals.map((e) => [e.id, e.name]))
-	const foreignIds = externals
-		.map((e) => linkByExternal.get(e.external_id)?.entity_id)
-		.filter((id): id is number => id !== null && id !== undefined && !localName.has(id))
-	if (foreignIds.length > 0) {
-		for (const row of await getDb()
+	await addForeignNames(localName, externals, linkByExternal, (ids) =>
+		getDb()
 			.select({ id: employees.id, name: employees.name })
 			.from(employees)
-			.where(inArray(employees.id, foreignIds))) {
-			localName.set(row.id, row.name)
-		}
-	}
+			.where(inArray(employees.id, ids)),
+	)
 	const externalName = new Map(allExternal.map((e) => [e.external_id, e.name]))
 
 	const { auto, suggestions } = matchEmployees(
@@ -319,10 +329,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 		externals.filter((e) => e.active && !linkByExternal.has(e.external_id)),
 	)
 	// Only offer a suggestion when the employee has exactly one candidate.
-	const candidates = new Map<number, typeof auto>()
-	for (const pair of [...auto, ...suggestions]) {
-		candidates.set(pair.employee_id, [...(candidates.get(pair.employee_id) ?? []), pair])
-	}
+	const candidates = candidatesBy([...auto, ...suggestions], (pair) => pair.employee_id)
 
 	const local: LinkBoardLocal[] = locals
 		.map((e): LinkBoardLocal => {
@@ -343,14 +350,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 				suggestion: pair ? { external_id: pair.external_id, via: pair.via } : null,
 			}
 		})
-		.sort(
-			(a, b) =>
-				(a.ignored ? 2 : a.external_id === null ? 0 : 1) -
-					(b.ignored ? 2 : b.external_id === null ? 0 : 1) ||
-				a.name.localeCompare(b.name),
-		)
-	const externalStateOrder = (state: LinkBoardExternal['state']): number =>
-		state === 'ignored' ? 2 : state === 'linked' ? 1 : 0
+		.sort(compareLocal)
 	const external = externals
 		.map((e) => {
 			const row = externalRow(
@@ -366,11 +366,7 @@ export async function employeeBoard(provider: ProviderId, tenantId: number): Pro
 			)
 			return row.state === null && !e.active ? { ...row, state: 'ignored' as const } : row
 		})
-		.sort(
-			(a, b) =>
-				externalStateOrder(a.state) - externalStateOrder(b.state) ||
-				a.name.localeCompare(b.name),
-		)
+		.sort(compareExternal)
 	return {
 		provider,
 		entity_type: 'employee',

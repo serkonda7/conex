@@ -332,3 +332,21 @@ export function providerFor(row: IntegrationRow): Result<ReturnType<typeof build
 		}),
 	)
 }
+
+/** Provider instance of `row`; a `ValidationError` when the integration is disabled. */
+export function enabledProviderFor(
+	row: IntegrationRow,
+): Result<ReturnType<typeof buildProvider>, Error> {
+	if (!row.enabled) {
+		return Result.err(new ValidationError('Integration is disabled'))
+	}
+	return providerFor(row)
+}
+
+/** Provider instance of the enabled integration `provider`. */
+export async function enabledProvider(
+	provider: ProviderId,
+): Promise<Result<ReturnType<typeof buildProvider>, Error>> {
+	const row = await getIntegrationRow(provider)
+	return Result.isError(row) ? row : enabledProviderFor(row.value)
+}

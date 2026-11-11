@@ -3,10 +3,19 @@
  * over the hono RPC client. Errors surface as `Result.err` with the server's
  * `{ error }` message.
  */
-import { Result } from 'better-result'
+import type { Result } from 'better-result'
 import type { EmployeeRow } from 'server/src/db/employees'
 import type { EmployeeCreate, EmployeeListQuery, EmployeeUpdate, Page } from 'shared/src/types'
-import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
+import {
+	by_id,
+	client,
+	failed,
+	fetch_all_pages,
+	getPage,
+	paging,
+	to_query,
+	to_result,
+} from './client'
 
 export type { EmployeeRow }
 
@@ -39,17 +48,7 @@ export async function fetch_employee(id: number): Promise<Result<EmployeeRow, Er
 export async function fetch_all_employees(
 	filters?: Partial<EmployeeListQuery>,
 ): Promise<Result<EmployeeRow[], Error>> {
-	const rows: EmployeeRow[] = []
-	for (let page = 1; ; page++) {
-		const result = await fetch_employees({ ...filters, page, limit: 200 })
-		if (Result.isError(result)) {
-			return result
-		}
-		rows.push(...result.value.items)
-		if (rows.length >= result.value.total || result.value.items.length === 0) {
-			return Result.ok(rows)
-		}
-	}
+	return fetch_all_pages((page) => fetch_employees({ ...filters, ...page }))
 }
 
 export async function create_employee(input: EmployeeCreate): Promise<Result<EmployeeRow, Error>> {

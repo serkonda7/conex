@@ -3181,25 +3181,31 @@ export const SavedFilterDeleteQuerySchema = v.object({
 	name: NameSchema,
 })
 
-/** One saved filter of the overview across all tables. */
-export interface SavedFilterEntryJson {
+/** The fields every saved-list overview entry shares (saved filters, layouts). */
+export interface SavedListEntryBase {
 	table: string
-	/** 0-based position in the table's list (its tab order). */
+	/** 0-based position in the table's list (its tab or menu order). */
 	position: number
 	name: string
-	values: SavedFilterJson['values']
 	/** Unix seconds of the table's last save. */
 	updated_at: number
 }
 
-/** Overview page plus every table key that holds saved filters (for the table filter). */
-export interface SavedFilterPageJson {
-	items: SavedFilterEntryJson[]
+/** Overview page plus every table key that holds saved items (for the table filter). */
+export interface SavedListPageJson<E extends SavedListEntryBase> {
+	items: E[]
 	total: number
 	page: number
 	limit: number
 	tables: string[]
 }
+
+/** One saved filter of the overview across all tables. */
+export interface SavedFilterEntryJson extends SavedListEntryBase {
+	values: SavedFilterJson['values']
+}
+
+export type SavedFilterPageJson = SavedListPageJson<SavedFilterEntryJson>
 
 // ---------------------------------------------------------------------------
 // Saved layouts: named DataTable column layouts (visible columns, order,
@@ -3237,24 +3243,11 @@ export const SavedLayoutUpdateSchema = v.strictObject({
 export type SavedLayoutUpdate = v.InferOutput<typeof SavedLayoutUpdateSchema>
 
 /** One saved layout of the overview across all tables. */
-export interface SavedLayoutEntryJson {
-	table: string
-	/** 0-based position in the table's list (its menu order). */
-	position: number
-	name: string
+export interface SavedLayoutEntryJson extends SavedListEntryBase {
 	layout: SavedLayoutJson['layout']
-	/** Unix seconds of the table's last save. */
-	updated_at: number
 }
 
-/** Overview page plus every table key that holds saved layouts (for the table filter). */
-export interface SavedLayoutPageJson {
-	items: SavedLayoutEntryJson[]
-	total: number
-	page: number
-	limit: number
-	tables: string[]
-}
+export type SavedLayoutPageJson = SavedListPageJson<SavedLayoutEntryJson>
 
 // ---------------------------------------------------------------------------
 // Calendar sync: TANSS appointments (Einsatzplanung) → Outlook calendars of

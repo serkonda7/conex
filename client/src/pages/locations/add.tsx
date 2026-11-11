@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, type JSX } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { create_location, fetch_locations, fetch_sites, type LocationType } from '../../api/tenancy'
 import {
 	DescriptionField,
@@ -18,7 +18,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
+import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -37,13 +37,7 @@ export function LocationAddPage(): JSX.Element {
 		form.setError,
 	)
 	// The tenant comes from the global tenant selection, which also limits the sites.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
-	createEffect(() => {
-		const id = parseId(siteId())
-		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
-			handleSiteChange('')
-		}
-	})
+	const siteOptions = useNewObjectSites(sites, siteId, () => handleSiteChange(''))
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)

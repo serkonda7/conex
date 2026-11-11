@@ -1,7 +1,8 @@
 /**
- * Device-type select options shared by the device and rack forms: the
- * model as label with its manufacturer as detail column.
+ * Device- and rack-type select options shared by the device and rack forms:
+ * the model as label with its manufacturer as detail column.
  */
+import type { Result } from 'better-result'
 import type { DeviceTypeListQuery } from 'shared/src/types'
 import {
 	type DeviceTypeListRow,
@@ -12,19 +13,19 @@ import type { FormOption } from '../../components/form'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, type ErrorSink, type QueryResource } from '../../lib/resource'
 
-export function useDeviceTypeOptions(
-	filters: Partial<DeviceTypeListQuery>,
-	onError?: ErrorSink,
-): {
-	types: QueryResource<DeviceTypeListRow[]>
+export interface TypeOptions<T> {
+	types: QueryResource<T[]>
 	options: () => FormOption[]
 	/** Refetches the types and their manufacturers (`SelectField.reload`). */
 	reload: () => Promise<void>
-} {
-	const [types, { refetch: refetchTypes }] = createRows(
-		() => fetch_device_types(filters),
-		onError,
-	)
+}
+
+/** Options of the types `fetchTypes` loads, labelled by model and manufacturer. */
+export function useTypeOptions<T extends { id: number; model: string; manufacturer_id: number }>(
+	fetchTypes: () => Promise<Result<T[] | { items: T[] }, Error>>,
+	onError?: ErrorSink,
+): TypeOptions<T> {
+	const [types, { refetch: refetchTypes }] = createRows(fetchTypes, onError)
 	const [manufacturers, { refetch: refetchManufacturers }] = createRows(
 		fetch_manufacturers,
 		onError,
@@ -42,4 +43,11 @@ export function useDeviceTypeOptions(
 			await Promise.all([refetchTypes(), refetchManufacturers()])
 		},
 	}
+}
+
+export function useDeviceTypeOptions(
+	filters: Partial<DeviceTypeListQuery>,
+	onError?: ErrorSink,
+): TypeOptions<DeviceTypeListRow> {
+	return useTypeOptions(() => fetch_device_types(filters), onError)
 }

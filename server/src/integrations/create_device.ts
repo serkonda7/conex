@@ -14,7 +14,7 @@ import { nowSeconds } from '../util/time'
 import { linkJson, linkOf, setLink } from './links'
 import { localDevices } from './report'
 import { upsertDevice } from './snapshot'
-import { getIntegrationRow, providerFor } from './store'
+import { enabledProvider } from './store'
 
 export async function createExternalDevice(
 	provider: ProviderId,
@@ -38,14 +38,7 @@ export async function createExternalDevice(
 		.from(devices)
 		.innerJoin(device_roles, eq(devices.device_role_id, device_roles.id))
 		.where(eq(devices.id, device.id))
-	const row = await getIntegrationRow(provider)
-	if (Result.isError(row)) {
-		return row
-	}
-	if (!row.value.enabled) {
-		return Result.err(new ValidationError('Integration is disabled'))
-	}
-	const built = providerFor(row.value)
+	const built = await enabledProvider(provider)
 	if (Result.isError(built)) {
 		return built
 	}
