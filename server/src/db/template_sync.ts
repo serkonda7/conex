@@ -1,23 +1,23 @@
 import { Result } from 'better-result'
-import { asc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, or, sql } from 'drizzle-orm'
 import { portKindsCompatible } from 'shared/src/ports'
 import type { ExpandedInterface, TemplateSyncApply, TemplateSyncPreview } from 'shared/src/schemas'
 import { cables, floorplan_placements, interfaces } from '../schema'
 import { buildPreview, planSync, type SyncPlan } from '../services/template_sync'
 import { expandStubs } from '../services/templates'
-import { logCreate, logDelete, logUpdate } from './changelog'
+import { createChanges, deleteChanges, logChanges, updateChanges } from './changelog'
 import { getDb, withTransaction } from './connection'
 import {
 	getDevice,
-	getInterface,
 	type InterfaceJson,
 	type InterfaceRow,
+	insertPorts,
 	listInterfaces,
 	toInterfaceJson,
 } from './devices'
 import { ConflictError } from './errors'
 import { removeEmptyJacks } from './jacks'
-import { insertedId, tryWrite } from './list'
+import { tryWrite } from './list'
 import { stubsOf } from './templates'
 
 /** Above any real position, so parked front ports never meet a real slot. */
@@ -112,6 +112,7 @@ async function checkCabledKinds(
  * step: a port is only renamed to a name no port of its side holds.
  */
 async function parkMovingFronts({ expected }: SyncState, plan: SyncPlan): Promise<void> {
+	const moving: number[] = []
 	for (const [i, port] of plan.slots.entries()) {
 		const target = expected[i]
 		if (!port || !target || port.rear_port_id === null) {
@@ -120,28 +121,31 @@ async function parkMovingFronts({ expected }: SyncState, plan: SyncPlan): Promis
 		const rearId =
 			target.rear_index === null ? null : (plan.slots[target.rear_index]?.id ?? null)
 		if (port.rear_port_id !== rearId || port.rear_port_position !== target.rear_port_position) {
-			await getDb()
-				.update(interfaces)
-				.set({ rear_port_position: PARKED_POSITION + port.id })
-				.where(eq(interfaces.id, port.id))
+			moving.push(port.id)
 		}
 	}
+	if (moving.length > 0) {
+		await getDb()
+			.update(interfaces)
+			.set({ rear_port_position: sql`${PARKED_POSITION} + ${interfaces.id}` })
+			.where(inArray(interfaces.id, moving))
+	}
 }
+
+type PortFields = Pick<
+	InterfaceRow,
+	'name' | 'template_name' | 'kind' | 'positions' | 'rear_port_id' | 'rear_port_position'
+>
 
 /** Applies a plan and logs every touched port. Runs inside a transaction. */
 async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Promise<void> {
 	const db = getDb()
 	await parkMovingFronts(state, plan)
-	// Expansion lists rear ports before the front ports that map onto them,
-	// so their ids are known by then.
-	const ids: number[] = []
-	const created: number[] = []
-	const updated: InterfaceRow[] = []
-	for (const [i, target] of state.expected.entries()) {
+	const fieldsOf = (i: number, rearPortId: number | null): PortFields => {
+		const target = state.expected[i] as ExpandedInterface
 		const port = plan.slots[i]
-		const rearPortId = target.rear_index === null ? null : (ids[target.rear_index] ?? null)
 		const linked = port !== null && port !== undefined && plan.linked.has(port.id)
-		const fields = {
+		return {
 			name: linked ? port.name : target.name,
 			template_name: linked ? target.name : null,
 			kind: target.kind,
@@ -149,38 +153,64 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 			rear_port_id: rearPortId,
 			rear_port_position: target.rear_port_position,
 		}
+	}
+	// Expansion lists rear ports before the front ports that map onto them:
+	// new ports without a rear port go in first, so every port's rear id is
+	// known before the updates and the new front ports.
+	const ids: (number | null)[] = plan.slots.map((port) => port?.id ?? null)
+	const createdAt = (front: boolean): number[] =>
+		state.expected.flatMap((target, i) =>
+			!plan.slots[i] && (target.rear_index !== null) === front ? [i] : [],
+		)
+	const rearOf = (i: number): number | null => {
+		const rearIndex = state.expected[i]?.rear_index ?? null
+		return rearIndex === null ? null : (ids[rearIndex] ?? null)
+	}
+	const insertAt = async (indexes: number[]): Promise<void> => {
+		const inserted = await insertPorts(
+			db,
+			deviceId,
+			indexes.map((i) => ({
+				side: state.expected[i]?.side ?? null,
+				...fieldsOf(i, rearOf(i)),
+			})),
+		)
+		indexes.forEach((i, n) => {
+			ids[i] = inserted[n] ?? null
+		})
+	}
+	const plainCreated = createdAt(false)
+	const frontCreated = createdAt(true)
+	await insertAt(plainCreated)
+	const updated: InterfaceRow[] = []
+	const unplaced: number[] = []
+	for (const [i, port] of plan.slots.entries()) {
 		if (!port) {
-			const id = insertedId(
-				await db
-					.insert(interfaces)
-					.values({ device_id: deviceId, connected: 0, side: target.side, ...fields })
-					.returning({ id: interfaces.id }),
-			)
-			ids.push(id)
-			created.push(id)
 			continue
 		}
-		ids.push(port.id)
+		const fields = fieldsOf(i, rearOf(i))
 		if (
-			Object.entries(fields).every(
-				([key, value]) => port[key as keyof typeof fields] === value,
-			)
+			Object.entries(fields).every(([key, value]) => port[key as keyof PortFields] === value)
 		) {
 			continue
 		}
 		// More than one position makes it a plain rear port, no longer an outlet.
-		const outletLost = target.positions > 1 && port.positions === 1
+		const outletLost = fields.positions > 1 && port.positions === 1
 		await db
 			.update(interfaces)
 			.set({ ...fields, ...(outletLost ? { location_id: null, jack_id: null } : {}) })
 			.where(eq(interfaces.id, port.id))
 		if (outletLost) {
-			await db
-				.delete(floorplan_placements)
-				.where(eq(floorplan_placements.interface_id, port.id))
+			unplaced.push(port.id)
 		}
 		updated.push(port)
 	}
+	if (unplaced.length > 0) {
+		await db
+			.delete(floorplan_placements)
+			.where(inArray(floorplan_placements.interface_id, unplaced))
+	}
+	await insertAt(frontCreated)
 	if (plan.removed.length > 0) {
 		// One statement: front and rear ports may go together (self reference).
 		await db.delete(interfaces).where(
@@ -190,16 +220,31 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 			),
 		)
 	}
-	for (const port of plan.removed) {
-		await logDelete('interface', toInterfaceJson(port))
-	}
 	await removeEmptyJacks(deviceId)
-	for (const port of updated) {
-		await logUpdate('interface', toInterfaceJson(port), await getInterface(deviceId, port.id))
-	}
-	for (const id of created) {
-		await logCreate('interface', await getInterface(deviceId, id))
-	}
+	const created = [...plainCreated, ...frontCreated].flatMap((i) => ids[i] ?? [])
+	const touched = [...updated.map((port) => port.id), ...created]
+	const rows =
+		touched.length === 0
+			? []
+			: await db
+					.select()
+					.from(interfaces)
+					.where(and(eq(interfaces.device_id, deviceId), inArray(interfaces.id, touched)))
+	const after = new Map(rows.map((row) => [row.id, toInterfaceJson(row)]))
+	await logChanges([
+		...deleteChanges('interface', plan.removed.map(toInterfaceJson)),
+		...updateChanges(
+			'interface',
+			updated.flatMap((port): [InterfaceJson, InterfaceJson][] => {
+				const row = after.get(port.id)
+				return row ? [[toInterfaceJson(port), row]] : []
+			}),
+		),
+		...createChanges(
+			'interface',
+			created.flatMap((id) => after.get(id) ?? []),
+		),
+	])
 }
 
 /**

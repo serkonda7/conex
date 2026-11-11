@@ -61,9 +61,9 @@ import {
 import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
 import { cableEnds } from './cables'
-import { logCreate, logDelete, logUpdate } from './changelog'
+import { logCreate, logDelete, logDeletes, logUpdate, logUpdates } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { toInterfaceJson } from './devices'
+import { type InterfaceJson, toInterfaceJson } from './devices'
 import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
 import {
 	checkExists,
@@ -1207,14 +1207,14 @@ async function locateOutlets(owner: AttachmentOwner, input: FloorplanPut): Promi
 				unlocated.map((row) => row.id),
 			),
 		)
-	for (const row of unlocated) {
-		const before = toInterfaceJson(row)
-		await logUpdate(
-			'interface',
-			before,
-			Result.ok({ ...before, location_id: owner.location_id }),
-		)
-	}
+	const locationId = owner.location_id
+	await logUpdates(
+		'interface',
+		unlocated.map((row): [InterfaceJson, InterfaceJson] => {
+			const before = toInterfaceJson(row)
+			return [before, { ...before, location_id: locationId }]
+		}),
+	)
 }
 
 /**
@@ -1738,9 +1738,7 @@ export async function deleteAttachment(
  */
 export async function deleteOwnerAttachments(owner: AttachmentOwner): Promise<AttachmentRow[]> {
 	const rows = await getDb().delete(attachments).where(ownerCondition(owner)).returning()
-	for (const row of rows) {
-		await logDelete('attachment', toJson(row))
-	}
+	await logDeletes('attachment', rows.map(toJson))
 	return rows
 }
 

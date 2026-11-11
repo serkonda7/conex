@@ -25,6 +25,7 @@ import type {
 	DeviceMove,
 	DeviceRoleIcon,
 	DeviceUpdate,
+	ExpandedInterface,
 	InterfaceCreate,
 	InterfaceLocation,
 	InterfaceUpdate,
@@ -54,8 +55,8 @@ import { isOutOfSync } from '../services/template_sync'
 import { expandStub, expandStubs } from '../services/templates'
 import { prunePlacements } from './attachments'
 import { cableEnds, deviceHasCables } from './cables'
-import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb, withTransaction } from './connection'
+import { logCreate, logDelete, logUpdate, logUpdates } from './changelog'
+import { type DbHandle, getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
 import { checkEmployeeAssignment } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
@@ -869,6 +870,49 @@ export async function getDeviceDetail(
 	return row ? Result.ok(row) : Result.err(new NotFoundError('Device not found'))
 }
 
+/** Columns of a new port taken from its device-type expansion. */
+type NewPort = Pick<
+	InterfaceRow,
+	'name' | 'side' | 'kind' | 'positions' | 'rear_port_id' | 'rear_port_position'
+> &
+	Partial<Pick<InterfaceRow, 'template_name'>>
+
+function portValues(iface: ExpandedInterface, rearPortId: number | null): NewPort {
+	return {
+		name: iface.name,
+		kind: iface.kind,
+		side: iface.side,
+		positions: iface.positions,
+		rear_port_id: rearPortId,
+		rear_port_position: iface.rear_port_position,
+	}
+}
+
+/**
+ * Inserts ports of one device with one statement on `db`; returns their ids
+ * in the order of `ports`.
+ */
+export async function insertPorts(
+	db: DbHandle,
+	deviceId: number,
+	ports: NewPort[],
+): Promise<number[]> {
+	if (ports.length === 0) {
+		return []
+	}
+	const rows = await db
+		.insert(interfaces)
+		.values(ports.map((port) => ({ device_id: deviceId, connected: 0, ...port })))
+		.returning({ id: interfaces.id, side: interfaces.side, name: interfaces.name })
+	// Side and name are unique per device (`interfaces_device_name_idx`), so
+	// they tell which returned id belongs to which port.
+	const ids = new Map(rows.map((row) => [`${row.side}:${row.name}`, row.id]))
+	return ports.map((port) => {
+		const id = ids.get(`${port.side}:${port.name}`)
+		return insertedId(id === undefined ? [] : [{ id }])
+	})
+}
+
 export async function createDevice(rawInput: DeviceCreate): Promise<Result<DeviceRow, Error>> {
 	const normalized = await normalizeShelf(rawInput)
 	if (Result.isError(normalized)) {
@@ -932,35 +976,35 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		employee_id: input.employee_id ?? null,
 		description: input.description ?? null,
 	}
+	// Expansion lists rear ports before the front ports that map onto them:
+	// ports without a rear port go in first, then the front ports with the
+	// ids of their rear ports. Ids keep the order of the expansion.
+	const plain = expanded.value.flatMap((iface, i) =>
+		iface.rear_index === null ? [{ iface, i }] : [],
+	)
+	const fronts = expanded.value.filter((iface) => iface.rear_index !== null)
 	const id = await tryWrite(
 		() =>
 			getDb().transaction(async (tx) => {
 				const deviceId = insertedId(
 					await tx.insert(devices).values(values).returning({ id: devices.id }),
 				)
-				// Expansion lists rear ports before the front ports that map
-				// onto them, so their ids are known by then.
-				const ids: number[] = []
-				for (const iface of expanded.value) {
-					const rearPortId = iface.rear_index === null ? null : ids[iface.rear_index]
-					ids.push(
-						insertedId(
-							await tx
-								.insert(interfaces)
-								.values({
-									device_id: deviceId,
-									name: iface.name,
-									kind: iface.kind,
-									connected: 0,
-									side: iface.side,
-									positions: iface.positions,
-									rear_port_id: rearPortId ?? null,
-									rear_port_position: iface.rear_port_position,
-								})
-								.returning({ id: interfaces.id }),
+				const plainIds = await insertPorts(
+					tx,
+					deviceId,
+					plain.map(({ iface }) => portValues(iface, null)),
+				)
+				const ids = new Map(plain.map(({ i }, n) => [i, plainIds[n] ?? null]))
+				await insertPorts(
+					tx,
+					deviceId,
+					fronts.map((iface) =>
+						portValues(
+							iface,
+							iface.rear_index === null ? null : (ids.get(iface.rear_index) ?? null),
 						),
-					)
-				}
+					),
+				)
 				return deviceId
 			}),
 		duplicateDeviceError,
@@ -1620,10 +1664,13 @@ async function relocateJackSiblings(
 				siblings.map((port) => port.id),
 			),
 		)
-	for (const port of siblings) {
-		const before = toInterfaceJson(port)
-		await logUpdate('interface', before, Result.ok({ ...before, location_id: locationId }))
-	}
+	await logUpdates(
+		'interface',
+		siblings.map((port): [InterfaceJson, InterfaceJson] => {
+			const before = toInterfaceJson(port)
+			return [before, { ...before, location_id: locationId }]
+		}),
+	)
 }
 
 /**
@@ -1666,13 +1713,13 @@ export async function setOutletLocations(
 							changed.map((port) => port.id),
 						),
 					)
-				for (const port of changed) {
-					await logUpdate(
-						'interface',
+				await logUpdates(
+					'interface',
+					changed.map((port): [InterfaceJson, InterfaceJson] => [
 						port,
-						Result.ok({ ...port, location_id: input.location_id }),
-					)
-				}
+						{ ...port, location_id: input.location_id },
+					]),
+				)
 				await prunePlacements()
 			}),
 		)
