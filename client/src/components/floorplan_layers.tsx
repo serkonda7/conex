@@ -3,16 +3,24 @@
  * type) and markers by what they place (rack, device, outlet). The toggle bar
  * doubles as the legend; hidden layers are kept per browser in
  * `localStorage` and shared by the view and the editor. The last toggles show
- * the names of the markers on the plan and, on a plan with a scale, the
- * metric grid, kept the same way, as is the grid size chosen below the stage.
+ * the names of the markers on the plan, the status colours of device and
+ * outlet markers (with their legend) and, on a plan with a scale, the metric
+ * grid, kept the same way, as is the grid size chosen below the stage.
  */
 
-import { IconBox, IconGrid4x4, IconOutlet, IconServer, IconTag } from '@tabler/icons-solidjs'
+import {
+	IconBox,
+	IconGrid4x4,
+	IconOutlet,
+	IconPalette,
+	IconServer,
+	IconTag,
+} from '@tabler/icons-solidjs'
 import { LOCATION_TYPES, type LocationType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { FloorplanAreaJson, FloorplanPlacementJson } from '../api/attachments'
-import { type MessageKey, t } from '../i18n'
+import { type MessageKey, t, tp } from '../i18n'
 import type { IconComponent } from '../lib/icons'
 
 export type AreaLayer = 'site' | LocationType
@@ -122,6 +130,77 @@ export function toggleMarkerNames(): void {
 	} catch {
 		// Storage unavailable: the choice applies until reload.
 	}
+}
+
+const STATUS_STORAGE_KEY = 'conex:floorplan-status-colors'
+
+function loadStatusColors(): boolean {
+	try {
+		return window.localStorage.getItem(STATUS_STORAGE_KEY) !== 'false'
+	} catch {
+		return true
+	}
+}
+
+const [statusColors, setStatusColors] = createSignal(loadStatusColors())
+
+/**
+ * Whether device markers are coloured by their status and outlets by their
+ * cabling (on by default).
+ */
+export function statusColorsVisible(): boolean {
+	return statusColors()
+}
+
+export function toggleStatusColors(): void {
+	const next = !statusColors()
+	setStatusColors(next)
+	try {
+		window.localStorage.setItem(STATUS_STORAGE_KEY, String(next))
+	} catch {
+		// Storage unavailable: the choice applies until reload.
+	}
+}
+
+/** Colour classes of the status legend, with their label keys. */
+const DEVICE_STATUS_LEGEND: readonly { tone: string; key: MessageKey }[] = [
+	{ tone: 'active', key: 'floorplan.statusActive' },
+	{ tone: 'planned', key: 'floorplan.statusPlanned' },
+	{ tone: 'inactive', key: 'floorplan.statusInactive' },
+]
+
+const OUTLET_LEGEND: readonly { tone: string; key: MessageKey }[] = [
+	{ tone: 'cabled', key: 'floorplan.legendCabled' },
+	{ tone: 'free', key: 'floorplan.legendFree' },
+]
+
+/** Legend of the status colours of the marker kinds on the plan. */
+function StatusLegend(props: { devices: boolean; outlets: boolean }): JSX.Element {
+	const item = (entry: { tone: string; key: MessageKey }): JSX.Element => (
+		<li>
+			<span
+				class={`floorplan-status-dot floorplan-status-${entry.tone}`}
+				aria-hidden="true"
+			/>
+			{t(entry.key)}
+		</li>
+	)
+	return (
+		<div class="floorplan-status-legend">
+			<Show when={props.devices}>
+				<span class="floorplan-status-legend-group">{tp('entity.device', 2)}:</span>
+				<ul>
+					<For each={DEVICE_STATUS_LEGEND}>{item}</For>
+				</ul>
+			</Show>
+			<Show when={props.outlets}>
+				<span class="floorplan-status-legend-group">{tp('entity.outlet', 2)}:</span>
+				<ul>
+					<For each={OUTLET_LEGEND}>{item}</For>
+				</ul>
+			</Show>
+		</div>
+	)
 }
 
 const GRID_STORAGE_KEY = 'conex:floorplan-grid'
@@ -246,6 +325,10 @@ export function LayerBar(props: {
 		presentLayers(props.areas, props.placements)
 	const allHidden = (): boolean =>
 		present().length > 0 && present().every(({ layer }) => !layerVisible(layer))
+	const hasDevices = (): boolean =>
+		props.placements.some((p: FloorplanPlacementJson) => markerLayer(p) === 'marker-device')
+	const hasOutlets = (): boolean =>
+		props.placements.some((p: FloorplanPlacementJson) => p.port !== null)
 	return (
 		<>
 			<Show when={present().length > 0 || props.has_scale}>
@@ -287,6 +370,22 @@ export function LayerBar(props: {
 							<span>{t('floorplan.markerNames')}</span>
 						</button>
 					</Show>
+					<Show when={hasDevices() || hasOutlets()}>
+						<button
+							type="button"
+							class="floorplan-layer-toggle floorplan-names-toggle"
+							aria-pressed={statusColorsVisible()}
+							title={t(
+								statusColorsVisible()
+									? 'floorplan.hideStatusColors'
+									: 'floorplan.showStatusColors',
+							)}
+							onClick={toggleStatusColors}
+						>
+							<IconPalette size={12} aria-hidden="true" />
+							<span>{t('floorplan.statusColors')}</span>
+						</button>
+					</Show>
 					<Show when={props.has_scale}>
 						<button
 							type="button"
@@ -300,6 +399,9 @@ export function LayerBar(props: {
 						</button>
 					</Show>
 				</fieldset>
+			</Show>
+			<Show when={statusColorsVisible() && (hasDevices() || hasOutlets())}>
+				<StatusLegend devices={hasDevices()} outlets={hasOutlets()} />
 			</Show>
 			<Show when={allHidden()}>
 				<p class="floorplan-hint">

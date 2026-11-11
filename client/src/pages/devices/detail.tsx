@@ -31,6 +31,7 @@ import { IconLabel } from '../../components/icon_label'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, faceLabel } from '../../i18n/labels'
+import { floorplanHref } from '../../lib/floorplan_link'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
 import { createDerived, createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
@@ -225,7 +226,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					? (outlets() ?? []).find((o) => o.interface_id === row.rear.id)
 					: undefined
 			return outlet ? (
-				<a href={`/floorplans/${outlet.attachment_id}`}>{outlet.owner_name}</a>
+				<a href={floorplanHref(outlet.attachment_id, { interface: outlet.interface_id })}>
+					{outlet.owner_name}
+				</a>
 			) : (
 				<span>—</span>
 			)

@@ -45,6 +45,7 @@ import {
 	gridVisible,
 	markerNamesVisible,
 	setGridSize,
+	statusColorsVisible,
 } from './floorplan_layers'
 
 /** Percent offset of a normalized coordinate, for `left` / `top`. */
@@ -163,9 +164,25 @@ export function MarkerName(props: { placement: FloorplanPlacementJson }): JSX.El
 	)
 }
 
-/** Marker classes shared by the view and edit modes. */
+/** Colour tone of a device status: in use, not yet in use, out of use. */
+function statusTone(status: string): 'active' | 'planned' | 'inactive' {
+	if (status === 'active') {
+		return 'active'
+	}
+	return status === 'planned' || status === 'staged' ? 'planned' : 'inactive'
+}
+
+/**
+ * Marker classes shared by the view and edit modes. The status and cabling
+ * classes only colour while the stage shows status colours.
+ */
 export function markerClasses(placement: FloorplanPlacementJson): Record<string, boolean> {
+	const tone =
+		placement.status !== null && placement.port === null ? statusTone(placement.status) : null
 	return {
+		'floorplan-marker-status-active': tone === 'active',
+		'floorplan-marker-status-planned': tone === 'planned',
+		'floorplan-marker-status-inactive': tone === 'inactive',
 		'floorplan-marker-rack': placement.rack_id !== null,
 		'floorplan-marker-outlet': placement.port !== null,
 		'floorplan-marker-jack': isJack(placement.port),
@@ -732,7 +749,7 @@ export function FloorplanStage(props: {
 		<div class="floorplan-frame">
 			<div
 				class="floorplan-viewport"
-				classList={{ zoomed: zoomed() }}
+				classList={{ zoomed: zoomed(), 'status-colors': statusColorsVisible() }}
 				ref={viewport}
 				onPointerDown={onPointerDown}
 				onPointerMove={trackPointer}

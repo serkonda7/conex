@@ -3748,8 +3748,21 @@ span.attachment-star,
 	cursor: pointer;
 }
 
-.floorplan-marker-outlet.floorplan-marker-cabled {
+.status-colors .floorplan-marker-outlet.floorplan-marker-cabled {
 	border-color: var(--success);
+}
+
+/* Device markers by status, while status colours are on. */
+.status-colors .floorplan-marker-status-active {
+	border-color: var(--success);
+}
+
+.status-colors .floorplan-marker-status-planned {
+	border-color: var(--link);
+}
+
+.status-colors .floorplan-marker-status-inactive {
+	border-color: var(--error);
 }
 
 /* Jack: one socket per port in one marker, each coloured by its cabling. */
@@ -3769,8 +3782,59 @@ span.attachment-star,
 	color: var(--text-muted);
 }
 
-.floorplan-jack-port-cabled {
+.status-colors .floorplan-jack-port-cabled {
 	color: var(--success);
+}
+
+/* Legend of the status colours, below the layer bar. */
+.floorplan-status-legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.75rem;
+	contain: inline-size;
+	margin: 0 0 0.4rem;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+}
+
+.floorplan-status-legend ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.floorplan-status-legend li {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.floorplan-status-legend-group {
+	font-weight: 600;
+}
+
+.floorplan-status-dot {
+	width: 0.6rem;
+	height: 0.6rem;
+	border-radius: 999px;
+	border: 2px solid var(--text-muted);
+}
+
+.floorplan-status-dot.floorplan-status-active,
+.floorplan-status-dot.floorplan-status-cabled {
+	border-color: var(--success);
+}
+
+.floorplan-status-dot.floorplan-status-planned {
+	border-color: var(--link);
+}
+
+.floorplan-status-dot.floorplan-status-inactive {
+	border-color: var(--error);
 }
 
 .floorplan-popover-port {
@@ -3905,6 +3969,22 @@ span.attachment-star,
 	vector-effect: non-scaling-stroke;
 }
 
+/* Objects the side panel's search does not match fade back. */
+.floorplan-area.floorplan-dimmed {
+	opacity: 0.2;
+}
+
+.floorplan-area-label.floorplan-dimmed,
+.floorplan-marker.floorplan-dimmed,
+.floorplan-cluster.floorplan-dimmed {
+	opacity: 0.25;
+}
+
+.floorplan-search-matches {
+	margin: 0.3rem 0 0.4rem;
+	font-size: var(--font-size-sm);
+}
+
 .floorplan-area-label-handle {
 	cursor: move;
 	touch-action: none;
@@ -4001,6 +4081,20 @@ span.attachment-star,
 
 .floorplan-snap-toggle {
 	margin-top: 0.4rem;
+}
+
+.floorplan-history {
+	display: flex;
+	gap: 0.25rem;
+	margin-bottom: 0.4rem;
+}
+
+/* Selection box of a Shift + drag on the plan. */
+.floorplan-select-box {
+	position: absolute;
+	border: 1px dashed var(--primary-text);
+	background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+	pointer-events: none;
 }
 
 /* Snapping: alignment guides of a dragged marker and the point an area snapped to. */
