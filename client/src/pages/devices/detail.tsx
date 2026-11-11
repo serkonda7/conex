@@ -5,10 +5,9 @@ import { type Accessor, createMemo, createSignal, type JSX, Show } from 'solid-j
 import { Dynamic } from 'solid-js/web'
 import { fetch_outlets } from '../../api/attachments'
 import { delete_cable, fetch_trace } from '../../api/cables'
-import { fetch_device_role } from '../../api/device_roles'
 import {
+	type DeviceDetail,
 	type DeviceListItem,
-	type DeviceRow,
 	delete_device,
 	fetch_device,
 	fetch_device_list,
@@ -17,18 +16,12 @@ import {
 	fetch_jacks,
 	type InterfaceJson,
 } from '../../api/devices'
-import { fetch_employee } from '../../api/employees'
-import { fetch_rack } from '../../api/racks'
-import { fetch_shelf } from '../../api/shelves'
-import { fetch_device_type } from '../../api/templates'
-import { fetch_location, fetch_site, fetch_tenant } from '../../api/tenancy'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
 	ForeignKeyLink,
-	RecordLink,
 	RelatedPreview,
 	useDetailDelete,
 } from '../../components/detail_page'
@@ -54,6 +47,12 @@ import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
 import { DevicePortTable } from './port_table'
 import { DeviceStatusBadge } from './status'
+
+/** The device's role as `deviceRoleLabel` reads it. */
+const roleOf = (
+	row: DeviceDetail | null | undefined,
+): { name: string; key: string | null } | undefined =>
+	row ? { name: row.device_role_name, key: row.device_role_key } : undefined
 
 /**
  * General, power, outlet and display ports have no enabled state; patch-panel
@@ -137,6 +136,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	)
 	const [trace] = createRecord(id, (key: number) => fetch_trace(key, 4), setError)
 	const [outlets] = createRowsFor(id, fetch_outlets, setError)
+	// Starts with the device; a device write (role, tenant) outdates it in the cache.
+	const [service] = createRecord(id, fetch_device_service, setError)
 	const typeId = (): number | undefined => device()?.device_type_id
 	const roleId = (): number | undefined => device()?.device_role_id
 	const siteId = (): number | null | undefined => device()?.site_id
@@ -145,25 +146,23 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const shelfId = (): number | null | undefined => device()?.shelf_id
 	const tenantId = (): number | null | undefined => device()?.tenant_id
 	const employeeId = (): number | null | undefined => device()?.employee_id
-	const [deviceType] = createRecord(typeId, fetch_device_type)
-	const [deviceRole] = createRecord(roleId, fetch_device_role, setError)
-	const [site] = createRecord(siteId, fetch_site, setError)
-	const [location] = createRecord(locationId, fetch_location, setError)
-	const [rack] = createRecord(rackId, fetch_rack, setError)
-	const [shelf] = createRecord(shelfId, fetch_shelf, setError)
-	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
-	const [employee] = createRecord(employeeId, fetch_employee, setError)
-	// Keyed on the record so a role or tenant change refetches the SLA.
-	const [service] = createRecord(
-		() => device(),
-		(row: DeviceRow) => fetch_device_service(row.id),
-		setError,
-	)
+	/** A related row the device names (null when unset or out of scope). */
+	const named = (key: number | null, name: string | null): { id: number; name: string } | null =>
+		key !== null && name !== null ? { id: key, name } : null
 	const trail = createDerived(
-		() => ({ site: site(), location: locationId() ?? null, rack: rack() }),
-		async ({ site: siteRow, location: locationKey, rack: rackRow }): Promise<Crumb[]> => [
-			...(await siteTrail(siteRow, locationKey)),
-			...(rackRow ? [{ label: rackRow.name, href: `/racks/${rackRow.id}` }] : []),
+		() => {
+			const row = device()
+			return row
+				? {
+						site: named(row.site_id, row.site_name),
+						location: row.location_id,
+						rack: named(row.rack_id, row.rack_name),
+					}
+				: null
+		},
+		async ({ site, location, rack }): Promise<Crumb[]> => [
+			...(await siteTrail(site, location)),
+			...(rack ? [{ label: rack.name, href: `/racks/${rack.id}` }] : []),
 		],
 	)
 
@@ -298,10 +297,16 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const firstPortSection = (): string =>
 		panelPorts().length > 0 ? 'device-panel-ports' : 'device-interfaces'
 
-	const shelfLabel = (): string =>
-		t('device.onShelf', {
-			name: shelf()?.name || t('common.unitPosition', { u: shelf()?.position_u ?? '' }),
+	/** Shelf name or U; undefined when the shelf is out of scope (the link shows its id). */
+	const shelfLabel = (): string | undefined => {
+		const row = device()
+		if (row?.shelf_position_u == null) {
+			return undefined
+		}
+		return t('device.onShelf', {
+			name: row.shelf_name || t('common.unitPosition', { u: row.shelf_position_u }),
 		})
+	}
 
 	/** Where in the rack the device sits: U and face, or its shelf (hidden when unracked). */
 	function Mount(): JSX.Element {
@@ -313,7 +318,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					fallback={
 						<ForeignKeyLink
 							id={shelfId()}
-							loading={shelf.loading}
+							loading={device.loading}
 							name={shelfLabel()}
 							href={`/shelves/${shelfId() ?? ''}/edit`}
 						/>
@@ -367,19 +372,19 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							<dd>
 								<ForeignKeyLink
 									id={typeId()}
-									loading={deviceType.loading}
-									name={deviceType()?.model}
+									loading={device.loading}
+									name={device()?.device_type_model}
 									href={`/device-types/${typeId() ?? ''}`}
 								/>{' '}
-								<EolPill date={deviceType()?.eol_date} />
+								<EolPill date={device()?.device_type_eol_date} />
 							</dd>
 							<dt>{tp('entity.deviceRole', 1)}</dt>
 							<dd>
-								<IconLabel icon={deviceRoleIcon(deviceRole()?.icon)}>
+								<IconLabel icon={deviceRoleIcon(device()?.device_role_icon)}>
 									<ForeignKeyLink
 										id={roleId()}
-										loading={deviceRole.loading}
-										name={deviceRoleLabel(deviceRole())}
+										loading={device.loading}
+										name={deviceRoleLabel(roleOf(device()))}
 										href={`/device-roles/${roleId() ?? ''}`}
 									/>
 								</IconLabel>
@@ -395,15 +400,30 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						<dl>
 							<dt>{tp('entity.site', 1)}</dt>
 							<dd>
-								<RecordLink id={siteId()} record={site} base="/sites" />
+								<ForeignKeyLink
+									id={siteId()}
+									loading={device.loading}
+									name={device()?.site_name}
+									href={`/sites/${siteId() ?? ''}`}
+								/>
 							</dd>
 							<dt>{tp('entity.location', 1)}</dt>
 							<dd>
-								<RecordLink id={locationId()} record={location} base="/locations" />
+								<ForeignKeyLink
+									id={locationId()}
+									loading={device.loading}
+									name={device()?.location_name}
+									href={`/locations/${locationId() ?? ''}`}
+								/>
 							</dd>
 							<dt>{tp('entity.rack', 1)}</dt>
 							<dd>
-								<RecordLink id={rackId()} record={rack} base="/racks" />
+								<ForeignKeyLink
+									id={rackId()}
+									loading={device.loading}
+									name={device()?.rack_name}
+									href={`/racks/${rackId() ?? ''}`}
+								/>
 								<Mount />
 							</dd>
 							<FloorplanLinks
@@ -426,11 +446,21 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						<dl>
 							<dt>{tp('entity.tenant', 1)}</dt>
 							<dd>
-								<RecordLink id={tenantId()} record={tenant} base="/tenants" />
+								<ForeignKeyLink
+									id={tenantId()}
+									loading={device.loading}
+									name={device()?.tenant_name}
+									href={`/tenants/${tenantId() ?? ''}`}
+								/>
 							</dd>
 							<dt>{t('device.assignedEmployee')}</dt>
 							<dd>
-								<RecordLink id={employeeId()} record={employee} base="/employees" />
+								<ForeignKeyLink
+									id={employeeId()}
+									loading={device.loading}
+									name={device()?.employee_name}
+									href={`/employees/${employeeId() ?? ''}`}
+								/>
 							</dd>
 							<dt>{t('device.section.ports')}</dt>
 							<dd>
@@ -506,7 +536,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 					</section>
 				</Show>
-				<Show when={deviceRole()?.can_host_vms === 1}>
+				<Show when={device()?.device_role_can_host_vms === 1}>
 					<section class="component-section flat-table" id="device-vms">
 						<div class="card-header">
 							<h3>
@@ -585,7 +615,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				/>
 			</Show>
 			<Show when={movingTenant() ? device() : undefined}>
-				{(row: () => DeviceRow): JSX.Element => (
+				{(row: () => DeviceDetail): JSX.Element => (
 					<MoveTenantDialog
 						row={{ kind: 'device', ...row() }}
 						on_moved={() => setMovingTenant(false)}

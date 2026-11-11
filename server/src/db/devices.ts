@@ -4,6 +4,7 @@ import {
 	asc,
 	count,
 	eq,
+	getTableColumns,
 	gte,
 	inArray,
 	isNotNull,
@@ -797,6 +798,76 @@ function deviceOrder(
 
 export function getDevice(id: number): Promise<Result<DeviceRow, Error>> {
 	return findById(devices, id, 'Device not found')
+}
+
+/**
+ * A device with the display fields of its related rows, so the detail page
+ * renders without a lookup per foreign key. Like list rows, the names of a
+ * site, location, rack or shelf outside the requester's tenant scope are
+ * null (their own endpoints answer 403). Tenant and employee names are not
+ * scoped: the device route only answers for a device in scope, whose tenant
+ * is then in scope and whose employee belongs to that tenant (composite FK).
+ */
+export type DeviceDetail = DeviceRow &
+	DeviceListNames & {
+		device_role_can_host_vms: number
+		device_type_model: string
+		device_type_eol_date: string | null
+		site_name: string | null
+		location_name: string | null
+		rack_name: string | null
+		/** Null when the shelf is unnamed or out of scope (then `shelf_position_u` is null too). */
+		shelf_name: string | null
+		shelf_position_u: number | null
+	}
+
+/**
+ * The device row plus its related display fields in one statement (read
+ * path only; writes and changelog snapshots keep using `getDevice`).
+ */
+export async function getDeviceDetail(
+	id: number,
+	scope: readonly number[] | undefined,
+): Promise<Result<DeviceDetail, Error>> {
+	const shelfRacks = alias(racks, 'shelf_rack')
+	const shelfVisible = scopeCondition(shelfRacks.tenant_id, scope)
+	const [row] = await getDb()
+		.select({
+			...getTableColumns(devices),
+			device_role_name: device_roles.name,
+			device_role_key: device_roles.key,
+			device_role_icon: device_roles.icon,
+			device_role_can_host_vms: device_roles.can_host_vms,
+			device_type_model: device_types.model,
+			device_type_eol_date: device_types.eol_date,
+			site_name: scopedName(sites.name, scopeCondition(sites.tenant_id, scope), 'site_name'),
+			location_name: scopedName(
+				locations.name,
+				scopeCondition(locations.tenant_id, scope),
+				'location_name',
+			),
+			rack_name: scopedName(racks.name, scopeCondition(racks.tenant_id, scope), 'rack_name'),
+			shelf_name: scopedName(shelves.name, shelfVisible, 'shelf_name'),
+			shelf_position_u: (shelfVisible === undefined
+				? sql<number | null>`${shelves.position_u}`
+				: sql<number | null>`CASE WHEN ${shelfVisible} THEN ${shelves.position_u} END`
+			).as('shelf_position_u'),
+			tenant_name: sql<string | null>`${tenants.name}`.as('tenant_name'),
+			employee_name: sql<string | null>`${employees.name}`.as('employee_name'),
+		})
+		.from(devices)
+		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
+		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
+		.leftJoin(sites, eq(sites.id, devices.site_id))
+		.leftJoin(locations, eq(locations.id, devices.location_id))
+		.leftJoin(racks, eq(racks.id, devices.rack_id))
+		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
+		.leftJoin(shelfRacks, eq(shelfRacks.id, shelves.rack_id))
+		.leftJoin(tenants, eq(tenants.id, devices.tenant_id))
+		.leftJoin(employees, eq(employees.id, devices.employee_id))
+		.where(eq(devices.id, id))
+		.limit(1)
+	return row ? Result.ok(row) : Result.err(new NotFoundError('Device not found'))
 }
 
 export async function createDevice(rawInput: DeviceCreate): Promise<Result<DeviceRow, Error>> {
