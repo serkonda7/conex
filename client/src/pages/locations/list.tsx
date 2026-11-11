@@ -3,13 +3,12 @@ import {
 	delete_location,
 	fetch_locations,
 	fetch_sites,
-	fetch_tenants,
 	type LocationListRow,
 	type LocationRow,
 	type LocationSort,
 	type LocationType,
 } from '../../api/tenancy'
-import type { DataTableColumn } from '../../components/data_table'
+import { type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
@@ -24,8 +23,7 @@ import { t, tp } from '../../i18n'
 import { locationTypeLabel, locationTypeOptions } from '../../i18n/labels'
 import { createCollapsedTree } from '../../lib/collapsed_tree'
 import { locationTypeIcon } from '../../lib/icons'
-import { useNameOf } from '../../lib/lookup'
-import { createRows, createRowsFor } from '../../lib/resource'
+import { createRowsFor } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 
@@ -65,14 +63,12 @@ export function LocationsPage(): JSX.Element {
 		fetch: fetch_locations,
 		remove: delete_location,
 	})
-	const [tenants] = createRows(fetch_tenants, list.setError)
 	// Site options follow the tenant (page `?tenant=` or tenant context).
 	const [sites] = createRowsFor(
 		() => tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		fetch_sites,
 		list.setError,
 	)
-	const tenantName = useNameOf(tenants)
 
 	const columns: DataTableColumn<LocationListRow>[] = [
 		{
@@ -110,10 +106,17 @@ export function LocationsPage(): JSX.Element {
 				<a href={`/sites/${l.site_id}`}>{l.site_name}</a>
 			),
 		},
+		descriptionColumn({ sortable: true }),
 		{
 			key: 'tenant',
 			label: tp('entity.tenant', 1),
-			getValue: (l: LocationRow): string => tenantName(l.tenant_id),
+			sortable: true,
+			getValue: (l: LocationListRow): JSX.Element =>
+				l.tenant_id === null ? (
+					<span>—</span>
+				) : (
+					<a href={`/tenants/${l.tenant_id}`}>{l.tenant_name}</a>
+				),
 		},
 	]
 

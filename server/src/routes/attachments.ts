@@ -94,6 +94,8 @@ export const attachmentsApp = new Hono()
 					search: query.search,
 					page: query.page,
 					limit: query.limit,
+					sort: query.sort,
+					order: query.order,
 					...scope,
 				}),
 			)

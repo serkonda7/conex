@@ -834,6 +834,7 @@ export const de: Messages = {
 	'device.positionInvalid':
 		'Die Rackposition muss eine positive ganze Zahl sein oder leer bleiben.',
 	'device.serial': 'Seriennummer',
+	'device.assetTag': 'Inventarnummer',
 	'device.assignedEmployee': 'Mitarbeiter',
 	'device.bundleNotContracted': 'SLA nicht festgelegt',
 	'device.noEmployee': 'Keine Zuweisung',

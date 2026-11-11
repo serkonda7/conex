@@ -17,6 +17,7 @@ import {
 	isPatchEmpty,
 	type ListParams,
 	offsetOf,
+	orderOf,
 	type Page,
 	pageOf,
 	pickDefined,
@@ -149,15 +150,23 @@ const USER_JSON_COLUMNS: {
 	active: sql<boolean>`coalesce(${employees.active}, 1) = 1`,
 }
 
-/** Users matching `where` (may use `employees` columns), by username. */
-function selectUserJson(where: SQL | undefined, limit: number, offset = 0): Promise<UserJson[]> {
+/**
+ * Users matching `where` (may use `employees` columns), by `orderBy` (may use
+ * `roles` and `employees` columns too) and then username.
+ */
+function selectUserJson(
+	where: SQL | undefined,
+	limit: number,
+	offset = 0,
+	orderBy: SQL[] = [],
+): Promise<UserJson[]> {
 	return getDb()
 		.select(USER_JSON_COLUMNS)
 		.from(users)
 		.innerJoin(roles, eq(roles.id, users.role_id))
 		.leftJoin(employees, eq(employees.id, users.employee_id))
 		.where(where)
-		.orderBy(asc(users.username))
+		.orderBy(...orderBy, asc(users.username), asc(users.id))
 		.limit(limit)
 		.offset(offset)
 }
@@ -183,9 +192,11 @@ const SCOPE_FOLLOWS_EMPLOYEE =
 	"Accounts of employees are limited to the employee's tenants; change those on the employee instead"
 
 export interface UserListParams extends ListParams {
-	role?: number
+	role?: number[]
 	tenant?: number
 	employee?: number
+	sort: 'username' | 'employee' | 'role'
+	order: 'asc' | 'desc'
 }
 
 export type UserPage = Page<UserJson>
@@ -193,11 +204,18 @@ export type UserPage = Page<UserJson>
 export async function listUsers(params: UserListParams): Promise<UserPage> {
 	const where = and(
 		searchCondition(params.search, [users.username, employees.name]),
-		params.role ? eq(users.role_id, params.role) : undefined,
+		params.role ? inArray(users.role_id, params.role) : undefined,
 		params.tenant ? userInTenant(params.tenant) : undefined,
 		params.employee ? eq(users.employee_id, params.employee) : undefined,
 	)
-	const rows = await selectUserJson(where, params.limit, offsetOf(params))
+	const orderColumn = {
+		username: users.username,
+		employee: employees.name,
+		role: roles.name,
+	}[params.sort]
+	const rows = await selectUserJson(where, params.limit, offsetOf(params), [
+		orderOf(orderColumn, params.order),
+	])
 	const [total] = await getDb()
 		.select({ n: count() })
 		.from(users)

@@ -25,7 +25,7 @@ export function TenantGroupDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const id = (): number => props.id
 	const [group] = createRecord(id, fetch_tenant_group, setError)
-	const [tenants] = createRowsFor(id, (key: number) => fetch_tenants({ group: key }), setError)
+	const [tenants] = createRowsFor(id, (key: number) => fetch_tenants({ group: [key] }), setError)
 	const tenantCount = (): number => tenants()?.length ?? 0
 
 	const handleDelete = useDetailDelete({

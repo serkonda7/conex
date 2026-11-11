@@ -37,6 +37,8 @@ export const usersApp = new Hono()
 				role: query.role,
 				tenant: query.tenant,
 				employee: query.employee,
+				sort: query.sort,
+				order: query.order,
 			}),
 		)
 	})

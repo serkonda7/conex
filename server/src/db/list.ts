@@ -109,6 +109,15 @@ export function countWhere(column: PgColumn, outer: SQLWrapper, where?: SQL): SQ
 		.where(and(eq(column, outer), where))})`.mapWith(Number)
 }
 
+/**
+ * `(SELECT value FROM <value's table> WHERE id = outer)`: a related row's
+ * column (e.g. the tenant name of a site) for a sort order. Nested like
+ * {@link countWhere}, so `outer` stays bound to the outer row.
+ */
+export function relatedValue(value: PgColumn, id: PgColumn, outer: SQLWrapper): SQL {
+	return sql`(${subquery.select({ value }).from(value.table).where(eq(id, outer))})`
+}
+
 /** True when a patch object carries no columns to write. */
 export function isPatchEmpty(patch: object): boolean {
 	return Object.keys(patch).length === 0

@@ -17,7 +17,7 @@ import {
 	type FilterTableProps,
 	type FilterTableValues,
 } from '@serkonda7/solid-components'
-import { type JSX, mergeProps, splitProps } from 'solid-js'
+import { type JSX, mergeProps, Show, splitProps } from 'solid-js'
 import { t } from '../i18n'
 import { useTabPath } from '../lib/router'
 import { use_saved_filters } from '../lib/saved_filters'
@@ -171,6 +171,15 @@ export function nameColumn<TRow extends { id: number; name: string }>(
 			<a href={`${base}/${row.id}`}>{opts?.rowLabel ? opts.rowLabel(row) : row.name}</a>
 		),
 	}
+}
+
+/** Count cell linking to the related list; zero has nothing to show there. */
+export function CountLink(props: { count: number; href: string }): JSX.Element {
+	return (
+		<Show when={props.count > 0} fallback="0">
+			<a href={props.href}>{props.count}</a>
+		</Show>
+	)
 }
 
 /** Truncated description column with the full text as tooltip. */

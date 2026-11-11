@@ -38,6 +38,7 @@ export function TenantGroupsPage(): JSX.Element {
 				{
 					key: 'tenants',
 					label: tp('entity.tenant', 2),
+					sortable: true,
 					getValue: (row: TenantGroupListItem): JSX.Element => (
 						<a href={`/tenants?group=${row.id}`}>{row.tenant_count}</a>
 					),

@@ -92,7 +92,10 @@ export function ChangelogPage(): JSX.Element {
 	const emptyText = (): string =>
 		search()
 			? t('list.noMatch', { noun: tp('noun.change', 2), search: search() })
-			: action() || objectType() || filterTenant() !== '' || tenantContext().kind !== 'all'
+			: action().length > 0 ||
+					objectType().length > 0 ||
+					filterTenant() !== '' ||
+					tenantContext().kind !== 'all'
 				? t('list.noMatchFilters', { noun: tp('noun.change', 2) })
 				: t('changelog.empty')
 

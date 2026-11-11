@@ -6,22 +6,31 @@ import {
 	type TenantSort,
 	type TenantWithCounts,
 } from '../../api/tenancy'
-import { type DataTableColumn, nameColumn } from '../../components/data_table'
-import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
+import { CountLink, type DataTableColumn, nameColumn } from '../../components/data_table'
+import {
+	EntityListPage,
+	idOptions,
+	idsOf,
+	useEntityList,
+	useQueryFilterList,
+} from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
-import { parseId } from '../../lib/router'
 import { contextGroupId } from '../../lib/tenant_context'
 
 /**
- * /tenants — NetBox-style tenant list: search, sortable columns, tenant
- * group filter (deep-linkable via `?group=<id>`, else the top-bar group
- * context), and icon actions with delete in a row menu.
+ * /tenants — NetBox-style tenant list: search, sortable columns with the
+ * related-object counts, tenant group filter (deep-linkable via
+ * `?group=<id>`, else the top-bar group context), and icon actions with
+ * delete in a row menu.
  */
 export function TenantsPage(): JSX.Element {
-	const [filterGroup] = useQueryFilter('group')
-	const group = (): number | undefined => parseId(filterGroup()) ?? contextGroupId()
+	const [filterGroup, setFilterGroup] = useQueryFilterList('group')
+	const group = (): number[] | undefined => {
+		const context = contextGroupId()
+		return idsOf(filterGroup()) ?? (context === undefined ? undefined : [context])
+	}
 	const list = useEntityList({
 		noun: 'noun.tenant',
 		sort: 'name' as TenantSort,
@@ -43,11 +52,38 @@ export function TenantsPage(): JSX.Element {
 		{
 			key: 'group',
 			label: tp('entity.tenantGroup', 1),
+			sortable: true,
 			getValue: (row: TenantWithCounts): string => groupName(row.tenant_group_id),
+		},
+		{
+			key: 'sites',
+			label: tp('entity.site', 2),
+			sortable: true,
+			getValue: (row: TenantWithCounts): JSX.Element => (
+				<CountLink count={row.site_count} href={`/sites?tenant=${row.id}`} />
+			),
+		},
+		{
+			key: 'racks',
+			label: tp('entity.rack', 2),
+			sortable: true,
+			getValue: (row: TenantWithCounts): JSX.Element => (
+				<CountLink count={row.rack_count} href={`/racks?tenant=${row.id}`} />
+			),
+		},
+		{
+			key: 'devices',
+			label: tp('entity.device', 2),
+			sortable: true,
+			getValue: (row: TenantWithCounts): JSX.Element => (
+				<CountLink count={row.device_count} href={`/devices?tenant=${row.id}`} />
+			),
 		},
 	]
 	const tenantsHref = (): string =>
-		filterGroup() === '' ? '/tenants' : `/tenants?group=${encodeURIComponent(filterGroup())}`
+		filterGroup().length === 0
+			? '/tenants'
+			: `/tenants?group=${encodeURIComponent(filterGroup().join(','))}`
 
 	return (
 		<EntityListPage
@@ -58,9 +94,19 @@ export function TenantsPage(): JSX.Element {
 				{ label: tp('entity.tenantGroup', 2), href: '/tenant-groups', active: false },
 			]}
 			addHref="/tenants/add"
-			filtered={group() !== undefined}
+			filters={[
+				{
+					key: 'group',
+					label: tp('entity.tenantGroup', 1),
+					options: idOptions(groups()),
+					value: filterGroup,
+					onChange: setFilterGroup,
+				},
+			]}
+			filtered={contextGroupId() !== undefined}
 			columns={columns}
 			columnsKey="tenants"
+			defaultColumns={['name', 'customer_number', 'group']}
 			rowName={(row: TenantWithCounts): string => row.name}
 			editHref={(row: TenantWithCounts): string => `/tenants/${row.id}/edit`}
 			emptyText={t('tenant.empty')}

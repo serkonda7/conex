@@ -30,6 +30,7 @@ import {
 	isPatchEmpty,
 	isTaken,
 	type ListParams,
+	orderOf,
 	type Page,
 	pageRows,
 	pickDefined,
@@ -83,11 +84,21 @@ function toRoleJson(row: typeof roles.$inferSelect & ExtraRow<typeof roleExtras>
 	}
 }
 
-export async function listRoles(params: ListParams): Promise<Page<RoleJson>> {
+export interface RoleListParams extends ListParams {
+	sort: 'name' | 'description' | 'users'
+	order: 'asc' | 'desc'
+}
+
+export async function listRoles(params: RoleListParams): Promise<Page<RoleJson>> {
+	const orderColumn = {
+		name: roles.name,
+		description: roles.description,
+		users: roleExtras.user_count,
+	}[params.sort]
 	const page = await pageRows(
 		roles,
 		searchCondition(params.search, [roles.name, roles.description]),
-		[asc(roles.name), asc(roles.id)],
+		[orderOf(orderColumn, params.order), asc(roles.name), asc(roles.id)],
 		params,
 		roleExtras,
 	)

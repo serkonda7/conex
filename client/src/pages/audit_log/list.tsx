@@ -108,7 +108,7 @@ export function AuditLogPage(): JSX.Element {
 	const emptyText = (): string =>
 		search()
 			? t('list.noMatch', { noun: tp('noun.auditEntry', 2), search: search() })
-			: event()
+			: event().length > 0
 				? t('list.noMatchFilters', { noun: tp('noun.auditEntry', 2) })
 				: t('audit.empty')
 

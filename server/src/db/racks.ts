@@ -9,7 +9,16 @@ import type {
 	RackCreate,
 	RackUpdate,
 } from 'shared/src/schemas'
-import { device_types, devices, locations, rack_types, racks, shelves, sites } from '../schema'
+import {
+	device_types,
+	devices,
+	locations,
+	rack_types,
+	racks,
+	shelves,
+	sites,
+	tenants,
+} from '../schema'
 import { checkBounds, faceOf, getOccupancy, type OccupantSpan } from '../services/occupancy'
 import { removeAttachmentFiles } from '../storage'
 import { type AttachmentRow, deleteOwnerAttachments, prunePlacements } from './attachments'
@@ -27,6 +36,7 @@ import {
 	orderOf,
 	pageRows,
 	pickDefined,
+	relatedValue,
 	searchCondition,
 	subquery,
 	tenantConditions,
@@ -55,7 +65,7 @@ export interface RackListParams extends ListParams, TenantFilterParams {
 	site?: number[]
 	location?: number[]
 	rack_type?: number[]
-	sort: 'name'
+	sort: 'name' | 'site' | 'location' | 'description' | 'type' | 'height' | 'tenant'
 	order: 'asc' | 'desc'
 }
 
@@ -67,10 +77,19 @@ export async function listRacks(params: RackListParams): Promise<Page<RackRow>> 
 		params.rack_type ? inArray(racks.rack_type_id, params.rack_type) : undefined,
 		...tenantConditions(racks.tenant_id, params),
 	)
+	const orderColumn = {
+		name: racks.name,
+		site: relatedValue(sites.name, sites.id, racks.site_id),
+		location: relatedValue(locations.name, locations.id, racks.location_id),
+		description: racks.description,
+		type: relatedValue(rack_types.model, rack_types.id, racks.rack_type_id),
+		height: rackHeight.height_u,
+		tenant: relatedValue(tenants.name, tenants.id, racks.tenant_id),
+	}[params.sort]
 	return await pageRows(
 		racks,
 		where,
-		[orderOf(racks.name, params.order), asc(racks.id)],
+		[orderOf(orderColumn, params.order), asc(racks.name), asc(racks.id)],
 		params,
 		rackHeight,
 	)

@@ -1,6 +1,6 @@
 import { Result } from 'better-result'
 import { and, asc, eq, getTableColumns, inArray, notInArray, type SQL, sql } from 'drizzle-orm'
-import type { EmployeeCreate, EmployeeUpdate } from 'shared/src/schemas'
+import type { EmployeeCreate, EmployeeListQuery, EmployeeUpdate } from 'shared/src/schemas'
 import {
 	devices,
 	employee_tenants,
@@ -104,7 +104,7 @@ export async function checkEmployeeAssignment(
 
 export interface EmployeeListParams extends ListParams, TenantFilterParams {
 	active?: boolean
-	sort: 'name' | 'first_name' | 'last_name' | 'title' | 'email'
+	sort: EmployeeListQuery['sort']
 	order: 'asc' | 'desc'
 }
 
@@ -123,9 +123,13 @@ export async function listEmployees(params: EmployeeListParams): Promise<Page<Em
 		name: employees.name,
 		first_name: employees.first_name,
 		last_name: employees.last_name,
+		salutation: employees.salutation,
 		title: employees.title,
 		// Primary (first) address.
 		email: sql`${employees.emails}->0->>'address'`,
+		// Active first.
+		status: sql`-${employees.active}`,
+		description: employees.description,
 	}[params.sort]
 	const db = getDb()
 	const items = await db

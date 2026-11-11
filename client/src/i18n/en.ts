@@ -824,6 +824,7 @@ export const en = {
 	'device.selectTypeFirst': 'Select a device type first.',
 	'device.positionInvalid': 'Rack position must be a positive integer or empty.',
 	'device.serial': 'Serial number',
+	'device.assetTag': 'Asset tag',
 	'device.assignedEmployee': 'Assigned employee',
 	'device.bundleNotContracted': 'Not contracted by the tenant',
 	'device.noEmployee': 'No assignment',

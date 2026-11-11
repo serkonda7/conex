@@ -44,6 +44,7 @@ export function ServiceLevelsPage(): JSX.Element {
 				{
 					key: 'holiday_region',
 					label: t('serviceLevel.holidayRegion'),
+					sortable: true,
 					getValue: (r: ServiceLevelListRow): string =>
 						r.holiday_region === null
 							? t('serviceLevel.holidayNationwide')
@@ -52,6 +53,7 @@ export function ServiceLevelsPage(): JSX.Element {
 				{
 					key: 'targets',
 					label: t('serviceLevel.targets'),
+					sortable: true,
 					getValue: (r: ServiceLevelListRow): string => String(r.target_count),
 				},
 			]}

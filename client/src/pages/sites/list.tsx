@@ -10,9 +10,12 @@ import {
 import { type DataTableColumn, descriptionColumn, nameColumn } from '../../components/data_table'
 import {
 	EntityListPage,
+	idOptions,
+	idsOf,
 	type ListTab,
 	useEntityList,
 	useQueryFilter,
+	useQueryFilterList,
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
@@ -34,16 +37,20 @@ export function siteTabs(active: 'sites' | 'site-groups', tenant: string): ListT
 }
 
 /**
- * /sites — NetBox-style site list: search, sortable columns, tenant filter
- * (deep-linkable via `?tenant=<id>`), and icon actions with delete in a row
- * menu.
+ * /sites — NetBox-style site list: search, sortable columns, site group
+ * filter (deep-linkable via `?group=<id>`), tenant filter (deep-linkable via
+ * `?tenant=<id>`), and icon actions with delete in a row menu.
  */
 export function SitesPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
+	const [filterGroup, setFilterGroup] = useQueryFilterList('group')
 	const list = useEntityList({
 		noun: 'noun.site',
 		sort: 'name' as SiteSort,
-		filters: () => tenantContextFilters(parseId(filterTenant()) ?? undefined),
+		filters: () => ({
+			group: idsOf(filterGroup()),
+			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
+		}),
 		fetch: fetch_sites,
 		remove: delete_site,
 	})
@@ -59,11 +66,13 @@ export function SitesPage(): JSX.Element {
 		{
 			key: 'tenant',
 			label: tp('entity.tenant', 1),
+			sortable: true,
 			getValue: (s: SiteRow): string => tenantName(s.tenant_id),
 		},
 		{
 			key: 'group',
 			label: t('common.group'),
+			sortable: true,
 			getValue: (s: SiteRow): string => groupName(s.site_group_id),
 		},
 	]
@@ -74,6 +83,15 @@ export function SitesPage(): JSX.Element {
 			title={tp('entity.site', 2)}
 			tabs={siteTabs('sites', filterTenant())}
 			addHref="/sites/add"
+			filters={[
+				{
+					key: 'group',
+					label: tp('entity.siteGroup', 1),
+					options: idOptions(groups()),
+					value: filterGroup,
+					onChange: setFilterGroup,
+				},
+			]}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="sites"

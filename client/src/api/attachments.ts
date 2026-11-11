@@ -173,6 +173,8 @@ export async function fetch_outlets(
 }
 
 /** One page of the marked floor plans, narrowed by search and tenant filters. */
+export type FloorplanSort = FloorplanListQuery['sort']
+
 export async function fetch_floorplans(
 	filters: Partial<FloorplanListQuery>,
 ): Promise<Result<Page<FloorplanListJson>, Error>> {
@@ -182,6 +184,8 @@ export async function fetch_floorplans(
 				...paging(filters),
 				tenant: filters.tenant,
 				tenant_group: filters.tenant_group,
+				sort: filters.sort ?? 'site',
+				order: filters.order ?? 'asc',
 			}),
 		}),
 		failed.list('noun.floorplan'),

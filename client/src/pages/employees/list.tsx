@@ -121,6 +121,7 @@ export function EmployeesPage(): JSX.Element {
 		{
 			key: 'salutation',
 			label: t('employee.salutation'),
+			sortable: true,
 			getValue: (e: EmployeeRow): string =>
 				e.salutation === null ? '—' : employeeSalutationLabel(e.salutation),
 		},
@@ -161,9 +162,10 @@ export function EmployeesPage(): JSX.Element {
 		{
 			key: 'status',
 			label: t('common.status'),
+			sortable: true,
 			getValue: (e: EmployeeRow): JSX.Element => <EmployeeStatus active={e.active} />,
 		},
-		descriptionColumn(),
+		descriptionColumn({ sortable: true }),
 	]
 
 	return (
