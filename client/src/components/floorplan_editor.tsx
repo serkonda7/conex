@@ -6,10 +6,16 @@
  *   click corner by corner to draw a polygon (closed by clicking the first
  *   corner, a double click or Enter; Backspace drops the last corner,
  *   Escape the whole draft). Then pick its target site or location. Areas
- *   are selected by click, moved by dragging, reshaped with corner handles
- *   (a rectangle's neighbors follow), relabelled and deleted below the
- *   stage. Dragging an edge's midpoint handle inserts a corner there; a
- *   double click on a corner handle removes it.
+ *   are selected by click, moved by dragging their name, reshaped with
+ *   corner handles (a rectangle's neighbors follow), relabelled and deleted
+ *   below the stage. Dragging an edge's midpoint handle inserts a corner
+ *   there; a double click on a corner handle removes it.
+ * - Selection: Shift + click (on the stage or in the object list) adds an
+ *   area or marker to the selection, Shift + drag on the plan selects what
+ *   lies fully inside the box. Dragging a selected name or marker moves the
+ *   whole selection; Delete removes it, Escape clears it.
+ * - Undo / redo (Ctrl + Z, Ctrl + Shift + Z or Ctrl + Y, and the buttons)
+ *   step through the draft's changes; a drag is one step.
  * - Palette: unplaced racks and devices, grouped by location, and the
  *   unplaced outlets (patch-panel rear ports) of the site, grouped by
  *   panel. Dragging an item onto the stage (HTML5 drag and drop) places a
@@ -35,6 +41,8 @@
  * All coordinates are clamped to 0..1.
  */
 import {
+	IconArrowBackUp,
+	IconArrowForwardUp,
 	IconCurrentLocation,
 	IconMagnet,
 	IconPencilPlus,
@@ -70,11 +78,19 @@ import type { LocationType } from '../api/tenancy'
 import { fetch_locations, fetch_sites } from '../api/tenancy'
 import { t, tp } from '../i18n'
 import { createRows, useAction } from '../lib/resource'
-import { useLeaveGuard } from '../lib/router'
+import { useLeaveGuard, usePaneVisible } from '../lib/router'
 import { tenantContextFilters } from '../lib/tenant_context'
 import { InlineError, Loading } from './feedback'
 import { areaLayer, LayerBar, layerVisible, markerLayer, showLayer } from './floorplan_layers'
-import { focusObject, ObjectList, type PlanObject } from './floorplan_objects'
+import {
+	focusObject,
+	focusObjects,
+	ObjectList,
+	objectKey,
+	type PlanObject,
+	PlanSearch,
+	searchMatches,
+} from './floorplan_objects'
 import {
 	alignPoint,
 	type Guide,
@@ -115,6 +131,26 @@ const SAME_POINT = 0.002
 
 /** Shortest distance (image px) between the two scale points. */
 const MIN_SCALE_PX = 5
+
+/** Undo steps kept. */
+const MAX_UNDO = 100
+
+/** The draft's editable state, as one undo step restores it. */
+interface Snapshot {
+	areas: FloorplanAreaJson[]
+	placements: FloorplanPlacementJson[]
+	scale: FloorplanScale | null
+	origin: Point | null
+}
+
+/** True while focus is in a text field, which keeps its own keys (undo, Delete). */
+function typingIn(target: EventTarget | null): boolean {
+	return (
+		target instanceof HTMLInputElement ||
+		target instanceof HTMLTextAreaElement ||
+		(target instanceof HTMLElement && target.isContentEditable)
+	)
+}
 
 function clamp01(value: number): number {
 	return Math.min(1, Math.max(0, value))
@@ -525,8 +561,12 @@ export function FloorplanEditor(props: {
 	const [placements, setPlacements] = createSignal<FloorplanPlacementJson[]>(
 		props.plan.placements,
 	)
-	const [selected, setSelected] = createSignal<number | null>(null)
-	const [selectedMarker, setSelectedMarker] = createSignal<number | null>(null)
+	/** Selected areas and markers. */
+	const [selection, setSelection] = createSignal<PlanObject[]>([])
+	/** Selection box of a Shift + drag on the plan. */
+	const [selectBox, setSelectBox] = createSignal<{ a: Point; b: Point } | null>(null)
+	const [undoStack, setUndoStack] = createSignal<Snapshot[]>([])
+	const [redoStack, setRedoStack] = createSignal<Snapshot[]>([])
 	const [tab, setTab] = createSignal<SideTab>('palette')
 	const [search, setSearch] = createSignal('')
 	const zoom = props.zoom
@@ -556,6 +596,12 @@ export function FloorplanEditor(props: {
 
 	// Items added in the editor have no id yet: negative ones never clash.
 	let nextId = -1
+	/** The inspector's label field made its undo step since it got focus. */
+	let labelRecorded = false
+	/** A Shift + drag just drew a selection box, so the click it ends in does not toggle. */
+	let boxDrawn = false
+	// Keys go to the window; a page in a background tab leaves them alone.
+	const paneVisible = usePaneVisible()
 
 	const initial = JSON.stringify(
 		toPut(props.plan.areas, props.plan.placements, props.plan.scale, props.plan.origin),
@@ -570,28 +616,111 @@ export function FloorplanEditor(props: {
 				placements().map((placement: FloorplanPlacementJson) => candidateKey(placement)),
 			),
 	)
-	const selectedArea = createMemo(() =>
-		areas().find(
-			(area: FloorplanAreaJson) => area.id === selected() && layerVisible(areaLayer(area)),
-		),
-	)
+	const selectedKeys = createMemo(() => new Set(selection().map(objectKey)))
+	const isSelected = (object: PlanObject): boolean => selectedKeys().has(objectKey(object))
+	/** The selected area while it is the only selected object, for its handles and inspector. */
+	const selectedArea = createMemo(() => {
+		const [only, ...rest] = selection()
+		if (!only || rest.length > 0 || only.kind !== 'area') {
+			return undefined
+		}
+		return areas().find(
+			(area: FloorplanAreaJson) => area.id === only.id && layerVisible(areaLayer(area)),
+		)
+	})
 	const shownAreas = (): FloorplanAreaJson[] =>
 		areas().filter((area: FloorplanAreaJson) => layerVisible(areaLayer(area)))
 	const shownPlacements = (): FloorplanPlacementJson[] =>
 		placements().filter((p: FloorplanPlacementJson) => layerVisible(markerLayer(p)))
-	const selectedObject = (): PlanObject | null => {
-		const area = selected()
-		if (area !== null) {
-			return { kind: 'area', id: area }
-		}
-		const marker = selectedMarker()
-		return marker !== null ? { kind: 'marker', id: marker } : null
+	/** Objects the object list's search matches, dimming the rest on the stage. */
+	const matches = createMemo(() =>
+		tab() === 'objects' ? searchMatches(areas(), placements(), search()) : null,
+	)
+	const matchKeys = createMemo(() => {
+		const found = matches()
+		return found ? new Set(found.map(objectKey)) : null
+	})
+	const dimmed = (object: PlanObject): boolean => {
+		const keys = matchKeys()
+		return keys !== null && !keys.has(objectKey(object))
 	}
 
-	function selectObject(object: PlanObject): void {
-		setSelected(object.kind === 'area' ? object.id : null)
-		setSelectedMarker(object.kind === 'marker' ? object.id : null)
+	function selectOnly(object: PlanObject | null): void {
+		setSelection(object ? [object] : [])
+	}
+
+	/** Adds `object` to the selection, or drops it when it is selected. */
+	function toggleSelected(object: PlanObject): void {
+		setSelection((all: PlanObject[]) =>
+			isSelected(object)
+				? all.filter((other: PlanObject) => objectKey(other) !== objectKey(object))
+				: [...all, object],
+		)
+	}
+
+	function unselect(object: PlanObject): void {
+		setSelection((all: PlanObject[]) =>
+			all.filter((other: PlanObject) => objectKey(other) !== objectKey(object)),
+		)
+	}
+
+	function selectObject(object: PlanObject, add: boolean): void {
+		if (add) {
+			toggleSelected(object)
+			return
+		}
+		selectOnly(object)
 		focusObject(zoom, object, areas(), placements())
+	}
+
+	function snapshot(): Snapshot {
+		return {
+			areas: areas(),
+			placements: placements(),
+			scale: planScale(),
+			origin: planOrigin(),
+		}
+	}
+
+	/** Records the draft as it stands, before a change, as an undo step. */
+	function checkpoint(): void {
+		setUndoStack((stack: Snapshot[]) => [...stack, snapshot()].slice(-MAX_UNDO))
+		setRedoStack([])
+	}
+
+	function restore(state: Snapshot): void {
+		setAreas(state.areas)
+		setPlacements(state.placements)
+		setScale(state.scale)
+		setOrigin(state.origin)
+		// Objects the step removed leave the selection.
+		const ids = new Set([
+			...state.areas.map((area: FloorplanAreaJson) => `area:${area.id}`),
+			...state.placements.map((p: FloorplanPlacementJson) => `marker:${p.id}`),
+		])
+		setSelection((all: PlanObject[]) =>
+			all.filter((object: PlanObject) => ids.has(objectKey(object))),
+		)
+	}
+
+	function undo(): void {
+		const stack = undoStack()
+		const previous = stack[stack.length - 1]
+		if (previous) {
+			setRedoStack((redoAll: Snapshot[]) => [...redoAll, snapshot()])
+			setUndoStack(stack.slice(0, -1))
+			restore(previous)
+		}
+	}
+
+	function redo(): void {
+		const stack = redoStack()
+		const next = stack[stack.length - 1]
+		if (next) {
+			setUndoStack((undoAll: Snapshot[]) => [...undoAll, snapshot()])
+			setRedoStack(stack.slice(0, -1))
+			restore(next)
+		}
 	}
 
 	// The browser asks before a reload or tab close would drop the draft.
@@ -671,6 +800,21 @@ export function FloorplanEditor(props: {
 		window.addEventListener('pointercancel', onUp)
 	}
 
+	/** A drag that changes the draft: one undo step, recorded on the first move. */
+	function startEdit(
+		e: PointerEvent,
+		move: (dx: number, dy: number, ev: PointerEvent) => void,
+	): void {
+		let recorded = false
+		startDrag(e, (dx: number, dy: number, ev: PointerEvent) => {
+			if (!recorded) {
+				recorded = true
+				checkpoint()
+			}
+			move(dx, dy, ev)
+		})
+	}
+
 	function patchArea(id: number, patch: Partial<FloorplanAreaJson>): void {
 		setAreas((all: FloorplanAreaJson[]) =>
 			all.map((area: FloorplanAreaJson) => (area.id === id ? { ...area, ...patch } : area)),
@@ -683,11 +827,126 @@ export function FloorplanEditor(props: {
 		)
 	}
 
+	/**
+	 * Press on an object's handle (area name, marker): Shift toggles it in
+	 * the selection; on a selected object of several it moves them all.
+	 * Returns true when the press is handled, so the object does not drag alone.
+	 */
+	function pressSelectable(e: PointerEvent, object: PlanObject): boolean {
+		if (e.shiftKey) {
+			e.preventDefault()
+			e.stopPropagation()
+			toggleSelected(object)
+			return true
+		}
+		if (isSelected(object) && selection().length > 1) {
+			dragSelection(e)
+			return true
+		}
+		selectOnly(object)
+		return false
+	}
+
+	/** Moves every selected area and marker by the drag, keeping them all on the plan. */
+	function dragSelection(e: PointerEvent): void {
+		const keys = selectedKeys()
+		const areaOrigin = new Map(
+			areas()
+				.filter((area: FloorplanAreaJson) => keys.has(`area:${area.id}`))
+				.map((area: FloorplanAreaJson): [number, Point[]] => [area.id, area.points]),
+		)
+		const markerOrigin = new Map(
+			placements()
+				.filter((p: FloorplanPlacementJson) => keys.has(`marker:${p.id}`))
+				.map((p: FloorplanPlacementJson): [number, Point] => [p.id, [p.x, p.y]]),
+		)
+		const all: Point[] = [...[...areaOrigin.values()].flat(), ...markerOrigin.values()]
+		if (all.length === 0) {
+			return
+		}
+		const xs = all.map((point: Point) => point[0])
+		const ys = all.map((point: Point) => point[1])
+		const [minX, maxX, minY, maxY] = [
+			Math.min(...xs),
+			Math.max(...xs),
+			Math.min(...ys),
+			Math.max(...ys),
+		]
+		startEdit(e, (dx: number, dy: number) => {
+			const mx = Math.min(Math.max(dx, -minX), 1 - maxX)
+			const my = Math.min(Math.max(dy, -minY), 1 - maxY)
+			setAreas((list: FloorplanAreaJson[]) =>
+				list.map((area: FloorplanAreaJson) => {
+					const from = areaOrigin.get(area.id)
+					return from
+						? {
+								...area,
+								points: from.map(
+									(point: Point): Point => [point[0] + mx, point[1] + my],
+								),
+							}
+						: area
+				}),
+			)
+			setPlacements((list: FloorplanPlacementJson[]) =>
+				list.map((p: FloorplanPlacementJson) => {
+					const from = markerOrigin.get(p.id)
+					return from ? { ...p, x: from[0] + mx, y: from[1] + my } : p
+				}),
+			)
+		})
+	}
+
+	/** Shift + drag on the plan: adds the areas and markers fully inside the box to the selection. */
+	function boxSelect(e: PointerEvent): void {
+		const start = stagePoint(e)
+		startDrag(
+			e,
+			(dx: number, dy: number) =>
+				setSelectBox({ a: start, b: [clamp01(start[0] + dx), clamp01(start[1] + dy)] }),
+			() => {
+				const box = selectBox()
+				setSelectBox(null)
+				if (!box) {
+					return
+				}
+				boxDrawn = true
+				const [x0, x1] = [Math.min(box.a[0], box.b[0]), Math.max(box.a[0], box.b[0])]
+				const [y0, y1] = [Math.min(box.a[1], box.b[1]), Math.max(box.a[1], box.b[1])]
+				const inside = (point: Point): boolean =>
+					point[0] >= x0 && point[0] <= x1 && point[1] >= y0 && point[1] <= y1
+				const found: PlanObject[] = [
+					...shownAreas()
+						.filter((area: FloorplanAreaJson) => area.points.every(inside))
+						.map(
+							(area: FloorplanAreaJson): PlanObject => ({
+								kind: 'area',
+								id: area.id,
+							}),
+						),
+					...shownPlacements()
+						.filter((p: FloorplanPlacementJson) => inside([p.x, p.y]))
+						.map(
+							(p: FloorplanPlacementJson): PlanObject => ({
+								kind: 'marker',
+								id: p.id,
+							}),
+						),
+				]
+				setSelection((all: PlanObject[]) => [
+					...all,
+					...found.filter((object: PlanObject) => !isSelected(object)),
+				])
+			},
+		)
+	}
+
 	function dragArea(e: PointerEvent, area: FloorplanAreaJson): void {
-		setSelected(area.id)
-		setSelectedMarker(null)
+		if (pressSelectable(e, { kind: 'area', id: area.id })) {
+			return
+		}
 		const origin = area.points
-		startDrag(e, (dx: number, dy: number, ev: PointerEvent) => {
+		startEdit(e, (dx: number, dy: number, ev: PointerEvent) => {
 			const shift = snapping(ev)
 				? snapShift(metric(), origin, dx, dy, snapPolygons(area.id))
 				: { dx, dy, at: null }
@@ -696,9 +955,16 @@ export function FloorplanEditor(props: {
 		})
 	}
 
-	function dragCorner(e: PointerEvent, area: FloorplanAreaJson, index: number): void {
+	/** `recorded`: the caller made the undo step already (a midpoint drag). */
+	function dragCorner(
+		e: PointerEvent,
+		area: FloorplanAreaJson,
+		index: number,
+		recorded = false,
+	): void {
 		const origin = area.points
-		startDrag(e, (dx: number, dy: number, ev: PointerEvent) =>
+		const drag = recorded ? startDrag : startEdit
+		drag(e, (dx: number, dy: number, ev: PointerEvent) =>
 			patchArea(area.id, {
 				points: moveCorner(
 					origin,
@@ -722,12 +988,14 @@ export function FloorplanEditor(props: {
 		}
 		const origin = [...area.points]
 		origin.splice(index + 1, 0, edgeMidpoints(area.points)[index])
+		checkpoint()
 		patchArea(area.id, { points: origin })
-		dragCorner(e, { ...area, points: origin }, index + 1)
+		dragCorner(e, { ...area, points: origin }, index + 1, true)
 	}
 
 	function removeCorner(area: FloorplanAreaJson, index: number): void {
 		if (area.points.length > 3) {
+			checkpoint()
 			patchArea(area.id, {
 				points: area.points.filter((_point: Point, i: number) => i !== index),
 			})
@@ -735,8 +1003,9 @@ export function FloorplanEditor(props: {
 	}
 
 	function dragMarker(e: PointerEvent, placement: FloorplanPlacementJson): void {
-		setSelected(null)
-		setSelectedMarker(placement.id)
+		if (pressSelectable(e, { kind: 'marker', id: placement.id })) {
+			return
+		}
 		const [x, y] = [placement.x, placement.y]
 		// Other markers and the area centers, as they stand when the drag starts.
 		const targets: Point[] = [
@@ -748,7 +1017,7 @@ export function FloorplanEditor(props: {
 				return [center.x, center.y]
 			}),
 		]
-		startDrag(e, (dx: number, dy: number, ev: PointerEvent) => {
+		startEdit(e, (dx: number, dy: number, ev: PointerEvent) => {
 			const at: Point = [clamp01(x + dx), clamp01(y + dy)]
 			const aligned = snapping(ev)
 				? alignPoint(metric(), at, targets)
@@ -848,6 +1117,9 @@ export function FloorplanEditor(props: {
 
 	// Keys of the area tool; ignored while typing in a field.
 	const onKeyDown = (e: KeyboardEvent): void => {
+		if (!paneVisible()) {
+			return
+		}
 		if (tool() !== null && e.key === 'Escape' && askDistance() === null) {
 			e.preventDefault()
 			selectTool(null)
@@ -856,6 +1128,10 @@ export function FloorplanEditor(props: {
 		if (sequence() !== null && e.key === 'Escape') {
 			e.preventDefault()
 			setSequence(null)
+			return
+		}
+		if (!drawing() && !picking() && askDistance() === null && !typingIn(e.target)) {
+			onSelectionKey(e)
 			return
 		}
 		if (!drawing() || rectDragging() || picking() || e.target instanceof HTMLInputElement) {
@@ -876,6 +1152,29 @@ export function FloorplanEditor(props: {
 	onMount(() => window.addEventListener('keydown', onKeyDown))
 	onCleanup(() => window.removeEventListener('keydown', onKeyDown))
 
+	/** Keys outside the tools: undo / redo, and Delete / Escape on the selection. */
+	function onSelectionKey(e: KeyboardEvent): void {
+		const mod = e.ctrlKey || e.metaKey
+		const key = e.key.toLowerCase()
+		if (mod && key === 'z') {
+			e.preventDefault()
+			if (e.shiftKey) {
+				redo()
+			} else {
+				undo()
+			}
+		} else if (mod && key === 'y') {
+			e.preventDefault()
+			redo()
+		} else if ((e.key === 'Delete' || e.key === 'Backspace') && selection().length > 0) {
+			e.preventDefault()
+			deleteSelection()
+		} else if (e.key === 'Escape' && selection().length > 0) {
+			e.preventDefault()
+			setSelection([])
+		}
+	}
+
 	/** The draft as drawn so far, with the polygon's next edge to the pointer. */
 	const draftPreview = createMemo((): Point[] | null => {
 		const points = draft()
@@ -895,6 +1194,7 @@ export function FloorplanEditor(props: {
 			return
 		}
 		const id = nextId--
+		checkpoint()
 		setAreas((all: FloorplanAreaJson[]) => [
 			...all,
 			{
@@ -914,23 +1214,39 @@ export function FloorplanEditor(props: {
 				target_type: target.type,
 			}),
 		)
-		setSelected(id)
+		selectOnly({ kind: 'area', id })
 	}
 
 	function deleteArea(id: number): void {
+		checkpoint()
 		setAreas((all: FloorplanAreaJson[]) =>
 			all.filter((area: FloorplanAreaJson) => area.id !== id),
 		)
-		setSelected(null)
+		unselect({ kind: 'area', id })
 	}
 
 	function removeMarker(id: number): void {
+		checkpoint()
 		setPlacements((all: FloorplanPlacementJson[]) =>
 			all.filter((p: FloorplanPlacementJson) => p.id !== id),
 		)
-		if (selectedMarker() === id) {
-			setSelectedMarker(null)
+		unselect({ kind: 'marker', id })
+	}
+
+	/** Deletes the selected areas and markers as one undo step. */
+	function deleteSelection(): void {
+		const keys = selectedKeys()
+		if (keys.size === 0) {
+			return
 		}
+		checkpoint()
+		setAreas((all: FloorplanAreaJson[]) =>
+			all.filter((area: FloorplanAreaJson) => !keys.has(`area:${area.id}`)),
+		)
+		setPlacements((all: FloorplanPlacementJson[]) =>
+			all.filter((p: FloorplanPlacementJson) => !keys.has(`marker:${p.id}`)),
+		)
+		setSelection([])
 	}
 
 	function addPlacement(candidate: FloorplanCandidateJson, at: Point): void {
@@ -938,6 +1254,7 @@ export function FloorplanEditor(props: {
 			return
 		}
 		showLayer(markerLayer(candidate))
+		checkpoint()
 		setPlacements((all: FloorplanPlacementJson[]) => [
 			...all,
 			{
@@ -984,6 +1301,7 @@ export function FloorplanEditor(props: {
 		e.stopPropagation()
 		const at = stagePoint(e)
 		if (tool() === 'origin') {
+			checkpoint()
 			setOrigin(at)
 			setTool(null)
 			return
@@ -1019,6 +1337,7 @@ export function FloorplanEditor(props: {
 		const points = askDistance()
 		setAskDistance(null)
 		if (points) {
+			checkpoint()
 			setScale({ ...points, centimeters })
 		}
 	}
@@ -1031,7 +1350,7 @@ export function FloorplanEditor(props: {
 		}
 		const from = current[end]
 		const other = end === 'a' ? current.b : current.a
-		startDrag(e, (dx: number, dy: number) => {
+		startEdit(e, (dx: number, dy: number) => {
 			const to: Point = [clamp01(from[0] + dx), clamp01(from[1] + dy)]
 			if (scaleSpan(to, other)) {
 				setScale({ ...current, [end]: to })
@@ -1042,7 +1361,7 @@ export function FloorplanEditor(props: {
 	function dragOrigin(e: PointerEvent): void {
 		const from = planOrigin()
 		if (from) {
-			startDrag(e, (dx: number, dy: number) =>
+			startEdit(e, (dx: number, dy: number) =>
 				setOrigin([clamp01(from[0] + dx), clamp01(from[1] + dy)]),
 			)
 		}
@@ -1121,6 +1440,28 @@ export function FloorplanEditor(props: {
 				{(mount: () => HTMLElement) => (
 					<Portal mount={mount()}>
 						<div class="modal-actions">
+							<div class="floorplan-history">
+								<button
+									type="button"
+									class="floorplan-history-button"
+									aria-label={t('floorplan.undo')}
+									title={t('floorplan.undoHint')}
+									disabled={undoStack().length === 0}
+									onClick={undo}
+								>
+									<IconArrowBackUp size={16} />
+								</button>
+								<button
+									type="button"
+									class="floorplan-history-button"
+									aria-label={t('floorplan.redo')}
+									title={t('floorplan.redoHint')}
+									disabled={redoStack().length === 0}
+									onClick={redo}
+								>
+									<IconArrowForwardUp size={16} />
+								</button>
+							</div>
 							<button type="button" onClick={onCancel} disabled={save.pending()}>
 								{t('common.cancel')}
 							</button>
@@ -1149,9 +1490,13 @@ export function FloorplanEditor(props: {
 						calibration={{ scale: planScale(), origin: planOrigin() }}
 						ref={setStage}
 						handlers={{
-							onPointerDown: () => {
-								setSelected(null)
-								setSelectedMarker(null)
+							onPointerDown: (e: PointerEvent) => {
+								boxDrawn = false
+								if (e.shiftKey && (e.pointerType !== 'mouse' || e.button === 0)) {
+									boxSelect(e)
+								} else if (!e.shiftKey) {
+									setSelection([])
+								}
 							},
 							onDragOver: (e: DragEvent) => {
 								if (dragged() !== null) {
@@ -1169,11 +1514,25 @@ export function FloorplanEditor(props: {
 						>
 							<For each={shownAreas()}>
 								{(area: FloorplanAreaJson) => (
+									// biome-ignore lint/a11y/noStaticElementInteractions: The object list selects areas from the keyboard.
 									<g
 										class={`floorplan-area floorplan-area-editing floorplan-layer-${areaLayer(area)}`}
-										classList={{ selected: selected() === area.id }}
-										data-pan-hint
-										onPointerDown={(e: PointerEvent) => dragArea(e, area)}
+										classList={{
+											selected: isSelected({ kind: 'area', id: area.id }),
+											'floorplan-dimmed': dimmed({
+												kind: 'area',
+												id: area.id,
+											}),
+										}}
+										onClick={(e: MouseEvent) => {
+											const drawn = boxDrawn
+											boxDrawn = false
+											if (!e.shiftKey) {
+												selectOnly({ kind: 'area', id: area.id })
+											} else if (!drawn) {
+												toggleSelected({ kind: 'area', id: area.id })
+											}
+										}}
 									>
 										<polygon points={svgPoints(area.points)} />
 									</g>
@@ -1213,7 +1572,12 @@ export function FloorplanEditor(props: {
 						<For each={shownAreas()}>
 							{(area: FloorplanAreaJson) => (
 								<span
-									class="floorplan-area-label floorplan-area-label-static"
+									class="floorplan-area-label floorplan-area-label-handle"
+									classList={{
+										selected: isSelected({ kind: 'area', id: area.id }),
+										'floorplan-dimmed': dimmed({ kind: 'area', id: area.id }),
+									}}
+									onPointerDown={(e: PointerEvent) => dragArea(e, area)}
 									style={{
 										left: percent(areaCenter(area).x),
 										top: percent(areaCenter(area).y),
@@ -1270,14 +1634,17 @@ export function FloorplanEditor(props: {
 									class="floorplan-marker floorplan-marker-editing"
 									classList={{
 										...markerClasses(placement),
-										selected: selectedMarker() === placement.id,
+										selected: isSelected({ kind: 'marker', id: placement.id }),
+										'floorplan-dimmed': dimmed({
+											kind: 'marker',
+											id: placement.id,
+										}),
 									}}
 									style={{
 										left: percent(placement.x),
 										top: percent(placement.y),
 									}}
 									title={markerTitle(placement)}
-									data-pan-hint
 									onPointerDown={(e: PointerEvent) => dragMarker(e, placement)}
 								>
 									<MarkerGlyph placement={placement} size={16} />
@@ -1342,6 +1709,20 @@ export function FloorplanEditor(props: {
 									style={{ left: percent(point()[0]), top: percent(point()[1]) }}
 									title={t('floorplan.origin')}
 									onPointerDown={dragOrigin}
+								/>
+							)}
+						</Show>
+						<Show when={selectBox()}>
+							{(box: () => { a: Point; b: Point }) => (
+								<div
+									class="floorplan-select-box"
+									style={{
+										left: percent(Math.min(box().a[0], box().b[0])),
+										top: percent(Math.min(box().a[1], box().b[1])),
+										width: percent(Math.abs(box().a[0] - box().b[0])),
+										height: percent(Math.abs(box().a[1] - box().b[1])),
+									}}
+									aria-hidden="true"
 								/>
 							)}
 						</Show>
@@ -1421,9 +1802,19 @@ export function FloorplanEditor(props: {
 										value={area().label ?? ''}
 										placeholder={area().target_name}
 										maxLength={100}
+										onFocus={() => {
+											labelRecorded = false
+										}}
 										onInput={(
 											e: InputEvent & { currentTarget: HTMLInputElement },
-										) => patchArea(area().id, { label: e.currentTarget.value })}
+										) => {
+											// One undo step per visit of the field, not per key.
+											if (!labelRecorded) {
+												labelRecorded = true
+												checkpoint()
+											}
+											patchArea(area().id, { label: e.currentTarget.value })
+										}}
 									/>
 								</label>
 								<button type="button" onClick={() => deleteArea(area().id)}>
@@ -1431,6 +1822,17 @@ export function FloorplanEditor(props: {
 								</button>
 							</div>
 						)}
+					</Show>
+					<Show when={selection().length > 1}>
+						<div class="floorplan-inspector">
+							<span>{tp('floorplan.selectedCount', selection().length)}</span>
+							<button type="button" onClick={deleteSelection}>
+								{t('floorplan.deleteSelected')}
+							</button>
+							<button type="button" onClick={() => setSelection([])}>
+								{t('floorplan.clearSelection')}
+							</button>
+						</div>
 					</Show>
 				</div>
 				<aside class="floorplan-palette" aria-label={t('floorplan.palette')}>
@@ -1507,7 +1909,10 @@ export function FloorplanEditor(props: {
 									<button
 										type="button"
 										class="floorplan-link-button"
-										onClick={() => setScale(null)}
+										onClick={() => {
+											checkpoint()
+											setScale(null)
+										}}
 									>
 										{t('floorplan.remove')}
 									</button>
@@ -1520,7 +1925,10 @@ export function FloorplanEditor(props: {
 								<button
 									type="button"
 									class="floorplan-link-button"
-									onClick={() => setOrigin(null)}
+									onClick={() => {
+										checkpoint()
+										setOrigin(null)
+									}}
 								>
 									{t('floorplan.remove')}
 								</button>
@@ -1549,23 +1957,19 @@ export function FloorplanEditor(props: {
 							})}
 						</button>
 					</div>
-					<input
-						type="search"
-						class="floorplan-palette-search"
+					<PlanSearch
+						value={search()}
 						placeholder={
 							tab() === 'palette'
 								? t('floorplan.paletteSearch')
 								: t('floorplan.objectSearch')
 						}
-						aria-label={
-							tab() === 'palette'
-								? t('floorplan.paletteSearch')
-								: t('floorplan.objectSearch')
-						}
-						value={search()}
-						onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
-							setSearch(e.currentTarget.value)
-						}
+						on_input={setSearch}
+						matches={matches()}
+						on_focus_matches={(found: PlanObject[]) => {
+							setSelection(found)
+							focusObjects(zoom, found, areas(), placements())
+						}}
 					/>
 					<Show
 						when={tab() === 'palette'}
@@ -1574,11 +1978,18 @@ export function FloorplanEditor(props: {
 								areas={areas()}
 								placements={placements()}
 								search={search()}
-								selected={selectedObject()}
+								selected={selection()}
 								on_select={selectObject}
 								actions={{
-									rename_area: (id: number, label: string) =>
-										patchArea(id, { label }),
+									rename_area: (id: number, label: string) => {
+										const before = areas().find(
+											(area: FloorplanAreaJson) => area.id === id,
+										)
+										if ((before?.label ?? '') !== label) {
+											checkpoint()
+											patchArea(id, { label })
+										}
+									},
 									delete_area: deleteArea,
 									remove_marker: removeMarker,
 								}}

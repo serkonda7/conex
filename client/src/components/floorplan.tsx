@@ -12,22 +12,33 @@
  * stage. Beside the stage, the object list reaches every area and marker.
  */
 import { IconPencil } from '@tabler/icons-solidjs'
-import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, type JSX, on, Show } from 'solid-js'
 import {
 	type AttachmentJson,
 	type FloorplanAreaJson,
 	type FloorplanJson,
+	type FloorplanOutletPortJson,
 	type FloorplanPlacementJson,
 	fetch_floorplan,
 } from '../api/attachments'
 import { t } from '../i18n'
+import { FLOORPLAN_LINK_KEYS, type FloorplanLinkKey } from '../lib/floorplan_link'
 import { createRecord } from '../lib/resource'
-import { goTo } from '../lib/router'
+import { goTo, queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import { InlineError, Loading } from './feedback'
 import { FloorplanEditor } from './floorplan_editor'
 import { areaLayer, LayerBar, layerVisible, markerLayer } from './floorplan_layers'
-import { focusObject, ObjectList, type PlanObject, sameObject } from './floorplan_objects'
+import {
+	focusObject,
+	focusObjects,
+	ObjectList,
+	objectKey,
+	type PlanObject,
+	PlanSearch,
+	sameObject,
+	searchMatches,
+} from './floorplan_objects'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import {
 	areaCenter,
@@ -45,6 +56,37 @@ import {
 	type StageZoom,
 } from './floorplan_stage'
 import { IconLabel } from './icon_label'
+
+/**
+ * The object a deep link (`floorplanHref`) points at: a marker by its rack, device, outlet
+ * port or jack, an area by its site or location. An outlet port inside a
+ * jack finds the jack's marker.
+ */
+function linkedObject(plan: FloorplanJson, key: FloorplanLinkKey, id: number): PlanObject | null {
+	if (key === 'site' || key === 'location') {
+		const area = plan.areas.find((a: FloorplanAreaJson) =>
+			key === 'site' ? a.site_id === id : a.location_id === id,
+		)
+		return area ? { kind: 'area', id: area.id } : null
+	}
+	const placement = plan.placements.find((p: FloorplanPlacementJson) => {
+		switch (key) {
+			case 'rack':
+				return p.rack_id === id
+			case 'device':
+				return p.device_id === id
+			case 'jack':
+				return p.jack_id === id
+			case 'interface':
+				return (
+					p.interface_id === id ||
+					p.port?.ports.some((port: FloorplanOutletPortJson) => port.id === id) === true
+				)
+		}
+		return false
+	})
+	return placement ? { kind: 'marker', id: placement.id } : null
+}
 
 /** The area target's own floor plan, else its detail page. */
 function areaHref(area: FloorplanAreaJson): string {
@@ -70,7 +112,10 @@ function markerHref(placement: FloorplanPlacementJson): string {
 function AreaLayer(props: {
 	areas: FloorplanAreaJson[]
 	selected: PlanObject | null
+	/** True for objects the side panel's search does not match. */
+	dimmed: (object: PlanObject) => boolean
 }): JSX.Element {
+	const dimmed = (area: FloorplanAreaJson): boolean => props.dimmed({ kind: 'area', id: area.id })
 	const isSelected = (area: FloorplanAreaJson): boolean =>
 		sameObject(props.selected, { kind: 'area', id: area.id })
 	return (
@@ -88,7 +133,10 @@ function AreaLayer(props: {
 						// biome-ignore lint/a11y/noStaticElementInteractions: The adjacent area label provides the keyboard-accessible link.
 						<g
 							class={`floorplan-area floorplan-layer-${areaLayer(area)}`}
-							classList={{ selected: isSelected(area) }}
+							classList={{
+								selected: isSelected(area),
+								'floorplan-dimmed': dimmed(area),
+							}}
 							onClick={(e: MouseEvent) => goTo(e, areaHref(area))}
 							onAuxClick={(e: MouseEvent) => {
 								if (e.button === 1) {
@@ -108,7 +156,7 @@ function AreaLayer(props: {
 					<a
 						href={areaHref(area)}
 						class="floorplan-area-label"
-						classList={{ selected: isSelected(area) }}
+						classList={{ selected: isSelected(area), 'floorplan-dimmed': dimmed(area) }}
 						style={{
 							left: percent(areaCenter(area).x),
 							top: percent(areaCenter(area).y),
@@ -134,7 +182,10 @@ function MarkerLayer(props: {
 	placements: FloorplanPlacementJson[]
 	zoom: StageZoom
 	selected: PlanObject | null
+	dimmed: (object: PlanObject) => boolean
 }): JSX.Element {
+	const dimmed = (placement: FloorplanPlacementJson): boolean =>
+		props.dimmed({ kind: 'marker', id: placement.id })
 	const [open, setOpen] = createSignal<number | null>(null)
 	const openOutlet = (): OutletPlacement | undefined => {
 		const found = props.placements.find((p: FloorplanPlacementJson) => p.id === open())
@@ -162,6 +213,7 @@ function MarkerLayer(props: {
 								classList={{
 									...markerClasses(item.placement),
 									selected: selectedId() === item.placement.id,
+									'floorplan-dimmed': dimmed(item.placement),
 								}}
 								style={style(item)}
 								draggable={false}
@@ -179,6 +231,7 @@ function MarkerLayer(props: {
 							classList={{
 								...markerClasses(item.placement),
 								selected: selectedId() === item.placement.id,
+								'floorplan-dimmed': dimmed(item.placement),
 							}}
 							style={style(item)}
 							title={markerTitle(item.placement)}
@@ -195,7 +248,13 @@ function MarkerLayer(props: {
 				)}
 			</For>
 			<For each={shown().clusters}>
-				{(cluster: MarkerCluster) => <ClusterBubble cluster={cluster} zoom={props.zoom} />}
+				{(cluster: MarkerCluster) => (
+					<ClusterBubble
+						cluster={cluster}
+						zoom={props.zoom}
+						dimmed={cluster.members.every(dimmed)}
+					/>
+				)}
 			</For>
 			<Show when={openOutlet()}>
 				{(placement: () => OutletPlacement) => (
@@ -207,7 +266,12 @@ function MarkerLayer(props: {
 }
 
 /** Count bubble of a marker cluster; a click zooms in on its members. */
-function ClusterBubble(props: { cluster: MarkerCluster; zoom: StageZoom }): JSX.Element {
+function ClusterBubble(props: {
+	cluster: MarkerCluster
+	zoom: StageZoom
+	/** No member matches the search. */
+	dimmed: boolean
+}): JSX.Element {
 	const label = (): string =>
 		t('floorplan.clusterZoom', {
 			count: props.cluster.members.length,
@@ -217,6 +281,7 @@ function ClusterBubble(props: { cluster: MarkerCluster; zoom: StageZoom }): JSX.
 		<button
 			type="button"
 			class="floorplan-cluster"
+			classList={{ 'floorplan-dimmed': props.dimmed }}
 			style={{ left: percent(props.cluster.x), top: percent(props.cluster.y) }}
 			title={label()}
 			aria-label={label()}
@@ -240,15 +305,53 @@ function ClusterBubble(props: { cluster: MarkerCluster; zoom: StageZoom }): JSX.
 	)
 }
 
-/** The read-only plan: layer bar, zoomable stage and the object list beside it. */
+/**
+ * The read-only plan: layer bar, zoomable stage and the object list beside
+ * it. The deep-linked object (`take_focus`) is selected and zoomed to once
+ * the stage has its size.
+ */
 function PlanViewer(props: {
 	attachment: AttachmentJson
 	plan: FloorplanJson
 	zoom: StageZoom
+	take_focus: () => PlanObject | null
 }): JSX.Element {
 	const zoom = props.zoom
 	const [selected, setSelected] = createSignal<PlanObject | null>(null)
 	const [search, setSearch] = createSignal('')
+	const matches = createMemo(() =>
+		searchMatches(props.plan.areas, props.plan.placements, search()),
+	)
+	const matchKeys = createMemo(() => {
+		const found = matches()
+		return found ? new Set(found.map(objectKey)) : null
+	})
+	const dimmed = (object: PlanObject): boolean => {
+		const keys = matchKeys()
+		return keys !== null && !keys.has(objectKey(object))
+	}
+	const selectedList = (): PlanObject[] => {
+		const object = selected()
+		return object ? [object] : []
+	}
+	const select = (object: PlanObject): void => {
+		setSelected(object)
+		focusObject(zoom, object, props.plan.areas, props.plan.placements)
+	}
+	// Deep link: waits for the first measurement, then focuses once.
+	createEffect(
+		on(
+			() => zoom.size().width > 0,
+			(measured: boolean, before: boolean | undefined) => {
+				if (measured && !before) {
+					const focus = props.take_focus()
+					if (focus) {
+						select(focus)
+					}
+				}
+			},
+		),
+	)
 	const areas = (): FloorplanAreaJson[] =>
 		props.plan.areas.filter((area: FloorplanAreaJson) => layerVisible(areaLayer(area)))
 	const placements = (): FloorplanPlacementJson[] =>
@@ -267,31 +370,33 @@ function PlanViewer(props: {
 					zoom={zoom}
 					calibration={{ scale: props.plan.scale, origin: props.plan.origin }}
 				>
-					<AreaLayer areas={areas()} selected={selected()} />
-					<MarkerLayer placements={placements()} zoom={zoom} selected={selected()} />
+					<AreaLayer areas={areas()} selected={selected()} dimmed={dimmed} />
+					<MarkerLayer
+						placements={placements()}
+						zoom={zoom}
+						selected={selected()}
+						dimmed={dimmed}
+					/>
 				</FloorplanStage>
 			</div>
 			<aside class="floorplan-palette" aria-label={t('floorplan.objects')}>
 				<h4>{t('floorplan.objects')}</h4>
-				<input
-					type="search"
-					class="floorplan-palette-search"
-					placeholder={t('floorplan.objectSearch')}
-					aria-label={t('floorplan.objectSearch')}
+				<PlanSearch
 					value={search()}
-					onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
-						setSearch(e.currentTarget.value)
-					}
+					placeholder={t('floorplan.objectSearch')}
+					on_input={setSearch}
+					matches={matches()}
+					on_focus_matches={(found: PlanObject[]) => {
+						setSelected(found.length === 1 ? found[0] : null)
+						focusObjects(zoom, found, props.plan.areas, props.plan.placements)
+					}}
 				/>
 				<ObjectList
 					areas={props.plan.areas}
 					placements={props.plan.placements}
 					search={search()}
-					selected={selected()}
-					on_select={(object: PlanObject) => {
-						setSelected(object)
-						focusObject(zoom, object, props.plan.areas, props.plan.placements)
-					}}
+					selected={selectedList()}
+					on_select={(object: PlanObject) => select(object)}
 				/>
 			</aside>
 		</div>
@@ -318,6 +423,20 @@ export function FloorplanView(props: {
 	const [editing, setEditing] = createSignal(false)
 	// Shared by the view and the editor, so switching modes keeps zoom and pan.
 	const zoom = createStageZoom()
+	// The tab remounts the page when its path changes, so this is read once.
+	let link = FLOORPLAN_LINK_KEYS.map((key: FloorplanLinkKey) => ({
+		key,
+		id: Number(queryParam(key)),
+	})).find(
+		(entry: { key: FloorplanLinkKey; id: number }) =>
+			Number.isInteger(entry.id) && entry.id > 0,
+	)
+	/** The linked object, once: coming back from the editor keeps the view as it is. */
+	const takeFocus = (loaded: FloorplanJson): PlanObject | null => {
+		const pending = link
+		link = undefined
+		return pending ? linkedObject(loaded, pending.key, pending.id) : null
+	}
 
 	const [actions, setActions] = createSignal<HTMLElement>()
 
@@ -355,7 +474,12 @@ export function FloorplanView(props: {
 								/>
 							}
 						>
-							<PlanViewer attachment={props.attachment} plan={loaded()} zoom={zoom} />
+							<PlanViewer
+								attachment={props.attachment}
+								plan={loaded()}
+								zoom={zoom}
+								take_focus={() => takeFocus(loaded())}
+							/>
 						</Show>
 					)}
 				</Show>

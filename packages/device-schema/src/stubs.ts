@@ -91,7 +91,7 @@ export const MAX_STUB_START = 9999
  * `{prefix: "eth", count: 24}` -> `eth1..eth24`, with `digits: 2`
  * `eth01..eth24`, with `start: 17, count: 8` `eth17..eth24`. A single-port
  * stub keeps its name verbatim (`Port 1` stays `Port 1`); only multi-port
- * stubs append an index.
+ * stubs append an index, and only they may have an empty prefix (`01..24`).
  */
 export function expandStub(
 	prefix: string,
@@ -100,11 +100,12 @@ export function expandStub(
 	start = 1,
 ): Checked<string[]> {
 	const head = stubPrefix(prefix, count)
-	if (head.trim().length === 0) {
-		return invalid('Stub prefix must not be empty')
-	}
 	if (!Number.isInteger(count) || count < 1) {
 		return invalid('Stub count must be an integer of at least 1')
+	}
+	// A run may be bare numbers (`01..24`); a single port needs a name.
+	if (count === 1 && head.length === 0) {
+		return invalid('Stub prefix must not be empty')
 	}
 	if (!Number.isInteger(digits) || digits < 1 || digits > MAX_STUB_DIGITS) {
 		return invalid(`Stub digits must be an integer from 1 to ${MAX_STUB_DIGITS}`)
@@ -197,8 +198,11 @@ export interface StubRun {
 	start: number
 }
 
-/** A run prefix: no leading space, at most one trailing space as the separator. */
-const RUN_PREFIX = /^\S(.*\S)? ?$/
+/**
+ * A run prefix: no leading space, at most one trailing space as the
+ * separator; empty for bare numbers (`01..24`).
+ */
+const RUN_PREFIX = /^(\S(.*\S)? ?)?$/
 
 /**
  * Collapses consecutive names `B17, B18, …, Bn` (also zero-padded, `B01,

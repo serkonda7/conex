@@ -20,6 +20,7 @@ import {
 	expandNameTemplate,
 	expandStubs,
 	type StubInput,
+	type StubRun,
 	stubPowerError,
 } from './stubs'
 
@@ -96,20 +97,46 @@ class Plan {
 	}
 }
 
+/** A rear port of the plan: its stub, its index in that stub and its slot count. */
+interface PlannedRear {
+	stub: number
+	offset: number
+	positions: number
+}
+
+/** Splits items, in order, into segments of neighbours that belong together. */
+function segmentsOf<T>(items: T[], sameSegment: (prev: T, next: T) => boolean): T[][] {
+	const segments: T[][] = []
+	for (const item of items) {
+		const last = segments.at(-1)
+		const prev = last?.at(-1)
+		if (last && prev !== undefined && sameSegment(prev, item)) {
+			last.push(item)
+		} else {
+			segments.push([item])
+		}
+	}
+	return segments
+}
+
 /**
  * NetBox `rear-ports` (`{name, type, positions}`) and `front-ports`
- * (`{name, type, rear_port, rear_port_position}`): each port becomes a
- * single-port stub, a front port mapped onto the rear port of that name in
- * the same document at an explicit position (inline, or via NetBox 4.3+
- * `port-mappings`). Rear ports come first so the front ports can reference
- * them. Answers the failure message, or null.
+ * (`{name, type, rear_port, rear_port_position}`): numbered series collapse
+ * into runs as on the other lists (`Rear 01..Rear 24`). Single-position rear
+ * ports of one type form a run; multi-position ones (MPO) stay single-port
+ * stubs. A front run maps consecutive front ports of one type onto
+ * consecutive slots of one rear run. The mapping comes inline, or via NetBox
+ * 4.3+ `port-mappings`, onto the rear port of that name in the same document.
+ * Rear ports come first so the front ports can reference them. Answers the
+ * failure message, or null.
  */
 function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
-	const rearByName = new Map<string, number>()
+	const rearByName = new Map<string, PlannedRear>()
 	const rears = componentsOf('rear-ports', item['rear-ports'])
 	if (!rears.ok) {
 		return rears.error
 	}
+	const rearPorts: { name: string; kind: string; positions: number }[] = []
 	for (const port of rears.value) {
 		const name = nameOf(port)
 		if (!name) {
@@ -127,18 +154,39 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 		if (!names.ok) {
 			return `rear-ports "${name}": ${names.error}`
 		}
-		for (const prefix of names.value) {
+		rearPorts.push(...names.value.map((prefix) => ({ name: prefix, kind, positions })))
+	}
+	const rearSegments = segmentsOf(
+		rearPorts,
+		(prev, next) => prev.positions === 1 && next.positions === 1 && prev.kind === next.kind,
+	)
+	for (const segment of rearSegments) {
+		const first = segment[0]
+		if (!first) {
+			continue
+		}
+		let offset = 0
+		for (const run of collapseRuns(segment.map((port) => port.name))) {
 			const stub = plan.add('rear-ports', {
-				prefix,
-				count: 1,
-				kind,
+				...runFields(run),
+				kind: first.kind,
 				side: 'rear',
-				positions,
+				positions: first.positions,
 			})
 			if (!stub.ok) {
 				return stub.error
 			}
-			rearByName.set(prefix, stub.value)
+			for (let i = 0; i < run.count; i += 1) {
+				const port = segment[offset + i]
+				if (port) {
+					rearByName.set(port.name, {
+						stub: stub.value,
+						offset: i,
+						positions: port.positions,
+					})
+				}
+			}
+			offset += run.count
 		}
 	}
 	// NetBox 4.3+ moves the mapping out of the front port into a top-level
@@ -159,6 +207,7 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 	if (!fronts.ok) {
 		return fronts.error
 	}
+	const frontPorts: { name: string; kind: string; rear: number; slot: number }[] = []
 	for (const port of fronts.value) {
 		const name = nameOf(port)
 		if (!name) {
@@ -174,8 +223,8 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 		}
 		const source = port.rear_port === undefined ? (mappingByFront.get(name) ?? port) : port
 		const rearName = typeof source.rear_port === 'string' ? source.rear_port.trim() : ''
-		const rearIndex = rearByName.get(rearName)
-		if (rearIndex === undefined) {
+		const rear = rearByName.get(rearName)
+		if (rear === undefined) {
 			return `front-ports "${name}": unknown rear_port "${rearName}"`
 		}
 		const position =
@@ -183,23 +232,56 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 		if (!Number.isInteger(position) || position < 1) {
 			return `front-ports "${name}": rear_port_position must be an integer of at least 1`
 		}
+		if (position > rear.positions) {
+			return `front-ports "${name}": rear_port_position exceeds the ${rear.positions} position(s) of rear port "${rearName}"`
+		}
 		const kind = passThroughKindOf(port)
 		if (kind === null) {
 			return `front-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
 		}
-		const stub = plan.add('front-ports', {
-			prefix: names.value[0] ?? name,
-			count: 1,
+		frontPorts.push({
+			name: names.value[0] ?? name,
 			kind,
-			side: 'front',
-			rear_index: rearIndex,
-			rear_position: position,
+			rear: rear.stub,
+			slot: rear.offset * rear.positions + position - 1,
 		})
-		if (!stub.ok) {
-			return stub.error
+	}
+	const frontSegments = segmentsOf(
+		frontPorts,
+		(prev, next) =>
+			prev.kind === next.kind && prev.rear === next.rear && next.slot === prev.slot + 1,
+	)
+	for (const segment of frontSegments) {
+		let offset = 0
+		for (const run of collapseRuns(segment.map((port) => port.name))) {
+			const first = segment[offset]
+			if (!first) {
+				break
+			}
+			const stub = plan.add('front-ports', {
+				...runFields(run),
+				kind: first.kind,
+				side: 'front',
+				rear_index: first.rear,
+				rear_position: first.slot + 1,
+			})
+			if (!stub.ok) {
+				return stub.error
+			}
+			offset += run.count
 		}
 	}
 	return null
+}
+
+/** The stub fields of a collapsed run; defaults stay unset. */
+function runFields(run: StubRun): Pick<PlannedStub, 'prefix' | 'count' | 'digits' | 'start'> {
+	return {
+		prefix: run.prefix,
+		count: run.count,
+		...(run.digits > 1 ? { digits: run.digits } : {}),
+		...(run.start === 1 ? {} : { start: run.start }),
+	}
 }
 
 /** The component lists of a definition, grouped into runs of equal ports. */
@@ -287,10 +369,7 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 	for (const group of groups.values()) {
 		for (const run of collapseRuns(group.names)) {
 			const stub = plan.add(group.key, {
-				prefix: run.prefix,
-				count: run.count,
-				...(run.digits > 1 ? { digits: run.digits } : {}),
-				...(run.start === 1 ? {} : { start: run.start }),
+				...runFields(run),
 				kind: group.kind,
 				...group.power,
 			})

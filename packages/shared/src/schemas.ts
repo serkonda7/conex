@@ -698,13 +698,14 @@ const PORT_NAME_MESSAGE = 'Must be letters, digits, space, dot, dash, underscore
  * Stub name prefix: count 1 keeps the name verbatim, count N>1 expands to
  * `prefix1..prefixN` (e.g. `eth` x3 -> `eth1..eth3`, `Port ` x8 with 2
  * digits from 17 -> `Port 17..Port 24`). One trailing space stays as the separator.
+ * Empty for a run of bare numbers (`01..24`); a single port needs a name,
+ * which the stub expansion checks.
  */
 export const InterfacePrefixSchema = v.pipe(
 	v.string(),
 	v.transform(trimStubPrefix),
-	v.minLength(1),
 	v.maxLength(50),
-	v.regex(PORT_NAME_PATTERN, PORT_NAME_MESSAGE),
+	v.check((prefix) => prefix === '' || PORT_NAME_PATTERN.test(prefix), PORT_NAME_MESSAGE),
 )
 
 /** NetBox rack form-factor choices. */
@@ -2221,7 +2222,7 @@ export interface FloorplanPlacementJson {
 	port: FloorplanPortJson | null
 	x: number
 	y: number
-	/** Rack or device name; `PP-A / 12` for an outlet. */
+	/** Rack or device name; `PP-A 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null
@@ -2344,7 +2345,7 @@ export interface FloorplanCandidateJson {
 	/** Unplaced jack of such ports. */
 	jack_id: number | null
 	port: FloorplanPortJson | null
-	/** Rack or device name; `PP-A / 12` for an outlet. */
+	/** Rack or device name; `PP-A 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null

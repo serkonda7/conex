@@ -3474,34 +3474,12 @@ span.attachment-star,
 	cursor: grabbing;
 }
 
-/* Covers areas and markers while Ctrl is held or the middle button pans,
-   so their move / pointer cursors give way to the grab cursor. */
+/* Covers markers and labels while the middle button pans, so their move
+   cursor gives way to the grabbing one. */
 .floorplan-pan-cover {
 	position: absolute;
 	inset: 0;
-	cursor: grab;
-}
-
-.floorplan-pan-cover.panning {
 	cursor: grabbing;
-}
-
-/* Floats next to the cursor (shifted back into the window) over areas and
-   markers while zoomed in. */
-.floorplan-pan-hint {
-	position: fixed;
-	top: calc(var(--cursor-y) + 1rem);
-	left: calc(var(--cursor-x) + 1rem);
-	translate: min(0px, calc(100vw - var(--cursor-x) - 1.5rem - 100%)) 0;
-	z-index: 10;
-	padding: 0.15rem 0.4rem;
-	border: 1px solid var(--border);
-	border-radius: 0.25rem;
-	background-color: var(--bg-raised);
-	font-size: var(--font-size-sm);
-	color: var(--text-muted);
-	white-space: nowrap;
-	pointer-events: none;
 }
 
 .floorplan-stage {
@@ -3690,7 +3668,7 @@ span.attachment-star,
 	height: 1.75rem;
 	color: var(--text);
 	background-color: var(--bg-surface);
-	border: 2px solid var(--primary);
+	border: 0;
 	border-radius: 999px;
 	box-shadow: var(--shadow);
 }
@@ -3700,7 +3678,6 @@ span.attachment-star,
 }
 
 .floorplan-marker-inactive {
-	border-style: dashed;
 	opacity: 0.75;
 }
 
@@ -3760,21 +3737,31 @@ span.attachment-star,
 	background-color: var(--primary-hover);
 }
 
-/* Outlet (patch-panel rear port): smaller socket, grey while uncabled. */
+/* Outlet (patch-panel rear port): smaller socket, filled grey while free
+   and green once cabled. */
 .floorplan-marker-outlet {
 	width: 1.4rem;
 	height: 1.4rem;
 	padding: 0;
-	border-color: var(--text-muted);
 	border-radius: 0.3rem;
 	cursor: pointer;
 }
 
-.floorplan-marker-outlet.floorplan-marker-cabled {
-	border-color: var(--success);
+.floorplan-marker-outlet:not(.floorplan-marker-jack) {
+	color: var(--bg-base);
+	background-color: var(--text-muted);
 }
 
-/* Jack: one socket per port in one marker, each coloured by its cabling. */
+.floorplan-marker-outlet.floorplan-marker-cabled:not(.floorplan-marker-jack) {
+	background-color: var(--success);
+}
+
+.floorplan-marker-outlet:hover,
+.floorplan-marker-outlet:focus-visible {
+	filter: brightness(1.15);
+}
+
+/* Jack: one socket per port in one marker, each filled by its cabling. */
 .floorplan-marker-jack {
 	width: auto;
 	padding: 0 0.1rem;
@@ -3788,11 +3775,55 @@ span.attachment-star,
 .floorplan-jack-port {
 	display: grid;
 	place-items: center;
-	color: var(--text-muted);
+	margin: 0 0.05rem;
+	color: var(--bg-base);
+	background-color: var(--text-muted);
+	border-radius: 0.2rem;
 }
 
 .floorplan-jack-port-cabled {
-	color: var(--success);
+	background-color: var(--success);
+}
+
+/* Legend of the outlets' cabling colours, at the right end of the layer bar. */
+.floorplan-status-legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.75rem;
+	margin-left: auto;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+}
+
+.floorplan-status-legend ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.floorplan-status-legend li {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.floorplan-status-legend-group {
+	font-weight: 600;
+}
+
+.floorplan-status-dot {
+	width: 0.7rem;
+	height: 0.7rem;
+	border-radius: 0.2rem;
+	background-color: var(--text-muted);
+}
+
+.floorplan-status-dot.floorplan-status-cabled {
+	background-color: var(--success);
 }
 
 .floorplan-popover-port {
@@ -3914,10 +3945,6 @@ span.attachment-star,
 	align-items: start;
 }
 
-.floorplan-area.floorplan-area-editing polygon {
-	cursor: move;
-}
-
 .floorplan-area.floorplan-area-editing.selected polygon {
 	stroke-width: 2;
 	stroke-dasharray: 6 3;
@@ -3931,8 +3958,26 @@ span.attachment-star,
 	vector-effect: non-scaling-stroke;
 }
 
-.floorplan-area-label-static {
-	pointer-events: none;
+/* Objects the side panel's search does not match fade back. */
+.floorplan-area.floorplan-dimmed {
+	opacity: 0.2;
+}
+
+.floorplan-area-label.floorplan-dimmed,
+.floorplan-marker.floorplan-dimmed,
+.floorplan-cluster.floorplan-dimmed {
+	opacity: 0.25;
+}
+
+.floorplan-search-matches {
+	margin: 0.3rem 0 0.4rem;
+	font-size: var(--font-size-sm);
+}
+
+.floorplan-area-label-handle {
+	cursor: move;
+	touch-action: none;
+	user-select: none;
 }
 
 .floorplan-handle {
@@ -4025,6 +4070,25 @@ span.attachment-star,
 
 .floorplan-snap-toggle {
 	margin-top: 0.4rem;
+}
+
+/* Undo and redo, left of Cancel in the page header. */
+.floorplan-history {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.floorplan-history-button {
+	display: inline-grid;
+	place-items: center;
+}
+
+/* Selection box of a Shift + drag on the plan. */
+.floorplan-select-box {
+	position: absolute;
+	border: 1px dashed var(--primary-text);
+	background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+	pointer-events: none;
 }
 
 /* Snapping: alignment guides of a dragged marker and the point an area snapped to. */

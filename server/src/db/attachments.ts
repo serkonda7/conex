@@ -202,8 +202,8 @@ function portOf(
 /** Name of an outlet with `panel_jacks` joined to it: its jack's, else its port's. */
 const outletPortNameSql: SQL<string> = sql<string>`coalesce(${panel_jacks.name}, ${interfaces.name})`
 
-/** `PP-A / 12`: an outlet's label on plans and in palettes. */
-const outletNameSql: SQL<string> = sql<string>`${portDevice.name} || ' / ' || ${outletPortNameSql}`
+/** `PP-A 12`: an outlet's label on plans and in palettes. */
+const outletNameSql: SQL<string> = sql<string>`${portDevice.name} || ' ' || ${outletPortNameSql}`
 
 /** Outlet columns selected alongside a placement or candidate (`portOf`). */
 const portColumns: {
@@ -1036,7 +1036,7 @@ async function checkOutlets(
 			: await getDb()
 					.select({
 						...columns,
-						name: sql<string>`${portDevice.name} || ' / ' || ${interfaces.name}`,
+						name: sql<string>`${portDevice.name} || ' ' || ${interfaces.name}`,
 					})
 					.from(interfaces)
 					.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))

@@ -1,7 +1,8 @@
 /**
  * Detail-grid rows linking to floor plans: the plans that reference an
  * object ("On floor plan of X" for a rack or device, "Linked from Y" for a
- * site or location) and the placed outlets a device is cabled to. They
+ * site or location) and the placed outlets a device is cabled to. Each
+ * link opens the plan focused on the object (`floorplanHref`). They
  * render nothing while loading or when there are none; a failed lookup
  * reports to `onError`.
  */
@@ -13,6 +14,7 @@ import {
 	fetch_floorplan_links,
 } from '../api/attachments'
 import { type MessageKey, t } from '../i18n'
+import { floorplanHref } from '../lib/floorplan_link'
 import { createRowsFor, type ErrorSink } from '../lib/resource'
 
 export function FloorplanLinks(props: {
@@ -29,7 +31,9 @@ export function FloorplanLinks(props: {
 					{(link: FloorplanLinkJson, index: () => number) => (
 						<>
 							<Show when={index() > 0}>{', '}</Show>
-							<a href={`/floorplans/${link.attachment_id}`}>{link.owner_name}</a>
+							<a href={floorplanHref(link.attachment_id, props.target)}>
+								{link.owner_name}
+							</a>
 						</>
 					)}
 				</For>
@@ -40,7 +44,7 @@ export function FloorplanLinks(props: {
 
 /**
  * Detail-grid row of the outlets a device's ports are cabled to and where
- * they sit: "eth0 → PP-A / 12 (floor plan of X)". Renders nothing without
+ * they sit: "eth0 → PP-A 12 (floor plan of X)". Renders nothing without
  * placed outlets.
  */
 export function OutletLinks(props: {
@@ -65,9 +69,16 @@ export function OutletLinks(props: {
 								)}
 							</Show>
 							<a href={`/devices/${outlet.port.device_id}`}>
-								{outlet.port.device_name} / {outlet.port.name}
+								{outlet.port.device_name} {outlet.port.name}
 							</a>{' '}
-							(<a href={`/floorplans/${outlet.attachment_id}`}>{outlet.owner_name}</a>
+							(
+							<a
+								href={floorplanHref(outlet.attachment_id, {
+									interface: outlet.interface_id,
+								})}
+							>
+								{outlet.owner_name}
+							</a>
 							)
 						</>
 					)}

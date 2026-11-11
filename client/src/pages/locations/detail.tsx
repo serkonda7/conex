@@ -37,6 +37,7 @@ import { IconLabel } from '../../components/icon_label'
 import type { PluralKey } from '../../i18n'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, locationTypeLabel } from '../../i18n/labels'
+import { floorplanHref } from '../../lib/floorplan_link'
 import { deviceRoleIcon, locationTypeIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
@@ -398,7 +399,11 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 											{(link: FloorplanLinkJson, index: () => number) => (
 												<>
 													<Show when={index() > 0}>{', '}</Show>
-													<a href={`/floorplans/${link.attachment_id}`}>
+													<a
+														href={floorplanHref(link.attachment_id, {
+															location: props.id,
+														})}
+													>
 														{link.owner_name}
 													</a>
 												</>

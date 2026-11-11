@@ -5,6 +5,7 @@
  * `localStorage` and shared by the view and the editor. The last toggles show
  * the names of the markers on the plan and, on a plan with a scale, the
  * metric grid, kept the same way, as is the grid size chosen below the stage.
+ * With outlets on the plan, the bar ends in the legend of their cabling colours.
  */
 
 import { IconBox, IconGrid4x4, IconOutlet, IconServer, IconTag } from '@tabler/icons-solidjs'
@@ -12,7 +13,7 @@ import { LOCATION_TYPES, type LocationType } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { FloorplanAreaJson, FloorplanPlacementJson } from '../api/attachments'
-import { type MessageKey, t } from '../i18n'
+import { type MessageKey, t, tp } from '../i18n'
 import type { IconComponent } from '../lib/icons'
 
 export type AreaLayer = 'site' | LocationType
@@ -122,6 +123,33 @@ export function toggleMarkerNames(): void {
 	} catch {
 		// Storage unavailable: the choice applies until reload.
 	}
+}
+
+/** Colour classes of the status legend, with their label keys. */
+const OUTLET_LEGEND: readonly { tone: string; key: MessageKey }[] = [
+	{ tone: 'cabled', key: 'floorplan.legendCabled' },
+	{ tone: 'free', key: 'floorplan.legendFree' },
+]
+
+/** Legend of the outlets' cabling colours. */
+function StatusLegend(): JSX.Element {
+	const item = (entry: { tone: string; key: MessageKey }): JSX.Element => (
+		<li>
+			<span
+				class={`floorplan-status-dot floorplan-status-${entry.tone}`}
+				aria-hidden="true"
+			/>
+			{t(entry.key)}
+		</li>
+	)
+	return (
+		<div class="floorplan-status-legend">
+			<span class="floorplan-status-legend-group">{tp('entity.outlet', 2)}:</span>
+			<ul>
+				<For each={OUTLET_LEGEND}>{item}</For>
+			</ul>
+		</div>
+	)
 }
 
 const GRID_STORAGE_KEY = 'conex:floorplan-grid'
@@ -246,6 +274,8 @@ export function LayerBar(props: {
 		presentLayers(props.areas, props.placements)
 	const allHidden = (): boolean =>
 		present().length > 0 && present().every(({ layer }) => !layerVisible(layer))
+	const hasOutlets = (): boolean =>
+		props.placements.some((p: FloorplanPlacementJson) => p.port !== null)
 	return (
 		<>
 			<Show when={present().length > 0 || props.has_scale}>
@@ -298,6 +328,9 @@ export function LayerBar(props: {
 							<IconGrid4x4 size={12} aria-hidden="true" />
 							<span>{t('floorplan.grid')}</span>
 						</button>
+					</Show>
+					<Show when={hasOutlets()}>
+						<StatusLegend />
 					</Show>
 				</fieldset>
 			</Show>

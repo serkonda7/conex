@@ -12,6 +12,7 @@ import {
 	fetch_floorplan,
 } from '../api/attachments'
 import { t } from '../i18n'
+import { floorplanHref } from '../lib/floorplan_link'
 import { createRecord, type ErrorSink } from '../lib/resource'
 import { percent } from './floorplan_stage'
 
@@ -27,7 +28,10 @@ export function FloorplanPreview(props: {
 	return (
 		<a
 			class="floorplan-preview"
-			href={`/floorplans/${props.attachment.id}`}
+			href={floorplanHref(
+				props.attachment.id,
+				props.highlight === undefined ? undefined : { location: props.highlight },
+			)}
 			aria-label={t('floorplan.open')}
 			draggable={false}
 		>

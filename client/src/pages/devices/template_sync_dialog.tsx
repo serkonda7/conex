@@ -101,7 +101,7 @@ export function TemplateSyncDialog(props: {
 				)
 			})
 			.flatMap((port) => {
-				const params = { name: port.name, kind: portKindLabel(port.kind) }
+				const params = { name: port.name }
 				return [
 					{
 						value: `${MAP_PREFIX}${port.name}`,
