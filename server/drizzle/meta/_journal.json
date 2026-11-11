@@ -120,6 +120,13 @@
       "when": 1794396536791,
       "tag": "0068_search_trigrams",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1794396991689,
+      "tag": "0069_index_housekeeping",
+      "breakpoints": true
     }
   ]
 }
