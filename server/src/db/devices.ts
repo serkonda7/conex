@@ -456,22 +456,24 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 									devices.device_id,
 									devices.serial,
 								]),
-								inArray(
-									devices.device_type_id,
-									db
-										.select({ id: device_types.id })
-										.from(device_types)
-										.innerJoin(
-											manufacturers,
-											eq(manufacturers.id, device_types.manufacturer_id),
-										)
-										.where(
-											searchCondition(params.search, [
-												device_types.model,
-												manufacturers.name,
-											]),
-										),
-								),
+								// `= ANY(ARRAY(…))`, not `IN (…)`: the type subquery runs once and
+								// the arm stays an index condition, so the trigram indexes on the
+								// device columns combine in one BitmapOr. An `IN` subquery in an OR
+								// is a per-row filter and forces a full scan of devices. The array
+								// holds matching device types (a catalog), so it stays small.
+								sql`${devices.device_type_id} = ANY(ARRAY(${db
+									.select({ id: device_types.id })
+									.from(device_types)
+									.innerJoin(
+										manufacturers,
+										eq(manufacturers.id, device_types.manufacturer_id),
+									)
+									.where(
+										searchCondition(params.search, [
+											device_types.model,
+											manufacturers.name,
+										]),
+									)}))`,
 							)
 						: undefined,
 					params.site ? eq(devices.site_id, params.site) : undefined,
