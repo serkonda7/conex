@@ -3,8 +3,10 @@
  * reports to the page's error line and falls back to an empty value, so the
  * rest of the page stays usable. Queries are keyed by the load function plus
  * the source value: pages passing the same named fetcher share one cache
- * entry, inline closures get their own. `useAction` is the write-side
- * counterpart.
+ * entry, inline closures get their own. Each fetch tags its query with the
+ * API resources it requests, so a write refreshes only the queries it can
+ * affect (see `lib/query.ts`); pages declare nothing. `useAction` is the
+ * write-side counterpart.
  */
 import {
 	hashKey,
@@ -25,7 +27,7 @@ import {
 	type ResourceReturn,
 	untrack,
 } from 'solid-js'
-import { is_current, mark_fetch, queryClient, writeSettled } from './query'
+import { is_current, mark_fetch, queryClient, track_fetch, writeSettled } from './query'
 import { usePaneVisible } from './router'
 
 /** Receives the message of a failed request (usually a page's `setError`). */
@@ -91,10 +93,8 @@ function observe<S, D, T>(opts: {
 		placeholderData: typeof keepPreviousData | undefined
 	} => ({
 		queryKey: key ?? opts.idle,
-		queryFn: (context: { queryKey: Key<S> }): Promise<D> => {
-			mark_fetch(context.queryKey)
-			return opts.load((key as Key<S>)[1] as S)
-		},
+		queryFn: (context: { queryKey: Key<S> }): Promise<D> =>
+			track_fetch(context.queryKey, () => opts.load((key as Key<S>)[1] as S)),
 		enabled: key !== null,
 		placeholderData: opts.keepPrevious === true ? keepPreviousData : undefined,
 	})
@@ -119,7 +119,8 @@ function observe<S, D, T>(opts: {
 		),
 	)
 
-	// Outdated by a write: refresh now if this pane shows, else when it does.
+	// Outdated by a write that reaches its resources: refresh now if this pane
+	// shows, else when it does.
 	// Fetches that started after the write count as current, and marking the
 	// key keeps other observers of the query from repeating the request.
 	const visible = usePaneVisible()
