@@ -22,6 +22,7 @@ import type {
 	DeviceListKind,
 	DeviceListQuery,
 	DeviceMove,
+	DeviceRoleIcon,
 	DeviceUpdate,
 	InterfaceCreate,
 	InterfaceLocation,
@@ -308,6 +309,20 @@ function activeCondition(status: SQLWrapper, active: boolean | undefined): SQL |
 	return active ? ne(status, 'inactive') : eq(status, 'inactive')
 }
 
+/**
+ * Display names of a list row's related rows, so a list renders without
+ * lookup requests. A name the requester's tenant scope does not cover is
+ * null (the client falls back to the id, as a lookup miss did).
+ */
+interface DeviceListNames {
+	device_role_name: string
+	/** Built-in role key (localized label on the client). */
+	device_role_key: string | null
+	device_role_icon: DeviceRoleIcon | null
+	employee_name: string | null
+	tenant_name: string | null
+}
+
 /** One device list row: a physical device or a virtual machine (with its host's name). */
 export type DeviceListItem =
 	| ({
@@ -319,13 +334,36 @@ export type DeviceListItem =
 			 * only computed when listing by `device_type`.
 			 */
 			out_of_sync: boolean
-	  } & DeviceRow)
-	| ({ kind: 'vm'; host_name: string | null } & VirtualMachineRow)
+			device_type_model: string
+			rack_name: string | null
+			site_name: string | null
+	  } & DeviceListNames &
+			DeviceRow)
+	| ({ kind: 'vm'; host_name: string | null } & DeviceListNames & VirtualMachineRow)
 
 const nullInt = (name: string): SQL.Aliased<number | null> =>
 	sql<number | null>`NULL::integer`.as(name)
 const nullText = (name: string): SQL.Aliased<string | null> =>
 	sql<string | null>`NULL::text`.as(name)
+
+/**
+ * A related row's `name` for a list row, NULL unless `visible` (the
+ * related row lies in the requester's tenant scope; `undefined` without a
+ * scope). Rows of a scoped list are in scope, their related rows need not
+ * be (a shared rack, a site of another tenant), and the name must not tell
+ * more than the id did.
+ */
+function scopedName(
+	name: SQLWrapper,
+	visible: SQL | undefined,
+	as: string,
+): SQL.Aliased<string | null> {
+	return (
+		visible === undefined
+			? sql<string | null>`${name}`
+			: sql<string | null>`CASE WHEN ${visible} THEN ${name} END`
+	).as(as)
+}
 
 /**
  * Matches devices of the interface's own tenant (cables never cross
@@ -484,6 +522,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 					activeCondition(virtual_machines.status, params.active),
 				)
 	const hosts = alias(devices, 'host')
+	const scope = params.scopeTenantIds
 	const deviceBranch = db
 		.select({
 			kind: sql<DeviceListKind>`'device'`.as('kind'),
@@ -518,15 +557,20 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			sort_tenant: sql<
 				string | null
 			>`${relatedValue(tenants.name, tenants.id, devices.tenant_id)}`.as('sort_tenant'),
-			sort_site: sql<
-				string | null
-			>`${relatedValue(sites.name, sites.id, devices.site_id)}`.as('sort_site'),
+			sort_site: sql<string | null>`${sites.name}`.as('sort_site'),
+			device_role_key: sql<string | null>`${device_roles.key}`.as('device_role_key'),
+			device_role_icon: sql<DeviceRoleIcon | null>`${device_roles.icon}`.as(
+				'device_role_icon',
+			),
+			rack_name: scopedName(racks.name, scopeCondition(racks.tenant_id, scope), 'rack_name'),
+			site_name: scopedName(sites.name, scopeCondition(sites.tenant_id, scope), 'site_name'),
 		})
 		.from(devices)
 		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
 		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
 		.leftJoin(racks, eq(racks.id, devices.rack_id))
 		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
+		.leftJoin(sites, eq(sites.id, devices.site_id))
 		.where(deviceWhere)
 	const vmBranch = db
 		.select({
@@ -565,6 +609,12 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 				'sort_tenant',
 			),
 			sort_site: nullText('sort_site'),
+			device_role_key: sql<string | null>`${device_roles.key}`.as('device_role_key'),
+			device_role_icon: sql<DeviceRoleIcon | null>`${device_roles.icon}`.as(
+				'device_role_icon',
+			),
+			rack_name: nullText('rack_name'),
+			site_name: nullText('site_name'),
 		})
 		.from(virtual_machines)
 		.innerJoin(device_roles, eq(device_roles.id, virtual_machines.device_role_id))
@@ -639,7 +689,15 @@ type DeviceListRow = Omit<DeviceRow, 'device_type_id'> & {
 	shelf_position_u: number | null
 	device_type_id: number | null
 	host_device_id: number | null
+	sort_role: string
+	sort_type: string | null
 	sort_mount: string | null
+	sort_tenant: string | null
+	device_role_key: string | null
+	device_role_icon: DeviceRoleIcon | null
+	sort_employee: string | null
+	rack_name: string | null
+	site_name: string | null
 }
 
 /** Narrows a union row to its kind's columns. */
@@ -652,6 +710,13 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		tenant_id: row.tenant_id,
 		employee_id: row.employee_id,
 		description: row.description,
+		device_role_name: row.sort_role,
+		device_role_key: row.device_role_key,
+		device_role_icon: row.device_role_icon,
+		// Rows of a scoped list lie in the scope, so their tenant is visible,
+		// and an assigned employee belongs to the row's tenant (composite FK).
+		employee_name: row.sort_employee,
+		tenant_name: row.sort_tenant,
 	}
 	if (row.kind === 'vm') {
 		return {
@@ -665,7 +730,10 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		kind: 'device',
 		...shared,
 		device_type_id: row.device_type_id ?? 0,
+		device_type_model: row.sort_type ?? '',
+		rack_name: row.rack_name,
 		site_id: row.site_id,
+		site_name: row.site_name,
 		location_id: row.location_id,
 		rack_id: row.rack_id,
 		face: row.face,
