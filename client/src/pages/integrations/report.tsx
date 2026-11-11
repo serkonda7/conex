@@ -367,6 +367,17 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						>
 							<IconLinkPlus size={20} />
 						</button>
+						<button
+							type="button"
+							class="icon-btn"
+							title={t('integration.ignore')}
+							aria-label={t('integration.ignore')}
+							onClick={() =>
+								void run(() => ignore_local(provider, 'tenant', f.tenant_id ?? 0))
+							}
+						>
+							<IconBan size={20} />
+						</button>
 					</Show>
 				)
 			case 'tenant_missing_in_conex':

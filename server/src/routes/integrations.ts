@@ -626,6 +626,18 @@ export const integrationsApp = new Hono()
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
+			if (input.entity_type === 'tenant') {
+				// Tenants are global-write; an ignored one has no company.
+				const denied = requireGlobalPermission(c, 'integrations.manage')
+				if (denied) {
+					return denied
+				}
+				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
+					return notFound(c, 'Tenant not found')
+				}
+				const res = await ignoreLocal(provider, 'tenant', input.entity_id, null, userId)
+				return sendResult(c, res.map(linkJson))
+			}
 			const denied = requirePermission(c, 'integrations.manage')
 			if (denied) {
 				return denied

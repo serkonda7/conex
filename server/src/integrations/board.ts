@@ -137,9 +137,11 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 		a.name.localeCompare(b.name),
 	)
 	const externalById = new Map(allExternal.map((e) => [e.external_id, e]))
-	const { byExternal: linkByExternal, linked: linkByTenant } = indexLinks(
-		await listLinks(provider, 'tenant'),
-	)
+	const {
+		byExternal: linkByExternal,
+		linked: linkByTenant,
+		ignored: ignoredByTenant,
+	} = indexLinks(await listLinks(provider, 'tenant'))
 	// Inactive and private customers are not offered for linking; ones
 	// already linked stay listed so they can be unlinked.
 	const externals = allExternal.filter(
@@ -149,7 +151,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 	)
 
 	const suggestions = uniqueNameMatches(
-		rows.filter((r) => !linkByTenant.has(r.id)),
+		rows.filter((r) => !linkByTenant.has(r.id) && !ignoredByTenant.has(r.id)),
 		externals.filter((e) => !linkByExternal.has(e.external_id)),
 		(r) => r.name,
 		(e) => e.name,
@@ -158,6 +160,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 	const local: LinkBoardLocal[] = rows
 		.map((row): LinkBoardLocal => {
 			const link = linkByTenant.get(row.id)
+			const ignored = ignoredByTenant.get(row.id)
 			const suggested = suggestions.get(row)
 			return {
 				id: row.id,
@@ -165,10 +168,10 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 				detail: row.group,
 				serial: null,
 				active: true,
-				link_id: link?.id ?? null,
+				link_id: link?.id ?? ignored?.id ?? null,
 				external_id: link?.external_id ?? null,
 				external_name: link ? (externalById.get(link.external_id)?.name ?? null) : null,
-				ignored: false,
+				ignored: ignored !== undefined,
 				suggestion: suggested ? { external_id: suggested.external_id, via: 'name' } : null,
 			}
 		})

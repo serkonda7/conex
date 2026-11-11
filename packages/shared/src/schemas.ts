@@ -2738,13 +2738,13 @@ export const ExternalIgnoreSchema = v.strictObject({
 })
 
 /**
- * Marks a conex device or employee as intentionally absent from the
- * external system (suppresses its `*_missing_in_external` finding). Stored
+ * Marks a conex tenant, device or employee as intentionally absent from the
+ * external system (suppresses its `*_missing_in_external` / `tenant_unlinked` finding). Stored
  * as an `ignored` link row keyed by the conex entity; see `ignoreLocal` in
  * `server/src/integrations/links.ts` for the synthetic `external_id`.
  */
 export const ExternalIgnoreLocalSchema = v.strictObject({
-	entity_type: v.picklist(['device', 'employee']),
+	entity_type: v.picklist(['tenant', 'device', 'employee']),
 	entity_id: IdSchema,
 })
 

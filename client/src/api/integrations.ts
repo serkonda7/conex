@@ -247,10 +247,10 @@ export async function ignore_external(
 	return to_result<ExternalLinkJson>(res, t('integration.linkFailed'))
 }
 
-/** Marks a conex device or employee as intentionally absent from the external system. */
+/** Marks a conex tenant, device or employee as intentionally absent from the external system. */
 export async function ignore_local(
 	provider: IntegrationProvider,
-	entity_type: 'device' | 'employee',
+	entity_type: LinkEntityType,
 	entity_id: number,
 ): Promise<Result<ExternalLinkJson, Error>> {
 	const res = await client.integrations[':provider'].links['ignore-local'].$put({

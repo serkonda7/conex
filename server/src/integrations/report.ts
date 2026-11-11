@@ -269,9 +269,12 @@ export async function buildReport(
 	const tenantLinkRows = await listLinks(provider, 'tenant')
 	const tenantRowByExternal = new Map(tenantLinkRows.map((link) => [link.external_id, link]))
 	const linksByTenant = new Map<number, ExternalLinkRow[]>()
+	const ignoredTenants = new Set<number>()
 	for (const link of tenantLinkRows.toSorted((a, b) => a.id - b.id)) {
 		if (link.state === 'linked' && link.entity_id !== null) {
 			linksByTenant.set(link.entity_id, [...(linksByTenant.get(link.entity_id) ?? []), link])
+		} else if (link.state === 'ignored' && link.entity_id !== null) {
+			ignoredTenants.add(link.entity_id)
 		}
 	}
 	// conex tenant → linked external tenant ids that still exist.
@@ -280,7 +283,9 @@ export async function buildReport(
 		const links = linksByTenant.get(tenant.id) ?? []
 		const base = { tenant_id: tenant.id, tenant_name: tenant.name }
 		if (links.length === 0) {
-			findings.push(finding('tenant_unlinked', base))
+			if (!ignoredTenants.has(tenant.id)) {
+				findings.push(finding('tenant_unlinked', base))
+			}
 			continue
 		}
 		for (const link of links) {

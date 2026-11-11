@@ -104,8 +104,6 @@ export function LinkBoardView(props: {
 	)
 
 	const provider = (): string => providerLabel(props.provider)
-	/** Device and employee boards can ignore conex rows as missing externally. */
-	const ignoresLocal = (): boolean => props.board.entity_type !== 'tenant'
 	const localPath = (id: number): string => {
 		const base =
 			props.board.entity_type === 'device'
@@ -283,13 +281,9 @@ export function LinkBoardView(props: {
 	}
 
 	async function ignoreLocal(localId: number): Promise<void> {
-		const entityType = props.board.entity_type
-		if (entityType === 'tenant') {
-			return
-		}
 		setPicked(null)
 		setIgnoredLocal((prev) => new Set(prev).add(localId))
-		await write.run(() => ignore_local(props.provider, entityType, localId))
+		await write.run(() => ignore_local(props.provider, props.board.entity_type, localId))
 	}
 
 	/**
@@ -415,7 +409,7 @@ export function LinkBoardView(props: {
 		const suggested = suggestionOf().get(row.id)
 		if (suggested === undefined) {
 			return (
-				<Show when={props.editable && ignoresLocal()}>
+				<Show when={props.editable}>
 					<button
 						type="button"
 						class="icon-btn"
@@ -444,7 +438,7 @@ export function LinkBoardView(props: {
 						<IconLinkPlus size={20} />
 					</button>
 				</Show>
-				<Show when={props.editable && ignoresLocal()}>
+				<Show when={props.editable}>
 					<button
 						type="button"
 						class="icon-btn"

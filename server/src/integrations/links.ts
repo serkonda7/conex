@@ -142,20 +142,24 @@ async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error
 	return tryWrite(() =>
 		withTransaction(async () => {
 			const db = getDb()
-			await db
-				.delete(external_links)
-				.where(
-					and(
-						eq(external_links.provider, link.provider),
-						eq(external_links.entity_type, link.entity_type),
-						or(
-							eq(external_links.external_id, link.external_id),
-							link.entity_id === null || !byEntity
-								? undefined
-								: eq(external_links.entity_id, link.entity_id),
-						),
+			await db.delete(external_links).where(
+				and(
+					eq(external_links.provider, link.provider),
+					eq(external_links.entity_type, link.entity_type),
+					or(
+						eq(external_links.external_id, link.external_id),
+						link.entity_id === null
+							? undefined
+							: byEntity
+								? eq(external_links.entity_id, link.entity_id)
+								: // Many-link tenants keep their other links, but a link ends an ignore.
+									and(
+										eq(external_links.entity_id, link.entity_id),
+										eq(external_links.state, 'ignored'),
+									),
 					),
-				)
+				),
+			)
 			const row = (
 				await db
 					.insert(external_links)
@@ -228,7 +232,7 @@ export function localIgnoreExternalId(entityType: LinkEntityType, entityId: numb
 
 /**
  * Marks a conex entity as intentionally absent from the external system
- * (suppresses its `*_missing_in_external` finding). Replaces any
+ * (suppresses its `*_missing_in_external` / `tenant_unlinked` finding). Replaces any
  * previous link row of that entity.
  */
 export function ignoreLocal(
