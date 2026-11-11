@@ -1,3 +1,4 @@
+import { extensionDisplay, normalizePhone } from 'shared/src/phone'
 import { primaryEmail, primaryPhone } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import {
@@ -35,6 +36,11 @@ export function EmailLink(props: { email: string | null }): JSX.Element {
 	return props.email ? <a href={`mailto:${props.email}`}>{props.email}</a> : '—'
 }
 
+/** Phone number as a `tel:` link (dialing its normalized form), or `—`. */
+export function PhoneLink(props: { number: string | null }): JSX.Element {
+	return props.number ? <a href={`tel:${normalizePhone(props.number)}`}>{props.number}</a> : '—'
+}
+
 /**
  * /employees — contact persons of the tenants: search, sortable columns, tenant
  * and active/inactive filters (deep-linkable via `?tenant=<id>` and
@@ -58,6 +64,20 @@ export function EmployeesPage(): JSX.Element {
 	})
 	const [tenants] = createRows(fetch_tenants, list.setError)
 	const tenantName = useNameOf(tenants)
+	/**
+	 * Work number of an employee: its extension completed with the main number
+	 * of its first visible tenant, else its first phone number.
+	 */
+	const workPhone = (e: EmployeeRow): string | null => {
+		const extension = primaryPhone(e.phones, 'extension')
+		if (extension === null) {
+			return primaryPhone(e.phones, 'phone')
+		}
+		const tenant = e.tenant_ids
+			.map((id) => tenants()?.find((row) => row.id === id))
+			.find((row) => row !== undefined)
+		return extensionDisplay(extension, primaryPhone(tenant?.phones ?? [], 'phone')) ?? extension
+	}
 
 	const columns: DataTableColumn<EmployeeRow>[] = [
 		{
@@ -99,12 +119,14 @@ export function EmployeesPage(): JSX.Element {
 		{
 			key: 'phone',
 			label: t('employee.phone'),
-			getValue: (e: EmployeeRow): string => primaryPhone(e.phones, 'phone') ?? '—',
+			getValue: (e: EmployeeRow): JSX.Element => <PhoneLink number={workPhone(e)} />,
 		},
 		{
 			key: 'mobile',
 			label: t('employee.mobile'),
-			getValue: (e: EmployeeRow): string => primaryPhone(e.phones, 'mobile') ?? '—',
+			getValue: (e: EmployeeRow): JSX.Element => (
+				<PhoneLink number={primaryPhone(e.phones, 'mobile')} />
+			),
 		},
 		{
 			key: 'tenant',
