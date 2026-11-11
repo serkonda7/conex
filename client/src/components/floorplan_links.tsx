@@ -40,7 +40,7 @@ export function FloorplanLinks(props: {
 
 /**
  * Detail-grid row of the outlets a device's ports are cabled to and where
- * they sit: "eth0 → PP-A / 12 (floor plan of X)". Renders nothing without
+ * they sit: "eth0 → PP-A 12 (floor plan of X)". Renders nothing without
  * placed outlets.
  */
 export function OutletLinks(props: {
@@ -65,7 +65,7 @@ export function OutletLinks(props: {
 								)}
 							</Show>
 							<a href={`/devices/${outlet.port.device_id}`}>
-								{outlet.port.device_name} / {outlet.port.name}
+								{outlet.port.device_name} {outlet.port.name}
 							</a>{' '}
 							(<a href={`/floorplans/${outlet.attachment_id}`}>{outlet.owner_name}</a>
 							)

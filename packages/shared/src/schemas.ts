@@ -2221,7 +2221,7 @@ export interface FloorplanPlacementJson {
 	port: FloorplanPortJson | null
 	x: number
 	y: number
-	/** Rack or device name; `PP-A / 12` for an outlet. */
+	/** Rack or device name; `PP-A 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null
@@ -2344,7 +2344,7 @@ export interface FloorplanCandidateJson {
 	/** Unplaced jack of such ports. */
 	jack_id: number | null
 	port: FloorplanPortJson | null
-	/** Rack or device name; `PP-A / 12` for an outlet. */
+	/** Rack or device name; `PP-A 12` for an outlet. */
 	name: string
 	/** Device status; `null` for a rack. */
 	status: string | null

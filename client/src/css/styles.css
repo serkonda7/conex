@@ -3474,34 +3474,12 @@ span.attachment-star,
 	cursor: grabbing;
 }
 
-/* Covers areas and markers while Ctrl is held or the middle button pans,
-   so their move / pointer cursors give way to the grab cursor. */
+/* Covers markers and labels while the middle button pans, so their move
+   cursor gives way to the grabbing one. */
 .floorplan-pan-cover {
 	position: absolute;
 	inset: 0;
-	cursor: grab;
-}
-
-.floorplan-pan-cover.panning {
 	cursor: grabbing;
-}
-
-/* Floats next to the cursor (shifted back into the window) over areas and
-   markers while zoomed in. */
-.floorplan-pan-hint {
-	position: fixed;
-	top: calc(var(--cursor-y) + 1rem);
-	left: calc(var(--cursor-x) + 1rem);
-	translate: min(0px, calc(100vw - var(--cursor-x) - 1.5rem - 100%)) 0;
-	z-index: 10;
-	padding: 0.15rem 0.4rem;
-	border: 1px solid var(--border);
-	border-radius: 0.25rem;
-	background-color: var(--bg-raised);
-	font-size: var(--font-size-sm);
-	color: var(--text-muted);
-	white-space: nowrap;
-	pointer-events: none;
 }
 
 .floorplan-stage {
@@ -3914,10 +3892,6 @@ span.attachment-star,
 	align-items: start;
 }
 
-.floorplan-area.floorplan-area-editing polygon {
-	cursor: move;
-}
-
 .floorplan-area.floorplan-area-editing.selected polygon {
 	stroke-width: 2;
 	stroke-dasharray: 6 3;
@@ -3931,8 +3905,10 @@ span.attachment-star,
 	vector-effect: non-scaling-stroke;
 }
 
-.floorplan-area-label-static {
-	pointer-events: none;
+.floorplan-area-label-handle {
+	cursor: move;
+	touch-action: none;
+	user-select: none;
 }
 
 .floorplan-handle {

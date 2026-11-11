@@ -6,7 +6,7 @@
  *   click corner by corner to draw a polygon (closed by clicking the first
  *   corner, a double click or Enter; Backspace drops the last corner,
  *   Escape the whole draft). Then pick its target site or location. Areas
- *   are selected by click, moved by dragging, reshaped with corner handles
+ *   are selected by click, moved by dragging their name, reshaped with corner handles
  *   (a rectangle's neighbors follow), relabelled and deleted below the
  *   stage. Dragging an edge's midpoint handle inserts a corner there; a
  *   double click on a corner handle removes it.
@@ -1169,11 +1169,14 @@ export function FloorplanEditor(props: {
 						>
 							<For each={shownAreas()}>
 								{(area: FloorplanAreaJson) => (
+									// biome-ignore lint/a11y/noStaticElementInteractions: The object list selects areas from the keyboard.
 									<g
 										class={`floorplan-area floorplan-area-editing floorplan-layer-${areaLayer(area)}`}
 										classList={{ selected: selected() === area.id }}
-										data-pan-hint
-										onPointerDown={(e: PointerEvent) => dragArea(e, area)}
+										onClick={() => {
+											setSelected(area.id)
+											setSelectedMarker(null)
+										}}
 									>
 										<polygon points={svgPoints(area.points)} />
 									</g>
@@ -1213,7 +1216,9 @@ export function FloorplanEditor(props: {
 						<For each={shownAreas()}>
 							{(area: FloorplanAreaJson) => (
 								<span
-									class="floorplan-area-label floorplan-area-label-static"
+									class="floorplan-area-label floorplan-area-label-handle"
+									classList={{ selected: selected() === area.id }}
+									onPointerDown={(e: PointerEvent) => dragArea(e, area)}
 									style={{
 										left: percent(areaCenter(area).x),
 										top: percent(areaCenter(area).y),
@@ -1277,7 +1282,6 @@ export function FloorplanEditor(props: {
 										top: percent(placement.y),
 									}}
 									title={markerTitle(placement)}
-									data-pan-hint
 									onPointerDown={(e: PointerEvent) => dragMarker(e, placement)}
 								>
 									<MarkerGlyph placement={placement} size={16} />
