@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import { and, eq, isNull, type SQL } from 'drizzle-orm'
 import type { VirtualMachineCreate, VirtualMachineUpdate } from 'shared/src/schemas'
 import { device_roles, devices, virtual_machines } from '../schema'
-import { logCreate, logDelete, logUpdate } from './changelog'
+import { logCreate, logDelete, logUpdate, logUpdates } from './changelog'
 import { getDb } from './connection'
 import { checkDeviceRoleExists } from './device_roles'
 import { checkEmployeeAssignment } from './employees'
@@ -247,8 +247,17 @@ export async function retenantHostedVms(hostId: number, tenantId: number | null)
 	if (moved.length === 0) {
 		return
 	}
-	await db.update(virtual_machines).set({ tenant_id: tenantId, employee_id: null }).where(hosted)
-	for (const vm of moved) {
-		await logUpdate('virtual_machine', vm, await getVirtualMachine(vm.id))
-	}
+	const updated = await db
+		.update(virtual_machines)
+		.set({ tenant_id: tenantId, employee_id: null })
+		.where(hosted)
+		.returning()
+	const after = new Map(updated.map((vm) => [vm.id, vm]))
+	await logUpdates(
+		'virtual_machine',
+		moved.flatMap((vm): [VirtualMachineRow, VirtualMachineRow][] => {
+			const row = after.get(vm.id)
+			return row ? [[vm, row]] : []
+		}),
+	)
 }

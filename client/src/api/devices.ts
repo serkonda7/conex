@@ -5,6 +5,7 @@
  */
 import type { Result } from 'better-result'
 import type {
+	DeviceDetail,
 	DeviceListItem,
 	DevicePortJson,
 	DeviceRow,
@@ -35,7 +36,14 @@ import {
 	to_result,
 } from './client'
 
-export type { DeviceListItem, DevicePortJson, DeviceRow, InterfaceJson, PanelJackJson }
+export type {
+	DeviceDetail,
+	DeviceListItem,
+	DevicePortJson,
+	DeviceRow,
+	InterfaceJson,
+	PanelJackJson,
+}
 
 export type DeviceSort = DeviceListQuery['sort']
 
@@ -96,9 +104,10 @@ export async function fetch_all_devices_of_type(
 	)
 }
 
-export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {
+/** A device with the display names of its related rows (see `getDeviceDetail`). */
+export async function fetch_device(id: number): Promise<Result<DeviceDetail, Error>> {
 	const res = await client.devices[':id'].$get(by_id(id))
-	return to_result<DeviceRow>(res, failed.load('noun.device'))
+	return to_result<DeviceDetail>(res, failed.load('noun.device'))
 }
 
 /** Managed bundle of a device (via its role) and its tenant's SLA for it. */

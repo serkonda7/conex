@@ -53,16 +53,35 @@ function reprOf(row: Snapshot): string {
 	return `#${row.id}`
 }
 
+/** Shares parent tenant lookups between the rows of one batch. */
+type TenantCache = Map<string, Promise<number | null | undefined>>
+
 /**
  * Tenant whose scoped users may see the change: the tenant itself, the
  * row's `tenant_id`, or the parent's for tenant-less children. A cable
  * belongs to a tenant only when both ends do (the cable read rule).
- * Catalog data has none.
+ * Catalog data has none. Parent lookups go through `cache`, so rows of one
+ * batch with the same parent query it once.
  */
-async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<number | null> {
+async function tenantOf(
+	objectType: ChangeObjectType,
+	row: Snapshot,
+	cache: TenantCache,
+): Promise<number | null> {
 	const fields = row as Record<string, unknown>
 	const ref = (key: string): number | null =>
 		typeof fields[key] === 'number' ? (fields[key] as number) : null
+	const cached = async (
+		key: string,
+		load: () => Promise<number | null | undefined>,
+	): Promise<number | null> => {
+		let tenant = cache.get(key)
+		if (!tenant) {
+			tenant = load()
+			cache.set(key, tenant)
+		}
+		return (await tenant) ?? null
+	}
 	switch (objectType) {
 		case 'tenant':
 			return row.id
@@ -78,22 +97,24 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 		case 'device':
 		case 'virtual_machine':
 			return ref('tenant_id')
-		case 'attachment':
-			return (
-				(await ownerTenant({
-					site_id: ref('site_id'),
-					location_id: ref('location_id'),
-					rack_id: ref('rack_id'),
-				})) ?? null
+		case 'attachment': {
+			const owner = {
+				site_id: ref('site_id'),
+				location_id: ref('location_id'),
+				rack_id: ref('rack_id'),
+			}
+			return cached(`owner:${owner.site_id}:${owner.location_id}:${owner.rack_id}`, () =>
+				ownerTenant(owner),
 			)
+		}
 		case 'shelf': {
 			const rack = ref('rack_id')
-			return rack === null ? null : ((await rackTenant(rack)) ?? null)
+			return rack === null ? null : cached(`rack:${rack}`, () => rackTenant(rack))
 		}
 		case 'interface':
 		case 'panel_jack': {
 			const device = ref('device_id')
-			return device === null ? null : ((await deviceTenant(device)) ?? null)
+			return device === null ? null : cached(`device:${device}`, () => deviceTenant(device))
 		}
 		case 'cable': {
 			const a = ref('a_interface_id')
@@ -101,39 +122,48 @@ async function tenantOf(objectType: ChangeObjectType, row: Snapshot): Promise<nu
 			if (a === null || b === null) {
 				return null
 			}
-			const [tenantA, tenantB] = await cableTenants({ a_interface_id: a, b_interface_id: b })
-			return tenantA === tenantB ? tenantA : null
+			return cached(`cable:${a}:${b}`, async () => {
+				const [tenantA, tenantB] = await cableTenants({
+					a_interface_id: a,
+					b_interface_id: b,
+				})
+				return tenantA === tenantB ? tenantA : null
+			})
 		}
 		default:
 			return null
 	}
 }
 
+/** One change to record: `before` is null for a creation, `after` for a deletion. */
+export interface Change {
+	action: ChangeAction
+	objectType: ChangeObjectType
+	before: Snapshot | null
+	after: Snapshot | null
+}
+
 /**
- * Appends one change. Runs on the caller's `getDb()`, so inside
+ * Appends changes in the given order with one INSERT, resolving each
+ * parent's tenant once. Runs on the caller's `getDb()`, so inside
  * `withTransaction` it commits or rolls back with the change itself. A
  * failed write is logged but never fails the change.
  */
-async function recordChange(
-	action: ChangeAction,
-	objectType: ChangeObjectType,
-	before: Snapshot | null,
-	after: Snapshot | null,
-): Promise<void> {
-	const subject = after ?? before
-	if (!subject) {
-		return
-	}
-	// A patch that changed nothing is not a change.
-	if (before && after && JSON.stringify(before) === JSON.stringify(after)) {
-		return
-	}
+export async function logChanges(changes: Change[]): Promise<void> {
 	const actor = actorStore.getStore()
 	try {
-		const tenantId = await tenantOf(objectType, subject)
-		await getDb()
-			.insert(object_changes)
-			.values({
+		const cache: TenantCache = new Map()
+		const rows: (typeof object_changes.$inferInsert)[] = []
+		for (const { action, objectType, before, after } of changes) {
+			const subject = after ?? before
+			if (!subject) {
+				continue
+			}
+			// A patch that changed nothing is not a change.
+			if (before && after && JSON.stringify(before) === JSON.stringify(after)) {
+				continue
+			}
+			rows.push({
 				created_at: nowSeconds(),
 				user_id: actor?.user_id ?? null,
 				username: actor?.username ?? '',
@@ -142,10 +172,15 @@ async function recordChange(
 				object_type: objectType,
 				object_id: subject.id,
 				object_repr: reprOf(subject),
-				tenant_id: tenantId,
+				tenant_id: await tenantOf(objectType, subject, cache),
 				prechange_data: before,
 				postchange_data: after,
 			})
+		}
+		if (rows.length > 0) {
+			// Ids follow the VALUES order, keeping the order of `changes`.
+			await getDb().insert(object_changes).values(rows)
+		}
 	} catch (e) {
 		console.error('Failed to write changelog entry:', e)
 	}
@@ -157,7 +192,7 @@ export async function logCreate<T extends Snapshot>(
 	result: Result<T, Error>,
 ): Promise<Result<T, Error>> {
 	if (Result.isOk(result)) {
-		await recordChange('create', resolveType(objectType, result.value), null, result.value)
+		await logCreates(objectType, [result.value])
 	}
 	return result
 }
@@ -169,7 +204,7 @@ export async function logUpdate<T extends Snapshot>(
 	result: Result<T, Error>,
 ): Promise<Result<T, Error>> {
 	if (Result.isOk(result)) {
-		await recordChange('update', resolveType(objectType, before), before, result.value)
+		await logUpdates(objectType, [[before, result.value]])
 	}
 	return result
 }
@@ -179,8 +214,71 @@ export async function logDelete<T extends Snapshot>(
 	objectType: ObjectTypeOf<T>,
 	before: T,
 ): Promise<Result<T, Error>> {
-	await recordChange('delete', resolveType(objectType, before), before, null)
+	await logDeletes(objectType, [before])
 	return Result.ok(before)
+}
+
+/** Creation entries for `rows`, in order. */
+export function createChanges<T extends Snapshot>(
+	objectType: ObjectTypeOf<T>,
+	rows: T[],
+): Change[] {
+	return rows.map((row) => ({
+		action: 'create',
+		objectType: resolveType(objectType, row),
+		before: null,
+		after: row,
+	}))
+}
+
+/** Update entries for `[before, after]` pairs, in order. */
+export function updateChanges<T extends Snapshot>(
+	objectType: ObjectTypeOf<T>,
+	pairs: [T, T][],
+): Change[] {
+	return pairs.map(([before, after]) => ({
+		action: 'update',
+		objectType: resolveType(objectType, before),
+		before,
+		after,
+	}))
+}
+
+/** Deletion entries for `rows`, in order. */
+export function deleteChanges<T extends Snapshot>(
+	objectType: ObjectTypeOf<T>,
+	rows: T[],
+): Change[] {
+	return rows.map((row) => ({
+		action: 'delete',
+		objectType: resolveType(objectType, row),
+		before: row,
+		after: null,
+	}))
+}
+
+/** Records the creation of `rows` with one INSERT (see `logChanges`). */
+export function logCreates<T extends Snapshot>(
+	objectType: ObjectTypeOf<T>,
+	rows: T[],
+): Promise<void> {
+	return logChanges(createChanges(objectType, rows))
+}
+
+/** Records `[before, after]` updates with one INSERT (see `logChanges`). */
+export function logUpdates<T extends Snapshot>(
+	objectType: ObjectTypeOf<T>,
+	pairs: [T, T][],
+): Promise<void> {
+	return logChanges(updateChanges(objectType, pairs))
+}
+
+/** Records the deletion of `rows` with one INSERT (see `logChanges`). */
+export function logDeletes<T extends Snapshot>(
+	objectType: ObjectTypeOf<T>,
+	rows: T[],
+): Promise<void> {
+	return logChanges(deleteChanges(objectType, rows))
 }
 
 export interface ChangelogListParams extends ListParams, TenantFilterParams {

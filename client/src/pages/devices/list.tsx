@@ -10,8 +10,6 @@ import {
 } from '../../api/devices'
 import { fetch_all_employees } from '../../api/employees'
 import { fetch_racks } from '../../api/racks'
-import { fetch_device_types } from '../../api/templates'
-import { fetch_sites, fetch_tenants } from '../../api/tenancy'
 import { delete_virtual_machine } from '../../api/virtual_machines'
 import { type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
@@ -28,7 +26,6 @@ import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, deviceStatusLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
-import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { navigate, parseId } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
@@ -85,18 +82,11 @@ export function DevicesPage(): JSX.Element {
 		removeOf: (row: DeviceListItem) =>
 			row.kind === 'vm' ? delete_virtual_machine : delete_device,
 	})
-	const [types] = createRows(fetch_device_types, list.setError)
+	// Rows carry their related names; these lookups feed the filters (and
+	// the role's `can_host_vms` for the row menu).
 	const [roles] = createRows(fetch_device_roles, list.setError)
 	const [racks] = createRows(fetch_racks, list.setError)
 	const [employees] = createRows(fetch_all_employees, list.setError)
-	// A failed tenant or site lookup degrades to raw ids rather than an error.
-	const [tenants] = createRows(fetch_tenants)
-	const [sites] = createRows(fetch_sites)
-	const employeeName = useNameOf(employees)
-	const tenantName = useNameOf(tenants)
-	const siteName = useNameOf(sites)
-	const typeName = useNameOf(types, (type) => type.model)
-	const roleName = useNameOf(roles, deviceRoleLabel)
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
 	const roleFilterOptions = createMemo(() => {
 		const all = roles() ?? []
@@ -108,7 +98,9 @@ export function DevicesPage(): JSX.Element {
 			icon: deviceRoleIcon(icons.get(r.id)),
 		}))
 	})
-	const rackName = useNameOf(racks)
+	// A name outside the requester's tenant scope comes back null: show the id.
+	const nameOr = (name: string | null, id: number | null): string =>
+		name ?? (id === null ? '—' : String(id))
 
 	const columns: DataTableColumn<DeviceListItem>[] = [
 		{
@@ -135,8 +127,8 @@ export function DevicesPage(): JSX.Element {
 			sortable: true,
 			getValue: (d: DeviceListItem): JSX.Element => (
 				<a href={`/device-roles/${d.device_role_id}`}>
-					<IconLabel icon={deviceRoleIcon(roleById().get(d.device_role_id)?.icon)}>
-						{roleName(d.device_role_id)}
+					<IconLabel icon={deviceRoleIcon(d.device_role_icon)}>
+						{deviceRoleLabel({ name: d.device_role_name, key: d.device_role_key })}
 					</IconLabel>
 				</a>
 			),
@@ -149,7 +141,7 @@ export function DevicesPage(): JSX.Element {
 				d.kind === 'vm' ? (
 					<span>{t('entity.virtualMachine.one')}</span>
 				) : (
-					<a href={`/device-types/${d.device_type_id}`}>{typeName(d.device_type_id)}</a>
+					<a href={`/device-types/${d.device_type_id}`}>{d.device_type_model}</a>
 				),
 		},
 		{
@@ -161,7 +153,7 @@ export function DevicesPage(): JSX.Element {
 					<span>—</span>
 				) : (
 					<a href={`/employees/${device.employee_id}`}>
-						{employeeName(device.employee_id)}
+						{nameOr(device.employee_name, device.employee_id)}
 					</a>
 				),
 		},
@@ -186,7 +178,7 @@ export function DevicesPage(): JSX.Element {
 					return (
 						<span>
 							<Show when={d.rack_id !== null}>
-								<a href={`/racks/${d.rack_id}`}>{rackName(d.rack_id)}</a>
+								<a href={`/racks/${d.rack_id}`}>{nameOr(d.rack_name, d.rack_id)}</a>
 								{' · '}
 							</Show>
 							<Show when={d.rack_id !== null} fallback={shelfLabel}>
@@ -199,7 +191,7 @@ export function DevicesPage(): JSX.Element {
 					return <span>—</span>
 				}
 				const label = t('device.mountPosition', {
-					rack: d.rack_id === null ? tp('noun.rack', 1) : rackName(d.rack_id),
+					rack: d.rack_id === null ? tp('noun.rack', 1) : nameOr(d.rack_name, d.rack_id),
 					u: d.position_u,
 				})
 				return d.rack_id === null ? (
@@ -213,7 +205,7 @@ export function DevicesPage(): JSX.Element {
 			key: 'tenant',
 			label: tp('entity.tenant', 1),
 			sortable: true,
-			getValue: (d: DeviceListItem): string => tenantName(d.tenant_id),
+			getValue: (d: DeviceListItem): string => nameOr(d.tenant_name, d.tenant_id),
 		},
 		{
 			key: 'site',
@@ -221,7 +213,7 @@ export function DevicesPage(): JSX.Element {
 			sortable: true,
 			getValue: (d: DeviceListItem): JSX.Element =>
 				d.kind === 'device' && d.site_id !== null ? (
-					<a href={`/sites/${d.site_id}`}>{siteName(d.site_id)}</a>
+					<a href={`/sites/${d.site_id}`}>{nameOr(d.site_name, d.site_id)}</a>
 				) : (
 					<span>—</span>
 				),

@@ -37,6 +37,7 @@ import {
 	type DeviceRow,
 	deleteDevice,
 	getDevice,
+	getDeviceDetail,
 	getInterface,
 	listDevices,
 	listInterfaces,
@@ -137,7 +138,7 @@ export const devicesApp = new Hono()
 		},
 	)
 	.get('/:id', vValidator('param', EntityParamsSchema, onValidationError), async (c) => {
-		return sendTenantRow(c, await getDevice(c.req.valid('param').id))
+		return sendTenantRow(c, await getDeviceDetail(c.req.valid('param').id, requestScope(c)))
 	})
 	.patch(
 		'/:id',

@@ -4,6 +4,7 @@ import {
 	asc,
 	count,
 	eq,
+	getTableColumns,
 	gte,
 	inArray,
 	isNotNull,
@@ -22,7 +23,9 @@ import type {
 	DeviceListKind,
 	DeviceListQuery,
 	DeviceMove,
+	DeviceRoleIcon,
 	DeviceUpdate,
+	ExpandedInterface,
 	InterfaceCreate,
 	InterfaceLocation,
 	InterfaceUpdate,
@@ -31,7 +34,6 @@ import type {
 	PortSide,
 } from 'shared/src/schemas'
 import {
-	cables,
 	device_roles,
 	device_type_interfaces,
 	device_types,
@@ -52,9 +54,9 @@ import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupa
 import { isOutOfSync } from '../services/template_sync'
 import { expandStub, expandStubs } from '../services/templates'
 import { prunePlacements } from './attachments'
-import { deviceHasCables } from './cables'
-import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb, withTransaction } from './connection'
+import { cableEnds, deviceHasCables } from './cables'
+import { logCreate, logDelete, logUpdate, logUpdates } from './changelog'
+import { type DbHandle, getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
 import { checkEmployeeAssignment } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
@@ -308,6 +310,20 @@ function activeCondition(status: SQLWrapper, active: boolean | undefined): SQL |
 	return active ? ne(status, 'inactive') : eq(status, 'inactive')
 }
 
+/**
+ * Display names of a list row's related rows, so a list renders without
+ * lookup requests. A name the requester's tenant scope does not cover is
+ * null (the client falls back to the id, as a lookup miss did).
+ */
+interface DeviceListNames {
+	device_role_name: string
+	/** Built-in role key (localized label on the client). */
+	device_role_key: string | null
+	device_role_icon: DeviceRoleIcon | null
+	employee_name: string | null
+	tenant_name: string | null
+}
+
 /** One device list row: a physical device or a virtual machine (with its host's name). */
 export type DeviceListItem =
 	| ({
@@ -319,13 +335,36 @@ export type DeviceListItem =
 			 * only computed when listing by `device_type`.
 			 */
 			out_of_sync: boolean
-	  } & DeviceRow)
-	| ({ kind: 'vm'; host_name: string | null } & VirtualMachineRow)
+			device_type_model: string
+			rack_name: string | null
+			site_name: string | null
+	  } & DeviceListNames &
+			DeviceRow)
+	| ({ kind: 'vm'; host_name: string | null } & DeviceListNames & VirtualMachineRow)
 
 const nullInt = (name: string): SQL.Aliased<number | null> =>
 	sql<number | null>`NULL::integer`.as(name)
 const nullText = (name: string): SQL.Aliased<string | null> =>
 	sql<string | null>`NULL::text`.as(name)
+
+/**
+ * A related row's `name` for a list row, NULL unless `visible` (the
+ * related row lies in the requester's tenant scope; `undefined` without a
+ * scope). Rows of a scoped list are in scope, their related rows need not
+ * be (a shared rack, a site of another tenant), and the name must not tell
+ * more than the id did.
+ */
+function scopedName(
+	name: SQLWrapper,
+	visible: SQL | undefined,
+	as: string,
+): SQL.Aliased<string | null> {
+	return (
+		visible === undefined
+			? sql<string | null>`${name}`
+			: sql<string | null>`CASE WHEN ${visible} THEN ${name} END`
+	).as(as)
+}
 
 /**
  * Matches devices of the interface's own tenant (cables never cross
@@ -417,22 +456,24 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 									devices.device_id,
 									devices.serial,
 								]),
-								inArray(
-									devices.device_type_id,
-									db
-										.select({ id: device_types.id })
-										.from(device_types)
-										.innerJoin(
-											manufacturers,
-											eq(manufacturers.id, device_types.manufacturer_id),
-										)
-										.where(
-											searchCondition(params.search, [
-												device_types.model,
-												manufacturers.name,
-											]),
-										),
-								),
+								// `= ANY(ARRAY(…))`, not `IN (…)`: the type subquery runs once and
+								// the arm stays an index condition, so the trigram indexes on the
+								// device columns combine in one BitmapOr. An `IN` subquery in an OR
+								// is a per-row filter and forces a full scan of devices. The array
+								// holds matching device types (a catalog), so it stays small.
+								sql`${devices.device_type_id} = ANY(ARRAY(${db
+									.select({ id: device_types.id })
+									.from(device_types)
+									.innerJoin(
+										manufacturers,
+										eq(manufacturers.id, device_types.manufacturer_id),
+									)
+									.where(
+										searchCondition(params.search, [
+											device_types.model,
+											manufacturers.name,
+										]),
+									)}))`,
 							)
 						: undefined,
 					params.site ? eq(devices.site_id, params.site) : undefined,
@@ -484,6 +525,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 					activeCondition(virtual_machines.status, params.active),
 				)
 	const hosts = alias(devices, 'host')
+	const scope = params.scopeTenantIds
 	const deviceBranch = db
 		.select({
 			kind: sql<DeviceListKind>`'device'`.as('kind'),
@@ -518,15 +560,20 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			sort_tenant: sql<
 				string | null
 			>`${relatedValue(tenants.name, tenants.id, devices.tenant_id)}`.as('sort_tenant'),
-			sort_site: sql<
-				string | null
-			>`${relatedValue(sites.name, sites.id, devices.site_id)}`.as('sort_site'),
+			sort_site: sql<string | null>`${sites.name}`.as('sort_site'),
+			device_role_key: sql<string | null>`${device_roles.key}`.as('device_role_key'),
+			device_role_icon: sql<DeviceRoleIcon | null>`${device_roles.icon}`.as(
+				'device_role_icon',
+			),
+			rack_name: scopedName(racks.name, scopeCondition(racks.tenant_id, scope), 'rack_name'),
+			site_name: scopedName(sites.name, scopeCondition(sites.tenant_id, scope), 'site_name'),
 		})
 		.from(devices)
 		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
 		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
 		.leftJoin(racks, eq(racks.id, devices.rack_id))
 		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
+		.leftJoin(sites, eq(sites.id, devices.site_id))
 		.where(deviceWhere)
 	const vmBranch = db
 		.select({
@@ -565,6 +612,12 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 				'sort_tenant',
 			),
 			sort_site: nullText('sort_site'),
+			device_role_key: sql<string | null>`${device_roles.key}`.as('device_role_key'),
+			device_role_icon: sql<DeviceRoleIcon | null>`${device_roles.icon}`.as(
+				'device_role_icon',
+			),
+			rack_name: nullText('rack_name'),
+			site_name: nullText('site_name'),
 		})
 		.from(virtual_machines)
 		.innerJoin(device_roles, eq(device_roles.id, virtual_machines.device_role_id))
@@ -639,7 +692,15 @@ type DeviceListRow = Omit<DeviceRow, 'device_type_id'> & {
 	shelf_position_u: number | null
 	device_type_id: number | null
 	host_device_id: number | null
+	sort_role: string
+	sort_type: string | null
 	sort_mount: string | null
+	sort_tenant: string | null
+	device_role_key: string | null
+	device_role_icon: DeviceRoleIcon | null
+	sort_employee: string | null
+	rack_name: string | null
+	site_name: string | null
 }
 
 /** Narrows a union row to its kind's columns. */
@@ -652,6 +713,13 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		tenant_id: row.tenant_id,
 		employee_id: row.employee_id,
 		description: row.description,
+		device_role_name: row.sort_role,
+		device_role_key: row.device_role_key,
+		device_role_icon: row.device_role_icon,
+		// Rows of a scoped list lie in the scope, so their tenant is visible,
+		// and an assigned employee belongs to the row's tenant (composite FK).
+		employee_name: row.sort_employee,
+		tenant_name: row.sort_tenant,
 	}
 	if (row.kind === 'vm') {
 		return {
@@ -665,7 +733,10 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		kind: 'device',
 		...shared,
 		device_type_id: row.device_type_id ?? 0,
+		device_type_model: row.sort_type ?? '',
+		rack_name: row.rack_name,
 		site_id: row.site_id,
+		site_name: row.site_name,
 		location_id: row.location_id,
 		rack_id: row.rack_id,
 		face: row.face,
@@ -731,6 +802,119 @@ export function getDevice(id: number): Promise<Result<DeviceRow, Error>> {
 	return findById(devices, id, 'Device not found')
 }
 
+/**
+ * A device with the display fields of its related rows, so the detail page
+ * renders without a lookup per foreign key. Like list rows, the names of a
+ * site, location, rack or shelf outside the requester's tenant scope are
+ * null (their own endpoints answer 403). Tenant and employee names are not
+ * scoped: the device route only answers for a device in scope, whose tenant
+ * is then in scope and whose employee belongs to that tenant (composite FK).
+ */
+export type DeviceDetail = DeviceRow &
+	DeviceListNames & {
+		device_role_can_host_vms: number
+		device_type_model: string
+		device_type_eol_date: string | null
+		site_name: string | null
+		location_name: string | null
+		rack_name: string | null
+		/** Null when the shelf is unnamed or out of scope (then `shelf_position_u` is null too). */
+		shelf_name: string | null
+		shelf_position_u: number | null
+	}
+
+/**
+ * The device row plus its related display fields in one statement (read
+ * path only; writes and changelog snapshots keep using `getDevice`).
+ */
+export async function getDeviceDetail(
+	id: number,
+	scope: readonly number[] | undefined,
+): Promise<Result<DeviceDetail, Error>> {
+	const shelfRacks = alias(racks, 'shelf_rack')
+	const shelfVisible = scopeCondition(shelfRacks.tenant_id, scope)
+	const [row] = await getDb()
+		.select({
+			...getTableColumns(devices),
+			device_role_name: device_roles.name,
+			device_role_key: device_roles.key,
+			device_role_icon: device_roles.icon,
+			device_role_can_host_vms: device_roles.can_host_vms,
+			device_type_model: device_types.model,
+			device_type_eol_date: device_types.eol_date,
+			site_name: scopedName(sites.name, scopeCondition(sites.tenant_id, scope), 'site_name'),
+			location_name: scopedName(
+				locations.name,
+				scopeCondition(locations.tenant_id, scope),
+				'location_name',
+			),
+			rack_name: scopedName(racks.name, scopeCondition(racks.tenant_id, scope), 'rack_name'),
+			shelf_name: scopedName(shelves.name, shelfVisible, 'shelf_name'),
+			shelf_position_u: (shelfVisible === undefined
+				? sql<number | null>`${shelves.position_u}`
+				: sql<number | null>`CASE WHEN ${shelfVisible} THEN ${shelves.position_u} END`
+			).as('shelf_position_u'),
+			tenant_name: sql<string | null>`${tenants.name}`.as('tenant_name'),
+			employee_name: sql<string | null>`${employees.name}`.as('employee_name'),
+		})
+		.from(devices)
+		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
+		.innerJoin(device_types, eq(device_types.id, devices.device_type_id))
+		.leftJoin(sites, eq(sites.id, devices.site_id))
+		.leftJoin(locations, eq(locations.id, devices.location_id))
+		.leftJoin(racks, eq(racks.id, devices.rack_id))
+		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
+		.leftJoin(shelfRacks, eq(shelfRacks.id, shelves.rack_id))
+		.leftJoin(tenants, eq(tenants.id, devices.tenant_id))
+		.leftJoin(employees, eq(employees.id, devices.employee_id))
+		.where(eq(devices.id, id))
+		.limit(1)
+	return row ? Result.ok(row) : Result.err(new NotFoundError('Device not found'))
+}
+
+/** Columns of a new port taken from its device-type expansion. */
+type NewPort = Pick<
+	InterfaceRow,
+	'name' | 'side' | 'kind' | 'positions' | 'rear_port_id' | 'rear_port_position'
+> &
+	Partial<Pick<InterfaceRow, 'template_name'>>
+
+function portValues(iface: ExpandedInterface, rearPortId: number | null): NewPort {
+	return {
+		name: iface.name,
+		kind: iface.kind,
+		side: iface.side,
+		positions: iface.positions,
+		rear_port_id: rearPortId,
+		rear_port_position: iface.rear_port_position,
+	}
+}
+
+/**
+ * Inserts ports of one device with one statement on `db`; returns their ids
+ * in the order of `ports`.
+ */
+export async function insertPorts(
+	db: DbHandle,
+	deviceId: number,
+	ports: NewPort[],
+): Promise<number[]> {
+	if (ports.length === 0) {
+		return []
+	}
+	const rows = await db
+		.insert(interfaces)
+		.values(ports.map((port) => ({ device_id: deviceId, connected: 0, ...port })))
+		.returning({ id: interfaces.id, side: interfaces.side, name: interfaces.name })
+	// Side and name are unique per device (`interfaces_device_name_idx`), so
+	// they tell which returned id belongs to which port.
+	const ids = new Map(rows.map((row) => [`${row.side}:${row.name}`, row.id]))
+	return ports.map((port) => {
+		const id = ids.get(`${port.side}:${port.name}`)
+		return insertedId(id === undefined ? [] : [{ id }])
+	})
+}
+
 export async function createDevice(rawInput: DeviceCreate): Promise<Result<DeviceRow, Error>> {
 	const normalized = await normalizeShelf(rawInput)
 	if (Result.isError(normalized)) {
@@ -794,35 +978,35 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		employee_id: input.employee_id ?? null,
 		description: input.description ?? null,
 	}
+	// Expansion lists rear ports before the front ports that map onto them:
+	// ports without a rear port go in first, then the front ports with the
+	// ids of their rear ports. Ids keep the order of the expansion.
+	const plain = expanded.value.flatMap((iface, i) =>
+		iface.rear_index === null ? [{ iface, i }] : [],
+	)
+	const fronts = expanded.value.filter((iface) => iface.rear_index !== null)
 	const id = await tryWrite(
 		() =>
 			getDb().transaction(async (tx) => {
 				const deviceId = insertedId(
 					await tx.insert(devices).values(values).returning({ id: devices.id }),
 				)
-				// Expansion lists rear ports before the front ports that map
-				// onto them, so their ids are known by then.
-				const ids: number[] = []
-				for (const iface of expanded.value) {
-					const rearPortId = iface.rear_index === null ? null : ids[iface.rear_index]
-					ids.push(
-						insertedId(
-							await tx
-								.insert(interfaces)
-								.values({
-									device_id: deviceId,
-									name: iface.name,
-									kind: iface.kind,
-									connected: 0,
-									side: iface.side,
-									positions: iface.positions,
-									rear_port_id: rearPortId ?? null,
-									rear_port_position: iface.rear_port_position,
-								})
-								.returning({ id: interfaces.id }),
+				const plainIds = await insertPorts(
+					tx,
+					deviceId,
+					plain.map(({ iface }) => portValues(iface, null)),
+				)
+				const ids = new Map(plain.map(({ i }, n) => [i, plainIds[n] ?? null]))
+				await insertPorts(
+					tx,
+					deviceId,
+					fronts.map((iface) =>
+						portValues(
+							iface,
+							iface.rear_index === null ? null : (ids.get(iface.rear_index) ?? null),
 						),
-					)
-				}
+					),
+				)
 				return deviceId
 			}),
 		duplicateDeviceError,
@@ -1482,10 +1666,13 @@ async function relocateJackSiblings(
 				siblings.map((port) => port.id),
 			),
 		)
-	for (const port of siblings) {
-		const before = toInterfaceJson(port)
-		await logUpdate('interface', before, Result.ok({ ...before, location_id: locationId }))
-	}
+	await logUpdates(
+		'interface',
+		siblings.map((port): [InterfaceJson, InterfaceJson] => {
+			const before = toInterfaceJson(port)
+			return [before, { ...before, location_id: locationId }]
+		}),
+	)
 }
 
 /**
@@ -1528,13 +1715,13 @@ export async function setOutletLocations(
 							changed.map((port) => port.id),
 						),
 					)
-				for (const port of changed) {
-					await logUpdate(
-						'interface',
+				await logUpdates(
+					'interface',
+					changed.map((port): [InterfaceJson, InterfaceJson] => [
 						port,
-						Result.ok({ ...port, location_id: input.location_id }),
-					)
-				}
+						{ ...port, location_id: input.location_id },
+					]),
+				)
 				await prunePlacements()
 			}),
 		)
@@ -1556,6 +1743,7 @@ export async function listLocationOutlets(
 ): Promise<LocationOutletJson[]> {
 	const peer = alias(interfaces, 'peer_iface')
 	const peerDevice = alias(devices, 'peer_device')
+	const ends = cableEnds()
 	const subtree = sql`(
 		with recursive subtree(id) as (
 			select ${locationId}::integer
@@ -1581,14 +1769,8 @@ export async function listLocationOutlets(
 		.from(interfaces)
 		.innerJoin(devices, eq(devices.id, interfaces.device_id))
 		.innerJoin(locations, eq(locations.id, interfaces.location_id))
-		.leftJoin(
-			cables,
-			or(eq(cables.a_interface_id, interfaces.id), eq(cables.b_interface_id, interfaces.id)),
-		)
-		.leftJoin(
-			peer,
-			sql`${peer.id} = case when ${cables.a_interface_id} = ${interfaces.id} then ${cables.b_interface_id} else ${cables.a_interface_id} end`,
-		)
+		.leftJoin(ends.table, eq(ends.interface_id, interfaces.id))
+		.leftJoin(peer, eq(peer.id, ends.peer_interface_id))
 		.leftJoin(peerDevice, eq(peerDevice.id, peer.device_id))
 		.where(
 			and(

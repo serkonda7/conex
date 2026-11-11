@@ -7,7 +7,9 @@ import {
 	customType,
 	date,
 	doublePrecision,
+	type ExtraConfigColumn,
 	foreignKey,
+	type IndexBuilder,
 	index,
 	integer,
 	pgTable,
@@ -33,6 +35,19 @@ import {
 	type TenantEmail,
 	type TenantPhone,
 } from 'shared/src/schemas'
+
+/**
+ * Trigram (GIN, `pg_trgm`) index on a text column, so the `%term%` ILIKE of
+ * `searchCondition` can use an index instead of scanning the table. A search
+ * ORs its columns, and Postgres only combines indexes (BitmapOr) when every
+ * arm of the OR has one, so a table gets one on each column its searches OR
+ * together. One index per column, not one multi-column index: either serves
+ * the BitmapOr, and a single column stays usable and droppable on its own.
+ * Only on tables that grow large; migration 0068 creates the extension.
+ */
+function trigramIndex(name: string, column: ExtraConfigColumn): IndexBuilder {
+	return index(name).using('gin', column.op('gin_trgm_ops'))
+}
 
 // P0 minimal schema: auth only. Domain tables (tenants, sites, racks,
 // devices, cables) are added in P1-P5.
@@ -116,7 +131,11 @@ export const sessions = pgTable(
 		last_seen_at: bigint('last_seen_at', { mode: 'number' }).notNull(),
 		expires_at: bigint('expires_at', { mode: 'number' }).notNull(),
 	},
-	(table) => [index('sessions_expires_at_idx').on(table.expires_at)],
+	(table) => [
+		index('sessions_expires_at_idx').on(table.expires_at),
+		// `invalidateUserSessions` and the cascade on user delete.
+		index('sessions_user_id_idx').on(table.user_id),
+	],
 )
 
 export const auth_states = pgTable(
@@ -257,6 +276,7 @@ export const locations = pgTable(
 	(table) => [
 		index('locations_site_id_idx').on(table.site_id),
 		index('locations_parent_id_idx').on(table.parent_id),
+		index('locations_tenant_id_idx').on(table.tenant_id),
 	],
 )
 
@@ -334,6 +354,7 @@ export const racks = pgTable(
 		index('racks_site_id_idx').on(table.site_id),
 		index('racks_location_id_idx').on(table.location_id),
 		index('racks_tenant_id_idx').on(table.tenant_id),
+		index('racks_rack_type_id_idx').on(table.rack_type_id),
 		index('racks_name_idx').on(table.name),
 	],
 )
@@ -356,7 +377,7 @@ export const manufacturers = pgTable(
 		support_url: text('support_url'),
 		comments: text('comments'),
 	},
-	(table) => [index('manufacturers_name_idx').on(table.name)],
+	// No plain index on `name`: the unique constraint's index serves lookups.
 )
 
 export const rack_types = pgTable(
@@ -375,8 +396,8 @@ export const rack_types = pgTable(
 		comments: text('comments'),
 	},
 	(table) => [
-		index('rack_types_manufacturer_id_idx').on(table.manufacturer_id),
 		index('rack_types_model_idx').on(table.model),
+		// Leads with `manufacturer_id`, so it also serves lookups by manufacturer.
 		uniqueIndex('rack_types_manufacturer_model_idx').on(table.manufacturer_id, table.model),
 	],
 )
@@ -408,9 +429,11 @@ export const device_types = pgTable(
 		),
 	},
 	(table) => [
-		index('device_types_manufacturer_id_idx').on(table.manufacturer_id),
 		index('device_types_model_idx').on(table.model),
+		// Leads with `manufacturer_id`, so it also serves lookups by manufacturer.
 		uniqueIndex('device_types_manufacturer_model_idx').on(table.manufacturer_id, table.model),
+		// Device role list: device types per role.
+		index('device_types_default_device_role_id_idx').on(table.default_device_role_id),
 	],
 )
 
@@ -491,7 +514,6 @@ export const device_roles = pgTable(
 		key: text('key').unique(),
 	},
 	(table) => [
-		index('device_roles_name_idx').on(table.name),
 		index('device_roles_parent_id_idx').on(table.parent_id),
 		index('device_roles_managed_bundle_id_idx').on(table.managed_bundle_id),
 	],
@@ -541,7 +563,7 @@ export const service_levels = pgTable(
 			.default(sql`'[]'::jsonb`),
 		holiday_region: text('holiday_region', { enum: HOLIDAY_REGIONS }),
 	},
-	(table) => [index('service_levels_name_idx').on(table.name)],
+	// No plain index on `name`: the unique constraint's index serves lookups.
 )
 
 export const service_level_targets = pgTable(
@@ -645,6 +667,7 @@ export const devices = pgTable(
 		index('devices_type_id_idx').on(table.device_type_id),
 		index('devices_device_role_id_idx').on(table.device_role_id),
 		index('devices_site_id_idx').on(table.site_id),
+		index('devices_location_id_idx').on(table.location_id),
 		index('devices_rack_id_idx').on(table.rack_id),
 		index('devices_shelf_id_idx').on(table.shelf_id),
 		index('devices_tenant_id_idx').on(table.tenant_id),
@@ -660,6 +683,11 @@ export const devices = pgTable(
 		),
 		index('devices_status_idx').on(table.status),
 		index('devices_name_idx').on(table.name),
+		// Device list and global search: name, asset tag, device id, serial.
+		trigramIndex('devices_name_trgm_idx', table.name),
+		trigramIndex('devices_asset_tag_trgm_idx', table.asset_tag),
+		trigramIndex('devices_device_id_trgm_idx', table.device_id),
+		trigramIndex('devices_serial_trgm_idx', table.serial),
 	],
 )
 
@@ -687,12 +715,13 @@ export const virtual_machines = pgTable(
 		description: text('description'),
 	},
 	(table) => [
-		index('virtual_machines_host_device_id_idx').on(table.host_device_id),
 		index('virtual_machines_device_role_id_idx').on(table.device_role_id),
 		index('virtual_machines_tenant_id_idx').on(table.tenant_id),
 		index('virtual_machines_employee_id_idx').on(table.employee_id),
 		index('virtual_machines_status_idx').on(table.status),
 		index('virtual_machines_name_idx').on(table.name),
+		trigramIndex('virtual_machines_name_trgm_idx', table.name),
+		// Leads with `host_device_id`, so it also serves lookups by host.
 		uniqueIndex('virtual_machines_host_name_idx').on(table.host_device_id, table.name),
 		// Hostless VMs: name unique per tenant. Two partial indexes because
 		// NULL tenants never collide in a plain unique index.
@@ -808,6 +837,8 @@ export const interfaces = pgTable(
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),
 		index('interfaces_jack_id_idx').on(table.jack_id),
+		// No trigram indexes: the interface list search ORs in the device name
+		// (another table), so no index on interfaces could serve it.
 		check(
 			'interfaces_jack_check',
 			sql`${table.jack_id} IS NULL OR (${table.side} IS NOT DISTINCT FROM 'rear' AND ${table.positions} = 1)`,
@@ -858,9 +889,11 @@ export const cables = pgTable(
 		description: text('description'),
 	},
 	(table) => [
-		index('cables_a_interface_id_idx').on(table.a_interface_id),
-		index('cables_b_interface_id_idx').on(table.b_interface_id),
+		// No plain indexes on `a_interface_id` / `b_interface_id`: their unique
+		// constraints' indexes serve lookups.
 		index('cables_status_idx').on(table.status),
+		trigramIndex('cables_label_trgm_idx', table.label),
+		trigramIndex('cables_kind_trgm_idx', table.kind),
 	],
 )
 
@@ -945,6 +978,10 @@ export const floorplan_areas = pgTable(
 		),
 		uniqueIndex('floorplan_areas_site_idx').on(table.attachment_id, table.site_id),
 		uniqueIndex('floorplan_areas_location_idx').on(table.attachment_id, table.location_id),
+		// The two above lead with `attachment_id`; areas linking to a site or
+		// location (delete impact, linked plans, cascade) need their own.
+		index('floorplan_areas_site_id_idx').on(table.site_id),
+		index('floorplan_areas_location_id_idx').on(table.location_id),
 	],
 )
 
@@ -1124,6 +1161,8 @@ export const object_changes = pgTable(
 		index('object_changes_created_at_idx').on(table.created_at),
 		index('object_changes_object_idx').on(table.object_type, table.object_id),
 		index('object_changes_tenant_id_idx').on(table.tenant_id),
+		trigramIndex('object_changes_object_repr_trgm_idx', table.object_repr),
+		trigramIndex('object_changes_username_trgm_idx', table.username),
 	],
 )
 
