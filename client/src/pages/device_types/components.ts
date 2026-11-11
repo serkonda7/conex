@@ -150,6 +150,11 @@ export function stubRange(stub: {
 	})
 }
 
+/** A stub's name in titles: its prefix, or its range for a run of bare numbers. */
+export function stubLabel(stub: Parameters<typeof stubRange>[0]): string {
+	return stub.prefix.trim() || stubRange(stub)
+}
+
 /** Digits that keep names numbered up to `last` in order when sorted as text. */
 export function sortableDigits(last: number): number {
 	return Math.min(String(last).length, MAX_STUB_DIGITS)

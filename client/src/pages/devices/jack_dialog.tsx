@@ -15,9 +15,9 @@ import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
 import { isOutlet } from './outlet_location'
 
-/** Default jack name: its port names (`12+13`). */
+/** Default jack name: its port names (`12/13`). */
 function jackName(ports: InterfaceJson[]): string {
-	return ports.map((port) => port.name).join('+')
+	return ports.map((port) => port.name).join('/')
 }
 
 /** One existing jack: rename in place, or ungroup. */

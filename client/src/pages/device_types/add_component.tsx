@@ -23,7 +23,13 @@ import { poeModeLabel, poeTypeOption, portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
-import { COMPONENT_CLASSES, type ComponentClassInfo, sortableDigits, stubRange } from './components'
+import {
+	COMPONENT_CLASSES,
+	type ComponentClassInfo,
+	sortableDigits,
+	stubLabel,
+	stubRange,
+} from './components'
 import { CassetteIcon, PatchPanelIcon } from './connector_icons'
 
 const MAX_COUNT = 1024
@@ -202,9 +208,12 @@ export function ComponentDialog(props: {
 	/** One trailing space stays: it separates name and number (`Port 01`). */
 	const prefixInput = (): string => trimStubPrefix(name())
 
+	/** A run may be bare numbers (`01..24`); a single port needs a name. */
+	const nameRequired = (): boolean => !countValid() || parsedCount() === 1
+
 	/** Names the current input expands to, shown under the name field. */
 	const preview = (): string | undefined =>
-		prefixInput().trim() && countValid() && startValid()
+		(prefixInput().trim() || !nameRequired()) && countValid() && startValid()
 			? stubRange({
 					prefix: prefixInput(),
 					count: parsedCount(),
@@ -285,7 +294,7 @@ export function ComponentDialog(props: {
 		<Modal
 			title={
 				stub
-					? t('deviceType.component.editTitle', { name: stub.prefix })
+					? t('deviceType.component.editTitle', { name: stubLabel(stub) })
 					: t('deviceType.component.addTitle', { component: t(props.info.label) })
 			}
 			on_close={props.onClose}
@@ -297,7 +306,7 @@ export function ComponentDialog(props: {
 					label={t('common.name')}
 					placeholder={props.info.placeholder}
 					maxLength={50}
-					required
+					required={nameRequired()}
 					autofocus
 					value={name()}
 					onInput={setName}
@@ -535,9 +544,7 @@ export function PassThroughPresetDialog(props: {
 				<TextField
 					id={`${prefix}-name`}
 					label={t('deviceType.preset.frontName')}
-					placeholder="Port"
 					maxLength={50}
-					required
 					autofocus
 					value={name()}
 					onInput={setName}

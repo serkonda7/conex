@@ -62,6 +62,7 @@ import {
 	COMPONENT_CLASSES,
 	type ComponentClassInfo,
 	componentClassOf,
+	stubLabel,
 	stubRange,
 } from './components'
 import { EolPill } from './eol_pill'
@@ -81,8 +82,10 @@ function StubActions(props: {
 				<button
 					type="button"
 					class="icon-btn"
-					title={t('deviceType.component.editTitle', { name: props.stub.prefix })}
-					aria-label={t('deviceType.component.editTitle', { name: props.stub.prefix })}
+					title={t('deviceType.component.editTitle', { name: stubLabel(props.stub) })}
+					aria-label={t('deviceType.component.editTitle', {
+						name: stubLabel(props.stub),
+					})}
 					onClick={(): void => props.onEdit()}
 				>
 					<IconPencil size={16} />
@@ -92,8 +95,10 @@ function StubActions(props: {
 				<button
 					type="button"
 					class="icon-btn"
-					title={t('deviceType.component.deleteTitle', { name: props.stub.prefix })}
-					aria-label={t('deviceType.component.deleteTitle', { name: props.stub.prefix })}
+					title={t('deviceType.component.deleteTitle', { name: stubLabel(props.stub) })}
+					aria-label={t('deviceType.component.deleteTitle', {
+						name: stubLabel(props.stub),
+					})}
 					onClick={(): void => props.onDelete()}
 				>
 					<IconTrash size={16} />
@@ -152,8 +157,10 @@ function ComponentTable(props: {
 	const hasPassThrough = (): boolean => props.stubs.some((row) => row.side !== null)
 	/** Types with a maximum draw or PoE add a column for them. */
 	const hasPower = (): boolean => props.stubs.some(hasPowerDetails)
-	const stubPrefix = (stubId: number | null): string =>
-		props.stubs.find((row) => row.id === stubId)?.prefix ?? '—'
+	const rearName = (stubId: number | null): string => {
+		const rear = props.stubs.find((row) => row.id === stubId)
+		return rear ? stubLabel(rear) : '—'
+	}
 	const passThrough = (s: StubRow): string => {
 		if (!s.side) {
 			return '—'
@@ -161,7 +168,7 @@ function ComponentTable(props: {
 		return s.side === 'rear'
 			? tp('deviceType.component.positionsCount', s.positions)
 			: t('deviceType.component.mapsTo', {
-					rear: stubPrefix(s.rear_stub_id),
+					rear: rearName(s.rear_stub_id),
 					position: s.rear_position,
 				})
 	}
@@ -315,7 +322,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	]
 
 	async function deleteStub(s: StubRow): Promise<void> {
-		if (window.confirm(t('deviceType.component.confirmDelete', { name: s.prefix }))) {
+		if (window.confirm(t('deviceType.component.confirmDelete', { name: stubLabel(s) }))) {
 			await run(() => delete_stub(props.id, s.id))
 		}
 	}

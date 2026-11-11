@@ -127,7 +127,8 @@ export const StubFieldEntries = {
  * names keep any character.
  */
 export const ImportedStubSchema = v.strictObject({
-	prefix: v.pipe(v.string(), v.transform(trimStubPrefix), v.minLength(1), v.maxLength(50)),
+	// Empty only for a run of bare numbers; `expandStub` rejects a nameless single port.
+	prefix: v.pipe(v.string(), v.transform(trimStubPrefix), v.maxLength(50)),
 	...StubFieldEntries,
 })
 
