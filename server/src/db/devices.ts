@@ -33,7 +33,6 @@ import type {
 	PortSide,
 } from 'shared/src/schemas'
 import {
-	cables,
 	device_roles,
 	device_type_interfaces,
 	device_types,
@@ -54,7 +53,7 @@ import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupa
 import { isOutOfSync } from '../services/template_sync'
 import { expandStub, expandStubs } from '../services/templates'
 import { prunePlacements } from './attachments'
-import { deviceHasCables } from './cables'
+import { cableEnds, deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
@@ -1695,6 +1694,7 @@ export async function listLocationOutlets(
 ): Promise<LocationOutletJson[]> {
 	const peer = alias(interfaces, 'peer_iface')
 	const peerDevice = alias(devices, 'peer_device')
+	const ends = cableEnds()
 	const subtree = sql`(
 		with recursive subtree(id) as (
 			select ${locationId}::integer
@@ -1720,14 +1720,8 @@ export async function listLocationOutlets(
 		.from(interfaces)
 		.innerJoin(devices, eq(devices.id, interfaces.device_id))
 		.innerJoin(locations, eq(locations.id, interfaces.location_id))
-		.leftJoin(
-			cables,
-			or(eq(cables.a_interface_id, interfaces.id), eq(cables.b_interface_id, interfaces.id)),
-		)
-		.leftJoin(
-			peer,
-			sql`${peer.id} = case when ${cables.a_interface_id} = ${interfaces.id} then ${cables.b_interface_id} else ${cables.a_interface_id} end`,
-		)
+		.leftJoin(ends.table, eq(ends.interface_id, interfaces.id))
+		.leftJoin(peer, eq(peer.id, ends.peer_interface_id))
 		.leftJoin(peerDevice, eq(peerDevice.id, peer.device_id))
 		.where(
 			and(

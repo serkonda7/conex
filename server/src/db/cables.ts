@@ -53,6 +53,33 @@ export function cableInTenants(tenantIds: readonly number[]): SQL {
 	return sql`(${endIn(cables.a_interface_id)} AND ${endIn(cables.b_interface_id)})`
 }
 
+/** `cableEnds`: the relation to join and its two columns. */
+export interface CableEnds {
+	table: SQL
+	interface_id: SQL<number>
+	peer_interface_id: SQL<number>
+}
+
+/**
+ * Every cable once per end, as `(interface_id, peer_interface_id)`. Joined on
+ * `interface_id = <interface>` it finds the cable on an interface with a hash
+ * or index join; `a_interface_id = id OR b_interface_id = id` instead scans
+ * `cables` once per interface row.
+ */
+export function cableEnds(name = 'cable_ends'): CableEnds {
+	const ends = sql.identifier(name)
+	const { a_interface_id: a, b_interface_id: b } = cables
+	return {
+		table: sql`(
+			select ${a} as interface_id, ${b} as peer_interface_id from ${cables}
+			union all
+			select ${b}, ${a} from ${cables}
+		) as ${ends}`,
+		interface_id: sql<number>`${ends}.interface_id`,
+		peer_interface_id: sql<number>`${ends}.peer_interface_id`,
+	}
+}
+
 /** Cable with either end on one of `ifaceIds` (a list or a subquery). */
 function cableTouches(ifaceIds: number[] | SQLWrapper): SQL | undefined {
 	return or(inArray(cables.a_interface_id, ifaceIds), inArray(cables.b_interface_id, ifaceIds))

@@ -38,7 +38,6 @@ import type {
 } from 'shared/src/schemas'
 import {
 	attachments,
-	cables,
 	device_roles,
 	devices,
 	floorplan_areas,
@@ -61,6 +60,7 @@ import {
 } from '../storage'
 import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
+import { cableEnds } from './cables'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { toInterfaceJson } from './devices'
@@ -1525,11 +1525,10 @@ export async function listOutlets(
 	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
 	const local = alias(interfaces, 'local_iface')
 	// The device's own port, or the port at the other end of the outlet's cable.
+	const ends = cableEnds()
 	const localId = sql<number>`coalesce(
 		case when ${portDevice.id} = ${deviceId} then ${interfaces.id} end,
-		(select case when c.a_interface_id = ${interfaces.id} then c.b_interface_id else c.a_interface_id end
-			from ${cables} c
-			where c.a_interface_id = ${interfaces.id} or c.b_interface_id = ${interfaces.id})
+		${ends.peer_interface_id}
 	)`
 	const rows = await getDb()
 		.select({
@@ -1556,6 +1555,7 @@ export async function listOutlets(
 		.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
 		.leftJoin(sites, eq(sites.id, attachments.site_id))
 		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.leftJoin(ends.table, eq(ends.interface_id, interfaces.id))
 		.innerJoin(local, eq(local.id, localId))
 		.where(
 			and(
