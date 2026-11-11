@@ -143,6 +143,8 @@ export const de: Messages = {
 	'entity.auditLog.one': 'Audit-Log',
 	'entity.auditLog.other': 'Audit-Log',
 	'entity.changelog': 'Änderungen',
+	'entity.savedFilter.one': 'Gespeicherter Filter',
+	'entity.savedFilter.other': 'Gespeicherte Filter',
 	'entity.floorplan.one': 'Grundriss',
 	'entity.floorplan.other': 'Grundrisse',
 	'noun.tenant.one': 'Mandant',
@@ -254,6 +256,7 @@ export const de: Messages = {
 	'app.navGroup.organization': 'Firma',
 	'app.navGroup.catalog': 'Katalog',
 	'app.nav.managedService': 'MSP',
+	'app.navGroup.customization': 'Anpassung',
 	'app.navGroup.administration': 'Administration',
 	'app.tenantContext': 'Mandantenkontext',
 	'app.tenantContextGroup': 'Alle aus {name}',
@@ -995,6 +998,18 @@ export const de: Messages = {
 	'audit.userAgent': 'User-Agent',
 	'audit.target': 'Betroffener Benutzer',
 	'audit.empty': 'Noch keine Audit-Log-Einträge vorhanden.',
+
+	'savedFilter.table': 'Tabelle',
+	'savedFilter.parameters': 'Parameter',
+	'savedFilter.updated': 'Aktualisiert',
+	'savedFilter.noValues': 'Keine Filterwerte',
+	'savedFilter.empty':
+		'Noch keine gespeicherten Filter. Speichern Sie einen im Tab „Gespeicherte Filter“ einer Liste.',
+	'savedFilter.editTitle': 'Gespeicherten Filter bearbeiten: {name}',
+	'savedFilter.parametersHint':
+		'JSON-Objekt aus Filterschlüsseln und ihren Werten (Text oder Liste von Texten), wie die Liste sie speichert.',
+	'savedFilter.invalidParameters':
+		'Parameter müssen ein JSON-Objekt sein, dessen Werte Text oder Listen von Text sind.',
 	'auditEvent.loginSuccess': 'Anmeldung erfolgreich',
 	'auditEvent.loginFailure': 'Anmeldung fehlgeschlagen',
 	'auditEvent.passwordChange': 'Passwort geändert',

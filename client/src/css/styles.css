@@ -1264,6 +1264,13 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+/* Saved filter parameters as `key=value` chips (saved filters page). */
+.saved-filter-values {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+}
+
 /* Consistency finding: field, conex value, external value. Fixed leading
    tracks keep the values aligned across rows; the last one takes the rest. */
 .finding-detail {

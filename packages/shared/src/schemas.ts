@@ -3083,9 +3083,32 @@ export interface EmployeeIntegrationStatus {
 // a list of selected options, as the table hands them out.
 // ---------------------------------------------------------------------------
 
+const SavedFilterTableKeySchema = v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/))
+
 export const SavedFilterTableParamsSchema = v.object({
-	table: v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/)),
+	table: SavedFilterTableKeySchema,
 })
+
+/** One saved filter by its table and 0-based position in that table's list. */
+export const SavedFilterEntryParamsSchema = v.object({
+	table: SavedFilterTableKeySchema,
+	position: v.pipe(
+		v.string(),
+		v.regex(/^\d{1,3}$/),
+		v.transform((raw) => Number(raw)),
+	),
+})
+
+/** `?search=` matches the filter name; `?table=a,b` limits the tables. */
+export const SavedFilterListQuerySchema = v.object({
+	...ListQueryEntries,
+	table: v.optional(
+		v.pipe(CsvListSchema, v.array(SavedFilterTableKeySchema), v.transform(emptyAsUndefined)),
+		undefined,
+	),
+})
+
+export type SavedFilterListQuery = v.InferOutput<typeof SavedFilterListQuerySchema>
 
 const SavedFilterValueSchema = v.union([
 	v.pipe(v.string(), v.maxLength(500)),
@@ -3101,6 +3124,43 @@ export const SavedFilterSchema = v.strictObject({
 export const SavedFilterListSchema = v.pipe(v.array(SavedFilterSchema), v.maxLength(100))
 
 export type SavedFilterJson = v.InferOutput<typeof SavedFilterSchema>
+
+/**
+ * Replaces one saved filter. `current_name` is the name the client saw at
+ * `position`: when the list changed meanwhile, the server answers 409 instead
+ * of overwriting another filter.
+ */
+export const SavedFilterUpdateSchema = v.strictObject({
+	current_name: NameSchema,
+	filter: SavedFilterSchema,
+})
+
+export type SavedFilterUpdate = v.InferOutput<typeof SavedFilterUpdateSchema>
+
+/** Delete guard, see {@link SavedFilterUpdateSchema}. */
+export const SavedFilterDeleteQuerySchema = v.object({
+	name: NameSchema,
+})
+
+/** One saved filter of the overview across all tables. */
+export interface SavedFilterEntryJson {
+	table: string
+	/** 0-based position in the table's list (its tab order). */
+	position: number
+	name: string
+	values: SavedFilterJson['values']
+	/** Unix seconds of the table's last save. */
+	updated_at: number
+}
+
+/** Overview page plus every table key that holds saved filters (for the table filter). */
+export interface SavedFilterPageJson {
+	items: SavedFilterEntryJson[]
+	total: number
+	page: number
+	limit: number
+	tables: string[]
+}
 
 // ---------------------------------------------------------------------------
 // Calendar sync: TANSS appointments (Einsatzplanung) → Outlook calendars of

@@ -13,6 +13,7 @@ import {
 	IconBuildingSkyscraper,
 	IconCpu,
 	IconDevices,
+	IconFilter,
 	IconFlag,
 	IconFolder,
 	IconHistory,
@@ -187,6 +188,9 @@ const RacksPage = lazyPage(() => import('../pages/racks/list').then((m) => m.Rac
 const RoleAddPage = lazyPage(() => import('../pages/roles/form').then((m) => m.RoleAddPage))
 const RoleEditPage = lazyPage(() => import('../pages/roles/form').then((m) => m.RoleEditPage))
 const RolesPage = lazyPage(() => import('../pages/roles/list').then((m) => m.RolesPage))
+const SavedFiltersPage = lazyPage(() =>
+	import('../pages/saved_filters/list').then((m) => m.SavedFiltersPage),
+)
 const ServiceLevelDetailPage = lazyPage(() =>
 	import('../pages/service-levels/detail').then((m) => m.ServiceLevelDetailPage),
 )
@@ -526,6 +530,15 @@ export const SECTIONS: readonly Section[] = [
 		hideAddInNav: true,
 		list: ChangelogPage,
 		detail: ChangeDetailPage,
+	},
+	{
+		// Filters are saved from each list's "Saved filters" tab.
+		path: 'saved-filters',
+		noun: (n: number): string => tp('entity.savedFilter', n),
+		icon: IconFilter,
+		permission: null,
+		hideAddInNav: true,
+		list: SavedFiltersPage,
 	},
 ]
 
