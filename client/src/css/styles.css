@@ -1838,6 +1838,45 @@ tbody tr:last-child td {
 	list-style: none;
 }
 
+/* Mail / phone value with a small copy button that shows on hover or focus. */
+.copy-value {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	white-space: nowrap;
+}
+
+.copy-value-btn {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.1rem;
+	color: var(--text-secondary);
+	background: none;
+	border: none;
+	opacity: 0;
+}
+
+.copy-value-btn:hover {
+	color: var(--text);
+	background-color: var(--bg-hover);
+}
+
+.copy-value:hover .copy-value-btn,
+.copy-value-btn:focus-visible,
+.copy-value-done {
+	opacity: 1;
+}
+
+.copy-value-done {
+	color: var(--success);
+}
+
+@media (hover: none) {
+	.copy-value-btn {
+		opacity: 1;
+	}
+}
+
 /* Phone numbers with a scope: number, type and scope each get a column. */
 .contact-list-scoped {
 	grid-template-columns: max-content max-content auto;

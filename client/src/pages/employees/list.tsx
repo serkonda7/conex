@@ -1,6 +1,6 @@
 import { extensionDisplay, normalizePhone } from 'shared/src/phone'
 import { primaryEmail, primaryPhone } from 'shared/src/schemas'
-import type { JSX } from 'solid-js'
+import { type JSX, Show } from 'solid-js'
 import {
 	delete_employee,
 	type EmployeeRow,
@@ -8,6 +8,7 @@ import {
 	fetch_employees,
 } from '../../api/employees'
 import { fetch_tenants } from '../../api/tenancy'
+import { CopyValue } from '../../components/copy_value'
 import { type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import {
 	EntityListPage,
@@ -31,14 +32,33 @@ export function EmployeeStatus(props: { active: number }): JSX.Element {
 	)
 }
 
-/** Mail link, or a dash without an address. */
+/** Mail link with a copy button, or a dash without an address. */
 export function EmailLink(props: { email: string | null }): JSX.Element {
-	return props.email ? <a href={`mailto:${props.email}`}>{props.email}</a> : '—'
+	return (
+		<Show when={props.email} fallback="—">
+			{(email: () => string): JSX.Element => (
+				<CopyValue value={email()}>
+					<a href={`mailto:${email()}`}>{email()}</a>
+				</CopyValue>
+			)}
+		</Show>
+	)
 }
 
-/** Phone number as a `tel:` link (dialing its normalized form), or `—`. */
+/**
+ * Phone number as a `tel:` link (dialing its normalized form) with a copy
+ * button, or `—`.
+ */
 export function PhoneLink(props: { number: string | null }): JSX.Element {
-	return props.number ? <a href={`tel:${normalizePhone(props.number)}`}>{props.number}</a> : '—'
+	return (
+		<Show when={props.number} fallback="—">
+			{(number: () => string): JSX.Element => (
+				<CopyValue value={number()}>
+					<a href={`tel:${normalizePhone(number())}`}>{number()}</a>
+				</CopyValue>
+			)}
+		</Show>
+	)
 }
 
 /**
