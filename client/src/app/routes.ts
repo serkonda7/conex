@@ -17,6 +17,7 @@ import {
 	IconFlag,
 	IconFolder,
 	IconHistory,
+	IconLayoutColumns,
 	IconLayoutDashboard,
 	IconListDetails,
 	IconLocation,
@@ -190,6 +191,9 @@ const RoleEditPage = lazyPage(() => import('../pages/roles/form').then((m) => m.
 const RolesPage = lazyPage(() => import('../pages/roles/list').then((m) => m.RolesPage))
 const SavedFiltersPage = lazyPage(() =>
 	import('../pages/saved_filters/list').then((m) => m.SavedFiltersPage),
+)
+const SavedLayoutsPage = lazyPage(() =>
+	import('../pages/saved_layouts/list').then((m) => m.SavedLayoutsPage),
 )
 const ServiceLevelDetailPage = lazyPage(() =>
 	import('../pages/service-levels/detail').then((m) => m.ServiceLevelDetailPage),
@@ -539,6 +543,15 @@ export const SECTIONS: readonly Section[] = [
 		permission: null,
 		hideAddInNav: true,
 		list: SavedFiltersPage,
+	},
+	{
+		// Layouts are saved from the arrow beside each table's "Columns" button.
+		path: 'saved-layouts',
+		noun: (n: number): string => tp('entity.savedLayout', n),
+		icon: IconLayoutColumns,
+		permission: null,
+		hideAddInNav: true,
+		list: SavedLayoutsPage,
 	},
 ]
 

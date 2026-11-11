@@ -11,7 +11,6 @@ import {
 	type SavedFilterPageJson,
 	update_saved_filter,
 } from '../../api/saved_filters'
-import { routeSection } from '../../app/routes'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
 import { Hint, TextAreaField, TextField } from '../../components/form'
@@ -27,19 +26,8 @@ import { MoreActionsButton } from '../../components/more_actions_button'
 import { t, tp } from '../../i18n'
 import { usePagedList } from '../../lib/paged_list'
 import { useAction } from '../../lib/resource'
+import { tableHref, tableLabel } from '../../lib/table_keys'
 import { formatTime } from '../../lib/time'
-
-/** Localized name of a table key (its list section), or the raw key for unknown tables. */
-function tableLabel(table: string): string {
-	const section = routeSection(`/${table}`)
-	return section && section.path === table ? (section.navLabel?.() ?? section.noun(2)) : table
-}
-
-/** List page of a table key, when the key names a routed list. */
-function tableHref(table: string): string | undefined {
-	const section = routeSection(`/${table}`)
-	return section && section.path === table && section.list ? `/${table}` : undefined
-}
 
 function rowKey(entry: SavedFilterEntryJson): string {
 	return `${entry.table}/${entry.position}`

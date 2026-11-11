@@ -146,6 +146,8 @@ export const en = {
 	'entity.changelog': 'Changelog',
 	'entity.savedFilter.one': 'Saved filter',
 	'entity.savedFilter.other': 'Saved filters',
+	'entity.savedLayout.one': 'Saved layout',
+	'entity.savedLayout.other': 'Saved layouts',
 	'entity.floorplan.one': 'Floor plan',
 	'entity.floorplan.other': 'Floor plans',
 	'noun.tenant.one': 'tenant',
@@ -194,6 +196,8 @@ export const en = {
 	'noun.role.other': 'roles',
 	'noun.savedFilter.one': 'saved filter',
 	'noun.savedFilter.other': 'saved filters',
+	'noun.savedLayout.one': 'saved layout',
+	'noun.savedLayout.other': 'saved layouts',
 	'noun.auditEntry.one': 'audit log entry',
 	'noun.auditEntry.other': 'audit log entries',
 	'noun.change.one': 'change',
@@ -231,6 +235,9 @@ export const en = {
 	'table.filterName': 'Filter name',
 	'table.clearSavedFilter': 'Clear saved filter',
 	'table.removeValue': 'Remove',
+	'table.savedLayouts': 'Saved layouts',
+	'table.saveLayout': 'Save layout',
+	'table.layoutName': 'Layout name',
 
 	// app
 	'app.skipToContent': 'Skip to content',
@@ -1001,6 +1008,17 @@ export const en = {
 		'JSON object of filter keys and their values (text or a list of texts), as the list stores them.',
 	'savedFilter.invalidParameters':
 		'Parameters must be a JSON object whose values are text or lists of text.',
+
+	'savedLayout.columns': 'Columns',
+	'savedLayout.layout': 'Layout',
+	'savedLayout.noColumns': 'No columns',
+	'savedLayout.empty':
+		'No saved layouts yet. Save one from the arrow beside the "Columns" button of a table.',
+	'savedLayout.editTitle': 'Edit saved layout: {name}',
+	'savedLayout.layoutHint':
+		'JSON object with "visibleColumns" (shown column keys), "columnOrder" (every column key in order) and optional "columnWidths" (pixel widths by column key).',
+	'savedLayout.invalidLayout':
+		'The layout must be a JSON object with "visibleColumns" and "columnOrder" as lists of text and optional "columnWidths" as whole pixel numbers.',
 	'auditEvent.loginSuccess': 'Login succeeded',
 	'auditEvent.loginFailure': 'Login failed',
 	'auditEvent.passwordChange': 'Password changed',

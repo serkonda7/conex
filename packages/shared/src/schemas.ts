@@ -3163,6 +3163,61 @@ export interface SavedFilterPageJson {
 }
 
 // ---------------------------------------------------------------------------
+// Saved layouts: named DataTable column layouts (visible columns, order,
+// pixel widths), stored per table for all users like the saved filters.
+// The table key, entry and list query params are shared with them.
+// ---------------------------------------------------------------------------
+
+const ColumnKeySchema = v.pipe(v.string(), v.maxLength(100))
+
+export const SavedLayoutSchema = v.strictObject({
+	name: NameSchema,
+	layout: v.strictObject({
+		visibleColumns: v.pipe(v.array(ColumnKeySchema), v.maxLength(200)),
+		columnOrder: v.pipe(v.array(ColumnKeySchema), v.maxLength(200)),
+		columnWidths: v.optional(
+			v.record(
+				ColumnKeySchema,
+				v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10000)),
+			),
+		),
+	}),
+})
+
+/** Full list of a table's saved layouts; a PUT replaces the stored list. */
+export const SavedLayoutListSchema = v.pipe(v.array(SavedLayoutSchema), v.maxLength(100))
+
+export type SavedLayoutJson = v.InferOutput<typeof SavedLayoutSchema>
+
+/** Replaces one saved layout, guarded like {@link SavedFilterUpdateSchema}. */
+export const SavedLayoutUpdateSchema = v.strictObject({
+	current_name: NameSchema,
+	layout: SavedLayoutSchema,
+})
+
+export type SavedLayoutUpdate = v.InferOutput<typeof SavedLayoutUpdateSchema>
+
+/** One saved layout of the overview across all tables. */
+export interface SavedLayoutEntryJson {
+	table: string
+	/** 0-based position in the table's list (its menu order). */
+	position: number
+	name: string
+	layout: SavedLayoutJson['layout']
+	/** Unix seconds of the table's last save. */
+	updated_at: number
+}
+
+/** Overview page plus every table key that holds saved layouts (for the table filter). */
+export interface SavedLayoutPageJson {
+	items: SavedLayoutEntryJson[]
+	total: number
+	page: number
+	limit: number
+	tables: string[]
+}
+
+// ---------------------------------------------------------------------------
 // Calendar sync: TANSS appointments (Einsatzplanung) → Outlook calendars of
 // the mapped technicians through Microsoft Graph. One direction only; all
 // routes need `integrations.manage`. See `docs/src/integrations/calendar-sync.md`.

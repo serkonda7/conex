@@ -1264,7 +1264,8 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
-/* Saved filter parameters as `key=value` chips (saved filters page). */
+/* Saved filter parameters / saved layout columns as code chips (saved filters
+   and saved layouts pages). */
 .saved-filter-values {
 	display: flex;
 	flex-wrap: wrap;
@@ -2066,6 +2067,13 @@ tbody tr:last-child td {
 	--combobox-hover-bg: var(--bg-hover);
 	--combobox-muted: var(--text-muted);
 	--combobox-accent: var(--primary);
+	--combobox-chip-bg: var(--bg-hover);
+}
+
+/* Picked values of a multi-select combobox match the filter pills: neutral
+   tags with green text. */
+.combobox-chip {
+	color: var(--primary-text);
 }
 
 .app-content .form-stacked .field .combobox {
