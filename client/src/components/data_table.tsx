@@ -4,7 +4,7 @@
  * form) replaced by localized defaults. Pages import them from here instead
  * of the package. Both enable column resizing by default (opt out with
  * `resizableColumns={false}`). `FilterTable` also persists its saved filters globally
- * when given a `savedFiltersKey`.
+ * and the applied filters per browser when given a `savedFiltersKey`.
  */
 import {
 	DataTable as BaseDataTable,
@@ -18,6 +18,7 @@ import {
 } from '@serkonda7/solid-components'
 import { type JSX, mergeProps, splitProps } from 'solid-js'
 import { t } from '../i18n'
+import { useTabPath } from '../lib/router'
 import { use_saved_filters } from '../lib/saved_filters'
 import { InlineError } from './feedback'
 
@@ -64,12 +65,16 @@ export function DataTable<TRow>(props: DataTableProps<TRow>): JSX.Element {
 /**
  * `savedFiltersKey` turns on saved filters, stored on the server under that
  * table key and shared by all users; a failed load or save shows below the table.
+ * It also keeps the applied filters in localStorage under
+ * `conex:filters:<key>`, restored on the next visit unless the tab was opened
+ * with a query (a deep link such as `/sites?tenant=<id>` sets its own filters).
  */
 export function FilterTable<TRow>(
 	props: FilterTableProps<TRow> & { savedFiltersKey?: string },
 ): JSX.Element {
 	const [local, tableProps] = splitProps(props, ['savedFiltersKey'])
 	const saved = local.savedFiltersKey ? use_saved_filters(local.savedFiltersKey) : undefined
+	const deepLink = useTabPath().split('#')[0]?.includes('?') ?? false
 	const merged = mergeProps(
 		{ resizableColumns: true },
 		tableLabels(),
@@ -93,6 +98,8 @@ export function FilterTable<TRow>(
 			? {
 					savedFilters: saved.savedFilters,
 					onSavedFiltersChange: saved.onSavedFiltersChange,
+					filterStorageKey: `conex:filters:${local.savedFiltersKey}`,
+					restoreFilters: !deepLink,
 				}
 			: {},
 		tableProps,
