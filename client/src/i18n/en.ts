@@ -227,6 +227,7 @@ export const en = {
 	'table.savedFilters': 'Saved filters',
 	'table.filterName': 'Filter name',
 	'table.clearSavedFilter': 'Clear saved filter',
+	'table.removeValue': 'Remove',
 
 	// app
 	'app.skipToContent': 'Skip to content',

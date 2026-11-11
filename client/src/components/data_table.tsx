@@ -93,6 +93,7 @@ export function FilterTable<TRow>(
 			saveNameLabel: t('table.filterName'),
 			cancelLabel: t('common.cancel'),
 			clearSavedFilterLabel: t('table.clearSavedFilter'),
+			removeLabel: t('table.removeValue'),
 		},
 		saved
 			? {

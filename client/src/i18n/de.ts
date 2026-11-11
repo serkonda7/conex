@@ -229,6 +229,7 @@ export const de: Messages = {
 	'table.savedFilters': 'Gespeicherte Filter',
 	'table.filterName': 'Filtername',
 	'table.clearSavedFilter': 'Gespeicherten Filter entfernen',
+	'table.removeValue': 'Entfernen',
 
 	// app
 	'app.skipToContent': 'Zum Inhalt springen',

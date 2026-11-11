@@ -2263,6 +2263,36 @@ tbody tr:last-child td {
 	color: var(--primary-contrast);
 }
 
+/* Filter pills: applied filters are neutral tags with green text, "save" is
+   outlined green like the active status badge, "clear all" is red text. */
+.filter-table-pill {
+	border-color: var(--border-strong);
+	background: var(--bg-raised);
+	color: var(--primary-text);
+}
+
+.filter-table-pill:hover {
+	border-color: var(--text-secondary);
+	background: var(--bg-hover);
+}
+
+.filter-table-pill.filter-table-pill-save,
+.filter-table-pill.filter-table-pill-save:hover {
+	border-color: var(--success);
+	color: var(--success);
+}
+
+.filter-table-pill.filter-table-pill-clear,
+.filter-table-pill.filter-table-pill-clear:hover {
+	border-color: transparent;
+	background: transparent;
+	color: var(--error);
+}
+
+.filter-table-pill.filter-table-pill-clear:hover {
+	text-decoration: underline;
+}
+
 /* Table cell helpers. */
 .cell-checkbox {
 	width: 2rem;
