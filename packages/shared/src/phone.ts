@@ -56,3 +56,17 @@ export function extensionNumber(extension: string, mainNumber: string | null): s
 	}
 	return normalizePhone(mainNumber.slice(0, cut)) + digits
 }
+
+/**
+ * Extension as written with the tenant's main number up to its last `-`
+ * (`12` with `+49 (0)521 44709-0` → `+49 (0)521 44709-12`). `null` if the
+ * main number has no `-` separating the extension.
+ */
+export function extensionDisplay(extension: string, mainNumber: string | null): string | null {
+	const cut = mainNumber?.lastIndexOf('-') ?? -1
+	const ext = extension.trim().replace(/^-/, '')
+	if (mainNumber == null || cut === -1 || ext === '') {
+		return null
+	}
+	return mainNumber.slice(0, cut + 1) + ext
+}

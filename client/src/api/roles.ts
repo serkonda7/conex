@@ -9,11 +9,19 @@ import { by_id, client, failed, getPage, paging, to_query, to_result } from './c
 
 export type { RoleJson }
 
+export type RoleSort = RoleListQuery['sort']
+
 export async function fetch_roles(
 	filters?: Partial<RoleListQuery>,
 ): Promise<Result<Page<RoleJson>, Error>> {
 	return getPage<RoleJson>(
-		client.roles.$get({ query: to_query({ ...paging(filters) }) }),
+		client.roles.$get({
+			query: to_query({
+				...paging(filters),
+				sort: filters?.sort ?? 'name',
+				order: filters?.order ?? 'asc',
+			}),
+		}),
 		failed.list('noun.role'),
 	)
 }

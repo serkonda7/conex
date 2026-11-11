@@ -3,7 +3,7 @@
  * client. Errors surface as `Result.err` with the server's `{ error }`
  * message.
  */
-import { Result } from 'better-result'
+import type { Result } from 'better-result'
 import type {
 	DeviceListItem,
 	DevicePortJson,
@@ -24,7 +24,16 @@ import type {
 	TemplateSyncApply,
 	TemplateSyncPreview,
 } from 'shared/src/types'
-import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
+import {
+	by_id,
+	client,
+	failed,
+	fetch_all_pages,
+	getPage,
+	paging,
+	to_query,
+	to_result,
+} from './client'
 
 export type { DeviceListItem, DevicePortJson, DeviceRow, InterfaceJson, PanelJackJson }
 
@@ -79,22 +88,12 @@ export type DeviceListDevice = Extract<DeviceListItem, { kind: 'device' }>
 export async function fetch_all_devices_of_type(
 	deviceTypeId: number,
 ): Promise<Result<DeviceListDevice[], Error>> {
-	const rows: DeviceListDevice[] = []
-	for (let page = 1; ; page++) {
-		const result = await fetch_device_list({
-			device_type: deviceTypeId,
-			kind: 'device',
-			page,
-			limit: 200,
-		})
-		if (Result.isError(result)) {
-			return result
-		}
-		rows.push(...result.value.items.filter((row) => row.kind === 'device'))
-		if (rows.length >= result.value.total || result.value.items.length === 0) {
-			return Result.ok(rows)
-		}
-	}
+	const rows = await fetch_all_pages((page) =>
+		fetch_device_list({ device_type: deviceTypeId, kind: 'device', ...page }),
+	)
+	return rows.map((items) =>
+		items.filter((row): row is DeviceListDevice => row.kind === 'device'),
+	)
 }
 
 export async function fetch_device(id: number): Promise<Result<DeviceRow, Error>> {

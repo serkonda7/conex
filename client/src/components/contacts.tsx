@@ -11,6 +11,7 @@ import { createSignal, For, Index, type JSX, Show } from 'solid-js'
 import { t } from '../i18n'
 import { contactScopeLabel, phoneTypeLabel, phoneTypeOptions } from '../i18n/labels'
 import { EmailLink } from '../pages/employees/list'
+import { CopyValue } from './copy_value'
 import { Field } from './form'
 
 // ---------------------------------------------------------------------------
@@ -363,7 +364,9 @@ export function PhoneList(props: {
 								}
 							>
 								{(tel: () => string): JSX.Element => (
-									<a href={`tel:${tel()}`}>{p.number}</a>
+									<CopyValue value={p.number}>
+										<a href={`tel:${tel()}`}>{p.number}</a>
+									</CopyValue>
 								)}
 							</Show>
 							<span class="text-muted">{phoneTypeLabel(p.type)}</span>

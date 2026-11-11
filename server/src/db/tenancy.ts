@@ -72,6 +72,7 @@ import {
 	pageOf,
 	pageRows,
 	pickDefined,
+	relatedValue,
 	scopeCondition,
 	searchCondition,
 	type TenantFilterParams,
@@ -94,15 +95,16 @@ export type LocationRow = typeof locations.$inferSelect
  */
 export type LocationListRow = LocationRow & {
 	site_name: string
+	tenant_name: string | null
 	depth: number
 	child_count: number
 	ancestor_ids: number[]
 }
 
 export interface TenantListParams extends ListParams {
-	/** Only tenants of this tenant group. */
-	group?: number
-	sort: 'name' | 'customer_number'
+	/** Only tenants of these tenant groups. */
+	group?: number[]
+	sort: 'name' | 'customer_number' | 'group' | 'sites' | 'racks' | 'devices'
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to these
@@ -139,7 +141,7 @@ async function checkNoDependents(
 // ---------------------------------------------------------------------------
 
 export interface TenantGroupListParams extends ListParams {
-	sort: 'name' | 'description'
+	sort: 'name' | 'description' | 'tenants'
 	order: 'asc' | 'desc'
 	/**
 	 * Tenant scope for scoped editors/viewers: restricts the list to the
@@ -162,14 +164,18 @@ export async function listTenantGroups(
 			? sql`${tenant_groups.id} IN (SELECT ${tenants.tenant_group_id} FROM ${tenants} WHERE ${inTenants(tenants.id, params.scopeTenantIds)})`
 			: undefined,
 	)
-	const orderColumn =
-		params.sort === 'description' ? tenant_groups.description : tenant_groups.name
+	const tenantCount = countWhere(tenants.tenant_group_id, tenant_groups.id)
+	const orderColumn = {
+		name: tenant_groups.name,
+		description: tenant_groups.description,
+		tenants: tenantCount,
+	}[params.sort]
 	return await pageRows(
 		tenant_groups,
 		where,
-		[orderOf(orderColumn, params.order), asc(tenant_groups.id)],
+		[orderOf(orderColumn, params.order), asc(tenant_groups.name), asc(tenant_groups.id)],
 		params,
-		{ tenant_count: countWhere(tenants.tenant_group_id, tenant_groups.id) },
+		{ tenant_count: tenantCount },
 	)
 }
 
@@ -277,22 +283,30 @@ export async function listTenants(params: TenantListParams): Promise<Page<Tenant
 			sql`jsonb_path_query_array(${tenants.emails}, '$[*].address')::text`,
 			sql`jsonb_path_query_array(${tenants.phones}, '$[*].number')::text`,
 		]),
-		params.group !== undefined ? eq(tenants.tenant_group_id, params.group) : undefined,
+		params.group ? inArray(tenants.tenant_group_id, params.group) : undefined,
 		scopeCondition(tenants.id, params.scopeTenantIds),
 	)
-	const orderColumn = params.sort === 'customer_number' ? tenants.customer_number : tenants.name
 	// NetBox-style related-object counts for the list view, selected with
 	// the page so this stays one statement instead of O(page size).
+	const counts = {
+		site_count: countWhere(sites.tenant_id, tenants.id),
+		rack_count: countWhere(racks.tenant_id, tenants.id),
+		device_count: countWhere(devices.tenant_id, tenants.id),
+	}
+	const orderColumn = {
+		name: tenants.name,
+		customer_number: tenants.customer_number,
+		group: relatedValue(tenant_groups.name, tenant_groups.id, tenants.tenant_group_id),
+		sites: counts.site_count,
+		racks: counts.rack_count,
+		devices: counts.device_count,
+	}[params.sort]
 	return await pageRows(
 		tenants,
 		where,
-		[orderOf(orderColumn, params.order), asc(tenants.id)],
+		[orderOf(orderColumn, params.order), asc(tenants.name), asc(tenants.id)],
 		params,
-		{
-			site_count: countWhere(sites.tenant_id, tenants.id),
-			rack_count: countWhere(racks.tenant_id, tenants.id),
-			device_count: countWhere(devices.tenant_id, tenants.id),
-		},
+		counts,
 	)
 }
 
@@ -528,19 +542,29 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 // ---------------------------------------------------------------------------
 
 export interface SiteListParams extends ListParams, TenantFilterParams {
-	group?: number
-	sort: 'name' | 'description'
+	group?: number[]
+	sort: 'name' | 'description' | 'tenant' | 'group'
 	order: 'asc' | 'desc'
 }
 
 export function listSites(params: SiteListParams): Promise<Page<SiteRow>> {
 	const where = and(
 		searchCondition(params.search, [sites.name, sites.description]),
-		params.group ? eq(sites.site_group_id, params.group) : undefined,
+		params.group ? inArray(sites.site_group_id, params.group) : undefined,
 		...tenantConditions(sites.tenant_id, params),
 	)
-	const orderColumn = params.sort === 'description' ? sites.description : sites.name
-	return pageRows(sites, where, [orderOf(orderColumn, params.order), asc(sites.id)], params)
+	const orderColumn = {
+		name: sites.name,
+		description: sites.description,
+		tenant: relatedValue(tenants.name, tenants.id, sites.tenant_id),
+		group: relatedValue(site_groups.name, site_groups.id, sites.site_group_id),
+	}[params.sort]
+	return pageRows(
+		sites,
+		where,
+		[orderOf(orderColumn, params.order), asc(sites.name), asc(sites.id)],
+		params,
+	)
 }
 
 export function getSite(id: number): Promise<Result<SiteRow, Error>> {
@@ -666,7 +690,7 @@ export async function deleteSite(
 // ---------------------------------------------------------------------------
 
 export interface SiteGroupListParams extends ListParams, TenantFilterParams {
-	sort: 'name' | 'description'
+	sort: 'name' | 'description' | 'tenant'
 	order: 'asc' | 'desc'
 }
 
@@ -675,11 +699,15 @@ export function listSiteGroups(params: SiteGroupListParams): Promise<Page<SiteGr
 		searchCondition(params.search, [site_groups.name, site_groups.description]),
 		...tenantConditions(site_groups.tenant_id, params),
 	)
-	const orderColumn = params.sort === 'description' ? site_groups.description : site_groups.name
+	const orderColumn = {
+		name: site_groups.name,
+		description: site_groups.description,
+		tenant: relatedValue(tenants.name, tenants.id, site_groups.tenant_id),
+	}[params.sort]
 	return pageRows(
 		site_groups,
 		where,
-		[orderOf(orderColumn, params.order), asc(site_groups.id)],
+		[orderOf(orderColumn, params.order), asc(site_groups.name), asc(site_groups.id)],
 		params,
 	)
 }
@@ -766,7 +794,7 @@ export interface LocationListParams extends ListParams, TenantFilterParams {
 	site?: number[]
 	parent?: number
 	type?: LocationType[]
-	sort: 'name' | 'description' | 'type' | 'site'
+	sort: 'name' | 'description' | 'type' | 'site' | 'tenant'
 	order: 'asc' | 'desc'
 }
 
@@ -779,9 +807,14 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 		...tenantConditions(locations.tenant_id, params),
 	)
 	const matching = await getDb()
-		.select({ ...getTableColumns(locations), site_name: sites.name })
+		.select({
+			...getTableColumns(locations),
+			site_name: sites.name,
+			tenant_name: tenants.name,
+		})
 		.from(locations)
 		.innerJoin(sites, eq(sites.id, locations.site_id))
+		.leftJoin(tenants, eq(tenants.id, locations.tenant_id))
 		.where(where)
 	const ordered = sortHierarchically(
 		matching,
@@ -790,7 +823,9 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 			? (l: (typeof matching)[number]): number => LOCATION_TYPES.indexOf(l.type)
 			: params.sort === 'site'
 				? 'site_name'
-				: params.sort,
+				: params.sort === 'tenant'
+					? 'tenant_name'
+					: params.sort,
 		params.order,
 	)
 	const linked = withTreeLinks(ordered)

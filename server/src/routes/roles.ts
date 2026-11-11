@@ -24,7 +24,13 @@ export const rolesApp = new Hono()
 	.get('/', vValidator('query', RoleListQuerySchema, onValidationError), async (c) => {
 		const query = c.req.valid('query')
 		return c.json(
-			await listRoles({ search: query.search, page: query.page, limit: query.limit }),
+			await listRoles({
+				search: query.search,
+				page: query.page,
+				limit: query.limit,
+				sort: query.sort,
+				order: query.order,
+			}),
 		)
 	})
 	.post('/', vValidator('json', RoleCreateSchema, onValidationError), async (c) => {

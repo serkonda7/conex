@@ -75,6 +75,7 @@ import {
 	isPatchEmpty,
 	type ListParams,
 	offsetOf,
+	orderOf,
 	type Page,
 	pageOf,
 	pickDefined,
@@ -1588,12 +1589,16 @@ export async function listOutlets(
 
 /**
  * One page of the marked floor plans whose owner matches the tenant filters,
- * ordered by site and owner name. `search` matches the owner or site name. The
+ * ordered by `params.sort` (site by default), then site and owner name. `search` matches the owner or site name. The
  * area and marker counts leave out content outside `params.scopeTenantIds`, like
  * `getPlan`.
  */
 export async function listFloorplans(
-	params: TenantFilterParams & ListParams,
+	params: TenantFilterParams &
+		ListParams & {
+			sort: 'owner' | 'type' | 'site' | 'tenant'
+			order: 'asc' | 'desc'
+		},
 ): Promise<Page<FloorplanListJson>> {
 	const ownerSite = alias(sites, 'owner_site')
 	const ownerTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
@@ -1623,7 +1628,20 @@ export async function listFloorplans(
 		)
 		.leftJoin(tenants, eq(tenants.id, ownerTenant))
 		.where(where)
-		.orderBy(asc(ownerSite.name), asc(ownerName), asc(attachments.id))
+		.orderBy(
+			orderOf(
+				{
+					owner: ownerName,
+					type: locations.type,
+					site: ownerSite.name,
+					tenant: tenants.name,
+				}[params.sort],
+				params.order,
+			),
+			asc(ownerSite.name),
+			asc(ownerName),
+			asc(attachments.id),
+		)
 		.limit(params.limit)
 		.offset(offsetOf(params))
 	const [{ total }] = await getDb()

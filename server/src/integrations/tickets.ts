@@ -22,26 +22,14 @@ import { devices, employee_tenants, employees, priorities, tenants } from '../sc
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { normalizeName } from './match'
-import { getIntegrationRow, providerFor } from './store'
-import type { ExternalTicket, IntegrationProvider } from './types'
+import { enabledProvider, enabledProviderFor, getIntegrationRow } from './store'
+import type { ExternalTicket } from './types'
 
 /** Ticket lists are fetched from the external system at most this often. */
 const TICKET_CACHE_SECONDS = 30 * 60
 
 /** `provider:externalCompanyId` → last fetched open tickets. */
 const ticketCache = new Map<string, { fetched_at: number; tickets: ExternalTicket[] }>()
-
-/** Provider instance of an enabled integration. */
-async function enabledProvider(provider: ProviderId): Promise<Result<IntegrationProvider, Error>> {
-	const row = await getIntegrationRow(provider)
-	if (Result.isError(row)) {
-		return row
-	}
-	if (!row.value.enabled) {
-		return Result.err(new ValidationError('Integration is disabled'))
-	}
-	return providerFor(row.value)
-}
 
 export async function createTicket(
 	provider: ProviderId,
@@ -163,10 +151,7 @@ export async function listTickets(
 			tickets: await withPriorities(cached.tickets),
 		})
 	}
-	if (!row.value.enabled) {
-		return Result.err(new ValidationError('Integration is disabled'))
-	}
-	const built = providerFor(row.value)
+	const built = enabledProviderFor(row.value)
 	if (Result.isError(built)) {
 		return built
 	}

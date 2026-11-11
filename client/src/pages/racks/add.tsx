@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, type JSX } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { create_rack } from '../../api/racks'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
@@ -18,7 +18,7 @@ import {
 } from '../../lib/form'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
-import { newObjectTenantId, rowsOfTenant } from '../../lib/tenant_context'
+import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
 import { useRackTypeOptions } from '../rack_types/options'
 
 /** Id of the hint under the rack-type select. */
@@ -43,13 +43,7 @@ export function RackAddPage(): JSX.Element {
 	)
 
 	// The tenant comes from the global tenant selection, which also limits the sites.
-	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
-	createEffect(() => {
-		const id = parseId(siteId())
-		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
-			handleSiteChange('')
-		}
-	})
+	const siteOptions = useNewObjectSites(sites, siteId, () => handleSiteChange(''))
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)

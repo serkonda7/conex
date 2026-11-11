@@ -28,6 +28,7 @@ import {
 	POE_TYPES,
 	PORT_SIDES,
 	type SavedFilterJson,
+	type SavedLayoutJson,
 	type ServiceWindow,
 	type TenantEmail,
 	type TenantPhone,
@@ -1132,6 +1133,14 @@ export const object_changes = pgTable(
 export const saved_filters = pgTable('saved_filters', {
 	table_key: text('table_key').primaryKey(),
 	filters: jsonb('filters').$type<SavedFilterJson[]>().notNull().default(sql`'[]'::jsonb`),
+	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+})
+
+// Saved DataTable column layouts, shared by all users; one row per table
+// like `saved_filters`, `layouts` holds the whole ordered `SavedLayoutJson[]`.
+export const saved_layouts = pgTable('saved_layouts', {
+	table_key: text('table_key').primaryKey(),
+	layouts: jsonb('layouts').$type<SavedLayoutJson[]>().notNull().default(sql`'[]'::jsonb`),
 	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
 })
 

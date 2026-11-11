@@ -45,6 +45,7 @@ export function SiteGroupsPage(): JSX.Element {
 				{
 					key: 'tenant',
 					label: tp('entity.tenant', 1),
+					sortable: true,
 					getValue: (g: SiteGroupRow): string => tenantName(g.tenant_id),
 				},
 			]}

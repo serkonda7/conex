@@ -418,7 +418,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	filters?: readonly ListFilter[]
 	filtered?: boolean
 	columns: DataTableColumn<Row>[]
-	/** Storage key of the persisted column choice and the saved filters. */
+	/** Storage key of the persisted column choice, the saved filters and layouts. */
 	columnsKey: string
 	defaultColumns?: string[]
 	rowName: (row: Row) => string
@@ -494,6 +494,7 @@ export function EntityListPage<Row extends { id: number }>(props: {
 				filterValues={filters.filterValues}
 				onFilterValuesChange={filters.onFilterValuesChange}
 				savedFiltersKey={props.columnsKey}
+				savedLayoutsKey={props.columnsKey}
 				manualFiltering
 				quickSearchLabel={t('list.searchLabel', { noun: nouns() })}
 				getRowId={keyOf}

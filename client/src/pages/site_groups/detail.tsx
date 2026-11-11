@@ -31,7 +31,7 @@ export function SiteGroupDetailPage(props: { id: number }): JSX.Element {
 	const [group] = createRecord(id, fetch_site_group, setError)
 	const tenantId = (): number | null | undefined => group()?.tenant_id
 	const [tenant] = createRecord(tenantId, fetch_tenant, setError)
-	const [sites] = createRowsFor(id, (key: number) => fetch_sites({ group: key }), setError)
+	const [sites] = createRowsFor(id, (key: number) => fetch_sites({ group: [key] }), setError)
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.siteGroup',

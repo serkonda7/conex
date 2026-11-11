@@ -17,7 +17,7 @@ import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { localDevices } from './report'
 import { upsertDevice } from './snapshot'
-import { getIntegrationRow, providerFor } from './store'
+import { enabledProvider } from './store'
 
 export async function updateExternalDevice(
 	provider: ProviderId,
@@ -36,14 +36,7 @@ export async function updateExternalDevice(
 	if (value === null) {
 		return Result.err(new ValidationError(`Device has no ${field}`))
 	}
-	const row = await getIntegrationRow(provider)
-	if (Result.isError(row)) {
-		return row
-	}
-	if (!row.value.enabled) {
-		return Result.err(new ValidationError('Integration is disabled'))
-	}
-	const built = providerFor(row.value)
+	const built = await enabledProvider(provider)
 	if (Result.isError(built)) {
 		return built
 	}

@@ -1,5 +1,6 @@
+import { extensionDisplay, normalizePhone } from 'shared/src/phone'
 import { primaryEmail, primaryPhone } from 'shared/src/schemas'
-import type { JSX } from 'solid-js'
+import { type JSX, Show } from 'solid-js'
 import {
 	delete_employee,
 	type EmployeeRow,
@@ -7,6 +8,7 @@ import {
 	fetch_employees,
 } from '../../api/employees'
 import { fetch_tenants } from '../../api/tenancy'
+import { CopyValue } from '../../components/copy_value'
 import { type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import {
 	EntityListPage,
@@ -30,9 +32,33 @@ export function EmployeeStatus(props: { active: number }): JSX.Element {
 	)
 }
 
-/** Mail link, or a dash without an address. */
+/** Mail link with a copy button, or a dash without an address. */
 export function EmailLink(props: { email: string | null }): JSX.Element {
-	return props.email ? <a href={`mailto:${props.email}`}>{props.email}</a> : '—'
+	return (
+		<Show when={props.email} fallback="—">
+			{(email: () => string): JSX.Element => (
+				<CopyValue value={email()}>
+					<a href={`mailto:${email()}`}>{email()}</a>
+				</CopyValue>
+			)}
+		</Show>
+	)
+}
+
+/**
+ * Phone number as a `tel:` link (dialing its normalized form) with a copy
+ * button, or `—`.
+ */
+export function PhoneLink(props: { number: string | null }): JSX.Element {
+	return (
+		<Show when={props.number} fallback="—">
+			{(number: () => string): JSX.Element => (
+				<CopyValue value={number()}>
+					<a href={`tel:${normalizePhone(number())}`}>{number()}</a>
+				</CopyValue>
+			)}
+		</Show>
+	)
 }
 
 /**
@@ -58,6 +84,20 @@ export function EmployeesPage(): JSX.Element {
 	})
 	const [tenants] = createRows(fetch_tenants, list.setError)
 	const tenantName = useNameOf(tenants)
+	/**
+	 * Work number of an employee: its extension completed with the main number
+	 * of its first visible tenant, else its first phone number.
+	 */
+	const workPhone = (e: EmployeeRow): string | null => {
+		const extension = primaryPhone(e.phones, 'extension')
+		if (extension === null) {
+			return primaryPhone(e.phones, 'phone')
+		}
+		const tenant = e.tenant_ids
+			.map((id) => tenants()?.find((row) => row.id === id))
+			.find((row) => row !== undefined)
+		return extensionDisplay(extension, primaryPhone(tenant?.phones ?? [], 'phone')) ?? extension
+	}
 
 	const columns: DataTableColumn<EmployeeRow>[] = [
 		{
@@ -81,6 +121,7 @@ export function EmployeesPage(): JSX.Element {
 		{
 			key: 'salutation',
 			label: t('employee.salutation'),
+			sortable: true,
 			getValue: (e: EmployeeRow): string =>
 				e.salutation === null ? '—' : employeeSalutationLabel(e.salutation),
 		},
@@ -99,12 +140,14 @@ export function EmployeesPage(): JSX.Element {
 		{
 			key: 'phone',
 			label: t('employee.phone'),
-			getValue: (e: EmployeeRow): string => primaryPhone(e.phones, 'phone') ?? '—',
+			getValue: (e: EmployeeRow): JSX.Element => <PhoneLink number={workPhone(e)} />,
 		},
 		{
 			key: 'mobile',
 			label: t('employee.mobile'),
-			getValue: (e: EmployeeRow): string => primaryPhone(e.phones, 'mobile') ?? '—',
+			getValue: (e: EmployeeRow): JSX.Element => (
+				<PhoneLink number={primaryPhone(e.phones, 'mobile')} />
+			),
 		},
 		{
 			key: 'tenant',
@@ -119,9 +162,10 @@ export function EmployeesPage(): JSX.Element {
 		{
 			key: 'status',
 			label: t('common.status'),
+			sortable: true,
 			getValue: (e: EmployeeRow): JSX.Element => <EmployeeStatus active={e.active} />,
 		},
-		descriptionColumn(),
+		descriptionColumn({ sortable: true }),
 	]
 
 	return (

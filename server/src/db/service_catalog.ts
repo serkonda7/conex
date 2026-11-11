@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import type {
 	ManagedBundleCreate,
 	ManagedBundleListQuery,
@@ -157,7 +157,7 @@ export type ServiceLevelListRow = ServiceLevelRow & { target_count: number }
 const SERVICE_LEVEL_NAME_IN_USE = 'Service level name is already in use'
 
 export interface ServiceLevelListParams extends ListParams {
-	sort: 'name' | 'description'
+	sort: 'name' | 'description' | 'holiday_region' | 'targets'
 	order: 'asc' | 'desc'
 }
 
@@ -169,14 +169,20 @@ function sortedHours(windows: ServiceWindow[]): ServiceWindow[] {
 export async function listServiceLevels(
 	params: ServiceLevelListParams,
 ): Promise<Page<ServiceLevelListRow>> {
-	const orderColumn =
-		params.sort === 'description' ? service_levels.description : service_levels.name
+	const targetCount = countWhere(service_level_targets.service_level_id, service_levels.id)
+	const orderColumn = {
+		name: service_levels.name,
+		description: service_levels.description,
+		// Nationwide (no region) first.
+		holiday_region: sql`coalesce(${service_levels.holiday_region}, '')`,
+		targets: targetCount,
+	}[params.sort]
 	return await pageRows(
 		service_levels,
 		searchCondition(params.search, [service_levels.name, service_levels.description]),
-		[orderOf(orderColumn, params.order), asc(service_levels.id)],
+		[orderOf(orderColumn, params.order), asc(service_levels.name), asc(service_levels.id)],
 		params,
-		{ target_count: countWhere(service_level_targets.service_level_id, service_levels.id) },
+		{ target_count: targetCount },
 	)
 }
 

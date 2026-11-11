@@ -18,6 +18,9 @@ export const de: Messages = {
 	'common.save': 'Speichern',
 	'common.saving': 'Wird gespeichert…',
 	'common.close': 'Schließen',
+	'common.copy': 'Kopieren',
+	'common.copyValue': '{value} kopieren',
+	'common.copied': 'Kopiert',
 	'common.loading': 'Wird geladen…',
 	'common.quickSearch': 'Suche',
 	'common.search': 'Suchen…',
@@ -143,6 +146,10 @@ export const de: Messages = {
 	'entity.auditLog.one': 'Audit-Log',
 	'entity.auditLog.other': 'Audit-Log',
 	'entity.changelog': 'Änderungen',
+	'entity.savedFilter.one': 'Gespeicherter Filter',
+	'entity.savedFilter.other': 'Gespeicherte Filter',
+	'entity.savedLayout.one': 'Gespeichertes Layout',
+	'entity.savedLayout.other': 'Gespeicherte Layouts',
 	'entity.floorplan.one': 'Grundriss',
 	'entity.floorplan.other': 'Grundrisse',
 	'noun.tenant.one': 'Mandant',
@@ -191,6 +198,8 @@ export const de: Messages = {
 	'noun.role.other': 'Rollen',
 	'noun.savedFilter.one': 'Gespeicherter Filter',
 	'noun.savedFilter.other': 'Gespeicherte Filter',
+	'noun.savedLayout.one': 'Gespeichertes Layout',
+	'noun.savedLayout.other': 'Gespeicherte Layouts',
 	'noun.auditEntry.one': 'Audit-Log-Eintrag',
 	'noun.auditEntry.other': 'Audit-Log-Einträge',
 	'noun.change.one': 'Änderung',
@@ -227,6 +236,10 @@ export const de: Messages = {
 	'table.savedFilters': 'Gespeicherte Filter',
 	'table.filterName': 'Filtername',
 	'table.clearSavedFilter': 'Gespeicherten Filter entfernen',
+	'table.removeValue': 'Entfernen',
+	'table.savedLayouts': 'Gespeicherte Layouts',
+	'table.saveLayout': 'Layout speichern',
+	'table.layoutName': 'Layoutname',
 
 	// app
 	'app.skipToContent': 'Zum Inhalt springen',
@@ -254,6 +267,7 @@ export const de: Messages = {
 	'app.navGroup.organization': 'Firma',
 	'app.navGroup.catalog': 'Katalog',
 	'app.nav.managedService': 'MSP',
+	'app.navGroup.customization': 'Anpassung',
 	'app.navGroup.administration': 'Administration',
 	'app.tenantContext': 'Mandantenkontext',
 	'app.tenantContextGroup': 'Alle aus {name}',
@@ -820,6 +834,7 @@ export const de: Messages = {
 	'device.positionInvalid':
 		'Die Rackposition muss eine positive ganze Zahl sein oder leer bleiben.',
 	'device.serial': 'Seriennummer',
+	'device.assetTag': 'Inventarnummer',
 	'device.assignedEmployee': 'Mitarbeiter',
 	'device.bundleNotContracted': 'SLA nicht festgelegt',
 	'device.noEmployee': 'Keine Zuweisung',
@@ -995,6 +1010,29 @@ export const de: Messages = {
 	'audit.userAgent': 'User-Agent',
 	'audit.target': 'Betroffener Benutzer',
 	'audit.empty': 'Noch keine Audit-Log-Einträge vorhanden.',
+
+	'savedFilter.table': 'Tabelle',
+	'savedFilter.parameters': 'Parameter',
+	'savedFilter.updated': 'Aktualisiert',
+	'savedFilter.noValues': 'Keine Filterwerte',
+	'savedFilter.empty':
+		'Noch keine gespeicherten Filter. Speichern Sie einen im Tab „Gespeicherte Filter“ einer Liste.',
+	'savedFilter.editTitle': 'Gespeicherten Filter bearbeiten: {name}',
+	'savedFilter.parametersHint':
+		'JSON-Objekt aus Filterschlüsseln und ihren Werten (Text oder Liste von Texten), wie die Liste sie speichert.',
+	'savedFilter.invalidParameters':
+		'Parameter müssen ein JSON-Objekt sein, dessen Werte Text oder Listen von Text sind.',
+
+	'savedLayout.columns': 'Spalten',
+	'savedLayout.layout': 'Layout',
+	'savedLayout.noColumns': 'Keine Spalten',
+	'savedLayout.empty':
+		'Noch keine gespeicherten Layouts. Speichern Sie eines über den Pfeil neben der Schaltfläche „Spalten“ einer Tabelle.',
+	'savedLayout.editTitle': 'Gespeichertes Layout bearbeiten: {name}',
+	'savedLayout.layoutHint':
+		'JSON-Objekt mit „visibleColumns“ (angezeigte Spaltenschlüssel), „columnOrder“ (alle Spaltenschlüssel in Reihenfolge) und optional „columnWidths“ (Pixelbreiten je Spaltenschlüssel).',
+	'savedLayout.invalidLayout':
+		'Das Layout muss ein JSON-Objekt mit „visibleColumns“ und „columnOrder“ als Textlisten und optional „columnWidths“ als ganze Pixelzahlen sein.',
 	'auditEvent.loginSuccess': 'Anmeldung erfolgreich',
 	'auditEvent.loginFailure': 'Anmeldung fehlgeschlagen',
 	'auditEvent.passwordChange': 'Passwort geändert',

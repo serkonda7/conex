@@ -19,7 +19,7 @@ import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 
 /**
  * /racks — NetBox-style rack list: search, sortable columns, site /
- * location / tenant filters (deep-linkable via `?site=<id>` /
+ * location / rack type / tenant filters (deep-linkable via `?site=<id>` /
  * `?location=<id>` / `?tenant=<id>`), and
  * icon actions with delete in a row menu.
  */
@@ -68,22 +68,37 @@ export function RacksPage(): JSX.Element {
 		{
 			key: 'site',
 			label: tp('entity.site', 1),
+			sortable: true,
 			getValue: (r: RackRow): string => siteName(r.site_id),
 		},
 		{
 			key: 'location',
 			label: tp('entity.location', 1),
+			sortable: true,
 			getValue: (r: RackRow): string => locationName(r.location_id),
 		},
-		descriptionColumn(),
+		descriptionColumn({ sortable: true }),
 		{
 			key: 'type',
 			label: t('common.type'),
-			getValue: (r: RackRow): string => rackTypeName(r.rack_type_id),
+			sortable: true,
+			getValue: (r: RackRow): JSX.Element =>
+				r.rack_type_id === null ? (
+					<span>—</span>
+				) : (
+					<a href={`/rack-types/${r.rack_type_id}`}>{rackTypeName(r.rack_type_id)}</a>
+				),
+		},
+		{
+			key: 'height',
+			label: t('common.heightU'),
+			sortable: true,
+			getValue: (r: RackRow): string => (r.height_u > 0 ? String(r.height_u) : '—'),
 		},
 		{
 			key: 'tenant',
 			label: tp('entity.tenant', 1),
+			sortable: true,
 			getValue: (r: RackRow): string => tenantName(r.tenant_id),
 		},
 	]

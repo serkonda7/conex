@@ -5,19 +5,10 @@ import {
 	type ManufacturerListRow,
 	type ManufacturerSort,
 } from '../../api/templates'
-import { descriptionColumn, nameColumn } from '../../components/data_table'
+import { CountLink, descriptionColumn, nameColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { SpecLink } from '../device_types/spec_link'
-
-/** Count cell linking to the related list; zero has nothing to show there. */
-function CountLink(props: { count: number; href: string }): JSX.Element {
-	return (
-		<Show when={props.count > 0} fallback="0">
-			<a href={props.href}>{props.count}</a>
-		</Show>
-	)
-}
 
 /**
  * /manufacturers — manufacturer list: search, sortable columns with the

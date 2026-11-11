@@ -20,6 +20,7 @@ import { passThroughGroup, portKindsCompatible } from 'shared/src/ports'
 import type {
 	DeviceCreate,
 	DeviceListKind,
+	DeviceListQuery,
 	DeviceMove,
 	DeviceUpdate,
 	InterfaceCreate,
@@ -35,6 +36,7 @@ import {
 	device_type_interfaces,
 	device_types,
 	devices,
+	employees,
 	external_links,
 	interfaces,
 	locations,
@@ -43,6 +45,7 @@ import {
 	racks,
 	shelves,
 	sites,
+	tenants,
 	virtual_machines,
 } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
@@ -69,6 +72,7 @@ import {
 	orderOf,
 	pageOf,
 	pickDefined,
+	relatedValue,
 	scopeCondition,
 	searchCondition,
 	tenantConditions,
@@ -292,7 +296,7 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	mountable?: boolean
 	/** Devices whose type is past its EOL date, or the others when false. */
 	past_eol?: boolean
-	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
+	sort: DeviceListQuery['sort']
 	order: 'asc' | 'desc'
 }
 
@@ -506,6 +510,17 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			sort_role: sql<string>`${device_roles.name}`.as('sort_role'),
 			sort_type: sql<string | null>`${device_types.model}`.as('sort_type'),
 			sort_mount: sql<string | null>`${racks.name}`.as('sort_mount'),
+			sort_employee: sql<
+				string | null
+			>`${relatedValue(employees.name, employees.id, devices.employee_id)}`.as(
+				'sort_employee',
+			),
+			sort_tenant: sql<
+				string | null
+			>`${relatedValue(tenants.name, tenants.id, devices.tenant_id)}`.as('sort_tenant'),
+			sort_site: sql<
+				string | null
+			>`${relatedValue(sites.name, sites.id, devices.site_id)}`.as('sort_site'),
 		})
 		.from(devices)
 		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
@@ -539,6 +554,17 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			sort_role: sql<string>`${device_roles.name}`.as('sort_role'),
 			sort_type: nullText('sort_type'),
 			sort_mount: sql<string | null>`${hosts.name}`.as('sort_mount'),
+			sort_employee: sql<
+				string | null
+			>`${relatedValue(employees.name, employees.id, virtual_machines.employee_id)}`.as(
+				'sort_employee',
+			),
+			sort_tenant: sql<
+				string | null
+			>`${relatedValue(tenants.name, tenants.id, virtual_machines.tenant_id)}`.as(
+				'sort_tenant',
+			),
+			sort_site: nullText('sort_site'),
 		})
 		.from(virtual_machines)
 		.innerJoin(device_roles, eq(device_roles.id, virtual_machines.device_role_id))
@@ -549,7 +575,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		.with(rows)
 		.select()
 		.from(rows)
-		.orderBy(...deviceOrder(rows, params), asc(rows.kind), asc(rows.id))
+		.orderBy(...deviceOrder(rows, params), asc(rows.name), asc(rows.kind), asc(rows.id))
 		.limit(params.limit)
 		.offset(offsetOf(params))
 	const total = (await db.with(rows).select({ n: count() }).from(rows))[0]?.n ?? 0
@@ -664,10 +690,28 @@ function deviceOrder(
 		sort_role: SQLWrapper
 		sort_type: SQLWrapper
 		sort_mount: SQLWrapper
+		sort_employee: SQLWrapper
+		sort_tenant: SQLWrapper
+		sort_site: SQLWrapper
+		serial: SQLWrapper
+		asset_tag: SQLWrapper
+		description: SQLWrapper
 	},
 	params: DeviceListParams,
 ): SQL[] {
 	switch (params.sort) {
+		case 'employee':
+			return [orderOf(rows.sort_employee, params.order)]
+		case 'tenant':
+			return [orderOf(rows.sort_tenant, params.order)]
+		case 'site':
+			return [orderOf(rows.sort_site, params.order)]
+		case 'serial':
+			return [orderOf(rows.serial, params.order)]
+		case 'asset_tag':
+			return [orderOf(rows.asset_tag, params.order)]
+		case 'description':
+			return [orderOf(rows.description, params.order)]
 		case 'status':
 			return [orderOf(rows.status, params.order)]
 		case 'device_id':

@@ -18,5 +18,5 @@ export const sitesApp = makeTenantApp({
 	get: getSite,
 	update: updateSite,
 	remove: (id: number, query: DeleteQuery) => deleteSite(id, query.confirm === 'floorplan'),
-	filters: (q: { group?: number }) => ({ group: q.group }),
+	filters: (q: { group?: number[] }) => ({ group: q.group }),
 })

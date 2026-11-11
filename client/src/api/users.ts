@@ -9,6 +9,8 @@ import { by_id, client, failed, getPage, paging, to_query, to_result } from './c
 
 export type { UserJson }
 
+export type UserSort = UserListQuery['sort']
+
 export async function fetch_users(
 	filters?: Partial<UserListQuery>,
 ): Promise<Result<Page<UserJson>, Error>> {
@@ -19,6 +21,8 @@ export async function fetch_users(
 				role: filters?.role,
 				tenant: filters?.tenant,
 				employee: filters?.employee,
+				sort: filters?.sort ?? 'username',
+				order: filters?.order ?? 'asc',
 			}),
 		}),
 		failed.list('noun.user'),

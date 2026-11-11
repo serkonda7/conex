@@ -1264,6 +1264,14 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+/* Saved filter parameters / saved layout columns as code chips (saved filters
+   and saved layouts pages). */
+.saved-filter-values {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+}
+
 /* Consistency finding: field, conex value, external value. Fixed leading
    tracks keep the values aligned across rows; the last one takes the rest. */
 .finding-detail {
@@ -1831,6 +1839,45 @@ tbody tr:last-child td {
 	list-style: none;
 }
 
+/* Mail / phone value with a small copy button that shows on hover or focus. */
+.copy-value {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	white-space: nowrap;
+}
+
+.copy-value-btn {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.1rem;
+	color: var(--text-secondary);
+	background: none;
+	border: none;
+	opacity: 0;
+}
+
+.copy-value-btn:hover {
+	color: var(--text);
+	background-color: var(--bg-hover);
+}
+
+.copy-value:hover .copy-value-btn,
+.copy-value-btn:focus-visible,
+.copy-value-done {
+	opacity: 1;
+}
+
+.copy-value-done {
+	color: var(--success);
+}
+
+@media (hover: none) {
+	.copy-value-btn {
+		opacity: 1;
+	}
+}
+
 /* Phone numbers with a scope: number, type and scope each get a column. */
 .contact-list-scoped {
 	grid-template-columns: max-content max-content auto;
@@ -2020,6 +2067,13 @@ tbody tr:last-child td {
 	--combobox-hover-bg: var(--bg-hover);
 	--combobox-muted: var(--text-muted);
 	--combobox-accent: var(--primary);
+	--combobox-chip-bg: var(--bg-hover);
+}
+
+/* Picked values of a multi-select combobox match the filter pills: neutral
+   tags with green text. */
+.combobox-chip {
+	color: var(--primary-text);
 }
 
 .app-content .form-stacked .field .combobox {
@@ -2254,6 +2308,36 @@ tbody tr:last-child td {
 .filter-table-badge,
 .filter-table-button-primary {
 	color: var(--primary-contrast);
+}
+
+/* Filter pills: applied filters are neutral tags with green text, "save" is
+   outlined green like the active status badge, "clear all" is red text. */
+.filter-table-pill {
+	border-color: var(--border-strong);
+	background: var(--bg-raised);
+	color: var(--primary-text);
+}
+
+.filter-table-pill:hover {
+	border-color: var(--text-secondary);
+	background: var(--bg-hover);
+}
+
+.filter-table-pill.filter-table-pill-save,
+.filter-table-pill.filter-table-pill-save:hover {
+	border-color: var(--success);
+	color: var(--success);
+}
+
+.filter-table-pill.filter-table-pill-clear,
+.filter-table-pill.filter-table-pill-clear:hover {
+	border-color: transparent;
+	background: transparent;
+	color: var(--error);
+}
+
+.filter-table-pill.filter-table-pill-clear:hover {
+	text-decoration: underline;
 }
 
 /* Table cell helpers. */

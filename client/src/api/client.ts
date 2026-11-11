@@ -109,6 +109,26 @@ export async function getPage<T>(
 }
 
 /**
+ * Collects every page of a paginated list: `fetchPage` loads one page of
+ * 200 rows, until `total` rows were seen or a page comes back empty.
+ */
+export async function fetch_all_pages<T>(
+	fetchPage: (page: { page: number; limit: number }) => Promise<Result<Page<T>, Error>>,
+): Promise<Result<T[], Error>> {
+	const rows: T[] = []
+	for (let page = 1; ; page++) {
+		const result = await fetchPage({ page, limit: 200 })
+		if (Result.isError(result)) {
+			return result
+		}
+		rows.push(...result.value.items)
+		if (rows.length >= result.value.total || result.value.items.length === 0) {
+			return Result.ok(rows)
+		}
+	}
+}
+
+/**
  * POSTs a JSON body via raw `fetch` and wraps the JSON response in a Result,
  * for the non-RPC call sites (`auth`, `transfer`). Chain `.map()` to discard
  * the body for void endpoints (login/setup).

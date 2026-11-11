@@ -494,15 +494,18 @@ const OptionalIdListEntry = v.optional(
 
 export const TenantGroupListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'tenants']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export const TenantListQuerySchema = v.object({
 	...ListQueryEntries,
-	/** Only tenants of this tenant group. */
-	group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'customer_number']), 'name'),
+	/** Only tenants of these tenant groups. */
+	group: OptionalIdListEntry,
+	sort: v.optional(
+		v.picklist(['name', 'customer_number', 'group', 'sites', 'racks', 'devices']),
+		'name',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -510,8 +513,9 @@ export const SiteListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
-	group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	/** Only sites of these site groups. */
+	group: OptionalIdListEntry,
+	sort: v.optional(v.picklist(['name', 'description', 'tenant', 'group']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -519,7 +523,7 @@ export const SiteGroupListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'tenant']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -533,7 +537,7 @@ export const LocationListQuerySchema = v.object({
 		v.pipe(CsvListSchema, v.array(LocationTypeSchema), v.transform(emptyAsUndefined)),
 		undefined,
 	),
-	sort: v.optional(v.picklist(['name', 'description', 'type', 'site']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'type', 'site', 'tenant']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -544,7 +548,16 @@ export const EmployeeListQuerySchema = v.object({
 	/** `true` / `false` narrows to active / inactive employees. */
 	active: v.optional(v.picklist(['true', 'false']), undefined),
 	sort: v.optional(
-		v.picklist(['name', 'first_name', 'last_name', 'title', 'email']),
+		v.picklist([
+			'name',
+			'first_name',
+			'last_name',
+			'salutation',
+			'title',
+			'email',
+			'status',
+			'description',
+		]),
 		'last_name',
 	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
@@ -597,7 +610,10 @@ export const RackListQuerySchema = v.object({
 	rack_type: OptionalIdListEntry,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
-	sort: v.optional(v.picklist(['name']), 'name'),
+	sort: v.optional(
+		v.picklist(['name', 'site', 'location', 'description', 'type', 'height', 'tenant']),
+		'name',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1219,7 +1235,7 @@ export type ServiceLevelUpdate = v.InferOutput<typeof ServiceLevelUpdateSchema>
 
 export const ServiceLevelListQuerySchema = v.object({
 	...ListQueryEntries,
-	sort: v.optional(v.picklist(['name', 'description']), 'name'),
+	sort: v.optional(v.picklist(['name', 'description', 'holiday_region', 'targets']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1543,7 +1559,23 @@ export const DeviceListQuerySchema = v.object({
 	mountable: v.optional(looseBoolean(false), undefined),
 	/** Devices whose type is past its EOL date, or the others when false (hides VMs). */
 	past_eol: v.optional(looseBoolean(false), undefined),
-	sort: v.optional(v.picklist(['name', 'status', 'device_id', 'role', 'type', 'mount']), 'name'),
+	sort: v.optional(
+		v.picklist([
+			'name',
+			'status',
+			'device_id',
+			'role',
+			'type',
+			'mount',
+			'employee',
+			'tenant',
+			'site',
+			'serial',
+			'asset_tag',
+			'description',
+		]),
+		'name',
+	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
@@ -1829,6 +1861,8 @@ export const RoleUpdateSchema = v.strictObject({
 
 export const RoleListQuerySchema = v.object({
 	...ListQueryEntries,
+	sort: v.optional(v.picklist(['name', 'description', 'users']), 'name'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 /** Role as returned by `/roles`; `user_count` drives the delete guard in the UI. */
@@ -1875,9 +1909,11 @@ export const UserUpdateSchema = v.strictObject({
 
 export const UserListQuerySchema = v.object({
 	...ListQueryEntries,
-	role: OptionalIdEntry,
+	role: OptionalIdListEntry,
 	tenant: OptionalIdEntry,
 	employee: OptionalIdEntry,
+	sort: v.optional(v.picklist(['username', 'employee', 'role']), 'username'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 /** Public user shape: password hashes never leave the server. */
@@ -2328,6 +2364,9 @@ export const FloorplanListQuerySchema = v.object({
 	...ListQueryEntries,
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
+	/** Default: by site, then owner name. */
+	sort: v.optional(v.picklist(['owner', 'type', 'site', 'tenant']), 'site'),
+	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
 
 export type FloorplanListQuery = v.InferOutput<typeof FloorplanListQuerySchema>
@@ -3083,9 +3122,32 @@ export interface EmployeeIntegrationStatus {
 // a list of selected options, as the table hands them out.
 // ---------------------------------------------------------------------------
 
+const SavedFilterTableKeySchema = v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/))
+
 export const SavedFilterTableParamsSchema = v.object({
-	table: v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/)),
+	table: SavedFilterTableKeySchema,
 })
+
+/** One saved filter by its table and 0-based position in that table's list. */
+export const SavedFilterEntryParamsSchema = v.object({
+	table: SavedFilterTableKeySchema,
+	position: v.pipe(
+		v.string(),
+		v.regex(/^\d{1,3}$/),
+		v.transform((raw) => Number(raw)),
+	),
+})
+
+/** `?search=` matches the filter name; `?table=a,b` limits the tables. */
+export const SavedFilterListQuerySchema = v.object({
+	...ListQueryEntries,
+	table: v.optional(
+		v.pipe(CsvListSchema, v.array(SavedFilterTableKeySchema), v.transform(emptyAsUndefined)),
+		undefined,
+	),
+})
+
+export type SavedFilterListQuery = v.InferOutput<typeof SavedFilterListQuerySchema>
 
 const SavedFilterValueSchema = v.union([
 	v.pipe(v.string(), v.maxLength(500)),
@@ -3101,6 +3163,91 @@ export const SavedFilterSchema = v.strictObject({
 export const SavedFilterListSchema = v.pipe(v.array(SavedFilterSchema), v.maxLength(100))
 
 export type SavedFilterJson = v.InferOutput<typeof SavedFilterSchema>
+
+/**
+ * Replaces one saved filter. `current_name` is the name the client saw at
+ * `position`: when the list changed meanwhile, the server answers 409 instead
+ * of overwriting another filter.
+ */
+export const SavedFilterUpdateSchema = v.strictObject({
+	current_name: NameSchema,
+	filter: SavedFilterSchema,
+})
+
+export type SavedFilterUpdate = v.InferOutput<typeof SavedFilterUpdateSchema>
+
+/** Delete guard, see {@link SavedFilterUpdateSchema}. */
+export const SavedFilterDeleteQuerySchema = v.object({
+	name: NameSchema,
+})
+
+/** The fields every saved-list overview entry shares (saved filters, layouts). */
+export interface SavedListEntryBase {
+	table: string
+	/** 0-based position in the table's list (its tab or menu order). */
+	position: number
+	name: string
+	/** Unix seconds of the table's last save. */
+	updated_at: number
+}
+
+/** Overview page plus every table key that holds saved items (for the table filter). */
+export interface SavedListPageJson<E extends SavedListEntryBase> {
+	items: E[]
+	total: number
+	page: number
+	limit: number
+	tables: string[]
+}
+
+/** One saved filter of the overview across all tables. */
+export interface SavedFilterEntryJson extends SavedListEntryBase {
+	values: SavedFilterJson['values']
+}
+
+export type SavedFilterPageJson = SavedListPageJson<SavedFilterEntryJson>
+
+// ---------------------------------------------------------------------------
+// Saved layouts: named DataTable column layouts (visible columns, order,
+// pixel widths), stored per table for all users like the saved filters.
+// The table key, entry and list query params are shared with them.
+// ---------------------------------------------------------------------------
+
+const ColumnKeySchema = v.pipe(v.string(), v.maxLength(100))
+
+export const SavedLayoutSchema = v.strictObject({
+	name: NameSchema,
+	layout: v.strictObject({
+		visibleColumns: v.pipe(v.array(ColumnKeySchema), v.maxLength(200)),
+		columnOrder: v.pipe(v.array(ColumnKeySchema), v.maxLength(200)),
+		columnWidths: v.optional(
+			v.record(
+				ColumnKeySchema,
+				v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10000)),
+			),
+		),
+	}),
+})
+
+/** Full list of a table's saved layouts; a PUT replaces the stored list. */
+export const SavedLayoutListSchema = v.pipe(v.array(SavedLayoutSchema), v.maxLength(100))
+
+export type SavedLayoutJson = v.InferOutput<typeof SavedLayoutSchema>
+
+/** Replaces one saved layout, guarded like {@link SavedFilterUpdateSchema}. */
+export const SavedLayoutUpdateSchema = v.strictObject({
+	current_name: NameSchema,
+	layout: SavedLayoutSchema,
+})
+
+export type SavedLayoutUpdate = v.InferOutput<typeof SavedLayoutUpdateSchema>
+
+/** One saved layout of the overview across all tables. */
+export interface SavedLayoutEntryJson extends SavedListEntryBase {
+	layout: SavedLayoutJson['layout']
+}
+
+export type SavedLayoutPageJson = SavedListPageJson<SavedLayoutEntryJson>
 
 // ---------------------------------------------------------------------------
 // Calendar sync: TANSS appointments (Einsatzplanung) → Outlook calendars of

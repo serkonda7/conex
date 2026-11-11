@@ -26,6 +26,7 @@ import { rackTypesApp } from './routes/rack_types'
 import { racksApp } from './routes/racks'
 import { rolesApp } from './routes/roles'
 import { savedFiltersApp } from './routes/saved_filters'
+import { savedLayoutsApp } from './routes/saved_layouts'
 import { searchApp } from './routes/search'
 import { managedBundlesApp, prioritiesApp, serviceLevelsApp } from './routes/service_catalog'
 import { shelvesApp } from './routes/shelves'
@@ -102,6 +103,7 @@ export function createApp() {
 			.route('/directory', directoryApp)
 			.route('/attachments', attachmentsApp)
 			.route('/saved-filters', savedFiltersApp)
+			.route('/saved-layouts', savedLayoutsApp)
 	)
 }
 

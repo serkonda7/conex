@@ -770,6 +770,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 									getRowId={findingKey}
 									columns={columns}
 									showColumnCustomizer
+									savedLayoutsKey="integration-report"
 									visibleColumns={visibleColumns}
 									onVisibleColumnsChange={setVisibleColumns}
 									rowActions={(f: IntegrationFinding): JSX.Element => (

@@ -11,8 +11,9 @@ import {
 import { fetch_all_employees } from '../../api/employees'
 import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
+import { fetch_sites, fetch_tenants } from '../../api/tenancy'
 import { delete_virtual_machine } from '../../api/virtual_machines'
-import type { DataTableColumn } from '../../components/data_table'
+import { type DataTableColumn, descriptionColumn } from '../../components/data_table'
 import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
@@ -88,7 +89,12 @@ export function DevicesPage(): JSX.Element {
 	const [roles] = createRows(fetch_device_roles, list.setError)
 	const [racks] = createRows(fetch_racks, list.setError)
 	const [employees] = createRows(fetch_all_employees, list.setError)
+	// A failed tenant or site lookup degrades to raw ids rather than an error.
+	const [tenants] = createRows(fetch_tenants)
+	const [sites] = createRows(fetch_sites)
 	const employeeName = useNameOf(employees)
+	const tenantName = useNameOf(tenants)
+	const siteName = useNameOf(sites)
 	const typeName = useNameOf(types, (type) => type.model)
 	const roleName = useNameOf(roles, deviceRoleLabel)
 	const roleById = createMemo(() => new Map((roles() ?? []).map((r) => [r.id, r])))
@@ -149,6 +155,7 @@ export function DevicesPage(): JSX.Element {
 		{
 			key: 'employee',
 			label: t('device.assignedEmployee'),
+			sortable: true,
 			getValue: (device: DeviceListItem): JSX.Element =>
 				device.employee_id === null ? (
 					<span>—</span>
@@ -202,6 +209,36 @@ export function DevicesPage(): JSX.Element {
 				)
 			},
 		},
+		{
+			key: 'tenant',
+			label: tp('entity.tenant', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): string => tenantName(d.tenant_id),
+		},
+		{
+			key: 'site',
+			label: tp('entity.site', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element =>
+				d.kind === 'device' && d.site_id !== null ? (
+					<a href={`/sites/${d.site_id}`}>{siteName(d.site_id)}</a>
+				) : (
+					<span>—</span>
+				),
+		},
+		{
+			key: 'serial',
+			label: t('device.serial'),
+			sortable: true,
+			getValue: (d: DeviceListItem): string => (d.kind === 'device' && d.serial) || '—',
+		},
+		{
+			key: 'asset_tag',
+			label: t('device.assetTag'),
+			sortable: true,
+			getValue: (d: DeviceListItem): string => (d.kind === 'device' && d.asset_tag) || '—',
+		},
+		descriptionColumn({ sortable: true }),
 	]
 
 	return (
@@ -272,6 +309,15 @@ export function DevicesPage(): JSX.Element {
 				}
 				columns={columns}
 				columnsKey="devices"
+				defaultColumns={[
+					'name',
+					'status',
+					'device_id',
+					'role',
+					'type',
+					'employee',
+					'mount',
+				]}
 				rowName={(d: DeviceListItem): string => d.name}
 				rowKey={(d: DeviceListItem): string => `${d.kind}-${d.id}`}
 				editHref={(d: DeviceListItem): string => `${deviceListHref(d)}/edit`}
