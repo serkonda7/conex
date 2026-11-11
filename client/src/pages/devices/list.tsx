@@ -25,7 +25,7 @@ import {
 } from '../../components/list_page'
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel } from '../../i18n/labels'
+import { deviceRoleLabel, deviceStatusLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
@@ -42,7 +42,7 @@ export function deviceListHref(row: DeviceListItem): string {
 
 /**
  * /devices — NetBox-style device list of devices and virtual machines:
- * search, sortable columns, kind / rack / role / EOL / tenant filters (tenant,
+ * search, sortable columns, kind / active / rack / role / EOL / tenant filters (tenant,
  * role and device type deep-linkable via `?tenant=<id>`, `?role=<id>` and
  * `?device_type=<id>`), and icon actions with clone, move to another tenant
  * and delete in a row menu. Ids collide across the two kinds, so rows are
@@ -58,6 +58,7 @@ export function DevicesPage(): JSX.Element {
 	const [filterEmployee, setFilterEmployee] = useQueryFilterList('employee')
 	const [filterKind, setFilterKind] = useQueryFilterList('kind')
 	const [filterPastEol, setFilterPastEol] = useQueryFilterList('past_eol')
+	const [filterActive, setFilterActive] = useQueryFilterList('active')
 	const [movingRow, setMovingRow] = createSignal<DeviceListItem | null>(null)
 	const list = useEntityList({
 		noun: 'noun.device',
@@ -75,6 +76,7 @@ export function DevicesPage(): JSX.Element {
 			employee: idsOf(filterEmployee()),
 			// Both values chosen is the same as no filter.
 			past_eol: filterPastEol().length === 1 ? filterPastEol()[0] === 'true' : undefined,
+			active: filterActive().length === 1 ? filterActive()[0] === 'true' : undefined,
 			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
 		}),
 		fetch: fetch_device_list,
@@ -218,6 +220,16 @@ export function DevicesPage(): JSX.Element {
 						],
 						value: filterKind,
 						onChange: setFilterKind,
+					},
+					{
+						key: 'active',
+						label: t('common.status'),
+						options: [
+							{ value: 'true', label: deviceStatusLabel('active') },
+							{ value: 'false', label: deviceStatusLabel('inactive') },
+						],
+						value: filterActive,
+						onChange: setFilterActive,
 					},
 					{
 						key: 'employee',

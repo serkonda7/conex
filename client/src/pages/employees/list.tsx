@@ -8,7 +8,12 @@ import {
 } from '../../api/employees'
 import { fetch_tenants } from '../../api/tenancy'
 import { type DataTableColumn, descriptionColumn } from '../../components/data_table'
-import { EntityListPage, useEntityList, useQueryFilter } from '../../components/list_page'
+import {
+	EntityListPage,
+	useEntityList,
+	useQueryFilter,
+	useQueryFilterList,
+} from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
@@ -32,15 +37,22 @@ export function EmailLink(props: { email: string | null }): JSX.Element {
 
 /**
  * /employees — contact persons of the tenants: search, sortable columns, tenant
- * filter (deep-linkable via `?tenant=<id>`), and icon actions with delete in a
+ * and active/inactive filters (deep-linkable via `?tenant=<id>` and
+ * `?active=true`), and icon actions with delete in a
  * row menu.
  */
 export function EmployeesPage(): JSX.Element {
 	const [filterTenant] = useQueryFilter('tenant')
+	const [filterActive, setFilterActive] = useQueryFilterList('active')
 	const list = useEntityList({
 		noun: 'noun.employee',
 		sort: 'last_name' as EmployeeSort,
-		filters: () => tenantContextFilters(parseId(filterTenant()) ?? undefined),
+		filters: () => ({
+			...tenantContextFilters(parseId(filterTenant()) ?? undefined),
+			// Both values chosen is the same as no filter.
+			active:
+				filterActive().length === 1 ? (filterActive()[0] as 'true' | 'false') : undefined,
+		}),
 		fetch: fetch_employees,
 		remove: delete_employee,
 	})
@@ -118,6 +130,18 @@ export function EmployeesPage(): JSX.Element {
 			title={tp('entity.employee', 2)}
 			// The filtered tenant is preselected in the add form.
 			addHref={filterTenant() ? `/employees/add?tenant=${filterTenant()}` : '/employees/add'}
+			filters={[
+				{
+					key: 'active',
+					label: t('common.status'),
+					options: [
+						{ value: 'true', label: t('employee.active') },
+						{ value: 'false', label: t('employee.inactive') },
+					],
+					value: filterActive,
+					onChange: setFilterActive,
+				},
+			]}
 			filtered={filterTenant() !== '' || tenantContext().kind !== 'all'}
 			columns={columns}
 			columnsKey="employees"

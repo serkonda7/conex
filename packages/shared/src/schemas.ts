@@ -1529,6 +1529,8 @@ export const DeviceListQuerySchema = v.object({
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
 	status: v.optional(DeviceStatusSchema, undefined),
+	/** `true` hides inactive devices and VMs, `false` lists only those. */
+	active: v.optional(looseBoolean(false), undefined),
 	/** Placed = U-mounted; unplaced = neither mounted nor rack-assigned. */
 	placed: v.optional(looseBoolean(false), undefined),
 	/** Devices only, VMs only, or both (omitted). */

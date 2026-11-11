@@ -761,6 +761,8 @@ export async function listPlanCandidates(
 				// Racked devices are managed in the rack view, not on plans.
 				isNull(devices.rack_id),
 				free,
+				// Inactive devices are not offered, unless already on this plan.
+				or(ne(devices.status, 'inactive'), eq(floorplan_placements.attachment_id, id)),
 				scopeCondition(devices.tenant_id, scopeTenantIds),
 			),
 		)

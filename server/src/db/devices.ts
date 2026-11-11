@@ -278,6 +278,8 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	manufacturer?: number
 	employee?: number[]
 	status?: string
+	/** `true` hides inactive rows, `false` lists only those. */
+	active?: boolean
 	/** Placed = U-mounted; unplaced = position empty. */
 	placed?: boolean
 	/** Devices only, VMs only; `undefined` lists both. */
@@ -292,6 +294,14 @@ export interface DeviceListParams extends ListParams, TenantFilterParams {
 	past_eol?: boolean
 	sort: 'name' | 'status' | 'device_id' | 'role' | 'type' | 'mount'
 	order: 'asc' | 'desc'
+}
+
+/** `active` list filter on a status column: inactive rows hidden, or only those. */
+function activeCondition(status: SQLWrapper, active: boolean | undefined): SQL | undefined {
+	if (active === undefined) {
+		return undefined
+	}
+	return active ? ne(status, 'inactive') : eq(status, 'inactive')
 }
 
 /** One device list row: a physical device or a virtual machine (with its host's name). */
@@ -438,6 +448,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 					params.employee ? inArray(devices.employee_id, params.employee) : undefined,
 					...tenantConditions(devices.tenant_id, params),
 					params.status ? eq(devices.status, params.status) : undefined,
+					activeCondition(devices.status, params.active),
 					params.placed === undefined
 						? undefined
 						: params.placed
@@ -466,6 +477,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 						: undefined,
 					...tenantConditions(virtual_machines.tenant_id, params),
 					params.status ? eq(virtual_machines.status, params.status) : undefined,
+					activeCondition(virtual_machines.status, params.active),
 				)
 	const hosts = alias(devices, 'host')
 	const deviceBranch = db

@@ -48,6 +48,7 @@ export async function fetch_device_list(
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
 				status: filters?.status,
+				active: filters?.active,
 				placed: filters?.placed,
 				kind: filters?.kind,
 				host: filters?.host,
