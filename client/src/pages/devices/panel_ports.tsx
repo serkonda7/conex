@@ -1,4 +1,4 @@
-import { IconLinkPlus } from '@tabler/icons-solidjs'
+import { IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, type JSX, Show } from 'solid-js'
 import type { InterfaceJson } from '../../api/devices'
@@ -66,7 +66,8 @@ export function rowPatched(row: PanelRow): boolean {
  * → peer`, plus `extraColumns` (floor plan). Multi-position rear ports
  * list their positions underneath; unpatched rows are dimmed and show a
  * hint instead of their port names. Unconnected patched ports get a
- * connect button on row hover (`onConnect`); `rowActions` (one edit
+ * connect button on row hover (`onConnect`), connected ports a
+ * disconnect button (`onDisconnect`); `rowActions` (one edit
  * button) edits both ports of a row.
  */
 export function PanelPortTable(props: {
@@ -75,6 +76,8 @@ export function PanelPortTable(props: {
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
 	/** Connects an unconnected port; no button without it. */
 	onConnect?: (iface: InterfaceJson) => void
+	/** Removes the cable of a connected port; no button without it. */
+	onDisconnect?: (link: TraceLink) => void
 	rowActions?: (row: PanelRow) => JSX.Element
 	extraColumns?: DataTableColumn<PanelRow>[]
 }): JSX.Element {
@@ -98,6 +101,19 @@ export function PanelPortTable(props: {
 					>
 						<IconLinkPlus size={20} />
 					</button>
+				</Show>
+				<Show when={props.onDisconnect ? props.links.get(iface.id) : undefined}>
+					{(link: () => TraceLink): JSX.Element => (
+						<button
+							type="button"
+							class="icon-btn icon-btn-danger icon-btn-disconnect"
+							title={t('device.disconnectPort', { name: iface.name })}
+							aria-label={t('device.disconnectPort', { name: iface.name })}
+							onClick={(): void => props.onDisconnect?.(link())}
+						>
+							<IconUnlink size={20} />
+						</button>
+					)}
 				</Show>
 			</span>
 		)

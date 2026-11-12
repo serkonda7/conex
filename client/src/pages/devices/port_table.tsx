@@ -1,4 +1,4 @@
-import { IconLinkPlus } from '@tabler/icons-solidjs'
+import { IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
 import type { PoeType } from 'shared/src/schemas'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, type JSX, Show } from 'solid-js'
@@ -16,7 +16,8 @@ import { PortPeer } from './trace_peer'
  * Interfaces get their 1-based port number (creation order, eth1..ethN);
  * disabled ones carry a pill before it and dim their name and type. The type
  * adds the PoE type of the port's device-type stub when set. Unconnected
- * enabled ports get a connect button on row hover (`onConnect`); `actions`
+ * enabled ports get a connect button on row hover (`onConnect`), connected
+ * ones a disconnect button (`onDisconnect`); `actions`
  * renders the buttons of a row.
  */
 export function DevicePortTable(props: {
@@ -25,6 +26,8 @@ export function DevicePortTable(props: {
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
 	/** Connects an unconnected port; no button without it. */
 	onConnect?: (iface: InterfaceJson) => void
+	/** Removes the cable of a connected port; no button without it. */
+	onDisconnect?: (link: TraceLink) => void
 	actions?: (iface: InterfaceJson) => JSX.Element
 }): JSX.Element {
 	const portNumbers = createMemo(
@@ -80,6 +83,19 @@ export function DevicePortTable(props: {
 							>
 								<IconLinkPlus size={20} />
 							</button>
+						</Show>
+						<Show when={props.onDisconnect ? props.links.get(iface.id) : undefined}>
+							{(link: () => TraceLink): JSX.Element => (
+								<button
+									type="button"
+									class="icon-btn icon-btn-danger icon-btn-disconnect"
+									title={t('device.disconnectPort', { name: iface.name })}
+									aria-label={t('device.disconnectPort', { name: iface.name })}
+									onClick={(): void => props.onDisconnect?.(link())}
+								>
+									<IconUnlink size={20} />
+								</button>
+							)}
 						</Show>
 					</span>
 				</Show>

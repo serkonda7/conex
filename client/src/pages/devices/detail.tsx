@@ -1,10 +1,10 @@
 import { IconArrowsExchange, IconPencil } from '@tabler/icons-solidjs'
 import { OTHER_PORT_KINDS } from 'shared/src/ports'
-import type { TraceEndToEnd } from 'shared/src/types'
+import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { type Accessor, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_outlets } from '../../api/attachments'
-import { fetch_trace } from '../../api/cables'
+import { delete_cable, fetch_trace } from '../../api/cables'
 import {
 	type DeviceDetail,
 	type DeviceListItem,
@@ -33,7 +33,7 @@ import { t, tp } from '../../i18n'
 import { deviceRoleLabel, faceLabel } from '../../i18n/labels'
 import { floorplanHref } from '../../lib/floorplan_link'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
-import { createDerived, createRecord, createRowsFor } from '../../lib/resource'
+import { createDerived, createRecord, createRowsFor, useAction } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
@@ -123,6 +123,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		setError,
 		listRoute: '/devices',
 	})
+
+	const cable = useAction(setError)
+	/** Removes a port's cable from the table, without a dialog. */
+	const disconnect = (link: TraceLink): void => {
+		if (!cable.pending()) {
+			void cable.run(() => delete_cable(link.cable_id))
+		}
+	}
 
 	function openDialog(open: (iface: InterfaceJson) => void, iface: InterfaceJson): void {
 		setError(null)
@@ -438,6 +446,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 											openDialog(setConnectingIface, iface)
 									: undefined
 							}
+							onDisconnect={can('edit') ? disconnect : undefined}
 							rowActions={can('edit') ? panelRowActions : undefined}
 							extraColumns={[jackColumn, planColumn]}
 						/>
@@ -464,6 +473,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 												openDialog(setConnectingIface, iface)
 										: undefined
 								}
+								onDisconnect={can('edit') ? disconnect : undefined}
 								actions={can('edit') ? portActions : undefined}
 							/>
 						</Show>
