@@ -31,6 +31,7 @@ import { parseId, queryParam } from '../../lib/router'
 import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 import { deviceRoleOptions } from '../device-roles/options'
+import { locationOptions } from '../locations/options'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 
@@ -285,7 +286,7 @@ export function DeviceAddPage(): JSX.Element {
 					value={locationId()}
 					disabled={siteId() === ''}
 					onChange={setLocationId}
-					options={row_options(locations() ?? [])}
+					options={locationOptions(locations() ?? [])}
 					emptyLabel={t('common.selectPlaceholder')}
 				/>
 				<RackMountField

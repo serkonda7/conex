@@ -23,6 +23,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { deviceRoleOptions } from '../device-roles/options'
+import { locationOptions } from '../locations/options'
 import { parsePosition, validPosition } from './add'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
@@ -205,7 +206,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					label={tp('entity.location', 1)}
 					value={locationId()}
 					onChange={setLocationId}
-					options={row_options(locations() ?? [])}
+					options={locationOptions(locations() ?? [])}
 					emptyLabel={t('rack.noLocation')}
 					disabled={siteId() === ''}
 				/>

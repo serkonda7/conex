@@ -21,6 +21,7 @@ import { locationTypeOptions } from '../../i18n/labels'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
+import { locationOptions } from './options'
 
 /** /locations/:id/edit — location edit form. Saves back to the list when opened from it, else to the detail page. */
 export function LocationEditPage(props: { id: number }): JSX.Element {
@@ -105,7 +106,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 				label={t('site.parentLocation')}
 				value={parentId()}
 				onChange={setParentId}
-				options={row_options((siblings() ?? []).filter((l) => l.id !== props.id))}
+				options={locationOptions(siblings() ?? [], props.id)}
 				emptyLabel={t('site.topLevel')}
 			/>
 			<SelectField

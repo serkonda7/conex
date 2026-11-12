@@ -19,6 +19,7 @@ import {
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
+import { locationOptions } from '../locations/options'
 import { useRackTypeOptions } from '../rack_types/options'
 
 /** Id of the hint under the rack-type select. */
@@ -100,7 +101,7 @@ export function RackAddPage(): JSX.Element {
 				value={locationId()}
 				disabled={siteId() === ''}
 				onChange={setLocationId}
-				options={row_options(locations() ?? [])}
+				options={locationOptions(locations() ?? [])}
 				emptyLabel={t('rack.noLocation')}
 			/>
 			<NameField id="rack-name" placeholder="A1" value={name()} onInput={setName} autofocus />

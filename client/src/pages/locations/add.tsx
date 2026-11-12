@@ -19,6 +19,7 @@ import {
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, queryParam } from '../../lib/router'
 import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
+import { locationOptions } from './options'
 
 /** /locations/add — NetBox-style location create form. */
 export function LocationAddPage(): JSX.Element {
@@ -108,7 +109,7 @@ export function LocationAddPage(): JSX.Element {
 				value={parentId()}
 				disabled={siteId() === ''}
 				onChange={setParentId}
-				options={row_options(parents() ?? [])}
+				options={locationOptions(parents() ?? [])}
 				emptyLabel={t('site.topLevel')}
 			/>
 			<DescriptionField
