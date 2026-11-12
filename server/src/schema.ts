@@ -822,16 +822,11 @@ export const interfaces = pgTable(
 		// port; empty slots are allowed.
 		rear_port_id: integer('rear_port_id').references((): AnyPgColumn => interfaces.id),
 		rear_port_position: integer('rear_port_position'),
-		// Outlets (single-position rear ports): the room the installation
-		// cable ends in, independent of the panel's own location and of any
-		// floor plan. Location delete is blocked while outlets reference it
-		// (service layer).
-		location_id: integer('location_id').references(() => locations.id),
 		// Patch-panel ports: false = only part of the panel, not wired up
 		// (yet). Informational; cables may still be connected.
 		patched: integer('patched').notNull().default(1),
 		// Outlets only: the jack the port sits in with others of its panel
-		// (same device, service layer). The jack's ports share `location_id`.
+		// (same device, service layer).
 		jack_id: integer('jack_id').references(() => panel_jacks.id),
 	},
 	(table) => [
@@ -849,11 +844,6 @@ export const interfaces = pgTable(
 		uniqueIndex('interfaces_rear_port_position_idx').on(
 			table.rear_port_id,
 			table.rear_port_position,
-		),
-		index('interfaces_location_id_idx').on(table.location_id),
-		check(
-			'interfaces_location_check',
-			sql`${table.location_id} IS NULL OR (${table.side} IS NOT DISTINCT FROM 'rear' AND ${table.positions} = 1)`,
 		),
 		check(
 			'interfaces_side_check',

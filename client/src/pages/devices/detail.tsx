@@ -43,7 +43,6 @@ import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { JackDialog } from './jack_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
-import { useOutletLocationOptions } from './outlet_location'
 import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
 import { DevicePortTable } from './port_table'
@@ -192,10 +191,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const panelPorts = createMemo(() => (ifaces() ?? []).filter(isPanelPort))
 	const [jacks] = createRowsFor(() => panelPorts().length > 0 && props.id, fetch_jacks, setError)
 	const jackNames = createMemo(() => new Map((jacks() ?? []).map((jack) => [jack.id, jack.name])))
-	const locationOptions = useOutletLocationOptions(tenantId, setError)
-	const locationLabels = createMemo(
-		() => new Map(locationOptions().map((option) => [Number(option.value), option.label])),
-	)
 	/** Current state of a port of the row being edited (its cable may change meanwhile). */
 	const currentIface = (iface: InterfaceJson | null): InterfaceJson | null =>
 		iface && ((ifaces() ?? []).find((i) => i.id === iface.id) ?? iface)
@@ -245,22 +240,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				<span>—</span>
 			) : (
 				<span class="badge">{jackNames().get(jackId) ?? `#${jackId}`}</span>
-			)
-		},
-	}
-
-	/** Room an outlet's installation cable ends in. */
-	const locationColumn: DataTableColumn<PanelRow> = {
-		key: 'location',
-		label: t('device.panel.location'),
-		getValue: (row: PanelRow): JSX.Element => {
-			const locationKey = row.position === null ? row.rear.location_id : null
-			return locationKey === null ? (
-				<span>—</span>
-			) : (
-				<a href={`/locations/${locationKey}`}>
-					{locationLabels().get(locationKey) ?? `#${locationKey}`}
-				</a>
 			)
 		},
 	}
@@ -515,7 +494,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 									: undefined
 							}
 							rowActions={can('edit') ? panelRowActions : undefined}
-							extraColumns={[jackColumn, locationColumn, planColumn]}
+							extraColumns={[jackColumn, planColumn]}
 						/>
 					</section>
 				</Show>
@@ -602,7 +581,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						front={currentIface(row.front)}
 						links={linksByIface()}
 						endToEnd={endToEndOf}
-						location_options={locationOptions()}
 						on_saved={() => setEditingRow(null)}
 						on_close={() => setEditingRow(null)}
 					/>

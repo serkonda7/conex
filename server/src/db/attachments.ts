@@ -61,9 +61,8 @@ import {
 import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
 import { cableEnds } from './cables'
-import { logCreate, logDelete, logDeletes, logUpdate, logUpdates } from './changelog'
+import { logCreate, logDelete, logDeletes, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { type InterfaceJson, toInterfaceJson } from './devices'
 import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
 import {
 	checkExists,
@@ -112,7 +111,7 @@ const ALREADY_PLACED = 'A rack, device or outlet is already placed on another fl
 /** Panel device of a placed outlet (rear port); `devices` itself is the placed device. */
 const portDevice = alias(devices, 'port_device')
 
-/** First port of a jack: it stands for the jack's panel, location and tenant. */
+/** First port of a jack: it stands for the jack's panel and tenant. */
 function firstJackPort(jackId: SQL | PgColumn): SQL<number | null> {
 	return sql<
 		number | null
@@ -121,17 +120,9 @@ function firstJackPort(jackId: SQL | PgColumn): SQL<number | null> {
 
 /**
  * Joins `interfaces` to a placement's outlet: the placed port, or the
- * first port of the placed jack (its ports share panel and location).
+ * first port of the placed jack (its ports share a panel).
  */
 const placedPortJoin: SQL = sql`${interfaces.id} = coalesce(${floorplan_placements.interface_id}, ${firstJackPort(floorplan_placements.jack_id)})`
-
-/** An outlet's own location (`interfaces.location_id`), apart from its panel's. */
-const outletLocation = alias(locations, 'outlet_location')
-
-/** Site an outlet lies in: its own location's, else its panel's. */
-const outletSiteSql: SQL<number | null> = sql<
-	number | null
->`coalesce(${outletLocation.site_id}, ${portDevice.site_id})`
 
 /** Tenant of a placement's object: its rack, device or outlet panel. */
 const placementTenantSql: SQL<number | null> = sql<
@@ -771,10 +762,8 @@ export async function listPlanCandidates(
 		)
 		.orderBy(asc(devices.name), asc(devices.id))
 	// Outlets: single-position rear ports (a multi-position rear port is a
-	// trunk, not an outlet) in the owner's site: by their own location, else
-	// by their panel's. On a location's plan, an outlet with a location of
-	// its own must lie in the owner's scope. A jack is one outlet, its
-	// first port's row stands for it.
+	// trunk, not an outlet) on panels in the owner's site. A jack is one
+	// outlet, its first port's row stands for it.
 	const siteId = await siteOfOwner(owner)
 	const portRows =
 		siteId === null
@@ -784,19 +773,14 @@ export async function listPlanCandidates(
 						port_id: interfaces.id,
 						jack_id: interfaces.jack_id,
 						name: outletNameSql,
-						location_id: sql<
-							number | null
-						>`coalesce(${interfaces.location_id}, ${portDevice.location_id})`,
-						location_name: sql<
-							string | null
-						>`coalesce(${outletLocation.name}, ${locations.name})`,
+						location_id: portDevice.location_id,
+						location_name: locations.name,
 						...portColumns,
 					})
 					.from(interfaces)
 					.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))
 					.leftJoin(panel_jacks, eq(panel_jacks.id, interfaces.jack_id))
 					.leftJoin(locations, eq(locations.id, portDevice.location_id))
-					.leftJoin(outletLocation, eq(outletLocation.id, interfaces.location_id))
 					.leftJoin(
 						floorplan_placements,
 						or(
@@ -812,13 +796,7 @@ export async function listPlanCandidates(
 								isNull(interfaces.jack_id),
 								sql`${interfaces.id} = ${firstJackPort(interfaces.jack_id)}`,
 							),
-							sql`${outletSiteSql} = ${siteId}`,
-							locationIds === null
-								? undefined
-								: or(
-										isNull(interfaces.location_id),
-										inArray(interfaces.location_id, locationIds),
-									),
+							eq(portDevice.site_id, siteId),
 							free,
 							scopeCondition(portDevice.tenant_id, scopeTenantIds),
 						),
@@ -927,7 +905,7 @@ async function checkPlanInput(
 		)
 	}
 	const scope = await ownerLocations(owner)
-	const outlets = await checkOutlets(owner, scope, interfaceIds, jackIds, scopeTenantIds)
+	const outlets = await checkOutlets(owner, interfaceIds, jackIds, scopeTenantIds)
 	if (Result.isError(outlets)) {
 		return outlets
 	}
@@ -1009,13 +987,11 @@ async function checkPlanInput(
 
 /**
  * Placed outlets exist, are visible, are single-position rear ports in no
- * jack, or jacks, and lie in the owner's site (`outletSiteSql`); on a
- * location's plan an outlet with a location of its own must lie in
- * `scope`. Missing and invisible ports and jacks get the same message.
+ * jack, or jacks, and their panels lie in the owner's site. Missing and
+ * invisible ports and jacks get the same message.
  */
 async function checkOutlets(
 	owner: AttachmentOwner,
-	scope: number[] | null,
 	interfaceIds: number[],
 	jackIds: number[],
 	scopeTenantIds: readonly number[] | undefined,
@@ -1029,8 +1005,7 @@ async function checkOutlets(
 		side: interfaces.side,
 		positions: interfaces.positions,
 		tenant_id: portDevice.tenant_id,
-		site_id: outletSiteSql,
-		location_id: interfaces.location_id,
+		site_id: portDevice.site_id,
 	}
 	const portRows =
 		interfaceIds.length === 0
@@ -1042,7 +1017,6 @@ async function checkOutlets(
 					})
 					.from(interfaces)
 					.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))
-					.leftJoin(outletLocation, eq(outletLocation.id, interfaces.location_id))
 					.where(inArray(interfaces.id, interfaceIds))
 	// A jack's first port stands for it (`firstJackPort`).
 	const jackRows =
@@ -1053,7 +1027,6 @@ async function checkOutlets(
 					.from(panel_jacks)
 					.innerJoin(interfaces, sql`${interfaces.id} = ${firstJackPort(panel_jacks.id)}`)
 					.innerJoin(portDevice, eq(portDevice.id, interfaces.device_id))
-					.leftJoin(outletLocation, eq(outletLocation.id, interfaces.location_id))
 					.where(inArray(panel_jacks.id, jackIds))
 	const siteId = await siteOfOwner(owner)
 	const outlets = [
@@ -1088,9 +1061,6 @@ async function checkOutlets(
 			return Result.err(
 				new ValidationError(`Outlet "${row.name}" is outside this floor plan's site`),
 			)
-		}
-		if (scope !== null && row.location_id !== null && !scope.includes(row.location_id)) {
-			return Result.err(new ValidationError(`Outlet "${row.name}" is in another location`))
 		}
 	}
 	return Result.ok(undefined)
@@ -1170,53 +1140,6 @@ async function planSnapshot(id: number): Promise<
 		.where(eq(floorplan_placements.attachment_id, id))
 		.orderBy(asc(floorplan_placements.id))
 	return { areas, placements, ...(await planCalibration(id)) }
-}
-
-/**
- * Placing an outlet on a location's plan puts it (all ports of a jack) in
- * that location when it has none yet (one changelog entry per port). Runs
- * on the caller's `getDb()` (its transaction).
- */
-async function locateOutlets(owner: AttachmentOwner, input: FloorplanPut): Promise<void> {
-	const ids = input.placements.flatMap((p) =>
-		p.interface_id === undefined ? [] : [p.interface_id],
-	)
-	const jackIds = input.placements.flatMap((p) => (p.jack_id === undefined ? [] : [p.jack_id]))
-	if (owner.location_id === undefined || ids.length + jackIds.length === 0) {
-		return
-	}
-	const unlocated = await getDb()
-		.select()
-		.from(interfaces)
-		.where(
-			and(
-				or(
-					ids.length === 0 ? undefined : inArray(interfaces.id, ids),
-					jackIds.length === 0 ? undefined : inArray(interfaces.jack_id, jackIds),
-				),
-				isNull(interfaces.location_id),
-			),
-		)
-	if (unlocated.length === 0) {
-		return
-	}
-	await getDb()
-		.update(interfaces)
-		.set({ location_id: owner.location_id })
-		.where(
-			inArray(
-				interfaces.id,
-				unlocated.map((row) => row.id),
-			),
-		)
-	const locationId = owner.location_id
-	await logUpdates(
-		'interface',
-		unlocated.map((row): [InterfaceJson, InterfaceJson] => {
-			const before = toInterfaceJson(row)
-			return [before, { ...before, location_id: locationId }]
-		}),
-	)
 }
 
 /**
@@ -1310,7 +1233,6 @@ export async function putPlan(
 						origin: input.origin,
 					})
 				}
-				await locateOutlets(owner, input)
 				const after = await planSnapshot(id)
 				await logUpdate(
 					'attachment',
@@ -1332,11 +1254,8 @@ export async function putPlan(
 
 /**
  * Removes placements whose rack or device no longer lies in its plan
- * owner's scope (see `ownerLocations`), and outlets that left the owner's
- * site (by their own location, else their panel's) or, on a location's
- * plan, whose location was cleared or left the owner's scope (placing sets
- * it, see `locateOutlets`), after a site, location, rack or outlet
- * location change. Runs on the caller's `getDb()` (its transaction).
+ * owner's scope (see `ownerLocations`), and outlets whose panel left the
+ * owner's site, after a site, location or rack change. Runs on the caller's `getDb()` (its transaction).
  */
 export async function prunePlacements(): Promise<void> {
 	await getDb().execute(sql`
@@ -1348,27 +1267,13 @@ export async function prunePlacements(): Promise<void> {
 			select 1
 			from ${interfaces} i
 			join ${devices} d on d.id = i.device_id
-			left join ${locations} il on il.id = i.location_id
 			where i.id = coalesce(
 				fp.interface_id,
 				(select min(jp.id) from ${interfaces} jp where jp.jack_id = fp.jack_id)
 			)
-			and coalesce(il.site_id, d.site_id) = coalesce(
+			and d.site_id = coalesce(
 				a.site_id,
 				(select l.site_id from ${locations} l where l.id = a.location_id)
-			)
-			and (
-				a.location_id is null
-				or a.location_id in (
-					with recursive ancestors(id) as (
-						select i.location_id
-						union
-						select l.parent_id from ${locations} l
-						join ancestors on l.id = ancestors.id
-						where l.parent_id is not null
-					)
-					select id from ancestors
-				)
 			)
 		)
 	`)

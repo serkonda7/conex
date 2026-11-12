@@ -967,7 +967,7 @@ export interface TemplateSyncPreview {
 		side: PortSide | null
 		kind: string
 		connected: boolean
-		/** Has a room or a floor plan placement, which removing the port deletes. */
+		/** Has a floor plan placement, which removing the port deletes. */
 		located: boolean
 		/** Has a custom name linked to a template port that is gone. */
 		linked: boolean
@@ -1416,43 +1416,15 @@ export const InterfaceUpdateSchema = v.strictObject({
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_port_id: v.optional(IdSchema, undefined),
 	rear_port_position: v.optional(PortPositionsSchema, undefined),
-	// Outlets (single-position rear ports) only: the room the cable ends in.
-	location_id: v.optional(v.nullable(IdSchema), undefined),
 	// Patch-panel ports only: wired up, or just part of the panel.
 	patched: v.optional(v.boolean(), undefined),
 })
-
-/** `PUT /devices/:id/interfaces/location`: set or clear the location of several outlets. */
-export const InterfaceLocationSchema = v.strictObject({
-	interface_ids: v.pipe(v.array(IdSchema), v.minLength(1), v.maxLength(500)),
-	location_id: v.nullable(IdSchema),
-})
-
-/**
- * `GET /locations/:id/outlets`: an outlet located in the location or one
- * of its descendants, with its panel and the port cabled to it.
- */
-export interface LocationOutletJson {
-	/** The outlet (rear port) interface. */
-	id: number
-	/** Port name on the panel (`12`). */
-	name: string
-	connected: boolean
-	/** The panel device. */
-	device_id: number
-	device_name: string
-	location_id: number
-	location_name: string
-	/** Port at the other end of the outlet's cable, if any. */
-	peer: { device_id: number; device_name: string; interface_name: string } | null
-}
 
 export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
 export type DeviceUpdate = v.InferOutput<typeof DeviceUpdateSchema>
 export type DeviceMove = v.InferOutput<typeof DeviceMoveSchema>
 export type InterfaceCreate = v.InferOutput<typeof InterfaceCreateSchema>
 export type InterfaceUpdate = v.InferOutput<typeof InterfaceUpdateSchema>
-export type InterfaceLocation = v.InferOutput<typeof InterfaceLocationSchema>
 
 /** Jack names also allow slashes and the separator used for generated names. */
 const JackNameSchema = v.pipe(

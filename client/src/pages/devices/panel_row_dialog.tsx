@@ -5,13 +5,11 @@ import { createSignal, Show } from 'solid-js'
 import { delete_cable } from '../../api/cables'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
-import { CheckboxField, type FormOption, FormSection, TextField } from '../../components/form'
+import { CheckboxField, FormSection, TextField } from '../../components/form'
 import { Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
-import { parseId } from '../../lib/router'
 import { ConnectPortDialog } from './connect_port_dialog'
-import { isOutlet, OutletLocationField } from './outlet_location'
 import { PortPeer } from './trace_peer'
 
 export interface PanelRowDialogProps {
@@ -22,8 +20,6 @@ export interface PanelRowDialogProps {
 	front: InterfaceJson | null
 	links: Map<number, TraceLink>
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
-	/** Location choices of an outlet (`useOutletLocationOptions`). */
-	location_options: FormOption[]
 	/** A cable was connected or removed; the dialog stays open. */
 	on_saved: () => void
 	on_close: () => void
@@ -31,14 +27,13 @@ export interface PanelRowDialogProps {
 
 /**
  * Edit dialog of one patch-panel row: whether it is patched, names and
- * cables of its front and rear port, and (for an outlet) the rear port's
- * location. Cables are connected and removed right away; the other fields
+ * cables of its front and rear port. Cables are connected and removed right
+ * away; the other fields
  * are saved together (`patched` on both ports of the row).
  */
 export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 	const [frontName, setFrontName] = createSignal(props.front?.name ?? '')
 	const [rearName, setRearName] = createSignal(props.rear?.name ?? '')
-	const [location, setLocation] = createSignal(String(props.rear?.location_id ?? ''))
 	const [patched, setPatched] = createSignal((props.rear ?? props.front)?.patched ?? true)
 	const [connecting, setConnecting] = createSignal<InterfaceJson | null>(null)
 	const [error, setError] = createSignal<string | null>(null)
@@ -56,12 +51,8 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 
 	/** Changed fields of a port; empty when nothing changed. */
 	function changesOf(iface: InterfaceJson, name: string): InterfaceUpdate {
-		const locationId = parseId(location())
 		return {
 			...(name.trim() !== iface.name ? { name: name.trim() } : {}),
-			...(isOutlet(iface) && locationId !== iface.location_id
-				? { location_id: locationId }
-				: {}),
 			...(patched() !== iface.patched ? { patched: patched() } : {}),
 		}
 	}
@@ -187,14 +178,6 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 									autofocus={!props.front}
 								/>
 								{connectionField(rear())}
-								<Show when={isOutlet(rear())}>
-									<OutletLocationField
-										id="panel-row-location"
-										value={location()}
-										onChange={setLocation}
-										options={props.location_options}
-									/>
-								</Show>
 							</FormSection>
 						)}
 					</Show>

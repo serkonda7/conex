@@ -120,8 +120,8 @@ const READS: Record<string, Reach> = {
 		'service-levels',
 		'priorities',
 	],
-	// Device names and tenant scope, connected flags, outlet locations.
-	interfaces: [...TENANCY, 'devices', 'cables', 'locations'],
+	// Device names and tenant scope, connected flags.
+	interfaces: [...TENANCY, 'devices', 'cables'],
 	// End ports and devices, traces, tenant scope of both ends.
 	cables: [...TENANCY, 'interfaces', 'devices'],
 	// Tenant memberships, the linked login.
@@ -179,8 +179,7 @@ const WRITES: Record<string, Reach> = {
 	cables: ['interfaces'],
 	// Deactivating or deleting one changes its login; deletes drop integration links.
 	employees: ['users', 'integrations'],
-	// Placing outlets on a plan sets their location.
-	attachments: ['interfaces'],
+	attachments: [],
 	'saved-filters': [],
 	'saved-layouts': [],
 	'calendar-sync': [],

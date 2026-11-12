@@ -462,11 +462,6 @@ export const de: Messages = {
 	'location.noFloorplan': 'Noch kein Grundriss zeigt diesen Bereich.',
 	'location.noRacks': 'Hier sind noch keine Racks vorhanden.',
 	'location.noDevices': 'Hier sind noch keine Geräte vorhanden.',
-	'location.noOutlets':
-		'Hier sind noch keine Dosen vorhanden. Der Bereich einer Dose wird an ihrem Patchfeld gesetzt.',
-	'location.outletPanel': 'Patchfeld',
-	'location.outletPort': 'Port',
-	'location.outletPeer': 'Verbunden mit',
 	'locationType.building': 'Gebäude',
 	'locationType.floor': 'Etage',
 	'locationType.room': 'Raum',
@@ -862,8 +857,7 @@ export const de: Messages = {
 	'device.templateSync.keep': 'Unverändert behalten',
 	'device.templateSync.remove': 'Entfernen',
 	'device.templateSync.cabled': 'Kabel bleibt verbunden',
-	'device.templateSync.located':
-		'Raum oder Grundrissposition wird durch Entfernen gelöscht',
+	'device.templateSync.located': 'Grundrissposition wird durch Entfernen gelöscht',
 	'device.templateSync.added': 'Neue Ports ({count})',
 	'device.templateSync.updated': 'Geänderte Ports ({count})',
 	'device.templateSync.change': '{field}: {from} → {to}',
@@ -899,7 +893,6 @@ export const de: Messages = {
 		'Nicht aufgelegt: Zeile als aufgelegt speichern, um ein Kabel anzuschließen',
 	'device.panel.cabledPatched': 'Verkabelte Ports bleiben aufgelegt; zuerst die Kabel trennen',
 	'device.panel.otherPorts': 'Ports',
-	'device.panel.location': 'Bereich der Dose',
 	'device.panel.jack': 'Mehrfachdose',
 	'device.panel.manageJacks': 'Mehrfachdosen…',
 	'device.jacks.title': 'Mehrfachdosen von {name}',
@@ -916,7 +909,6 @@ export const de: Messages = {
 	'device.jacks.sequenceGroup': '{count} freie Dosen zusammenfassen',
 	'device.jacks.sequenceHint':
 		'Fasst die freien Dosen in Portreihenfolge zusammen, je {size} pro Mehrfachdose, benannt nach ihren Ports. Ein kleinerer Rest bleibt einzeln.',
-	'device.outletLocation.none': 'Kein Bereich',
 	'device.trace.via': 'über {via}',
 	'device.trace.split': '(eine von mehreren Fasern)',
 	'device.trace.openEnd': '→ frei',
