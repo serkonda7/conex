@@ -25,7 +25,7 @@ export function row_options(rows: readonly { id: number; name: string }[]): Form
 }
 
 /** Focuses `el` on mount when `autofocus` is set. */
-function useAutofocus(autofocus: () => boolean | undefined): (el: HTMLElement) => void {
+export function useAutofocus(autofocus: () => boolean | undefined): (el: HTMLElement) => void {
 	let target: HTMLElement | undefined
 	onMount(() => {
 		if (autofocus() === true) {
@@ -171,6 +171,43 @@ export function CheckboxField(props: {
 					/>
 					{props.label}
 				</label>
+			</div>
+		</div>
+	)
+}
+
+/** Labelled on/off switch; the current state is spelled out next to it. */
+export function ToggleField(props: {
+	id: string
+	label: string
+	checked: boolean
+	onChange: (checked: boolean) => void
+	/** State text shown next to the switch when on / off. */
+	on_text: string
+	off_text: string
+	disabled?: boolean
+	/** Shown on hover, e.g. why the switch is disabled. */
+	title?: string
+}): JSX.Element {
+	return (
+		<div class="field">
+			<label for={props.id}>{props.label}</label>
+			<div class="field-control">
+				<span class="field-toggle" title={props.title}>
+					<input
+						id={props.id}
+						type="checkbox"
+						role="switch"
+						aria-checked={props.checked}
+						class="toggle"
+						checked={props.checked}
+						disabled={props.disabled}
+						onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+							props.onChange(e.currentTarget.checked)
+						}
+					/>
+					<span aria-hidden="true">{props.checked ? props.on_text : props.off_text}</span>
+				</span>
 			</div>
 		</div>
 	)

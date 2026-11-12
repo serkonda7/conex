@@ -198,7 +198,7 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 		const outletLost = fields.positions > 1 && port.positions === 1
 		await db
 			.update(interfaces)
-			.set({ ...fields, ...(outletLost ? { location_id: null, jack_id: null } : {}) })
+			.set({ ...fields, ...(outletLost ? { jack_id: null } : {}) })
 			.where(eq(interfaces.id, port.id))
 		if (outletLost) {
 			unplaced.push(port.id)

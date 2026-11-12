@@ -1,17 +1,16 @@
 /**
  * Jacks of a patch panel: single-position rear ports (outlets) grouped
  * behind one faceplate, e.g. a double jack with two ports. A jack belongs
- * to one panel and its ports share one location; on a floor plan the jack
+ * to one panel; on a floor plan the jack
  * is placed instead of its ports (`attachments.ts`).
  */
 import { Result } from 'better-result'
 import { and, asc, eq, getTableColumns, inArray, notExists, type SQL, sql } from 'drizzle-orm'
 import type { PanelJackCreate, PanelJackJson, PanelJackUpdate } from 'shared/src/schemas'
 import { devices, floorplan_placements, interfaces, panel_jacks } from '../schema'
-import { prunePlacements } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { getDevice, toInterfaceJson } from './devices'
+import { getDevice } from './devices'
 import { ConflictError, NotFoundError } from './errors'
 import { exists, insertedId, subquery, tryWrite } from './list'
 
@@ -55,8 +54,8 @@ export async function listJacks(deviceId: number): Promise<Result<PanelJackJson[
 }
 
 /**
- * Groups outlets of a panel into a new jack (`PanelJackCreateSchema`). One
- * changelog entry for the jack, one per port whose location it aligned.
+ * Groups outlets of a panel into a new jack (`PanelJackCreateSchema`) with
+ * one changelog entry for the jack.
  */
 export async function createJack(
 	deviceId: number,
@@ -90,11 +89,6 @@ export async function createJack(
 			return Result.err(new ConflictError(`Port ${port.name} is already in a jack`))
 		}
 	}
-	const locationIds = new Set(ports.flatMap((port) => port.location_id ?? []))
-	if (locationIds.size > 1) {
-		return Result.err(new ConflictError('The ports lie in different locations'))
-	}
-	const locationId = [...locationIds][0] ?? null
 	const written = await tryWrite(
 		() =>
 			withTransaction(async () => {
@@ -106,18 +100,8 @@ export async function createJack(
 				)
 				await getDb()
 					.update(interfaces)
-					.set({ jack_id: jackId, location_id: locationId })
+					.set({ jack_id: jackId })
 					.where(inArray(interfaces.id, ids))
-				for (const port of ports) {
-					if (port.location_id !== locationId) {
-						const before = toInterfaceJson(port)
-						await logUpdate(
-							'interface',
-							before,
-							Result.ok({ ...before, location_id: locationId }),
-						)
-					}
-				}
 				// The first placed port's marker becomes the jack's.
 				const placed = await getDb()
 					.select()
@@ -135,8 +119,6 @@ export async function createJack(
 						x: first.x,
 						y: first.y,
 					})
-					// An aligned location can take the marker out of its plan's scope.
-					await prunePlacements()
 				}
 				return jackId
 			}),
@@ -169,7 +151,7 @@ export async function updateJack(
 }
 
 /**
- * Ungroups a jack: its ports stay as single outlets with their location;
+ * Ungroups a jack: its ports stay as single outlets;
  * its floor-plan marker is removed.
  */
 export async function deleteJack(

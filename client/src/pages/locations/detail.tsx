@@ -1,4 +1,3 @@
-import type { LocationOutletJson } from 'shared/src/types'
 import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import {
 	type AttachmentJson,
@@ -13,7 +12,6 @@ import { fetch_device_types } from '../../api/templates'
 import {
 	delete_location,
 	fetch_location,
-	fetch_location_outlets,
 	fetch_locations,
 	fetch_site,
 	fetch_tenant,
@@ -143,7 +141,7 @@ function locationTab<Row extends { id: number }>(opts: {
 /**
  * /locations/:id — location detail: header with the type icon, spec sheet
  * (general, hierarchy, floor plans), the floor plan preview and images, and
- * tabs with the racks, devices and outlets.
+ * tabs with the racks and devices.
  */
 export function LocationDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -178,8 +176,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		deviceItems()?.filter(
 			(row: DeviceListItem): row is DeviceListDevice => row.kind === 'device',
 		)
-	// Outlets of this location and its descendants, wherever their panel sits.
-	const [outlets] = createRowsFor(id, fetch_location_outlets, setError)
 	const [roles] = createRows(fetch_device_roles, setError)
 	const [deviceTypes] = createRows(fetch_device_types, setError)
 	const roleName = useNameOf(roles, deviceRoleLabel)
@@ -274,43 +270,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 		},
 	]
 
-	const outletColumns: DataTableColumn<LocationOutletJson>[] = [
-		{
-			key: 'panel',
-			label: t('location.outletPanel'),
-			class: 'component-name',
-			getValue: (o: LocationOutletJson): JSX.Element => (
-				<a href={`/devices/${o.device_id}`}>{o.device_name}</a>
-			),
-		},
-		{
-			key: 'port',
-			label: t('location.outletPort'),
-			getValue: (o: LocationOutletJson): JSX.Element => <code>{o.name}</code>,
-		},
-		{
-			key: 'location',
-			label: tp('entity.location', 1),
-			getValue: (o: LocationOutletJson): JSX.Element => (
-				<a href={`/locations/${o.location_id}`}>{o.location_name}</a>
-			),
-		},
-		{
-			key: 'peer',
-			label: t('location.outletPeer'),
-			getValue: (o: LocationOutletJson): JSX.Element => (
-				<Show when={o.peer} fallback="—">
-					{(peer: () => NonNullable<LocationOutletJson['peer']>): JSX.Element => (
-						<span>
-							<a href={`/devices/${peer().device_id}`}>{peer().device_name}</a>{' '}
-							<code>{peer().interface_name}</code>
-						</span>
-					)}
-				</Show>
-			),
-		},
-	]
-
 	const tabs = (): RelatedTab[] => [
 		locationTab({
 			key: 'racks',
@@ -329,15 +288,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 			noun: 'noun.device',
 			emptyText: t('location.noDevices'),
 			columns: deviceColumns,
-		}),
-		locationTab({
-			key: 'outlets',
-			label: tp('entity.outlet', 2),
-			rows: outlets,
-			loading: () => outlets.loading,
-			noun: 'noun.outlet',
-			emptyText: t('location.noOutlets'),
-			columns: outletColumns,
 		}),
 	]
 

@@ -13,7 +13,7 @@ import { TextField } from '../../components/form'
 import { Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
-import { isOutlet } from './outlet_location'
+import { isOutlet } from './outlet'
 
 /** Default jack name: its port names without leading zeros (`03` + `04` → `3/4`). */
 function jackName(ports: InterfaceJson[]): string {

@@ -17,7 +17,7 @@ import { create_stub, delete_stub, type StubRow, update_stub } from '../../api/t
 import { InlineError } from '../../components/feedback'
 import { Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
-import { Modal } from '../../components/modal'
+import { confirmDiscard, Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
 import { poeModeLabel, poeTypeOption, portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
@@ -186,6 +186,23 @@ export function ComponentDialog(props: {
 	const [poeType, setPoeType] = createSignal<PoeType | ''>(stub?.poe_type ?? '')
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
+	/** The form's fields, compared to their initial values to find unsaved changes. */
+	const formState = (): string =>
+		JSON.stringify([
+			name(),
+			count(),
+			start(),
+			pickedDigits(),
+			positions(),
+			rearStub(),
+			rearPosition(),
+			kind(),
+			maximumDraw(),
+			poeMode(),
+			poeType(),
+		])
+	const initialState = formState()
+	const dirty = (): boolean => formState() !== initialState
 	const prefix = `${stub ? 'edit' : 'add'}-${props.info.key}`
 	const isPowerInput = props.info.key === 'power-port'
 	const isInterface = props.info.key === 'interface'
@@ -297,6 +314,7 @@ export function ComponentDialog(props: {
 					? t('deviceType.component.editTitle', { name: stubLabel(stub) })
 					: t('deviceType.component.addTitle', { component: t(props.info.label) })
 			}
+			dirty={dirty()}
 			on_close={props.onClose}
 		>
 			<form class="form-stacked" onSubmit={handleSubmit}>
@@ -457,7 +475,10 @@ export function ComponentDialog(props: {
 					/>
 				</Show>
 				<div class="modal-actions">
-					<button type="button" onClick={props.onClose}>
+					<button
+						type="button"
+						onClick={() => confirmDiscard(dirty()) && props.onClose()}
+					>
 						{t('common.cancel')}
 					</button>
 					<button type="submit" disabled={!name().trim() || save.pending()}>

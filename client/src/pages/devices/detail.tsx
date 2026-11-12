@@ -1,4 +1,4 @@
-import { IconArrowsExchange, IconLinkPlus, IconPencil, IconUnlink } from '@tabler/icons-solidjs'
+import { IconArrowsExchange, IconPencil } from '@tabler/icons-solidjs'
 import { OTHER_PORT_KINDS } from 'shared/src/ports'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { type Accessor, createMemo, createSignal, type JSX, Show } from 'solid-js'
@@ -43,7 +43,6 @@ import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { JackDialog } from './jack_dialog'
 import { MoveTenantDialog } from './move_tenant_dialog'
-import { useOutletLocationOptions } from './outlet_location'
 import { PanelPortTable, type PanelRow } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
 import { DevicePortTable } from './port_table'
@@ -62,57 +61,6 @@ const roleOf = (
 const isOtherPort = (iface: InterfaceJson): boolean =>
 	!iface.side && OTHER_PORT_KINDS.has(iface.kind)
 const isPanelPort = (iface: InterfaceJson): boolean => iface.side !== null
-
-/** Connect or disconnect plus edit buttons of one port row. */
-function PortActions(props: {
-	iface: InterfaceJson
-	link: TraceLink | undefined
-	onConnect: () => void
-	onDisconnect: (cableId: number) => void
-	onEdit: () => void
-}): JSX.Element {
-	const name = (): string => props.iface.name
-	return (
-		<span class="row-actions">
-			<Show
-				when={props.link}
-				fallback={
-					<button
-						type="button"
-						class="icon-btn icon-btn-connect"
-						disabled={props.iface.connected}
-						title={t('device.connectToPeer', { name: name() })}
-						aria-label={t('device.connectCableFor', { name: name() })}
-						onClick={props.onConnect}
-					>
-						<IconLinkPlus size={16} />
-					</button>
-				}
-			>
-				{(link: () => TraceLink): JSX.Element => (
-					<button
-						type="button"
-						class="icon-btn icon-btn-danger"
-						title={t('device.disconnectPort', { name: name() })}
-						aria-label={t('device.disconnectPort', { name: name() })}
-						onClick={() => props.onDisconnect(link().cable_id)}
-					>
-						<IconUnlink size={16} />
-					</button>
-				)}
-			</Show>
-			<button
-				type="button"
-				class="icon-btn"
-				title={t('device.editPort', { name: name() })}
-				aria-label={t('device.editPort', { name: name() })}
-				onClick={props.onEdit}
-			>
-				<IconPencil size={16} />
-			</button>
-		</span>
-	)
-}
 
 /**
  * /devices/:id — detail with network and other interfaces, plus the per-port
@@ -167,12 +115,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		],
 	)
 
-	const action = useAction(setError)
-
-	async function handleDisconnect(cableId: number): Promise<void> {
-		await action.run(() => delete_cable(cableId))
-	}
-
 	const handleDelete = useDetailDelete({
 		noun: 'noun.device',
 		name: () => device()?.name,
@@ -181,6 +123,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		setError,
 		listRoute: '/devices',
 	})
+
+	const cable = useAction(setError)
+	/** Removes a port's cable from the table, without a dialog. */
+	const disconnect = (link: TraceLink): void => {
+		if (!cable.pending()) {
+			void cable.run(() => delete_cable(link.cable_id))
+		}
+	}
 
 	function openDialog(open: (iface: InterfaceJson) => void, iface: InterfaceJson): void {
 		setError(null)
@@ -192,10 +142,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const panelPorts = createMemo(() => (ifaces() ?? []).filter(isPanelPort))
 	const [jacks] = createRowsFor(() => panelPorts().length > 0 && props.id, fetch_jacks, setError)
 	const jackNames = createMemo(() => new Map((jacks() ?? []).map((jack) => [jack.id, jack.name])))
-	const locationOptions = useOutletLocationOptions(tenantId, setError)
-	const locationLabels = createMemo(
-		() => new Map(locationOptions().map((option) => [Number(option.value), option.label])),
-	)
 	/** Current state of a port of the row being edited (its cable may change meanwhile). */
 	const currentIface = (iface: InterfaceJson | null): InterfaceJson | null =>
 		iface && ((ifaces() ?? []).find((i) => i.id === iface.id) ?? iface)
@@ -249,30 +195,16 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		},
 	}
 
-	/** Room an outlet's installation cable ends in. */
-	const locationColumn: DataTableColumn<PanelRow> = {
-		key: 'location',
-		label: t('device.panel.location'),
-		getValue: (row: PanelRow): JSX.Element => {
-			const locationKey = row.position === null ? row.rear.location_id : null
-			return locationKey === null ? (
-				<span>—</span>
-			) : (
-				<a href={`/locations/${locationKey}`}>
-					{locationLabels().get(locationKey) ?? `#${locationKey}`}
-				</a>
-			)
-		},
-	}
-
 	const portActions = (iface: InterfaceJson): JSX.Element => (
-		<PortActions
-			iface={iface}
-			link={linksByIface().get(iface.id)}
-			onConnect={(): void => openDialog(setConnectingIface, iface)}
-			onDisconnect={(cableId: number): void => void handleDisconnect(cableId)}
-			onEdit={(): void => openDialog(setEditingIface, iface)}
-		/>
+		<button
+			type="button"
+			class="icon-btn"
+			title={t('device.editPort', { name: iface.name })}
+			aria-label={t('device.editPort', { name: iface.name })}
+			onClick={(): void => openDialog(setEditingIface, iface)}
+		>
+			<IconPencil size={20} />
+		</button>
 	)
 
 	const panelRowActions = (row: PanelRow): JSX.Element => {
@@ -514,8 +446,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 											openDialog(setConnectingIface, iface)
 									: undefined
 							}
+							onDisconnect={can('edit') ? disconnect : undefined}
 							rowActions={can('edit') ? panelRowActions : undefined}
-							extraColumns={[jackColumn, locationColumn, planColumn]}
+							extraColumns={[jackColumn, planColumn]}
 						/>
 					</section>
 				</Show>
@@ -534,6 +467,13 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 								ports={ports()}
 								links={linksByIface()}
 								endToEnd={endToEndOf}
+								onConnect={
+									can('edit')
+										? (iface: InterfaceJson): void =>
+												openDialog(setConnectingIface, iface)
+										: undefined
+								}
+								onDisconnect={can('edit') ? disconnect : undefined}
 								actions={can('edit') ? portActions : undefined}
 							/>
 						</Show>
@@ -587,8 +527,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				{(iface: () => InterfaceJson): JSX.Element => (
 					<EditPortDialog
 						device_id={props.id}
-						iface={iface()}
+						iface={currentIface(iface()) ?? iface()}
 						show_enabled={!isOtherPort(iface())}
+						link={linksByIface().get(iface().id)}
+						endToEnd={endToEndOf(iface().id)}
 						on_saved={() => setEditingIface(null)}
 						on_close={() => setEditingIface(null)}
 					/>
@@ -598,11 +540,11 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				{(row: PanelRow): JSX.Element => (
 					<PanelRowDialog
 						device_id={props.id}
-						rear={row.position === null ? currentIface(row.rear) : null}
+						rear={currentIface(row.rear)}
 						front={currentIface(row.front)}
+						position={row.position}
 						links={linksByIface()}
 						endToEnd={endToEndOf}
-						location_options={locationOptions()}
 						on_saved={() => setEditingRow(null)}
 						on_close={() => setEditingRow(null)}
 					/>

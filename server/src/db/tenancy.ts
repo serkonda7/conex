@@ -22,7 +22,6 @@ import {
 	devices,
 	employee_tenants,
 	external_links,
-	interfaces,
 	locations,
 	managed_bundles,
 	racks,
@@ -968,11 +967,6 @@ export async function deleteLocation(
 			'Location still has child locations; move or delete them first',
 		],
 		[racks, eq(racks.location_id, id), 'Location still has racks; move or delete them first'],
-		[
-			interfaces,
-			eq(interfaces.location_id, id),
-			'Location still has outlets; move them to another location first',
-		],
 	])
 	if (Result.isError(blocked)) {
 		return blocked

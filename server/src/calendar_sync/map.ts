@@ -35,10 +35,10 @@ export interface LinkedNames {
 	companyAddresses: Map<number, string>
 }
 
-const LOCATION_LABELS: Record<string, string> = {
-	OFFICE: 'Office',
-	CUSTOMER: 'Customer',
-	REMOTE: 'Remote',
+/** Outlook location for in-office and remote supports, regardless of the company. */
+const FIXED_LOCATIONS: Record<string, string> = {
+	OFFICE: '',
+	REMOTE: 'Fernwartung',
 }
 
 function text(value: string | undefined | null): string | null {
@@ -67,7 +67,7 @@ const ABSENCE_SUBJECT = 'Absence'
 
 /** Subjects of the drive time events. */
 const APPROACH_TITLE = 'Anfahrt'
-const DEPARTURE_TITLE = 'Abfahrt'
+const DEPARTURE_TITLE = 'Rückfahrt'
 
 /**
  * `<company>: <ticket title> [#<ticket>]`. Without a ticket title the first
@@ -98,10 +98,15 @@ function subjectOf(support: TnsSupportList, names: LinkedNames, company: string 
 }
 
 /**
- * The company address, else `outlookLocation`, else the support location
- * (on-site appointments name the company).
+ * In-office supports have no location and remote ones say "Fernwartung".
+ * Otherwise the company address, else `outlookLocation`, else
+ * the company name for on-site supports.
  */
 function locationOf(support: TnsSupportList, names: LinkedNames, company: string | null): string {
+	const fixed = support.location ? FIXED_LOCATIONS[support.location] : undefined
+	if (fixed !== undefined) {
+		return fixed
+	}
 	const address = support.companyId ? text(names.companyAddresses.get(support.companyId)) : null
 	if (address) {
 		return address
@@ -110,10 +115,7 @@ function locationOf(support: TnsSupportList, names: LinkedNames, company: string
 	if (outlookLocation) {
 		return outlookLocation
 	}
-	if (support.location === 'CUSTOMER' && company) {
-		return company
-	}
-	return support.location ? (LOCATION_LABELS[support.location] ?? '') : ''
+	return support.location === 'CUSTOMER' && company ? company : ''
 }
 
 /** TANSS ticket link plus the support text. */
@@ -180,6 +182,8 @@ export function toCalendarItems(
 			start: main.end,
 			end: main.end + departure * 60,
 			title: DEPARTURE_TITLE,
+			// The drive back ends at the office, not at the customer.
+			location: '',
 		})
 	}
 	return items

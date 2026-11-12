@@ -6,8 +6,15 @@ export interface ModalProps {
 	title: string
 	/** Extra class on the dialog box, e.g. to widen it. */
 	class?: string
+	/** Unsaved changes: Escape, a backdrop click and the close button ask first. */
+	dirty?: boolean
 	on_close: () => void
 	children: JSX.Element
+}
+
+/** True when the dialog may close: nothing is unsaved, or the user discards it. */
+export function confirmDiscard(dirty: boolean | undefined): boolean {
+	return !dirty || window.confirm(t('common.confirmDiscard'))
 }
 
 /**
@@ -20,6 +27,7 @@ export function Modal(props: ModalProps): JSX.Element {
 			open
 			title={props.title}
 			class={props.class}
+			onBeforeClose={() => confirmDiscard(props.dirty)}
 			onClose={props.on_close}
 			closeLabel={t('common.close')}
 		>

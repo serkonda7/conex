@@ -12,8 +12,10 @@ import {
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
+import { locationTypeIcon } from '../../lib/icons'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
+import { locationOptions as locationTreeOptions } from '../locations/options'
 import { useRackTypeOptions } from '../rack_types/options'
 
 /** /racks/:id/edit — rack edit form. Saves back to the list when opened from it, else to the detail page. */
@@ -49,10 +51,14 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 	// Keep a current location that falls outside the sibling list selectable
 	// so the combobox can still show it.
 	function locationOptions(): FormOption[] {
-		const options = row_options(siblings() ?? [])
+		const options = locationTreeOptions(siblings() ?? [])
 		const current = currentLocation()
 		if (current && locationId() !== '' && options.every((o) => o.value !== current.id)) {
-			options.push({ value: current.id, label: current.name })
+			options.push({
+				value: current.id,
+				label: current.name,
+				icon: locationTypeIcon(current.type),
+			})
 		}
 		return options
 	}

@@ -1665,7 +1665,8 @@ tbody tr:last-child td {
 .app-content .import-prompt-controls .field input,
 .app-content .form-stacked .field input,
 .app-content .form-stacked .field select,
-.app-content .form-stacked .field textarea {
+.app-content .form-stacked .field textarea,
+.app-content .form-stacked .panel-row-field input {
 	flex: none;
 	width: 100%;
 }
@@ -2166,6 +2167,54 @@ tbody tr:last-child td {
 	width: 7rem;
 }
 
+/* On/off switch (ToggleField): a checkbox drawn as a track with a knob. */
+.field-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: 2.1rem;
+}
+
+:is(.field .field-toggle, .panel-row-switch) input.toggle {
+	appearance: none;
+	position: relative;
+	flex: none;
+	width: 2.25rem;
+	height: 1.25rem;
+	margin: 0;
+	padding: 0;
+	cursor: pointer;
+	background-color: var(--border-strong);
+	border: none;
+	border-radius: 999px;
+	transition: background-color 150ms ease;
+}
+
+:is(.field .field-toggle, .panel-row-switch) input.toggle::before {
+	content: "";
+	position: absolute;
+	top: 0.1875rem;
+	left: 0.1875rem;
+	width: 0.875rem;
+	height: 0.875rem;
+	border-radius: 50%;
+	background-color: var(--primary-contrast);
+	transition: transform 150ms ease;
+}
+
+:is(.field .field-toggle, .panel-row-switch) input.toggle:checked {
+	background-color: var(--primary);
+}
+
+:is(.field .field-toggle, .panel-row-switch) input.toggle:checked::before {
+	transform: translateX(1rem);
+}
+
+:is(.field .field-toggle, .panel-row-switch) input.toggle:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
 .app-content .form-stacked .field .field-checkbox-label input,
 .app-content .form-stacked .jack-outlet-list .field-checkbox-label input {
 	flex: none;
@@ -2563,18 +2612,23 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
-/* Connect buttons in the panel table only show on row hover (or focus). */
-.panel-port-table .icon-btn-connect {
+/* Connect and disconnect buttons in the port tables only show on row hover (or focus). */
+:is(.panel-port-table, .device-port-table)
+	:is(.icon-btn-connect, .icon-btn-disconnect) {
 	opacity: 0;
 }
 
-.panel-port-table tr:hover .icon-btn-connect,
-.panel-port-table .icon-btn-connect:focus-visible {
+:is(.panel-port-table, .device-port-table)
+	tr:hover
+	:is(.icon-btn-connect, .icon-btn-disconnect),
+:is(.panel-port-table, .device-port-table)
+	:is(.icon-btn-connect, .icon-btn-disconnect):focus-visible {
 	opacity: 1;
 }
 
 @media (hover: none) {
-	.panel-port-table .icon-btn-connect {
+	:is(.panel-port-table, .device-port-table)
+		:is(.icon-btn-connect, .icon-btn-disconnect) {
 		opacity: 1;
 	}
 }
@@ -2654,6 +2708,179 @@ tbody tr:last-child td {
 
 .modal.jack-dialog {
 	--modal-width: 40rem;
+}
+
+/* Patch-panel row dialog: front port, patched switch and rear port side by
+   side, the way the signal runs through the panel. */
+.modal.panel-row-dialog {
+	--modal-width: 44rem;
+}
+
+.panel-row-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 6rem minmax(0, 1fr);
+}
+
+.panel-row-port {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	min-width: 0;
+	padding: 0.85rem;
+	background: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+}
+
+.panel-row-port-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 0.5rem;
+	font-size: var(--font-size-sm);
+}
+
+.panel-row-port-head h3 {
+	margin: 0;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.panel-row-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.panel-row-field > span:first-child {
+	font-weight: 500;
+	color: #d6d6d6;
+}
+
+.panel-row-name {
+	width: 100%;
+}
+
+.panel-row-name:disabled {
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+}
+
+.panel-row-cable {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+:is(.panel-row-connect, .panel-row-disconnect) {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.panel-row-connect {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.panel-row-connect:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+.panel-row-disconnect {
+	background: none;
+	color: var(--error);
+}
+
+/* The switch sits on the link between the ports: solid when patched,
+   dashed when not. */
+.panel-row-bridge {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.2rem;
+	font-size: var(--font-size-sm);
+	font-weight: 500;
+	color: var(--primary-text);
+	text-align: center;
+}
+
+.panel-row-bridge.is-off {
+	color: var(--text-muted);
+}
+
+.panel-row-switch {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	min-height: 2.5rem;
+	background:
+		linear-gradient(var(--primary), var(--primary)) center / 100% 2px
+		no-repeat;
+}
+
+.panel-row-bridge.is-off .panel-row-switch {
+	background:
+		repeating-linear-gradient(
+			90deg,
+			var(--border-strong) 0 6px,
+			transparent 6px 10px
+		)
+		center / 100% 2px no-repeat;
+}
+
+.panel-row-switch > .toggle {
+	box-shadow: 0 0 0 0.6rem var(--bg-surface);
+}
+
+.panel-row-bridge label {
+	cursor: pointer;
+}
+
+.panel-row-note {
+	min-height: 1.25rem;
+	margin: 0;
+	color: var(--text-secondary);
+}
+
+.panel-row-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
+.panel-row-save-hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: var(--font-size-sm);
+}
+
+@media (max-width: 36rem) {
+	.panel-row-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.panel-row-switch {
+		background: none;
+	}
+
+	.panel-row-bridge {
+		flex-direction: row;
+		padding: 0.5rem 0;
+	}
 }
 
 .modal.ai-update-dialog {
@@ -3761,7 +3988,30 @@ span.attachment-star,
 	filter: brightness(1.15);
 }
 
-/* Jack: one socket per port in one marker, each filled by its cabling. */
+/* Jack of more ports: one connector and the port count; partly cabled
+   ones are half green. */
+.floorplan-marker-jack-compact {
+	display: inline-flex;
+	gap: 0.1rem;
+	width: auto;
+	padding: 0 0.2rem;
+}
+
+.floorplan-marker-outlet.floorplan-marker-partial:not(.floorplan-marker-jack) {
+	background: linear-gradient(
+		135deg,
+		var(--success) 50%,
+		var(--text-muted) 50%
+	);
+}
+
+.floorplan-jack-count {
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	line-height: 1;
+}
+
+/* Jack of two ports: one connector per port in one marker, each filled by its cabling. */
 .floorplan-marker-jack {
 	width: auto;
 	padding: 0 0.1rem;

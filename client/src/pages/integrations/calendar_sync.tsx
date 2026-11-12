@@ -27,7 +27,7 @@ import {
 	wait_for_calendar_sync,
 } from '../../api/calendar_sync'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { CheckboxField, Field, Hint, TextField } from '../../components/form'
+import { Field, Hint, TextField, ToggleField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
 import { syncStateLabel } from '../../i18n/labels'
@@ -109,6 +109,14 @@ function SettingsForm(props: {
 			class="form-stacked calendar-sync-form"
 			onSubmit={(e: SubmitEvent) => void handleSave(e)}
 		>
+			<ToggleField
+				id="calendar-sync-enabled"
+				label={t('common.status')}
+				checked={enabled()}
+				onChange={setEnabled}
+				on_text={t('integration.enabled')}
+				off_text={t('integration.disabled')}
+			/>
 			<TextField
 				id="calendar-sync-tenant-id"
 				label={t('calendarSync.tenantId')}
@@ -150,12 +158,6 @@ function SettingsForm(props: {
 				step={1}
 				value={interval()}
 				onInput={setIntervalMinutes}
-			/>
-			<CheckboxField
-				id="calendar-sync-enabled"
-				label={t('calendarSync.enabled')}
-				checked={enabled()}
-				onChange={setEnabled}
 			/>
 			<Field label={t('integration.connection')} for="calendar-sync-test-mailbox">
 				<div class="input-with-button">

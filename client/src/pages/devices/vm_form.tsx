@@ -10,7 +10,6 @@ import {
 	type VirtualMachineRow,
 } from '../../api/virtual_machines'
 import {
-	CheckboxField,
 	DescriptionField,
 	Field,
 	FormPage,
@@ -19,6 +18,7 @@ import {
 	NameField,
 	row_options,
 	SelectField,
+	ToggleField,
 } from '../../components/form'
 import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
@@ -234,6 +234,14 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 			onSubmit={handleSubmit}
 		>
 			<FormSection title={tp('entity.virtualMachine', 1)}>
+				<ToggleField
+					id={`${prefix}-inactive`}
+					label={t('common.status')}
+					checked={!inactive()}
+					onChange={(isActive: boolean) => setInactive(!isActive)}
+					on_text={deviceStatusLabel('active')}
+					off_text={deviceStatusLabel('inactive')}
+				/>
 				<NameField
 					id={`${prefix}-name`}
 					placeholder={t('vm.namePlaceholder')}
@@ -256,12 +264,6 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					id={`${prefix}-description`}
 					value={description()}
 					onInput={setDescription}
-				/>
-				<CheckboxField
-					id={`${prefix}-inactive`}
-					label={deviceStatusLabel('inactive')}
-					checked={inactive()}
-					onChange={setInactive}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

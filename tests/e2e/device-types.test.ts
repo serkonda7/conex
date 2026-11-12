@@ -15,7 +15,6 @@ interface Port {
 	side: 'front' | 'rear' | null
 	enabled: boolean
 	connected: boolean
-	location_id: number | null
 	kind: string
 	template_name: string | null
 }
@@ -246,7 +245,7 @@ test.describe('template sync', () => {
 		}
 	})
 
-	test('ports with a room or floor plan position are kept unless removed explicitly', async ({
+	test('ports with a floor plan position are kept unless removed explicitly', async ({
 		page,
 	}) => {
 		const api = page.request
@@ -273,7 +272,7 @@ test.describe('template sync', () => {
 
 			const typeId = await createType(api, cleanup)
 			const stubIds = await Promise.all(
-				['roomed', 'placed', 'bare', 'dropped'].map((prefix) =>
+				['placed', 'bare', 'dropped'].map((prefix) =>
 					createStub(api, typeId, { prefix, side: 'rear', kind: '8p8c' }),
 				),
 			)
@@ -282,21 +281,16 @@ test.describe('template sync', () => {
 				location_id: locationId,
 			})
 			const ports = await portsOf(api, deviceId)
-			const roomed = portNamed(ports, 'roomed')
 			const placed = portNamed(ports, 'placed')
 			const dropped = portNamed(ports, 'dropped')
-			for (const port of [roomed, dropped]) {
-				await ok(
-					await api.patch(`/api/devices/${deviceId}/interfaces/${port.id}`, {
-						data: { location_id: locationId },
-					}),
-				)
-			}
 			await ok(
 				await api.put(`/api/attachments/${planId}/plan`, {
 					data: {
 						areas: [],
-						placements: [{ interface_id: placed.id, x: 0.5, y: 0.5 }],
+						placements: [
+							{ interface_id: placed.id, x: 0.25, y: 0.5 },
+							{ interface_id: dropped.id, x: 0.75, y: 0.5 },
+						],
 					},
 				}),
 			)
@@ -306,7 +300,6 @@ test.describe('template sync', () => {
 
 			const { orphaned } = await preview(api, deviceId)
 			expect(Object.fromEntries(orphaned.map((port) => [port.name, port.located]))).toEqual({
-				roomed: true,
 				placed: true,
 				bare: false,
 				dropped: true,
@@ -314,10 +307,11 @@ test.describe('template sync', () => {
 
 			const dialog = await openSync(page, typeId)
 			const choice = (port: Port): Locator => dialog.locator(`#template-sync-${port.id}`)
-			await expect(choice(roomed)).toHaveValue('Unverändert behalten')
 			await expect(choice(placed)).toHaveValue('Unverändert behalten')
 			await expect(choice(portNamed(ports, 'bare'))).toHaveValue('Entfernen')
-			await expect(dialog.getByText('Entfernen löscht diese')).toHaveCount(3)
+			await expect(
+				dialog.getByText('Grundrissposition wird durch Entfernen gelöscht'),
+			).toHaveCount(2)
 
 			// The warned port goes only when the user picks that.
 			await choice(dropped).click()
@@ -325,8 +319,7 @@ test.describe('template sync', () => {
 			await applySync(dialog)
 
 			const after = await portsOf(api, deviceId)
-			expect(after.map((port) => port.name).sort()).toEqual(['placed', 'roomed'])
-			expect(portNamed(after, 'roomed').location_id).toBe(locationId)
+			expect(after.map((port) => port.name)).toEqual(['placed'])
 			const plan = await ok(await api.get(`/api/attachments/${planId}/plan`))
 			const { placements } = (await plan.json()) as {
 				placements: { interface_id: number | null }[]

@@ -6,7 +6,6 @@ import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
-	CheckboxField,
 	DescriptionField,
 	FormPage,
 	FormSection,
@@ -15,6 +14,7 @@ import {
 	row_options,
 	SelectField,
 	TextField,
+	ToggleField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { deviceStatusLabel } from '../../i18n/labels'
@@ -23,6 +23,7 @@ import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { deviceRoleOptions } from '../device-roles/options'
+import { locationOptions } from '../locations/options'
 import { parsePosition, validPosition } from './add'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
@@ -142,6 +143,14 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			onSubmit={handleSave}
 		>
 			<FormSection title={tp('entity.device', 1)}>
+				<ToggleField
+					id="device-edit-inactive"
+					label={t('common.status')}
+					checked={!inactive()}
+					onChange={(isActive: boolean) => setInactive(!isActive)}
+					on_text={deviceStatusLabel('active')}
+					off_text={deviceStatusLabel('inactive')}
+				/>
 				<NameField
 					id="device-edit-name"
 					placeholder={t('device.namePlaceholder')}
@@ -184,12 +193,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					value={deviceId()}
 					onInput={setDeviceId}
 				/>
-				<CheckboxField
-					id="device-edit-inactive"
-					label={deviceStatusLabel('inactive')}
-					checked={inactive()}
-					onChange={setInactive}
-				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>
 				<SelectField
@@ -205,7 +208,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					label={tp('entity.location', 1)}
 					value={locationId()}
 					onChange={setLocationId}
-					options={row_options(locations() ?? [])}
+					options={locationOptions(locations() ?? [])}
 					emptyLabel={t('rack.noLocation')}
 					disabled={siteId() === ''}
 				/>

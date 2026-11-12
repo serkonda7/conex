@@ -1,13 +1,15 @@
 import {
 	IconBolt,
+	IconCheck,
+	IconFileExport,
 	IconPencil,
 	IconPlug,
 	IconRefreshAlert,
 	IconSparkles,
 	IconTrash,
 } from '@tabler/icons-solidjs'
-import type { Result } from 'better-result'
-import { createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { Result } from 'better-result'
+import { createMemo, createSignal, type JSX, onCleanup, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_device_role } from '../../api/device_roles'
 import { type DeviceListDevice, fetch_all_devices_of_type } from '../../api/devices'
@@ -16,6 +18,7 @@ import {
 	delete_device_type,
 	delete_stub,
 	fetch_device_type,
+	fetch_device_type_yaml,
 	fetch_manufacturer,
 	fetch_stubs,
 	type StubRow,
@@ -67,6 +70,9 @@ import {
 } from './components'
 import { EolPill } from './eol_pill'
 import { SpecLink } from './spec_link'
+
+/** How long the export button confirms the copy. */
+const EXPORTED_MS = 1500
 
 const canChangeStubs = (): boolean => can('edit') || can('delete')
 
@@ -286,6 +292,30 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		return action.run(request)
 	}
 
+	/** Briefly true after the YAML export reached the clipboard. */
+	const [exported, setExported] = createSignal(false)
+	let exportedTimer: ReturnType<typeof setTimeout> | undefined
+	onCleanup(() => clearTimeout(exportedTimer))
+
+	async function exportYaml(): Promise<void> {
+		setExported(false)
+		const copied = await run(async () => {
+			const res = await fetch_device_type_yaml(props.id)
+			if (Result.isError(res)) {
+				return res
+			}
+			return Result.tryPromise({
+				try: () => navigator.clipboard.writeText(res.value.yaml),
+				catch: () => new Error(t('deviceType.exportYaml.failed')),
+			})
+		})
+		if (copied) {
+			setExported(true)
+			clearTimeout(exportedTimer)
+			exportedTimer = setTimeout(() => setExported(false), EXPORTED_MS)
+		}
+	}
+
 	const rearStubs = (): StubRow[] => (stubs() ?? []).filter((row) => row.side === 'rear')
 
 	const handleDelete = useDetailDelete({
@@ -341,13 +371,26 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/device-types/${props.id}/edit`}
 					onDelete={handleDelete}
 					actions={
-						<Show when={can('edit')}>
-							<button type="button" onClick={() => setUpdatingWithAi(true)}>
-								<IconLabel icon={IconSparkles}>
-									{t('deviceType.aiUpdate.button')}
+						<>
+							<button
+								type="button"
+								title={t('deviceType.exportYaml.hint')}
+								onClick={() => void exportYaml()}
+							>
+								<IconLabel icon={exported() ? IconCheck : IconFileExport}>
+									{exported()
+										? t('deviceType.exportYaml.copied')
+										: t('deviceType.exportYaml.button')}
 								</IconLabel>
 							</button>
-						</Show>
+							<Show when={can('edit')}>
+								<button type="button" onClick={() => setUpdatingWithAi(true)}>
+									<IconLabel icon={IconSparkles}>
+										{t('deviceType.aiUpdate.button')}
+									</IconLabel>
+								</button>
+							</Show>
+						</>
 					}
 				/>
 				<DetailSubtitle description={deviceType()?.description} />

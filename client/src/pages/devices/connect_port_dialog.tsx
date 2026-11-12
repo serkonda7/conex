@@ -134,7 +134,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				!compatible
 					? t('device.incompatiblePort')
 					: !iface.patched
-						? t('device.panel.unpatched')
+						? t('device.panel.notPatched')
 						: link
 							? `${link.peer_device.name}: ${link.peer_interface.name}`
 							: iface.connected

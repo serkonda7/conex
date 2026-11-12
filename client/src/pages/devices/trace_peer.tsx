@@ -51,7 +51,8 @@ export function EndToEndPeer(props: { peer: TraceEndToEnd }): JSX.Element {
 
 /**
  * Cable peer of a port: the direct peer, and behind patch panels the
- * end-to-end peers underneath.
+ * end-to-end peers underneath. A patch-panel path ending at a free port
+ * shows its hint on the peer's line instead.
  */
 export function PortPeer(props: {
 	link: TraceLink | undefined
@@ -64,8 +65,20 @@ export function PortPeer(props: {
 					<span>
 						<a href={`/devices/${link().peer_device.id}`}>{link().peer_device.name}</a>{' '}
 						<code class="peer-port">{link().peer_interface.name}</code>
+						<Show
+							when={props.endToEnd.some(
+								(peer: TraceEndToEnd): boolean => !peer.end_device,
+							)}
+						>
+							{' '}
+							<span class="panel-port-muted">{t('device.trace.openEnd')}</span>
+						</Show>
 					</span>
-					<For each={props.endToEnd}>
+					<For
+						each={props.endToEnd.filter(
+							(peer: TraceEndToEnd): boolean => !!peer.end_device,
+						)}
+					>
 						{(peer: TraceEndToEnd): JSX.Element => <EndToEndPeer peer={peer} />}
 					</For>
 				</span>

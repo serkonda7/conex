@@ -1,3 +1,4 @@
+import { IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
 import type { PoeType } from 'shared/src/schemas'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { createMemo, type JSX, Show } from 'solid-js'
@@ -14,12 +15,19 @@ import { PortPeer } from './trace_peer'
  * the device-type components, with kind glyph and cable peer.
  * Interfaces get their 1-based port number (creation order, eth1..ethN);
  * disabled ones carry a pill before it and dim their name and type. The type
- * adds the PoE type of the port's device-type stub when set. `actions` renders the buttons of a row.
+ * adds the PoE type of the port's device-type stub when set. Unconnected
+ * enabled ports get a connect button on row hover (`onConnect`), connected
+ * ones a disconnect button (`onDisconnect`); `actions`
+ * renders the buttons of a row.
  */
 export function DevicePortTable(props: {
 	ports: DevicePortJson[]
 	links: Map<number, TraceLink>
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
+	/** Connects an unconnected port; no button without it. */
+	onConnect?: (iface: InterfaceJson) => void
+	/** Removes the cable of a connected port; no button without it. */
+	onDisconnect?: (link: TraceLink) => void
 	actions?: (iface: InterfaceJson) => JSX.Element
 }): JSX.Element {
 	const portNumbers = createMemo(
@@ -60,10 +68,36 @@ export function DevicePortTable(props: {
 					when={props.links.get(iface.id) || iface.enabled}
 					fallback={<span class="text-muted">—</span>}
 				>
-					<PortPeer
-						link={props.links.get(iface.id)}
-						endToEnd={props.endToEnd(iface.id)}
-					/>
+					<span class="panel-port-cell">
+						<PortPeer
+							link={props.links.get(iface.id)}
+							endToEnd={props.endToEnd(iface.id)}
+						/>
+						<Show when={props.onConnect && !iface.connected}>
+							<button
+								type="button"
+								class="icon-btn icon-btn-connect"
+								title={t('device.connectToPeer', { name: iface.name })}
+								aria-label={t('device.connectCableFor', { name: iface.name })}
+								onClick={(): void => props.onConnect?.(iface)}
+							>
+								<IconLinkPlus size={20} />
+							</button>
+						</Show>
+						<Show when={props.onDisconnect ? props.links.get(iface.id) : undefined}>
+							{(link: () => TraceLink): JSX.Element => (
+								<button
+									type="button"
+									class="icon-btn icon-btn-danger icon-btn-disconnect"
+									title={t('device.disconnectPort', { name: iface.name })}
+									aria-label={t('device.disconnectPort', { name: iface.name })}
+									onClick={(): void => props.onDisconnect?.(link())}
+								>
+									<IconUnlink size={20} />
+								</button>
+							)}
+						</Show>
+					</span>
 				</Show>
 			),
 		},
@@ -84,7 +118,7 @@ export function DevicePortTable(props: {
 	]
 	return (
 		<DataTable
-			class="component-table"
+			class="component-table device-port-table"
 			columnLines
 			rows={() => props.ports}
 			getRowId={(iface: DevicePortJson): number => iface.id}
