@@ -540,8 +540,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				{(row: PanelRow): JSX.Element => (
 					<PanelRowDialog
 						device_id={props.id}
-						rear={row.position === null ? currentIface(row.rear) : null}
+						rear={currentIface(row.rear)}
 						front={currentIface(row.front)}
+						position={row.position}
 						links={linksByIface()}
 						endToEnd={endToEndOf}
 						on_saved={() => setEditingRow(null)}

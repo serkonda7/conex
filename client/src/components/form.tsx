@@ -25,7 +25,7 @@ export function row_options(rows: readonly { id: number; name: string }[]): Form
 }
 
 /** Focuses `el` on mount when `autofocus` is set. */
-function useAutofocus(autofocus: () => boolean | undefined): (el: HTMLElement) => void {
+export function useAutofocus(autofocus: () => boolean | undefined): (el: HTMLElement) => void {
 	let target: HTMLElement | undefined
 	onMount(() => {
 		if (autofocus() === true) {

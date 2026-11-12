@@ -128,7 +128,7 @@ export function PanelPortTable(props: {
 				return rowPatched(row) ? (
 					label
 				) : (
-					<span class="panel-row-unpatched" title={t('device.panel.unpatched')}>
+					<span class="panel-row-unpatched" title={t('device.panel.notPatched')}>
 						{label}
 					</span>
 				)
