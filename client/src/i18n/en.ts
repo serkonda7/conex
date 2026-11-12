@@ -563,6 +563,11 @@ export const en = {
 	'deviceType.preset.frontType': 'Front type',
 	'deviceType.preset.rearName': 'Rear port name',
 	'deviceType.notFound': 'Device type not found.',
+	'deviceType.exportYaml.button': 'Export YAML',
+	'deviceType.exportYaml.copied': 'YAML copied',
+	'deviceType.exportYaml.hint': 'Copy this device type as an importable YAML definition',
+	'deviceType.exportYaml.failed':
+		'Could not copy the YAML. Allow clipboard access and use HTTPS or localhost, then try again.',
 	'deviceType.aiUpdate.button': 'Update with AI',
 	'deviceType.aiUpdate.title': 'Update {name} with AI',
 	'deviceType.aiUpdate.hint':

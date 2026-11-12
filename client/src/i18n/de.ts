@@ -567,6 +567,11 @@ export const de: Messages = {
 	'deviceType.preset.frontType': 'Fronttyp',
 	'deviceType.preset.rearName': 'Name des Rückports',
 	'deviceType.notFound': 'Gerätetyp nicht gefunden.',
+	'deviceType.exportYaml.button': 'YAML exportieren',
+	'deviceType.exportYaml.copied': 'YAML kopiert',
+	'deviceType.exportYaml.hint': 'Diesen Gerätetyp als importierbare YAML-Definition kopieren',
+	'deviceType.exportYaml.failed':
+		'YAML konnte nicht kopiert werden. Erlauben Sie den Zugriff auf die Zwischenablage und verwenden Sie HTTPS oder localhost.',
 	'deviceType.aiUpdate.button': 'Mit KI aktualisieren',
 	'deviceType.aiUpdate.title': '{name} mit KI aktualisieren',
 	'deviceType.aiUpdate.hint':
