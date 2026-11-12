@@ -157,6 +157,7 @@ async function outletPorts(
 					.select({
 						id: interfaces.id,
 						name: interfaces.name,
+						kind: interfaces.kind,
 						connected: interfaces.connected,
 						jack_id: interfaces.jack_id,
 					})
@@ -171,6 +172,7 @@ async function outletPorts(
 	const toPort = (row: (typeof rows)[number]): FloorplanOutletPortJson => ({
 		id: row.id,
 		name: row.name,
+		kind: row.kind,
 		connected: row.connected === 1,
 	})
 	return (key: OutletKey): FloorplanOutletPortJson[] =>

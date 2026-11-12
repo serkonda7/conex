@@ -3761,7 +3761,30 @@ span.attachment-star,
 	filter: brightness(1.15);
 }
 
-/* Jack: one socket per port in one marker, each filled by its cabling. */
+/* Jack of more ports: one connector and the port count; partly cabled
+   ones are half green. */
+.floorplan-marker-jack-compact {
+	display: inline-flex;
+	gap: 0.1rem;
+	width: auto;
+	padding: 0 0.2rem;
+}
+
+.floorplan-marker-outlet.floorplan-marker-partial:not(.floorplan-marker-jack) {
+	background: linear-gradient(
+		135deg,
+		var(--success) 50%,
+		var(--text-muted) 50%
+	);
+}
+
+.floorplan-jack-count {
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	line-height: 1;
+}
+
+/* Jack of two ports: one connector per port in one marker, each filled by its cabling. */
 .floorplan-marker-jack {
 	width: auto;
 	padding: 0 0.1rem;

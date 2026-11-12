@@ -2191,6 +2191,8 @@ export interface FloorplanOutletPortJson {
 	id: number
 	/** Port name on the panel (`12`). */
 	name: string
+	/** Connector kind (`8p8c`, `lc`, …): copper or fiber. */
+	kind: string
 	connected: boolean
 }
 
