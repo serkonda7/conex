@@ -185,17 +185,20 @@ export function TemplateSyncDialog(props: {
 										}}
 										options={optionsOf(orphan)}
 										hint={
-											<Hint>
-												{portKindLabel(orphan.kind)}
-												<Show when={orphan.connected}>
-													{' · '}
-													{t('device.templateSync.cabled')}
-												</Show>
-												<Show when={orphan.located}>
-													{' · '}
-													{t('device.templateSync.located')}
-												</Show>
-											</Hint>
+											<Show when={orphan.connected || orphan.located}>
+												<Hint>
+													{[
+														orphan.connected
+															? t('device.templateSync.cabled')
+															: null,
+														orphan.located
+															? t('device.templateSync.located')
+															: null,
+													]
+														.filter((note) => note !== null)
+														.join(' · ')}
+												</Hint>
+											</Show>
 										}
 									/>
 								)}

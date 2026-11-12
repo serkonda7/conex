@@ -856,9 +856,9 @@ export const de: Messages = {
 	'device.templateSync.linkTo': 'Namen behalten, mit {name} verknüpfen',
 	'device.templateSync.keep': 'Unverändert behalten',
 	'device.templateSync.remove': 'Entfernen',
-	'device.templateSync.cabled': 'Hat ein Kabel, das verbunden bleibt.',
+	'device.templateSync.cabled': 'Kabel bleibt verbunden',
 	'device.templateSync.located':
-		'Hat einen Raum oder eine Grundrissposition; Entfernen löscht diese.',
+		'Raum oder Grundrissposition wird durch Entfernen gelöscht',
 	'device.templateSync.added': 'Neue Ports ({count})',
 	'device.templateSync.updated': 'Geänderte Ports ({count})',
 	'device.templateSync.change': '{field}: {from} → {to}',
