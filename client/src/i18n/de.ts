@@ -908,7 +908,7 @@ export const de: Messages = {
 	'device.jacks.empty': 'Noch keine Mehrfachdosen.',
 	'device.jacks.ports': 'Ports',
 	'device.jacks.ungroup': '{name} auflösen',
-	'device.jacks.rename': '{name} umbenennen',
+	'device.jacks.edit': '{name} bearbeiten',
 	'device.jacks.new': 'Neue Mehrfachdose',
 	'device.jacks.outlets': 'Dosen',
 	'device.jacks.noFreeOutlets': 'Alle Dosen sind in Mehrfachdosen.',

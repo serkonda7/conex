@@ -1,4 +1,4 @@
-import { IconCheck, IconUnlink } from '@tabler/icons-solidjs'
+import { IconPencil, IconUnlink } from '@tabler/icons-solidjs'
 import type { JSX } from 'solid-js'
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import {
@@ -20,42 +20,31 @@ function jackName(ports: InterfaceJson[]): string {
 	return ports.map((port) => port.name.replace(/^0+(?=\d)/, '')).join('/')
 }
 
-/** One existing jack: rename in place, or ungroup. */
+/** One existing jack: edit it in the form below, or ungroup it. */
 function JackRow(props: {
 	jack: PanelJackJson
 	ports: InterfaceJson[]
+	editing: boolean
 	pending: boolean
-	on_rename: (name: string) => void
+	on_edit: () => void
 	on_ungroup: () => void
 }): JSX.Element {
-	const [name, setName] = createSignal(props.jack.name)
-	const changed = (): boolean => name().trim() !== '' && name().trim() !== props.jack.name
 	return (
-		<li class="jack-row">
-			<input
-				type="text"
-				class="jack-row-name"
-				value={name()}
-				aria-label={t('device.jacks.rename', { name: props.jack.name })}
-				onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
-					setName(e.currentTarget.value)
-				}
-			/>
+		<li class="jack-row" classList={{ 'jack-row-editing': props.editing }}>
+			<span class="jack-row-name">{props.jack.name}</span>
 			<span class="jack-row-ports">
 				<For each={props.ports}>{(port: InterfaceJson) => <code>{port.name}</code>}</For>
 			</span>
-			<Show when={changed()}>
-				<button
-					type="button"
-					class="icon-btn"
-					disabled={props.pending}
-					title={t('device.jacks.rename', { name: props.jack.name })}
-					aria-label={t('device.jacks.rename', { name: props.jack.name })}
-					onClick={() => props.on_rename(name().trim())}
-				>
-					<IconCheck size={18} />
-				</button>
-			</Show>
+			<button
+				type="button"
+				class="icon-btn"
+				disabled={props.pending || props.editing}
+				title={t('device.jacks.edit', { name: props.jack.name })}
+				aria-label={t('device.jacks.edit', { name: props.jack.name })}
+				onClick={props.on_edit}
+			>
+				<IconPencil size={18} />
+			</button>
 			<button
 				type="button"
 				class="icon-btn icon-btn-danger"
@@ -70,10 +59,18 @@ function JackRow(props: {
 	)
 }
 
+/** True when both lists hold the same ids, in any order. */
+function sameIds(a: readonly number[], b: readonly number[]): boolean {
+	const set = new Set(a)
+	return set.size === new Set(b).size && b.every((id) => set.has(id))
+}
+
 /**
  * Jacks of a patch panel: its outlets (single-position rear ports) grouped
- * behind one faceplate. Lists the jacks to rename or ungroup and groups
- * picked outlets into a new jack. Each change is saved right away.
+ * behind one faceplate. Lists the jacks to edit or ungroup and groups
+ * picked outlets into a new jack; editing a jack loads it into the same
+ * form, with its ports picked among the free outlets. Each change is saved
+ * right away.
  */
 export function JackDialog(props: {
 	device_id: number
@@ -87,13 +84,35 @@ export function JackDialog(props: {
 	const [picked, setPicked] = createSignal<ReadonlySet<number>>(new Set())
 	const [name, setName] = createSignal('')
 	const [nameEdited, setNameEdited] = createSignal(false)
+	const [editingId, setEditingId] = createSignal<number | null>(null)
 
 	const outlets = createMemo(() => props.ports.filter(isOutlet))
 	const freeOutlets = createMemo(() => outlets().filter((port) => port.jack_id === null))
 	const portsOf = (jack: PanelJackJson): InterfaceJson[] =>
 		outlets().filter((port) => port.jack_id === jack.id)
-	const pickedPorts = (): InterfaceJson[] => freeOutlets().filter((port) => picked().has(port.id))
+	/** The jack in the form, while it still exists. */
+	const editing = createMemo(() => props.jacks.find((jack) => jack.id === editingId()) ?? null)
+	/** Outlets to pick from: the free ones, plus the edited jack's. */
+	const choices = createMemo(() => {
+		const jack = editing()
+		return outlets().filter(
+			(port) => port.jack_id === null || (jack !== null && port.jack_id === jack.id),
+		)
+	})
+	const pickedPorts = (): InterfaceJson[] => choices().filter((port) => picked().has(port.id))
 	const shownName = (): string => (nameEdited() ? name() : jackName(pickedPorts()))
+	/** Edit mode: true when the form differs from the edited jack. */
+	const changed = (): boolean => {
+		const jack = editing()
+		return (
+			jack !== null &&
+			(shownName().trim() !== jack.name ||
+				!sameIds(
+					jack.interface_ids,
+					pickedPorts().map((port) => port.id),
+				))
+		)
+	}
 
 	function toggle(id: number, on: boolean): void {
 		const next = new Set(picked())
@@ -105,19 +124,36 @@ export function JackDialog(props: {
 		setPicked(next)
 	}
 
-	async function handleCreate(e: SubmitEvent): Promise<void> {
+	function resetForm(): void {
+		setEditingId(null)
+		setPicked(new Set<number>())
+		setName('')
+		setNameEdited(false)
+	}
+
+	function startEdit(jack: PanelJackJson): void {
+		setEditingId(jack.id)
+		setPicked(new Set(jack.interface_ids))
+		setName(jack.name)
+		// A default name follows the picked ports, a custom one stays.
+		setNameEdited(jack.name !== jackName(portsOf(jack)))
+	}
+
+	async function handleSubmit(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		const ports = pickedPorts()
+		const jack = editing()
+		const ids = pickedPorts().map((port) => port.id)
+		const trimmed = shownName().trim()
 		const ok = await action.run(() =>
-			create_jack(props.device_id, {
-				name: shownName().trim(),
-				interface_ids: ports.map((port) => port.id),
-			}),
+			jack
+				? update_jack(props.device_id, jack.id, {
+						name: trimmed !== jack.name ? trimmed : undefined,
+						interface_ids: sameIds(jack.interface_ids, ids) ? undefined : ids,
+					})
+				: create_jack(props.device_id, { name: trimmed, interface_ids: ids }),
 		)
 		if (ok) {
-			setPicked(new Set<number>())
-			setName('')
-			setNameEdited(false)
+			resetForm()
 		}
 	}
 
@@ -136,15 +172,17 @@ export function JackDialog(props: {
 								<JackRow
 									jack={jack}
 									ports={portsOf(jack)}
+									editing={editing()?.id === jack.id}
 									pending={action.pending()}
-									on_rename={(next: string) =>
-										void action.run(() =>
-											update_jack(props.device_id, jack.id, { name: next }),
+									on_edit={() => startEdit(jack)}
+									on_ungroup={async () => {
+										const ok = await action.run(() =>
+											delete_jack(props.device_id, jack.id),
 										)
-									}
-									on_ungroup={() =>
-										void action.run(() => delete_jack(props.device_id, jack.id))
-									}
+										if (ok && editingId() === jack.id) {
+											resetForm()
+										}
+									}}
 								/>
 							)}
 						</For>
@@ -152,7 +190,7 @@ export function JackDialog(props: {
 				</Show>
 			</section>
 			<Show
-				when={freeOutlets().length >= 2}
+				when={editing() !== null || freeOutlets().length >= 2}
 				fallback={
 					<Show when={outlets().length > 0}>
 						<p>{t('device.jacks.noFreeOutlets')}</p>
@@ -160,8 +198,12 @@ export function JackDialog(props: {
 				}
 			>
 				<section class="jack-dialog-section">
-					<h3>{t('device.jacks.new')}</h3>
-					<form class="form-stacked" onSubmit={handleCreate}>
+					<h3>
+						{editing()
+							? t('device.jacks.edit', { name: editing()?.name ?? '' })
+							: t('device.jacks.new')}
+					</h3>
+					<form class="form-stacked" onSubmit={handleSubmit}>
 						<div class="field">
 							<span class="field-group-label" aria-hidden="true">
 								{t('device.jacks.outlets')}
@@ -171,13 +213,13 @@ export function JackDialog(props: {
 								<div
 									class="jack-outlet-list"
 									style={{
-										'--jack-outlet-rows': Math.ceil(freeOutlets().length / 4),
+										'--jack-outlet-rows': Math.ceil(choices().length / 4),
 										'--jack-outlet-rows-narrow': Math.ceil(
-											freeOutlets().length / 2,
+											choices().length / 2,
 										),
 									}}
 								>
-									<For each={freeOutlets()}>
+									<For each={choices()}>
 										{(port: InterfaceJson) => (
 											<label class="field-checkbox-label">
 												<input
@@ -207,15 +249,21 @@ export function JackDialog(props: {
 							required
 						/>
 						<div class="modal-actions">
+							<Show when={editing()}>
+								<button type="button" onClick={resetForm}>
+									{t('common.cancel')}
+								</button>
+							</Show>
 							<button
 								type="submit"
 								disabled={
 									pickedPorts().length < 2 ||
 									shownName().trim() === '' ||
+									(editing() !== null && !changed()) ||
 									action.pending()
 								}
 							>
-								{t('device.jacks.create')}
+								{editing() ? t('common.save') : t('device.jacks.create')}
 							</button>
 						</div>
 					</form>

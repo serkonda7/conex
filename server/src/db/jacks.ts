@@ -5,7 +5,7 @@
  * is placed instead of its ports (`attachments.ts`).
  */
 import { Result } from 'better-result'
-import { and, asc, eq, getTableColumns, inArray, notExists, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, notExists, or, type SQL, sql } from 'drizzle-orm'
 import type { PanelJackCreate, PanelJackJson, PanelJackUpdate } from 'shared/src/schemas'
 import { devices, floorplan_placements, interfaces, panel_jacks } from '../schema'
 import { inferOutletLocations } from './attachments'
@@ -54,19 +54,19 @@ export async function listJacks(deviceId: number): Promise<Result<PanelJackJson[
 	)
 }
 
+type PortRow = typeof interfaces.$inferSelect
+
 /**
- * Groups outlets of a panel into a new jack (`PanelJackCreateSchema`) with
- * one changelog entry for the jack.
+ * The outlets `ids` of a panel for jack `jackId` (null for a new jack), in
+ * port order, checked to be free or in that jack. When neither the jack nor
+ * one of the ports is placed, the ports must agree on their location:
+ * `location_id` is the jack's then, else `undefined` (its floor plan sets it).
  */
-export async function createJack(
+async function jackPorts(
 	deviceId: number,
-	input: PanelJackCreate,
-): Promise<Result<PanelJackJson, Error>> {
-	const device = await getDevice(deviceId)
-	if (Result.isError(device)) {
-		return device
-	}
-	const ids = [...new Set(input.interface_ids)]
+	ids: number[],
+	jackId: number | null,
+): Promise<Result<{ ports: PortRow[]; location_id: number | null | undefined }, Error>> {
 	if (ids.length < 2) {
 		return Result.err(new ConflictError('A jack needs at least two ports'))
 	}
@@ -86,22 +86,113 @@ export async function createJack(
 				),
 			)
 		}
-		if (port.jack_id !== null) {
+		if (port.jack_id !== null && port.jack_id !== jackId) {
 			return Result.err(new ConflictError(`Port ${port.name} is already in a jack`))
 		}
 	}
-	// A placed port's floor plan sets the jack's location (`inferOutletLocations`);
-	// else the ports must agree on theirs.
-	const placedPort = await getDb()
-		.select({ id: floorplan_placements.id })
-		.from(floorplan_placements)
-		.where(inArray(floorplan_placements.interface_id, ids))
-		.limit(1)
+	// A placed port or jack sets the location from its floor plan
+	// (`inferOutletLocations`); else the ports must agree on theirs.
+	const placed = await exists(
+		floorplan_placements,
+		jackId === null
+			? inArray(floorplan_placements.interface_id, ids)
+			: or(
+					inArray(floorplan_placements.interface_id, ids),
+					eq(floorplan_placements.jack_id, jackId),
+				),
+	)
+	if (placed) {
+		return Result.ok({ ports, location_id: undefined })
+	}
 	const locationIds = new Set(ports.flatMap((port) => port.location_id ?? []))
-	if (placedPort.length === 0 && locationIds.size > 1) {
+	if (locationIds.size > 1) {
 		return Result.err(new ConflictError('The ports lie in different locations'))
 	}
-	const locationId = [...locationIds][0] ?? null
+	return Result.ok({ ports, location_id: [...locationIds][0] ?? null })
+}
+
+/**
+ * Moves the checked `ports` into jack `jackId` (all of them, its existing
+ * ones included) with their floor-plan markers and location: an unplaced
+ * jack takes the first placed new port's marker, the other port markers are
+ * removed; a placed jack's ports take the location from its plan, an
+ * unplaced one's `locationId`. Runs on the caller's `getDb()`.
+ */
+async function fillJack(
+	jackId: number,
+	ports: PortRow[],
+	locationId: number | null | undefined,
+): Promise<void> {
+	const added = ports.filter((port) => port.jack_id !== jackId).map((port) => port.id)
+	if (added.length > 0) {
+		await getDb()
+			.update(interfaces)
+			.set({ jack_id: jackId })
+			.where(inArray(interfaces.id, added))
+	}
+	if (locationId !== undefined) {
+		const ids = ports.map((port) => port.id)
+		await getDb()
+			.update(interfaces)
+			.set({ location_id: locationId })
+			.where(inArray(interfaces.id, ids))
+		await logUpdates(
+			'interface',
+			ports
+				.filter((port) => port.location_id !== locationId)
+				.map((port): [InterfaceJson, InterfaceJson] => {
+					const before = toInterfaceJson(port)
+					return [before, { ...before, location_id: locationId }]
+				}),
+		)
+		return
+	}
+	if (added.length > 0) {
+		const [first] = await getDb()
+			.select()
+			.from(floorplan_placements)
+			.where(inArray(floorplan_placements.interface_id, added))
+			.orderBy(asc(floorplan_placements.interface_id))
+			.limit(1)
+		if (first) {
+			await getDb()
+				.delete(floorplan_placements)
+				.where(inArray(floorplan_placements.interface_id, added))
+			if (!(await exists(floorplan_placements, eq(floorplan_placements.jack_id, jackId)))) {
+				await getDb().insert(floorplan_placements).values({
+					attachment_id: first.attachment_id,
+					jack_id: jackId,
+					x: first.x,
+					y: first.y,
+				})
+			}
+		}
+	}
+	const [marker] = await getDb()
+		.select({ attachment_id: floorplan_placements.attachment_id })
+		.from(floorplan_placements)
+		.where(eq(floorplan_placements.jack_id, jackId))
+	if (marker) {
+		await inferOutletLocations([marker.attachment_id])
+	}
+}
+
+/**
+ * Groups outlets of a panel into a new jack (`PanelJackCreateSchema`) with
+ * one changelog entry for the jack.
+ */
+export async function createJack(
+	deviceId: number,
+	input: PanelJackCreate,
+): Promise<Result<PanelJackJson, Error>> {
+	const device = await getDevice(deviceId)
+	if (Result.isError(device)) {
+		return device
+	}
+	const checked = await jackPorts(deviceId, [...new Set(input.interface_ids)], null)
+	if (Result.isError(checked)) {
+		return checked
+	}
 	const written = await tryWrite(
 		() =>
 			withTransaction(async () => {
@@ -111,44 +202,7 @@ export async function createJack(
 						.values({ device_id: deviceId, name: input.name })
 						.returning({ id: panel_jacks.id }),
 				)
-				await getDb()
-					.update(interfaces)
-					.set({ jack_id: jackId })
-					.where(inArray(interfaces.id, ids))
-				if (placedPort.length === 0) {
-					await getDb()
-						.update(interfaces)
-						.set({ location_id: locationId })
-						.where(inArray(interfaces.id, ids))
-					await logUpdates(
-						'interface',
-						ports
-							.filter((port) => port.location_id !== locationId)
-							.map((port): [InterfaceJson, InterfaceJson] => {
-								const before = toInterfaceJson(port)
-								return [before, { ...before, location_id: locationId }]
-							}),
-					)
-				}
-				// The first placed port's marker becomes the jack's.
-				const placed = await getDb()
-					.select()
-					.from(floorplan_placements)
-					.where(inArray(floorplan_placements.interface_id, ids))
-					.orderBy(asc(floorplan_placements.interface_id))
-				const [first] = placed
-				if (first) {
-					await getDb()
-						.delete(floorplan_placements)
-						.where(inArray(floorplan_placements.interface_id, ids))
-					await getDb().insert(floorplan_placements).values({
-						attachment_id: first.attachment_id,
-						jack_id: jackId,
-						x: first.x,
-						y: first.y,
-					})
-					await inferOutletLocations([first.attachment_id])
-				}
+				await fillJack(jackId, checked.value.ports, checked.value.location_id)
 				return jackId
 			}),
 		NAME_TAKEN,
@@ -159,6 +213,11 @@ export async function createJack(
 	return await logCreate('panel_jack', await getJack(deviceId, written.value))
 }
 
+/**
+ * Renames a jack and/or sets its ports (`PanelJackUpdateSchema`): added
+ * outlets join it as on create, removed ones stay as single, unplaced
+ * outlets with their location. One changelog entry for the jack.
+ */
 export async function updateJack(
 	deviceId: number,
 	jackId: number,
@@ -168,9 +227,31 @@ export async function updateJack(
 	if (Result.isError(current)) {
 		return current
 	}
+	const ids = input.interface_ids ? [...new Set(input.interface_ids)] : null
+	const checked = ids ? await jackPorts(deviceId, ids, jackId) : null
+	if (checked && Result.isError(checked)) {
+		return checked
+	}
 	const written = await tryWrite(
 		() =>
-			getDb().update(panel_jacks).set({ name: input.name }).where(eq(panel_jacks.id, jackId)),
+			withTransaction(async () => {
+				if (input.name !== undefined) {
+					await getDb()
+						.update(panel_jacks)
+						.set({ name: input.name })
+						.where(eq(panel_jacks.id, jackId))
+				}
+				if (ids && checked) {
+					const removed = current.value.interface_ids.filter((id) => !ids.includes(id))
+					if (removed.length > 0) {
+						await getDb()
+							.update(interfaces)
+							.set({ jack_id: null })
+							.where(inArray(interfaces.id, removed))
+					}
+					await fillJack(jackId, checked.value.ports, checked.value.location_id)
+				}
+			}),
 		NAME_TAKEN,
 	)
 	if (Result.isError(written)) {

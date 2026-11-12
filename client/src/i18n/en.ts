@@ -900,7 +900,7 @@ export const en = {
 	'device.jacks.empty': 'No jacks yet.',
 	'device.jacks.ports': 'Ports',
 	'device.jacks.ungroup': 'Ungroup {name}',
-	'device.jacks.rename': 'Rename {name}',
+	'device.jacks.edit': 'Edit {name}',
 	'device.jacks.new': 'New jack',
 	'device.jacks.outlets': 'Outlets',
 	'device.jacks.noFreeOutlets': 'All outlets are in jacks.',

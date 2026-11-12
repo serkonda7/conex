@@ -1473,9 +1473,17 @@ export const PanelJackCreateSchema = v.strictObject({
 
 export type PanelJackCreate = v.InferOutput<typeof PanelJackCreateSchema>
 
-/** `PATCH /devices/:id/jacks/:jackId`: rename a jack. */
+/**
+ * `PATCH /devices/:id/jacks/:jackId`: rename a jack and/or set its ports.
+ * `interface_ids` lists all its ports: added outlets (free ones of the
+ * panel) join as on create, removed ones become single outlets again.
+ */
 export const PanelJackUpdateSchema = v.strictObject({
-	name: JackNameSchema,
+	name: v.optional(JackNameSchema, undefined),
+	interface_ids: v.optional(
+		v.pipe(v.array(IdSchema), v.minLength(2), v.maxLength(48)),
+		undefined,
+	),
 })
 
 export type PanelJackUpdate = v.InferOutput<typeof PanelJackUpdateSchema>

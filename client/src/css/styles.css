@@ -772,6 +772,13 @@ tbody tr:last-child td {
 
 .jack-row-name {
 	width: 10rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jack-row-editing .jack-row-name {
+	font-weight: 600;
 }
 
 .jack-row-ports {
