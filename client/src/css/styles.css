@@ -3289,6 +3289,11 @@ tbody tr:last-child td {
 	border-color: var(--border-strong);
 }
 
+.floorplan-preview-canvas {
+	position: relative;
+	transform-origin: 0 0;
+}
+
 .floorplan-preview img {
 	display: block;
 	max-width: 100%;
@@ -3313,7 +3318,8 @@ tbody tr:last-child td {
 	width: 6px;
 	height: 6px;
 	border-radius: 50%;
-	transform: translate(-50%, -50%);
+	/* Kept at its size when the canvas is zoomed in. */
+	transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1)));
 	background-color: var(--text-secondary);
 	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }

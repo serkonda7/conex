@@ -310,7 +310,7 @@ test.describe('template sync', () => {
 			await expect(choice(placed)).toHaveValue('Unverändert behalten')
 			await expect(choice(portNamed(ports, 'bare'))).toHaveValue('Entfernen')
 			await expect(
-				dialog.getByText('Grundrissposition wird durch Entfernen gelöscht'),
+				dialog.getByText('Bereich und Grundrissposition werden durch Entfernen gelöscht'),
 			).toHaveCount(2)
 
 			// The warned port goes only when the user picks that.

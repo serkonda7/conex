@@ -130,7 +130,7 @@ export function buildPreview(
 			side: port.side,
 			kind: port.kind,
 			connected: port.connected !== 0,
-			located: placed.has(port.id),
+			located: port.location_id !== null || placed.has(port.id),
 			linked: port.template_name !== null,
 			suggestion: suggestions.get(port.id) ?? null,
 		})),

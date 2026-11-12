@@ -2,14 +2,18 @@ import { IconInfoCircle, IconLinkPlus, IconLock, IconUnlink } from '@tabler/icon
 import type { InterfaceUpdate, TraceEndToEnd, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
+import type { FloorplanOutletJson } from '../../api/attachments'
 import { delete_cable } from '../../api/cables'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
-import { useAutofocus } from '../../components/form'
+import { type FormOption, Hint, SelectField, useAutofocus } from '../../components/form'
 import { confirmDiscard, Modal } from '../../components/modal'
 import { t } from '../../i18n'
+import { floorplanHref } from '../../lib/floorplan_link'
 import { useAction } from '../../lib/resource'
+import { parseId } from '../../lib/router'
 import { ConnectPortDialog } from './connect_port_dialog'
+import { isOutlet } from './outlet'
 import { PortPeer } from './trace_peer'
 
 export interface PanelRowDialogProps {
@@ -23,6 +27,10 @@ export interface PanelRowDialogProps {
 	 * single-position row. The shared rear port is then shown read-only.
 	 */
 	position: number | null
+	/** Location choices of an outlet rear port. */
+	location_options: FormOption[]
+	/** Floor plan placement of an outlet rear port, which sets its location. */
+	placement?: FloorplanOutletJson
 	links: Map<number, TraceLink>
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
 	/** A cable was connected or removed; the dialog stays open. */
@@ -32,13 +40,15 @@ export interface PanelRowDialogProps {
 
 /**
  * Edit dialog of one patch-panel row: front port, the patched switch and rear
- * port side by side, the way the signal runs. Cables are connected and
- * removed right away; names and `patched` are saved together (`patched` on
- * every editable port of the row).
+ * port side by side, the way the signal runs, and an outlet's location below
+ * (read-only while its floor plan sets it). Cables are connected and removed
+ * right away; names, `patched` and the location are saved together
+ * (`patched` on every editable port of the row).
  */
 export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 	const [frontName, setFrontName] = createSignal(props.front?.name ?? '')
 	const [rearName, setRearName] = createSignal(props.rear?.name ?? '')
+	const [location, setLocation] = createSignal(String(props.rear?.location_id ?? ''))
 	const [patched, setPatched] = createSignal(
 		(props.position === null ? (props.rear ?? props.front) : props.front)?.patched ?? true,
 	)
@@ -49,6 +59,9 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 
 	/** The shared rear port of a position row belongs to its own row. */
 	const rearEditable = (): boolean => props.position === null
+	const rearOutlet = (): boolean => rearEditable() && props.rear !== null && isOutlet(props.rear)
+	/** A placed outlet takes its location from the floor plan. */
+	const locationEditable = (): boolean => rearOutlet() && props.placement === undefined
 	const title = (): string =>
 		t('device.panel.editRow', {
 			name: [props.front?.name, props.rear?.name].filter(Boolean).join(' / '),
@@ -63,8 +76,12 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 
 	/** Changed fields of a port; empty when nothing changed. */
 	function changesOf(iface: InterfaceJson, name: string): InterfaceUpdate {
+		const locationId = parseId(location())
 		return {
 			...(name.trim() !== iface.name ? { name: name.trim() } : {}),
+			...(iface === props.rear && locationEditable() && locationId !== iface.location_id
+				? { location_id: locationId }
+				: {}),
 			...(patched() !== iface.patched ? { patched: patched() } : {}),
 		}
 	}
@@ -259,6 +276,33 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 							autofocus: !props.front,
 						})}
 					</div>
+					<Show when={rearOutlet()}>
+						<SelectField
+							id="panel-row-location"
+							label={t('device.panel.location')}
+							value={location()}
+							onChange={setLocation}
+							options={props.location_options}
+							emptyLabel={t('device.outletLocation.none')}
+							disabled={!locationEditable()}
+							hint={
+								<Show when={props.placement}>
+									{(placement: () => FloorplanOutletJson): JSX.Element => (
+										<Hint>
+											{t('device.panel.locationFromPlan')}{' '}
+											<a
+												href={floorplanHref(placement().attachment_id, {
+													interface: placement().interface_id,
+												})}
+											>
+												{placement().owner_name}
+											</a>
+										</Hint>
+									)}
+								</Show>
+							}
+						/>
+					</Show>
 					<p id="panel-row-note" class="panel-row-note">
 						<Show when={locked()}>{t('device.panel.cabledPatched')}</Show>
 					</p>

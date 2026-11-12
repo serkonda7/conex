@@ -13,6 +13,7 @@ import {
 	eq,
 	getTableColumns,
 	inArray,
+	isNotNull,
 	isNull,
 	ne,
 	notInArray,
@@ -33,6 +34,7 @@ import type {
 	FloorplanListJson,
 	FloorplanOutletJson,
 	FloorplanOutletPortJson,
+	FloorplanPoint,
 	FloorplanPortJson,
 	FloorplanPut,
 } from 'shared/src/schemas'
@@ -61,8 +63,9 @@ import {
 import { IMAGE_EXTENSIONS, readImageInfo } from '../util/image'
 import { nowSeconds } from '../util/time'
 import { cableEnds } from './cables'
-import { logCreate, logDelete, logDeletes, logUpdate } from './changelog'
+import { logCreate, logDelete, logDeletes, logUpdate, logUpdates } from './changelog'
 import { getDb, withTransaction } from './connection'
+import { type InterfaceJson, toInterfaceJson } from './devices'
 import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
 import {
 	checkExists,
@@ -1233,6 +1236,7 @@ export async function putPlan(
 						origin: input.origin,
 					})
 				}
+				await inferOutletLocations([id])
 				const after = await planSnapshot(id)
 				await logUpdate(
 					'attachment',
@@ -1250,6 +1254,124 @@ export async function putPlan(
 		return written.value
 	}
 	return getPlan(id, scopeTenantIds)
+}
+
+/** Even-odd test: `point` lies inside the polygon `points`. */
+function containsPoint(points: readonly FloorplanPoint[], [x, y]: FloorplanPoint): boolean {
+	let inside = false
+	for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+		const [xi, yi] = points[i] as FloorplanPoint
+		const [xj, yj] = points[j] as FloorplanPoint
+		if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+			inside = !inside
+		}
+	}
+	return inside
+}
+
+/** Area of a polygon (shoelace), in normalized plan units. */
+function polygonArea(points: readonly FloorplanPoint[]): number {
+	let twice = 0
+	for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+		const [xi, yi] = points[i] as FloorplanPoint
+		const [xj, yj] = points[j] as FloorplanPoint
+		twice += xj * yi - xi * yj
+	}
+	return Math.abs(twice) / 2
+}
+
+/**
+ * Sets the location of the outlets placed on the plans `attachmentIds`
+ * (every port of a placed jack) from where their marker lies: the smallest
+ * location area containing it, else the plan's own location (none on a
+ * site's plan). One changelog entry per changed port. Runs on the caller's
+ * `getDb()` (its transaction).
+ */
+export async function inferOutletLocations(attachmentIds: number[]): Promise<void> {
+	if (attachmentIds.length === 0) {
+		return
+	}
+	const placements = await getDb()
+		.select({
+			attachment_id: floorplan_placements.attachment_id,
+			interface_id: floorplan_placements.interface_id,
+			jack_id: floorplan_placements.jack_id,
+			x: floorplan_placements.x,
+			y: floorplan_placements.y,
+			plan_location_id: attachments.location_id,
+		})
+		.from(floorplan_placements)
+		.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
+		.where(
+			and(
+				inArray(floorplan_placements.attachment_id, attachmentIds),
+				or(
+					isNotNull(floorplan_placements.interface_id),
+					isNotNull(floorplan_placements.jack_id),
+				),
+			),
+		)
+	if (placements.length === 0) {
+		return
+	}
+	const areas = await getDb()
+		.select({
+			attachment_id: floorplan_areas.attachment_id,
+			location_id: floorplan_areas.location_id,
+			points: floorplan_areas.points,
+		})
+		.from(floorplan_areas)
+		.where(
+			and(
+				inArray(floorplan_areas.attachment_id, attachmentIds),
+				isNotNull(floorplan_areas.location_id),
+			),
+		)
+	const sized = areas
+		.map((area) => ({ ...area, size: polygonArea(area.points) }))
+		.sort((a, b) => a.size - b.size)
+	const byPort = new Map<number, number | null>()
+	const byJack = new Map<number, number | null>()
+	for (const placement of placements) {
+		const area = sized.find(
+			(candidate) =>
+				candidate.attachment_id === placement.attachment_id &&
+				containsPoint(candidate.points, [placement.x, placement.y]),
+		)
+		const locationId = area?.location_id ?? placement.plan_location_id
+		if (placement.interface_id !== null) {
+			byPort.set(placement.interface_id, locationId)
+		} else if (placement.jack_id !== null) {
+			byJack.set(placement.jack_id, locationId)
+		}
+	}
+	const ports = await getDb()
+		.select()
+		.from(interfaces)
+		.where(
+			or(
+				byPort.size === 0 ? undefined : inArray(interfaces.id, [...byPort.keys()]),
+				byJack.size === 0 ? undefined : inArray(interfaces.jack_id, [...byJack.keys()]),
+			),
+		)
+	const changed: [InterfaceJson, InterfaceJson][] = []
+	for (const port of ports) {
+		const locationId = byPort.has(port.id)
+			? byPort.get(port.id)
+			: port.jack_id === null
+				? undefined
+				: byJack.get(port.jack_id)
+		if (locationId === undefined || locationId === port.location_id) {
+			continue
+		}
+		await getDb()
+			.update(interfaces)
+			.set({ location_id: locationId })
+			.where(eq(interfaces.id, port.id))
+		const before = toInterfaceJson(port)
+		changed.push([before, { ...before, location_id: locationId }])
+	}
+	await logUpdates('interface', changed)
 }
 
 /**
