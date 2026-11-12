@@ -2563,18 +2563,18 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
-/* Connect buttons in the panel table only show on row hover (or focus). */
-.panel-port-table .icon-btn-connect {
+/* Connect buttons in the port tables only show on row hover (or focus). */
+:is(.panel-port-table, .device-port-table) .icon-btn-connect {
 	opacity: 0;
 }
 
-.panel-port-table tr:hover .icon-btn-connect,
-.panel-port-table .icon-btn-connect:focus-visible {
+:is(.panel-port-table, .device-port-table) tr:hover .icon-btn-connect,
+:is(.panel-port-table, .device-port-table) .icon-btn-connect:focus-visible {
 	opacity: 1;
 }
 
 @media (hover: none) {
-	.panel-port-table .icon-btn-connect {
+	:is(.panel-port-table, .device-port-table) .icon-btn-connect {
 		opacity: 1;
 	}
 }
