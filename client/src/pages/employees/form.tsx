@@ -21,7 +21,6 @@ import {
 	RowSelect,
 } from '../../components/contacts'
 import {
-	CheckboxField,
 	CommentsField,
 	DescriptionField,
 	type FormOption,
@@ -30,6 +29,7 @@ import {
 	row_options,
 	SelectField,
 	TextField,
+	ToggleField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { contactScopeOptions, employeeSalutationOptions } from '../../i18n/labels'
@@ -199,6 +199,14 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			tenant="required"
 			onSubmit={handleSubmit}
 		>
+			<ToggleField
+				id={`${prefix}-active`}
+				label={t('common.status')}
+				checked={active()}
+				onChange={setActive}
+				on_text={t('employee.active')}
+				off_text={t('employee.inactive')}
+			/>
 			<SelectField
 				id={`${prefix}-salutation`}
 				label={t('employee.salutation')}
@@ -334,12 +342,6 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 						/>
 					</>
 				)}
-			/>
-			<CheckboxField
-				id={`${prefix}-active`}
-				label={t('employee.active')}
-				checked={active()}
-				onChange={setActive}
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

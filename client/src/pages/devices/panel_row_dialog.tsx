@@ -5,7 +5,7 @@ import { createSignal, Show } from 'solid-js'
 import { delete_cable } from '../../api/cables'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
-import { CheckboxField, FormSection, TextField } from '../../components/form'
+import { FormSection, TextField, ToggleField } from '../../components/form'
 import { confirmDiscard, Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
@@ -145,11 +145,13 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 			<Modal title={title()} dirty={dirty()} on_close={props.on_close}>
 				<form class="form-stacked" onSubmit={handleSave}>
 					<Show when={props.front || props.rear}>
-						<CheckboxField
+						<ToggleField
 							id="panel-row-patched"
-							label={t('device.panel.patched')}
+							label={t('common.status')}
 							checked={patched()}
 							onChange={setPatched}
+							on_text={t('device.panel.patched')}
+							off_text={t('device.panel.notPatched')}
 							disabled={cabled() && patched()}
 							title={
 								cabled() && patched() ? t('device.panel.cabledPatched') : undefined

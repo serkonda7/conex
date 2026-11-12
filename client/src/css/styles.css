@@ -2166,6 +2166,54 @@ tbody tr:last-child td {
 	width: 7rem;
 }
 
+/* On/off switch (ToggleField): a checkbox drawn as a track with a knob. */
+.field-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: 2.1rem;
+}
+
+.field .field-toggle input.toggle {
+	appearance: none;
+	position: relative;
+	flex: none;
+	width: 2.25rem;
+	height: 1.25rem;
+	margin: 0;
+	padding: 0;
+	cursor: pointer;
+	background-color: var(--border-strong);
+	border: none;
+	border-radius: 999px;
+	transition: background-color 150ms ease;
+}
+
+.field .field-toggle input.toggle::before {
+	content: "";
+	position: absolute;
+	top: 0.1875rem;
+	left: 0.1875rem;
+	width: 0.875rem;
+	height: 0.875rem;
+	border-radius: 50%;
+	background-color: var(--primary-contrast);
+	transition: transform 150ms ease;
+}
+
+.field .field-toggle input.toggle:checked {
+	background-color: var(--primary);
+}
+
+.field .field-toggle input.toggle:checked::before {
+	transform: translateX(1rem);
+}
+
+.field .field-toggle input.toggle:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
 .app-content .form-stacked .field .field-checkbox-label input,
 .app-content .form-stacked .jack-outlet-list .field-checkbox-label input {
 	flex: none;

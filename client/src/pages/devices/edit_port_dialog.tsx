@@ -5,7 +5,7 @@ import { createSignal, Show } from 'solid-js'
 import { delete_cable } from '../../api/cables'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
-import { CheckboxField, TextField } from '../../components/form'
+import { TextField, ToggleField } from '../../components/form'
 import { confirmDiscard, Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
@@ -69,6 +69,16 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 			on_close={props.on_close}
 		>
 			<form class="form-stacked" onSubmit={handleSave}>
+				<Show when={props.show_enabled}>
+					<ToggleField
+						id="edit-port-enabled"
+						label={t('common.status')}
+						checked={enabled()}
+						onChange={setEnabled}
+						on_text={t('device.enabled')}
+						off_text={t('device.disabled')}
+					/>
+				</Show>
 				<TextField
 					id="edit-port-name"
 					label={t('common.name')}
@@ -77,14 +87,6 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 					required
 					autofocus
 				/>
-				<Show when={props.show_enabled}>
-					<CheckboxField
-						id="edit-port-enabled"
-						label={t('device.enabled')}
-						checked={enabled()}
-						onChange={setEnabled}
-					/>
-				</Show>
 				<Show when={props.link}>
 					{(link: () => TraceLink): JSX.Element => (
 						<div class="field">

@@ -6,7 +6,6 @@ import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
-	CheckboxField,
 	DescriptionField,
 	FormPage,
 	FormSection,
@@ -15,6 +14,7 @@ import {
 	row_options,
 	SelectField,
 	TextField,
+	ToggleField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { deviceStatusLabel } from '../../i18n/labels'
@@ -143,6 +143,14 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			onSubmit={handleSave}
 		>
 			<FormSection title={tp('entity.device', 1)}>
+				<ToggleField
+					id="device-edit-inactive"
+					label={t('common.status')}
+					checked={!inactive()}
+					onChange={(isActive: boolean) => setInactive(!isActive)}
+					on_text={deviceStatusLabel('active')}
+					off_text={deviceStatusLabel('inactive')}
+				/>
 				<NameField
 					id="device-edit-name"
 					placeholder={t('device.namePlaceholder')}
@@ -184,12 +192,6 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					maxLength={100}
 					value={deviceId()}
 					onInput={setDeviceId}
-				/>
-				<CheckboxField
-					id="device-edit-inactive"
-					label={deviceStatusLabel('inactive')}
-					checked={inactive()}
-					onChange={setInactive}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

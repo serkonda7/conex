@@ -6,7 +6,6 @@ import { fetch_rack, fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
-	CheckboxField,
 	DescriptionField,
 	FormPage,
 	FormSection,
@@ -15,6 +14,7 @@ import {
 	row_options,
 	SelectField,
 	TextField,
+	ToggleField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { deviceStatusLabel } from '../../i18n/labels'
@@ -222,6 +222,14 @@ export function DeviceAddPage(): JSX.Element {
 	return (
 		<FormPage form={form} cancelTo="/devices" tenant="required" onSubmit={handleCreate}>
 			<FormSection title={tp('entity.device', 1)}>
+				<ToggleField
+					id="device-inactive"
+					label={t('common.status')}
+					checked={!inactive()}
+					onChange={(isActive: boolean) => setInactive(!isActive)}
+					on_text={deviceStatusLabel('active')}
+					off_text={deviceStatusLabel('inactive')}
+				/>
 				<NameField id="device-name" value={name()} onInput={setName} autofocus />
 				<SelectField
 					id="device-type"
@@ -263,12 +271,6 @@ export function DeviceAddPage(): JSX.Element {
 					maxLength={100}
 					value={deviceId()}
 					onInput={setDeviceId}
-				/>
-				<CheckboxField
-					id="device-inactive"
-					label={deviceStatusLabel('inactive')}
-					checked={inactive()}
-					onChange={setInactive}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>
