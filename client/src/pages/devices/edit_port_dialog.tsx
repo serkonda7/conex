@@ -3,7 +3,7 @@ import { createSignal, Show } from 'solid-js'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
 import { CheckboxField, TextField } from '../../components/form'
-import { Modal } from '../../components/modal'
+import { confirmDiscard, Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
 
@@ -22,6 +22,9 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 	const [enabled, setEnabled] = createSignal(props.iface.enabled)
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
+	const dirty = (): boolean =>
+		name().trim() !== props.iface.name ||
+		(props.show_enabled && enabled() !== props.iface.enabled)
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -45,7 +48,11 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 	}
 
 	return (
-		<Modal title={t('device.editPort', { name: props.iface.name })} on_close={props.on_close}>
+		<Modal
+			title={t('device.editPort', { name: props.iface.name })}
+			dirty={dirty()}
+			on_close={props.on_close}
+		>
 			<form class="form-stacked" onSubmit={handleSave}>
 				<TextField
 					id="edit-port-name"
@@ -64,11 +71,14 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 					/>
 				</Show>
 				<div class="modal-actions">
+					<button
+						type="button"
+						onClick={() => confirmDiscard(dirty()) && props.on_close()}
+					>
+						{t('common.cancel')}
+					</button>
 					<button type="submit" disabled={!name().trim() || save.pending()}>
 						{t('common.save')}
-					</button>
-					<button type="button" onClick={props.on_close}>
-						{t('common.cancel')}
 					</button>
 				</div>
 			</form>

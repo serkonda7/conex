@@ -16,6 +16,7 @@ export const en = {
 	'common.save': 'Save',
 	'common.saving': 'Saving…',
 	'common.close': 'Close',
+	'common.confirmDiscard': 'Discard the unsaved changes?',
 	'common.copy': 'Copy',
 	'common.copyValue': 'Copy {value}',
 	'common.copied': 'Copied',

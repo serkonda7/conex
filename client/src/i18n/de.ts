@@ -18,6 +18,7 @@ export const de: Messages = {
 	'common.save': 'Speichern',
 	'common.saving': 'Wird gespeichert…',
 	'common.close': 'Schließen',
+	'common.confirmDiscard': 'Die nicht gespeicherten Änderungen verwerfen?',
 	'common.copy': 'Kopieren',
 	'common.copyValue': '{value} kopieren',
 	'common.copied': 'Kopiert',

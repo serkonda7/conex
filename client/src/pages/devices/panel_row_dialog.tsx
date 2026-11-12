@@ -6,7 +6,7 @@ import { delete_cable } from '../../api/cables'
 import { type InterfaceJson, update_interface } from '../../api/devices'
 import { InlineError } from '../../components/feedback'
 import { CheckboxField, FormSection, TextField } from '../../components/form'
-import { Modal } from '../../components/modal'
+import { confirmDiscard, Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { useAction } from '../../lib/resource'
 import { ConnectPortDialog } from './connect_port_dialog'
@@ -56,6 +56,11 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 			...(patched() !== iface.patched ? { patched: patched() } : {}),
 		}
 	}
+
+	/** Unsaved name or `patched` changes; cables are saved right away. */
+	const dirty = (): boolean =>
+		(props.front !== null && Object.keys(changesOf(props.front, frontName())).length > 0) ||
+		(props.rear !== null && Object.keys(changesOf(props.rear, rearName())).length > 0)
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -137,7 +142,7 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 
 	return (
 		<>
-			<Modal title={title()} on_close={props.on_close}>
+			<Modal title={title()} dirty={dirty()} on_close={props.on_close}>
 				<form class="form-stacked" onSubmit={handleSave}>
 					<Show when={props.front || props.rear}>
 						<CheckboxField
@@ -182,11 +187,14 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 						)}
 					</Show>
 					<div class="modal-actions">
+						<button
+							type="button"
+							onClick={() => confirmDiscard(dirty()) && props.on_close()}
+						>
+							{t('common.cancel')}
+						</button>
 						<button type="submit" disabled={!valid() || save.pending()}>
 							{t('common.save')}
-						</button>
-						<button type="button" onClick={props.on_close}>
-							{t('common.cancel')}
 						</button>
 					</div>
 				</form>
