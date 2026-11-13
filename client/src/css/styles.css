@@ -3594,15 +3594,6 @@ tbody tr:last-child td {
 	--modal-width: 80rem;
 }
 
-.attachment-full {
-	display: block;
-	max-width: 100%;
-	max-height: 70vh;
-	width: auto;
-	height: auto;
-	margin: 0 auto;
-}
-
 .attachment-meta,
 .attachment-description {
 	color: var(--text-secondary);
@@ -3632,20 +3623,18 @@ span.attachment-star,
 	color: #f5c518;
 }
 
-/* Floor plan: the image, capped in height and shrink-wrapped by the
-   viewport, with areas and markers on top, all positioned in normalized
-   (0..1) coordinates. Zoom scales and shifts the stage inside the viewport;
-   overlay pieces scale back by --floorplan-inv-zoom to keep their size, so
-   they anchor at their top left (transform-origin 0 0) and center with
+/* Zoom viewport: the stage, shrink-wrapped by the viewport, with the zoom
+   bar below. Zoom scales and shifts the stage inside the viewport; overlay
+   pieces scale back by --inv-zoom to keep their size, so they anchor at
+   their top left (transform-origin 0 0) and center with
    translate(-50%, -50%) after the counter-scale. */
-/* The viewport with the stage bar below, as wide as the image. */
-.floorplan-frame {
+/* The viewport with the bar below, as wide as the stage. */
+.zoom-frame {
 	width: fit-content;
 	max-width: 100%;
-	margin: 0.6rem 0;
 }
 
-.floorplan-viewport {
+.zoom-viewport {
 	position: relative;
 	border: 1px solid var(--border);
 	border-radius: 0.35rem;
@@ -3655,32 +3644,39 @@ span.attachment-star,
 	touch-action: pan-x pan-y;
 }
 
-.floorplan-viewport.zoomed {
+.zoom-viewport.zoomed {
 	cursor: grab;
 	touch-action: none;
 }
 
-.floorplan-viewport.zoomed:active {
+.zoom-viewport.zoomed:active {
 	cursor: grabbing;
 }
 
-/* Covers markers and labels while the middle button pans, so their move
-   cursor gives way to the grabbing one. */
-.floorplan-pan-cover {
+/* Covers stage pieces while the middle button pans, so their own cursor
+   gives way to the grabbing one. */
+.zoom-pan-cover {
 	position: absolute;
 	inset: 0;
 	cursor: grabbing;
 }
 
-.floorplan-stage {
+.zoom-stage {
 	position: relative;
 	transform-origin: 0 0;
-	--floorplan-inv-zoom: 1;
+	--inv-zoom: 1;
 }
 
-/* Zoom, grid size and pointer position below the image. */
-.floorplan-stage-bar {
-	/* Wraps within the image's width instead of widening the frame. */
+.zoom-stage > img {
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 100%;
+}
+
+/* Zoom buttons and the owner's items below the stage. */
+.zoom-bar {
+	/* Wraps within the stage's width instead of widening the frame. */
 	contain: inline-size;
 	display: flex;
 	flex-wrap: wrap;
@@ -3690,18 +3686,37 @@ span.attachment-star,
 	font-size: var(--font-size-sm);
 }
 
-.floorplan-zoom-controls {
+.zoom-controls {
 	display: flex;
 	gap: 0.2rem;
 }
 
-.floorplan-zoom-button {
+.zoom-button {
 	display: grid;
 	place-items: center;
 	width: 1.9rem;
 	height: 1.9rem;
 	padding: 0;
 	background-color: var(--bg-surface);
+}
+
+/* Floor plan: the image capped in height in a zoom viewport, with areas
+   and markers on top, all positioned in normalized (0..1) coordinates. */
+.floorplan-frame {
+	margin: 0.6rem 0;
+}
+
+.floorplan-frame .zoom-stage > img {
+	max-height: 60vh;
+}
+
+/* Attachment lightbox: the image capped in height, centered. */
+.attachment-zoom {
+	margin: 0 auto;
+}
+
+.attachment-zoom .zoom-stage > img {
+	max-height: 70vh;
 }
 
 .floorplan-grid-size {
@@ -3790,14 +3805,6 @@ span.attachment-star,
 	color: var(--text-muted);
 }
 
-.floorplan-stage > img {
-	display: block;
-	width: auto;
-	height: auto;
-	max-width: 100%;
-	max-height: 60vh;
-}
-
 .floorplan-overlay {
 	position: absolute;
 	inset: 0;
@@ -3825,7 +3832,7 @@ span.attachment-star,
 .floorplan-area-label {
 	position: absolute;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
 	max-width: 40%;
 	padding: 0.05rem 0.4rem;
 	overflow: hidden;
@@ -3847,7 +3854,7 @@ span.attachment-star,
 	position: absolute;
 	transform-origin: 0 0;
 	/* --floorplan-dx / -dy spread a crowd at full zoom. */
-	transform: scale(var(--floorplan-inv-zoom))
+	transform: scale(var(--inv-zoom))
 		translate(
 			calc(-50% + var(--floorplan-dx, 0px)),
 			calc(-50% + var(--floorplan-dy, 0px))
@@ -3907,7 +3914,7 @@ span.attachment-star,
 .floorplan-cluster {
 	position: absolute;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
 	display: grid;
 	place-items: center;
 	min-width: 1.9rem;
@@ -4058,7 +4065,7 @@ span.attachment-star,
 	position: absolute;
 	z-index: 2;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, 1.1rem);
+	transform: scale(var(--inv-zoom)) translate(-50%, 1.1rem);
 	cursor: auto;
 	display: grid;
 	gap: 0.35rem;
@@ -4189,7 +4196,7 @@ span.attachment-star,
 .floorplan-handle {
 	position: absolute;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
 	width: 0.8rem;
 	height: 0.8rem;
 	background-color: var(--bg-surface);
@@ -4309,7 +4316,7 @@ span.attachment-star,
 .floorplan-snap-mark {
 	position: absolute;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
 	width: 0.7rem;
 	height: 0.7rem;
 	border: 2px solid var(--primary);
@@ -4441,7 +4448,7 @@ span.attachment-star,
 .floorplan-origin {
 	position: absolute;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -50%);
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
 	width: 1rem;
 	height: 1rem;
 	border: 2px solid var(--primary);
@@ -4482,7 +4489,7 @@ span.attachment-star,
 .floorplan-scale-label {
 	position: absolute;
 	transform-origin: 0 0;
-	transform: scale(var(--floorplan-inv-zoom)) translate(-50%, -150%);
+	transform: scale(var(--inv-zoom)) translate(-50%, -150%);
 	padding: 0 0.35rem;
 	font-size: var(--font-size-sm);
 	white-space: nowrap;

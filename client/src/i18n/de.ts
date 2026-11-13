@@ -1170,10 +1170,10 @@ export const de: Messages = {
 	'floorplan.scaleState': 'Maßstab: {distance} zwischen den Punkten',
 	'floorplan.originState': 'Nullpunkt festgelegt',
 	'floorplan.remove': 'Entfernen',
-	'floorplan.zoomIn': 'Vergrößern',
-	'floorplan.zoomOut': 'Verkleinern',
-	'floorplan.zoomReset': 'Ganzen Grundriss zeigen',
-	'floorplan.zoomHint':
+	'zoom.in': 'Vergrößern',
+	'zoom.out': 'Verkleinern',
+	'zoom.reset': 'Ganzes Bild zeigen',
+	'zoom.hint':
 		'Strg + Scrollen oder Zwei-Finger-Geste zum Zoomen; vergrößert zum Verschieben ziehen',
 	'floorplan.clusterZoom': '{count} Markierungen: {names}. Vergrößern',
 	'floorplan.objects': 'Auf diesem Grundriss',

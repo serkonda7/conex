@@ -111,12 +111,12 @@ import {
 	markerTitle,
 	percent,
 	pixelDistance,
-	type StageZoom,
 } from './floorplan_stage'
 import { TextField } from './form'
 import { IconLabel } from './icon_label'
 import { Modal } from './modal'
 import { ObjectSearch } from './object_selector'
+import type { StageZoom } from './zoom_viewport'
 
 type Point = [number, number]
 

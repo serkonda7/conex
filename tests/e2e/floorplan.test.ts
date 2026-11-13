@@ -30,7 +30,7 @@ test('draws a polygon area, finishes it with Enter and keeps it after saving', a
 	await page.getByRole('button', { name: 'Grundriss bearbeiten' }).click()
 	await page.getByRole('button', { name: 'Bereich zeichnen' }).click()
 
-	const stage = page.locator('.floorplan-stage')
+	const stage = page.locator('.floorplan-frame .zoom-stage')
 	const box = await stage.boundingBox()
 	expect(box).not.toBeNull()
 	const at = (x: number, y: number): { x: number; y: number } => ({

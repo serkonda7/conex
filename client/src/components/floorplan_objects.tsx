@@ -22,7 +22,8 @@ import {
 	markerLayer,
 	showLayer,
 } from './floorplan_layers'
-import { areaBox, areaName, markerIcon, type PlanBox, type StageZoom } from './floorplan_stage'
+import { areaBox, areaName, markerIcon } from './floorplan_stage'
+import type { PlanBox, StageZoom } from './zoom_viewport'
 
 /** An object of the plan: area or marker (their ids are separate sequences). */
 export type PlanObject = { kind: 'area'; id: number } | { kind: 'marker'; id: number }
