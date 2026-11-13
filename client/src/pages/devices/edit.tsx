@@ -14,17 +14,15 @@ import {
 	row_options,
 	SelectField,
 	TextField,
-	ToggleField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { deviceStatusLabel } from '../../i18n/labels'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { deviceRoleOptions } from '../device-roles/options'
 import { locationOptions } from '../locations/options'
-import { parsePosition, validPosition } from './add'
+import { DeviceStatusField, parsePosition, validPosition } from './add'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 import { inactiveStatusChange } from './status'
@@ -143,19 +141,17 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			onSubmit={handleSave}
 		>
 			<FormSection title={tp('entity.device', 1)}>
-				<ToggleField
+				<DeviceStatusField
 					id="device-edit-inactive"
-					label={t('common.status')}
-					checked={!inactive()}
-					onChange={(isActive: boolean) => setInactive(!isActive)}
-					on_text={deviceStatusLabel('active')}
-					off_text={deviceStatusLabel('inactive')}
+					inactive={inactive()}
+					onChange={setInactive}
 				/>
 				<NameField
 					id="device-edit-name"
 					placeholder={t('device.namePlaceholder')}
 					value={name()}
 					onInput={setName}
+					autofocus
 				/>
 				<ReadOnlyField
 					id="device-edit-type"

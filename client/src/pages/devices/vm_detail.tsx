@@ -1,4 +1,3 @@
-import { IconArrowsExchange } from '@tabler/icons-solidjs'
 import { createSignal, type JSX, Show } from 'solid-js'
 import { fetch_device_role } from '../../api/device_roles'
 import { fetch_device } from '../../api/devices'
@@ -28,7 +27,7 @@ import { createRecord } from '../../lib/resource'
 import type { Crumb } from '../../lib/router'
 import { canGlobal } from '../../lib/session'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
-import { MoveTenantDialog } from './move_tenant_dialog'
+import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
 import { DeviceStatusBadge } from './status'
 
 /**
@@ -88,11 +87,7 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 					onDelete={handleDelete}
 					actions={
 						<Show when={canGlobal('edit') && hostId() === null}>
-							<button type="button" onClick={() => setMovingTenant(true)}>
-								<IconLabel icon={IconArrowsExchange}>
-									{t('device.moveTenant')}
-								</IconLabel>
-							</button>
+							<MoveTenantButton onClick={() => setMovingTenant(true)} />
 						</Show>
 					}
 				/>

@@ -30,13 +30,14 @@ import {
 	DetailShell,
 	DetailSubtitle,
 	ForeignKeyLink,
+	RecordLink,
 	RelatedPreview,
+	SpecSheetComments,
 	useDetailDelete,
 	ViewAllLink,
 } from '../../components/detail_page'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
-import { Markdown } from '../../components/markdown'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import {
@@ -401,11 +402,10 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 						<dl>
 							<dt>{tp('entity.manufacturer', 1)}</dt>
 							<dd>
-								<ForeignKeyLink
+								<RecordLink
 									id={manufacturerId()}
-									loading={manufacturer.loading}
-									name={manufacturer()?.name}
-									href={`/manufacturers/${manufacturerId() ?? ''}`}
+									record={manufacturer}
+									base="/manufacturers"
 								/>
 							</dd>
 							<dt>{t('deviceType.partNumber')}</dt>
@@ -460,12 +460,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 						</dl>
 					</section>
-					<Show when={deviceType()?.comments}>
-						<section class="spec-sheet-notes">
-							<h4>{t('common.comments')}</h4>
-							<Markdown text={deviceType()?.comments} />
-						</section>
-					</Show>
+					<SpecSheetComments text={deviceType()?.comments} />
 				</section>
 			</DetailShell>
 

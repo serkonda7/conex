@@ -17,7 +17,7 @@ import { type ListParams, offsetOf, pageOf, tryWrite } from './list'
 
 type SavedListTable = typeof saved_filters | typeof saved_layouts
 
-export interface SavedListParams extends ListParams {
+interface SavedListParams extends ListParams {
 	table?: string[]
 }
 

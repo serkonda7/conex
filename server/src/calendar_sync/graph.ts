@@ -18,7 +18,7 @@ export interface GraphCredentials {
 }
 
 /** HTTP failure of a Graph or token call; `status` null when nothing came back. */
-export class GraphApiError extends Error {
+class GraphApiError extends Error {
 	constructor(
 		message: string,
 		readonly status: number | null,

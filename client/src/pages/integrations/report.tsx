@@ -330,6 +330,28 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 				{t('integration.deactivateEmployee', { provider: providerLabel(provider) })}
 			</button>
 		)
+		const ignoreButton = (request: () => Promise<Result<unknown, Error>>): JSX.Element => (
+			<button
+				type="button"
+				class="icon-btn"
+				title={t('integration.ignore')}
+				aria-label={t('integration.ignore')}
+				onClick={(): void => void run(request)}
+			>
+				<IconBan size={20} />
+			</button>
+		)
+		const confirmLinkButton = (request: () => Promise<Result<unknown, Error>>): JSX.Element => (
+			<button
+				type="button"
+				class="icon-btn icon-btn-connect"
+				title={t('integration.confirmLink')}
+				aria-label={t('integration.confirmLink')}
+				onClick={(): void => void run(request)}
+			>
+				<IconLinkPlus size={20} />
+			</button>
+		)
 		const unlink: JSX.Element = (
 			<Show when={f.link_id !== null}>
 				<button
@@ -361,19 +383,9 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'tenant_missing_in_conex':
 				return (
 					<Show when={canGlobal('integrations.manage')}>
-						<button
-							type="button"
-							class="icon-btn"
-							title={t('integration.ignore')}
-							aria-label={t('integration.ignore')}
-							onClick={() =>
-								void run(() =>
-									ignore_external(provider, 'tenant', f.external_id ?? ''),
-								)
-							}
-						>
-							<IconBan size={20} />
-						</button>
+						{ignoreButton(() =>
+							ignore_external(provider, 'tenant', f.external_id ?? ''),
+						)}
 					</Show>
 				)
 			case 'tenant_stale':
@@ -381,42 +393,22 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 			case 'device_suggestion':
 				return (
 					<Show when={can('integrations.manage')}>
-						<button
-							type="button"
-							class="icon-btn icon-btn-connect"
-							title={t('integration.confirmLink')}
-							aria-label={t('integration.confirmLink')}
-							onClick={() =>
-								void run(() =>
-									link_external(
-										provider,
-										'device',
-										f.device_id ?? 0,
-										f.external_id ?? '',
-									),
-								)
-							}
-						>
-							<IconLinkPlus size={20} />
-						</button>
+						{confirmLinkButton(() =>
+							link_external(
+								provider,
+								'device',
+								f.device_id ?? 0,
+								f.external_id ?? '',
+							),
+						)}
 					</Show>
 				)
 			case 'device_missing_in_conex':
 				return (
 					<Show when={can('integrations.manage')}>
-						<button
-							type="button"
-							class="icon-btn"
-							title={t('integration.ignore')}
-							aria-label={t('integration.ignore')}
-							onClick={() =>
-								void run(() =>
-									ignore_external(provider, 'device', f.external_id ?? ''),
-								)
-							}
-						>
-							<IconBan size={20} />
-						</button>
+						{ignoreButton(() =>
+							ignore_external(provider, 'device', f.external_id ?? ''),
+						)}
 					</Show>
 				)
 			case 'device_missing_in_external':
@@ -431,17 +423,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						>
 							{t('integration.createExternal', { provider: providerLabel(provider) })}
 						</button>
-						<button
-							type="button"
-							class="icon-btn"
-							title={t('integration.ignore')}
-							aria-label={t('integration.ignore')}
-							onClick={() =>
-								void run(() => ignore_local(provider, 'device', f.device_id ?? 0))
-							}
-						>
-							<IconBan size={20} />
-						</button>
+						{ignoreButton(() => ignore_local(provider, 'device', f.device_id ?? 0))}
 					</Show>
 				)
 			case 'device_stale':
@@ -476,24 +458,14 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 							f.remote === 'active' &&
 							f.external_id !== null &&
 							deactivate}
-						<button
-							type="button"
-							class="icon-btn icon-btn-connect"
-							title={t('integration.confirmLink')}
-							aria-label={t('integration.confirmLink')}
-							onClick={() =>
-								void run(() =>
-									link_external(
-										provider,
-										'employee',
-										f.employee_id ?? 0,
-										f.external_id ?? '',
-									),
-								)
-							}
-						>
-							<IconLinkPlus size={20} />
-						</button>
+						{confirmLinkButton(() =>
+							link_external(
+								provider,
+								'employee',
+								f.employee_id ?? 0,
+								f.external_id ?? '',
+							),
+						)}
 					</Show>
 				)
 			case 'employee_missing_in_conex':
@@ -515,37 +487,15 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 								{t('integration.importToConex')}
 							</button>
 						</Show>
-						<button
-							type="button"
-							class="icon-btn"
-							title={t('integration.ignore')}
-							aria-label={t('integration.ignore')}
-							onClick={() =>
-								void run(() =>
-									ignore_external(provider, 'employee', f.external_id ?? ''),
-								)
-							}
-						>
-							<IconBan size={20} />
-						</button>
+						{ignoreButton(() =>
+							ignore_external(provider, 'employee', f.external_id ?? ''),
+						)}
 					</Show>
 				)
 			case 'employee_missing_in_external':
 				return (
 					<Show when={can('integrations.manage')}>
-						<button
-							type="button"
-							class="icon-btn"
-							title={t('integration.ignore')}
-							aria-label={t('integration.ignore')}
-							onClick={() =>
-								void run(() =>
-									ignore_local(provider, 'employee', f.employee_id ?? 0),
-								)
-							}
-						>
-							<IconBan size={20} />
-						</button>
+						{ignoreButton(() => ignore_local(provider, 'employee', f.employee_id ?? 0))}
 					</Show>
 				)
 			case 'employee_stale':

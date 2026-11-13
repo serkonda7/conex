@@ -224,6 +224,25 @@ export function TabBar(): JSX.Element {
 		})
 	})
 
+	/**
+	 * Scrolls the strip sideways to show the active tab. Not `scrollIntoView`:
+	 * that also scrolls the page up to the tab bar, losing the page's scroll
+	 * position whenever a tab title changes (e.g. a refresh after a write).
+	 */
+	function revealTab(id: number): void {
+		const button = strip?.querySelector<HTMLElement>(`[data-tab-button="${id}"]`)
+		if (!strip || !button) {
+			return
+		}
+		const bounds = strip.getBoundingClientRect()
+		const rect = button.getBoundingClientRect()
+		if (rect.left < bounds.left) {
+			strip.scrollLeft -= bounds.left - rect.left
+		} else if (rect.right > bounds.right) {
+			strip.scrollLeft += rect.right - bounds.right
+		}
+	}
+
 	// Titles change as pages load, so re-measure whenever they do, and keep
 	// the active tab scrolled into view.
 	createEffect(() => {
@@ -233,9 +252,7 @@ export function TabBar(): JSX.Element {
 		const id = activeTabId()
 		requestAnimationFrame(() => {
 			measure()
-			strip
-				?.querySelector(`[data-tab-button="${id}"]`)
-				?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+			revealTab(id)
 		})
 	})
 

@@ -249,11 +249,6 @@ export function JackDialog(props: {
 							required
 						/>
 						<div class="modal-actions">
-							<Show when={editing()}>
-								<button type="button" onClick={resetForm}>
-									{t('common.cancel')}
-								</button>
-							</Show>
 							<button
 								type="submit"
 								disabled={
@@ -265,6 +260,11 @@ export function JackDialog(props: {
 							>
 								{editing() ? t('common.save') : t('device.jacks.create')}
 							</button>
+							<Show when={editing()}>
+								<button type="button" onClick={resetForm}>
+									{t('common.cancel')}
+								</button>
+							</Show>
 						</div>
 					</form>
 				</section>

@@ -41,7 +41,7 @@ export function offsetOf(params: ListParams): number {
 }
 
 /** LIKE pattern with `%`, `_` and `\` escaped so the search stays literal. */
-export function searchPattern(raw: string): string {
+function searchPattern(raw: string): string {
 	return `%${raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
 }
 

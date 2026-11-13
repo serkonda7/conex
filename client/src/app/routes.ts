@@ -632,10 +632,6 @@ export function matchRoute(raw: string, checkPermission = true): RouteMatch | nu
 	return null
 }
 
-export function isDetailRoute(raw: string): boolean {
-	return matchRoute(raw, false)?.kind === 'detail'
-}
-
 /**
  * Short human label for a tab button, derived from the route and the name
  * its page reported once loaded.

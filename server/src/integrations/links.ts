@@ -181,7 +181,7 @@ export function ignoreExternal(
  * entity deletes this row by `entity_id`, deleting the entity deletes it in
  * the service layer.
  */
-export function localIgnoreExternalId(entityType: LinkEntityType, entityId: number): string {
+function localIgnoreExternalId(entityType: LinkEntityType, entityId: number): string {
 	return `conex:${entityType}:${entityId}`
 }
 

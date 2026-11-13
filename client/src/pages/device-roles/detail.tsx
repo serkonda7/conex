@@ -32,9 +32,17 @@ import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
+import {
+	deviceTypeDevicesColumn,
+	deviceTypeHeightColumn,
+	deviceTypeManufacturerColumn,
+	deviceTypeModelColumn,
+	deviceTypeRoleColumn,
+} from '../device_types/columns'
 import { EolPill } from '../device_types/eol_pill'
 import { deviceListHref } from '../devices/list'
 import { DeviceStatusBadge } from '../devices/status'
+import { useDeviceRoleLink } from './role_link'
 
 /** Rows of the device type and device tabs; the "View all" link leads to the rest. */
 const PREVIEW_LIMIT = 5
@@ -75,9 +83,7 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 	const [roles] = createRows(fetch_device_roles, setError)
 	const [manufacturers] = createRows(fetch_manufacturers, setError)
 	const [allTypes] = createRows(fetch_device_types, setError)
-	const roleName = useNameOf(roles, deviceRoleLabel)
-	const roleIcon = (roleId: number): ReturnType<typeof deviceRoleIcon> =>
-		deviceRoleIcon(roles()?.find((r) => r.id === roleId)?.icon)
+	const roleCell = useDeviceRoleLink(roles)
 	const manufacturerName = useNameOf(manufacturers)
 	const typeOf = (typeId: number): DeviceTypeListRow | undefined =>
 		allTypes()?.find((type) => type.id === typeId)
@@ -90,12 +96,6 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 		setError,
 		listRoute: '/device-roles',
 	})
-
-	const roleCell = (roleId: number): JSX.Element => (
-		<a href={`/device-roles/${roleId}`}>
-			<IconLabel icon={roleIcon(roleId)}>{roleName(roleId)}</IconLabel>
-		</a>
-	)
 
 	const childColumns: DataTableColumn<DeviceRoleListRow>[] = [
 		{
@@ -127,43 +127,11 @@ export function DeviceRoleDetailPage(props: { id: number }): JSX.Element {
 	]
 
 	const deviceTypeColumns: DataTableColumn<DeviceTypeListRow>[] = [
-		{
-			key: 'model',
-			label: t('common.model'),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/device-types/${dt.id}`}>{dt.model}</a>
-			),
-		},
-		{
-			key: 'manufacturer',
-			label: tp('entity.manufacturer', 1),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/manufacturers/${dt.manufacturer_id}`}>
-					{manufacturerName(dt.manufacturer_id)}
-				</a>
-			),
-		},
-		{
-			key: 'role',
-			label: t('deviceType.defaultRole'),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<Show when={dt.default_device_role_id} fallback="—">
-					{(roleId: () => number): JSX.Element => roleCell(roleId())}
-				</Show>
-			),
-		},
-		{
-			key: 'u_height',
-			label: t('common.heightU'),
-			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
-		},
-		{
-			key: 'devices',
-			label: tp('entity.device', 2),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/devices?device_type=${dt.id}`}>{dt.instance_count}</a>
-			),
-		},
+		deviceTypeModelColumn(),
+		deviceTypeManufacturerColumn(manufacturerName),
+		deviceTypeRoleColumn(roleCell),
+		deviceTypeHeightColumn(),
+		deviceTypeDevicesColumn(),
 	]
 
 	const deviceColumns: DataTableColumn<DeviceListItem>[] = [

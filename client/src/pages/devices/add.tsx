@@ -51,6 +51,24 @@ export function queryFace(): string {
 	return face === 'front' || face === 'rear' ? face : ''
 }
 
+/** Active/inactive switch of the device and virtual machine forms. */
+export function DeviceStatusField(props: {
+	id: string
+	inactive: boolean
+	onChange: (inactive: boolean) => void
+}): JSX.Element {
+	return (
+		<ToggleField
+			id={props.id}
+			label={t('common.status')}
+			checked={!props.inactive}
+			onChange={(isActive: boolean) => props.onChange(!isActive)}
+			on_text={deviceStatusLabel('active')}
+			off_text={deviceStatusLabel('inactive')}
+		/>
+	)
+}
+
 /**
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
  * pre-fills it from that device, except the name, serial, device ID,
@@ -212,8 +230,19 @@ export function DeviceAddPage(): JSX.Element {
 			// Elevation deep links return to the rack they came from.
 			navigateTo:
 				rackId() && queryParam('rack') === rackId() ? `/racks/${rackId()}` : '/devices',
-			onSuccess: is_add_another_submit(e) ? () => setName('') : undefined,
+			onSuccess: is_add_another_submit(e) ? resetForNext : undefined,
 		})
+	}
+
+	// Create & Add Another keeps the shared fields (type, role, place) and
+	// clears the ones chosen per device, as a clone does: the next device
+	// cannot share the serial, device ID or U position.
+	function resetForNext(): void {
+		setName('')
+		setSerial('')
+		setDeviceId('')
+		setPositionU('')
+		setEmployeeId('')
 	}
 
 	const shelfName = (): string =>
@@ -222,13 +251,10 @@ export function DeviceAddPage(): JSX.Element {
 	return (
 		<FormPage form={form} cancelTo="/devices" tenant="required" onSubmit={handleCreate}>
 			<FormSection title={tp('entity.device', 1)}>
-				<ToggleField
+				<DeviceStatusField
 					id="device-inactive"
-					label={t('common.status')}
-					checked={!inactive()}
-					onChange={(isActive: boolean) => setInactive(!isActive)}
-					on_text={deviceStatusLabel('active')}
-					off_text={deviceStatusLabel('inactive')}
+					inactive={inactive()}
+					onChange={setInactive}
 				/>
 				<NameField id="device-name" value={name()} onInput={setName} autofocus />
 				<SelectField

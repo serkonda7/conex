@@ -12,6 +12,7 @@ import {
 	lt,
 	or,
 	type SQL,
+	type SQLWrapper,
 	sql,
 } from 'drizzle-orm'
 import type {
@@ -265,13 +266,7 @@ export async function listDeviceTypes(
 						device_types.part_number,
 						device_types.description,
 					]),
-					inArray(
-						device_types.manufacturer_id,
-						getDb()
-							.select({ id: manufacturers.id })
-							.from(manufacturers)
-							.where(searchCondition(params.search, [manufacturers.name])),
-					),
+					manufacturerSearchCondition(device_types.manufacturer_id, params.search),
 				)
 			: undefined,
 		params.manufacturer
@@ -309,8 +304,19 @@ export function getDeviceType(id: number): Promise<Result<DeviceTypeRow, Error>>
 	return findById(device_types, id, 'Device type not found')
 }
 
-function checkManufacturerExists(id: number | undefined): Promise<Result<undefined, Error>> {
+export function checkManufacturerExists(id: number | undefined): Promise<Result<undefined, Error>> {
 	return checkExists(manufacturers, id, 'Manufacturer not found')
+}
+
+/** `column` references a manufacturer whose name matches `search`. */
+export function manufacturerSearchCondition(column: SQLWrapper, search: string): SQL {
+	return inArray(
+		column,
+		getDb()
+			.select({ id: manufacturers.id })
+			.from(manufacturers)
+			.where(searchCondition(search, [manufacturers.name])),
+	)
 }
 
 function checkDefaultRoleExists(id: number | null | undefined): Promise<Result<undefined, Error>> {

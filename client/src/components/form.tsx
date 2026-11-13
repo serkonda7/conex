@@ -9,7 +9,7 @@
 import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { type JSX, onMount, Show } from 'solid-js'
-import { t } from '../i18n'
+import { t, tp } from '../i18n'
 import type { FormState } from '../lib/form'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
 import { isScoped } from '../lib/session'
@@ -352,6 +352,26 @@ export function SelectField(props: {
 	)
 }
 
+/** Tenant picker of an edit form, with a "no tenant" choice. The page
+ * loads the `tenants` so the request starts with the record's. */
+export function TenantSelectField(props: {
+	id: string
+	value: string
+	onChange: (value: string) => void
+	tenants: readonly { id: number; name: string }[] | undefined
+}): JSX.Element {
+	return (
+		<SelectField
+			id={props.id}
+			label={tp('entity.tenant', 1)}
+			value={props.value}
+			onChange={props.onChange}
+			options={row_options(props.tenants ?? [])}
+			emptyLabel={t('common.noTenant')}
+		/>
+	)
+}
+
 /** Create actions. Cancel closes the tab back into the page that opened
  * it, keeping its exact contents (`cancelTo` when there is none); `singleton` drops "Create & Add
  * Another" for one-of-a-kind objects. */
@@ -365,13 +385,6 @@ function CreateActions(props: {
 	const disabled = (): boolean => props.saving || props.blocked === true
 	return (
 		<div class="form-actions">
-			<button
-				type="button"
-				onClick={() => navigate(props.cancelTo, { back: true })}
-				disabled={props.saving}
-			>
-				{t('common.cancel')}
-			</button>
 			<div class="btn-group">
 				<button type="submit" name="action" value="create" disabled={disabled()}>
 					{props.saving ? t('common.creating') : t('common.create')}
@@ -388,6 +401,13 @@ function CreateActions(props: {
 					</button>
 				</Show>
 			</div>
+			<button
+				type="button"
+				onClick={() => navigate(props.cancelTo, { back: true })}
+				disabled={props.saving}
+			>
+				{t('common.cancel')}
+			</button>
 		</div>
 	)
 }
@@ -400,11 +420,11 @@ function EditActions(props: {
 }): JSX.Element {
 	return (
 		<div class="form-actions">
-			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
-				{t('common.cancel')}
-			</button>
 			<button type="submit" disabled={props.saving}>
 				{props.saving ? t('common.saving') : t('common.save')}
+			</button>
+			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
+				{t('common.cancel')}
 			</button>
 			<Show when={props.onDelete}>
 				<button

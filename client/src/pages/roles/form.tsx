@@ -5,13 +5,7 @@ import { create_role, fetch_role, type RoleJson, update_role } from '../../api/r
 import { DescriptionField, FormPage, NameField } from '../../components/form'
 import { t } from '../../i18n'
 import { permissionLabel } from '../../i18n/labels'
-import {
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 
 /** Role create (`id` omitted) or edit form: name, description and permission checkboxes. */
 function RoleForm(props: { id?: number }): JSX.Element {
@@ -40,32 +34,23 @@ function RoleForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
 		const granted = PERMISSIONS.filter((p) => permissions().has(p))
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: ({ name: trimmed }: FormValues) =>
-				id === undefined
-					? create_role({
-							name: trimmed,
-							description: text(description()),
-							permissions: granted,
-						})
-					: update_role(id, {
-							name: trimmed,
-							description: text(description()) ?? null,
-							permissions: granted,
-						}),
+			body: (values: FormValues) => ({
+				name: values.name,
+				description: text(description()),
+				permissions: granted,
+			}),
+			create: create_role,
+			update: update_role,
 			navigateTo: '/roles',
-			onSuccess: is_add_another_submit(e)
-				? (): void => {
-						setName('')
-						setDescription('')
-						setPermissions(new Set<Permission>())
-					}
-				: undefined,
+			reset: () => {
+				setName('')
+				setDescription('')
+				setPermissions(new Set<Permission>())
+			},
 		})
 	}
 

@@ -148,7 +148,7 @@ export async function listDeviceRoles(
 	)
 }
 
-export function getDeviceRole(id: number): Promise<Result<DeviceRoleRow, Error>> {
+function getDeviceRole(id: number): Promise<Result<DeviceRoleRow, Error>> {
 	return findById(device_roles, id, 'Device role not found')
 }
 
@@ -197,7 +197,9 @@ export async function getDeviceRoleDetail(id: number): Promise<Result<DeviceRole
 	})
 }
 
-export function checkDeviceRoleExists(roleId: number): Promise<Result<undefined, Error>> {
+export function checkDeviceRoleExists(
+	roleId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
 	return checkExists(device_roles, roleId, 'Device role not found')
 }
 

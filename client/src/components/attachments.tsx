@@ -37,6 +37,7 @@ import { Empty, InlineError, Loading } from './feedback'
 import { TextAreaField } from './form'
 import { IconLabel } from './icon_label'
 import { Modal } from './modal'
+import { createStageZoom, ZoomViewport } from './zoom_viewport'
 
 const ACCEPT = ATTACHMENT_MIMES.join(',')
 
@@ -164,7 +165,7 @@ async function toggleFloorplan(
 }
 
 /**
- * Lightbox: the full image, its facts, and the edit / floor-plan /
+ * Lightbox: the full image (zoomable), its facts, and the edit / floor-plan /
  * replace / delete actions.
  */
 function AttachmentLightbox(props: {
@@ -180,6 +181,7 @@ function AttachmentLightbox(props: {
 	const [editing, setEditing] = createSignal(false)
 	const [description, setDescription] = createSignal('')
 	const action = useAction(setError)
+	const zoom = createStageZoom()
 
 	function startEdit(): void {
 		setDescription(props.attachment.description ?? '')
@@ -242,13 +244,19 @@ function AttachmentLightbox(props: {
 			class="attachment-lightbox"
 			on_close={props.on_close}
 		>
-			<img
-				class="attachment-full"
-				src={attachment_file_url(props.attachment)}
-				alt={props.attachment.description ?? props.attachment.filename}
-				width={props.attachment.width_px}
-				height={props.attachment.height_px}
-			/>
+			<ZoomViewport
+				class="attachment-zoom"
+				zoom={zoom}
+				fill={{ width: props.attachment.width_px, height: props.attachment.height_px }}
+			>
+				<img
+					src={attachment_file_url(props.attachment)}
+					alt={props.attachment.description ?? props.attachment.filename}
+					width={props.attachment.width_px}
+					height={props.attachment.height_px}
+					draggable={false}
+				/>
+			</ZoomViewport>
 			<p class="attachment-meta">
 				{t('attachment.dimensions', {
 					width: props.attachment.width_px,

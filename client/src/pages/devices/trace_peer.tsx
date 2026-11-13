@@ -9,7 +9,7 @@ import { For, type JSX, Show } from 'solid-js'
 import { t } from '../../i18n'
 
 /** `PP-A 12`, or `CB MPO→LC2` when the signal leaves by a port of another name. */
-export function panelPassLabel(pass: TracePanelPass): string {
+function panelPassLabel(pass: TracePanelPass): string {
 	const out = pass.out_interface
 	const ports =
 		out && out.name !== pass.in_interface.name
@@ -19,7 +19,7 @@ export function panelPassLabel(pass: TracePanelPass): string {
 }
 
 /** "→ PC-123: eth0 via PP-A 12 · PP-B 12" (or "ends at a free port" inside a panel). */
-export function EndToEndPeer(props: { peer: TraceEndToEnd }): JSX.Element {
+function EndToEndPeer(props: { peer: TraceEndToEnd }): JSX.Element {
 	const via = (): string => props.peer.via.map(panelPassLabel).join(' · ')
 	return (
 		<span class="trace-end-to-end">

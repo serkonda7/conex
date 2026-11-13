@@ -185,15 +185,10 @@ export async function updateVirtualMachine(
 		await checkTenantExists(tenantChanged ? tenantId : undefined),
 		await checkEmployeeAssignment(employeeId, tenantId),
 		await checkNameFree(name, hostId, tenantId, id),
+		await checkDeviceRoleExists(input.device_role_id),
 	]) {
 		if (Result.isError(guard)) {
 			return guard
-		}
-	}
-	if (input.device_role_id !== undefined) {
-		const roleCheck = await checkDeviceRoleExists(input.device_role_id)
-		if (Result.isError(roleCheck)) {
-			return roleCheck
 		}
 	}
 	const patch: Partial<VirtualMachineRow> = pickDefined(input, [

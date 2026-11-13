@@ -240,13 +240,6 @@ export function TemplateSyncDialog(props: {
 							</Hint>
 						</Show>
 						<div class="form-actions template-sync-actions">
-							<button
-								type="button"
-								onClick={props.on_close}
-								disabled={save.pending()}
-							>
-								{t('common.cancel')}
-							</button>
 							<div class="btn-group">
 								<button type="submit" disabled={upToDate() || save.pending()}>
 									{t('device.templateSync.apply')}
@@ -261,6 +254,13 @@ export function TemplateSyncDialog(props: {
 									{t('device.templateSync.applyNext')}
 								</button>
 							</div>
+							<button
+								type="button"
+								onClick={props.on_close}
+								disabled={save.pending()}
+							>
+								{t('common.cancel')}
+							</button>
 						</div>
 					</form>
 				)}

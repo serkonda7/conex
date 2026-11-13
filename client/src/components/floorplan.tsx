@@ -43,7 +43,6 @@ import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outle
 import {
 	areaCenter,
 	areaName,
-	createStageZoom,
 	declutter,
 	FloorplanStage,
 	type MarkerCluster,
@@ -53,9 +52,9 @@ import {
 	markerTitle,
 	percent,
 	type ShownMarker,
-	type StageZoom,
 } from './floorplan_stage'
 import { IconLabel } from './icon_label'
+import { createStageZoom, type StageZoom } from './zoom_viewport'
 
 /**
  * The object a deep link (`floorplanHref`) points at: a marker by its rack, device, outlet

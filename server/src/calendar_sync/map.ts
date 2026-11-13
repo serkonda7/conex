@@ -47,7 +47,7 @@ function text(value: string | undefined | null): string | null {
 }
 
 /** Support texts are HTML in TANSS; Outlook gets plain text. */
-export function plainText(html: string): string {
+function plainText(html: string): string {
 	return html
 		.replace(/<br\s*\/?>/gi, '\n')
 		.replace(/<\/(p|div|li|h[1-6])>/gi, '\n')

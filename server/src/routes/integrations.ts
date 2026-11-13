@@ -1,7 +1,8 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
-import { type Context, Hono } from 'hono'
+import { type Context, Hono, type MiddlewareHandler } from 'hono'
+import { createMiddleware } from 'hono/factory'
 import {
 	ExternalDeviceCreateSchema,
 	ExternalDeviceUpdateSchema,
@@ -67,6 +68,7 @@ import {
 } from '../integrations/store'
 import { getSyncRun, startSync } from '../integrations/sync'
 import { createTicket, listTickets } from '../integrations/tickets'
+import type { ExternalDevice, ExternalEmployee } from '../integrations/types'
 import { updateExternalDevice } from '../integrations/update_device'
 import { deactivateExternalEmployee, updateExternalEmployee } from '../integrations/update_employee'
 import { authMiddleware } from '../middleware/auth'
@@ -81,6 +83,18 @@ async function requireConfigured(c: Context, provider: ProviderId): Promise<Resp
 	const row = await getIntegrationRow(provider)
 	return Result.isError(row) ? sendResult(c, row) : null
 }
+
+/**
+ * Route gate for `requireConfigured`: registered after the validators, so a
+ * 400 for a bad param or query still wins over the 404.
+ */
+const requireConfiguredMiddleware: MiddlewareHandler = createMiddleware(async (c, next) => {
+	const missing = await requireConfigured(c, c.req.param('provider') as ProviderId)
+	if (missing) {
+		return missing
+	}
+	await next()
+})
 
 const EXTERNAL_TENANTS_GLOBAL = 'Forbidden: tenant-scoped users cannot list external tenants'
 
@@ -139,6 +153,49 @@ async function checkExternalWrite(
 	}
 	const ids = Array.isArray(externalTenantIds) ? externalTenantIds : [externalTenantIds]
 	return (await scopeCompany(provider, scope, ids)) === null ? forbidden(c) : null
+}
+
+/** External employee writable by the requester, or the 404/403 response. */
+async function loadExternalEmployee(
+	c: Context,
+	provider: ProviderId,
+	externalId: string,
+): Promise<ExternalEmployee | Response> {
+	const external = await readEmployee(provider, externalId)
+	if (!external) {
+		return notFound(c, 'External employee not found')
+	}
+	return (await checkExternalWrite(c, provider, external.external_tenant_ids)) ?? external
+}
+
+/** External device writable by the requester, or the 404/403 response. */
+async function loadExternalDevice(
+	c: Context,
+	provider: ProviderId,
+	externalId: string,
+): Promise<ExternalDevice | Response> {
+	const external = await readDevice(provider, externalId)
+	if (!external) {
+		return notFound(c, 'External device not found')
+	}
+	return (await checkExternalWrite(c, provider, external.external_tenant_id)) ?? external
+}
+
+/**
+ * Company linked to the tenant of a conex device or employee, after the
+ * write gate; 400 while the tenant is not linked, else the 403 response.
+ */
+async function loadTenantCompany(
+	c: Context,
+	provider: ProviderId,
+	entityType: 'device' | 'employee',
+	tenant: number | null,
+): Promise<string | Response> {
+	const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
+	if (!tenantLink) {
+		return jsonError(c, `The ${entityType}'s tenant is not linked yet`, 400)
+	}
+	return (await checkExternalWrite(c, provider, tenantLink.external_id)) ?? tenantLink.external_id
 }
 
 /** First company among `externalTenantIds` linked to one of the `tenantIds`, null for none. */
@@ -349,12 +406,9 @@ export const integrationsApp = new Hono()
 		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', IntegrationReportQuerySchema, onValidationError),
+		requireConfiguredMiddleware,
 		async (c) => {
 			const { provider } = c.req.valid('param')
-			const missing = await requireConfigured(c, provider)
-			if (missing) {
-				return missing
-			}
 			const query = c.req.valid('query')
 			const filter = await listTenantScope(c, query.tenant, query.tenant_group)
 			if (filter instanceof Response) {
@@ -372,12 +426,9 @@ export const integrationsApp = new Hono()
 		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('query', LinkBoardQuerySchema, onValidationError),
+		requireConfiguredMiddleware,
 		async (c) => {
 			const { provider } = c.req.valid('param')
-			const missing = await requireConfigured(c, provider)
-			if (missing) {
-				return missing
-			}
 			const query = c.req.valid('query')
 			if (query.entity_type === 'tenant') {
 				// Lists every external company: global users only.
@@ -404,12 +455,9 @@ export const integrationsApp = new Hono()
 		'/:provider/tenant-status/:id',
 		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
+		requireConfiguredMiddleware,
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
-			const missing = await requireConfigured(c, provider)
-			if (missing) {
-				return missing
-			}
 			return (await checkTenantRow(c, id)) ?? c.json(await tenantStatus(provider, id))
 		},
 	)
@@ -417,12 +465,9 @@ export const integrationsApp = new Hono()
 		'/:provider/device-status/:id',
 		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
+		requireConfiguredMiddleware,
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
-			const missing = await requireConfigured(c, provider)
-			if (missing) {
-				return missing
-			}
 			const tenant = await loadDeviceTenant(c, id)
 			if (tenant instanceof Response) {
 				return tenant
@@ -434,12 +479,9 @@ export const integrationsApp = new Hono()
 		'/:provider/employee-status/:id',
 		requirePermissionMiddleware('view'),
 		vValidator('param', IntegrationEntityParamsSchema, onValidationError),
+		requireConfiguredMiddleware,
 		async (c) => {
 			const { provider, id } = c.req.valid('param')
-			const missing = await requireConfigured(c, provider)
-			if (missing) {
-				return missing
-			}
 			const tenant = await loadEmployeeTenant(c, id)
 			if (tenant instanceof Response) {
 				return tenant
@@ -484,17 +526,9 @@ export const integrationsApp = new Hono()
 				if (tenant instanceof Response) {
 					return tenant
 				}
-				const external = await readEmployee(provider, input.external_id)
-				if (!external) {
-					return notFound(c, 'External employee not found')
-				}
-				const externalDenied = await checkExternalWrite(
-					c,
-					provider,
-					external.external_tenant_ids,
-				)
-				if (externalDenied) {
-					return externalDenied
+				const external = await loadExternalEmployee(c, provider, input.external_id)
+				if (external instanceof Response) {
+					return external
 				}
 				const company =
 					(await scopeCompany(provider, [tenant], external.external_tenant_ids)) ??
@@ -511,17 +545,9 @@ export const integrationsApp = new Hono()
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			const external = await readDevice(provider, input.external_id)
-			if (!external) {
-				return notFound(c, 'External device not found')
-			}
-			const externalDenied = await checkExternalWrite(
-				c,
-				provider,
-				external.external_tenant_id,
-			)
-			if (externalDenied) {
-				return externalDenied
+			const external = await loadExternalDevice(c, provider, input.external_id)
+			if (external instanceof Response) {
+				return external
 			}
 			const res = await setLink(
 				provider,
@@ -563,17 +589,9 @@ export const integrationsApp = new Hono()
 				return denied
 			}
 			if (input.entity_type === 'employee') {
-				const external = await readEmployee(provider, input.external_id)
-				if (!external) {
-					return notFound(c, 'External employee not found')
-				}
-				const externalDenied = await checkExternalWrite(
-					c,
-					provider,
-					external.external_tenant_ids,
-				)
-				if (externalDenied) {
-					return externalDenied
+				const external = await loadExternalEmployee(c, provider, input.external_id)
+				if (external instanceof Response) {
+					return external
 				}
 				// Filed under a company of the scoped user, so they can restore it.
 				const scope = requestScope(c)
@@ -591,17 +609,9 @@ export const integrationsApp = new Hono()
 				)
 				return sendResult(c, res.map(linkJson))
 			}
-			const external = await readDevice(provider, input.external_id)
-			if (!external) {
-				return notFound(c, 'External device not found')
-			}
-			const externalDenied = await checkExternalWrite(
-				c,
-				provider,
-				external.external_tenant_id,
-			)
-			if (externalDenied) {
-				return externalDenied
+			const external = await loadExternalDevice(c, provider, input.external_id)
+			if (external instanceof Response) {
+				return external
 			}
 			const res = await ignoreExternal(
 				provider,
@@ -632,19 +642,15 @@ export const integrationsApp = new Hono()
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
-			if (!tenantLink) {
-				return jsonError(c, `The ${input.entity_type}'s tenant is not linked yet`, 400)
-			}
-			const externalDenied = await checkExternalWrite(c, provider, tenantLink.external_id)
-			if (externalDenied) {
-				return externalDenied
+			const company = await loadTenantCompany(c, provider, input.entity_type, tenant)
+			if (company instanceof Response) {
+				return company
 			}
 			const res = await ignoreLocal(
 				provider,
 				input.entity_type,
 				input.entity_id,
-				tenantLink.external_id,
+				company,
 				userId,
 			)
 			return sendResult(c, res.map(linkJson))
@@ -665,13 +671,9 @@ export const integrationsApp = new Hono()
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
-			if (!tenantLink) {
-				return jsonError(c, "The device's tenant is not linked yet", 400)
-			}
-			const externalDenied = await checkExternalWrite(c, provider, tenantLink.external_id)
-			if (externalDenied) {
-				return externalDenied
+			const company = await loadTenantCompany(c, provider, 'device', tenant)
+			if (company instanceof Response) {
+				return company
 			}
 			return sendCreated(
 				c,
@@ -716,17 +718,9 @@ export const integrationsApp = new Hono()
 			if (denied) {
 				return denied
 			}
-			const external = await readEmployee(provider, external_id)
-			if (!external) {
-				return notFound(c, 'External employee not found')
-			}
-			const externalDenied = await checkExternalWrite(
-				c,
-				provider,
-				external.external_tenant_ids,
-			)
-			if (externalDenied) {
-				return externalDenied
+			const external = await loadExternalEmployee(c, provider, external_id)
+			if (external instanceof Response) {
+				return external
 			}
 			return sendResult(c, await deactivateExternalEmployee(provider, external_id))
 		},

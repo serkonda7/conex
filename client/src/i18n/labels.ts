@@ -259,17 +259,6 @@ export function deviceTypeUpdateFieldLabel(value: string): string {
 	return lookup(DEVICE_TYPE_UPDATE_FIELD_KEYS, value)
 }
 
-const CABLE_STATUS_KEYS: Record<string, MessageKey> = {
-	connected: 'cableStatus.connected',
-	planned: 'cableStatus.planned',
-	decommissioned: 'cableStatus.decommissioned',
-}
-
-/** Cable status (`connected` / `planned` / `decommissioned`). */
-export function cableStatusLabel(value: string): string {
-	return lookup(CABLE_STATUS_KEYS, value)
-}
-
 const DEVICE_STATUS_KEYS: Record<string, MessageKey> = {
 	active: 'deviceStatus.active',
 	inactive: 'deviceStatus.inactive',
@@ -447,7 +436,7 @@ export function deviceRoleLabel(
 }
 
 /** Device role icon (`server`, `access-point`, …). */
-export function deviceRoleIconLabel(value: string): string {
+function deviceRoleIconLabel(value: string): string {
 	return lookup(DEVICE_ROLE_ICON_KEYS, value)
 }
 

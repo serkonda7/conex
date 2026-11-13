@@ -111,12 +111,12 @@ import {
 	markerTitle,
 	percent,
 	pixelDistance,
-	type StageZoom,
 } from './floorplan_stage'
 import { TextField } from './form'
 import { IconLabel } from './icon_label'
 import { Modal } from './modal'
 import { ObjectSearch } from './object_selector'
+import type { StageZoom } from './zoom_viewport'
 
 type Point = [number, number]
 
@@ -402,11 +402,11 @@ function ScaleDistanceDialog(props: {
 					autofocus
 				/>
 				<div class="modal-actions">
-					<button type="button" onClick={props.on_close}>
-						{t('common.cancel')}
-					</button>
 					<button type="submit" disabled={!valid()}>
 						{t('common.save')}
+					</button>
+					<button type="button" onClick={props.on_close}>
+						{t('common.cancel')}
 					</button>
 				</div>
 			</form>
@@ -1480,15 +1480,15 @@ export function FloorplanEditor(props: {
 									<IconArrowForwardUp size={16} />
 								</button>
 							</div>
-							<button type="button" onClick={onCancel} disabled={save.pending()}>
-								{t('common.cancel')}
-							</button>
 							<button
 								type="submit"
 								onClick={() => void onSave()}
 								disabled={save.pending() || !dirty()}
 							>
 								{save.pending() ? t('common.saving') : t('common.save')}
+							</button>
+							<button type="button" onClick={onCancel} disabled={save.pending()}>
+								{t('common.cancel')}
 							</button>
 						</div>
 					</Portal>

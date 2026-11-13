@@ -17,9 +17,15 @@ import {
 } from '../../components/list_page'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
-import { formFactorLabel, formFactorOptions } from '../../i18n/labels'
+import { formFactorOptions } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
+import {
+	rackTypeFormFactorColumn,
+	rackTypeHeightColumn,
+	rackTypeModelColumn,
+	rackTypeRacksColumn,
+} from './columns'
 
 /**
  * /rack-types — rack-type catalog: search, sortable columns, manufacturer
@@ -60,14 +66,7 @@ export function RackTypesPage(): JSX.Element {
 	)
 
 	const columns: DataTableColumn<RackTypeListRow>[] = [
-		{
-			key: 'model',
-			label: t('common.model'),
-			sortable: true,
-			getValue: (rt: RackTypeListRow): JSX.Element => (
-				<a href={`/rack-types/${rt.id}`}>{rt.model}</a>
-			),
-		},
+		rackTypeModelColumn({ sortable: true }),
 		{
 			key: 'manufacturer',
 			label: tp('entity.manufacturer', 1),
@@ -78,23 +77,13 @@ export function RackTypesPage(): JSX.Element {
 				</a>
 			),
 		},
-		{
-			key: 'form_factor',
-			label: t('rackType.formFactor'),
-			sortable: true,
-			getValue: (rt: RackTypeListRow): string => formFactorLabel(rt.form_factor),
-		},
+		rackTypeFormFactorColumn({ sortable: true }),
 		{
 			key: 'width',
 			label: t('rackType.width'),
 			getValue: (rt: RackTypeListRow): string => `${rt.width}″`,
 		},
-		{
-			key: 'u_height',
-			sortable: true,
-			label: t('common.heightU'),
-			getValue: (rt: RackTypeListRow): string => `${rt.u_height}`,
-		},
+		rackTypeHeightColumn({ sortable: true }),
 		{
 			key: 'description',
 			sortable: true,
@@ -108,14 +97,7 @@ export function RackTypesPage(): JSX.Element {
 			class: 'cell-truncate',
 			getValue: (rt: RackTypeListRow): JSX.Element => <Markdown text={rt.comments} inline />,
 		},
-		{
-			key: 'racks',
-			sortable: true,
-			label: tp('entity.rack', 2),
-			getValue: (rt: RackTypeListRow): JSX.Element => (
-				<a href={`/racks?rack_type=${rt.id}`}>{rt.instance_count}</a>
-			),
-		},
+		rackTypeRacksColumn({ sortable: true }),
 	]
 
 	return (

@@ -8,14 +8,7 @@ import {
 } from '../../api/tenancy'
 import { CommentsField, DescriptionField, FormPage, NameField } from '../../components/form'
 import { t } from '../../i18n'
-import {
-	cleared,
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { useFormReturnRoute } from '../../lib/router'
 
 /** Tenant group create (`id` omitted) or edit form. */
@@ -42,21 +35,14 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 	})
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: (values: FormValues) =>
-				id === undefined
-					? create_tenant_group(body(values))
-					: update_tenant_group(id, cleared(body(values))),
+			body,
+			create: create_tenant_group,
+			update: update_tenant_group,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? (): void => {
-						setName('')
-					}
-				: undefined,
+			reset: () => setName(''),
 		})
 	}
 

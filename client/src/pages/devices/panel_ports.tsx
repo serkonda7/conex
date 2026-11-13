@@ -1,9 +1,10 @@
-import { IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
-import { createMemo, type JSX, Show } from 'solid-js'
+import { createComputed, createMemo, type JSX } from 'solid-js'
+import { createStore, reconcile } from 'solid-js/store'
 import type { InterfaceJson } from '../../api/devices'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { t } from '../../i18n'
+import { CableButtons } from './port_table'
 import { PortPeer } from './trace_peer'
 
 /**
@@ -22,7 +23,7 @@ interface PanelRow {
 }
 
 /** Rows of all rear ports, in creation order. */
-export function panelRowsOf(ports: InterfaceJson[]): PanelRow[] {
+function panelRowsOf(ports: InterfaceJson[]): PanelRow[] {
 	const frontBySlot = new Map<string, InterfaceJson>()
 	for (const port of ports) {
 		if (port.side === 'front' && port.rear_port_id !== null) {
@@ -57,7 +58,7 @@ export function panelRowsOf(ports: InterfaceJson[]): PanelRow[] {
 }
 
 /** A row is patched when its port is: the rear port, or the front port on a position row. */
-export function rowPatched(row: PanelRow): boolean {
+function rowPatched(row: PanelRow): boolean {
 	return row.position === null ? row.rear.patched : (row.front?.patched ?? row.rear.patched)
 }
 
@@ -81,7 +82,19 @@ export function PanelPortTable(props: {
 	rowActions?: (row: PanelRow) => JSX.Element
 	extraColumns?: DataTableColumn<PanelRow>[]
 }): JSX.Element {
-	const rows = createMemo(() => panelRowsOf(props.ports))
+	// Keep row objects (and their DOM nodes) across refreshes, so the browser
+	// retains its scroll anchor and the dialog can return focus to its button.
+	// Copy the ports: reconciliation must not mutate the query cache's objects.
+	const [storedRows, setStoredRows] = createStore<PanelRow[]>([])
+	createComputed(() => {
+		const next = panelRowsOf(props.ports).map((row) => ({
+			...row,
+			rear: { ...row.rear },
+			front: row.front ? { ...row.front } : null,
+		}))
+		setStoredRows(reconcile(next, { key: 'key' }))
+	})
+	const rows = createMemo(() => [...storedRows])
 
 	const portCell = (iface: InterfaceJson | null): JSX.Element => {
 		if (!iface) {
@@ -91,30 +104,13 @@ export function PanelPortTable(props: {
 			<span class="panel-port-cell">
 				<span>{iface.name}</span>
 				<PortPeer link={props.links.get(iface.id)} endToEnd={props.endToEnd(iface.id)} />
-				<Show when={props.onConnect && iface.patched && !iface.connected}>
-					<button
-						type="button"
-						class="icon-btn icon-btn-connect"
-						title={t('device.connectToPeer', { name: iface.name })}
-						aria-label={t('device.connectCableFor', { name: iface.name })}
-						onClick={(): void => props.onConnect?.(iface)}
-					>
-						<IconLinkPlus size={20} />
-					</button>
-				</Show>
-				<Show when={props.onDisconnect ? props.links.get(iface.id) : undefined}>
-					{(link: () => TraceLink): JSX.Element => (
-						<button
-							type="button"
-							class="icon-btn icon-btn-danger icon-btn-disconnect"
-							title={t('device.disconnectPort', { name: iface.name })}
-							aria-label={t('device.disconnectPort', { name: iface.name })}
-							onClick={(): void => props.onDisconnect?.(link())}
-						>
-							<IconUnlink size={20} />
-						</button>
-					)}
-				</Show>
+				<CableButtons
+					iface={iface}
+					link={props.links.get(iface.id)}
+					connectable={iface.patched && !iface.connected}
+					onConnect={props.onConnect}
+					onDisconnect={props.onDisconnect}
+				/>
 			</span>
 		)
 	}

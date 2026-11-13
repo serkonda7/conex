@@ -30,10 +30,10 @@ import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Field, Hint, TextField, ToggleField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
-import { syncStateLabel } from '../../i18n/labels'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import { usePageMeta } from '../../lib/router'
-import { formatTime } from '../../lib/time'
+import { type TestResult, TestResultLine } from './form_fields'
+import { RunStateLine } from './run_state'
 
 /** Credentials, schedule and the connection test. */
 function SettingsForm(props: {
@@ -49,7 +49,7 @@ function SettingsForm(props: {
 	const [testMailbox, setTestMailbox] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
 	const [testing, setTesting] = createSignal(false)
-	const [testResult, setTestResult] = createSignal<{ ok: boolean; message: string } | null>(null)
+	const [testResult, setTestResult] = createSignal<TestResult | null>(null)
 	const action = useAction(setError)
 
 	const credentials = (): {
@@ -174,16 +174,7 @@ function SettingsForm(props: {
 						{testing() ? t('integration.testing') : t('integration.test')}
 					</button>
 				</div>
-				<Show when={testResult()}>
-					{(result: () => { ok: boolean; message: string }) => (
-						<p
-							class={result().ok ? 'text-success' : 'text-danger'}
-							role={result().ok ? 'status' : 'alert'}
-						>
-							{result().message}
-						</p>
-					)}
-				</Show>
+				<TestResultLine result={testResult()} />
 			</Field>
 			<InlineError message={error()} />
 			<div class="form-actions">
@@ -364,16 +355,7 @@ function SyncState(props: {
 function LastRun(props: { run: CalendarSyncRunJson }): JSX.Element {
 	return (
 		<>
-			<div>
-				{syncStateLabel(props.run.state)}
-				{' ('}
-				{formatTime(props.run.finished_at ?? props.run.started_at)}
-				{')'}
-				<Show when={props.run.error}>
-					{' · '}
-					<span class="text-danger">{props.run.error}</span>
-				</Show>
-			</div>
+			<RunStateLine run={props.run} />
 			<Show when={props.run.state !== 'running'}>
 				<div>{t('calendarSync.counts', { ...props.run.counts })}</div>
 			</Show>

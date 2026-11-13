@@ -109,7 +109,7 @@ function remoteValue(device: ExternalDevice, field: DeviceCompareField): string 
  * Field-by-field comparison. A value missing on either side is shown but not
  * counted as a mismatch (`equal: true`).
  */
-export function compareFields(local: LocalDeviceRow, remote: ExternalDevice): FieldComparison[] {
+function compareFields(local: LocalDeviceRow, remote: ExternalDevice): FieldComparison[] {
 	return DEVICE_COMPARE_FIELDS.map((field) => {
 		const l = localValue(local, field)
 		const r = remoteValue(remote, field)

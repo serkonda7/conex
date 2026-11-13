@@ -17,11 +17,11 @@ import { type MessageKey, t, tp } from '../i18n'
 import type { IconComponent } from '../lib/icons'
 
 export type AreaLayer = 'site' | LocationType
-export type MarkerLayer = 'rack' | 'device' | 'outlet'
+type MarkerLayer = 'rack' | 'device' | 'outlet'
 export type Layer = `area-${AreaLayer}` | `marker-${MarkerLayer}`
 
 export const AREA_LAYERS: readonly AreaLayer[] = ['site', ...LOCATION_TYPES]
-export const MARKER_LAYERS: readonly MarkerLayer[] = ['rack', 'device', 'outlet']
+const MARKER_LAYERS: readonly MarkerLayer[] = ['rack', 'device', 'outlet']
 
 const MARKER_ICONS: Record<MarkerLayer, IconComponent> = {
 	rack: IconBox,
@@ -74,7 +74,7 @@ export function layerVisible(layer: Layer): boolean {
 	return !hidden().has(layer)
 }
 
-export function toggleLayer(layer: Layer): void {
+function toggleLayer(layer: Layer): void {
 	const next = new Set(hidden())
 	if (!next.delete(layer)) {
 		next.add(layer)
@@ -90,7 +90,7 @@ export function showLayer(layer: Layer): void {
 }
 
 /** Shows every layer in `layers`. */
-export function showLayers(layers: readonly Layer[]): void {
+function showLayers(layers: readonly Layer[]): void {
 	const next = new Set(hidden())
 	for (const layer of layers) {
 		next.delete(layer)
@@ -115,7 +115,7 @@ export function markerNamesVisible(): boolean {
 	return markerNames()
 }
 
-export function toggleMarkerNames(): void {
+function toggleMarkerNames(): void {
 	const next = !markerNames()
 	setMarkerNames(next)
 	try {
@@ -169,7 +169,7 @@ export function gridVisible(): boolean {
 	return grid()
 }
 
-export function toggleGrid(): void {
+function toggleGrid(): void {
 	const next = !grid()
 	setGrid(next)
 	try {
@@ -212,7 +212,7 @@ export function setGridSize(size: GridSize): void {
 }
 
 /** Layers with content on the plan, in display order, with their object counts. */
-export function presentLayers(
+function presentLayers(
 	areas: FloorplanAreaJson[],
 	placements: FloorplanPlacementJson[],
 ): { layer: Layer; count: number }[] {

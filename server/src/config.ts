@@ -6,7 +6,7 @@ import { formatValibotIssues } from './util/valibot'
 /**
  * Schema definition of config file structure and fields.
  */
-export const configSchema = v.strictObject({
+const configSchema = v.strictObject({
 	auth: v.strictObject({
 		// Backs JWT signing via HKDF-derived subkeys (see `keys.ts`).
 		appKey: v.pipe(v.string(), v.minLength(32)),

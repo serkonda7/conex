@@ -7,7 +7,7 @@ import { getDb } from './connection'
 import { type ListParams, type Page, pageRows, searchCondition, tryWrite } from './list'
 
 /** Entries older than this are dropped by the periodic session sweep. */
-export const AUDIT_RETENTION_S = 365 * 24 * 60 * 60
+const AUDIT_RETENTION_S = 365 * 24 * 60 * 60
 
 /** Caps on client-supplied text so a hostile request cannot bloat rows. */
 const MAX_TEXT = 512

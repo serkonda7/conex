@@ -156,18 +156,6 @@ export function newObjectTenantId(): number | null {
 	return sessionTenantId() ?? contextTenantId()
 }
 
-/** True when a tenant row lies inside the context (for per-page dropdowns). */
-export function inTenantContext(row: { id: number; tenant_group_id: number | null }): boolean {
-	const ctx = tenantContext()
-	if (ctx.kind === 'group') {
-		return row.tenant_group_id === ctx.id
-	}
-	if (ctx.kind === 'tenant') {
-		return row.id === ctx.id
-	}
-	return true
-}
-
 /** Rows owned by `tenant` (null: all rows). */
 export function rowsOfTenant<T extends { tenant_id: number | null }>(
 	rows: T[],

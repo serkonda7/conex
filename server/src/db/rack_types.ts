@@ -7,7 +7,6 @@ import { getDb } from './connection'
 import { ConflictError } from './errors'
 import type { ListParams, Page } from './list'
 import {
-	checkExists,
 	countWhere,
 	exists,
 	insertedId,
@@ -19,6 +18,7 @@ import {
 	tryWrite,
 } from './list'
 import { checkRackHeight, getRackType, type RackTypeRow } from './racks'
+import { checkManufacturerExists, manufacturerSearchCondition } from './templates'
 
 export { getRackType, type RackTypeRow }
 
@@ -43,13 +43,7 @@ export async function listRackTypes(params: RackTypeListParams): Promise<Page<Ra
 		params.search
 			? or(
 					searchCondition(params.search, [rack_types.model, rack_types.description]),
-					inArray(
-						rack_types.manufacturer_id,
-						getDb()
-							.select({ id: manufacturers.id })
-							.from(manufacturers)
-							.where(searchCondition(params.search, [manufacturers.name])),
-					),
+					manufacturerSearchCondition(rack_types.manufacturer_id, params.search),
 				)
 			: undefined,
 		params.manufacturer ? inArray(rack_types.manufacturer_id, params.manufacturer) : undefined,
@@ -72,10 +66,6 @@ export async function listRackTypes(params: RackTypeListParams): Promise<Page<Ra
 		params,
 		{ instance_count: instanceCount },
 	)
-}
-
-function checkManufacturerExists(id: number | undefined): Promise<Result<undefined, Error>> {
-	return checkExists(manufacturers, id, 'Manufacturer not found')
 }
 
 export async function createRackType(input: RackTypeCreate): Promise<Result<RackTypeRow, Error>> {

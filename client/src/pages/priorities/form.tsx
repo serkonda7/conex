@@ -17,13 +17,7 @@ import {
 } from '../../components/form'
 import { PriorityPill } from '../../components/priority_pill'
 import { t } from '../../i18n'
-import {
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { queryParam, useFormReturnRoute } from '../../lib/router'
 
 /** Priority create (`id` omitted) or edit form. */
@@ -55,32 +49,24 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
 		const rankValue = Number(rank())
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
 			validate: () =>
 				Number.isInteger(rankValue) && rankValue >= 1 && rankValue <= 99
 					? null
 					: t('priority.rankInvalid'),
-			save: ({ name: trimmed }: FormValues) =>
-				id === undefined
-					? create_priority({
-							name: trimmed,
-							rank: rankValue,
-							color: color(),
-							description: text(description()),
-						})
-					: update_priority(id, {
-							name: trimmed,
-							rank: rankValue,
-							color: color(),
-							description: text(description()) ?? null,
-						}),
+			body: (values: FormValues) => ({
+				name: values.name,
+				rank: rankValue,
+				color: color(),
+				description: text(description()),
+			}),
+			create: create_priority,
+			update: update_priority,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e) ? reset : undefined,
+			reset,
 		})
 	}
 

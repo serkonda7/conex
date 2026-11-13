@@ -16,13 +16,11 @@ import {
 	FormSection,
 	Hint,
 	NameField,
-	row_options,
 	SelectField,
-	ToggleField,
+	TenantSelectField,
 } from '../../components/form'
 import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
-import { deviceStatusLabel } from '../../i18n/labels'
 import {
 	type FormValues,
 	id_value,
@@ -35,6 +33,7 @@ import { createRecord, createRows, createSnapshot } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 import { newObjectTenantId } from '../../lib/tenant_context'
 import { deviceRoleOptions } from '../device-roles/options'
+import { DeviceStatusField } from './add'
 import { useDeviceSearch } from './device_search'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { inactiveStatusChange } from './status'
@@ -234,13 +233,10 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 			onSubmit={handleSubmit}
 		>
 			<FormSection title={tp('entity.virtualMachine', 1)}>
-				<ToggleField
+				<DeviceStatusField
 					id={`${prefix}-inactive`}
-					label={t('common.status')}
-					checked={!inactive()}
-					onChange={(isActive: boolean) => setInactive(!isActive)}
-					on_text={deviceStatusLabel('active')}
-					off_text={deviceStatusLabel('inactive')}
+					inactive={inactive()}
+					onChange={setInactive}
 				/>
 				<NameField
 					id={`${prefix}-name`}
@@ -279,13 +275,11 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					onChange={handleHostChange}
 				/>
 				<Show when={form.editing && hostId() === null}>
-					<SelectField
+					<TenantSelectField
 						id={`${prefix}-tenant`}
-						label={tp('entity.tenant', 1)}
 						value={tenantId()}
 						onChange={handleTenantChange}
-						options={row_options(tenants() ?? [])}
-						emptyLabel={t('common.noTenant')}
+						tenants={tenants()}
 					/>
 				</Show>
 			</FormSection>

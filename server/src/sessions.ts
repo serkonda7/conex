@@ -39,7 +39,7 @@ export function getSessionCookieOpts(): CookieOptions {
 
 export const SESSION_SWEEP_INTERVAL_MS = 60 * 60 * 1000
 
-export async function createSession(userId: number): Promise<string> {
+async function createSession(userId: number): Promise<string> {
 	// Opaque v7 token (not an entity id): time-ordered, so recent sessions
 	// sort without a secondary index.
 	const id = Bun.randomUUIDv7()

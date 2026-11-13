@@ -94,7 +94,6 @@ import {
 	tryWrite,
 } from './list'
 
-export type { ListParams, Page } from './list'
 export type TenantGroupRow = typeof tenant_groups.$inferSelect
 export type TenantRow = typeof tenants.$inferSelect
 /** A tenant with its contracted bundles, sorted by bundle name. */

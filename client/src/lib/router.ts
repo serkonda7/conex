@@ -186,9 +186,6 @@ if (typeof window !== 'undefined') {
 	})
 }
 
-/** Set when tags are created or deleted so the home view can refresh entries. */
-const [tagsChanged, setTagsChanged] = createSignal(false)
-
 /** Per-tab scroll positions, indexed like the tab's history entries. */
 const scrollByTab = new Map<number, number[]>()
 
@@ -722,4 +719,4 @@ export function parseId(raw: string | null | undefined): number | null {
 	return Number.isInteger(id) && id >= 1 ? id : null
 }
 
-export { activeTabId, setTagsChanged, tabs, tagsChanged }
+export { activeTabId, tabs }

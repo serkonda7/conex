@@ -1,4 +1,4 @@
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import type { RackRow } from '../../api/racks'
 import { fetch_racks } from '../../api/racks'
 import { delete_rack_type, fetch_manufacturer, fetch_rack_type } from '../../api/templates'
@@ -7,12 +7,12 @@ import {
 	DetailHeader,
 	DetailShell,
 	DetailSubtitle,
-	ForeignKeyLink,
+	RecordLink,
 	RelatedSection,
+	SpecSheetComments,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
 import { formFactorLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
@@ -63,11 +63,10 @@ export function RackTypeDetailPage(props: { id: number }): JSX.Element {
 						<dl>
 							<dt>{tp('entity.manufacturer', 1)}</dt>
 							<dd>
-								<ForeignKeyLink
+								<RecordLink
 									id={manufacturerId()}
-									loading={manufacturer.loading}
-									name={manufacturer()?.name}
-									href={`/manufacturers/${manufacturerId() ?? ''}`}
+									record={manufacturer}
+									base="/manufacturers"
 								/>
 							</dd>
 						</dl>
@@ -83,12 +82,7 @@ export function RackTypeDetailPage(props: { id: number }): JSX.Element {
 							<dd>{rackType()?.u_height}</dd>
 						</dl>
 					</section>
-					<Show when={rackType()?.comments}>
-						<section class="spec-sheet-notes">
-							<h4>{t('common.comments')}</h4>
-							<Markdown text={rackType()?.comments} />
-						</section>
-					</Show>
+					<SpecSheetComments text={rackType()?.comments} />
 				</section>
 			</DetailShell>
 

@@ -18,13 +18,7 @@ import {
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { formFactorOptions } from '../../i18n/labels'
-import {
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 
@@ -79,34 +73,23 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: model(),
 			nameError: t('deviceType.modelRequired'),
 			validate,
-			save: (values: FormValues) => {
-				const body = {
-					manufacturer_id: Number(manufacturerId()),
-					model: values.name,
-					form_factor: formFactor() as RackFormFactor,
-					u_height: Number(height()),
-				}
-				return id === undefined
-					? create_rack_type({
-							...body,
-							description: text(description()),
-							comments: text(comments()),
-						})
-					: update_rack_type(id, {
-							...body,
-							description: text(description()) ?? null,
-							comments: text(comments()) ?? null,
-						})
-			},
+			body: (values: FormValues) => ({
+				manufacturer_id: Number(manufacturerId()),
+				model: values.name,
+				form_factor: formFactor() as RackFormFactor,
+				u_height: Number(height()),
+				description: text(description()),
+				comments: text(comments()),
+			}),
+			create: create_rack_type,
+			update: update_rack_type,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e) ? resetForNext : undefined,
+			reset: resetForNext,
 		})
 	}
 

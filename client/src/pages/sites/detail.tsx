@@ -1,4 +1,3 @@
-import { primaryEmail } from 'shared/src/schemas'
 import { createMemo, createSignal, type JSX, Show } from 'solid-js'
 import type { AttachmentJson } from '../../api/attachments'
 import { fetch_device_roles } from '../../api/device_roles'
@@ -42,11 +41,9 @@ import { locationTypeIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { siteGroupTrail } from '../../lib/trails'
-import { deviceListHref } from '../devices/list'
-import { EmailLink } from '../employees/list'
 import { LocationTreeName } from '../locations/list'
 import { rackHeightColumn } from '../racks/columns'
-import { roleColumn, vmHost } from '../tenants/detail'
+import { relatedEmployeeColumns, roleColumn, vmHost, vmNameColumn } from '../tenants/detail'
 
 /** The flat location list in tree preorder (siblings by name), with depths. */
 function treeOrder(rows: readonly LocationRow[]): { row: LocationRow; depth: number }[] {
@@ -174,27 +171,9 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 			),
 		},
 	]
-	const employeeColumns: DataTableColumn<EmployeeRow>[] = [
-		nameColumn<EmployeeRow>(t('common.name'), '/employees'),
-		{
-			key: 'title',
-			label: t('employee.title'),
-			getValue: (e: EmployeeRow): string => e.title ?? '—',
-		},
-		{
-			key: 'email',
-			label: t('employee.email'),
-			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={primaryEmail(e.emails)} />,
-		},
-	]
+	const employeeColumns = relatedEmployeeColumns()
 	const vmColumns: DataTableColumn<DeviceListItem>[] = [
-		{
-			key: 'name',
-			label: t('common.name'),
-			getValue: (vm: DeviceListItem): JSX.Element => (
-				<a href={deviceListHref(vm)}>{vm.name}</a>
-			),
-		},
+		vmNameColumn(),
 		roleColumn<DeviceListItem>(roleName),
 		{ key: 'host', label: t('vm.host'), getValue: vmHost },
 	]

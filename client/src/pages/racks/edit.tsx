@@ -7,8 +7,8 @@ import {
 	FormPage,
 	NameField,
 	ReadOnlyField,
-	row_options,
 	SelectField,
+	TenantSelectField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
@@ -119,13 +119,11 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 				options={rackTypes.options()}
 				required
 			/>
-			<SelectField
+			<TenantSelectField
 				id="rack-edit-tenant"
-				label={tp('entity.tenant', 1)}
 				value={tenantId()}
 				onChange={setTenantId}
-				options={row_options(tenants() ?? [])}
-				emptyLabel={t('common.noTenant')}
+				tenants={tenants()}
 			/>
 		</FormPage>
 	)

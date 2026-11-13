@@ -1,4 +1,4 @@
-import { IconInfoCircle, IconLinkPlus, IconLock, IconUnlink } from '@tabler/icons-solidjs'
+import { IconLinkPlus, IconLock, IconUnlink } from '@tabler/icons-solidjs'
 import type { InterfaceUpdate, TraceEndToEnd, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'
@@ -308,14 +308,14 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 					</p>
 					<div class="panel-row-footer">
 						<div class="modal-actions">
+							<button type="submit" disabled={!valid() || !dirty() || save.pending()}>
+								{t('common.save')}
+							</button>
 							<button
 								type="button"
 								onClick={() => confirmDiscard(dirty()) && props.on_close()}
 							>
 								{t('common.cancel')}
-							</button>
-							<button type="submit" disabled={!valid() || !dirty() || save.pending()}>
-								{t('common.save')}
 							</button>
 						</div>
 					</div>

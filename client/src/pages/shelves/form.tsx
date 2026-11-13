@@ -19,7 +19,7 @@ import {
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { faceOptions } from '../../i18n/labels'
-import { is_add_another_submit, submit_form, useEntityForm } from '../../lib/form'
+import { submit_entity_form, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { type Crumb, navigate, parseId, queryParam } from '../../lib/router'
 import { queryFace } from '../devices/add'
@@ -98,26 +98,26 @@ function ShelfForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		const body = {
-			name: name().trim() || null,
-			rack_id: Number(rackId()),
-			face: face() as DeviceFace,
-			position_u: Number(positionU()),
-			mount_height: count(mountHeight(), 1),
-			mount_usable: mountUsable(),
-			reserved_height: count(reservedHeight(), 0),
-			is_full_depth: fullDepth(),
-		}
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
 			optionalName: true,
 			validate,
-			save: () => (id === undefined ? create_shelf(body) : update_shelf(id, body)),
+			// No field is ever omitted, so the edit saves the same body.
+			body: () => ({
+				name: name().trim() || null,
+				rack_id: Number(rackId()),
+				face: face() as DeviceFace,
+				position_u: Number(positionU()),
+				mount_height: count(mountHeight(), 1),
+				mount_usable: mountUsable(),
+				reserved_height: count(reservedHeight(), 0),
+				is_full_depth: fullDepth(),
+			}),
+			create: create_shelf,
+			update: update_shelf,
 			navigateTo: rackRoute(),
-			onSuccess: is_add_another_submit(e) ? () => setPositionU('') : undefined,
+			reset: () => setPositionU(''),
 		})
 	}
 

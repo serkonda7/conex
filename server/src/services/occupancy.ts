@@ -28,7 +28,7 @@ export interface OccupantSpan {
 	is_full_depth?: boolean
 }
 
-export interface ElevationUnit {
+interface ElevationUnit {
 	u: number
 	device: { id: number; name: string } | null
 }
@@ -40,12 +40,12 @@ export interface OccupancyMap {
 }
 
 /** Inclusive `[first, last]` U range of a span. */
-export function spanRange(span: Pick<OccupantSpan, 'position_u' | 'height_u'>): [number, number] {
+function spanRange(span: Pick<OccupantSpan, 'position_u' | 'height_u'>): [number, number] {
 	return [span.position_u, span.position_u + span.height_u - 1]
 }
 
 /** True when two inclusive U ranges share at least one U. */
-export function rangesOverlap(a: [number, number], b: [number, number]): boolean {
+function rangesOverlap(a: [number, number], b: [number, number]): boolean {
 	return a[0] <= b[1] && b[0] <= a[1]
 }
 

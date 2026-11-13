@@ -3,10 +3,9 @@
  * with the overlay layers on top, its zoom and pan, the marker declutter and
  * the display helpers of areas and markers.
  *
- * Zoom is view-only: the stage is scaled and shifted with a CSS transform,
- * so coordinates stay normalized (0..1) and the editor's pointer mapping
- * (`getBoundingClientRect` of the stage) keeps working. Markers, labels and
- * handles scale back by `--floorplan-inv-zoom` to keep their screen size.
+ * Zoom and pan come from `ZoomViewport`: coordinates stay normalized (0..1)
+ * and markers, labels and handles scale back by `--inv-zoom` to keep their
+ * screen size.
  *
  * A plan with a scale draws a metric grid through its origin (toggled in the
  * layer bar) and shows the pointer's position in meters. The zoom buttons,
@@ -15,8 +14,8 @@
  * Markers and area labels of the editor take a press for their own drag;
  * while zoomed in, the middle mouse button pans over them too.
  */
-import { IconBox, IconServer, IconZoomIn, IconZoomOut, IconZoomReset } from '@tabler/icons-solidjs'
-import { type Accessor, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js'
+import { IconBox, IconServer } from '@tabler/icons-solidjs'
+import { type Accessor, createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import {
 	type AttachmentJson,
@@ -39,6 +38,7 @@ import {
 	markerNamesVisible,
 	setGridSize,
 } from './floorplan_layers'
+import { MAX_ZOOM, type PlanBox, type StageZoom, ZoomViewport } from './zoom_viewport'
 
 /** Percent offset of a normalized coordinate, for `left` / `top`. */
 export function percent(value: number): string {
@@ -87,12 +87,12 @@ export function markerIcon(
 }
 
 /** Connector glyph of an outlet: RJ-45 for copper, fiber for the rest (its first port's kind). */
-export function outletIcon(port: FloorplanPortJson): IconComponent {
+function outletIcon(port: FloorplanPortJson): IconComponent {
 	return panelKindIcon(port.ports[0]?.kind ?? '8p8c')
 }
 
 /** True when an outlet is a jack of several ports. */
-export function isJack(port: FloorplanPortJson | null): boolean {
+function isJack(port: FloorplanPortJson | null): boolean {
 	return port !== null && port.ports.length > 1
 }
 
@@ -207,118 +207,6 @@ export function markerClasses(placement: FloorplanPlacementJson): Record<string,
 	}
 }
 
-/** Zoom range of the stage; 1 fits the whole plan. */
-export const MIN_ZOOM = 1
-export const MAX_ZOOM = 8
-
-/** Factor of one zoom button step. */
-const ZOOM_STEP = 1.5
-
-/** Pointer travel (px) after which a press on the stage pans instead of clicking. */
-const PAN_THRESHOLD = 4
-
-/** Normalized box on the plan. */
-export interface PlanBox {
-	x0: number
-	y0: number
-	x1: number
-	y1: number
-}
-
-/** Zoom and pan state of a stage, created by its owner so lists can focus objects. */
-export interface StageZoom {
-	scale: Accessor<number>
-	/** Translation of the scaled stage in the viewport, px. */
-	offset: Accessor<{ x: number; y: number }>
-	/** Unscaled layout size of the stage, px. */
-	size: Accessor<{ width: number; height: number }>
-	/** Zooms by `factor` keeping viewport point (`px`, `py`) in place; the center without one. */
-	zoomBy: (factor: number, px?: number, py?: number) => void
-	panBy: (dx: number, dy: number) => void
-	reset: () => void
-	/** Zooms to fit `box` (at least `minScale`) and centers it. */
-	focus: (box: PlanBox, minScale?: number) => void
-	/** Normalized center of the visible part of the plan. */
-	viewCenter: () => [number, number]
-	/** Measures the stage; called by `FloorplanStage`. */
-	setSize: (width: number, height: number) => void
-}
-
-function clampZoom(value: number): number {
-	return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
-}
-
-export function createStageZoom(): StageZoom {
-	const [scale, setScale] = createSignal(1)
-	const [offset, setOffset] = createSignal({ x: 0, y: 0 })
-	const [size, setSizeSignal] = createSignal({ width: 0, height: 0 })
-
-	/** Keeps the scaled stage covering the viewport. */
-	function place(nextScale: number, x: number, y: number): void {
-		const { width, height } = size()
-		setScale(nextScale)
-		setOffset({
-			x: Math.min(0, Math.max(width - width * nextScale, x)),
-			y: Math.min(0, Math.max(height - height * nextScale, y)),
-		})
-	}
-
-	const zoom: StageZoom = {
-		scale,
-		offset,
-		size,
-		zoomBy(factor: number, px?: number, py?: number): void {
-			const { width, height } = size()
-			const [cx, cy] = [px ?? width / 2, py ?? height / 2]
-			const next = clampZoom(scale() * factor)
-			const ratio = next / scale()
-			place(next, cx - (cx - offset().x) * ratio, cy - (cy - offset().y) * ratio)
-		},
-		panBy(dx: number, dy: number): void {
-			place(scale(), offset().x + dx, offset().y + dy)
-		},
-		reset(): void {
-			place(1, 0, 0)
-		},
-		focus(box: PlanBox, minScale = 1): void {
-			const { width, height } = size()
-			const fit = Math.min(
-				0.6 / Math.max(box.x1 - box.x0, 1e-3),
-				0.6 / Math.max(box.y1 - box.y0, 1e-3),
-			)
-			const next = clampZoom(Math.max(minScale, Math.min(fit, MAX_ZOOM)))
-			const cx = ((box.x0 + box.x1) / 2) * width * next
-			const cy = ((box.y0 + box.y1) / 2) * height * next
-			place(next, width / 2 - cx, height / 2 - cy)
-		},
-		viewCenter(): [number, number] {
-			const { width, height } = size()
-			if (width === 0 || height === 0) {
-				return [0.5, 0.5]
-			}
-			return [
-				(width / 2 - offset().x) / (width * scale()),
-				(height / 2 - offset().y) / (height * scale()),
-			]
-		},
-		setSize(width: number, height: number): void {
-			// A hidden stage (its in-app tab in the background) measures 0 × 0;
-			// keep the last size so zoom and pan come back unchanged.
-			if (width === 0 || height === 0) {
-				return
-			}
-			const before = size()
-			setSizeSignal({ width, height })
-			if (before.width > 0 && before.width !== width) {
-				// Keep the same part of the plan in view when the layout resizes.
-				const ratio = width / before.width
-				place(scale(), offset().x * ratio, offset().y * ratio)
-			}
-		},
-	}
-	return zoom
-}
-
 /** Bounding box of an area. */
 export function areaBox(area: Pick<FloorplanAreaJson, 'points'>): PlanBox {
 	const xs = area.points.map((point) => point[0])
@@ -430,12 +318,12 @@ export function pixelDistance(image: ImageSize, a: [number, number], b: [number,
 }
 
 /** Meters per image pixel of a scale. */
-export function metersPerPixel(image: ImageSize, scale: FloorplanScale): number {
+function metersPerPixel(image: ImageSize, scale: FloorplanScale): number {
 	return scale.centimeters / 100 / pixelDistance(image, scale.a, scale.b)
 }
 
 /** Position of a normalized point in meters from the origin (top left without one), y up. */
-export function planMeters(
+function planMeters(
 	image: ImageSize,
 	calibration: PlanCalibration & { scale: FloorplanScale },
 	point: [number, number],
@@ -446,7 +334,7 @@ export function planMeters(
 }
 
 /** A length in meters for display, with up to two decimals. */
-export function formatMeters(value: number): string {
+function formatMeters(value: number): string {
 	return t('floorplan.meters', {
 		value: new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(value),
 	})
@@ -557,44 +445,6 @@ function PointerReadout(props: { pointer: [number, number] | null }): JSX.Elemen
 	)
 }
 
-/** Zoom in / out / fit buttons below the stage. */
-function ZoomControls(props: { zoom: StageZoom }): JSX.Element {
-	return (
-		<div class="floorplan-zoom-controls" title={t('floorplan.zoomHint')}>
-			<button
-				type="button"
-				class="floorplan-zoom-button"
-				aria-label={t('floorplan.zoomIn')}
-				title={t('floorplan.zoomIn')}
-				disabled={props.zoom.scale() >= MAX_ZOOM}
-				onClick={() => props.zoom.zoomBy(ZOOM_STEP)}
-			>
-				<IconZoomIn size={16} />
-			</button>
-			<button
-				type="button"
-				class="floorplan-zoom-button"
-				aria-label={t('floorplan.zoomOut')}
-				title={t('floorplan.zoomOut')}
-				disabled={props.zoom.scale() <= MIN_ZOOM}
-				onClick={() => props.zoom.zoomBy(1 / ZOOM_STEP)}
-			>
-				<IconZoomOut size={16} />
-			</button>
-			<button
-				type="button"
-				class="floorplan-zoom-button"
-				aria-label={t('floorplan.zoomReset')}
-				title={t('floorplan.zoomReset')}
-				disabled={props.zoom.scale() <= MIN_ZOOM}
-				onClick={() => props.zoom.reset()}
-			>
-				<IconZoomReset size={16} />
-			</button>
-		</div>
-	)
-}
-
 /**
  * The image capped at 60vh high with the overlay layers (`children`) on
  * top, in a viewport that zooms (buttons, Ctrl + wheel, pinch) and pans (drag
@@ -612,16 +462,9 @@ export function FloorplanStage(props: {
 	/** Scale and origin; with a scale the stage draws the grid and measures the pointer. */
 	calibration?: PlanCalibration
 }): JSX.Element {
-	let viewport!: HTMLDivElement
 	let stage!: HTMLDivElement
-	/** Active pointers on the viewport, for pan and pinch. */
-	const pointers = new Map<number, { x: number; y: number }>()
-	let travelled = 0
 	/** Pointer position over the plan in meters, while there is a scale. */
 	const [pointer, setPointer] = createSignal<[number, number] | null>(null)
-	/** A middle-button pan is in progress. */
-	const [forcedPan, setForcedPan] = createSignal(false)
-	const zoomed = (): boolean => props.zoom.scale() > MIN_ZOOM
 	const scaled = (): (PlanCalibration & { scale: FloorplanScale }) | undefined => {
 		const calibration = props.calibration
 		return calibration?.scale ? { ...calibration, scale: calibration.scale } : undefined
@@ -643,181 +486,50 @@ export function FloorplanStage(props: {
 		)
 	}
 
-	const local = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
-		const box = viewport.getBoundingClientRect()
-		return { x: e.clientX - box.left, y: e.clientY - box.top }
-	}
-
-	const onWheel = (e: WheelEvent): void => {
-		// Plain wheel scrolls the page; Ctrl + wheel (and trackpad pinch) zooms.
-		if (!e.ctrlKey && !e.metaKey) {
-			return
-		}
-		e.preventDefault()
-		const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY
-		const at = local(e)
-		props.zoom.zoomBy(Math.exp(-delta * 0.002), at.x, at.y)
-	}
-
-	const onPointerDown = (e: PointerEvent): void => {
-		if ((e.target as Element).closest('.floorplan-popover')) {
-			return
-		}
-		if (e.pointerType === 'mouse' && e.button !== 0) {
-			return
-		}
-		if (pointers.size === 0) {
-			travelled = 0
-		}
-		pointers.set(e.pointerId, local(e))
-		if (props.zoom.scale() > MIN_ZOOM || pointers.size > 1) {
-			// No text selection or native link / image drag while panning.
-			e.preventDefault()
-		}
-	}
-
-	/**
-	 * Capture phase, ahead of the editor's drag handlers: a middle-button
-	 * press pans instead of reaching the marker or label below.
-	 */
-	const onPointerDownCapture = (e: PointerEvent): void => {
-		const middle = e.pointerType === 'mouse' && e.button === 1
-		if (!zoomed() || !middle) {
-			return
-		}
-		if ((e.target as Element).closest('.floorplan-popover')) {
-			return
-		}
-		e.preventDefault()
-		e.stopPropagation()
-		pointers.set(e.pointerId, local(e))
-		// Pans from the first move; the click after release is swallowed.
-		travelled = PAN_THRESHOLD
-		setForcedPan(true)
-	}
-
-	const onPointerMove = (e: PointerEvent): void => {
-		const last = pointers.get(e.pointerId)
-		if (!last) {
-			return
-		}
-		const at = local(e)
-		if (pointers.size === 2) {
-			const [other] = [...pointers.entries()].filter(([id]) => id !== e.pointerId)
-			const before = Math.hypot(last.x - other[1].x, last.y - other[1].y)
-			const after = Math.hypot(at.x - other[1].x, at.y - other[1].y)
-			if (before > 0) {
-				props.zoom.zoomBy(after / before, (at.x + other[1].x) / 2, (at.y + other[1].y) / 2)
-			}
-			travelled += PAN_THRESHOLD
-		} else if (props.zoom.scale() > MIN_ZOOM) {
-			travelled += Math.hypot(at.x - last.x, at.y - last.y)
-			if (travelled >= PAN_THRESHOLD) {
-				props.zoom.panBy(at.x - last.x, at.y - last.y)
-			}
-		}
-		pointers.set(e.pointerId, at)
-	}
-
-	const onPointerUp = (e: PointerEvent): void => {
-		pointers.delete(e.pointerId)
-		if (pointers.size === 0) {
-			setForcedPan(false)
-		}
-	}
-
-	// A press that panned does not also click the area or marker below.
-	const onClickCapture = (e: MouseEvent): void => {
-		if (travelled >= PAN_THRESHOLD) {
-			e.preventDefault()
-			e.stopPropagation()
-			travelled = 0
-		}
-	}
-
-	onMount(() => {
-		// Non-passive, so Ctrl + wheel does not also zoom the page.
-		viewport.addEventListener('wheel', onWheel, { passive: false })
-		viewport.addEventListener('click', onClickCapture, true)
-		viewport.addEventListener('pointerdown', onPointerDownCapture, true)
-		window.addEventListener('pointermove', onPointerMove)
-		window.addEventListener('pointerup', onPointerUp)
-		window.addEventListener('pointercancel', onPointerUp)
-		const observer = new ResizeObserver(() =>
-			props.zoom.setSize(stage.offsetWidth, stage.offsetHeight),
-		)
-		observer.observe(stage)
-		onCleanup(() => {
-			observer.disconnect()
-			viewport.removeEventListener('wheel', onWheel)
-			viewport.removeEventListener('click', onClickCapture, true)
-			viewport.removeEventListener('pointerdown', onPointerDownCapture, true)
-			window.removeEventListener('pointermove', onPointerMove)
-			window.removeEventListener('pointerup', onPointerUp)
-			window.removeEventListener('pointercancel', onPointerUp)
-		})
-	})
-
 	return (
-		<div class="floorplan-frame">
-			<div
-				class="floorplan-viewport"
-				classList={{ zoomed: zoomed() }}
-				ref={viewport}
-				onPointerDown={onPointerDown}
-				onPointerMove={trackPointer}
-				onPointerLeave={() => setPointer(null)}
-			>
-				<div
-					class="floorplan-stage"
-					ref={(el: HTMLDivElement) => {
-						stage = el
-						props.ref?.(el)
-					}}
-					style={{
-						transform: `translate(${props.zoom.offset().x}px, ${props.zoom.offset().y}px) scale(${props.zoom.scale()})`,
-						'--floorplan-inv-zoom': String(1 / props.zoom.scale()),
-					}}
-					{...props.handlers}
-				>
-					<img
-						src={attachment_file_url(props.attachment)}
-						alt={t('floorplan.image', {
-							name: props.attachment.description || props.attachment.filename,
-						})}
-						width={props.attachment.width_px}
-						height={props.attachment.height_px}
-						draggable={false}
-					/>
-					<Show when={gridVisible() && scaled()}>
-						{(calibration: Accessor<PlanCalibration & { scale: FloorplanScale }>) => (
-							<GridLayer attachment={props.attachment} calibration={calibration()} />
-						)}
-					</Show>
-					<Show when={props.calibration?.origin}>
-						{(origin: Accessor<[number, number]>) => (
-							<span
-								class="floorplan-origin"
-								style={{ left: percent(origin()[0]), top: percent(origin()[1]) }}
-								title={t('floorplan.origin')}
-							/>
-						)}
-					</Show>
-					{props.children}
-				</div>
-				<Show when={forcedPan()}>
-					<div class="floorplan-pan-cover" />
-				</Show>
-			</div>
-			<div class="floorplan-stage-bar">
-				<ZoomControls zoom={props.zoom} />
+		<ZoomViewport
+			class="floorplan-frame"
+			zoom={props.zoom}
+			ref={(el: HTMLDivElement) => {
+				stage = el
+				props.ref?.(el)
+			}}
+			handlers={props.handlers}
+			onPointerMove={trackPointer}
+			onPointerLeave={() => setPointer(null)}
+			bar={
 				<Show when={scaled()}>
 					<Show when={gridVisible()}>
 						<GridSizeSelect />
 					</Show>
 					<PointerReadout pointer={pointer()} />
 				</Show>
-			</div>
-		</div>
+			}
+		>
+			<img
+				src={attachment_file_url(props.attachment)}
+				alt={t('floorplan.image', {
+					name: props.attachment.description || props.attachment.filename,
+				})}
+				width={props.attachment.width_px}
+				height={props.attachment.height_px}
+				draggable={false}
+			/>
+			<Show when={gridVisible() && scaled()}>
+				{(calibration: Accessor<PlanCalibration & { scale: FloorplanScale }>) => (
+					<GridLayer attachment={props.attachment} calibration={calibration()} />
+				)}
+			</Show>
+			<Show when={props.calibration?.origin}>
+				{(origin: Accessor<[number, number]>) => (
+					<span
+						class="floorplan-origin"
+						style={{ left: percent(origin()[0]), top: percent(origin()[1]) }}
+						title={t('floorplan.origin')}
+					/>
+				)}
+			</Show>
+			{props.children}
+		</ZoomViewport>
 	)
 }
