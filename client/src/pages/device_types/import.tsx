@@ -306,15 +306,15 @@ export function DeviceTypeImportPage(): JSX.Element {
 				</Field>
 				<InlineError message={error()} alert />
 				<div class="form-actions">
+					<button type="submit" disabled={importing()}>
+						{importing() ? t('import.importing') : t('import.import')}
+					</button>
 					<button
 						type="button"
 						onClick={() => navigate('/device-types', { back: true })}
 						disabled={importing()}
 					>
 						{t('common.cancel')}
-					</button>
-					<button type="submit" disabled={importing()}>
-						{importing() ? t('import.importing') : t('import.import')}
 					</button>
 				</div>
 			</form>

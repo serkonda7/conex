@@ -141,14 +141,14 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 						</div>
 					</div>
 					<div class="modal-actions">
+						<button type="submit" disabled={!name().trim() || save.pending()}>
+							{t('common.save')}
+						</button>
 						<button
 							type="button"
 							onClick={() => confirmDiscard(dirty()) && props.on_close()}
 						>
 							{t('common.cancel')}
-						</button>
-						<button type="submit" disabled={!name().trim() || save.pending()}>
-							{t('common.save')}
 						</button>
 					</div>
 				</form>

@@ -385,13 +385,6 @@ function CreateActions(props: {
 	const disabled = (): boolean => props.saving || props.blocked === true
 	return (
 		<div class="form-actions">
-			<button
-				type="button"
-				onClick={() => navigate(props.cancelTo, { back: true })}
-				disabled={props.saving}
-			>
-				{t('common.cancel')}
-			</button>
 			<div class="btn-group">
 				<button type="submit" name="action" value="create" disabled={disabled()}>
 					{props.saving ? t('common.creating') : t('common.create')}
@@ -408,6 +401,13 @@ function CreateActions(props: {
 					</button>
 				</Show>
 			</div>
+			<button
+				type="button"
+				onClick={() => navigate(props.cancelTo, { back: true })}
+				disabled={props.saving}
+			>
+				{t('common.cancel')}
+			</button>
 		</div>
 	)
 }
@@ -420,11 +420,11 @@ function EditActions(props: {
 }): JSX.Element {
 	return (
 		<div class="form-actions">
-			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
-				{t('common.cancel')}
-			</button>
 			<button type="submit" disabled={props.saving}>
 				{props.saving ? t('common.saving') : t('common.save')}
+			</button>
+			<button type="button" onClick={() => navigate(props.cancelTo)} disabled={props.saving}>
+				{t('common.cancel')}
 			</button>
 			<Show when={props.onDelete}>
 				<button

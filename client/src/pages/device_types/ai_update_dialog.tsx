@@ -260,9 +260,6 @@ export function AiUpdateDialog(props: {
 				</Show>
 				<InlineError message={error()} alert />
 				<div class="form-actions template-sync-actions">
-					<button type="button" onClick={props.on_close} disabled={busy.pending()}>
-						{t('common.cancel')}
-					</button>
 					<Show
 						when={preview()}
 						fallback={
@@ -279,6 +276,9 @@ export function AiUpdateDialog(props: {
 							</button>
 						)}
 					</Show>
+					<button type="button" onClick={props.on_close} disabled={busy.pending()}>
+						{t('common.cancel')}
+					</button>
 				</div>
 			</form>
 		</Modal>
