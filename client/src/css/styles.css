@@ -2860,6 +2860,12 @@ tbody tr:last-child td {
 	margin-left: 0;
 }
 
+.connect-actions {
+	flex: none;
+	margin-left: auto;
+	padding-top: 0;
+}
+
 .template-sync-list {
 	margin: 0;
 	padding-left: 1.1rem;
@@ -2926,50 +2932,6 @@ tbody tr:last-child td {
 	--modal-width: 40rem;
 }
 
-.connect-steps {
-	display: flex;
-	gap: 1.25rem;
-	list-style: none;
-	padding: 0 0 0.75rem;
-	margin: 0 0 0.75rem;
-	border-bottom: 1px solid var(--border);
-	font-size: var(--font-size-base);
-	color: var(--text-muted);
-}
-
-.connect-steps li {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-}
-
-.connect-steps li.active {
-	color: var(--text);
-	font-weight: 600;
-}
-
-.connect-step-num {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.35rem;
-	height: 1.35rem;
-	border-radius: 50%;
-	border: 1px solid var(--border-strong);
-	font-size: var(--font-size-sm);
-}
-
-.connect-steps li.active .connect-step-num {
-	background-color: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-contrast);
-}
-
-.connect-steps li.done .connect-step-num {
-	border-color: var(--primary);
-	color: var(--primary-text);
-}
-
 .app-content .connect-dialog form.connect-port-form {
 	flex-direction: column;
 	flex-wrap: nowrap;
@@ -2981,31 +2943,24 @@ tbody tr:last-child td {
 	flex: none;
 }
 
-.connect-peer {
+.connect-port-toolbar {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	padding: 0.5rem 0.75rem;
-	background-color: var(--bg-raised);
-	border: 1px solid var(--border);
-	border-radius: 0.35rem;
+	gap: 0.5rem;
 }
 
-.connect-peer-info {
-	display: flex;
-	flex-direction: column;
+.app-content .connect-port-toolbar .object-selector-search {
+	flex: 1;
 	min-width: 0;
 }
 
-.connect-peer-info strong {
-	overflow: hidden;
-	text-overflow: ellipsis;
+.app-content .connect-port-toolbar .connect-free-only {
 	white-space: nowrap;
 }
 
-.connect-peer-info small {
-	color: var(--text-muted);
+.app-content .connect-port-toolbar .connect-free-only[aria-pressed="true"] {
+	border-color: var(--primary);
+	background-color: var(--primary);
+	color: var(--primary-contrast);
 }
 
 .port-grid {
@@ -3090,6 +3045,10 @@ tbody tr:last-child td {
 
 .connect-summary-hint {
 	color: var(--text-muted);
+}
+
+.connect-summary-done {
+	color: var(--success);
 }
 
 .modal-actions {

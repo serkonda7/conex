@@ -14,6 +14,7 @@ export const en = {
 	'common.noTenantSelectedRequired':
 		'No tenant selected in the top bar. Select one to create this object.',
 	'common.save': 'Save',
+	'common.saveAndNext': 'Save & Next',
 	'common.saving': 'Saving…',
 	'common.close': 'Close',
 	'common.confirmDiscard': 'Discard the unsaved changes?',
@@ -917,12 +918,11 @@ export const en = {
 	'device.connect': 'Connect',
 	'device.disconnect': 'Disconnect',
 	'device.notConnected': 'Not connected',
-	'device.connectStepPort': 'Port',
-	'device.changePeerDevice': 'Change device',
+	'device.freePortsOnly': 'Free only',
+	'device.pickPeerDevice': 'Select a device to see its ports.',
 	'device.noPeerPorts': 'This device has no compatible ports.',
 	'device.filterPorts': 'Filter ports…',
-	'device.freePortsCount': '{free} of {total} free',
-	'device.pickPeerPort': 'Select a free port',
+	'device.connectNextHint': 'Save, then continue with the next port (Shift+Enter)',
 	// virtual machines
 	'vm.kind': 'Kind',
 	'vm.host': 'Host',

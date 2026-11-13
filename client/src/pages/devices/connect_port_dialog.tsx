@@ -1,3 +1,4 @@
+import { Combobox } from '@serkonda7/solid-components'
 import { Result } from 'better-result'
 import { portsCompatible } from 'shared/src/ports'
 import type { PortSide } from 'shared/src/schemas'
@@ -5,14 +6,20 @@ import type { InputEventAndTarget, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { create_cable, fetch_trace } from '../../api/cables'
-import { type DeviceRow, fetch_interfaces, type InterfaceJson } from '../../api/devices'
+import {
+	type DeviceRow,
+	fetch_devices,
+	fetch_interfaces,
+	type InterfaceJson,
+} from '../../api/devices'
+import { fetch_device_types } from '../../api/templates'
 import { Empty, InlineError, Loading } from '../../components/feedback'
+import type { FormOption } from '../../components/form'
 import { Modal } from '../../components/modal'
-import { ObjectSearch } from '../../components/object_selector'
 import { t } from '../../i18n'
 import { portKindLabel, portSideLabel } from '../../i18n/labels'
-import { useAction } from '../../lib/resource'
-import { useDeviceSearch } from './device_search'
+import { useNameOf } from '../../lib/lookup'
+import { createRows, useAction } from '../../lib/resource'
 
 /** A peer port, whether the local port can be cabled to it, and when it is taken, the cable's other end. */
 interface PortOption {
@@ -36,81 +43,123 @@ export interface ConnectPortDialogProps {
 	on_close: () => void
 }
 
+const isFree = (p: PortOption): boolean => p.compatible && p.iface.patched && !p.iface.connected
+
 /**
- * Two-step cable connect dialog: search and pick the peer device first, then
- * one of its free ports from a filterable tile grid; clicking a tile (or
- * pressing Enter on it) connects right away. Incompatible and taken ports are
- * shown disabled.
+ * Cable connect dialog on one page: a searchable device dropdown above the
+ * peer device's ports as a filterable tile grid. Clicking a tile selects it
+ * for Save; double-clicking it or pressing Enter on it saves right away.
+ * Save & next (Shift+Enter on a tile) keeps the dialog open for the next free
+ * port of the local device, with the next free peer port selected. Only free ports show unless "free only" is
+ * turned off; then incompatible and taken ports are shown disabled.
  */
 export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
-	const [peerDevice, setPeerDevice] = createSignal<DeviceRow | null>(null)
+	/** Local port the next cable starts at; advanced by connect & next. */
+	const [local, setLocal] = createSignal(props.iface)
+	/** Selected peer device id as the combobox value; `''` while none is picked. */
+	const [peerId, setPeerId] = createSignal('')
 	const [peerIface, setPeerIface] = createSignal<InterfaceJson | null>(null)
 	const [portFilter, setPortFilter] = createSignal('')
+	const [freeOnly, setFreeOnly] = createSignal(true)
+	/** Last cable created by connect & next, shown in the footer. */
+	const [lastCable, setLastCable] = createSignal<{ from: string; to: string } | null>(null)
+	const [refreshing, setRefreshing] = createSignal(false)
+	/** True once a cable was created, so closing reports the connection. */
+	let connectedAny = false
 	const [error, setError] = createSignal<string | null>(null)
 	const submit = useAction(setError)
 
 	// Existing cables from the local device, keyed by peer device, so the
-	// device search can flag already connected devices.
-	const localLinksPromise = fetch_trace(props.iface.device_id, 1).then((trace) => {
+	// device dropdown can flag already connected devices.
+	const [localLinks, { refetch: refetchLocalLinks }] = createResource(async () => {
+		const trace = await fetch_trace(props.iface.device_id, 1)
 		const byPeer = new Map<number, TraceLink[]>()
 		for (const link of Result.isError(trace) ? [] : trace.value.links) {
 			byPeer.set(link.peer_device.id, [...(byPeer.get(link.peer_device.id) ?? []), link])
 		}
 		return byPeer
 	})
-	const [localLinks] = createResource(() => localLinksPromise)
-	// Only devices with a port the local one can be cabled to.
-	const deviceSearch = useDeviceSearch(
-		(device: DeviceRow) => {
-			const links = localLinks()?.get(device.id)
-			return links
+	// The local device's ports, in order, to find the next one to connect.
+	const [localPorts] = createResource(async (): Promise<InterfaceJson[]> => {
+		const res = await fetch_interfaces(props.iface.device_id)
+		return Result.isError(res) ? [] : res.value
+	})
+
+	// Only devices with a port the local one can be cabled to; the dropdown
+	// searches them client-side (pickers load the first 200 rows).
+	const [devices] = createResource(
+		() => local().id,
+		async (localId: number): Promise<DeviceRow[]> => {
+			const res = await fetch_devices({ compatible_with: localId })
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return []
+			}
+			return res.value.items
+		},
+	)
+	const [types] = createRows(fetch_device_types)
+	const typeName = useNameOf(types, (type) => type.model)
+	/** Device type, then the existing cables to that device, as the option detail. */
+	const deviceOptions = createMemo((): FormOption[] =>
+		(devices() ?? []).map((device) => {
+			const links = localLinks()
+				?.get(device.id)
 				?.map((l) => `${l.local_interface.name} ⟷ ${l.peer_interface.name}`)
 				.join(', ')
-		},
-		() => ({ compatible_with: props.iface.id }),
+			return {
+				value: device.id,
+				label: device.name,
+				detail: [typeName(device.device_type_id), links].filter(Boolean).join(' · '),
+			}
+		}),
+	)
+	const peerDevice = createMemo(
+		() => (devices() ?? []).find((device) => String(device.id) === peerId()) ?? null,
 	)
 
 	// The depth-1 trace runs in parallel and only names the far end of taken
 	// ports; if it fails the tiles fall back to a plain "connected".
-	const [peerPorts] = createResource(peerDevice, async (device: DeviceRow) => {
-		const [res, trace] = await Promise.all([
-			fetch_interfaces(device.id),
-			fetch_trace(device.id, 1),
-		])
-		if (Result.isError(res)) {
-			setError(res.error.message)
-			return []
-		}
-		const links = new Map(
-			Result.isError(trace)
-				? []
-				: trace.value.links.map((link) => [link.local_interface.id, link]),
-		)
-		return res.value
-			.filter((i) => i.id !== props.iface.id)
-			.map(
-				(iface): PortOption => ({
-					iface,
-					compatible: portsCompatible(props.iface, iface),
-					link: links.get(iface.id),
-				}),
+	const [peerPorts, { refetch: refetchPeerPorts }] = createResource(
+		() => Number(peerId()) || false,
+		async (deviceId: number) => {
+			const [res, trace] = await Promise.all([
+				fetch_interfaces(deviceId),
+				fetch_trace(deviceId, 1),
+			])
+			if (Result.isError(res)) {
+				setError(res.error.message)
+				return []
+			}
+			const links = new Map(
+				Result.isError(trace)
+					? []
+					: trace.value.links.map((link) => [link.local_interface.id, link]),
 			)
-	})
-	const compatibleCount = (): number => (peerPorts() ?? []).filter((p) => p.compatible).length
-	const freeCount = (): number =>
-		(peerPorts() ?? []).filter((p) => p.compatible && p.iface.patched && !p.iface.connected)
-			.length
-	/** Filter matches the port name or, for taken ports, the device on the far end. */
+			return res.value
+				.filter((i) => i.id !== local().id)
+				.map(
+					(iface): PortOption => ({
+						iface,
+						compatible: portsCompatible(local(), iface),
+						link: links.get(iface.id),
+					}),
+				)
+		},
+	)
+	/**
+	 * Free-only hides every port that cannot be picked; the filter matches the
+	 * port name or, for taken ports, the device on the far end.
+	 */
 	const visiblePorts = createMemo(() => {
 		const needle = portFilter().trim().toLowerCase()
-		const all = peerPorts() ?? []
-		return needle === ''
-			? all
-			: all.filter(
-					(p) =>
-						p.iface.name.toLowerCase().includes(needle) ||
-						(p.link?.peer_device.name.toLowerCase().includes(needle) ?? false),
-				)
+		return (peerPorts() ?? []).filter(
+			(p) =>
+				(!freeOnly() || isFree(p)) &&
+				(needle === '' ||
+					p.iface.name.toLowerCase().includes(needle) ||
+					(p.link?.peer_device.name.toLowerCase().includes(needle) ?? false)),
+		)
 	})
 
 	/** Visible tiles grouped by side; empty groups are left out. */
@@ -129,6 +178,7 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 				selected: peerIface()?.id === iface.id,
 			}}
 			aria-pressed={peerIface()?.id === iface.id}
+			data-port-id={iface.id}
 			disabled={!compatible || !iface.patched || iface.connected || submit.pending()}
 			title={
 				!compatible
@@ -142,7 +192,16 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 								: undefined
 			}
 			onClick={(): void => {
+				setPeerIface(iface)
+			}}
+			onDblClick={(): void => {
 				void connect(iface)
+			}}
+			onKeyDown={(e: KeyboardEvent): void => {
+				if (e.key === 'Enter') {
+					e.preventDefault()
+					void connect(iface, e.shiftKey)
+				}
 			}}
 		>
 			<span class="port-tile-name">
@@ -168,152 +227,241 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 		</button>
 	)
 
-	function pickDevice(device: DeviceRow): void {
+	function pickDevice(id: string): void {
 		setError(null)
 		setPeerIface(null)
 		setPortFilter('')
-		setPeerDevice(device)
+		setPeerId(id)
 	}
 
-	function back(): void {
-		setError(null)
-		setPeerIface(null)
-		setPeerDevice(null)
+	/** Next unconnected, patched local port on the same side after `current`. */
+	function nextLocalPort(current: InterfaceJson): InterfaceJson | null {
+		const ports = localPorts() ?? []
+		const at = ports.findIndex((p) => p.id === current.id)
+		return (
+			ports
+				.slice(at + 1)
+				.find(
+					(p) => (p.side ?? null) === (current.side ?? null) && p.patched && !p.connected,
+				) ?? null
+		)
 	}
 
-	async function connect(peer: InterfaceJson): Promise<void> {
+	/** Selects and focuses the first visible free peer port after `afterId`, wrapping around. */
+	function selectNextFree(afterId: number): void {
+		const all = peerPorts() ?? []
+		const visible = new Set(visiblePorts().map((p) => p.iface.id))
+		const at = all.findIndex((p) => p.iface.id === afterId)
+		const pick = (p: PortOption): boolean => isFree(p) && visible.has(p.iface.id)
+		const target = all.slice(at + 1).find(pick) ?? all.find(pick)
+		if (target) {
+			setPeerIface(target.iface)
+			document
+				.querySelector<HTMLButtonElement>(
+					`.connect-dialog [data-port-id="${target.iface.id}"]`,
+				)
+				?.focus()
+		}
+	}
+
+	/**
+	 * Cables the local port to `peer`. With `next`, the dialog stays open for
+	 * the next local port; it closes when there is none.
+	 */
+	async function connect(peer: InterfaceJson, next = false): Promise<void> {
 		if (submit.pending()) {
 			return
 		}
+		const from = local()
 		setPeerIface(peer)
 		const created = await submit.run(() =>
-			create_cable({ a_interface_id: props.iface.id, b_interface_id: peer.id }),
+			create_cable({ a_interface_id: from.id, b_interface_id: peer.id }),
 		)
-		if (created) {
+		if (!created) {
+			return
+		}
+		connectedAny = true
+		const following = next ? nextLocalPort(from) : null
+		if (!following) {
 			props.on_connected()
+			return
+		}
+		setLastCable({ from: from.name, to: `${peerDevice()?.name ?? ''}: ${peer.name}` })
+		setPeerIface(null)
+		setPortFilter('')
+		setLocal(following)
+		setRefreshing(true)
+		await Promise.all([refetchPeerPorts(), refetchLocalLinks()])
+		setRefreshing(false)
+		queueMicrotask(() => selectNextFree(peer.id))
+	}
+
+	/** Closing after connect & next still reports the cables made. */
+	function close(): void {
+		if (connectedAny) {
+			props.on_connected()
+		} else {
+			props.on_close()
 		}
 	}
 
-	/** Tiles connect on click; Enter in the filter must not submit the form. */
+	/** The buttons save; Enter in the filter must not submit the form. */
 	function handleSubmit(e: SubmitEvent): void {
 		e.preventDefault()
 	}
 
-	const title = (): string => t('device.connectToPeer', { name: props.iface.name })
+	const title = (): string => t('device.connectToPeer', { name: local().name })
 
 	return (
-		<Modal title={title()} class="connect-dialog" on_close={props.on_close}>
-			<ol class="connect-steps">
-				<li classList={{ active: !peerDevice(), done: Boolean(peerDevice()) }}>
-					<span class="connect-step-num">1</span>
-					{t('entity.device.one')}
-				</li>
-				<li classList={{ active: Boolean(peerDevice()) }}>
-					<span class="connect-step-num">2</span>
-					{t('device.connectStepPort')}
-				</li>
-			</ol>
-			<Show
-				when={peerDevice()}
-				fallback={<ObjectSearch {...deviceSearch} on_select={pickDevice} />}
-			>
-				{(device: () => DeviceRow): JSX.Element => (
-					<form class="connect-port-form" onSubmit={handleSubmit}>
-						<div class="connect-peer">
-							<div class="connect-peer-info">
-								<strong>{device().name}</strong>
-								<Show when={!peerPorts.loading}>
-									<small>
-										{t('device.freePortsCount', {
-											free: freeCount(),
-											total: compatibleCount(),
-										})}
-									</small>
-								</Show>
-							</div>
-							<button type="button" onClick={back}>
-								{t('device.changePeerDevice')}
-							</button>
-						</div>
-						<input
-							ref={(el: HTMLInputElement): void => queueMicrotask(() => el.focus())}
-							class="object-selector-search"
-							placeholder={t('device.filterPorts')}
-							aria-label={t('device.filterPorts')}
-							value={portFilter()}
-							onInput={(e: InputEventAndTarget) =>
-								setPortFilter(e.currentTarget.value)
-							}
-						/>
+		<Modal title={title()} class="connect-dialog" on_close={close}>
+			<form class="connect-port-form" onSubmit={handleSubmit}>
+				<Combobox
+					id="connect-peer-device"
+					ariaLabel={t('entity.device.one')}
+					value={peerId()}
+					onChange={pickDevice}
+					options={deviceOptions()}
+					placeholder={t('rack.searchDevices')}
+					searchLabel={t('common.search')}
+					noMatchesLabel={t('common.noMatchingObjects')}
+					autofocus
+				/>
+				<div class="connect-port-toolbar">
+					<input
+						class="object-selector-search"
+						placeholder={t('device.filterPorts')}
+						aria-label={t('device.filterPorts')}
+						value={portFilter()}
+						disabled={!peerDevice()}
+						onInput={(e: InputEventAndTarget) => setPortFilter(e.currentTarget.value)}
+					/>
+					<button
+						type="button"
+						class="connect-free-only"
+						aria-pressed={freeOnly()}
+						onClick={() => setFreeOnly(!freeOnly())}
+					>
+						{t('device.freePortsOnly')}
+					</button>
+				</div>
+				<Show
+					when={peerDevice()}
+					fallback={
 						<Show
-							when={!peerPorts.loading}
+							when={!devices.loading}
 							fallback={<Loading message={t('common.loading')} />}
 						>
+							<Empty message={t('device.pickPeerDevice')} />
+						</Show>
+					}
+				>
+					{/* A refresh after connect & next keeps the tiles (and focus) in place. */}
+					<Show
+						when={!peerPorts.loading || refreshing()}
+						fallback={<Loading message={t('common.loading')} />}
+					>
+						<Show
+							when={(peerPorts() ?? []).length > 0}
+							fallback={<Empty message={t('device.noPeerPorts')} />}
+						>
 							<Show
-								when={(peerPorts() ?? []).length > 0}
-								fallback={<Empty message={t('device.noPeerPorts')} />}
+								when={visiblePorts().length > 0}
+								fallback={<Empty message={t('common.noMatchingObjects')} />}
 							>
-								<Show
-									when={visiblePorts().length > 0}
-									fallback={<Empty message={t('common.noMatchingObjects')} />}
-								>
-									<For each={portGroups()}>
-										{(group: {
-											side: PortSide | null
-											ports: PortOption[]
-										}): JSX.Element => (
-											<>
-												<Show
-													when={
-														group.side !== null ||
-														portGroups().length > 1
-													}
-												>
-													<h4 class="port-group-heading">
-														{group.side === null
-															? t('device.panel.otherPorts')
-															: t(GROUP_HEADINGS[group.side])}
-													</h4>
-												</Show>
-												<div class="port-grid">
-													<For each={group.ports}>{portTile}</For>
-												</div>
-											</>
-										)}
-									</For>
-								</Show>
+								<For each={portGroups()}>
+									{(group: {
+										side: PortSide | null
+										ports: PortOption[]
+									}): JSX.Element => (
+										<>
+											<Show
+												when={
+													group.side !== null || portGroups().length > 1
+												}
+											>
+												<h4 class="port-group-heading">
+													{group.side === null
+														? t('device.panel.otherPorts')
+														: t(GROUP_HEADINGS[group.side])}
+												</h4>
+											</Show>
+											<div class="port-grid">
+												<For each={group.ports}>{portTile}</For>
+											</div>
+										</>
+									)}
+								</For>
 							</Show>
 						</Show>
-						<div class="connect-footer">
-							<p class="connect-summary">
-								<Show
-									when={peerIface()}
-									fallback={
-										<span class="connect-summary-hint">
-											{t('device.pickPeerPort')}
-										</span>
-									}
-								>
-									{(peer: () => InterfaceJson): JSX.Element => (
+					</Show>
+				</Show>
+				<div class="connect-footer">
+					<p class="connect-summary">
+						<Show
+							when={peerIface()}
+							fallback={
+								<Show when={lastCable()}>
+									{(cable: () => { from: string; to: string }): JSX.Element => (
 										<>
-											<code>{props.iface.name}</code>
-											<span aria-hidden="true">⟷</span>
-											<span class="connect-summary-peer">
-												{device().name}: <code>{peer().name}</code>
+											<span class="connect-summary-done">
+												{t('device.connected')}:
 											</span>
+											<code>{cable().from}</code>
+											<span aria-hidden="true">⟷</span>
+											<span class="connect-summary-peer">{cable().to}</span>
 										</>
 									)}
 								</Show>
-							</p>
-							<div class="modal-actions">
-								<button type="button" onClick={props.on_close}>
-									{t('common.cancel')}
-								</button>
-							</div>
+							}
+						>
+							{(peer: () => InterfaceJson): JSX.Element => (
+								<>
+									<code>{local().name}</code>
+									<span aria-hidden="true">⟷</span>
+									<span class="connect-summary-peer">
+										{peerDevice()?.name}: <code>{peer().name}</code>
+									</span>
+								</>
+							)}
+						</Show>
+					</p>
+					<div class="form-actions connect-actions">
+						<div class="btn-group">
+							<button
+								type="button"
+								disabled={!peerIface() || submit.pending()}
+								onClick={() => {
+									const peer = peerIface()
+									if (peer) {
+										void connect(peer)
+									}
+								}}
+							>
+								{t('common.save')}
+							</button>
+							<button
+								type="button"
+								class="btn-outline"
+								title={t('device.connectNextHint')}
+								disabled={
+									!peerIface() || submit.pending() || !nextLocalPort(local())
+								}
+								onClick={() => {
+									const peer = peerIface()
+									if (peer) {
+										void connect(peer, true)
+									}
+								}}
+							>
+								{t('common.saveAndNext')}
+							</button>
 						</div>
-					</form>
-				)}
-			</Show>
+						<button type="button" onClick={close} disabled={submit.pending()}>
+							{t('common.cancel')}
+						</button>
+					</div>
+				</div>
+			</form>
 			<InlineError message={error()} alert />
 		</Modal>
 	)

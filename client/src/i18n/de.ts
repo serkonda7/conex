@@ -16,6 +16,7 @@ export const de: Messages = {
 	'common.noTenantSelectedRequired':
 		'Kein Mandant in der oberen Leiste ausgewählt. Wähle einen aus, um das Objekt anzulegen.',
 	'common.save': 'Speichern',
+	'common.saveAndNext': 'Speichern & Weiter',
 	'common.saving': 'Wird gespeichert…',
 	'common.close': 'Schließen',
 	'common.confirmDiscard': 'Die nicht gespeicherten Änderungen verwerfen?',
@@ -925,12 +926,12 @@ export const de: Messages = {
 	'device.connect': 'Verbinden',
 	'device.disconnect': 'Trennen',
 	'device.notConnected': 'Nicht verbunden',
-	'device.connectStepPort': 'Anschluss',
-	'device.changePeerDevice': 'Gerät ändern',
+	'device.freePortsOnly': 'Nur freie',
+	'device.pickPeerDevice': 'Gerät auswählen, um seine Anschlüsse zu sehen.',
 	'device.noPeerPorts': 'Dieses Gerät hat keine passenden Anschlüsse.',
 	'device.filterPorts': 'Anschlüsse filtern…',
-	'device.freePortsCount': '{free} von {total} frei',
-	'device.pickPeerPort': 'Freien Anschluss auswählen',
+	'device.connectNextHint':
+		'Speichern und mit dem nächsten Anschluss weitermachen (Umschalt+Enter)',
 	// virtual machines
 	'vm.kind': 'Art',
 	'vm.host': 'Host',
