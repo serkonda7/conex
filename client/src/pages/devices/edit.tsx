@@ -151,6 +151,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					placeholder={t('device.namePlaceholder')}
 					value={name()}
 					onInput={setName}
+					autofocus
 				/>
 				<ReadOnlyField
 					id="device-edit-type"
