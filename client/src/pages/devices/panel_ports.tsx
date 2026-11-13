@@ -1,5 +1,6 @@
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
-import { createMemo, type JSX } from 'solid-js'
+import { createComputed, createMemo, type JSX } from 'solid-js'
+import { createStore, reconcile } from 'solid-js/store'
 import type { InterfaceJson } from '../../api/devices'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { t } from '../../i18n'
@@ -81,7 +82,19 @@ export function PanelPortTable(props: {
 	rowActions?: (row: PanelRow) => JSX.Element
 	extraColumns?: DataTableColumn<PanelRow>[]
 }): JSX.Element {
-	const rows = createMemo(() => panelRowsOf(props.ports))
+	// Keep row objects (and their DOM nodes) across refreshes, so the browser
+	// retains its scroll anchor and the dialog can return focus to its button.
+	// Copy the ports: reconciliation must not mutate the query cache's objects.
+	const [storedRows, setStoredRows] = createStore<PanelRow[]>([])
+	createComputed(() => {
+		const next = panelRowsOf(props.ports).map((row) => ({
+			...row,
+			rear: { ...row.rear },
+			front: row.front ? { ...row.front } : null,
+		}))
+		setStoredRows(reconcile(next, { key: 'key' }))
+	})
+	const rows = createMemo(() => [...storedRows])
 
 	const portCell = (iface: InterfaceJson | null): JSX.Element => {
 		if (!iface) {

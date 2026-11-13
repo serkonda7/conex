@@ -27,7 +27,8 @@ export function RouteContent(props: { routePath: string; tabId: number }): JSX.E
 		if (!pane || (focused instanceof HTMLElement && pane.contains(focused))) {
 			return
 		}
-		pane.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+		// Without scrolling: the router has just restored the tab's scroll position.
+		pane.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true })
 	})
 	return (
 		<TabContext.Provider value={{ id: props.tabId, path: props.routePath }}>
