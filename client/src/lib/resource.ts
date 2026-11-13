@@ -34,7 +34,7 @@ import { usePaneVisible } from './router'
 export type ErrorSink = (message: string) => void
 
 /** The value of `res`, or `fallback` after reporting the error to `onError`. */
-export function unwrap<T, F>(res: Result<T, Error>, fallback: F, onError?: ErrorSink): T | F {
+function unwrap<T, F>(res: Result<T, Error>, fallback: F, onError?: ErrorSink): T | F {
 	if (Result.isError(res)) {
 		onError?.(res.error.message)
 		return fallback

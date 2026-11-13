@@ -45,6 +45,28 @@ export function secrets(form: IntegrationFormState): { password?: string; erp_to
 	}
 }
 
+/** Outcome of a connection test. */
+export interface TestResult {
+	ok: boolean
+	message: string
+}
+
+/** Connection test outcome under the test button; nothing before a test. */
+export function TestResultLine(props: { result: TestResult | null }): JSX.Element {
+	return (
+		<Show when={props.result}>
+			{(result: () => TestResult) => (
+				<p
+					class={result().ok ? 'text-success' : 'text-danger'}
+					role={result().ok ? 'status' : 'alert'}
+				>
+					{result().message}
+				</p>
+			)}
+		</Show>
+	)
+}
+
 export function IntegrationFormFields(props: {
 	provider: IntegrationProvider
 	form: IntegrationFormState
@@ -53,7 +75,7 @@ export function IntegrationFormFields(props: {
 }): JSX.Element {
 	const f = props.form
 	const [testing, setTesting] = createSignal(false)
-	const [testResult, setTestResult] = createSignal<{ ok: boolean; message: string } | null>(null)
+	const [testResult, setTestResult] = createSignal<TestResult | null>(null)
 
 	async function handleTest(): Promise<void> {
 		setTesting(true)
@@ -126,16 +148,7 @@ export function IntegrationFormFields(props: {
 						{testing() ? t('integration.testing') : t('integration.test')}
 					</button>
 				</div>
-				<Show when={testResult()}>
-					{(result: () => { ok: boolean; message: string }) => (
-						<p
-							class={result().ok ? 'text-success' : 'text-danger'}
-							role={result().ok ? 'status' : 'alert'}
-						>
-							{result().message}
-						</p>
-					)}
-				</Show>
+				<TestResultLine result={testResult()} />
 			</Field>
 		</>
 	)

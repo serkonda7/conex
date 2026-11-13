@@ -10,7 +10,6 @@ import type {
 	ExternalEmployeeJson,
 	ExternalLinkJson,
 	ExternalPushField,
-	ExternalTenantJson,
 	ExternalTenantListItem,
 	IntegrationCreate,
 	IntegrationJson,
@@ -35,7 +34,6 @@ import { client, failed, to_query, to_result } from './client'
 export type {
 	ExternalEmployeeJson,
 	ExternalLinkJson,
-	ExternalTenantJson,
 	ExternalTenantListItem,
 	IntegrationJson,
 	IntegrationProvider,
@@ -131,7 +129,7 @@ export async function fetch_tickets(
 	return to_result<TicketListJson>(res, t('ticket.listFailed'))
 }
 
-export async function fetch_sync_run(
+async function fetch_sync_run(
 	provider: IntegrationProvider,
 	id: number,
 ): Promise<Result<SyncRunJson, Error>> {

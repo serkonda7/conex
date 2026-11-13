@@ -29,7 +29,7 @@ export type PluralKey = {
 
 export type MessageParams = Record<string, string | number>
 
-export const LOCALES: readonly Locale[] = ['en', 'de']
+const LOCALES: readonly Locale[] = ['en', 'de']
 
 const STORAGE_KEY = 'conex:locale'
 

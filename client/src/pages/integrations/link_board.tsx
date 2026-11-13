@@ -412,21 +412,22 @@ export function LinkBoardView(props: {
 				</>
 			)
 		}
+		const ignoreButton = (): JSX.Element => (
+			<Show when={props.editable && ignoresLocal()}>
+				<button
+					type="button"
+					class="icon-btn"
+					title={t('integration.ignore')}
+					aria-label={t('integration.ignore')}
+					onClick={inRow(() => void ignoreLocal(row.id))}
+				>
+					<IconBan size={20} />
+				</button>
+			</Show>
+		)
 		const suggested = suggestionOf().get(row.id)
 		if (suggested === undefined) {
-			return (
-				<Show when={props.editable && ignoresLocal()}>
-					<button
-						type="button"
-						class="icon-btn"
-						title={t('integration.ignore')}
-						aria-label={t('integration.ignore')}
-						onClick={inRow(() => void ignoreLocal(row.id))}
-					>
-						<IconBan size={20} />
-					</button>
-				</Show>
-			)
+			return ignoreButton()
 		}
 		return (
 			<>
@@ -444,17 +445,7 @@ export function LinkBoardView(props: {
 						<IconLinkPlus size={20} />
 					</button>
 				</Show>
-				<Show when={props.editable && ignoresLocal()}>
-					<button
-						type="button"
-						class="icon-btn"
-						title={t('integration.ignore')}
-						aria-label={t('integration.ignore')}
-						onClick={inRow(() => void ignoreLocal(row.id))}
-					>
-						<IconBan size={20} />
-					</button>
-				</Show>
+				{ignoreButton()}
 			</>
 		)
 	}

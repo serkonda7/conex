@@ -149,7 +149,7 @@ export async function deletePriority(id: number): Promise<Result<PriorityRow, Er
 // Service levels (SLA)
 // ---------------------------------------------------------------------------
 
-export type ServiceLevelRow = typeof service_levels.$inferSelect
+type ServiceLevelRow = typeof service_levels.$inferSelect
 /** A service level with its targets, sorted by priority rank. */
 export type ServiceLevelDetail = ServiceLevelRow & { targets: ServiceLevelTargetJson[] }
 export type ServiceLevelListRow = ServiceLevelRow & { target_count: number }

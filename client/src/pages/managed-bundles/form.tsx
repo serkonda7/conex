@@ -7,13 +7,7 @@ import {
 } from '../../api/service_catalog'
 import { DescriptionField, FormPage, Hint, NameField } from '../../components/form'
 import { t } from '../../i18n'
-import {
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { queryParam, useFormReturnRoute } from '../../lib/router'
 
 /** Managed bundle create (`id` omitted) or edit form. */
@@ -33,25 +27,20 @@ function ManagedBundleForm(props: { id?: number }): JSX.Element {
 	const backTo = useFormReturnRoute('/managed-bundles', props.id)
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: ({ name: trimmed }: FormValues) =>
-				id === undefined
-					? create_managed_bundle({ name: trimmed, description: text(description()) })
-					: update_managed_bundle(id, {
-							name: trimmed,
-							description: text(description()) ?? null,
-						}),
+			body: (values: FormValues) => ({
+				name: values.name,
+				description: text(description()),
+			}),
+			create: create_managed_bundle,
+			update: update_managed_bundle,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? (): void => {
-						setName('')
-						setDescription('')
-					}
-				: undefined,
+			reset: () => {
+				setName('')
+				setDescription('')
+			},
 		})
 	}
 

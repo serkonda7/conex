@@ -19,14 +19,7 @@ import {
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleIconOptions, deviceRoleLabel } from '../../i18n/labels'
-import {
-	type FormValues,
-	id_value,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, id_value, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
@@ -89,38 +82,26 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 		icon() === '' ? null : (icon() as DeviceRoleIcon)
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: ({ name: trimmed }: FormValues) =>
-				id === undefined
-					? create_device_role({
-							name: trimmed,
-							parent_id: parseId(parentId()),
-							description: text(description()),
-							icon: selectedIcon(),
-							can_host_vms: canHostVms(),
-							managed_bundle_id: parseId(bundleId()),
-						})
-					: update_device_role(id, {
-							name: trimmed,
-							parent_id: parseId(parentId()),
-							description: text(description()) ?? null,
-							icon: selectedIcon(),
-							can_host_vms: canHostVms(),
-							managed_bundle_id: parseId(bundleId()),
-						}),
+			body: (values: FormValues) => ({
+				name: values.name,
+				parent_id: parseId(parentId()),
+				description: text(description()),
+				icon: selectedIcon(),
+				can_host_vms: canHostVms(),
+				managed_bundle_id: parseId(bundleId()),
+			}),
+			create: create_device_role,
+			update: update_device_role,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? (): void => {
-						setName('')
-						setDescription('')
-						setIcon('')
-						setCanHostVms(false)
-					}
-				: undefined,
+			reset: () => {
+				setName('')
+				setDescription('')
+				setIcon('')
+				setCanHostVms(false)
+			},
 		})
 	}
 

@@ -89,8 +89,19 @@ import {
 } from './list'
 
 export type AttachmentRow = typeof attachments.$inferSelect
+
 type FloorplanAreaRow = typeof floorplan_areas.$inferSelect
 type FloorplanPlacementRow = typeof floorplan_placements.$inferSelect
+
+/** Reads an attachment `FOR UPDATE` inside the caller's transaction, 404 when missing. */
+async function lockAttachment(id: number): Promise<Result<AttachmentRow, Error>> {
+	const [row] = await getDb()
+		.select()
+		.from(attachments)
+		.where(eq(attachments.id, id))
+		.for('update')
+	return row ? Result.ok(row) : Result.err(new NotFoundError(NOT_FOUND))
+}
 
 /** Owner of an attachment: exactly one of the three ids is set. */
 export interface AttachmentOwner {
@@ -306,7 +317,7 @@ export async function listAttachments(
 }
 
 /** Raw row including the storage key (file serving, replace, delete). */
-export function getAttachmentRow(id: number): Promise<Result<AttachmentRow, Error>> {
+function getAttachmentRow(id: number): Promise<Result<AttachmentRow, Error>> {
 	return findById(attachments, id, NOT_FOUND)
 }
 
@@ -467,14 +478,11 @@ export async function updateAttachment(
 						.where(eq(locations.id, owner.location_id))
 						.for('update')
 				}
-				const [row] = await getDb()
-					.select()
-					.from(attachments)
-					.where(eq(attachments.id, id))
-					.for('update')
-				if (!row) {
-					return Result.err(new NotFoundError(NOT_FOUND))
+				const locked = await lockAttachment(id)
+				if (Result.isError(locked)) {
+					return locked
 				}
+				const row = locked.value
 				if (input.is_floorplan === true) {
 					const unmarked = await getDb()
 						.update(attachments)
@@ -1160,14 +1168,11 @@ export async function putPlan(
 		() =>
 			withTransaction(async (): Promise<Result<undefined, Error>> => {
 				// Serializes with mark changes, which clear the plan.
-				const [row] = await getDb()
-					.select()
-					.from(attachments)
-					.where(eq(attachments.id, id))
-					.for('update')
-				if (!row) {
-					return Result.err(new NotFoundError(NOT_FOUND))
+				const locked = await lockAttachment(id)
+				if (Result.isError(locked)) {
+					return locked
 				}
+				const row = locked.value
 				if (row.is_floorplan === 0) {
 					return Result.err(new ConflictError(NOT_MARKED))
 				}
@@ -1488,41 +1493,26 @@ export async function listFloorplanLinks(
 		owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
 	}
 	const visible = scopeCondition(ownerTenant, scopeTenantIds)
-	if (query.interface !== undefined) {
-		return getDb()
-			.select(columns)
-			.from(floorplan_placements)
-			.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
-			.leftJoin(sites, eq(sites.id, attachments.site_id))
-			.leftJoin(locations, eq(locations.id, attachments.location_id))
-			.where(
-				and(
-					or(
+	if (query.interface !== undefined || query.rack !== undefined || query.device !== undefined) {
+		const placed =
+			query.interface !== undefined
+				? or(
 						eq(floorplan_placements.interface_id, query.interface),
 						eq(
 							floorplan_placements.jack_id,
 							sql`(select jack_id from ${interfaces} where id = ${query.interface})`,
 						),
-					),
-					visible,
-				),
-			)
-	}
-	if (query.rack !== undefined || query.device !== undefined) {
+					)
+				: query.rack !== undefined
+					? eq(floorplan_placements.rack_id, query.rack)
+					: eq(floorplan_placements.device_id, query.device ?? 0)
 		return getDb()
 			.select(columns)
 			.from(floorplan_placements)
 			.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
 			.leftJoin(sites, eq(sites.id, attachments.site_id))
 			.leftJoin(locations, eq(locations.id, attachments.location_id))
-			.where(
-				and(
-					query.rack !== undefined
-						? eq(floorplan_placements.rack_id, query.rack)
-						: eq(floorplan_placements.device_id, query.device ?? 0),
-					visible,
-				),
-			)
+			.where(and(placed, visible))
 	}
 	return getDb()
 		.select(columns)

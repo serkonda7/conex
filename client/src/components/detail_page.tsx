@@ -19,6 +19,7 @@ import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, Loading } from './feedback'
 import { IconLabel } from './icon_label'
 import { RowMenu, useRowMenu } from './list_page'
+import { Markdown } from './markdown'
 import { MoreActionsButton } from './more_actions_button'
 
 /**
@@ -129,6 +130,18 @@ export function DetailCard(props: { label: string; children: JSX.Element }): JSX
 		<section class="card" aria-label={props.label}>
 			<dl class="detail-grid">{props.children}</dl>
 		</section>
+	)
+}
+
+/** Comments section of a spec sheet, rendered as Markdown; nothing without comments. */
+export function SpecSheetComments(props: { text: string | null | undefined }): JSX.Element {
+	return (
+		<Show when={props.text}>
+			<section class="spec-sheet-notes">
+				<h4>{t('common.comments')}</h4>
+				<Markdown text={props.text} />
+			</section>
+		</Show>
 	)
 }
 

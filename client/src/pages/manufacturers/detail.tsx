@@ -19,21 +19,32 @@ import {
 	RelatedPreview,
 	type RelatedTab,
 	RelatedTabs,
+	SpecSheetComments,
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { IconLabel } from '../../components/icon_label'
-import { Markdown } from '../../components/markdown'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel, formFactorLabel } from '../../i18n/labels'
-import { deviceRoleIcon } from '../../lib/icons'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { formatDate, isPastEol } from '../../lib/time'
+import {
+	deviceTypeDevicesColumn,
+	deviceTypeHeightColumn,
+	deviceTypeModelColumn,
+	deviceTypePartNumberColumn,
+	deviceTypeRoleColumn,
+} from '../device_types/columns'
 import { EolPill } from '../device_types/eol_pill'
 import { SpecLink } from '../device_types/spec_link'
+import { useDeviceRoleLink } from '../device-roles/role_link'
 import { devicePlacementColumns } from '../devices/placement_columns'
+import {
+	rackTypeFormFactorColumn,
+	rackTypeHeightColumn,
+	rackTypeModelColumn,
+	rackTypeRacksColumn,
+} from '../rack_types/columns'
 
 /** Rows of the device tab; the "View all" link leads to the rest. */
 const DEVICE_PREVIEW_LIMIT = 5
@@ -81,9 +92,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 	const [tenants] = createRows(fetch_tenants, setError)
 	const [sites] = createRows(fetch_sites, setError)
 	const [racks] = createRows(fetch_racks, setError)
-	const roleName = useNameOf(roles, deviceRoleLabel)
-	const roleIcon = (roleId: number): ReturnType<typeof deviceRoleIcon> =>
-		deviceRoleIcon(roles()?.find((r) => r.id === roleId)?.icon)
+	const roleCell = useDeviceRoleLink(roles)
 	const typeName = useNameOf(deviceTypes, (type) => type.model)
 	const tenantName = useNameOf(tenants)
 	const siteName = useNameOf(sites)
@@ -99,75 +108,23 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 	})
 
 	const deviceTypeColumns: DataTableColumn<DeviceTypeListRow>[] = [
-		{
-			key: 'model',
-			label: t('common.model'),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/device-types/${dt.id}`}>{dt.model}</a>
-			),
-		},
-		{
-			key: 'part_number',
-			label: t('deviceType.partNumber'),
-			getValue: (dt: DeviceTypeListRow): string => dt.part_number || '—',
-		},
-		{
-			key: 'role',
-			label: t('deviceType.defaultRole'),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<Show when={dt.default_device_role_id} fallback="—">
-					{(role: () => number): JSX.Element => (
-						<a href={`/device-roles/${role()}`}>
-							<IconLabel icon={roleIcon(role())}>{roleName(role())}</IconLabel>
-						</a>
-					)}
-				</Show>
-			),
-		},
-		{
-			key: 'u_height',
-			label: t('common.heightU'),
-			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
-		},
+		deviceTypeModelColumn(),
+		deviceTypePartNumberColumn(),
+		deviceTypeRoleColumn(roleCell),
+		deviceTypeHeightColumn(),
 		{
 			key: 'eol_date',
 			label: t('deviceType.eolDate'),
 			getValue: (dt: DeviceTypeListRow): JSX.Element => <EolDate date={dt.eol_date} />,
 		},
-		{
-			key: 'devices',
-			label: tp('entity.device', 2),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/devices?device_type=${dt.id}`}>{dt.instance_count}</a>
-			),
-		},
+		deviceTypeDevicesColumn(),
 	]
 
 	const rackTypeColumns: DataTableColumn<RackTypeListRow>[] = [
-		{
-			key: 'model',
-			label: t('common.model'),
-			getValue: (rt: RackTypeListRow): JSX.Element => (
-				<a href={`/rack-types/${rt.id}`}>{rt.model}</a>
-			),
-		},
-		{
-			key: 'form_factor',
-			label: t('rackType.formFactor'),
-			getValue: (rt: RackTypeListRow): string => formFactorLabel(rt.form_factor),
-		},
-		{
-			key: 'u_height',
-			label: t('common.heightU'),
-			getValue: (rt: RackTypeListRow): string => `${rt.u_height}`,
-		},
-		{
-			key: 'racks',
-			label: tp('entity.rack', 2),
-			getValue: (rt: RackTypeListRow): JSX.Element => (
-				<a href={`/racks?rack_type=${rt.id}`}>{rt.instance_count}</a>
-			),
-		},
+		rackTypeModelColumn(),
+		rackTypeFormFactorColumn(),
+		rackTypeHeightColumn(),
+		rackTypeRacksColumn(),
 	]
 
 	const eolDate = (d: DeviceListDevice): string | null | undefined =>
@@ -327,12 +284,7 @@ export function ManufacturerDetailPage(props: { id: number }): JSX.Element {
 							</dd>
 						</dl>
 					</section>
-					<Show when={manufacturer()?.comments}>
-						<section class="spec-sheet-notes">
-							<h4>{t('common.comments')}</h4>
-							<Markdown text={manufacturer()?.comments} />
-						</section>
-					</Show>
+					<SpecSheetComments text={manufacturer()?.comments} />
 				</section>
 
 				<RelatedTabs

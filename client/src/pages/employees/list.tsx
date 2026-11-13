@@ -49,7 +49,7 @@ export function EmailLink(props: { email: string | null }): JSX.Element {
  * Phone number as a `tel:` link (dialing its normalized form) with a copy
  * button, or `—`.
  */
-export function PhoneLink(props: { number: string | null }): JSX.Element {
+function PhoneLink(props: { number: string | null }): JSX.Element {
 	return (
 		<Show when={props.number} fallback="—">
 			{(number: () => string): JSX.Element => (

@@ -27,13 +27,7 @@ import {
 } from '../../components/form'
 import { t, tp } from '../../i18n'
 import { durationUnitLabel, holidayRegionOptions } from '../../i18n/labels'
-import {
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { queryParam, useFormReturnRoute } from '../../lib/router'
 import {
@@ -235,34 +229,23 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
 		const parsed = parsedTargets()
 		const region = holidayRegion() === '' ? null : (holidayRegion() as HolidayRegion)
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
 			validate: () => hoursProblem() ?? (typeof parsed === 'string' ? parsed : null),
-			save: ({ name: trimmed }: FormValues) => {
-				const values = {
-					service_hours: serviceHours(),
-					holiday_region: region,
-					targets: parsed as ServiceLevelTarget[],
-				}
-				return id === undefined
-					? create_service_level({
-							name: trimmed,
-							description: text(description()),
-							...values,
-						})
-					: update_service_level(id, {
-							name: trimmed,
-							description: text(description()) ?? null,
-							...values,
-						})
-			},
+			body: (values: FormValues) => ({
+				name: values.name,
+				description: text(description()),
+				service_hours: serviceHours(),
+				holiday_region: region,
+				targets: parsed as ServiceLevelTarget[],
+			}),
+			create: create_service_level,
+			update: update_service_level,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e) ? reset : undefined,
+			reset,
 		})
 	}
 

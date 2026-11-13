@@ -33,15 +33,7 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import {
-	cleared,
-	type FormValues,
-	id_value,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, id_value, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 import { contextGroupId, refreshTenantContext, setTenantContext } from '../../lib/tenant_context'
@@ -105,8 +97,8 @@ function TenantForm(props: { id?: number }): JSX.Element {
 		comments: text(comments()),
 	})
 
-	async function create(values: FormValues): Promise<Result<TenantDetail, Error>> {
-		const res = await create_tenant(body(values))
+	async function create(input: TenantCreate): Promise<Result<TenantDetail, Error>> {
+		const res = await create_tenant(input)
 		if (selectAfterCreate && Result.isOk(res)) {
 			setTenantContext({ kind: 'tenant', id: res.value.id })
 			void refreshTenantContext()
@@ -115,21 +107,18 @@ function TenantForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: (values: FormValues) =>
-				id === undefined ? create(values) : update_tenant(id, cleared(body(values))),
+			body,
+			create,
+			update: update_tenant,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? () => {
-						setName('')
-						setEmails([blankEmail()])
-						setPhones([blankPhone()])
-					}
-				: undefined,
+			reset: () => {
+				setName('')
+				setEmails([blankEmail()])
+				setPhones([blankPhone()])
+			},
 		})
 	}
 

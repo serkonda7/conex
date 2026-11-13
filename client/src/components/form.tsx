@@ -9,7 +9,7 @@
 import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { type JSX, onMount, Show } from 'solid-js'
-import { t } from '../i18n'
+import { t, tp } from '../i18n'
 import type { FormState } from '../lib/form'
 import { type Crumb, navigate, usePageMeta } from '../lib/router'
 import { isScoped } from '../lib/session'
@@ -349,6 +349,26 @@ export function SelectField(props: {
 				previewAtCursor={props.info}
 			/>
 		</Field>
+	)
+}
+
+/** Tenant picker of an edit form, with a "no tenant" choice. The page
+ * loads the `tenants` so the request starts with the record's. */
+export function TenantSelectField(props: {
+	id: string
+	value: string
+	onChange: (value: string) => void
+	tenants: readonly { id: number; name: string }[] | undefined
+}): JSX.Element {
+	return (
+		<SelectField
+			id={props.id}
+			label={tp('entity.tenant', 1)}
+			value={props.value}
+			onChange={props.onChange}
+			options={row_options(props.tenants ?? [])}
+			emptyLabel={t('common.noTenant')}
+		/>
 	)
 }
 

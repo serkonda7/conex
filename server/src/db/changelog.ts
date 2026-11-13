@@ -17,7 +17,7 @@ import {
 import { cableTenants, deviceTenant, ownerTenant, rackTenant } from './owners'
 
 /** Changes older than this are dropped by the periodic session sweep. */
-export const CHANGELOG_RETENTION_S = 365 * 24 * 60 * 60
+const CHANGELOG_RETENTION_S = 365 * 24 * 60 * 60
 
 /** Who a change is attributed to; set per request by `authMiddleware`. */
 export interface ChangeActor {
@@ -258,10 +258,7 @@ export function deleteChanges<T extends Snapshot>(
 }
 
 /** Records the creation of `rows` with one INSERT (see `logChanges`). */
-export function logCreates<T extends Snapshot>(
-	objectType: ObjectTypeOf<T>,
-	rows: T[],
-): Promise<void> {
+function logCreates<T extends Snapshot>(objectType: ObjectTypeOf<T>, rows: T[]): Promise<void> {
 	return logChanges(createChanges(objectType, rows))
 }
 

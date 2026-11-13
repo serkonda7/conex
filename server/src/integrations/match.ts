@@ -59,16 +59,16 @@ export interface LocalEmployee {
 	emails: EmployeeEmail[]
 }
 
-export type MatchKey = 'serial' | 'asset_tag' | 'name'
-export type EmployeeMatchKey = 'email' | 'name'
+type MatchKey = 'serial' | 'asset_tag' | 'name'
+type EmployeeMatchKey = 'email' | 'name'
 
-export interface MatchPair {
+interface MatchPair {
 	device_id: number
 	external_id: string
 	via: MatchKey
 }
 
-export interface EmployeeMatchPair {
+interface EmployeeMatchPair {
 	employee_id: number
 	external_id: string
 	via: EmployeeMatchKey

@@ -13,13 +13,7 @@ import {
 	TextField,
 } from '../../components/form'
 import { t } from '../../i18n'
-import {
-	type FormValues,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { queryParam, useFormReturnRoute } from '../../lib/router'
 
 /** Manufacturer create (`id` omitted) or edit form. */
@@ -45,37 +39,26 @@ function ManufacturerForm(props: { id?: number }): JSX.Element {
 	const backTo = useFormReturnRoute('/manufacturers', props.id)
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: ({ name: trimmed }: FormValues) =>
-				id === undefined
-					? create_manufacturer({
-							name: trimmed,
-							description: text(description()),
-							website: text(website()),
-							support_url: text(supportUrl()),
-							comments: text(comments()),
-						})
-					: update_manufacturer(id, {
-							name: trimmed,
-							description: text(description()) ?? null,
-							website: text(website()) ?? null,
-							support_url: text(supportUrl()) ?? null,
-							comments: text(comments()) ?? null,
-						}),
+			body: (values: FormValues) => ({
+				name: values.name,
+				description: text(description()),
+				website: text(website()),
+				support_url: text(supportUrl()),
+				comments: text(comments()),
+			}),
+			create: create_manufacturer,
+			update: update_manufacturer,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? (): void => {
-						setName('')
-						setDescription('')
-						setWebsite('')
-						setSupportUrl('')
-						setComments('')
-					}
-				: undefined,
+			reset: () => {
+				setName('')
+				setDescription('')
+				setWebsite('')
+				setSupportUrl('')
+				setComments('')
+			},
 		})
 	}
 

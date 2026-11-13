@@ -16,7 +16,7 @@ export const client = hc<AppType>('/api', { fetch: api_fetch })
 export type ApiResponse = Pick<Response, 'ok' | 'status' | 'json'>
 
 /** Signals that the server rejected a request because the session is gone. */
-export class UnauthorizedError extends Error {
+class UnauthorizedError extends Error {
 	constructor() {
 		super(t('api.notSignedIn'))
 		this.name = 'UnauthorizedError'
@@ -71,11 +71,6 @@ function error_message(data: unknown, fallback_msg: string): string {
 		return String((data as { error: unknown }).error)
 	}
 	return fallback_msg
-}
-
-/** The server's `{ error }` message, or `fallback_msg` when the body has none. */
-export async function read_api_error(response: ApiResponse, fallback_msg: string): Promise<string> {
-	return error_message(await response.json().catch(() => null), fallback_msg)
 }
 
 /**

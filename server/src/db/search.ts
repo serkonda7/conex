@@ -5,7 +5,7 @@ import { cableInTenants } from './cables'
 import { getDb } from './connection'
 import { scopeCondition, searchCondition } from './list'
 
-export interface SearchGroup<T> {
+interface SearchGroup<T> {
 	items: T[]
 	total: number
 }

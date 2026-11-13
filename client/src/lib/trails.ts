@@ -22,7 +22,7 @@ export async function siteGroupTrail(id: number | null): Promise<Crumb[]> {
 }
 
 /** The location `id` and its ancestors within the site, outermost first. */
-export async function locationTrail(siteId: number, id: number | null): Promise<Crumb[]> {
+async function locationTrail(siteId: number, id: number | null): Promise<Crumb[]> {
 	if (id === null) {
 		return []
 	}

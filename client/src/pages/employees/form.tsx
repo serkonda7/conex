@@ -34,10 +34,9 @@ import {
 import { t, tp } from '../../i18n'
 import { contactScopeOptions, employeeSalutationOptions } from '../../i18n/labels'
 import {
-	cleared,
+	type Cleared,
 	type FormValues,
-	is_add_another_submit,
-	submit_form,
+	submit_entity_form,
 	text,
 	useEntityForm,
 } from '../../lib/form'
@@ -56,6 +55,9 @@ type SelectEvent = Event & { currentTarget: HTMLSelectElement }
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
 const blankTenant = (): TenantEntry => ({ id: '' })
 const blankPhone = (): PhoneRow<EmployeePhone> => ({ number: '', type: 'phone', scope: 'work' })
+
+/** Saved employee fields; the memberships go separately. */
+type EmployeeBody = Omit<EmployeeCreate, 'tenant_ids'>
 
 /** Employee create (`id` omitted) or edit form. */
 function EmployeeForm(props: { id?: number }): JSX.Element {
@@ -140,7 +142,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const prefix = form.editing ? 'employee-edit' : 'employee'
 	const backTo = useFormReturnRoute('/employees', props.id)
 
-	const body = (values: FormValues, tenantId: number): Omit<EmployeeCreate, 'tenant_ids'> => ({
+	const body = (values: FormValues, tenantId: number): EmployeeBody => ({
 		first_name: text(firstName()),
 		last_name: values.name,
 		salutation: (salutation() || null) as EmployeeCreate['salutation'],
@@ -159,33 +161,29 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	})
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
 		// Never null here: the form blocks submitting without a tenant.
 		const tenantId = tenant() ?? 0
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			// The last name is the required name part.
 			name: lastName(),
 			nameError: t('employee.lastNameRequired'),
-			save: (values: FormValues) =>
-				id === undefined
-					? create_employee({ ...body(values, tenantId), tenant_ids: [tenantId] })
-					: update_employee(id, {
-							...cleared(body(values, tenantId)),
-							...(editsTenants() ? { tenant_ids: savedTenantIds() } : {}),
-						}),
+			body: (values: FormValues) => body(values, tenantId),
+			create: (input: EmployeeBody) => create_employee({ ...input, tenant_ids: [tenantId] }),
+			update: (id: number, patch: Cleared<EmployeeBody>) =>
+				update_employee(id, {
+					...patch,
+					...(editsTenants() ? { tenant_ids: savedTenantIds() } : {}),
+				}),
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? () => {
-						setFirstName('')
-						setLastName('')
-						setSalutation('')
-						setTitle('')
-						setEmails([blankEmail()])
-						setPhones([blankPhone()])
-					}
-				: undefined,
+			reset: () => {
+				setFirstName('')
+				setLastName('')
+				setSalutation('')
+				setTitle('')
+				setEmails([blankEmail()])
+				setPhones([blankPhone()])
+			},
 		})
 	}
 

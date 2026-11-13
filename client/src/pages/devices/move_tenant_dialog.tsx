@@ -1,3 +1,4 @@
+import { IconArrowsExchange } from '@tabler/icons-solidjs'
 import type { JSX } from 'solid-js'
 import { createSignal } from 'solid-js'
 import { type DeviceListItem, update_device } from '../../api/devices'
@@ -5,10 +6,20 @@ import { fetch_tenants } from '../../api/tenancy'
 import { update_virtual_machine } from '../../api/virtual_machines'
 import { InlineError } from '../../components/feedback'
 import { Hint, row_options, SelectField } from '../../components/form'
+import { IconLabel } from '../../components/icon_label'
 import { Modal } from '../../components/modal'
 import { t, tp } from '../../i18n'
 import { createRows, useAction } from '../../lib/resource'
 import { parseId } from '../../lib/router'
+
+/** Detail page header action that opens the {@link MoveTenantDialog}. */
+export function MoveTenantButton(props: { onClick: () => void }): JSX.Element {
+	return (
+		<button type="button" onClick={() => props.onClick()}>
+			<IconLabel icon={IconArrowsExchange}>{t('device.moveTenant')}</IconLabel>
+		</button>
+	)
+}
 
 export interface MoveTenantDialogProps {
 	/** A device, or a hostless VM (a hosted VM follows its host). */

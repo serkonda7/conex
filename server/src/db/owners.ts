@@ -7,7 +7,6 @@
  */
 import { asc, eq, inArray } from 'drizzle-orm'
 import {
-	attachments,
 	type cables,
 	devices,
 	employee_tenants,
@@ -17,14 +16,13 @@ import {
 	racks,
 	shelves,
 	sites,
-	virtual_machines,
 } from '../schema'
 import { getDb } from './connection'
 
 type Tenant = number | null | undefined
 
 /** Tenant of a site, or `undefined` when the site is missing. */
-export async function siteTenant(siteId: number): Promise<Tenant> {
+async function siteTenant(siteId: number): Promise<Tenant> {
 	const rows = await getDb()
 		.select({ tenant_id: sites.tenant_id })
 		.from(sites)
@@ -34,7 +32,7 @@ export async function siteTenant(siteId: number): Promise<Tenant> {
 }
 
 /** Tenant of a location, or `undefined` when the location is missing. */
-export async function locationTenant(locationId: number): Promise<Tenant> {
+async function locationTenant(locationId: number): Promise<Tenant> {
 	const rows = await getDb()
 		.select({ tenant_id: locations.tenant_id })
 		.from(locations)
@@ -61,21 +59,6 @@ export function ownerTenant(owner: {
 	return Promise.resolve(undefined)
 }
 
-/** Tenant of an attachment's owner, or `undefined` when either is missing. */
-export async function attachmentTenant(attachmentId: number): Promise<Tenant> {
-	const rows = await getDb()
-		.select({
-			site_id: attachments.site_id,
-			location_id: attachments.location_id,
-			rack_id: attachments.rack_id,
-		})
-		.from(attachments)
-		.where(eq(attachments.id, attachmentId))
-		.limit(1)
-	const row = rows[0]
-	return row ? ownerTenant(row) : undefined
-}
-
 /** Tenant of a rack, or `undefined` when the rack is missing. */
 export async function rackTenant(rackId: number): Promise<Tenant> {
 	const rows = await getDb()
@@ -92,16 +75,6 @@ export async function deviceTenant(deviceId: number): Promise<Tenant> {
 		.select({ tenant_id: devices.tenant_id })
 		.from(devices)
 		.where(eq(devices.id, deviceId))
-		.limit(1)
-	return rows[0]?.tenant_id
-}
-
-/** Tenant of a virtual machine, or `undefined` when the VM is missing. */
-export async function virtualMachineTenant(vmId: number): Promise<Tenant> {
-	const rows = await getDb()
-		.select({ tenant_id: virtual_machines.tenant_id })
-		.from(virtual_machines)
-		.where(eq(virtual_machines.id, vmId))
 		.limit(1)
 	return rows[0]?.tenant_id
 }

@@ -120,7 +120,7 @@ export function listCables(params: CableListParams): Promise<Page<CableRow>> {
 	return pageRows(cables, where, [asc(cables.id)], params)
 }
 
-export function getCable(id: number): Promise<Result<CableRow, Error>> {
+function getCable(id: number): Promise<Result<CableRow, Error>> {
 	return findById(cables, id, 'Cable not found')
 }
 

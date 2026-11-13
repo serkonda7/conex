@@ -89,6 +89,12 @@ export const DescriptionSchema = v.optional(
 	undefined,
 )
 
+/** Nullable description: accepts a missing key, null, or up to 500 characters. */
+const NullableDescriptionSchema = v.optional(
+	v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+	undefined,
+)
+
 export const CommentsSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(2000)), undefined)
 
 /**
@@ -215,7 +221,7 @@ export const TenantGroupCreateSchema = v.strictObject({
 
 export const TenantGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
@@ -273,7 +279,7 @@ export const TenantCreateSchema = v.strictObject({
 
 export const TenantUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	tenant_group_id: v.optional(v.nullable(IdSchema), undefined),
+	tenant_group_id: NullableIdSchema,
 	customer_number: v.optional(
 		v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))),
 		undefined,
@@ -311,9 +317,9 @@ export const SiteCreateSchema = v.strictObject({
 
 export const SiteUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	site_group_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	tenant_id: NullableIdSchema,
+	site_group_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 	physical_street: v.optional(v.nullable(StreetSchema), undefined),
 	physical_postcode: v.optional(v.nullable(PostcodeSchema), undefined),
@@ -348,8 +354,8 @@ export const SiteGroupCreateSchema = v.strictObject({
 
 export const SiteGroupUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	tenant_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
@@ -358,9 +364,9 @@ export const LocationUpdateSchema = v.strictObject({
 	type: v.optional(LocationTypeSchema, undefined),
 	// site_id is immutable after create: moving a subtree across sites
 	// would silently re-parent every descendant.
-	parent_id: v.optional(v.nullable(IdSchema), undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	parent_id: NullableIdSchema,
+	tenant_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 })
 
 /**
@@ -397,7 +403,7 @@ export const EmployeeUpdateSchema = v.strictObject({
 	emails: v.optional(EmployeeEmailsSchema, undefined),
 	phones: v.optional(EmployeePhonesSchema, undefined),
 	active: v.optional(v.boolean(), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
@@ -595,9 +601,9 @@ export const RackUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	rack_type_id: v.optional(IdSchema, undefined),
 	// site_id is immutable after create: rack placement depends on its site.
-	location_id: v.optional(v.nullable(IdSchema), undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	location_id: NullableIdSchema,
+	tenant_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 })
 
 export type RackCreate = v.InferOutput<typeof RackCreateSchema>
@@ -732,7 +738,7 @@ export const ManufacturerCreateSchema = v.strictObject({
 
 export const ManufacturerUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	website: v.optional(v.nullable(WebsiteSchema), undefined),
 	support_url: v.optional(v.nullable(WebsiteSchema), undefined),
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
@@ -778,7 +784,7 @@ export const RackTypeUpdateSchema = v.strictObject({
 	model: v.optional(NameSchema, undefined),
 	form_factor: v.optional(RackFormFactorSchema, undefined),
 	u_height: v.optional(RackHeightSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	comments: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))), undefined),
 })
 
@@ -1055,11 +1061,11 @@ export const DeviceRoleCreateSchema = v.strictObject({
 
 export const DeviceRoleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	parent_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	parent_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 	icon: v.optional(v.nullable(DeviceRoleIconSchema), undefined),
 	can_host_vms: v.optional(v.boolean(), undefined),
-	managed_bundle_id: v.optional(v.nullable(IdSchema), undefined),
+	managed_bundle_id: NullableIdSchema,
 })
 
 export type DeviceRoleCreate = v.InferOutput<typeof DeviceRoleCreateSchema>
@@ -1100,7 +1106,7 @@ export const PriorityUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	color: v.optional(PriorityColorSchema, undefined),
 	rank: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99)), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 })
 
 export type PriorityCreate = v.InferOutput<typeof PriorityCreateSchema>
@@ -1225,7 +1231,7 @@ export const ServiceLevelCreateSchema = v.strictObject({
 /** `service_hours` and `targets` replace the stored set when present. */
 export const ServiceLevelUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	service_hours: v.optional(ServiceHoursSchema, undefined),
 	holiday_region: v.optional(v.nullable(HolidayRegionSchema), undefined),
 	targets: v.optional(ServiceLevelTargetsSchema, undefined),
@@ -1260,7 +1266,7 @@ export const ManagedBundleCreateSchema = v.strictObject({
 
 export const ManagedBundleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 })
 
 export type ManagedBundleCreate = v.InferOutput<typeof ManagedBundleCreateSchema>
@@ -1307,8 +1313,6 @@ export const InterfaceNameSchema = v.pipe(
 	v.regex(PORT_NAME_PATTERN, PORT_NAME_MESSAGE),
 )
 
-const OptionalNullableIdEntry = v.optional(v.nullable(IdSchema), undefined)
-
 const OptionalNullablePositionEntry = v.optional(
 	v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	undefined,
@@ -1347,18 +1351,18 @@ export const DeviceUpdateSchema = v.strictObject({
 	device_role_id: v.optional(IdSchema, undefined),
 	name: v.optional(NameSchema, undefined),
 	status: v.optional(DeviceStatusSchema, undefined),
-	site_id: v.optional(v.nullable(IdSchema), undefined),
-	location_id: v.optional(v.nullable(IdSchema), undefined),
-	rack_id: v.optional(v.nullable(IdSchema), undefined),
+	site_id: NullableIdSchema,
+	location_id: NullableIdSchema,
+	rack_id: NullableIdSchema,
 	face: v.optional(v.nullable(DeviceFaceSchema), undefined),
 	position_u: v.optional(v.nullable(PositionUSchema), undefined),
-	shelf_id: v.optional(v.nullable(IdSchema), undefined),
+	shelf_id: NullableIdSchema,
 	serial: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	employee_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	tenant_id: NullableIdSchema,
+	employee_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 })
 
 /**
@@ -1367,7 +1371,7 @@ export const DeviceUpdateSchema = v.strictObject({
  */
 export const DeviceMoveSchema = v.pipe(
 	v.strictObject({
-		rack_id: OptionalNullableIdEntry,
+		rack_id: NullableIdSchema,
 		position_u: OptionalNullablePositionEntry,
 	}),
 	v.check(
@@ -1418,7 +1422,7 @@ export const InterfaceUpdateSchema = v.strictObject({
 	rear_port_position: v.optional(PortPositionsSchema, undefined),
 	// Outlets (single-position rear ports) only: the room the cable ends in.
 	// A placed outlet takes it from its floor plan and rejects it here.
-	location_id: v.optional(v.nullable(IdSchema), undefined),
+	location_id: NullableIdSchema,
 	// Patch-panel ports only: wired up, or just part of the panel.
 	patched: v.optional(v.boolean(), undefined),
 })
@@ -1515,13 +1519,13 @@ export const VirtualMachineCreateSchema = v.strictObject({
 })
 
 export const VirtualMachineUpdateSchema = v.strictObject({
-	host_device_id: v.optional(v.nullable(IdSchema), undefined),
+	host_device_id: NullableIdSchema,
 	device_role_id: v.optional(IdSchema, undefined),
 	name: v.optional(NameSchema, undefined),
 	status: v.optional(DeviceStatusSchema, undefined),
-	tenant_id: v.optional(v.nullable(IdSchema), undefined),
-	employee_id: v.optional(v.nullable(IdSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	tenant_id: NullableIdSchema,
+	employee_id: NullableIdSchema,
+	description: NullableDescriptionSchema,
 })
 
 export type VirtualMachineCreate = v.InferOutput<typeof VirtualMachineCreateSchema>
@@ -1589,7 +1593,6 @@ export const InterfaceListQuerySchema = v.object({
 })
 
 export type DeviceListQuery = v.InferOutput<typeof DeviceListQuerySchema>
-export type InterfaceListQuery = v.InferOutput<typeof InterfaceListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // Shelves (rack fixtures, fully separate from devices)
@@ -1629,7 +1632,7 @@ export const ShelfUpdateSchema = v.strictObject({
 	mount_usable: v.optional(v.boolean(), undefined),
 	reserved_height: v.optional(ShelfReservedHeightSchema, undefined),
 	is_full_depth: v.optional(v.boolean(), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 })
 
 export type ShelfCreate = v.InferOutput<typeof ShelfCreateSchema>
@@ -1641,8 +1644,6 @@ export const ShelfListQuerySchema = v.object({
 	sort: v.optional(v.picklist(['name']), 'name'),
 	order: v.optional(v.picklist(['asc', 'desc']), 'asc'),
 })
-
-export type ShelfListQuery = v.InferOutput<typeof ShelfListQuerySchema>
 
 // ---------------------------------------------------------------------------
 // P5: cables (L1)
@@ -1673,7 +1674,7 @@ export const CableUpdateSchema = v.strictObject({
 	status: v.optional(CableStatusSchema, undefined),
 	kind: v.optional(v.nullable(CableKindSchema), undefined),
 	label: v.optional(v.nullable(CableLabelSchema), undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 })
 
 /** Convenience connect body: `POST` one end in the path, the peer in the body. */
@@ -1683,7 +1684,6 @@ export const InterfaceConnectSchema = v.strictObject({
 
 export type CableCreate = v.InferOutput<typeof CableCreateSchema>
 export type CableUpdate = v.InferOutput<typeof CableUpdateSchema>
-export type InterfaceConnect = v.InferOutput<typeof InterfaceConnectSchema>
 
 export const CableListQuerySchema = v.object({
 	...ListQueryEntries,
@@ -1693,8 +1693,6 @@ export const CableListQuerySchema = v.object({
 	/** Filter to cables touching any interface of this device (either end). */
 	device: OptionalIdEntry,
 })
-
-export type CableListQuery = v.InferOutput<typeof CableListQuerySchema>
 
 /** One peer link in a per-device trace. */
 export interface TracePeerInterface {
@@ -1805,8 +1803,6 @@ export const TraceQuerySchema = v.object({
 	depth: coercedInt(1, 10, 4),
 })
 
-export type TraceQuery = v.InferOutput<typeof TraceQuerySchema>
-
 // ---------------------------------------------------------------------------
 // P7: users / roles / permissions
 // ---------------------------------------------------------------------------
@@ -1858,7 +1854,7 @@ export const RoleCreateSchema = v.strictObject({
 
 export const RoleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	permissions: v.optional(PermissionListSchema, undefined),
 })
 
@@ -1906,7 +1902,7 @@ export const UserCreateSchema = v.strictObject({
 export const UserUpdateSchema = v.strictObject({
 	role_id: v.optional(IdSchema, undefined),
 	tenant_ids: v.optional(UserTenantIdsSchema, undefined),
-	employee_id: v.optional(v.nullable(IdSchema), undefined),
+	employee_id: NullableIdSchema,
 	password: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(1024)), undefined),
 })
 
@@ -2045,13 +2041,11 @@ export const AttachmentCreateSchema = v.pipe(
 export const AttachmentFileReplaceSchema = v.strictObject({ file: AttachmentFileSchema })
 
 export const AttachmentUpdateSchema = v.strictObject({
-	description: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))), undefined),
+	description: NullableDescriptionSchema,
 	/** Marks the attachment as its site's or location's floor plan (unmarking the previous one). */
 	is_floorplan: v.optional(v.boolean(), undefined),
 })
 
-export type AttachmentListQuery = v.InferOutput<typeof AttachmentListQuerySchema>
-export type AttachmentCreate = v.InferOutput<typeof AttachmentCreateSchema>
 export type AttachmentUpdate = v.InferOutput<typeof AttachmentUpdateSchema>
 
 /** Attachment row on the wire (the image itself is `GET /attachments/:id/file`). */
@@ -2306,8 +2300,6 @@ export type FloorplanLinksQuery = v.InferOutput<typeof FloorplanLinksQuerySchema
  */
 export const FloorplanOutletsQuerySchema = v.object({ device: IdSchema })
 
-export type FloorplanOutletsQuery = v.InferOutput<typeof FloorplanOutletsQuerySchema>
-
 /** One placed outlet seen from a device (`FloorplanOutletsQuerySchema`). */
 export interface FloorplanOutletJson {
 	/** The device's port: the rear port itself on a panel, else the port cabled to it. */
@@ -2481,21 +2473,15 @@ export const SearchQuerySchema = v.object({
 	q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ''),
 })
 
-export type SearchQuery = v.InferOutput<typeof SearchQuerySchema>
-
 /** JSON body for CSV imports: raw CSV text, parsed row-by-row server-side. */
 export const CsvImportBodySchema = v.strictObject({
 	csv: v.pipe(v.string(), v.minLength(1), v.maxLength(1_000_000)),
 })
 
-export type CsvImportBody = v.InferOutput<typeof CsvImportBodySchema>
-
 /** JSON body for NetBox device-type YAML imports. */
 export const YamlImportBodySchema = v.strictObject({
 	yaml: v.pipe(v.string(), v.minLength(1), v.maxLength(1_000_000)),
 })
-
-export type YamlImportBody = v.InferOutput<typeof YamlImportBodySchema>
 
 /** `POST /device-types/:id/update`: `revision` is the one the reviewed preview was based on. */
 export const DeviceTypeUpdateApplySchema = v.strictObject({
@@ -2537,8 +2523,6 @@ export const DeviceImportRowSchema = v.object({
 	status: v.optional(DeviceStatusSchema, 'active'),
 })
 
-export type DeviceImportRow = v.InferOutput<typeof DeviceImportRowSchema>
-
 /** One cable CSV row: device/interface names resolve to ids server-side. */
 export const CableImportRowSchema = v.object({
 	a_device: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
@@ -2552,8 +2536,6 @@ export const CableImportRowSchema = v.object({
 	kind: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50)), undefined),
 	status: v.optional(CableStatusSchema, 'connected'),
 })
-
-export type CableImportRow = v.InferOutput<typeof CableImportRowSchema>
 
 /** Per-row import outcome: created id or the row's error message. */
 export interface ImportRowResult {
@@ -2770,13 +2752,7 @@ export const ExternalEmployeeDeactivateSchema = v.strictObject({
 	external_id: ExternalIdSchema,
 })
 
-export type ExternalLinkCreate = v.InferOutput<typeof ExternalLinkCreateSchema>
-export type ExternalIgnore = v.InferOutput<typeof ExternalIgnoreSchema>
-export type ExternalIgnoreLocal = v.InferOutput<typeof ExternalIgnoreLocalSchema>
-export type ExternalDeviceCreate = v.InferOutput<typeof ExternalDeviceCreateSchema>
 export type ExternalEmployeeImport = v.InferOutput<typeof ExternalEmployeeImportSchema>
-export type ExternalDeviceUpdate = v.InferOutput<typeof ExternalDeviceUpdateSchema>
-export type ExternalEmployeeUpdate = v.InferOutput<typeof ExternalEmployeeUpdateSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */
@@ -2794,16 +2770,12 @@ export const IntegrationReportQuerySchema = v.object({
 	tenant_group: OptionalIdEntry,
 })
 
-export type IntegrationReportQuery = v.InferOutput<typeof IntegrationReportQuerySchema>
-
 /** Link board: tenants, or the devices/employees of one conex tenant. */
 export const LinkBoardQuerySchema = v.object({
 	entity_type: LinkEntityTypeSchema,
 	/** Device/employee board only: the conex tenant whose objects are shown. */
 	tenant: OptionalIdEntry,
 })
-
-export type LinkBoardQuery = v.InferOutput<typeof LinkBoardQuerySchema>
 
 /**
  * New ticket in the external system for a linked tenant (company), optionally
@@ -2831,8 +2803,6 @@ export interface TicketCreated {
 export const TicketListQuerySchema = v.object({
 	tenant: OptionalIdEntry,
 })
-
-export type TicketListQuery = v.InferOutput<typeof TicketListQuerySchema>
 
 /** Open ticket in the external system (times in unix seconds). */
 export interface ExternalTicketJson {

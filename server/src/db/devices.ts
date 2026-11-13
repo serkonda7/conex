@@ -1057,15 +1057,10 @@ export async function updateDevice(
 			input.tenant_id !== undefined ? input.tenant_id : node.tenant_id,
 		),
 		await checkDeviceUnique(input, id),
+		await checkDeviceRoleExists(input.device_role_id),
 	]) {
 		if (Result.isError(guard)) {
 			return guard
-		}
-	}
-	if (input.device_role_id !== undefined) {
-		const roleCheck = await checkDeviceRoleExists(input.device_role_id)
-		if (Result.isError(roleCheck)) {
-			return roleCheck
 		}
 	}
 	if (mountChanged || input.face !== undefined || input.name !== undefined) {

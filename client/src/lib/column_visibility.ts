@@ -3,7 +3,7 @@ import { createSignal } from 'solid-js'
 const STORAGE_PREFIX = 'conex:columns:'
 
 /** Reads persisted visible-column keys for a table, or null when unset/corrupt. */
-export function load_visible_columns(key: string): string[] | null {
+function load_visible_columns(key: string): string[] | null {
 	try {
 		const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${key}`)
 		if (!raw) {

@@ -147,19 +147,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		},
 		employeeColumn<DeviceRow>(employeeName),
 	]
-	const employeeColumns: DataTableColumn<EmployeeRow>[] = [
-		nameColumn<EmployeeRow>(t('common.name'), '/employees'),
-		{
-			key: 'title',
-			label: t('employee.title'),
-			getValue: (e: EmployeeRow): string => e.title ?? '—',
-		},
-		{
-			key: 'email',
-			label: t('employee.email'),
-			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={primaryEmail(e.emails)} />,
-		},
-	]
+	const employeeColumns = relatedEmployeeColumns()
 	const rackColumns: DataTableColumn<RackRow>[] = [
 		nameColumn<RackRow>(t('common.name'), '/racks'),
 		{
@@ -170,13 +158,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		rackHeightColumn(),
 	]
 	const vmColumns: DataTableColumn<DeviceListItem>[] = [
-		{
-			key: 'name',
-			label: t('common.name'),
-			getValue: (vm: DeviceListItem): JSX.Element => (
-				<a href={deviceListHref(vm)}>{vm.name}</a>
-			),
-		},
+		vmNameColumn(),
 		statusColumn<DeviceListItem>(),
 		roleColumn<DeviceListItem>(roleName),
 		{
@@ -609,8 +591,34 @@ export function vmHost(vm: DeviceListItem): JSX.Element {
 	return <span>{t('deviceRoleIcon.cloud')}</span>
 }
 
+/** Name of a device list row (here a VM), linking its detail page. */
+export function vmNameColumn(): DataTableColumn<DeviceListItem> {
+	return {
+		key: 'name',
+		label: t('common.name'),
+		getValue: (vm: DeviceListItem): JSX.Element => <a href={deviceListHref(vm)}>{vm.name}</a>,
+	}
+}
+
+/** Name, title and primary email of the related employees. */
+export function relatedEmployeeColumns(): DataTableColumn<EmployeeRow>[] {
+	return [
+		nameColumn<EmployeeRow>(t('common.name'), '/employees'),
+		{
+			key: 'title',
+			label: t('employee.title'),
+			getValue: (e: EmployeeRow): string => e.title ?? '—',
+		},
+		{
+			key: 'email',
+			label: t('employee.email'),
+			getValue: (e: EmployeeRow): JSX.Element => <EmailLink email={primaryEmail(e.emails)} />,
+		},
+	]
+}
+
 /** Status pill of a device or VM. */
-export function statusColumn<Row extends { status: string }>(): DataTableColumn<Row> {
+function statusColumn<Row extends { status: string }>(): DataTableColumn<Row> {
 	return {
 		key: 'status',
 		label: t('common.status'),
@@ -630,7 +638,7 @@ export function roleColumn<Row extends { device_role_id: number }>(
 	}
 }
 
-export function employeeColumn<Row extends { employee_id: number | null }>(
+function employeeColumn<Row extends { employee_id: number | null }>(
 	employeeName: (id: number) => string,
 ): DataTableColumn<Row> {
 	return {

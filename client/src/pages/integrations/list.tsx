@@ -14,12 +14,13 @@ import {
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { providerLabel, syncStateLabel } from '../../i18n/labels'
+import { providerLabel } from '../../i18n/labels'
 import { createRows, useAction } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { formatTime } from '../../lib/time'
 import { CalendarSyncCard } from './calendar_sync'
+import { RunStateLine } from './run_state'
 
 /** Login state: disabled, the last error, or when it last connected. */
 function LoginStatus(props: { integration: IntegrationJson }): JSX.Element {
@@ -40,16 +41,7 @@ function LoginStatus(props: { integration: IntegrationJson }): JSX.Element {
 function SyncStatus(props: { run: SyncRunJson }): JSX.Element {
 	return (
 		<>
-			<div>
-				{syncStateLabel(props.run.state)}
-				{' ('}
-				{formatTime(props.run.finished_at ?? props.run.started_at)}
-				{')'}
-				<Show when={props.run.error}>
-					{' · '}
-					<span class="text-danger">{props.run.error}</span>
-				</Show>
-			</div>
+			<RunStateLine run={props.run} />
 			<Show when={props.run.state === 'ok'}>
 				<div>
 					{t('integration.syncCounts', {

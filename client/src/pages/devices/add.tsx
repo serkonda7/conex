@@ -51,6 +51,24 @@ export function queryFace(): string {
 	return face === 'front' || face === 'rear' ? face : ''
 }
 
+/** Active/inactive switch of the device and virtual machine forms. */
+export function DeviceStatusField(props: {
+	id: string
+	inactive: boolean
+	onChange: (inactive: boolean) => void
+}): JSX.Element {
+	return (
+		<ToggleField
+			id={props.id}
+			label={t('common.status')}
+			checked={!props.inactive}
+			onChange={(isActive: boolean) => props.onChange(!isActive)}
+			on_text={deviceStatusLabel('active')}
+			off_text={deviceStatusLabel('inactive')}
+		/>
+	)
+}
+
 /**
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
  * pre-fills it from that device, except the name, serial, device ID,
@@ -222,13 +240,10 @@ export function DeviceAddPage(): JSX.Element {
 	return (
 		<FormPage form={form} cancelTo="/devices" tenant="required" onSubmit={handleCreate}>
 			<FormSection title={tp('entity.device', 1)}>
-				<ToggleField
+				<DeviceStatusField
 					id="device-inactive"
-					label={t('common.status')}
-					checked={!inactive()}
-					onChange={(isActive: boolean) => setInactive(!isActive)}
-					on_text={deviceStatusLabel('active')}
-					off_text={deviceStatusLabel('inactive')}
+					inactive={inactive()}
+					onChange={setInactive}
 				/>
 				<NameField id="device-name" value={name()} onInput={setName} autofocus />
 				<SelectField

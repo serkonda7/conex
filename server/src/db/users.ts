@@ -280,7 +280,7 @@ async function writeOwnTenants(userId: number, tenantIds: readonly number[]): Pr
 }
 
 /** Login of an employee's account: its primary mail address, null without one. */
-export function loginOf(emails: readonly { address: string }[]): string | null {
+function loginOf(emails: readonly { address: string }[]): string | null {
 	const address = emails[0]?.address
 	return address ? normalize_username(address) : null
 }

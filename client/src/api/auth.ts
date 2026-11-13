@@ -11,20 +11,6 @@ import type { Permission } from 'shared/src/types'
 import { t } from '../i18n'
 import { post_json } from './client'
 
-export type AuthProviders = { local: boolean; microsoft: boolean }
-
-export async function fetchProviders(): Promise<AuthProviders | undefined> {
-	try {
-		const res = await fetch('/api/auth/providers')
-		if (!res.ok) {
-			return undefined
-		}
-		return (await res.json()) as AuthProviders
-	} catch {
-		return undefined
-	}
-}
-
 /** True when no admin account exists yet. Never throws: null on network error. */
 export async function fetchSetupStatus(): Promise<boolean | null> {
 	try {

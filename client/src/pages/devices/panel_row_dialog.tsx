@@ -1,4 +1,4 @@
-import { IconInfoCircle, IconLinkPlus, IconLock, IconUnlink } from '@tabler/icons-solidjs'
+import { IconLinkPlus, IconLock, IconUnlink } from '@tabler/icons-solidjs'
 import type { InterfaceUpdate, TraceEndToEnd, TraceLink } from 'shared/src/types'
 import type { JSX } from 'solid-js'
 import { createSignal, Show } from 'solid-js'

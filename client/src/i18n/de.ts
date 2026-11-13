@@ -92,9 +92,6 @@ export const de: Messages = {
 	'portKind.displayport': 'DisplayPort',
 	'portKind.vga': 'VGA',
 	'portKind.dvi': 'DVI',
-	'cableStatus.connected': 'Verbunden',
-	'cableStatus.planned': 'Geplant',
-	'cableStatus.decommissioned': 'Außer Betrieb',
 
 	// entity
 	'entity.tenant.one': 'Mandant',
@@ -698,7 +695,6 @@ export const de: Messages = {
 	'managedBundle.rolesHint':
 		'Die Geräterollen, für die dieses Paket gilt, werden an den Rollen selbst festgelegt. Bearbeite eine Geräterolle, um sie diesem Paket zuzuweisen.',
 	'managedBundle.notFound': 'Managed-Paket nicht gefunden.',
-	'managedBundle.details': 'Managed-Paket-Details',
 	'managedBundle.roleCount': 'Geräterollen',
 	'managedBundle.tenantCount': 'Mandanten',
 	'managedBundle.noRoles': 'Diesem Paket sind noch keine Geräterollen zugeordnet.',
@@ -810,7 +806,6 @@ export const de: Messages = {
 	'shelf.nameOptional': 'Name (optional)',
 	'shelf.namePlaceholder': 'Fachboden',
 	'shelf.face': 'Seite',
-	'shelf.faceHint': 'An welcher Rackseite der Fachboden montiert ist.',
 	'shelf.position': 'Position (HE)',
 	'shelf.positionHint': 'Unterste HE der Montage.',
 	'shelf.mountHeight': 'Montagehöhe (HE)',
@@ -906,18 +901,12 @@ export const de: Messages = {
 	'device.panel.manageJacks': 'Mehrfachdosen…',
 	'device.jacks.title': 'Mehrfachdosen von {name}',
 	'device.jacks.empty': 'Noch keine Mehrfachdosen.',
-	'device.jacks.ports': 'Ports',
 	'device.jacks.ungroup': '{name} auflösen',
 	'device.jacks.edit': '{name} bearbeiten',
 	'device.jacks.new': 'Neue Mehrfachdose',
 	'device.jacks.outlets': 'Dosen',
 	'device.jacks.noFreeOutlets': 'Alle Dosen sind in Mehrfachdosen.',
 	'device.jacks.create': 'Zusammenfassen',
-	'device.jacks.sequence': 'Der Reihe nach zusammenfassen',
-	'device.jacks.portsPerJack': 'Ports pro Mehrfachdose',
-	'device.jacks.sequenceGroup': '{count} freie Dosen zusammenfassen',
-	'device.jacks.sequenceHint':
-		'Fasst die freien Dosen in Portreihenfolge zusammen, je {size} pro Mehrfachdose, benannt nach ihren Ports. Ein kleinerer Rest bleibt einzeln.',
 	'device.trace.via': 'über {via}',
 	'device.trace.split': '(eine von mehreren Fasern)',
 	'device.trace.openEnd': '→ frei',
@@ -942,8 +931,6 @@ export const de: Messages = {
 	'device.filterPorts': 'Anschlüsse filtern…',
 	'device.freePortsCount': '{free} von {total} frei',
 	'device.pickPeerPort': 'Freien Anschluss auswählen',
-	'device.traceDepth': 'Pfadtiefe',
-	'device.depth': 'Tiefe {count}',
 	// virtual machines
 	'vm.kind': 'Art',
 	'vm.host': 'Host',
@@ -953,7 +940,6 @@ export const de: Messages = {
 	'vm.clearHost': 'Host entfernen',
 	'vm.hostHint':
 		'Ohne Host läuft die virtuelle Maschine in der Cloud und hat einen eigenen Mandanten.',
-	'vm.tenantFromHost': 'Eine virtuelle Maschine auf einem Host hat den Mandanten ihres Hosts.',
 	'vm.namePlaceholder': 'vm-web-01',
 	'vm.editTitle': 'Virtuelle Maschine bearbeiten',
 	'vm.loadingOne': 'Virtuelle Maschine wird geladen…',
@@ -965,10 +951,6 @@ export const de: Messages = {
 	'vm.moveTenantHint': 'Beim Verschieben wird die Zuweisung entfernt.',
 
 	// interface
-	'connection.endpointA': 'Endpunkt A',
-	'connection.endpointB': 'Endpunkt B',
-	'connection.show': 'Anzeigen',
-	'connection.label': 'Bezeichnung',
 
 	// user
 	'user.tenantScope': 'Mandantenzuordnung',
@@ -1119,7 +1101,6 @@ export const de: Messages = {
 	'floorplan.outletSwitchSide': 'Panelseite',
 	'floorplan.outletDeviceSide': 'Dosenseite',
 	'floorplan.openPanel': 'Panel öffnen',
-	'floorplan.outletOf': 'Dose: {outlet}',
 	'floorplan.pageName': 'Grundriss {name}',
 	'floorplan.notFound': 'Grundriss nicht gefunden.',
 	'floorplan.open': 'Grundriss öffnen',
@@ -1413,7 +1394,6 @@ export const de: Messages = {
 	'calendarSync.confirmRemove':
 		'Zuordnung von {name} entfernen? Die synchronisierten Termine werden beim nächsten Lauf aus Outlook gelöscht.',
 	'calendarSync.mappingFailed': 'Die Zuordnung konnte nicht gespeichert werden',
-	'calendarSync.runs': 'Letzte Läufe',
 	'calendarSync.runsFailed': 'Die Läufe der Kalendersynchronisation konnten nicht geladen werden',
 	'calendarSync.counts':
 		'{created} erstellt, {updated} aktualisiert, {deleted} gelöscht, {failed} fehlgeschlagen',

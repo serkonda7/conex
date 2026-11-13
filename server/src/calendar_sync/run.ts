@@ -53,13 +53,13 @@ const WINDOW_FUTURE_DAYS = 60
 
 let running = false
 
-export interface SyncWindow {
+interface SyncWindow {
 	from: number
 	to: number
 }
 
 /** Today (UTC) −7 days up to the end of today +60 days. */
-export function syncWindow(now: number): SyncWindow {
+function syncWindow(now: number): SyncWindow {
 	const today = now - (now % DAY_S)
 	return { from: today - WINDOW_PAST_DAYS * DAY_S, to: today + (WINDOW_FUTURE_DAYS + 1) * DAY_S }
 }

@@ -26,7 +26,8 @@ export function id_value(id: number | null | undefined): string {
 	return id === null || id === undefined ? '' : String(id)
 }
 
-type Cleared<T> = {
+/** Update patch of a create body `T`; see {@link cleared}. */
+export type Cleared<T> = {
 	[K in keyof T]: undefined extends T[K] ? Exclude<T[K], undefined> | null : T[K]
 }
 
@@ -63,6 +64,8 @@ export function useFormState(): FormState {
 
 /** {@link FormState} of a form that edits the record `id`, or creates one when omitted. */
 export interface EntityFormState<T> extends FormState {
+	/** The edited record's id; undefined on create forms. */
+	id: number | undefined
 	/** The loaded record; stays undefined on create forms. */
 	record: Resource<T | null>
 }
@@ -92,7 +95,7 @@ export function useEntityForm<T>(opts: {
 			return res.value
 		},
 	)
-	return { ...base, editing: opts.id !== undefined, loaded, record }
+	return { ...base, id: opts.id, editing: opts.id !== undefined, loaded, record }
 }
 
 /** Trimmed name handed to `SubmitFormOptions.save`. */
@@ -153,4 +156,36 @@ export async function submit_form<T>(opts: SubmitFormOptions<T>): Promise<void> 
 		return
 	}
 	navigate(opts.navigateTo)
+}
+
+/** Options for {@link submit_entity_form}. */
+export interface EntitySubmitOptions<B extends object>
+	extends Omit<SubmitFormOptions<unknown>, 'form' | 'save' | 'onSuccess'> {
+	form: EntityFormState<unknown>
+	/** The create body; an edit saves it {@link cleared}. */
+	body: (values: FormValues) => B
+	create: (body: NoInfer<B>) => Promise<Result<unknown, Error>>
+	update: (id: number, patch: Cleared<NoInfer<B>>) => Promise<Result<unknown, Error>>
+	/** Clears the fields after Create & Add Another. */
+	reset?: () => void
+}
+
+/**
+ * Submit handler body of a combined add/edit form: {@link submit_form} that
+ * creates the `body` on a create form and saves it {@link cleared} on an
+ * edit form; Create & Add Another stays on the form and calls `reset`.
+ */
+export async function submit_entity_form<B extends object>(
+	e: SubmitEvent,
+	opts: EntitySubmitOptions<B>,
+): Promise<void> {
+	e.preventDefault()
+	const { body, create, update, reset, ...rest } = opts
+	const id = opts.form.id
+	await submit_form({
+		...rest,
+		save: (values: FormValues) =>
+			id === undefined ? create(body(values)) : update(id, cleared(body(values))),
+		onSuccess: reset !== undefined && is_add_another_submit(e) ? reset : undefined,
+	})
 }

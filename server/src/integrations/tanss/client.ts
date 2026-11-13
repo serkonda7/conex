@@ -119,7 +119,7 @@ export interface TanssAppointments {
 }
 
 /** Raised for HTTP failures; `status` 401/403 means bad credentials. */
-export class TanssApiError extends Error {
+class TanssApiError extends Error {
 	constructor(
 		message: string,
 		readonly status: number | null,
@@ -151,7 +151,7 @@ const DeviceResponseSchema = v.object({
 /** TANSS link types (`linkTypeId` of tickets and assignments). */
 export const PC_LINK_TYPE = 1
 export const PERIPHERY_LINK_TYPE = 3
-export const TICKET_LINK_TYPE = 11
+const TICKET_LINK_TYPE = 11
 
 export interface TanssTicketInput {
 	companyId: number
@@ -296,7 +296,7 @@ async function call(
 }
 
 /** Logs in a TANSS user and returns the `Bearer ...` API key. */
-export async function tanssLogin(
+async function tanssLogin(
 	baseUrl: string,
 	username: string,
 	password: string,

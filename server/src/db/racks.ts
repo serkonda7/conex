@@ -159,7 +159,7 @@ function spanOf(device: MountedDevice): OccupantSpan {
  * `db/devices.ts` and `db/shelves.ts` validate mounts against the same rows
  * the elevation renders.
  */
-export async function deviceSpansOf(rackId: number): Promise<OccupantSpan[]> {
+async function deviceSpansOf(rackId: number): Promise<OccupantSpan[]> {
 	return (await deviceDetailsOf(rackId)).map(spanOf)
 }
 

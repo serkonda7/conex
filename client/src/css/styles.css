@@ -2320,43 +2320,10 @@ tbody tr:last-child td {
 	margin: 0.5rem 0;
 }
 
-.toolbar-search {
-	flex: 1 1 14rem;
-	display: flex;
-}
-
 .toolbar-search-input {
 	flex: 1 1 auto;
 	width: 100%;
 	min-width: 0;
-}
-
-.toolbar-count {
-	font-size: var(--font-size-base);
-	color: var(--text-secondary);
-	white-space: nowrap;
-}
-
-.toolbar-spacer {
-	flex: 1 1 auto;
-}
-
-/* Sortable column headers. */
-.sort-th {
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	text-transform: inherit;
-	letter-spacing: inherit;
-	cursor: pointer;
-	white-space: nowrap;
-}
-
-.sort-th:hover {
-	background: transparent;
-	color: var(--text);
 }
 
 /* The package picks a dark text color on its accent in dark mode; text on
@@ -2397,10 +2364,6 @@ tbody tr:last-child td {
 }
 
 /* Table cell helpers. */
-.cell-checkbox {
-	width: 2rem;
-}
-
 .cell-nowrap {
 	white-space: nowrap;
 }
@@ -2866,13 +2829,6 @@ tbody tr:last-child td {
 	gap: 0.75rem;
 	padding-top: 0.75rem;
 	border-top: 1px solid var(--border);
-}
-
-.panel-row-save-hint {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
-	font-size: var(--font-size-sm);
 }
 
 @media (max-width: 36rem) {
@@ -3412,12 +3368,6 @@ tbody tr:last-child td {
 	flex: none;
 	width: 18px;
 	height: 18px;
-}
-
-.component-actions {
-	width: 1%;
-	white-space: nowrap;
-	text-align: right;
 }
 
 /* Device type detail: device preview in the same flat style. */
@@ -4178,13 +4128,6 @@ span.attachment-star,
 	margin: 0.6rem 0;
 }
 
-.floorplan-toolbar {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.6rem;
-}
-
 .floorplan-palette-actions button.active,
 .floorplan-kinds button.active {
 	background-color: var(--bg-hover);
@@ -4805,15 +4748,6 @@ span.attachment-star,
 	display: none;
 }
 
-.rack-dev-face {
-	flex-shrink: 0;
-	font-size: var(--font-size-sm);
-	border: 1px solid var(--border-strong);
-	border-radius: 999px;
-	padding: 0 0.4rem;
-	color: var(--text-secondary);
-}
-
 .rack-u-body .badge {
 	flex-shrink: 0;
 }
@@ -5327,12 +5261,6 @@ a.rack-shelf-plate:hover {
 	flex-direction: column;
 	gap: 0.6rem;
 	padding-top: 2.1rem;
-}
-
-.link-board-hint {
-	margin: 0;
-	color: var(--text-secondary);
-	font-size: var(--font-size-sm);
 }
 
 .link-board-toggle {

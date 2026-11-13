@@ -9,7 +9,6 @@ import {
 	fetch_manufacturers,
 } from '../../api/templates'
 import type { DataTableColumn } from '../../components/data_table'
-import { IconLabel } from '../../components/icon_label'
 import {
 	EntityListPage,
 	idOptions,
@@ -19,12 +18,19 @@ import {
 } from '../../components/list_page'
 import { Markdown } from '../../components/markdown'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel, deviceTypeEolOptions, yesNo, yesNoOptions } from '../../i18n/labels'
-import { deviceRoleIcon } from '../../lib/icons'
+import { deviceTypeEolOptions, yesNo, yesNoOptions } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
 import { formatDate, isPastEol } from '../../lib/time'
 import { deviceRoleOptions } from '../device-roles/options'
+import { useDeviceRoleLink } from '../device-roles/role_link'
+import {
+	deviceTypeDevicesColumn,
+	deviceTypeHeightColumn,
+	deviceTypeManufacturerColumn,
+	deviceTypeModelColumn,
+	deviceTypePartNumberColumn,
+} from './columns'
 import { EolPill } from './eol_pill'
 import { SpecLink } from './spec_link'
 
@@ -58,9 +64,7 @@ export function DeviceTypesPage(): JSX.Element {
 	const [manufacturers] = createRows(fetch_manufacturers, list.setError)
 	const [roles] = createRows(fetch_device_roles, list.setError)
 	const manufacturerName = useNameOf(manufacturers)
-	const roleName = useNameOf(roles, deviceRoleLabel)
-	const roleIcon = (id: number): ReturnType<typeof deviceRoleIcon> =>
-		deviceRoleIcon(roles()?.find((r) => r.id === id)?.icon)
+	const roleCell = useDeviceRoleLink(roles)
 	// Only manufacturers with device types, plus a chosen one (deep link).
 	const manufacturerOptions = createMemo(() =>
 		idOptions(
@@ -91,43 +95,16 @@ export function DeviceTypesPage(): JSX.Element {
 	})
 
 	const columns: DataTableColumn<DeviceTypeListRow>[] = [
-		{
-			key: 'manufacturer',
-			label: tp('entity.manufacturer', 1),
-			sortable: true,
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/manufacturers/${dt.manufacturer_id}`}>
-					{manufacturerName(dt.manufacturer_id)}
-				</a>
-			),
-		},
-		{
-			key: 'model',
-			label: t('common.model'),
-			sortable: true,
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/device-types/${dt.id}`}>{dt.model}</a>
-			),
-		},
-		{
-			key: 'part_number',
-			sortable: true,
-			label: t('deviceType.partNumber'),
-			getValue: (dt: DeviceTypeListRow): string => dt.part_number || '—',
-		},
+		deviceTypeManufacturerColumn(manufacturerName, { sortable: true }),
+		deviceTypeModelColumn({ sortable: true }),
+		deviceTypePartNumberColumn({ sortable: true }),
 		{
 			key: 'role',
 			sortable: true,
 			label: t('deviceType.defaultRole'),
 			getValue: (dt: DeviceTypeListRow): JSX.Element => {
 				const id = dt.default_device_role_id
-				return id === null ? (
-					<span>—</span>
-				) : (
-					<a href={`/device-roles/${id}`}>
-						<IconLabel icon={roleIcon(id)}>{roleName(id)}</IconLabel>
-					</a>
-				)
+				return id === null ? <span>—</span> : roleCell(id)
 			},
 		},
 		{
@@ -145,12 +122,7 @@ export function DeviceTypesPage(): JSX.Element {
 				<Markdown text={dt.comments} inline />
 			),
 		},
-		{
-			key: 'u_height',
-			sortable: true,
-			label: t('common.heightU'),
-			getValue: (dt: DeviceTypeListRow): string => `${dt.u_height}`,
-		},
+		deviceTypeHeightColumn({ sortable: true }),
 		{
 			key: 'is_full_depth',
 			sortable: true,
@@ -177,14 +149,7 @@ export function DeviceTypesPage(): JSX.Element {
 					'—'
 				),
 		},
-		{
-			key: 'devices',
-			sortable: true,
-			label: tp('entity.device', 2),
-			getValue: (dt: DeviceTypeListRow): JSX.Element => (
-				<a href={`/devices?device_type=${dt.id}`}>{dt.instance_count}</a>
-			),
-		},
+		deviceTypeDevicesColumn({ sortable: true }),
 	]
 
 	return (

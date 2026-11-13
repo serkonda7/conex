@@ -24,7 +24,7 @@ export async function initStorage(serverRoot: string): Promise<void> {
 }
 
 /** The attachments directory; throws when `initStorage` was not called. */
-export function getAttachmentsDir(): string {
+function getAttachmentsDir(): string {
 	if (!attachmentsDir) {
 		throw new Error('Storage has not been initialized. Call initStorage() during startup.')
 	}

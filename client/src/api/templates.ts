@@ -13,7 +13,6 @@ import type {
 	StubRow,
 } from 'server/src/db/templates'
 import type {
-	DeviceTypeCreate,
 	DeviceTypeListQuery,
 	DeviceTypeUpdate,
 	DeviceTypeUpdateApply,
@@ -103,16 +102,6 @@ export async function delete_manufacturer(id: number): Promise<Result<unknown, E
 
 export type DeviceTypeSort = DeviceTypeListQuery['sort']
 
-/**
- * Device-type create body. `u_height` / `is_full_depth` stay optional here
- * even though the shared output type marks them required: the server
- * defaults them.
- */
-export type DeviceTypeCreateInput = Omit<DeviceTypeCreate, 'u_height' | 'is_full_depth'> & {
-	u_height?: DeviceTypeCreate['u_height']
-	is_full_depth?: DeviceTypeCreate['is_full_depth']
-}
-
 export async function fetch_device_types(
 	filters?: Partial<DeviceTypeListQuery>,
 ): Promise<Result<Page<DeviceTypeListRow>, Error>> {
@@ -142,13 +131,6 @@ export async function fetch_all_device_types(
 export async function fetch_device_type(id: number): Promise<Result<DeviceTypeRow, Error>> {
 	const res = await client['device-types'][':id'].$get(by_id(id))
 	return to_result<DeviceTypeRow>(res, failed.load('noun.deviceType'))
-}
-
-export async function create_device_type(
-	input: DeviceTypeCreateInput,
-): Promise<Result<DeviceTypeRow, Error>> {
-	const res = await client['device-types'].$post({ json: input })
-	return to_result<DeviceTypeRow>(res, failed.create('noun.deviceType'))
 }
 
 export async function update_device_type(

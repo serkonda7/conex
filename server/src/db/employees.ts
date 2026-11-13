@@ -56,7 +56,7 @@ const employeeLogin: SQL<string | null> = sql<string | null>`(
 )`
 
 /** Columns of an `EmployeeRow`. */
-export const employeeColumns: ReturnType<typeof getTableColumns<typeof employees>> & {
+const employeeColumns: ReturnType<typeof getTableColumns<typeof employees>> & {
 	tenant_ids: SQL<number[]>
 	login: SQL<string | null>
 } = { ...getTableColumns(employees), tenant_ids: employeeTenantIds, login: employeeLogin }

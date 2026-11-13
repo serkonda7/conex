@@ -90,9 +90,6 @@ export const en = {
 	'portKind.displayport': 'DisplayPort',
 	'portKind.vga': 'VGA',
 	'portKind.dvi': 'DVI',
-	'cableStatus.connected': 'Connected',
-	'cableStatus.planned': 'Planned',
-	'cableStatus.decommissioned': 'Decommissioned',
 
 	// entity
 	'entity.tenant.one': 'Tenant',
@@ -692,7 +689,6 @@ export const en = {
 	'managedBundle.rolesHint':
 		'The device roles this bundle applies to are set on the roles themselves. Edit a device role to assign it to this bundle.',
 	'managedBundle.notFound': 'Managed bundle not found.',
-	'managedBundle.details': 'Managed bundle details',
 	'managedBundle.roleCount': 'Device roles',
 	'managedBundle.tenantCount': 'Tenants',
 	'managedBundle.noRoles': 'No device roles fall under this bundle yet.',
@@ -804,7 +800,6 @@ export const en = {
 	'shelf.nameOptional': 'Name (optional)',
 	'shelf.namePlaceholder': 'shelf',
 	'shelf.face': 'Face',
-	'shelf.faceHint': 'Which rack face the shelf is mounted on.',
 	'shelf.position': 'Position (U)',
 	'shelf.positionHint': 'Lowest U of the mount (1-based).',
 	'shelf.mountHeight': 'Mount height (U)',
@@ -898,18 +893,12 @@ export const en = {
 	'device.panel.manageJacks': 'Jacks…',
 	'device.jacks.title': 'Jacks of {name}',
 	'device.jacks.empty': 'No jacks yet.',
-	'device.jacks.ports': 'Ports',
 	'device.jacks.ungroup': 'Ungroup {name}',
 	'device.jacks.edit': 'Edit {name}',
 	'device.jacks.new': 'New jack',
 	'device.jacks.outlets': 'Outlets',
 	'device.jacks.noFreeOutlets': 'All outlets are in jacks.',
 	'device.jacks.create': 'Group',
-	'device.jacks.sequence': 'Group in sequence',
-	'device.jacks.portsPerJack': 'Ports per jack',
-	'device.jacks.sequenceGroup': 'Group {count} free outlets',
-	'device.jacks.sequenceHint':
-		'Groups the free outlets in port order, {size} per jack, named after their ports. A smaller remainder stays single.',
 	'device.trace.via': 'via {via}',
 	'device.trace.split': '(one of several fibers)',
 	'device.trace.openEnd': '→ free',
@@ -934,8 +923,6 @@ export const en = {
 	'device.filterPorts': 'Filter ports…',
 	'device.freePortsCount': '{free} of {total} free',
 	'device.pickPeerPort': 'Select a free port',
-	'device.traceDepth': 'Trace depth',
-	'device.depth': 'Depth {count}',
 	// virtual machines
 	'vm.kind': 'Kind',
 	'vm.host': 'Host',
@@ -944,7 +931,6 @@ export const en = {
 	'vm.selectHostTitle': 'Select host device',
 	'vm.clearHost': 'Remove host',
 	'vm.hostHint': 'Without a host the virtual machine runs in the cloud and has its own tenant.',
-	'vm.tenantFromHost': 'A virtual machine on a host has the tenant of its host.',
 	'vm.namePlaceholder': 'vm-web-01',
 	'vm.editTitle': 'Edit virtual machine',
 	'vm.loadingOne': 'Loading virtual machine…',
@@ -956,10 +942,6 @@ export const en = {
 	'vm.moveTenantHint': 'Moving clears the assignment.',
 
 	// interface
-	'connection.endpointA': 'Endpoint A',
-	'connection.endpointB': 'Endpoint B',
-	'connection.show': 'Show',
-	'connection.label': 'Label',
 
 	// user
 	'user.tenantScope': 'Tenant scope',
@@ -1106,7 +1088,6 @@ export const en = {
 	'floorplan.outletSwitchSide': 'Panel side',
 	'floorplan.outletDeviceSide': 'Outlet side',
 	'floorplan.openPanel': 'Open panel',
-	'floorplan.outletOf': 'Outlet: {outlet}',
 	'floorplan.pageName': 'Floor plan {name}',
 	'floorplan.notFound': 'Floor plan not found.',
 	'floorplan.open': 'Open floor plan',
@@ -1389,7 +1370,6 @@ export const en = {
 	'calendarSync.confirmRemove':
 		'Remove the mapping of {name}? Their synced events are deleted from Outlook on the next run.',
 	'calendarSync.mappingFailed': 'Failed to save the mapping',
-	'calendarSync.runs': 'Recent runs',
 	'calendarSync.runsFailed': 'Failed to load the calendar sync runs',
 	'calendarSync.counts':
 		'{created} created, {updated} updated, {deleted} deleted, {failed} failed',

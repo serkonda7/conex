@@ -12,19 +12,10 @@ import {
 	DescriptionField,
 	FormPage,
 	NameField,
-	row_options,
-	SelectField,
+	TenantSelectField,
 } from '../../components/form'
-import { t, tp } from '../../i18n'
-import {
-	cleared,
-	type FormValues,
-	id_value,
-	is_add_another_submit,
-	submit_form,
-	text,
-	useEntityForm,
-} from '../../lib/form'
+import { t } from '../../i18n'
+import { type FormValues, id_value, submit_entity_form, text, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { newObjectTenantId } from '../../lib/tenant_context'
@@ -58,21 +49,14 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 	})
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		e.preventDefault()
-		const id = props.id
-		await submit_form({
+		await submit_entity_form(e, {
 			form,
 			name: name(),
-			save: (values: FormValues) =>
-				id === undefined
-					? create_site_group(body(values))
-					: update_site_group(id, cleared(body(values))),
+			body,
+			create: create_site_group,
+			update: update_site_group,
 			navigateTo: backTo(),
-			onSuccess: is_add_another_submit(e)
-				? (): void => {
-						setName('')
-					}
-				: undefined,
+			reset: () => setName(''),
 		})
 	}
 
@@ -94,13 +78,11 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 				autofocus={!form.editing}
 			/>
 			<Show when={form.editing}>
-				<SelectField
+				<TenantSelectField
 					id={`${prefix}-tenant`}
-					label={tp('entity.tenant', 1)}
 					value={tenantId()}
 					onChange={setTenantId}
-					options={row_options(tenants() ?? [])}
-					emptyLabel={t('common.noTenant')}
+					tenants={tenants()}
 				/>
 			</Show>
 			<DescriptionField

@@ -87,12 +87,12 @@ export function markerIcon(
 }
 
 /** Connector glyph of an outlet: RJ-45 for copper, fiber for the rest (its first port's kind). */
-export function outletIcon(port: FloorplanPortJson): IconComponent {
+function outletIcon(port: FloorplanPortJson): IconComponent {
 	return panelKindIcon(port.ports[0]?.kind ?? '8p8c')
 }
 
 /** True when an outlet is a jack of several ports. */
-export function isJack(port: FloorplanPortJson | null): boolean {
+function isJack(port: FloorplanPortJson | null): boolean {
 	return port !== null && port.ports.length > 1
 }
 
@@ -208,8 +208,8 @@ export function markerClasses(placement: FloorplanPlacementJson): Record<string,
 }
 
 /** Zoom range of the stage; 1 fits the whole plan. */
-export const MIN_ZOOM = 1
-export const MAX_ZOOM = 8
+const MIN_ZOOM = 1
+const MAX_ZOOM = 8
 
 /** Factor of one zoom button step. */
 const ZOOM_STEP = 1.5
@@ -430,12 +430,12 @@ export function pixelDistance(image: ImageSize, a: [number, number], b: [number,
 }
 
 /** Meters per image pixel of a scale. */
-export function metersPerPixel(image: ImageSize, scale: FloorplanScale): number {
+function metersPerPixel(image: ImageSize, scale: FloorplanScale): number {
 	return scale.centimeters / 100 / pixelDistance(image, scale.a, scale.b)
 }
 
 /** Position of a normalized point in meters from the origin (top left without one), y up. */
-export function planMeters(
+function planMeters(
 	image: ImageSize,
 	calibration: PlanCalibration & { scale: FloorplanScale },
 	point: [number, number],
@@ -446,7 +446,7 @@ export function planMeters(
 }
 
 /** A length in meters for display, with up to two decimals. */
-export function formatMeters(value: number): string {
+function formatMeters(value: number): string {
 	return t('floorplan.meters', {
 		value: new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(value),
 	})

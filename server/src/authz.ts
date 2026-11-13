@@ -43,7 +43,7 @@ export function requestUser(c: Context): CurrentUser {
 }
 
 /** Effective tenant scope: the user's tenant ids, `null` when global. */
-export function scopeTenantIds(user: CurrentUser): readonly number[] | null {
+function scopeTenantIds(user: CurrentUser): readonly number[] | null {
 	return user.tenant_ids
 }
 
@@ -63,15 +63,12 @@ export function can(user: CurrentUser, permission: Permission): boolean {
 }
 
 /** Scope rule (read and write): scoped users need a (non-null) tenant in their scope. */
-export function canAccessTenant(user: CurrentUser, tenant: number | null): boolean {
+function canAccessTenant(user: CurrentUser, tenant: number | null): boolean {
 	return inScope(tenant, scopeTenantIds(user) ?? undefined)
 }
 
 /** Cable rule (read and write): both endpoints must sit in scoped tenants. */
-export function canAccessCable(
-	user: CurrentUser,
-	tenants: [number | null, number | null],
-): boolean {
+function canAccessCable(user: CurrentUser, tenants: [number | null, number | null]): boolean {
 	return canAccessTenant(user, tenants[0]) && canAccessTenant(user, tenants[1])
 }
 
