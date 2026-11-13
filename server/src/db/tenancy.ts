@@ -1,5 +1,16 @@
 import { Result } from 'better-result'
-import { and, asc, eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
+import {
+	and,
+	asc,
+	eq,
+	getTableColumns,
+	inArray,
+	isNotNull,
+	notExists,
+	or,
+	type SQL,
+	sql,
+} from 'drizzle-orm'
 import type { PgTable } from 'drizzle-orm/pg-core'
 import {
 	LOCATION_TYPES,
@@ -22,6 +33,9 @@ import {
 	devices,
 	employee_tenants,
 	external_links,
+	floorplan_areas,
+	floorplan_placements,
+	interfaces,
 	locations,
 	managed_bundles,
 	racks,
@@ -48,6 +62,7 @@ import {
 	type AttachmentRow,
 	checkFloorplanDelete,
 	deleteOwnerAttachments,
+	inferOutletLocations,
 	prunePlacements,
 } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -967,6 +982,28 @@ export async function deleteLocation(
 			'Location still has child locations; move or delete them first',
 		],
 		[racks, eq(racks.location_id, id), 'Location still has racks; move or delete them first'],
+		// Placed outlets take their location from their plan, which follows.
+		[
+			interfaces,
+			and(
+				eq(interfaces.location_id, id),
+				notExists(
+					getDb()
+						.select({ id: floorplan_placements.id })
+						.from(floorplan_placements)
+						.where(
+							or(
+								eq(floorplan_placements.interface_id, interfaces.id),
+								and(
+									isNotNull(interfaces.jack_id),
+									eq(floorplan_placements.jack_id, interfaces.jack_id),
+								),
+							),
+						),
+				),
+			) as SQL,
+			'Location still has outlets; move them to another location first',
+		],
 	])
 	if (Result.isError(blocked)) {
 		return blocked
@@ -979,7 +1016,13 @@ export async function deleteLocation(
 	const deleted = await tryWrite(() =>
 		withTransaction(async (): Promise<AttachmentRow[]> => {
 			const removed = await deleteOwnerAttachments({ location_id: id })
+			// Plans with an area of the location: their outlets there move on.
+			const linked = await getDb()
+				.selectDistinct({ id: floorplan_areas.attachment_id })
+				.from(floorplan_areas)
+				.where(eq(floorplan_areas.location_id, id))
 			await getDb().delete(locations).where(eq(locations.id, id))
+			await inferOutletLocations(linked.map((row) => row.id))
 			return removed
 		}),
 	)

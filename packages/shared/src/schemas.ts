@@ -967,7 +967,7 @@ export interface TemplateSyncPreview {
 		side: PortSide | null
 		kind: string
 		connected: boolean
-		/** Has a floor plan placement, which removing the port deletes. */
+		/** Has a location or a floor plan placement, which removing the port deletes. */
 		located: boolean
 		/** Has a custom name linked to a template port that is gone. */
 		linked: boolean
@@ -1416,9 +1416,31 @@ export const InterfaceUpdateSchema = v.strictObject({
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_port_id: v.optional(IdSchema, undefined),
 	rear_port_position: v.optional(PortPositionsSchema, undefined),
+	// Outlets (single-position rear ports) only: the room the cable ends in.
+	// A placed outlet takes it from its floor plan and rejects it here.
+	location_id: v.optional(v.nullable(IdSchema), undefined),
 	// Patch-panel ports only: wired up, or just part of the panel.
 	patched: v.optional(v.boolean(), undefined),
 })
+
+/**
+ * `GET /locations/:id/outlets`: an outlet located in the location or one
+ * of its descendants, with its panel and the port cabled to it.
+ */
+export interface LocationOutletJson {
+	/** The outlet (rear port) interface. */
+	id: number
+	/** Port name on the panel (`12`). */
+	name: string
+	connected: boolean
+	/** The panel device. */
+	device_id: number
+	device_name: string
+	location_id: number
+	location_name: string
+	/** Port at the other end of the outlet's cable, if any. */
+	peer: { device_id: number; device_name: string; interface_name: string } | null
+}
 
 export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
 export type DeviceUpdate = v.InferOutput<typeof DeviceUpdateSchema>
@@ -1451,9 +1473,17 @@ export const PanelJackCreateSchema = v.strictObject({
 
 export type PanelJackCreate = v.InferOutput<typeof PanelJackCreateSchema>
 
-/** `PATCH /devices/:id/jacks/:jackId`: rename a jack. */
+/**
+ * `PATCH /devices/:id/jacks/:jackId`: rename a jack and/or set its ports.
+ * `interface_ids` lists all its ports: added outlets (free ones of the
+ * panel) join as on create, removed ones become single outlets again.
+ */
 export const PanelJackUpdateSchema = v.strictObject({
-	name: JackNameSchema,
+	name: v.optional(JackNameSchema, undefined),
+	interface_ids: v.optional(
+		v.pipe(v.array(IdSchema), v.minLength(2), v.maxLength(48)),
+		undefined,
+	),
 })
 
 export type PanelJackUpdate = v.InferOutput<typeof PanelJackUpdateSchema>

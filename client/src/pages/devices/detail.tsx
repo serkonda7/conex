@@ -3,7 +3,7 @@ import { OTHER_PORT_KINDS } from 'shared/src/ports'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
 import { type Accessor, createMemo, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { fetch_outlets } from '../../api/attachments'
+import { type FloorplanOutletJson, fetch_outlets } from '../../api/attachments'
 import { delete_cable, fetch_trace } from '../../api/cables'
 import {
 	type DeviceDetail,
@@ -16,6 +16,7 @@ import {
 	fetch_jacks,
 	type InterfaceJson,
 } from '../../api/devices'
+import { fetch_locations } from '../../api/tenancy'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
 	DetailHeader,
@@ -38,6 +39,7 @@ import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
 import { EolPill } from '../device_types/eol_pill'
+import { locationOptions } from '../locations/options'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
@@ -94,6 +96,25 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const rackId = (): number | null | undefined => device()?.rack_id
 	const shelfId = (): number | null | undefined => device()?.shelf_id
 	const tenantId = (): number | null | undefined => device()?.tenant_id
+	// Outlet locations: the panel's site, shared and the panel's tenant's.
+	const [siteLocations] = createRowsFor(
+		() => {
+			const site = siteId()
+			if (site === null || site === undefined) {
+				return null
+			}
+			const tenant = tenantId()
+			return tenant === null || tenant === undefined ? { site } : { site, tenant }
+		},
+		({ site, tenant }: { site: number; tenant?: number }) =>
+			fetch_locations({ site: [site], tenant }),
+		setError,
+	)
+	const outletLocationOptions = createMemo(() => locationOptions(siteLocations() ?? []))
+	const locationLabels = createMemo(
+		() =>
+			new Map(outletLocationOptions().map((option) => [Number(option.value), option.label])),
+	)
 	const employeeId = (): number | null | undefined => device()?.employee_id
 	/** A related row the device names (null when unset or out of scope). */
 	const named = (key: number | null, name: string | null): { id: number; name: string } | null =>
@@ -162,21 +183,38 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	})
 	const endToEndOf = (ifaceId: number): TraceEndToEnd[] => endToEndByIface().get(ifaceId) ?? []
 
+	/** Placement of an outlet (single-position rear port), itself or by its jack. */
+	const placementOf = (ifaceId: number): FloorplanOutletJson | undefined =>
+		(outlets() ?? []).find((o) => o.interface_id === ifaceId)
+
 	/** Floor plan an outlet (single-position rear port) is placed on. */
 	const planColumn: DataTableColumn<PanelRow> = {
 		key: 'plan',
 		label: tp('entity.floorplan', 1),
 		getValue: (row: PanelRow): JSX.Element => {
-			const outlet =
-				row.position === null
-					? (outlets() ?? []).find((o) => o.interface_id === row.rear.id)
-					: undefined
+			const outlet = row.position === null ? placementOf(row.rear.id) : undefined
 			return outlet ? (
 				<a href={floorplanHref(outlet.attachment_id, { interface: outlet.interface_id })}>
 					{outlet.owner_name}
 				</a>
 			) : (
 				<span>—</span>
+			)
+		},
+	}
+
+	/** Room an outlet's installation cable ends in (set by its floor plan when placed). */
+	const locationColumn: DataTableColumn<PanelRow> = {
+		key: 'location',
+		label: t('device.panel.location'),
+		getValue: (row: PanelRow): JSX.Element => {
+			const locationKey = row.position === null ? row.rear.location_id : null
+			return locationKey === null ? (
+				<span>—</span>
+			) : (
+				<a href={`/locations/${locationKey}`}>
+					{locationLabels().get(locationKey) ?? `#${locationKey}`}
+				</a>
 			)
 		},
 	}
@@ -448,7 +486,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							}
 							onDisconnect={can('edit') ? disconnect : undefined}
 							rowActions={can('edit') ? panelRowActions : undefined}
-							extraColumns={[jackColumn, planColumn]}
+							extraColumns={[jackColumn, locationColumn, planColumn]}
 						/>
 					</section>
 				</Show>
@@ -543,6 +581,10 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						rear={currentIface(row.rear)}
 						front={currentIface(row.front)}
 						position={row.position}
+						location_options={outletLocationOptions()}
+						placement={
+							row.position === null && row.rear ? placementOf(row.rear.id) : undefined
+						}
 						links={linksByIface()}
 						endToEnd={endToEndOf}
 						on_saved={() => setEditingRow(null)}

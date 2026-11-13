@@ -1,0 +1,4 @@
+ALTER TABLE "interfaces" ADD COLUMN "location_id" integer;--> statement-breakpoint
+ALTER TABLE "interfaces" ADD CONSTRAINT "interfaces_location_id_locations_id_fk" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "interfaces_location_id_idx" ON "interfaces" USING btree ("location_id");--> statement-breakpoint
+ALTER TABLE "interfaces" ADD CONSTRAINT "interfaces_location_check" CHECK ("interfaces"."location_id" IS NULL OR ("interfaces"."side" IS NOT DISTINCT FROM 'rear' AND "interfaces"."positions" = 1));

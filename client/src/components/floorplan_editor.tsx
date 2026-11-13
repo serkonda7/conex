@@ -418,6 +418,8 @@ function ScaleDistanceDialog(props: {
 type CalibrationTool = 'scale' | 'origin'
 
 interface PaletteGroup {
+	/** Stable across placements, so the list keeps its DOM (and scroll position). */
+	key: string
 	name: string
 	items: FloorplanCandidateJson[]
 	/** Panel of an outlet group, for the sequence toggle; `null` for a location group. */
@@ -459,7 +461,12 @@ function Palette(props: {
 				continue
 			}
 			const key = port ? `port:${port.device_id}` : `location:${name}`
-			const group = byGroup.get(key) ?? { name, items: [], panel_id: port?.device_id ?? null }
+			const group = byGroup.get(key) ?? {
+				key,
+				name,
+				items: [],
+				panel_id: port?.device_id ?? null,
+			}
 			group.items.push(candidate)
 			byGroup.set(key, group)
 		}
@@ -478,6 +485,10 @@ function Palette(props: {
 					a.name.localeCompare(b.name),
 			)
 	})
+	const groupKeys = createMemo(() => groups().map((group: PaletteGroup) => group.key))
+	const groupsByKey = createMemo(
+		() => new Map(groups().map((group: PaletteGroup) => [group.key, group])),
+	)
 
 	return (
 		<Show when={!props.loading} fallback={<Loading message={t('common.loading')} />}>
@@ -485,58 +496,65 @@ function Palette(props: {
 				when={groups().length > 0}
 				fallback={<p class="floorplan-hint">{t('floorplan.paletteEmpty')}</p>}
 			>
-				<For each={groups()}>
-					{(group: PaletteGroup) => (
-						<section>
-							<div class="floorplan-palette-group-header">
-								<h5>{group.name}</h5>
-								<Show when={group.panel_id}>
-									{(panelId: () => number) => (
-										<button
-											type="button"
-											class="floorplan-palette-sequence"
-											classList={{ active: props.sequence === panelId() }}
-											aria-pressed={props.sequence === panelId()}
-											title={t('floorplan.sequenceHint')}
-											onClick={() =>
-												props.on_sequence(
-													props.sequence === panelId() ? null : panelId(),
-												)
-											}
-										>
-											{t('floorplan.sequence')}
-										</button>
-									)}
-								</Show>
-							</div>
-							<ul>
-								<For each={group.items}>
-									{(candidate: FloorplanCandidateJson) => (
-										<li>
+				{/* Keyed by group key: rebuilding the sections on each placement resets the scroll. */}
+				<For each={groupKeys()}>
+					{(key: string) => {
+						const group = (): PaletteGroup =>
+							groupsByKey().get(key) ?? { key, name: '', items: [], panel_id: null }
+						return (
+							<section>
+								<div class="floorplan-palette-group-header">
+									<h5>{group().name}</h5>
+									<Show when={group().panel_id}>
+										{(panelId: () => number) => (
 											<button
 												type="button"
-												class="floorplan-palette-item"
-												draggable="true"
-												title={t('floorplan.placeHint')}
-												onDragStart={(e: DragEvent) => {
-													e.dataTransfer?.setData(
-														'text/plain',
-														candidateKey(candidate),
+												class="floorplan-palette-sequence"
+												classList={{ active: props.sequence === panelId() }}
+												aria-pressed={props.sequence === panelId()}
+												title={t('floorplan.sequenceHint')}
+												onClick={() =>
+													props.on_sequence(
+														props.sequence === panelId()
+															? null
+															: panelId(),
 													)
-													props.on_drag(candidateKey(candidate))
-												}}
-												onDragEnd={() => props.on_drag(null)}
-												onClick={() => props.on_place(candidate)}
+												}
 											>
-												<MarkerGlyph placement={candidate} size={14} />
-												<span>{candidate.name}</span>
+												{t('floorplan.sequence')}
 											</button>
-										</li>
-									)}
-								</For>
-							</ul>
-						</section>
-					)}
+										)}
+									</Show>
+								</div>
+								<ul>
+									<For each={group().items}>
+										{(candidate: FloorplanCandidateJson) => (
+											<li>
+												<button
+													type="button"
+													class="floorplan-palette-item"
+													draggable="true"
+													title={t('floorplan.placeHint')}
+													onDragStart={(e: DragEvent) => {
+														e.dataTransfer?.setData(
+															'text/plain',
+															candidateKey(candidate),
+														)
+														props.on_drag(candidateKey(candidate))
+													}}
+													onDragEnd={() => props.on_drag(null)}
+													onClick={() => props.on_place(candidate)}
+												>
+													<MarkerGlyph placement={candidate} size={14} />
+													<span>{candidate.name}</span>
+												</button>
+											</li>
+										)}
+									</For>
+								</ul>
+							</section>
+						)
+					}}
 				</For>
 			</Show>
 		</Show>

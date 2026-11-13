@@ -822,16 +822,29 @@ export const interfaces = pgTable(
 		// port; empty slots are allowed.
 		rear_port_id: integer('rear_port_id').references((): AnyPgColumn => interfaces.id),
 		rear_port_position: integer('rear_port_position'),
+		// Outlets (single-position rear ports): the room the installation
+		// cable ends in, independent of the panel's own location. A placed
+		// outlet takes it from its floor plan (the location area its marker
+		// lies in, else the plan's location; `inferOutletLocations`). Location
+		// delete is blocked while unplaced outlets reference it (service layer).
+		location_id: integer('location_id').references(() => locations.id, {
+			onDelete: 'set null',
+		}),
 		// Patch-panel ports: false = only part of the panel, not wired up
 		// (yet). Informational; cables may still be connected.
 		patched: integer('patched').notNull().default(1),
 		// Outlets only: the jack the port sits in with others of its panel
-		// (same device, service layer).
+		// (same device, service layer). The jack's ports share `location_id`.
 		jack_id: integer('jack_id').references(() => panel_jacks.id),
 	},
 	(table) => [
 		index('interfaces_device_id_idx').on(table.device_id),
 		index('interfaces_jack_id_idx').on(table.jack_id),
+		index('interfaces_location_id_idx').on(table.location_id),
+		check(
+			'interfaces_location_check',
+			sql`${table.location_id} IS NULL OR (${table.side} IS NOT DISTINCT FROM 'rear' AND ${table.positions} = 1)`,
+		),
 		// No trigram indexes: the interface list search ORs in the device name
 		// (another table), so no index on interfaces could serve it.
 		check(
