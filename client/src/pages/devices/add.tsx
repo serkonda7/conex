@@ -230,8 +230,19 @@ export function DeviceAddPage(): JSX.Element {
 			// Elevation deep links return to the rack they came from.
 			navigateTo:
 				rackId() && queryParam('rack') === rackId() ? `/racks/${rackId()}` : '/devices',
-			onSuccess: is_add_another_submit(e) ? () => setName('') : undefined,
+			onSuccess: is_add_another_submit(e) ? resetForNext : undefined,
 		})
+	}
+
+	// Create & Add Another keeps the shared fields (type, role, place) and
+	// clears the ones chosen per device, as a clone does: the next device
+	// cannot share the serial, device ID or U position.
+	function resetForNext(): void {
+		setName('')
+		setSerial('')
+		setDeviceId('')
+		setPositionU('')
+		setEmployeeId('')
 	}
 
 	const shelfName = (): string =>
