@@ -10,6 +10,11 @@
  * The stage zooms by the buttons in the bar below, Ctrl + wheel and pinch,
  * and pans by a drag while zoomed in. Pieces on the stage that take a press
  * for their own drag still pan with the middle mouse button.
+ *
+ * By default the viewport shrink-wraps the stage. With `fill` it is a box
+ * as wide as the frame (as high as the image at that width, capped by the
+ * viewport's CSS `max-height`) with the image fitted and centered in it, so zooming into a narrow image first grows it into the
+ * empty space (design decision 0003).
  */
 import { IconZoomIn, IconZoomOut, IconZoomReset } from '@tabler/icons-solidjs'
 import { type Accessor, createSignal, type JSX, onCleanup, onMount, Show } from 'solid-js'
@@ -40,6 +45,8 @@ export interface StageZoom {
 	offset: Accessor<{ x: number; y: number }>
 	/** Unscaled layout size of the stage, px. */
 	size: Accessor<{ width: number; height: number }>
+	/** Inner size of the viewport, px; the stage's size until measured. */
+	view: Accessor<{ width: number; height: number }>
 	/** Zooms by `factor` keeping viewport point (`px`, `py`) in place; the center without one. */
 	zoomBy: (factor: number, px?: number, py?: number) => void
 	panBy: (dx: number, dy: number) => void
@@ -50,6 +57,8 @@ export interface StageZoom {
 	viewCenter: () => [number, number]
 	/** Measures the stage; called by `ZoomViewport`. */
 	setSize: (width: number, height: number) => void
+	/** Measures the viewport; called by `ZoomViewport`. */
+	setView: (width: number, height: number) => void
 }
 
 function clampZoom(value: number): number {
@@ -60,14 +69,27 @@ export function createStageZoom(): StageZoom {
 	const [scale, setScale] = createSignal(1)
 	const [offset, setOffset] = createSignal({ x: 0, y: 0 })
 	const [size, setSizeSignal] = createSignal({ width: 0, height: 0 })
+	const [measuredView, setMeasuredView] = createSignal({ width: 0, height: 0 })
+	const view = (): { width: number; height: number } =>
+		measuredView().width > 0 ? measuredView() : size()
 
-	/** Keeps the scaled stage covering the viewport. */
+	/**
+	 * Per axis: a scaled stage smaller than the viewport is centered, a
+	 * larger one keeps covering the viewport.
+	 */
+	function along(viewExtent: number, extent: number, at: number): number {
+		return extent <= viewExtent
+			? (viewExtent - extent) / 2
+			: Math.min(0, Math.max(viewExtent - extent, at))
+	}
+
 	function place(nextScale: number, x: number, y: number): void {
 		const { width, height } = size()
+		const box = view()
 		setScale(nextScale)
 		setOffset({
-			x: Math.min(0, Math.max(width - width * nextScale, x)),
-			y: Math.min(0, Math.max(height - height * nextScale, y)),
+			x: along(box.width, width * nextScale, x),
+			y: along(box.height, height * nextScale, y),
 		})
 	}
 
@@ -75,8 +97,9 @@ export function createStageZoom(): StageZoom {
 		scale,
 		offset,
 		size,
+		view,
 		zoomBy(factor: number, px?: number, py?: number): void {
-			const { width, height } = size()
+			const { width, height } = view()
 			const [cx, cy] = [px ?? width / 2, py ?? height / 2]
 			const next = clampZoom(scale() * factor)
 			const ratio = next / scale()
@@ -90,6 +113,7 @@ export function createStageZoom(): StageZoom {
 		},
 		focus(box: PlanBox, minScale = 1): void {
 			const { width, height } = size()
+			const shown = view()
 			const fit = Math.min(
 				0.6 / Math.max(box.x1 - box.x0, 1e-3),
 				0.6 / Math.max(box.y1 - box.y0, 1e-3),
@@ -97,16 +121,17 @@ export function createStageZoom(): StageZoom {
 			const next = clampZoom(Math.max(minScale, Math.min(fit, MAX_ZOOM)))
 			const cx = ((box.x0 + box.x1) / 2) * width * next
 			const cy = ((box.y0 + box.y1) / 2) * height * next
-			place(next, width / 2 - cx, height / 2 - cy)
+			place(next, shown.width / 2 - cx, shown.height / 2 - cy)
 		},
 		viewCenter(): [number, number] {
 			const { width, height } = size()
 			if (width === 0 || height === 0) {
 				return [0.5, 0.5]
 			}
+			const shown = view()
 			return [
-				(width / 2 - offset().x) / (width * scale()),
-				(height / 2 - offset().y) / (height * scale()),
+				(shown.width / 2 - offset().x) / (width * scale()),
+				(shown.height / 2 - offset().y) / (height * scale()),
 			]
 		},
 		setSize(width: number, height: number): void {
@@ -121,7 +146,17 @@ export function createStageZoom(): StageZoom {
 				// Keep the same part of the image in view when the layout resizes.
 				const ratio = width / before.width
 				place(scale(), offset().x * ratio, offset().y * ratio)
+			} else {
+				place(scale(), offset().x, offset().y)
 			}
+		},
+		setView(width: number, height: number): void {
+			if (width === 0 || height === 0) {
+				return
+			}
+			setMeasuredView({ width, height })
+			// Re-centers or re-clamps the stage in the new box.
+			place(scale(), offset().x, offset().y)
 		},
 	}
 	return zoom
@@ -184,9 +219,29 @@ export function ZoomViewport(props: {
 	/** Pointer moves over the viewport, also while not pressed. */
 	onPointerMove?: (e: PointerEvent) => void
 	onPointerLeave?: () => void
+	/** Natural image size: the viewport becomes a box the image is fitted into. */
+	fill?: { width: number; height: number }
 }): JSX.Element {
 	let viewport!: HTMLDivElement
 	let stage!: HTMLDivElement
+	/** Inner size of the viewport, for the `fill` layout. */
+	const [viewBox, setViewBox] = createSignal({ width: 0, height: 0 })
+	/** As high as the image at the full width, never upscaled. */
+	const fillViewportStyle = (fill: { width: number; height: number }): JSX.CSSProperties => {
+		const width = viewBox().width
+		const height =
+			width > 0 ? Math.min(fill.height, (width * fill.height) / fill.width) : fill.height
+		return { height: `${height}px` }
+	}
+	/** The image fitted into the viewport, never upscaled. */
+	const fillStageStyle = (fill: { width: number; height: number }): JSX.CSSProperties => {
+		const { width, height } = viewBox()
+		if (width === 0 || height === 0) {
+			return {}
+		}
+		const fitted = Math.min(width, (height * fill.width) / fill.height, fill.width)
+		return { width: `${fitted}px`, height: `${(fitted * fill.height) / fill.width}px` }
+	}
 	/** Active pointers on the viewport, for pan and pinch. */
 	const pointers = new Map<number, { x: number; y: number }>()
 	let travelled = 0
@@ -295,9 +350,13 @@ export function ZoomViewport(props: {
 		window.addEventListener('pointermove', onWindowPointerMove)
 		window.addEventListener('pointerup', onPointerUp)
 		window.addEventListener('pointercancel', onPointerUp)
-		const observer = new ResizeObserver(() =>
-			props.zoom.setSize(stage.offsetWidth, stage.offsetHeight),
-		)
+		const observer = new ResizeObserver(() => {
+			const view = { width: viewport.clientWidth, height: viewport.clientHeight }
+			setViewBox(view)
+			props.zoom.setView(view.width, view.height)
+			props.zoom.setSize(stage.offsetWidth, stage.offsetHeight)
+		})
+		observer.observe(viewport)
 		observer.observe(stage)
 		onCleanup(() => {
 			observer.disconnect()
@@ -311,10 +370,14 @@ export function ZoomViewport(props: {
 	})
 
 	return (
-		<div class={props.class ? `zoom-frame ${props.class}` : 'zoom-frame'}>
+		<div
+			class={props.class ? `zoom-frame ${props.class}` : 'zoom-frame'}
+			classList={{ 'zoom-fill': props.fill !== undefined }}
+		>
 			<div
 				class="zoom-viewport"
 				classList={{ zoomed: zoomed() }}
+				style={props.fill ? fillViewportStyle(props.fill) : undefined}
 				ref={viewport}
 				onPointerDown={onPointerDown}
 				onPointerMove={(e: PointerEvent) => props.onPointerMove?.(e)}
@@ -327,6 +390,7 @@ export function ZoomViewport(props: {
 						props.ref?.(el)
 					}}
 					style={{
+						...(props.fill ? fillStageStyle(props.fill) : {}),
 						transform: `translate(${props.zoom.offset().x}px, ${props.zoom.offset().y}px) scale(${props.zoom.scale()})`,
 						'--inv-zoom': String(1 / props.zoom.scale()),
 					}}

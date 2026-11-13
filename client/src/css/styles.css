@@ -3710,12 +3710,26 @@ span.attachment-star,
 	max-height: 60vh;
 }
 
-/* Attachment lightbox: the image capped in height, centered. */
-.attachment-zoom {
-	margin: 0 auto;
+/* Fill layout: the viewport is a box as wide as the frame; the stage is
+   sized by the component and placed by its transform alone. */
+.zoom-frame.zoom-fill {
+	width: 100%;
 }
 
-.attachment-zoom .zoom-stage > img {
+.zoom-fill .zoom-stage {
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.zoom-fill .zoom-stage > img {
+	width: 100%;
+	height: 100%;
+	max-width: none;
+}
+
+/* Attachment lightbox: the image fitted into a box up to 70vh high. */
+.attachment-zoom .zoom-viewport {
 	max-height: 70vh;
 }
 

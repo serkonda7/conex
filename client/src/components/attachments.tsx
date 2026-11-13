@@ -244,7 +244,11 @@ function AttachmentLightbox(props: {
 			class="attachment-lightbox"
 			on_close={props.on_close}
 		>
-			<ZoomViewport class="attachment-zoom" zoom={zoom}>
+			<ZoomViewport
+				class="attachment-zoom"
+				zoom={zoom}
+				fill={{ width: props.attachment.width_px, height: props.attachment.height_px }}
+			>
 				<img
 					src={attachment_file_url(props.attachment)}
 					alt={props.attachment.description ?? props.attachment.filename}
