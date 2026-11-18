@@ -39,7 +39,7 @@ async function createDeviceWithPort(
 	return { id, portId }
 }
 
-test('connect dialog focuses the search on open and the port filter after picking a device', async ({
+test('connect dialog focuses the device search on open and the port filter after picking a device', async ({
 	page,
 }) => {
 	const suffix = Date.now()
@@ -55,16 +55,17 @@ test('connect dialog focuses the search on open and the port filter after pickin
 
 		const dialog = page.getByRole('dialog')
 		await expect(dialog).toBeVisible()
-		await expect(dialog.getByRole('textbox')).toBeFocused()
+		const search = dialog.getByRole('combobox', { name: 'Gerät' })
+		await expect(search).toBeFocused()
 
-		await dialog.getByRole('textbox').fill(peerName)
-		await dialog.getByRole('button', { name: new RegExp(peerName) }).click()
+		// Tab picks the highlighted device and moves on to the port filter.
+		await search.fill(peerName)
+		await expect(dialog.getByRole('option', { name: new RegExp(peerName) })).toBeVisible()
+		await search.press('Tab')
 
-		await expect(dialog.getByRole('textbox', { name: 'Anschlüsse filtern…' })).toBeFocused()
-
-		// Going back to the device step focuses its search again.
-		await dialog.getByRole('button', { name: 'Gerät ändern' }).click()
-		await expect(dialog.getByRole('textbox')).toBeFocused()
+		const filter = dialog.getByRole('textbox', { name: 'Anschlüsse filtern…' })
+		await expect(filter).toBeEnabled()
+		await expect(filter).toBeFocused()
 	} finally {
 		await page.request.delete(`/api/devices/${peerId}`)
 		await page.request.delete(`/api/devices/${localId}`)
@@ -99,11 +100,13 @@ test('connect dialog only lists devices of the same tenant with a compatible por
 		await page.goto(`/devices/${local.id}`)
 		await page.getByRole('button', { name: 'Kabel für eth0 verbinden' }).click()
 		const dialog = page.getByRole('dialog')
-		await dialog.getByRole('textbox').fill(String(suffix))
+		await dialog.getByRole('combobox', { name: 'Gerät' }).fill(String(suffix))
 
 		// Left out: the power-only device, the other tenant's device and the
 		// local device (no other port).
-		await expect(dialog.locator('.object-selector-label')).toHaveText([peerName])
+		const options = dialog.getByRole('option')
+		await expect(options).toHaveCount(1)
+		await expect(options).toContainText(peerName)
 
 		// Cables never cross tenants, not even through the API.
 		const crossTenant = await page.request.post('/api/cables', {
