@@ -32,7 +32,7 @@ import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 import { deviceRoleOptions } from '../device-roles/options'
 import { locationOptions } from '../locations/options'
-import { EmployeeAssignmentField } from './employee_assignment'
+import { DeviceEmployeesField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 
 /** Rack position from the field: null when blank, NaN when malformed. */
@@ -87,7 +87,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
 	const [inactive, setInactive] = createSignal(false)
-	const [employeeId, setEmployeeId] = createSignal('')
+	const [employeeIds, setEmployeeIds] = createSignal<string[]>([])
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
 	// Rack-install deep link (`/devices/add?rack=<id>&position_u=<u>&face=front`)
@@ -158,7 +158,7 @@ export function DeviceAddPage(): JSX.Element {
 			handleRackChange('')
 		}
 	})
-	createEffect(on(newObjectTenantId, () => setEmployeeId(''), { defer: true }))
+	createEffect(on(newObjectTenantId, () => setEmployeeIds([]), { defer: true }))
 
 	const [source] = createSnapshot(() => parseId(queryParam('clone')), fetch_device, form.setError)
 	createEffect(() => {
@@ -225,7 +225,7 @@ export function DeviceAddPage(): JSX.Element {
 					position_u: onShelf ? null : parsePosition(positionU()),
 					shelf_id: shelfId(),
 					tenant_id: newObjectTenantId(),
-					employee_id: parseId(employeeId()),
+					employee_ids: employeeIds().map(Number),
 				}),
 			// Elevation deep links return to the rack they came from.
 			navigateTo:
@@ -242,7 +242,7 @@ export function DeviceAddPage(): JSX.Element {
 		setSerial('')
 		setDeviceId('')
 		setPositionU('')
-		setEmployeeId('')
+		setEmployeeIds([])
 	}
 
 	const shelfName = (): string =>
@@ -338,13 +338,12 @@ export function DeviceAddPage(): JSX.Element {
 				/>
 			</FormSection>
 			<FormSection title={t('device.assignmentSection')}>
-				<EmployeeAssignmentField
-					id="device-employee"
+				<DeviceEmployeesField
+					id="device-employees"
 					tenantId={newObjectTenantId()}
-					value={employeeId()}
-					onChange={setEmployeeId}
+					values={employeeIds()}
+					onChange={setEmployeeIds}
 					onError={form.setError}
-					emptyLabel={t('common.selectPlaceholder')}
 				/>
 			</FormSection>
 		</FormPage>

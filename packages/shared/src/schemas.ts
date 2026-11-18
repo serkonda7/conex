@@ -1323,6 +1323,13 @@ export const DeviceFaceSchema = v.picklist(['front', 'rear'])
 
 export type DeviceFace = v.InferOutput<typeof DeviceFaceSchema>
 
+/** Employees assigned to a device, without duplicates (order is irrelevant). */
+const DeviceEmployeeIdsSchema = v.pipe(
+	v.array(IdSchema),
+	v.maxLength(100),
+	v.check((ids) => new Set(ids).size === ids.length, 'Employees must be unique'),
+)
+
 export const DeviceCreateSchema = v.strictObject({
 	device_type_id: IdSchema,
 	device_role_id: IdSchema,
@@ -1341,7 +1348,7 @@ export const DeviceCreateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: DeviceIdSchema,
 	tenant_id: NullableIdSchema,
-	employee_id: NullableIdSchema,
+	employee_ids: v.optional(DeviceEmployeeIdsSchema, []),
 	description: DescriptionSchema,
 })
 
@@ -1361,7 +1368,8 @@ export const DeviceUpdateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: NullableIdSchema,
-	employee_id: NullableIdSchema,
+	/** Replaces the whole assignment; omitted keeps it. */
+	employee_ids: v.optional(DeviceEmployeeIdsSchema, undefined),
 	description: NullableDescriptionSchema,
 })
 

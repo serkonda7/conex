@@ -1,7 +1,8 @@
 import { Result } from 'better-result'
-import { createMemo, type JSX } from 'solid-js'
+import { createMemo, For, type JSX, Show } from 'solid-js'
+import type { EmployeeRef } from '../../api/devices'
 import { type EmployeeRow, fetch_all_employees, fetch_employee } from '../../api/employees'
-import { type FormOption, row_options, SelectField } from '../../components/form'
+import { type FormOption, MultiSelectField, row_options, SelectField } from '../../components/form'
 import { t } from '../../i18n'
 import { createRowsFor, type ErrorSink } from '../../lib/resource'
 
@@ -51,7 +52,7 @@ export function createEmployeeOptions(
 	return { options, loading: () => active.loading }
 }
 
-/** Only contacts of the device's tenant can be assigned. */
+/** Only contacts of the VM's tenant can be assigned. */
 export function EmployeeAssignmentField(props: {
 	id: string
 	tenantId: number | null
@@ -75,5 +76,46 @@ export function EmployeeAssignmentField(props: {
 			emptyLabel={props.emptyLabel ?? t('device.noEmployee')}
 			disabled={props.tenantId === null || employees.loading()}
 		/>
+	)
+}
+
+/** Employees of a device: any number of contacts of the device's tenant. */
+export function DeviceEmployeesField(props: {
+	id: string
+	tenantId: number | null
+	values: string[]
+	onChange: (values: string[]) => void
+	onError: ErrorSink
+}): JSX.Element {
+	const employees = createEmployeeOptions(
+		() => props.tenantId,
+		() => props.values.map(Number),
+		props.onError,
+	)
+	return (
+		<MultiSelectField
+			id={props.id}
+			label={t('device.assignedEmployees')}
+			values={props.values}
+			onChange={props.onChange}
+			options={employees.options()}
+			disabled={props.tenantId === null || employees.loading()}
+		/>
+	)
+}
+
+/** Comma-separated links to `employees`, or a dash without any. */
+export function EmployeeLinks(props: { employees: readonly EmployeeRef[] }): JSX.Element {
+	return (
+		<Show when={props.employees.length > 0} fallback="—">
+			<For each={props.employees}>
+				{(employee: EmployeeRef, i: () => number): JSX.Element => (
+					<>
+						{i() > 0 ? ', ' : ''}
+						<a href={`/employees/${employee.id}`}>{employee.name}</a>
+					</>
+				)}
+			</For>
+		</Show>
 	)
 }

@@ -44,6 +44,7 @@ import { locationOptions } from '../locations/options'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
+import { EmployeeLinks } from './employee_assignment'
 import { JackDialog } from './jack_dialog'
 import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
 import { PanelPortTable, type PanelRow, panelRowsOf } from './panel_ports'
@@ -116,7 +117,6 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 		() =>
 			new Map(outletLocationOptions().map((option) => [Number(option.value), option.label])),
 	)
-	const employeeId = (): number | null | undefined => device()?.employee_id
 	/** A related row the device names (null when unset or out of scope). */
 	const named = (key: number | null, name: string | null): { id: number; name: string } | null =>
 		key !== null && name !== null ? { id: key, name } : null
@@ -444,14 +444,14 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 									href={`/tenants/${tenantId() ?? ''}`}
 								/>
 							</dd>
-							<dt>{t('device.assignedEmployee')}</dt>
+							<dt>{t('device.assignedEmployees')}</dt>
 							<dd>
-								<ForeignKeyLink
-									id={employeeId()}
-									loading={device.loading}
-									name={device()?.employee_name}
-									href={`/employees/${employeeId() ?? ''}`}
-								/>
+								<Show
+									when={!device.loading}
+									fallback={<span class="skeleton">…</span>}
+								>
+									<EmployeeLinks employees={device()?.employees ?? []} />
+								</Show>
 							</dd>
 							<dt>{t('device.section.ports')}</dt>
 							<dd>

@@ -33,6 +33,7 @@ import type {
 	PortSide,
 } from 'shared/src/schemas'
 import {
+	device_employees,
 	device_roles,
 	device_type_interfaces,
 	device_types,
@@ -58,13 +59,12 @@ import { cableEnds, deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate, logUpdates } from './changelog'
 import { type DbHandle, getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
-import { checkEmployeeAssignment } from './employees'
+import { checkEmployeeAssignments } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
 	checkTenantExists,
-	findById,
 	findOne,
 	inScope,
 	insertedId,
@@ -88,7 +88,42 @@ import {
 	type VirtualMachineRow,
 } from './virtual_machines'
 
-export type DeviceRow = typeof devices.$inferSelect
+/** The columns of a `devices` row. */
+type DeviceColumns = typeof devices.$inferSelect
+
+/** A device with the ids of its assigned employees (ascending). */
+export type DeviceRow = DeviceColumns & { employee_ids: number[] }
+
+/** An assigned employee as shown in lists: id and display name. */
+export interface EmployeeRef {
+	id: number
+	name: string
+}
+
+// The outer device is referenced by hand (`devices`.`id`): drizzle renders the
+// columns of a single-table select unqualified, which would rebind them inside
+// the subquery. jsonb, not an int array: Bun's driver returns int arrays as
+// `Int32Array`.
+
+/** Ids of the employees assigned to the selected device, ascending. */
+const deviceEmployeeIds: SQL<number[]> = sql<number[]>`coalesce((
+	select jsonb_agg("de"."employee_id" order by "de"."employee_id")
+	from ${device_employees} as "de"
+	where "de"."device_id" = ${devices}."id"
+), '[]'::jsonb)`
+
+/** Employees assigned to the selected device, by name. */
+const deviceEmployeeRefs: SQL<EmployeeRef[]> = sql<EmployeeRef[]>`coalesce((
+	select jsonb_agg(jsonb_build_object('id', "e"."id", 'name', "e"."name") order by "e"."name", "e"."id")
+	from ${device_employees} as "de"
+	join ${employees} as "e" on "e"."id" = "de"."employee_id"
+	where "de"."device_id" = ${devices}."id"
+), '[]'::jsonb)`
+
+/** Columns of a `DeviceRow`. */
+const deviceColumns: ReturnType<typeof getTableColumns<typeof devices>> & {
+	employee_ids: SQL<number[]>
+} = { ...getTableColumns(devices), employee_ids: deviceEmployeeIds }
 export type InterfaceRow = typeof interfaces.$inferSelect
 
 /**
@@ -320,7 +355,8 @@ interface DeviceListNames {
 	/** Built-in role key (localized label on the client). */
 	device_role_key: string | null
 	device_role_icon: DeviceRoleIcon | null
-	employee_name: string | null
+	/** Assigned employees by name (a VM has at most one). */
+	employees: EmployeeRef[]
 	tenant_name: string | null
 }
 
@@ -490,7 +526,9 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 									.where(eq(device_types.manufacturer_id, params.manufacturer)),
 							)
 						: undefined,
-					params.employee ? inArray(devices.employee_id, params.employee) : undefined,
+					params.employee
+						? sql`exists (select 1 from ${device_employees} as "de" where "de"."device_id" = ${devices}."id" and ${inArray(sql`"de"."employee_id"`, params.employee)})`
+						: undefined,
 					...tenantConditions(devices.tenant_id, params),
 					params.status ? eq(devices.status, params.status) : undefined,
 					activeCondition(devices.status, params.active),
@@ -534,7 +572,8 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			status: devices.status,
 			device_role_id: devices.device_role_id,
 			tenant_id: devices.tenant_id,
-			employee_id: devices.employee_id,
+			employee_id: nullInt('employee_id'),
+			employees: deviceEmployeeRefs.as('employees'),
 			description: devices.description,
 			device_type_id: sql<number | null>`${devices.device_type_id}`.as('device_type_id'),
 			site_id: devices.site_id,
@@ -552,11 +591,13 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			sort_role: sql<string>`${device_roles.name}`.as('sort_role'),
 			sort_type: sql<string | null>`${device_types.model}`.as('sort_type'),
 			sort_mount: sql<string | null>`${racks.name}`.as('sort_mount'),
-			sort_employee: sql<
-				string | null
-			>`${relatedValue(employees.name, employees.id, devices.employee_id)}`.as(
-				'sort_employee',
-			),
+			// First assigned employee by name.
+			sort_employee: sql<string | null>`(
+				select min("e"."name")
+				from ${device_employees} as "de"
+				join ${employees} as "e" on "e"."id" = "de"."employee_id"
+				where "de"."device_id" = ${devices}."id"
+			)`.as('sort_employee'),
 			sort_tenant: sql<
 				string | null
 			>`${relatedValue(tenants.name, tenants.id, devices.tenant_id)}`.as('sort_tenant'),
@@ -584,6 +625,11 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			device_role_id: virtual_machines.device_role_id,
 			tenant_id: virtual_machines.tenant_id,
 			employee_id: virtual_machines.employee_id,
+			employees: sql<EmployeeRef[]>`coalesce((
+				select jsonb_build_array(jsonb_build_object('id', "e"."id", 'name', "e"."name"))
+				from ${employees} as "e"
+				where "e"."id" = ${virtual_machines}."employee_id"
+			), '[]'::jsonb)`.as('employees'),
 			description: virtual_machines.description,
 			device_type_id: nullInt('device_type_id'),
 			site_id: nullInt('site_id'),
@@ -686,8 +732,10 @@ async function outOfSyncDevices(
 }
 
 /** A raw union row: the columns of both kinds, the other kind's ones null. */
-type DeviceListRow = Omit<DeviceRow, 'device_type_id'> & {
+type DeviceListRow = Omit<DeviceColumns, 'device_type_id'> & {
 	kind: DeviceListKind
+	employee_id: number | null
+	employees: EmployeeRef[]
 	shelf_name: string | null
 	shelf_position_u: number | null
 	device_type_id: number | null
@@ -711,20 +759,20 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		status: row.status,
 		device_role_id: row.device_role_id,
 		tenant_id: row.tenant_id,
-		employee_id: row.employee_id,
 		description: row.description,
 		device_role_name: row.sort_role,
 		device_role_key: row.device_role_key,
 		device_role_icon: row.device_role_icon,
 		// Rows of a scoped list lie in the scope, so their tenant is visible,
-		// and an assigned employee belongs to the row's tenant (composite FK).
-		employee_name: row.sort_employee,
+		// and assigned employees belong to the row's tenant (composite FK).
+		employees: row.employees,
 		tenant_name: row.sort_tenant,
 	}
 	if (row.kind === 'vm') {
 		return {
 			kind: 'vm',
 			...shared,
+			employee_id: row.employee_id,
 			host_device_id: row.host_device_id,
 			host_name: row.sort_mount,
 		}
@@ -732,6 +780,7 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 	return {
 		kind: 'device',
 		...shared,
+		employee_ids: row.employees.map((employee) => employee.id).sort((a, b) => a - b),
 		device_type_id: row.device_type_id ?? 0,
 		device_type_model: row.sort_type ?? '',
 		rack_name: row.rack_name,
@@ -798,8 +847,13 @@ function deviceOrder(
 	}
 }
 
-export function getDevice(id: number): Promise<Result<DeviceRow, Error>> {
-	return findById(devices, id, 'Device not found')
+export async function getDevice(id: number): Promise<Result<DeviceRow, Error>> {
+	const [row] = await getDb()
+		.select(deviceColumns)
+		.from(devices)
+		.where(eq(devices.id, id))
+		.limit(1)
+	return row ? Result.ok(row) : Result.err(new NotFoundError('Device not found'))
 }
 
 /**
@@ -835,7 +889,7 @@ export async function getDeviceDetail(
 	const shelfVisible = scopeCondition(shelfRacks.tenant_id, scope)
 	const [row] = await getDb()
 		.select({
-			...getTableColumns(devices),
+			...deviceColumns,
 			device_role_name: device_roles.name,
 			device_role_key: device_roles.key,
 			device_role_icon: device_roles.icon,
@@ -855,7 +909,7 @@ export async function getDeviceDetail(
 				: sql<number | null>`CASE WHEN ${shelfVisible} THEN ${shelves.position_u} END`
 			).as('shelf_position_u'),
 			tenant_name: sql<string | null>`${tenants.name}`.as('tenant_name'),
-			employee_name: sql<string | null>`${employees.name}`.as('employee_name'),
+			employees: deviceEmployeeRefs.as('employees'),
 		})
 		.from(devices)
 		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
@@ -866,7 +920,6 @@ export async function getDeviceDetail(
 		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
 		.leftJoin(shelfRacks, eq(shelfRacks.id, shelves.rack_id))
 		.leftJoin(tenants, eq(tenants.id, devices.tenant_id))
-		.leftJoin(employees, eq(employees.id, devices.employee_id))
 		.where(eq(devices.id, id))
 		.limit(1)
 	return row ? Result.ok(row) : Result.err(new NotFoundError('Device not found'))
@@ -915,6 +968,25 @@ export async function insertPorts(
 	})
 }
 
+/** Assigns `employeeIds` (members of `tenantId`, checked before) to a device. */
+async function insertAssignments(
+	db: DbHandle,
+	deviceId: number,
+	employeeIds: readonly number[],
+	tenantId: number | null,
+): Promise<void> {
+	if (employeeIds.length === 0 || tenantId === null) {
+		return
+	}
+	await db.insert(device_employees).values(
+		employeeIds.map((employee_id) => ({
+			device_id: deviceId,
+			employee_id,
+			tenant_id: tenantId,
+		})),
+	)
+}
+
 export async function createDevice(rawInput: DeviceCreate): Promise<Result<DeviceRow, Error>> {
 	const normalized = await normalizeShelf(rawInput)
 	if (Result.isError(normalized)) {
@@ -945,7 +1017,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		await checkExists(sites, deviceSiteId, 'Site not found'),
 		await checkLocation(deviceLocationId, deviceSiteId),
 		await checkTenantExists(input.tenant_id),
-		await checkEmployeeAssignment(input.employee_id, input.tenant_id),
+		await checkEmployeeAssignments(input.employee_ids, input.tenant_id),
 		await checkDeviceRoleExists(input.device_role_id),
 		await checkDeviceUnique(input),
 		await checkPlacement(input.name, mount, template.value),
@@ -960,7 +1032,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 	if (Result.isError(expanded)) {
 		return Result.err(new ConflictError(expanded.error.message))
 	}
-	const values: Omit<DeviceRow, 'id'> = {
+	const values: Omit<DeviceColumns, 'id'> = {
 		device_type_id: input.device_type_id,
 		device_role_id: input.device_role_id,
 		site_id: deviceSiteId,
@@ -975,7 +1047,6 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		asset_tag: input.asset_tag ?? null,
 		device_id: input.device_id ?? null,
 		tenant_id: input.tenant_id ?? null,
-		employee_id: input.employee_id ?? null,
 		description: input.description ?? null,
 	}
 	// Expansion lists rear ports before the front ports that map onto them:
@@ -991,6 +1062,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 				const deviceId = insertedId(
 					await tx.insert(devices).values(values).returning({ id: devices.id }),
 				)
+				await insertAssignments(tx, deviceId, input.employee_ids, values.tenant_id)
 				const plainIds = await insertPorts(
 					tx,
 					deviceId,
@@ -1052,8 +1124,8 @@ export async function updateDevice(
 		await checkExists(sites, input.site_id, 'Site not found'),
 		await checkLocation(deviceLocationId, deviceSiteId),
 		await checkTenantExists(input.tenant_id),
-		await checkEmployeeAssignment(
-			input.employee_id !== undefined ? input.employee_id : node.employee_id,
+		await checkEmployeeAssignments(
+			input.employee_ids ?? node.employee_ids,
 			input.tenant_id !== undefined ? input.tenant_id : node.tenant_id,
 		),
 		await checkDeviceUnique(input, id),
@@ -1075,7 +1147,7 @@ export async function updateDevice(
 			return mountCheck
 		}
 	}
-	const patch: Partial<DeviceRow> = pickDefined(input, [
+	const patch: Partial<DeviceColumns> = pickDefined(input, [
 		'device_role_id',
 		'name',
 		'status',
@@ -1088,7 +1160,6 @@ export async function updateDevice(
 		'asset_tag',
 		'device_id',
 		'tenant_id',
-		'employee_id',
 		'description',
 	])
 	if (input.site_id !== undefined || relocated) {
@@ -1097,13 +1168,27 @@ export async function updateDevice(
 	if (input.location_id !== undefined || relocated) {
 		patch.location_id = deviceLocationId
 	}
-	if (!isPatchEmpty(patch)) {
+	const employeeIds = input.employee_ids
+	if (!isPatchEmpty(patch) || employeeIds !== undefined) {
 		// Another site or location can take the device out of its floor plan's
-		// scope; another tenant moves the VMs it hosts along.
+		// scope; another tenant moves the VMs it hosts along. A new assignment
+		// is dropped before the tenant changes: the change cascades to the
+		// kept assignments, which must stay members of the tenant.
 		const written = await tryWrite(
 			() =>
 				withTransaction(async () => {
-					await getDb().update(devices).set(patch).where(eq(devices.id, id))
+					const db = getDb()
+					if (employeeIds !== undefined) {
+						await db.delete(device_employees).where(eq(device_employees.device_id, id))
+					}
+					if (!isPatchEmpty(patch)) {
+						await db.update(devices).set(patch).where(eq(devices.id, id))
+					}
+					if (employeeIds !== undefined) {
+						const tenantId =
+							patch.tenant_id !== undefined ? patch.tenant_id : node.tenant_id
+						await insertAssignments(db, id, employeeIds, tenantId)
+					}
 					if (patch.tenant_id !== undefined && patch.tenant_id !== node.tenant_id) {
 						await retenantHostedVms(id, patch.tenant_id)
 					}
@@ -1147,7 +1232,7 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 	if (Result.isError(mountCheck)) {
 		return mountCheck
 	}
-	const patch: Partial<DeviceRow> = {
+	const patch: Partial<DeviceColumns> = {
 		rack_id: mount.rack_id,
 		position_u: mount.position_u,
 	}

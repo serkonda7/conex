@@ -9,6 +9,7 @@ import type {
 	DeviceListItem,
 	DevicePortJson,
 	DeviceRow,
+	EmployeeRef,
 	InterfaceJson,
 } from 'server/src/db/devices'
 import type {
@@ -41,6 +42,7 @@ export type {
 	DeviceListItem,
 	DevicePortJson,
 	DeviceRow,
+	EmployeeRef,
 	InterfaceJson,
 	PanelJackJson,
 }
@@ -83,9 +85,9 @@ export async function fetch_device_list(
 /** Physical devices only (no virtual machines). */
 export function fetch_devices(
 	filters?: Partial<Omit<DeviceListQuery, 'kind' | 'host'>>,
-): Promise<Result<Page<DeviceRow>, Error>> {
+): Promise<Result<Page<DeviceListDevice>, Error>> {
 	return fetch_device_list({ ...filters, kind: 'device' }) as Promise<
-		Result<Page<DeviceRow>, Error>
+		Result<Page<DeviceListDevice>, Error>
 	>
 }
 

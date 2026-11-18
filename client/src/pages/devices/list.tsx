@@ -30,6 +30,7 @@ import { createRows } from '../../lib/resource'
 import { navigate, parseId } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
+import { EmployeeLinks } from './employee_assignment'
 import { MoveTenantDialog } from './move_tenant_dialog'
 import { DeviceStatusBadge } from './status'
 
@@ -146,16 +147,13 @@ export function DevicesPage(): JSX.Element {
 		},
 		{
 			key: 'employee',
-			label: t('device.assignedEmployee'),
+			label: t('device.assignedEmployees'),
 			sortable: true,
-			getValue: (device: DeviceListItem): JSX.Element =>
-				device.employee_id === null ? (
-					<span>—</span>
-				) : (
-					<a href={`/employees/${device.employee_id}`}>
-						{nameOr(device.employee_name, device.employee_id)}
-					</a>
-				),
+			getValue: (device: DeviceListItem): JSX.Element => (
+				<span>
+					<EmployeeLinks employees={device.employees} />
+				</span>
+			),
 		},
 		{
 			key: 'mount',

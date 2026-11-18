@@ -84,7 +84,7 @@ test('device add form layout', async ({ page }) => {
 	await page.goto('/devices/add')
 	await expect(page.locator('#device-name')).toBeVisible()
 	await expect(page.locator('#device-inactive')).not.toBeChecked()
-	await expect(page.locator('#device-employee')).toBeEnabled()
+	await expect(page.locator('#device-employees')).toBeEnabled()
 	await expect(page.locator('.form-section-title')).toHaveCount(3)
 	await stabilizeForSnapshot(page)
 	await expect(page.locator('main.app-content')).toHaveScreenshot('device-add-form.png')
