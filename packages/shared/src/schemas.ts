@@ -1585,6 +1585,8 @@ export const DeviceListQuerySchema = v.object({
 			'employee',
 			'tenant',
 			'site',
+			'location',
+			'floorplan',
 			'serial',
 			'asset_tag',
 			'description',

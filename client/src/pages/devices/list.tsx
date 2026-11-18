@@ -25,6 +25,7 @@ import {
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, deviceStatusLabel } from '../../i18n/labels'
+import { floorplanHref } from '../../lib/floorplan_link'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRows } from '../../lib/resource'
 import { navigate, parseId } from '../../lib/router'
@@ -217,6 +218,30 @@ export function DevicesPage(): JSX.Element {
 				),
 		},
 		{
+			key: 'location',
+			label: tp('entity.location', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element =>
+				d.kind === 'device' && d.location_id !== null ? (
+					<a href={`/locations/${d.location_id}`}>
+						{nameOr(d.location_name, d.location_id)}
+					</a>
+				) : (
+					<span>—</span>
+				),
+		},
+		{
+			key: 'floorplan',
+			label: tp('entity.floorplan', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element =>
+				d.kind === 'device' && d.floorplan_id !== null ? (
+					<a href={floorplanHref(d.floorplan_id, { device: d.id })}>{d.floorplan_name}</a>
+				) : (
+					<span>—</span>
+				),
+		},
+		{
 			key: 'serial',
 			label: t('device.serial'),
 			sortable: true,
@@ -307,6 +332,7 @@ export function DevicesPage(): JSX.Element {
 					'type',
 					'employee',
 					'mount',
+					'location',
 				]}
 				rowName={(d: DeviceListItem): string => d.name}
 				rowKey={(d: DeviceListItem): string => `${d.kind}-${d.id}`}

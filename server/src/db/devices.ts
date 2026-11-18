@@ -33,6 +33,7 @@ import type {
 	PortSide,
 } from 'shared/src/schemas'
 import {
+	attachments,
 	device_employees,
 	device_roles,
 	device_type_interfaces,
@@ -374,6 +375,11 @@ export type DeviceListItem =
 			device_type_model: string
 			rack_name: string | null
 			site_name: string | null
+			location_name: string | null
+			/** Floor plan (attachment) the device is placed on, null when unplaced. */
+			floorplan_id: number | null
+			/** The plan's owner (site or location) name, as plan links name it. */
+			floorplan_name: string | null
 	  } & DeviceListNames &
 			DeviceRow)
 	| ({ kind: 'vm'; host_name: string | null } & DeviceListNames & VirtualMachineRow)
@@ -564,6 +570,14 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 				)
 	const hosts = alias(devices, 'host')
 	const scope = params.scopeTenantIds
+	// The plan a device is placed on (at most one) and its owner; a plan
+	// whose owner lies outside the scope is left out, as in `listFloorplanLinks`.
+	const planSites = alias(sites, 'plan_site')
+	const planLocations = alias(locations, 'plan_location')
+	const planVisible = and(
+		isNotNull(attachments.id),
+		scopeCondition(sql`coalesce(${planSites.tenant_id}, ${planLocations.tenant_id})`, scope),
+	)
 	const deviceBranch = db
 		.select({
 			kind: sql<DeviceListKind>`'device'`.as('kind'),
@@ -608,6 +622,19 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			),
 			rack_name: scopedName(racks.name, scopeCondition(racks.tenant_id, scope), 'rack_name'),
 			site_name: scopedName(sites.name, scopeCondition(sites.tenant_id, scope), 'site_name'),
+			location_name: scopedName(
+				locations.name,
+				scopeCondition(locations.tenant_id, scope),
+				'location_name',
+			),
+			floorplan_id: sql<
+				number | null
+			>`CASE WHEN ${planVisible} THEN ${attachments.id} END`.as('floorplan_id'),
+			floorplan_name: scopedName(
+				sql`coalesce(${planSites.name}, ${planLocations.name})`,
+				planVisible,
+				'floorplan_name',
+			),
 		})
 		.from(devices)
 		.innerJoin(device_roles, eq(device_roles.id, devices.device_role_id))
@@ -615,6 +642,11 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		.leftJoin(racks, eq(racks.id, devices.rack_id))
 		.leftJoin(shelves, eq(shelves.id, devices.shelf_id))
 		.leftJoin(sites, eq(sites.id, devices.site_id))
+		.leftJoin(locations, eq(locations.id, devices.location_id))
+		.leftJoin(floorplan_placements, eq(floorplan_placements.device_id, devices.id))
+		.leftJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
+		.leftJoin(planSites, eq(planSites.id, attachments.site_id))
+		.leftJoin(planLocations, eq(planLocations.id, attachments.location_id))
 		.where(deviceWhere)
 	const vmBranch = db
 		.select({
@@ -664,6 +696,9 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			),
 			rack_name: nullText('rack_name'),
 			site_name: nullText('site_name'),
+			location_name: nullText('location_name'),
+			floorplan_id: nullInt('floorplan_id'),
+			floorplan_name: nullText('floorplan_name'),
 		})
 		.from(virtual_machines)
 		.innerJoin(device_roles, eq(device_roles.id, virtual_machines.device_role_id))
@@ -749,6 +784,9 @@ type DeviceListRow = Omit<DeviceColumns, 'device_type_id'> & {
 	sort_employee: string | null
 	rack_name: string | null
 	site_name: string | null
+	location_name: string | null
+	floorplan_id: number | null
+	floorplan_name: string | null
 }
 
 /** Narrows a union row to its kind's columns. */
@@ -787,6 +825,9 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		site_id: row.site_id,
 		site_name: row.site_name,
 		location_id: row.location_id,
+		location_name: row.location_name,
+		floorplan_id: row.floorplan_id,
+		floorplan_name: row.floorplan_name,
 		rack_id: row.rack_id,
 		face: row.face,
 		position_u: row.position_u,
@@ -813,6 +854,8 @@ function deviceOrder(
 		sort_employee: SQLWrapper
 		sort_tenant: SQLWrapper
 		sort_site: SQLWrapper
+		location_name: SQLWrapper
+		floorplan_name: SQLWrapper
 		serial: SQLWrapper
 		asset_tag: SQLWrapper
 		description: SQLWrapper
@@ -826,6 +869,10 @@ function deviceOrder(
 			return [orderOf(rows.sort_tenant, params.order)]
 		case 'site':
 			return [orderOf(rows.sort_site, params.order)]
+		case 'location':
+			return [orderOf(rows.location_name, params.order)]
+		case 'floorplan':
+			return [orderOf(rows.floorplan_name, params.order)]
 		case 'serial':
 			return [orderOf(rows.serial, params.order)]
 		case 'asset_tag':
