@@ -237,6 +237,7 @@ export function DeviceTypeImportPage(): JSX.Element {
 						add={{ label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }}
 						reload={refetchManufacturers}
 						required
+						autofocus
 						disabled={copyingPrompt()}
 					/>
 					<TextField

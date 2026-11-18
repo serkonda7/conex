@@ -809,6 +809,13 @@ export async function listPlanCandidates(
 							),
 							eq(portDevice.site_id, siteId),
 							free,
+							// Unpatched outlets (a jack without a patched port) are
+							// not offered, unless already on this plan.
+							or(
+								sql`(${interfaces.jack_id} is null and ${interfaces.patched} = 1)`,
+								sql`exists (select 1 from ${interfaces} jp where jp.jack_id = ${interfaces.jack_id} and jp.patched = 1)`,
+								eq(floorplan_placements.attachment_id, id),
+							),
 							scopeCondition(portDevice.tenant_id, scopeTenantIds),
 						),
 					)
