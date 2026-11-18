@@ -38,6 +38,7 @@ import { createDerived, createRecord, createRowsFor, useAction } from '../../lib
 import { type Crumb, navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { siteTrail } from '../../lib/trails'
+import { componentClassOf } from '../device_types/components'
 import { EolPill } from '../device_types/eol_pill'
 import { locationOptions } from '../locations/options'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
@@ -45,7 +46,7 @@ import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { JackDialog } from './jack_dialog'
 import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
-import { PanelPortTable, type PanelRow } from './panel_ports'
+import { PanelPortTable, type PanelRow, panelRowsOf } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
 import { DevicePortTable } from './port_table'
 import { DeviceStatusBadge } from './status'
@@ -174,6 +175,19 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	/** Current state of a port of the row being edited (its cable may change meanwhile). */
 	const currentIface = (iface: InterfaceJson | null): InterfaceJson | null =>
 		iface && ((ifaces() ?? []).find((i) => i.id === iface.id) ?? iface)
+	/** Port after `iface` in its group of the ports table, for save & next. */
+	const nextPort = (iface: InterfaceJson): InterfaceJson | null => {
+		const group = componentClassOf(iface)
+		const list = ports()
+		const at = list.findIndex((p) => p.id === iface.id)
+		return list.slice(at + 1).find((p) => componentClassOf(p) === group) ?? null
+	}
+	/** Patch-panel row after `row`, for save & next. */
+	const nextPanelRow = (row: PanelRow): PanelRow | null => {
+		const rows = panelRowsOf(panelPorts())
+		const at = rows.findIndex((r) => r.key === row.key)
+		return at < 0 ? null : (rows[at + 1] ?? null)
+	}
 	/** Direct cable peer per local interface, from the trace links. */
 	const linksByIface = createMemo(
 		() => new Map((trace()?.links ?? []).map((link) => [link.local_interface.id, link])),
@@ -555,18 +569,22 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					/>
 				)}
 			</Show>
-			<Show when={editingIface()}>
-				{(iface: () => InterfaceJson): JSX.Element => (
-					<EditPortDialog
-						device_id={props.id}
-						iface={currentIface(iface()) ?? iface()}
-						show_enabled={!isOtherPort(iface())}
-						link={linksByIface().get(iface().id)}
-						endToEnd={endToEndOf(iface().id)}
-						on_saved={() => setEditingIface(null)}
-						on_close={() => setEditingIface(null)}
-					/>
-				)}
+			<Show when={editingIface()} keyed>
+				{(iface: InterfaceJson): JSX.Element => {
+					const next = nextPort(iface)
+					return (
+						<EditPortDialog
+							device_id={props.id}
+							iface={currentIface(iface) ?? iface}
+							show_enabled={!isOtherPort(iface)}
+							link={linksByIface().get(iface.id)}
+							endToEnd={endToEndOf(iface.id)}
+							on_saved={() => setEditingIface(null)}
+							on_next={next ? () => setEditingIface(next) : undefined}
+							on_close={() => setEditingIface(null)}
+						/>
+					)
+				}}
 			</Show>
 			<Show when={editingRow()} keyed>
 				{(row: PanelRow): JSX.Element => (
@@ -582,6 +600,9 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						links={linksByIface()}
 						endToEnd={endToEndOf}
 						on_saved={() => setEditingRow(null)}
+						on_next={
+							nextPanelRow(row) ? () => setEditingRow(nextPanelRow(row)) : undefined
+						}
 						on_close={() => setEditingRow(null)}
 					/>
 				)}

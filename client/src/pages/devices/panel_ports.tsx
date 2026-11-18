@@ -168,3 +168,4 @@ export function PanelPortTable(props: {
 }
 
 export type { PanelRow }
+export { panelRowsOf }
