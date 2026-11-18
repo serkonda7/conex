@@ -2608,6 +2608,23 @@ tbody tr:last-child td {
 	opacity: 0.5;
 }
 
+/* Summary row of consecutive unpatched rear ports; toggles their rows. */
+.panel-run-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0;
+	border: none;
+	background: none;
+	color: var(--text-muted);
+	font: inherit;
+	cursor: pointer;
+}
+
+.panel-run-toggle:hover {
+	color: var(--text);
+}
+
 /* Front/rear marker on port tiles and trace hops. */
 /* Direct cable peer with the end-to-end peers behind patch panels below it. */
 .port-peer {
