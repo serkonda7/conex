@@ -6,7 +6,7 @@
  * the e2e tests and the detail-page deep links address them directly.
  */
 
-import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
+import { Combobox, type ComboboxOption, MultiCombobox } from '@serkonda7/solid-components'
 import type { InputEventAndTarget } from 'shared/src/types'
 import { type JSX, onMount, Show } from 'solid-js'
 import { t, tp } from '../i18n'
@@ -347,6 +347,36 @@ export function SelectField(props: {
 				searchLabel={t('common.search')}
 				noMatchesLabel={t('common.noMatchingObjects')}
 				previewAtCursor={props.info}
+			/>
+		</Field>
+	)
+}
+
+/** Searchable multi-select; the picked options show as removable chips. */
+export function MultiSelectField(props: {
+	id: string
+	label: string
+	values: string[]
+	onChange?: (values: string[]) => void
+	options: FormOption[]
+	required?: boolean
+	disabled?: boolean
+	hint?: JSX.Element
+	reload?: () => unknown
+}): JSX.Element {
+	return (
+		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
+			<MultiCombobox
+				id={props.id}
+				values={props.values}
+				onChange={props.onChange}
+				options={props.options}
+				required={props.required}
+				disabled={props.disabled}
+				onOpen={props.reload}
+				searchLabel={t('common.search')}
+				noMatchesLabel={t('common.noMatchingObjects')}
+				removeLabel={(label: string): string => t('common.removeValue', { value: label })}
 			/>
 		</Field>
 	)

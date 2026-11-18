@@ -659,11 +659,12 @@ export const devices = pgTable(
 		asset_tag: text('asset_tag').unique(),
 		device_id: text('device_id').unique(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
-		// One assigned contact; the composite FK requires its membership in the tenant.
-		employee_id: integer('employee_id'),
+		// Assigned contacts live in `device_employees`.
 		description: text('description'),
 	},
 	(table) => [
+		// Target of the `device_employees` composite FK.
+		unique('devices_id_tenant_id_unique').on(table.id, table.tenant_id),
 		index('devices_type_id_idx').on(table.device_type_id),
 		index('devices_device_role_id_idx').on(table.device_role_id),
 		index('devices_site_id_idx').on(table.site_id),
@@ -671,16 +672,6 @@ export const devices = pgTable(
 		index('devices_rack_id_idx').on(table.rack_id),
 		index('devices_shelf_id_idx').on(table.shelf_id),
 		index('devices_tenant_id_idx').on(table.tenant_id),
-		index('devices_employee_id_idx').on(table.employee_id),
-		foreignKey({
-			name: 'devices_employee_tenant_fk',
-			columns: [table.employee_id, table.tenant_id],
-			foreignColumns: [employee_tenants.employee_id, employee_tenants.tenant_id],
-		}),
-		check(
-			'devices_employee_requires_tenant',
-			sql`${table.employee_id} IS NULL OR ${table.tenant_id} IS NOT NULL`,
-		),
 		index('devices_status_idx').on(table.status),
 		index('devices_name_idx').on(table.name),
 		// Device list and global search: name, asset tag, device id, serial.
@@ -688,6 +679,38 @@ export const devices = pgTable(
 		trigramIndex('devices_asset_tag_trgm_idx', table.asset_tag),
 		trigramIndex('devices_device_id_trgm_idx', table.device_id),
 		trigramIndex('devices_serial_trgm_idx', table.serial),
+	],
+)
+
+// Contacts assigned to a device. `tenant_id` mirrors the device's tenant:
+// the (device_id, tenant_id) FK cascades a tenant change of the device, and
+// the (employee_id, tenant_id) FK then requires every assigned employee to
+// be a member of the new tenant, so a move or a membership removal is
+// refused while an assignment would leave the tenant. A device without a
+// tenant can have no assignment (tenant_id is NOT NULL). Deleting the device
+// drops its assignments.
+export const device_employees = pgTable(
+	'device_employees',
+	{
+		device_id: integer('device_id').notNull(),
+		employee_id: integer('employee_id').notNull(),
+		tenant_id: integer('tenant_id').notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.device_id, table.employee_id] }),
+		index('device_employees_employee_id_idx').on(table.employee_id),
+		foreignKey({
+			name: 'device_employees_device_tenant_fk',
+			columns: [table.device_id, table.tenant_id],
+			foreignColumns: [devices.id, devices.tenant_id],
+		})
+			.onDelete('cascade')
+			.onUpdate('cascade'),
+		foreignKey({
+			name: 'device_employees_employee_tenant_fk',
+			columns: [table.employee_id, table.tenant_id],
+			foreignColumns: [employee_tenants.employee_id, employee_tenants.tenant_id],
+		}),
 	],
 )
 

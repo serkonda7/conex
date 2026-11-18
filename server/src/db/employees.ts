@@ -2,7 +2,7 @@ import { Result } from 'better-result'
 import { and, asc, eq, getTableColumns, inArray, notInArray, type SQL, sql } from 'drizzle-orm'
 import type { EmployeeCreate, EmployeeListQuery, EmployeeUpdate } from 'shared/src/schemas'
 import {
-	devices,
+	device_employees,
 	employee_tenants,
 	employees,
 	external_links,
@@ -93,6 +93,31 @@ export async function checkEmployeeAssignment(
 		and(eq(employee_tenants.employee_id, employeeId), eq(employee_tenants.tenant_id, tenantId)),
 	)
 	return membership
+		? Result.ok(undefined)
+		: Result.err(new NotFoundError('Employee not found in this tenant'))
+}
+
+/** Like {@link checkEmployeeAssignment}, for the employees of a device. */
+export async function checkEmployeeAssignments(
+	employeeIds: readonly number[],
+	tenantId: number | null | undefined,
+): Promise<Result<undefined, Error>> {
+	if (employeeIds.length === 0) {
+		return Result.ok(undefined)
+	}
+	if (tenantId === null || tenantId === undefined) {
+		return Result.err(new ConflictError('Select a tenant before assigning an employee'))
+	}
+	const members = await getDb()
+		.select({ id: employee_tenants.employee_id })
+		.from(employee_tenants)
+		.where(
+			and(
+				inArray(employee_tenants.employee_id, [...employeeIds]),
+				eq(employee_tenants.tenant_id, tenantId),
+			),
+		)
+	return members.length === new Set(employeeIds).size
 		? Result.ok(undefined)
 		: Result.err(new NotFoundError('Employee not found in this tenant'))
 }
@@ -313,10 +338,10 @@ export async function updateEmployee(
 async function hasAssignments(id: number, tenantIds?: number[]): Promise<boolean> {
 	return (
 		(await findOne(
-			devices,
+			device_employees,
 			and(
-				eq(devices.employee_id, id),
-				tenantIds ? inArray(devices.tenant_id, tenantIds) : undefined,
+				eq(device_employees.employee_id, id),
+				tenantIds ? inArray(device_employees.tenant_id, tenantIds) : undefined,
 			),
 		)) !== undefined ||
 		(await findOne(

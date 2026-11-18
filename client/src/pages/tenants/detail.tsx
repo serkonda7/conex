@@ -9,8 +9,9 @@ import { type FloorplanListJson, fetch_floorplans } from '../../api/attachments'
 import { fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { fetch_device_roles } from '../../api/device_roles'
 import {
+	type DeviceListDevice,
 	type DeviceListItem,
-	type DeviceRow,
+	type EmployeeRef,
 	fetch_device_list,
 	fetch_devices,
 } from '../../api/devices'
@@ -54,6 +55,7 @@ import { can } from '../../lib/session'
 import { setTenantContext } from '../../lib/tenant_context'
 import { formatRelative } from '../../lib/time'
 import { ChangeActionBadge, ChangedObjectLink, changeUser } from '../changelog/common'
+import { EmployeeLinks } from '../devices/employee_assignment'
 import { deviceListHref } from '../devices/list'
 import { EmailLink } from '../employees/list'
 import {
@@ -110,12 +112,11 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	)
 	const [roles] = createRows(fetch_device_roles, setError)
 	const racks = (): RackRow[] => rackPage()?.items ?? []
-	const devices = (): DeviceRow[] => devicePage()?.items ?? []
+	const devices = (): DeviceListDevice[] => devicePage()?.items ?? []
 	const employees = (): EmployeeRow[] => employeePage()?.items ?? []
 	const siteName = useNameOf(sites)
 	const rackName = useNameOf(racks)
 	const roleName = useNameOf(roles, deviceRoleLabel)
-	const employeeName = useNameOf(employees)
 	const [floorplans] = createRowsFor(
 		id,
 		(key: number) => fetch_floorplans({ tenant: key }),
@@ -137,15 +138,15 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 		listRoute: '/tenants',
 	})
 
-	const deviceColumns: DataTableColumn<DeviceRow>[] = [
-		nameColumn<DeviceRow>(t('common.name'), '/devices'),
-		roleColumn<DeviceRow>(roleName),
+	const deviceColumns: DataTableColumn<DeviceListDevice>[] = [
+		nameColumn<DeviceListDevice>(t('common.name'), '/devices'),
+		roleColumn<DeviceListDevice>(roleName),
 		{
 			key: 'site',
 			label: t('tenant.siteRack'),
-			getValue: (d: DeviceRow): string => siteRackLabel(d, siteName, rackName),
+			getValue: (d: DeviceListDevice): string => siteRackLabel(d, siteName, rackName),
 		},
-		employeeColumn<DeviceRow>(employeeName),
+		employeeColumn<DeviceListDevice>(),
 	]
 	const employeeColumns = relatedEmployeeColumns()
 	const rackColumns: DataTableColumn<RackRow>[] = [
@@ -166,7 +167,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 			label: t('vm.host'),
 			getValue: vmHost,
 		},
-		employeeColumn<DeviceListItem>(employeeName),
+		employeeColumn<DeviceListItem>(),
 	]
 	const siteGroupColumns: DataTableColumn<SiteGroupRow>[] = [
 		nameColumn<SiteGroupRow>(t('common.name'), '/site-groups'),
@@ -456,7 +457,7 @@ function SitesCard(props: {
 	sites: SiteRow[]
 	loading: boolean
 	racks: RackRow[]
-	devices: DeviceRow[]
+	devices: DeviceListDevice[]
 	floorplans: FloorplanListJson[]
 }): JSX.Element {
 	return (
@@ -500,13 +501,13 @@ function SiteCard(props: {
 	tenantId: number
 	site: SiteRow
 	racks: RackRow[]
-	devices: DeviceRow[]
+	devices: DeviceListDevice[]
 	floorplans: FloorplanListJson[]
 }): JSX.Element {
 	const rackCount = (): number =>
 		props.racks.filter((r: RackRow) => r.site_id === props.site.id).length
 	const deviceCount = (): number =>
-		props.devices.filter((d: DeviceRow) => d.site_id === props.site.id).length
+		props.devices.filter((d: DeviceListDevice) => d.site_id === props.site.id).length
 	const sitePlan = (): FloorplanListJson | undefined =>
 		props.floorplans.find(
 			(p: FloorplanListJson) => p.site_id === props.site.id && p.location_id === null,
@@ -638,25 +639,17 @@ export function roleColumn<Row extends { device_role_id: number }>(
 	}
 }
 
-function employeeColumn<Row extends { employee_id: number | null }>(
-	employeeName: (id: number) => string,
-): DataTableColumn<Row> {
+function employeeColumn<Row extends { employees: readonly EmployeeRef[] }>(): DataTableColumn<Row> {
 	return {
 		key: 'employee',
-		label: t('device.assignedEmployee'),
-		getValue: (row: Row): JSX.Element => (
-			<Show when={row.employee_id} fallback="—">
-				{(employee: () => number) => (
-					<a href={`/employees/${employee()}`}>{employeeName(employee())}</a>
-				)}
-			</Show>
-		),
+		label: t('device.assignedEmployees'),
+		getValue: (row: Row): JSX.Element => <EmployeeLinks employees={row.employees} />,
 	}
 }
 
 /** `Site / Rack U<position>` of a device, as far as it is placed. */
 function siteRackLabel(
-	d: DeviceRow,
+	d: DeviceListDevice,
 	siteName: (id: number) => string,
 	rackName: (id: number) => string,
 ): string {

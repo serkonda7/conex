@@ -22,6 +22,7 @@ export const de: Messages = {
 	'common.confirmDiscard': 'Die nicht gespeicherten Änderungen verwerfen?',
 	'common.copy': 'Kopieren',
 	'common.copyValue': '{value} kopieren',
+	'common.removeValue': '{value} entfernen',
 	'common.copied': 'Kopiert',
 	'common.loading': 'Wird geladen…',
 	'common.quickSearch': 'Suche',
@@ -239,6 +240,8 @@ export const de: Messages = {
 	'table.savedLayouts': 'Gespeicherte Layouts',
 	'table.saveLayout': 'Layout speichern',
 	'table.layoutName': 'Layoutname',
+	'table.filterLayout': 'Spaltenlayout',
+	'table.noLayout': 'Kein Layout',
 
 	// app
 	'app.skipToContent': 'Zum Inhalt springen',
@@ -838,6 +841,7 @@ export const de: Messages = {
 	'device.serial': 'Seriennummer',
 	'device.assetTag': 'Inventarnummer',
 	'device.assignedEmployee': 'Mitarbeiter',
+	'device.assignedEmployees': 'Mitarbeiter',
 	'device.bundleNotContracted': 'SLA nicht festgelegt',
 	'device.noEmployee': 'Keine Zuweisung',
 	'device.serialPlaceholder': 'Seriennummer (optional)',
@@ -890,6 +894,11 @@ export const de: Messages = {
 	'device.panel.editRow': '{name} bearbeiten',
 	'device.panel.patched': 'Aufgelegt',
 	'device.panel.notPatched': 'Nicht aufgelegt',
+	'device.panel.portRange': '{from}–{to}',
+	'device.panel.unpatchedRun.one': '{count} Port nicht aufgelegt',
+	'device.panel.unpatchedRun.other': '{count} Ports nicht aufgelegt',
+	'device.panel.expandRun': 'Nicht aufgelegte Ports {range} anzeigen',
+	'device.panel.collapseRun': 'Nicht aufgelegte Ports {range} ausblenden',
 	'device.panel.patchToConnect': 'Zum Verbinden auflegen',
 	'device.panel.frontCaption': 'zum Rack',
 	'device.panel.rearCaption': 'zur Dose',
@@ -1004,6 +1013,11 @@ export const de: Messages = {
 
 	'savedFilter.table': 'Tabelle',
 	'savedFilter.parameters': 'Parameter',
+	'savedFilter.layout': 'Spaltenlayout',
+	'savedFilter.layoutHint': 'Wird zusammen mit dem Filter angewendet.',
+	'savedFilter.layoutMissing': '{name} (fehlt)',
+	'savedFilter.layoutMissingHint':
+		'Kein gespeichertes Layout dieser Tabelle hat diesen Namen; es wird ignoriert.',
 	'savedFilter.updated': 'Aktualisiert',
 	'savedFilter.noValues': 'Keine Filterwerte',
 	'savedFilter.empty':

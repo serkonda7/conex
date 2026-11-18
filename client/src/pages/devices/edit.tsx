@@ -23,7 +23,7 @@ import { parseId, useFormReturnRoute } from '../../lib/router'
 import { deviceRoleOptions } from '../device-roles/options'
 import { locationOptions } from '../locations/options'
 import { DeviceStatusField, parsePosition, validPosition } from './add'
-import { EmployeeAssignmentField } from './employee_assignment'
+import { DeviceEmployeesField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 import { inactiveStatusChange } from './status'
 
@@ -48,7 +48,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [face, setFace] = createSignal('')
 	const [positionU, setPositionU] = createSignal('')
 	const [tenantId, setTenantId] = createSignal('')
-	const [employeeId, setEmployeeId] = createSignal('')
+	const [employeeIds, setEmployeeIds] = createSignal<string[]>([])
 	const form = useEntityForm({
 		id: props.id,
 		load: fetch_device,
@@ -65,7 +65,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setFace(row.face ?? '')
 			setPositionU(id_value(row.position_u))
 			setTenantId(id_value(row.tenant_id))
-			setEmployeeId(id_value(row.employee_id))
+			setEmployeeIds(row.employee_ids.map(String))
 		},
 	})
 	// Sites, locations and racks are limited to the device's tenant; a device
@@ -125,7 +125,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					rack_id: parseId(rackId()),
 					face: (face() || null) as DeviceFace | null,
 					position_u: parsePosition(positionU()),
-					employee_id: parseId(employeeId()),
+					employee_ids: employeeIds().map(Number),
 				}),
 			navigateTo: backTo(),
 		})
@@ -222,11 +222,11 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 				/>
 			</FormSection>
 			<FormSection title={t('device.assignmentSection')}>
-				<EmployeeAssignmentField
-					id="device-edit-employee"
+				<DeviceEmployeesField
+					id="device-edit-employees"
 					tenantId={parseId(tenantId())}
-					value={employeeId()}
-					onChange={setEmployeeId}
+					values={employeeIds()}
+					onChange={setEmployeeIds}
 					onError={form.setError}
 				/>
 			</FormSection>

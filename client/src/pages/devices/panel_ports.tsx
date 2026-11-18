@@ -1,9 +1,10 @@
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-solidjs'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
-import { createComputed, createMemo, type JSX } from 'solid-js'
+import { createComputed, createMemo, createSignal, type JSX } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import type { InterfaceJson } from '../../api/devices'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
-import { t } from '../../i18n'
+import { t, tp } from '../../i18n'
 import { CableButtons } from './port_table'
 import { PortPeer } from './trace_peer'
 
@@ -63,10 +64,81 @@ function rowPatched(row: PanelRow): boolean {
 }
 
 /**
+ * Summary row of a run of consecutive unpatched rear ports (two or more),
+ * a rear port counting with its position rows as one unit.
+ */
+interface PanelRunRow {
+	key: string
+	run: {
+		/** Rear port numbers of the first and last port. */
+		from: number
+		to: number
+		/** Keys of the rear ports (their first row) in the run. */
+		units: string[]
+		/** Whether the run's rows show below the summary row. */
+		open: boolean
+	}
+}
+
+type PanelTableRow = PanelRow | PanelRunRow
+
+function isRun(row: PanelTableRow): row is PanelRunRow {
+	return 'run' in row
+}
+
+/**
+ * Table rows of `rows` (from {@link panelRowsOf}): runs of two or more fully
+ * unpatched rear ports collapse into a summary row, followed by their rows
+ * when one of their rear ports is in `expanded`.
+ */
+function tableRowsOf(rows: PanelRow[], expanded: ReadonlySet<string>): PanelTableRow[] {
+	const units: PanelRow[][] = []
+	for (const row of rows) {
+		const unit = units.at(-1)
+		if (unit && unit[0]?.rear.id === row.rear.id) {
+			unit.push(row)
+		} else {
+			units.push([row])
+		}
+	}
+	const out: PanelTableRow[] = []
+	let run: PanelRow[][] = []
+	const flush = (): void => {
+		const first = run[0]?.[0]
+		const last = run.at(-1)?.[0]
+		if (run.length > 1 && first && last) {
+			const keys = run.map((unit) => unit[0]?.key ?? '')
+			const open = keys.some((key) => expanded.has(key))
+			out.push({
+				key: `run:${first.key}`,
+				run: { from: first.number, to: last.number, units: keys, open },
+			})
+			if (open) {
+				out.push(...run.flat())
+			}
+		} else {
+			out.push(...run.flat())
+		}
+		run = []
+	}
+	for (const unit of units) {
+		if (unit.every((row) => !rowPatched(row))) {
+			run.push(unit)
+		} else {
+			flush()
+			out.push(...unit)
+		}
+	}
+	flush()
+	return out
+}
+
+/**
  * Patch-panel ports grouped by rear port: `# | Front → peer | Rear (outlet)
  * → peer`, plus `extraColumns` (floor plan). Multi-position rear ports
  * list their positions underneath; unpatched rows are dimmed and show a
- * hint instead of their port names. Unconnected patched ports get a
+ * hint instead of their port names. Two or more consecutive unpatched rear
+ * ports collapse into one summary row (`5–12`) that expands to their rows. Unconnected patched ports get a
  * connect button on row hover (`onConnect`), connected ports a
  * disconnect button (`onDisconnect`); `rowActions` (one edit
  * button) edits both ports of a row.
@@ -85,16 +157,33 @@ export function PanelPortTable(props: {
 	// Keep row objects (and their DOM nodes) across refreshes, so the browser
 	// retains its scroll anchor and the dialog can return focus to its button.
 	// Copy the ports: reconciliation must not mutate the query cache's objects.
-	const [storedRows, setStoredRows] = createStore<PanelRow[]>([])
+	const [storedRows, setStoredRows] = createStore<PanelTableRow[]>([])
+	// Rear ports (by row key) of the expanded runs; a split run stays expanded.
+	const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set())
 	createComputed(() => {
 		const next = panelRowsOf(props.ports).map((row) => ({
 			...row,
 			rear: { ...row.rear },
 			front: row.front ? { ...row.front } : null,
 		}))
-		setStoredRows(reconcile(next, { key: 'key' }))
+		setStoredRows(reconcile(tableRowsOf(next, expanded()), { key: 'key' }))
 	})
 	const rows = createMemo(() => [...storedRows])
+
+	const toggleRun = (run: PanelRunRow['run']): void => {
+		const next = new Set(expanded())
+		for (const key of run.units) {
+			if (run.open) {
+				next.delete(key)
+			} else {
+				next.add(key)
+			}
+		}
+		setExpanded(next)
+	}
+
+	const runLabel = (run: PanelRunRow['run']): string =>
+		t('device.panel.portRange', { from: run.from, to: run.to })
 
 	const portCell = (iface: InterfaceJson | null): JSX.Element => {
 		if (!iface) {
@@ -115,11 +204,34 @@ export function PanelPortTable(props: {
 		)
 	}
 
-	const columns = (): DataTableColumn<PanelRow>[] => [
+	const columns = (): DataTableColumn<PanelTableRow>[] => [
 		{
 			key: 'number',
 			label: '#',
-			getValue: (row: PanelRow): JSX.Element => {
+			getValue: (row: PanelTableRow): JSX.Element => {
+				if (isRun(row)) {
+					const label = (): string =>
+						t(row.run.open ? 'device.panel.collapseRun' : 'device.panel.expandRun', {
+							range: runLabel(row.run),
+						})
+					return (
+						<button
+							type="button"
+							class="panel-run-toggle"
+							aria-expanded={row.run.open}
+							aria-label={label()}
+							title={label()}
+							onClick={(): void => toggleRun(row.run)}
+						>
+							{row.run.open ? (
+								<IconChevronDown size={14} />
+							) : (
+								<IconChevronRight size={14} />
+							)}
+							<span>{runLabel(row.run)}</span>
+						</button>
+					)
+				}
 				const label = row.position === null ? String(row.number) : `↳ ${row.position}`
 				return rowPatched(row) ? (
 					label
@@ -133,8 +245,12 @@ export function PanelPortTable(props: {
 		{
 			key: 'front',
 			label: t('device.panel.front'),
-			getValue: (row: PanelRow): JSX.Element =>
-				!rowPatched(row) ? (
+			getValue: (row: PanelTableRow): JSX.Element =>
+				isRun(row) ? (
+					<span class="panel-port-muted">
+						{tp('device.panel.unpatchedRun', row.run.units.length)}
+					</span>
+				) : !rowPatched(row) ? (
 					<span class="panel-port-muted">{t('device.panel.notPatched')}</span>
 				) : row.position === null && row.rear.positions > 1 ? (
 					<span class="panel-port-muted">
@@ -147,10 +263,25 @@ export function PanelPortTable(props: {
 		{
 			key: 'rear',
 			label: t('device.panel.rear'),
-			getValue: (row: PanelRow): JSX.Element =>
-				row.position === null && rowPatched(row) ? portCell(row.rear) : <span />,
+			getValue: (row: PanelTableRow): JSX.Element =>
+				!isRun(row) && row.position === null && rowPatched(row) ? (
+					portCell(row.rear)
+				) : (
+					<span />
+				),
 		},
-		...(props.extraColumns ?? []),
+		// Summary rows leave the caller's columns empty.
+		...(props.extraColumns ?? []).map(
+			({ getValue, sortValue, ...column }): DataTableColumn<PanelTableRow> => ({
+				...column,
+				getValue: getValue
+					? (row: PanelTableRow): JSX.Element => (isRun(row) ? <span /> : getValue(row))
+					: undefined,
+				sortValue: sortValue
+					? (row: PanelTableRow): unknown => (isRun(row) ? undefined : sortValue(row))
+					: undefined,
+			}),
+		),
 	]
 
 	return (
@@ -158,13 +289,19 @@ export function PanelPortTable(props: {
 			class="panel-port-table"
 			columnLines
 			rows={rows}
-			getRowId={(row: PanelRow): string => row.key}
+			getRowId={(row: PanelTableRow): string => row.key}
 			showColumnCustomizer
 			columns={columns()}
-			rowActions={props.rowActions}
+			rowActions={
+				props.rowActions
+					? (row: PanelTableRow): JSX.Element =>
+							isRun(row) ? <span /> : props.rowActions?.(row)
+					: undefined
+			}
 			empty={false}
 		/>
 	)
 }
 
 export type { PanelRow }
+export { panelRowsOf }

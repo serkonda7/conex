@@ -15,8 +15,11 @@ import { ListLoading, RowMenu, type RowMenuAnchor, useListFilters, useRowMenu } 
 import { Modal } from './modal'
 import { MoreActionsButton } from './more_actions_button'
 
-/** The part of a saved-list page that differs per kind (filters, layouts). */
-export interface SavedListPageConfig<E extends SavedListEntryBase, P> {
+/**
+ * The part of a saved-list page that differs per kind (filters, layouts).
+ * `X` is the value of the edit dialog's optional extra field.
+ */
+export interface SavedListPageConfig<E extends SavedListEntryBase, P, X = undefined> {
 	/** Page heading. */
 	title: string
 	/** Lower-case noun, singular for 1. */
@@ -25,8 +28,8 @@ export interface SavedListPageConfig<E extends SavedListEntryBase, P> {
 	emptyText: string
 	fetch: (query: SavedFilterListQuery) => Promise<Result<SavedListPageJson<E>, Error>>
 	remove: (entry: E) => Promise<Result<unknown, Error>>
-	/** The column showing an entry's payload. */
-	payloadColumn: { key: string; label: string; render: (entry: E) => JSX.Element }
+	/** The columns showing an entry's payload. */
+	payloadColumns: { key: string; label: string; render: (entry: E) => JSX.Element }[]
 	/** The edit dialog's raw JSON payload field. */
 	edit: {
 		title: (name: string) => string
@@ -39,7 +42,17 @@ export interface SavedListPageConfig<E extends SavedListEntryBase, P> {
 		payloadOf: (entry: E) => P
 		/** Checks the parsed JSON object; null when it is not a valid payload. */
 		parse: (raw: Record<string, unknown>) => P | null
-		save: (entry: E, name: string, payload: P) => Promise<Result<unknown, Error>>
+		/**
+		 * A field below the name, created once per dialog; its `value()` is
+		 * handed to `save`.
+		 */
+		extra?: (entry: E) => { field: JSX.Element; value: () => X }
+		save: (
+			entry: E,
+			name: string,
+			payload: P,
+			extra: X | undefined,
+		) => Promise<Result<unknown, Error>>
 	}
 }
 
@@ -64,9 +77,9 @@ function rowKey(entry: SavedListEntryBase): string {
 }
 
 /** Renames a saved entry or edits its raw payload (JSON). */
-function EditSavedEntryDialog<E extends SavedListEntryBase, P>(props: {
+function EditSavedEntryDialog<E extends SavedListEntryBase, P, X>(props: {
 	entry: E
-	edit: SavedListPageConfig<E, P>['edit']
+	edit: SavedListPageConfig<E, P, X>['edit']
 	on_close: () => void
 }): JSX.Element {
 	const [name, setName] = createSignal(props.entry.name)
@@ -75,6 +88,7 @@ function EditSavedEntryDialog<E extends SavedListEntryBase, P>(props: {
 	)
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
+	const extra = props.edit.extra?.(props.entry)
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
@@ -84,7 +98,9 @@ function EditSavedEntryDialog<E extends SavedListEntryBase, P>(props: {
 			setError(props.edit.invalid)
 			return
 		}
-		const saved = await save.run(() => props.edit.save(props.entry, name().trim(), parsed))
+		const saved = await save.run(() =>
+			props.edit.save(props.entry, name().trim(), parsed, extra?.value()),
+		)
 		if (saved) {
 			props.on_close()
 		}
@@ -102,6 +118,7 @@ function EditSavedEntryDialog<E extends SavedListEntryBase, P>(props: {
 					value={name()}
 					onInput={setName}
 				/>
+				{extra?.field}
 				<TextAreaField
 					id={`${props.edit.idPrefix}-payload`}
 					label={props.edit.label}
@@ -129,8 +146,8 @@ function EditSavedEntryDialog<E extends SavedListEntryBase, P>(props: {
  * users: entries are renamed, their payload edited, or deleted. Searchable
  * by name and filterable by table.
  */
-export function SavedListPage<E extends SavedListEntryBase, P>(
-	props: SavedListPageConfig<E, P>,
+export function SavedListPage<E extends SavedListEntryBase, P, X = undefined>(
+	props: SavedListPageConfig<E, P, X>,
 ): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [search, setSearch] = createSignal('')
@@ -204,11 +221,13 @@ export function SavedListPage<E extends SavedListEntryBase, P>(
 				</Show>
 			),
 		},
-		{
-			key: props.payloadColumn.key,
-			label: props.payloadColumn.label,
-			getValue: props.payloadColumn.render,
-		},
+		...props.payloadColumns.map(
+			(column): DataTableColumn<E> => ({
+				key: column.key,
+				label: column.label,
+				getValue: column.render,
+			}),
+		),
 		{
 			key: 'updated',
 			label: t('savedFilter.updated'),

@@ -21,12 +21,17 @@ export interface EditPortDialogProps {
 	link: TraceLink | undefined
 	endToEnd: TraceEndToEnd[]
 	on_saved: () => void
+	/** Opens the next port row; absent on the last one (no save & next). */
+	on_next?: () => void
 	on_close: () => void
 }
+
+const NEXT = 'next'
 
 /**
  * Port edit dialog: rename, (for network ports) enable/disable, and connect
  * or remove the cable. Cables are changed right away; the dialog stays open.
+ * Save & next (Shift+Enter) saves and continues with the next port row.
  */
 export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 	const [name, setName] = createSignal(props.iface.name)
@@ -34,6 +39,7 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 	const [connecting, setConnecting] = createSignal(false)
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
+	let nextButton: HTMLButtonElement | undefined
 	const cable = useAction(setError)
 	const dirty = (): boolean =>
 		name().trim() !== props.iface.name ||
@@ -41,6 +47,7 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
+		const next = (e.submitter as HTMLButtonElement | null)?.value === NEXT && props.on_next
 		const trimmed = name().trim()
 		if (!trimmed) {
 			return
@@ -52,11 +59,11 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 				: {}),
 		}
 		if (Object.keys(input).length === 0) {
-			props.on_close()
+			;(next || props.on_close)()
 			return
 		}
 		if (await save.run(() => update_interface(props.device_id, props.iface.id, input))) {
-			props.on_saved()
+			;(next || props.on_saved)()
 		}
 	}
 
@@ -71,7 +78,16 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 				dirty={dirty()}
 				on_close={props.on_close}
 			>
-				<form class="form-stacked" onSubmit={handleSave}>
+				<form
+					class="form-stacked"
+					onSubmit={handleSave}
+					onKeyDown={(e: KeyboardEvent & { currentTarget: HTMLFormElement }): void => {
+						if (e.key === 'Enter' && e.shiftKey && nextButton && !nextButton.disabled) {
+							e.preventDefault()
+							e.currentTarget.requestSubmit(nextButton)
+						}
+					}}
+				>
 					<Show when={props.show_enabled}>
 						<ToggleField
 							id="edit-port-enabled"
@@ -140,10 +156,23 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 							</span>
 						</div>
 					</div>
-					<div class="modal-actions">
-						<button type="submit" disabled={!name().trim() || save.pending()}>
-							{t('common.save')}
-						</button>
+					<div class="form-actions modal-actions">
+						<div class="btn-group">
+							<button type="submit" disabled={!name().trim() || save.pending()}>
+								{t('common.save')}
+							</button>
+							<button
+								ref={nextButton}
+								type="submit"
+								class="btn-outline"
+								name="action"
+								value={NEXT}
+								title={t('device.connectNextHint')}
+								disabled={!props.on_next || !name().trim() || save.pending()}
+							>
+								{t('common.saveAndNext')}
+							</button>
+						</div>
 						<button
 							type="button"
 							onClick={() => confirmDiscard(dirty()) && props.on_close()}

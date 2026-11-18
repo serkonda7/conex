@@ -1323,6 +1323,13 @@ export const DeviceFaceSchema = v.picklist(['front', 'rear'])
 
 export type DeviceFace = v.InferOutput<typeof DeviceFaceSchema>
 
+/** Employees assigned to a device, without duplicates (order is irrelevant). */
+const DeviceEmployeeIdsSchema = v.pipe(
+	v.array(IdSchema),
+	v.maxLength(100),
+	v.check((ids) => new Set(ids).size === ids.length, 'Employees must be unique'),
+)
+
 export const DeviceCreateSchema = v.strictObject({
 	device_type_id: IdSchema,
 	device_role_id: IdSchema,
@@ -1341,7 +1348,7 @@ export const DeviceCreateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: DeviceIdSchema,
 	tenant_id: NullableIdSchema,
-	employee_id: NullableIdSchema,
+	employee_ids: v.optional(DeviceEmployeeIdsSchema, []),
 	description: DescriptionSchema,
 })
 
@@ -1361,7 +1368,8 @@ export const DeviceUpdateSchema = v.strictObject({
 	asset_tag: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	device_id: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 	tenant_id: NullableIdSchema,
-	employee_id: NullableIdSchema,
+	/** Replaces the whole assignment; omitted keeps it. */
+	employee_ids: v.optional(DeviceEmployeeIdsSchema, undefined),
 	description: NullableDescriptionSchema,
 })
 
@@ -1577,6 +1585,8 @@ export const DeviceListQuerySchema = v.object({
 			'employee',
 			'tenant',
 			'site',
+			'location',
+			'floorplan',
 			'serial',
 			'asset_tag',
 			'description',
@@ -3094,7 +3104,9 @@ export interface EmployeeIntegrationStatus {
 // ---------------------------------------------------------------------------
 // Saved filters: named FilterTable filter sets, stored per table for all
 // users. `values` maps filter keys (plus the quick search `q`) to a text or
-// a list of selected options, as the table hands them out.
+// a list of selected options, as the table hands them out. `layout` names a
+// saved layout of the same table applied with the filter; a name no saved
+// layout has is ignored (filters saved before it existed have none).
 // ---------------------------------------------------------------------------
 
 const SavedFilterTableKeySchema = v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/))
@@ -3132,6 +3144,7 @@ const SavedFilterValueSchema = v.union([
 export const SavedFilterSchema = v.strictObject({
 	name: NameSchema,
 	values: v.record(v.pipe(v.string(), v.maxLength(100)), SavedFilterValueSchema),
+	layout: v.optional(NameSchema),
 })
 
 /** Full list of a table's saved filters; a PUT replaces the stored list. */
@@ -3178,6 +3191,7 @@ export interface SavedListPageJson<E extends SavedListEntryBase> {
 /** One saved filter of the overview across all tables. */
 export interface SavedFilterEntryJson extends SavedListEntryBase {
 	values: SavedFilterJson['values']
+	layout?: string
 }
 
 export type SavedFilterPageJson = SavedListPageJson<SavedFilterEntryJson>

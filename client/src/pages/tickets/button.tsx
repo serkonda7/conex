@@ -20,8 +20,8 @@ function openDeviceId(): number | null {
  * Top-bar "Ticket" button next to the tenant context (`tickets.create`):
  * opens `/tickets/add` in its own tab, which uses the user's only tenant
  * or the selected tenant context. The device open in the
- * active tab is preselected, along with the employee it is assigned to, when
- * it belongs to that tenant.
+ * active tab is preselected, along with its employee when exactly one is
+ * assigned, when it belongs to that tenant.
  */
 export function CreateTicketButton(props: { scopeTenantId: number | null }): JSX.Element {
 	const [device] = createRecord(
@@ -33,8 +33,10 @@ export function CreateTicketButton(props: { scopeTenantId: number | null }): JSX
 		const query = new URLSearchParams()
 		if (d && d.tenant_id === (props.scopeTenantId ?? contextTenantId())) {
 			query.set('device', String(d.id))
-			if (d.employee_id !== null) {
-				query.set('employee', String(d.employee_id))
+			// A ticket names one contact: preselected only when unambiguous.
+			const [employee, ...others] = d.employee_ids
+			if (employee !== undefined && others.length === 0) {
+				query.set('employee', String(employee))
 			}
 		}
 		const qs = query.toString()

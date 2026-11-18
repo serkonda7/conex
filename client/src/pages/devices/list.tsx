@@ -25,11 +25,13 @@ import {
 import { treeIcons, treePaths } from '../../components/tree_name'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, deviceStatusLabel } from '../../i18n/labels'
+import { floorplanHref } from '../../lib/floorplan_link'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRows } from '../../lib/resource'
 import { navigate, parseId } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
+import { EmployeeLinks } from './employee_assignment'
 import { MoveTenantDialog } from './move_tenant_dialog'
 import { DeviceStatusBadge } from './status'
 
@@ -146,16 +148,13 @@ export function DevicesPage(): JSX.Element {
 		},
 		{
 			key: 'employee',
-			label: t('device.assignedEmployee'),
+			label: t('device.assignedEmployees'),
 			sortable: true,
-			getValue: (device: DeviceListItem): JSX.Element =>
-				device.employee_id === null ? (
-					<span>—</span>
-				) : (
-					<a href={`/employees/${device.employee_id}`}>
-						{nameOr(device.employee_name, device.employee_id)}
-					</a>
-				),
+			getValue: (device: DeviceListItem): JSX.Element => (
+				<span>
+					<EmployeeLinks employees={device.employees} />
+				</span>
+			),
 		},
 		{
 			key: 'mount',
@@ -214,6 +213,30 @@ export function DevicesPage(): JSX.Element {
 			getValue: (d: DeviceListItem): JSX.Element =>
 				d.kind === 'device' && d.site_id !== null ? (
 					<a href={`/sites/${d.site_id}`}>{nameOr(d.site_name, d.site_id)}</a>
+				) : (
+					<span>—</span>
+				),
+		},
+		{
+			key: 'location',
+			label: tp('entity.location', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element =>
+				d.kind === 'device' && d.location_id !== null ? (
+					<a href={`/locations/${d.location_id}`}>
+						{nameOr(d.location_name, d.location_id)}
+					</a>
+				) : (
+					<span>—</span>
+				),
+		},
+		{
+			key: 'floorplan',
+			label: tp('entity.floorplan', 1),
+			sortable: true,
+			getValue: (d: DeviceListItem): JSX.Element =>
+				d.kind === 'device' && d.floorplan_id !== null ? (
+					<a href={floorplanHref(d.floorplan_id, { device: d.id })}>{d.floorplan_name}</a>
 				) : (
 					<span>—</span>
 				),
@@ -309,6 +332,7 @@ export function DevicesPage(): JSX.Element {
 					'type',
 					'employee',
 					'mount',
+					'location',
 				]}
 				rowName={(d: DeviceListItem): string => d.name}
 				rowKey={(d: DeviceListItem): string => `${d.kind}-${d.id}`}

@@ -35,15 +35,20 @@ export interface PanelRowDialogProps {
 	endToEnd: (ifaceId: number) => TraceEndToEnd[]
 	/** A cable was connected or removed; the dialog stays open. */
 	on_saved: () => void
+	/** Opens the next panel row; absent on the last one (no save & next). */
+	on_next?: () => void
 	on_close: () => void
 }
+
+const NEXT = 'next'
 
 /**
  * Edit dialog of one patch-panel row: front port, the patched switch and rear
  * port side by side, the way the signal runs, and an outlet's location below
  * (read-only while its floor plan sets it). Cables are connected and removed
  * right away; names, `patched` and the location are saved together
- * (`patched` on every editable port of the row).
+ * (`patched` on every editable port of the row). Save & next (Shift+Enter)
+ * saves and continues with the next row.
  */
 export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 	const [frontName, setFrontName] = createSignal(props.front?.name ?? '')
@@ -55,6 +60,7 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 	const [connecting, setConnecting] = createSignal<InterfaceJson | null>(null)
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
+	let nextButton: HTMLButtonElement | undefined
 	const cable = useAction(setError)
 
 	/** The shared rear port of a position row belongs to its own row. */
@@ -100,6 +106,7 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
+		const next = (e.submitter as HTMLButtonElement | null)?.value === NEXT && props.on_next
 		if (!valid()) {
 			return
 		}
@@ -113,10 +120,10 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 			}
 		}
 		if (updates.length === 0) {
-			props.on_close()
+			;(next || props.on_close)()
 			return
 		}
-		props.on_saved()
+		;(next || props.on_saved)()
 	}
 
 	async function handleDisconnect(cableId: number): Promise<void> {
@@ -225,7 +232,16 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 				dirty={dirty()}
 				on_close={props.on_close}
 			>
-				<form class="form-stacked" onSubmit={handleSave}>
+				<form
+					class="form-stacked"
+					onSubmit={handleSave}
+					onKeyDown={(e: KeyboardEvent & { currentTarget: HTMLFormElement }): void => {
+						if (e.key === 'Enter' && e.shiftKey && nextButton && !nextButton.disabled) {
+							e.preventDefault()
+							e.currentTarget.requestSubmit(nextButton)
+						}
+					}}
+				>
 					<div class="panel-row-grid">
 						{portCard({
 							id: 'panel-row-front',
@@ -307,10 +323,26 @@ export function PanelRowDialog(props: PanelRowDialogProps): JSX.Element {
 						<Show when={locked()}>{t('device.panel.cabledPatched')}</Show>
 					</p>
 					<div class="panel-row-footer">
-						<div class="modal-actions">
-							<button type="submit" disabled={!valid() || !dirty() || save.pending()}>
-								{t('common.save')}
-							</button>
+						<div class="form-actions modal-actions">
+							<div class="btn-group">
+								<button
+									type="submit"
+									disabled={!valid() || !dirty() || save.pending()}
+								>
+									{t('common.save')}
+								</button>
+								<button
+									ref={nextButton}
+									type="submit"
+									class="btn-outline"
+									name="action"
+									value={NEXT}
+									title={t('device.connectNextHint')}
+									disabled={!props.on_next || !valid() || save.pending()}
+								>
+									{t('common.saveAndNext')}
+								</button>
+							</div>
 							<button
 								type="button"
 								onClick={() => confirmDiscard(dirty()) && props.on_close()}

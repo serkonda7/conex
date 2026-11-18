@@ -486,6 +486,8 @@ export async function importDevicesCsv(
 			asset_tag: input.asset_tag,
 			device_id: input.device_id,
 			...(tenantId !== undefined ? { tenant_id: tenantId } : {}),
+			// The CSV format carries no employee assignment.
+			employee_ids: [],
 		})
 	})
 }
