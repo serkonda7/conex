@@ -1680,6 +1680,8 @@ tbody tr:last-child td {
 
 .form-actions {
 	display: flex;
+	/* Narrow screens: Cancel wraps below the submit group instead of under it. */
+	flex-wrap: wrap;
 	gap: 0.4rem;
 	padding-top: 0.2rem;
 	margin-left: calc(var(--label-width) + 0.75rem);
