@@ -6,6 +6,8 @@
  * `resizableColumns={false}`). Both persist their saved column layouts globally
  * when given a `savedLayoutsKey`; `FilterTable` also persists its saved filters
  * globally and the applied filters per browser when given a `savedFiltersKey`.
+ * With both keys, a saved filter may name one of the table's saved layouts,
+ * which picking the filter applies too.
  */
 import {
 	DataTable as BaseDataTable,
@@ -131,6 +133,8 @@ export function FilterTable<TRow>(
 			savedFiltersLabel: t('table.savedFilters'),
 			saveLabel: t('common.save'),
 			saveNameLabel: t('table.filterName'),
+			saveLayoutChoiceLabel: t('table.filterLayout'),
+			noLayoutLabel: t('table.noLayout'),
 			clearSavedFilterLabel: t('table.clearSavedFilter'),
 			removeLabel: t('table.removeValue'),
 		},

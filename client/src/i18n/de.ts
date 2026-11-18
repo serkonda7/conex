@@ -240,6 +240,8 @@ export const de: Messages = {
 	'table.savedLayouts': 'Gespeicherte Layouts',
 	'table.saveLayout': 'Layout speichern',
 	'table.layoutName': 'Layoutname',
+	'table.filterLayout': 'Spaltenlayout',
+	'table.noLayout': 'Kein Layout',
 
 	// app
 	'app.skipToContent': 'Zum Inhalt springen',
@@ -1011,6 +1013,11 @@ export const de: Messages = {
 
 	'savedFilter.table': 'Tabelle',
 	'savedFilter.parameters': 'Parameter',
+	'savedFilter.layout': 'Spaltenlayout',
+	'savedFilter.layoutHint': 'Wird zusammen mit dem Filter angewendet.',
+	'savedFilter.layoutMissing': '{name} (fehlt)',
+	'savedFilter.layoutMissingHint':
+		'Kein gespeichertes Layout dieser Tabelle hat diesen Namen; es wird ignoriert.',
 	'savedFilter.updated': 'Aktualisiert',
 	'savedFilter.noValues': 'Keine Filterwerte',
 	'savedFilter.empty':

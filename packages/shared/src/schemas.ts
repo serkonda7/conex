@@ -3104,7 +3104,9 @@ export interface EmployeeIntegrationStatus {
 // ---------------------------------------------------------------------------
 // Saved filters: named FilterTable filter sets, stored per table for all
 // users. `values` maps filter keys (plus the quick search `q`) to a text or
-// a list of selected options, as the table hands them out.
+// a list of selected options, as the table hands them out. `layout` names a
+// saved layout of the same table applied with the filter; a name no saved
+// layout has is ignored (filters saved before it existed have none).
 // ---------------------------------------------------------------------------
 
 const SavedFilterTableKeySchema = v.pipe(v.string(), v.regex(/^[a-z0-9_.-]{1,100}$/))
@@ -3142,6 +3144,7 @@ const SavedFilterValueSchema = v.union([
 export const SavedFilterSchema = v.strictObject({
 	name: NameSchema,
 	values: v.record(v.pipe(v.string(), v.maxLength(100)), SavedFilterValueSchema),
+	layout: v.optional(NameSchema),
 })
 
 /** Full list of a table's saved filters; a PUT replaces the stored list. */
@@ -3188,6 +3191,7 @@ export interface SavedListPageJson<E extends SavedListEntryBase> {
 /** One saved filter of the overview across all tables. */
 export interface SavedFilterEntryJson extends SavedListEntryBase {
 	values: SavedFilterJson['values']
+	layout?: string
 }
 
 export type SavedFilterPageJson = SavedListPageJson<SavedFilterEntryJson>

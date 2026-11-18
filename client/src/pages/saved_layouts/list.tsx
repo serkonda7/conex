@@ -79,13 +79,15 @@ export function SavedLayoutsPage(): JSX.Element {
 			emptyText={t('savedLayout.empty')}
 			fetch={fetch_all_saved_layouts}
 			remove={delete_saved_layout}
-			payloadColumn={{
-				key: 'columns',
-				label: t('savedLayout.columns'),
-				render: (e: SavedLayoutEntryJson): JSX.Element => (
-					<LayoutColumns layout={e.layout} />
-				),
-			}}
+			payloadColumns={[
+				{
+					key: 'columns',
+					label: t('savedLayout.columns'),
+					render: (e: SavedLayoutEntryJson): JSX.Element => (
+						<LayoutColumns layout={e.layout} />
+					),
+				},
+			]}
 			edit={{
 				title: (name: string): string => t('savedLayout.editTitle', { name }),
 				idPrefix: 'saved-layout',

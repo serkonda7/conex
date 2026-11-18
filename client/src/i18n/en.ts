@@ -238,6 +238,8 @@ export const en = {
 	'table.savedLayouts': 'Saved layouts',
 	'table.saveLayout': 'Save layout',
 	'table.layoutName': 'Layout name',
+	'table.filterLayout': 'Column layout',
+	'table.noLayout': 'No layout',
 
 	// app
 	'app.skipToContent': 'Skip to content',
@@ -1001,6 +1003,10 @@ export const en = {
 
 	'savedFilter.table': 'Table',
 	'savedFilter.parameters': 'Parameters',
+	'savedFilter.layout': 'Column layout',
+	'savedFilter.layoutHint': 'Applied together with the filter.',
+	'savedFilter.layoutMissing': '{name} (missing)',
+	'savedFilter.layoutMissingHint': 'No saved layout of this table has this name; it is ignored.',
 	'savedFilter.updated': 'Updated',
 	'savedFilter.noValues': 'No filter values',
 	'savedFilter.empty': 'No saved filters yet. Save one from the "Saved filters" tab of a list.',

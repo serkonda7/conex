@@ -3,7 +3,7 @@ import { asc, eq } from 'drizzle-orm'
 import type { SavedListEntryBase, SavedListPageJson } from 'shared/src/schemas'
 import type { saved_filters, saved_layouts } from '../schema'
 import { nowSeconds } from '../util/time'
-import { getDb } from './connection'
+import { type DbHandle, getDb } from './connection'
 import { ConflictError, NotFoundError } from './errors'
 import { type ListParams, offsetOf, pageOf, tryWrite } from './list'
 
@@ -47,13 +47,15 @@ export interface SavedListStore<T extends { name: string }, E extends SavedListE
 /**
  * The store of one saved-list table. `column` names its jsonb list column,
  * `noun` the item in error messages, and `toEntry` copies an item's payload
- * into its overview entry.
+ * into its overview entry. `renamed` runs in the transaction of an `update`
+ * that renamed an item, e.g. to follow references to it by name.
  */
 export function savedListStore<T extends { name: string }, E extends SavedListEntryBase>(opts: {
 	table: SavedListTable
 	column: 'filters' | 'layouts'
 	noun: string
 	toEntry: (item: T) => Omit<E, keyof SavedListEntryBase>
+	renamed?: (tx: DbHandle, key: string, from: string, to: string) => Promise<void>
 }): SavedListStore<T, E> {
 	// Both tables share the shape `{ table_key, <column>, updated_at }`; the
 	// casts below only bridge the differently named list column.
@@ -115,13 +117,15 @@ export function savedListStore<T extends { name: string }, E extends SavedListEn
 	/**
 	 * Applies `change` to the item at `position` of `key` in one transaction
 	 * (row locked). `expectedName` guards against a list that changed since
-	 * the client loaded it: a mismatch is a `ConflictError`.
+	 * the client loaded it: a mismatch is a `ConflictError`. `after` runs
+	 * last in the same transaction.
 	 */
 	async function change(
 		key: string,
 		position: number,
 		expectedName: string,
 		apply: (items: T[]) => T[],
+		after?: (tx: DbHandle) => Promise<void>,
 	): Promise<Result<T[], Error>> {
 		const result = await tryWrite(() =>
 			getDb().transaction(async (tx): Promise<Result<T[], Error>> => {
@@ -147,6 +151,7 @@ export function savedListStore<T extends { name: string }, E extends SavedListEn
 					.update(table)
 					.set({ ...withItems(next), updated_at: nowSeconds() })
 					.where(eq(table.table_key, key))
+				await after?.(tx)
 				return Result.ok(next)
 			}),
 		)
@@ -159,8 +164,15 @@ export function savedListStore<T extends { name: string }, E extends SavedListEn
 		currentName: string,
 		item: T,
 	): Promise<Result<T[], Error>> {
-		return change(key, position, currentName, (items) =>
-			items.map((old, i) => (i === position ? item : old)),
+		const renamed = opts.renamed
+		return change(
+			key,
+			position,
+			currentName,
+			(items) => items.map((old, i) => (i === position ? item : old)),
+			renamed && item.name !== currentName
+				? (tx: DbHandle): Promise<void> => renamed(tx, key, currentName, item.name)
+				: undefined,
 		)
 	}
 
