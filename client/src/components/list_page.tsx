@@ -45,9 +45,10 @@ import {
 import { Empty, InlineError, Loading } from './feedback'
 import { MoreActionsButton } from './more_actions_button'
 
-/** Sortable-column state for a DataTable: toggle on repeat, reset on clear. */
+/** Sortable-column state for a DataTable: toggle on repeat, restore the initial order on clear. */
 export function useSort<T extends string>(
 	initial: T | undefined,
+	initialOrder: 'asc' | 'desc' = 'asc',
 ): {
 	sort: Accessor<T | undefined>
 	order: Accessor<'asc' | 'desc'>
@@ -55,7 +56,7 @@ export function useSort<T extends string>(
 	clearSort: () => void
 } {
 	const [sort, setSort] = createSignal<T | undefined>(initial)
-	const [order, setOrder] = createSignal<'asc' | 'desc'>('asc')
+	const [order, setOrder] = createSignal<'asc' | 'desc'>(initialOrder)
 
 	function handleSort(key: string): void {
 		const col = key as T
@@ -69,7 +70,7 @@ export function useSort<T extends string>(
 
 	function clearSort(): void {
 		setSort(undefined)
-		setOrder('asc')
+		setOrder(initialOrder)
 	}
 
 	return { sort, order, handleSort, clearSort }

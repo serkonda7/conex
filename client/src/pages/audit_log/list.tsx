@@ -1,9 +1,9 @@
 import type { AuditEvent } from 'shared/src/schemas'
 import { createSignal, type JSX, Show } from 'solid-js'
-import { type AuditLogEntryJson, fetch_audit_log } from '../../api/audit_log'
+import { type AuditLogEntryJson, type AuditLogSort, fetch_audit_log } from '../../api/audit_log'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
-import { ListLoading, useListFilters } from '../../components/list_page'
+import { ListLoading, useListFilters, useSort } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { usePagedList } from '../../lib/paged_list'
@@ -24,8 +24,9 @@ const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
 
 /**
  * /audit-log — admin-only, read-only list of login attempts, password
- * changes and calendar sync changes (newest first) with their source address. Searchable by username
- * or IP and filterable by event.
+ * changes and calendar sync changes with their source address. Sortable by
+ * every column, newest first by default; searchable by username or IP and
+ * filterable by event.
  */
 export function AuditLogPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -47,22 +48,31 @@ export function AuditLogPage(): JSX.Element {
 		],
 	})
 
+	const { sort, order, handleSort, clearSort } = useSort<AuditLogSort>('created_at', 'desc')
+
 	const entries = usePagedList({
-		query: () => ({ search: search(), event: event().length > 0 ? event() : undefined }),
+		query: () => ({
+			search: search(),
+			event: event().length > 0 ? event() : undefined,
+			sort: sort(),
+			order: order(),
+		}),
 		fetch: fetch_audit_log,
 		setError,
 	})
 
 	const columns: DataTableColumn<AuditLogEntryJson>[] = [
 		{
-			key: 'time',
+			key: 'created_at',
 			label: t('audit.time'),
 			class: 'cell-nowrap',
+			sortable: true,
 			getValue: (e: AuditLogEntryJson): string => formatTime(e.created_at),
 		},
 		{
 			key: 'event',
 			label: t('audit.event'),
+			sortable: true,
 			getValue: (e: AuditLogEntryJson): JSX.Element => (
 				<span class={`badge ${AUDIT_EVENT_BADGE[e.event]}`}>
 					{auditEventLabel(e.event)}
@@ -72,16 +82,19 @@ export function AuditLogPage(): JSX.Element {
 		{
 			key: 'username',
 			label: t('auth.username'),
+			sortable: true,
 			getValue: (e: AuditLogEntryJson): string => e.username,
 		},
 		{
-			key: 'target',
+			key: 'target_username',
 			label: t('audit.target'),
+			sortable: true,
 			getValue: (e: AuditLogEntryJson): string => e.target_username ?? '',
 		},
 		{
 			key: 'ip',
 			label: t('audit.sourceIp'),
+			sortable: true,
 			// A forwarded address is only a client-supplied hint, so the socket
 			// peer stays visible next to it.
 			getValue: (e: AuditLogEntryJson): JSX.Element => (
@@ -98,6 +111,7 @@ export function AuditLogPage(): JSX.Element {
 		{
 			key: 'user_agent',
 			label: t('audit.userAgent'),
+			sortable: true,
 			getValue: (e: AuditLogEntryJson): JSX.Element => (
 				<span class="text-muted" title={e.user_agent ?? ''}>
 					{e.user_agent ? shortUserAgent(e.user_agent) : ''}
@@ -129,6 +143,10 @@ export function AuditLogPage(): JSX.Element {
 				quickSearchLabel={t('list.searchLabel', { noun: tp('noun.auditEntry', 2) })}
 				getRowId={(e: AuditLogEntryJson): number => e.id}
 				columns={columns}
+				sortKey={sort}
+				sortDirection={order}
+				onSort={handleSort}
+				onSortClear={clearSort}
 				pagination={entries.pagination}
 				onPaginationChange={entries.onPaginationChange}
 				loading={() => entries.page.loading}

@@ -7,13 +7,19 @@ import type { AuditLogEntryJson, AuditLogListQuery, Page } from 'shared/src/type
 import { client, failed, getPage, paging, to_query } from './client'
 
 export type { AuditLogEntryJson }
+export type AuditLogSort = AuditLogListQuery['sort']
 
 export async function fetch_audit_log(
 	filters?: Partial<AuditLogListQuery>,
 ): Promise<Result<Page<AuditLogEntryJson>, Error>> {
 	return getPage<AuditLogEntryJson>(
 		client['audit-log'].$get({
-			query: to_query({ ...paging(filters), event: filters?.event }),
+			query: to_query({
+				...paging(filters),
+				event: filters?.event,
+				sort: filters?.sort ?? 'created_at',
+				order: filters?.order ?? 'desc',
+			}),
 		}),
 		failed.list('noun.auditEntry'),
 	)
