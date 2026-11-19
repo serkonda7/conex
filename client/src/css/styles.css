@@ -5409,26 +5409,14 @@ a.rack-shelf-plate:hover {
 	background-color: var(--warning);
 }
 
-.integration-section + .integration-section {
-	margin-top: 1.5rem;
-}
-
-.integration-section h3 {
-	margin: 0 0 0.6rem;
-	font-size: var(--font-size-sm);
-	font-weight: 700;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--text-muted);
-}
-
 .integration-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
 	gap: 0.75rem;
 }
 
-/* Card: identity, status pills, sync detail, footer with link + action. */
+/* Card: identity, then status pills, last sync time and the action in one
+   row, then errors and a link that needs attention. */
 .integration-card {
 	display: flex;
 	flex-direction: column;
@@ -5477,11 +5465,7 @@ a.rack-shelf-plate:hover {
 	outline-offset: 2px;
 }
 
-.integration-card-linked:hover .integration-card-link {
-	text-decoration: underline;
-}
-
-.integration-card-linked :is(button, .integration-card-foot a) {
+.integration-card-linked :is(button, .integration-card-fix a) {
 	position: relative;
 	z-index: 1;
 }
@@ -5520,10 +5504,67 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
+/* Compact text action ("Set up", "Run first sync"); the green primary
+   style stays for "Run first sync". */
+.integration-card-btn {
+	padding: 0.2rem 0.5rem;
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+}
+
+.integration-card-action {
+	align-self: flex-start;
+}
+
+/* "Sync now" as a borderless icon right after the last sync time. */
+.integration-sync-btn {
+	padding: 0.2rem;
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+.integration-sync-btn:hover:not(:disabled) {
+	border-color: var(--border);
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+:is(.integration-card-btn, .integration-sync-btn):disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.integration-sync-btn-spin > :where(svg) {
+	animation: integration-sync-spin 1s linear infinite;
+}
+
+@keyframes integration-sync-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.integration-sync-btn-spin > :where(svg) {
+		animation: none;
+	}
+}
+
 .integration-card-body {
 	display: flex;
 	flex-direction: column;
 	gap: 0.35rem;
+}
+
+.integration-card-action:empty,
+.integration-card-fix:empty,
+.integration-card-body:not(:has(> :not(:empty))) {
+	display: none;
+}
+
+.integration-card-fix {
+	font-size: var(--font-size-sm);
 }
 
 /* Dimmed, but the footer stays readable to switch it back on. */
@@ -5576,30 +5617,15 @@ a.rack-shelf-plate:hover {
 	font-variant-numeric: tabular-nums;
 }
 
+.integration-status .integration-meta {
+	margin-left: 0.25rem;
+}
+
 .integration-error {
 	margin: 0;
 	color: var(--error);
 	font-size: var(--font-size-sm);
 	overflow-wrap: anywhere;
-}
-
-.integration-card-foot {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.4rem;
-	margin-top: auto;
-	padding-top: 0.75rem;
-	border-top: 1px solid var(--border);
-}
-
-.integration-card-spacer {
-	flex: 1;
-}
-
-.integration-card-foot button:disabled {
-	opacity: 0.55;
-	cursor: not-allowed;
 }
 
 .integrations-layout-toggle {
@@ -5633,8 +5659,8 @@ a.rack-shelf-plate:hover {
 	color: var(--text);
 }
 
-/* List layout: one row per integration in a shared box per category;
-   head, status and footer wrap below each other on narrow screens. */
+/* List layout: one row per integration in one shared box;
+   head, status and action wrap below each other on narrow screens. */
 .integrations-list .integration-grid {
 	grid-template-columns: minmax(0, 1fr);
 	gap: 0;
@@ -5675,19 +5701,6 @@ a.rack-shelf-plate:hover {
 .integrations-list .integration-card-body {
 	flex: 1 1 18rem;
 	min-width: 0;
-}
-
-.integrations-list .integration-card-foot {
-	flex: 0 1 auto;
-	min-width: 0;
-	margin-top: 0;
-	margin-left: auto;
-	padding-top: 0;
-	border-top: none;
-}
-
-.integrations-list .integration-card-spacer {
-	flex: 0 0 0.5rem;
 }
 
 /* Integration detail page: identity and status left,

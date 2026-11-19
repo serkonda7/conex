@@ -2,9 +2,9 @@
  * One integration on /integrations, top to bottom: icon tile, name and a
  * few-word description; one state pill (Connected, Syncing…, Connection
  * failed, Disabled) plus yellow warning pills for problems that keep the
- * connection working; when it last synced (relative, exact time on hover) or
- * the server's error; then a footer with one action on the right ("Sync now",
- * "Set up") and a link on the left only when something needs fixing.
+ * connection working, followed in the same row by when it last synced
+ * (relative, exact time on hover) and the action (a sync icon, "Set up");
+ * then the server's error and a link only when something needs fixing.
  *
  * The whole card opens the integration's detail page (the name is the link,
  * stretched over the card; buttons and links stay on top). A failing card gets
@@ -13,6 +13,8 @@
  * is kept for the one action that matters most (e.g. "Run first sync"). The
  * list layout lays the same parts out as one row per integration.
  */
+
+import { IconRefresh } from '@tabler/icons-solidjs'
 import { type Accessor, type Component, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { t } from '../../i18n'
@@ -92,32 +94,71 @@ export interface RunSummary {
 	error: string | null
 }
 
+/** When the latest sync ran (relative, exact time on hover), inline. */
+export function LastRunTime(props: { run: RunSummary | null }): JSX.Element {
+	return (
+		<Show
+			when={props.run}
+			fallback={<span class="integration-meta">{t('integration.neverSynced')}</span>}
+		>
+			{(run: () => RunSummary): JSX.Element => {
+				const at = (): number => run().finished_at ?? run().started_at
+				return (
+					<span class="integration-meta" title={formatTime(at())}>
+						{run().state === 'running'
+							? t('integration.syncStarted', { time: formatRelative(at()) })
+							: t('integration.lastSyncAt', { time: formatRelative(at()) })}
+					</span>
+				)
+			}}
+		</Show>
+	)
+}
+
+/** The error of the latest sync, when it failed. */
+export function LastRunError(props: { run: RunSummary | null }): JSX.Element {
+	return (
+		<Show when={props.run?.state === 'error' && props.run.error}>
+			<p class="integration-error">{props.run?.error}</p>
+		</Show>
+	)
+}
+
 /**
  * When the latest sync ran (relative, exact time on hover). A failed run
  * adds its error on a second line.
  */
 export function LastRunLine(props: { run: RunSummary | null }): JSX.Element {
 	return (
-		<Show
-			when={props.run}
-			fallback={<p class="integration-meta">{t('integration.neverSynced')}</p>}
+		<>
+			<p class="integration-meta">
+				<LastRunTime run={props.run} />
+			</p>
+			<LastRunError run={props.run} />
+		</>
+	)
+}
+
+/** Icon-only "Sync now" next to the last sync time; spins while syncing. */
+export function SyncIconButton(props: {
+	syncing: boolean
+	disabled: boolean
+	onClick: () => void
+}): JSX.Element {
+	const label = (): string =>
+		props.syncing ? t('integration.syncing') : t('integration.syncNow')
+	return (
+		<button
+			type="button"
+			class="icon-btn integration-sync-btn"
+			classList={{ 'integration-sync-btn-spin': props.syncing }}
+			aria-label={label()}
+			title={label()}
+			disabled={props.disabled || props.syncing}
+			onClick={() => props.onClick()}
 		>
-			{(run: () => RunSummary): JSX.Element => {
-				const at = (): number => run().finished_at ?? run().started_at
-				return (
-					<>
-						<p class="integration-meta" title={formatTime(at())}>
-							{run().state === 'running'
-								? t('integration.syncStarted', { time: formatRelative(at()) })
-								: t('integration.lastSyncAt', { time: formatRelative(at()) })}
-						</p>
-						<Show when={run().state === 'error' && run().error}>
-							<p class="integration-error">{run().error}</p>
-						</Show>
-					</>
-				)
-			}}
-		</Show>
+			<IconRefresh size={14} />
+		</button>
 	)
 }
 
@@ -127,13 +168,13 @@ export function IntegrationCard(props: {
 	icon: Component<{ size?: number }>
 	/** Detail page the card opens; omitted while it cannot be opened. */
 	href?: string
-	/** Status pills; omitted while the integration is not set up. */
+	/** Status pills and last sync time; omitted while the integration is not set up. */
 	status?: JSX.Element
-	/** Lines below the pills: sync detail, errors, prerequisites. */
+	/** Lines below the status row: errors, prerequisites. */
 	details?: JSX.Element
-	/** Footer, left: a link that needs attention (e.g. "Fix connection →"). */
+	/** Below the details: a link that needs attention (e.g. "Fix connection →"). */
 	link?: JSX.Element
-	/** Footer, right: the one action. */
+	/** The one action: at the end of the status row, or last without one. */
 	action?: JSX.Element
 	tone?: 'error' | 'disabled'
 }): JSX.Element {
@@ -164,18 +205,18 @@ export function IntegrationCard(props: {
 					<p>{props.description}</p>
 				</div>
 			</div>
-			<Show when={props.status || props.details}>
-				<div class="integration-card-body">
-					<Show when={props.status}>
-						<div class="integration-status">{props.status}</div>
-					</Show>
-					{props.details}
-				</div>
-			</Show>
-			<div class="integration-card-foot">
-				{props.link}
-				<span class="integration-card-spacer" />
-				{props.action}
+			<div class="integration-card-body">
+				<Show when={props.status}>
+					<div class="integration-status">
+						{props.status}
+						{props.action}
+					</div>
+				</Show>
+				{props.details}
+				<span class="integration-card-fix">{props.link}</span>
+				<Show when={!props.status}>
+					<span class="integration-card-action">{props.action}</span>
+				</Show>
 			</div>
 		</section>
 	)

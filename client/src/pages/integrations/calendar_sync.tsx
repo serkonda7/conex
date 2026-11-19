@@ -6,7 +6,7 @@
  * mailbox mapping and the settings (Microsoft 365 app, schedule, removal).
  * Global `integrations.manage` only, like the routes.
  */
-import { IconCalendarEvent, IconPlus, IconRefresh } from '@tabler/icons-solidjs'
+import { IconCalendarEvent, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { CALENDAR_SYNC_MAX_INTERVAL, CALENDAR_SYNC_MIN_INTERVAL } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -45,8 +45,10 @@ import { type TestResult, TestResultLine } from './form_fields'
 import {
 	IntegrationCard,
 	type IntegrationStatus,
-	LastRunLine,
+	LastRunError,
+	LastRunTime,
 	StatusPill,
+	SyncIconButton,
 	WarningPill,
 } from './integration_card'
 
@@ -555,24 +557,34 @@ export function CalendarSyncDetailPage(): JSX.Element {
 	)
 }
 
-/** Status pills, last sync time and errors of the configured sync. */
-function SyncDetails(props: {
+/** Status pills and last sync time of the configured sync. */
+function SyncStatus(props: {
 	config: CalendarSyncConfigJson
 	status: IntegrationStatus
 	lastRun: CalendarSyncRunJson | null
 }): JSX.Element {
 	return (
 		<>
-			<div class="integration-status">
-				<StatusPill status={props.status} />
-				<Show when={props.config.enabled && props.lastRun?.state === 'error'}>
-					<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
-				</Show>
-			</div>
+			<StatusPill status={props.status} />
+			<Show when={props.config.enabled && props.lastRun?.state === 'error'}>
+				<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
+			</Show>
+			<LastRunTime run={props.lastRun} />
+		</>
+	)
+}
+
+/** Connection and sync errors of the configured sync. */
+function SyncErrors(props: {
+	config: CalendarSyncConfigJson
+	lastRun: CalendarSyncRunJson | null
+}): JSX.Element {
+	return (
+		<>
 			<Show when={props.config.enabled && props.config.last_error}>
 				<p class="integration-error">{props.config.last_error}</p>
 			</Show>
-			<LastRunLine run={props.lastRun} />
+			<LastRunError run={props.lastRun} />
 		</>
 	)
 }
@@ -616,15 +628,20 @@ function ConfigurableSyncCard(): JSX.Element {
 									? 'disabled'
 									: undefined
 					}
+					status={
+						c().configured ? (
+							<SyncStatus
+								config={c()}
+								status={status(c())}
+								lastRun={runs.lastRun()}
+							/>
+						) : undefined
+					}
 					details={
 						c().configured || error() !== null ? (
 							<>
 								<Show when={c().configured}>
-									<SyncDetails
-										config={c()}
-										status={status(c())}
-										lastRun={runs.lastRun()}
-									/>
+									<SyncErrors config={c()} lastRun={runs.lastRun()} />
 								</Show>
 								<InlineError message={error()} />
 							</>
@@ -643,23 +660,18 @@ function ConfigurableSyncCard(): JSX.Element {
 							fallback={
 								<button
 									type="button"
+									class="integration-card-btn"
 									onClick={() => navigate(settingsHref(CALENDAR_SYNC_HREF))}
 								>
 									<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
 								</button>
 							}
 						>
-							<button
-								type="button"
-								disabled={!c().enabled || runs.syncing()}
+							<SyncIconButton
+								syncing={runs.syncing()}
+								disabled={!c().enabled}
 								onClick={() => void runs.sync()}
-							>
-								<IconLabel icon={IconRefresh}>
-									{runs.syncing()
-										? t('integration.syncing')
-										: t('integration.syncNow')}
-								</IconLabel>
-							</button>
+							/>
 						</Show>
 					}
 				/>
@@ -683,7 +695,7 @@ export function CalendarSyncCard(props: { blocked: boolean }): JSX.Element {
 					icon={IconCalendarEvent}
 					details={<p class="integration-meta">{t('calendarSync.requiresTanss')}</p>}
 					action={
-						<button type="button" disabled>
+						<button type="button" class="integration-card-btn" disabled>
 							<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
 						</button>
 					}

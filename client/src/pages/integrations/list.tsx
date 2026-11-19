@@ -3,7 +3,6 @@ import {
 	IconList,
 	IconPlugConnected,
 	IconPlus,
-	IconRefresh,
 	IconTicket,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
@@ -32,8 +31,10 @@ import {
 	type IntegrationLayout,
 	type IntegrationStatus,
 	integrationLayout,
-	LastRunLine,
+	LastRunError,
+	LastRunTime,
 	StatusPill,
+	SyncIconButton,
 	setIntegrationLayout,
 	WarningPill,
 } from './integration_card'
@@ -87,7 +88,11 @@ function ProviderCard(props: {
 					href={can('integrations.manage') ? '/integrations/add' : undefined}
 					action={
 						<Show when={can('integrations.manage')}>
-							<button type="button" onClick={() => navigate('/integrations/add')}>
+							<button
+								type="button"
+								class="integration-card-btn"
+								onClick={() => navigate('/integrations/add')}
+							>
 								<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
 							</button>
 						</Show>
@@ -123,6 +128,7 @@ function ProviderCard(props: {
 								>
 									<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
 								</Show>
+								<LastRunTime run={integration().last_sync} />
 							</>
 						}
 						details={
@@ -130,7 +136,7 @@ function ProviderCard(props: {
 								<Show when={integration().enabled && integration().last_error}>
 									<p class="integration-error">{integration().last_error}</p>
 								</Show>
-								<LastRunLine run={integration().last_sync} />
+								<LastRunError run={integration().last_sync} />
 							</>
 						}
 						link={
@@ -142,25 +148,26 @@ function ProviderCard(props: {
 						}
 						action={
 							<Show when={can('integrations.manage')}>
-								<button
-									type="button"
-									classList={{
-										'btn-add': neverSynced() && status() === 'connected',
-									}}
-									disabled={busy() || !integration().enabled}
-									onClick={() => props.onSync(false)}
+								<Show
+									when={!neverSynced() || running()}
+									fallback={
+										<button
+											type="button"
+											class="integration-card-btn"
+											classList={{ 'btn-add': status() === 'connected' }}
+											disabled={busy() || !integration().enabled}
+											onClick={() => props.onSync(false)}
+										>
+											{t('integration.runFirstSync')}
+										</button>
+									}
 								>
-									<Show
-										when={!neverSynced() || running()}
-										fallback={t('integration.runFirstSync')}
-									>
-										<IconLabel icon={IconRefresh}>
-											{running()
-												? t('integration.syncing')
-												: t('integration.syncNow')}
-										</IconLabel>
-									</Show>
-								</button>
+									<SyncIconButton
+										syncing={running()}
+										disabled={busy() || !integration().enabled}
+										onClick={() => props.onSync(false)}
+									/>
+								</Show>
 							</Show>
 						}
 					/>
@@ -196,19 +203,9 @@ function LayoutToggle(): JSX.Element {
 	)
 }
 
-/** Category heading with its cards in a responsive grid. */
-function CardSection(props: { title: string; children: JSX.Element }): JSX.Element {
-	return (
-		<section class="integration-section" aria-label={props.title}>
-			<h3>{props.title}</h3>
-			<div class="integration-grid">{props.children}</div>
-		</section>
-	)
-}
-
 /**
- * /integrations — every integration, set up or not, as a card grouped by
- * category, with a grid / list switch (remembered per browser) and a
+ * /integrations — every integration, set up or not, as a card in one grid,
+ * with a grid / list switch (remembered per browser) and a
  * connected / needs-attention summary in the header. A card opens the detail
  * page (an unconfigured one its setup), never a form in place; it has no ⋯
  * menu and no remove action (design decision 0006). Admins set up providers here.
@@ -290,7 +287,7 @@ export function IntegrationsPage(): JSX.Element {
 					<Loading message={t('list.loading', { noun: tp('noun.integration', 2) })} />
 				}
 			>
-				<CardSection title={t('integration.category.psa')}>
+				<div class="integration-grid">
 					<For each={INTEGRATION_PROVIDERS}>
 						{(provider: IntegrationProvider): JSX.Element => (
 							<ProviderCard
@@ -301,12 +298,10 @@ export function IntegrationsPage(): JSX.Element {
 							/>
 						)}
 					</For>
-				</CardSection>
-				<Show when={calendarVisible()}>
-					<CardSection title={t('integration.category.calendar')}>
+					<Show when={calendarVisible()}>
 						<CalendarSyncCard blocked={!configured('tanss')} />
-					</CardSection>
-				</Show>
+					</Show>
+				</div>
 			</Show>
 			<InlineError message={error()} />
 		</div>
