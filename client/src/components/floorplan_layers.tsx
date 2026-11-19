@@ -1,6 +1,7 @@
 /**
  * Layers of a floor plan: areas by their target's kind (site or location
- * type) and markers by what they place (rack, device, outlet). The toggle bar
+ * type) and markers by what they place (rack, device, outlet). A device's
+ * area belongs to the device layer, with the device markers. The toggle bar
  * doubles as the legend; hidden layers are kept per browser in
  * `localStorage` and shared by the view and the editor. The last toggles show
  * the names of the markers on the plan and, on a plan with a scale, the
@@ -29,7 +30,12 @@ const MARKER_ICONS: Record<MarkerLayer, IconComponent> = {
 	outlet: IconOutlet,
 }
 
-export function areaLayer(area: Pick<FloorplanAreaJson, 'site_id' | 'target_type'>): Layer {
+export function areaLayer(
+	area: Pick<FloorplanAreaJson, 'site_id' | 'device_id' | 'target_type'>,
+): Layer {
+	if (area.device_id !== null) {
+		return 'marker-device'
+	}
 	return `area-${area.site_id !== null ? 'site' : (area.target_type ?? 'other')}`
 }
 
@@ -180,7 +186,7 @@ function toggleGrid(): void {
 }
 
 /** Grid sizes to choose from, in meters. */
-export const GRID_SIZES = [0.5, 1, 5] as const
+export const GRID_SIZES = [1, 5, 10] as const
 export type GridSize = (typeof GRID_SIZES)[number]
 export const DEFAULT_GRID_SIZE: GridSize = 1
 

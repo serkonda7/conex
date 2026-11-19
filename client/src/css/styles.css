@@ -26,6 +26,7 @@
 	--primary: #058a05;
 	--primary-hover: #047a04;
 	--primary-text: #08bf08; /* --primary is too dark for text on the dark surfaces. */
+	--primary-tint: color-mix(in srgb, var(--primary) 18%, var(--bg-surface));
 	--primary-contrast: #ffffff;
 	--secondary: #1a73b8;
 	--secondary-hover: #16659f;
@@ -44,6 +45,11 @@
 	--font-size-2xl: 1.3rem;
 	/* Fixed top bar height; the sticky sidebar sizes itself against it. */
 	--topbar-height: 3.5rem;
+	/* Sidebar widths; the top bar's corner cell above it matches them. */
+	--sidebar-width: 13rem;
+	/* Sidebar padding (2 × 0.5rem) + link padding (2 × 0.5rem) + icon (20px)
+	   + borders (4px) + vertical scrollbar (1rem). */
+	--sidebar-collapsed-width: calc(3rem + 24px);
 }
 
 html {
@@ -580,8 +586,8 @@ tbody tr:last-child td {
 
 .app-user-dropdown {
 	position: absolute;
-	left: 0;
-	bottom: calc(100% + 0.3rem);
+	right: 0;
+	top: calc(100% + 0.3rem);
 	min-width: 10rem;
 	background-color: var(--bg-raised);
 	border: 1px solid var(--border);
@@ -617,40 +623,259 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 }
 
-/* Account menu pinned to the bottom of the sidebar. */
-.app-sidebar-user {
+/* Search button and account menu at the right end of the top bar. */
+.app-topbar-user {
 	display: flex;
 	align-items: center;
-	gap: 0.25rem;
-	margin-top: auto;
-	padding-top: 0.5rem;
-	border-top: 1px solid var(--border);
+	gap: 0.5rem;
+	margin-left: auto;
+	flex-shrink: 0;
 }
 
-.app-sidebar-user .app-user-menu {
-	flex: 1;
-	min-width: 0;
-}
-
-.app-sidebar-toggle {
+/* Opens the command palette; label and shortcut collapse on narrow screens. */
+.app-search-trigger {
 	display: inline-flex;
 	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	padding: 0.35rem;
-	border: none;
-	background: transparent;
-	color: var(--text-secondary);
+	gap: 0.4rem;
+	padding: 0.3rem 0.5rem;
+	background-color: var(--bg-input);
+	border: 1px solid var(--border-strong);
+	color: var(--text-muted);
 }
 
-.app-sidebar-toggle:hover {
+.app-search-trigger:hover {
 	background-color: var(--bg-hover);
 	color: var(--text);
 }
 
-.app-sidebar-user .app-user-button {
-	width: 100%;
+.app-search-trigger-label {
+	min-width: 4rem;
+	text-align: left;
+}
+
+.app-search-trigger-key,
+.command-palette-hints kbd {
+	padding: 0 0.3rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.25rem;
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+	font-family: inherit;
+	font-size: var(--font-size-sm);
+	line-height: 1.4;
+}
+
+@media (max-width: 48rem) {
+	.app-search-trigger {
+		padding: 0.3rem;
+		border-color: var(--border);
+	}
+
+	.app-search-trigger-label,
+	.app-search-trigger-key {
+		display: none;
+	}
+}
+
+/* Command palette (Ctrl+K): centered near the top, like a launcher. */
+.command-palette {
+	width: min(40rem, calc(100vw - 2rem));
 	max-width: none;
+	margin: 12vh auto auto;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-raised);
+	color: var(--text);
+	box-shadow: var(--shadow);
+}
+
+.command-palette::backdrop {
+	background-color: rgb(0 0 0 / 50%);
+}
+
+.command-palette-box {
+	display: flex;
+	flex-direction: column;
+	max-height: min(32rem, 76vh);
+}
+
+.command-palette-input-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid var(--border);
+	color: var(--text-muted);
+}
+
+.command-palette-input {
+	flex: 1;
+	min-width: 0;
+	padding: 0.35rem 0;
+	border: none;
+	background: transparent;
+	font-size: var(--font-size-lg);
+}
+
+.command-palette-input:focus,
+.command-palette-input:focus-visible {
+	outline: none;
+	box-shadow: none;
+}
+
+.command-palette-options {
+	flex: 1;
+	overflow-y: auto;
+	padding: 0.25rem 0.35rem;
+}
+
+.command-palette-options:empty {
+	display: none;
+}
+
+.command-palette-group {
+	padding: 0.5rem 0.5rem 0.2rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.command-palette-option {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.35rem 0.5rem;
+	border-radius: 0.25rem;
+	color: var(--text);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.command-palette-option:hover {
+	color: var(--text);
+}
+
+.command-palette-option.active {
+	background-color: var(--bg-hover);
+}
+
+.command-palette-icon {
+	display: inline-flex;
+	width: 16px;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.command-palette-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.command-palette-detail {
+	margin-left: auto;
+	padding-left: 0.75rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+/* Tenant of an object hit: a pill at the right end, after the detail. */
+.command-palette-tenant {
+	flex-shrink: 0;
+	max-width: 12rem;
+	padding: 0 0.4rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.6rem;
+	color: var(--text-secondary);
+	font-size: var(--font-size-sm);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.command-palette-label + .command-palette-tenant {
+	margin-left: auto;
+}
+
+.command-palette-status {
+	margin: 0;
+	padding: 0.75rem;
+	color: var(--text-muted);
+}
+
+.command-palette-status.error {
+	color: var(--error);
+}
+
+.command-palette-hints {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 1rem;
+	padding: 0.4rem 0.75rem;
+	border-top: 1px solid var(--border);
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.command-palette-hints kbd + kbd {
+	margin-left: 0.15rem;
+}
+
+/* Top-left corner of the top bar: the brand, exactly as wide as the sidebar
+   so its right edge runs through the full window height. The negative
+   margins cancel the top bar's padding; the right margin keeps the next item
+   clear of the toggle knob. */
+.app-sidebar-corner {
+	--knob-size: 24px;
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	align-self: stretch;
+	width: var(--sidebar-width);
+	margin: -0.35rem 0.5rem -0.35rem -0.75rem;
+	padding: 0 calc(var(--knob-size) / 2 + 0.5rem) 0 1rem;
+	border-right: 1px solid var(--border);
+}
+
+.app-sidebar-corner.collapsed {
+	width: var(--sidebar-collapsed-width);
+}
+
+.app-sidebar-corner .app-topbar-brand {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Round sidebar toggle centered on the sidebar's edge line, inside the top
+   bar. The ring in the top bar's color cuts the edge line around it. */
+.app-sidebar-toggle {
+	position: absolute;
+	top: 50%;
+	right: calc(var(--knob-size) / -2 - 0.5px);
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	width: var(--knob-size);
+	height: var(--knob-size);
+	padding: 0;
+	border: 1px solid var(--border-strong);
+	border-radius: 50%;
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+	box-shadow: 0 0 0 3px var(--bg-surface);
+	transform: translateY(-50%);
+}
+
+.app-sidebar-toggle:hover {
+	background-color: var(--bg-hover);
+	border-color: var(--text-muted);
+	color: var(--text);
 }
 
 .app-body {
@@ -670,7 +895,7 @@ tbody tr:last-child td {
 }
 
 .app-sidebar {
-	width: 13rem;
+	width: var(--sidebar-width);
 	flex-shrink: 0;
 	position: sticky;
 	top: var(--topbar-height);
@@ -680,18 +905,27 @@ tbody tr:last-child td {
 	gap: 0.5rem;
 	background-color: var(--bg-surface);
 	border-right: 1px solid var(--border);
-	padding: 0.6rem 0.5rem;
+	/* No right padding: the nav's scrollbar runs directly along the edge. */
+	padding: 0.6rem 0 0.6rem 0.5rem;
+}
+
+.app-sidebar > :not(.app-nav) {
+	margin-right: 0.5rem;
 }
 
 /* The nav scrolls instead of the sidebar so the account dropdown can
-   overflow the (collapsed) sidebar's edge. */
+   overflow the (collapsed) sidebar's edge. Its right padding keeps the rows
+   clear of the thin scrollbar on the sidebar's edge. */
 .app-nav {
 	display: flex;
 	flex-direction: column;
 	gap: 0.3rem;
 	flex: 1;
 	min-height: 0;
+	padding-right: 0.5rem;
 	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-strong) transparent;
 }
 
 .app-nav-group {
@@ -824,12 +1058,12 @@ tbody tr:last-child td {
 
 .app-nav a:hover,
 .app-nav-item:hover {
-	background-color: var(--bg-hover);
+	background-color: var(--primary-tint);
 }
 
 .app-nav a.active,
 .app-nav-item.active {
-	background-color: var(--bg-raised);
+	background-color: var(--primary-tint);
 	border-color: var(--border);
 	font-weight: 600;
 }
@@ -853,11 +1087,11 @@ tbody tr:last-child td {
 }
 
 .app-nav-item:hover {
-	background-color: var(--bg-hover);
+	background-color: var(--primary-tint);
 }
 
 .app-nav-item.active {
-	background-color: var(--bg-raised);
+	background-color: var(--primary-tint);
 	border-color: var(--border);
 }
 
@@ -888,7 +1122,7 @@ tbody tr:last-child td {
 }
 
 .app-nav-add:hover:not(:disabled) {
-	background-color: var(--bg-hover);
+	background-color: var(--primary-tint);
 	border-color: var(--border);
 	color: var(--text);
 }
@@ -899,17 +1133,15 @@ tbody tr:last-child td {
 
 /* Icon rail: labels, group headings and shortcuts give way to icons. */
 .app-sidebar.collapsed {
-	/* sidebar padding + link padding + icon + borders + vertical scrollbar */
-	width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 2px + 1px + 1px + 1rem);
-	min-width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 2px + 1px + 1px + 1rem);
+	width: var(--sidebar-collapsed-width);
+	min-width: var(--sidebar-collapsed-width);
 }
 
 .app-sidebar.collapsed .app-nav {
 	overflow-x: hidden;
 }
 
-.app-sidebar.collapsed .app-nav-text,
-.app-sidebar.collapsed .app-user-info {
+.app-sidebar.collapsed .app-nav-text {
 	display: none;
 }
 
@@ -919,14 +1151,6 @@ tbody tr:last-child td {
 	margin: 0.25rem 0.25rem;
 	overflow: hidden;
 	border-top: 1px solid var(--border);
-}
-
-.app-sidebar.collapsed .app-sidebar-user {
-	flex-direction: column;
-}
-
-.app-sidebar.collapsed .app-user-button {
-	justify-content: center;
 }
 
 .app-content {
@@ -1408,7 +1632,7 @@ tbody tr:last-child td {
 
 	.app-topbar {
 		display: grid;
-		grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+		grid-template-columns: 2.75rem minmax(0, 1fr) auto auto;
 		grid-template-rows: repeat(2, minmax(0, 1fr));
 		gap: 0.25rem 0.5rem;
 		padding: 0.5rem 0.75rem;
@@ -1429,6 +1653,20 @@ tbody tr:last-child td {
 		grid-column: 3;
 		grid-row: 1;
 		min-height: 2.75rem;
+	}
+
+	.app-topbar-user {
+		grid-column: 4;
+		grid-row: 1;
+		margin-left: 0;
+	}
+
+	.app-user-button {
+		min-height: 2.75rem;
+	}
+
+	.app-user-info {
+		display: none;
 	}
 
 	.app-tenant-context {
@@ -1507,13 +1745,8 @@ tbody tr:last-child td {
 		opacity: 1;
 	}
 
-	.app-sidebar-user .app-user-button,
 	.app-user-logout {
 		min-height: 2.75rem;
-	}
-
-	.app-sidebar-user {
-		flex-shrink: 0;
 	}
 
 	.app-content {
@@ -2184,7 +2417,8 @@ tbody tr:last-child td {
 	min-height: 2.1rem;
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle {
 	appearance: none;
 	position: relative;
 	flex: none;
@@ -2199,7 +2433,8 @@ tbody tr:last-child td {
 	transition: background-color 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle::before {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle::before {
 	content: "";
 	position: absolute;
 	top: 0.1875rem;
@@ -2211,15 +2446,18 @@ tbody tr:last-child td {
 	transition: transform 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle:checked {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle:checked {
 	background-color: var(--primary);
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle:checked::before {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle:checked::before {
 	transform: translateX(1rem);
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle:disabled {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle:disabled {
 	cursor: not-allowed;
 	opacity: 0.5;
 }
@@ -3643,6 +3881,8 @@ span.attachment-star,
 	position: relative;
 	transform-origin: 0 0;
 	--inv-zoom: 1;
+	/* Shrinks line widths of areas and the grid while zoomed in. */
+	--line-zoom: 1;
 }
 
 .zoom-stage > img {
@@ -3743,6 +3983,11 @@ span.attachment-star,
 	--area-color: #a0a0a0;
 }
 
+/* A device's area (a machine), on the device layer. */
+.floorplan-layer-marker-device {
+	--area-color: #81c784;
+}
+
 .floorplan-swatch {
 	display: inline-grid;
 	place-items: center;
@@ -3807,7 +4052,7 @@ span.attachment-star,
 .floorplan-area polygon {
 	fill: color-mix(in srgb, var(--area-color, var(--link)) 14%, transparent);
 	stroke: var(--area-color, var(--link));
-	stroke-width: 2;
+	stroke-width: calc(2px * var(--line-zoom, 1));
 	vector-effect: non-scaling-stroke;
 	cursor: pointer;
 }
@@ -3818,7 +4063,6 @@ span.attachment-star,
 
 .floorplan-area.selected polygon {
 	fill: color-mix(in srgb, var(--area-color, var(--link)) 32%, transparent);
-	stroke-width: 3;
 }
 
 .floorplan-area-label {
@@ -3840,6 +4084,23 @@ span.attachment-star,
 
 .floorplan-area-label.selected {
 	outline: 2px solid var(--primary);
+}
+
+/* A device's label leads with its role glyph. */
+.floorplan-area-label.floorplan-area-device {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.floorplan-area-label-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.floorplan-area.floorplan-area-inactive,
+.floorplan-area-label.floorplan-area-inactive {
+	opacity: 0.75;
 }
 
 .floorplan-marker {
@@ -4127,6 +4388,90 @@ span.attachment-star,
 	margin: 0.6rem 0;
 }
 
+/* Area target picker: one search over locations and devices, grouped by kind. */
+.modal.floorplan-target-picker {
+	--modal-width: 36rem;
+}
+
+.floorplan-targets {
+	max-height: 24rem;
+	overflow-y: auto;
+	margin-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
+.floorplan-targets h3 {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	margin: 0;
+	padding: 0.5rem 0.5rem 0.25rem;
+	background-color: var(--bg-surface);
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.floorplan-targets ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.floorplan-target {
+	display: grid;
+	grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+	align-items: center;
+	column-gap: 0.6rem;
+	width: 100%;
+	padding: 0.3rem 0.5rem;
+	border: 0;
+	border-radius: 0.25rem;
+	background-color: transparent;
+	text-align: left;
+}
+
+/* Hover follows the pointer through `active`, so it needs no own style. */
+.floorplan-target:hover {
+	background-color: transparent;
+}
+
+.floorplan-target.active {
+	background-color: var(--bg-hover);
+	box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.floorplan-target-icon {
+	display: inline-flex;
+	align-items: center;
+	color: var(--text-secondary);
+}
+
+.floorplan-target-text {
+	display: grid;
+	min-width: 0;
+}
+
+.floorplan-target-text > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.floorplan-target-text small,
+.floorplan-target-detail {
+	color: var(--text-muted);
+}
+
+.floorplan-target-detail {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	white-space: nowrap;
+}
+
 .floorplan-palette-actions button.active,
 .floorplan-kinds button.active {
 	background-color: var(--bg-hover);
@@ -4151,7 +4496,6 @@ span.attachment-star,
 }
 
 .floorplan-area.floorplan-area-editing.selected polygon {
-	stroke-width: 2;
 	stroke-dasharray: 6 3;
 }
 
@@ -4428,13 +4772,13 @@ span.attachment-star,
 .floorplan-grid line {
 	/* Neutral grey reads on light and dark plan images alike. */
 	stroke: rgba(128, 128, 128, 0.45);
-	stroke-width: 1;
+	stroke-width: calc(1px * var(--line-zoom, 1));
 	vector-effect: non-scaling-stroke;
 }
 
 .floorplan-grid line.floorplan-grid-axis {
 	stroke: color-mix(in srgb, var(--primary) 70%, transparent);
-	stroke-width: 1.5;
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
 }
 
 .floorplan-origin {
@@ -5300,4 +5644,465 @@ a.rack-shelf-plate:hover {
    wider label column. */
 .calendar-sync-form {
 	--label-width: 12rem;
+}
+
+/* Integrations page: icon header with a connected /
+   needs-attention summary, then cards grouped by category. */
+.integrations-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem 1rem;
+	margin-bottom: 1.25rem;
+}
+
+.integrations-header-icon {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex: none;
+	border-radius: 0.5rem;
+	border: 1px solid var(--border);
+	background-color: var(--bg-raised);
+	color: var(--primary-text);
+}
+
+/* The header's own layout replaces the page-title underline. */
+.app-content .integrations-header h2:first-of-type {
+	flex: 1 1 12rem;
+	min-width: 0;
+	margin: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.integrations-summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 1rem;
+	color: var(--text-secondary);
+}
+
+.integrations-summary > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.integrations-summary-dot {
+	width: 0.4rem;
+	height: 0.4rem;
+	border-radius: 50%;
+	background-color: var(--success);
+}
+
+.integrations-summary-dot-warning {
+	background-color: var(--warning);
+}
+
+.integration-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+	gap: 0.75rem;
+}
+
+/* Card: identity, then status pills, last sync time and the action in one
+   row, then errors and a link that needs attention. */
+.integration-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+	transition: border-color 150ms ease;
+}
+
+.integration-card:hover {
+	border-color: var(--border-strong);
+}
+
+.integration-card-error,
+.integration-card-error:hover {
+	border-color: color-mix(in srgb, var(--error) 50%, transparent);
+}
+
+/* The whole card opens the detail page: the name's link covers the card,
+   while buttons and links stay on top of it. */
+.integration-card-linked {
+	position: relative;
+	cursor: pointer;
+}
+
+.integration-card-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.integration-card-link::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.integration-card-link:focus-visible {
+	outline: none;
+}
+
+.integration-card-linked:has(.integration-card-link:focus-visible) {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
+.integration-card-linked :is(button, .integration-card-fix a) {
+	position: relative;
+	z-index: 1;
+}
+
+.integration-card-head {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+}
+
+.integration-logo {
+	display: grid;
+	place-items: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	flex: none;
+	border-radius: 0.5rem;
+	border: 1px solid var(--border);
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+}
+
+.integration-card-title {
+	flex: 1;
+	min-width: 0;
+}
+
+.integration-card-title h4 {
+	margin: 0;
+	font-size: var(--font-size-lg);
+	line-height: 1.35;
+}
+
+.integration-card-title p {
+	margin: 0.1rem 0 0;
+	color: var(--text-secondary);
+}
+
+/* Compact text action ("Set up", "Run first sync"); the green primary
+   style stays for "Run first sync". */
+.integration-card-btn {
+	padding: 0.2rem 0.5rem;
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+}
+
+.integration-card-action {
+	align-self: flex-start;
+}
+
+/* "Sync now" as a borderless icon right after the last sync time. */
+.integration-sync-btn {
+	padding: 0.2rem;
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+.integration-sync-btn:hover:not(:disabled) {
+	border-color: var(--border);
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+:is(.integration-card-btn, .integration-sync-btn):disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.integration-sync-btn-spin > :where(svg) {
+	animation: integration-sync-spin 1s linear infinite;
+}
+
+@keyframes integration-sync-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.integration-sync-btn-spin > :where(svg) {
+		animation: none;
+	}
+}
+
+.integration-card-body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.integration-card-action:empty,
+.integration-card-fix:empty,
+.integration-card-body:not(:has(> :not(:empty))) {
+	display: none;
+}
+
+.integration-card-fix {
+	font-size: var(--font-size-sm);
+}
+
+/* Dimmed, but the footer stays readable to switch it back on. */
+.integration-card-disabled .integration-card-head,
+.integration-card-disabled .integration-card-body {
+	opacity: 0.72;
+}
+
+.integration-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.integration-status .badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.badge-dot {
+	width: 0.375rem;
+	height: 0.375rem;
+	flex: none;
+	border-radius: 50%;
+	background-color: currentColor;
+}
+
+.badge-dot-pulse {
+	animation: badge-dot-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes badge-dot-pulse {
+	50% {
+		opacity: 0.25;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.badge-dot-pulse {
+		animation: none;
+	}
+}
+
+.integration-meta {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+.integration-status .integration-meta {
+	margin-left: 0.25rem;
+}
+
+.integration-error {
+	margin: 0;
+	color: var(--error);
+	font-size: var(--font-size-sm);
+	overflow-wrap: anywhere;
+}
+
+.integrations-layout-toggle {
+	display: inline-flex;
+	min-width: 0;
+	margin: 0;
+	gap: 0.15rem;
+	padding: 0.15rem;
+	border: 1px solid var(--border);
+	border-radius: 0.4rem;
+}
+
+.integrations-layout-option {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.3rem;
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+.integrations-layout-option:hover {
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text);
+}
+
+.integrations-layout-option[aria-pressed="true"] {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+/* List layout: one row per integration in one shared box;
+   head, status and action wrap below each other on narrow screens. */
+.integrations-list .integration-grid {
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	overflow: hidden;
+}
+
+.integrations-list .integration-card {
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 1.5rem;
+	padding: 0.75rem 1rem;
+	border: none;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+}
+
+.integrations-list .integration-card:last-child {
+	border-bottom: none;
+}
+
+.integrations-list .integration-card:hover {
+	background-color: var(--bg-raised);
+}
+
+.integrations-list .integration-card-error {
+	background-color: color-mix(in srgb, var(--error) 7%, var(--bg-surface));
+}
+
+.integrations-list .integration-card-head {
+	flex: 999 1 18rem;
+	min-width: 0;
+	align-items: center;
+}
+
+.integrations-list .integration-card-body {
+	flex: 1 1 18rem;
+	min-width: 0;
+}
+
+/* Integration detail page: identity and status left,
+   Enabled switch, "Sync now" and ⋯ right, then the tabs. */
+.integration-detail-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 0.75rem 1rem;
+	margin-bottom: 1rem;
+}
+
+.integration-detail-logo {
+	width: 3rem;
+	height: 3rem;
+	color: var(--primary-text);
+}
+
+.integration-detail-title {
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+
+.app-content .integration-detail-header h2 {
+	margin: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.integration-detail-title > p {
+	margin: 0.1rem 0 0;
+	color: var(--text-secondary);
+}
+
+.integration-detail-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.75rem;
+	margin-top: 0.5rem;
+}
+
+.integration-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.integration-detail-switch {
+	padding-right: 0.5rem;
+	cursor: pointer;
+}
+
+.integration-detail-alert {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	margin-bottom: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--error) 50%, transparent);
+	border-radius: 0.5rem;
+	background-color: color-mix(in srgb, var(--error) 7%, var(--bg-surface));
+}
+
+.integration-detail-alert strong {
+	color: var(--error);
+}
+
+.integration-detail-tabs {
+	margin-bottom: 0.75rem;
+}
+
+.integration-report-asof {
+	margin-bottom: 0.5rem;
+}
+
+.integration-settings {
+	max-width: 48rem;
+}
+
+.integration-settings-section {
+	padding: 1rem;
+	margin: 0 0 1rem;
+}
+
+.integration-settings-section h3 {
+	margin: 0 0 0.75rem;
+}
+
+.integration-danger-zone {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem 1.5rem;
+	margin-top: 1.5rem;
+	padding: 1rem;
+	border-color: color-mix(in srgb, var(--error) 50%, transparent);
+}
+
+.integration-danger-zone h3 {
+	margin: 0 0 0.25rem;
+	color: var(--error);
+}
+
+.integration-danger-zone p {
+	margin: 0;
+	max-width: 36rem;
+	color: var(--text-secondary);
 }

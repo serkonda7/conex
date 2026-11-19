@@ -1,25 +1,19 @@
 /**
  * Main navigation: routed sections in labeled groups (NetBox-style, with
- * quick add/import buttons for writers) and the account menu at the bottom.
- * The whole sidebar collapses to an icon rail (persisted to localStorage).
+ * quick add/import buttons for writers).
+ * The whole sidebar collapses to an icon rail (persisted to localStorage);
+ * its toggle sits in the top bar's corner cell above it.
  */
 import {
 	IconChevronsLeft,
 	IconChevronsRight,
 	IconDownload,
-	IconKey,
-	IconLogout,
 	IconPlus,
-	IconUserCircle,
 	IconX,
 } from '@tabler/icons-solidjs'
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from 'solid-js'
-import type { SessionUser } from '../api/auth'
 import { type MessageKey, t } from '../i18n'
-import { useDismiss } from '../lib/dismiss'
 import { goTo, path } from '../lib/router'
-import { LanguageSwitcher } from './language_switcher'
-import { PasswordDialog } from './password_dialog'
 import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
 /** Hover shortcut next to a nav row; without `href` a disabled placeholder. */
@@ -150,88 +144,6 @@ function NavItem(props: {
 	)
 }
 
-/** Account button with the language switcher, password change and logout in its dropdown. */
-function UserMenu(props: {
-	user: SessionUser | null
-	onLogout: () => void
-	collapsed: boolean
-}): JSX.Element {
-	const [open, setOpen] = createSignal(false)
-	const [changingPassword, setChangingPassword] = createSignal(false)
-	const name = (): string => props.user?.username ?? '…'
-
-	useDismiss('.app-user-menu', () => setOpen(false))
-
-	return (
-		<div class="app-user-menu">
-			<button
-				type="button"
-				class="app-user-button"
-				aria-haspopup="menu"
-				aria-expanded={open()}
-				aria-label={t('app.accountNamed', { name: name() })}
-				title={props.collapsed ? name() : undefined}
-				onClick={() => setOpen(!open())}
-				onKeyDown={(e: KeyboardEvent): void => {
-					if (e.key === 'Escape') {
-						setOpen(false)
-					}
-				}}
-			>
-				<span aria-hidden="true" class="app-nav-icon app-user-icon">
-					<IconUserCircle size={20} />
-				</span>
-				<span class="app-user-info">
-					<span class="app-user-username">{name()}</span>
-					<Show when={props.user}>
-						{(user: () => SessionUser) => (
-							<span class="app-user-role">{user().role.name}</span>
-						)}
-					</Show>
-				</span>
-			</button>
-			<Show when={open()}>
-				<div class="app-user-dropdown" role="menu">
-					<div class="app-user-language">
-						<LanguageSwitcher />
-					</div>
-					<button
-						type="button"
-						role="menuitem"
-						class="app-user-logout"
-						onClick={() => {
-							setOpen(false)
-							setChangingPassword(true)
-						}}
-					>
-						<span aria-hidden="true" class="app-nav-icon">
-							<IconKey size={16} />
-						</span>
-						{t('account.changePassword')}
-					</button>
-					<button
-						type="button"
-						role="menuitem"
-						class="app-user-logout"
-						onClick={() => {
-							setOpen(false)
-							props.onLogout()
-						}}
-					>
-						<span aria-hidden="true" class="app-nav-icon">
-							<IconLogout size={16} />
-						</span>
-						{t('app.logout')}
-					</button>
-				</div>
-			</Show>
-			<Show when={changingPassword()}>
-				<PasswordDialog on_close={() => setChangingPassword(false)} />
-			</Show>
-		</div>
-	)
-}
-
 interface NavGroup {
 	label: MessageKey
 	paths: readonly string[]
@@ -304,8 +216,6 @@ function NavGroupSection(props: {
 }
 
 interface SidebarProps {
-	user: SessionUser | null
-	onLogout: () => void
 	mobile?: boolean
 	onClose?: () => void
 }
@@ -356,24 +266,34 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 					}}
 				</For>
 			</nav>
-			<div class="app-sidebar-user">
-				<UserMenu user={props.user} onLogout={props.onLogout} collapsed={isCollapsed()} />
-				<button
-					type="button"
-					class="app-sidebar-toggle"
-					aria-expanded={!collapsed()}
-					aria-label={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
-					title={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
-					onClick={() => setCollapsed(!collapsed())}
-				>
-					<span aria-hidden="true" class="app-nav-icon">
-						<Show when={collapsed()} fallback={<IconChevronsLeft size={20} />}>
-							<IconChevronsRight size={20} />
-						</Show>
-					</span>
-				</button>
-			</div>
 		</aside>
+	)
+}
+
+/**
+ * Top-left corner cell of the top bar, as wide as the sidebar below it: the
+ * brand (`children`) and the round collapse toggle on its right edge, in line
+ * with the sidebar's edge; collapsed, only the toggle.
+ */
+export function SidebarCorner(props: { children: JSX.Element }): JSX.Element {
+	return (
+		<div classList={{ 'app-sidebar-corner': true, collapsed: collapsed() }}>
+			<Show when={!collapsed()}>{props.children}</Show>
+			<button
+				type="button"
+				class="app-sidebar-toggle"
+				aria-expanded={!collapsed()}
+				aria-label={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
+				title={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
+				onClick={() => setCollapsed(!collapsed())}
+			>
+				<span aria-hidden="true" class="app-nav-icon">
+					<Show when={collapsed()} fallback={<IconChevronsLeft size={14} />}>
+						<IconChevronsRight size={14} />
+					</Show>
+				</span>
+			</button>
+		</div>
 	)
 }
 
@@ -413,7 +333,7 @@ export function MobileSidebar(
 				}
 			}}
 		>
-			<Sidebar user={props.user} onLogout={props.onLogout} mobile onClose={props.onClose} />
+			<Sidebar mobile onClose={props.onClose} />
 		</dialog>
 	)
 }

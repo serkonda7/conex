@@ -26,10 +26,12 @@ import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/t
 import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
+import { CommandPalette, CommandPaletteButton } from './command_palette'
 import { RouteContent } from './route_content'
-import { MobileSidebar, Sidebar } from './sidebar'
+import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
 import { TabBar } from './tab_bar'
 import { TenantContextSelector } from './tenant_context_selector'
+import { UserMenu } from './user_menu'
 
 /**
  * Routes in-app anchors that have no click handler of their own through
@@ -60,6 +62,7 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	const mobileQuery = window.matchMedia('(max-width: 48rem)')
 	const [mobile, setMobile] = createSignal(mobileQuery.matches)
 	const [navigationOpen, setNavigationOpen] = createSignal(false)
+	const [paletteOpen, setPaletteOpen] = createSignal(false)
 	const closeNavigation = (): void => {
 		setNavigationOpen(false)
 	}
@@ -103,7 +106,16 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	return (
 		<>
 			<header class="app-topbar">
-				<Show when={mobile()}>
+				<Show
+					when={mobile()}
+					fallback={
+						<SidebarCorner>
+							<a href={homePath()} class="app-topbar-brand">
+								{APP_TITLE}
+							</a>
+						</SidebarCorner>
+					}
+				>
 					<button
 						type="button"
 						class="app-mobile-nav-toggle"
@@ -118,21 +130,23 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 				</Show>
 				<TenantContextSelector scoped={fixedContext()} canAdd={canAddTenants()} />
 				<CreateTicketButton scopeTenantId={singleTenant()} />
-				<div class="app-topbar-actions">
-					<a href={homePath()} class="app-topbar-brand">
-						{APP_TITLE}
-					</a>
+				<Show when={mobile()}>
+					<div class="app-topbar-actions">
+						<a href={homePath()} class="app-topbar-brand">
+							{APP_TITLE}
+						</a>
+					</div>
+				</Show>
+				<div class="app-topbar-user">
+					<CommandPaletteButton onOpen={() => setPaletteOpen(true)} />
+					<UserMenu user={props.user} onLogout={props.onLogout} />
 				</div>
 			</header>
+			<CommandPalette open={paletteOpen()} setOpen={setPaletteOpen} />
 			<div class="app-body">
-				<Show
-					when={mobile()}
-					fallback={<Sidebar user={props.user} onLogout={props.onLogout} />}
-				>
+				<Show when={mobile()} fallback={<Sidebar />}>
 					<MobileSidebar
 						id={navigationId}
-						user={props.user}
-						onLogout={props.onLogout}
 						open={navigationOpen()}
 						onClose={closeNavigation}
 					/>

@@ -52,9 +52,13 @@ test('draws a polygon area, finishes it with Enter and keeps it after saving', a
 	await expect(page.getByText('Enter')).toBeVisible()
 	await page.keyboard.press('Enter')
 
-	await page.getByRole('dialog').getByRole('button', { name: 'Bereich', exact: true }).click()
-	await page.getByRole('dialog').getByRole('textbox').fill('E2E Cage A')
-	await page.getByRole('button', { name: 'E2E Cage A' }).click()
+	// The target search works like a combobox: Tab picks the highlighted result.
+	await page.getByRole('dialog').getByRole('combobox').fill('E2E Cage A')
+	await expect(page.getByRole('option', { name: /^E2E Cage A/ })).toHaveAttribute(
+		'aria-selected',
+		'true',
+	)
+	await page.keyboard.press('Tab')
 	await expect(page.locator('.floorplan-area-editing')).toHaveCount(1)
 
 	await page.getByRole('button', { name: 'Speichern' }).click()

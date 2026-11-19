@@ -75,6 +75,7 @@ import {
 	errOf,
 	exists,
 	findById,
+	inScope,
 	insertedId,
 	inTenants,
 	isPatchEmpty,
@@ -104,7 +105,9 @@ export type LocationRow = typeof locations.$inferSelect
 
 /**
  * List row: `child_count` and `ancestor_ids` (root first) refer to the
- * filtered tree, so the client can collapse rows across pages.
+ * filtered tree, so the client can collapse rows across pages. `path` is
+ * different: the names of all ancestors in the site (root first), filtered
+ * or not, leaving out those outside the requester's tenant scope.
  */
 export type LocationListRow = LocationRow & {
 	site_name: string
@@ -112,6 +115,7 @@ export type LocationListRow = LocationRow & {
 	depth: number
 	child_count: number
 	ancestor_ids: number[]
+	path: string[]
 }
 
 export interface TenantListParams extends ListParams {
@@ -843,7 +847,89 @@ export async function listLocations(params: LocationListParams): Promise<Page<Lo
 	)
 	const linked = withTreeLinks(ordered)
 	const offset = offsetOf(params)
-	return pageOf(linked.slice(offset, offset + params.limit), matching.length, params)
+	const items = linked.slice(offset, offset + params.limit)
+	const paths = await ancestorPaths(items, matching, params.scopeTenantIds)
+	return pageOf(
+		items.map((row) => ({ ...row, path: paths.get(row.id) ?? [] })),
+		matching.length,
+		params,
+	)
+}
+
+interface PathNode {
+	id: number
+	parent_id: number | null
+	name: string
+	tenant_id: number | null
+}
+
+/**
+ * Ancestor names (root first) of each of `rows`. Ancestors among `known`
+ * (the filtered list, already in scope) cost nothing; the rest are loaded
+ * with one recursive query starting at the first missing link of each chain,
+ * so an unfiltered list needs no extra query. Ancestors outside `scope` are
+ * left out of the path.
+ */
+async function ancestorPaths(
+	rows: readonly PathNode[],
+	known: readonly PathNode[],
+	scope: readonly number[] | undefined,
+): Promise<Map<number, string[]>> {
+	const nodes = new Map<number, PathNode>(known.map((node) => [node.id, node]))
+	const missing = new Set<number>()
+	for (const row of rows) {
+		let parent = row.parent_id
+		// The bound keeps corrupt (cyclic) data from looping forever.
+		for (let depth = 0; parent !== null && depth < MAX_LOCATION_DEPTH; depth++) {
+			const node = nodes.get(parent)
+			if (!node) {
+				missing.add(parent)
+				break
+			}
+			parent = node.parent_id
+		}
+	}
+	if (missing.size > 0) {
+		const chain = sql`(
+			with recursive chain(id) as (
+				select l.id from ${locations} l where ${inArray(sql`l.id`, [...missing])}
+				union
+				select l.parent_id from ${locations} l
+				join chain on l.id = chain.id
+				where l.parent_id is not null
+			)
+			select id from chain
+		)`
+		const loaded = await getDb()
+			.select({
+				id: locations.id,
+				parent_id: locations.parent_id,
+				name: locations.name,
+				tenant_id: locations.tenant_id,
+			})
+			.from(locations)
+			.where(inArray(locations.id, chain))
+		for (const node of loaded) {
+			nodes.set(node.id, node)
+		}
+	}
+	const paths = new Map<number, string[]>()
+	for (const row of rows) {
+		const path: string[] = []
+		let parent = row.parent_id
+		for (let depth = 0; parent !== null && depth < MAX_LOCATION_DEPTH; depth++) {
+			const node = nodes.get(parent)
+			if (!node) {
+				break
+			}
+			if (inScope(node.tenant_id, scope)) {
+				path.unshift(node.name)
+			}
+			parent = node.parent_id
+		}
+		paths.set(row.id, path)
+	}
+	return paths
 }
 
 export function getLocation(id: number): Promise<Result<LocationRow, Error>> {

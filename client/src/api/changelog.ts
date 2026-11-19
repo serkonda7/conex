@@ -7,6 +7,7 @@ import type { ChangelogListQuery, ObjectChangeJson, Page } from 'shared/src/type
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
 export type { ObjectChangeJson }
+export type ChangelogSort = ChangelogListQuery['sort']
 
 export async function fetch_changelog(
 	filters?: Partial<ChangelogListQuery>,
@@ -19,6 +20,8 @@ export async function fetch_changelog(
 				object_type: filters?.object_type,
 				tenant: filters?.tenant,
 				tenant_group: filters?.tenant_group,
+				sort: filters?.sort ?? 'created_at',
+				order: filters?.order ?? 'desc',
 			}),
 		}),
 		failed.list('noun.change'),

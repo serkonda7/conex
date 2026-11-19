@@ -11,10 +11,21 @@
  * and pans by a drag while zoomed in. Pieces on the stage that take a press
  * for their own drag still pan with the middle mouse button.
  *
- * By default the viewport shrink-wraps the stage. With `fill` it is a box
- * as wide as the frame (as high as the image at that width, capped by the
- * viewport's CSS `max-height`) with the image fitted and centered in it, so zooming into a narrow image first grows it into the
- * empty space (design decision 0003).
+ * Every zoomable image uses this component (design decision 0003). It has
+ * two layouts:
+ *
+ * - Shrink-wrapped (default, the floor plan): the viewport is exactly as
+ *   large as the image capped in height, so the floor plan's toolbar and
+ *   stage bar line up with the image.
+ * - Fill (`fill`, the lightbox): a box as wide as the frame and as high as
+ *   the image at that width, capped by the viewport's CSS `max-height`
+ *   (70vh), with the image fitted, centered and never upscaled. Otherwise a
+ *   very narrow, tall image (rack photo) would stay a thin strip when zoomed.
+ *
+ * Zoom and pan treat each axis on its own: while the zoomed image is smaller
+ * than the viewport along an axis it stays centered there; once larger it
+ * keeps covering the viewport. Zooming into a tall image first widens it into
+ * the empty space and only then crops it.
  */
 import { IconZoomIn, IconZoomOut, IconZoomReset } from '@tabler/icons-solidjs'
 import { type Accessor, createSignal, type JSX, onCleanup, onMount, Show } from 'solid-js'
@@ -23,6 +34,14 @@ import { t } from '../i18n'
 /** Zoom range of the stage; 1 fits the whole image. */
 const MIN_ZOOM = 1
 export const MAX_ZOOM = 8
+
+/**
+ * Factor for overlay line widths: lines thin out as the plan zooms in, so
+ * zoomed-in detail is not covered by them (1 at 100 %, half from 4x on).
+ */
+function lineZoom(scale: number): number {
+	return Math.max(0.5, Math.min(1, 1 / Math.sqrt(scale)))
+}
 
 /** Factor of one zoom button step. */
 const ZOOM_STEP = 1.5
@@ -393,6 +412,7 @@ export function ZoomViewport(props: {
 						...(props.fill ? fillStageStyle(props.fill) : {}),
 						transform: `translate(${props.zoom.offset().x}px, ${props.zoom.offset().y}px) scale(${props.zoom.scale()})`,
 						'--inv-zoom': String(1 / props.zoom.scale()),
+						'--line-zoom': String(lineZoom(props.zoom.scale())),
 					}}
 					{...props.handlers}
 				>

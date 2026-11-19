@@ -83,13 +83,18 @@ Testpostfach außerhalb der Techniker ist dann erfolgreich.
 **Integrationen → Outlook-Kalendersynchronisation** (Berechtigung
 `integrations.manage`):
 
-1. **Einrichten** klicken (später **Bearbeiten**), dann **Mandanten-ID**,
-   **Anwendungs-ID (Client-ID)** und **Geheimer Clientschlüssel** eintragen.
+1. **Einrichten** klicken (später die Karte öffnen, Reiter **Einstellungen**),
+   dann **Mandanten-ID**, **Anwendungs-ID (Client-ID)** und
+   **Geheimer Clientschlüssel** eintragen.
 2. **Testpostfach** eines Technikers eintragen → **Verbindung testen** muss
    erfolgreich sein. Ein Postfach außerhalb der Gruppe muss fehlschlagen.
-3. **Intervall (Minuten)** setzen, **Aktiviert** anhaken, **Speichern**.
-4. Unter **Technikerzuordnung →** das Postfach prüfen und **Zuordnen** klicken.
-5. **Jetzt synchronisieren**
+3. **Intervall (Minuten)** setzen, **Speichern und aktivieren**.
+4. Im Reiter **Techniker** das Postfach prüfen und **Zuordnen** klicken.
+5. **Synchronisieren**
+
+Der Schalter **Aktiviert** im Kopf der Seite hält die Synchronisierung an.
+**Entfernen** (Reiter **Einstellungen**, ganz unten) löscht Einstellungen,
+Zuordnungen und Verlauf; bereits angelegte Outlook-Termine bleiben bestehen.
 
 
 ## Fehlerbehebung

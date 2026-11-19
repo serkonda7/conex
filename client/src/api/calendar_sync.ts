@@ -32,6 +32,12 @@ export async function save_calendar_sync_config(
 	return to_result<CalendarSyncConfigJson>(res, t('calendarSync.saveFailed'))
 }
 
+/** Removes the settings, mappings, sync state and run history. */
+export async function delete_calendar_sync_config(): Promise<Result<unknown, Error>> {
+	const res = await api.config.$delete()
+	return to_result<unknown>(res, t('calendarSync.removeFailed'))
+}
+
 export async function test_calendar_sync_config(
 	input: CalendarSyncTest,
 ): Promise<Result<unknown, Error>> {

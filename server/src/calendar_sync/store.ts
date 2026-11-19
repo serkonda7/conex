@@ -15,7 +15,7 @@ import type {
 	CalendarSyncTest,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
-import { getDb } from '../db/connection'
+import { getDb, withTransaction } from '../db/connection'
 import { NotFoundError, ValidationError } from '../db/errors'
 import { errOf, tryWrite } from '../db/list'
 import { decryptJson, encryptJson } from '../integrations/secrets'
@@ -225,6 +225,28 @@ export async function saveCalendarSyncConfig(
 		return saved
 	}
 	return Result.ok(await getCalendarSyncConfig())
+}
+
+/**
+ * Removes the calendar sync: settings, mappings, synced items and runs.
+ * Events already written to Outlook stay there, no longer managed.
+ */
+export async function deleteCalendarSyncConfig(): Promise<Result<void, Error>> {
+	if (!(await getConfigRow())) {
+		return Result.err(new NotFoundError('Calendar sync is not configured'))
+	}
+	try {
+		await withTransaction(async () => {
+			const db = getDb()
+			await db.delete(calendar_sync_items)
+			await db.delete(calendar_sync_mappings)
+			await db.delete(calendar_sync_runs)
+			await db.delete(calendar_sync_config)
+		})
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
+	return Result.ok(undefined)
 }
 
 export async function recordConfigError(error: string | null): Promise<void> {

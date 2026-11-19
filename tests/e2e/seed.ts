@@ -326,6 +326,34 @@ if (e2eSite && e2eRackType) {
 				await db.insert(devices).values(values)
 			}
 		}
+		// Unracked device in a room of Floor 1: a floor plan candidate, offered
+		// by the palette and the area target picker of the Floor 1 plan.
+		const storageRoom = (await db.select().from(locations)).find(
+			(row) => row.name === 'E2E Storage Room',
+		)
+		const looseValues = {
+			device_type_id: e2eSwitch.id,
+			device_role_id: e2eChildRole.id,
+			site_id: e2eSite.id,
+			location_id: storageRoom?.id ?? null,
+			rack_id: null,
+			face: null,
+			position_u: null,
+			status: 'active',
+			name: 'E2E Floor Switch',
+			serial: null,
+			asset_tag: null,
+			tenant_id: tenant.id,
+			description: null,
+		}
+		const existingLoose = (await db.select().from(devices)).find(
+			(row) => row.name === looseValues.name,
+		)
+		if (existingLoose) {
+			await getSqlClient()`UPDATE devices SET ${getSqlClient()(looseValues)} WHERE id = ${existingLoose.id}`
+		} else {
+			await db.insert(devices).values(looseValues)
+		}
 	}
 	const shelfValues = {
 		rack_id: visualRack.id,

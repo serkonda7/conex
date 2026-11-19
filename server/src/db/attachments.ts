@@ -125,6 +125,15 @@ const ALREADY_PLACED = 'A rack, device or outlet is already placed on another fl
 /** Panel device of a placed outlet (rear port); `devices` itself is the placed device. */
 const portDevice = alias(devices, 'port_device')
 
+/** Device an area outlines, and its role. */
+const areaDevice = alias(devices, 'area_device')
+const areaDeviceRole = alias(device_roles, 'area_device_role')
+
+/** Tenant of an area's target; needs `sites`, `locations` and `areaDevice` joined. */
+const areaTenantSql: SQL<number | null> = sql<
+	number | null
+>`coalesce(${sites.tenant_id}, ${locations.tenant_id}, ${areaDevice.tenant_id})`
+
 /** First port of a jack: it stands for the jack's panel and tenant. */
 function firstJackPort(jackId: SQL | PgColumn): SQL<number | null> {
 	return sql<
@@ -555,22 +564,26 @@ export async function getPlan(
 			has_hidden_content: false,
 		})
 	}
-	const areaTenant = sql<number | null>`coalesce(${sites.tenant_id}, ${locations.tenant_id})`
 	const targetPlan = alias(attachments, 'target_plan')
 	const areasQuery = getDb()
 		.select({
 			id: floorplan_areas.id,
 			site_id: floorplan_areas.site_id,
 			location_id: floorplan_areas.location_id,
+			device_id: floorplan_areas.device_id,
 			label: floorplan_areas.label,
 			points: floorplan_areas.points,
-			target_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
+			target_name: sql<string>`coalesce(${sites.name}, ${locations.name}, ${areaDevice.name}, '#' || ${areaDevice.id})`,
 			target_type: locations.type,
 			target_plan_id: targetPlan.id,
+			status: areaDevice.status,
+			role_icon: areaDeviceRole.icon,
 		})
 		.from(floorplan_areas)
 		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
 		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.leftJoin(areaDevice, eq(areaDevice.id, floorplan_areas.device_id))
+		.leftJoin(areaDeviceRole, eq(areaDeviceRole.id, areaDevice.device_role_id))
 		.leftJoin(
 			targetPlan,
 			and(
@@ -582,7 +595,10 @@ export async function getPlan(
 			),
 		)
 		.where(
-			and(eq(floorplan_areas.attachment_id, id), scopeCondition(areaTenant, scopeTenantIds)),
+			and(
+				eq(floorplan_areas.attachment_id, id),
+				scopeCondition(areaTenantSql, scopeTenantIds),
+			),
 		)
 		.orderBy(asc(floorplan_areas.id))
 	const placementsQuery = getDb()
@@ -747,6 +763,11 @@ export async function listPlanCandidates(
 			),
 		)
 		.orderBy(asc(racks.name), asc(racks.id))
+	// A device is a marker or an area, on one plan at most.
+	const onThisPlan = or(
+		eq(floorplan_placements.attachment_id, id),
+		eq(floorplan_areas.attachment_id, id),
+	)
 	const deviceRows = await getDb()
 		.select({
 			device_id: devices.id,
@@ -760,14 +781,15 @@ export async function listPlanCandidates(
 		.leftJoin(device_roles, eq(device_roles.id, devices.device_role_id))
 		.leftJoin(locations, eq(locations.id, devices.location_id))
 		.leftJoin(floorplan_placements, eq(floorplan_placements.device_id, devices.id))
+		.leftJoin(floorplan_areas, eq(floorplan_areas.device_id, devices.id))
 		.where(
 			and(
 				containedIn(devices, owner, locationIds),
 				// Racked devices are managed in the rack view, not on plans.
 				isNull(devices.rack_id),
-				free,
+				or(and(isNull(floorplan_placements.id), isNull(floorplan_areas.id)), onThisPlan),
 				// Inactive devices are not offered, unless already on this plan.
-				or(ne(devices.status, 'inactive'), eq(floorplan_placements.attachment_id, id)),
+				or(ne(devices.status, 'inactive'), onThisPlan),
 				scopeCondition(devices.tenant_id, scopeTenantIds),
 			),
 		)
@@ -852,10 +874,11 @@ async function siteOfOwner(owner: AttachmentOwner): Promise<number | null> {
 }
 
 /**
- * Checks a plan save against its owner: area targets exist, are visible,
- * are not the owner and occur once; placed racks and devices exist, are
- * visible, occur once, lie in the owner's scope and are not placed on
- * another plan. Missing and invisible objects get the same message.
+ * Checks a plan save against its owner: site and location area targets
+ * exist, are visible, are not the owner and occur once; placed racks and
+ * devices (markers, and the devices areas outline) exist, are visible,
+ * occur once, lie in the owner's scope and are not on another plan.
+ * Missing and invisible objects get the same message.
  */
 async function checkPlanInput(
 	id: number,
@@ -868,6 +891,9 @@ async function checkPlanInput(
 	)
 	const locationIds = input.areas.flatMap((area) =>
 		area.location_id === undefined ? [] : [area.location_id],
+	)
+	const areaDeviceIds = input.areas.flatMap((area) =>
+		area.device_id === undefined ? [] : [area.device_id],
 	)
 	if (new Set(siteIds).size < siteIds.length || new Set(locationIds).size < locationIds.length) {
 		return Result.err(new ValidationError('Each site or location can be linked only once'))
@@ -905,9 +931,11 @@ async function checkPlanInput(
 	}
 
 	const rackIds = input.placements.flatMap((p) => (p.rack_id === undefined ? [] : [p.rack_id]))
-	const deviceIds = input.placements.flatMap((p) =>
-		p.device_id === undefined ? [] : [p.device_id],
-	)
+	// A device's area counts as its placement.
+	const deviceIds = [
+		...input.placements.flatMap((p) => (p.device_id === undefined ? [] : [p.device_id])),
+		...areaDeviceIds,
+	]
 	const interfaceIds = input.placements.flatMap((p) =>
 		p.interface_id === undefined ? [] : [p.interface_id],
 	)
@@ -998,7 +1026,20 @@ async function checkPlanInput(
 			),
 		)
 		.limit(1)
-	return elsewhere.length > 0
+	const elsewhereArea =
+		deviceIds.length === 0
+			? []
+			: await getDb()
+					.select({ id: floorplan_areas.id })
+					.from(floorplan_areas)
+					.where(
+						and(
+							ne(floorplan_areas.attachment_id, id),
+							inArray(floorplan_areas.device_id, deviceIds),
+						),
+					)
+					.limit(1)
+	return elsewhere.length + elsewhereArea.length > 0
 		? Result.err(new ConflictError(ALREADY_PLACED))
 		: Result.ok(undefined)
 }
@@ -1100,14 +1141,9 @@ async function hiddenPlanIds(
 		.from(floorplan_areas)
 		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
 		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.leftJoin(areaDevice, eq(areaDevice.id, floorplan_areas.device_id))
 		.where(
-			and(
-				eq(floorplan_areas.attachment_id, id),
-				outsideScope(
-					sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`,
-					scopeTenantIds,
-				),
-			),
+			and(eq(floorplan_areas.attachment_id, id), outsideScope(areaTenantSql, scopeTenantIds)),
 		)
 	const placements = await getDb()
 		.select({ id: floorplan_placements.id })
@@ -1128,7 +1164,10 @@ async function hiddenPlanIds(
 /** Areas and placements of a plan as stored, for the changelog entry of a save. */
 async function planSnapshot(id: number): Promise<
 	{
-		areas: Pick<FloorplanAreaRow, 'site_id' | 'location_id' | 'label' | 'points'>[]
+		areas: Pick<
+			FloorplanAreaRow,
+			'site_id' | 'location_id' | 'device_id' | 'label' | 'points'
+		>[]
 		placements: Pick<
 			FloorplanPlacementRow,
 			'rack_id' | 'device_id' | 'interface_id' | 'jack_id' | 'x' | 'y'
@@ -1139,6 +1178,7 @@ async function planSnapshot(id: number): Promise<
 		.select({
 			site_id: floorplan_areas.site_id,
 			location_id: floorplan_areas.location_id,
+			device_id: floorplan_areas.device_id,
 			label: floorplan_areas.label,
 			points: floorplan_areas.points,
 		})
@@ -1218,6 +1258,7 @@ export async function putPlan(
 								attachment_id: id,
 								site_id: area.site_id ?? null,
 								location_id: area.location_id ?? null,
+								device_id: area.device_id ?? null,
 								label: area.label || null,
 								points: area.points,
 							})),
@@ -1388,8 +1429,9 @@ export async function inferOutletLocations(attachmentIds: number[]): Promise<voi
 
 /**
  * Removes placements whose rack or device no longer lies in its plan
- * owner's scope (see `ownerLocations`), and outlets whose panel left the
- * owner's site, after a site, location or rack change. Runs on the caller's `getDb()` (its transaction).
+ * owner's scope (see `ownerLocations`), device areas likewise, and outlets
+ * whose panel left the owner's site, after a site, location or rack change.
+ * Runs on the caller's `getDb()` (its transaction).
  */
 export async function prunePlacements(): Promise<void> {
 	await getDb().execute(sql`
@@ -1437,13 +1479,52 @@ export async function prunePlacements(): Promise<void> {
 			)
 		)
 	`)
+	await getDb().execute(sql`
+		delete from ${floorplan_areas} fa
+		using ${attachments} a
+		where a.id = fa.attachment_id
+		and fa.device_id is not null
+		and not exists (
+			select 1
+			from ${devices} d
+			where d.id = fa.device_id
+			and (
+				d.site_id = a.site_id
+				or a.location_id in (
+					with recursive ancestors(id) as (
+						select d.location_id
+						union
+						select l.parent_id from ${locations} l
+						join ancestors on l.id = ancestors.id
+						where l.parent_id is not null
+					)
+					select id from ancestors
+				)
+			)
+		)
+	`)
 }
+
+/** Object whose delete can remove floor-plan data: a plan owner, or a device areas outline. */
+export type FloorplanDeleteTarget = AttachmentOwner | { device_id: number }
 
 /**
  * Floor-plan data deleting an owner removes: its marked plan's areas and
- * placements, and the areas on other plans linking to it.
+ * placements, and the areas on other plans linking to it. A device has no
+ * plan of its own; its area goes with it.
  */
-async function floorplanImpact(owner: AttachmentOwner): Promise<FloorplanImpactJson> {
+async function floorplanImpact(target: FloorplanDeleteTarget): Promise<FloorplanImpactJson> {
+	if ('device_id' in target) {
+		return {
+			areas: 0,
+			placements: 0,
+			linkedFrom: await getDb().$count(
+				floorplan_areas,
+				eq(floorplan_areas.device_id, target.device_id),
+			),
+		}
+	}
+	const owner = target
 	const [plan] = await getDb()
 		.select({ id: attachments.id })
 		.from(attachments)
@@ -1471,13 +1552,13 @@ async function floorplanImpact(owner: AttachmentOwner): Promise<FloorplanImpactJ
  * (`?confirm=floorplan`); the error carries the impact for the client.
  */
 export async function checkFloorplanDelete(
-	owner: AttachmentOwner,
+	target: FloorplanDeleteTarget,
 	confirmed: boolean,
 ): Promise<Result<undefined, Error>> {
 	if (confirmed) {
 		return Result.ok(undefined)
 	}
-	const impact = await floorplanImpact(owner)
+	const impact = await floorplanImpact(target)
 	return impact.areas + impact.placements + impact.linkedFrom > 0
 		? Result.err(new FloorplanImpactError(impact))
 		: Result.ok(undefined)
@@ -1485,8 +1566,9 @@ export async function checkFloorplanDelete(
 
 /**
  * Plans referencing an object (`FloorplanLinkJson`): the one placing a rack
- * or device, or those with an area linking to a site or location. Plans
- * whose owner lies outside `scopeTenantIds` are left out.
+ * or device (a device as a marker or an area), or those with an area
+ * linking to a site or location. Plans whose owner lies outside
+ * `scopeTenantIds` are left out.
  */
 export async function listFloorplanLinks(
 	query: FloorplanLinksQuery,
@@ -1500,6 +1582,20 @@ export async function listFloorplanLinks(
 		owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
 	}
 	const visible = scopeCondition(ownerTenant, scopeTenantIds)
+	const areaTarget =
+		query.site !== undefined
+			? eq(floorplan_areas.site_id, query.site)
+			: query.location !== undefined
+				? eq(floorplan_areas.location_id, query.location)
+				: eq(floorplan_areas.device_id, query.device ?? 0)
+	const areaPlans = getDb()
+		.select(columns)
+		.from(floorplan_areas)
+		.innerJoin(attachments, eq(attachments.id, floorplan_areas.attachment_id))
+		.leftJoin(sites, eq(sites.id, attachments.site_id))
+		.leftJoin(locations, eq(locations.id, attachments.location_id))
+		.where(and(areaTarget, visible))
+		.orderBy(asc(columns.owner_name), asc(attachments.id))
 	if (query.interface !== undefined || query.rack !== undefined || query.device !== undefined) {
 		const placed =
 			query.interface !== undefined
@@ -1513,29 +1609,16 @@ export async function listFloorplanLinks(
 				: query.rack !== undefined
 					? eq(floorplan_placements.rack_id, query.rack)
 					: eq(floorplan_placements.device_id, query.device ?? 0)
-		return getDb()
+		const placedOn = await getDb()
 			.select(columns)
 			.from(floorplan_placements)
 			.innerJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
 			.leftJoin(sites, eq(sites.id, attachments.site_id))
 			.leftJoin(locations, eq(locations.id, attachments.location_id))
 			.where(and(placed, visible))
+		return query.device === undefined ? placedOn : [...placedOn, ...(await areaPlans)]
 	}
-	return getDb()
-		.select(columns)
-		.from(floorplan_areas)
-		.innerJoin(attachments, eq(attachments.id, floorplan_areas.attachment_id))
-		.leftJoin(sites, eq(sites.id, attachments.site_id))
-		.leftJoin(locations, eq(locations.id, attachments.location_id))
-		.where(
-			and(
-				query.site !== undefined
-					? eq(floorplan_areas.site_id, query.site)
-					: eq(floorplan_areas.location_id, query.location ?? 0),
-				visible,
-			),
-		)
-		.orderBy(asc(columns.owner_name), asc(attachments.id))
+	return areaPlans
 }
 
 /**
@@ -1690,11 +1773,9 @@ export async function listFloorplans(
 		.from(floorplan_areas)
 		.leftJoin(sites, eq(sites.id, floorplan_areas.site_id))
 		.leftJoin(locations, eq(locations.id, floorplan_areas.location_id))
+		.leftJoin(areaDevice, eq(areaDevice.id, floorplan_areas.device_id))
 		.where(
-			and(
-				inArray(floorplan_areas.attachment_id, ids),
-				scopeCondition(sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`, scope),
-			),
+			and(inArray(floorplan_areas.attachment_id, ids), scopeCondition(areaTenantSql, scope)),
 		)
 		.groupBy(floorplan_areas.attachment_id)
 	const placementCounts = await getDb()

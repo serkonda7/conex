@@ -1,22 +1,22 @@
 /**
- * Calendar sync card on the integrations page (TANSS appointments →
- * Outlook), laid out like the provider cards: "Sync now" / "Edit" in the
- * header and a summary of the Microsoft 365 app, which "Edit" swaps for the
- * settings form with its connection test, and the recent runs. The
- * technician → mailbox mappings live on their own page
- * (/integrations/calendar-sync), linked from the card like the TANSS
- * consistency report. Global `integrations.manage` only, like the routes.
+ * Outlook calendar sync (TANSS appointments → Outlook), laid out like a
+ * provider (design decision 0006): an `IntegrationCard` on the integrations
+ * page that opens /integrations/calendar-sync, whose header carries the
+ * status, the Enabled switch and "Sync now", with tabs for the technician →
+ * mailbox mapping and the settings (Microsoft 365 app, schedule, removal).
+ * Global `integrations.manage` only, like the routes.
  */
-import { IconPencil, IconRefresh } from '@tabler/icons-solidjs'
+import { IconCalendarEvent, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { CALENDAR_SYNC_MAX_INTERVAL, CALENDAR_SYNC_MIN_INTERVAL } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
-import { createEffect, createSignal, For, type JSX, on, Show } from 'solid-js'
+import { type Accessor, createEffect, createSignal, For, type JSX, on, Show } from 'solid-js'
 import {
 	type CalendarSyncConfigJson,
 	type CalendarSyncRunJson,
 	type CalendarTechnicianJson,
 	delete_calendar_mapping,
+	delete_calendar_sync_config,
 	fetch_calendar_sync_config,
 	fetch_calendar_sync_runs,
 	fetch_calendar_technicians,
@@ -26,37 +26,65 @@ import {
 	test_calendar_sync_config,
 	wait_for_calendar_sync,
 } from '../../api/calendar_sync'
+import { fetch_integrations } from '../../api/integrations'
 import { Empty, InlineError, Loading } from '../../components/feedback'
-import { Field, Hint, TextField, ToggleField } from '../../components/form'
+import { Field, Hint, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
-import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
-import { usePageMeta } from '../../lib/router'
+import { createRecord, createRows, useAction } from '../../lib/resource'
+import { forgetDeleted, navigate, queryParam, usePageMeta } from '../../lib/router'
+import {
+	DangerZone,
+	type DetailTab,
+	DetailTabs,
+	IntegrationDetailHeader,
+	SettingsSection,
+	settingsHref,
+} from './detail_parts'
 import { type TestResult, TestResultLine } from './form_fields'
-import { RunStateLine } from './run_state'
+import {
+	IntegrationCard,
+	type IntegrationStatus,
+	LastRunError,
+	LastRunTime,
+	StatusPill,
+	SyncIconButton,
+	WarningPill,
+} from './integration_card'
 
-/** Credentials, schedule and the connection test. */
-function SettingsForm(props: {
+/** Detail page of the calendar sync. */
+export const CALENDAR_SYNC_HREF = '/integrations/calendar-sync'
+
+/** Unsaved credentials of the settings form. */
+interface Credentials {
+	ms_tenant_id: string
+	client_id: string
+	client_secret?: string
+}
+
+/**
+ * Settings tab: the Microsoft 365 app with its connection test, the sync
+ * interval, and the danger zone once set up. The first save turns the sync
+ * on; afterwards the header's switch does.
+ */
+function SettingsPanel(props: {
 	config: CalendarSyncConfigJson
 	onSaved: (config: CalendarSyncConfigJson) => void
-	onCancel: () => void
+	onRemoved: () => void
 }): JSX.Element {
 	const [tenantId, setTenantId] = createSignal(props.config.ms_tenant_id)
 	const [clientId, setClientId] = createSignal(props.config.client_id)
 	const [secret, setSecret] = createSignal('')
-	const [enabled, setEnabled] = createSignal(props.config.enabled)
 	const [interval, setIntervalMinutes] = createSignal(String(props.config.interval_minutes))
 	const [testMailbox, setTestMailbox] = createSignal('')
 	const [error, setError] = createSignal<string | null>(null)
 	const [testing, setTesting] = createSignal(false)
 	const [testResult, setTestResult] = createSignal<TestResult | null>(null)
+	const [saved, setSaved] = createSignal(false)
 	const action = useAction(setError)
+	const remove = useAction(setError)
 
-	const credentials = (): {
-		ms_tenant_id: string
-		client_id: string
-		client_secret?: string
-	} => ({
+	const credentials = (): Credentials => ({
 		ms_tenant_id: tenantId().trim(),
 		client_id: clientId().trim(),
 		...(secret() !== '' ? { client_secret: secret() } : {}),
@@ -86,106 +114,137 @@ function SettingsForm(props: {
 
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
-		let saved: CalendarSyncConfigJson | null = null
+		setSaved(false)
+		let next: CalendarSyncConfigJson | null = null
 		const ok = await action.run(async () => {
 			const res = await save_calendar_sync_config({
 				...credentials(),
-				enabled: enabled(),
+				enabled: props.config.configured ? props.config.enabled : true,
 				interval_minutes: Number(interval()),
 			})
 			if (Result.isOk(res)) {
-				saved = res.value
+				next = res.value
 			}
 			return res
 		})
-		if (ok && saved) {
+		if (ok && next) {
 			setSecret('')
-			props.onSaved(saved)
+			setSaved(true)
+			props.onSaved(next)
+		}
+	}
+
+	async function handleRemove(): Promise<void> {
+		if (!window.confirm(t('calendarSync.confirmRemoveSync'))) {
+			return
+		}
+		if (await remove.run(() => delete_calendar_sync_config())) {
+			props.onRemoved()
 		}
 	}
 
 	return (
-		<form
-			class="form-stacked calendar-sync-form"
-			onSubmit={(e: SubmitEvent) => void handleSave(e)}
-		>
-			<ToggleField
-				id="calendar-sync-enabled"
-				label={t('common.status')}
-				checked={enabled()}
-				onChange={setEnabled}
-				on_text={t('integration.enabled')}
-				off_text={t('integration.disabled')}
-			/>
-			<TextField
-				id="calendar-sync-tenant-id"
-				label={t('calendarSync.tenantId')}
-				required
-				maxLength={200}
-				autocomplete="off"
-				placeholder="contoso.onmicrosoft.com"
-				value={tenantId()}
-				onInput={setTenantId}
-				hint={<Hint>{t('calendarSync.tenantIdHint')}</Hint>}
-			/>
-			<TextField
-				id="calendar-sync-client-id"
-				label={t('calendarSync.clientId')}
-				required
-				maxLength={36}
-				autocomplete="off"
-				placeholder="00000000-0000-0000-0000-000000000000"
-				value={clientId()}
-				onInput={setClientId}
-			/>
-			<TextField
-				id="calendar-sync-client-secret"
-				label={t('calendarSync.clientSecret')}
-				type="password"
-				required={!props.config.has_secret}
-				placeholder={props.config.has_secret ? t('integration.keepSecret') : undefined}
-				autocomplete="new-password"
-				value={secret()}
-				onInput={setSecret}
-			/>
-			<TextField
-				id="calendar-sync-interval"
-				label={t('calendarSync.interval')}
-				type="number"
-				required
-				min={CALENDAR_SYNC_MIN_INTERVAL}
-				max={CALENDAR_SYNC_MAX_INTERVAL}
-				step={1}
-				value={interval()}
-				onInput={setIntervalMinutes}
-			/>
-			<Field label={t('integration.connection')} for="calendar-sync-test-mailbox">
-				<div class="input-with-button">
-					<input
-						id="calendar-sync-test-mailbox"
-						type="email"
+		<div class="integration-settings">
+			<form class="form-stacked" onSubmit={(e: SubmitEvent) => void handleSave(e)}>
+				<SettingsSection title={t('calendarSync.settings')}>
+					<TextField
+						id="calendar-sync-tenant-id"
+						label={t('calendarSync.tenantId')}
+						required
+						maxLength={200}
 						autocomplete="off"
-						placeholder={t('calendarSync.testMailbox')}
-						aria-label={t('calendarSync.testMailbox')}
-						value={testMailbox()}
-						onInput={(e: InputEventAndTarget) => setTestMailbox(e.currentTarget.value)}
+						placeholder="contoso.onmicrosoft.com"
+						value={tenantId()}
+						onInput={setTenantId}
+						hint={<Hint>{t('calendarSync.tenantIdHint')}</Hint>}
 					/>
-					<button type="button" disabled={testing()} onClick={() => void handleTest()}>
-						{testing() ? t('integration.testing') : t('integration.test')}
+					<TextField
+						id="calendar-sync-client-id"
+						label={t('calendarSync.clientId')}
+						required
+						maxLength={36}
+						autocomplete="off"
+						placeholder="00000000-0000-0000-0000-000000000000"
+						value={clientId()}
+						onInput={setClientId}
+					/>
+					<TextField
+						id="calendar-sync-client-secret"
+						label={t('calendarSync.clientSecret')}
+						type="password"
+						required={!props.config.has_secret}
+						placeholder={
+							props.config.has_secret ? t('integration.keepSecret') : undefined
+						}
+						autocomplete="new-password"
+						value={secret()}
+						onInput={setSecret}
+					/>
+					<Field label={t('integration.connection')} for="calendar-sync-test-mailbox">
+						<div class="input-with-button">
+							<input
+								id="calendar-sync-test-mailbox"
+								type="email"
+								autocomplete="off"
+								placeholder={t('calendarSync.testMailbox')}
+								aria-label={t('calendarSync.testMailbox')}
+								value={testMailbox()}
+								onInput={(e: InputEventAndTarget) =>
+									setTestMailbox(e.currentTarget.value)
+								}
+							/>
+							<button
+								type="button"
+								disabled={testing()}
+								onClick={() => void handleTest()}
+							>
+								{testing() ? t('integration.testing') : t('integration.test')}
+							</button>
+						</div>
+						<TestResultLine result={testResult()} />
+					</Field>
+				</SettingsSection>
+				<SettingsSection
+					title={t('integration.schedule')}
+					description={t('calendarSync.scheduleHint')}
+				>
+					<TextField
+						id="calendar-sync-interval"
+						label={t('calendarSync.interval')}
+						type="number"
+						required
+						min={CALENDAR_SYNC_MIN_INTERVAL}
+						max={CALENDAR_SYNC_MAX_INTERVAL}
+						step={1}
+						value={interval()}
+						onInput={setIntervalMinutes}
+					/>
+				</SettingsSection>
+				<div class="form-actions">
+					<button type="submit" disabled={action.pending()}>
+						{action.pending()
+							? t('common.saving')
+							: props.config.configured
+								? t('common.save')
+								: t('calendarSync.saveAndEnable')}
 					</button>
+					<Show when={saved() && !action.pending()}>
+						<span class="text-success" role="status">
+							{t('integration.saved')}
+						</span>
+					</Show>
 				</div>
-				<TestResultLine result={testResult()} />
-			</Field>
+			</form>
 			<InlineError message={error()} />
-			<div class="form-actions">
-				<button type="submit" disabled={action.pending()}>
-					{action.pending() ? t('common.saving') : t('common.save')}
-				</button>
-				<button type="button" onClick={() => props.onCancel()}>
-					{t('common.cancel')}
-				</button>
-			</div>
-		</form>
+			<Show when={props.config.configured}>
+				<DangerZone
+					name={t('calendarSync.title')}
+					text={t('calendarSync.removeText')}
+					pending={remove.pending()}
+					onRemove={() => void handleRemove()}
+				/>
+			</Show>
+		</div>
 	)
 }
 
@@ -268,19 +327,12 @@ function TechnicianRow(props: {
 	)
 }
 
-/**
- * /integrations/calendar-sync — TANSS technicians with their mailbox
- * mapping, opened from the calendar sync card.
- */
-export function CalendarSyncTechniciansPage(): JSX.Element {
+/** Technicians tab: TANSS technicians with their mailbox mapping. */
+function TechniciansPanel(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [technicians, { refetch }] = createRows(fetch_calendar_technicians, setError)
-	usePageMeta(() => ({ name: t('calendarSync.techniciansTitle') }))
 	return (
 		<div>
-			<div class="page-header">
-				<h2>{t('calendarSync.techniciansTitle')}</h2>
-			</div>
 			<p class="field-hint">{t('calendarSync.techniciansHint')}</p>
 			<Show
 				when={!technicians.loading || technicians() !== undefined}
@@ -318,93 +370,38 @@ export function CalendarSyncTechniciansPage(): JSX.Element {
 	)
 }
 
+/** Enabled, but the sign-in or the latest run failed (header summary). */
+export function calendarNeedsAttention(config: CalendarSyncConfigJson | null): boolean {
+	return (
+		config?.configured === true &&
+		config.enabled &&
+		(config.last_error !== null || config.last_run?.state === 'error')
+	)
+}
+
+/** State of the configured sync; `running` covers a run followed from here. */
+function syncStatus(config: CalendarSyncConfigJson, running: boolean): IntegrationStatus {
+	if (!config.enabled) {
+		return 'disabled'
+	}
+	if (config.last_error) {
+		return 'error'
+	}
+	return running ? 'running' : 'connected'
+}
+
 /**
- * Enabled state (or the last error) of the sync, and how many technicians
- * have an enabled mailbox mapping.
+ * Run history with "Sync now": a run already in progress (sweep or another
+ * admin) is followed too, and every finished run refreshes the list.
  */
-function SyncState(props: {
-	config: CalendarSyncConfigJson
-	technicians: CalendarTechnicianJson[] | undefined
-}): JSX.Element {
-	const active = (): number =>
-		(props.technicians ?? []).filter((tech) => tech.mapping?.enabled === true).length
-	return (
-		<>
-			<div>
-				<Show when={props.config.enabled} fallback={t('integration.disabled')}>
-					<Show when={props.config.last_error} fallback={t('integration.enabled')}>
-						<span class="text-danger">{props.config.last_error}</span>
-					</Show>
-				</Show>
-			</div>
-			<Show when={props.technicians}>
-				{(techs: () => CalendarTechnicianJson[]) => (
-					<div>
-						{t('calendarSync.technicianCount', {
-							active: active(),
-							total: techs().length,
-						})}
-					</div>
-				)}
-			</Show>
-		</>
-	)
-}
-
-/** State, time, error and counts of the latest run. */
-function LastRun(props: { run: CalendarSyncRunJson }): JSX.Element {
-	return (
-		<>
-			<RunStateLine run={props.run} />
-			<Show when={props.run.state !== 'running'}>
-				<div>{t('calendarSync.counts', { ...props.run.counts })}</div>
-			</Show>
-		</>
-	)
-}
-
-/** Summary of the saved settings and the latest run. */
-function SyncDetails(props: {
-	config: CalendarSyncConfigJson
-	lastRun: CalendarSyncRunJson | undefined
-	technicians: CalendarTechnicianJson[] | undefined
-}): JSX.Element {
-	return (
-		<>
-			<dl class="detail-grid">
-				<dt>{t('calendarSync.tenantId')}</dt>
-				<dd>{props.config.ms_tenant_id}</dd>
-				<dt>{t('calendarSync.clientId')}</dt>
-				<dd>{props.config.client_id}</dd>
-				<dt>{t('calendarSync.intervalLabel')}</dt>
-				<dd>
-					{t('calendarSync.everyMinutes', { minutes: props.config.interval_minutes })}
-				</dd>
-				<dt>{t('common.status')}</dt>
-				<dd>
-					<SyncState config={props.config} technicians={props.technicians} />
-				</dd>
-				<dt>{t('integration.lastSync')}</dt>
-				<dd>
-					<Show when={props.lastRun} fallback={t('integration.neverSynced')}>
-						{(run: () => CalendarSyncRunJson) => <LastRun run={run()} />}
-					</Show>
-				</dd>
-			</dl>
-			<p>
-				<a href="/integrations/calendar-sync">{t('calendarSync.openTechnicians')}</a>
-			</p>
-		</>
-	)
-}
-
-export function CalendarSyncCard(): JSX.Element {
-	const [error, setError] = createSignal<string | null>(null)
+function useCalendarRuns(setError: (message: string | null) => void): {
+	lastRun: Accessor<CalendarSyncRunJson | null>
+	syncing: Accessor<boolean>
+	sync: () => Promise<void>
+} {
 	const [syncing, setSyncing] = createSignal(false)
-	const [config, { mutate }] = createRecord(() => true, fetch_calendar_sync_config, setError)
-	const [runs, { refetch: refetchRuns }] = createRows(fetch_calendar_sync_runs, setError)
+	const [runs, { refetch }] = createRows(fetch_calendar_sync_runs, setError)
 
-	// A run already in progress (sweep or another admin) is followed too.
 	createEffect(
 		on(runs, (rows) => {
 			const current = rows?.[0]
@@ -421,10 +418,10 @@ export function CalendarSyncCard(): JSX.Element {
 		if (Result.isError(done)) {
 			setError(done.error.message)
 		}
-		void refetchRuns()
+		void refetch()
 	}
 
-	async function handleSync(): Promise<void> {
+	async function sync(): Promise<void> {
 		setError(null)
 		const started = await start_calendar_sync()
 		if (Result.isError(started)) {
@@ -434,103 +431,278 @@ export function CalendarSyncCard(): JSX.Element {
 		await follow(started.value.id)
 	}
 
-	const [editing, setEditing] = createSignal(false)
-	// Shares the cache with the technician page, so its changes show here.
-	const [technicians] = createRowsFor(
-		() => config()?.configured === true,
-		fetch_calendar_technicians,
-		setError,
-	)
+	return { lastRun: () => runs()?.[0] ?? null, syncing, sync }
+}
 
-	const canSync = (): boolean => {
-		const c = config()
-		return c?.configured === true && c.enabled && !syncing()
+/** Saves the stored settings with only `enabled` changed (no new sign-in). */
+function saveEnabled(
+	config: CalendarSyncConfigJson,
+	enabled: boolean,
+): ReturnType<typeof save_calendar_sync_config> {
+	return save_calendar_sync_config({
+		ms_tenant_id: config.ms_tenant_id,
+		client_id: config.client_id,
+		enabled,
+		interval_minutes: config.interval_minutes,
+	})
+}
+
+type View = 'technicians' | 'settings'
+
+/**
+ * /integrations/calendar-sync — detail page of the calendar sync
+ * (design decision 0006). Before setup only the Settings tab shows; without TANSS
+ * the page only says it needs it.
+ */
+export function CalendarSyncDetailPage(): JSX.Element {
+	const [error, setError] = createSignal<string | null>(null)
+	const [integrations] = createRows(fetch_integrations, setError)
+	const tanssReady = (): boolean => (integrations() ?? []).some((i) => i.provider === 'tanss')
+	const [config, { mutate }] = createRecord(() => true, fetch_calendar_sync_config, setError)
+	const runs = useCalendarRuns(setError)
+	const toggle = useAction(setError)
+	const [view, setView] = createSignal<View>(
+		queryParam('view') === 'settings' ? 'settings' : 'technicians',
+	)
+	usePageMeta(() => ({ name: t('calendarSync.title') }))
+
+	const configured = (): boolean => config()?.configured === true
+	const activeView = (): View => (configured() ? view() : 'settings')
+	const tabs = (): DetailTab<View>[] => [
+		...(configured()
+			? [{ key: 'technicians' as const, label: t('calendarSync.viewTechnicians') }]
+			: []),
+		{ key: 'settings', label: t('integration.settings') },
+	]
+
+	async function handleToggle(enabled: boolean): Promise<void> {
+		const current = config()
+		if (!current) {
+			return
+		}
+		await toggle.run(async () => {
+			const res = await saveEnabled(current, enabled)
+			if (Result.isOk(res)) {
+				mutate(res.value)
+			}
+			return res
+		})
 	}
 
 	return (
-		<section class="card" aria-label={t('calendarSync.title')}>
-			<div class="page-header">
-				<h3>{t('calendarSync.title')}</h3>
+		<div class="integration-detail">
+			<Show
+				when={!config.loading || config() !== undefined}
+				fallback={<Loading message={t('calendarSync.loading')} />}
+			>
 				<Show when={config()}>
 					{(c: () => CalendarSyncConfigJson): JSX.Element => (
-						<Show
-							when={c().configured}
-							fallback={
-								<Show when={!editing()}>
-									<button
-										type="button"
-										class="btn-add"
-										onClick={(): void => {
-											setEditing(true)
-										}}
-									>
-										{t('integration.setUp')}
-									</button>
-								</Show>
-							}
-						>
-							<div class="form-actions">
-								<button
-									type="button"
-									disabled={!canSync()}
-									onClick={() => void handleSync()}
-								>
-									<IconLabel icon={IconRefresh}>
-										{syncing()
-											? t('integration.syncing')
-											: t('integration.syncNow')}
-									</IconLabel>
-								</button>
-								<button
-									type="button"
-									disabled={editing()}
-									onClick={(): void => {
-										setEditing(true)
+						<>
+							<IntegrationDetailHeader
+								name={t('calendarSync.title')}
+								description={t('calendarSync.description')}
+								icon={IconCalendarEvent}
+								configured={c().configured}
+								status={syncStatus(c(), runs.syncing())}
+								lastSyncFailed={runs.lastRun()?.state === 'error'}
+								lastRun={runs.lastRun()}
+								connectionError={c().last_error}
+								manageable
+								enabled={c().enabled}
+								toggling={toggle.pending()}
+								onToggle={(enabled: boolean) => void handleToggle(enabled)}
+								syncing={runs.syncing()}
+								onSync={() => void runs.sync()}
+								menuActions={[]}
+								onOpenSettings={() => setView('settings')}
+							/>
+							<InlineError message={error()} />
+							<Show
+								when={tanssReady() || integrations.loading}
+								fallback={<Empty message={t('calendarSync.requiresTanss')} />}
+							>
+								<DetailTabs
+									label={t('integration.views')}
+									tabs={tabs()}
+									active={activeView()}
+									onSelect={(key: View) => {
+										setError(null)
+										setView(key)
 									}}
-								>
-									<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
-								</button>
-							</div>
-						</Show>
-					)}
-				</Show>
-			</div>
-			<Show when={config()} fallback={<Loading message={t('calendarSync.loading')} />}>
-				{(c: () => CalendarSyncConfigJson): JSX.Element => (
-					<>
-						<Show
-							when={editing()}
-							fallback={
-								<Show
-									when={c().configured}
-									fallback={<Empty message={t('integration.notConfigured')} />}
-								>
-									<SyncDetails
+								/>
+								<Show when={activeView() === 'technicians'}>
+									<TechniciansPanel />
+								</Show>
+								<Show when={activeView() === 'settings'}>
+									<SettingsPanel
 										config={c()}
-										lastRun={runs()?.[0]}
-										technicians={
-											technicians.loading ? undefined : technicians()
+										onSaved={(saved: CalendarSyncConfigJson): void => {
+											const first = !c().configured
+											mutate(saved)
+											if (first) {
+												setView('technicians')
+											}
+										}}
+										onRemoved={(): void =>
+											forgetDeleted(CALENDAR_SYNC_HREF, '/integrations')
 										}
 									/>
 								</Show>
+							</Show>
+						</>
+					)}
+				</Show>
+			</Show>
+		</div>
+	)
+}
+
+/** Status pills and last sync time of the configured sync. */
+function SyncStatus(props: {
+	config: CalendarSyncConfigJson
+	status: IntegrationStatus
+	lastRun: CalendarSyncRunJson | null
+}): JSX.Element {
+	return (
+		<>
+			<StatusPill status={props.status} />
+			<Show when={props.config.enabled && props.lastRun?.state === 'error'}>
+				<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
+			</Show>
+			<LastRunTime run={props.lastRun} />
+		</>
+	)
+}
+
+/** Connection and sync errors of the configured sync. */
+function SyncErrors(props: {
+	config: CalendarSyncConfigJson
+	lastRun: CalendarSyncRunJson | null
+}): JSX.Element {
+	return (
+		<>
+			<Show when={props.config.enabled && props.config.last_error}>
+				<p class="integration-error">{props.config.last_error}</p>
+			</Show>
+			<LastRunError run={props.lastRun} />
+		</>
+	)
+}
+
+/**
+ * Card of the calendar sync on the integrations page (`integrations.manage`,
+ * global): opens the detail page; "Set up" and "Settings" open its Settings
+ * tab.
+ */
+function ConfigurableSyncCard(): JSX.Element {
+	const [error, setError] = createSignal<string | null>(null)
+	const [config] = createRecord(() => true, fetch_calendar_sync_config, setError)
+	const runs = useCalendarRuns(setError)
+	const status = (c: CalendarSyncConfigJson): IntegrationStatus => syncStatus(c, runs.syncing())
+
+	return (
+		<Show
+			when={config()}
+			fallback={
+				<IntegrationCard
+					name={t('calendarSync.title')}
+					description={t('calendarSync.description')}
+					icon={IconCalendarEvent}
+					href={CALENDAR_SYNC_HREF}
+					details={<Loading message={t('calendarSync.loading')} />}
+				/>
+			}
+		>
+			{(c: () => CalendarSyncConfigJson): JSX.Element => (
+				<IntegrationCard
+					name={t('calendarSync.title')}
+					description={t('calendarSync.description')}
+					icon={IconCalendarEvent}
+					href={c().configured ? CALENDAR_SYNC_HREF : settingsHref(CALENDAR_SYNC_HREF)}
+					tone={
+						!c().configured
+							? undefined
+							: status(c()) === 'error'
+								? 'error'
+								: status(c()) === 'disabled'
+									? 'disabled'
+									: undefined
+					}
+					status={
+						c().configured ? (
+							<SyncStatus
+								config={c()}
+								status={status(c())}
+								lastRun={runs.lastRun()}
+							/>
+						) : undefined
+					}
+					details={
+						c().configured || error() !== null ? (
+							<>
+								<Show when={c().configured}>
+									<SyncErrors config={c()} lastRun={runs.lastRun()} />
+								</Show>
+								<InlineError message={error()} />
+							</>
+						) : undefined
+					}
+					link={
+						<Show when={c().configured && status(c()) === 'error'}>
+							<a href={settingsHref(CALENDAR_SYNC_HREF)}>
+								{t('integration.fixConnection')}
+							</a>
+						</Show>
+					}
+					action={
+						<Show
+							when={c().configured}
+							fallback={
+								<button
+									type="button"
+									class="integration-card-btn"
+									onClick={() => navigate(settingsHref(CALENDAR_SYNC_HREF))}
+								>
+									<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
+								</button>
 							}
 						>
-							<h4>{t('calendarSync.settings')}</h4>
-							<SettingsForm
-								config={c()}
-								onSaved={(saved: CalendarSyncConfigJson): void => {
-									mutate(saved)
-									setEditing(false)
-								}}
-								onCancel={(): void => {
-									setEditing(false)
-								}}
+							<SyncIconButton
+								syncing={runs.syncing()}
+								disabled={!c().enabled}
+								onClick={() => void runs.sync()}
 							/>
 						</Show>
-					</>
-				)}
-			</Show>
-			<InlineError message={error()} />
-		</section>
+					}
+				/>
+			)}
+		</Show>
+	)
+}
+
+/**
+ * The calendar sync card; while TANSS is not set up it only says so, since
+ * the sync reads its appointments from there.
+ */
+export function CalendarSyncCard(props: { blocked: boolean }): JSX.Element {
+	return (
+		<Show
+			when={!props.blocked}
+			fallback={
+				<IntegrationCard
+					name={t('calendarSync.title')}
+					description={t('calendarSync.description')}
+					icon={IconCalendarEvent}
+					details={<p class="integration-meta">{t('calendarSync.requiresTanss')}</p>}
+					action={
+						<button type="button" class="integration-card-btn" disabled>
+							<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
+						</button>
+					}
+				/>
+			}
+		>
+			<ConfigurableSyncCard />
+		</Show>
 	)
 }

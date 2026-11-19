@@ -5,7 +5,7 @@
  * `viewBox="0 0 1 1"` stretched over it, labels and markers are positioned
  * in percent. An area links to its target's own floor plan, so plans drill
  * down site → floor → room (a target without one links to its detail page);
- * a marker links to its rack or device.
+ * a device's area and a marker link to their device or rack.
  *
  * The stage and its layers are separate pieces so the edit mode
  * (`FloorplanEditor`) can swap the view layers for editable ones on the same
@@ -41,8 +41,11 @@ import {
 } from './floorplan_objects'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import {
+	AreaLabelText,
 	areaCenter,
+	areaClasses,
 	areaName,
+	areaTitle,
 	declutter,
 	FloorplanStage,
 	type MarkerCluster,
@@ -58,15 +61,19 @@ import { createStageZoom, type StageZoom } from './zoom_viewport'
 
 /**
  * The object a deep link (`floorplanHref`) points at: a marker by its rack, device, outlet
- * port or jack, an area by its site or location. An outlet port inside a
+ * port or jack, an area by its site, location or device. An outlet port inside a
  * jack finds the jack's marker.
  */
 function linkedObject(plan: FloorplanJson, key: FloorplanLinkKey, id: number): PlanObject | null {
-	if (key === 'site' || key === 'location') {
-		const area = plan.areas.find((a: FloorplanAreaJson) =>
-			key === 'site' ? a.site_id === id : a.location_id === id,
+	if (key === 'site' || key === 'location' || key === 'device') {
+		const area = plan.areas.find(
+			(a: FloorplanAreaJson) =>
+				(key === 'site' ? a.site_id : key === 'location' ? a.location_id : a.device_id) ===
+				id,
 		)
-		return area ? { kind: 'area', id: area.id } : null
+		if (area || key !== 'device') {
+			return area ? { kind: 'area', id: area.id } : null
+		}
 	}
 	const placement = plan.placements.find((p: FloorplanPlacementJson) => {
 		switch (key) {
@@ -89,6 +96,9 @@ function linkedObject(plan: FloorplanJson, key: FloorplanLinkKey, id: number): P
 
 /** The area target's own floor plan, else its detail page. */
 function areaHref(area: FloorplanAreaJson): string {
+	if (area.device_id !== null) {
+		return `/devices/${area.device_id}`
+	}
 	if (area.target_plan_id !== null) {
 		return `/floorplans/${area.target_plan_id}`
 	}
@@ -133,6 +143,7 @@ function AreaLayer(props: {
 						<g
 							class={`floorplan-area floorplan-layer-${areaLayer(area)}`}
 							classList={{
+								...areaClasses(area),
 								selected: isSelected(area),
 								'floorplan-dimmed': dimmed(area),
 							}}
@@ -155,15 +166,22 @@ function AreaLayer(props: {
 					<a
 						href={areaHref(area)}
 						class="floorplan-area-label"
-						classList={{ selected: isSelected(area), 'floorplan-dimmed': dimmed(area) }}
+						classList={{
+							...areaClasses(area),
+							selected: isSelected(area),
+							'floorplan-dimmed': dimmed(area),
+						}}
 						style={{
 							left: percent(areaCenter(area).x),
 							top: percent(areaCenter(area).y),
 						}}
 						draggable={false}
-						aria-label={t('floorplan.openArea', { name: areaName(area) })}
+						title={areaTitle(area)}
+						aria-label={t('floorplan.openArea', {
+							name: areaTitle(area) ?? areaName(area),
+						})}
 					>
-						{areaName(area)}
+						<AreaLabelText area={area} />
 					</a>
 				)}
 			</For>

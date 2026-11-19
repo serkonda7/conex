@@ -1,0 +1,1 @@
+ALTER TABLE "object_changes" DROP COLUMN "request_id";

@@ -1,8 +1,7 @@
 import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
-import { type Context, Hono } from 'hono'
+import { Hono } from 'hono'
 import {
-	type AuditEvent,
 	CalendarMappingParamsSchema,
 	CalendarMappingSchema,
 	CalendarSyncConfigSchema,
@@ -10,7 +9,7 @@ import {
 	type CalendarTechnicianJson,
 } from 'shared/src/schemas'
 import { requestUser, requireGlobalScope } from '../authz'
-import { startCalendarSync, tanssSession } from '../calendar_sync/run'
+import { removeCalendarSync, startCalendarSync, tanssSession } from '../calendar_sync/run'
 import {
 	deleteMapping,
 	getCalendarSyncConfig,
@@ -25,19 +24,7 @@ import { ExternalServiceError } from '../db/errors'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { auditRequest } from '../util/audit'
 import { sendResult } from '../util/result_response'
-
-/** Audit entry for a successful change by the requesting user. */
-async function audit(c: Context, event: AuditEvent, target: string | null = null): Promise<void> {
-	const actor = requestUser(c)
-	await auditRequest(c, {
-		event,
-		username: actor.username,
-		user_id: actor.id,
-		target_username: target,
-	})
-}
 
 /** TANSS technicians with their mapping; mappings of vanished technicians are kept. */
 async function technicians(): Promise<Result<CalendarTechnicianJson[], Error>> {
@@ -74,7 +61,7 @@ async function technicians(): Promise<Result<CalendarTechnicianJson[], Error>> {
 /**
  * Calendar sync (TANSS appointments → Outlook): settings, technician →
  * mailbox mappings and runs. Global `integrations.manage` only: the sync
- * writes to mailboxes of the whole organisation. Changes are audited.
+ * writes to mailboxes of the whole organisation.
  */
 export const calendarSyncApp = new Hono()
 	.use(authMiddleware)
@@ -89,10 +76,14 @@ export const calendarSyncApp = new Hono()
 	.get('/config', async (c) => c.json(await getCalendarSyncConfig()))
 	.put('/config', vValidator('json', CalendarSyncConfigSchema, onValidationError), async (c) => {
 		const res = await saveCalendarSyncConfig(c.req.valid('json'))
-		if (Result.isOk(res)) {
-			await audit(c, 'calendar_sync.config_update')
-		}
 		return sendResult(c, res)
+	})
+	.delete('/config', async (c) => {
+		const res = await removeCalendarSync()
+		return sendResult(
+			c,
+			res.map(() => ({ ok: true })),
+		)
 	})
 	.post(
 		'/config/test',
@@ -116,9 +107,6 @@ export const calendarSyncApp = new Hono()
 				c.req.valid('json'),
 				requestUser(c).id,
 			)
-			if (Result.isOk(res)) {
-				await audit(c, 'calendar_sync.mapping_update', res.value.mailbox_upn)
-			}
 			return sendResult(c, res)
 		},
 	)
@@ -127,17 +115,11 @@ export const calendarSyncApp = new Hono()
 		vValidator('param', CalendarMappingParamsSchema, onValidationError),
 		async (c) => {
 			const res = await deleteMapping(c.req.valid('param').tanssEmployeeId)
-			if (Result.isOk(res)) {
-				await audit(c, 'calendar_sync.mapping_delete', res.value.mailbox_upn)
-			}
 			return sendResult(c, res)
 		},
 	)
 	.post('/run', async (c) => {
 		const res = await startCalendarSync()
-		if (Result.isOk(res)) {
-			await audit(c, 'calendar_sync.run')
-		}
 		return sendResult(c, res, 202)
 	})
 	.get('/runs', async (c) => c.json(await listRuns()))

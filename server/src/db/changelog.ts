@@ -1,13 +1,19 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Result } from 'better-result'
-import { and, desc, inArray, lte } from 'drizzle-orm'
-import type { ChangeAction, ChangeObjectType, ObjectChangeJson } from 'shared/src/schemas'
+import { and, inArray, lte } from 'drizzle-orm'
+import type {
+	ChangeAction,
+	ChangelogListQuery,
+	ChangeObjectType,
+	ObjectChangeJson,
+} from 'shared/src/schemas'
 import { object_changes } from '../schema'
 import { nowSeconds } from '../util/time'
 import { getDb } from './connection'
 import {
 	findById,
 	type ListParams,
+	orderOf,
 	type Page,
 	pageRows,
 	searchCondition,
@@ -23,7 +29,6 @@ const CHANGELOG_RETENTION_S = 365 * 24 * 60 * 60
 export interface ChangeActor {
 	user_id: number
 	username: string
-	request_id: string
 }
 
 const actorStore = new AsyncLocalStorage<ChangeActor>()
@@ -167,7 +172,6 @@ export async function logChanges(changes: Change[]): Promise<void> {
 				created_at: nowSeconds(),
 				user_id: actor?.user_id ?? null,
 				username: actor?.username ?? '',
-				request_id: actor?.request_id ?? null,
 				action,
 				object_type: objectType,
 				object_id: subject.id,
@@ -281,6 +285,8 @@ export function logDeletes<T extends Snapshot>(
 export interface ChangelogListParams extends ListParams, TenantFilterParams {
 	action?: ChangeAction[]
 	object_type?: ChangeObjectType[]
+	sort: ChangelogListQuery['sort']
+	order: 'asc' | 'desc'
 }
 
 export async function listChangelog(
@@ -292,10 +298,17 @@ export async function listChangelog(
 		params.object_type ? inArray(object_changes.object_type, params.object_type) : undefined,
 		...tenantConditions(object_changes.tenant_id, params),
 	)
+	const orderColumn = {
+		created_at: object_changes.created_at,
+		username: object_changes.username,
+		action: object_changes.action,
+		object_type: object_changes.object_type,
+		object_repr: object_changes.object_repr,
+	}[params.sort]
 	const page = await pageRows(
 		object_changes,
 		where,
-		[desc(object_changes.created_at), desc(object_changes.id)],
+		[orderOf(orderColumn, params.order), orderOf(object_changes.id, params.order)],
 		params,
 	)
 	return Result.ok(page as Page<ObjectChangeJson>)

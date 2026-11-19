@@ -21,5 +21,8 @@
   then use `t('key', { param })` / `tp('plural.key', count)`.
   Enum display values go through `client/src/i18n/labels.ts`.
 - Design decisions: read `docs/design/decisions/` before UI changes and follow
-  the accepted decisions there. Record significant new design choices as a new
-  numbered file; to reverse one, add a new decision that replaces it.
+  the accepted decisions there. Decisions exist to keep pages consistent: record
+  a new numbered file only for a convention every page must follow (e.g. button
+  order, paging), not for a one-off change to a single page or the app shell.
+  To reverse one, add a new decision that replaces it; one that turns out not
+  to be such a convention may be trimmed or deleted directly.

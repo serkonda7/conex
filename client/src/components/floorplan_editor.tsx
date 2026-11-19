@@ -5,7 +5,8 @@
  * - Area tool: drag on the stage to draw a rectangle (four points), or
  *   click corner by corner to draw a polygon (closed by clicking the first
  *   corner, a double click or Enter; Backspace drops the last corner,
- *   Escape the whole draft). Then pick its target site or location. Areas
+ *   Escape the whole draft). Then pick its target location, or
+ *   the unplaced device it outlines (a machine taking up floor space). Areas
  *   are selected by click, moved by dragging their name, reshaped with
  *   corner handles (a rectangle's neighbors follow), relabelled and deleted
  *   below the stage. Dragging an edge's midpoint handle inserts a corner
@@ -45,14 +46,18 @@ import {
 	IconArrowForwardUp,
 	IconCurrentLocation,
 	IconMagnet,
+	IconMapPin,
 	IconPencilPlus,
 	IconRulerMeasure,
 	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import type { InputEventAndTarget } from 'shared/src/types'
 import {
 	createMemo,
+	createResource,
 	createSignal,
+	createUniqueId,
 	For,
 	Index,
 	type JSX,
@@ -62,7 +67,7 @@ import {
 	Show,
 	Switch,
 } from 'solid-js'
-import { Portal } from 'solid-js/web'
+import { Dynamic, Portal } from 'solid-js/web'
 import {
 	type AttachmentJson,
 	type FloorplanAreaJson,
@@ -74,13 +79,15 @@ import {
 	fetch_floorplan_candidates,
 	put_floorplan,
 } from '../api/attachments'
-import type { LocationType } from '../api/tenancy'
-import { fetch_locations, fetch_sites } from '../api/tenancy'
+import type { LocationListRow, LocationType } from '../api/tenancy'
+import { fetch_locations } from '../api/tenancy'
 import { t, tp } from '../i18n'
+import { deviceStatusLabel, locationTypeLabel } from '../i18n/labels'
+import { locationTypeIcon } from '../lib/icons'
 import { createRows, useAction } from '../lib/resource'
 import { useLeaveGuard, usePaneVisible } from '../lib/router'
 import { tenantContextFilters } from '../lib/tenant_context'
-import { InlineError, Loading } from './feedback'
+import { Empty, InlineError, Loading } from './feedback'
 import { areaLayer, LayerBar, layerVisible, markerLayer, showLayer } from './floorplan_layers'
 import {
 	focusObject,
@@ -101,8 +108,10 @@ import {
 	toggleSnap,
 } from './floorplan_snap'
 import {
+	AreaLabelText,
 	areaCenter,
-	areaName,
+	areaClasses,
+	areaTitle,
 	FloorplanStage,
 	formatCentimeters,
 	MarkerGlyph,
@@ -115,7 +124,6 @@ import {
 import { TextField } from './form'
 import { IconLabel } from './icon_label'
 import { Modal } from './modal'
-import { ObjectSearch } from './object_selector'
 import type { StageZoom } from './zoom_viewport'
 
 type Point = [number, number]
@@ -246,7 +254,9 @@ function toPut(
 		areas: areas.map((area: FloorplanAreaJson) => ({
 			...(area.site_id !== null
 				? { site_id: area.site_id }
-				: { location_id: area.location_id ?? undefined }),
+				: area.device_id !== null
+					? { device_id: area.device_id }
+					: { location_id: area.location_id ?? undefined }),
 			label: area.label?.trim() || null,
 			points: area.points,
 		})),
@@ -281,7 +291,11 @@ function candidateKey(candidate: {
 		: `device:${candidate.device_id}`
 }
 
-type TargetKind = 'site' | 'location'
+/** The picker offers locations and devices; sites are not area targets. */
+type TargetKind = 'location' | 'device'
+
+/** Result groups, in list order: locations are the usual target of an area. */
+const TARGET_KINDS: readonly TargetKind[] = ['location', 'device']
 
 interface AreaTarget {
 	kind: TargetKind
@@ -289,81 +303,261 @@ interface AreaTarget {
 	name: string
 	/** Location type of a location target, for its layer. */
 	type: LocationType | null
+	/** Status and role icon of a device target. */
+	status: string | null
+	role_icon: FloorplanCandidateJson['role_icon']
 }
 
-interface TargetRow {
-	id: number
-	name: string
-	type?: LocationType
+/** One result row of the target picker. */
+interface TargetOption {
+	target: AreaTarget
+	/** Second line: a location's site and parents, a device's location. */
+	path: string | null
+	/** Device rows draw their marker glyph. */
+	candidate: FloorplanCandidateJson | null
 }
 
-/** Modal to pick the site or location a new area links to. */
+function kindHeading(kind: TargetKind): string {
+	return kind === 'device' ? t('floorplan.unplacedDevices') : tp(`entity.${kind}`, 2)
+}
+
+/** Type column of a row: location type or device status. */
+function optionDetail(option: TargetOption): string {
+	const target = option.target
+	if (target.kind === 'location') {
+		return target.type ? locationTypeLabel(target.type) : ''
+	}
+	return deviceStatusLabel(target.status ?? '')
+}
+
+function OptionIcon(props: { option: TargetOption }): JSX.Element {
+	return (
+		<Switch fallback={<IconMapPin size={16} />}>
+			<Match when={props.option.candidate}>
+				{(candidate: () => FloorplanCandidateJson) => (
+					<MarkerGlyph placement={candidate()} size={16} />
+				)}
+			</Match>
+			<Match when={props.option.target.type}>
+				{(type: () => LocationType) => (
+					<Dynamic component={locationTypeIcon(type())} size={16} />
+				)}
+			</Match>
+		</Switch>
+	)
+}
+
+/**
+ * Modal to pick the location a new area links to, or the device it
+ * outlines: one of the plan's unplaced device candidates. One search covers
+ * both, grouped by kind. Arrow keys move through the results, Enter picks.
+ */
 function AreaTargetPicker(props: {
 	attachment: AttachmentJson
 	areas: FloorplanAreaJson[]
+	/** Devices neither placed nor outlined on the draft. */
+	devices: FloorplanCandidateJson[]
 	on_select: (target: AreaTarget) => void
 	on_close: () => void
 }): JSX.Element {
-	const [kind, setKind] = createSignal<TargetKind>('site')
-	/** Not offered: the plan's owner and the targets of existing areas. */
-	const taken = (id: number, kindOf: TargetKind): boolean =>
-		(kindOf === 'site' ? props.attachment.site_id : props.attachment.location_id) === id ||
-		props.areas.some(
-			(area: FloorplanAreaJson) =>
-				(kindOf === 'site' ? area.site_id : area.location_id) === id,
-		)
+	const [search, setSearch] = createSignal('')
+	const [active, setActive] = createSignal(0)
 
-	const load = async (search: string): Promise<Result<TargetRow[], Error>> => {
-		const filters = { search, ...tenantContextFilters() }
-		const res: Result<{ items: TargetRow[] }, Error> =
-			kind() === 'site' ? await fetch_sites(filters) : await fetch_locations(filters)
-		if (Result.isError(res)) {
-			return Result.err(res.error)
+	/** Not offered: the plan's owner and the targets of areas already on the plan. */
+	const offered = (id: number): boolean =>
+		props.attachment.location_id !== id &&
+		!props.areas.some((area: FloorplanAreaJson) => area.location_id === id)
+
+	const [remote] = createResource(search, async (value: string) => {
+		const locations = await fetch_locations({ search: value, ...tenantContextFilters() })
+		if (Result.isError(locations)) {
+			return Result.err(locations.error)
 		}
-		return Result.ok(res.value.items.filter((row: { id: number }) => !taken(row.id, kind())))
+		const options: TargetOption[] = locations.value.items
+			.filter((row: LocationListRow) => offered(row.id))
+			.map((row: LocationListRow) => ({
+				target: {
+					kind: 'location' as const,
+					id: row.id,
+					name: row.name,
+					type: row.type,
+					status: null,
+					role_icon: null,
+				},
+				path: [row.site_name, ...row.path].join(' › '),
+				candidate: null,
+			}))
+		return Result.ok(options)
+	})
+
+	const devices = createMemo((): TargetOption[] => {
+		const needle = search().trim().toLowerCase()
+		return props.devices
+			.filter((device: FloorplanCandidateJson) => device.name.toLowerCase().includes(needle))
+			.map((device: FloorplanCandidateJson) => ({
+				target: {
+					kind: 'device' as const,
+					id: device.device_id ?? 0,
+					name: device.name,
+					type: null,
+					status: device.status,
+					role_icon: device.role_icon,
+				},
+				path: device.location_name ?? t('floorplan.noLocation'),
+				candidate: device,
+			}))
+	})
+
+	const loadError = (): string | null => {
+		const res = remote.latest
+		return res && Result.isError(res) ? res.error.message : null
+	}
+	const loaded = (): TargetOption[] => {
+		const res = remote.latest
+		return [...(res && Result.isOk(res) ? res.value : []), ...devices()]
+	}
+	const groups = createMemo((): { kind: TargetKind; options: TargetOption[] }[] =>
+		TARGET_KINDS.map((kind: TargetKind) => ({
+			kind,
+			options: loaded().filter((option: TargetOption) => option.target.kind === kind),
+		})).filter((group: { options: TargetOption[] }) => group.options.length > 0),
+	)
+	/** Rows in display order, for the arrow keys. */
+	const ordered = createMemo((): TargetOption[] =>
+		groups().flatMap((group: { options: TargetOption[] }) => group.options),
+	)
+
+	const listId = createUniqueId()
+	const optionId = (index: number): string => `${listId}-${index}`
+
+	/** Moves the highlight by `step`, wrapping around like the `Combobox`. */
+	function move(step: number): void {
+		const count = ordered().length
+		if (count === 0) {
+			return
+		}
+		setActive((active() + step + count) % count)
+		document
+			.querySelector(`#${CSS.escape(optionId(active()))}`)
+			?.scrollIntoView({ block: 'nearest' })
+	}
+
+	/**
+	 * Keys of the `Combobox`: arrows move the highlight, Enter and Tab pick
+	 * it (Tab with nothing to pick moves focus on as usual).
+	 */
+	function onKeyDown(e: KeyboardEvent): void {
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault()
+			move(e.key === 'ArrowDown' ? 1 : -1)
+			return
+		}
+		const option = ordered()[active()]
+		if ((e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) && option) {
+			e.preventDefault()
+			props.on_select(option.target)
+		}
 	}
 
 	return (
 		<Modal
 			title={t('floorplan.selectTarget')}
-			class="object-selector"
+			class="object-selector floorplan-target-picker"
 			on_close={props.on_close}
 		>
-			<div class="floorplan-kinds">
-				<For each={['site', 'location'] as const}>
-					{(option: TargetKind) => (
-						<button
-							type="button"
-							aria-pressed={kind() === option}
-							classList={{ active: kind() === option }}
-							onClick={() => setKind(option)}
-						>
-							{tp(`entity.${option}`, 1)}
-						</button>
-					)}
-				</For>
+			<input
+				// `autofocus` only fires on page load, not for inputs mounted later.
+				ref={(el: HTMLInputElement): void => queueMicrotask(() => el.focus())}
+				class="object-selector-search"
+				role="combobox"
+				aria-autocomplete="list"
+				aria-expanded="true"
+				aria-controls={listId}
+				aria-activedescendant={ordered().length > 0 ? optionId(active()) : undefined}
+				autocomplete="off"
+				placeholder={t('floorplan.targetSearch')}
+				aria-label={t('floorplan.targetSearch')}
+				value={search()}
+				onInput={(e: InputEventAndTarget) => {
+					setSearch(e.currentTarget.value)
+					setActive(0)
+				}}
+				onKeyDown={onKeyDown}
+			/>
+			<div
+				class="floorplan-targets"
+				id={listId}
+				role="listbox"
+				aria-label={t('floorplan.selectTarget')}
+			>
+				<Show
+					when={!remote.loading || remote.latest}
+					fallback={<Loading message={t('common.loading')} />}
+				>
+					<InlineError message={loadError()} />
+					<Show
+						when={groups().length > 0}
+						fallback={<Empty message={t('common.noMatchingObjects')} />}
+					>
+						<For each={groups()}>
+							{(group: { kind: TargetKind; options: TargetOption[] }) => (
+								<section>
+									<h3>{kindHeading(group.kind)}</h3>
+									<ul role="none">
+										<For each={group.options}>
+											{(option: TargetOption) => (
+												<li role="none">
+													<button
+														type="button"
+														tabIndex={-1}
+														id={optionId(ordered().indexOf(option))}
+														role="option"
+														aria-selected={
+															ordered()[active()] === option
+														}
+														class="floorplan-target"
+														classList={{
+															active: ordered()[active()] === option,
+														}}
+														// pointerdown keeps focus in the search input.
+														onPointerDown={(e: PointerEvent) =>
+															e.preventDefault()
+														}
+														onClick={() =>
+															props.on_select(option.target)
+														}
+														onPointerMove={() => {
+															const at = ordered().indexOf(option)
+															if (at >= 0) {
+																setActive(at)
+															}
+														}}
+													>
+														<span class="floorplan-target-icon">
+															<OptionIcon option={option} />
+														</span>
+														<span class="floorplan-target-text">
+															<span>{option.target.name}</span>
+															<Show when={option.path}>
+																{(path: () => string) => (
+																	<small>{path()}</small>
+																)}
+															</Show>
+														</span>
+														<small class="floorplan-target-detail">
+															{optionDetail(option)}
+														</small>
+													</button>
+												</li>
+											)}
+										</For>
+									</ul>
+								</section>
+							)}
+						</For>
+					</Show>
+				</Show>
 			</div>
-			{/* Keyed on the kind so the search restarts with the other list. */}
-			<Switch>
-				<For each={['site', 'location'] as const}>
-					{(option: TargetKind) => (
-						<Match when={kind() === option}>
-							<ObjectSearch
-								load={load}
-								get_label={(row: { name: string }) => row.name}
-								on_select={(row: TargetRow) =>
-									props.on_select({
-										kind: option,
-										id: row.id,
-										name: row.name,
-										type: row.type ?? null,
-									})
-								}
-							/>
-						</Match>
-					)}
-				</For>
-			</Switch>
 		</Modal>
 	)
 }
@@ -628,11 +822,22 @@ export function FloorplanEditor(props: {
 		() => JSON.stringify(toPut(areas(), placements(), planScale(), planOrigin())) !== initial,
 	)
 
+	/** Candidates on the draft: placed as markers, or devices outlined by an area. */
 	const placed = createMemo(
 		() =>
-			new Set(
-				placements().map((placement: FloorplanPlacementJson) => candidateKey(placement)),
-			),
+			new Set([
+				...placements().map((placement: FloorplanPlacementJson) => candidateKey(placement)),
+				...areas().flatMap((area: FloorplanAreaJson) =>
+					area.device_id === null ? [] : [`device:${area.device_id}`],
+				),
+			]),
+	)
+	/** Devices the area picker offers: candidates not yet on the draft. */
+	const freeDevices = createMemo(() =>
+		(candidates() ?? []).filter(
+			(item: FloorplanCandidateJson) =>
+				item.device_id !== null && !placed().has(candidateKey(item)),
+		),
 	)
 	const selectedKeys = createMemo(() => new Set(selection().map(objectKey)))
 	const isSelected = (object: PlanObject): boolean => selectedKeys().has(objectKey(object))
@@ -1212,26 +1417,22 @@ export function FloorplanEditor(props: {
 			return
 		}
 		const id = nextId--
+		const area: FloorplanAreaJson = {
+			id,
+			site_id: null,
+			location_id: target.kind === 'location' ? target.id : null,
+			device_id: target.kind === 'device' ? target.id : null,
+			label: null,
+			points,
+			target_name: target.name,
+			target_type: target.type,
+			target_plan_id: null,
+			status: target.status,
+			role_icon: target.role_icon,
+		}
 		checkpoint()
-		setAreas((all: FloorplanAreaJson[]) => [
-			...all,
-			{
-				id,
-				site_id: target.kind === 'site' ? target.id : null,
-				location_id: target.kind === 'location' ? target.id : null,
-				label: null,
-				points,
-				target_name: target.name,
-				target_type: target.type,
-				target_plan_id: null,
-			},
-		])
-		showLayer(
-			areaLayer({
-				site_id: target.kind === 'site' ? target.id : null,
-				target_type: target.type,
-			}),
-		)
+		setAreas((all: FloorplanAreaJson[]) => [...all, area])
+		showLayer(areaLayer(area))
 		selectOnly({ kind: 'area', id })
 	}
 
@@ -1536,6 +1737,7 @@ export function FloorplanEditor(props: {
 									<g
 										class={`floorplan-area floorplan-area-editing floorplan-layer-${areaLayer(area)}`}
 										classList={{
+											...areaClasses(area),
 											selected: isSelected({ kind: 'area', id: area.id }),
 											'floorplan-dimmed': dimmed({
 												kind: 'area',
@@ -1592,6 +1794,7 @@ export function FloorplanEditor(props: {
 								<span
 									class="floorplan-area-label floorplan-area-label-handle"
 									classList={{
+										...areaClasses(area),
 										selected: isSelected({ kind: 'area', id: area.id }),
 										'floorplan-dimmed': dimmed({ kind: 'area', id: area.id }),
 									}}
@@ -1600,8 +1803,9 @@ export function FloorplanEditor(props: {
 										left: percent(areaCenter(area).x),
 										top: percent(areaCenter(area).y),
 									}}
+									title={areaTitle(area)}
 								>
-									{areaName(area)}
+									<AreaLabelText area={area} />
 								</span>
 							)}
 						</For>
@@ -2040,6 +2244,7 @@ export function FloorplanEditor(props: {
 				<AreaTargetPicker
 					attachment={props.attachment}
 					areas={areas()}
+					devices={freeDevices()}
 					on_select={addArea}
 					on_close={closePicker}
 				/>

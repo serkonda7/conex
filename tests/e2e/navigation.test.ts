@@ -48,7 +48,7 @@ test('cancelling device add from the navbar returns to the device detail', async
 
 	// The header and context popover also fit narrow phones without wrapping controls.
 	await page.setViewportSize({ width: 320, height: 640 })
-	const context = page.getByRole('button', { name: /^Mandantenkontext:/ })
+	const context = page.getByRole('button', { name: /^Firmenkontext:/ })
 	await context.click()
 	const popover = await page.locator('.app-tenant-context-popover').boundingBox()
 	expect(popover).not.toBeNull()

@@ -1,14 +1,17 @@
-# Example server config. Copy to `data/config.toml` (gitignored) for manual setup:
+# Example server config. Copy to `data/config.toml`:
 #   cp server/config.example.toml server/data/config.toml
-# Local `bun run dev` auto-creates `data/config.toml` with a random appKey
-# on first start, so this file is only needed as a reference / for production.
 
 [auth]
-# Minimum 32 chars. Generate one with: openssl rand -hex 48
+secureCookies = false   # plain-HTTP local dev; keep true behind HTTPS
+# >= 32 chars. Generate with: openssl rand -hex 48
 appKey = "REPLACE-ME-with-at-least-32-chars-long-random-secret"
-secureCookies = false # plain-HTTP local dev; keep true behind HTTPS
 
 [storage]
-# Image attachments (site/location photos, floor plans). Relative to the data
-# dir, or absolute. Back it up together with the database.
+# Directory for image attachments. Absolute or relative to data dir.
+# Must be included in backups.
 attachmentsDir = "attachments"
+
+[integrations]
+# Safety switch for every outbound integration request (TANSS, Microsoft Graph).
+# Override with CONEX_INTEGRATIONS_MODE.
+mode = "live"   # live | offline

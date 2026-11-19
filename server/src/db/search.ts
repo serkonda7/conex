@@ -1,7 +1,6 @@
-import { and, asc, type SQL } from 'drizzle-orm'
+import { and, asc, eq, type SQL } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
-import { cables, devices, racks, sites, tenants, virtual_machines } from '../schema'
-import { cableInTenants } from './cables'
+import { devices, racks, sites, tenants, virtual_machines } from '../schema'
 import { getDb } from './connection'
 import { scopeCondition, searchCondition } from './list'
 
@@ -10,14 +9,20 @@ interface SearchGroup<T> {
 	total: number
 }
 
+/** A hit that belongs to a tenant; `tenant_name` is null for shared rows. */
+interface TenantHit {
+	id: number
+	name: string
+	tenant_name: string | null
+}
+
 export interface GlobalSearchResponse {
 	q: string
 	tenants: SearchGroup<{ id: number; name: string }>
-	sites: SearchGroup<{ id: number; name: string }>
-	racks: SearchGroup<{ id: number; name: string }>
-	devices: SearchGroup<{ id: number; name: string; asset_tag: string | null }>
-	virtual_machines: SearchGroup<{ id: number; name: string }>
-	cables: SearchGroup<{ id: number; label: string | null; kind: string | null }>
+	sites: SearchGroup<TenantHit>
+	racks: SearchGroup<TenantHit>
+	devices: SearchGroup<TenantHit & { asset_tag: string | null }>
+	virtual_machines: SearchGroup<TenantHit>
 }
 
 const GROUP_LIMIT = 10
@@ -27,16 +32,15 @@ function groupOf<T>(items: T[]): SearchGroup<T> {
 }
 
 /**
- * Cross-entity substring search over name/asset_tag/label columns.
+ * Cross-entity substring search over name/asset_tag/serial columns, backing
+ * the client's command palette. Only entities with a detail page are searched.
  * Tenants are documentation labels only, so one flat query spans every
  * group — no row-level isolation applies. Each group caps at 10 hits;
  * an empty query returns empty groups instead of the whole inventory.
  *
  * `scopeTenantIds` limits scoped editors/viewers to their tenants, strictly:
- * the tenants group returns only the scope tenants, the sites/racks/devices/VMs
- * groups return scope rows only (shared `NULL` rows excluded), and the
- * cables group returns only cables whose both endpoint devices sit in the
- * scope (so no peer name from another tenant leaks).
+ * the tenants group returns only the scope tenants, the other groups return
+ * scope rows only (shared `NULL` rows excluded).
  */
 export async function globalSearch(
 	q: string,
@@ -51,14 +55,13 @@ export async function globalSearch(
 			racks: groupOf([]),
 			devices: groupOf([]),
 			virtual_machines: groupOf([]),
-			cables: groupOf([]),
 		}
 	}
 	const db = getDb()
 	const inScope = (column: PgColumn): SQL | undefined => scopeCondition(column, scopeTenantIds)
 
 	// Independent groups: run them concurrently.
-	const [tenantRows, siteRows, rackRows, deviceRows, vmRows, cableRows] = await Promise.all([
+	const [tenantRows, siteRows, rackRows, deviceRows, vmRows] = await Promise.all([
 		db
 			.select({ id: tenants.id, name: tenants.name })
 			.from(tenants)
@@ -71,20 +74,28 @@ export async function globalSearch(
 			.orderBy(asc(tenants.name), asc(tenants.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: sites.id, name: sites.name })
+			.select({ id: sites.id, name: sites.name, tenant_name: tenants.name })
 			.from(sites)
+			.leftJoin(tenants, eq(tenants.id, sites.tenant_id))
 			.where(and(searchCondition(query, [sites.name]), inScope(sites.tenant_id)))
 			.orderBy(asc(sites.name), asc(sites.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: racks.id, name: racks.name })
+			.select({ id: racks.id, name: racks.name, tenant_name: tenants.name })
 			.from(racks)
+			.leftJoin(tenants, eq(tenants.id, racks.tenant_id))
 			.where(and(searchCondition(query, [racks.name]), inScope(racks.tenant_id)))
 			.orderBy(asc(racks.name), asc(racks.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: devices.id, name: devices.name, asset_tag: devices.asset_tag })
+			.select({
+				id: devices.id,
+				name: devices.name,
+				asset_tag: devices.asset_tag,
+				tenant_name: tenants.name,
+			})
 			.from(devices)
+			.leftJoin(tenants, eq(tenants.id, devices.tenant_id))
 			.where(
 				and(
 					searchCondition(query, [
@@ -99,8 +110,13 @@ export async function globalSearch(
 			.orderBy(asc(devices.name), asc(devices.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: virtual_machines.id, name: virtual_machines.name })
+			.select({
+				id: virtual_machines.id,
+				name: virtual_machines.name,
+				tenant_name: tenants.name,
+			})
 			.from(virtual_machines)
+			.leftJoin(tenants, eq(tenants.id, virtual_machines.tenant_id))
 			.where(
 				and(
 					searchCondition(query, [virtual_machines.name]),
@@ -108,17 +124,6 @@ export async function globalSearch(
 				),
 			)
 			.orderBy(asc(virtual_machines.name), asc(virtual_machines.id))
-			.limit(GROUP_LIMIT),
-		db
-			.select({ id: cables.id, label: cables.label, kind: cables.kind })
-			.from(cables)
-			.where(
-				and(
-					searchCondition(query, [cables.label, cables.kind]),
-					scopeTenantIds === undefined ? undefined : cableInTenants(scopeTenantIds),
-				),
-			)
-			.orderBy(asc(cables.id))
 			.limit(GROUP_LIMIT),
 	])
 
@@ -129,6 +134,5 @@ export async function globalSearch(
 		racks: groupOf(rackRows),
 		devices: groupOf(deviceRows),
 		virtual_machines: groupOf(vmRows),
-		cables: groupOf(cableRows),
 	}
 }

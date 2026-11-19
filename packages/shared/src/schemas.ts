@@ -1954,31 +1954,30 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 /**
  * `password.change`: a user changed their own password. `password.reset`: a
  * user manager set another account's password (`target_username`).
- * `calendar_sync.*`: changes to the TANSS → Outlook calendar sync; mapping
- * events carry the mailbox in `target_username`.
  */
 export const AUDIT_EVENTS = [
 	'login.success',
 	'login.failure',
 	'password.change',
 	'password.reset',
-	'calendar_sync.config_update',
-	'calendar_sync.mapping_update',
-	'calendar_sync.mapping_delete',
-	'calendar_sync.run',
 ] as const
 
 export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
 
 export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
 
-/** `search` matches username, target username, peer IP or forwarded-for; newest entries first. */
+/** `search` matches username, target username, peer IP or forwarded-for. Defaults to newest first. */
 export const AuditLogListQuerySchema = v.object({
 	...ListQueryEntries,
 	event: v.optional(
 		v.pipe(CsvListSchema, v.array(AuditEventSchema), v.transform(emptyAsUndefined)),
 		undefined,
 	),
+	sort: v.optional(
+		v.picklist(['created_at', 'event', 'username', 'target_username', 'ip', 'user_agent']),
+		'created_at',
+	),
+	order: v.optional(v.picklist(['asc', 'desc']), 'desc'),
 })
 
 export type AuditLogListQuery = v.InferOutput<typeof AuditLogListQuerySchema>
@@ -2094,11 +2093,15 @@ const FloorplanCoordSchema = v.pipe(
 /** `[x, y]` pair of normalized coordinates. */
 export type FloorplanPoint = [number, number]
 
-/** Area linking to one site or location: a polygon of at least three points. */
+/**
+ * Area linking to one site or location, or outlining one device (a machine
+ * that takes up floor space): a polygon of at least three points.
+ */
 const FloorplanAreaInputSchema = v.pipe(
 	v.strictObject({
 		site_id: v.optional(IdSchema, undefined),
 		location_id: v.optional(IdSchema, undefined),
+		device_id: v.optional(IdSchema, undefined),
 		/** Shown instead of the target's name; empty or missing shows the name. */
 		label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
 		points: v.pipe(
@@ -2108,8 +2111,8 @@ const FloorplanAreaInputSchema = v.pipe(
 		),
 	}),
 	v.check(
-		(area) => hasOneOwner(area.site_id, area.location_id),
-		'Exactly one of site or location is required as the area target',
+		(area) => hasOneOwner(area.site_id, area.location_id, area.device_id),
+		'Exactly one of site, location or device is required as the area target',
 	),
 )
 
@@ -2179,17 +2182,22 @@ export type FloorplanPut = v.InferOutput<typeof FloorplanPutSchema>
 /** Area on the wire, with its target resolved for display and linking. */
 export interface FloorplanAreaJson {
 	id: number
-	/** Target: exactly one of `site_id` / `location_id` is set. */
+	/** Target: exactly one of `site_id` / `location_id` / `device_id` is set. */
 	site_id: number | null
 	location_id: number | null
+	device_id: number | null
 	/** Custom label; `null` shows `target_name`. */
 	label: string | null
 	points: FloorplanPoint[]
 	target_name: string
-	/** Location type of a location target; `null` for a site. */
+	/** Location type of a location target; `null` for a site or device. */
 	target_type: LocationType | null
-	/** Floor plan (attachment) of the target, if it has one marked. */
+	/** Floor plan (attachment) of a site or location target, if it has one marked. */
 	target_plan_id: number | null
+	/** Status of a device target; `null` for a site or location. */
+	status: string | null
+	/** Icon of a device target's role; `null` otherwise or for a role without one. */
+	role_icon: DeviceRoleIcon | null
 }
 
 /** One rear port of an outlet. */
@@ -2270,7 +2278,7 @@ export interface FloorplanImpactJson {
 	areas: number
 	/** Markers on the deleted object's own floor plan. */
 	placements: number
-	/** Areas on other floor plans that link to the deleted object. */
+	/** Areas on floor plans that link to (or outline) the deleted object. */
 	linkedFrom: number
 }
 
@@ -2282,8 +2290,9 @@ export interface FloorplanImpactErrorJson {
 
 /**
  * `GET /attachments/floorplan-links?site=|location=|rack=|device=`: plans
- * that place the rack or device, or that have an area linking to the site
- * or location. Plans whose owner the requester cannot see are left out.
+ * that place the rack or device (as a marker, or a device as an area), or
+ * that have an area linking to the site or location. Plans whose owner the
+ * requester cannot see are left out.
  */
 export const FloorplanLinksQuerySchema = v.pipe(
 	v.object({
@@ -2434,7 +2443,7 @@ export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)
 
 export type ChangeObjectType = v.InferOutput<typeof ChangeObjectTypeSchema>
 
-/** `search` matches the object name or the username; newest changes first. */
+/** `search` matches the object name or the username. Defaults to newest first. */
 export const ChangelogListQuerySchema = v.object({
 	...ListQueryEntries,
 	action: v.optional(
@@ -2447,6 +2456,11 @@ export const ChangelogListQuerySchema = v.object({
 	),
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
+	sort: v.optional(
+		v.picklist(['created_at', 'username', 'action', 'object_type', 'object_repr']),
+		'created_at',
+	),
+	order: v.optional(v.picklist(['asc', 'desc']), 'desc'),
 })
 
 export type ChangelogListQuery = v.InferOutput<typeof ChangelogListQuerySchema>
@@ -2459,8 +2473,6 @@ export interface ObjectChangeJson {
 	user_id: number | null
 	/** Name at the time of the change; empty for system changes. */
 	username: string
-	/** Shared by every change one request made. */
-	request_id: string | null
 	action: ChangeAction
 	object_type: ChangeObjectType
 	object_id: number

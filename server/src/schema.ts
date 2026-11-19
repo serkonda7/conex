@@ -981,8 +981,10 @@ export const attachments = pgTable(
 )
 
 // Area on a floor plan linking to another site or location (each target at
-// most once per plan). `points` is a polygon of at least three `[x, y]`
-// pairs; `label` NULL shows the target's name.
+// most once per plan), or outlining a device (a machine) that takes up floor
+// space. A device lies on at most one plan, as an area or a marker. `points`
+// is a polygon of at least three `[x, y]` pairs; `label` NULL shows the
+// target's name.
 export const floorplan_areas = pgTable(
 	'floorplan_areas',
 	{
@@ -994,13 +996,16 @@ export const floorplan_areas = pgTable(
 		location_id: integer('location_id').references(() => locations.id, {
 			onDelete: 'cascade',
 		}),
+		device_id: integer('device_id')
+			.unique()
+			.references(() => devices.id, { onDelete: 'cascade' }),
 		label: text('label'),
 		points: jsonb('points').$type<[number, number][]>().notNull(),
 	},
 	(table) => [
 		check(
 			'floorplan_areas_target_check',
-			sql`(${table.site_id} IS NULL) <> (${table.location_id} IS NULL)`,
+			sql`num_nonnulls(${table.site_id}, ${table.location_id}, ${table.device_id}) = 1`,
 		),
 		uniqueIndex('floorplan_areas_site_idx').on(table.attachment_id, table.site_id),
 		uniqueIndex('floorplan_areas_location_idx').on(table.attachment_id, table.location_id),
@@ -1160,11 +1165,10 @@ export const sync_runs = pgTable(
 // `ChangeActionSchema`); `object_id` is polymorphic (no FK) and the
 // snapshots outlive the object. `username` keeps the actor's name so the
 // row stays readable after the user is deleted; both are empty/NULL for
-// changes made without a signed-in user. `request_id` groups the changes
-// of one request. `tenant_id` is the tenant the object belonged to (after
-// the change, or before a delete) and decides which tenant-scoped users see
-// the row; NULL for catalog data and cables spanning tenants. No FK: a
-// tenant's own delete is recorded after the row is gone.
+// changes made without a signed-in user. `tenant_id` is the tenant the object
+// belonged to (after the change, or before a delete) and decides which
+// tenant-scoped users see the row; NULL for catalog data and cables spanning
+// tenants. No FK: a tenant's own delete is recorded after the row is gone.
 // ---------------------------------------------------------------------------
 
 export const object_changes = pgTable(
@@ -1174,7 +1178,6 @@ export const object_changes = pgTable(
 		created_at: bigint('created_at', { mode: 'number' }).notNull(),
 		user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
 		username: text('username').notNull(),
-		request_id: text('request_id'),
 		action: text('action').notNull(),
 		object_type: text('object_type').notNull(),
 		object_id: integer('object_id').notNull(),

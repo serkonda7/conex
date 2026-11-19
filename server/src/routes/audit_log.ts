@@ -20,6 +20,8 @@ export const auditLogApp = new Hono()
 				page: query.page,
 				limit: query.limit,
 				event: query.event,
+				sort: query.sort,
+				order: query.order,
 			}),
 		)
 	})

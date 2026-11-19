@@ -112,17 +112,14 @@ const FloorplansPage = lazyPage(() =>
 const IntegrationAddPage = lazyPage(() =>
 	import('../pages/integrations/add').then((m) => m.IntegrationAddPage),
 )
-const CalendarSyncTechniciansPage = lazyPage(() =>
-	import('../pages/integrations/calendar_sync').then((m) => m.CalendarSyncTechniciansPage),
+const CalendarSyncDetailPage = lazyPage(() =>
+	import('../pages/integrations/calendar_sync').then((m) => m.CalendarSyncDetailPage),
 )
-const IntegrationEditPage = lazyPage(() =>
-	import('../pages/integrations/edit').then((m) => m.IntegrationEditPage),
+const IntegrationDetailPage = lazyPage(() =>
+	import('../pages/integrations/detail').then((m) => m.IntegrationDetailPage),
 )
 const IntegrationsPage = lazyPage(() =>
 	import('../pages/integrations/list').then((m) => m.IntegrationsPage),
-)
-const IntegrationReportPage = lazyPage(() =>
-	import('../pages/integrations/report').then((m) => m.IntegrationReportPage),
 )
 const LocationAddPage = lazyPage(() =>
 	import('../pages/locations/add').then((m) => m.LocationAddPage),
@@ -480,17 +477,17 @@ export const SECTIONS: readonly Section[] = [
 		hideAddInNav: true,
 		list: IntegrationsPage,
 		add: IntegrationAddPage,
-		detail: IntegrationReportPage,
-		edit: IntegrationEditPage,
+		// Settings are a tab of the detail page (design decision 0006): no edit route.
+		detail: IntegrationDetailPage,
 	},
 	{
-		// Technician mapping of the calendar sync, linked from its card.
+		// Detail page of the calendar sync (no id: there is only one), opened from its card.
 		path: 'integrations/calendar-sync',
 		parent: 'integrations',
-		noun: (): string => t('calendarSync.techniciansTitle'),
+		noun: (): string => t('calendarSync.title'),
 		permission: 'integrations.manage',
 		hideInNav: true,
-		list: CalendarSyncTechniciansPage,
+		list: CalendarSyncDetailPage,
 	},
 	{
 		// Reached from the top-bar ticket button.

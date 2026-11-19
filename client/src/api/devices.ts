@@ -13,6 +13,7 @@ import type {
 	InterfaceJson,
 } from 'server/src/db/devices'
 import type {
+	DeleteQuery,
 	DeviceCreate,
 	DeviceListQuery,
 	DeviceServiceJson,
@@ -139,8 +140,15 @@ export async function update_device(
 	return to_result<DeviceRow>(res, failed.update('noun.device'))
 }
 
-export async function delete_device(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.devices[':id'].$delete(by_id(id))
+/** `opts.confirm` also deletes the device's floor-plan area (see `FloorplanImpactError`). */
+export async function delete_device(
+	id: number,
+	opts?: DeleteQuery,
+): Promise<Result<unknown, Error>> {
+	const res = await client.devices[':id'].$delete({
+		...by_id(id),
+		query: to_query({ confirm: opts?.confirm }),
+	})
 	return to_result<unknown>(res, failed.delete('noun.device'))
 }
 

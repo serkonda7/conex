@@ -41,6 +41,7 @@ import {
 	devices,
 	employees,
 	external_links,
+	floorplan_areas,
 	floorplan_placements,
 	interfaces,
 	locations,
@@ -55,7 +56,7 @@ import {
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { isOutOfSync } from '../services/template_sync'
 import { expandStub, expandStubs } from '../services/templates'
-import { prunePlacements } from './attachments'
+import { checkFloorplanDelete, prunePlacements } from './attachments'
 import { cableEnds, deviceHasCables } from './cables'
 import { logCreate, logDelete, logUpdate, logUpdates } from './changelog'
 import { type DbHandle, getDb, withTransaction } from './connection'
@@ -570,8 +571,10 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 				)
 	const hosts = alias(devices, 'host')
 	const scope = params.scopeTenantIds
-	// The plan a device is placed on (at most one) and its owner; a plan
-	// whose owner lies outside the scope is left out, as in `listFloorplanLinks`.
+	// The plan a device is placed on (at most one, as a marker or an area)
+	// and its owner; a plan whose owner lies outside the scope is left out,
+	// as in `listFloorplanLinks`.
+	const deviceArea = alias(floorplan_areas, 'device_area')
 	const planSites = alias(sites, 'plan_site')
 	const planLocations = alias(locations, 'plan_location')
 	const planVisible = and(
@@ -644,7 +647,14 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 		.leftJoin(sites, eq(sites.id, devices.site_id))
 		.leftJoin(locations, eq(locations.id, devices.location_id))
 		.leftJoin(floorplan_placements, eq(floorplan_placements.device_id, devices.id))
-		.leftJoin(attachments, eq(attachments.id, floorplan_placements.attachment_id))
+		.leftJoin(deviceArea, eq(deviceArea.device_id, devices.id))
+		.leftJoin(
+			attachments,
+			eq(
+				attachments.id,
+				sql`coalesce(${floorplan_placements.attachment_id}, ${deviceArea.attachment_id})`,
+			),
+		)
 		.leftJoin(planSites, eq(planSites.id, attachments.site_id))
 		.leftJoin(planLocations, eq(planLocations.id, attachments.location_id))
 		.where(deviceWhere)
@@ -1312,7 +1322,11 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 	return await logUpdate('device', node, await getDevice(id))
 }
 
-export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>> {
+/** An area outlining the device on a floor plan needs `confirmFloorplan`. */
+export async function deleteDevice(
+	id: number,
+	confirmFloorplan = false,
+): Promise<Result<DeviceRow, Error>> {
 	const current = await getDevice(id)
 	if (Result.isError(current)) {
 		return current
@@ -1328,6 +1342,10 @@ export async function deleteDevice(id: number): Promise<Result<DeviceRow, Error>
 		return Result.err(
 			new ConflictError('Device still hosts virtual machines; move or delete them first'),
 		)
+	}
+	const floorplan = await checkFloorplanDelete({ device_id: id }, confirmFloorplan)
+	if (Result.isError(floorplan)) {
+		return floorplan
 	}
 	const deleted = await tryWrite(() =>
 		getDb().transaction(async (tx) => {

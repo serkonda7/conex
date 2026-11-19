@@ -86,10 +86,6 @@ export function ChangeDetailPage(props: { id: number }): JSX.Element {
 								<dd>
 									<ChangedObjectLink change={c()} />
 								</dd>
-								<dt>{t('changelog.requestId')}</dt>
-								<dd>
-									<code>{c().request_id ?? '—'}</code>
-								</dd>
 							</DetailCard>
 
 							<section aria-label={t('changelog.difference')}>

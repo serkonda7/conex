@@ -7,7 +7,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 
-/** Global search across tenants/sites/racks/devices/cables (grouped hits). */
+/** Global search across tenants/sites/racks/devices/VMs (grouped hits). */
 export const searchApp = new Hono()
 	.use(authMiddleware)
 	.use(requirePermissionMiddleware('view'))
