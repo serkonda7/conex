@@ -1,7 +1,6 @@
 import {
 	IconLayoutGrid,
 	IconList,
-	IconPencil,
 	IconPlugConnected,
 	IconPlus,
 	IconRefresh,
@@ -13,7 +12,6 @@ import { createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_calendar_sync_config } from '../../api/calendar_sync'
 import {
-	delete_integration,
 	fetch_integrations,
 	type IntegrationJson,
 	type IntegrationProvider,
@@ -22,14 +20,13 @@ import {
 } from '../../api/integrations'
 import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
-import { RowMenu, type RowMenuAction, useRowMenu } from '../../components/list_page'
-import { MoreActionsButton } from '../../components/more_actions_button'
 import { t, tp } from '../../i18n'
 import { providerDescription, providerLabel } from '../../i18n/labels'
-import { createRecord, createRows, useAction } from '../../lib/resource'
+import { createRecord, createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { CalendarSyncCard, calendarNeedsAttention } from './calendar_sync'
+import { settingsHref } from './detail_parts'
 import {
 	IntegrationCard,
 	type IntegrationLayout,
@@ -60,61 +57,17 @@ function needsAttention(integration: IntegrationJson): boolean {
 	)
 }
 
-/** Edit / force full sync / delete behind the ⋯ button of a configured provider. */
-function ProviderMenu(props: {
-	integration: IntegrationJson
-	busy: boolean
-	onSync: (clean: boolean) => void
-	onDelete: () => void
-}): JSX.Element {
-	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
-	const name = (): string => providerLabel(props.integration.provider)
-	const actions = (): RowMenuAction[] => [
-		{
-			label: t('common.edit'),
-			icon: IconPencil,
-			onSelect: (): void => navigate(`/integrations/${props.integration.id}/edit`),
-		},
-		...(canGlobal('integrations.manage') && props.integration.enabled && !props.busy
-			? [
-					{
-						label: t('integration.forceFullSync'),
-						icon: IconRefresh,
-						onSelect: (): void => props.onSync(true),
-					},
-				]
-			: []),
-	]
-	return (
-		<>
-			<MoreActionsButton
-				name={name()}
-				open={openMenu() !== null}
-				onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
-					toggleMenu(e, props.integration.provider, name())
-				}
-				onClose={closeMenu}
-			/>
-			<RowMenu
-				menu={openMenu}
-				onClose={closeMenu}
-				cloneHref={() => undefined}
-				actions={actions}
-				deletable={() => true}
-				onDelete={() => props.onDelete()}
-			/>
-		</>
-	)
+function detailHref(integration: IntegrationJson): string {
+	return `/integrations/${integration.id}`
 }
 
-/** Card of one provider, set up or not. */
+/** Card of one provider, set up or not; it opens the detail page or the setup. */
 function ProviderCard(props: {
 	provider: IntegrationProvider
 	integration: IntegrationJson | undefined
 	/** Provider currently syncing from this page, if any. */
 	syncing: IntegrationProvider | null
 	onSync: (clean: boolean) => void
-	onDelete: () => void
 }): JSX.Element {
 	const shared = {
 		get name(): string {
@@ -131,6 +84,7 @@ function ProviderCard(props: {
 			fallback={
 				<IntegrationCard
 					{...shared}
+					href={can('integrations.manage') ? '/integrations/add' : undefined}
 					action={
 						<Show when={can('integrations.manage')}>
 							<button type="button" onClick={() => navigate('/integrations/add')}>
@@ -150,6 +104,7 @@ function ProviderCard(props: {
 				return (
 					<IntegrationCard
 						{...shared}
+						href={detailHref(integration())}
 						tone={
 							status() === 'error'
 								? 'error'
@@ -178,26 +133,9 @@ function ProviderCard(props: {
 								<LastRunLine run={integration().last_sync} />
 							</>
 						}
-						menu={
-							<Show when={can('integrations.manage')}>
-								<ProviderMenu
-									integration={integration()}
-									busy={busy()}
-									onSync={props.onSync}
-									onDelete={props.onDelete}
-								/>
-							</Show>
-						}
 						link={
-							<Show
-								when={status() === 'error' && can('integrations.manage')}
-								fallback={
-									<a href={`/integrations/${integration().id}`}>
-										{t('integration.openReport')}
-									</a>
-								}
-							>
-								<a href={`/integrations/${integration().id}/edit`}>
+							<Show when={status() === 'error' && can('integrations.manage')}>
+								<a href={settingsHref(detailHref(integration()))}>
 									{t('integration.fixConnection')}
 								</a>
 							</Show>
@@ -276,7 +214,6 @@ export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [syncing, setSyncing] = createSignal<IntegrationProvider | null>(null)
 	const [integrations] = createRows(fetch_integrations, setError)
-	const action = useAction(setError)
 
 	const configured = (provider: IntegrationProvider): IntegrationJson | undefined =>
 		integrations()?.find((i) => i.provider === provider)
@@ -313,14 +250,6 @@ export function IntegrationsPage(): JSX.Element {
 		if (Result.isError(done)) {
 			setError(done.error.message)
 		}
-	}
-
-	async function handleDelete(integration: IntegrationJson): Promise<void> {
-		const name = providerLabel(integration.provider)
-		if (!window.confirm(t('integration.confirmDelete', { name }))) {
-			return
-		}
-		await action.run(() => delete_integration(integration.provider))
 	}
 
 	return (
@@ -366,12 +295,6 @@ export function IntegrationsPage(): JSX.Element {
 								integration={configured(provider)}
 								syncing={syncing()}
 								onSync={(clean: boolean): void => void handleSync(provider, clean)}
-								onDelete={(): void => {
-									const integration = configured(provider)
-									if (integration) {
-										void handleDelete(integration)
-									}
-								}}
 							/>
 						)}
 					</For>

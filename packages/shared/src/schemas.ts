@@ -1963,6 +1963,7 @@ export const AUDIT_EVENTS = [
 	'password.change',
 	'password.reset',
 	'calendar_sync.config_update',
+	'calendar_sync.config_delete',
 	'calendar_sync.mapping_update',
 	'calendar_sync.mapping_delete',
 	'calendar_sync.run',

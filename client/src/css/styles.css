@@ -2184,7 +2184,8 @@ tbody tr:last-child td {
 	min-height: 2.1rem;
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle {
 	appearance: none;
 	position: relative;
 	flex: none;
@@ -2199,7 +2200,8 @@ tbody tr:last-child td {
 	transition: background-color 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle::before {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle::before {
 	content: "";
 	position: absolute;
 	top: 0.1875rem;
@@ -2211,15 +2213,18 @@ tbody tr:last-child td {
 	transition: transform 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle:checked {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle:checked {
 	background-color: var(--primary);
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle:checked::before {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle:checked::before {
 	transform: translateX(1rem);
 }
 
-:is(.field .field-toggle, .panel-row-switch) input.toggle:disabled {
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+	input.toggle:disabled {
 	cursor: not-allowed;
 	opacity: 0.5;
 }
@@ -5372,7 +5377,7 @@ a.rack-shelf-plate:hover {
 
 .integration-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
 	gap: 0.75rem;
 }
 
@@ -5397,9 +5402,41 @@ a.rack-shelf-plate:hover {
 	border-color: color-mix(in srgb, var(--error) 50%, transparent);
 }
 
-/* An open settings form takes the whole row. */
-.integration-card-wide {
-	grid-column: 1 / -1;
+/* The whole card opens the detail page: the name's link covers the card,
+   while buttons and links stay on top of it (decision 0006). */
+.integration-card-linked {
+	position: relative;
+	cursor: pointer;
+}
+
+.integration-card-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.integration-card-link::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.integration-card-link:focus-visible {
+	outline: none;
+}
+
+.integration-card-linked:has(.integration-card-link:focus-visible) {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
+.integration-card-linked:hover .integration-card-link {
+	text-decoration: underline;
+}
+
+.integration-card-linked :is(button, .integration-card-foot a) {
+	position: relative;
+	z-index: 1;
 }
 
 .integration-card-head {
@@ -5434,10 +5471,6 @@ a.rack-shelf-plate:hover {
 .integration-card-title p {
 	margin: 0.1rem 0 0;
 	color: var(--text-secondary);
-}
-
-.integration-card-head .row-menu-wrap {
-	margin: -0.25rem -0.4rem 0 0;
 }
 
 .integration-card-body {
@@ -5610,12 +5643,114 @@ a.rack-shelf-plate:hover {
 	flex: 0 0 0.5rem;
 }
 
-/* An open settings form stacks under the card's head. */
-.integrations-list .integration-card-wide {
-	flex-direction: column;
-	align-items: stretch;
+/* Integration detail page (decision 0006): identity and status left,
+   Enabled switch, "Sync now" and ⋯ right, then the tabs. */
+.integration-detail-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 0.75rem 1rem;
+	margin-bottom: 1rem;
 }
 
-.integrations-list .integration-card-wide:hover {
-	background-color: var(--bg-surface);
+.integration-detail-logo {
+	width: 3rem;
+	height: 3rem;
+	color: var(--primary-text);
+}
+
+.integration-detail-title {
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+
+.app-content .integration-detail-header h2 {
+	margin: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.integration-detail-title > p {
+	margin: 0.1rem 0 0;
+	color: var(--text-secondary);
+}
+
+.integration-detail-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.75rem;
+	margin-top: 0.5rem;
+}
+
+.integration-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.integration-detail-switch {
+	padding-right: 0.5rem;
+	cursor: pointer;
+}
+
+.integration-detail-alert {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	margin-bottom: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--error) 50%, transparent);
+	border-radius: 0.5rem;
+	background-color: color-mix(in srgb, var(--error) 7%, var(--bg-surface));
+}
+
+.integration-detail-alert strong {
+	color: var(--error);
+}
+
+.integration-detail-tabs {
+	margin-bottom: 0.75rem;
+}
+
+.integration-report-asof {
+	margin-bottom: 0.5rem;
+}
+
+.integration-settings {
+	max-width: 48rem;
+}
+
+.integration-settings-section {
+	padding: 1rem;
+	margin: 0 0 1rem;
+}
+
+.integration-settings-section h3 {
+	margin: 0 0 0.75rem;
+}
+
+.integration-danger-zone {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem 1.5rem;
+	margin-top: 1.5rem;
+	padding: 1rem;
+	border-color: color-mix(in srgb, var(--error) 50%, transparent);
+}
+
+.integration-danger-zone h3 {
+	margin: 0 0 0.25rem;
+	color: var(--error);
+}
+
+.integration-danger-zone p {
+	margin: 0;
+	max-width: 36rem;
+	color: var(--text-secondary);
 }

@@ -1,10 +1,10 @@
 /**
- * One integration on /integrations (design decision 0005): icon, name and
- * description, status pills, when it last synced, then a footer
- * with the main link on the left and one action on the right. Rarer
- * actions sit in the ⋯ menu. A card that opens its settings form inline
- * spans the whole grid row. The list layout lays the same parts out as one
- * row per integration, with the ⋯ menu at the end of the row.
+ * One integration on /integrations (design decisions 0005, 0006, 0007): icon,
+ * name and description, status pills, when it last synced, then a footer with
+ * an optional link on the left and one action on the right. The whole card
+ * opens the integration's detail page (the name is the link, stretched over
+ * the card; buttons and links stay on top). The list layout lays the same
+ * parts out as one row per integration.
  */
 import { type Accessor, type Component, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
@@ -118,19 +118,17 @@ export function IntegrationCard(props: {
 	name: string
 	description: string
 	icon: Component<{ size?: number }>
+	/** Detail page the card opens; omitted while it cannot be opened. */
+	href?: string
 	/** Status pills; omitted while the integration is not set up. */
 	status?: JSX.Element
 	/** Lines below the pills: sync detail, errors, prerequisites. */
 	details?: JSX.Element
-	/** The ⋯ menu: top-right corner in the grid, end of the row in the list. */
-	menu?: JSX.Element
-	/** Footer, left: the main link. */
+	/** Footer, left: a link that needs attention (e.g. "Fix connection →"). */
 	link?: JSX.Element
 	/** Footer, right: the one action. */
 	action?: JSX.Element
 	tone?: 'error' | 'disabled'
-	/** Inline form shown instead of status, details and footer; spans the row. */
-	form?: JSX.Element
 }): JSX.Element {
 	return (
 		<section
@@ -138,7 +136,7 @@ export function IntegrationCard(props: {
 			classList={{
 				'integration-card-error': props.tone === 'error',
 				'integration-card-disabled': props.tone === 'disabled',
-				'integration-card-wide': props.form !== undefined,
+				'integration-card-linked': props.href !== undefined,
 			}}
 			aria-label={props.name}
 		>
@@ -147,34 +145,31 @@ export function IntegrationCard(props: {
 					<Dynamic component={props.icon} size={18} />
 				</span>
 				<div class="integration-card-title">
-					<h4>{props.name}</h4>
+					<h4>
+						<Show when={props.href} fallback={props.name}>
+							{(href: () => string): JSX.Element => (
+								<a class="integration-card-link" href={href()}>
+									{props.name}
+								</a>
+							)}
+						</Show>
+					</h4>
 					<p>{props.description}</p>
 				</div>
-				<Show when={layout() === 'grid'}>{props.menu}</Show>
 			</div>
-			<Show
-				when={props.form}
-				fallback={
-					<>
-						<Show when={props.status || props.details}>
-							<div class="integration-card-body">
-								<Show when={props.status}>
-									<div class="integration-status">{props.status}</div>
-								</Show>
-								{props.details}
-							</div>
-						</Show>
-						<div class="integration-card-foot">
-							{props.link}
-							<span class="integration-card-spacer" />
-							{props.action}
-							<Show when={layout() === 'list'}>{props.menu}</Show>
-						</div>
-					</>
-				}
-			>
-				{props.form}
+			<Show when={props.status || props.details}>
+				<div class="integration-card-body">
+					<Show when={props.status}>
+						<div class="integration-status">{props.status}</div>
+					</Show>
+					{props.details}
+				</div>
 			</Show>
+			<div class="integration-card-foot">
+				{props.link}
+				<span class="integration-card-spacer" />
+				{props.action}
+			</div>
 		</section>
 	)
 }

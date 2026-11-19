@@ -1,5 +1,5 @@
-import { IconBan, IconLinkPlus, IconRefresh, IconUnlink } from '@tabler/icons-solidjs'
-import type { Result } from 'better-result'
+import { IconBan, IconLinkPlus, IconRefresh, IconTicket, IconUnlink } from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
 import {
 	EMPLOYEE_PUSH_FIELDS,
 	type EmployeePushField,
@@ -10,7 +10,7 @@ import {
 	type IntegrationFinding,
 } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, Show } from 'solid-js'
 import {
 	create_external_device,
 	deactivate_external_employee,
@@ -18,6 +18,7 @@ import {
 	fetch_integration,
 	fetch_integration_report,
 	fetch_link_board,
+	type IntegrationJson,
 	type IntegrationProvider,
 	ignore_external,
 	ignore_local,
@@ -29,18 +30,19 @@ import {
 	unlink_external,
 	update_external_device,
 	update_external_employee,
+	update_integration,
 } from '../../api/integrations'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { SelectField } from '../../components/form'
-import { IconLabel } from '../../components/icon_label'
-import { useTableColumns } from '../../components/list_page'
+import { type RowMenuAction, useTableColumns } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import {
 	compareFieldLabel,
 	compareValueLabel,
 	deviceStatusLabel,
 	findingKindLabel,
+	providerDescription,
 	providerLabel,
 } from '../../i18n/labels'
 import { createRecord, useAction } from '../../lib/resource'
@@ -48,8 +50,11 @@ import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
 import { contextTenantId, tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
+import { type DetailTab, DetailTabs, IntegrationDetailHeader } from './detail_parts'
 import { ExternalTenantPicker } from './external_tenant_picker'
+import type { IntegrationStatus } from './integration_card'
 import { LinkBoardView } from './link_board'
+import { ProviderSettings } from './settings'
 
 /** Field of a mismatch that can be written to the external system. */
 function pushField(f: IntegrationFinding): ExternalPushField | null {
@@ -118,10 +123,23 @@ function parseKind(raw: string): FindingKind | '' {
 	return (FINDING_KINDS as readonly string[]).includes(raw) ? (raw as FindingKind) : ''
 }
 
-type View = 'report' | 'tenants' | 'devices' | 'employees'
+type View = 'report' | 'tenants' | 'devices' | 'employees' | 'settings'
 
 function parseView(raw: string): View {
-	return raw === 'tenants' || raw === 'devices' || raw === 'employees' ? raw : 'report'
+	return raw === 'tenants' || raw === 'devices' || raw === 'employees' || raw === 'settings'
+		? raw
+		: 'report'
+}
+
+/** Header state of the provider; `syncing` is a sync started from this page. */
+function providerStatus(integration: IntegrationJson, syncing: boolean): IntegrationStatus {
+	if (!integration.enabled) {
+		return 'disabled'
+	}
+	if (integration.last_error) {
+		return 'error'
+	}
+	return syncing || integration.last_sync?.state === 'running' ? 'running' : 'connected'
 }
 
 /**
@@ -213,13 +231,15 @@ function LinkBoardPanel(props: {
 }
 
 /**
- * /integrations/:id — consistency report of one provider, plus link boards
- * (`?view=tenants|devices|employees`) for side-by-side linking. The report, the
- * device/employee boards and "Sync now" follow the tenant selector; `?tenant=` (from a
- * tenant's integration card) wins until the selector is switched. Rows offer the fitting
- * fix: link, confirm a suggestion, create the device externally, ignore, or unlink.
+ * /integrations/:id — detail page of one provider (decision 0006): header with
+ * status, Enabled switch and "Sync now", then tabs: the consistency report,
+ * link boards (`?view=tenants|devices|employees`) for side-by-side linking, and
+ * the settings (`?view=settings`). The report, the device/employee boards and
+ * "Sync now" follow the tenant selector; `?tenant=` (from a tenant's integration
+ * card) wins until the selector is switched. Rows offer the fitting fix: link,
+ * confirm a suggestion, create the device externally, ignore, or unlink.
  */
-export function IntegrationReportPage(props: { id: number }): JSX.Element {
+export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [kindFilter, setKindFilter] = createSignal<string>(parseKind(queryParam('kind')))
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
@@ -229,19 +249,20 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	// Single selected tenant (the user's only one, if so) of the boards and syncs.
 	const selectedTenant = (): number | null =>
 		queryTenant() ?? sessionTenantId() ?? contextTenantId()
-	const views = (): { id: View; label: string }[] => [
-		{ id: 'report', label: t('integration.viewReport') },
+	const views = (): DetailTab<View>[] => [
+		{ key: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.
-		...(isScoped() ? [] : [{ id: 'tenants' as const, label: t('integration.viewTenants') }]),
-		{ id: 'devices', label: t('integration.viewDevices') },
-		{ id: 'employees', label: t('integration.viewEmployees') },
+		...(isScoped() ? [] : [{ key: 'tenants' as const, label: t('integration.viewTenants') }]),
+		{ key: 'devices', label: t('integration.viewDevices') },
+		{ key: 'employees', label: t('integration.viewEmployees') },
+		...(can('integrations.manage')
+			? [{ key: 'settings' as const, label: t('integration.settings') }]
+			: []),
 	]
 
-	const [integration] = createRecord(() => props.id, fetch_integration, setError)
+	const [integration, { mutate }] = createRecord(() => props.id, fetch_integration, setError)
 	usePageMeta(() => ({
-		name: integration()
-			? t('integration.reportTitle', { name: providerLabel(integration()?.provider ?? '') })
-			: undefined,
+		name: integration() ? providerLabel(integration()?.provider ?? '') : undefined,
 	}))
 
 	const source = createMemo(() => {
@@ -273,6 +294,21 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 
 	const action = useAction(setError)
 	const sync = useAction(setError)
+	const toggle = useAction(setError)
+
+	async function handleToggle(enabled: boolean): Promise<void> {
+		const row = integration()
+		if (!row) {
+			return
+		}
+		await toggle.run(async () => {
+			const res = await update_integration(row.provider, { enabled })
+			if (Result.isOk(res)) {
+				mutate(res.value)
+			}
+			return res
+		})
+	}
 
 	async function run(request: () => Promise<Result<unknown, Error>>): Promise<void> {
 		await action.run(request)
@@ -280,7 +316,7 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 
 	async function handleSync(clean = false): Promise<void> {
 		const row = integration()
-		if (!row) {
+		if (!row || sync.pending()) {
 			return
 		}
 		if (
@@ -291,6 +327,22 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 		}
 		await sync.run(() => run_sync(row.provider, selectedTenant() ?? undefined, clean))
 	}
+
+	function selectView(next: View): void {
+		setError(null)
+		setView(next)
+	}
+
+	const menuActions = (): RowMenuAction[] =>
+		canGlobal('integrations.manage')
+			? [
+					{
+						label: t('integration.forceFullSync'),
+						icon: IconRefresh,
+						onSelect: (): void => void handleSync(true),
+					},
+				]
+			: []
 
 	function handleLinkTenant(item: ExternalTenantListItem): void {
 		const row = integration()
@@ -600,70 +652,49 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 	)
 
 	return (
-		<div class="integration-report">
-			<div class="page-header">
-				<h2>
-					{t('integration.reportTitle', {
-						name: providerLabel(integration()?.provider ?? 'tanss'),
-					})}
-				</h2>
-				<Show when={can('integrations.manage') && integration()}>
-					<div class="form-actions">
-						<button
-							type="button"
-							disabled={sync.pending()}
-							onClick={() => void handleSync()}
-						>
-							<IconLabel icon={IconRefresh}>
-								{sync.pending()
-									? t('integration.syncing')
-									: t('integration.syncNow')}
-							</IconLabel>
-						</button>
-						<Show when={canGlobal('integrations.manage')}>
-							<button
-								type="button"
-								disabled={sync.pending()}
-								onClick={() => void handleSync(true)}
-							>
-								<IconLabel icon={IconRefresh}>
-									{sync.pending()
-										? t('integration.syncing')
-										: t('integration.forceFullSync')}
-								</IconLabel>
-							</button>
-						</Show>
-					</div>
-				</Show>
-			</div>
-			<p class="page-subtitle">
-				{report()?.synced_at
-					? t('integration.syncedAt', { time: formatTime(report()?.synced_at ?? 0) })
-					: t('integration.neverSynced')}
-			</p>
-			<InlineError message={error()} />
-
+		<div class="integration-report integration-detail">
 			<Show
 				when={!integration.loading}
 				fallback={<Loading message={t('integration.loadingOne')} />}
 			>
 				<Show when={integration()} fallback={<Empty message={t('integration.notFound')} />}>
-					<div class="view-switch">
-						<For each={views()}>
-							{(item: { id: View; label: string }): JSX.Element => (
-								<button
-									type="button"
-									aria-pressed={view() === item.id}
-									onClick={() => {
-										setError(null)
-										setView(item.id)
-									}}
-								>
-									{item.label}
-								</button>
+					{(row: () => IntegrationJson): JSX.Element => (
+						<IntegrationDetailHeader
+							name={providerLabel(row().provider)}
+							description={providerDescription(row().provider)}
+							icon={IconTicket}
+							configured
+							status={providerStatus(row(), sync.pending())}
+							lastSyncFailed={row().last_sync?.state === 'error'}
+							lastRun={row().last_sync}
+							connectionError={row().last_error}
+							manageable={can('integrations.manage')}
+							enabled={row().enabled}
+							toggling={toggle.pending()}
+							onToggle={(enabled: boolean) => void handleToggle(enabled)}
+							syncing={sync.pending() || row().last_sync?.state === 'running'}
+							onSync={() => void handleSync()}
+							menuActions={menuActions()}
+							onOpenSettings={() => selectView('settings')}
+						/>
+					)}
+				</Show>
+				<InlineError message={error()} />
+				<Show when={integration()}>
+					<DetailTabs
+						label={t('integration.views')}
+						tabs={views()}
+						active={view()}
+						onSelect={selectView}
+					/>
+					<Show when={view() === 'settings'}>
+						{/* Not keyed: a refetch after a sync or toggle must not reset typed values. */}
+						<Show when={integration()}>
+							{(row: () => IntegrationJson): JSX.Element => (
+								<ProviderSettings integration={row()} />
 							)}
-						</For>
-					</div>
+						</Show>
+					</Show>
 					{/* Separate instances: selections must not carry over between levels. */}
 					<Show when={view() === 'tenants'}>
 						<LinkBoardPanel
@@ -690,6 +721,13 @@ export function IntegrationReportPage(props: { id: number }): JSX.Element {
 						/>
 					</Show>
 					<Show when={view() === 'report'}>
+						<p class="integration-meta integration-report-asof">
+							{report()?.synced_at
+								? t('integration.syncedAt', {
+										time: formatTime(report()?.synced_at ?? 0),
+									})
+								: t('integration.neverSynced')}
+						</p>
 						<div class="toolbar-row">
 							<SelectField
 								id="integration-finding-filter"

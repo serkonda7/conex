@@ -27,6 +27,7 @@ import { nowSeconds } from '../util/time'
 import { GraphClient, isGraphNotFound } from './graph'
 import { type CalendarItem, hash, type LinkedNames, toCalendarItems, toGraphEvent } from './map'
 import {
+	deleteCalendarSyncConfig,
 	deleteItems,
 	EMPTY_COUNTS,
 	finishRun,
@@ -384,6 +385,14 @@ export async function startCalendarSync(): Promise<Result<CalendarSyncRunJson, E
 		running = false
 	})
 	return Result.ok(runJson(run.value))
+}
+
+/** Removes the calendar sync; refused while a run is in progress. */
+export async function removeCalendarSync(): Promise<Result<void, Error>> {
+	if (running) {
+		return Result.err(new ConflictError('A calendar sync is running'))
+	}
+	return deleteCalendarSyncConfig()
 }
 
 /**

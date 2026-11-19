@@ -10,7 +10,7 @@ import {
 	type CalendarTechnicianJson,
 } from 'shared/src/schemas'
 import { requestUser, requireGlobalScope } from '../authz'
-import { startCalendarSync, tanssSession } from '../calendar_sync/run'
+import { removeCalendarSync, startCalendarSync, tanssSession } from '../calendar_sync/run'
 import {
 	deleteMapping,
 	getCalendarSyncConfig,
@@ -93,6 +93,16 @@ export const calendarSyncApp = new Hono()
 			await audit(c, 'calendar_sync.config_update')
 		}
 		return sendResult(c, res)
+	})
+	.delete('/config', async (c) => {
+		const res = await removeCalendarSync()
+		if (Result.isOk(res)) {
+			await audit(c, 'calendar_sync.config_delete')
+		}
+		return sendResult(
+			c,
+			res.map(() => ({ ok: true })),
+		)
 	})
 	.post(
 		'/config/test',

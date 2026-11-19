@@ -1,18 +1,19 @@
 # 0005: Integrations as status cards
 - Date: 2026-11-19
-- Status: accepted
+- Status: accepted, partly replaced by 0006 (card click, footer link,
+  inline settings form, Delete) and 0007 (no card ⋯ menu)
 
 The integrations page lists every integration, set up or not, as a card in a
 responsive grid, grouped under a category heading (PSA & ticketing,
 Calendar, …). The header shows how many integrations are connected and how
 many need attention, and a grid / list switch (remembered per browser). The
 list layout shows the same parts as one row per integration in a shared box
-per category, with the ⋯ menu at the end of the row.
+per category.
 
 Every card has the same anatomy, top to bottom:
 
-1. Icon tile, name, a short one-line description (a few words, no
-   sentence about the vendor) and, once set up, the ⋯ menu.
+1. Icon tile, name and a short one-line description (a few words, no
+   sentence about the vendor).
 2. Status pills: one state pill (Connected, Syncing… with a pulsing dot,
    Connection failed, Disabled), plus yellow warning pills for problems
    that do not break the connection (e.g. "Last sync failed").
@@ -23,8 +24,8 @@ Every card has the same anatomy, top to bottom:
    "Fix connection →" while the login fails) and one action on the right
    ("Sync now", or "Set up" before setup).
 
-Rarer actions (Edit, Force full sync, Delete) live in the ⋯ menu, never as
-a row of buttons. "Set up" is a secondary button; the green primary style is
+Rarer actions (Settings, Force full sync, Delete) live on the detail page
+(0006, 0007), never on the card. "Set up" is a secondary button; the green primary style is
 kept for the one action that matters most, such as "Run first sync" on an
 integration that has never synced.
 

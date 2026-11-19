@@ -16,6 +16,7 @@ const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
 	'password.change': 'badge-planned',
 	'password.reset': 'badge-planned',
 	'calendar_sync.config_update': 'badge-staged',
+	'calendar_sync.config_delete': 'badge-staged',
 	'calendar_sync.mapping_update': 'badge-staged',
 	'calendar_sync.mapping_delete': 'badge-staged',
 	'calendar_sync.run': 'badge-staged',
