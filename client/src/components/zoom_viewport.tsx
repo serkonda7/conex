@@ -35,6 +35,14 @@ import { t } from '../i18n'
 const MIN_ZOOM = 1
 export const MAX_ZOOM = 8
 
+/**
+ * Factor for overlay line widths: lines thin out as the plan zooms in, so
+ * zoomed-in detail is not covered by them (1 at 100 %, half from 4x on).
+ */
+function lineZoom(scale: number): number {
+	return Math.max(0.5, Math.min(1, 1 / Math.sqrt(scale)))
+}
+
 /** Factor of one zoom button step. */
 const ZOOM_STEP = 1.5
 
@@ -404,6 +412,7 @@ export function ZoomViewport(props: {
 						...(props.fill ? fillStageStyle(props.fill) : {}),
 						transform: `translate(${props.zoom.offset().x}px, ${props.zoom.offset().y}px) scale(${props.zoom.scale()})`,
 						'--inv-zoom': String(1 / props.zoom.scale()),
+						'--line-zoom': String(lineZoom(props.zoom.scale())),
 					}}
 					{...props.handlers}
 				>

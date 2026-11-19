@@ -3685,6 +3685,8 @@ span.attachment-star,
 	position: relative;
 	transform-origin: 0 0;
 	--inv-zoom: 1;
+	/* Shrinks line widths of areas and the grid while zoomed in. */
+	--line-zoom: 1;
 }
 
 .zoom-stage > img {
@@ -3849,7 +3851,7 @@ span.attachment-star,
 .floorplan-area polygon {
 	fill: color-mix(in srgb, var(--area-color, var(--link)) 14%, transparent);
 	stroke: var(--area-color, var(--link));
-	stroke-width: 2;
+	stroke-width: calc(2px * var(--line-zoom, 1));
 	vector-effect: non-scaling-stroke;
 	cursor: pointer;
 }
@@ -3860,7 +3862,6 @@ span.attachment-star,
 
 .floorplan-area.selected polygon {
 	fill: color-mix(in srgb, var(--area-color, var(--link)) 32%, transparent);
-	stroke-width: 3;
 }
 
 .floorplan-area-label {
@@ -4193,7 +4194,6 @@ span.attachment-star,
 }
 
 .floorplan-area.floorplan-area-editing.selected polygon {
-	stroke-width: 2;
 	stroke-dasharray: 6 3;
 }
 
@@ -4470,13 +4470,13 @@ span.attachment-star,
 .floorplan-grid line {
 	/* Neutral grey reads on light and dark plan images alike. */
 	stroke: rgba(128, 128, 128, 0.45);
-	stroke-width: 1;
+	stroke-width: calc(1px * var(--line-zoom, 1));
 	vector-effect: non-scaling-stroke;
 }
 
 .floorplan-grid line.floorplan-grid-axis {
 	stroke: color-mix(in srgb, var(--primary) 70%, transparent);
-	stroke-width: 1.5;
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
 }
 
 .floorplan-origin {

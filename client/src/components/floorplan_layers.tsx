@@ -180,7 +180,7 @@ function toggleGrid(): void {
 }
 
 /** Grid sizes to choose from, in meters. */
-export const GRID_SIZES = [0.5, 1, 5] as const
+export const GRID_SIZES = [1, 5, 10] as const
 export type GridSize = (typeof GRID_SIZES)[number]
 export const DEFAULT_GRID_SIZE: GridSize = 1
 
