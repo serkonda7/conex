@@ -26,6 +26,7 @@
 	--primary: #058a05;
 	--primary-hover: #047a04;
 	--primary-text: #08bf08; /* --primary is too dark for text on the dark surfaces. */
+	--primary-tint: color-mix(in srgb, var(--primary) 18%, var(--bg-surface));
 	--primary-contrast: #ffffff;
 	--secondary: #1a73b8;
 	--secondary-hover: #16659f;
@@ -824,7 +825,7 @@ tbody tr:last-child td {
 
 .app-nav a:hover,
 .app-nav-item:hover {
-	background-color: var(--bg-hover);
+	background-color: var(--primary-tint);
 }
 
 .app-nav a.active,
@@ -853,7 +854,7 @@ tbody tr:last-child td {
 }
 
 .app-nav-item:hover {
-	background-color: var(--bg-hover);
+	background-color: var(--primary-tint);
 }
 
 .app-nav-item.active {
@@ -888,7 +889,7 @@ tbody tr:last-child td {
 }
 
 .app-nav-add:hover:not(:disabled) {
-	background-color: var(--bg-hover);
+	background-color: var(--primary-tint);
 	border-color: var(--border);
 	color: var(--text);
 }
