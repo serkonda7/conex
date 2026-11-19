@@ -27,7 +27,7 @@ import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { RouteContent } from './route_content'
-import { MobileSidebar, Sidebar } from './sidebar'
+import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
 import { TabBar } from './tab_bar'
 import { TenantContextSelector } from './tenant_context_selector'
 
@@ -103,7 +103,16 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	return (
 		<>
 			<header class="app-topbar">
-				<Show when={mobile()}>
+				<Show
+					when={mobile()}
+					fallback={
+						<SidebarCorner>
+							<a href={homePath()} class="app-topbar-brand">
+								{APP_TITLE}
+							</a>
+						</SidebarCorner>
+					}
+				>
 					<button
 						type="button"
 						class="app-mobile-nav-toggle"
@@ -118,11 +127,13 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 				</Show>
 				<TenantContextSelector scoped={fixedContext()} canAdd={canAddTenants()} />
 				<CreateTicketButton scopeTenantId={singleTenant()} />
-				<div class="app-topbar-actions">
-					<a href={homePath()} class="app-topbar-brand">
-						{APP_TITLE}
-					</a>
-				</div>
+				<Show when={mobile()}>
+					<div class="app-topbar-actions">
+						<a href={homePath()} class="app-topbar-brand">
+							{APP_TITLE}
+						</a>
+					</div>
+				</Show>
 			</header>
 			<div class="app-body">
 				<Show

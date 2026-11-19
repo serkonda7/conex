@@ -1,9 +1,11 @@
 /**
- * Building blocks of the integration detail pages (design decision 0005):
- * the header with status, the Enabled switch, "Sync now" and the ⋯ menu, the
- * tab bar, and the danger zone at the end of the Settings tab. The TANSS page
- * and the calendar sync page share them, so every integration reads and
- * behaves the same.
+ * Building blocks of the integration detail pages: the header with status,
+ * the Enabled switch, "Sync now" and the ⋯ menu for rarer actions (Force full
+ * sync), the tab bar (the integration's data first, Settings last; before
+ * setup Settings is the only tab), and the danger zone at the end of the
+ * Settings tab (design decision 0006). A failing login shows an error box
+ * with a way to the settings. The TANSS page and the calendar sync page share
+ * them, so every integration reads and behaves the same.
  */
 import { IconRefresh } from '@tabler/icons-solidjs'
 import { type Component, For, type JSX, Show } from 'solid-js'

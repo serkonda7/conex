@@ -207,8 +207,11 @@ function CardSection(props: { title: string; children: JSX.Element }): JSX.Eleme
 }
 
 /**
- * /integrations — integration cards grouped by category, with a connected /
- * needs-attention summary in the header. Admins set up providers here.
+ * /integrations — every integration, set up or not, as a card grouped by
+ * category, with a grid / list switch (remembered per browser) and a
+ * connected / needs-attention summary in the header. A card opens the detail
+ * page (an unconfigured one its setup), never a form in place; it has no ⋯
+ * menu and no remove action (design decision 0006). Admins set up providers here.
  */
 export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)

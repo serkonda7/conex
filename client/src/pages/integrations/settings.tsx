@@ -1,5 +1,5 @@
 /**
- * Settings tab of a provider's detail page (decision 0005): the connection
+ * Settings tab of a provider's detail page (design decision 0006): the connection
  * form with its test, then the danger zone. Blank secrets keep the stored
  * ones; a changed URL or credentials log in again before saving. The
  * Enabled switch lives in the page header, not here.

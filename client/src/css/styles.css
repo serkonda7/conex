@@ -45,6 +45,11 @@
 	--font-size-2xl: 1.3rem;
 	/* Fixed top bar height; the sticky sidebar sizes itself against it. */
 	--topbar-height: 3.5rem;
+	/* Sidebar widths; the top bar's corner cell above it matches them. */
+	--sidebar-width: 13rem;
+	/* Sidebar padding (2 × 0.5rem) + link padding (2 × 0.5rem) + icon (20px)
+	   + borders (4px) + vertical scrollbar (1rem). */
+	--sidebar-collapsed-width: calc(3rem + 24px);
 }
 
 html {
@@ -633,19 +638,56 @@ tbody tr:last-child td {
 	min-width: 0;
 }
 
-.app-sidebar-toggle {
-	display: inline-flex;
+/* Top-left corner of the top bar: the brand, exactly as wide as the sidebar
+   so its right edge runs through the full window height. The negative
+   margins cancel the top bar's padding; the right margin keeps the next item
+   clear of the toggle knob. */
+.app-sidebar-corner {
+	--knob-size: 24px;
+	position: relative;
+	display: flex;
 	align-items: center;
-	justify-content: center;
 	flex-shrink: 0;
-	padding: 0.35rem;
-	border: none;
-	background: transparent;
+	align-self: stretch;
+	width: var(--sidebar-width);
+	margin: -0.35rem 0.5rem -0.35rem -0.75rem;
+	padding: 0 calc(var(--knob-size) / 2 + 0.5rem) 0 1rem;
+	border-right: 1px solid var(--border);
+}
+
+.app-sidebar-corner.collapsed {
+	width: var(--sidebar-collapsed-width);
+}
+
+.app-sidebar-corner .app-topbar-brand {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Round sidebar toggle centered on the sidebar's edge line, inside the top
+   bar. The ring in the top bar's color cuts the edge line around it. */
+.app-sidebar-toggle {
+	position: absolute;
+	top: 50%;
+	right: calc(var(--knob-size) / -2 - 0.5px);
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	width: var(--knob-size);
+	height: var(--knob-size);
+	padding: 0;
+	border: 1px solid var(--border-strong);
+	border-radius: 50%;
+	background-color: var(--bg-raised);
 	color: var(--text-secondary);
+	box-shadow: 0 0 0 3px var(--bg-surface);
+	transform: translateY(-50%);
 }
 
 .app-sidebar-toggle:hover {
 	background-color: var(--bg-hover);
+	border-color: var(--text-muted);
 	color: var(--text);
 }
 
@@ -671,7 +713,7 @@ tbody tr:last-child td {
 }
 
 .app-sidebar {
-	width: 13rem;
+	width: var(--sidebar-width);
 	flex-shrink: 0;
 	position: sticky;
 	top: var(--topbar-height);
@@ -681,18 +723,27 @@ tbody tr:last-child td {
 	gap: 0.5rem;
 	background-color: var(--bg-surface);
 	border-right: 1px solid var(--border);
-	padding: 0.6rem 0.5rem;
+	/* No right padding: the nav's scrollbar runs directly along the edge. */
+	padding: 0.6rem 0 0.6rem 0.5rem;
+}
+
+.app-sidebar > :not(.app-nav) {
+	margin-right: 0.5rem;
 }
 
 /* The nav scrolls instead of the sidebar so the account dropdown can
-   overflow the (collapsed) sidebar's edge. */
+   overflow the (collapsed) sidebar's edge. Its right padding keeps the rows
+   clear of the thin scrollbar on the sidebar's edge. */
 .app-nav {
 	display: flex;
 	flex-direction: column;
 	gap: 0.3rem;
 	flex: 1;
 	min-height: 0;
+	padding-right: 0.5rem;
 	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-strong) transparent;
 }
 
 .app-nav-group {
@@ -900,9 +951,8 @@ tbody tr:last-child td {
 
 /* Icon rail: labels, group headings and shortcuts give way to icons. */
 .app-sidebar.collapsed {
-	/* sidebar padding + link padding + icon + borders + vertical scrollbar */
-	width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 2px + 1px + 1px + 1rem);
-	min-width: calc(2 * 0.5rem + 2 * 0.5rem + 20px + 2px + 1px + 1px + 1rem);
+	width: var(--sidebar-collapsed-width);
+	min-width: var(--sidebar-collapsed-width);
 }
 
 .app-sidebar.collapsed .app-nav {
@@ -920,10 +970,6 @@ tbody tr:last-child td {
 	margin: 0.25rem 0.25rem;
 	overflow: hidden;
 	border-top: 1px solid var(--border);
-}
-
-.app-sidebar.collapsed .app-sidebar-user {
-	flex-direction: column;
 }
 
 .app-sidebar.collapsed .app-user-button {
@@ -5308,7 +5354,7 @@ a.rack-shelf-plate:hover {
 	--label-width: 12rem;
 }
 
-/* Integrations page (decision 0005): icon header with a connected /
+/* Integrations page: icon header with a connected /
    needs-attention summary, then cards grouped by category. */
 .integrations-header {
 	display: flex;
@@ -5404,7 +5450,7 @@ a.rack-shelf-plate:hover {
 }
 
 /* The whole card opens the detail page: the name's link covers the card,
-   while buttons and links stay on top of it (decision 0006). */
+   while buttons and links stay on top of it. */
 .integration-card-linked {
 	position: relative;
 	cursor: pointer;
@@ -5644,7 +5690,7 @@ a.rack-shelf-plate:hover {
 	flex: 0 0 0.5rem;
 }
 
-/* Integration detail page (decision 0006): identity and status left,
+/* Integration detail page: identity and status left,
    Enabled switch, "Sync now" and ⋯ right, then the tabs. */
 .integration-detail-header {
 	display: flex;

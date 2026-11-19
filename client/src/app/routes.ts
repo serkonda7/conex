@@ -477,7 +477,7 @@ export const SECTIONS: readonly Section[] = [
 		hideAddInNav: true,
 		list: IntegrationsPage,
 		add: IntegrationAddPage,
-		// Settings are a tab of the detail page (decision 0005): no edit route.
+		// Settings are a tab of the detail page (design decision 0006): no edit route.
 		detail: IntegrationDetailPage,
 	},
 	{

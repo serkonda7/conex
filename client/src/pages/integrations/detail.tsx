@@ -231,7 +231,7 @@ function LinkBoardPanel(props: {
 }
 
 /**
- * /integrations/:id — detail page of one provider (decision 0005): header with
+ * /integrations/:id — detail page of one provider (design decision 0006): header with
  * status, Enabled switch and "Sync now", then tabs: the consistency report,
  * link boards (`?view=tenants|devices|employees`) for side-by-side linking, and
  * the settings (`?view=settings`). The report, the device/employee boards and

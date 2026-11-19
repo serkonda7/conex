@@ -1,10 +1,17 @@
 /**
- * One integration on /integrations (design decision 0005): icon,
- * name and description, status pills, when it last synced, then a footer with
- * an optional link on the left and one action on the right. The whole card
- * opens the integration's detail page (the name is the link, stretched over
- * the card; buttons and links stay on top). The list layout lays the same
- * parts out as one row per integration.
+ * One integration on /integrations, top to bottom: icon tile, name and a
+ * few-word description; one state pill (Connected, Syncing…, Connection
+ * failed, Disabled) plus yellow warning pills for problems that keep the
+ * connection working; when it last synced (relative, exact time on hover) or
+ * the server's error; then a footer with one action on the right ("Sync now",
+ * "Set up") and a link on the left only when something needs fixing.
+ *
+ * The whole card opens the integration's detail page (the name is the link,
+ * stretched over the card; buttons and links stay on top). A failing card gets
+ * an error-tinted border, a disabled one is dimmed, and one with a missing
+ * prerequisite stays visible and says what it needs. The green primary style
+ * is kept for the one action that matters most (e.g. "Run first sync"). The
+ * list layout lays the same parts out as one row per integration.
  */
 import { type Accessor, type Component, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'

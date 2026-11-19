@@ -1,7 +1,8 @@
 /**
  * Main navigation: routed sections in labeled groups (NetBox-style, with
  * quick add/import buttons for writers) and the account menu at the bottom.
- * The whole sidebar collapses to an icon rail (persisted to localStorage).
+ * The whole sidebar collapses to an icon rail (persisted to localStorage);
+ * its toggle sits in the top bar's corner cell above it.
  */
 import {
 	IconChevronsLeft,
@@ -358,22 +359,35 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 			</nav>
 			<div class="app-sidebar-user">
 				<UserMenu user={props.user} onLogout={props.onLogout} collapsed={isCollapsed()} />
-				<button
-					type="button"
-					class="app-sidebar-toggle"
-					aria-expanded={!collapsed()}
-					aria-label={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
-					title={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
-					onClick={() => setCollapsed(!collapsed())}
-				>
-					<span aria-hidden="true" class="app-nav-icon">
-						<Show when={collapsed()} fallback={<IconChevronsLeft size={20} />}>
-							<IconChevronsRight size={20} />
-						</Show>
-					</span>
-				</button>
 			</div>
 		</aside>
+	)
+}
+
+/**
+ * Top-left corner cell of the top bar, as wide as the sidebar below it: the
+ * brand (`children`) and the round collapse toggle on its right edge, in line
+ * with the sidebar's edge; collapsed, only the toggle.
+ */
+export function SidebarCorner(props: { children: JSX.Element }): JSX.Element {
+	return (
+		<div classList={{ 'app-sidebar-corner': true, collapsed: collapsed() }}>
+			<Show when={!collapsed()}>{props.children}</Show>
+			<button
+				type="button"
+				class="app-sidebar-toggle"
+				aria-expanded={!collapsed()}
+				aria-label={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
+				title={collapsed() ? t('app.expandSidebar') : t('app.collapseSidebar')}
+				onClick={() => setCollapsed(!collapsed())}
+			>
+				<span aria-hidden="true" class="app-nav-icon">
+					<Show when={collapsed()} fallback={<IconChevronsLeft size={14} />}>
+						<IconChevronsRight size={14} />
+					</Show>
+				</span>
+			</button>
+		</div>
 	)
 }
 
