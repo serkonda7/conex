@@ -1954,19 +1954,12 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 /**
  * `password.change`: a user changed their own password. `password.reset`: a
  * user manager set another account's password (`target_username`).
- * `calendar_sync.*`: changes to the TANSS → Outlook calendar sync; mapping
- * events carry the mailbox in `target_username`.
  */
 export const AUDIT_EVENTS = [
 	'login.success',
 	'login.failure',
 	'password.change',
 	'password.reset',
-	'calendar_sync.config_update',
-	'calendar_sync.config_delete',
-	'calendar_sync.mapping_update',
-	'calendar_sync.mapping_delete',
-	'calendar_sync.run',
 ] as const
 
 export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
