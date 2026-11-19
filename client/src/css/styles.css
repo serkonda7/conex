@@ -586,8 +586,8 @@ tbody tr:last-child td {
 
 .app-user-dropdown {
 	position: absolute;
-	left: 0;
-	bottom: calc(100% + 0.3rem);
+	right: 0;
+	top: calc(100% + 0.3rem);
 	min-width: 10rem;
 	background-color: var(--bg-raised);
 	border: 1px solid var(--border);
@@ -623,19 +623,10 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 }
 
-/* Account menu pinned to the bottom of the sidebar. */
-.app-sidebar-user {
-	display: flex;
-	align-items: center;
-	gap: 0.25rem;
-	margin-top: auto;
-	padding-top: 0.5rem;
-	border-top: 1px solid var(--border);
-}
-
-.app-sidebar-user .app-user-menu {
-	flex: 1;
-	min-width: 0;
+/* Account menu at the right end of the top bar. */
+.app-topbar-user {
+	margin-left: auto;
+	flex-shrink: 0;
 }
 
 /* Top-left corner of the top bar: the brand, exactly as wide as the sidebar
@@ -689,11 +680,6 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 	border-color: var(--text-muted);
 	color: var(--text);
-}
-
-.app-sidebar-user .app-user-button {
-	width: 100%;
-	max-width: none;
 }
 
 .app-body {
@@ -959,8 +945,7 @@ tbody tr:last-child td {
 	overflow-x: hidden;
 }
 
-.app-sidebar.collapsed .app-nav-text,
-.app-sidebar.collapsed .app-user-info {
+.app-sidebar.collapsed .app-nav-text {
 	display: none;
 }
 
@@ -970,10 +955,6 @@ tbody tr:last-child td {
 	margin: 0.25rem 0.25rem;
 	overflow: hidden;
 	border-top: 1px solid var(--border);
-}
-
-.app-sidebar.collapsed .app-user-button {
-	justify-content: center;
 }
 
 .app-content {
@@ -1455,7 +1436,7 @@ tbody tr:last-child td {
 
 	.app-topbar {
 		display: grid;
-		grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+		grid-template-columns: 2.75rem minmax(0, 1fr) auto auto;
 		grid-template-rows: repeat(2, minmax(0, 1fr));
 		gap: 0.25rem 0.5rem;
 		padding: 0.5rem 0.75rem;
@@ -1476,6 +1457,20 @@ tbody tr:last-child td {
 		grid-column: 3;
 		grid-row: 1;
 		min-height: 2.75rem;
+	}
+
+	.app-topbar-user {
+		grid-column: 4;
+		grid-row: 1;
+		margin-left: 0;
+	}
+
+	.app-user-button {
+		min-height: 2.75rem;
+	}
+
+	.app-user-info {
+		display: none;
 	}
 
 	.app-tenant-context {
@@ -1554,13 +1549,8 @@ tbody tr:last-child td {
 		opacity: 1;
 	}
 
-	.app-sidebar-user .app-user-button,
 	.app-user-logout {
 		min-height: 2.75rem;
-	}
-
-	.app-sidebar-user {
-		flex-shrink: 0;
 	}
 
 	.app-content {

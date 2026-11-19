@@ -30,6 +30,7 @@ import { RouteContent } from './route_content'
 import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
 import { TabBar } from './tab_bar'
 import { TenantContextSelector } from './tenant_context_selector'
+import { UserMenu } from './user_menu'
 
 /**
  * Routes in-app anchors that have no click handler of their own through
@@ -134,16 +135,14 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 						</a>
 					</div>
 				</Show>
+				<div class="app-topbar-user">
+					<UserMenu user={props.user} onLogout={props.onLogout} />
+				</div>
 			</header>
 			<div class="app-body">
-				<Show
-					when={mobile()}
-					fallback={<Sidebar user={props.user} onLogout={props.onLogout} />}
-				>
+				<Show when={mobile()} fallback={<Sidebar />}>
 					<MobileSidebar
 						id={navigationId}
-						user={props.user}
-						onLogout={props.onLogout}
 						open={navigationOpen()}
 						onClose={closeNavigation}
 					/>
