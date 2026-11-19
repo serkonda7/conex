@@ -1,5 +1,5 @@
 /**
- * One integration on /integrations (design decisions 0005, 0006, 0007): icon,
+ * One integration on /integrations (design decision 0005): icon,
  * name and description, status pills, when it last synced, then a footer with
  * an optional link on the left and one action on the right. The whole card
  * opens the integration's detail page (the name is the link, stretched over

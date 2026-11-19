@@ -1,6 +1,6 @@
 /**
  * Outlook calendar sync (TANSS appointments → Outlook), laid out like a
- * provider (decisions 0005, 0006): an `IntegrationCard` on the integrations
+ * provider (decision 0005): an `IntegrationCard` on the integrations
  * page that opens /integrations/calendar-sync, whose header carries the
  * status, the Enabled switch and "Sync now", with tabs for the technician →
  * mailbox mapping and the settings (Microsoft 365 app, schedule, removal).
@@ -449,7 +449,7 @@ type View = 'technicians' | 'settings'
 
 /**
  * /integrations/calendar-sync — detail page of the calendar sync
- * (decision 0006). Before setup only the Settings tab shows; without TANSS
+ * (decision 0005). Before setup only the Settings tab shows; without TANSS
  * the page only says it needs it.
  */
 export function CalendarSyncDetailPage(): JSX.Element {

@@ -1,5 +1,5 @@
 /**
- * Building blocks of the integration detail pages (design decision 0006):
+ * Building blocks of the integration detail pages (design decision 0005):
  * the header with status, the Enabled switch, "Sync now" and the ⋯ menu, the
  * tab bar, and the danger zone at the end of the Settings tab. The TANSS page
  * and the calendar sync page share them, so every integration reads and
