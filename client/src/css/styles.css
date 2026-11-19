@@ -5301,3 +5301,321 @@ a.rack-shelf-plate:hover {
 .calendar-sync-form {
 	--label-width: 12rem;
 }
+
+/* Integrations page (decision 0005): icon header with a connected /
+   needs-attention summary, then cards grouped by category. */
+.integrations-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem 1rem;
+	margin-bottom: 1.25rem;
+}
+
+.integrations-header-icon {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex: none;
+	border-radius: 0.5rem;
+	border: 1px solid var(--border);
+	background-color: var(--bg-raised);
+	color: var(--primary-text);
+}
+
+/* The header's own layout replaces the page-title underline. */
+.app-content .integrations-header h2:first-of-type {
+	flex: 1 1 12rem;
+	min-width: 0;
+	margin: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.integrations-summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 1rem;
+	color: var(--text-secondary);
+}
+
+.integrations-summary > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.integrations-summary-dot {
+	width: 0.4rem;
+	height: 0.4rem;
+	border-radius: 50%;
+	background-color: var(--success);
+}
+
+.integrations-summary-dot-warning {
+	background-color: var(--warning);
+}
+
+.integration-section + .integration-section {
+	margin-top: 1.5rem;
+}
+
+.integration-section h3 {
+	margin: 0 0 0.6rem;
+	font-size: var(--font-size-sm);
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.integration-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+	gap: 0.75rem;
+}
+
+/* Card: identity, status pills, sync detail, footer with link + action. */
+.integration-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+	transition: border-color 150ms ease;
+}
+
+.integration-card:hover {
+	border-color: var(--border-strong);
+}
+
+.integration-card-error,
+.integration-card-error:hover {
+	border-color: color-mix(in srgb, var(--error) 50%, transparent);
+}
+
+/* An open settings form takes the whole row. */
+.integration-card-wide {
+	grid-column: 1 / -1;
+}
+
+.integration-card-head {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+}
+
+.integration-logo {
+	display: grid;
+	place-items: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	flex: none;
+	border-radius: 0.5rem;
+	border: 1px solid var(--border);
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+}
+
+.integration-card-title {
+	flex: 1;
+	min-width: 0;
+}
+
+.integration-card-title h4 {
+	margin: 0;
+	font-size: var(--font-size-lg);
+	line-height: 1.35;
+}
+
+.integration-card-title p {
+	margin: 0.1rem 0 0;
+	color: var(--text-secondary);
+}
+
+.integration-card-head .row-menu-wrap {
+	margin: -0.25rem -0.4rem 0 0;
+}
+
+.integration-card-body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+/* Dimmed, but the footer stays readable to switch it back on. */
+.integration-card-disabled .integration-card-head,
+.integration-card-disabled .integration-card-body {
+	opacity: 0.72;
+}
+
+.integration-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.integration-status .badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.badge-dot {
+	width: 0.375rem;
+	height: 0.375rem;
+	flex: none;
+	border-radius: 50%;
+	background-color: currentColor;
+}
+
+.badge-dot-pulse {
+	animation: badge-dot-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes badge-dot-pulse {
+	50% {
+		opacity: 0.25;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.badge-dot-pulse {
+		animation: none;
+	}
+}
+
+.integration-meta {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+.integration-error {
+	margin: 0;
+	color: var(--error);
+	font-size: var(--font-size-sm);
+	overflow-wrap: anywhere;
+}
+
+.integration-card-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: auto;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
+.integration-card-spacer {
+	flex: 1;
+}
+
+.integration-card-foot button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.integrations-layout-toggle {
+	display: inline-flex;
+	min-width: 0;
+	margin: 0;
+	gap: 0.15rem;
+	padding: 0.15rem;
+	border: 1px solid var(--border);
+	border-radius: 0.4rem;
+}
+
+.integrations-layout-option {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.3rem;
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+.integrations-layout-option:hover {
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text);
+}
+
+.integrations-layout-option[aria-pressed="true"] {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+/* List layout: one row per integration in a shared box per category;
+   head, status and footer wrap below each other on narrow screens. */
+.integrations-list .integration-grid {
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	overflow: hidden;
+}
+
+.integrations-list .integration-card {
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 1.5rem;
+	padding: 0.75rem 1rem;
+	border: none;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+}
+
+.integrations-list .integration-card:last-child {
+	border-bottom: none;
+}
+
+.integrations-list .integration-card:hover {
+	background-color: var(--bg-raised);
+}
+
+.integrations-list .integration-card-error {
+	background-color: color-mix(in srgb, var(--error) 7%, var(--bg-surface));
+}
+
+.integrations-list .integration-card-head {
+	flex: 999 1 18rem;
+	min-width: 0;
+	align-items: center;
+}
+
+.integrations-list .integration-card-body {
+	flex: 1 1 18rem;
+	min-width: 0;
+}
+
+.integrations-list .integration-card-foot {
+	flex: 0 1 auto;
+	min-width: 0;
+	margin-top: 0;
+	margin-left: auto;
+	padding-top: 0;
+	border-top: none;
+}
+
+.integrations-list .integration-card-spacer {
+	flex: 0 0 0.5rem;
+}
+
+/* An open settings form stacks under the card's head. */
+.integrations-list .integration-card-wide {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.integrations-list .integration-card-wide:hover {
+	background-color: var(--bg-surface);
+}

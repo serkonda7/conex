@@ -1,13 +1,12 @@
 /**
  * Calendar sync card on the integrations page (TANSS appointments →
- * Outlook), laid out like the provider cards: "Sync now" / "Edit" in the
- * header and a summary of the Microsoft 365 app, which "Edit" swaps for the
- * settings form with its connection test, and the recent runs. The
- * technician → mailbox mappings live on their own page
- * (/integrations/calendar-sync), linked from the card like the TANSS
- * consistency report. Global `integrations.manage` only, like the routes.
+ * Outlook), an `IntegrationCard` like the providers': "Sync now" in the
+ * footer, "Edit" in the ⋯ menu, which swaps the card for the settings form
+ * with its connection test. The technician → mailbox mappings live on their
+ * own page (/integrations/calendar-sync), linked from the card like the
+ * TANSS consistency report. Global `integrations.manage` only, like the routes.
  */
-import { IconPencil, IconRefresh } from '@tabler/icons-solidjs'
+import { IconCalendarEvent, IconPencil, IconPlus, IconRefresh } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { CALENDAR_SYNC_MAX_INTERVAL, CALENDAR_SYNC_MIN_INTERVAL } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
@@ -29,11 +28,19 @@ import {
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { Field, Hint, TextField, ToggleField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
+import { RowMenu, useRowMenu } from '../../components/list_page'
+import { MoreActionsButton } from '../../components/more_actions_button'
 import { t } from '../../i18n'
-import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
+import { createRecord, createRows, useAction } from '../../lib/resource'
 import { usePageMeta } from '../../lib/router'
 import { type TestResult, TestResultLine } from './form_fields'
-import { RunStateLine } from './run_state'
+import {
+	IntegrationCard,
+	type IntegrationStatus,
+	LastRunLine,
+	StatusPill,
+	WarningPill,
+} from './integration_card'
 
 /** Credentials, schedule and the connection test. */
 function SettingsForm(props: {
@@ -318,87 +325,81 @@ export function CalendarSyncTechniciansPage(): JSX.Element {
 	)
 }
 
-/**
- * Enabled state (or the last error) of the sync, and how many technicians
- * have an enabled mailbox mapping.
- */
-function SyncState(props: {
-	config: CalendarSyncConfigJson
-	technicians: CalendarTechnicianJson[] | undefined
-}): JSX.Element {
-	const active = (): number =>
-		(props.technicians ?? []).filter((tech) => tech.mapping?.enabled === true).length
+/** Enabled, but the sign-in or the latest run failed (header summary). */
+export function calendarNeedsAttention(config: CalendarSyncConfigJson | null): boolean {
+	return (
+		config?.configured === true &&
+		config.enabled &&
+		(config.last_error !== null || config.last_run?.state === 'error')
+	)
+}
+
+/** Card state of the configured sync; `running` covers a run followed from here. */
+function syncStatus(config: CalendarSyncConfigJson, running: boolean): IntegrationStatus {
+	if (!config.enabled) {
+		return 'disabled'
+	}
+	if (config.last_error) {
+		return 'error'
+	}
+	return running ? 'running' : 'connected'
+}
+
+/** "Edit" behind the ⋯ button of the configured sync. */
+function SyncMenu(props: { onEdit: () => void }): JSX.Element {
+	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 	return (
 		<>
-			<div>
-				<Show when={props.config.enabled} fallback={t('integration.disabled')}>
-					<Show when={props.config.last_error} fallback={t('integration.enabled')}>
-						<span class="text-danger">{props.config.last_error}</span>
-					</Show>
-				</Show>
-			</div>
-			<Show when={props.technicians}>
-				{(techs: () => CalendarTechnicianJson[]) => (
-					<div>
-						{t('calendarSync.technicianCount', {
-							active: active(),
-							total: techs().length,
-						})}
-					</div>
-				)}
-			</Show>
+			<MoreActionsButton
+				name={t('calendarSync.title')}
+				open={openMenu() !== null}
+				onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+					toggleMenu(e, 'calendar-sync', t('calendarSync.title'))
+				}
+				onClose={closeMenu}
+			/>
+			<RowMenu
+				menu={openMenu}
+				onClose={closeMenu}
+				cloneHref={() => undefined}
+				actions={() => [
+					{ label: t('common.edit'), icon: IconPencil, onSelect: props.onEdit },
+				]}
+				deletable={() => false}
+				onDelete={() => undefined}
+			/>
 		</>
 	)
 }
 
-/** State, time, error and counts of the latest run. */
-function LastRun(props: { run: CalendarSyncRunJson }): JSX.Element {
-	return (
-		<>
-			<RunStateLine run={props.run} />
-			<Show when={props.run.state !== 'running'}>
-				<div>{t('calendarSync.counts', { ...props.run.counts })}</div>
-			</Show>
-		</>
-	)
-}
-
-/** Summary of the saved settings and the latest run. */
+/** Status pills, last sync time and errors of the configured sync. */
 function SyncDetails(props: {
 	config: CalendarSyncConfigJson
-	lastRun: CalendarSyncRunJson | undefined
-	technicians: CalendarTechnicianJson[] | undefined
+	status: IntegrationStatus
+	lastRun: CalendarSyncRunJson | null
 }): JSX.Element {
 	return (
 		<>
-			<dl class="detail-grid">
-				<dt>{t('calendarSync.tenantId')}</dt>
-				<dd>{props.config.ms_tenant_id}</dd>
-				<dt>{t('calendarSync.clientId')}</dt>
-				<dd>{props.config.client_id}</dd>
-				<dt>{t('calendarSync.intervalLabel')}</dt>
-				<dd>
-					{t('calendarSync.everyMinutes', { minutes: props.config.interval_minutes })}
-				</dd>
-				<dt>{t('common.status')}</dt>
-				<dd>
-					<SyncState config={props.config} technicians={props.technicians} />
-				</dd>
-				<dt>{t('integration.lastSync')}</dt>
-				<dd>
-					<Show when={props.lastRun} fallback={t('integration.neverSynced')}>
-						{(run: () => CalendarSyncRunJson) => <LastRun run={run()} />}
-					</Show>
-				</dd>
-			</dl>
-			<p>
-				<a href="/integrations/calendar-sync">{t('calendarSync.openTechnicians')}</a>
-			</p>
+			<div class="integration-status">
+				<StatusPill status={props.status} />
+				<Show when={props.config.enabled && props.lastRun?.state === 'error'}>
+					<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
+				</Show>
+			</div>
+			<Show when={props.config.enabled && props.config.last_error}>
+				<p class="integration-error">{props.config.last_error}</p>
+			</Show>
+			<LastRunLine run={props.lastRun} />
 		</>
 	)
 }
 
-export function CalendarSyncCard(): JSX.Element {
+/**
+ * Calendar sync card on the integrations page (`integrations.manage`,
+ * global): "Set up" or "Edit" swaps the card for the settings form across
+ * the whole row; the technician mapping has its own page.
+ */
+function ConfigurableSyncCard(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [syncing, setSyncing] = createSignal(false)
 	const [config, { mutate }] = createRecord(() => true, fetch_calendar_sync_config, setError)
@@ -435,102 +436,133 @@ export function CalendarSyncCard(): JSX.Element {
 	}
 
 	const [editing, setEditing] = createSignal(false)
-	// Shares the cache with the technician page, so its changes show here.
-	const [technicians] = createRowsFor(
-		() => config()?.configured === true,
-		fetch_calendar_technicians,
-		setError,
-	)
-
+	const status = (c: CalendarSyncConfigJson): IntegrationStatus => syncStatus(c, syncing())
 	const canSync = (): boolean => {
 		const c = config()
 		return c?.configured === true && c.enabled && !syncing()
 	}
 
 	return (
-		<section class="card" aria-label={t('calendarSync.title')}>
-			<div class="page-header">
-				<h3>{t('calendarSync.title')}</h3>
-				<Show when={config()}>
-					{(c: () => CalendarSyncConfigJson): JSX.Element => (
+		<Show
+			when={config()}
+			fallback={
+				<IntegrationCard
+					name={t('calendarSync.title')}
+					description={t('calendarSync.description')}
+					icon={IconCalendarEvent}
+					details={<Loading message={t('calendarSync.loading')} />}
+				/>
+			}
+		>
+			{(c: () => CalendarSyncConfigJson): JSX.Element => (
+				<IntegrationCard
+					name={t('calendarSync.title')}
+					description={t('calendarSync.description')}
+					icon={IconCalendarEvent}
+					tone={
+						!c().configured
+							? undefined
+							: status(c()) === 'error'
+								? 'error'
+								: status(c()) === 'disabled'
+									? 'disabled'
+									: undefined
+					}
+					form={
+						editing() ? (
+							<>
+								<h4>{t('calendarSync.settings')}</h4>
+								<SettingsForm
+									config={c()}
+									onSaved={(saved: CalendarSyncConfigJson): void => {
+										mutate(saved)
+										setEditing(false)
+									}}
+									onCancel={(): void => {
+										setEditing(false)
+									}}
+								/>
+								<InlineError message={error()} />
+							</>
+						) : undefined
+					}
+					details={
+						c().configured || error() !== null ? (
+							<>
+								<Show when={c().configured}>
+									<SyncDetails
+										config={c()}
+										status={status(c())}
+										lastRun={runs()?.[0] ?? null}
+									/>
+								</Show>
+								<InlineError message={error()} />
+							</>
+						) : undefined
+					}
+					menu={
+						<Show when={c().configured}>
+							<SyncMenu onEdit={() => setEditing(true)} />
+						</Show>
+					}
+					link={
+						<Show when={c().configured}>
+							<a href="/integrations/calendar-sync">
+								{t('calendarSync.openTechnicians')}
+							</a>
+						</Show>
+					}
+					action={
 						<Show
 							when={c().configured}
 							fallback={
-								<Show when={!editing()}>
-									<button
-										type="button"
-										class="btn-add"
-										onClick={(): void => {
-											setEditing(true)
-										}}
-									>
-										{t('integration.setUp')}
-									</button>
-								</Show>
+								<button type="button" onClick={() => setEditing(true)}>
+									<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
+								</button>
 							}
 						>
-							<div class="form-actions">
-								<button
-									type="button"
-									disabled={!canSync()}
-									onClick={() => void handleSync()}
-								>
-									<IconLabel icon={IconRefresh}>
-										{syncing()
-											? t('integration.syncing')
-											: t('integration.syncNow')}
-									</IconLabel>
-								</button>
-								<button
-									type="button"
-									disabled={editing()}
-									onClick={(): void => {
-										setEditing(true)
-									}}
-								>
-									<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
-								</button>
-							</div>
+							<button
+								type="button"
+								disabled={!canSync()}
+								onClick={() => void handleSync()}
+							>
+								<IconLabel icon={IconRefresh}>
+									{syncing()
+										? t('integration.syncing')
+										: t('integration.syncNow')}
+								</IconLabel>
+							</button>
 						</Show>
-					)}
-				</Show>
-			</div>
-			<Show when={config()} fallback={<Loading message={t('calendarSync.loading')} />}>
-				{(c: () => CalendarSyncConfigJson): JSX.Element => (
-					<>
-						<Show
-							when={editing()}
-							fallback={
-								<Show
-									when={c().configured}
-									fallback={<Empty message={t('integration.notConfigured')} />}
-								>
-									<SyncDetails
-										config={c()}
-										lastRun={runs()?.[0]}
-										technicians={
-											technicians.loading ? undefined : technicians()
-										}
-									/>
-								</Show>
-							}
-						>
-							<h4>{t('calendarSync.settings')}</h4>
-							<SettingsForm
-								config={c()}
-								onSaved={(saved: CalendarSyncConfigJson): void => {
-									mutate(saved)
-									setEditing(false)
-								}}
-								onCancel={(): void => {
-									setEditing(false)
-								}}
-							/>
-						</Show>
-					</>
-				)}
-			</Show>
-			<InlineError message={error()} />
-		</section>
+					}
+				/>
+			)}
+		</Show>
+	)
+}
+
+/**
+ * The calendar sync card; while TANSS is not set up it only says so, since
+ * the sync reads its appointments from there.
+ */
+export function CalendarSyncCard(props: { blocked: boolean }): JSX.Element {
+	return (
+		<Show
+			when={!props.blocked}
+			fallback={
+				<IntegrationCard
+					name={t('calendarSync.title')}
+					description={t('calendarSync.description')}
+					icon={IconCalendarEvent}
+					details={<p class="integration-meta">{t('calendarSync.requiresTanss')}</p>}
+					action={
+						<button type="button" disabled>
+							<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
+						</button>
+					}
+				/>
+			}
+		>
+			<ConfigurableSyncCard />
+		</Show>
 	)
 }

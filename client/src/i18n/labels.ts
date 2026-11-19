@@ -39,7 +39,6 @@ import {
 	type PortKind,
 	type PortSide,
 	RACK_FORM_FACTORS,
-	type SyncRunState,
 	type TemplateSyncField,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
@@ -458,15 +457,13 @@ export function providerLabel(value: string): string {
 	return lookup(PROVIDER_KEYS, value)
 }
 
-const SYNC_STATE_KEYS: Record<SyncRunState, MessageKey> = {
-	running: 'syncState.running',
-	ok: 'syncState.ok',
-	error: 'syncState.error',
+const PROVIDER_DESCRIPTION_KEYS: Record<IntegrationProvider, MessageKey> = {
+	tanss: 'provider.tanss.description',
 }
 
-/** Sync run state (`running` / `ok` / `error`). */
-export function syncStateLabel(value: string): string {
-	return lookup(SYNC_STATE_KEYS, value)
+/** One-line summary of what an integration provider does, for its card. */
+export function providerDescription(value: string): string {
+	return lookup(PROVIDER_DESCRIPTION_KEYS, value)
 }
 
 const FINDING_KEYS: Record<FindingKind, MessageKey> = {

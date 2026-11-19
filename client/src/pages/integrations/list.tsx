@@ -1,136 +1,276 @@
-import { IconPencil, IconRefresh, IconTrash } from '@tabler/icons-solidjs'
+import {
+	IconLayoutGrid,
+	IconList,
+	IconPencil,
+	IconPlugConnected,
+	IconPlus,
+	IconRefresh,
+	IconTicket,
+} from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { INTEGRATION_PROVIDERS } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
+import { fetch_calendar_sync_config } from '../../api/calendar_sync'
 import {
 	delete_integration,
 	fetch_integrations,
 	type IntegrationJson,
 	type IntegrationProvider,
-	type SyncRunJson,
 	start_sync,
 	wait_for_sync,
 } from '../../api/integrations'
-import { Empty, InlineError, Loading } from '../../components/feedback'
+import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
+import { RowMenu, type RowMenuAction, useRowMenu } from '../../components/list_page'
+import { MoreActionsButton } from '../../components/more_actions_button'
 import { t, tp } from '../../i18n'
-import { providerLabel } from '../../i18n/labels'
-import { createRows, useAction } from '../../lib/resource'
+import { providerDescription, providerLabel } from '../../i18n/labels'
+import { createRecord, createRows, useAction } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
-import { formatTime } from '../../lib/time'
-import { CalendarSyncCard } from './calendar_sync'
-import { RunStateLine } from './run_state'
+import { CalendarSyncCard, calendarNeedsAttention } from './calendar_sync'
+import {
+	IntegrationCard,
+	type IntegrationLayout,
+	type IntegrationStatus,
+	integrationLayout,
+	LastRunLine,
+	StatusPill,
+	setIntegrationLayout,
+	WarningPill,
+} from './integration_card'
 
-/** Login state: disabled, the last error, or when it last connected. */
-function LoginStatus(props: { integration: IntegrationJson }): JSX.Element {
-	const connected = (): string => {
-		const at = props.integration.last_login_ok_at
-		return at === null ? '—' : t('integration.connectedAt', { time: formatTime(at) })
+/** Card state of a configured provider; `syncing` is a sync started from this page. */
+function providerStatus(integration: IntegrationJson, syncing: boolean): IntegrationStatus {
+	if (!integration.enabled) {
+		return 'disabled'
 	}
+	if (integration.last_error) {
+		return 'error'
+	}
+	return syncing || integration.last_sync?.state === 'running' ? 'running' : 'connected'
+}
+
+/** Enabled, but the login or the latest sync failed. */
+function needsAttention(integration: IntegrationJson): boolean {
 	return (
-		<Show when={props.integration.enabled} fallback={t('integration.disabled')}>
-			<Show when={props.integration.last_error} fallback={connected()}>
-				<span class="text-danger">{props.integration.last_error}</span>
-			</Show>
-		</Show>
+		integration.enabled &&
+		(integration.last_error !== null || integration.last_sync?.state === 'error')
 	)
 }
 
-/** State, time, error and counts of the last sync run. */
-function SyncStatus(props: { run: SyncRunJson }): JSX.Element {
+/** Edit / force full sync / delete behind the ⋯ button of a configured provider. */
+function ProviderMenu(props: {
+	integration: IntegrationJson
+	busy: boolean
+	onSync: (clean: boolean) => void
+	onDelete: () => void
+}): JSX.Element {
+	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
+	const name = (): string => providerLabel(props.integration.provider)
+	const actions = (): RowMenuAction[] => [
+		{
+			label: t('common.edit'),
+			icon: IconPencil,
+			onSelect: (): void => navigate(`/integrations/${props.integration.id}/edit`),
+		},
+		...(canGlobal('integrations.manage') && props.integration.enabled && !props.busy
+			? [
+					{
+						label: t('integration.forceFullSync'),
+						icon: IconRefresh,
+						onSelect: (): void => props.onSync(true),
+					},
+				]
+			: []),
+	]
 	return (
 		<>
-			<RunStateLine run={props.run} />
-			<Show when={props.run.state === 'ok'}>
-				<div>
-					{t('integration.syncCounts', {
-						tenants: props.run.counts.tenants,
-						devices: props.run.counts.devices,
-					})}
-				</div>
-			</Show>
+			<MoreActionsButton
+				name={name()}
+				open={openMenu() !== null}
+				onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+					toggleMenu(e, props.integration.provider, name())
+				}
+				onClose={closeMenu}
+			/>
+			<RowMenu
+				menu={openMenu}
+				onClose={closeMenu}
+				cloneHref={() => undefined}
+				actions={actions}
+				deletable={() => true}
+				onDelete={() => props.onDelete()}
+			/>
 		</>
 	)
 }
 
-/** Sync / full sync / edit / delete buttons of a configured provider. */
-function IntegrationActions(props: {
-	integration: IntegrationJson
+/** Card of one provider, set up or not. */
+function ProviderCard(props: {
+	provider: IntegrationProvider
+	integration: IntegrationJson | undefined
 	/** Provider currently syncing from this page, if any. */
 	syncing: IntegrationProvider | null
 	onSync: (clean: boolean) => void
 	onDelete: () => void
 }): JSX.Element {
-	const running = (): boolean =>
-		props.syncing === props.integration.provider ||
-		props.integration.last_sync?.state === 'running'
-	const busy = (): boolean =>
-		props.syncing !== null || props.integration.last_sync?.state === 'running'
+	const shared = {
+		get name(): string {
+			return providerLabel(props.provider)
+		},
+		get description(): string {
+			return providerDescription(props.provider)
+		},
+		icon: IconTicket,
+	}
 	return (
-		<div class="form-actions">
-			<Show when={can('integrations.manage')}>
-				<button type="button" disabled={busy()} onClick={() => props.onSync(false)}>
-					<IconLabel icon={IconRefresh}>
-						{running() ? t('integration.syncing') : t('integration.syncNow')}
-					</IconLabel>
-				</button>
-				<Show when={canGlobal('integrations.manage')}>
-					<button type="button" disabled={busy()} onClick={() => props.onSync(true)}>
-						<IconLabel icon={IconRefresh}>
-							{running() ? t('integration.syncing') : t('integration.forceFullSync')}
-						</IconLabel>
-					</button>
-				</Show>
-			</Show>
-			<Show when={can('integrations.manage')}>
-				<button
-					type="button"
-					onClick={() => navigate(`/integrations/${props.integration.id}/edit`)}
-				>
-					<IconLabel icon={IconPencil}>{t('common.edit')}</IconLabel>
-				</button>
-				<button type="button" class="btn-danger" onClick={() => props.onDelete()}>
-					<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
-				</button>
-			</Show>
-		</div>
+		<Show
+			when={props.integration}
+			fallback={
+				<IntegrationCard
+					{...shared}
+					action={
+						<Show when={can('integrations.manage')}>
+							<button type="button" onClick={() => navigate('/integrations/add')}>
+								<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
+							</button>
+						</Show>
+					}
+				/>
+			}
+		>
+			{(integration: () => IntegrationJson): JSX.Element => {
+				const running = (): boolean =>
+					props.syncing === props.provider || integration().last_sync?.state === 'running'
+				const busy = (): boolean => props.syncing !== null || running()
+				const status = (): IntegrationStatus => providerStatus(integration(), running())
+				const neverSynced = (): boolean => integration().last_sync === null
+				return (
+					<IntegrationCard
+						{...shared}
+						tone={
+							status() === 'error'
+								? 'error'
+								: status() === 'disabled'
+									? 'disabled'
+									: undefined
+						}
+						status={
+							<>
+								<StatusPill status={status()} />
+								<Show
+									when={
+										integration().enabled &&
+										integration().last_sync?.state === 'error'
+									}
+								>
+									<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
+								</Show>
+							</>
+						}
+						details={
+							<>
+								<Show when={integration().enabled && integration().last_error}>
+									<p class="integration-error">{integration().last_error}</p>
+								</Show>
+								<LastRunLine run={integration().last_sync} />
+							</>
+						}
+						menu={
+							<Show when={can('integrations.manage')}>
+								<ProviderMenu
+									integration={integration()}
+									busy={busy()}
+									onSync={props.onSync}
+									onDelete={props.onDelete}
+								/>
+							</Show>
+						}
+						link={
+							<Show
+								when={status() === 'error' && can('integrations.manage')}
+								fallback={
+									<a href={`/integrations/${integration().id}`}>
+										{t('integration.openReport')}
+									</a>
+								}
+							>
+								<a href={`/integrations/${integration().id}/edit`}>
+									{t('integration.fixConnection')}
+								</a>
+							</Show>
+						}
+						action={
+							<Show when={can('integrations.manage')}>
+								<button
+									type="button"
+									classList={{
+										'btn-add': neverSynced() && status() === 'connected',
+									}}
+									disabled={busy() || !integration().enabled}
+									onClick={() => props.onSync(false)}
+								>
+									<Show
+										when={!neverSynced() || running()}
+										fallback={t('integration.runFirstSync')}
+									>
+										<IconLabel icon={IconRefresh}>
+											{running()
+												? t('integration.syncing')
+												: t('integration.syncNow')}
+										</IconLabel>
+									</Show>
+								</button>
+							</Show>
+						}
+					/>
+				)
+			}}
+		</Show>
 	)
 }
 
-/** Connection and last-sync details of a configured provider. */
-function IntegrationDetails(props: { integration: IntegrationJson }): JSX.Element {
+/** Grid / list switch of the integrations page. */
+function LayoutToggle(): JSX.Element {
+	const option = (
+		value: IntegrationLayout,
+		label: string,
+		icon: typeof IconList,
+	): JSX.Element => (
+		<button
+			type="button"
+			class="integrations-layout-option"
+			aria-label={label}
+			title={label}
+			aria-pressed={integrationLayout() === value}
+			onClick={(): void => setIntegrationLayout(value)}
+		>
+			<Dynamic component={icon} size={16} />
+		</button>
+	)
 	return (
-		<>
-			<dl class="detail-grid">
-				<dt>{t('integration.baseUrl')}</dt>
-				<dd>{props.integration.base_url}</dd>
-				<dt>{t('integration.username')}</dt>
-				<dd>{props.integration.username}</dd>
-				<dt>{t('integration.lastLogin')}</dt>
-				<dd>
-					<LoginStatus integration={props.integration} />
-				</dd>
-				<dt>{t('integration.lastSync')}</dt>
-				<dd>
-					<Show
-						when={props.integration.last_sync}
-						fallback={t('integration.neverSynced')}
-					>
-						{(run: () => SyncRunJson) => <SyncStatus run={run()} />}
-					</Show>
-				</dd>
-			</dl>
-			<p>
-				<a href={`/integrations/${props.integration.id}`}>{t('integration.openReport')}</a>
-			</p>
-		</>
+		<fieldset class="integrations-layout-toggle" aria-label={t('integration.layout')}>
+			{option('grid', t('integration.layoutGrid'), IconLayoutGrid)}
+			{option('list', t('integration.layoutList'), IconList)}
+		</fieldset>
+	)
+}
+
+/** Category heading with its cards in a responsive grid. */
+function CardSection(props: { title: string; children: JSX.Element }): JSX.Element {
+	return (
+		<section class="integration-section" aria-label={props.title}>
+			<h3>{props.title}</h3>
+			<div class="integration-grid">{props.children}</div>
+		</section>
 	)
 }
 
 /**
- * /integrations — one card per provider: connection state, last sync and
- * the sync / report / edit actions. Admins set up providers here.
+ * /integrations — integration cards grouped by category, with a connected /
+ * needs-attention summary in the header. Admins set up providers here.
  */
 export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -140,6 +280,20 @@ export function IntegrationsPage(): JSX.Element {
 
 	const configured = (provider: IntegrationProvider): IntegrationJson | undefined =>
 		integrations()?.find((i) => i.provider === provider)
+
+	// The calendar sync builds on the TANSS credentials; its card shares this cache entry.
+	const calendarVisible = (): boolean => canGlobal('integrations.manage')
+	const [calendar] = createRecord(
+		() => (calendarVisible() && configured('tanss') ? true : null),
+		fetch_calendar_sync_config,
+		setError,
+	)
+
+	const connectedCount = (): number =>
+		(integrations() ?? []).length + (calendar()?.configured ? 1 : 0)
+	const attentionCount = (): number =>
+		(integrations() ?? []).filter(needsAttention).length +
+		(calendarNeedsAttention(calendar() ?? null) ? 1 : 0)
 
 	async function handleSync(provider: IntegrationProvider, clean: boolean): Promise<void> {
 		const name = providerLabel(provider)
@@ -169,49 +323,34 @@ export function IntegrationsPage(): JSX.Element {
 		await action.run(() => delete_integration(integration.provider))
 	}
 
-	const card = (provider: IntegrationProvider): JSX.Element => (
-		<section class="card" aria-label={providerLabel(provider)}>
-			<div class="page-header">
-				<h3>{providerLabel(provider)}</h3>
-				<Show
-					when={configured(provider)}
-					fallback={
-						<Show when={can('integrations.manage')}>
-							<button
-								type="button"
-								class="btn-add"
-								onClick={(): void => navigate('/integrations/add')}
-							>
-								{t('integration.setUp')}
-							</button>
-						</Show>
-					}
-				>
-					{(integration: () => IntegrationJson): JSX.Element => (
-						<IntegrationActions
-							integration={integration()}
-							syncing={syncing()}
-							onSync={(clean: boolean): void => void handleSync(provider, clean)}
-							onDelete={(): void => void handleDelete(integration())}
-						/>
-					)}
-				</Show>
-			</div>
-			<Show
-				when={configured(provider)}
-				fallback={<Empty message={t('integration.notConfigured')} />}
-			>
-				{(integration: () => IntegrationJson): JSX.Element => (
-					<IntegrationDetails integration={integration()} />
-				)}
-			</Show>
-		</section>
-	)
-
 	return (
-		<div>
-			<div class="page-header">
+		<div
+			class="integrations-page"
+			classList={{ 'integrations-list': integrationLayout() === 'list' }}
+		>
+			<div class="integrations-header">
+				<span class="integrations-header-icon" aria-hidden="true">
+					<IconPlugConnected size={20} />
+				</span>
 				<h2>{tp('entity.integration', 2)}</h2>
+				<div class="integrations-summary">
+					<Show when={connectedCount() > 0}>
+						<span>
+							<span aria-hidden="true" class="integrations-summary-dot" />
+							{t('integration.summaryConnected', { count: connectedCount() })}
+						</span>
+					</Show>
+					<Show when={attentionCount() > 0}>
+						<span>
+							<span
+								aria-hidden="true"
+								class="integrations-summary-dot integrations-summary-dot-warning"
+							/>
+							{tp('integration.summaryAttention', attentionCount())}
+						</span>
+					</Show>
+				</div>
+				<LayoutToggle />
 			</div>
 			<Show
 				when={!integrations.loading || integrations() !== undefined}
@@ -219,10 +358,28 @@ export function IntegrationsPage(): JSX.Element {
 					<Loading message={t('list.loading', { noun: tp('noun.integration', 2) })} />
 				}
 			>
-				<For each={INTEGRATION_PROVIDERS}>{card}</For>
-				{/* Builds on the TANSS integration's credentials. */}
-				<Show when={canGlobal('integrations.manage') && configured('tanss')}>
-					<CalendarSyncCard />
+				<CardSection title={t('integration.category.psa')}>
+					<For each={INTEGRATION_PROVIDERS}>
+						{(provider: IntegrationProvider): JSX.Element => (
+							<ProviderCard
+								provider={provider}
+								integration={configured(provider)}
+								syncing={syncing()}
+								onSync={(clean: boolean): void => void handleSync(provider, clean)}
+								onDelete={(): void => {
+									const integration = configured(provider)
+									if (integration) {
+										void handleDelete(integration)
+									}
+								}}
+							/>
+						)}
+					</For>
+				</CardSection>
+				<Show when={calendarVisible()}>
+					<CardSection title={t('integration.category.calendar')}>
+						<CalendarSyncCard blocked={!configured('tanss')} />
+					</CardSection>
 				</Show>
 			</Show>
 			<InlineError message={error()} />

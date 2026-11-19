@@ -89,7 +89,7 @@ Testpostfach außerhalb der Techniker ist dann erfolgreich.
    erfolgreich sein. Ein Postfach außerhalb der Gruppe muss fehlschlagen.
 3. **Intervall (Minuten)** setzen, **Aktiviert** anhaken, **Speichern**.
 4. Unter **Technikerzuordnung →** das Postfach prüfen und **Zuordnen** klicken.
-5. **Jetzt synchronisieren**
+5. **Synchronisieren**
 
 
 ## Fehlerbehebung
