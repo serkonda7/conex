@@ -10,6 +10,7 @@
 import { createHash } from 'node:crypto'
 import { Result } from 'better-result'
 import * as v from 'valibot'
+import { ensureIntegrationsLive } from '../config'
 
 export interface GraphCredentials {
 	ms_tenant_id: string
@@ -123,7 +124,11 @@ async function send(
 	what: string,
 	url: string,
 	init: RequestInit,
-): Promise<Result<Response, GraphApiError>> {
+): Promise<Result<Response, Error>> {
+	const live = ensureIntegrationsLive('Microsoft Graph')
+	if (Result.isError(live)) {
+		return live
+	}
 	for (let attempt = 1; ; attempt++) {
 		const res = await Result.tryPromise({
 			try: () => fetch(url, init),

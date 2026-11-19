@@ -1,7 +1,11 @@
 import fs from 'node:fs'
 import { Result } from 'better-result'
 import * as v from 'valibot'
+import { getTrimmedEnv } from './util/server_root'
 import { formatValibotIssues } from './util/valibot'
+
+export const INTEGRATION_MODES = ['live', 'offline'] as const
+export type IntegrationMode = (typeof INTEGRATION_MODES)[number]
 
 /**
  * Schema definition of config file structure and fields.
@@ -21,6 +25,13 @@ const configSchema = v.strictObject({
 		secureCookies: v.optional(v.boolean(), true), // Only disable for plain-HTTP local development
 	}),
 	frontendUrl: v.optional(v.string()),
+	integrations: v.optional(
+		v.strictObject({
+			// "offline" keeps every integration from contacting its external system.
+			mode: v.optional(v.picklist(INTEGRATION_MODES), 'live'),
+		}),
+		{},
+	),
 	storage: v.optional(
 		v.strictObject({
 			// Image attachments; relative to the data dir, or absolute.
@@ -42,11 +53,21 @@ export function load_config_file(path: string): Result<AppConfig, Error> {
 
 	// Parse TOML file content
 	const content = fs.readFileSync(path, 'utf8')
-	let parsed: object
+	let parsed: Record<string, unknown>
 	try {
-		parsed = Bun.TOML.parse(content)
+		parsed = Bun.TOML.parse(content) as Record<string, unknown>
 	} catch {
 		return Result.err(new Error(`Failed to parse TOML configuration at ${path}`))
+	}
+
+	// CONEX_INTEGRATIONS_MODE overrides `[integrations] mode`; validated below like the file.
+	const modeOverride = getTrimmedEnv('CONEX_INTEGRATIONS_MODE')
+	if (modeOverride !== undefined) {
+		const section = parsed.integrations
+		parsed.integrations = {
+			...(typeof section === 'object' && section !== null ? section : {}),
+			mode: modeOverride,
+		}
 	}
 
 	// Validate schema
@@ -78,4 +99,17 @@ export function getConfig(): AppConfig {
 	}
 
 	return config
+}
+
+/**
+ * Guards every outbound integration request: errs in `offline` mode so no
+ * request reaches `system`. Call it at each client's single network choke point.
+ */
+export function ensureIntegrationsLive(system: string): Result<void, Error> {
+	if (getConfig().integrations.mode === 'offline') {
+		return Result.err(
+			new Error(`${system} is not contacted: integrations are offline ([integrations] mode)`),
+		)
+	}
+	return Result.ok(undefined)
 }

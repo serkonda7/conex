@@ -50,6 +50,7 @@ import {
 	type TnsSupportList,
 } from 'tanss-api'
 import * as v from 'valibot'
+import { ensureIntegrationsLive } from '../../config'
 
 export interface TanssCredentials {
 	base_url: string
@@ -274,6 +275,10 @@ async function call(
 	what: string,
 	run: () => Promise<HeyApiResult>,
 ): Promise<Result<unknown, Error>> {
+	const live = ensureIntegrationsLive('TANSS')
+	if (Result.isError(live)) {
+		return live
+	}
 	const res = await Result.tryPromise({
 		try: run,
 		// Facade methods (ERP client) throw instead of returning `error`.

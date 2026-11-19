@@ -9,6 +9,7 @@
 
 # Integrationen
 
+- [Integrationsmodus](integrations/mode.md)
 - [Datenabgleich der Integrationen](integrations/consistency.md)
 - [Outlook-Kalendersynchronisation](integrations/calendar-sync.md)
 - [AGFEO-Dashboard](integrations/agfeo.md)
