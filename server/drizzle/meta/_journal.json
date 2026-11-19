@@ -148,6 +148,13 @@
       "when": 1794995348996,
       "tag": "0072_device_employees",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795093202862,
+      "tag": "0073_floorplan_device_areas",
+      "breakpoints": true
     }
   ]
 }

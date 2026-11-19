@@ -11,6 +11,7 @@ import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { FloorplanAreaJson, FloorplanPlacementJson } from '../api/attachments'
 import { t, tp } from '../i18n'
+import type { IconComponent } from '../lib/icons'
 import {
 	AREA_LAYERS,
 	type AreaLayer,
@@ -67,6 +68,19 @@ interface GroupedRow {
 	row: ObjectRow
 }
 
+/** Glyph of a marker or device area row; `null` shows the layer swatch. */
+function rowIcon(row: ObjectRow): IconComponent | null {
+	if (row.placement) {
+		return markerIcon(row.placement)
+	}
+	return row.area && row.area.device_id !== null
+		? markerIcon({ rack_id: null, port: null, role_icon: row.area.role_icon })
+		: null
+}
+
+/** Group order of the device layer: after the area layers and racks. */
+const DEVICE_ORDER = 101
+
 /** Every object of the plan as a list row with its group, unfiltered. */
 function groupedRows(
 	areas: FloorplanAreaJson[],
@@ -78,7 +92,11 @@ function groupedRows(
 		rows.push({
 			key: layer,
 			name: layerLabel(layer),
-			order: AREA_LAYERS.indexOf(layer.slice('area-'.length) as AreaLayer),
+			// A device's area lists with the device markers.
+			order:
+				area.device_id !== null
+					? DEVICE_ORDER
+					: AREA_LAYERS.indexOf(layer.slice('area-'.length) as AreaLayer),
 			row: { object: { kind: 'area', id: area.id }, name: areaName(area), layer, area },
 		})
 	}
@@ -101,7 +119,7 @@ function groupedRows(
 				: {
 						key: layer,
 						name: layerLabel(layer),
-						order: layer === 'marker-rack' ? 100 : 101,
+						order: layer === 'marker-rack' ? 100 : DEVICE_ORDER,
 						row,
 					},
 		)
@@ -304,16 +322,11 @@ export function ObjectList(props: {
 													}
 												>
 													<Show
-														when={row.placement}
+														when={rowIcon(row)}
 														fallback={<LayerSwatch layer={row.layer} />}
 													>
-														{(
-															placement: () => FloorplanPlacementJson,
-														) => (
-															<Dynamic
-																component={markerIcon(placement())}
-																size={14}
-															/>
+														{(icon: () => IconComponent) => (
+															<Dynamic component={icon()} size={14} />
 														)}
 													</Show>
 													<span>{row.name}</span>

@@ -50,6 +50,38 @@ export function areaName(area: FloorplanAreaJson): string {
 	return area.label || area.target_name
 }
 
+/** Tooltip of an area: a device's name with its status; none for a site or location. */
+export function areaTitle(area: FloorplanAreaJson): string | undefined {
+	return area.status === null
+		? undefined
+		: markerTitle({ name: areaName(area), status: area.status, port: null })
+}
+
+/** Classes of a device area, from its status; shared by the view and edit modes. */
+export function areaClasses(area: FloorplanAreaJson): Record<string, boolean> {
+	return {
+		'floorplan-area-device': area.device_id !== null,
+		'floorplan-area-inactive': area.status !== null && area.status !== 'active',
+	}
+}
+
+/** Text of an area's label: its name, led by the role glyph for a device. */
+export function AreaLabelText(props: { area: FloorplanAreaJson }): JSX.Element {
+	return (
+		<Show when={props.area.device_id !== null} fallback={areaName(props.area)}>
+			<Dynamic
+				component={markerIcon({
+					rack_id: null,
+					port: null,
+					role_icon: props.area.role_icon,
+				})}
+				size={12}
+			/>
+			<span class="floorplan-area-label-text">{areaName(props.area)}</span>
+		</Show>
+	)
+}
+
 /** Label anchor of an area: its centroid, or the center of its bounding box when it has no area. */
 export function areaCenter(area: FloorplanAreaJson): { x: number; y: number } {
 	let twiceArea = 0

@@ -3,6 +3,7 @@ import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import {
 	CsvImportBodySchema,
+	DeleteQuerySchema,
 	DeviceCreateSchema,
 	DeviceIfaceParamsSchema,
 	DeviceJackParamsSchema,
@@ -158,9 +159,14 @@ export const devicesApp = new Hono()
 		'/:id',
 		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('query', DeleteQuerySchema, onValidationError),
 		async (c) => {
 			const id = c.req.valid('param').id
-			return checkTenant(c, await deviceTenant(id)) ?? sendResult(c, await deleteDevice(id))
+			const confirm = c.req.valid('query').confirm === 'floorplan'
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				sendResult(c, await deleteDevice(id, confirm))
+			)
 		},
 	)
 	// Managed bundle (via the role) and the tenant's SLA for it.

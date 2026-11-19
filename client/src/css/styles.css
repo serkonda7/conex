@@ -3787,6 +3787,11 @@ span.attachment-star,
 	--area-color: #a0a0a0;
 }
 
+/* A device's area (a machine), on the device layer. */
+.floorplan-layer-marker-device {
+	--area-color: #81c784;
+}
+
 .floorplan-swatch {
 	display: inline-grid;
 	place-items: center;
@@ -3883,6 +3888,23 @@ span.attachment-star,
 
 .floorplan-area-label.selected {
 	outline: 2px solid var(--primary);
+}
+
+/* A device's label leads with its role glyph. */
+.floorplan-area-label.floorplan-area-device {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.floorplan-area-label-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.floorplan-area.floorplan-area-inactive,
+.floorplan-area-label.floorplan-area-inactive {
+	opacity: 0.75;
 }
 
 .floorplan-marker {

@@ -5,7 +5,8 @@
  * - Area tool: drag on the stage to draw a rectangle (four points), or
  *   click corner by corner to draw a polygon (closed by clicking the first
  *   corner, a double click or Enter; Backspace drops the last corner,
- *   Escape the whole draft). Then pick its target site or location. Areas
+ *   Escape the whole draft). Then pick its target site or location, or
+ *   the unplaced device it outlines (a machine taking up floor space). Areas
  *   are selected by click, moved by dragging their name, reshaped with
  *   corner handles (a rectangle's neighbors follow), relabelled and deleted
  *   below the stage. Dragging an edge's midpoint handle inserts a corner
@@ -101,8 +102,10 @@ import {
 	toggleSnap,
 } from './floorplan_snap'
 import {
+	AreaLabelText,
 	areaCenter,
-	areaName,
+	areaClasses,
+	areaTitle,
 	FloorplanStage,
 	formatCentimeters,
 	MarkerGlyph,
@@ -246,7 +249,9 @@ function toPut(
 		areas: areas.map((area: FloorplanAreaJson) => ({
 			...(area.site_id !== null
 				? { site_id: area.site_id }
-				: { location_id: area.location_id ?? undefined }),
+				: area.device_id !== null
+					? { device_id: area.device_id }
+					: { location_id: area.location_id ?? undefined }),
 			label: area.label?.trim() || null,
 			points: area.points,
 		})),
@@ -281,7 +286,9 @@ function candidateKey(candidate: {
 		: `device:${candidate.device_id}`
 }
 
-type TargetKind = 'site' | 'location'
+type TargetKind = 'site' | 'location' | 'device'
+
+const TARGET_KINDS: readonly TargetKind[] = ['site', 'location', 'device']
 
 interface AreaTarget {
 	kind: TargetKind
@@ -289,6 +296,9 @@ interface AreaTarget {
 	name: string
 	/** Location type of a location target, for its layer. */
 	type: LocationType | null
+	/** Status and role icon of a device target. */
+	status: string | null
+	role_icon: FloorplanCandidateJson['role_icon']
 }
 
 interface TargetRow {
@@ -297,10 +307,15 @@ interface TargetRow {
 	type?: LocationType
 }
 
-/** Modal to pick the site or location a new area links to. */
+/**
+ * Modal to pick the site or location a new area links to, or the device it
+ * outlines: one of the plan's unplaced device candidates.
+ */
 function AreaTargetPicker(props: {
 	attachment: AttachmentJson
 	areas: FloorplanAreaJson[]
+	/** Devices neither placed nor outlined on the draft. */
+	devices: FloorplanCandidateJson[]
 	on_select: (target: AreaTarget) => void
 	on_close: () => void
 }): JSX.Element {
@@ -314,6 +329,19 @@ function AreaTargetPicker(props: {
 		)
 
 	const load = async (search: string): Promise<Result<TargetRow[], Error>> => {
+		if (kind() === 'device') {
+			const needle = search.trim().toLowerCase()
+			return Result.ok(
+				props.devices
+					.filter((device: FloorplanCandidateJson) =>
+						device.name.toLowerCase().includes(needle),
+					)
+					.map((device: FloorplanCandidateJson) => ({
+						id: device.device_id ?? 0,
+						name: device.name,
+					})),
+			)
+		}
 		const filters = { search, ...tenantContextFilters() }
 		const res: Result<{ items: TargetRow[] }, Error> =
 			kind() === 'site' ? await fetch_sites(filters) : await fetch_locations(filters)
@@ -330,7 +358,7 @@ function AreaTargetPicker(props: {
 			on_close={props.on_close}
 		>
 			<div class="floorplan-kinds">
-				<For each={['site', 'location'] as const}>
+				<For each={TARGET_KINDS}>
 					{(option: TargetKind) => (
 						<button
 							type="button"
@@ -345,20 +373,26 @@ function AreaTargetPicker(props: {
 			</div>
 			{/* Keyed on the kind so the search restarts with the other list. */}
 			<Switch>
-				<For each={['site', 'location'] as const}>
+				<For each={TARGET_KINDS}>
 					{(option: TargetKind) => (
 						<Match when={kind() === option}>
 							<ObjectSearch
 								load={load}
 								get_label={(row: { name: string }) => row.name}
-								on_select={(row: TargetRow) =>
+								on_select={(row: TargetRow) => {
+									const device = props.devices.find(
+										(item: FloorplanCandidateJson) =>
+											option === 'device' && item.device_id === row.id,
+									)
 									props.on_select({
 										kind: option,
 										id: row.id,
 										name: row.name,
 										type: row.type ?? null,
+										status: device?.status ?? null,
+										role_icon: device?.role_icon ?? null,
 									})
-								}
+								}}
 							/>
 						</Match>
 					)}
@@ -628,11 +662,22 @@ export function FloorplanEditor(props: {
 		() => JSON.stringify(toPut(areas(), placements(), planScale(), planOrigin())) !== initial,
 	)
 
+	/** Candidates on the draft: placed as markers, or devices outlined by an area. */
 	const placed = createMemo(
 		() =>
-			new Set(
-				placements().map((placement: FloorplanPlacementJson) => candidateKey(placement)),
-			),
+			new Set([
+				...placements().map((placement: FloorplanPlacementJson) => candidateKey(placement)),
+				...areas().flatMap((area: FloorplanAreaJson) =>
+					area.device_id === null ? [] : [`device:${area.device_id}`],
+				),
+			]),
+	)
+	/** Devices the area picker offers: candidates not yet on the draft. */
+	const freeDevices = createMemo(() =>
+		(candidates() ?? []).filter(
+			(item: FloorplanCandidateJson) =>
+				item.device_id !== null && !placed().has(candidateKey(item)),
+		),
 	)
 	const selectedKeys = createMemo(() => new Set(selection().map(objectKey)))
 	const isSelected = (object: PlanObject): boolean => selectedKeys().has(objectKey(object))
@@ -1212,26 +1257,22 @@ export function FloorplanEditor(props: {
 			return
 		}
 		const id = nextId--
+		const area: FloorplanAreaJson = {
+			id,
+			site_id: target.kind === 'site' ? target.id : null,
+			location_id: target.kind === 'location' ? target.id : null,
+			device_id: target.kind === 'device' ? target.id : null,
+			label: null,
+			points,
+			target_name: target.name,
+			target_type: target.type,
+			target_plan_id: null,
+			status: target.status,
+			role_icon: target.role_icon,
+		}
 		checkpoint()
-		setAreas((all: FloorplanAreaJson[]) => [
-			...all,
-			{
-				id,
-				site_id: target.kind === 'site' ? target.id : null,
-				location_id: target.kind === 'location' ? target.id : null,
-				label: null,
-				points,
-				target_name: target.name,
-				target_type: target.type,
-				target_plan_id: null,
-			},
-		])
-		showLayer(
-			areaLayer({
-				site_id: target.kind === 'site' ? target.id : null,
-				target_type: target.type,
-			}),
-		)
+		setAreas((all: FloorplanAreaJson[]) => [...all, area])
+		showLayer(areaLayer(area))
 		selectOnly({ kind: 'area', id })
 	}
 
@@ -1536,6 +1577,7 @@ export function FloorplanEditor(props: {
 									<g
 										class={`floorplan-area floorplan-area-editing floorplan-layer-${areaLayer(area)}`}
 										classList={{
+											...areaClasses(area),
 											selected: isSelected({ kind: 'area', id: area.id }),
 											'floorplan-dimmed': dimmed({
 												kind: 'area',
@@ -1592,6 +1634,7 @@ export function FloorplanEditor(props: {
 								<span
 									class="floorplan-area-label floorplan-area-label-handle"
 									classList={{
+										...areaClasses(area),
 										selected: isSelected({ kind: 'area', id: area.id }),
 										'floorplan-dimmed': dimmed({ kind: 'area', id: area.id }),
 									}}
@@ -1600,8 +1643,9 @@ export function FloorplanEditor(props: {
 										left: percent(areaCenter(area).x),
 										top: percent(areaCenter(area).y),
 									}}
+									title={areaTitle(area)}
 								>
-									{areaName(area)}
+									<AreaLabelText area={area} />
 								</span>
 							)}
 						</For>
@@ -2040,6 +2084,7 @@ export function FloorplanEditor(props: {
 				<AreaTargetPicker
 					attachment={props.attachment}
 					areas={areas()}
+					devices={freeDevices()}
 					on_select={addArea}
 					on_close={closePicker}
 				/>

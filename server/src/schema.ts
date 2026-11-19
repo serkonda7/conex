@@ -981,8 +981,10 @@ export const attachments = pgTable(
 )
 
 // Area on a floor plan linking to another site or location (each target at
-// most once per plan). `points` is a polygon of at least three `[x, y]`
-// pairs; `label` NULL shows the target's name.
+// most once per plan), or outlining a device (a machine) that takes up floor
+// space. A device lies on at most one plan, as an area or a marker. `points`
+// is a polygon of at least three `[x, y]` pairs; `label` NULL shows the
+// target's name.
 export const floorplan_areas = pgTable(
 	'floorplan_areas',
 	{
@@ -994,13 +996,16 @@ export const floorplan_areas = pgTable(
 		location_id: integer('location_id').references(() => locations.id, {
 			onDelete: 'cascade',
 		}),
+		device_id: integer('device_id')
+			.unique()
+			.references(() => devices.id, { onDelete: 'cascade' }),
 		label: text('label'),
 		points: jsonb('points').$type<[number, number][]>().notNull(),
 	},
 	(table) => [
 		check(
 			'floorplan_areas_target_check',
-			sql`(${table.site_id} IS NULL) <> (${table.location_id} IS NULL)`,
+			sql`num_nonnulls(${table.site_id}, ${table.location_id}, ${table.device_id}) = 1`,
 		),
 		uniqueIndex('floorplan_areas_site_idx').on(table.attachment_id, table.site_id),
 		uniqueIndex('floorplan_areas_location_idx').on(table.attachment_id, table.location_id),
