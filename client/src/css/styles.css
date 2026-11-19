@@ -623,10 +623,188 @@ tbody tr:last-child td {
 	background-color: var(--bg-hover);
 }
 
-/* Account menu at the right end of the top bar. */
+/* Search button and account menu at the right end of the top bar. */
 .app-topbar-user {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 	margin-left: auto;
 	flex-shrink: 0;
+}
+
+/* Opens the command palette; label and shortcut collapse on narrow screens. */
+.app-search-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.3rem 0.5rem;
+	background-color: var(--bg-input);
+	border: 1px solid var(--border-strong);
+	color: var(--text-muted);
+}
+
+.app-search-trigger:hover {
+	background-color: var(--bg-hover);
+	color: var(--text);
+}
+
+.app-search-trigger-label {
+	min-width: 4rem;
+	text-align: left;
+}
+
+.app-search-trigger-key,
+.command-palette-hints kbd {
+	padding: 0 0.3rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.25rem;
+	background-color: var(--bg-raised);
+	color: var(--text-secondary);
+	font-family: inherit;
+	font-size: var(--font-size-sm);
+	line-height: 1.4;
+}
+
+@media (max-width: 48rem) {
+	.app-search-trigger {
+		padding: 0.3rem;
+		border-color: var(--border);
+	}
+
+	.app-search-trigger-label,
+	.app-search-trigger-key {
+		display: none;
+	}
+}
+
+/* Command palette (Ctrl+K): centered near the top, like a launcher. */
+.command-palette {
+	width: min(40rem, calc(100vw - 2rem));
+	max-width: none;
+	margin: 12vh auto auto;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-raised);
+	color: var(--text);
+	box-shadow: var(--shadow);
+}
+
+.command-palette::backdrop {
+	background-color: rgb(0 0 0 / 50%);
+}
+
+.command-palette-box {
+	display: flex;
+	flex-direction: column;
+	max-height: min(32rem, 76vh);
+}
+
+.command-palette-input-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid var(--border);
+	color: var(--text-muted);
+}
+
+.command-palette-input {
+	flex: 1;
+	min-width: 0;
+	padding: 0.35rem 0;
+	border: none;
+	background: transparent;
+	font-size: var(--font-size-lg);
+}
+
+.command-palette-input:focus,
+.command-palette-input:focus-visible {
+	outline: none;
+	box-shadow: none;
+}
+
+.command-palette-options {
+	flex: 1;
+	overflow-y: auto;
+	padding: 0.25rem 0.35rem;
+}
+
+.command-palette-options:empty {
+	display: none;
+}
+
+.command-palette-group {
+	padding: 0.5rem 0.5rem 0.2rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.command-palette-option {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.35rem 0.5rem;
+	border-radius: 0.25rem;
+	color: var(--text);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.command-palette-option:hover {
+	color: var(--text);
+}
+
+.command-palette-option.active {
+	background-color: var(--bg-hover);
+}
+
+.command-palette-icon {
+	display: inline-flex;
+	width: 16px;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.command-palette-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.command-palette-detail {
+	margin-left: auto;
+	padding-left: 0.75rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.command-palette-status {
+	margin: 0;
+	padding: 0.75rem;
+	color: var(--text-muted);
+}
+
+.command-palette-status.error {
+	color: var(--error);
+}
+
+.command-palette-hints {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 1rem;
+	padding: 0.4rem 0.75rem;
+	border-top: 1px solid var(--border);
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.command-palette-hints kbd + kbd {
+	margin-left: 0.15rem;
 }
 
 /* Top-left corner of the top bar: the brand, exactly as wide as the sidebar

@@ -26,6 +26,7 @@ import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/t
 import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
+import { CommandPalette, CommandPaletteButton } from './command_palette'
 import { RouteContent } from './route_content'
 import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
 import { TabBar } from './tab_bar'
@@ -61,6 +62,7 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	const mobileQuery = window.matchMedia('(max-width: 48rem)')
 	const [mobile, setMobile] = createSignal(mobileQuery.matches)
 	const [navigationOpen, setNavigationOpen] = createSignal(false)
+	const [paletteOpen, setPaletteOpen] = createSignal(false)
 	const closeNavigation = (): void => {
 		setNavigationOpen(false)
 	}
@@ -136,9 +138,11 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 					</div>
 				</Show>
 				<div class="app-topbar-user">
+					<CommandPaletteButton onOpen={() => setPaletteOpen(true)} />
 					<UserMenu user={props.user} onLogout={props.onLogout} />
 				</div>
 			</header>
+			<CommandPalette open={paletteOpen()} setOpen={setPaletteOpen} />
 			<div class="app-body">
 				<Show when={mobile()} fallback={<Sidebar />}>
 					<MobileSidebar
