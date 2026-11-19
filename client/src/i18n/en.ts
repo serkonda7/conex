@@ -1112,6 +1112,8 @@ export const en = {
 	'floorplan.finishHint': 'Press Enter to finish the area.',
 	'floorplan.closePolygon': 'Finish the area',
 	'floorplan.selectTarget': 'Select area target',
+	'floorplan.targetSearch': 'Search locations and devices…',
+	'floorplan.unplacedDevices': 'Unplaced devices',
 	'floorplan.areaLabel': 'Label of area {name}',
 	'floorplan.deleteArea': 'Delete area',
 	'floorplan.removeMarker': 'Remove {name} from the plan',

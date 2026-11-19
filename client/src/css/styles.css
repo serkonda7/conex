@@ -4192,6 +4192,90 @@ span.attachment-star,
 	margin: 0.6rem 0;
 }
 
+/* Area target picker: one search over locations and devices, grouped by kind. */
+.modal.floorplan-target-picker {
+	--modal-width: 36rem;
+}
+
+.floorplan-targets {
+	max-height: 24rem;
+	overflow-y: auto;
+	margin-top: 0.75rem;
+	border-top: 1px solid var(--border);
+}
+
+.floorplan-targets h3 {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	margin: 0;
+	padding: 0.5rem 0.5rem 0.25rem;
+	background-color: var(--bg-surface);
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.floorplan-targets ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.floorplan-target {
+	display: grid;
+	grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+	align-items: center;
+	column-gap: 0.6rem;
+	width: 100%;
+	padding: 0.3rem 0.5rem;
+	border: 0;
+	border-radius: 0.25rem;
+	background-color: transparent;
+	text-align: left;
+}
+
+/* Hover follows the pointer through `active`, so it needs no own style. */
+.floorplan-target:hover {
+	background-color: transparent;
+}
+
+.floorplan-target.active {
+	background-color: var(--bg-hover);
+	box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.floorplan-target-icon {
+	display: inline-flex;
+	align-items: center;
+	color: var(--text-secondary);
+}
+
+.floorplan-target-text {
+	display: grid;
+	min-width: 0;
+}
+
+.floorplan-target-text > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.floorplan-target-text small,
+.floorplan-target-detail {
+	color: var(--text-muted);
+}
+
+.floorplan-target-detail {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	white-space: nowrap;
+}
+
 .floorplan-palette-actions button.active,
 .floorplan-kinds button.active {
 	background-color: var(--bg-hover);

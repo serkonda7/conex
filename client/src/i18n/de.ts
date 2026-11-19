@@ -1126,6 +1126,8 @@ export const de: Messages = {
 	'floorplan.finishHint': 'Enter drücken, um den Bereich abzuschließen.',
 	'floorplan.closePolygon': 'Bereich abschließen',
 	'floorplan.selectTarget': 'Ziel des Bereichs wählen',
+	'floorplan.targetSearch': 'Bereiche und Geräte suchen…',
+	'floorplan.unplacedDevices': 'Nicht platzierte Geräte',
 	'floorplan.areaLabel': 'Beschriftung des Bereichs {name}',
 	'floorplan.deleteArea': 'Bereich löschen',
 	'floorplan.removeMarker': '{name} vom Grundriss entfernen',
