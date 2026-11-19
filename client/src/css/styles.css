@@ -881,7 +881,7 @@ tbody tr:last-child td {
 
 .app-nav a.active,
 .app-nav-item.active {
-	background-color: var(--bg-raised);
+	background-color: var(--primary-tint);
 	border-color: var(--border);
 	font-weight: 600;
 }
@@ -909,7 +909,7 @@ tbody tr:last-child td {
 }
 
 .app-nav-item.active {
-	background-color: var(--bg-raised);
+	background-color: var(--primary-tint);
 	border-color: var(--border);
 }
 
