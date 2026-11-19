@@ -1973,13 +1973,18 @@ export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
 
 export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
 
-/** `search` matches username, target username, peer IP or forwarded-for; newest entries first. */
+/** `search` matches username, target username, peer IP or forwarded-for. Defaults to newest first. */
 export const AuditLogListQuerySchema = v.object({
 	...ListQueryEntries,
 	event: v.optional(
 		v.pipe(CsvListSchema, v.array(AuditEventSchema), v.transform(emptyAsUndefined)),
 		undefined,
 	),
+	sort: v.optional(
+		v.picklist(['created_at', 'event', 'username', 'target_username', 'ip', 'user_agent']),
+		'created_at',
+	),
+	order: v.optional(v.picklist(['asc', 'desc']), 'desc'),
 })
 
 export type AuditLogListQuery = v.InferOutput<typeof AuditLogListQuerySchema>
@@ -2445,7 +2450,7 @@ export const ChangeObjectTypeSchema = v.picklist(CHANGE_OBJECT_TYPES)
 
 export type ChangeObjectType = v.InferOutput<typeof ChangeObjectTypeSchema>
 
-/** `search` matches the object name or the username; newest changes first. */
+/** `search` matches the object name or the username. Defaults to newest first. */
 export const ChangelogListQuerySchema = v.object({
 	...ListQueryEntries,
 	action: v.optional(
@@ -2458,6 +2463,11 @@ export const ChangelogListQuerySchema = v.object({
 	),
 	tenant: OptionalIdEntry,
 	tenant_group: OptionalIdEntry,
+	sort: v.optional(
+		v.picklist(['created_at', 'username', 'action', 'object_type', 'object_repr']),
+		'created_at',
+	),
+	order: v.optional(v.picklist(['asc', 'desc']), 'desc'),
 })
 
 export type ChangelogListQuery = v.InferOutput<typeof ChangelogListQuerySchema>

@@ -1,10 +1,10 @@
 import { Result } from 'better-result'
-import { and, desc, inArray, lte } from 'drizzle-orm'
-import type { AuditEvent, AuditLogEntryJson } from 'shared/src/schemas'
+import { and, inArray, lte } from 'drizzle-orm'
+import type { AuditEvent, AuditLogEntryJson, AuditLogListQuery } from 'shared/src/schemas'
 import { audit_log } from '../schema'
 import { nowSeconds } from '../util/time'
 import { getDb } from './connection'
-import { type ListParams, type Page, pageRows, searchCondition, tryWrite } from './list'
+import { type ListParams, orderOf, type Page, pageRows, searchCondition, tryWrite } from './list'
 
 /** Entries older than this are dropped by the periodic session sweep. */
 const AUDIT_RETENTION_S = 365 * 24 * 60 * 60
@@ -45,6 +45,8 @@ export async function recordAudit(entry: AuditRecord): Promise<Result<unknown, E
 
 export interface AuditListParams extends ListParams {
 	event?: AuditEvent[]
+	sort: AuditLogListQuery['sort']
+	order: 'asc' | 'desc'
 }
 
 export async function listAuditLog(
@@ -59,10 +61,18 @@ export async function listAuditLog(
 		]),
 		params.event ? inArray(audit_log.event, params.event) : undefined,
 	)
+	const orderColumn = {
+		created_at: audit_log.created_at,
+		event: audit_log.event,
+		username: audit_log.username,
+		target_username: audit_log.target_username,
+		ip: audit_log.ip,
+		user_agent: audit_log.user_agent,
+	}[params.sort]
 	const page = await pageRows(
 		audit_log,
 		where,
-		[desc(audit_log.created_at), desc(audit_log.id)],
+		[orderOf(orderColumn, params.order), orderOf(audit_log.id, params.order)],
 		params,
 	)
 	return Result.ok(page as Page<AuditLogEntryJson>)

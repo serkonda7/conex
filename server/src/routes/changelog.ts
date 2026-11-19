@@ -32,6 +32,8 @@ export const changelogApp = new Hono()
 				limit: query.limit,
 				action: query.action,
 				object_type: query.object_type,
+				sort: query.sort,
+				order: query.order,
 				...scope,
 			}),
 		)
