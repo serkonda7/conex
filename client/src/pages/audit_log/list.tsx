@@ -7,7 +7,7 @@ import { ListLoading, useListFilters, useSort } from '../../components/list_page
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { usePagedList } from '../../lib/paged_list'
-import { formatTime } from '../../lib/time'
+import { formatRelative, formatTime } from '../../lib/time'
 import { shortUserAgent } from '../../lib/user_agent'
 
 const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
@@ -67,7 +67,9 @@ export function AuditLogPage(): JSX.Element {
 			label: t('audit.time'),
 			class: 'cell-nowrap',
 			sortable: true,
-			getValue: (e: AuditLogEntryJson): string => formatTime(e.created_at),
+			getValue: (e: AuditLogEntryJson): JSX.Element => (
+				<span title={formatTime(e.created_at)}>{formatRelative(e.created_at)}</span>
+			),
 		},
 		{
 			key: 'event',

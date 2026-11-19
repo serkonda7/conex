@@ -9,7 +9,7 @@ import { changeActionOptions, changeObjectLabel, changeObjectOptions } from '../
 import { usePagedList } from '../../lib/paged_list'
 import { parseId } from '../../lib/router'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
-import { formatTime } from '../../lib/time'
+import { formatRelative, formatTime } from '../../lib/time'
 import { ChangeActionBadge, ChangedObjectLink, changeUser } from './common'
 
 /**
@@ -68,9 +68,12 @@ export function ChangelogPage(): JSX.Element {
 		{
 			key: 'created_at',
 			label: t('changelog.time'),
+			class: 'cell-nowrap',
 			sortable: true,
 			getValue: (c: ObjectChangeJson): JSX.Element => (
-				<a href={`/changelog/${c.id}`}>{formatTime(c.created_at)}</a>
+				<a href={`/changelog/${c.id}`} title={formatTime(c.created_at)}>
+					{formatRelative(c.created_at)}
+				</a>
 			),
 		},
 		{
