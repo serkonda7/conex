@@ -29,7 +29,6 @@ const CHANGELOG_RETENTION_S = 365 * 24 * 60 * 60
 export interface ChangeActor {
 	user_id: number
 	username: string
-	request_id: string
 }
 
 const actorStore = new AsyncLocalStorage<ChangeActor>()
@@ -173,7 +172,6 @@ export async function logChanges(changes: Change[]): Promise<void> {
 				created_at: nowSeconds(),
 				user_id: actor?.user_id ?? null,
 				username: actor?.username ?? '',
-				request_id: actor?.request_id ?? null,
 				action,
 				object_type: objectType,
 				object_id: subject.id,

@@ -1033,7 +1033,6 @@ export const en = {
 	'changelog.time': 'Time',
 	'changelog.action': 'Action',
 	'changelog.object': 'Object',
-	'changelog.requestId': 'Request ID',
 	'changelog.system': 'System',
 	'changelog.empty': 'No changes recorded yet.',
 	'changelog.title': 'Change #{id}',

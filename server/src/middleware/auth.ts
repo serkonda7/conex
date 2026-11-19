@@ -42,10 +42,7 @@ export const authMiddleware = createMiddleware<{
 		c.set('jwtPayload', payload)
 		c.set('currentUser', user)
 		// Changes recorded while handling this request are attributed to the user.
-		await runAsActor(
-			{ user_id: user.id, username: user.username, request_id: crypto.randomUUID() },
-			next,
-		)
+		await runAsActor({ user_id: user.id, username: user.username }, next)
 	} catch (_e) {
 		return jsonError(c, 'Unauthorized', 401)
 	}

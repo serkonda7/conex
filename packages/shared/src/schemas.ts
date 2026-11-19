@@ -2480,8 +2480,6 @@ export interface ObjectChangeJson {
 	user_id: number | null
 	/** Name at the time of the change; empty for system changes. */
 	username: string
-	/** Shared by every change one request made. */
-	request_id: string | null
 	action: ChangeAction
 	object_type: ChangeObjectType
 	object_id: number

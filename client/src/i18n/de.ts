@@ -1044,7 +1044,6 @@ export const de: Messages = {
 	'changelog.time': 'Zeitpunkt',
 	'changelog.action': 'Aktion',
 	'changelog.object': 'Objekt',
-	'changelog.requestId': 'Anfrage-ID',
 	'changelog.system': 'System',
 	'changelog.empty': 'Noch keine Änderungen erfasst.',
 	'changelog.title': 'Änderung #{id}',
