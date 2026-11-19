@@ -280,7 +280,7 @@ export const en = {
 	'app.tenantContextList': 'Manage tenants',
 	'palette.title': 'Search and go to',
 	'palette.trigger': 'Search',
-	'palette.placeholder': 'Search objects, pages and actions…',
+	'palette.placeholder': 'Search objects, pages and actions (+ to add)…',
 	'palette.pages': 'Pages',
 	'palette.actions': 'Actions',
 	'palette.searching': 'Searching…',

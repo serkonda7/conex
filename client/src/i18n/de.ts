@@ -281,7 +281,7 @@ export const de: Messages = {
 	'app.tenantContextList': 'Firmen verwalten',
 	'palette.title': 'Suchen und öffnen',
 	'palette.trigger': 'Suchen',
-	'palette.placeholder': 'Einträge, Seiten und Aktionen suchen…',
+	'palette.placeholder': 'Einträge, Seiten und Aktionen suchen (+ zum Hinzufügen)…',
 	'palette.pages': 'Seiten',
 	'palette.actions': 'Aktionen',
 	'palette.searching': 'Suche läuft…',

@@ -1,4 +1,4 @@
-import { and, asc, type SQL } from 'drizzle-orm'
+import { and, asc, eq, type SQL } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
 import { devices, racks, sites, tenants, virtual_machines } from '../schema'
 import { getDb } from './connection'
@@ -9,13 +9,20 @@ interface SearchGroup<T> {
 	total: number
 }
 
+/** A hit that belongs to a tenant; `tenant_name` is null for shared rows. */
+interface TenantHit {
+	id: number
+	name: string
+	tenant_name: string | null
+}
+
 export interface GlobalSearchResponse {
 	q: string
 	tenants: SearchGroup<{ id: number; name: string }>
-	sites: SearchGroup<{ id: number; name: string }>
-	racks: SearchGroup<{ id: number; name: string }>
-	devices: SearchGroup<{ id: number; name: string; asset_tag: string | null }>
-	virtual_machines: SearchGroup<{ id: number; name: string }>
+	sites: SearchGroup<TenantHit>
+	racks: SearchGroup<TenantHit>
+	devices: SearchGroup<TenantHit & { asset_tag: string | null }>
+	virtual_machines: SearchGroup<TenantHit>
 }
 
 const GROUP_LIMIT = 10
@@ -67,20 +74,28 @@ export async function globalSearch(
 			.orderBy(asc(tenants.name), asc(tenants.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: sites.id, name: sites.name })
+			.select({ id: sites.id, name: sites.name, tenant_name: tenants.name })
 			.from(sites)
+			.leftJoin(tenants, eq(tenants.id, sites.tenant_id))
 			.where(and(searchCondition(query, [sites.name]), inScope(sites.tenant_id)))
 			.orderBy(asc(sites.name), asc(sites.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: racks.id, name: racks.name })
+			.select({ id: racks.id, name: racks.name, tenant_name: tenants.name })
 			.from(racks)
+			.leftJoin(tenants, eq(tenants.id, racks.tenant_id))
 			.where(and(searchCondition(query, [racks.name]), inScope(racks.tenant_id)))
 			.orderBy(asc(racks.name), asc(racks.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: devices.id, name: devices.name, asset_tag: devices.asset_tag })
+			.select({
+				id: devices.id,
+				name: devices.name,
+				asset_tag: devices.asset_tag,
+				tenant_name: tenants.name,
+			})
 			.from(devices)
+			.leftJoin(tenants, eq(tenants.id, devices.tenant_id))
 			.where(
 				and(
 					searchCondition(query, [
@@ -95,8 +110,13 @@ export async function globalSearch(
 			.orderBy(asc(devices.name), asc(devices.id))
 			.limit(GROUP_LIMIT),
 		db
-			.select({ id: virtual_machines.id, name: virtual_machines.name })
+			.select({
+				id: virtual_machines.id,
+				name: virtual_machines.name,
+				tenant_name: tenants.name,
+			})
 			.from(virtual_machines)
+			.leftJoin(tenants, eq(tenants.id, virtual_machines.tenant_id))
 			.where(
 				and(
 					searchCondition(query, [virtual_machines.name]),

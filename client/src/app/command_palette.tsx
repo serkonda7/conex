@@ -41,8 +41,12 @@ interface PaletteItem {
 	label: string
 	/** Secondary text right of the label (e.g. a device's asset tag). */
 	detail?: string
+	/** Owning tenant of an object hit, at the right end. */
+	tenant?: string
 	href: string
 	icon?: Component<{ size?: number }>
+	/** Extra words the item matches without showing them (`+` for add forms). */
+	keywords?: string
 }
 
 interface PaletteGroup {
@@ -61,13 +65,29 @@ function sectionIcon(section: Section | null): Section['icon'] {
 	return section?.icon ?? SECTIONS.find((s) => s.path === section?.parent)?.icon
 }
 
-function matches(label: string, query: string): boolean {
-	return label.toLocaleLowerCase().includes(query)
+/** Lower-cased query words; `+` counts as a word of its own (`+device`). */
+function queryWords(query: string): string[] {
+	return query
+		.toLocaleLowerCase()
+		.replaceAll('+', ' + ')
+		.split(/\s+/)
+		.filter((word) => word !== '')
+}
+
+/** True when every query word occurs in the item's label or keywords, in any order. */
+function matches(item: PaletteItem, words: readonly string[]): boolean {
+	const text = `${item.label} ${item.keywords ?? ''}`.toLocaleLowerCase()
+	return words.every((word) => text.includes(word))
+}
+
+/** A query starting with `+` asks for an add form, not for objects. */
+function isAddQuery(query: string): boolean {
+	return query.trim().startsWith('+')
 }
 
 /** Section lists the user may open, then their add/import forms. */
 function commandGroups(query: string): PaletteGroup[] {
-	const q = query.trim().toLocaleLowerCase()
+	const words = queryWords(query)
 	const pages: PaletteItem[] = []
 	const actions: PaletteItem[] = []
 	for (const section of SECTIONS) {
@@ -89,6 +109,7 @@ function commandGroups(query: string): PaletteGroup[] {
 				label: t('tab.add', { entity: section.noun(1) }),
 				href: `${href}/add`,
 				icon: IconPlus,
+				keywords: `+ ${section.noun(2)}`,
 			})
 		}
 		if (section.import) {
@@ -104,15 +125,15 @@ function commandGroups(query: string): PaletteGroup[] {
 		{
 			key: 'pages',
 			label: t('palette.pages'),
-			items: pages.filter((i) => matches(i.label, q)),
+			items: pages.filter((i) => matches(i, words)),
 		},
 	]
 	// Without a query the actions would only bury the pages.
-	if (q !== '') {
+	if (words.length > 0) {
 		groups.push({
 			key: 'actions',
 			label: t('palette.actions'),
-			items: actions.filter((i) => matches(i.label, q)),
+			items: actions.filter((i) => matches(i, words)),
 		})
 	}
 	return groups
@@ -124,7 +145,8 @@ function resultGroups(res: GlobalSearchResponse): PaletteGroup[] {
 		key: string,
 		noun: PluralKey,
 		base: string,
-		rows: { id: number; name: string; detail?: string | null }[],
+		/** `tenant_name`: null for shared rows, absent for tenants themselves. */
+		rows: { id: number; name: string; detail?: string | null; tenant_name?: string | null }[],
 	): PaletteGroup => {
 		const icon = sectionIcon(routeSection(base))
 		return {
@@ -134,6 +156,10 @@ function resultGroups(res: GlobalSearchResponse): PaletteGroup[] {
 				key: `${key}:${row.id}`,
 				label: row.name,
 				detail: row.detail ?? undefined,
+				tenant:
+					row.tenant_name === undefined
+						? undefined
+						: (row.tenant_name ?? t('common.noTenant')),
 				href: `${base}/${row.id}`,
 				icon,
 			})),
@@ -234,7 +260,7 @@ export function CommandPalette(props: {
 			clearTimeout(timer)
 			const seq = ++requestSeq
 			const trimmed = q.trim()
-			if (trimmed === '' || !can('view')) {
+			if (trimmed === '' || isAddQuery(trimmed) || !can('view')) {
 				setResults(null)
 				setError(null)
 				setSearching(false)
@@ -399,6 +425,11 @@ export function CommandPalette(props: {
 											<Show when={item.detail}>
 												<span class="command-palette-detail">
 													{item.detail}
+												</span>
+											</Show>
+											<Show when={item.tenant}>
+												<span class="command-palette-tenant">
+													{item.tenant}
 												</span>
 											</Show>
 										</a>
