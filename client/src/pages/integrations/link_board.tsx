@@ -1,7 +1,7 @@
-import { IconBan, IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
+import { IconBan, IconLinkPlus, IconUnlink, IconX } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import {
 	type IntegrationProvider,
 	ignore_external,
@@ -13,18 +13,41 @@ import {
 	link_external,
 	unlink_external,
 } from '../../api/integrations'
+import { Empty } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
-import { providerLabel } from '../../i18n/labels'
+import { compareFieldLabel, providerLabel } from '../../i18n/labels'
 import { useAction } from '../../lib/resource'
 import { goTo } from '../../lib/router'
 import { can } from '../../lib/session'
+import { formatTime } from '../../lib/time'
 
 type Side = 'local' | 'external'
+
+/** Status switch of the board: what still needs work, what is done, what is set aside. */
+type Filter = 'open' | 'linked' | 'ignored'
 
 interface Picked {
 	side: Side
 	id: string
+}
+
+/** One suggested pair: conex row, external row and the field they matched on. */
+interface SuggestedPair {
+	local: LinkBoardLocal
+	external: LinkBoardExternal
+	via: string
+}
+
+/** One linked pair of the "Linked" view. */
+interface LinkedPair {
+	key: string
+	local: () => JSX.Element
+	external: () => JSX.Element
+	/** Searchable text of both sides. */
+	text: (string | null)[]
+	/** Removes the link; null when it cannot be removed here (yet). */
+	unlink: (() => void) | null
 }
 
 function matches(needle: string, ...values: (string | null)[]): boolean {
@@ -56,14 +79,21 @@ function detailText(...values: (string | null)[]): string {
 }
 
 /**
- * conex objects (left) and external objects (right) of one link level side
- * by side. Click a row on each side (either order) to link them; "Link all
- * suggestions" takes every unambiguous match at once. Picking a row ranks
- * likely partners first on the other side. Linked rows stay visible after unlinked ones; ignored rows
- * are hidden unless toggled on, so both lists shrink while working. Changes
- * show immediately and are reconciled with the server's board afterwards.
- * The employee board can also import every open external employee into
- * conex at once.
+ * conex objects and external objects of one link level. A summary with the
+ * linked share sits on top, then a status switch (Open / Linked / Ignored),
+ * one search for both sides and the bulk actions ("Link all suggestions",
+ * on the employee board "Import employees").
+ *
+ * - **Open:** unambiguous suggestions as pairs, each linked with one click or
+ *   dismissed as "not a match" (for this visit; both rows then join the
+ *   lists below). Below, the remaining rows side by side: click a row on each
+ *   side (either order) to link them; picking a row ranks likely partners
+ *   first on the other side.
+ * - **Linked:** one row per link, with Unlink.
+ * - **Ignored:** ignored rows of both sides, with Restore.
+ *
+ * Changes show immediately and are reconciled with the server's board
+ * afterwards.
  */
 export function LinkBoardView(props: {
 	provider: IntegrationProvider
@@ -72,15 +102,15 @@ export function LinkBoardView(props: {
 	tenant_id?: number
 	editable: boolean
 	on_error: (message: string | null) => void
-	/** Reloads the board from the server. */
 	/** Called with the conex ids linked by one user action. */
 	on_linked?: (ids: number[]) => void
 }): JSX.Element {
-	const [showIgnored, setShowIgnored] = createSignal(false)
-	const [localSearch, setLocalSearch] = createSignal('')
-	const [externalSearch, setExternalSearch] = createSignal('')
+	const [filter, setFilter] = createSignal<Filter>('open')
+	const [search, setSearch] = createSignal('')
 	const [picked, setPicked] = createSignal<Picked | null>(null)
 	const [busy, setBusy] = createSignal(false)
+	// Suggestions rejected as "not a match" (conex ids); kept across reloads.
+	const [dismissed, setDismissed] = createSignal(new Set<number>())
 	const write = useAction(props.on_error)
 	// Optimistic changes, dropped whenever a fresh board arrives.
 	const [linked, setLinked] = createSignal(new Map<number, string>())
@@ -104,6 +134,7 @@ export function LinkBoardView(props: {
 	)
 
 	const provider = (): string => providerLabel(props.provider)
+	const needle = (): string => search().trim().toLowerCase()
 	/** Device and employee boards can ignore conex rows as missing externally. */
 	const ignoresLocal = (): boolean => props.board.entity_type !== 'tenant'
 	const localPath = (id: number): string => {
@@ -114,6 +145,16 @@ export function LinkBoardView(props: {
 					? 'employees'
 					: 'tenants'
 		return `/${base}/${id}`
+	}
+
+	/** The same level on the cross-integration matching page. */
+	const matchingHref = (): string => {
+		const type = props.board.entity_type
+		if (type === 'tenant') {
+			return '/integrations/matching'
+		}
+		const tenant = props.tenant_id === undefined ? '' : `&tenant=${props.tenant_id}`
+		return `/integrations/matching?type=${type === 'device' ? 'devices' : 'employees'}${tenant}`
 	}
 
 	const localById = createMemo(() => new Map(props.board.local.map((r) => [r.id, r])))
@@ -146,33 +187,6 @@ export function LinkBoardView(props: {
 	function localOpen(row: LinkBoardLocal): boolean {
 		return localLink(row) === null && !localIgnored(row)
 	}
-	/** Linked rows stay visible; only ignored rows are hidden by the toggle. */
-	function localVisible(row: LinkBoardLocal): boolean {
-		return showIgnored() || !localIgnored(row)
-	}
-	function externalVisible(row: LinkBoardExternal): boolean {
-		return showIgnored() || !externalIgnored(row)
-	}
-	/** Open rows first, linked rows after, ignored rows last. */
-	function localOrder(row: LinkBoardLocal): number {
-		if (localIgnored(row)) {
-			return 2
-		}
-		return localLink(row) === null ? 0 : 1
-	}
-	function externalOrder(row: LinkBoardExternal): number {
-		if (externalIgnored(row)) {
-			return 2
-		}
-		return externalOpen(row) ? 0 : 1
-	}
-	/** Stable sort by status, then descending score (ties keep server order). */
-	function rankBy<T>(rows: T[], order: (row: T) => number, score: (row: T) => number): T[] {
-		return rows
-			.map((row, index) => ({ row, index, order: order(row), score: score(row) }))
-			.sort((a, b) => a.order - b.order || b.score - a.score || a.index - b.index)
-			.map((entry) => entry.row)
-	}
 	function externalOpen(row: LinkBoardExternal): boolean {
 		return (
 			(row.state === null || released().has(row.external_id)) &&
@@ -180,26 +194,57 @@ export function LinkBoardView(props: {
 			!ignored().has(row.external_id)
 		)
 	}
+	/** Stable sort by descending score (ties keep server order). */
+	function rankBy<T>(rows: T[], score: (row: T) => number): T[] {
+		return rows
+			.map((row, index) => ({ row, index, score: score(row) }))
+			.sort((a, b) => b.score - a.score || a.index - b.index)
+			.map((entry) => entry.row)
+	}
 
 	const openLocal = createMemo(() => props.board.local.filter(localOpen))
 	const openExternal = createMemo(() => props.board.external.filter(externalOpen))
 
-	/** Unambiguous suggestions whose both sides are still free. */
-	const suggestions = createMemo((): [number, string][] => {
+	/** Unambiguous, not dismissed suggestions whose both sides are still free. */
+	const suggestions = createMemo((): SuggestedPair[] => {
 		const free = new Set(openExternal().map((r) => r.external_id))
-		const pairs: [number, string][] = []
-		for (const row of openLocal()) {
-			if (row.suggestion && free.has(row.suggestion.external_id)) {
-				pairs.push([row.id, row.suggestion.external_id])
+		const pairs: SuggestedPair[] = []
+		for (const local of openLocal()) {
+			const suggestion = local.suggestion
+			const external = suggestion ? externalById().get(suggestion.external_id) : undefined
+			if (
+				suggestion &&
+				external &&
+				free.has(suggestion.external_id) &&
+				!dismissed().has(local.id)
+			) {
+				pairs.push({ local, external, via: suggestion.via })
 			}
 		}
 		const uses = new Map<string, number>()
-		for (const [, externalId] of pairs) {
-			uses.set(externalId, (uses.get(externalId) ?? 0) + 1)
+		for (const pair of pairs) {
+			const id = pair.external.external_id
+			uses.set(id, (uses.get(id) ?? 0) + 1)
 		}
-		return pairs.filter(([, externalId]) => uses.get(externalId) === 1)
+		return pairs.filter((pair) => uses.get(pair.external.external_id) === 1)
 	})
-	const suggestionOf = createMemo(() => new Map(suggestions()))
+	const suggestedLocal = createMemo(() => new Set(suggestions().map((p) => p.local.id)))
+	const suggestedExternal = createMemo(
+		() => new Set(suggestions().map((p) => p.external.external_id)),
+	)
+	const visibleSuggestions = createMemo(() =>
+		suggestions().filter(
+			(p) =>
+				matches(needle(), p.local.name, p.local.detail, p.local.serial) ||
+				matches(needle(), p.external.name, p.external.detail, p.external.serial),
+		),
+	)
+
+	/** Open rows not covered by a suggestion: linked by picking both sides. */
+	const unmatchedLocal = createMemo(() => openLocal().filter((r) => !suggestedLocal().has(r.id)))
+	const unmatchedExternal = createMemo(() =>
+		openExternal().filter((r) => !suggestedExternal().has(r.external_id)),
+	)
 
 	const pickedLocal = (): LinkBoardLocal | undefined => {
 		const p = picked()
@@ -211,34 +256,115 @@ export function LinkBoardView(props: {
 	}
 
 	const localRows = createMemo(() => {
-		const needle = localSearch().trim().toLowerCase()
-		const rows = props.board.local.filter(
-			(r) => localVisible(r) && matches(needle, r.name, r.detail, r.serial),
-		)
+		const rows = unmatchedLocal().filter((r) => matches(needle(), r.name, r.detail, r.serial))
 		const partner = pickedExternal()
-		const words = partner ? tokens(partner.name) : null
-		return rankBy(rows, localOrder, (r) =>
-			words === null
-				? 0
-				: r.suggestion?.external_id === partner?.external_id
-					? 100
-					: similarity(words, r.name),
+		if (!partner) {
+			return rows
+		}
+		const words = tokens(partner.name)
+		return rankBy(rows, (r) =>
+			r.suggestion?.external_id === partner.external_id ? 100 : similarity(words, r.name),
 		)
 	})
 	const externalRows = createMemo(() => {
-		const needle = externalSearch().trim().toLowerCase()
-		const rows = props.board.external.filter(
-			(r) => externalVisible(r) && matches(needle, r.name, r.detail, r.serial),
+		const rows = unmatchedExternal().filter((r) =>
+			matches(needle(), r.name, r.detail, r.serial),
 		)
 		const partner = pickedLocal()
-		const words = partner ? tokens(partner.name) : null
-		return rankBy(rows, externalOrder, (r) =>
-			words === null
-				? 0
-				: partner?.suggestion?.external_id === r.external_id
-					? 100
-					: similarity(words, r.name),
+		if (!partner) {
+			return rows
+		}
+		const words = tokens(partner.name)
+		return rankBy(rows, (r) =>
+			partner.suggestion?.external_id === r.external_id ? 100 : similarity(words, r.name),
 		)
+	})
+
+	const ignoredLocalRows = createMemo(() =>
+		props.board.local.filter(
+			(r) => localIgnored(r) && matches(needle(), r.name, r.detail, r.serial),
+		),
+	)
+	const ignoredExternalRows = createMemo(() =>
+		props.board.external.filter(
+			(r) => externalIgnored(r) && matches(needle(), r.name, r.detail, r.serial),
+		),
+	)
+	const ignoredCount = createMemo(
+		() =>
+			props.board.local.filter(localIgnored).length +
+			props.board.external.filter(externalIgnored).length,
+	)
+
+	/**
+	 * Every link of the level: conex rows of the board first, then external
+	 * rows linked to conex objects outside it (another tenant).
+	 */
+	const linkedPairs = createMemo((): LinkedPair[] => {
+		const pairs: LinkedPair[] = []
+		const shown = new Set<string>()
+		for (const row of props.board.local) {
+			const externalId = localLink(row)
+			if (externalId === null || localIgnored(row)) {
+				continue
+			}
+			shown.add(externalId)
+			const external = externalById().get(externalId)
+			const externalName =
+				external?.name ?? (externalId === row.external_id ? row.external_name : null)
+			const linkId = row.link_id
+			pairs.push({
+				key: `l${row.id}`,
+				local: () => localCell(row),
+				external: () =>
+					external ? (
+						externalCell(external)
+					) : (
+						<span class="text-muted">
+							{externalName ?? t('integration.staleExternal', { id: externalId })}
+						</span>
+					),
+				text: [row.name, row.detail, row.serial, externalName, external?.detail ?? null],
+				unlink:
+					props.editable && linkId !== null && externalId === row.external_id
+						? () => void unlink(linkId, externalId)
+						: null,
+			})
+		}
+		for (const row of props.board.external) {
+			if (
+				shown.has(row.external_id) ||
+				externalOpen(row) ||
+				externalIgnored(row) ||
+				(row.entity_id !== null && localById().has(row.entity_id))
+			) {
+				continue
+			}
+			const entityId = row.entity_id
+			pairs.push({
+				key: `e${row.external_id}`,
+				local: () =>
+					entityId !== null ? (
+						<a href={localPath(entityId)}>{row.entity_name ?? `#${entityId}`}</a>
+					) : (
+						<span class="text-muted">—</span>
+					),
+				external: () => externalCell(row),
+				text: [row.name, row.detail, row.serial, row.entity_name],
+				unlink: null,
+			})
+		}
+		return pairs
+	})
+	const visibleLinked = createMemo(() =>
+		linkedPairs().filter((p) => matches(needle(), ...p.text)),
+	)
+
+	/** Linked share of the conex rows that are not ignored. */
+	const progress = createMemo(() => {
+		const rows = props.board.local.filter((r) => !localIgnored(r))
+		const done = rows.filter((r) => localLink(r) !== null).length
+		return { done, total: rows.length }
 	})
 
 	// Actions -------------------------------------------------------------------
@@ -276,6 +402,14 @@ export function LinkBoardView(props: {
 		}
 	}
 
+	function linkSuggestions(pairs: SuggestedPair[]): Promise<void> {
+		return linkPairs(pairs.map((p) => [p.local.id, p.external.external_id]))
+	}
+
+	function dismiss(localId: number): void {
+		setDismissed((prev) => new Set(prev).add(localId))
+	}
+
 	async function ignore(externalId: string): Promise<void> {
 		setPicked(null)
 		setIgnored((prev) => new Set(prev).add(externalId))
@@ -300,8 +434,7 @@ export function LinkBoardView(props: {
 		if (props.board.entity_type !== 'employee') {
 			return []
 		}
-		const suggested = new Set(suggestions().map(([, externalId]) => externalId))
-		return openExternal().filter((r) => r.active && !suggested.has(r.external_id))
+		return unmatchedExternal().filter((r) => r.active)
 	})
 
 	async function importAll(): Promise<void> {
@@ -353,6 +486,11 @@ export function LinkBoardView(props: {
 		setPicked(current?.id === id ? null : { side, id })
 	}
 
+	function selectFilter(next: Filter): void {
+		setPicked(null)
+		setFilter(next)
+	}
+
 	function rowKeyDown(e: KeyboardEvent, activate: () => void): void {
 		if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
 			e.preventDefault()
@@ -369,216 +507,510 @@ export function LinkBoardView(props: {
 	}
 
 	// Cells -----------------------------------------------------------------------
-	function localState(row: LinkBoardLocal): JSX.Element {
-		if (localIgnored(row)) {
-			return (
-				<>
-					<span class="badge">{t('integration.ignored')}</span>
-					<Show when={props.editable && row.link_id !== null}>
-						<button
-							type="button"
-							class="btn-small"
-							onClick={inRow(() => void restoreLocal(row))}
-						>
-							{t('integration.restore')}
-						</button>
-					</Show>
-				</>
-			)
-		}
-		const externalId = localLink(row)
-		if (externalId !== null) {
-			const name =
-				externalById().get(externalId)?.name ??
-				(externalId === row.external_id ? row.external_name : null)
-			return (
-				<>
-					<span>→ {name ?? t('integration.staleExternal', { id: externalId })}</span>
-					<Show
-						when={
-							props.editable && row.link_id !== null && externalId === row.external_id
-						}
-					>
-						<button
-							type="button"
-							class="icon-btn icon-btn-danger"
-							title={t('integration.unlink')}
-							aria-label={t('integration.unlink')}
-							onClick={inRow(() => void unlink(row.link_id ?? 0, externalId))}
-						>
-							<IconUnlink size={20} />
-						</button>
-					</Show>
-				</>
-			)
-		}
-		const ignoreButton = (): JSX.Element => (
-			<Show when={props.editable && ignoresLocal()}>
-				<button
-					type="button"
-					class="icon-btn"
-					title={t('integration.ignore')}
-					aria-label={t('integration.ignore')}
-					onClick={inRow(() => void ignoreLocal(row.id))}
-				>
-					<IconBan size={20} />
-				</button>
+	function inactiveBadge(active: boolean): JSX.Element {
+		return (
+			<Show when={!active}>
+				{' '}
+				<span class="badge">{t('integration.inactive')}</span>
 			</Show>
 		)
-		const suggested = suggestionOf().get(row.id)
-		if (suggested === undefined) {
-			return ignoreButton()
-		}
+	}
+
+	function localCell(row: LinkBoardLocal): JSX.Element {
 		return (
 			<>
-				<span class="link-board-suggestion">
-					≈ {externalById().get(suggested)?.name ?? suggested}
-				</span>
-				<Show when={props.editable}>
-					<button
-						type="button"
-						class="icon-btn icon-btn-connect"
-						title={t('integration.confirmLink')}
-						aria-label={t('integration.confirmLink')}
-						onClick={inRow(() => void linkPairs([[row.id, suggested]]))}
-					>
-						<IconLinkPlus size={20} />
-					</button>
-				</Show>
-				{ignoreButton()}
+				<a
+					href={localPath(row.id)}
+					onClick={(e: MouseEvent): void => {
+						e.stopPropagation()
+						goTo(e, localPath(row.id))
+					}}
+				>
+					{row.name}
+				</a>
+				{inactiveBadge(row.active)}
+				<small class="link-board-detail">{detailText(row.detail, row.serial)}</small>
 			</>
 		)
 	}
 
-	function externalState(row: LinkBoardExternal): JSX.Element {
-		if (externalOpen(row)) {
-			return (
-				<Show when={props.editable}>
-					<button
-						type="button"
-						class="icon-btn"
-						title={t('integration.ignore')}
-						aria-label={t('integration.ignore')}
-						onClick={inRow(() => void ignore(row.external_id))}
-					>
-						<IconBan size={20} />
-					</button>
-				</Show>
-			)
-		}
-		if (externalIgnored(row)) {
-			return (
-				<>
-					<span class="badge">{t('integration.ignored')}</span>
-					<Show when={props.editable && row.state === 'ignored' && row.link_id !== null}>
-						<button
-							type="button"
-							class="btn-small"
-							onClick={inRow(() => void unlink(row.link_id ?? 0, row.external_id))}
-						>
-							{t('integration.restore')}
-						</button>
-					</Show>
-				</>
-			)
-		}
-		const pendingLocal = [...linked()].find(([, id]) => id === row.external_id)?.[0]
-		const name =
-			pendingLocal !== undefined ? localById().get(pendingLocal)?.name : row.entity_name
-		return <span>← {name ?? (row.entity_id !== null ? `#${row.entity_id}` : '')}</span>
-	}
-
-	function searchBox(value: () => string, set: (v: string) => void): JSX.Element {
+	function externalCell(row: LinkBoardExternal): JSX.Element {
 		return (
-			<input
-				type="search"
-				class="toolbar-search-input"
-				aria-label={t('common.search')}
-				placeholder={t('common.search')}
-				value={value()}
-				onInput={(e: InputEvent & { currentTarget: HTMLInputElement }) =>
-					set(e.currentTarget.value)
-				}
-			/>
+			<>
+				<span class="link-board-name">{row.name}</span>
+				{inactiveBadge(row.active)}
+				<small class="link-board-detail">{detailText(row.detail, row.serial)}</small>
+			</>
 		)
 	}
 
-	const empty = (): JSX.Element => (
-		<tr>
-			<td class="text-muted">{t('integration.noRows')}</td>
-		</tr>
+	function ignoreButton(action: () => void): JSX.Element {
+		return (
+			<button
+				type="button"
+				class="icon-btn"
+				title={t('integration.ignore')}
+				aria-label={t('integration.ignore')}
+				onClick={inRow(action)}
+			>
+				<IconBan size={18} />
+			</button>
+		)
+	}
+
+	function restoreButton(action: () => void): JSX.Element {
+		return (
+			<button type="button" class="btn-small" onClick={action}>
+				{t('integration.restore')}
+			</button>
+		)
+	}
+
+	function emptyRow(colspan: number): JSX.Element {
+		return (
+			<tr>
+				<td class="text-muted" colspan={colspan}>
+					{t('integration.noRows')}
+				</td>
+			</tr>
+		)
+	}
+
+	/** Column title with its row count ("12 open", "3 ignored"). */
+	function columnHeading(label: string, count: string): JSX.Element {
+		return (
+			<h4 class="link-board-heading">
+				{label} <span class="text-muted">{count}</span>
+			</h4>
+		)
+	}
+
+	// Views -----------------------------------------------------------------------
+	function filterOption(value: Filter, label: string, count: number): JSX.Element {
+		return (
+			<button
+				type="button"
+				class="link-board-filter-option"
+				aria-pressed={filter() === value}
+				onClick={(): void => selectFilter(value)}
+			>
+				{label} <span class="badge">{count}</span>
+			</button>
+		)
+	}
+
+	function pairsTable(children: JSX.Element): JSX.Element {
+		return (
+			<div class="link-board-scroll">
+				<table class="link-board-pairs">
+					<thead>
+						<tr>
+							<th>{t('integration.sideConex')}</th>
+							<th class="link-board-arrow" />
+							<th>{provider()}</th>
+							<th class="link-board-actions">
+								<span class="visually-hidden">{t('table.actions')}</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody>{children}</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	const pickedName = (): string => pickedLocal()?.name ?? pickedExternal()?.name ?? ''
+
+	const openView = (): JSX.Element => (
+		<Show
+			when={suggestions().length + unmatchedLocal().length + unmatchedExternal().length > 0}
+			fallback={<Empty message={t('integration.nothingOpen')} />}
+		>
+			<Show when={suggestions().length > 0}>
+				<section class="link-board-section">
+					<h3>
+						{t('integration.suggestions')}{' '}
+						<span class="badge">{suggestions().length}</span>
+					</h3>
+					<p class="link-board-hint">{t('integration.suggestionsHint')}</p>
+					{pairsTable(
+						<For each={visibleSuggestions()} fallback={emptyRow(4)}>
+							{(pair: SuggestedPair): JSX.Element => (
+								<tr>
+									<td>{localCell(pair.local)}</td>
+									<td class="link-board-arrow">
+										<span class="link-board-via">
+											{t('integration.matchVia', {
+												field: compareFieldLabel(pair.via),
+											})}
+										</span>
+									</td>
+									<td>{externalCell(pair.external)}</td>
+									<td class="link-board-actions">
+										<span class="row-actions">
+											<Show when={props.editable}>
+												<button
+													type="button"
+													class="icon-btn icon-btn-connect"
+													disabled={busy()}
+													title={t('integration.confirmLink')}
+													aria-label={t('integration.confirmLink')}
+													onClick={(): void =>
+														void linkSuggestions([pair])
+													}
+												>
+													<IconLinkPlus size={18} />
+												</button>
+												<button
+													type="button"
+													class="icon-btn"
+													title={t('integration.dismissSuggestion')}
+													aria-label={t('integration.dismissSuggestion')}
+													onClick={(): void => dismiss(pair.local.id)}
+												>
+													<IconX size={18} />
+												</button>
+											</Show>
+										</span>
+									</td>
+								</tr>
+							)}
+						</For>,
+					)}
+				</section>
+			</Show>
+
+			<Show when={unmatchedLocal().length + unmatchedExternal().length > 0}>
+				<section class="link-board-section">
+					<h3>{t('integration.unmatched')}</h3>
+					<Show when={props.editable}>
+						<Show
+							when={picked()}
+							fallback={<p class="link-board-hint">{t('integration.pickHint')}</p>}
+						>
+							<div class="link-board-pickbar" role="status">
+								<span>
+									{t('integration.pickedHint', {
+										name: pickedName(),
+										side:
+											picked()?.side === 'local'
+												? provider()
+												: t('integration.sideConex'),
+									})}
+								</span>
+								<button
+									type="button"
+									class="btn-small"
+									onClick={(): void => {
+										setPicked(null)
+									}}
+								>
+									{t('common.cancel')}
+								</button>
+							</div>
+						</Show>
+					</Show>
+					<div class="link-board-columns">
+						<div class="link-board-column">
+							{columnHeading(
+								t('integration.sideConex'),
+								t('integration.openCount', { count: unmatchedLocal().length }),
+							)}
+							<div class="link-board-scroll">
+								<table class="link-board-list">
+									<tbody>
+										<For each={localRows()} fallback={emptyRow(2)}>
+											{(row: LinkBoardLocal): JSX.Element => (
+												<tr
+													class="link-board-row"
+													classList={{
+														selected: pickedLocal()?.id === row.id,
+														highlighted:
+															pickedExternal() !== undefined &&
+															row.suggestion?.external_id ===
+																pickedExternal()?.external_id,
+														inactive: !row.active,
+														pickable: props.editable,
+													}}
+													tabIndex={props.editable ? 0 : undefined}
+													aria-selected={pickedLocal()?.id === row.id}
+													onClick={(): void =>
+														pick('local', String(row.id))
+													}
+													onKeyDown={(e: KeyboardEvent): void =>
+														rowKeyDown(e, (): void =>
+															pick('local', String(row.id)),
+														)
+													}
+												>
+													<td>{localCell(row)}</td>
+													<td class="link-board-actions">
+														<span class="row-actions">
+															<Show
+																when={
+																	props.editable && ignoresLocal()
+																}
+															>
+																{ignoreButton(
+																	() => void ignoreLocal(row.id),
+																)}
+															</Show>
+														</span>
+													</td>
+												</tr>
+											)}
+										</For>
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="link-board-column">
+							{columnHeading(
+								provider(),
+								t('integration.openCount', { count: unmatchedExternal().length }),
+							)}
+							<div class="link-board-scroll">
+								<table class="link-board-list">
+									<tbody>
+										<For each={externalRows()} fallback={emptyRow(2)}>
+											{(row: LinkBoardExternal): JSX.Element => (
+												<tr
+													class="link-board-row"
+													classList={{
+														selected:
+															pickedExternal()?.external_id ===
+															row.external_id,
+														highlighted:
+															pickedLocal()?.suggestion
+																?.external_id === row.external_id,
+														inactive: !row.active,
+														pickable: props.editable,
+													}}
+													tabIndex={props.editable ? 0 : undefined}
+													aria-selected={
+														pickedExternal()?.external_id ===
+														row.external_id
+													}
+													onClick={(): void =>
+														pick('external', row.external_id)
+													}
+													onKeyDown={(e: KeyboardEvent): void =>
+														rowKeyDown(e, (): void =>
+															pick('external', row.external_id),
+														)
+													}
+												>
+													<td>{externalCell(row)}</td>
+													<td class="link-board-actions">
+														<span class="row-actions">
+															<Show when={props.editable}>
+																{ignoreButton(
+																	() =>
+																		void ignore(
+																			row.external_id,
+																		),
+																)}
+															</Show>
+														</span>
+													</td>
+												</tr>
+											)}
+										</For>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				</section>
+			</Show>
+		</Show>
+	)
+
+	const linkedView = (): JSX.Element => (
+		<Show
+			when={linkedPairs().length > 0}
+			fallback={<Empty message={t('integration.noLinked')} />}
+		>
+			{pairsTable(
+				<For each={visibleLinked()} fallback={emptyRow(4)}>
+					{(pair: LinkedPair): JSX.Element => (
+						<tr>
+							<td>{pair.local()}</td>
+							<td class="link-board-arrow" aria-hidden="true">
+								⇄
+							</td>
+							<td>{pair.external()}</td>
+							<td class="link-board-actions">
+								<span class="row-actions">
+									<Show when={pair.unlink}>
+										{(action: () => () => void): JSX.Element => (
+											<button
+												type="button"
+												class="icon-btn icon-btn-danger"
+												title={t('integration.unlink')}
+												aria-label={t('integration.unlink')}
+												onClick={(): void => action()()}
+											>
+												<IconUnlink size={18} />
+											</button>
+										)}
+									</Show>
+								</span>
+							</td>
+						</tr>
+					)}
+				</For>,
+			)}
+		</Show>
+	)
+
+	const ignoredView = (): JSX.Element => (
+		<Show when={ignoredCount() > 0} fallback={<Empty message={t('integration.noIgnored')} />}>
+			<div class="link-board-columns">
+				<Show when={ignoresLocal()}>
+					<div class="link-board-column">
+						{columnHeading(
+							t('integration.sideConex'),
+							t('integration.ignoredCount', { count: ignoredLocalRows().length }),
+						)}
+						<div class="link-board-scroll">
+							<table class="link-board-list">
+								<tbody>
+									<For each={ignoredLocalRows()} fallback={emptyRow(2)}>
+										{(row: LinkBoardLocal): JSX.Element => (
+											<tr
+												class="link-board-row"
+												classList={{ inactive: !row.active }}
+											>
+												<td>{localCell(row)}</td>
+												<td class="link-board-actions">
+													<span class="row-actions">
+														<Show
+															when={
+																props.editable &&
+																row.link_id !== null
+															}
+														>
+															{restoreButton(
+																() => void restoreLocal(row),
+															)}
+														</Show>
+													</span>
+												</td>
+											</tr>
+										)}
+									</For>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</Show>
+				<div class="link-board-column">
+					{columnHeading(
+						provider(),
+						t('integration.ignoredCount', { count: ignoredExternalRows().length }),
+					)}
+					<div class="link-board-scroll">
+						<table class="link-board-list">
+							<tbody>
+								<For each={ignoredExternalRows()} fallback={emptyRow(2)}>
+									{(row: LinkBoardExternal): JSX.Element => (
+										<tr
+											class="link-board-row"
+											classList={{ inactive: !row.active }}
+										>
+											<td>{externalCell(row)}</td>
+											<td class="link-board-actions">
+												<span class="row-actions">
+													<Show
+														when={
+															props.editable &&
+															row.state === 'ignored' &&
+															row.link_id !== null
+														}
+													>
+														{restoreButton(
+															() =>
+																void unlink(
+																	row.link_id ?? 0,
+																	row.external_id,
+																),
+														)}
+													</Show>
+												</span>
+											</td>
+										</tr>
+									)}
+								</For>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</Show>
 	)
 
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: Escape drops the picked row.
 		<div
 			class="link-board"
-			onKeyDown={(e: KeyboardEvent) => {
+			onKeyDown={(e: KeyboardEvent): void => {
 				if (e.key === 'Escape') {
 					setPicked(null)
 				}
 			}}
 		>
-			<section class="link-board-side">
-				<h3>
-					{t('integration.sideConex')}{' '}
-					<small class="text-muted">
-						{t('integration.openCount', { count: openLocal().length })}
-					</small>
-				</h3>
-				{searchBox(localSearch, setLocalSearch)}
-				<div class="link-board-scroll">
-					<table>
-						<tbody>
-							<For each={localRows()} fallback={empty()}>
-								{(row: LinkBoardLocal): JSX.Element => (
-									<tr
-										class="link-board-row"
-										classList={{
-											selected: pickedLocal()?.id === row.id,
-											highlighted:
-												pickedExternal() !== undefined &&
-												row.suggestion?.external_id ===
-													pickedExternal()?.external_id,
-											inactive: !row.active,
-										}}
-										tabIndex={0}
-										aria-selected={pickedLocal()?.id === row.id}
-										onClick={() => pick('local', String(row.id))}
-										onKeyDown={(e: KeyboardEvent) =>
-											rowKeyDown(e, () => pick('local', String(row.id)))
-										}
-									>
-										<td>
-											<a
-												href={localPath(row.id)}
-												onClick={(e: MouseEvent): void => {
-													e.stopPropagation()
-													goTo(e, localPath(row.id))
-												}}
-											>
-												{row.name}
-											</a>
-											<small class="link-board-detail">
-												{detailText(row.detail, row.serial)}
-											</small>
-										</td>
-										<td class="link-board-state">{localState(row)}</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
+			<div class="link-board-summary">
+				<div class="link-board-progress" aria-hidden="true">
+					<div
+						class="link-board-progress-bar"
+						style={{
+							width: `${progress().total === 0 ? 0 : (100 * progress().done) / progress().total}%`,
+						}}
+					/>
 				</div>
-			</section>
+				<span>
+					{t('integration.boardProgress', {
+						done: progress().done,
+						total: progress().total,
+					})}
+				</span>
+				<span class="text-muted">
+					{props.board.synced_at
+						? t('integration.syncedAt', { time: formatTime(props.board.synced_at) })
+						: t('integration.neverSynced')}
+				</span>
+				<a class="link-board-matching" href={matchingHref()}>
+					{t('matching.openFromBoard')}
+				</a>
+			</div>
 
-			<section class="link-board-middle">
+			<div class="toolbar-row link-board-toolbar">
+				<fieldset class="link-board-filter" aria-label={t('integration.boardFilter')}>
+					{filterOption(
+						'open',
+						t('integration.boardOpen'),
+						suggestions().length + unmatchedLocal().length + unmatchedExternal().length,
+					)}
+					{filterOption('linked', t('integration.boardLinked'), linkedPairs().length)}
+					{filterOption('ignored', t('integration.ignored'), ignoredCount())}
+				</fieldset>
+				<input
+					type="search"
+					class="toolbar-search-input link-board-search"
+					aria-label={t('integration.boardSearch')}
+					placeholder={t('integration.boardSearch')}
+					value={search()}
+					onInput={(e: InputEvent & { currentTarget: HTMLInputElement }): void => {
+						setSearch(e.currentTarget.value)
+					}}
+				/>
 				<Show when={props.editable}>
 					<Show when={suggestions().length > 0}>
 						<button
 							type="submit"
 							disabled={busy()}
-							onClick={() => void linkPairs(suggestions())}
+							onClick={(): void => void linkSuggestions(suggestions())}
 						>
 							<IconLabel icon={IconLinkPlus}>
 								{tp('integration.linkSuggestions', suggestions().length)}
@@ -590,75 +1022,22 @@ export function LinkBoardView(props: {
 							can('edit') && props.tenant_id !== undefined && importable().length > 0
 						}
 					>
-						<button type="button" disabled={busy()} onClick={() => void importAll()}>
+						<button
+							type="button"
+							disabled={busy()}
+							onClick={(): void => void importAll()}
+						>
 							{tp('integration.importEmployees', importable().length)}
 						</button>
 					</Show>
 				</Show>
-				<label class="link-board-toggle">
-					<input
-						type="checkbox"
-						checked={showIgnored()}
-						onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-							setShowIgnored(e.currentTarget.checked)
-						}
-					/>
-					{t('integration.showIgnored')}
-				</label>
-			</section>
+			</div>
 
-			<section class="link-board-side">
-				<h3>
-					{provider()}{' '}
-					<small class="text-muted">
-						{t('integration.openCount', { count: openExternal().length })}
-					</small>
-				</h3>
-				{searchBox(externalSearch, setExternalSearch)}
-				<div class="link-board-scroll">
-					<table>
-						<tbody>
-							<For each={externalRows()} fallback={empty()}>
-								{(row: LinkBoardExternal): JSX.Element => (
-									<tr
-										class="link-board-row"
-										classList={{
-											selected:
-												pickedExternal()?.external_id === row.external_id,
-											highlighted:
-												pickedLocal()?.suggestion?.external_id ===
-												row.external_id,
-											inactive: !row.active,
-										}}
-										tabIndex={0}
-										aria-selected={
-											pickedExternal()?.external_id === row.external_id
-										}
-										onClick={() => pick('external', row.external_id)}
-										onKeyDown={(e: KeyboardEvent) =>
-											rowKeyDown(e, () => pick('external', row.external_id))
-										}
-									>
-										<td>
-											{row.name}
-											<Show when={!row.active}>
-												{' '}
-												<span class="badge">
-													{t('integration.inactive')}
-												</span>
-											</Show>
-											<small class="link-board-detail">
-												{detailText(row.detail, row.serial)}
-											</small>
-										</td>
-										<td class="link-board-state">{externalState(row)}</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
-				</div>
-			</section>
+			<Switch>
+				<Match when={filter() === 'open'}>{openView()}</Match>
+				<Match when={filter() === 'linked'}>{linkedView()}</Match>
+				<Match when={filter() === 'ignored'}>{ignoredView()}</Match>
+			</Switch>
 		</div>
 	)
 }

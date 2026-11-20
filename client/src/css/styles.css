@@ -5518,58 +5518,159 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
-/* Integration view switch: report / link tenants / link devices. */
-.view-switch {
+/* Link board (integration detail): summary, status switch + search + bulk
+   actions, then suggestion pairs and two pick columns (Open), a pair table
+   (Linked) or two columns with Restore (Ignored). */
+.link-board-summary {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.25rem;
-	margin: 0.5rem 0;
+	align-items: center;
+	gap: 0.4rem 0.75rem;
+	font-size: var(--font-size-sm);
 }
 
-.view-switch [aria-pressed="true"] {
-	border-color: var(--primary);
+.link-board-progress {
+	flex: 0 0 10rem;
+	height: 0.4rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background-color: var(--bg-raised);
+}
+
+.link-board-progress-bar {
+	height: 100%;
+	border-radius: inherit;
+	background-color: var(--primary);
+	transition: width 0.2s ease;
+}
+
+.link-board-toolbar .link-board-search {
+	flex: 1 1 14rem;
+	width: auto;
+}
+
+.link-board-filter {
+	display: inline-flex;
+	min-width: 0;
+	margin: 0;
+	gap: 0.15rem;
+	padding: 0.15rem;
+	border: 1px solid var(--border);
+	border-radius: 0.4rem;
+}
+
+.link-board-filter-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.25rem 0.6rem;
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text-secondary);
+}
+
+.link-board-filter-option:hover {
+	border-color: transparent;
+	background-color: transparent;
+	color: var(--text);
+}
+
+.link-board-filter-option[aria-pressed="true"] {
 	background-color: var(--bg-hover);
+	color: var(--text);
 }
 
-/* Link board: conex table | actions | external table. */
-.link-board {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 12rem minmax(0, 1fr);
+.link-board-section + .link-board-section {
+	margin-top: 1.5rem;
+}
+
+.link-board-section h3 {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0.75rem 0 0.25rem;
+}
+
+.link-board-hint {
+	margin: 0 0 0.5rem;
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+}
+
+/* Shown instead of the hint while a row is picked. */
+.link-board-pickbar {
+	position: sticky;
+	top: var(--topbar-height);
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	gap: 0.75rem;
+	margin: 0 0 0.5rem;
+	padding: 0.4rem 0.6rem;
+	border: 1px solid var(--primary);
+	border-radius: 0.4rem;
+	background-color: var(--primary-tint);
+	font-size: var(--font-size-sm);
+}
+
+.link-board-columns {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 1rem;
 	align-items: start;
 }
 
-.link-board h3 {
-	margin: 0.25rem 0 0.4rem;
+.link-board-heading {
+	margin: 0 0 0.35rem;
+	font-size: var(--font-size-base);
 }
 
-.link-board .toolbar-search-input {
-	margin-bottom: 0.25rem;
+.link-board-heading .text-muted {
+	font-weight: 400;
+	font-size: var(--font-size-sm);
 }
 
 .app-content .link-board-scroll {
 	max-height: 70vh;
 	overflow: auto;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	background-color: var(--bg-surface);
 }
 
-.link-board-row {
+/* The wrapper scrolls and draws the frame, so the sticky head works. */
+.app-content .link-board-scroll table {
+	width: 100%;
+	margin: 0;
+	border: none;
+	border-radius: 0;
+	overflow: visible;
+}
+
+.link-board-pairs thead {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.link-board-row.pickable {
 	cursor: pointer;
 }
 
-.link-board-row:hover td {
-	background-color: var(--bg-raised);
-}
-
-.link-board-row.inactive td {
+.link-board-row.inactive {
 	color: var(--text-muted);
 }
 
-.link-board-row.highlighted td {
-	background-color: rgba(116, 202, 255, 0.12);
+/* Likely partner of the picked row. */
+.link-board-row.highlighted {
+	background-color: color-mix(in srgb, var(--link) 12%, transparent);
 }
 
-.link-board-row.selected td {
-	background-color: rgba(8, 191, 8, 0.18);
+.link-board-row.selected {
+	background-color: var(--primary-tint);
+	outline: 1px solid var(--primary);
+	outline-offset: -1px;
 }
 
 .link-board-detail {
@@ -5578,51 +5679,352 @@ a.rack-shelf-plate:hover {
 	font-size: var(--font-size-sm);
 }
 
-.link-board-state {
-	text-align: right;
+.link-board-arrow {
+	width: 1%;
 	white-space: nowrap;
+	text-align: center;
+	color: var(--text-muted);
 }
 
-.link-board-state > * + .btn-small,
-.link-board-state > * + .icon-btn {
-	margin-left: 0.35rem;
+.link-board-via {
+	font-size: var(--font-size-sm);
+	color: var(--link);
 }
 
-.link-board-state .icon-btn,
+.link-board-actions {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
+}
+
+/* Ignore only shows on hover/focus of its row on pointer devices, so the
+   pick lists read as names rather than buttons. */
+@media (hover: hover) {
+	.link-board-row.pickable .link-board-actions .icon-btn {
+		opacity: 0;
+	}
+
+	.link-board-row.pickable:hover .link-board-actions .icon-btn,
+	.link-board-row.pickable:focus-within .link-board-actions .icon-btn {
+		opacity: 1;
+	}
+}
+
+.link-board-matching {
+	margin-left: auto;
+}
+
+/* Cross-integration matching: conex objects as rows, one column per
+   integration with a combobox per cell; drafts until the sticky footer saves. */
+.matching-heading {
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+
+.app-content .matching-heading h2 {
+	margin: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.matching-heading p {
+	margin: 0.15rem 0 0;
+	font-size: var(--font-size-sm);
+}
+
+.matching-toolbar .link-board-search {
+	flex: 1 1 12rem;
+	width: auto;
+}
+
+.matching-tenant {
+	flex: 0 1 16rem;
+}
+
+.app-content .matching-scroll {
+	max-height: calc(100vh - var(--topbar-height) - 15rem);
+	min-height: 12rem;
+	overflow: auto;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+}
+
+.app-content .matching-table {
+	width: 100%;
+	margin: 0;
+	border: none;
+	border-radius: 0;
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: visible;
+}
+
+.matching-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background-color: var(--bg-raised);
+	vertical-align: bottom;
+}
+
+.matching-table tfoot td {
+	position: sticky;
+	bottom: 0;
+	z-index: 2;
+	background-color: var(--bg-raised);
+	font-size: var(--font-size-sm);
+}
+
+.matching-table th,
+.matching-table td {
+	padding: 0.45rem 0.75rem;
+	border-bottom: 1px solid var(--border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.matching-table tbody tr:hover > * {
+	background-color: color-mix(in srgb, var(--bg-hover) 35%, transparent);
+}
+
+/* The object column stays put while the integration columns scroll sideways. */
+.matching-table .matching-object {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	min-width: 14rem;
+	max-width: 22rem;
+	background-color: var(--bg-surface);
+	font-weight: 400;
+}
+
+.matching-table thead .matching-object {
+	z-index: 3;
+	background-color: var(--bg-raised);
+	font-weight: 600;
+}
+
+.matching-object-line {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+.matching-object-line a {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 600;
+}
+
+.matching-table tr.inactive .matching-object a {
+	color: var(--text-muted);
+}
+
+.matching-object .link-board-detail {
+	padding-left: 1.4rem;
+}
+
+.matching-status {
+	display: inline-flex;
+	flex: none;
+}
+
+.matching-status.done {
+	color: var(--success);
+}
+
+.matching-status.open {
+	color: var(--text-muted);
+}
+
+.matching-col {
+	min-width: 17rem;
+}
+
+.matching-col-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.6rem;
+}
+
+.matching-col-title {
+	font-weight: 600;
+}
+
+.matching-col-count {
+	color: var(--text-muted);
+	font-size: var(--font-size-sm);
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+.matching-col-bar {
+	height: 0.2rem;
+	margin-top: 0.4rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background-color: var(--bg-hover);
+}
+
+.matching-col-bar > div {
+	height: 100%;
+	border-radius: inherit;
+	background-color: var(--primary);
+	transition: width 0.2s ease;
+}
+
+.matching-suggest-all {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin-left: auto;
+	padding: 0.1rem 0.5rem;
+	border: 1px dashed var(--link);
+	border-radius: 999px;
+	background-color: transparent;
+	color: var(--link);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+}
+
+.matching-suggest-all:hover {
+	border-style: solid;
+	background-color: color-mix(in srgb, var(--link) 12%, transparent);
+}
+
+.matching-pick {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.matching-pick .combobox {
+	flex: 1 1 auto;
+}
+
+.matching-pick .combobox-input {
+	padding-block: 0.3rem;
+}
+
+/* Linked cells read as values, open ones as empty inputs. */
+.matching-pick:has(.combobox-input:placeholder-shown) .combobox-input {
+	border-style: dashed;
+}
+
+.matching-pick.ignored .combobox-input {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.matching-clear {
+	flex: none;
+	padding: 0.3rem;
+}
+
+/* Unsaved cell: accent bar on the left edge and an accent border. */
+.matching-cell.changed {
+	box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.matching-cell.changed .combobox-input {
+	border-color: var(--primary);
+}
+
+.matching-suggestion {
+	display: flex;
+	align-items: center;
+	gap: 0.15rem;
+	margin-top: 0.3rem;
+}
+
+.matching-suggestion-accept {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	min-width: 0;
+	max-width: 100%;
+	padding: 0.15rem 0.5rem;
+	border: 1px dashed var(--link);
+	border-radius: 0.3rem;
+	background-color: color-mix(in srgb, var(--link) 8%, transparent);
+	color: var(--link);
+	font-size: var(--font-size-sm);
+	text-align: left;
+}
+
+.matching-suggestion-accept:hover:not(:disabled) {
+	border-style: solid;
+	background-color: color-mix(in srgb, var(--link) 16%, transparent);
+}
+
+.matching-suggestion-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+}
+
+.matching-suggestion-via {
+	flex: none;
+	opacity: 0.85;
+}
+
+.matching-suggestion .icon-btn {
+	padding: 0.2rem;
+}
+
+.matching-footer {
+	position: sticky;
+	bottom: 0;
+	z-index: 4;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	margin-top: 0.75rem;
+	padding: 0.6rem 0;
+	border-top: 1px solid var(--border);
+	background-color: var(--bg-base);
+}
+
+.matching-summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.2rem 0.7rem;
+	border: 1px solid var(--warning);
+	border-radius: 999px;
+	color: var(--warning);
+	background-color: color-mix(in srgb, var(--warning) 10%, transparent);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+}
+
+.matching-summary.complete {
+	border-color: var(--success);
+	color: var(--success);
+	background-color: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.matching-footer-actions {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
 .integration-report .row-actions .icon-btn {
 	padding: 0.45rem;
 }
 
-.link-board-suggestion {
-	color: var(--link);
-}
-
-.link-board-middle {
-	position: sticky;
-	top: calc(var(--topbar-height) + 0.5rem);
-	display: flex;
-	flex-direction: column;
-	gap: 0.6rem;
-	padding-top: 2.1rem;
-}
-
-.link-board-toggle {
-	display: flex;
-	align-items: center;
-	gap: 0.35rem;
-	font-size: var(--font-size-sm);
-	color: var(--text-secondary);
-	cursor: pointer;
-}
-
-@media (max-width: 1100px) {
-	.link-board {
+@media (max-width: 900px) {
+	.link-board-columns {
 		grid-template-columns: minmax(0, 1fr);
-	}
-
-	.link-board-middle {
-		position: static;
-		padding-top: 0;
 	}
 }
 

@@ -1,4 +1,5 @@
 import {
+	IconArrowsJoin2,
 	IconLayoutGrid,
 	IconList,
 	IconPlugConnected,
@@ -267,6 +268,11 @@ export function IntegrationsPage(): JSX.Element {
 						</span>
 					</Show>
 				</div>
+				<Show when={(integrations() ?? []).some((i) => i.enabled)}>
+					<button type="button" onClick={(): void => navigate('/integrations/matching')}>
+						<IconLabel icon={IconArrowsJoin2}>{t('matching.open')}</IconLabel>
+					</button>
+				</Show>
 				<LayoutToggle />
 			</div>
 			<Show
