@@ -22,9 +22,7 @@
     "integrations:snapshot": "bun server/scripts/integrations-snapshot.ts",
     "test": "bun test server/src packages client/src",
     "test:e2e": "playwright test --project=chromium",
-    "test:e2e:reuse": "CONEX_E2E_REUSE_SERVERS=1 playwright test --project=chromium",
-    "test:visual": "CONEX_E2E_RESET_DB=1 playwright test --project=visual",
-    "test:visual:update": "CONEX_E2E_RESET_DB=1 playwright test --project=visual --update-snapshots"
+    "test:e2e:reuse": "CONEX_E2E_REUSE_SERVERS=1 playwright test --project=chromium"
   },
   "packageManager": "bun@1.4.4",
   "catalog": {
@@ -37,7 +35,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
-    "@fontsource-variable/noto-sans": "~5.3.0",
     "@playwright/test": "~1.65.0",
     "@types/bun": "1.4.4",
     "@types/node": "~26.6.6",

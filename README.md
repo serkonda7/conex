@@ -69,10 +69,7 @@ bun run lint:ci
 
 # Export CONEX_DATABASE_URL first (see Environment Variables above).
 bun run test:e2e
-bun run test:visual
-bun run test:visual:update
 ```
-`test:visual` and `test:visual:update` drop and reseed the e2e database, so stop any server left on the e2e API port (3300) first.
 
 
 ## Documentation
