@@ -1867,6 +1867,19 @@ const PermissionListSchema = v.pipe(
 	v.transform((list) => PERMISSIONS.filter((p) => list.includes(p))),
 )
 
+/** Identity of the signed-in user, returned by `GET /auth/me` and parsed by the client. */
+export const SessionUserSchema = v.object({
+	username: v.string(),
+	role: v.object({ id: v.number(), name: v.string() }),
+	permissions: v.array(v.picklist(PERMISSIONS)),
+	/** Tenants the user is limited to; null when global. */
+	tenant_ids: v.nullable(v.array(v.number())),
+	/** The employee behind the account, if linked. */
+	employee_id: v.nullable(v.number()),
+})
+
+export type SessionUser = v.InferOutput<typeof SessionUserSchema>
+
 /**
  * Roles bundle permissions and are assigned to users (one role per user).
  * Users whose role grants `users.manage` are always global (no tenant
