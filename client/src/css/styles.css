@@ -5683,6 +5683,23 @@ a.rack-shelf-plate:hover {
 	font-weight: 400;
 }
 
+/* The opaque sticky cell repeats the row's zebra stripe and hover tint. */
+.app-content .matching-table tbody tr:nth-child(even) > .matching-object {
+	background: linear-gradient(
+			color-mix(in srgb, var(--bg-hover) 45%, transparent),
+			color-mix(in srgb, var(--bg-hover) 45%, transparent)
+		)
+		var(--bg-surface);
+}
+
+.app-content .matching-table tbody tr:hover > .matching-object {
+	background: linear-gradient(
+			color-mix(in srgb, var(--bg-hover) 35%, transparent),
+			color-mix(in srgb, var(--bg-hover) 35%, transparent)
+		)
+		var(--bg-hover);
+}
+
 .matching-table thead .matching-object {
 	z-index: 3;
 	background-color: var(--bg-raised);
@@ -5804,9 +5821,20 @@ a.rack-shelf-plate:hover {
 	font-style: italic;
 }
 
-.matching-clear {
-	flex: none;
-	padding: 0.3rem;
+/* The built-in "ignore" entry (the only one with an icon) reads as muted. */
+.matching-pick .combobox-option:has(.combobox-option-icon) {
+	color: var(--text-muted);
+}
+
+/* Dropdowns overflow the scrolling table: pinned to the viewport at the
+   field, positioned by `placeList` in matching.tsx. */
+.matching-scroll .combobox-list {
+	position: fixed;
+	top: var(--list-top, auto);
+	bottom: var(--list-bottom, auto);
+	left: var(--list-left, 0);
+	min-width: var(--list-width, 100%);
+	max-height: var(--list-max, 16rem);
 }
 
 /* Unsaved cell: accent bar on the left edge and an accent border. */

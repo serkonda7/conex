@@ -11,7 +11,7 @@ import {
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { JSX } from 'solid-js'
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import {
 	fetch_integrations,
 	fetch_link_board,
@@ -142,28 +142,15 @@ async function fetchBoards(source: {
 }
 
 function externalOptions(board: LinkBoard): ComboboxOption[] {
-	const provider = providerLabel(board.provider)
 	// Built-in first entry: the object does not exist in this system.
 	const options: ComboboxOption[] = [
-		{
-			value: IGNORE,
-			label: t('matching.ignoreOption', { provider }),
-			detail: t('matching.ignoreDetail'),
-			icon: IconBan,
-		},
+		{ value: IGNORE, label: t('matching.ignore'), icon: IconBan },
 	]
 	for (const row of board.external) {
 		if (row.state === 'ignored') {
 			continue
 		}
-		const detail = [
-			row.detail,
-			row.serial,
-			row.active ? null : t('integration.inactive'),
-			row.state === 'linked' && row.entity_name !== null
-				? t('matching.linkedTo', { name: row.entity_name })
-				: null,
-		]
+		const detail = [row.detail, row.serial, row.active ? null : t('integration.inactive')]
 			.filter((part) => part !== null && part !== '')
 			.join(' · ')
 		options.push({
@@ -185,6 +172,36 @@ function externalOptions(board: LinkBoard): ComboboxOption[] {
 		}
 	}
 	return options
+}
+
+/** Viewport gap kept below or above a dropdown, in pixels. */
+const LIST_MARGIN = 8
+/** Tallest dropdown list (16rem), in pixels. */
+const LIST_MAX = 256
+
+/**
+ * Pins the open dropdown of `box` to the viewport (see `.matching-scroll
+ * .combobox-list`), so it overflows the scrolling table instead of being
+ * clipped: below the field, or above it when there is more room there.
+ */
+function placeList(box: HTMLElement): void {
+	const r = box.getBoundingClientRect()
+	const below = window.innerHeight - r.bottom - LIST_MARGIN
+	const above = r.top - LIST_MARGIN
+	const up = below < LIST_MAX && above > below
+	box.style.setProperty('--list-left', `${r.left}px`)
+	box.style.setProperty('--list-width', `${r.width}px`)
+	box.style.setProperty('--list-top', up ? 'auto' : `${r.bottom + 3}px`)
+	box.style.setProperty('--list-bottom', up ? `${window.innerHeight - r.top + 3}px` : 'auto')
+	box.style.setProperty('--list-max', `${Math.min(LIST_MAX, up ? above : below)}px`)
+}
+
+/** Repositions the dropdown of the focused combobox, if any. */
+function placeFocusedList(): void {
+	const box = document.activeElement?.closest<HTMLElement>('.matching-scroll .combobox')
+	if (box) {
+		placeList(box)
+	}
 }
 
 /**
@@ -664,21 +681,10 @@ export function MatchingPage(): JSX.Element {
 							}
 							options={column.options}
 							ariaLabel={t('matching.pickLabel', { name: row.name, provider: label })}
-							placeholder={t('matching.select', { provider: label })}
+							placeholder={t('matching.select')}
 							searchLabel={t('common.search')}
 							noMatchesLabel={t('common.noMatchingObjects')}
 						/>
-						<Show when={editable() && current() !== ''}>
-							<button
-								type="button"
-								class="icon-btn matching-clear"
-								title={t('matching.clear')}
-								aria-label={t('matching.clear')}
-								onClick={(): void => setCell(column, row.id, '')}
-							>
-								<IconX size={16} />
-							</button>
-						</Show>
 					</div>
 					<Show when={suggestion(column, row.id)}>
 						{(s: () => { external: LinkBoardExternal; via: string }): JSX.Element => (
@@ -747,8 +753,24 @@ export function MatchingPage(): JSX.Element {
 
 	const objectPath = (id: number): string => `/${kind()}s/${id}`
 
+	// Fixed dropdowns follow their field while anything scrolls or resizes.
+	document.addEventListener('scroll', placeFocusedList, true)
+	window.addEventListener('resize', placeFocusedList)
+	onCleanup(() => {
+		document.removeEventListener('scroll', placeFocusedList, true)
+		window.removeEventListener('resize', placeFocusedList)
+	})
+
 	const table = (): JSX.Element => (
-		<div class="matching-scroll">
+		<div
+			class="matching-scroll"
+			onFocusIn={(e: FocusEvent): void => {
+				const box = (e.target as Element).closest<HTMLElement>('.combobox')
+				if (box) {
+					placeList(box)
+				}
+			}}
+		>
 			<table class="matching-table">
 				<thead>
 					<tr>
