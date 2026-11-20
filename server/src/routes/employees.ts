@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import {
 	DeleteQuerySchema,
@@ -8,7 +7,15 @@ import {
 	EmployeeUpdateSchema,
 	EntityParamsSchema,
 } from 'shared/src/schemas'
-import { can, checkTenants, forbidden, listTenantScope, requestScope, requestUser } from '../authz'
+import {
+	can,
+	checkTenants,
+	forbidden,
+	listTenantScope,
+	loadScoped,
+	requestScope,
+	requestUser,
+} from '../authz'
 import {
 	createEmployee,
 	deleteEmployee,
@@ -62,11 +69,7 @@ function checkTenantChange(
 
 /** Loads an employee the requester may access: 404 when missing, 403 when out of scope. */
 async function loadEmployee(c: Context, id: number): Promise<EmployeeRow | Response> {
-	const current = await getEmployee(id)
-	if (Result.isError(current)) {
-		return sendResult(c, current)
-	}
-	return checkTenants(c, current.value.tenant_ids) ?? current.value
+	return loadScoped(c, await getEmployee(id), (current) => checkTenants(c, current.tenant_ids))
 }
 
 /**

@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import {
@@ -15,7 +14,7 @@ import {
 	FloorplanOutletsQuerySchema,
 	FloorplanPutSchema,
 } from 'shared/src/schemas'
-import { checkTenant, listTenantScope, requestScope, requestUser } from '../authz'
+import { checkTenant, listTenantScope, loadScoped, requestScope, requestUser } from '../authz'
 import {
 	type AttachmentRow,
 	type AttachmentUpload,
@@ -53,11 +52,10 @@ const uploadLimit = bodyLimit({
 
 /** Loads an attachment the requester may access (via its owner): the row, or the 404/403 response. */
 async function loadAttachment(c: Context, id: number): Promise<AttachmentRow | Response> {
-	const found = await getAttachmentWithTenant(id)
-	if (Result.isError(found)) {
-		return sendResult(c, found)
-	}
-	return checkTenant(c, found.value.tenant) ?? found.value.row
+	const loaded = await loadScoped(c, await getAttachmentWithTenant(id), (found) =>
+		checkTenant(c, found.tenant),
+	)
+	return loaded instanceof Response ? loaded : loaded.row
 }
 
 async function uploadOf(file: File): Promise<AttachmentUpload> {
