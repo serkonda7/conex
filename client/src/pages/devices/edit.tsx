@@ -16,13 +16,21 @@ import {
 	TextField,
 } from '../../components/form'
 import { t, tp } from '../../i18n'
-import { type FormValues, id_value, submit_form, text, useEntityForm } from '../../lib/form'
+import {
+	type FormValues,
+	id_value,
+	parsePosition,
+	submit_form,
+	text,
+	useEntityForm,
+	validPosition,
+} from '../../lib/form'
 import { useNameOf } from '../../lib/lookup'
 import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { deviceRoleOptions } from '../device-roles/options'
 import { locationOptions } from '../locations/options'
-import { DeviceStatusField, parsePosition, validPosition } from './add'
+import { DeviceStatusField } from './add'
 import { DeviceEmployeesField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 import { inactiveStatusChange } from './status'

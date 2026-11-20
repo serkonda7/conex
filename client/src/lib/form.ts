@@ -26,6 +26,16 @@ export function id_value(id: number | null | undefined): string {
 	return id === null || id === undefined ? '' : String(id)
 }
 
+/** Rack position from the field: null when blank, NaN when malformed. */
+export function parsePosition(value: string): number | null {
+	return value.trim() === '' ? null : Number(value)
+}
+
+/** Whether a parsed position is empty or a whole unit number. */
+export function validPosition(position: number | null): boolean {
+	return position === null || (Number.isInteger(position) && position >= 1)
+}
+
 /** Update patch of a create body `T`; see {@link cleared}. */
 export type Cleared<T> = {
 	[K in keyof T]: undefined extends T[K] ? Exclude<T[K], undefined> | null : T[K]

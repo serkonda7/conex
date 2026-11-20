@@ -56,7 +56,7 @@ import { setTenantContext } from '../../lib/tenant_context'
 import { formatRelative } from '../../lib/time'
 import { ChangeActionBadge, ChangedObjectLink, changeUser } from '../changelog/common'
 import { EmployeeLinks } from '../devices/employee_assignment'
-import { deviceListHref } from '../devices/list'
+import { deviceListHref } from '../devices/links'
 import { EmailLink } from '../employees/list'
 import {
 	type TenantIntegration,

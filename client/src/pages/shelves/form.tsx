@@ -21,9 +21,8 @@ import { t, tp } from '../../i18n'
 import { faceOptions } from '../../i18n/labels'
 import { submit_entity_form, useEntityForm } from '../../lib/form'
 import { createRows } from '../../lib/resource'
-import { type Crumb, navigate, parseId, queryParam } from '../../lib/router'
+import { type Crumb, navigate, parseId, queryFace, queryParam } from '../../lib/router'
 import { recordCrumb } from '../../lib/trails'
-import { queryFace } from '../devices/add'
 
 /** Whole number from a field, `fallback` when blank, NaN when malformed. */
 function count(value: string, fallback: number): number {

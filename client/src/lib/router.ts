@@ -708,6 +708,12 @@ export function queryParam(key: string, fromPath?: string): string {
 	return new URLSearchParams(query).get(key) ?? ''
 }
 
+/** `?face=` of a rack-elevation deep link, if it names a face. */
+export function queryFace(): string {
+	const face = queryParam('face')
+	return face === 'front' || face === 'rear' ? face : ''
+}
+
 /**
  * Parses a positive integer entity id from a URL segment or query value.
  * Returns null for missing or malformed values so callers can 404 cleanly.

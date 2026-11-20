@@ -22,34 +22,20 @@ import {
 	type FormValues,
 	id_value,
 	is_add_another_submit,
+	parsePosition,
 	submit_form,
 	text,
 	useFormState,
+	validPosition,
 } from '../../lib/form'
 import { createRecord, createRows, createRowsFor, createSnapshot } from '../../lib/resource'
-import { parseId, queryParam } from '../../lib/router'
+import { parseId, queryFace, queryParam } from '../../lib/router'
 import { newObjectTenantId, useNewObjectSites } from '../../lib/tenant_context'
 import { useDeviceTypeOptions } from '../device_types/options'
 import { deviceRoleOptions } from '../device-roles/options'
 import { locationOptions } from '../locations/options'
 import { DeviceEmployeesField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
-
-/** Rack position from the field: null when blank, NaN when malformed. */
-export function parsePosition(value: string): number | null {
-	return value.trim() === '' ? null : Number(value)
-}
-
-/** Whether a parsed position is empty or a whole unit number. */
-export function validPosition(position: number | null): boolean {
-	return position === null || (Number.isInteger(position) && position >= 1)
-}
-
-/** `?face=` of a rack-elevation deep link, if it names a face. */
-export function queryFace(): string {
-	const face = queryParam('face')
-	return face === 'front' || face === 'rear' ? face : ''
-}
 
 /** Active/inactive switch of the device and virtual machine forms. */
 export function DeviceStatusField(props: {

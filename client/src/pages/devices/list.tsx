@@ -32,13 +32,9 @@ import { navigate, parseId } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
 import { EmployeeLinks } from './employee_assignment'
+import { deviceListHref } from './links'
 import { MoveTenantDialog } from './move_tenant_dialog'
 import { DeviceStatusBadge } from './status'
-
-/** Detail route of a list row: `/devices/:id` or `/devices/vm/:id`. */
-export function deviceListHref(row: DeviceListItem): string {
-	return row.kind === 'vm' ? `/devices/vm/${row.id}` : `/devices/${row.id}`
-}
 
 /**
  * /devices — NetBox-style device list of devices and virtual machines:
