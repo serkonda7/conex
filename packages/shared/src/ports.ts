@@ -49,7 +49,11 @@ export interface PortShape {
 	rear_port_id: number | null
 }
 
-/** Pass-through group of a panel port (its rear port's id); see `server/src/db/cables.ts`. */
+/**
+ * Pass-through group of a panel port: a rear port and the front ports mapped
+ * onto it share the rear port's id (a rear port uses its own id); `null` for
+ * ports without one.
+ */
 export function passThroughGroup(port: PortShape): number | null {
 	if (port.side === 'rear') {
 		return port.id

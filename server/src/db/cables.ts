@@ -11,6 +11,7 @@ import {
 	sql,
 } from 'drizzle-orm'
 import { alias, type PgColumn } from 'drizzle-orm/pg-core'
+import { passThroughGroup } from 'shared/src/ports'
 import type { CableCreate, CableUpdate } from 'shared/src/schemas'
 import { cables, devices, interfaces } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -31,17 +32,6 @@ import {
 } from './list'
 
 export type CableRow = typeof cables.$inferSelect
-
-/**
- * Pass-through group of a patch-panel port: a rear port and the front ports
- * mapped onto it share the rear port's id. Normal ports have none.
- */
-function passThroughGroup(iface: typeof interfaces.$inferSelect): number | null {
-	if (iface.side === 'rear') {
-		return iface.id
-	}
-	return iface.side === 'front' ? iface.rear_port_id : null
-}
 
 /**
  * Both endpoint devices of a cable sit in `tenantIds` (the cable read rule of
