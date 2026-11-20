@@ -98,14 +98,10 @@ const requireConfiguredMiddleware: MiddlewareHandler = createMiddleware(async (c
 
 const EXTERNAL_TENANTS_GLOBAL = 'Forbidden: tenant-scoped users cannot list external tenants'
 
-function notFound(c: Context, message: string): Response {
-	return jsonError(c, message, 404)
-}
-
 /** Read gate for a tenant by id: 404 when missing, 403 when out of scope, else null. */
 async function checkTenantRow(c: Context, tenantId: number): Promise<Response | null> {
 	if (!(await exists(tenants, eq(tenants.id, tenantId)))) {
-		return notFound(c, 'Tenant not found')
+		return jsonError(c, 'Tenant not found', 404)
 	}
 	return checkTenant(c, tenantId)
 }
@@ -114,7 +110,7 @@ async function checkTenantRow(c: Context, tenantId: number): Promise<Response | 
 async function loadDeviceTenant(c: Context, deviceId: number): Promise<number | null | Response> {
 	const tenant = await deviceTenant(deviceId)
 	if (tenant === undefined) {
-		return notFound(c, 'Device not found')
+		return jsonError(c, 'Device not found', 404)
 	}
 	return checkTenant(c, tenant) ?? tenant
 }
@@ -126,13 +122,13 @@ async function loadDeviceTenant(c: Context, deviceId: number): Promise<number | 
 async function loadEmployeeTenant(c: Context, employeeId: number): Promise<number | Response> {
 	const memberships = await employeeTenants(employeeId)
 	if (memberships === undefined) {
-		return notFound(c, 'Employee not found')
+		return jsonError(c, 'Employee not found', 404)
 	}
 	const scope = requestScope(c)
 	return (
 		checkTenants(c, memberships) ??
 		memberships.find((id) => scope === undefined || scope.includes(id)) ??
-		notFound(c, 'Employee not found')
+		jsonError(c, 'Employee not found', 404)
 	)
 }
 
@@ -163,7 +159,7 @@ async function loadExternalEmployee(
 ): Promise<ExternalEmployee | Response> {
 	const external = await readEmployee(provider, externalId)
 	if (!external) {
-		return notFound(c, 'External employee not found')
+		return jsonError(c, 'External employee not found', 404)
 	}
 	return (await checkExternalWrite(c, provider, external.external_tenant_ids)) ?? external
 }
@@ -176,7 +172,7 @@ async function loadExternalDevice(
 ): Promise<ExternalDevice | Response> {
 	const external = await readDevice(provider, externalId)
 	if (!external) {
-		return notFound(c, 'External device not found')
+		return jsonError(c, 'External device not found', 404)
 	}
 	return (await checkExternalWrite(c, provider, external.external_tenant_id)) ?? external
 }
@@ -503,11 +499,11 @@ export const integrationsApp = new Hono()
 					return denied
 				}
 				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
-					return notFound(c, 'Tenant not found')
+					return jsonError(c, 'Tenant not found', 404)
 				}
 				const external = await readTenant(provider, input.external_id)
 				if (!external) {
-					return notFound(c, 'External tenant not found')
+					return jsonError(c, 'External tenant not found', 404)
 				}
 				const res = await setLink(
 					provider,
@@ -573,7 +569,7 @@ export const integrationsApp = new Hono()
 				}
 				const external = await readTenant(provider, input.external_id)
 				if (!external) {
-					return notFound(c, 'External tenant not found')
+					return jsonError(c, 'External tenant not found', 404)
 				}
 				const res = await ignoreExternal(
 					provider,
