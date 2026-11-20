@@ -5376,9 +5376,16 @@ a.rack-shelf-plate:hover {
 	display: inline-flex;
 }
 
-/* Path to the shown object above detail and form pages. */
+/* Path to the shown object above detail and form pages; it stays below the
+   topbar while the page scrolls. The bar spans the content padding so the
+   page scrolls under an opaque strip. */
 .breadcrumbs {
-	margin: 0 0 0.75rem;
+	position: sticky;
+	top: var(--topbar-height);
+	z-index: 4;
+	margin: -0.9rem -1rem 0.75rem;
+	padding: 0.5rem 1rem;
+	background-color: var(--bg-base);
 	font-size: var(--font-size-base);
 }
 
@@ -5740,7 +5747,7 @@ a.rack-shelf-plate:hover {
 .matching-footer {
 	position: sticky;
 	bottom: 0;
-	z-index: 4;
+	z-index: 3;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
