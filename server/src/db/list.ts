@@ -235,6 +235,24 @@ export async function checkExists(
 	return Result.err(new NotFoundError(notFound))
 }
 
+/**
+ * Every id in `ids` must name a row of `table` (duplicates count once); an
+ * empty list passes. Otherwise a `NotFoundError` with `notFound`.
+ */
+export async function allIdsExist(
+	table: PgTable,
+	idColumn: PgColumn,
+	ids: readonly number[],
+	notFound: string,
+): Promise<Result<undefined, Error>> {
+	const unique = new Set(ids)
+	if (unique.size === 0) {
+		return Result.ok(undefined)
+	}
+	const found = await getDb().$count(table, inArray(idColumn, [...unique]))
+	return found === unique.size ? Result.ok(undefined) : Result.err(new NotFoundError(notFound))
+}
+
 /** Shared tenant FK guard: null/undefined passes, missing id is 404. */
 export function checkTenantExists(
 	tenantId: number | null | undefined,

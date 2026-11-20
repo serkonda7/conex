@@ -13,6 +13,7 @@ import {
 	ValidationError,
 } from './errors'
 import {
+	allIdsExist,
 	findOne,
 	isPatchEmpty,
 	type ListParams,
@@ -237,12 +238,14 @@ async function checkUserInput(input: {
 	tenant_ids?: readonly number[]
 	role_id?: number
 }): Promise<Result<undefined, Error>> {
-	const ids = input.tenant_ids ?? []
-	if (
-		ids.length > 0 &&
-		(await getDb().$count(tenants, inArray(tenants.id, [...ids]))) !== ids.length
-	) {
-		return Result.err(new NotFoundError('Tenant not found'))
+	const tenantsValid = await allIdsExist(
+		tenants,
+		tenants.id,
+		input.tenant_ids ?? [],
+		'Tenant not found',
+	)
+	if (Result.isError(tenantsValid)) {
+		return tenantsValid
 	}
 	return input.role_id === undefined ? Result.ok(undefined) : checkRoleExists(input.role_id)
 }

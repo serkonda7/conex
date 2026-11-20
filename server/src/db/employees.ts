@@ -15,6 +15,7 @@ import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
+	allIdsExist,
 	findOne,
 	insertedId,
 	isPatchEmpty,
@@ -177,11 +178,8 @@ export async function getEmployee(id: number): Promise<Result<EmployeeRow, Error
 }
 
 /** Every id in `tenantIds` must name an existing tenant. */
-async function checkTenantsExist(tenantIds: readonly number[]): Promise<Result<undefined, Error>> {
-	const found = await getDb().$count(tenants, inArray(tenants.id, [...tenantIds]))
-	return found === new Set(tenantIds).size
-		? Result.ok(undefined)
-		: Result.err(new NotFoundError('Tenant not found'))
+function checkTenantsExist(tenantIds: readonly number[]): Promise<Result<undefined, Error>> {
+	return allIdsExist(tenants, tenants.id, tenantIds, 'Tenant not found')
 }
 
 /**
