@@ -158,7 +158,6 @@ function idByName(names: Map<number, string>, name: string | null): number | und
  */
 export class TanssProvider implements IntegrationProvider {
 	readonly id = 'tanss' as const
-	readonly tenantCardinality = 'one' as const
 	private readonly session: TanssSession
 	private manufacturers: Map<number, string> | null = null
 

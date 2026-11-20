@@ -21,6 +21,7 @@ import { employeesApp } from './routes/employees'
 import { integrationsApp } from './routes/integrations'
 import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
+import { m365ConsentApp } from './routes/m365_consent'
 import { manufacturersApp } from './routes/manufacturers'
 import { rackTypesApp } from './routes/rack_types'
 import { racksApp } from './routes/racks'
@@ -98,6 +99,8 @@ export function createApp() {
 			.route('/interfaces', interfacesApp)
 			.route('/cables', cablesApp)
 			.route('/search', searchApp)
+			// Public (no session) and therefore ahead of `integrationsApp`'s auth.
+			.route('/integrations/m365/consent', m365ConsentApp)
 			.route('/integrations', integrationsApp)
 			.route('/calendar-sync', calendarSyncApp)
 			.route('/directory', directoryApp)

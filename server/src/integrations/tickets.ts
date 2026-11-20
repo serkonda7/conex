@@ -76,6 +76,7 @@ export async function createTicket(
 		}
 		priority = priorityLabel(row)
 	}
+	// Ticket providers link one company per tenant (`tenant_cardinality: 'one'`).
 	const company = await linkOf(provider, 'tenant', tenant.id)
 	if (!company) {
 		return Result.err(new ValidationError('Tenant is not linked to an external company'))
@@ -140,7 +141,7 @@ export async function listTickets(
 	if (Result.isError(row)) {
 		return row
 	}
-	const base_url = row.value.base_url.replace(/\/+$/, '').replace(/\/backend$/i, '')
+	const base_url = row.value.base_url?.replace(/\/+$/, '').replace(/\/backend$/i, '') ?? null
 	const key = `${provider}:${company.external_id}`
 	const cached = ticketCache.get(key)
 	if (cached && nowSeconds() - cached.fetched_at < TICKET_CACHE_SECONDS) {

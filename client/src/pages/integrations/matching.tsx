@@ -238,7 +238,7 @@ export function MatchingPage(): JSX.Element {
 					provider: board.provider,
 					integration,
 					board,
-					usable: board.entity_type === 'tenant' || board.external_tenant !== null,
+					usable: board.entity_type === 'tenant' || board.external_tenants.length > 0,
 					local: new Map(board.local.map((r) => [r.id, r])),
 					external: new Map(board.external.map((r) => [r.external_id, r])),
 					options: externalOptions(board),

@@ -11,6 +11,7 @@
 
 - [Integrationsmodus](integrations/mode.md)
 - [Datenabgleich der Integrationen](integrations/consistency.md)
+- [Microsoft 365](integrations/m365.md)
 - [Outlook-Kalendersynchronisation](integrations/calendar-sync.md)
 - [AGFEO-Dashboard](integrations/agfeo.md)
 

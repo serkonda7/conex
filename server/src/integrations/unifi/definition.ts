@@ -1,0 +1,38 @@
+import { Result } from 'better-result'
+import type { IntegrationSecrets } from '../secrets'
+import type { IntegrationConfig, IntegrationProvider, ProviderDefinition } from '../types'
+import { UnifiProvider } from './provider'
+
+/** UniFi Site Manager: one console per tenant, devices only. */
+export const unifiDefinition: ProviderDefinition<'unifi'> = {
+	id: 'unifi',
+	capabilities: {
+		employees: false,
+		devices: true,
+		tickets: false,
+		push: false,
+		create_device: false,
+		customer_numbers: false,
+		tenant_cardinality: 'one',
+	},
+	incremental: false,
+	secretLabels: { password: 'API key' },
+	coversDevice: (device: { manufacturer: string }) =>
+		device.manufacturer.toLowerCase() === 'ubiquiti',
+	build(
+		config: IntegrationConfig,
+		secrets: IntegrationSecrets<'unifi'>,
+	): Result<IntegrationProvider, Error> {
+		if (config.base_url === null) {
+			return Result.err(new Error('UniFi Site Manager URL is required'))
+		}
+		return Result.ok(
+			new UnifiProvider({
+				base_url: config.base_url,
+				username: '',
+				password: secrets.password,
+				erp_token: '',
+			}),
+		)
+	},
+}

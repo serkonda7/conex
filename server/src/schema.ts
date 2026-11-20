@@ -1079,9 +1079,13 @@ export const floorplan_calibrations = pgTable('floorplan_calibrations', {
 export const integrations = pgTable('integrations', {
 	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 	provider: text('provider').notNull().unique(),
-	base_url: text('base_url').notNull(),
-	username: text('username').notNull(),
-	// `v1.<iv>.<ciphertext+tag>` (base64) of the JSON secrets object.
+	// NULL for providers without a configurable server / login user.
+	base_url: text('base_url'),
+	username: text('username'),
+	// Provider-specific plain settings (validated per provider).
+	settings: jsonb('settings').$type<Record<string, unknown>>().notNull().default({}),
+	// `v1.<iv>.<ciphertext+tag>` (base64) of the JSON secrets object
+	// (fields per provider: `INTEGRATION_SECRET_FIELDS`).
 	secrets: text('secrets').notNull(),
 	enabled: integer('enabled').notNull().default(1),
 	created_by: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -1157,6 +1161,18 @@ export const sync_runs = pgTable(
 	},
 	(table) => [index('sync_runs_provider_idx').on(table.provider, table.started_at)],
 )
+
+// Microsoft 365: customer Entra tenants whose admin consented to the MSP's
+// multi-tenant app. Graph cannot list them, so this table is what the sync
+// fetches; consent is proven by reading `/organization` before a row is added.
+export const m365_tenants = pgTable('m365_tenants', {
+	ms_tenant_id: text('ms_tenant_id').primaryKey(),
+	display_name: text('display_name'),
+	default_domain: text('default_domain'),
+	consented_at: bigint('consented_at', { mode: 'number' }).notNull(),
+	last_ok_at: bigint('last_ok_at', { mode: 'number' }),
+	last_error: text('last_error'),
+})
 
 // ---------------------------------------------------------------------------
 // Changelog (NetBox-style): one row per create/update/delete of an

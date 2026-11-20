@@ -55,7 +55,7 @@ import { type DetailTab, DetailTabs, IntegrationDetailHeader } from './detail_pa
 import { ExternalTenantPicker } from './external_tenant_picker'
 import { providerStatus } from './integration_card'
 import { LinkBoardView } from './link_board'
-import { providerCanWriteDevices } from './provider_capabilities'
+import { providerCanWriteDevices, providerHasCustomerNumbers } from './provider_capabilities'
 import { ProviderSettings } from './settings'
 
 /** Field of a mismatch that can be written to the external system. */
@@ -190,7 +190,7 @@ function LinkBoardPanel(props: {
 							<Show
 								when={
 									current().entity_type === 'tenant' ||
-									current().external_tenant !== null
+									current().external_tenants.length > 0
 								}
 								fallback={
 									<Empty
@@ -306,7 +306,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			return
 		}
 		await toggle.run(async () => {
-			const res = await update_integration(row.provider, { enabled })
+			const res = await update_integration(row.provider, { provider: row.provider, enabled })
 			if (Result.isOk(res)) {
 				mutate(res.value)
 			}
@@ -606,7 +606,9 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			key: 'kind',
 			label: t('integration.finding'),
 			getValue: (f: IntegrationFinding): JSX.Element => (
-				<span class="badge">{findingKindLabel(f.kind)}</span>
+				<span class="badge">
+					{findingKindLabel(f.kind, integration()?.provider ?? 'tanss')}
+				</span>
 			),
 		},
 		{
@@ -751,7 +753,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 								options={FINDING_KINDS.filter((kind) => counts().has(kind)).map(
 									(kind) => ({
 										value: kind,
-										label: `${findingKindLabel(kind)} (${counts().get(kind) ?? 0})`,
+										label: `${findingKindLabel(kind, integration()?.provider ?? 'tanss')} (${counts().get(kind) ?? 0})`,
 									}),
 								)}
 							/>
@@ -785,6 +787,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			<Show when={linkingTenant() !== null && integration()}>
 				<ExternalTenantPicker
 					provider={integration()?.provider ?? 'tanss'}
+					customer_numbers={providerHasCustomerNumbers(integration()?.provider ?? 'tanss')}
 					on_select={handleLinkTenant}
 					on_close={() => setLinkingTenant(null)}
 				/>

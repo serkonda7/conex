@@ -20,3 +20,8 @@ export function providerUsesMailLogin(provider: IntegrationProvider): boolean {
 export function providerUsesApiKey(provider: IntegrationProvider): boolean {
 	return provider === 'unifi'
 }
+
+/** Whether external tenants carry a customer number (TANSS, Octoja). */
+export function providerHasCustomerNumbers(provider: IntegrationProvider): boolean {
+	return provider === 'tanss' || provider === 'octoja'
+}

@@ -1,6 +1,10 @@
 # Example server config. Copy to `data/config.toml`:
 #   cp server/config.example.toml server/data/config.toml
 
+# Public address of conex (no trailing slash). The Microsoft 365 consent
+# link redirects to <frontendUrl>/api/integrations/m365/consent.
+# frontendUrl = "https://conex.example.com"
+
 [auth]
 secureCookies = false   # plain-HTTP local dev; keep true behind HTTPS
 # >= 32 chars. Generate with: openssl rand -hex 48

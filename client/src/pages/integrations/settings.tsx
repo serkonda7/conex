@@ -4,7 +4,6 @@
  * ones; a changed URL or credentials log in again before saving. The
  * Enabled switch lives in the page header, not here.
  */
-import { providerNeedsUsername } from 'shared/src/schemas'
 import { createSignal, type JSX, Show } from 'solid-js'
 import {
 	delete_integration,
@@ -18,12 +17,16 @@ import { useAction } from '../../lib/resource'
 import { forgetDeleted } from '../../lib/router'
 import { canGlobal } from '../../lib/session'
 import { DangerZone, SettingsSection } from './detail_parts'
-import { IntegrationFormFields, secrets, useIntegrationForm } from './form_fields'
+import {
+	fillIntegrationForm,
+	IntegrationFormFields,
+	updateBody,
+	useIntegrationForm,
+} from './form_fields'
 
 export function ProviderSettings(props: { integration: IntegrationJson }): JSX.Element {
 	const fields = useIntegrationForm()
-	fields.setBaseUrl(props.integration.base_url)
-	fields.setUsername(props.integration.username)
+	fillIntegrationForm(fields, props.integration)
 	const [error, setError] = createSignal<string | null>(null)
 	const [saved, setSaved] = createSignal(false)
 	const save = useAction(setError)
@@ -34,13 +37,10 @@ export function ProviderSettings(props: { integration: IntegrationJson }): JSX.E
 		e.preventDefault()
 		setSaved(false)
 		const ok = await save.run(() =>
-			update_integration(props.integration.provider, {
-				base_url: fields.baseUrl().trim(),
-				username: providerNeedsUsername(props.integration.provider)
-					? fields.username().trim()
-					: '',
-				...secrets(fields, props.integration.provider),
-			}),
+			update_integration(
+				props.integration.provider,
+				updateBody(props.integration.provider, fields, props.integration.enabled),
+			),
 		)
 		if (ok) {
 			fields.setPassword('')

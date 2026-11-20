@@ -39,6 +39,7 @@ import {
 	type PortKind,
 	type PortSide,
 	RACK_FORM_FACTORS,
+	type SyncRunState,
 	type TemplateSyncField,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
@@ -46,7 +47,7 @@ import type { FormOption } from '../components/form'
 import { RackFormFactorSchematic } from '../components/rack_form_factor'
 import { deviceRoleIcon, locationTypeIcon, portKindIcon } from '../lib/icons'
 import type { DurationUnit } from '../lib/service_level'
-import { type MessageKey, t } from '.'
+import { type MessageKey, type PluralKey, t, tp } from '.'
 
 function lookup(keys: Record<string, MessageKey>, value: string): string {
 	const key = keys[value]
@@ -448,6 +449,7 @@ const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {
 	tanss: 'provider.tanss',
 	octoja: 'provider.octoja',
 	unifi: 'provider.unifi',
+	m365: 'provider.m365',
 }
 
 /** Integration provider name (`tanss` → TANSS, `octoja` → Octoja, `unifi` → UniFi). */
@@ -459,6 +461,41 @@ const PROVIDER_DESCRIPTION_KEYS: Record<IntegrationProvider, MessageKey> = {
 	tanss: 'provider.tanss.description',
 	octoja: 'provider.octoja.description',
 	unifi: 'provider.unifi.description',
+	m365: 'provider.m365.description',
+}
+
+const EXTERNAL_TENANT_KEYS: Record<IntegrationProvider, PluralKey> = {
+	tanss: 'externalTenant.tanss',
+	octoja: 'externalTenant.octoja',
+	unifi: 'externalTenant.unifi',
+	m365: 'externalTenant.m365',
+}
+
+/**
+ * What the provider calls the external side of a conex tenant, lowercase
+ * where the language allows (TANSS: company, Octoja: customer, UniFi: site,
+ * M365: Entra tenant).
+ */
+export function externalTenantLabel(provider: string, count = 1): string {
+	const key = EXTERNAL_TENANT_KEYS[provider as IntegrationProvider]
+	return key ? tp(key, count) : provider
+}
+
+/** {@link externalTenantLabel} for the start of a sentence or label. */
+function externalTenantTitle(provider: string): string {
+	const label = externalTenantLabel(provider)
+	return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+const SYNC_STATE_KEYS: Record<SyncRunState, MessageKey> = {
+	running: 'syncState.running',
+	ok: 'syncState.ok',
+	error: 'syncState.error',
+}
+
+/** Sync run state (`running` / `ok` / `error`). */
+export function syncStateLabel(value: string): string {
+	return lookup(SYNC_STATE_KEYS, value)
 }
 
 /** One-line summary of what an integration provider does, for its card. */
@@ -472,6 +509,7 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	tenant_stale: 'finding.tenant_stale',
 	tenant_inactive: 'finding.tenant_inactive',
 	tenant_customer_number_mismatch: 'finding.tenant_customer_number_mismatch',
+	tenant_domain_unverified: 'finding.tenant_domain_unverified',
 	device_missing_in_conex: 'finding.device_missing_in_conex',
 	device_missing_in_external: 'finding.device_missing_in_external',
 	device_suggestion: 'finding.device_suggestion',
@@ -482,20 +520,24 @@ const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	employee_suggestion: 'finding.employee_suggestion',
 	employee_stale: 'finding.employee_stale',
 	employee_mismatch: 'finding.employee_mismatch',
+	employee_inactive_in_external: 'finding.employee_inactive_in_external',
 	priority_tag_missing: 'finding.priority_tag_missing',
 }
 
 /** Consistency finding kind (`device_missing_in_conex`, …). */
-export function findingKindLabel(value: string): string {
-	return lookup(FINDING_KEYS, value)
+/** Finding kind; tenant-level kinds name the provider's external tenant (company, site…). */
+export function findingKindLabel(value: string, provider: string): string {
+	const key = FINDING_KEYS[value as FindingKind]
+	return key ? t(key, { tenant: externalTenantTitle(provider) }) : value
 }
 
 const COMPARE_FIELD_KEYS: Record<
-	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'tenant' | 'status',
+	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'domain' | 'tenant' | 'status',
 	MessageKey
 > = {
 	name: 'common.name',
 	customer_number: 'tenant.customerNumber',
+	domain: 'compareField.domain',
 	tenant: 'entity.tenant.one',
 	status: 'common.status',
 	serial: 'device.serial',

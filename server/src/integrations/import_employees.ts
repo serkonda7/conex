@@ -2,7 +2,7 @@
  * Creates conex employees from external employees of the company linked to a
  * tenant and links each pair, so the report no longer lists them as missing.
  * External employees that already have a link row (linked or ignored) are
- * rejected, as are ones not assigned to the tenant's company.
+ * rejected, as are ones not assigned to an external tenant linked to the tenant.
  */
 import { Result } from 'better-result'
 import {
@@ -13,7 +13,7 @@ import {
 import * as v from 'valibot'
 import { createEmployee } from '../db/employees'
 import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
-import { linkOf, listLinks, setLink } from './links'
+import { listLinks, setLink, tenantLinks } from './links'
 import { readEmployee } from './snapshot'
 import type { ExternalEmployee } from './types'
 
@@ -56,24 +56,25 @@ export async function importExternalEmployees(
 	input: ExternalEmployeeImport,
 	userId: number,
 ): Promise<Result<{ created: number }, Error>> {
-	const company = await linkOf(provider, 'tenant', input.tenant_id)
-	if (!company) {
+	const companies = (await tenantLinks(provider, input.tenant_id)).map((l) => l.external_id)
+	if (companies.length === 0) {
 		return Result.err(new ValidationError('The tenant is not linked yet'))
 	}
 	const taken = new Set((await listLinks(provider, 'employee')).map((l) => l.external_id))
-	const externals: ExternalEmployee[] = []
+	const externals: { external: ExternalEmployee; company: string }[] = []
 	for (const id of new Set(input.external_ids)) {
 		const external = await readEmployee(provider, id)
-		if (!external?.external_tenant_ids.includes(company.external_id)) {
+		const company = external?.external_tenant_ids.find((c) => companies.includes(c))
+		if (!external || company === undefined) {
 			return Result.err(new NotFoundError(`External employee ${id} not found`))
 		}
 		if (taken.has(id)) {
 			return Result.err(new DuplicateError(`${external.name} is already linked or ignored`))
 		}
-		externals.push(external)
+		externals.push({ external, company })
 	}
 	let created = 0
-	for (const external of externals) {
+	for (const { external, company } of externals) {
 		const body = createInput(external, input.tenant_id)
 		if (Result.isError(body)) {
 			return body
@@ -88,7 +89,7 @@ export async function importExternalEmployees(
 				entity_type: 'employee',
 				entity_id: employee.value.id,
 				external_id: external.external_id,
-				external_tenant_id: company.external_id,
+				external_tenant_id: company,
 			},
 			'manual',
 			userId,

@@ -7,7 +7,7 @@ import {
 } from '../../api/integrations'
 import { ObjectSelector } from '../../components/object_selector'
 import { t } from '../../i18n'
-import { providerLabel } from '../../i18n/labels'
+import { externalTenantLabel, providerLabel } from '../../i18n/labels'
 
 interface PickerRow {
 	id: number
@@ -34,6 +34,8 @@ function label(item: ExternalTenantListItem): string {
  */
 export function ExternalTenantPicker(props: {
 	provider: IntegrationProvider
+	/** The provider's external tenants have customer numbers to search by. */
+	customer_numbers: boolean
 	on_select: (item: ExternalTenantListItem) => void
 	on_close: () => void
 }): JSX.Element {
@@ -50,8 +52,15 @@ export function ExternalTenantPicker(props: {
 
 	return (
 		<ObjectSelector
-			label={t('integration.pickTenant', { provider: providerLabel(props.provider) })}
-			placeholder={t('integration.searchTenants')}
+			label={t('integration.pickTenant', {
+				provider: providerLabel(props.provider),
+				tenant: externalTenantLabel(props.provider),
+			})}
+			placeholder={
+				props.customer_numbers
+					? t('integration.searchTenants')
+					: t('integration.searchTenantNames')
+			}
 			load={load}
 			get_label={(row: PickerRow): string => label(row.item)}
 			on_select={(row: PickerRow) => props.on_select(row.item)}
