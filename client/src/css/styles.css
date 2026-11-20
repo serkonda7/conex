@@ -609,7 +609,7 @@ tbody tr:last-child td {
 	max-width: none;
 }
 
-.app-user-logout {
+.app-user-menu-item {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.45rem;
@@ -619,7 +619,21 @@ tbody tr:last-child td {
 	text-align: left;
 }
 
-.app-user-logout:hover {
+.app-user-menu-item:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Always-visible logout button to the right of the account menu. */
+.app-logout-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.3rem;
+	border: none;
+	background: transparent;
+}
+
+.app-logout-button:hover {
 	background-color: var(--bg-hover);
 }
 
@@ -1745,7 +1759,12 @@ tbody tr:last-child td {
 		opacity: 1;
 	}
 
-	.app-user-logout {
+	.app-user-menu-item {
+		min-height: 2.75rem;
+	}
+
+	.app-logout-button {
+		min-width: 2.75rem;
 		min-height: 2.75rem;
 	}
 

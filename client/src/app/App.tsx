@@ -31,7 +31,7 @@ import { RouteContent } from './route_content'
 import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
 import { TabBar } from './tab_bar'
 import { TenantContextSelector } from './tenant_context_selector'
-import { UserMenu } from './user_menu'
+import { LogoutButton, UserMenu } from './user_menu'
 
 /**
  * Routes in-app anchors that have no click handler of their own through
@@ -139,7 +139,8 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 				</Show>
 				<div class="app-topbar-user">
 					<CommandPaletteButton onOpen={() => setPaletteOpen(true)} />
-					<UserMenu user={props.user} onLogout={props.onLogout} />
+					<UserMenu user={props.user} />
+					<LogoutButton onLogout={props.onLogout} />
 				</div>
 			</header>
 			<CommandPalette open={paletteOpen()} setOpen={setPaletteOpen} />
