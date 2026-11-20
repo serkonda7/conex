@@ -623,14 +623,11 @@ export const integrationsApp = new Hono()
 		'/:provider/links/ignore-local',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalIgnoreLocalSchema, onValidationError),
+		requirePermissionMiddleware('integrations.manage'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
-			const denied = requirePermission(c, 'integrations.manage')
-			if (denied) {
-				return denied
-			}
 			const tenant =
 				input.entity_type === 'employee'
 					? await loadEmployeeTenant(c, input.entity_id)
@@ -656,13 +653,10 @@ export const integrationsApp = new Hono()
 		'/:provider/devices',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalDeviceCreateSchema, onValidationError),
+		requirePermissionMiddleware('integrations.manage'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
-			const denied = requirePermission(c, 'integrations.manage')
-			if (denied) {
-				return denied
-			}
 			const tenant = await loadDeviceTenant(c, input.device_id)
 			if (tenant instanceof Response) {
 				return tenant
@@ -681,13 +675,10 @@ export const integrationsApp = new Hono()
 		'/:provider/devices',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalDeviceUpdateSchema, onValidationError),
+		requirePermissionMiddleware('integrations.manage'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
-			const denied = requirePermission(c, 'integrations.manage')
-			if (denied) {
-				return denied
-			}
 			const tenant = await loadDeviceTenant(c, input.device_id)
 			if (tenant instanceof Response) {
 				return tenant
@@ -707,13 +698,10 @@ export const integrationsApp = new Hono()
 		'/:provider/employees/deactivate',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalEmployeeDeactivateSchema, onValidationError),
+		requirePermissionMiddleware('integrations.manage'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const { external_id } = c.req.valid('json')
-			const denied = requirePermission(c, 'integrations.manage')
-			if (denied) {
-				return denied
-			}
 			const external = await loadExternalEmployee(c, provider, external_id)
 			if (external instanceof Response) {
 				return external
@@ -725,13 +713,10 @@ export const integrationsApp = new Hono()
 		'/:provider/employees',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalEmployeeUpdateSchema, onValidationError),
+		requirePermissionMiddleware('integrations.manage'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
-			const denied = requirePermission(c, 'integrations.manage')
-			if (denied) {
-				return denied
-			}
 			const tenant = await loadEmployeeTenant(c, input.employee_id)
 			if (tenant instanceof Response) {
 				return tenant
