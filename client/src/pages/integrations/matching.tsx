@@ -2,6 +2,7 @@ import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import {
 	IconAlertCircle,
 	IconArrowsJoin2,
+	IconBan,
 	IconCircleCheck,
 	IconCircleDashed,
 	IconDeviceFloppy,
@@ -124,12 +125,17 @@ async function fetchBoards(source: {
 	return Result.ok(boards)
 }
 
-function externalOptions(board: LinkBoard, kind: Kind): ComboboxOption[] {
+function externalOptions(board: LinkBoard): ComboboxOption[] {
 	const provider = providerLabel(board.provider)
-	const options: ComboboxOption[] = []
-	if (kind !== 'tenant') {
-		options.push({ value: IGNORE, label: t('matching.ignoreOption', { provider }) })
-	}
+	// Built-in first entry: the object does not exist in this system.
+	const options: ComboboxOption[] = [
+		{
+			value: IGNORE,
+			label: t('matching.ignoreOption', { provider }),
+			detail: t('matching.ignoreDetail'),
+			icon: IconBan,
+		},
+	]
 	for (const row of board.external) {
 		if (row.state === 'ignored') {
 			continue
@@ -170,8 +176,8 @@ function externalOptions(board: LinkBoard, kind: Kind): ComboboxOption[] {
  * devices or employees of one tenant) as a row, with one column per enabled
  * integration. Each cell picks the object's counterpart in that system
  * (searchable; picking one linked to another row moves it there), shows an
- * unambiguous suggestion to accept with one click, and on device and
- * employee rows can mark the object as missing there ("ignore").
+ * unambiguous suggestion to accept with one click, or marks the object as
+ * missing there (the built-in "ignore" entry atop every dropdown).
  *
  * Edits are drafts until "Save matches"; the sticky footer counts the fully
  * matched rows and the unsaved changes. External objects without a conex
@@ -235,7 +241,7 @@ export function MatchingPage(): JSX.Element {
 					usable: board.entity_type === 'tenant' || board.external_tenant !== null,
 					local: new Map(board.local.map((r) => [r.id, r])),
 					external: new Map(board.external.map((r) => [r.external_id, r])),
-					options: externalOptions(board, board.entity_type),
+					options: externalOptions(board),
 				},
 			]
 		})
@@ -490,7 +496,7 @@ export function MatchingPage(): JSX.Element {
 				}
 				res = await unlink_external(provider, linkId)
 			} else if (change.to === IGNORE) {
-				res = await ignore_local(provider, kind() as 'device' | 'employee', change.local.id)
+				res = await ignore_local(provider, kind(), change.local.id)
 			} else {
 				res = await link_external(provider, kind(), change.local.id, change.to)
 			}

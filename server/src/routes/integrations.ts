@@ -628,6 +628,18 @@ export const integrationsApp = new Hono()
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
+			if (input.entity_type === 'tenant') {
+				// Tenant links are global, like linking a tenant.
+				const denied = requireGlobalPermission(c, 'integrations.manage')
+				if (denied) {
+					return denied
+				}
+				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
+					return jsonError(c, 'Tenant not found', 404)
+				}
+				const res = await ignoreLocal(provider, 'tenant', input.entity_id, null, userId)
+				return sendResult(c, res.map(linkJson))
+			}
 			const tenant =
 				input.entity_type === 'employee'
 					? await loadEmployeeTenant(c, input.entity_id)

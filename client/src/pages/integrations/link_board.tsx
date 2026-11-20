@@ -135,8 +135,6 @@ export function LinkBoardView(props: {
 
 	const provider = (): string => providerLabel(props.provider)
 	const needle = (): string => search().trim().toLowerCase()
-	/** Device and employee boards can ignore conex rows as missing externally. */
-	const ignoresLocal = (): boolean => props.board.entity_type !== 'tenant'
 	const localPath = (id: number): string => {
 		const base =
 			props.board.entity_type === 'device'
@@ -417,13 +415,9 @@ export function LinkBoardView(props: {
 	}
 
 	async function ignoreLocal(localId: number): Promise<void> {
-		const entityType = props.board.entity_type
-		if (entityType === 'tenant') {
-			return
-		}
 		setPicked(null)
 		setIgnoredLocal((prev) => new Set(prev).add(localId))
-		await write.run(() => ignore_local(props.provider, entityType, localId))
+		await write.run(() => ignore_local(props.provider, props.board.entity_type, localId))
 	}
 
 	/**
@@ -746,11 +740,7 @@ export function LinkBoardView(props: {
 													<td>{localCell(row)}</td>
 													<td class="link-board-actions">
 														<span class="row-actions">
-															<Show
-																when={
-																	props.editable && ignoresLocal()
-																}
-															>
+															<Show when={props.editable}>
 																{ignoreButton(
 																	() => void ignoreLocal(row.id),
 																)}
@@ -867,44 +857,41 @@ export function LinkBoardView(props: {
 	const ignoredView = (): JSX.Element => (
 		<Show when={ignoredCount() > 0} fallback={<Empty message={t('integration.noIgnored')} />}>
 			<div class="link-board-columns">
-				<Show when={ignoresLocal()}>
-					<div class="link-board-column">
-						{columnHeading(
-							t('integration.sideConex'),
-							t('integration.ignoredCount', { count: ignoredLocalRows().length }),
-						)}
-						<div class="link-board-scroll">
-							<table class="link-board-list">
-								<tbody>
-									<For each={ignoredLocalRows()} fallback={emptyRow(2)}>
-										{(row: LinkBoardLocal): JSX.Element => (
-											<tr
-												class="link-board-row"
-												classList={{ inactive: !row.active }}
-											>
-												<td>{localCell(row)}</td>
-												<td class="link-board-actions">
-													<span class="row-actions">
-														<Show
-															when={
-																props.editable &&
-																row.link_id !== null
-															}
-														>
-															{restoreButton(
-																() => void restoreLocal(row),
-															)}
-														</Show>
-													</span>
-												</td>
-											</tr>
-										)}
-									</For>
-								</tbody>
-							</table>
-						</div>
+				<div class="link-board-column">
+					{columnHeading(
+						t('integration.sideConex'),
+						t('integration.ignoredCount', { count: ignoredLocalRows().length }),
+					)}
+					<div class="link-board-scroll">
+						<table class="link-board-list">
+							<tbody>
+								<For each={ignoredLocalRows()} fallback={emptyRow(2)}>
+									{(row: LinkBoardLocal): JSX.Element => (
+										<tr
+											class="link-board-row"
+											classList={{ inactive: !row.active }}
+										>
+											<td>{localCell(row)}</td>
+											<td class="link-board-actions">
+												<span class="row-actions">
+													<Show
+														when={
+															props.editable && row.link_id !== null
+														}
+													>
+														{restoreButton(
+															() => void restoreLocal(row),
+														)}
+													</Show>
+												</span>
+											</td>
+										</tr>
+									)}
+								</For>
+							</tbody>
+						</table>
 					</div>
-				</Show>
+				</div>
 				<div class="link-board-column">
 					{columnHeading(
 						provider(),
