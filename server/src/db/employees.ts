@@ -5,7 +5,6 @@ import {
 	device_employees,
 	employee_tenants,
 	employees,
-	external_links,
 	role_permissions,
 	tenants,
 	users,
@@ -14,6 +13,7 @@ import {
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { deleteExternalLinks } from './external_links'
 import {
 	allIdsExist,
 	findOne,
@@ -381,14 +381,7 @@ export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Er
 	const deleted = await tryWrite(() =>
 		withTransaction(async () => {
 			const db = getDb()
-			await db
-				.delete(external_links)
-				.where(
-					and(
-						eq(external_links.entity_type, 'employee'),
-						eq(external_links.entity_id, id),
-					),
-				)
+			await deleteExternalLinks('employee', id)
 			await db.delete(employees).where(eq(employees.id, id))
 		}),
 	)

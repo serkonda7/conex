@@ -40,7 +40,6 @@ import {
 	device_types,
 	devices,
 	employees,
-	external_links,
 	floorplan_areas,
 	floorplan_placements,
 	interfaces,
@@ -63,6 +62,7 @@ import { type DbHandle, getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
 import { checkEmployeeAssignments } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { deleteExternalLinks } from './external_links'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
@@ -1353,11 +1353,7 @@ export async function deleteDevice(
 			const db = getDb()
 			await db.delete(interfaces).where(eq(interfaces.device_id, id))
 			await db.delete(panel_jacks).where(eq(panel_jacks.device_id, id))
-			await db
-				.delete(external_links)
-				.where(
-					and(eq(external_links.entity_type, 'device'), eq(external_links.entity_id, id)),
-				)
+			await deleteExternalLinks('device', id)
 			await db.delete(devices).where(eq(devices.id, id))
 		}),
 	)

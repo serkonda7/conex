@@ -31,7 +31,6 @@ import {
 import {
 	devices,
 	employee_tenants,
-	external_links,
 	floorplan_areas,
 	floorplan_placements,
 	interfaces,
@@ -67,6 +66,7 @@ import {
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { deleteExternalLinks } from './external_links'
 import {
 	checkExists,
 	checkNoDependents,
@@ -526,11 +526,7 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 	const deleted = await tryWrite(() =>
 		withTransaction(async () => {
 			const db = getDb()
-			await db
-				.delete(external_links)
-				.where(
-					and(eq(external_links.entity_type, 'tenant'), eq(external_links.entity_id, id)),
-				)
+			await deleteExternalLinks('tenant', id)
 			await db.delete(tenants).where(eq(tenants.id, id))
 		}),
 	)
