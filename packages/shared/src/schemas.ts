@@ -734,8 +734,16 @@ export const RACK_FORM_FACTORS = [
 
 export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 
-/** Rack units a rack type provides: 1-60 U. */
-export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+/** Maximum rack height in U. */
+export const MAX_RACK_HEIGHT_U = 60
+
+/** Rack units a rack type provides: 1-{@link MAX_RACK_HEIGHT_U} U. */
+export const RackHeightSchema = v.pipe(
+	v.number(),
+	v.integer(),
+	v.minValue(1),
+	v.maxValue(MAX_RACK_HEIGHT_U),
+)
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -2102,6 +2110,9 @@ const FloorplanCoordSchema = v.pipe(
 /** `[x, y]` pair of normalized coordinates. */
 export type FloorplanPoint = [number, number]
 
+/** Maximum number of points in a floor-plan area polygon. */
+export const MAX_AREA_POINTS = 100
+
 /**
  * Area linking to one site or location, or outlining one device (a machine
  * that takes up floor space): a polygon of at least three points.
@@ -2116,7 +2127,7 @@ const FloorplanAreaInputSchema = v.pipe(
 		points: v.pipe(
 			v.array(v.tuple([FloorplanCoordSchema, FloorplanCoordSchema])),
 			v.minLength(3, 'An area needs at least 3 points'),
-			v.maxLength(100, 'An area has at most 100 points'),
+			v.maxLength(MAX_AREA_POINTS, `An area has at most ${MAX_AREA_POINTS} points`),
 		),
 	}),
 	v.check(

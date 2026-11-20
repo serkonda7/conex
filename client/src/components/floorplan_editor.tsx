@@ -52,6 +52,7 @@ import {
 	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import { MAX_AREA_POINTS } from 'shared/src/schemas'
 import type { InputEventAndTarget } from 'shared/src/types'
 import {
 	createMemo,
@@ -130,9 +131,6 @@ type Point = [number, number]
 
 /** Smallest side (fraction of the plan) of a drawn area's bounding box; smaller ones are discarded. */
 const MIN_AREA_SIZE = 0.01
-
-/** Most corners of an area (as `FloorplanPutSchema` allows). */
-const MAX_AREA_POINTS = 100
 
 /** Corners closer than this (fraction of the plan) count as the same one. */
 const SAME_POINT = 0.002
