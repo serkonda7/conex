@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import { and, asc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import type { RackTypeCreate, RackTypeListQuery, RackTypeUpdate } from 'shared/src/schemas'
 import { manufacturers, rack_types, racks } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
@@ -13,6 +13,7 @@ import {
 	orderOf,
 	pageRows,
 	pickDefined,
+	relatedValue,
 	searchCondition,
 	tryWrite,
 } from './list'
@@ -51,7 +52,11 @@ export async function listRackTypes(params: RackTypeListParams): Promise<Page<Ra
 	)
 	const orderColumns = {
 		model: rack_types.model,
-		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${rack_types.manufacturer_id})`,
+		manufacturer: relatedValue(
+			manufacturers.name,
+			manufacturers.id,
+			rack_types.manufacturer_id,
+		),
 		form_factor: rack_types.form_factor,
 		u_height: rack_types.u_height,
 		description: rack_types.description,

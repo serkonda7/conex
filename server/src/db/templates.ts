@@ -55,6 +55,7 @@ import {
 	orderOf,
 	pageRows,
 	pickDefined,
+	relatedValue,
 	searchCondition,
 	subquery,
 	tryWrite,
@@ -286,9 +287,13 @@ export async function listDeviceTypes(
 	)
 	const orderColumns = {
 		model: device_types.model,
-		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`,
+		manufacturer: relatedValue(
+			manufacturers.name,
+			manufacturers.id,
+			device_types.manufacturer_id,
+		),
 		part_number: device_types.part_number,
-		role: sql`(SELECT ${device_roles.name} FROM ${device_roles} WHERE ${device_roles.id} = ${device_types.default_device_role_id})`,
+		role: relatedValue(device_roles.name, device_roles.id, device_types.default_device_role_id),
 		description: device_types.description,
 		comments: device_types.comments,
 		u_height: device_types.u_height,
