@@ -198,8 +198,9 @@ async function execute(
 		employees: employeeSnapshot.length,
 		auto_linked: 0,
 	}
-	// Several links per tenant (UniFi sites) are fetched and auto-linked one
-	// by one; `linkState` keeps a device from being linked twice.
+	// Providers with `tenant_cardinality: 'many'` link several external tenants
+	// per tenant; they are fetched and auto-linked one by one and `linkState`
+	// keeps a device from being linked twice.
 	for (const link of tenantLinks) {
 		// Stale links (company gone) are reported, not fetched.
 		if (link.entity_id === null || !known.has(link.external_id)) {

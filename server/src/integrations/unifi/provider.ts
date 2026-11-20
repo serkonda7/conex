@@ -10,19 +10,19 @@
  * the API key isolated from other integrations.
  */
 import { createUnifiClient, type Device, type Host, UnifiApiError } from '@serkonda7/unifi-api'
-import { Result } from 'better-result'
-import { ensureIntegrationsLive } from '../../config'
+import type { Result } from 'better-result'
+import { externalCall, trimmedText } from '../external_call'
 import type {
 	ExternalDevice,
 	ExternalDirectory,
 	ExternalTenant,
 	IntegrationProvider,
-	ProviderCredentials,
 } from '../types'
 
-function text(value: string | null | undefined): string | null {
-	const trimmed = value?.trim() ?? ''
-	return trimmed === '' ? null : trimmed
+/** Credentials for UniFi Site Manager; the API key is the only secret. */
+export interface UnifiCredentials {
+	base_url: string
+	api_key: string
 }
 
 /** `reportedState` is opaque in the API, but usually carries a name or hostname. */
@@ -32,8 +32,8 @@ function reportedName(reportedState: unknown): string | null {
 	}
 	const record = reportedState as Record<string, unknown>
 	return (
-		text(typeof record.name === 'string' ? record.name : undefined) ??
-		text(typeof record.hostname === 'string' ? record.hostname : undefined)
+		trimmedText(typeof record.name === 'string' ? record.name : undefined) ??
+		trimmedText(typeof record.hostname === 'string' ? record.hostname : undefined)
 	)
 }
 
@@ -59,14 +59,14 @@ function failure(what: string, error: unknown): Error {
 
 /** Consoles without an id cannot be linked and are skipped. */
 export function toTenant(host: Host): ExternalTenant | null {
-	const id = text(host.id)
+	const id = trimmedText(host.id)
 	if (id === null) {
 		return null
 	}
 	return {
 		external_id: id,
 		display_id: null,
-		name: reportedName(host.reportedState) ?? text(host.ipAddress) ?? id,
+		name: reportedName(host.reportedState) ?? trimmedText(host.ipAddress) ?? id,
 		active: host.isBlocked !== true,
 		private: false,
 		headquarter_id: null,
@@ -75,18 +75,18 @@ export function toTenant(host: Host): ExternalTenant | null {
 
 /** Only called for devices with an id; the `device:` prefix keeps ids unambiguous like TANSS's `pc:`. */
 export function toDevice(device: Device, externalTenantId: string): ExternalDevice {
-	const id = text(device.id)
-	const mac = text(device.mac)
-	const ip = text(device.ip)
+	const id = trimmedText(device.id)
+	const mac = trimmedText(device.mac)
+	const ip = trimmedText(device.ip)
 	return {
 		external_id: `device:${id}`,
 		external_tenant_id: externalTenantId,
-		kind: text(device.productLine) ?? 'network',
-		name: text(device.name) ?? text(device.model) ?? mac ?? id ?? '',
+		kind: trimmedText(device.productLine) ?? 'network',
+		name: trimmedText(device.name) ?? trimmedText(device.model) ?? mac ?? id ?? '',
 		serial: null,
 		asset_tag: null,
 		manufacturer: 'Ubiquiti',
-		model: text(device.model) ?? text(device.shortname),
+		model: trimmedText(device.model) ?? trimmedText(device.shortname),
 		macs: mac === null ? [] : [mac],
 		ips: ip === null ? [] : [ip],
 		active: true,
@@ -95,11 +95,10 @@ export function toDevice(device: Device, externalTenantId: string): ExternalDevi
 
 export class UnifiProvider implements IntegrationProvider {
 	readonly id = 'unifi' as const
-	readonly tenantCardinality = 'one' as const
 	private readonly unifi: ReturnType<typeof createUnifiClient>
 
-	constructor(creds: ProviderCredentials) {
-		this.unifi = createUnifiClient({ apiKey: creds.password, baseUrl: creds.base_url })
+	constructor(creds: UnifiCredentials) {
+		this.unifi = createUnifiClient({ apiKey: creds.api_key, baseUrl: creds.base_url })
 	}
 
 	/** Single network choke point: offline guard and no throws. */
@@ -108,11 +107,7 @@ export class UnifiProvider implements IntegrationProvider {
 		run: () => Promise<T>,
 		mapError: (error: unknown) => Error = (error: unknown): Error => failure(what, error),
 	): Promise<Result<T, Error>> {
-		const live = ensureIntegrationsLive('UniFi')
-		if (Result.isError(live)) {
-			return live
-		}
-		return Result.tryPromise({ try: run, catch: mapError })
+		return externalCall('UniFi', run, mapError)
 	}
 
 	/** One cheap request is enough to check the key and its permission. */
@@ -140,7 +135,7 @@ export class UnifiProvider implements IntegrationProvider {
 			rows.flatMap((group) => {
 				const devices: ExternalDevice[] = []
 				for (const device of group.devices ?? []) {
-					if (device === null || text(device.id) === null) {
+					if (device === null || trimmedText(device.id) === null) {
 						continue
 					}
 					devices.push(toDevice(device, externalTenantId))

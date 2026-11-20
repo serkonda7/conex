@@ -14,27 +14,28 @@ import {
 	createOctojaClient,
 	OctojaApiError,
 } from 'octoja-api'
-import { ensureIntegrationsLive } from '../../config'
+import { externalCall, trimmedText } from '../external_call'
 import type {
 	ExternalDevice,
 	ExternalDirectory,
 	ExternalTenant,
 	IntegrationProvider,
-	ProviderCredentials,
 } from '../types'
+
+/** Login credentials for Octoja; the username is a mail address. */
+export interface OctojaCredentials {
+	base_url: string
+	mail_address: string
+	password: string
+}
 
 /** `GET /api/assets` clamps at 500 per Octoja's API docs; 200 is safe. */
 const PAGE_SIZE = 200
 
-function text(value: string | null | undefined): string | null {
-	const trimmed = value?.trim() ?? ''
-	return trimmed === '' ? null : trimmed
-}
-
 /** Reads the reason out of Octoja's RFC 7807 `ProblemDetails` error body. */
 function reason(body: unknown): string | null {
 	if (typeof body === 'string') {
-		return text(body)
+		return trimmedText(body)
 	}
 	if (typeof body !== 'object' || body === null) {
 		return null
@@ -45,7 +46,7 @@ function reason(body: unknown): string | null {
 		if (typeof raw !== 'string') {
 			continue
 		}
-		const value = text(raw)
+		const value = trimmedText(raw)
 		if (value !== null) {
 			return value
 		}
@@ -66,14 +67,14 @@ function failure(what: string, error: unknown): Error {
 
 /** Customers without an id cannot be linked and are skipped. */
 export function toTenant(customer: Customer): ExternalTenant | null {
-	const id = text(customer.id)
+	const id = trimmedText(customer.id)
 	if (id === null) {
 		return null
 	}
 	return {
 		external_id: id,
 		display_id: customer.externalReference ?? null,
-		name: text(customer.name) ?? id,
+		name: trimmedText(customer.name) ?? id,
 		active: true,
 		private: false,
 		headquarter_id: null,
@@ -82,16 +83,16 @@ export function toTenant(customer: Customer): ExternalTenant | null {
 
 /** `id` is a uuid, so the TANSS-style type prefix keeps ids unambiguous. */
 export function toDevice(asset: AssetHeaderResponse, externalTenantId: string): ExternalDevice {
-	const ip = text(asset.ipAddress)
+	const ip = trimmedText(asset.ipAddress)
 	return {
 		external_id: `asset:${asset.id}`,
 		external_tenant_id: externalTenantId,
 		kind: asset.deviceKind,
-		name: text(asset.displayName) ?? text(asset.deviceName) ?? asset.id,
-		serial: text(asset.serialNumber),
+		name: trimmedText(asset.displayName) ?? trimmedText(asset.deviceName) ?? asset.id,
+		serial: trimmedText(asset.serialNumber),
 		asset_tag: null,
-		manufacturer: text(asset.manufacturer),
-		model: text(asset.model),
+		manufacturer: trimmedText(asset.manufacturer),
+		model: trimmedText(asset.model),
 		macs: [],
 		ips: ip === null ? [] : [ip],
 		active: true,
@@ -100,11 +101,10 @@ export function toDevice(asset: AssetHeaderResponse, externalTenantId: string): 
 
 export class OctojaProvider implements IntegrationProvider {
 	readonly id = 'octoja' as const
-	readonly tenantCardinality = 'one' as const
 	private readonly octoja: ReturnType<typeof createOctojaClient>
 	private loginPromise: Promise<Result<void, Error>> | null = null
 
-	constructor(private readonly creds: ProviderCredentials) {
+	constructor(private readonly creds: OctojaCredentials) {
 		this.octoja = createOctojaClient({ baseUrl: creds.base_url })
 	}
 
@@ -114,11 +114,7 @@ export class OctojaProvider implements IntegrationProvider {
 		run: () => Promise<T>,
 		mapError: (error: unknown) => Error = (error: unknown): Error => failure(what, error),
 	): Promise<Result<T, Error>> {
-		const live = ensureIntegrationsLive('Octoja')
-		if (Result.isError(live)) {
-			return live
-		}
-		return Result.tryPromise({ try: run, catch: mapError })
+		return externalCall('Octoja', run, mapError)
 	}
 
 	/** Logs in once per provider instance; the facade stores the token. TOTP is unsupported. */
@@ -128,7 +124,7 @@ export class OctojaProvider implements IntegrationProvider {
 				'login',
 				() =>
 					this.octoja.auth.login({
-						mailAddress: this.creds.username,
+						mailAddress: this.creds.mail_address,
 						password: this.creds.password,
 					}),
 				(error: unknown) =>

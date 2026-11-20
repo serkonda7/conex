@@ -16,13 +16,18 @@ import type {
 	TicketListJson,
 } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
-import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
+import { NotFoundError, ValidationError } from '../db/errors'
 import { findOne } from '../db/list'
 import { devices, employee_tenants, employees, priorities, tenants } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { normalizeName } from './match'
-import { enabledProvider, enabledProviderFor, getIntegrationRow } from './store'
+import {
+	enabledProviderFor,
+	enabledProviderMethod,
+	getIntegrationRow,
+	providerMethod,
+} from './store'
 import type { ExternalTicket } from './types'
 
 /** Ticket lists are fetched from the external system at most this often. */
@@ -81,15 +86,11 @@ export async function createTicket(
 	if (!company) {
 		return Result.err(new ValidationError('Tenant is not linked to an external company'))
 	}
-	const built = await enabledProvider(provider)
-	if (Result.isError(built)) {
-		return built
+	const createTicketMethod = await enabledProviderMethod(provider, 'createTicket', 'tickets')
+	if (Result.isError(createTicketMethod)) {
+		return createTicketMethod
 	}
-	const instance = built.value
-	if (!instance.createTicket) {
-		return Result.err(new ValidationError('Integration does not support tickets'))
-	}
-	const created = await instance.createTicket({
+	const created = await createTicketMethod.value({
 		externalTenantId: company.external_id,
 		...(externalDeviceId !== undefined ? { externalDeviceId } : {}),
 		...(externalEmployeeId !== undefined ? { externalEmployeeId } : {}),
@@ -98,7 +99,7 @@ export async function createTicket(
 		content: input.content,
 	})
 	if (Result.isError(created)) {
-		return Result.err(new ExternalServiceError(created.error.message))
+		return created
 	}
 	return Result.ok({ id: created.value })
 }
@@ -156,13 +157,13 @@ export async function listTickets(
 	if (Result.isError(built)) {
 		return built
 	}
-	const instance = built.value
-	if (!instance.listTickets) {
-		return Result.err(new ValidationError('Integration does not support tickets'))
+	const listTicketsMethod = providerMethod(built.value, 'listTickets', 'tickets')
+	if (Result.isError(listTicketsMethod)) {
+		return listTicketsMethod
 	}
-	const listed = await instance.listTickets(company.external_id)
+	const listed = await listTicketsMethod.value(company.external_id)
 	if (Result.isError(listed)) {
-		return Result.err(new ExternalServiceError(listed.error.message))
+		return listed
 	}
 	const entry = {
 		fetched_at: nowSeconds(),

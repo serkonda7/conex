@@ -8,7 +8,6 @@ import {
 	FINDING_KINDS,
 	type FindingKind,
 	type IntegrationFinding,
-	providerHasEmployees,
 } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, on, Show } from 'solid-js'
@@ -55,7 +54,6 @@ import { type DetailTab, DetailTabs, IntegrationDetailHeader } from './detail_pa
 import { ExternalTenantPicker } from './external_tenant_picker'
 import { providerStatus } from './integration_card'
 import { LinkBoardView } from './link_board'
-import { providerCanWriteDevices, providerHasCustomerNumbers } from './provider_capabilities'
 import { ProviderSettings } from './settings'
 
 /** Field of a mismatch that can be written to the external system. */
@@ -244,11 +242,8 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 
 	const [integration, { mutate }] = createRecord(() => props.id, fetch_integration, setError)
 
-	// Providers without employees (Octoja) hide the tab and ignore `?view=employees`.
-	const hasEmployees = (): boolean => {
-		const provider = integration()?.provider
-		return provider !== undefined && providerHasEmployees(provider)
-	}
+	// Providers without employees (Octoja, UniFi) hide the tab and ignore `?view=employees`.
+	const hasEmployees = (): boolean => integration()?.capabilities.employees === true
 	const effectiveView = (): View =>
 		view() === 'employees' && !hasEmployees() ? 'report' : view()
 
@@ -364,6 +359,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			return null
 		}
 		const provider = row.provider
+		const capabilities = row.capabilities
 		const deactivate: JSX.Element = (
 			<button
 				type="button"
@@ -470,8 +466,8 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'device_missing_in_external':
 				return (
 					<Show when={can('integrations.manage')}>
-						{/* Octoja is read-only: it cannot accept a device created in conex. */}
-						<Show when={providerCanWriteDevices(provider)}>
+						{/* Providers without create_device cannot accept a device created in conex. */}
+						<Show when={capabilities.create_device}>
 							<button
 								type="button"
 								class="btn-small"
@@ -496,7 +492,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{providerCanWriteDevices(provider) && field !== null && (
+						{capabilities.push && field !== null && (
 							<button
 								type="button"
 								class="btn-small"
@@ -517,7 +513,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'employee_suggestion':
 				return (
 					<Show when={can('integrations.manage')}>
-						{providerHasEmployees(provider) &&
+						{capabilities.push &&
 							f.remote === 'active' &&
 							f.external_id !== null &&
 							deactivate}
@@ -534,7 +530,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'employee_missing_in_conex':
 				return (
 					<Show when={can('integrations.manage')}>
-						{providerHasEmployees(provider) && f.external_id !== null && deactivate}
+						{capabilities.push && f.external_id !== null && deactivate}
 						<Show when={can('edit') && f.tenant_id !== null}>
 							<button
 								type="button"
@@ -568,13 +564,13 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{providerHasEmployees(provider) &&
+						{capabilities.push &&
 							f.field === 'status' &&
 							f.local === 'inactive' &&
 							f.remote === 'active' &&
 							f.external_id !== null &&
 							deactivate}
-						{field !== null && (
+						{capabilities.push && field !== null && (
 							<button
 								type="button"
 								class="btn-small"
@@ -787,7 +783,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			<Show when={linkingTenant() !== null && integration()}>
 				<ExternalTenantPicker
 					provider={integration()?.provider ?? 'tanss'}
-					customer_numbers={providerHasCustomerNumbers(integration()?.provider ?? 'tanss')}
+					customer_numbers={integration()?.capabilities.customer_numbers ?? false}
 					on_select={handleLinkTenant}
 					on_close={() => setLinkingTenant(null)}
 				/>

@@ -11,13 +11,13 @@ import type {
 	ExternalPushField,
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
-import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
+import { NotFoundError, ValidationError } from '../db/errors'
 import { devices } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { localDevices } from './report'
 import { upsertDevice } from './snapshot'
-import { enabledProvider } from './store'
+import { enabledProviderMethod } from './store'
 
 export async function updateExternalDevice(
 	provider: ProviderId,
@@ -36,17 +36,13 @@ export async function updateExternalDevice(
 	if (value === null) {
 		return Result.err(new ValidationError(`Device has no ${field}`))
 	}
-	const built = await enabledProvider(provider)
-	if (Result.isError(built)) {
-		return built
+	const updateDevice = await enabledProviderMethod(provider, 'updateDevice', 'updating devices')
+	if (Result.isError(updateDevice)) {
+		return updateDevice
 	}
-	const instance = built.value
-	if (!instance.updateDevice) {
-		return Result.err(new ValidationError('Integration does not support updating devices'))
-	}
-	const updated = await instance.updateDevice(link.external_id, { [field]: value })
+	const updated = await updateDevice.value(link.external_id, { [field]: value })
 	if (Result.isError(updated)) {
-		return Result.err(new ExternalServiceError(updated.error.message))
+		return updated
 	}
 	await upsertDevice(provider, updated.value, nowSeconds())
 	return Result.ok(updated.value)

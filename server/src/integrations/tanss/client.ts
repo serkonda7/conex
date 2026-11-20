@@ -51,9 +51,14 @@ import {
 } from 'tanss-api'
 import * as v from 'valibot'
 import { ensureIntegrationsLive } from '../../config'
-import type { ProviderCredentials } from '../types'
 
-export type TanssCredentials = ProviderCredentials
+/** Login credentials of the TANSS user API plus the ERP API token. */
+export interface TanssCredentials {
+	base_url: string
+	username: string
+	password: string
+	erp_token: string
+}
 
 /** Company row of the ERP customer list (raw TANSS field names). */
 export interface TanssCompany {

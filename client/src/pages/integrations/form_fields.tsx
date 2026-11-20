@@ -77,19 +77,6 @@ export function useIntegrationForm(initialBaseUrl = ''): IntegrationFormState {
 	}
 }
 
-/** Secrets typed into the form; blank ones are left out (keep the stored value). */
-export function secrets(
-	form: IntegrationFormState,
-	provider: IntegrationProvider,
-): { password?: string; erp_token?: string } {
-	return {
-		...(form.password() !== '' ? { password: form.password() } : {}),
-		...(providerNeedsErpToken(provider) && form.erpToken() !== ''
-			? { erp_token: form.erpToken() }
-			: {}),
-	}
-}
-
 /** Outcome of a connection test. */
 export interface TestResult {
 	ok: boolean
@@ -223,25 +210,7 @@ export function updateBody(
 	f: IntegrationFormState,
 	enabled: boolean,
 ): IntegrationUpdate {
-	if (provider === 'm365') {
-		return {
-			provider,
-			client_id: f.clientId().trim(),
-			home_tenant: f.homeTenant().trim(),
-			licensed_only: f.licensedOnly() === '1',
-			secret_expires: f.secretExpires(),
-			...secret('client_secret', f.clientSecret()),
-			enabled,
-		}
-	}
-	return {
-		provider,
-		base_url: f.baseUrl().trim(),
-		username: providerNeedsUsername(provider) ? f.username().trim() : '',
-		...secret('password', f.password()),
-		...(providerNeedsErpToken(provider) ? secret('erp_token', f.erpToken()) : {}),
-		enabled,
-	}
+	return { ...testBody(provider, f), enabled }
 }
 
 function TanssFields(props: {

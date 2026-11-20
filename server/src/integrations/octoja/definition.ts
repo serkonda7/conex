@@ -17,7 +17,6 @@ export const octojaDefinition: ProviderDefinition<'octoja'> = {
 	},
 	incremental: false,
 	secretLabels: { password: 'Password' },
-	coversDevice: () => true,
 	build(
 		config: IntegrationConfig,
 		secrets: IntegrationSecrets<'octoja'>,
@@ -28,9 +27,8 @@ export const octojaDefinition: ProviderDefinition<'octoja'> = {
 		return Result.ok(
 			new OctojaProvider({
 				base_url: config.base_url,
-				username: config.username ?? '',
+				mail_address: config.username ?? '',
 				password: secrets.password,
-				erp_token: '',
 			}),
 		)
 	},

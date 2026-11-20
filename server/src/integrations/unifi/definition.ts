@@ -29,9 +29,7 @@ export const unifiDefinition: ProviderDefinition<'unifi'> = {
 		return Result.ok(
 			new UnifiProvider({
 				base_url: config.base_url,
-				username: '',
-				password: secrets.password,
-				erp_token: '',
+				api_key: secrets.password,
 			}),
 		)
 	},

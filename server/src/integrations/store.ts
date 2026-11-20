@@ -17,7 +17,7 @@ import {
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getDb, withTransaction } from '../db/connection'
-import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
+import { DuplicateError, ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { tryWrite } from '../db/list'
 import { external_links, external_objects, integrations, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
@@ -439,4 +439,64 @@ export async function enabledProvider(
 ): Promise<Result<IntegrationProvider, Error>> {
 	const row = await getIntegrationRow(provider)
 	return Result.isError(row) ? row : enabledProviderFor(row.value)
+}
+
+/** Optional provider methods that write to or read from an external system. */
+type OptionalMethod =
+	| 'createDevice'
+	| 'updateDevice'
+	| 'updateEmployee'
+	| 'createTicket'
+	| 'listTickets'
+	| 'listTags'
+
+/**
+ * One optional method of an enabled provider, bound to its instance, whose
+ * failures become `ExternalServiceError`s; a `ValidationError` naming
+ * `action` when the provider lacks it.
+ */
+export function providerMethod<M extends OptionalMethod>(
+	instance: IntegrationProvider,
+	method: M,
+	action: string,
+): Result<
+	(
+		...args: Parameters<NonNullable<IntegrationProvider[M]>>
+	) => ReturnType<NonNullable<IntegrationProvider[M]>>,
+	Error
+> {
+	const fn = instance[method] as
+		| ((...args: never[]) => Promise<Result<unknown, Error>>)
+		| undefined
+	if (!fn) {
+		return Result.err(new ValidationError(`Integration does not support ${action}`))
+	}
+	const bound = ((...args: never[]) =>
+		fn
+			.call(instance, ...args)
+			.then((result) =>
+				Result.isError(result)
+					? Result.err(new ExternalServiceError(result.error.message))
+					: result,
+			)) as unknown as (
+		...args: Parameters<NonNullable<IntegrationProvider[M]>>
+	) => ReturnType<NonNullable<IntegrationProvider[M]>>
+	return Result.ok(bound)
+}
+
+/** {@link providerMethod} of the enabled integration `provider`. */
+export async function enabledProviderMethod<M extends OptionalMethod>(
+	provider: ProviderId,
+	method: M,
+	action: string,
+): Promise<
+	Result<
+		(
+			...args: Parameters<NonNullable<IntegrationProvider[M]>>
+		) => ReturnType<NonNullable<IntegrationProvider[M]>>,
+		Error
+	>
+> {
+	const built = await enabledProvider(provider)
+	return Result.isError(built) ? built : providerMethod(built.value, method, action)
 }

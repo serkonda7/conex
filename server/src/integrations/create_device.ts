@@ -8,13 +8,13 @@ import { Result } from 'better-result'
 import { eq } from 'drizzle-orm'
 import type { ExternalLinkJson, IntegrationProvider as ProviderId } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
-import { DuplicateError, ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
+import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
 import { device_roles, devices } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkJson, linkOf, setLink, tenantLinks } from './links'
 import { localDevices } from './report'
 import { upsertDevice } from './snapshot'
-import { enabledProvider } from './store'
+import { enabledProviderMethod } from './store'
 
 export async function createExternalDevice(
 	provider: ProviderId,
@@ -43,15 +43,11 @@ export async function createExternalDevice(
 		.from(devices)
 		.innerJoin(device_roles, eq(devices.device_role_id, device_roles.id))
 		.where(eq(devices.id, device.id))
-	const built = await enabledProvider(provider)
-	if (Result.isError(built)) {
-		return built
+	const createDevice = await enabledProviderMethod(provider, 'createDevice', 'creating devices')
+	if (Result.isError(createDevice)) {
+		return createDevice
 	}
-	const instance = built.value
-	if (!instance.createDevice) {
-		return Result.err(new ValidationError('Integration does not support creating devices'))
-	}
-	const created = await instance.createDevice({
+	const created = await createDevice.value({
 		externalTenantId: company.external_id,
 		name: device.name,
 		serial: device.serial,
@@ -62,7 +58,7 @@ export async function createExternalDevice(
 		active: device.status === 'active',
 	})
 	if (Result.isError(created)) {
-		return Result.err(new ExternalServiceError(created.error.message))
+		return created
 	}
 	await upsertDevice(provider, created.value, nowSeconds())
 	const link = await setLink(

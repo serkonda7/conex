@@ -21,18 +21,6 @@ export type {
 export type ExternalTicket = Omit<ExternalTicketJson, 'priority'>
 
 /**
- * Credentials handed to a provider by the factory. Providers ignore the
- * fields they do not use: Octoja leaves `erp_token` empty (TANSS only), UniFi
- * stores its API key in `password` and leaves `username` and `erp_token` empty.
- */
-export interface ProviderCredentials {
-	base_url: string
-	username: string
-	password: string
-	erp_token: string
-}
-
-/**
  * One external system mapped onto normalized records, so linking, matching
  * and the consistency report are written once for every provider.
  * Methods return `Result`; HTTP/auth failures never throw.

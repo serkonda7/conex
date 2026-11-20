@@ -2695,11 +2695,6 @@ export function providerDefaultBaseUrl(provider: IntegrationProvider): string | 
 	return provider === 'unifi' ? 'https://api.ui.com' : null
 }
 
-/** Whether the provider has employees to link (TANSS and M365; Octoja and UniFi know none). */
-export function providerHasEmployees(provider: IntegrationProvider): boolean {
-	return provider === 'tanss' || provider === 'm365'
-}
-
 const BaseUrlSchema = v.pipe(
 	v.string(),
 	v.trim(),

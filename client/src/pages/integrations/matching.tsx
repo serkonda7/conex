@@ -10,7 +10,6 @@ import {
 	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import { providerHasEmployees } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import {
@@ -210,7 +209,7 @@ export function MatchingPage(): JSX.Element {
 
 	const enabled = createMemo(() =>
 		(integrations() ?? []).filter(
-			(i) => i.enabled && (kind() !== 'employee' || providerHasEmployees(i.provider)),
+			(i) => i.enabled && (kind() !== 'employee' || i.capabilities.employees),
 		),
 	)
 

@@ -1,15 +1,10 @@
 /**
- * Provider differences the integration pages branch on. The shared schemas
- * own the data-model differences (ERP token, employees); these cover the
- * remaining external-system behaviour in one place, so pages never compare
- * raw provider strings.
+ * Login-form differences between providers. Capabilities (employees, devices,
+ * push, create_device, customer_numbers, …) come from
+ * `IntegrationJson.capabilities`; this file only covers how the login form
+ * differs per provider.
  */
 import type { IntegrationProvider } from 'shared/src/types'
-
-/** Whether the external system accepts devices created/updated from conex. */
-export function providerCanWriteDevices(provider: IntegrationProvider): boolean {
-	return provider === 'tanss'
-}
 
 /** Whether the user signs in with a mail address instead of a username. */
 export function providerUsesMailLogin(provider: IntegrationProvider): boolean {
@@ -19,9 +14,4 @@ export function providerUsesMailLogin(provider: IntegrationProvider): boolean {
 /** Whether the external system authenticates with an API key alone (UniFi). */
 export function providerUsesApiKey(provider: IntegrationProvider): boolean {
 	return provider === 'unifi'
-}
-
-/** Whether external tenants carry a customer number (TANSS, Octoja). */
-export function providerHasCustomerNumbers(provider: IntegrationProvider): boolean {
-	return provider === 'tanss' || provider === 'octoja'
 }
