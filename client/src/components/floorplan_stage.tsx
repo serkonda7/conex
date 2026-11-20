@@ -29,6 +29,7 @@ import {
 import { locale, t, tp } from '../i18n'
 import { deviceStatusLabel } from '../i18n/labels'
 import { deviceRoleIcon, type IconComponent, panelKindIcon } from '../lib/icons'
+import { spreadApart } from '../lib/marker_spread'
 import {
 	DEFAULT_GRID_SIZE,
 	GRID_SIZES,
@@ -268,8 +269,9 @@ export interface MarkerCluster {
 
 /**
  * Splits markers into single ones and clusters by their distance on screen.
- * At full zoom a crowd is spread on a ring around its center instead;
- * `pinned` (the selected marker) is never clustered.
+ * At full zoom overlapping markers are pushed apart just enough instead,
+ * so the others stay where the editor draws them; `pinned` (the selected
+ * marker) is never clustered or moved.
  */
 export function declutter(
 	placements: FloorplanPlacementJson[],
@@ -287,6 +289,21 @@ export function declutter(
 	})
 	if (width === 0 || height === 0) {
 		return { markers: placements.map(single), clusters: [] }
+	}
+	if (scale >= MAX_ZOOM) {
+		const offsets = spreadApart(
+			placements.map((p): [number, number] => [p.x * width * scale, p.y * height * scale]),
+			CLUSTER_PX,
+			placements.map((p) => p.id === pinned),
+		)
+		return {
+			markers: placements.map((placement, index) => ({
+				...single(placement),
+				dx: offsets[index][0],
+				dy: offsets[index][1],
+			})),
+			clusters: [],
+		}
 	}
 	const groups: { x: number; y: number; members: FloorplanPlacementJson[] }[] = []
 	const markers: ShownMarker[] = []
@@ -310,27 +327,11 @@ export function declutter(
 			markers.push(single(group.members[0]))
 			continue
 		}
-		const x = group.members.reduce((sum, p) => sum + p.x, 0) / group.members.length
-		const y = group.members.reduce((sum, p) => sum + p.y, 0) / group.members.length
-		if (scale < MAX_ZOOM) {
-			clusters.push({
-				key: group.members.map((p) => p.id).join(','),
-				x,
-				y,
-				members: group.members,
-			})
-			continue
-		}
-		const radius = Math.max(CLUSTER_PX, (group.members.length * 32) / (2 * Math.PI))
-		group.members.forEach((placement, index) => {
-			const angle = (index / group.members.length) * 2 * Math.PI - Math.PI / 2
-			markers.push({
-				placement,
-				x,
-				y,
-				dx: Math.cos(angle) * radius,
-				dy: Math.sin(angle) * radius,
-			})
+		clusters.push({
+			key: group.members.map((p) => p.id).join(','),
+			x: group.members.reduce((sum, p) => sum + p.x, 0) / group.members.length,
+			y: group.members.reduce((sum, p) => sum + p.y, 0) / group.members.length,
+			members: group.members,
 		})
 	}
 	return { markers, clusters }
