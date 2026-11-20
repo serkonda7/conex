@@ -1399,7 +1399,6 @@ export const en = {
 	'matching.externalSection': 'External objects',
 	'matching.externalHint':
 		'Objects that exist only in a connected system. Ignore them, or import employees into conex.',
-	'matching.ignoredExternal': 'Ignored here',
 	'matching.rowDone': 'Matched in every integration',
 	'matching.rowOpen.one': '{count} integration still open',
 	'matching.rowOpen.other': '{count} integrations still open',

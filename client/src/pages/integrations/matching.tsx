@@ -966,12 +966,7 @@ export function MatchingPage(): JSX.Element {
 									<For each={ignoredExternal(column)}>
 										{(row: LinkBoardExternal): JSX.Element => (
 											<div class="matching-external-item">
-												<span class="matching-external-name">
-													{row.name}
-													<small class="link-board-detail">
-														{t('matching.ignoredExternal')}
-													</small>
-												</span>
+												<span class="matching-external-name">{row.name}</span>
 												<Show when={editable() && row.link_id !== null}>
 													<button
 														type="button"

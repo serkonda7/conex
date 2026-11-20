@@ -1401,7 +1401,7 @@ export const de: Messages = {
 	'matching.filterDone': 'Vollständig',
 	'matching.select': '- auswählen -',
 	'matching.pickLabel': '{name} in {provider}',
-	'matching.ignore': 'Ignorieren',
+	'matching.ignore': 'ignoriert',
 	'matching.acceptSuggestion': 'Vorschlag übernehmen',
 	'matching.acceptColumn': 'Alle Vorschläge für {provider} übernehmen',
 	'matching.suggestedCount.one': '{count} Vorschlag',
@@ -1416,7 +1416,6 @@ export const de: Messages = {
 	'matching.externalSection': 'Externe Objekte',
 	'matching.externalHint':
 		'Objekte, die nur in einem angebundenen System existieren. Ignoriere sie oder übernehme Mitarbeiter in conex.',
-	'matching.ignoredExternal': 'Hier ignoriert',
 	'matching.rowDone': 'In jeder Integration zugeordnet',
 	'matching.rowOpen.one': '{count} Integration noch offen',
 	'matching.rowOpen.other': '{count} Integrationen noch offen',
