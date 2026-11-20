@@ -25,10 +25,11 @@ import { removeAttachmentFiles } from '../storage'
 import { type AttachmentRow, deleteOwnerAttachments, prunePlacements } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, NotFoundError } from './errors'
+import { NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
+	checkNoDependents,
 	checkTenantExists,
 	exists,
 	findById,
@@ -375,11 +376,12 @@ export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(devices, eq(devices.rack_id, id))) {
-		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
-	}
-	if (await exists(shelves, eq(shelves.rack_id, id))) {
-		return Result.err(new ConflictError('Rack still has shelves; move or delete them first'))
+	const blocked = await checkNoDependents([
+		[devices, eq(devices.rack_id, id), 'Rack still has devices; move or delete them first'],
+		[shelves, eq(shelves.rack_id, id), 'Rack still has shelves; move or delete them first'],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	// Attachments go with their rack; their files only after the commit.
 	const deleted = await tryWrite(() =>

@@ -18,7 +18,7 @@ import { type PgColumn, type PgTable, QueryBuilder } from 'drizzle-orm/pg-core'
 import type { Page } from 'shared/src/types'
 import { tenants } from '../schema'
 import { getDb } from './connection'
-import { DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 
 export type { Page }
 
@@ -197,6 +197,21 @@ export async function findById<T extends TableWithId>(
 export async function exists(table: PgTable, where: SQL | undefined): Promise<boolean> {
 	const rows = await getDb().select({ one: sql`1` }).from(table).where(where).limit(1)
 	return rows.length > 0
+}
+
+/**
+ * Delete guard: the first dependent table that still references the row
+ * answers 409 with its message.
+ */
+export async function checkNoDependents(
+	dependents: [table: PgTable, where: SQL, message: string][],
+): Promise<Result<undefined, Error>> {
+	for (const [table, where, message] of dependents) {
+		if (await exists(table, where)) {
+			return Result.err(new ConflictError(message))
+		}
+	}
+	return Result.ok(undefined)
 }
 
 /** True when a row other than `excludeId` matches `where` (unique-value guards). */

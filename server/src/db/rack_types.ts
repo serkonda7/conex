@@ -4,11 +4,10 @@ import type { RackTypeCreate, RackTypeListQuery, RackTypeUpdate } from 'shared/s
 import { manufacturers, rack_types, racks } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb } from './connection'
-import { ConflictError } from './errors'
 import type { ListParams, Page } from './list'
 import {
+	checkNoDependents,
 	countWhere,
-	exists,
 	insertedId,
 	isPatchEmpty,
 	orderOf,
@@ -144,8 +143,11 @@ export async function deleteRackType(id: number): Promise<Result<RackTypeRow, Er
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(racks, eq(racks.rack_type_id, id))) {
-		return Result.err(new ConflictError('Rack type still has racks; move or delete them first'))
+	const blocked = await checkNoDependents([
+		[racks, eq(racks.rack_type_id, id), 'Rack type still has racks; move or delete them first'],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	const deleted = await tryWrite(() => getDb().delete(rack_types).where(eq(rack_types.id, id)))
 	if (Result.isError(deleted)) {

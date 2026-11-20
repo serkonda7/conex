@@ -44,6 +44,7 @@ import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
+	checkNoDependents,
 	countWhere,
 	exists,
 	findById,
@@ -210,15 +211,20 @@ export async function deleteManufacturer(id: number): Promise<Result<Manufacture
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(device_types, eq(device_types.manufacturer_id, id))) {
-		return Result.err(
-			new ConflictError('Manufacturer still has device types; move or delete them first'),
-		)
-	}
-	if (await exists(rack_types, eq(rack_types.manufacturer_id, id))) {
-		return Result.err(
-			new ConflictError('Manufacturer still has rack types; move or delete them first'),
-		)
+	const blocked = await checkNoDependents([
+		[
+			device_types,
+			eq(device_types.manufacturer_id, id),
+			'Manufacturer still has device types; move or delete them first',
+		],
+		[
+			rack_types,
+			eq(rack_types.manufacturer_id, id),
+			'Manufacturer still has rack types; move or delete them first',
+		],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	const deleted = await tryWrite(() =>
 		getDb().delete(manufacturers).where(eq(manufacturers.id, id)),

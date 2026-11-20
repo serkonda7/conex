@@ -11,7 +11,6 @@ import {
 	type SQL,
 	sql,
 } from 'drizzle-orm'
-import type { PgTable } from 'drizzle-orm/pg-core'
 import {
 	LOCATION_TYPES,
 	type LocationCreate,
@@ -70,6 +69,7 @@ import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import {
 	checkExists,
+	checkNoDependents,
 	checkTenantExists,
 	countWhere,
 	errOf,
@@ -136,21 +136,6 @@ export interface TenantListItem extends TenantRow {
 	site_count: number
 	rack_count: number
 	device_count: number
-}
-
-/**
- * Delete guard: the first dependent table that still references the row
- * answers 409 with its message.
- */
-async function checkNoDependents(
-	dependents: [table: PgTable, where: SQL, message: string][],
-): Promise<Result<undefined, Error>> {
-	for (const [table, where, message] of dependents) {
-		if (await exists(table, where)) {
-			return Result.err(new ConflictError(message))
-		}
-	}
-	return Result.ok(undefined)
 }
 
 // ---------------------------------------------------------------------------

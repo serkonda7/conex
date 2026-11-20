@@ -22,8 +22,8 @@ import { ConflictError, DuplicateError, NotFoundError, ValidationError } from '.
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
+	checkNoDependents,
 	countWhere,
-	exists,
 	findById,
 	insertedId,
 	isPatchEmpty,
@@ -393,20 +393,25 @@ export async function deleteDeviceRole(id: number): Promise<Result<DeviceRoleRow
 	if (current.value.key !== null) {
 		return Result.err(new ConflictError('Built-in device roles cannot be deleted'))
 	}
-	if (await exists(device_roles, eq(device_roles.parent_id, id))) {
-		return Result.err(
-			new ConflictError('Device role still has child roles; move or delete them first'),
-		)
-	}
-	if (
-		(await exists(devices, eq(devices.device_role_id, id))) ||
-		(await exists(virtual_machines, eq(virtual_machines.device_role_id, id)))
-	) {
-		return Result.err(
-			new ConflictError(
-				'Device role still has devices or virtual machines; move or delete them first',
-			),
-		)
+	const blocked = await checkNoDependents([
+		[
+			device_roles,
+			eq(device_roles.parent_id, id),
+			'Device role still has child roles; move or delete them first',
+		],
+		[
+			devices,
+			eq(devices.device_role_id, id),
+			'Device role still has devices or virtual machines; move or delete them first',
+		],
+		[
+			virtual_machines,
+			eq(virtual_machines.device_role_id, id),
+			'Device role still has devices or virtual machines; move or delete them first',
+		],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	const deleted = await tryWrite(() =>
 		getDb().delete(device_roles).where(eq(device_roles.id, id)),
