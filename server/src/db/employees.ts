@@ -381,8 +381,9 @@ export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Er
 		)
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx
+		withTransaction(async () => {
+			const db = getDb()
+			await db
 				.delete(external_links)
 				.where(
 					and(
@@ -390,7 +391,7 @@ export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Er
 						eq(external_links.entity_id, id),
 					),
 				)
-			await tx.delete(employees).where(eq(employees.id, id))
+			await db.delete(employees).where(eq(employees.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

@@ -539,13 +539,14 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 		return blocked
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx
+		withTransaction(async () => {
+			const db = getDb()
+			await db
 				.delete(external_links)
 				.where(
 					and(eq(external_links.entity_type, 'tenant'), eq(external_links.entity_id, id)),
 				)
-			await tx.delete(tenants).where(eq(tenants.id, id))
+			await db.delete(tenants).where(eq(tenants.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

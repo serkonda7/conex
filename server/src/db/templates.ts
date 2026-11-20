@@ -38,7 +38,7 @@ import {
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
 import { expandStubs, type StubInput, stubPowerError, stubPrefix } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { deviceRoleSubtrees } from './device_roles'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
@@ -475,11 +475,12 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 		)
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx
+		withTransaction(async () => {
+			const db = getDb()
+			await db
 				.delete(device_type_interfaces)
 				.where(eq(device_type_interfaces.device_type_id, id))
-			await tx.delete(device_types).where(eq(device_types.id, id))
+			await db.delete(device_types).where(eq(device_types.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

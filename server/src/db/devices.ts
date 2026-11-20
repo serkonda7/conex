@@ -1115,19 +1115,20 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 	const fronts = expanded.value.filter((iface) => iface.rear_index !== null)
 	const id = await tryWrite(
 		() =>
-			getDb().transaction(async (tx) => {
+			withTransaction(async () => {
+				const db = getDb()
 				const deviceId = insertedId(
-					await tx.insert(devices).values(values).returning({ id: devices.id }),
+					await db.insert(devices).values(values).returning({ id: devices.id }),
 				)
-				await insertAssignments(tx, deviceId, input.employee_ids, values.tenant_id)
+				await insertAssignments(db, deviceId, input.employee_ids, values.tenant_id)
 				const plainIds = await insertPorts(
-					tx,
+					db,
 					deviceId,
 					plain.map(({ iface }) => portValues(iface, null)),
 				)
 				const ids = new Map(plain.map(({ i }, n) => [i, plainIds[n] ?? null]))
 				await insertPorts(
-					tx,
+					db,
 					deviceId,
 					fronts.map((iface) =>
 						portValues(
@@ -1348,15 +1349,16 @@ export async function deleteDevice(
 		return floorplan
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx.delete(interfaces).where(eq(interfaces.device_id, id))
-			await tx.delete(panel_jacks).where(eq(panel_jacks.device_id, id))
-			await tx
+		withTransaction(async () => {
+			const db = getDb()
+			await db.delete(interfaces).where(eq(interfaces.device_id, id))
+			await db.delete(panel_jacks).where(eq(panel_jacks.device_id, id))
+			await db
 				.delete(external_links)
 				.where(
 					and(eq(external_links.entity_type, 'device'), eq(external_links.entity_id, id)),
 				)
-			await tx.delete(devices).where(eq(devices.id, id))
+			await db.delete(devices).where(eq(devices.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {
