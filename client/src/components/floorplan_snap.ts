@@ -15,6 +15,7 @@
  * same at every zoom.
  */
 import { createSignal } from 'solid-js'
+import { readStored, writeStored } from '../lib/storage'
 
 type Point = [number, number]
 
@@ -36,11 +37,7 @@ const ALIGN_REACH_PX = 600
 const STORAGE_KEY = 'conex:floorplan-snap'
 
 function loadSnap(): boolean {
-	try {
-		return window.localStorage.getItem(STORAGE_KEY) !== 'false'
-	} catch {
-		return true
-	}
+	return readStored(STORAGE_KEY) !== 'false'
 }
 
 const [snap, setSnap] = createSignal(loadSnap())
@@ -53,11 +50,7 @@ export function snapEnabled(): boolean {
 export function toggleSnap(): void {
 	const next = !snap()
 	setSnap(next)
-	try {
-		window.localStorage.setItem(STORAGE_KEY, String(next))
-	} catch {
-		// Storage unavailable: the choice applies until reload.
-	}
+	writeStored(STORAGE_KEY, String(next))
 }
 
 function screenDistance(metric: Metric, a: Point, b: Point): number {

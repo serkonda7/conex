@@ -1,25 +1,16 @@
 import { createSignal } from 'solid-js'
+import { readStoredJson, writeStoredJson } from './storage'
 
 const STORAGE_PREFIX = 'conex:collapsed:'
 
 /** Collapsed row ids kept in `localStorage`; ids of deleted rows are harmless. */
 function loadCollapsed(key: string): number[] {
-	try {
-		const raw: unknown = JSON.parse(
-			window.localStorage.getItem(`${STORAGE_PREFIX}${key}`) ?? '[]',
-		)
-		return Array.isArray(raw) ? raw.filter((id): id is number => Number.isInteger(id)) : []
-	} catch {
-		return []
-	}
+	const raw = readStoredJson<unknown>(`${STORAGE_PREFIX}${key}`, [])
+	return Array.isArray(raw) ? raw.filter((id): id is number => Number.isInteger(id)) : []
 }
 
 function saveCollapsed(key: string, ids: readonly number[]): void {
-	try {
-		window.localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(ids))
-	} catch {
-		// Storage unavailable: the collapse still applies until the page closes.
-	}
+	writeStoredJson(`${STORAGE_PREFIX}${key}`, ids)
 }
 
 export interface CollapsedTree {

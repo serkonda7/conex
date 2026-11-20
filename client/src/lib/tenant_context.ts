@@ -18,6 +18,7 @@ import {
 } from '../api/tenancy'
 import { parseId } from './router'
 import { sessionTenantId } from './session'
+import { readStored, removeStored, writeStored } from './storage'
 
 export type TenantContext =
 	| { kind: 'all' }
@@ -44,14 +45,7 @@ function parseStored(raw: string | null): TenantContext {
 }
 
 function initialContext(): TenantContext {
-	try {
-		if (typeof window !== 'undefined') {
-			return parseStored(window.localStorage.getItem(STORAGE_KEY))
-		}
-	} catch {
-		// Storage unavailable (private mode, …): start unfiltered.
-	}
-	return ALL
+	return parseStored(readStored(STORAGE_KEY))
 }
 
 const [selected, setSelected] = createSignal<TenantContext>(initialContext())
@@ -69,14 +63,10 @@ export function tenantContext(): TenantContext {
 
 export function setTenantContext(next: TenantContext): void {
 	setSelected(next)
-	try {
-		if (next.kind === 'all') {
-			window.localStorage.removeItem(STORAGE_KEY)
-		} else {
-			window.localStorage.setItem(STORAGE_KEY, `${next.kind}:${next.id}`)
-		}
-	} catch {
-		// Storage unavailable: the choice lasts for this session only.
+	if (next.kind === 'all') {
+		removeStored(STORAGE_KEY)
+	} else {
+		writeStored(STORAGE_KEY, `${next.kind}:${next.id}`)
 	}
 }
 

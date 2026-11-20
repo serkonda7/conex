@@ -18,6 +18,7 @@ import { IconRefresh } from '@tabler/icons-solidjs'
 import { type Accessor, type Component, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { t } from '../../i18n'
+import { readStored, writeStored } from '../../lib/storage'
 import { formatRelative, formatTime } from '../../lib/time'
 
 export type IntegrationLayout = 'grid' | 'list'
@@ -25,11 +26,7 @@ export type IntegrationLayout = 'grid' | 'list'
 const LAYOUT_KEY = 'conex:integrations-layout'
 
 function loadLayout(): IntegrationLayout {
-	try {
-		return window.localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'grid'
-	} catch {
-		return 'grid'
-	}
+	return readStored(LAYOUT_KEY) === 'list' ? 'list' : 'grid'
 }
 
 const [layout, setLayoutSignal] = createSignal<IntegrationLayout>(loadLayout())
@@ -39,11 +36,7 @@ export const integrationLayout: Accessor<IntegrationLayout> = layout
 
 export function setIntegrationLayout(next: IntegrationLayout): void {
 	setLayoutSignal(next)
-	try {
-		window.localStorage.setItem(LAYOUT_KEY, next)
-	} catch {
-		// Storage unavailable (private mode): the layout still applies for the session.
-	}
+	writeStored(LAYOUT_KEY, next)
 }
 
 export type IntegrationStatus = 'connected' | 'running' | 'error' | 'disabled'
