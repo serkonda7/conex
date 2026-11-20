@@ -15,8 +15,8 @@ import type {
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getDb, withTransaction } from '../db/connection'
-import { DuplicateError, isUniqueViolation, NotFoundError, ValidationError } from '../db/errors'
-import { errOf } from '../db/list'
+import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
+import { tryWrite } from '../db/list'
 import { external_links, external_objects, integrations, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
 import { buildProvider } from './registry'
@@ -166,9 +166,9 @@ export async function createIntegration(
 		return ok
 	}
 	const now = nowSeconds()
-	try {
-		const row = (
-			await getDb()
+	const inserted = await tryWrite(
+		() =>
+			getDb()
 				.insert(integrations)
 				.values({
 					provider: input.provider,
@@ -180,18 +180,17 @@ export async function createIntegration(
 					updated_at: now,
 					last_login_ok_at: now,
 				})
-				.returning()
-		)[0]
-		if (!row) {
-			return Result.err(new Error('Integration insert returned no row'))
-		}
-		return Result.ok(await toJson(row))
-	} catch (e) {
-		if (isUniqueViolation(e)) {
-			return Result.err(new DuplicateError('This integration already exists'))
-		}
-		return Result.err(errOf(e))
+				.returning(),
+		'This integration already exists',
+	)
+	if (Result.isError(inserted)) {
+		return inserted
 	}
+	const row = inserted.value[0]
+	if (!row) {
+		return Result.err(new Error('Integration insert returned no row'))
+	}
+	return Result.ok(await toJson(row))
 }
 
 /** Stored secrets overlaid with the given ones; a broken store counts as empty. */
@@ -245,28 +244,28 @@ export async function updateIntegration(
 			return ok
 		}
 	}
-	try {
-		const updated = (
-			await getDb()
-				.update(integrations)
-				.set({
-					base_url,
-					username,
-					secrets: encryptSecrets(secrets),
-					...(patch.enabled !== undefined ? { enabled: patch.enabled ? 1 : 0 } : {}),
-					updated_at: now,
-					...(credentialsChanged ? { last_login_ok_at: now, last_error: null } : {}),
-				})
-				.where(eq(integrations.id, row.id))
-				.returning()
-		)[0]
-		if (!updated) {
-			return Result.err(new NotFoundError('Integration not configured'))
-		}
-		return Result.ok(await toJson(updated))
-	} catch (e) {
-		return Result.err(errOf(e))
+	const updated = await tryWrite(() =>
+		getDb()
+			.update(integrations)
+			.set({
+				base_url,
+				username,
+				secrets: encryptSecrets(secrets),
+				...(patch.enabled !== undefined ? { enabled: patch.enabled ? 1 : 0 } : {}),
+				updated_at: now,
+				...(credentialsChanged ? { last_login_ok_at: now, last_error: null } : {}),
+			})
+			.where(eq(integrations.id, row.id))
+			.returning(),
+	)
+	if (Result.isError(updated)) {
+		return updated
 	}
+	const updatedRow = updated.value[0]
+	if (!updatedRow) {
+		return Result.err(new NotFoundError('Integration not configured'))
+	}
+	return Result.ok(await toJson(updatedRow))
 }
 
 /** "Test connection": verifies unsaved form values, nothing is stored. */
@@ -292,16 +291,17 @@ export async function deleteIntegration(
 	if (Result.isError(current)) {
 		return current
 	}
-	try {
-		await withTransaction(async () => {
+	const deleted = await tryWrite(() =>
+		withTransaction(async () => {
 			const db = getDb()
 			await db.delete(external_links).where(eq(external_links.provider, provider))
 			await db.delete(external_objects).where(eq(external_objects.provider, provider))
 			await db.delete(sync_runs).where(eq(sync_runs.provider, provider))
 			await db.delete(integrations).where(eq(integrations.provider, provider))
-		})
-	} catch (e) {
-		return Result.err(errOf(e))
+		}),
+	)
+	if (Result.isError(deleted)) {
+		return deleted
 	}
 	return Result.ok(current.value)
 }
