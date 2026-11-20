@@ -452,7 +452,7 @@ const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {
 	m365: 'provider.m365',
 }
 
-/** Integration provider name (`tanss` → TANSS, `octoja` → Octoja, `unifi` → UniFi). */
+/** Integration provider name (`tanss` → TANSS, `octoja` → Octoja, `unifi` → Unifi Site Manager). */
 export function providerLabel(value: string): string {
 	return lookup(PROVIDER_KEYS, value)
 }

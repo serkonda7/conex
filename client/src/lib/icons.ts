@@ -22,12 +22,15 @@ import {
 	IconServer,
 	IconSitemap,
 	IconStack2,
+	IconTicket,
+	IconUsers,
 	IconWifi,
 } from '@tabler/icons-solidjs'
 import { CELLULAR_KINDS, TRANSCEIVER_KINDS, WIFI_KINDS } from 'shared/src/ports'
 import {
 	COPPER_PASS_THROUGH_TYPES,
 	type DeviceRoleIcon,
+	type IntegrationProvider,
 	type LocationType,
 	PASS_THROUGH_PORT_TYPES,
 	type PassThroughPortType,
@@ -67,6 +70,19 @@ import {
 } from './port_icons'
 
 export type IconComponent = Component<{ size?: number }>
+
+/** Glyph of each integration provider: its main external object. */
+const PROVIDER_ICONS: Record<IntegrationProvider, IconComponent> = {
+	tanss: IconTicket,
+	octoja: IconDevices2,
+	unifi: IconRouter,
+	m365: IconUsers,
+}
+
+/** Integration provider glyph; unknown providers get the generic plug. */
+export function providerIcon(value: string): IconComponent {
+	return PROVIDER_ICONS[value as IntegrationProvider] ?? IconPlugConnected
+}
 
 const LOCATION_TYPE_ICONS: Record<LocationType, IconComponent> = {
 	building: IconBuilding,

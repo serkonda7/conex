@@ -1,4 +1,4 @@
-import { IconBan, IconLinkPlus, IconRefresh, IconTicket, IconUnlink } from '@tabler/icons-solidjs'
+import { IconBan, IconLinkPlus, IconRefresh, IconUnlink } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import {
 	EMPLOYEE_PUSH_FIELDS,
@@ -46,6 +46,7 @@ import {
 	providerDescription,
 	providerLabel,
 } from '../../i18n/labels'
+import { providerIcon } from '../../lib/icons'
 import { createRecord, useAction } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
@@ -691,7 +692,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 						<IntegrationDetailHeader
 							name={providerLabel(row().provider)}
 							description={providerDescription(row().provider)}
-							icon={IconTicket}
+							icon={providerIcon(row().provider)}
 							configured
 							status={providerStatus(row(), sync.pending())}
 							lastSyncFailed={row().last_sync?.state === 'error'}

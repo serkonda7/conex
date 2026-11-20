@@ -4,7 +4,6 @@ import {
 	IconList,
 	IconPlugConnected,
 	IconPlus,
-	IconTicket,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { INTEGRATION_PROVIDERS } from 'shared/src/schemas'
@@ -21,6 +20,7 @@ import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { providerDescription, providerLabel } from '../../i18n/labels'
+import { providerIcon } from '../../lib/icons'
 import { createRecord, createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
@@ -72,7 +72,7 @@ function ProviderCard(props: {
 		get description(): string {
 			return providerDescription(props.provider)
 		},
-		icon: IconTicket,
+		icon: providerIcon(props.provider),
 	}
 	return (
 		<Show
