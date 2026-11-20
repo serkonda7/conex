@@ -36,7 +36,7 @@ export function ProviderSettings(props: { integration: IntegrationJson }): JSX.E
 			update_integration(props.integration.provider, {
 				base_url: fields.baseUrl().trim(),
 				username: fields.username().trim(),
-				...secrets(fields),
+				...secrets(fields, props.integration.provider),
 			}),
 		)
 		if (ok) {

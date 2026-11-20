@@ -1,27 +1,47 @@
+import { INTEGRATION_PROVIDERS, providerNeedsErpToken } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
-import { create_integration } from '../../api/integrations'
+import { create_integration, type IntegrationProvider } from '../../api/integrations'
 import { FormPage } from '../../components/form'
 import { t } from '../../i18n'
 import { providerLabel } from '../../i18n/labels'
 import { submit_form, useFormState } from '../../lib/form'
+import { queryParam } from '../../lib/router'
 import { IntegrationFormFields, useIntegrationForm } from './form_fields'
+import { providerUsesMailLogin } from './provider_capabilities'
+
+/** Provider of `?provider=`, defaulting to TANSS when missing or unknown. */
+function selectedProvider(): IntegrationProvider {
+	const raw = queryParam('provider')
+	return (INTEGRATION_PROVIDERS as readonly string[]).includes(raw)
+		? (raw as IntegrationProvider)
+		: 'tanss'
+}
 
 /**
- * /integrations/add — TANSS setup (`integrations.manage`). Saving logs in to TANSS
- * first; the integration is only stored when the credentials work.
+ * /integrations/add?provider=… — setup of the chosen provider
+ * (`integrations.manage`), TANSS when no provider is given. Saving logs in to
+ * the external system first; the integration is only stored when the
+ * credentials work. Providers without an ERP token (Octoja) neither ask for
+ * nor send one.
  */
 export function IntegrationAddPage(): JSX.Element {
 	const form = useFormState()
 	const fields = useIntegrationForm()
+	const provider = selectedProvider()
+	const needsErpToken = (): boolean => providerNeedsErpToken(provider)
 
 	function validate(): string | null {
 		if (fields.username().trim() === '') {
-			return t('auth.usernameRequired')
+			return providerUsesMailLogin(provider)
+				? t('integration.mailAddressRequired')
+				: t('auth.usernameRequired')
 		}
 		if (fields.password() === '') {
 			return t('auth.passwordRequired')
 		}
-		return fields.erpToken() === '' ? t('integration.erpTokenRequired') : null
+		return needsErpToken() && fields.erpToken() === ''
+			? t('integration.erpTokenRequired')
+			: null
 	}
 
 	async function handleCreate(e: SubmitEvent): Promise<void> {
@@ -33,11 +53,11 @@ export function IntegrationAddPage(): JSX.Element {
 			validate,
 			save: () =>
 				create_integration({
-					provider: 'tanss',
+					provider,
 					base_url: fields.baseUrl().trim(),
 					username: fields.username().trim(),
 					password: fields.password(),
-					erp_token: fields.erpToken(),
+					erp_token: needsErpToken() ? fields.erpToken() : undefined,
 				}),
 			navigateTo: '/integrations',
 		})
@@ -46,12 +66,12 @@ export function IntegrationAddPage(): JSX.Element {
 	return (
 		<FormPage
 			form={form}
-			title={t('integration.addTitle', { name: providerLabel('tanss') })}
+			title={t('integration.addTitle', { name: providerLabel(provider) })}
 			cancelTo="/integrations"
 			singleton
 			onSubmit={handleCreate}
 		>
-			<IntegrationFormFields provider="tanss" form={fields} editing={false} />
+			<IntegrationFormFields provider={provider} form={fields} editing={false} />
 		</FormPage>
 	)
 }

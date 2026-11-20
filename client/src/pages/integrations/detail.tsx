@@ -8,6 +8,7 @@ import {
 	FINDING_KINDS,
 	type FindingKind,
 	type IntegrationFinding,
+	providerHasEmployees,
 } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, on, Show } from 'solid-js'
@@ -54,6 +55,7 @@ import { type DetailTab, DetailTabs, IntegrationDetailHeader } from './detail_pa
 import { ExternalTenantPicker } from './external_tenant_picker'
 import { providerStatus } from './integration_card'
 import { LinkBoardView } from './link_board'
+import { providerCanWriteDevices } from './provider_capabilities'
 import { ProviderSettings } from './settings'
 
 /** Field of a mismatch that can be written to the external system. */
@@ -222,8 +224,9 @@ function LinkBoardPanel(props: {
 /**
  * /integrations/:id — detail page of one provider (design decision 0006): header with
  * status, Enabled switch and "Sync now", then tabs: the consistency report,
- * link boards (`?view=tenants|devices|employees`) for side-by-side linking, and
- * the settings (`?view=settings`). The report, the device/employee boards and
+ * link boards (`?view=tenants|devices|employees`, employees only for providers
+ * that have them) for side-by-side linking, and the settings (`?view=settings`).
+ * The report, the device/employee boards and
  * "Sync now" follow the tenant selector; `?tenant=` (from a tenant's integration
  * card) wins until the selector is switched. Rows offer the fitting fix: link,
  * confirm a suggestion, create the device externally, ignore, or unlink.
@@ -238,18 +241,30 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 	// Single selected tenant (the user's only one, if so) of the boards and syncs.
 	const selectedTenant = (): number | null =>
 		queryTenant() ?? sessionTenantId() ?? contextTenantId()
+
+	const [integration, { mutate }] = createRecord(() => props.id, fetch_integration, setError)
+
+	// Providers without employees (Octoja) hide the tab and ignore `?view=employees`.
+	const hasEmployees = (): boolean => {
+		const provider = integration()?.provider
+		return provider !== undefined && providerHasEmployees(provider)
+	}
+	const effectiveView = (): View =>
+		view() === 'employees' && !hasEmployees() ? 'report' : view()
+
 	const views = (): DetailTab<View>[] => [
 		{ key: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.
 		...(isScoped() ? [] : [{ key: 'tenants' as const, label: t('integration.viewTenants') }]),
 		{ key: 'devices', label: t('integration.viewDevices') },
-		{ key: 'employees', label: t('integration.viewEmployees') },
+		...(hasEmployees()
+			? [{ key: 'employees' as const, label: t('integration.viewEmployees') }]
+			: []),
 		...(can('integrations.manage')
 			? [{ key: 'settings' as const, label: t('integration.settings') }]
 			: []),
 	]
 
-	const [integration, { mutate }] = createRecord(() => props.id, fetch_integration, setError)
 	usePageMeta(() => ({
 		name: integration() ? providerLabel(integration()?.provider ?? '') : undefined,
 	}))
@@ -455,15 +470,22 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'device_missing_in_external':
 				return (
 					<Show when={can('integrations.manage')}>
-						<button
-							type="button"
-							class="btn-small"
-							onClick={() =>
-								void run(() => create_external_device(provider, f.device_id ?? 0))
-							}
-						>
-							{t('integration.createExternal', { provider: providerLabel(provider) })}
-						</button>
+						{/* Octoja is read-only: it cannot accept a device created in conex. */}
+						<Show when={providerCanWriteDevices(provider)}>
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										create_external_device(provider, f.device_id ?? 0),
+									)
+								}
+							>
+								{t('integration.createExternal', {
+									provider: providerLabel(provider),
+								})}
+							</button>
+						</Show>
 						{ignoreButton(() => ignore_local(provider, 'device', f.device_id ?? 0))}
 					</Show>
 				)
@@ -474,7 +496,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{field !== null && (
+						{providerCanWriteDevices(provider) && field !== null && (
 							<button
 								type="button"
 								class="btn-small"
@@ -495,7 +517,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'employee_suggestion':
 				return (
 					<Show when={can('integrations.manage')}>
-						{provider === 'tanss' &&
+						{providerHasEmployees(provider) &&
 							f.remote === 'active' &&
 							f.external_id !== null &&
 							deactivate}
@@ -512,7 +534,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'employee_missing_in_conex':
 				return (
 					<Show when={can('integrations.manage')}>
-						{provider === 'tanss' && f.external_id !== null && deactivate}
+						{providerHasEmployees(provider) && f.external_id !== null && deactivate}
 						<Show when={can('edit') && f.tenant_id !== null}>
 							<button
 								type="button"
@@ -546,7 +568,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{provider === 'tanss' &&
+						{providerHasEmployees(provider) &&
 							f.field === 'status' &&
 							f.local === 'inactive' &&
 							f.remote === 'active' &&
@@ -673,10 +695,10 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 					<DetailTabs
 						label={t('integration.views')}
 						tabs={views()}
-						active={view()}
+						active={effectiveView()}
 						onSelect={selectView}
 					/>
-					<Show when={view() === 'settings'}>
+					<Show when={effectiveView() === 'settings'}>
 						{/* Not keyed: a refetch after a sync or toggle must not reset typed values. */}
 						<Show when={integration()}>
 							{(row: () => IntegrationJson): JSX.Element => (
@@ -685,7 +707,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 					</Show>
 					{/* Separate instances: selections must not carry over between levels. */}
-					<Show when={view() === 'tenants'}>
+					<Show when={effectiveView() === 'tenants'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="tenant"
@@ -693,7 +715,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							on_error={setError}
 						/>
 					</Show>
-					<Show when={view() === 'devices'}>
+					<Show when={effectiveView() === 'devices'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="device"
@@ -701,7 +723,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							on_error={setError}
 						/>
 					</Show>
-					<Show when={view() === 'employees'}>
+					<Show when={effectiveView() === 'employees'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="employee"
@@ -709,7 +731,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							on_error={setError}
 						/>
 					</Show>
-					<Show when={view() === 'report'}>
+					<Show when={effectiveView() === 'report'}>
 						<p class="integration-meta integration-report-asof">
 							{report()?.synced_at
 								? t('integration.syncedAt', {

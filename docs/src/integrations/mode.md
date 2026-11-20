@@ -1,6 +1,6 @@
 # Integrationsmodus
 
-Ein einziger Schalter legt fest, ob conex externe Systeme ansprechen darf – TANSS und
+Ein einziger Schalter legt fest, ob conex externe Systeme ansprechen darf – TANSS, Octoja und
 Microsoft Graph (für die [Outlook-Kalendersynchronisation](calendar-sync.md)):
 
 | Modus     | Verhalten                                                              |

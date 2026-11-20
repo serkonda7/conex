@@ -13,6 +13,7 @@ import type {
 	IntegrationProvider as ProviderId,
 	SyncRunJson,
 } from 'shared/src/schemas'
+import { providerNeedsErpToken } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getDb, withTransaction } from '../db/connection'
 import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
@@ -160,7 +161,11 @@ export async function createIntegration(
 	if (Result.isOk(existing)) {
 		return Result.err(new DuplicateError('This integration already exists'))
 	}
-	const secrets = { password: input.password, erp_token: input.erp_token }
+	const secrets = { password: input.password, erp_token: input.erp_token ?? '' }
+	const missing = missingSecret(input.provider, secrets)
+	if (missing) {
+		return Result.err(missing)
+	}
 	const ok = await verify(input.provider, input.base_url, input.username, secrets)
 	if (Result.isError(ok)) {
 		return ok
@@ -206,11 +211,11 @@ function mergedSecrets(
 	}
 }
 
-function missingSecret(secrets: IntegrationSecrets): ValidationError | null {
+function missingSecret(provider: ProviderId, secrets: IntegrationSecrets): ValidationError | null {
 	if (secrets.password === '') {
 		return new ValidationError('Password is required')
 	}
-	if (secrets.erp_token === '') {
+	if (providerNeedsErpToken(provider) && secrets.erp_token === '') {
 		return new ValidationError('ERP API token is required')
 	}
 	return null
@@ -235,7 +240,7 @@ export async function updateIntegration(
 		patch.erp_token !== undefined
 	const now = nowSeconds()
 	if (credentialsChanged) {
-		const missing = missingSecret(secrets)
+		const missing = missingSecret(provider, secrets)
 		if (missing) {
 			return Result.err(missing)
 		}
@@ -276,7 +281,7 @@ export async function testIntegration(
 	const current = await getIntegrationRow(provider)
 	const row = Result.isOk(current) ? current.value : null
 	const secrets = mergedSecrets(row, input)
-	const missing = missingSecret(secrets)
+	const missing = missingSecret(provider, secrets)
 	if (missing) {
 		return Result.err(missing)
 	}

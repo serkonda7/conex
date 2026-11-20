@@ -1279,6 +1279,10 @@ export const de: Messages = {
 	'integration.username': 'Benutzername',
 	'integration.usernameHint':
 		'Eigener Benutzer mit Leserechten und ohne Zwei-Faktor-Authentifizierung: Synchronisierungen laufen unbeaufsichtigt.',
+	'integration.mailAddress': 'E-Mail-Adresse',
+	'integration.mailAddressHint':
+		'E-Mail-Adresse eines eigenen Octoja-Benutzers mit Leserechten und ohne Zwei-Faktor-Authentifizierung: Synchronisierungen laufen unbeaufsichtigt.',
+	'integration.mailAddressRequired': 'E-Mail-Adresse ist erforderlich.',
 	'integration.erpToken': 'ERP-API-Token',
 	'integration.erpTokenHint':
 		'API-Token der externen API-Rolle ERP, inklusive Präfix „Bearer“. Wird für die Firmenliste verwendet.',
@@ -1290,6 +1294,7 @@ export const de: Messages = {
 	'integration.test': 'Verbindung testen',
 	'integration.testing': 'Wird getestet…',
 	'integration.testOk': 'Anmeldung und ERP-Token funktionieren.',
+	'integration.testOkNoErp': 'Anmeldung funktioniert.',
 	'integration.testFailed': 'Verbindungstest fehlgeschlagen',
 	'integration.neverSynced': 'Noch nie synchronisiert.',
 	'integration.syncedAt': 'Datenstand: {time}.',
@@ -1398,6 +1403,8 @@ export const de: Messages = {
 
 	'provider.tanss': 'TANSS',
 	'provider.tanss.description': 'Firmen, Geräte und Mitarbeiter abgleichen.',
+	'provider.octoja': 'Octoja',
+	'provider.octoja.description': 'Kunden und Geräte mit Octoja RMM verknüpfen.',
 	'calendarSync.title': 'Outlook-Kalendersynchronisation',
 	'calendarSync.description': 'Technikertermine nach Outlook übertragen.',
 	'calendarSync.requiresTanss':

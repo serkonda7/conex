@@ -2670,11 +2670,21 @@ export interface DeviceTypeUpdatePreview {
 // reports where the data disagrees. See `docs/integrations.md`.
 // ---------------------------------------------------------------------------
 
-export const INTEGRATION_PROVIDERS = ['tanss'] as const
+export const INTEGRATION_PROVIDERS = ['tanss', 'octoja'] as const
 
 export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
 
 export type IntegrationProvider = v.InferOutput<typeof IntegrationProviderSchema>
+
+/** Whether the provider needs an ERP API token besides username and password (TANSS only). */
+export function providerNeedsErpToken(provider: IntegrationProvider): boolean {
+	return provider === 'tanss'
+}
+
+/** Whether the provider has employees to link (TANSS only; Octoja knows customers and assets). */
+export function providerHasEmployees(provider: IntegrationProvider): boolean {
+	return provider === 'tanss'
+}
 
 const BaseUrlSchema = v.pipe(
 	v.string(),
@@ -2698,7 +2708,8 @@ export const IntegrationCreateSchema = v.strictObject({
 	base_url: BaseUrlSchema,
 	username: IntegrationUsernameSchema,
 	password: SecretSchema,
-	erp_token: SecretSchema,
+	/** Required for providers where `providerNeedsErpToken` holds; checked by the server. */
+	erp_token: v.optional(SecretSchema, undefined),
 })
 
 /** Integration patch: omitted secrets keep the stored ones. */

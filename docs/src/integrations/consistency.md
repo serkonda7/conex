@@ -1,16 +1,17 @@
 # Datenabgleich der Integrationen
 
 Der Abgleichbericht vergleicht conex mit den Daten der letzten Synchronisierung aus einem
-externen System (derzeit **TANSS**) und listet jede Abweichung als *Befund*. Er umfasst
+externen System (**TANSS** oder **Octoja**) und listet jede Abweichung als *Befund*. Er umfasst
 die Mandanten des ausgewählten Mandantenkontexts und lädt sich neu, wenn der Kontext
 gewechselt wird.
 
 ## Synchronisierung
 
 - **Firmen:** bei der ersten oder einer erzwungenen vollständigen Synchronisierung alle,
-  sonst nur die seit der letzten Synchronisierung geänderten.
+  sonst nur die seit der letzten Synchronisierung geänderten. Octoja liefert keine
+  Änderungsliste; dort werden immer alle Kunden abgerufen.
 - **Geräte:** nur für Firmen, die mit einem Mandanten verknüpft sind.
-- **Tags:** alle, bei jeder Synchronisierung.
+- **Tags:** alle, bei jeder Synchronisierung (nur TANSS).
 - Eindeutige Gerätezuordnungen werden [automatisch verknüpft](#gerätezuordnung).
 
 ### TANSS-Zuordnung
@@ -28,6 +29,18 @@ verglichen.
 Ein neues Ticket erhält den Tag, der zu seiner Priorität gehört: die Bezeichnung
 `P<rank> - <name>`, z. B. `P1 - Critical` (Groß-/Kleinschreibung wird ignoriert).
 Existiert dieser Tag nicht in TANSS, wird kein Ticket angelegt.
+
+### Octoja-Zuordnung
+
+| conex          | Octoja                          |
+| -------------- | ------------------------------- |
+| Mandant        | Kunde                           |
+| Gerät          | Asset                           |
+| Kundennummer   | externe Referenz des Kunden     |
+
+Die Anmeldung erfolgt mit E-Mail-Adresse und Passwort eines Octoja-Benutzers ohne
+Zwei-Faktor-Anmeldung. Octoja kennt in conex keine Mitarbeiter und keine Tickets; Geräte
+werden nur verknüpft und verglichen, nicht in Octoja angelegt oder geändert.
 
 ## Verknüpfungen
 

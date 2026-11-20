@@ -4,10 +4,12 @@
  * leaves them empty and blank means "keep the stored value".
  */
 import { Result } from 'better-result'
+import { providerNeedsErpToken } from 'shared/src/schemas'
 import { createSignal, type JSX, type Setter, Show } from 'solid-js'
 import { type IntegrationProvider, test_integration } from '../../api/integrations'
 import { Field, Hint, TextField } from '../../components/form'
 import { t } from '../../i18n'
+import { providerUsesMailLogin } from './provider_capabilities'
 
 export interface IntegrationFormState {
 	baseUrl: () => string
@@ -38,10 +40,15 @@ export function useIntegrationForm(): IntegrationFormState {
 }
 
 /** Secrets typed into the form; blank ones are left out (keep the stored value). */
-export function secrets(form: IntegrationFormState): { password?: string; erp_token?: string } {
+export function secrets(
+	form: IntegrationFormState,
+	provider: IntegrationProvider,
+): { password?: string; erp_token?: string } {
 	return {
 		...(form.password() !== '' ? { password: form.password() } : {}),
-		...(form.erpToken() !== '' ? { erp_token: form.erpToken() } : {}),
+		...(providerNeedsErpToken(provider) && form.erpToken() !== ''
+			? { erp_token: form.erpToken() }
+			: {}),
 	}
 }
 
@@ -83,13 +90,20 @@ export function IntegrationFormFields(props: {
 		const res = await test_integration(props.provider, {
 			base_url: f.baseUrl().trim(),
 			username: f.username().trim(),
-			...secrets(f),
+			...secrets(f, props.provider),
 		})
 		setTesting(false)
 		setTestResult(
 			Result.isError(res)
 				? { ok: false, message: res.error.message }
-				: { ok: true, message: t('integration.testOk') },
+				: {
+						ok: true,
+						message: t(
+							providerNeedsErpToken(props.provider)
+								? 'integration.testOk'
+								: 'integration.testOkNoErp',
+						),
+					},
 		)
 	}
 
@@ -99,7 +113,11 @@ export function IntegrationFormFields(props: {
 				id="integration-base-url"
 				label={t('integration.baseUrl')}
 				required
-				placeholder="https://tanss.example.com"
+				placeholder={
+					props.provider === 'octoja'
+						? 'https://acme.eu1.octoja.cloud'
+						: 'https://tanss.example.com'
+				}
 				maxLength={500}
 				autocomplete="off"
 				autofocus={!props.editing}
@@ -108,13 +126,23 @@ export function IntegrationFormFields(props: {
 			/>
 			<TextField
 				id="integration-username"
-				label={t('integration.username')}
+				label={
+					providerUsesMailLogin(props.provider)
+						? t('integration.mailAddress')
+						: t('integration.username')
+				}
 				required
 				maxLength={200}
 				autocomplete="off"
 				value={f.username()}
 				onInput={f.setUsername}
-				hint={<Hint>{t('integration.usernameHint')}</Hint>}
+				hint={
+					providerUsesMailLogin(props.provider) ? (
+						<Hint>{t('integration.mailAddressHint')}</Hint>
+					) : (
+						<Hint>{t('integration.usernameHint')}</Hint>
+					)
+				}
 			/>
 			<TextField
 				id="integration-password"
@@ -126,17 +154,19 @@ export function IntegrationFormFields(props: {
 				value={f.password()}
 				onInput={f.setPassword}
 			/>
-			<TextField
-				id="integration-erp-token"
-				label={t('integration.erpToken')}
-				type="password"
-				required={!props.editing}
-				placeholder={props.editing ? t('integration.keepSecret') : 'Bearer …'}
-				autocomplete="off"
-				value={f.erpToken()}
-				onInput={f.setErpToken}
-				hint={<Hint>{t('integration.erpTokenHint')}</Hint>}
-			/>
+			<Show when={providerNeedsErpToken(props.provider)}>
+				<TextField
+					id="integration-erp-token"
+					label={t('integration.erpToken')}
+					type="password"
+					required={!props.editing}
+					placeholder={props.editing ? t('integration.keepSecret') : 'Bearer …'}
+					autocomplete="off"
+					value={f.erpToken()}
+					onInput={f.setErpToken}
+					hint={<Hint>{t('integration.erpTokenHint')}</Hint>}
+				/>
+			</Show>
 			<Field label={t('integration.connection')} for="integration-test">
 				<div>
 					<button

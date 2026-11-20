@@ -51,6 +51,11 @@ function detailHref(integration: IntegrationJson): string {
 	return `/integrations/${integration.id}`
 }
 
+/** Setup page of one provider, preselected so its form fits it. */
+function addHref(provider: IntegrationProvider): string {
+	return `/integrations/add?provider=${provider}`
+}
+
 /** Card of one provider, set up or not; it opens the detail page or the setup. */
 function ProviderCard(props: {
 	provider: IntegrationProvider
@@ -74,13 +79,13 @@ function ProviderCard(props: {
 			fallback={
 				<IntegrationCard
 					{...shared}
-					href={can('integrations.manage') ? '/integrations/add' : undefined}
+					href={can('integrations.manage') ? addHref(props.provider) : undefined}
 					action={
 						<Show when={can('integrations.manage')}>
 							<button
 								type="button"
 								class="integration-card-btn"
-								onClick={() => navigate('/integrations/add')}
+								onClick={() => navigate(addHref(props.provider))}
 							>
 								<IconLabel icon={IconPlus}>{t('integration.setUp')}</IconLabel>
 							</button>
