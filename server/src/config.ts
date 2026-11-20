@@ -4,7 +4,7 @@ import * as v from 'valibot'
 import { getTrimmedEnv } from './util/server_root'
 import { formatValibotIssues } from './util/valibot'
 
-export const INTEGRATION_MODES = ['live', 'offline'] as const
+export const INTEGRATION_MODES = ['live', 'offline', 'mock'] as const
 export type IntegrationMode = (typeof INTEGRATION_MODES)[number]
 
 /**
@@ -27,8 +27,10 @@ const configSchema = v.strictObject({
 	frontendUrl: v.optional(v.string()),
 	integrations: v.optional(
 		v.strictObject({
-			// "offline" keeps every integration from contacting its external system.
+			// "offline" blocks every integration, "mock" serves captured snapshots instead.
 			mode: v.optional(v.picklist(INTEGRATION_MODES), 'live'),
+			// Snapshot files of the mock mode; relative to the data dir, or absolute.
+			mockDir: v.optional(v.pipe(v.string(), v.minLength(1)), 'integrations-mock'),
 		}),
 		{},
 	),
@@ -101,14 +103,23 @@ export function getConfig(): AppConfig {
 	return config
 }
 
+/** True in `mock` mode: providers serve snapshots instead of contacting external systems. */
+export function isMockMode(): boolean {
+	return getConfig().integrations.mode === 'mock'
+}
+
 /**
- * Guards every outbound integration request: errs in `offline` mode so no
- * request reaches `system`. Call it at each client's single network choke point.
+ * Guards every outbound integration request: errs in `offline` and `mock` mode
+ * so no request reaches `system`. Call it at each client's single network choke point.
  */
 export function ensureIntegrationsLive(system: string): Result<void, Error> {
-	if (getConfig().integrations.mode === 'offline') {
+	const mode = getConfig().integrations.mode
+	if (mode !== 'live') {
+		const reason = mode === 'mock' ? 'mocked' : 'offline'
 		return Result.err(
-			new Error(`${system} is not contacted: integrations are offline ([integrations] mode)`),
+			new Error(
+				`${system} is not contacted: integrations are ${reason} ([integrations] mode)`,
+			),
 		)
 	}
 	return Result.ok(undefined)

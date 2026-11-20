@@ -17,5 +17,9 @@ attachmentsDir = "attachments"
 
 [integrations]
 # Safety switch for every outbound integration request (TANSS, Microsoft Graph).
+# "mock" serves captured snapshots instead of contacting the external systems.
 # Override with CONEX_INTEGRATIONS_MODE.
-mode = "live"   # live | offline
+mode = "live"   # live | offline | mock
+# Snapshot files of the mock mode. Absolute or relative to the data dir.
+# Snapshots contain customer data and are never written by the server itself.
+mockDir = "integrations-mock"
