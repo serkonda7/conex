@@ -15,16 +15,12 @@ import {
 	sql,
 } from 'drizzle-orm'
 import { type PgColumn, type PgTable, QueryBuilder } from 'drizzle-orm/pg-core'
+import type { Page } from 'shared/src/types'
 import { tenants } from '../schema'
 import { getDb } from './connection'
 import { DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
+export type { Page }
 
 export interface ListParams {
 	search: string
