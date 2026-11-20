@@ -9,6 +9,7 @@ import { checkEmployeeAssignment } from './employees'
 import { ConflictError, NotFoundError, ValidationError } from './errors'
 import {
 	checkTenantExists,
+	errOf,
 	exists,
 	findById,
 	findOne,
@@ -84,7 +85,7 @@ async function checkNameFree(
 
 /** Maps a VM unique violation to the colliding name scope (host vs hostless). */
 function duplicateNameError(err: unknown): Error {
-	const message = err instanceof Error ? err.message : String(err)
+	const message = errOf(err).message
 	return new ConflictError(
 		message.includes('virtual_machines_host_name_idx')
 			? NAME_IN_USE_ON_HOST

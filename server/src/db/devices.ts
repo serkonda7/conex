@@ -67,6 +67,7 @@ import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
 	checkTenantExists,
+	errOf,
 	findOne,
 	inScope,
 	insertedId,
@@ -303,7 +304,7 @@ async function checkDeviceUnique(
 
 /** Maps a device unique violation to the colliding field (asset tag vs device ID). */
 function duplicateDeviceError(err: unknown): Error {
-	const message = err instanceof Error ? err.message : String(err)
+	const message = errOf(err).message
 	return new DuplicateError(message.includes('device_id') ? DEVICE_ID_IN_USE : ASSET_TAG_IN_USE)
 }
 

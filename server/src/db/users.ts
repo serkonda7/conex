@@ -14,6 +14,7 @@ import {
 } from './errors'
 import {
 	allIdsExist,
+	errOf,
 	exists,
 	findOne,
 	isPatchEmpty,
@@ -371,7 +372,7 @@ const EMPLOYEE_IN_USE = 'Employee already has a user account'
 /** Unique violations on create/update: username or employee taken. */
 function duplicateOf(err: unknown): Error {
 	return new DuplicateError(
-		String(err).includes('employee_id') ? EMPLOYEE_IN_USE : USERNAME_IN_USE,
+		errOf(err).message.includes('employee_id') ? EMPLOYEE_IN_USE : USERNAME_IN_USE,
 	)
 }
 
