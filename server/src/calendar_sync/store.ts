@@ -18,6 +18,7 @@ import * as v from 'valibot'
 import { getDb, withTransaction } from '../db/connection'
 import { NotFoundError, ValidationError } from '../db/errors'
 import { errOf, tryWrite } from '../db/list'
+import { failInterruptedRuns } from '../db/runs'
 import { decryptJson, encryptJson } from '../integrations/secrets'
 import {
 	calendar_sync_config,
@@ -379,10 +380,7 @@ export async function finishRun(
 		.where(eq(calendar_sync_runs.id, id))
 }
 
-/** Marks runs interrupted by a restart as failed. Called once at startup. */
+/** Marks interrupted calendar sync runs as failed. Called once at startup. */
 export async function failInterruptedCalendarSyncs(): Promise<void> {
-	await getDb()
-		.update(calendar_sync_runs)
-		.set({ state: 'error', finished_at: nowSeconds(), error: 'Interrupted by server restart' })
-		.where(eq(calendar_sync_runs.state, 'running'))
+	await failInterruptedRuns(calendar_sync_runs)
 }

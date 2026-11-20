@@ -52,7 +52,7 @@ import { contextTenantId, tenantContext, tenantContextFilters } from '../../lib/
 import { formatTime } from '../../lib/time'
 import { type DetailTab, DetailTabs, IntegrationDetailHeader } from './detail_parts'
 import { ExternalTenantPicker } from './external_tenant_picker'
-import type { IntegrationStatus } from './integration_card'
+import { providerStatus } from './integration_card'
 import { LinkBoardView } from './link_board'
 import { ProviderSettings } from './settings'
 
@@ -129,17 +129,6 @@ function parseView(raw: string): View {
 	return raw === 'tenants' || raw === 'devices' || raw === 'employees' || raw === 'settings'
 		? raw
 		: 'report'
-}
-
-/** Header state of the provider; `syncing` is a sync started from this page. */
-function providerStatus(integration: IntegrationJson, syncing: boolean): IntegrationStatus {
-	if (!integration.enabled) {
-		return 'disabled'
-	}
-	if (integration.last_error) {
-		return 'error'
-	}
-	return syncing || integration.last_sync?.state === 'running' ? 'running' : 'connected'
 }
 
 /**

@@ -38,12 +38,13 @@ import {
 import { checkBounds, checkOverlap, faceOf } from '../services/occupancy'
 import { expandStubs, type StubInput, stubPowerError, stubPrefix } from '../services/templates'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { deviceRoleSubtrees } from './device_roles'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import {
 	checkExists,
+	checkNoDependents,
 	countWhere,
 	exists,
 	findById,
@@ -54,6 +55,7 @@ import {
 	orderOf,
 	pageRows,
 	pickDefined,
+	relatedValue,
 	searchCondition,
 	subquery,
 	tryWrite,
@@ -210,15 +212,20 @@ export async function deleteManufacturer(id: number): Promise<Result<Manufacture
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(device_types, eq(device_types.manufacturer_id, id))) {
-		return Result.err(
-			new ConflictError('Manufacturer still has device types; move or delete them first'),
-		)
-	}
-	if (await exists(rack_types, eq(rack_types.manufacturer_id, id))) {
-		return Result.err(
-			new ConflictError('Manufacturer still has rack types; move or delete them first'),
-		)
+	const blocked = await checkNoDependents([
+		[
+			device_types,
+			eq(device_types.manufacturer_id, id),
+			'Manufacturer still has device types; move or delete them first',
+		],
+		[
+			rack_types,
+			eq(rack_types.manufacturer_id, id),
+			'Manufacturer still has rack types; move or delete them first',
+		],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	const deleted = await tryWrite(() =>
 		getDb().delete(manufacturers).where(eq(manufacturers.id, id)),
@@ -280,9 +287,13 @@ export async function listDeviceTypes(
 	)
 	const orderColumns = {
 		model: device_types.model,
-		manufacturer: sql`(SELECT ${manufacturers.name} FROM ${manufacturers} WHERE ${manufacturers.id} = ${device_types.manufacturer_id})`,
+		manufacturer: relatedValue(
+			manufacturers.name,
+			manufacturers.id,
+			device_types.manufacturer_id,
+		),
 		part_number: device_types.part_number,
-		role: sql`(SELECT ${device_roles.name} FROM ${device_roles} WHERE ${device_roles.id} = ${device_types.default_device_role_id})`,
+		role: relatedValue(device_roles.name, device_roles.id, device_types.default_device_role_id),
 		description: device_types.description,
 		comments: device_types.comments,
 		u_height: device_types.u_height,
@@ -475,11 +486,12 @@ export async function deleteDeviceType(id: number): Promise<Result<DeviceTypeRow
 		)
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx
+		withTransaction(async () => {
+			const db = getDb()
+			await db
 				.delete(device_type_interfaces)
 				.where(eq(device_type_interfaces.device_type_id, id))
-			await tx.delete(device_types).where(eq(device_types.id, id))
+			await db.delete(device_types).where(eq(device_types.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

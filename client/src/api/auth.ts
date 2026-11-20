@@ -6,10 +6,12 @@
  * of inline in components, so endpoint paths and `{ error }` parsing exist once.
  */
 import type { Result } from 'better-result'
-import { PERMISSIONS } from 'shared/src/schemas'
-import type { Permission } from 'shared/src/types'
+import { type SessionUser, SessionUserSchema } from 'shared/src/schemas'
+import * as v from 'valibot'
 import { t } from '../i18n'
 import { post_json } from './client'
+
+export type { SessionUser }
 
 /** True when no admin account exists yet. Never throws: null on network error. */
 export async function fetchSetupStatus(): Promise<boolean | null> {
@@ -36,17 +38,6 @@ export async function setupAdmin(username: string, password: string): Promise<Re
 	return res.map(() => undefined)
 }
 
-/** Current session identity: username, role, its permissions and the tenant scope. */
-export interface SessionUser {
-	username: string
-	role: { id: number; name: string }
-	permissions: Permission[]
-	/** Tenants the user is limited to; null when global. */
-	tenant_ids: number[] | null
-	/** The employee behind the account, if linked. */
-	employee_id: number | null
-}
-
 /** Current session identity, or null when logged out/unreachable. Never throws. */
 export async function fetchMe(): Promise<SessionUser | null> {
 	try {
@@ -54,26 +45,8 @@ export async function fetchMe(): Promise<SessionUser | null> {
 		if (!res.ok) {
 			return null
 		}
-		const data = (await res.json()) as Partial<SessionUser>
-		if (typeof data.username !== 'string') {
-			return null
-		}
-		return {
-			username: data.username,
-			role: {
-				id: typeof data.role?.id === 'number' ? data.role.id : 0,
-				name: typeof data.role?.name === 'string' ? data.role.name : '',
-			},
-			permissions: Array.isArray(data.permissions)
-				? data.permissions.filter((p: unknown): p is Permission =>
-						(PERMISSIONS as readonly unknown[]).includes(p),
-					)
-				: [],
-			tenant_ids: Array.isArray(data.tenant_ids)
-				? data.tenant_ids.filter((id: unknown): id is number => typeof id === 'number')
-				: null,
-			employee_id: typeof data.employee_id === 'number' ? data.employee_id : null,
-		}
+		const parsed = v.safeParse(SessionUserSchema, await res.json())
+		return parsed.success ? parsed.output : null
 	} catch {
 		return null
 	}

@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /** Audit log: `audit_log.view`, read-only. Entries are written by the auth and user routes. */
 export const auditLogApp = new Hono()
@@ -16,12 +17,8 @@ export const auditLogApp = new Hono()
 		return sendResult(
 			c,
 			await listAuditLog({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				event: query.event,
-				sort: query.sort,
-				order: query.order,
 			}),
 		)
 	})

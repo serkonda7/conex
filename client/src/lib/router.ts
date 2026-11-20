@@ -88,7 +88,8 @@ interface SavedTabs {
 	activeId: number
 }
 
-function isStringArray(value: unknown): value is string[] {
+/** Guard for stored JSON that must be a list of strings. */
+export function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((v) => typeof v === 'string')
 }
 
@@ -705,6 +706,12 @@ export function queryParam(key: string, fromPath?: string): string {
 	const current = (fromPath ?? useTabPath()).split('#')[0] ?? ''
 	const query = current.includes('?') ? (current.split('?')[1] ?? '') : ''
 	return new URLSearchParams(query).get(key) ?? ''
+}
+
+/** `?face=` of a rack-elevation deep link, if it names a face. */
+export function queryFace(): string {
+	const face = queryParam('face')
+	return face === 'front' || face === 'rear' ? face : ''
 }
 
 /**

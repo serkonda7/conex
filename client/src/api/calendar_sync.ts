@@ -14,7 +14,7 @@ import type {
 	CalendarTechnicianJson,
 } from 'shared/src/types'
 import { t } from '../i18n'
-import { client, to_result } from './client'
+import { client, poll_run, to_result } from './client'
 
 export type { CalendarSyncConfigJson, CalendarSyncRunJson, CalendarTechnicianJson }
 
@@ -82,22 +82,19 @@ export async function start_calendar_sync(): Promise<Result<CalendarSyncRunJson,
 	return to_result<CalendarSyncRunJson>(res, t('calendarSync.syncFailed'))
 }
 
-/** Polls the run list until run `id` leaves `running` (1.5 s steps). */
+/** Polls the run list until run `id` leaves `running` (1.5 s steps), then refreshes cached data. */
 export async function wait_for_calendar_sync(
 	id: number,
 ): Promise<Result<CalendarSyncRunJson, Error>> {
-	for (;;) {
-		await new Promise((resolve) => setTimeout(resolve, 1500))
-		const res = await fetch_calendar_sync_runs()
-		if (Result.isError(res)) {
-			return res
-		}
-		const run = res.value.find((r) => r.id === id)
-		if (!run) {
-			return Result.err(new Error(t('calendarSync.syncFailed')))
-		}
-		if (run.state !== 'running') {
-			return Result.ok(run)
-		}
-	}
+	return poll_run(
+		async (): Promise<Result<CalendarSyncRunJson, Error>> => {
+			const runs = await fetch_calendar_sync_runs()
+			if (Result.isError(runs)) {
+				return runs
+			}
+			const run = runs.value.find((r) => r.id === id)
+			return run ? Result.ok(run) : Result.err(new Error(t('calendarSync.syncFailed')))
+		},
+		(run: CalendarSyncRunJson): boolean => run.state === 'running',
+	)
 }

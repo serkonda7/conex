@@ -1,6 +1,27 @@
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-solidjs'
 import { type JSX, Show } from 'solid-js'
 
+/**
+ * Ancestors of `row`, nearest first, from the parent links within `rows`.
+ * The visited set keeps a malformed response from looping forever.
+ */
+function* ancestors<T extends { id: number; parent_id: number | null }>(
+	byId: Map<number, T>,
+	row: T,
+): Generator<T> {
+	const visited = new Set<number>([row.id])
+	let parent = row.parent_id
+	while (parent !== null && !visited.has(parent)) {
+		visited.add(parent)
+		const node = byId.get(parent)
+		if (!node) {
+			return
+		}
+		yield node
+		parent = node.parent_id
+	}
+}
+
 /** Full `parent > child` path of each row, from the parent links within `rows`. */
 export function treePaths<T extends { id: number; parent_id: number | null; name: string }>(
 	rows: readonly T[],
@@ -10,17 +31,8 @@ export function treePaths<T extends { id: number; parent_id: number | null; name
 	const out = new Map<number, string>()
 	for (const row of rows) {
 		const trail = [label(row)]
-		// The visited set keeps a malformed response from looping forever.
-		const visited = new Set<number>([row.id])
-		let parent = row.parent_id
-		while (parent !== null && !visited.has(parent)) {
-			visited.add(parent)
-			const node = byId.get(parent)
-			if (!node) {
-				break
-			}
+		for (const node of ancestors(byId, row)) {
 			trail.unshift(label(node))
-			parent = node.parent_id
 		}
 		out.set(row.id, trail.join(' > '))
 	}
@@ -35,20 +47,13 @@ export function treeIcons(
 	const out = new Map<number, string | null>()
 	for (const row of rows) {
 		let icon = row.icon
-		// The visited set keeps a malformed response from looping forever.
-		const visited = new Set<number>([row.id])
-		let parent = icon == null ? row.parent_id : null
-		while (parent !== null && !visited.has(parent)) {
-			visited.add(parent)
-			const node = byId.get(parent)
-			if (!node) {
-				break
+		if (icon === null) {
+			for (const node of ancestors(byId, row)) {
+				if (node.icon != null) {
+					icon = node.icon
+					break
+				}
 			}
-			if (node.icon != null) {
-				icon = node.icon
-				break
-			}
-			parent = node.parent_id
 		}
 		out.set(row.id, icon)
 	}

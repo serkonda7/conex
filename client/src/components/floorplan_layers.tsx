@@ -16,6 +16,7 @@ import { Dynamic } from 'solid-js/web'
 import type { FloorplanAreaJson, FloorplanPlacementJson } from '../api/attachments'
 import { type MessageKey, t, tp } from '../i18n'
 import type { IconComponent } from '../lib/icons'
+import { readStored, readStoredJson, writeStored, writeStoredJson } from '../lib/storage'
 
 export type AreaLayer = 'site' | LocationType
 type MarkerLayer = 'rack' | 'device' | 'outlet'
@@ -54,14 +55,8 @@ export function layerLabel(layer: Layer): string {
 const STORAGE_KEY = 'conex:floorplan-hidden-layers'
 
 function loadHidden(): Set<Layer> {
-	try {
-		const raw: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
-		return new Set(
-			Array.isArray(raw) ? (raw.filter((v) => typeof v === 'string') as Layer[]) : [],
-		)
-	} catch {
-		return new Set()
-	}
+	const raw = readStoredJson<unknown>(STORAGE_KEY, [])
+	return new Set(Array.isArray(raw) ? (raw.filter((v) => typeof v === 'string') as Layer[]) : [])
 }
 
 // One state for every plan, so a choice carries over to the next plan.
@@ -69,11 +64,7 @@ const [hidden, setHidden] = createSignal<Set<Layer>>(loadHidden())
 
 function saveHidden(next: Set<Layer>): void {
 	setHidden(next)
-	try {
-		window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
-	} catch {
-		// Storage unavailable: the choice applies until reload.
-	}
+	writeStoredJson(STORAGE_KEY, [...next])
 }
 
 export function layerVisible(layer: Layer): boolean {
@@ -107,11 +98,7 @@ function showLayers(layers: readonly Layer[]): void {
 const NAMES_STORAGE_KEY = 'conex:floorplan-marker-names'
 
 function loadMarkerNames(): boolean {
-	try {
-		return window.localStorage.getItem(NAMES_STORAGE_KEY) === 'true'
-	} catch {
-		return false
-	}
+	return readStored(NAMES_STORAGE_KEY) === 'true'
 }
 
 const [markerNames, setMarkerNames] = createSignal(loadMarkerNames())
@@ -124,11 +111,7 @@ export function markerNamesVisible(): boolean {
 function toggleMarkerNames(): void {
 	const next = !markerNames()
 	setMarkerNames(next)
-	try {
-		window.localStorage.setItem(NAMES_STORAGE_KEY, String(next))
-	} catch {
-		// Storage unavailable: the choice applies until reload.
-	}
+	writeStored(NAMES_STORAGE_KEY, String(next))
 }
 
 /** Colour classes of the status legend, with their label keys. */
@@ -161,11 +144,7 @@ function StatusLegend(): JSX.Element {
 const GRID_STORAGE_KEY = 'conex:floorplan-grid'
 
 function loadGrid(): boolean {
-	try {
-		return window.localStorage.getItem(GRID_STORAGE_KEY) !== 'false'
-	} catch {
-		return true
-	}
+	return readStored(GRID_STORAGE_KEY) !== 'false'
 }
 
 const [grid, setGrid] = createSignal(loadGrid())
@@ -178,11 +157,7 @@ export function gridVisible(): boolean {
 function toggleGrid(): void {
 	const next = !grid()
 	setGrid(next)
-	try {
-		window.localStorage.setItem(GRID_STORAGE_KEY, String(next))
-	} catch {
-		// Storage unavailable: the choice applies until reload.
-	}
+	writeStored(GRID_STORAGE_KEY, String(next))
 }
 
 /** Grid sizes to choose from, in meters. */
@@ -193,12 +168,8 @@ export const DEFAULT_GRID_SIZE: GridSize = 1
 const GRID_SIZE_STORAGE_KEY = 'conex:floorplan-grid-size'
 
 function loadGridSize(): GridSize {
-	try {
-		const raw = Number(window.localStorage.getItem(GRID_SIZE_STORAGE_KEY))
-		return GRID_SIZES.find((size) => size === raw) ?? DEFAULT_GRID_SIZE
-	} catch {
-		return DEFAULT_GRID_SIZE
-	}
+	const raw = Number(readStored(GRID_SIZE_STORAGE_KEY))
+	return GRID_SIZES.find((size) => size === raw) ?? DEFAULT_GRID_SIZE
 }
 
 const [gridSizeSignal, setGridSizeSignal] = createSignal<GridSize>(loadGridSize())
@@ -210,11 +181,7 @@ export function gridSize(): GridSize {
 
 export function setGridSize(size: GridSize): void {
 	setGridSizeSignal(size)
-	try {
-		window.localStorage.setItem(GRID_SIZE_STORAGE_KEY, String(size))
-	} catch {
-		// Storage unavailable: the choice applies until reload.
-	}
+	writeStored(GRID_SIZE_STORAGE_KEY, String(size))
 }
 
 /** Layers with content on the plan, in display order, with their object counts. */

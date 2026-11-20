@@ -11,6 +11,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /**
  * Role management (`users.manage`): named permission bundles assigned to
@@ -25,11 +26,7 @@ export const rolesApp = new Hono()
 		const query = c.req.valid('query')
 		return c.json(
 			await listRoles({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
-				sort: query.sort,
-				order: query.order,
+				...listQueryParams(query),
 			}),
 		)
 	})

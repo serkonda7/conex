@@ -33,7 +33,7 @@ function targetOf(choice: string): string | null {
 }
 
 /** Port name with its side, as front and rear ports may share a name. */
-function portLabel(port: { name: string; side: PortSide | null }): string {
+export function portLabel(port: { name: string; side: PortSide | null }): string {
 	return port.side === null ? port.name : `${port.name} (${portSideLabel(port.side)})`
 }
 

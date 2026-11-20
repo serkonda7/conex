@@ -22,10 +22,10 @@ import {
 	poeModeLabel,
 	poeTypeLabel,
 	portKindLabel,
-	portSideLabel,
 	yesNo,
 } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
+import { portLabel } from '../devices/template_sync_dialog'
 import { buildAiUpdatePrompt } from './ai-prompt'
 
 function fieldValue(field: DeviceTypeUpdateChange['field'], value: string): string {
@@ -51,11 +51,6 @@ function changeText(change: DeviceTypeUpdateChange): string {
 		from: value(change.from),
 		to: value(change.to),
 	})
-}
-
-/** Port name with its side, as front and rear ports may share a name. */
-function portLabel(port: DeviceTypeUpdatePort): string {
-	return port.side === null ? port.name : `${port.name} (${portSideLabel(port.side)})`
 }
 
 function PortList(props: { title: string; ports: DeviceTypeUpdatePort[] }): JSX.Element {

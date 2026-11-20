@@ -23,9 +23,10 @@ import {
 } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { DuplicateError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import {
+	checkNoDependents,
 	countWhere,
 	exists,
 	findById,
@@ -133,10 +134,15 @@ export async function deletePriority(id: number): Promise<Result<PriorityRow, Er
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(service_level_targets, eq(service_level_targets.priority_id, id))) {
-		return Result.err(
-			new ConflictError('Priority is used by service levels; remove its targets first'),
-		)
+	const blocked = await checkNoDependents([
+		[
+			service_level_targets,
+			eq(service_level_targets.priority_id, id),
+			'Priority is used by service levels; remove its targets first',
+		],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	const deleted = await tryWrite(() => getDb().delete(priorities).where(eq(priorities.id, id)))
 	if (Result.isError(deleted)) {
@@ -333,12 +339,15 @@ export async function deleteServiceLevel(id: number): Promise<Result<ServiceLeve
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(tenant_bundles, eq(tenant_bundles.service_level_id, id))) {
-		return Result.err(
-			new ConflictError(
-				'Service level is used by tenant bundle contracts; change them first',
-			),
-		)
+	const blocked = await checkNoDependents([
+		[
+			tenant_bundles,
+			eq(tenant_bundles.service_level_id, id),
+			'Service level is used by tenant bundle contracts; change them first',
+		],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	// Targets go with the service level (FK cascade).
 	const deleted = await tryWrite(() =>
@@ -447,15 +456,20 @@ export async function deleteManagedBundle(id: number): Promise<Result<ManagedBun
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(device_roles, eq(device_roles.managed_bundle_id, id))) {
-		return Result.err(
-			new ConflictError('Managed bundle is assigned to device roles; change them first'),
-		)
-	}
-	if (await exists(tenant_bundles, eq(tenant_bundles.managed_bundle_id, id))) {
-		return Result.err(
-			new ConflictError('Managed bundle is contracted by tenants; change them first'),
-		)
+	const blocked = await checkNoDependents([
+		[
+			device_roles,
+			eq(device_roles.managed_bundle_id, id),
+			'Managed bundle is assigned to device roles; change them first',
+		],
+		[
+			tenant_bundles,
+			eq(tenant_bundles.managed_bundle_id, id),
+			'Managed bundle is contracted by tenants; change them first',
+		],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	const deleted = await tryWrite(() =>
 		getDb().delete(managed_bundles).where(eq(managed_bundles.id, id)),

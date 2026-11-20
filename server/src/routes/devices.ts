@@ -24,6 +24,7 @@ import {
 	checkTenant,
 	checkUpdateTenant,
 	listTenantScope,
+	loadScoped,
 	requestScope,
 	resolveCreateTenant,
 	sendTenantRow,
@@ -57,11 +58,7 @@ import { sendCreated, sendResult } from '../util/result_response'
 
 /** Loads a device the requester may access: the row, or the 404/403 response. */
 async function loadDevice(c: Context, id: number): Promise<DeviceRow | Response> {
-	const device = await getDevice(id)
-	if (Result.isError(device)) {
-		return sendResult(c, device)
-	}
-	return checkTenant(c, device.value.tenant_id) ?? device.value
+	return loadScoped(c, await getDevice(id), (device) => checkTenant(c, device.tenant_id))
 }
 
 /**

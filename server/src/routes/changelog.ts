@@ -7,6 +7,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /**
  * Changelog: `changelog.view`, read-only. Every entry carries the tenant of its object, so
@@ -27,13 +28,9 @@ export const changelogApp = new Hono()
 		return sendResult(
 			c,
 			await listChangelog({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				action: query.action,
 				object_type: query.object_type,
-				sort: query.sort,
-				order: query.order,
 				...scope,
 			}),
 		)

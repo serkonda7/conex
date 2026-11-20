@@ -36,12 +36,29 @@ interface CrudOptions<Row> {
 	filters?: (query: any) => Record<string, unknown>
 }
 
-interface ListQuery extends Record<string, unknown> {
+/** Paging and sorting fields shared by every sortable list query. */
+export interface ListQueryParams {
 	search: string
 	page: number
 	limit: number
 	sort: string
 	order: 'asc' | 'desc'
+}
+
+/** Extracts the shared paging/sorting params from a validated list query. */
+export function listQueryParams<Q extends ListQueryParams>(
+	query: Q,
+): Pick<Q, 'search' | 'page' | 'limit' | 'sort' | 'order'> {
+	return {
+		search: query.search,
+		page: query.page,
+		limit: query.limit,
+		sort: query.sort,
+		order: query.order,
+	}
+}
+
+interface ListQuery extends Record<string, unknown>, ListQueryParams {
 	tenant?: number
 	tenant_group?: number
 }
@@ -49,11 +66,7 @@ interface ListQuery extends Record<string, unknown> {
 /** Common list params plus the entity's extra filters. */
 function listParams<Row>(opts: CrudOptions<Row>, query: ListQuery): Record<string, unknown> {
 	return {
-		search: query.search,
-		page: query.page,
-		limit: query.limit,
-		sort: query.sort,
-		order: query.order,
+		...listQueryParams(query),
 		...(opts.filters?.(query) ?? {}),
 	}
 }

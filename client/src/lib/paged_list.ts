@@ -5,32 +5,23 @@
  * fetch.
  */
 import type { Result } from 'better-result'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from 'shared/src/schemas'
 import type { Page } from 'shared/src/types'
 import { type Accessor, batch, createEffect, createMemo, createSignal } from 'solid-js'
 import type { DataTablePagination } from '../components/data_table'
 import { createRecord, type QueryResource } from './resource'
 import { historyEntryKey, useTabPath } from './router'
+import { readStored, writeStored } from './storage'
 
-const PAGE_SIZES = [25, 50, 100, 200]
-const DEFAULT_PAGE_SIZE = 50
 const STORAGE_KEY = 'conex:page-size'
 
 function load_page_size(): number {
-	try {
-		const stored = Number(window.localStorage.getItem(STORAGE_KEY))
-		return PAGE_SIZES.includes(stored) ? stored : DEFAULT_PAGE_SIZE
-	} catch {
-		return DEFAULT_PAGE_SIZE
-	}
+	const stored = Number(readStored(STORAGE_KEY))
+	return PAGE_SIZES.includes(stored) ? stored : DEFAULT_PAGE_SIZE
 }
 
 function save_page_size(size: number): void {
-	try {
-		window.localStorage.setItem(STORAGE_KEY, String(size))
-	} catch {
-		// Storage full or unavailable (private mode): the size still applies
-		// to this list, it just does not persist.
-	}
+	writeStored(STORAGE_KEY, String(size))
 }
 
 /** A page of a list together with the query it was chosen for. */

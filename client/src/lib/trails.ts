@@ -9,6 +9,14 @@ import type { Crumb } from './router'
 /** Guards the parent walks against cycles in bad data. */
 const MAX_DEPTH = 32
 
+/** One link crumb for `row` under `base`, or none while it is not loaded. */
+export function recordCrumb(
+	row: { id: number; name: string } | null | undefined,
+	base: string,
+): Crumb[] {
+	return row ? [{ label: row.name, href: `${base}/${row.id}` }] : []
+}
+
 /** The site group `id` as a single crumb (site groups are flat). */
 export async function siteGroupTrail(id: number | null): Promise<Crumb[]> {
 	if (id === null) {

@@ -15,16 +15,12 @@ import {
 	sql,
 } from 'drizzle-orm'
 import { type PgColumn, type PgTable, QueryBuilder } from 'drizzle-orm/pg-core'
+import type { Page } from 'shared/src/types'
 import { tenants } from '../schema'
 import { getDb } from './connection'
-import { DuplicateError, isUniqueViolation, NotFoundError } from './errors'
+import { ConflictError, DuplicateError, isUniqueViolation, NotFoundError } from './errors'
 
-export interface Page<T> {
-	items: T[]
-	total: number
-	page: number
-	limit: number
-}
+export type { Page }
 
 export interface ListParams {
 	search: string
@@ -203,6 +199,21 @@ export async function exists(table: PgTable, where: SQL | undefined): Promise<bo
 	return rows.length > 0
 }
 
+/**
+ * Delete guard: the first dependent table that still references the row
+ * answers 409 with its message.
+ */
+export async function checkNoDependents(
+	dependents: [table: PgTable, where: SQL, message: string][],
+): Promise<Result<undefined, Error>> {
+	for (const [table, where, message] of dependents) {
+		if (await exists(table, where)) {
+			return Result.err(new ConflictError(message))
+		}
+	}
+	return Result.ok(undefined)
+}
+
 /** True when a row other than `excludeId` matches `where` (unique-value guards). */
 export async function isTaken(
 	table: TableWithId,
@@ -222,6 +233,24 @@ export async function checkExists(
 		return Result.ok(undefined)
 	}
 	return Result.err(new NotFoundError(notFound))
+}
+
+/**
+ * Every id in `ids` must name a row of `table` (duplicates count once); an
+ * empty list passes. Otherwise a `NotFoundError` with `notFound`.
+ */
+export async function allIdsExist(
+	table: PgTable,
+	idColumn: PgColumn,
+	ids: readonly number[],
+	notFound: string,
+): Promise<Result<undefined, Error>> {
+	const unique = new Set(ids)
+	if (unique.size === 0) {
+		return Result.ok(undefined)
+	}
+	const found = await getDb().$count(table, inArray(idColumn, [...unique]))
+	return found === unique.size ? Result.ok(undefined) : Result.err(new NotFoundError(notFound))
 }
 
 /** Shared tenant FK guard: null/undefined passes, missing id is 404. */

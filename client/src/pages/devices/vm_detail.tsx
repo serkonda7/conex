@@ -24,8 +24,8 @@ import { t, tp } from '../../i18n'
 import { deviceRoleLabel } from '../../i18n/labels'
 import { deviceRoleIcon } from '../../lib/icons'
 import { createRecord } from '../../lib/resource'
-import type { Crumb } from '../../lib/router'
 import { canGlobal } from '../../lib/session'
+import { recordCrumb } from '../../lib/trails'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
 import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
 import { DeviceStatusBadge } from './status'
@@ -56,11 +56,6 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 		setError,
 	)
 
-	const crumbs = (): Crumb[] => {
-		const row = host()
-		return row ? [{ label: row.name, href: `/devices/${row.id}` }] : []
-	}
-
 	const handleDelete = useDetailDelete({
 		noun: 'noun.virtualMachine',
 		name: () => vm()?.name,
@@ -75,7 +70,7 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				name={vm()?.name}
-				crumbs={crumbs()}
+				crumbs={recordCrumb(host(), '/devices')}
 				record={vm}
 				loadingText={t('vm.loadingOne')}
 				emptyText={t('vm.notFound')}

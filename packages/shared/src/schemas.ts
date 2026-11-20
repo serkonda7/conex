@@ -31,7 +31,7 @@ import * as v from 'valibot'
 export * from '@serkonda7/conex-device-schema'
 
 // Username identity for local auth. Stored lowercase (see
-// `server/src/util/username.ts`); 1-254 chars of letters, digits, dot,
+// `normalizeLogin` in `shared/src/login.ts`); 1-254 chars of letters, digits, dot,
 // dash, underscore, plus or `@` (accounts of employees sign in with their
 // primary mail address), unambiguous in logs.
 export const UsernameSchema = v.pipe(
@@ -72,10 +72,19 @@ export type PasswordChange = v.InferOutput<typeof PasswordChangeSchema>
 
 // Shared list-query contract (?search=&page=&limit=) used by every P1+
 // list endpoint. Defaults keep callers from re-declaring pagination math.
+
+/** Page-size options offered by list tables and the maximum allowed `limit`. */
+export const PAGE_SIZES = [25, 50, 100, 200]
+export const DEFAULT_PAGE_SIZE = 50
+export const MAX_PAGE_SIZE = 200
+
 export const ListQuerySchema = v.strictObject({
 	search: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ''),
 	page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
-	limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
+	limit: v.optional(
+		v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_PAGE_SIZE)),
+		DEFAULT_PAGE_SIZE,
+	),
 })
 
 export type ListQuery = v.InferOutput<typeof ListQuerySchema>
@@ -725,8 +734,16 @@ export const RACK_FORM_FACTORS = [
 
 export const RackFormFactorSchema = v.picklist(RACK_FORM_FACTORS)
 
-/** Rack units a rack type provides: 1-60 U. */
-export const RackHeightSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60))
+/** Maximum rack height in U. */
+export const MAX_RACK_HEIGHT_U = 60
+
+/** Rack units a rack type provides: 1-{@link MAX_RACK_HEIGHT_U} U. */
+export const RackHeightSchema = v.pipe(
+	v.number(),
+	v.integer(),
+	v.minValue(1),
+	v.maxValue(MAX_RACK_HEIGHT_U),
+)
 
 export const ManufacturerCreateSchema = v.strictObject({
 	name: NameSchema,
@@ -1850,6 +1867,19 @@ const PermissionListSchema = v.pipe(
 	v.transform((list) => PERMISSIONS.filter((p) => list.includes(p))),
 )
 
+/** Identity of the signed-in user, returned by `GET /auth/me` and parsed by the client. */
+export const SessionUserSchema = v.object({
+	username: v.string(),
+	role: v.object({ id: v.number(), name: v.string() }),
+	permissions: v.array(v.picklist(PERMISSIONS)),
+	/** Tenants the user is limited to; null when global. */
+	tenant_ids: v.nullable(v.array(v.number())),
+	/** The employee behind the account, if linked. */
+	employee_id: v.nullable(v.number()),
+})
+
+export type SessionUser = v.InferOutput<typeof SessionUserSchema>
+
 /**
  * Roles bundle permissions and are assigned to users (one role per user).
  * Users whose role grants `users.manage` are always global (no tenant
@@ -2093,6 +2123,9 @@ const FloorplanCoordSchema = v.pipe(
 /** `[x, y]` pair of normalized coordinates. */
 export type FloorplanPoint = [number, number]
 
+/** Maximum number of points in a floor-plan area polygon. */
+export const MAX_AREA_POINTS = 100
+
 /**
  * Area linking to one site or location, or outlining one device (a machine
  * that takes up floor space): a polygon of at least three points.
@@ -2107,7 +2140,7 @@ const FloorplanAreaInputSchema = v.pipe(
 		points: v.pipe(
 			v.array(v.tuple([FloorplanCoordSchema, FloorplanCoordSchema])),
 			v.minLength(3, 'An area needs at least 3 points'),
-			v.maxLength(100, 'An area has at most 100 points'),
+			v.maxLength(MAX_AREA_POINTS, `An area has at most ${MAX_AREA_POINTS} points`),
 		),
 	}),
 	v.check(

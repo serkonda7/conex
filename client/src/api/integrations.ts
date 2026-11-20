@@ -29,7 +29,7 @@ import type {
 } from 'shared/src/types'
 import { t } from '../i18n'
 import { invalidate_queries } from '../lib/query'
-import { client, failed, to_query, to_result } from './client'
+import { client, failed, poll_run, to_query, to_result } from './client'
 
 export type {
 	ExternalEmployeeJson,
@@ -139,23 +139,19 @@ async function fetch_sync_run(
 	return to_result<SyncRunJson>(res, t('integration.syncFailed'))
 }
 
-/** Polls a sync run until it leaves `running` (1.5 s steps). */
+/** Polls a sync run until it leaves `running` (1.5 s steps), then refreshes cached data. */
 export async function wait_for_sync(
 	provider: IntegrationProvider,
 	run: SyncRunJson,
 ): Promise<Result<SyncRunJson, Error>> {
-	let current = run
-	while (current.state === 'running') {
-		await new Promise((resolve) => setTimeout(resolve, 1500))
-		const res = await fetch_sync_run(provider, current.id)
-		if (Result.isError(res)) {
-			return res
-		}
-		current = res.value
+	if (run.state !== 'running') {
+		invalidate_queries()
+		return Result.ok(run)
 	}
-	// The run changed data on the server without a write from this client.
-	invalidate_queries()
-	return Result.ok(current)
+	return poll_run(
+		() => fetch_sync_run(provider, run.id),
+		(current: SyncRunJson): boolean => current.state === 'running',
+	)
 }
 
 /** Starts a sync run and waits for it; a run that ends in `error` fails. */

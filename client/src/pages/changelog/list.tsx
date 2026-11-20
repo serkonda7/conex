@@ -3,7 +3,13 @@ import { createSignal, type JSX } from 'solid-js'
 import { type ChangelogSort, fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
-import { ListLoading, useListFilters, useQueryFilter, useSort } from '../../components/list_page'
+import {
+	emptyListText,
+	ListLoading,
+	useListFilters,
+	useQueryFilter,
+	useSort,
+} from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { changeActionOptions, changeObjectLabel, changeObjectOptions } from '../../i18n/labels'
 import { usePagedList } from '../../lib/paged_list'
@@ -103,14 +109,16 @@ export function ChangelogPage(): JSX.Element {
 	]
 
 	const emptyText = (): string =>
-		search()
-			? t('list.noMatch', { noun: tp('noun.change', 2), search: search() })
-			: action().length > 0 ||
-					objectType().length > 0 ||
-					filterTenant() !== '' ||
-					tenantContext().kind !== 'all'
-				? t('list.noMatchFilters', { noun: tp('noun.change', 2) })
-				: t('changelog.empty')
+		emptyListText({
+			noun: tp('noun.change', 2),
+			search: search(),
+			filtered:
+				action().length > 0 ||
+				objectType().length > 0 ||
+				filterTenant() !== '' ||
+				tenantContext().kind !== 'all',
+			empty: t('changelog.empty'),
+		})
 
 	return (
 		<div>

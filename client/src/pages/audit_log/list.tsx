@@ -3,7 +3,7 @@ import { createSignal, type JSX, Show } from 'solid-js'
 import { type AuditLogEntryJson, type AuditLogSort, fetch_audit_log } from '../../api/audit_log'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
-import { ListLoading, useListFilters, useSort } from '../../components/list_page'
+import { emptyListText, ListLoading, useListFilters, useSort } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
 import { usePagedList } from '../../lib/paged_list'
@@ -117,11 +117,12 @@ export function AuditLogPage(): JSX.Element {
 	]
 
 	const emptyText = (): string =>
-		search()
-			? t('list.noMatch', { noun: tp('noun.auditEntry', 2), search: search() })
-			: event().length > 0
-				? t('list.noMatchFilters', { noun: tp('noun.auditEntry', 2) })
-				: t('audit.empty')
+		emptyListText({
+			noun: tp('noun.auditEntry', 2),
+			search: search(),
+			filtered: event().length > 0,
+			empty: t('audit.empty'),
+		})
 
 	return (
 		<div>

@@ -1,3 +1,4 @@
+import { MAX_RACK_HEIGHT_U } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
 import {
 	create_rack_type,
@@ -58,7 +59,7 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 		if (!formFactor()) {
 			return t('rackType.selectFormFactor')
 		}
-		if (!Number.isInteger(rackHeight) || rackHeight < 1 || rackHeight > 60) {
+		if (!Number.isInteger(rackHeight) || rackHeight < 1 || rackHeight > MAX_RACK_HEIGHT_U) {
 			return t('rackType.heightRange')
 		}
 		return null

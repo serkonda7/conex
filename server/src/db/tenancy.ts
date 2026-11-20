@@ -11,7 +11,6 @@ import {
 	type SQL,
 	sql,
 } from 'drizzle-orm'
-import type { PgTable } from 'drizzle-orm/pg-core'
 import {
 	LOCATION_TYPES,
 	type LocationCreate,
@@ -32,7 +31,6 @@ import {
 import {
 	devices,
 	employee_tenants,
-	external_links,
 	floorplan_areas,
 	floorplan_placements,
 	interfaces,
@@ -68,8 +66,10 @@ import {
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { deleteExternalLinks } from './external_links'
 import {
 	checkExists,
+	checkNoDependents,
 	checkTenantExists,
 	countWhere,
 	errOf,
@@ -136,21 +136,6 @@ export interface TenantListItem extends TenantRow {
 	site_count: number
 	rack_count: number
 	device_count: number
-}
-
-/**
- * Delete guard: the first dependent table that still references the row
- * answers 409 with its message.
- */
-async function checkNoDependents(
-	dependents: [table: PgTable, where: SQL, message: string][],
-): Promise<Result<undefined, Error>> {
-	for (const [table, where, message] of dependents) {
-		if (await exists(table, where)) {
-			return Result.err(new ConflictError(message))
-		}
-	}
-	return Result.ok(undefined)
 }
 
 // ---------------------------------------------------------------------------
@@ -539,13 +524,10 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 		return blocked
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx
-				.delete(external_links)
-				.where(
-					and(eq(external_links.entity_type, 'tenant'), eq(external_links.entity_id, id)),
-				)
-			await tx.delete(tenants).where(eq(tenants.id, id))
+		withTransaction(async () => {
+			const db = getDb()
+			await deleteExternalLinks('tenant', id)
+			await db.delete(tenants).where(eq(tenants.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

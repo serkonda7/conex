@@ -14,6 +14,7 @@ import {
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from 'solid-js'
 import { type MessageKey, t } from '../i18n'
 import { goTo, path } from '../lib/router'
+import { readStored, writeStored } from '../lib/storage'
 import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
 /** Hover shortcut next to a nav row; without `href` a disabled placeholder. */
@@ -49,22 +50,14 @@ function NavShortcut(props: {
 const COLLAPSED_KEY = 'conex:sidebar-collapsed'
 
 function loadCollapsed(): boolean {
-	try {
-		return window.localStorage.getItem(COLLAPSED_KEY) === '1'
-	} catch {
-		return false
-	}
+	return readStored(COLLAPSED_KEY) === '1'
 }
 
 const [collapsed, setCollapsedSignal] = createSignal(loadCollapsed())
 
 function setCollapsed(next: boolean): void {
 	setCollapsedSignal(next)
-	try {
-		window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0')
-	} catch {
-		// Storage unavailable (private mode): the toggle still works for the session.
-	}
+	writeStored(COLLAPSED_KEY, next ? '1' : '0')
 }
 
 /**

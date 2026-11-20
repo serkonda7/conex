@@ -2,7 +2,13 @@ import { createSignal, type JSX, Show } from 'solid-js'
 import { type FloorplanListJson, type FloorplanSort, fetch_floorplans } from '../../api/attachments'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
-import { ListLoading, useListFilters, useSort, useTableColumns } from '../../components/list_page'
+import {
+	emptyListText,
+	ListLoading,
+	useListFilters,
+	useSort,
+	useTableColumns,
+} from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { locationTypeLabel } from '../../i18n/labels'
 import { usePagedList } from '../../lib/paged_list'
@@ -82,11 +88,12 @@ export function FloorplansPage(): JSX.Element {
 	)
 
 	const emptyText = (): string =>
-		search()
-			? t('list.noMatch', { noun: tp('noun.floorplan', 2), search: search() })
-			: tenantContext().kind !== 'all'
-				? t('list.noMatchFilters', { noun: tp('noun.floorplan', 2) })
-				: t('floorplan.listEmpty')
+		emptyListText({
+			noun: tp('noun.floorplan', 2),
+			search: search(),
+			filtered: tenantContext().kind !== 'all',
+			empty: t('floorplan.listEmpty'),
+		})
 
 	return (
 		<div>

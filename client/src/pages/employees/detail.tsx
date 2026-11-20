@@ -19,8 +19,8 @@ import { Markdown } from '../../components/markdown'
 import { t } from '../../i18n'
 import { employeeSalutationLabel } from '../../i18n/labels'
 import { createRecord, createRows, createRowsFor } from '../../lib/resource'
-import type { Crumb } from '../../lib/router'
 import { can, sessionTenantIds } from '../../lib/session'
+import { recordCrumb } from '../../lib/trails'
 import { EmployeeStatus } from './list'
 
 /**
@@ -57,11 +57,6 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 		setError,
 	)
 
-	const tenantCrumbs = (): Crumb[] => {
-		const row = tenant()
-		return row ? [{ label: row.name, href: `/tenants/${row.id}` }] : []
-	}
-
 	const handleDelete = useDetailDelete({
 		noun: 'noun.employee',
 		name: () => employee()?.name,
@@ -75,7 +70,7 @@ export function EmployeeDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				name={employee()?.name}
-				crumbs={tenantCrumbs()}
+				crumbs={recordCrumb(tenant(), '/tenants')}
 				record={employee}
 				loadingText={t('employee.loadingOne')}
 				emptyText={t('employee.notFound')}

@@ -1,3 +1,4 @@
+import { normalizeLogin } from 'shared/src/login'
 import { For, type JSX, Show } from 'solid-js'
 import { type EmployeeRow, fetch_all_employees } from '../../api/employees'
 import type { RoleJson } from '../../api/roles'
@@ -31,7 +32,7 @@ export function useAccountData(onError: ErrorSink): AccountData {
 /** Login of an employee's account: its primary mail address (as the server stores it). */
 export function loginOf(employee: EmployeeRow | undefined): string | null {
 	const address = employee?.emails[0]?.address
-	return address ? address.trim().toLowerCase() : null
+	return address ? normalizeLogin(address) : null
 }
 
 export function employeeOf(data: AccountData, employeeId: string): EmployeeRow | undefined {

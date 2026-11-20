@@ -1,5 +1,6 @@
 import { IconLock, IconMenu2, IconPlus, IconTrash } from '@tabler/icons-solidjs'
-import { extensionNumber, inferPhoneType } from 'shared/src/phone'
+import { normalizeLogin } from 'shared/src/login'
+import { extensionNumber, inferPhoneType, normalizePhone } from 'shared/src/phone'
 import type {
 	ContactScope,
 	InputEventAndTarget,
@@ -316,7 +317,7 @@ export function EmailList(props: {
 
 /** Whether `address` is the account username `login` (stored lowercase). */
 export function isLogin(address: string, login: string | null | undefined): boolean {
-	return login != null && address.trim().toLowerCase() === login
+	return login != null && normalizeLogin(address) === login
 }
 
 /** Extension that can't be completed to a full number with `mainNumber`. */
@@ -339,7 +340,7 @@ export function PhoneList(props: {
 	const dial = (p: TenantPhone): string | null =>
 		p.type === 'extension'
 			? extensionNumber(p.number, props.mainNumber ?? null)
-			: p.number.replace(/[^\d+]/g, '')
+			: normalizePhone(p.number)
 	return (
 		<Show when={props.phones.length > 0} fallback="—">
 			<ul

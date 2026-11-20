@@ -230,3 +230,20 @@ export function sendTenantRow<T extends { tenant_id: number | null }>(
 	}
 	return checkTenant(c, result.value.tenant_id) ?? c.json(result.value)
 }
+
+/**
+ * Loads a row for a single-object request: sends the lookup error (usually a
+ * 404) or the scope denial, otherwise returns the row. `gate` supplies the
+ * loader's scope rule — a row's tenant, a cable's endpoints or an employee's
+ * memberships — so every loader shares the same error/denial plumbing.
+ */
+export async function loadScoped<T>(
+	c: Context,
+	result: Result<T, Error>,
+	gate: (value: T) => Response | null | Promise<Response | null>,
+): Promise<T | Response> {
+	if (Result.isError(result)) {
+		return sendResult(c, result)
+	}
+	return (await gate(result.value)) ?? result.value
+}

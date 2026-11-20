@@ -13,6 +13,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /**
  * Tenants are the scope boundary itself: scoped editors/viewers see exactly
@@ -27,12 +28,8 @@ export const tenantsApp = new Hono()
 		const query = c.req.valid('query')
 		return c.json(
 			await listTenants({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				group: query.group,
-				sort: query.sort,
-				order: query.order,
 				scopeTenantIds: requestScope(c),
 			}),
 		)

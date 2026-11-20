@@ -2,7 +2,12 @@ import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import { deleteCookie, setCookie } from 'hono/cookie'
-import { LoginSchema, PasswordChangeSchema, SetupSchema } from 'shared/src/schemas'
+import {
+	LoginSchema,
+	PasswordChangeSchema,
+	type SessionUser,
+	SetupSchema,
+} from 'shared/src/schemas'
 import { requestUser } from '../authz'
 import { isUniqueViolation } from '../db/errors'
 import { fullAccessRoleId } from '../db/roles'
@@ -172,11 +177,12 @@ authApp.post(
 
 authApp.get('/me', authMiddleware, (c) => {
 	const user = requestUser(c)
-	return c.json({
+	const me: SessionUser = {
 		username: user.username,
 		role: { id: user.role_id, name: user.role_name },
 		permissions: [...user.permissions],
-		tenant_ids: user.tenant_ids,
+		tenant_ids: user.tenant_ids === null ? null : [...user.tenant_ids],
 		employee_id: user.employee_id,
-	})
+	}
+	return c.json(me)
 })

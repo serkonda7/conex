@@ -9,6 +9,7 @@ import type {
 	RackCreate,
 	RackUpdate,
 } from 'shared/src/schemas'
+import { shelfBlockedRange } from 'shared/src/shelves'
 import {
 	device_types,
 	devices,
@@ -24,10 +25,11 @@ import { removeAttachmentFiles } from '../storage'
 import { type AttachmentRow, deleteOwnerAttachments, prunePlacements } from './attachments'
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, NotFoundError } from './errors'
+import { NotFoundError } from './errors'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
+	checkNoDependents,
 	checkTenantExists,
 	exists,
 	findById,
@@ -42,6 +44,8 @@ import {
 	tenantConditions,
 	tryWrite,
 } from './list'
+
+export { shelfBlockedRange }
 
 type RackRecord = typeof racks.$inferSelect
 /** Rack height is computed from the linked rack type, not stored on racks. */
@@ -241,33 +245,6 @@ async function shelfDetailsOf(rackId: number): Promise<ElevationShelfRef[]> {
 	return mounts.map((mount) => ({ ...mount, devices: onShelves.get(mount.id) ?? [] }))
 }
 
-/**
- * Blocked U range of a shelf: the mount span counts unless `mount_usable`
- * is set; the reserved span always counts. Returns null when nothing is
- * blocked (mount usable with no reserve).
- */
-export function shelfBlockedRange(shelf: {
-	position_u: number
-	mount_height: number
-	mount_usable: boolean
-	reserved_height: number
-}): { position_u: number; height_u: number } | null {
-	const total = shelf.mount_height + shelf.reserved_height
-	if (shelf.mount_usable) {
-		if (shelf.reserved_height <= 0) {
-			return null
-		}
-		return {
-			position_u: shelf.position_u + shelf.mount_height,
-			height_u: shelf.reserved_height,
-		}
-	}
-	if (total <= 0) {
-		return null
-	}
-	return { position_u: shelf.position_u, height_u: total }
-}
-
 /** U-blocking spans of shelves (at most one span per shelf). */
 function shelfSpans(details: Omit<ElevationShelfRef, 'devices'>[]): OccupantSpan[] {
 	const spans: OccupantSpan[] = []
@@ -399,11 +376,12 @@ export async function deleteRack(id: number): Promise<Result<RackRow, Error>> {
 	if (Result.isError(current)) {
 		return current
 	}
-	if (await exists(devices, eq(devices.rack_id, id))) {
-		return Result.err(new ConflictError('Rack still has devices; move or delete them first'))
-	}
-	if (await exists(shelves, eq(shelves.rack_id, id))) {
-		return Result.err(new ConflictError('Rack still has shelves; move or delete them first'))
+	const blocked = await checkNoDependents([
+		[devices, eq(devices.rack_id, id), 'Rack still has devices; move or delete them first'],
+		[shelves, eq(shelves.rack_id, id), 'Rack still has shelves; move or delete them first'],
+	])
+	if (Result.isError(blocked)) {
+		return blocked
 	}
 	// Attachments go with their rack; their files only after the commit.
 	const deleted = await tryWrite(() =>

@@ -40,7 +40,7 @@ import {
 	deviceTypeRoleColumn,
 } from '../device_types/columns'
 import { EolPill } from '../device_types/eol_pill'
-import { deviceListHref } from '../devices/list'
+import { deviceListHref } from '../devices/links'
 import { DeviceStatusBadge } from '../devices/status'
 import { useDeviceRoleLink } from './role_link'
 

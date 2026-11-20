@@ -3,7 +3,7 @@ import { asc, eq } from 'drizzle-orm'
 import type { SavedListEntryBase, SavedListPageJson } from 'shared/src/schemas'
 import type { saved_filters, saved_layouts } from '../schema'
 import { nowSeconds } from '../util/time'
-import { type DbHandle, getDb } from './connection'
+import { type DbHandle, getDb, withTransaction } from './connection'
 import { ConflictError, NotFoundError } from './errors'
 import { type ListParams, offsetOf, pageOf, tryWrite } from './list'
 
@@ -128,8 +128,9 @@ export function savedListStore<T extends { name: string }, E extends SavedListEn
 		after?: (tx: DbHandle) => Promise<void>,
 	): Promise<Result<T[], Error>> {
 		const result = await tryWrite(() =>
-			getDb().transaction(async (tx): Promise<Result<T[], Error>> => {
-				const [row] = await tx
+			withTransaction(async (): Promise<Result<T[], Error>> => {
+				const db = getDb()
+				const [row] = await db
 					.select({ items: itemsColumn })
 					.from(table)
 					.where(eq(table.table_key, key))
@@ -147,11 +148,12 @@ export function savedListStore<T extends { name: string }, E extends SavedListEn
 					)
 				}
 				const next = apply(items)
-				await tx
+				await db
 					.update(table)
 					.set({ ...withItems(next), updated_at: nowSeconds() })
 					.where(eq(table.table_key, key))
-				await after?.(tx)
+				// `db` is the surrounding transaction handle, so `after` keeps its API.
+				await after?.(db)
 				return Result.ok(next)
 			}),
 		)

@@ -5,7 +5,6 @@ import {
 	device_employees,
 	employee_tenants,
 	employees,
-	external_links,
 	role_permissions,
 	tenants,
 	users,
@@ -14,7 +13,9 @@ import {
 import { logCreate, logDelete, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { deleteExternalLinks } from './external_links'
 import {
+	allIdsExist,
 	findOne,
 	insertedId,
 	isPatchEmpty,
@@ -177,11 +178,8 @@ export async function getEmployee(id: number): Promise<Result<EmployeeRow, Error
 }
 
 /** Every id in `tenantIds` must name an existing tenant. */
-async function checkTenantsExist(tenantIds: readonly number[]): Promise<Result<undefined, Error>> {
-	const found = await getDb().$count(tenants, inArray(tenants.id, [...tenantIds]))
-	return found === new Set(tenantIds).size
-		? Result.ok(undefined)
-		: Result.err(new NotFoundError('Tenant not found'))
+function checkTenantsExist(tenantIds: readonly number[]): Promise<Result<undefined, Error>> {
+	return allIdsExist(tenants, tenants.id, tenantIds, 'Tenant not found')
 }
 
 /**
@@ -381,16 +379,10 @@ export async function deleteEmployee(id: number): Promise<Result<EmployeeRow, Er
 		)
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx
-				.delete(external_links)
-				.where(
-					and(
-						eq(external_links.entity_type, 'employee'),
-						eq(external_links.entity_id, id),
-					),
-				)
-			await tx.delete(employees).where(eq(employees.id, id))
+		withTransaction(async () => {
+			const db = getDb()
+			await deleteExternalLinks('employee', id)
+			await db.delete(employees).where(eq(employees.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

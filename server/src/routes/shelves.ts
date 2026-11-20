@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import {
 	EntityParamsSchema,
@@ -7,7 +6,7 @@ import {
 	ShelfListQuerySchema,
 	ShelfUpdateSchema,
 } from 'shared/src/schemas'
-import { checkTenant, listTenantScope } from '../authz'
+import { checkTenant, listTenantScope, loadScoped } from '../authz'
 import { rackTenant, shelfTenant } from '../db/owners'
 import {
 	createShelf,
@@ -21,14 +20,13 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /** Loads a shelf the requester may access (via its rack): the row, or the 404/403 response. */
 async function loadShelf(c: Context, id: number): Promise<ShelfRow | Response> {
-	const shelf = await getShelf(id)
-	if (Result.isError(shelf)) {
-		return sendResult(c, shelf)
-	}
-	return checkTenant(c, (await shelfTenant(id)) ?? null) ?? shelf.value
+	return loadScoped(c, await getShelf(id), async () =>
+		checkTenant(c, (await shelfTenant(id)) ?? null),
+	)
 }
 
 /**
@@ -49,12 +47,8 @@ export const shelvesApp = new Hono()
 		}
 		return c.json(
 			await listShelves({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				rack: query.rack,
-				sort: query.sort,
-				order: query.order,
 				...scope,
 			}),
 		)

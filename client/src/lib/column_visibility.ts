@@ -1,31 +1,23 @@
 import { createSignal } from 'solid-js'
+import { readStored, readStoredJson, writeStoredJson } from './storage'
 
 const STORAGE_PREFIX = 'conex:columns:'
 
 /** Reads persisted visible-column keys for a table, or null when unset/corrupt. */
 function load_visible_columns(key: string): string[] | null {
-	try {
-		const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${key}`)
-		if (!raw) {
-			return null
-		}
-		const parsed: unknown = JSON.parse(raw)
-		if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === 'string')) {
-			return null
-		}
-		return parsed as string[]
-	} catch {
+	const storage_key = `${STORAGE_PREFIX}${key}`
+	if (!readStored(storage_key)) {
 		return null
 	}
+	const parsed = readStoredJson<unknown>(storage_key, null)
+	if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === 'string')) {
+		return null
+	}
+	return parsed as string[]
 }
 
 function save_visible_columns(key: string, visible: string[]): void {
-	try {
-		window.localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(visible))
-	} catch {
-		// Storage full or unavailable (private mode): customization still
-		// works for the session, it just does not persist.
-	}
+	writeStoredJson(`${STORAGE_PREFIX}${key}`, visible)
 }
 
 /**

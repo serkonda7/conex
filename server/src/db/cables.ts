@@ -11,10 +11,11 @@ import {
 	sql,
 } from 'drizzle-orm'
 import { alias, type PgColumn } from 'drizzle-orm/pg-core'
+import { passThroughGroup } from 'shared/src/ports'
 import type { CableCreate, CableUpdate } from 'shared/src/schemas'
 import { cables, devices, interfaces } from '../schema'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { ConflictError, NotFoundError } from './errors'
 import type { ListParams, Page } from './list'
 import {
@@ -31,17 +32,6 @@ import {
 } from './list'
 
 export type CableRow = typeof cables.$inferSelect
-
-/**
- * Pass-through group of a patch-panel port: a rear port and the front ports
- * mapped onto it share the rear port's id. Normal ports have none.
- */
-function passThroughGroup(iface: typeof interfaces.$inferSelect): number | null {
-	if (iface.side === 'rear') {
-		return iface.id
-	}
-	return iface.side === 'front' ? iface.rear_port_id : null
-}
 
 /**
  * Both endpoint devices of a cable sit in `tenantIds` (the cable read rule of
@@ -218,11 +208,12 @@ export async function connectCable(input: CableCreate): Promise<Result<CableRow,
 	}
 	const id = await tryWrite(
 		() =>
-			getDb().transaction(async (tx) => {
+			withTransaction(async () => {
+				const db = getDb()
 				const cableId = insertedId(
-					await tx.insert(cables).values(row).returning({ id: cables.id }),
+					await db.insert(cables).values(row).returning({ id: cables.id }),
 				)
-				await tx
+				await db
 					.update(interfaces)
 					.set({ connected: 1 })
 					.where(inArray(interfaces.id, [row.a_interface_id, row.b_interface_id]))
@@ -269,9 +260,10 @@ export async function deleteCable(id: number): Promise<Result<CableRow, Error>> 
 	}
 	const cable = current.value
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx.delete(cables).where(eq(cables.id, id))
-			await tx
+		withTransaction(async () => {
+			const db = getDb()
+			await db.delete(cables).where(eq(cables.id, id))
+			await db
 				.update(interfaces)
 				.set({ connected: 0 })
 				.where(inArray(interfaces.id, [cable.a_interface_id, cable.b_interface_id]))

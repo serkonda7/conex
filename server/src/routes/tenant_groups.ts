@@ -23,6 +23,7 @@ import {
 } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /**
  * Tenant groups bundle tenants for selection; they own no inventory.
@@ -36,11 +37,7 @@ export const tenantGroupsApp = new Hono()
 		const query = c.req.valid('query')
 		return c.json(
 			await listTenantGroups({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
-				sort: query.sort,
-				order: query.order,
+				...listQueryParams(query),
 				scopeTenantIds: requestScope(c),
 			}),
 		)

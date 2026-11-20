@@ -14,8 +14,7 @@ import {
 	fetch_integrations,
 	type IntegrationJson,
 	type IntegrationProvider,
-	start_sync,
-	wait_for_sync,
+	run_sync,
 } from '../../api/integrations'
 import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
@@ -33,22 +32,12 @@ import {
 	integrationLayout,
 	LastRunError,
 	LastRunTime,
+	providerStatus,
 	StatusPill,
 	SyncIconButton,
 	setIntegrationLayout,
 	WarningPill,
 } from './integration_card'
-
-/** Card state of a configured provider; `syncing` is a sync started from this page. */
-function providerStatus(integration: IntegrationJson, syncing: boolean): IntegrationStatus {
-	if (!integration.enabled) {
-		return 'disabled'
-	}
-	if (integration.last_error) {
-		return 'error'
-	}
-	return syncing || integration.last_sync?.state === 'running' ? 'running' : 'connected'
-}
 
 /** Enabled, but the login or the latest sync failed. */
 function needsAttention(integration: IntegrationJson): boolean {
@@ -239,13 +228,7 @@ export function IntegrationsPage(): JSX.Element {
 		}
 		setError(null)
 		setSyncing(provider)
-		const started = await start_sync(provider, undefined, clean)
-		if (Result.isError(started)) {
-			setSyncing(null)
-			setError(started.error.message)
-			return
-		}
-		const done = await wait_for_sync(provider, started.value)
+		const done = await run_sync(provider, undefined, clean)
 		setSyncing(null)
 		if (Result.isError(done)) {
 			setError(done.error.message)

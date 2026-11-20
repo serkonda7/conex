@@ -40,7 +40,6 @@ import {
 	device_types,
 	devices,
 	employees,
-	external_links,
 	floorplan_areas,
 	floorplan_placements,
 	interfaces,
@@ -63,10 +62,12 @@ import { type DbHandle, getDb, withTransaction } from './connection'
 import { checkDeviceRoleExists, deviceRoleSubtrees } from './device_roles'
 import { checkEmployeeAssignments } from './employees'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { deleteExternalLinks } from './external_links'
 import type { ListParams, Page, TenantFilterParams } from './list'
 import {
 	checkExists,
 	checkTenantExists,
+	errOf,
 	findOne,
 	inScope,
 	insertedId,
@@ -303,7 +304,7 @@ async function checkDeviceUnique(
 
 /** Maps a device unique violation to the colliding field (asset tag vs device ID). */
 function duplicateDeviceError(err: unknown): Error {
-	const message = err instanceof Error ? err.message : String(err)
+	const message = errOf(err).message
 	return new DuplicateError(message.includes('device_id') ? DEVICE_ID_IN_USE : ASSET_TAG_IN_USE)
 }
 
@@ -1115,19 +1116,20 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 	const fronts = expanded.value.filter((iface) => iface.rear_index !== null)
 	const id = await tryWrite(
 		() =>
-			getDb().transaction(async (tx) => {
+			withTransaction(async () => {
+				const db = getDb()
 				const deviceId = insertedId(
-					await tx.insert(devices).values(values).returning({ id: devices.id }),
+					await db.insert(devices).values(values).returning({ id: devices.id }),
 				)
-				await insertAssignments(tx, deviceId, input.employee_ids, values.tenant_id)
+				await insertAssignments(db, deviceId, input.employee_ids, values.tenant_id)
 				const plainIds = await insertPorts(
-					tx,
+					db,
 					deviceId,
 					plain.map(({ iface }) => portValues(iface, null)),
 				)
 				const ids = new Map(plain.map(({ i }, n) => [i, plainIds[n] ?? null]))
 				await insertPorts(
-					tx,
+					db,
 					deviceId,
 					fronts.map((iface) =>
 						portValues(
@@ -1348,15 +1350,12 @@ export async function deleteDevice(
 		return floorplan
 	}
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx.delete(interfaces).where(eq(interfaces.device_id, id))
-			await tx.delete(panel_jacks).where(eq(panel_jacks.device_id, id))
-			await tx
-				.delete(external_links)
-				.where(
-					and(eq(external_links.entity_type, 'device'), eq(external_links.entity_id, id)),
-				)
-			await tx.delete(devices).where(eq(devices.id, id))
+		withTransaction(async () => {
+			const db = getDb()
+			await db.delete(interfaces).where(eq(interfaces.device_id, id))
+			await db.delete(panel_jacks).where(eq(panel_jacks.device_id, id))
+			await deleteExternalLinks('device', id)
+			await db.delete(devices).where(eq(devices.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {

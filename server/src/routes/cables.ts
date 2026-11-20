@@ -1,5 +1,4 @@
 import { vValidator } from '@hono/valibot-validator'
-import { Result } from 'better-result'
 import { type Context, Hono } from 'hono'
 import {
 	CableCreateSchema,
@@ -9,7 +8,7 @@ import {
 	EntityParamsSchema,
 	TraceQuerySchema,
 } from 'shared/src/schemas'
-import { checkCable, checkTenant, requestScope } from '../authz'
+import { checkCable, checkTenant, loadScoped, requestScope } from '../authz'
 import {
 	type CableRow,
 	connectCable,
@@ -29,11 +28,10 @@ import { sendCreated, sendResult } from '../util/result_response'
 
 /** Loads a cable the requester may access: the row, or the 404/403 response. */
 async function loadCable(c: Context, id: number): Promise<CableRow | Response> {
-	const found = await getCableWithTenants(id)
-	if (Result.isError(found)) {
-		return sendResult(c, found)
-	}
-	return checkCable(c, found.value.tenants) ?? found.value.cable
+	const loaded = await loadScoped(c, await getCableWithTenants(id), (found) =>
+		checkCable(c, found.tenants),
+	)
+	return loaded instanceof Response ? loaded : loaded.cable
 }
 
 /**

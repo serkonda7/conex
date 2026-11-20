@@ -13,6 +13,9 @@ import {
 	ValidationError,
 } from './errors'
 import {
+	allIdsExist,
+	errOf,
+	exists,
 	findOne,
 	isPatchEmpty,
 	type ListParams,
@@ -89,9 +92,8 @@ export async function createLocalUser(
 }
 
 /** True when at least one user exists. Drives first-run setup gating. */
-export async function hasAnyUser(): Promise<boolean> {
-	const row = (await getDb().select({ id: users.id }).from(users).limit(1))[0]
-	return row !== undefined && row !== null
+export function hasAnyUser(): Promise<boolean> {
+	return exists(users, undefined)
 }
 
 // ---------------------------------------------------------------------------
@@ -237,12 +239,14 @@ async function checkUserInput(input: {
 	tenant_ids?: readonly number[]
 	role_id?: number
 }): Promise<Result<undefined, Error>> {
-	const ids = input.tenant_ids ?? []
-	if (
-		ids.length > 0 &&
-		(await getDb().$count(tenants, inArray(tenants.id, [...ids]))) !== ids.length
-	) {
-		return Result.err(new NotFoundError('Tenant not found'))
+	const tenantsValid = await allIdsExist(
+		tenants,
+		tenants.id,
+		input.tenant_ids ?? [],
+		'Tenant not found',
+	)
+	if (Result.isError(tenantsValid)) {
+		return tenantsValid
 	}
 	return input.role_id === undefined ? Result.ok(undefined) : checkRoleExists(input.role_id)
 }
@@ -368,7 +372,7 @@ const EMPLOYEE_IN_USE = 'Employee already has a user account'
 /** Unique violations on create/update: username or employee taken. */
 function duplicateOf(err: unknown): Error {
 	return new DuplicateError(
-		String(err).includes('employee_id') ? EMPLOYEE_IN_USE : USERNAME_IN_USE,
+		errOf(err).message.includes('employee_id') ? EMPLOYEE_IN_USE : USERNAME_IN_USE,
 	)
 }
 

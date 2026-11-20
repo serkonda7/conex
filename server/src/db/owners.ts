@@ -6,6 +6,7 @@
  * fall through to the normal 404 path instead of inventing a 403.
  */
 import { asc, eq, inArray } from 'drizzle-orm'
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
 import {
 	type cables,
 	devices,
@@ -20,25 +21,26 @@ import {
 import { getDb } from './connection'
 
 type Tenant = number | null | undefined
+type TenantTable = PgTable & { id: PgColumn; tenant_id: PgColumn }
+
+/** Tenant of row `id` of `table`, or `undefined` when the row is missing. */
+async function tenantIdOf(table: TenantTable, id: number): Promise<Tenant> {
+	const rows = await getDb()
+		.select({ tenant_id: table.tenant_id })
+		.from(table)
+		.where(eq(table.id, id))
+		.limit(1)
+	return rows[0]?.tenant_id as Tenant
+}
 
 /** Tenant of a site, or `undefined` when the site is missing. */
-async function siteTenant(siteId: number): Promise<Tenant> {
-	const rows = await getDb()
-		.select({ tenant_id: sites.tenant_id })
-		.from(sites)
-		.where(eq(sites.id, siteId))
-		.limit(1)
-	return rows[0]?.tenant_id
+function siteTenant(siteId: number): Promise<Tenant> {
+	return tenantIdOf(sites, siteId)
 }
 
 /** Tenant of a location, or `undefined` when the location is missing. */
-async function locationTenant(locationId: number): Promise<Tenant> {
-	const rows = await getDb()
-		.select({ tenant_id: locations.tenant_id })
-		.from(locations)
-		.where(eq(locations.id, locationId))
-		.limit(1)
-	return rows[0]?.tenant_id
+function locationTenant(locationId: number): Promise<Tenant> {
+	return tenantIdOf(locations, locationId)
 }
 
 /** Tenant of an attachment owner (one of the three ids set), `undefined` when missing. */
@@ -60,23 +62,13 @@ export function ownerTenant(owner: {
 }
 
 /** Tenant of a rack, or `undefined` when the rack is missing. */
-export async function rackTenant(rackId: number): Promise<Tenant> {
-	const rows = await getDb()
-		.select({ tenant_id: racks.tenant_id })
-		.from(racks)
-		.where(eq(racks.id, rackId))
-		.limit(1)
-	return rows[0]?.tenant_id
+export function rackTenant(rackId: number): Promise<Tenant> {
+	return tenantIdOf(racks, rackId)
 }
 
 /** Tenant of a device, or `undefined` when the device is missing. */
-export async function deviceTenant(deviceId: number): Promise<Tenant> {
-	const rows = await getDb()
-		.select({ tenant_id: devices.tenant_id })
-		.from(devices)
-		.where(eq(devices.id, deviceId))
-		.limit(1)
-	return rows[0]?.tenant_id
+export function deviceTenant(deviceId: number): Promise<Tenant> {
+	return tenantIdOf(devices, deviceId)
 }
 
 /**

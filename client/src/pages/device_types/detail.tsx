@@ -49,9 +49,9 @@ import {
 } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
-import type { Crumb } from '../../lib/router'
 import { can } from '../../lib/session'
 import { formatDate, isPastEol } from '../../lib/time'
+import { recordCrumb } from '../../lib/trails'
 import { devicePlacementColumns } from '../devices/placement_columns'
 import { TemplateSyncDialog } from '../devices/template_sync_dialog'
 import {
@@ -282,11 +282,6 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 	const siteName = useNameOf(sites)
 	const rackName = useNameOf(racks)
 
-	const manufacturerCrumbs = (): Crumb[] => {
-		const row = manufacturer()
-		return row ? [{ label: row.name, href: `/manufacturers/${row.id}` }] : []
-	}
-
 	const action = useAction(setError)
 
 	async function run(request: () => Promise<Result<unknown, Error>>): Promise<boolean> {
@@ -362,7 +357,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				name={deviceType()?.model}
-				crumbs={manufacturerCrumbs()}
+				crumbs={recordCrumb(manufacturer(), '/manufacturers')}
 				record={deviceType}
 				loadingText={t('deviceType.loadingOne')}
 				emptyText={t('deviceType.notFound')}

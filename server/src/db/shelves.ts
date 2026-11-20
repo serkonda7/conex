@@ -4,7 +4,7 @@ import type { ShelfCreate, ShelfUpdate } from 'shared/src/schemas'
 import { devices, racks, shelves } from '../schema'
 import { checkBounds, checkOverlap, type Face, faceOf } from '../services/occupancy'
 import { logCreate, logDelete, logUpdate } from './changelog'
-import { getDb } from './connection'
+import { getDb, withTransaction } from './connection'
 import { ConflictError, NotFoundError, ValidationError } from './errors'
 import type { ListParams, Page } from './list'
 import {
@@ -230,9 +230,10 @@ export async function deleteShelf(id: number): Promise<Result<ShelfRow, Error>> 
 	}
 	// Devices on the shelf stay assigned to the rack, just unplaced.
 	const deleted = await tryWrite(() =>
-		getDb().transaction(async (tx) => {
-			await tx.update(devices).set({ shelf_id: null }).where(eq(devices.shelf_id, id))
-			await tx.delete(shelves).where(eq(shelves.id, id))
+		withTransaction(async () => {
+			const db = getDb()
+			await db.update(devices).set({ shelf_id: null }).where(eq(devices.shelf_id, id))
+			await db.delete(shelves).where(eq(shelves.id, id))
 		}),
 	)
 	if (Result.isError(deleted)) {
