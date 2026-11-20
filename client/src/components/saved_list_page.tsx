@@ -56,10 +56,6 @@ export interface SavedListPageConfig<E extends SavedListEntryBase, P, X = undefi
 	}
 }
 
-export function isStringArray(value: unknown): value is string[] {
-	return Array.isArray(value) && value.every((v) => typeof v === 'string')
-}
-
 function parseJsonObject(raw: string): Record<string, unknown> | null {
 	let parsed: unknown
 	try {

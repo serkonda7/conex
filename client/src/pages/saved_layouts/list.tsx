@@ -7,8 +7,9 @@ import {
 	type SavedLayoutJson,
 	update_saved_layout,
 } from '../../api/saved_layouts'
-import { isStringArray, SavedListPage } from '../../components/saved_list_page'
+import { SavedListPage } from '../../components/saved_list_page'
 import { t, tp } from '../../i18n'
+import { isStringArray } from '../../lib/router'
 
 type Layout = SavedLayoutJson['layout']
 

@@ -9,8 +9,9 @@ import {
 } from '../../api/saved_filters'
 import { fetch_saved_layouts } from '../../api/saved_layouts'
 import { SelectField } from '../../components/form'
-import { isStringArray, SavedListPage } from '../../components/saved_list_page'
+import { SavedListPage } from '../../components/saved_list_page'
 import { t, tp } from '../../i18n'
+import { isStringArray } from '../../lib/router'
 
 type Values = SavedFilterJson['values']
 

@@ -88,7 +88,8 @@ interface SavedTabs {
 	activeId: number
 }
 
-function isStringArray(value: unknown): value is string[] {
+/** Guard for stored JSON that must be a list of strings. */
+export function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((v) => typeof v === 'string')
 }
 
