@@ -15,9 +15,10 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from
 import {
 	fetch_integrations,
 	fetch_link_board,
-	type IntegrationJson,
 	type IntegrationProvider,
+	ignore_external,
 	ignore_local,
+	import_external_employees,
 	type LinkBoard,
 	type LinkBoardExternal,
 	type LinkBoardLocal,
@@ -31,7 +32,7 @@ import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { compareFieldLabel, providerLabel } from '../../i18n/labels'
-import { createRecord, createRows } from '../../lib/resource'
+import { createRecord, createRows, useAction } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
 import { contextTenantId } from '../../lib/tenant_context'
@@ -52,7 +53,6 @@ const IGNORE = '__ignore'
 /** One integration's board, with lookups the cells need. */
 interface Column {
 	provider: IntegrationProvider
-	integration: IntegrationJson
 	board: LinkBoard
 	/** False while the tenant of a device/employee board is not linked there. */
 	usable: boolean
@@ -120,6 +120,10 @@ function stateOf(value: string): CellState {
 
 function matchesSearch(needle: string, ...values: (string | null | undefined)[]): boolean {
 	return needle === '' || values.some((v) => (v ?? '').toLowerCase().includes(needle))
+}
+
+function detailText(...values: (string | null)[]): string {
+	return values.filter((v) => v !== null && v !== '').join(' · ')
 }
 
 /** Boards of one level from every given integration, in the given order. */
@@ -214,8 +218,8 @@ function placeFocusedList(): void {
  *
  * Edits are drafts until "Save matches"; the sticky footer counts the fully
  * matched rows and the unsaved changes. External objects without a conex
- * counterpart are counted per column and handled on the integration's own
- * link board (ignore, import employees).
+ * counterpart stay visible below the table, where they can be ignored,
+ * restored or (for employees) imported into conex.
  */
 export function MatchingPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -235,6 +239,8 @@ export function MatchingPage(): JSX.Element {
 	const [saving, setSaving] = createSignal(false)
 	// Drafts written by "Save" whose boards have not reloaded yet (key → value).
 	const [saved, setSaved] = createSignal(new Map<string, string>())
+	// External-only objects have no cell to draft: their actions write at once.
+	const write = useAction(setError)
 
 	usePageMeta(() => ({ name: t('matching.title') }))
 
@@ -277,7 +283,6 @@ export function MatchingPage(): JSX.Element {
 			return [
 				{
 					provider: board.provider,
-					integration,
 					board,
 					usable: isTopLevel(board.entity_type) || board.external_tenants.length > 0,
 					local: new Map(board.local.map((r) => [r.id, r])),
@@ -451,8 +456,8 @@ export function MatchingPage(): JSX.Element {
 		}
 	}
 
-	/** Open external objects no row has taken: left for the integration's own board. */
-	function leftover(column: Column): number {
+	/** Active external objects no row has taken (drafts applied). */
+	function leftoverRows(column: Column): LinkBoardExternal[] {
 		const used = taken().get(column.provider)
 		return column.board.external.filter(
 			(e) =>
@@ -461,13 +466,58 @@ export function MatchingPage(): JSX.Element {
 				used?.has(e.external_id) !== true &&
 				// Linked to a conex object outside this board (another tenant).
 				!(e.state === 'linked' && e.entity_id !== null && !column.local.has(e.entity_id)),
-		).length
+		)
 	}
+	function leftover(column: Column): number {
+		return leftoverRows(column).length
+	}
+	/** Ignored external objects are hidden in the cells but can be restored here. */
+	function ignoredExternal(column: Column): LinkBoardExternal[] {
+		return column.board.external.filter((e) => e.state === 'ignored')
+	}
+	/** External employees with a suggested counterpart are linked, not imported. */
+	function importable(column: Column): LinkBoardExternal[] {
+		if (kind() !== 'employee') {
+			return []
+		}
+		const suggested = new Set(
+			column.board.local
+				.map((l) => l.suggestion?.external_id)
+				.filter((id): id is string => id !== undefined && id !== ''),
+		)
+		return leftoverRows(column).filter((e) => !suggested.has(e.external_id))
+	}
+	const columnsWithExternal = createMemo(() =>
+		usableColumns().filter((c) => leftoverRows(c).length > 0 || ignoredExternal(c).length > 0),
+	)
 
-	function boardHref(column: Column): string {
-		const view = isTopLevel(kind()) ? 'tenants' : `${kind()}s`
-		const tenantQuery = isTopLevel(kind()) ? '' : `&tenant=${tenant() ?? ''}`
-		return `/integrations/${column.integration.id}?view=${view}${tenantQuery}`
+	// External-only objects have no cell to draft: these actions write at once.
+	async function ignoreExternal(column: Column, externalId: string): Promise<void> {
+		await write.run(() => ignore_external(column.provider, kind(), externalId))
+	}
+	async function restoreExternal(column: Column, row: LinkBoardExternal): Promise<void> {
+		const linkId = row.link_id
+		if (linkId === null) {
+			return
+		}
+		await write.run(() => unlink_external(column.provider, linkId))
+	}
+	async function importAll(column: Column): Promise<void> {
+		const tenantId = tenant()
+		const importRows = importable(column)
+		if (tenantId === null || importRows.length === 0) {
+			return
+		}
+		if (!window.confirm(tp('integration.confirmImportEmployees', importRows.length))) {
+			return
+		}
+		await write.run(() =>
+			import_external_employees(
+				column.provider,
+				tenantId,
+				importRows.map((r) => r.external_id),
+			),
+		)
 	}
 
 	const changes = createMemo((): Change[] => {
@@ -826,9 +876,7 @@ export function MatchingPage(): JSX.Element {
 								{(column: Column): JSX.Element => (
 									<td>
 										<Show when={column.usable && leftover(column) > 0}>
-											<a href={boardHref(column)}>
-												{tp('matching.leftover', leftover(column))}
-											</a>
+											<span>{tp('matching.leftover', leftover(column))}</span>
 										</Show>
 									</td>
 								)}
@@ -839,6 +887,114 @@ export function MatchingPage(): JSX.Element {
 			</table>
 		</div>
 	)
+
+	/** External-only objects of each integration: ignore, restore or import. */
+	function externalSection(): JSX.Element {
+		return (
+			<Show when={columnsWithExternal().length > 0}>
+				<section class="matching-external" aria-labelledby="matching-external-title">
+					<h3 id="matching-external-title">{t('matching.externalSection')}</h3>
+					<p class="link-board-hint">{t('matching.externalHint')}</p>
+					<div class="matching-external-grid">
+						<For each={columnsWithExternal()}>
+							{(column: Column): JSX.Element => (
+								<div class="matching-external-col">
+									<h4>
+										{providerLabel(column.provider)}{' '}
+										<span class="badge">
+											{leftoverRows(column).length +
+												ignoredExternal(column).length}
+										</span>
+									</h4>
+									<For each={leftoverRows(column)}>
+										{(row: LinkBoardExternal): JSX.Element => (
+											<div
+												class="matching-external-item"
+												classList={{ inactive: !row.active }}
+											>
+												<span class="matching-external-name">
+													{row.name}
+													<small class="link-board-detail">
+														{detailText(row.detail, row.serial)}
+													</small>
+												</span>
+												<Show when={!row.active}>
+													<span class="badge">
+														{t('integration.inactive')}
+													</span>
+												</Show>
+												<Show when={editable()}>
+													<button
+														type="button"
+														class="icon-btn"
+														title={t('integration.ignore')}
+														aria-label={t('integration.ignore')}
+														disabled={write.pending()}
+														onClick={(): void =>
+															void ignoreExternal(
+																column,
+																row.external_id,
+															)
+														}
+													>
+														<IconBan size={18} />
+													</button>
+												</Show>
+											</div>
+										)}
+									</For>
+									<Show
+										when={
+											kind() === 'employee' &&
+											can('edit') &&
+											tenant() !== null &&
+											importable(column).length > 0
+										}
+									>
+										<button
+											type="button"
+											class="btn-small"
+											disabled={write.pending()}
+											onClick={(): void => void importAll(column)}
+										>
+											{tp(
+												'integration.importEmployees',
+												importable(column).length,
+											)}
+										</button>
+									</Show>
+									<For each={ignoredExternal(column)}>
+										{(row: LinkBoardExternal): JSX.Element => (
+											<div class="matching-external-item">
+												<span class="matching-external-name">
+													{row.name}
+													<small class="link-board-detail">
+														{t('matching.ignoredExternal')}
+													</small>
+												</span>
+												<Show when={editable() && row.link_id !== null}>
+													<button
+														type="button"
+														class="btn-small"
+														disabled={write.pending()}
+														onClick={(): void =>
+															void restoreExternal(column, row)
+														}
+													>
+														{t('integration.restore')}
+													</button>
+												</Show>
+											</div>
+										)}
+									</For>
+								</div>
+							)}
+						</For>
+					</div>
+				</section>
+			</Show>
+		)
+	}
 
 	return (
 		<div class="matching-page">
@@ -929,6 +1085,8 @@ export function MatchingPage(): JSX.Element {
 					</Show>
 				</Show>
 			</Show>
+
+			{externalSection()}
 
 			<Show when={boards() && rows().length > 0}>
 				<div class="matching-footer">

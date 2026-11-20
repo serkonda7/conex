@@ -5402,37 +5402,7 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
-/* Link board (integration detail): summary, status switch + search + bulk
-   actions, then suggestion pairs and two pick columns (Open), a pair table
-   (Linked) or two columns with Restore (Ignored). */
-.link-board-summary {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.4rem 0.75rem;
-	font-size: var(--font-size-sm);
-}
-
-.link-board-progress {
-	flex: 0 0 10rem;
-	height: 0.4rem;
-	overflow: hidden;
-	border-radius: 999px;
-	background-color: var(--bg-raised);
-}
-
-.link-board-progress-bar {
-	height: 100%;
-	border-radius: inherit;
-	background-color: var(--primary);
-	transition: width 0.2s ease;
-}
-
-.link-board-toolbar .link-board-search {
-	flex: 1 1 14rem;
-	width: auto;
-}
-
+/* Shared controls of the cross-integration matching page. */
 .link-board-filter {
 	display: inline-flex;
 	min-width: 0;
@@ -5464,138 +5434,16 @@ a.rack-shelf-plate:hover {
 	color: var(--text);
 }
 
-.link-board-section + .link-board-section {
-	margin-top: 1.5rem;
-}
-
-.link-board-section h3 {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin: 0.75rem 0 0.25rem;
-}
-
 .link-board-hint {
 	margin: 0 0 0.5rem;
 	color: var(--text-muted);
 	font-size: var(--font-size-sm);
 }
 
-/* Shown instead of the hint while a row is picked. */
-.link-board-pickbar {
-	position: sticky;
-	top: var(--topbar-height);
-	z-index: 1;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	margin: 0 0 0.5rem;
-	padding: 0.4rem 0.6rem;
-	border: 1px solid var(--primary);
-	border-radius: 0.4rem;
-	background-color: var(--primary-tint);
-	font-size: var(--font-size-sm);
-}
-
-.link-board-columns {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-	gap: 1rem;
-	align-items: start;
-}
-
-.link-board-heading {
-	margin: 0 0 0.35rem;
-	font-size: var(--font-size-base);
-}
-
-.link-board-heading .text-muted {
-	font-weight: 400;
-	font-size: var(--font-size-sm);
-}
-
-.app-content .link-board-scroll {
-	max-height: 70vh;
-	overflow: auto;
-	border: 1px solid var(--border);
-	border-radius: 0.35rem;
-	background-color: var(--bg-surface);
-}
-
-/* The wrapper scrolls and draws the frame, so the sticky head works. */
-.app-content .link-board-scroll table {
-	width: 100%;
-	margin: 0;
-	border: none;
-	border-radius: 0;
-	overflow: visible;
-}
-
-.link-board-pairs thead {
-	position: sticky;
-	top: 0;
-	z-index: 1;
-}
-
-.link-board-row.pickable {
-	cursor: pointer;
-}
-
-.link-board-row.inactive {
-	color: var(--text-muted);
-}
-
-/* Likely partner of the picked row. */
-.link-board-row.highlighted {
-	background-color: color-mix(in srgb, var(--link) 12%, transparent);
-}
-
-.link-board-row.selected {
-	background-color: var(--primary-tint);
-	outline: 1px solid var(--primary);
-	outline-offset: -1px;
-}
-
 .link-board-detail {
 	display: block;
 	color: var(--text-muted);
 	font-size: var(--font-size-sm);
-}
-
-.link-board-arrow {
-	width: 1%;
-	white-space: nowrap;
-	text-align: center;
-	color: var(--text-muted);
-}
-
-.link-board-via {
-	font-size: var(--font-size-sm);
-	color: var(--link);
-}
-
-.link-board-actions {
-	width: 1%;
-	white-space: nowrap;
-	text-align: right;
-}
-
-/* Ignore only shows on hover/focus of its row on pointer devices, so the
-   pick lists read as names rather than buttons. */
-@media (hover: hover) {
-	.link-board-row.pickable .link-board-actions .icon-btn {
-		opacity: 0;
-	}
-
-	.link-board-row.pickable:hover .link-board-actions .icon-btn,
-	.link-board-row.pickable:focus-within .link-board-actions .icon-btn {
-		opacity: 1;
-	}
-}
-
-.link-board-matching {
-	margin-left: auto;
 }
 
 /* Cross-integration matching: conex objects as rows, one column per
@@ -5930,14 +5778,64 @@ a.rack-shelf-plate:hover {
 	gap: 0.5rem;
 }
 
-.integration-report .row-actions .icon-btn {
-	padding: 0.45rem;
+/* External-only objects, grouped by integration: they have no row to match. */
+.matching-external {
+	margin-top: 1.5rem;
 }
 
-@media (max-width: 900px) {
-	.link-board-columns {
-		grid-template-columns: minmax(0, 1fr);
-	}
+.matching-external h3 {
+	margin: 0 0 0.25rem;
+}
+
+.matching-external-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+	gap: 1rem;
+	align-items: start;
+}
+
+.matching-external-col {
+	min-width: 0;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+}
+
+.matching-external-col h4 {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.4rem;
+}
+
+.matching-external-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.5rem;
+	padding: 0.2rem 0;
+}
+
+.matching-external-item + .matching-external-item {
+	border-top: 1px solid var(--border);
+}
+
+.matching-external-item.inactive {
+	color: var(--text-muted);
+}
+
+.matching-external-name {
+	flex: 1 1 10rem;
+	min-width: 0;
+}
+
+.matching-external-col .btn-small {
+	margin-top: 0.4rem;
+}
+
+.integration-report .row-actions .icon-btn {
+	padding: 0.45rem;
 }
 
 /* Changelog before/after table: changed values tinted red (old) / green (new). */
