@@ -35,7 +35,7 @@ function NavShortcut(props: {
 			onClick={(e: MouseEvent): void => {
 				e.stopPropagation()
 				if (props.href) {
-					goTo(e, props.href)
+					goTo(e, props.href, { sameTab: true })
 					props.onNavigate?.()
 				}
 			}}
@@ -94,7 +94,7 @@ function NavItem(props: {
 				aria-label={props.collapsed ? label() : undefined}
 				title={props.collapsed ? label() : undefined}
 				onClick={(e: MouseEvent): void => {
-					goTo(e, href())
+					goTo(e, href(), { sameTab: true })
 					props.onNavigate?.()
 				}}
 			>

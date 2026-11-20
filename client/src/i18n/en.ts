@@ -252,8 +252,9 @@ export const en = {
 	'account.sectionAuthentication': 'Authentication',
 	'account.sectionPreferences': 'Preferences',
 	'account.password': 'Password',
-	'account.passwordDescription': 'Change the password you sign in with.',
-	'account.languageDescription': 'Choose your preferred display language.',
+	'account.openItemsInNewTab': 'Open items in new tab',
+	'account.openItemsInNewTabDescription':
+		'Open links to items in a new browser tab.',
 	'account.loadFailed': 'Could not load your account.',
 	'account.changePassword': 'Change password',
 	'account.currentPassword': 'Current password',
@@ -265,9 +266,6 @@ export const en = {
 	'app.mainNavigation': 'Main navigation',
 	'app.openNavigation': 'Open navigation',
 	'app.closeNavigation': 'Close navigation',
-	'app.openPages': 'Open pages',
-	'app.closeTab': 'Close {title}',
-	'app.allTabs': 'All open pages',
 	'app.navAdd': 'Add {label}',
 	'app.navAddSoon': 'Add {label} (coming soon)',
 	'app.collapseSidebar': 'Collapse sidebar',
@@ -315,9 +313,6 @@ export const en = {
 	'tab.import': 'Import {entities}',
 	'tab.edit': 'Edit {entity} {id}',
 	'tab.editNamed': 'Edit {name}',
-	'tab.duplicate': 'Duplicate',
-	'tab.closeOthers': 'Close others',
-	'tab.closeToRight': 'Close tabs to the right',
 	'tab.detail': '{entity} {id}',
 
 	// list

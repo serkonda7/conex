@@ -50,7 +50,7 @@ import {
 } from '../../i18n/labels'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, type QueryResource } from '../../lib/resource'
-import { path, useTabPath } from '../../lib/router'
+import { path, useRoutePath } from '../../lib/router'
 import { can } from '../../lib/session'
 import { setTenantContext } from '../../lib/tenant_context'
 import { formatRelative } from '../../lib/time'
@@ -81,11 +81,11 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const id = (): number => props.id
 	const [tenant] = createRecord(id, fetch_tenant, setError)
 	const loadedId = createMemo((): number | undefined => tenant()?.id)
-	const tabPath = useTabPath()
-	// Viewing a tenant makes it the context, also on switching back to this tab.
+	const routePath = useRoutePath()
+	// Viewing a tenant makes it the context, also when the page is remounted.
 	createEffect(() => {
 		const tenantId = loadedId()
-		if (tenantId !== undefined && path() === tabPath) {
+		if (tenantId !== undefined && path() === routePath) {
 			setTenantContext({ kind: 'tenant', id: tenantId })
 		}
 	})

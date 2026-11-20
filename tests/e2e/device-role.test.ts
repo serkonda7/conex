@@ -17,12 +17,11 @@ test('saving a device role edited from the table returns to the table', async ({
 		await expect(page).toHaveURL(new RegExp(`/device-roles/${id}/edit`))
 
 		await page.locator('#device-role-edit-name').fill(renamed)
-		await page.locator('.tab-pane:not([hidden]) .form-actions button[type="submit"]').click()
+		await page.locator('#main .form-actions button[type="submit"]').click()
 
 		// Back on the table, not the detail page.
 		await expect(page).toHaveURL(/\/device-roles$/)
 		await expect(page.getByRole('link', { name: renamed, exact: true })).toBeVisible()
-		await expect(page.locator('[data-tab-button]')).toHaveCount(1)
 	} finally {
 		await page.request.delete(`/api/device-roles/${id}`)
 	}

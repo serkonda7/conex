@@ -1,6 +1,6 @@
 /**
  * Shared building blocks for the entity detail pages (tenant, site,
- * location, …): the tab title and breadcrumb report, the loading/empty
+ * location, …): the document title and breadcrumb report, the loading/empty
  * gate, the header with edit/delete actions, the detail card grid, the
  * foreign-key link pattern, the related-object sections and tabs, and the
  * confirm-then-delete flow.
@@ -23,7 +23,7 @@ import { Markdown } from './markdown'
 import { MoreActionsButton } from './more_actions_button'
 
 /**
- * Detail page shell: reports the object's name and ancestors to the tab
+ * Detail page shell: reports the object's name and ancestors to the document
  * title and breadcrumb bar, and gates the header block on loading/empty.
  * Related sections and the terminal error render after the shell, outside
  * the gate.

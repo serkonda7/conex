@@ -21,7 +21,7 @@ import {
 } from '@serkonda7/solid-components'
 import { type JSX, mergeProps, Show, splitProps } from 'solid-js'
 import { t } from '../i18n'
-import { useTabPath } from '../lib/router'
+import { useRoutePath } from '../lib/router'
 import { use_saved_filters } from '../lib/saved_filters'
 import { use_saved_layouts } from '../lib/saved_layouts'
 import { InlineError } from './feedback'
@@ -106,7 +106,7 @@ export function DataTable<TRow>(
  * `savedFiltersKey` turns on saved filters, stored on the server under that
  * table key and shared by all users; a failed load or save shows below the table.
  * It also keeps the applied filters in localStorage under
- * `conex:filters:<key>`, restored on the next visit unless the tab was opened
+ * `conex:filters:<key>`, restored on the next visit unless the page was opened
  * with a query (a deep link such as `/sites?tenant=<id>` sets its own filters).
  * `savedLayoutsKey` works as on {@link DataTable}.
  */
@@ -116,7 +116,7 @@ export function FilterTable<TRow>(
 	const [local, tableProps] = splitProps(props, ['savedFiltersKey', 'savedLayoutsKey'])
 	const saved = local.savedFiltersKey ? use_saved_filters(local.savedFiltersKey) : undefined
 	const layouts = local.savedLayoutsKey ? use_saved_layouts(local.savedLayoutsKey) : undefined
-	const deepLink = useTabPath().split('#')[0]?.includes('?') ?? false
+	const deepLink = useRoutePath().split('#')[0]?.includes('?') ?? false
 	const merged = mergeProps(
 		{ resizableColumns: true },
 		tableLabels(),

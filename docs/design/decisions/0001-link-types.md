@@ -12,8 +12,8 @@ Links use `--link`, underlined on hover. `mailto:` and `tel:` are plain `<a>`.
 
 - **In-app:** no click handler; the shell routes it. Use `goTo` only for options,
   a callback, or `stopPropagation`.
-- **Scroll:** no plain hash links; hidden tabs can hold the same id. Set
-  `scroll-margin-top: var(--topbar-height)` on the target.
+- **Scroll:** no plain hash links; use `ScrollLink` so the jump stays on the
+  current page. Set `scroll-margin-top: var(--topbar-height)` on the target.
 - **Buttons:** links go somewhere, buttons do something. `--link` text must be
   interactive.
 

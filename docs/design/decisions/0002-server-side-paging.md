@@ -9,8 +9,8 @@ the solid-components table and `usePagedList` (`client/src/lib/paged_list.ts`).
   select. It replaces the "Showing X-Y of Z" line.
 - **Page size:** 25, 50, 100 or 200, default 50. One preference for all lists,
   kept in `localStorage`. 200 is the server's limit.
-- **Page state:** not in the URL, because a pane remounts when its path changes.
-  Each tab history entry remembers its page, so going back lands where the user
+- **Page state:** not in the URL, because the page remounts when its path changes.
+  Each history entry remembers its page, so going back lands where the user
   left. Search, filters and sort are not remembered, so the page only comes back
   for the same query.
 - **Changing the query:** a new search, filter or sort goes to page 1. A page past

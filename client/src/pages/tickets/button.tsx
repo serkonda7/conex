@@ -8,7 +8,7 @@ import { navigate, path, routeSegments } from '../../lib/router'
 import { can } from '../../lib/session'
 import { contextTenantId } from '../../lib/tenant_context'
 
-/** Id of the device open in the active tab (`/devices/:id`), else null. */
+/** Id of the device shown by the current route (`/devices/:id`), else null. */
 function openDeviceId(): number | null {
 	const [section, id, ...rest] = routeSegments(path())
 	return section === 'devices' && rest.length === 0 && id !== undefined && /^\d+$/.test(id)
@@ -18,10 +18,10 @@ function openDeviceId(): number | null {
 
 /**
  * Top-bar "Ticket" button next to the tenant context (`tickets.create`):
- * opens `/tickets/add` in its own tab, which uses the user's only tenant
- * or the selected tenant context. The device open in the
- * active tab is preselected, along with its employee when exactly one is
- * assigned, when it belongs to that tenant.
+ * opens `/tickets/add` as its own page, which uses the user's only tenant
+ * or the selected tenant context. The device shown by the current route is
+ * preselected, along with its employee when exactly one is assigned, when it
+ * belongs to that tenant.
  */
 export function CreateTicketButton(props: { scopeTenantId: number | null }): JSX.Element {
 	const [device] = createRecord(

@@ -1,7 +1,8 @@
 /**
  * /settings — the signed-in user's own account settings: read-only identity,
- * UI language and a self-service password change. Available to every signed-in
- * user, so the section needs no permission beyond the session.
+ * UI language, the "open items in a new tab" preference and a self-service
+ * password change. Available to every signed-in user, so the section needs no
+ * permission beyond the session.
  */
 import { IconAdjustments, IconLock, IconShieldCheck, IconUserCog } from '@tabler/icons-solidjs'
 import { createResource, createSignal, type JSX, Show } from 'solid-js'
@@ -11,6 +12,7 @@ import { PasswordDialog } from '../../app/password_dialog'
 import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
+import { openItemsInNewTab, setOpenItemsInNewTab } from '../../lib/preferences'
 
 /** Account settings of the signed-in user. */
 export function SettingsPage(): JSX.Element {
@@ -51,12 +53,7 @@ export function SettingsPage(): JSX.Element {
 							<span>{t('account.sectionAuthentication')}</span>
 						</h4>
 						<dl>
-							<dt>
-								{t('account.password')}
-								<span class="settings-hint">
-									{t('account.passwordDescription')}
-								</span>
-							</dt>
+							<dt>{t('account.password')}</dt>
 							<dd>
 								<button type="button" onClick={() => setChangingPassword(true)}>
 									<IconLabel icon={IconLock}>
@@ -77,14 +74,30 @@ export function SettingsPage(): JSX.Element {
 							<span>{t('account.sectionPreferences')}</span>
 						</h4>
 						<dl>
+							<dt>{t('app.language')}</dt>
+							<dd>
+								<LanguageSwitcher />
+							</dd>
 							<dt>
-								{t('app.language')}
+								{t('account.openItemsInNewTab')}
 								<span class="settings-hint">
-									{t('account.languageDescription')}
+									{t('account.openItemsInNewTabDescription')}
 								</span>
 							</dt>
 							<dd>
-								<LanguageSwitcher />
+								<span class="settings-switch">
+									<input
+										type="checkbox"
+										role="switch"
+										class="toggle"
+										aria-label={t('account.openItemsInNewTab')}
+										aria-checked={openItemsInNewTab()}
+										checked={openItemsInNewTab()}
+										onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+											setOpenItemsInNewTab(e.currentTarget.checked)
+										}
+									/>
+								</span>
 							</dd>
 						</dl>
 					</section>

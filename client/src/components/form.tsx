@@ -314,7 +314,7 @@ export function SelectField(props: {
 	class?: string
 }): JSX.Element {
 	onMount(() => {
-		// The tab shell refocuses `[data-autofocus]` when the tab is reactivated.
+		// The page shell also focuses `[data-autofocus]` when the route mounts.
 		if (props.autofocus === true) {
 			document.querySelector(`#${CSS.escape(props.id)}`)?.setAttribute('data-autofocus', '')
 		}
@@ -323,8 +323,10 @@ export function SelectField(props: {
 	function openAddForm(name: string): void {
 		const href = props.add?.href
 		if (href !== undefined) {
-			// The add form starts with whatever was typed as its name.
-			navigate(name === '' ? href : `${href}?name=${encodeURIComponent(name)}`)
+			// A nested add form opens in its own browser tab so the opener keeps
+			// its typed input. No `noopener`: the popup closes itself on save or
+			// cancel, and the opener refetches its options when the list reopens.
+			window.open(name === '' ? href : `${href}?name=${encodeURIComponent(name)}`, '_blank')
 		}
 	}
 
@@ -402,9 +404,9 @@ export function TenantSelectField(props: {
 	)
 }
 
-/** Create actions. Cancel closes the tab back into the page that opened
- * it, keeping its exact contents (`cancelTo` when there is none); `singleton` drops "Create & Add
- * Another" for one-of-a-kind objects. */
+/** Create actions. Cancel returns to the page that opened the form, keeping
+ * its exact contents (`cancelTo` when there is none); `singleton` drops
+ * "Create & Add Another" for one-of-a-kind objects. */
 function CreateActions(props: {
 	saving: boolean
 	cancelTo: string
@@ -487,7 +489,7 @@ function NoTenantWarning(props: { required: boolean }): JSX.Element {
  * the create or save actions. Create forms with `tenant` take the new
  * object's tenant from the top bar and warn while none is selected; a
  * `required` tenant also blocks creating. Edit forms (`form.editing`) wait for the
- * record and report its `name` for the tab title and breadcrumb bar;
+ * record and report its `name` for the document title and breadcrumb bar;
  * `crumbs` are the ancestors when the form belongs to another object (e.g.
  * the rack a shelf sits in).
  */

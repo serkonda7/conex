@@ -2,20 +2,15 @@ import { expect, type Page, test } from '@playwright/test'
 
 // Auth comes from `auth.setup.ts` storageState — no per-test login.
 
-/** The active tab's pane; inactive tabs stay mounted but hidden, so form
- * actions must be scoped here to avoid hitting a background tab. */
-function activePane(page: Page): ReturnType<Page['locator']> {
-	return page.locator('.tab-pane:not([hidden])')
-}
-/** Opens the device-role add tab from the device add form via the role dropdown's add entry. */
-async function openDeviceRoleAdd(page: Page, openerName: string): Promise<void> {
-	await page.goto('/devices/add')
-	await expect(page.locator('#device-name')).toBeVisible()
-	await page.locator('#device-name').fill(openerName)
+/** Opens the device-role add form from the device add form via the role dropdown's add entry. */
+async function openRolePopup(page: Page): Promise<Page> {
 	await page.locator('#device-role').click()
+	const popupPromise = page.waitForEvent('popup')
 	await page.locator('#device-role-listbox .combobox-option-add').click()
-	await expect(page).toHaveURL(/\/device-roles\/add/)
-	await expect(page.locator('#device-role-name')).toBeVisible()
+	const popup = await popupPromise
+	await expect(popup).toHaveURL(/\/device-roles\/add/)
+	await expect(popup.locator('#device-role-name')).toBeVisible()
+	return popup
 }
 
 async function deleteDeviceRoleByName(page: Page, name: string): Promise<void> {
@@ -32,20 +27,23 @@ async function deleteDeviceRoleByName(page: Page, name: string): Promise<void> {
 	}
 }
 
-test('saving a device role opened from device add returns to the opener', async ({ page }) => {
+test('saving a device role opened from device add closes the popup and keeps the opener', async ({
+	page,
+}) => {
 	const roleName = `E2E Nested Role ${Date.now()}`
 	try {
-		await openDeviceRoleAdd(page, 'Nested Opener Device')
-		// Two tabs: the device add opener and the nested role add.
-		await expect(page.locator('[data-tab-button]')).toHaveCount(2)
+		await page.goto('/devices/add')
+		await page.locator('#device-name').fill('Nested Opener Device')
+		const popup = await openRolePopup(page)
 
-		await page.locator('#device-role-name').fill(roleName)
-		await activePane(page).locator('.form-actions button[value="create"]').click()
+		await popup.locator('#device-role-name').fill(roleName)
+		const closed = popup.waitForEvent('close')
+		await popup.locator('#main .form-actions button[value="create"]').click()
+		await closed
 
-		// Back on the opener, not the role list; typed input is kept.
-		await expect(page).toHaveURL(/\/devices\/add/)
+		// Still on the opener with its typed input; the popup saved and closed.
+		await expect(page).toHaveURL(/\/devices\/add$/)
 		await expect(page.locator('#device-name')).toHaveValue('Nested Opener Device')
-		await expect(page.locator('[data-tab-button]')).toHaveCount(1)
 	} finally {
 		await deleteDeviceRoleByName(page, roleName)
 	}
@@ -59,15 +57,19 @@ test('a device role added from the dropdown starts with the typed name and is li
 		await page.goto('/devices/add')
 		await page.locator('#device-role').click()
 		await page.locator('#device-role').fill(roleName)
+		const popupPromise = page.waitForEvent('popup')
 		await page.locator('#device-role-listbox .combobox-option-add').click()
+		const popup = await popupPromise
 
-		await expect(page).toHaveURL(/\/device-roles\/add\?name=/)
-		await expect(page.locator('#device-role-name')).toHaveValue(roleName)
-		await activePane(page).locator('.form-actions button[value="create"]').click()
+		await expect(popup).toHaveURL(/\/device-roles\/add\?name=/)
+		await expect(popup.locator('#device-role-name')).toHaveValue(roleName)
+		const closed = popup.waitForEvent('close')
+		await popup.locator('#main .form-actions button[value="create"]').click()
+		await closed
 
+		await expect(page).toHaveURL(/\/devices\/add$/)
 		// The opener loaded its roles before this one existed; reopening the
 		// dropdown refetches them.
-		await expect(page).toHaveURL(/\/devices\/add/)
 		await page.locator('#device-role').click()
 		await page.locator('#device-role').fill(roleName)
 		await expect(
@@ -82,11 +84,17 @@ test('a device role added from the dropdown starts with the typed name and is li
 	}
 })
 
-test('cancelling a device role opened from device add returns to the opener', async ({ page }) => {
-	await openDeviceRoleAdd(page, 'Nested Opener Device')
-	await activePane(page).locator('.form-actions > button').first().click()
+test('cancelling a device role opened from device add closes the popup and keeps the opener', async ({
+	page,
+}) => {
+	await page.goto('/devices/add')
+	await page.locator('#device-name').fill('Nested Opener Device')
+	const popup = await openRolePopup(page)
 
-	await expect(page).toHaveURL(/\/devices\/add/)
+	const closed = popup.waitForEvent('close')
+	await popup.locator('#main .form-actions > button').first().click()
+	await closed
+
+	await expect(page).toHaveURL(/\/devices\/add$/)
 	await expect(page.locator('#device-name')).toHaveValue('Nested Opener Device')
-	await expect(page.locator('[data-tab-button]')).toHaveCount(1)
 })

@@ -254,8 +254,9 @@ export const de: Messages = {
 	'account.sectionAuthentication': 'Authentifizierung',
 	'account.sectionPreferences': 'Voreinstellungen',
 	'account.password': 'Passwort',
-	'account.passwordDescription': 'Ändern Sie das Passwort, mit dem Sie sich anmelden.',
-	'account.languageDescription': 'Wählen Sie Ihre bevorzugte Anzeigesprache.',
+	'account.openItemsInNewTab': 'Objekte in neuem Tab öffnen',
+	'account.openItemsInNewTabDescription':
+		'Links zu Objekten in einem neuen Browser-Tab öffnen.',
 	'account.loadFailed': 'Konto konnte nicht geladen werden.',
 	'account.changePassword': 'Passwort ändern',
 	'account.currentPassword': 'Aktuelles Passwort',
@@ -266,9 +267,6 @@ export const de: Messages = {
 	'app.mainNavigation': 'Hauptnavigation',
 	'app.openNavigation': 'Navigation öffnen',
 	'app.closeNavigation': 'Navigation schließen',
-	'app.openPages': 'Geöffnete Seiten',
-	'app.closeTab': '{title} schließen',
-	'app.allTabs': 'Alle geöffneten Seiten',
 	'app.navAdd': '{label} hinzufügen',
 	'app.navAddSoon': '{label} hinzufügen (demnächst verfügbar)',
 	'app.collapseSidebar': 'Seitenleiste einklappen',
@@ -316,9 +314,6 @@ export const de: Messages = {
 	'tab.import': '{entities} importieren',
 	'tab.edit': '{entity} {id} bearbeiten',
 	'tab.editNamed': '{name} bearbeiten',
-	'tab.duplicate': 'Duplizieren',
-	'tab.closeOthers': 'Andere schließen',
-	'tab.closeToRight': 'Tabs rechts schließen',
 	'tab.detail': '{entity} {id}',
 
 	// list

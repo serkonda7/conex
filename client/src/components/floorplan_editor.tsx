@@ -86,7 +86,7 @@ import { t, tp } from '../i18n'
 import { deviceStatusLabel, locationTypeLabel } from '../i18n/labels'
 import { locationTypeIcon } from '../lib/icons'
 import { createRows, useAction } from '../lib/resource'
-import { useLeaveGuard, usePaneVisible } from '../lib/router'
+import { useLeaveGuard } from '../lib/router'
 import { tenantContextFilters } from '../lib/tenant_context'
 import { Empty, InlineError, Loading } from './feedback'
 import { areaLayer, LayerBar, layerVisible, markerLayer, showLayer } from './floorplan_layers'
@@ -810,8 +810,6 @@ export function FloorplanEditor(props: {
 	let labelRecorded = false
 	/** A Shift + drag just drew a selection box, so the click it ends in does not toggle. */
 	let boxDrawn = false
-	// Keys go to the window; a page in a background tab leaves them alone.
-	const paneVisible = usePaneVisible()
 
 	const initial = JSON.stringify(
 		toPut(props.plan.areas, props.plan.placements, props.plan.scale, props.plan.origin),
@@ -952,7 +950,7 @@ export function FloorplanEditor(props: {
 	}
 	onMount(() => window.addEventListener('beforeunload', warnUnload))
 	onCleanup(() => window.removeEventListener('beforeunload', warnUnload))
-	// In-app navigation, Back / Forward and closing the tab ask as well.
+	// In-app navigation and Back / Forward ask as well.
 	useLeaveGuard(dirty, () => t('floorplan.confirmCancel'))
 
 	/** Position of a pointer event on the plan, clamped to 0..1. */
@@ -1338,9 +1336,6 @@ export function FloorplanEditor(props: {
 
 	// Keys of the area tool; ignored while typing in a field.
 	const onKeyDown = (e: KeyboardEvent): void => {
-		if (!paneVisible()) {
-			return
-		}
 		if (tool() !== null && e.key === 'Escape' && askDistance() === null) {
 			e.preventDefault()
 			selectTool(null)

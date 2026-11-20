@@ -11,16 +11,14 @@ test('cancelling device add from the navbar returns to the device detail', async
 	const detailPath = `/devices/${device?.id}`
 
 	await page.goto(detailPath)
-	await expect(page.locator('.tab-pane:not([hidden])')).toContainText('E2E Spare Device')
+	await expect(page.locator('#main')).toContainText('E2E Spare Device')
 
 	await page.locator('.app-nav-item:has(> a[href="/devices"]) button.app-nav-add').first().click()
 	await expect(page).toHaveURL(/\/devices\/add$/)
-	await expect(page.locator('[data-tab-button]')).toHaveCount(2)
 
-	await page.locator('.tab-pane:not([hidden]) .form-actions > button').first().click()
+	await page.locator('#main .form-actions > button').first().click()
 
 	await expect(page).toHaveURL(new RegExp(`${detailPath}$`))
-	await expect(page.locator('[data-tab-button]')).toHaveCount(1)
 
 	// A saved desktop icon rail must not hide labels or shortcuts on mobile.
 	await page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true }).click()
@@ -71,9 +69,8 @@ test('cancelling device add from the navbar returns to the device detail', async
 	await expect(page).toHaveURL(/\/devices\/add$/)
 	await expect(drawer).toBeHidden()
 	await expect(menu).toHaveAttribute('aria-expanded', 'false')
-	await page.locator('.tab-pane:not([hidden]) .form-actions > button').first().click()
+	await page.locator('#main .form-actions > button').first().click()
 	await expect(page).toHaveURL(new RegExp(`${detailPath}$`))
-	await expect(page.locator('[data-tab-button]')).toHaveCount(1)
 
 	await menu.click()
 	await drawer.locator('a[href="/devices"]').click()
