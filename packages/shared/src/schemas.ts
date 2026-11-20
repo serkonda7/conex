@@ -72,10 +72,19 @@ export type PasswordChange = v.InferOutput<typeof PasswordChangeSchema>
 
 // Shared list-query contract (?search=&page=&limit=) used by every P1+
 // list endpoint. Defaults keep callers from re-declaring pagination math.
+
+/** Page-size options offered by list tables and the maximum allowed `limit`. */
+export const PAGE_SIZES = [25, 50, 100, 200]
+export const DEFAULT_PAGE_SIZE = 50
+export const MAX_PAGE_SIZE = 200
+
 export const ListQuerySchema = v.strictObject({
 	search: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ''),
 	page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
-	limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 50),
+	limit: v.optional(
+		v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_PAGE_SIZE)),
+		DEFAULT_PAGE_SIZE,
+	),
 })
 
 export type ListQuery = v.InferOutput<typeof ListQuerySchema>

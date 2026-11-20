@@ -5,14 +5,13 @@
  * fetch.
  */
 import type { Result } from 'better-result'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from 'shared/src/schemas'
 import type { Page } from 'shared/src/types'
 import { type Accessor, batch, createEffect, createMemo, createSignal } from 'solid-js'
 import type { DataTablePagination } from '../components/data_table'
 import { createRecord, type QueryResource } from './resource'
 import { historyEntryKey, useTabPath } from './router'
 
-const PAGE_SIZES = [25, 50, 100, 200]
-const DEFAULT_PAGE_SIZE = 50
 const STORAGE_KEY = 'conex:page-size'
 
 function load_page_size(): number {
