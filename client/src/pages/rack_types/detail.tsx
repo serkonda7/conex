@@ -16,7 +16,7 @@ import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
 import { formFactorLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
-import type { Crumb } from '../../lib/router'
+import { recordCrumb } from '../../lib/trails'
 
 /** /rack-types/:id — rack type detail: specification and the racks of this type. */
 export function RackTypeDetailPage(props: { id: number }): JSX.Element {
@@ -26,11 +26,6 @@ export function RackTypeDetailPage(props: { id: number }): JSX.Element {
 	const manufacturerId = (): number | undefined => rackType()?.manufacturer_id
 	const [manufacturer] = createRecord(manufacturerId, fetch_manufacturer, setError)
 	const [racks] = createRowsFor(id, (key: number) => fetch_racks({ rack_type: [key] }), setError)
-
-	const manufacturerCrumbs = (): Crumb[] => {
-		const row = manufacturer()
-		return row ? [{ label: row.name, href: `/manufacturers/${row.id}` }] : []
-	}
 
 	const handleDelete = useDetailDelete({
 		noun: 'noun.rackType',
@@ -45,7 +40,7 @@ export function RackTypeDetailPage(props: { id: number }): JSX.Element {
 		<div>
 			<DetailShell
 				name={rackType()?.model}
-				crumbs={manufacturerCrumbs()}
+				crumbs={recordCrumb(manufacturer(), '/manufacturers')}
 				record={rackType}
 				loadingText={t('rackType.loadingOne')}
 				emptyText={t('rackType.notFound')}
