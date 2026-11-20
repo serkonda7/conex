@@ -15,6 +15,13 @@
       "when": 1795179496787,
       "tag": "0001_integration_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795180562359,
+      "tag": "0002_unifi_site_links",
+      "breakpoints": true
     }
   ]
 }

@@ -11,7 +11,8 @@ gewechselt wird.
   sonst nur die seit der letzten Synchronisierung geänderten. Octoja und UniFi liefern
   keine Änderungsliste; dort werden immer alle Kunden bzw. alle Konsolen (Hosts)
   abgerufen.
-- **Geräte:** nur für Firmen, die mit einem Mandanten verknüpft sind.
+- **Geräte:** nur für Firmen, die mit einem Mandanten verknüpft sind (bei UniFi: Konsolen,
+  die mit einem Standort verknüpft sind).
 - **Tags:** alle, bei jeder Synchronisierung (nur TANSS).
 - Eindeutige Gerätezuordnungen werden [automatisch verknüpft](#gerätezuordnung).
 
@@ -45,10 +46,16 @@ werden nur verknüpft und verglichen, nicht in Octoja angelegt oder geändert.
 
 ### UniFi-Zuordnung
 
-| conex   | UniFi             |
-| ------- | ----------------- |
-| Mandant | Konsole (Host)    |
-| Gerät   | Gerät der Konsole |
+| conex    | UniFi             |
+| -------- | ----------------- |
+| Standort | Konsole (Host)    |
+| Gerät    | Gerät der Konsole |
+
+UniFi-Konsolen werden mit Standorten verknüpft, nicht mit Mandanten: jeder Standort mit
+höchstens einer Konsole, ein Mandant also mit einer Konsole je Standort. Die Geräte
+einer Konsole werden nur mit den conex-Geräten ihres Standorts abgeglichen. Der Reiter
+**Standorte verknüpfen** und die Objektart **Standorte** der Zuordnungsseite ersetzen
+für UniFi die Mandantenebene.
 
 Die Anmeldung erfolgt mit einem Site-Manager-API-Schlüssel aus unifi.ui.com. Ein
 Organisationsschlüssel erreicht alle Konsolen der Organisation, ein persönlicher
@@ -59,7 +66,7 @@ antwortet die API mit HTTP 429 (Rate Limit).
 
 ## Verknüpfungen
 
-Mandanten und Geräte werden manuell oder durch die Synchronisierung mit ihrem externen
+Mandanten (bei UniFi Standorte) und Geräte werden manuell oder durch die Synchronisierung mit ihrem externen
 Gegenstück verknüpft. Ignorierte Objekte werden weder als fehlend noch als Vorschlag
 gemeldet.
 
@@ -81,7 +88,7 @@ gemeldet.
 | Befund                         | Bedeutung                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Gerät existiert nicht mehr** | Das verknüpfte Gerät wurde bei der letzten Synchronisierung nicht gefunden.                                                                                                                                                                                                                                                                                                                             |
-| **Abweichung**                 | Ein Befund je abweichendem Merkmal: Mandant (das Gerät gehört zu einer anderen Firma als sein Mandant), Status (in einem System aktiv, im anderen inaktiv) oder Name, Seriennummer, Inventarnummer, Hersteller oder Modell (leere Werte werden nicht verglichen). Name, Hersteller und Modell können in TANSS mit dem conex-Wert überschrieben werden; der Hersteller muss in TANSS bereits existieren. |
+| **Abweichung**                 | Ein Befund je abweichendem Merkmal: Mandant (das Gerät gehört zu einer anderen Firma als sein Mandant; bei UniFi Standort: zu einer anderen Konsole als sein Standort), Status (in einem System aktiv, im anderen inaktiv) oder Name, Seriennummer, Inventarnummer, Hersteller oder Modell (leere Werte werden nicht verglichen). Name, Hersteller und Modell können in TANSS mit dem conex-Wert überschrieben werden; der Hersteller muss in TANSS bereits existieren. |
 
 #### Mitarbeiter
 
@@ -100,7 +107,8 @@ ein Offboarding). **In conex inaktiv setzen** behebt den Befund.
 | Befund                      | Bedeutung                                                            |
 | --------------------------- | -------------------------------------------------------------------- |
 | **Mandant nicht verknüpft** | Der Mandant hat keine Firma. Seine Geräte werden nicht geprüft.      |
-| **Firma fehlt in conex**    | Aktive, nicht-private Firma ohne Mandanten. Nur im globalen Bericht. |
+| **Standort nicht verknüpft** | Nur UniFi: Der Standort hat keine Konsole. Seine Geräte werden nicht geprüft. Standorte ohne UniFi-Geräte werden ignoriert. |
+| **Firma fehlt in conex**    | Aktive, nicht-private Firma ohne Mandanten (bei UniFi: Konsole ohne Standort). Nur im globalen Bericht. |
 
 #### Geräte
 

@@ -3,7 +3,7 @@ import type { IntegrationSecrets } from '../secrets'
 import type { IntegrationConfig, IntegrationProvider, ProviderDefinition } from '../types'
 import { UnifiProvider } from './provider'
 
-/** UniFi Site Manager: one console per tenant, devices only. */
+/** UniFi Site Manager: one console per conex site, devices only. */
 export const unifiDefinition: ProviderDefinition<'unifi'> = {
 	id: 'unifi',
 	capabilities: {
@@ -13,7 +13,7 @@ export const unifiDefinition: ProviderDefinition<'unifi'> = {
 		push: false,
 		create_device: false,
 		customer_numbers: false,
-		tenant_cardinality: 'one',
+		link_level: 'site',
 	},
 	incremental: false,
 	secretLabels: { password: 'API key' },

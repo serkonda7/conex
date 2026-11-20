@@ -21,6 +21,7 @@ import {
 	type LinkBoard,
 	type LinkBoardExternal,
 	type LinkBoardLocal,
+	type LinkEntityType,
 	link_external,
 	start_sync,
 	unlink_external,
@@ -35,7 +36,12 @@ import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
 import { contextTenantId } from '../../lib/tenant_context'
 
-type Kind = 'tenant' | 'device' | 'employee'
+type Kind = LinkEntityType
+
+/** Tenants and sites: linked to external tenants, listed in full for global users. */
+function isTopLevel(kind: Kind): boolean {
+	return kind === 'tenant' || kind === 'site'
+}
 
 /** Status filter of the rows. */
 type Filter = 'all' | 'open' | 'done'
@@ -74,15 +80,26 @@ interface Change {
 type CellState = 'linked' | 'ignored' | 'open'
 
 function parseKind(raw: string): Kind {
-	return raw === 'devices' ? 'device' : raw === 'employees' ? 'employee' : 'tenant'
+	return raw === 'devices'
+		? 'device'
+		: raw === 'employees'
+			? 'employee'
+			: raw === 'sites'
+				? 'site'
+				: 'tenant'
 }
 
 function kindNoun(kind: Kind, count: number): string {
-	return kind === 'tenant'
-		? tp('entity.tenant', count)
-		: kind === 'device'
-			? tp('entity.device', count)
-			: tp('entity.employee', count)
+	switch (kind) {
+		case 'tenant':
+			return tp('entity.tenant', count)
+		case 'site':
+			return tp('entity.site', count)
+		case 'device':
+			return tp('entity.device', count)
+		case 'employee':
+			return tp('entity.employee', count)
+	}
 }
 
 function cellKey(provider: IntegrationProvider, id: number): string {
@@ -171,9 +188,9 @@ function externalOptions(board: LinkBoard): ComboboxOption[] {
 }
 
 /**
- * /integrations/matching — every conex object of one level (tenants, or the
- * devices or employees of one tenant) as a row, with one column per enabled
- * integration. Each cell picks the object's counterpart in that system
+ * /integrations/matching — every conex object of one level (tenants, sites
+ * for integrations that link sites (UniFi), or the devices or employees of
+ * one tenant) as a row, with one column per enabled integration. Each cell picks the object's counterpart in that system
  * (searchable; picking one linked to another row moves it there), shows an
  * unambiguous suggestion to accept with one click, or marks the object as
  * missing there (the built-in "ignore" entry atop every dropdown).
@@ -186,7 +203,7 @@ function externalOptions(board: LinkBoard): ComboboxOption[] {
 export function MatchingPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [kind, setKind] = createSignal<Kind>(
-		isScoped() && parseKind(queryParam('type')) === 'tenant'
+		isScoped() && isTopLevel(parseKind(queryParam('type')))
 			? 'device'
 			: parseKind(queryParam('type')),
 	)
@@ -209,21 +226,29 @@ export function MatchingPage(): JSX.Element {
 
 	const enabled = createMemo(() =>
 		(integrations() ?? []).filter(
-			(i) => i.enabled && (kind() !== 'employee' || i.capabilities.employees),
+			(i) =>
+				i.enabled &&
+				(kind() === 'employee'
+					? i.capabilities.employees
+					: kind() === 'device' || i.capabilities.link_level === kind()),
 		),
+	)
+	// Sites are a level of their own only while an integration links them.
+	const hasSiteLevel = createMemo(() =>
+		(integrations() ?? []).some((i) => i.enabled && i.capabilities.link_level === 'site'),
 	)
 
 	const source = createMemo(() => {
 		const providers = enabled().map((i) => i.provider)
-		if (providers.length === 0 || (kind() !== 'tenant' && tenant() === null)) {
+		if (providers.length === 0 || (!isTopLevel(kind()) && tenant() === null)) {
 			return null
 		}
-		return { providers, kind: kind(), tenant: kind() === 'tenant' ? null : tenant() }
+		return { providers, kind: kind(), tenant: isTopLevel(kind()) ? null : tenant() }
 	})
 	const [boards] = createRecord(source, fetchBoards, setError)
 
 	const editable = (): boolean =>
-		kind() === 'tenant' ? canGlobal('integrations.manage') : can('integrations.manage')
+		isTopLevel(kind()) ? canGlobal('integrations.manage') : can('integrations.manage')
 
 	const columns = createMemo((): Column[] => {
 		const loaded = boards() ?? []
@@ -237,7 +262,7 @@ export function MatchingPage(): JSX.Element {
 					provider: board.provider,
 					integration,
 					board,
-					usable: board.entity_type === 'tenant' || board.external_tenants.length > 0,
+					usable: isTopLevel(board.entity_type) || board.external_tenants.length > 0,
 					local: new Map(board.local.map((r) => [r.id, r])),
 					external: new Map(board.external.map((r) => [r.external_id, r])),
 					options: externalOptions(board),
@@ -421,8 +446,8 @@ export function MatchingPage(): JSX.Element {
 	}
 
 	function boardHref(column: Column): string {
-		const view = kind() === 'tenant' ? 'tenants' : kind() === 'device' ? 'devices' : 'employees'
-		const tenantQuery = kind() === 'tenant' ? '' : `&tenant=${tenant() ?? ''}`
+		const view = isTopLevel(kind()) ? 'tenants' : `${kind()}s`
+		const tenantQuery = isTopLevel(kind()) ? '' : `&tenant=${tenant() ?? ''}`
 		return `/integrations/${column.integration.id}?view=${view}${tenantQuery}`
 	}
 
@@ -470,7 +495,7 @@ export function MatchingPage(): JSX.Element {
 	/**
 	 * Removals first, so an object moved between rows is free before it is
 	 * linked again; stops at the first failure and keeps the rest as drafts.
-	 * Newly linked tenants get their devices fetched right away.
+	 * Newly linked tenants and sites get their devices fetched right away.
 	 */
 	async function save(): Promise<void> {
 		const pending = changes()
@@ -514,7 +539,7 @@ export function MatchingPage(): JSX.Element {
 			}
 			return out
 		})
-		if (kind() === 'tenant') {
+		if (isTopLevel(kind())) {
 			const linkedBy = new Map<IntegrationProvider, number[]>()
 			for (const change of done) {
 				if (change.to !== '' && change.to !== IGNORE) {
@@ -524,8 +549,12 @@ export function MatchingPage(): JSX.Element {
 				}
 			}
 			// A run already in progress answers 409; the next sync covers them.
+			// Site ids are no tenant filter: those sync everything.
 			for (const [provider, ids] of linkedBy) {
-				void start_sync(provider, ids.length === 1 ? ids[0] : undefined)
+				void start_sync(
+					provider,
+					kind() === 'tenant' && ids.length === 1 ? ids[0] : undefined,
+				)
 			}
 		}
 		setSaving(false)
@@ -716,8 +745,7 @@ export function MatchingPage(): JSX.Element {
 		)
 	}
 
-	const objectPath = (id: number): string =>
-		`/${kind() === 'tenant' ? 'tenants' : kind() === 'device' ? 'devices' : 'employees'}/${id}`
+	const objectPath = (id: number): string => `/${kind()}s/${id}`
 
 	const table = (): JSX.Element => (
 		<div class="matching-scroll">
@@ -803,10 +831,11 @@ export function MatchingPage(): JSX.Element {
 			<div class="toolbar-row matching-toolbar">
 				<fieldset class="link-board-filter" aria-label={t('matching.kind')}>
 					<Show when={!isScoped()}>{kindOption('tenant')}</Show>
+					<Show when={!isScoped() && hasSiteLevel()}>{kindOption('site')}</Show>
 					{kindOption('device')}
 					{kindOption('employee')}
 				</fieldset>
-				<Show when={kind() !== 'tenant'}>
+				<Show when={!isTopLevel(kind())}>
 					<Combobox
 						class="combobox-fit matching-tenant"
 						value={tenant() === null ? '' : String(tenant())}
@@ -861,7 +890,7 @@ export function MatchingPage(): JSX.Element {
 				fallback={<Empty message={t('matching.noIntegrations')} />}
 			>
 				<Show
-					when={kind() === 'tenant' || tenant() !== null}
+					when={isTopLevel(kind()) || tenant() !== null}
 					fallback={<Empty message={t('matching.pickTenant')} />}
 				>
 					<Show

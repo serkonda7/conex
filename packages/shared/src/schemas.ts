@@ -2895,13 +2895,18 @@ export const IntegrationEntityParamsSchema = v.object({
 	id: IdSchema,
 })
 
-export const LinkEntityTypeSchema = v.picklist(['tenant', 'device', 'employee'])
+/**
+ * conex object an external object is linked to. External tenants link to a
+ * `tenant` or, for providers whose `link_level` is `site` (UniFi consoles),
+ * to a `site`.
+ */
+export const LinkEntityTypeSchema = v.picklist(['tenant', 'site', 'device', 'employee'])
 
 export type LinkEntityType = v.InferOutput<typeof LinkEntityTypeSchema>
 
 const ExternalIdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
 
-/** Links a conex tenant/device/employee to an external object (replaces its old link). */
+/** Links a conex tenant/site/device/employee to an external object (replaces its old link). */
 export const ExternalLinkCreateSchema = v.strictObject({
 	entity_type: LinkEntityTypeSchema,
 	entity_id: IdSchema,
@@ -2915,9 +2920,9 @@ export const ExternalIgnoreSchema = v.strictObject({
 })
 
 /**
- * Marks a conex tenant, device or employee as intentionally absent from the
- * external system (suppresses its `tenant_unlinked` / `*_missing_in_external`
- * finding). Stored
+ * Marks a conex tenant, site, device or employee as intentionally absent from
+ * the external system (suppresses its `tenant_unlinked` / `site_unlinked` /
+ * `*_missing_in_external` finding). Stored
  * as an `ignored` link row keyed by the conex entity; see `ignoreLocal` in
  * `server/src/integrations/links.ts` for the synthetic `external_id`.
  */
@@ -2989,7 +2994,7 @@ export const IntegrationReportQuerySchema = v.object({
 	tenant_group: OptionalIdEntry,
 })
 
-/** Link board: tenants, or the devices/employees of one conex tenant. */
+/** Link board: tenants or sites (per `link_level`), or the devices/employees of one conex tenant. */
 export const LinkBoardQuerySchema = v.object({
 	entity_type: LinkEntityTypeSchema,
 	/** Device/employee board only: the conex tenant whose objects are shown. */
@@ -3080,8 +3085,12 @@ export interface IntegrationCapabilities {
 	create_device: boolean
 	/** External tenants carry a customer number that is compared with the conex one. */
 	customer_numbers: boolean
-	/** How many external tenants one conex tenant may link to. */
-	tenant_cardinality: 'one' | 'many'
+	/**
+	 * conex object an external tenant links to, one each way: a tenant (TANSS
+	 * company), or a site (UniFi console; a tenant then has one per site, and
+	 * devices are compared per site instead of per tenant).
+	 */
+	link_level: 'tenant' | 'site'
 }
 
 /** Integration without secrets: only whether they are set. */
@@ -3105,7 +3114,7 @@ export interface IntegrationJson {
 	last_sync: SyncRunJson | null
 }
 
-/** Normalized external tenant (TANSS company, UniFi site, Entra tenant). */
+/** Normalized external tenant (TANSS company, UniFi console, Entra tenant). */
 export interface ExternalTenantJson {
 	external_id: string
 	/** Customer number (TANSS); null for providers without one. */
@@ -3123,9 +3132,9 @@ export interface ExternalTenantJson {
 	domains?: string[]
 }
 
-/** External tenant plus the conex tenant it is linked to (picker rows). */
+/** External tenant plus the conex tenant or site (`link_level`) it is linked to (picker rows). */
 export interface ExternalTenantListItem extends ExternalTenantJson {
-	linked_tenant_id: number | null
+	linked_entity_id: number | null
 	ignored: boolean
 }
 
@@ -3203,6 +3212,7 @@ export type EmployeeCompareField = (typeof EMPLOYEE_COMPARE_FIELDS)[number]
 
 export const FINDING_KINDS = [
 	'tenant_unlinked',
+	'site_unlinked',
 	'tenant_missing_in_conex',
 	'tenant_stale',
 	'tenant_inactive',
@@ -3229,6 +3239,9 @@ export interface IntegrationFinding {
 	kind: FindingKind
 	tenant_id: number | null
 	tenant_name: string | null
+	/** Site of site-level findings (`link_level: 'site'`) and their devices. */
+	site_id: number | null
+	site_name: string | null
 	device_id: number | null
 	device_name: string | null
 	employee_id: number | null
@@ -3238,8 +3251,9 @@ export interface IntegrationFinding {
 	external_name: string | null
 	external_tenant_id: string | null
 	/**
-	 * `tenant`/`status` only on `device_mismatch` and `employee_mismatch`;
-	 * `priority` on `priority_tag_missing` (priority label in `local`).
+	 * `tenant`/`status` only on `device_mismatch` and `employee_mismatch`
+	 * (`site` instead of `tenant` for site-level providers); `priority` on
+	 * `priority_tag_missing` (priority label in `local`).
 	 */
 	field:
 		| DeviceCompareField
@@ -3247,6 +3261,7 @@ export interface IntegrationFinding {
 		| 'customer_number'
 		| 'domain'
 		| 'tenant'
+		| 'site'
 		| 'status'
 		| 'priority'
 		| null
@@ -3274,7 +3289,7 @@ export interface FieldComparison {
 export interface LinkBoardLocal {
 	id: number
 	name: string
-	/** Tenant group, device manufacturer + model, or employee title + email. */
+	/** Tenant group, site tenant, device manufacturer + model, or employee title + email. */
 	detail: string | null
 	serial: string | null
 	active: boolean
@@ -3318,10 +3333,15 @@ export interface LinkBoard {
 /** Integration card on the tenant detail page. */
 export interface TenantIntegrationStatus {
 	/**
-	 * Linked external tenants (at most one unless the provider's
-	 * `tenant_cardinality` is `many`); `external` is null when it no longer exists.
+	 * Linked external tenants: at most one, or one per site of the tenant for
+	 * providers with `link_level: 'site'` (`site` set); `external` is null
+	 * when it no longer exists.
 	 */
-	links: { link: ExternalLinkJson; external: ExternalTenantJson | null }[]
+	links: {
+		link: ExternalLinkJson
+		external: ExternalTenantJson | null
+		site: { id: number; name: string } | null
+	}[]
 	finding_counts: Partial<Record<FindingKind, number>>
 }
 
@@ -3330,7 +3350,7 @@ export interface DeviceIntegrationStatus {
 	link: ExternalLinkJson | null
 	external: ExternalDeviceJson | null
 	fields: FieldComparison[]
-	/** External tenants linked to the device's tenant. */
+	/** External tenants linked to the device's tenant (to its site for `link_level: 'site'`). */
 	external_tenants: ExternalTenantJson[]
 	/** Unlinked, not ignored external devices of those tenants (link picker). */
 	candidates: ExternalDeviceJson[]

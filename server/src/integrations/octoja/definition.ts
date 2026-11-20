@@ -13,7 +13,7 @@ export const octojaDefinition: ProviderDefinition<'octoja'> = {
 		push: false,
 		create_device: false,
 		customer_numbers: true,
-		tenant_cardinality: 'one',
+		link_level: 'tenant',
 	},
 	incremental: false,
 	secretLabels: { password: 'Password' },

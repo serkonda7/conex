@@ -7,9 +7,11 @@
  * and only active external ones as missing in conex; linked ones in any
  * state are still compared.
  *
- * A conex tenant may link to several external tenants (`tenant_cardinality:
- * 'many'`); its devices and employees are then matched against the union of
- * them. Levels the provider does not support (employees, customer numbers,
+ * External tenants link to conex tenants, or to sites for providers with
+ * `link_level: 'site'` (UniFi consoles): then every site is reported as
+ * linked or not, a tenant has one external tenant per linked site, and
+ * devices are matched per site against its console instead of per tenant.
+ * Levels the provider does not support (employees, customer numbers,
  * priority tags) produce no findings.
  *
  * An external employee that is inactive while the linked conex employee is
@@ -31,9 +33,11 @@ import type {
 	ExternalTenantJson,
 	FieldComparison,
 	FindingKind,
+	IntegrationCapabilities,
 	IntegrationFinding,
 	IntegrationReport,
 	IntegrationProvider as ProviderId,
+	TenantEmail,
 	TenantIntegrationStatus,
 } from 'shared/src/schemas'
 import { DEVICE_COMPARE_FIELDS, EMPLOYEE_COMPARE_FIELDS, emailDomain } from 'shared/src/schemas'
@@ -47,10 +51,19 @@ import {
 	employees,
 	manufacturers,
 	priorities,
+	sites,
 	sync_runs,
 	tenants,
 } from '../schema'
-import { type ExternalLinkRow, linkJson, linkOf, listLinks, tenantLinks } from './links'
+import {
+	deviceScopeLinks,
+	type ExternalLinkRow,
+	linkJson,
+	linkOf,
+	listLinks,
+	scopeLinks,
+	tenantLinks,
+} from './links'
 import {
 	matchDevices,
 	matchEmployees,
@@ -78,6 +91,7 @@ export interface LocalDeviceRow {
 	asset_tag: string | null
 	status: string
 	tenant_id: number | null
+	site_id: number | null
 	manufacturer: string
 	model: string
 }
@@ -91,6 +105,7 @@ export async function localDevices(where: SQL | undefined): Promise<LocalDeviceR
 			asset_tag: devices.asset_tag,
 			status: devices.status,
 			tenant_id: devices.tenant_id,
+			site_id: devices.site_id,
 			manufacturer: manufacturers.name,
 			model: device_types.model,
 		})
@@ -220,6 +235,8 @@ function finding(kind: FindingKind, values: Partial<IntegrationFinding>): Integr
 		kind,
 		tenant_id: null,
 		tenant_name: null,
+		site_id: null,
+		site_name: null,
 		device_id: null,
 		device_name: null,
 		employee_id: null,
@@ -247,68 +264,84 @@ export async function lastSyncedAt(provider: ProviderId): Promise<number | null>
 	return row?.finished_at ?? null
 }
 
+/** Site of a site-level report. */
+interface ReportSite {
+	id: number
+	name: string
+	tenant_id: number | null
+}
+
 /**
- * Builds the report for the tenants selected by `filter`. `includeUnmapped`
- * adds external tenants that no conex tenant links to (global view only:
- * scoped users must not see other customers) and priorities without a
- * ticket tag of the same name (shared catalog data, so not per tenant).
+ * Sites of the reported tenants; the global view (`includeUnmapped`) also
+ * gets tenant-less sites.
  */
-export async function buildReport(
-	provider: ProviderId,
-	filter: TenantFilterParams,
-	includeUnmapped: boolean,
-): Promise<IntegrationReport> {
-	const findings: IntegrationFinding[] = []
-	const tenantRows = await getDb()
-		.select({
-			id: tenants.id,
-			name: tenants.name,
-			customer_number: tenants.customer_number,
-			emails: tenants.emails,
-		})
-		.from(tenants)
-		.where(and(...tenantConditions(tenants.id, filter)))
-		.orderBy(tenants.name)
-	const tenantName = new Map(tenantRows.map((t) => [t.id, t.name]))
-	const externalTenants = await readTenants(provider)
+async function reportedSites(tenantIds: number[], includeUnmapped: boolean): Promise<ReportSite[]> {
+	if (!includeUnmapped && tenantIds.length === 0) {
+		return []
+	}
+	return getDb()
+		.select({ id: sites.id, name: sites.name, tenant_id: sites.tenant_id })
+		.from(sites)
+		.where(includeUnmapped ? undefined : inArray(sites.tenant_id, tenantIds))
+		.orderBy(sites.name)
+}
 
-	const { capabilities, coversDevice } = providerDefinition(provider)
-
-	// Tenant level ----------------------------------------------------------
-	const tenantLinkRows = await listLinks(provider, 'tenant')
-	const tenantRowByExternal = new Map(tenantLinkRows.map((link) => [link.external_id, link]))
-	const linksByTenant = new Map<number, ExternalLinkRow[]>()
-	const ignoredTenants = new Set<number>()
-	for (const link of tenantLinkRows.toSorted((a, b) => a.id - b.id)) {
+/** Linked and ignored conex ids of the external-tenant links. */
+function indexTopLinks(links: ExternalLinkRow[]): {
+	linked: Map<number, ExternalLinkRow[]>
+	ignored: Set<number>
+} {
+	const linked = new Map<number, ExternalLinkRow[]>()
+	const ignored = new Set<number>()
+	for (const link of links.toSorted((a, b) => a.id - b.id)) {
 		if (link.state === 'linked' && link.entity_id !== null) {
-			linksByTenant.set(link.entity_id, [...(linksByTenant.get(link.entity_id) ?? []), link])
+			linked.set(link.entity_id, [...(linked.get(link.entity_id) ?? []), link])
 		} else if (link.state === 'ignored' && link.entity_id !== null) {
-			ignoredTenants.add(link.entity_id)
+			ignored.add(link.entity_id)
 		}
 	}
-	// conex tenant → linked external tenant ids that still exist.
-	const liveCompanies = new Map<number, string[]>()
+	return { linked, ignored }
+}
+
+/**
+ * Tenant level: unlinked tenants and their linked external tenants' state;
+ * fills `liveCompanies` with the live ones.
+ */
+function tenantFindings(
+	tenantRows: {
+		id: number
+		name: string
+		customer_number: string | null
+		emails: TenantEmail[]
+	}[],
+	links: ExternalLinkRow[],
+	externalTenants: Map<string, ExternalTenantJson>,
+	capabilities: IntegrationCapabilities,
+	liveCompanies: Map<number, string[]>,
+): IntegrationFinding[] {
+	const findings: IntegrationFinding[] = []
+	const { linked: linksByTenant, ignored: ignoredTenants } = indexTopLinks(links)
 	for (const tenant of tenantRows) {
-		const links = linksByTenant.get(tenant.id) ?? []
+		const linked = linksByTenant.get(tenant.id) ?? []
 		const base = { tenant_id: tenant.id, tenant_name: tenant.name }
-		if (links.length === 0) {
+		if (linked.length === 0) {
 			if (!ignoredTenants.has(tenant.id)) {
 				findings.push(finding('tenant_unlinked', base))
 			}
 			continue
 		}
-		for (const link of links) {
+		for (const link of linked) {
 			const external = externalTenants.get(link.external_id)
-			const linked = { ...base, link_id: link.id, external_id: link.external_id }
+			const withLink = { ...base, link_id: link.id, external_id: link.external_id }
 			if (!external) {
-				findings.push(finding('tenant_stale', linked))
+				findings.push(finding('tenant_stale', withLink))
 				continue
 			}
 			liveCompanies.set(tenant.id, [
 				...(liveCompanies.get(tenant.id) ?? []),
 				external.external_id,
 			])
-			const withName = { ...linked, external_name: external.name }
+			const withName = { ...withLink, external_name: external.name }
 			if (!external.active) {
 				findings.push(finding('tenant_inactive', withName))
 			}
@@ -349,6 +382,116 @@ export async function buildReport(
 			}
 		}
 	}
+	return findings
+}
+
+/**
+ * Site level (`link_level: 'site'`): unlinked sites and their linked external
+ * tenants' state; fills `liveBySite` and, per site tenant, `liveCompanies`.
+ */
+function siteFindings(
+	siteRows: ReportSite[],
+	links: ExternalLinkRow[],
+	externalTenants: Map<string, ExternalTenantJson>,
+	siteBase: (site: ReportSite) => Partial<IntegrationFinding>,
+	liveCompanies: Map<number, string[]>,
+	liveBySite: Map<number, string[]>,
+): IntegrationFinding[] {
+	const findings: IntegrationFinding[] = []
+	const { linked: linksBySite, ignored: ignoredSites } = indexTopLinks(links)
+	for (const site of siteRows) {
+		const link = linksBySite.get(site.id)?.[0]
+		const base = siteBase(site)
+		if (!link) {
+			if (!ignoredSites.has(site.id)) {
+				findings.push(finding('site_unlinked', base))
+			}
+			continue
+		}
+		const external = externalTenants.get(link.external_id)
+		const linked = { ...base, link_id: link.id, external_id: link.external_id }
+		if (!external) {
+			findings.push(finding('tenant_stale', linked))
+			continue
+		}
+		liveBySite.set(site.id, [external.external_id])
+		if (site.tenant_id !== null) {
+			liveCompanies.set(site.tenant_id, [
+				...(liveCompanies.get(site.tenant_id) ?? []),
+				external.external_id,
+			])
+		}
+		if (!external.active) {
+			findings.push(finding('tenant_inactive', { ...linked, external_name: external.name }))
+		}
+	}
+	return findings
+}
+
+/**
+ * Builds the report for the tenants selected by `filter`. `includeUnmapped`
+ * adds external tenants that no conex tenant links to (global view only:
+ * scoped users must not see other customers) and priorities without a
+ * ticket tag of the same name (shared catalog data, so not per tenant).
+ */
+export async function buildReport(
+	provider: ProviderId,
+	filter: TenantFilterParams,
+	includeUnmapped: boolean,
+): Promise<IntegrationReport> {
+	const findings: IntegrationFinding[] = []
+	const tenantRows = await getDb()
+		.select({
+			id: tenants.id,
+			name: tenants.name,
+			customer_number: tenants.customer_number,
+			emails: tenants.emails,
+		})
+		.from(tenants)
+		.where(and(...tenantConditions(tenants.id, filter)))
+		.orderBy(tenants.name)
+	const tenantName = new Map(tenantRows.map((t) => [t.id, t.name]))
+	const externalTenants = await readTenants(provider)
+
+	const { capabilities, coversDevice } = providerDefinition(provider)
+
+	// Tenant / site level ---------------------------------------------------
+	const level = capabilities.link_level
+	const tenantIds = tenantRows.map((t) => t.id)
+	const topLinks = await listLinks(provider, level)
+	const tenantRowByExternal = new Map(topLinks.map((link) => [link.external_id, link]))
+	// conex tenant → linked external tenant ids that still exist.
+	const liveCompanies = new Map<number, string[]>()
+	// Device groups (tenants, or sites for site links) → their live external tenant ids.
+	let liveGroups = liveCompanies
+	const siteRows = level === 'site' ? await reportedSites(tenantIds, includeUnmapped) : []
+	const siteById = new Map(siteRows.map((site) => [site.id, site]))
+	const siteBase = (site: ReportSite | undefined): Partial<IntegrationFinding> => ({
+		tenant_id: site?.tenant_id ?? null,
+		tenant_name:
+			site?.tenant_id !== null && site?.tenant_id !== undefined
+				? (tenantName.get(site.tenant_id) ?? null)
+				: null,
+		site_id: site?.id ?? null,
+		site_name: site?.name ?? null,
+	})
+	if (level === 'site') {
+		liveGroups = new Map()
+		findings.push(
+			...siteFindings(
+				siteRows,
+				topLinks,
+				externalTenants,
+				siteBase,
+				liveCompanies,
+				liveGroups,
+			),
+		)
+	} else {
+		findings.push(
+			...tenantFindings(tenantRows, topLinks, externalTenants, capabilities, liveCompanies),
+		)
+	}
 	if (includeUnmapped) {
 		for (const external of externalTenants.values()) {
 			if (
@@ -368,9 +511,22 @@ export async function buildReport(
 	}
 
 	// Device level ----------------------------------------------------------
-	const tenantIds = tenantRows.map((t) => t.id)
-	const locals =
-		tenantIds.length > 0 ? await localDevices(inArray(devices.tenant_id, tenantIds)) : []
+	const bySite = level === 'site'
+	const siteIds = siteRows.map((site) => site.id)
+	const locals = bySite
+		? siteIds.length > 0
+			? await localDevices(inArray(devices.site_id, siteIds))
+			: []
+		: tenantIds.length > 0
+			? await localDevices(inArray(devices.tenant_id, tenantIds))
+			: []
+	// The tenant or site whose external tenants a device is matched against.
+	const groupOf = (device: LocalDeviceRow): number | null =>
+		bySite ? device.site_id : device.tenant_id
+	const groupBase = (key: number): Partial<IntegrationFinding> =>
+		bySite
+			? siteBase(siteById.get(key))
+			: { tenant_id: key, tenant_name: tenantName.get(key) ?? null }
 	const deviceLinks = await listLinks(provider, 'device')
 	const linkByDevice = new Map<number, ExternalLinkRow>()
 	const ignoredLocalDevices = new Set<number>()
@@ -386,25 +542,25 @@ export async function buildReport(
 	const externalDevices = await readDevices(provider)
 	const externalById = new Map(externalDevices.map((d) => [d.external_id, d]))
 
-	const unlinkedByTenant = new Map<number, LocalDeviceRow[]>()
+	const unlinkedByGroup = new Map<number, LocalDeviceRow[]>()
 	for (const device of locals) {
 		const tenantId = device.tenant_id
+		const key = groupOf(device)
+		const site = bySite && device.site_id !== null ? siteById.get(device.site_id) : undefined
 		const base = {
 			tenant_id: tenantId,
 			tenant_name: tenantId !== null ? (tenantName.get(tenantId) ?? null) : null,
+			site_id: site?.id ?? null,
+			site_name: site?.name ?? null,
 			device_id: device.id,
 			device_name: device.name,
 		}
 		const link = linkByDevice.get(device.id)
 		if (!link) {
-			if (
-				tenantId !== null &&
-				liveCompanies.has(tenantId) &&
-				!ignoredLocalDevices.has(device.id)
-			) {
-				const list = unlinkedByTenant.get(tenantId) ?? []
+			if (key !== null && liveGroups.has(key) && !ignoredLocalDevices.has(device.id)) {
+				const list = unlinkedByGroup.get(key) ?? []
 				list.push(device)
-				unlinkedByTenant.set(tenantId, list)
+				unlinkedByGroup.set(key, list)
 			}
 			continue
 		}
@@ -412,8 +568,8 @@ export async function buildReport(
 		const linked = { ...base, link_id: link.id, external_id: link.external_id }
 		if (!external) {
 			// Only stale when the device's company was fetched; otherwise the
-			// snapshot simply does not cover it (tenant unlinked/stale).
-			if (tenantId !== null && liveCompanies.has(tenantId)) {
+			// snapshot simply does not cover it (tenant/site unlinked or stale).
+			if (key !== null && liveGroups.has(key)) {
 				findings.push(finding('device_stale', linked))
 			}
 			continue
@@ -423,12 +579,12 @@ export async function buildReport(
 			external_name: external.name,
 			external_tenant_id: external.external_tenant_id,
 		}
-		const companies = tenantId !== null ? (liveCompanies.get(tenantId) ?? []) : []
+		const companies = key !== null ? (liveGroups.get(key) ?? []) : []
 		if (!companies.includes(external.external_tenant_id)) {
 			findings.push(
 				finding('device_mismatch', {
 					...withExternal,
-					field: 'tenant',
+					field: bySite ? 'site' : 'tenant',
 					local: companies.length > 0 ? companies.join(', ') : null,
 					remote: external.external_tenant_id,
 				}),
@@ -458,8 +614,8 @@ export async function buildReport(
 		}
 	}
 
-	for (const [tenantId, companies] of liveCompanies) {
-		const tenantLocals = unlinkedByTenant.get(tenantId) ?? []
+	for (const [key, companies] of liveGroups) {
+		const tenantLocals = unlinkedByGroup.get(key) ?? []
 		const candidates = externalDevices.filter(
 			(d) => companies.includes(d.external_tenant_id) && !takenExternal.has(d.external_id),
 		)
@@ -469,7 +625,7 @@ export async function buildReport(
 		const pairs = [...auto, ...suggestions]
 		const suggestedLocal = new Set(pairs.map((p) => p.device_id))
 		const suggestedExternal = new Set(pairs.map((p) => p.external_id))
-		const base = { tenant_id: tenantId, tenant_name: tenantName.get(tenantId) ?? null }
+		const base = groupBase(key)
 		const localById = new Map(tenantLocals.map((d) => [d.id, d]))
 		for (const pair of pairs) {
 			const device = localById.get(pair.device_id)
@@ -743,15 +899,31 @@ async function employeeFindings(
 	return findings
 }
 
-/** Tenant detail card: links, linked external tenants and finding counts. */
+/** Tenant detail card: links (one per site for site links), linked external tenants and finding counts. */
 export async function tenantStatus(
 	provider: ProviderId,
 	tenantId: number,
 ): Promise<TenantIntegrationStatus> {
+	const scopes = await scopeLinks(provider, [tenantId])
+	const siteIds = scopes.map((s) => s.site_id).filter((id): id is number => id !== null)
+	const siteName = new Map(
+		siteIds.length > 0
+			? (
+					await getDb()
+						.select({ id: sites.id, name: sites.name })
+						.from(sites)
+						.where(inArray(sites.id, siteIds))
+				).map((row) => [row.id, row.name])
+			: [],
+	)
 	const links = await Promise.all(
-		(await tenantLinks(provider, tenantId)).map(async (link) => ({
-			link: linkJson(link),
-			external: await readTenant(provider, link.external_id),
+		scopes.map(async (scope) => ({
+			link: linkJson(scope.link),
+			external: await readTenant(provider, scope.link.external_id),
+			site:
+				scope.site_id !== null
+					? { id: scope.site_id, name: siteName.get(scope.site_id) ?? '' }
+					: null,
 		})),
 	)
 	const report = await buildReport(provider, { tenant: tenantId }, false)
@@ -762,16 +934,13 @@ export async function tenantStatus(
 	return { links, finding_counts }
 }
 
-/** Linked external tenants of a conex tenant that still exist in the snapshot. */
-export async function linkedExternalTenants(
+/** External tenants of `links` that still exist in the snapshot. */
+async function liveExternalTenants(
 	provider: ProviderId,
-	tenantId: number | null,
+	links: ExternalLinkRow[],
 ): Promise<ExternalTenantJson[]> {
-	if (tenantId === null) {
-		return []
-	}
 	const out: ExternalTenantJson[] = []
-	for (const link of await tenantLinks(provider, tenantId)) {
+	for (const link of links) {
 		const external = await readTenant(provider, link.external_id)
 		if (external) {
 			out.push(external)
@@ -780,15 +949,30 @@ export async function linkedExternalTenants(
 	return out
 }
 
+/**
+ * Linked external tenants of a conex tenant (of its sites for site links)
+ * that still exist in the snapshot.
+ */
+export async function linkedExternalTenants(
+	provider: ProviderId,
+	tenantId: number | null,
+): Promise<ExternalTenantJson[]> {
+	return tenantId === null
+		? []
+		: liveExternalTenants(provider, await tenantLinks(provider, tenantId))
+}
+
 /** Device detail card: link, field comparison and link candidates. */
 export async function deviceStatus(
 	provider: ProviderId,
 	deviceId: number,
-	tenantId: number | null,
 ): Promise<DeviceIntegrationStatus> {
 	const [local] = await localDevices(eq(devices.id, deviceId))
 	const link = await linkOf(provider, 'device', deviceId)
-	const external_tenants = await linkedExternalTenants(provider, tenantId)
+	const external_tenants = await liveExternalTenants(
+		provider,
+		await deviceScopeLinks(provider, deviceId),
+	)
 	const external = link ? await readDevice(provider, link.external_id) : null
 	let candidates: ExternalDeviceJson[] = []
 	if (external_tenants.length > 0) {

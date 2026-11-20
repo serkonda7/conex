@@ -27,7 +27,7 @@ export const m365Definition: ProviderDefinition<'m365'> = {
 		push: false,
 		create_device: false,
 		customer_numbers: false,
-		tenant_cardinality: 'one',
+		link_level: 'tenant',
 	},
 	incremental: false,
 	secretLabels: { client_secret: 'Client secret' },

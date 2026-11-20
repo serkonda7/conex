@@ -81,7 +81,7 @@ export async function createTicket(
 		}
 		priority = priorityLabel(row)
 	}
-	// Ticket providers link one company per tenant (`tenant_cardinality: 'one'`).
+	// Ticket providers link one company per tenant (`link_level: 'tenant'`).
 	const company = await linkOf(provider, 'tenant', tenant.id)
 	if (!company) {
 		return Result.err(new ValidationError('Tenant is not linked to an external company'))

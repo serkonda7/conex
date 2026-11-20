@@ -24,6 +24,7 @@ import {
 	ignore_local,
 	import_external_employees,
 	type LinkBoard,
+	type LinkEntityType,
 	link_external,
 	run_sync,
 	start_sync,
@@ -74,7 +75,7 @@ function employeePushField(f: IntegrationFinding): EmployeePushField | null {
 }
 
 function findingKey(f: IntegrationFinding): string {
-	return [f.kind, f.tenant_id, f.device_id, f.external_id, f.field, f.local].join('|')
+	return [f.kind, f.tenant_id, f.site_id, f.device_id, f.external_id, f.field, f.local].join('|')
 }
 
 /** Field, conex value and external value of a mismatch; matched field of a suggestion. */
@@ -132,17 +133,18 @@ function parseView(raw: string): View {
 }
 
 /**
- * Link board of tenants, or of the devices or employees of the selected
- * tenant (`tenant`, null: none selected).
+ * Link board of tenants (or sites), or of the devices or employees of the
+ * selected tenant (`tenant`, null: none selected).
  */
 function LinkBoardPanel(props: {
 	provider: IntegrationProvider
-	entity_type: 'tenant' | 'device' | 'employee'
+	entity_type: LinkEntityType
 	tenant: number | null
 	on_error: (message: string | null) => void
 }): JSX.Element {
+	const topLevel = (): boolean => props.entity_type === 'tenant' || props.entity_type === 'site'
 	const source = createMemo(() =>
-		props.entity_type === 'tenant'
+		topLevel()
 			? { entity_type: props.entity_type, tenant: undefined }
 			: props.tenant !== null
 				? {
@@ -157,17 +159,16 @@ function LinkBoardPanel(props: {
 		props.on_error,
 	)
 
-	function handleTenantsLinked(tenantIds: number[]): void {
+	function handleTenantsLinked(ids: number[]): void {
 		// Fetch the companies' devices right away (one tenant, or all linked
-		// ones after a bulk link). A run already in progress answers 409; the
-		// next "Sync now" covers these tenants then.
-		void start_sync(props.provider, tenantIds.length === 1 ? tenantIds[0] : undefined)
+		// ones after a bulk link or for sites). A run already in progress
+		// answers 409; the next "Sync now" covers these tenants then.
+		const tenant = props.entity_type === 'tenant' && ids.length === 1 ? ids[0] : undefined
+		void start_sync(props.provider, tenant)
 	}
 
 	const editable = (): boolean =>
-		props.entity_type === 'tenant'
-			? canGlobal('integrations.manage')
-			: can('integrations.manage')
+		topLevel() ? canGlobal('integrations.manage') : can('integrations.manage')
 
 	return (
 		<div>
@@ -186,10 +187,7 @@ function LinkBoardPanel(props: {
 					{(current: () => LinkBoard): JSX.Element => (
 						<>
 							<Show
-								when={
-									current().entity_type === 'tenant' ||
-									current().external_tenants.length > 0
-								}
+								when={topLevel() || current().external_tenants.length > 0}
 								fallback={
 									<Empty
 										message={t('integration.boardTenantNotLinked', {
@@ -204,11 +202,7 @@ function LinkBoardPanel(props: {
 									tenant_id={props.tenant ?? undefined}
 									editable={editable()}
 									on_error={props.on_error}
-									on_linked={
-										props.entity_type === 'tenant'
-											? handleTenantsLinked
-											: undefined
-									}
+									on_linked={topLevel() ? handleTenantsLinked : undefined}
 								/>
 							</Show>
 						</>
@@ -232,6 +226,7 @@ function LinkBoardPanel(props: {
 export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
 	const [kindFilter, setKindFilter] = createSignal<string>(parseKind(queryParam('kind')))
+	// Tenant (or site, for site-level providers) being linked via the picker.
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
 	const [view, setView] = createSignal<View>(parseView(queryParam('view')))
 	const [queryTenant, setQueryTenant] = createSignal(parseId(queryParam('tenant')))
@@ -244,13 +239,25 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 
 	// Providers without employees (Octoja, UniFi) hide the tab and ignore `?view=employees`.
 	const hasEmployees = (): boolean => integration()?.capabilities.employees === true
+	// UniFi consoles link to sites: the top board and report list sites.
+	const tenantLevel = (): 'tenant' | 'site' => integration()?.capabilities.link_level ?? 'tenant'
 	const effectiveView = (): View =>
 		view() === 'employees' && !hasEmployees() ? 'report' : view()
 
 	const views = (): DetailTab<View>[] => [
 		{ key: 'report', label: t('integration.viewReport') },
-		// The tenant board lists every external company: global users only.
-		...(isScoped() ? [] : [{ key: 'tenants' as const, label: t('integration.viewTenants') }]),
+		// The tenant (or site) board lists every external company: global users only.
+		...(isScoped()
+			? []
+			: [
+					{
+						key: 'tenants' as const,
+						label:
+							tenantLevel() === 'site'
+								? t('integration.viewSites')
+								: t('integration.viewTenants'),
+					},
+				]),
 		{ key: 'devices', label: t('integration.viewDevices') },
 		...(hasEmployees()
 			? [{ key: 'employees' as const, label: t('integration.viewEmployees') }]
@@ -350,7 +357,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 		if (!row || tenant === null) {
 			return
 		}
-		void run(() => link_external(row.provider, 'tenant', tenant, item.external_id))
+		void run(() => link_external(row.provider, tenantLevel(), tenant, item.external_id))
 	}
 
 	function actions(f: IntegrationFinding): JSX.Element {
@@ -419,24 +426,31 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 		)
 		switch (f.kind) {
 			case 'tenant_unlinked':
+			case 'site_unlinked': {
+				const level = f.kind === 'site_unlinked' ? 'site' : 'tenant'
+				const id = level === 'site' ? f.site_id : f.tenant_id
 				return (
-					<Show when={canGlobal('integrations.manage')}>
+					<Show when={canGlobal('integrations.manage') && id !== null}>
 						<button
 							type="button"
 							class="icon-btn icon-btn-connect"
 							title={t('integration.link')}
 							aria-label={t('integration.link')}
-							onClick={() => setLinkingTenant(f.tenant_id)}
+							onClick={() => setLinkingTenant(id)}
 						>
 							<IconLinkPlus size={20} />
 						</button>
+						{/* Sites without UniFi gear are ignored right here. */}
+						{level === 'site' &&
+							ignoreButton(() => ignore_local(provider, 'site', id ?? 0))}
 					</Show>
 				)
+			}
 			case 'tenant_missing_in_conex':
 				return (
 					<Show when={canGlobal('integrations.manage')}>
 						{ignoreButton(() =>
-							ignore_external(provider, 'tenant', f.external_id ?? ''),
+							ignore_external(provider, tenantLevel(), f.external_id ?? ''),
 						)}
 					</Show>
 				)
@@ -491,7 +505,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				const field = pushField(f)
 				return (
 					<Show when={can('integrations.manage')}>
-						<Show when={f.field === 'tenant'}>{unlink}</Show>
+						<Show when={f.field === 'tenant' || f.field === 'site'}>{unlink}</Show>
 						{capabilities.push && field !== null && (
 							<button
 								type="button"
@@ -618,6 +632,12 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				),
 		},
 		{
+			key: 'site',
+			label: tp('entity.site', 1),
+			getValue: (f: IntegrationFinding): JSX.Element =>
+				f.site_id !== null ? <a href={`/sites/${f.site_id}`}>{f.site_name}</a> : '—',
+		},
+		{
 			key: 'device',
 			label: tp('entity.device', 1),
 			getValue: (f: IntegrationFinding): JSX.Element =>
@@ -708,7 +728,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 					<Show when={effectiveView() === 'tenants'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
-							entity_type="tenant"
+							entity_type={tenantLevel()}
 							tenant={null}
 							on_error={setError}
 						/>
@@ -768,7 +788,12 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 									columns={columns}
 									showColumnCustomizer
 									savedLayoutsKey="integration-report"
-									visibleColumns={visibleColumns}
+									// The site column only applies to site-level providers.
+									visibleColumns={() =>
+										visibleColumns().filter(
+											(key) => key !== 'site' || tenantLevel() === 'site',
+										)
+									}
 									onVisibleColumnsChange={setVisibleColumns}
 									rowActions={(f: IntegrationFinding): JSX.Element => (
 										<div class="row-actions">{actions(f)}</div>

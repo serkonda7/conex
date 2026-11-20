@@ -135,21 +135,16 @@ export function LinkBoardView(props: {
 
 	const provider = (): string => providerLabel(props.provider)
 	const needle = (): string => search().trim().toLowerCase()
-	const localPath = (id: number): string => {
-		const base =
-			props.board.entity_type === 'device'
-				? 'devices'
-				: props.board.entity_type === 'employee'
-					? 'employees'
-					: 'tenants'
-		return `/${base}/${id}`
-	}
+	const localPath = (id: number): string => `/${props.board.entity_type}s/${id}`
 
 	/** The same level on the cross-integration matching page. */
 	const matchingHref = (): string => {
 		const type = props.board.entity_type
 		if (type === 'tenant') {
 			return '/integrations/matching'
+		}
+		if (type === 'site') {
+			return '/integrations/matching?type=sites'
 		}
 		const tenant = props.tenant_id === undefined ? '' : `&tenant=${props.tenant_id}`
 		return `/integrations/matching?type=${type === 'device' ? 'devices' : 'employees'}${tenant}`

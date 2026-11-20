@@ -22,6 +22,7 @@ import {
 	IntegrationTestSchema,
 	IntegrationUpdateSchema,
 	LinkBoardQuerySchema,
+	type LinkEntityType,
 	M365ConnectSchema,
 	M365ConsentLinkQuerySchema,
 	M365TenantParamsSchema,
@@ -50,6 +51,7 @@ import { createExternalDevice } from '../integrations/create_device'
 import { importExternalEmployees } from '../integrations/import_employees'
 import {
 	deleteLink,
+	deviceScopeLinks,
 	getLink,
 	ignoreExternal,
 	ignoreLocal,
@@ -57,6 +59,7 @@ import {
 	linkOf,
 	listLinks,
 	setLink,
+	tenantLevel,
 	tenantLinks,
 } from '../integrations/links'
 import { connectTenant, consentLink } from '../integrations/m365/consent'
@@ -80,7 +83,7 @@ import { deactivateExternalEmployee, updateExternalEmployee } from '../integrati
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { tenants } from '../schema'
+import { sites, tenants } from '../schema'
 import { jsonError } from '../util/http'
 import { sendCreated, sendResult } from '../util/result_response'
 
@@ -184,20 +187,61 @@ async function loadExternalDevice(
 }
 
 /**
- * Company linked to the tenant of a conex device or employee, after the
- * write gate; 400 while the tenant is not linked, else the 403 response.
+ * Company linked to the tenant of a conex device or employee (to the
+ * device's site for site links), after the write gate; 400 while it is not
+ * linked, else the 403 response.
  */
 async function loadTenantCompany(
 	c: Context,
 	provider: ProviderId,
 	entityType: 'device' | 'employee',
+	entityId: number,
 	tenant: number | null,
 ): Promise<string | Response> {
-	const tenantLink = tenant !== null ? await linkOf(provider, 'tenant', tenant) : null
-	if (!tenantLink) {
-		return jsonError(c, `The ${entityType}'s tenant is not linked yet`, 400)
+	const links =
+		entityType === 'device'
+			? await deviceScopeLinks(provider, entityId)
+			: tenant !== null
+				? await tenantLinks(provider, tenant)
+				: []
+	const company = links[0]
+	if (!company) {
+		const owner = entityType === 'device' ? tenantLevel(provider) : 'tenant'
+		return jsonError(c, `The ${entityType}'s ${owner} is not linked yet`, 400)
 	}
-	return (await checkExternalWrite(c, provider, tenantLink.external_id)) ?? tenantLink.external_id
+	return (await checkExternalWrite(c, provider, company.external_id)) ?? company.external_id
+}
+
+/** Whether links of `entityType` are external-tenant links (tenant or site). */
+function isTenantLevel(entityType: LinkEntityType): entityType is 'tenant' | 'site' {
+	return entityType === 'tenant' || entityType === 'site'
+}
+
+/**
+ * Gate for external-tenant links: 400 when the provider links its external
+ * tenants to the other level (UniFi consoles to sites, the rest to tenants),
+ * 404 when the conex tenant or site is missing, else null.
+ */
+async function checkTenantLevel(
+	c: Context,
+	provider: ProviderId,
+	entityType: 'tenant' | 'site',
+	entityId: number | null,
+): Promise<Response | null> {
+	const level = tenantLevel(provider)
+	if (entityType !== level) {
+		return jsonError(c, `This integration links ${level}s, not ${entityType}s`, 400)
+	}
+	if (entityId === null) {
+		return null
+	}
+	const found =
+		entityType === 'site'
+			? await exists(sites, eq(sites.id, entityId))
+			: await exists(tenants, eq(tenants.id, entityId))
+	return found
+		? null
+		: jsonError(c, entityType === 'site' ? 'Site not found' : 'Tenant not found', 404)
 }
 
 /**
@@ -223,7 +267,7 @@ async function scopeCompany(
  * Integrations: `integrations.manage` configures and lists providers
  * (credentials verified before saving, secrets never returned), runs syncs
  * and edits links; the reports and boards only need `view`. Links of
- * tenants are global-write like tenants themselves; device and employee
+ * tenants and sites are global-write like tenants themselves; device and employee
  * links follow the object's tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers. `tickets.create` opens tickets for tenants in scope and lists
@@ -418,7 +462,7 @@ export const integrationsApp = new Hono()
 			}
 			const needle = c.req.valid('query').search.toLowerCase()
 			const rows = new Map<string, { tenant: number | null; ignored: boolean }>()
-			for (const link of await listLinks(provider, 'tenant')) {
+			for (const link of await listLinks(provider, tenantLevel(provider))) {
 				rows.set(link.external_id, {
 					tenant: link.state === 'linked' ? link.entity_id : null,
 					ignored: link.state === 'ignored',
@@ -447,7 +491,7 @@ export const integrationsApp = new Hono()
 				.slice(0, 100)
 				.map((t) => ({
 					...t,
-					linked_tenant_id: rows.get(t.external_id)?.tenant ?? null,
+					linked_entity_id: rows.get(t.external_id)?.tenant ?? null,
 					ignored: rows.get(t.external_id)?.ignored ?? false,
 				}))
 			return c.json(items)
@@ -482,10 +526,11 @@ export const integrationsApp = new Hono()
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const query = c.req.valid('query')
-			if (query.entity_type === 'tenant') {
+			if (isTenantLevel(query.entity_type)) {
 				// Lists every external company: global users only.
 				return (
 					requireGlobalScope(c, EXTERNAL_TENANTS_GLOBAL) ??
+					(await checkTenantLevel(c, provider, query.entity_type, null)) ??
 					c.json(await tenantBoard(provider))
 				)
 			}
@@ -524,7 +569,7 @@ export const integrationsApp = new Hono()
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			return c.json(await deviceStatus(provider, id, tenant))
+			return c.json(await deviceStatus(provider, id))
 		},
 	)
 	.get(
@@ -549,13 +594,12 @@ export const integrationsApp = new Hono()
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
-			if (input.entity_type === 'tenant') {
-				const denied = requireGlobalPermission(c, 'integrations.manage')
+			if (isTenantLevel(input.entity_type)) {
+				const denied =
+					requireGlobalPermission(c, 'integrations.manage') ??
+					(await checkTenantLevel(c, provider, input.entity_type, input.entity_id))
 				if (denied) {
 					return denied
-				}
-				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
-					return jsonError(c, 'Tenant not found', 404)
 				}
 				const external = await readTenant(provider, input.external_id)
 				if (!external) {
@@ -618,8 +662,10 @@ export const integrationsApp = new Hono()
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
-			if (input.entity_type === 'tenant') {
-				const denied = requireGlobalPermission(c, 'integrations.manage')
+			if (isTenantLevel(input.entity_type)) {
+				const denied =
+					requireGlobalPermission(c, 'integrations.manage') ??
+					(await checkTenantLevel(c, provider, input.entity_type, null))
 				if (denied) {
 					return denied
 				}
@@ -629,7 +675,7 @@ export const integrationsApp = new Hono()
 				}
 				const res = await ignoreExternal(
 					provider,
-					'tenant',
+					input.entity_type,
 					external.external_id,
 					external.external_id,
 					userId,
@@ -684,16 +730,21 @@ export const integrationsApp = new Hono()
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
-			if (input.entity_type === 'tenant') {
-				// Tenants are global-write; an ignored one has no company.
-				const denied = requireGlobalPermission(c, 'integrations.manage')
+			if (isTenantLevel(input.entity_type)) {
+				// Tenants and sites are global-write; an ignored one has no company.
+				const denied =
+					requireGlobalPermission(c, 'integrations.manage') ??
+					(await checkTenantLevel(c, provider, input.entity_type, input.entity_id))
 				if (denied) {
 					return denied
 				}
-				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
-					return jsonError(c, 'Tenant not found', 404)
-				}
-				const res = await ignoreLocal(provider, 'tenant', input.entity_id, null, userId)
+				const res = await ignoreLocal(
+					provider,
+					input.entity_type,
+					input.entity_id,
+					null,
+					userId,
+				)
 				return sendResult(c, res.map(linkJson))
 			}
 			const tenant =
@@ -703,7 +754,13 @@ export const integrationsApp = new Hono()
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			const company = await loadTenantCompany(c, provider, input.entity_type, tenant)
+			const company = await loadTenantCompany(
+				c,
+				provider,
+				input.entity_type,
+				input.entity_id,
+				tenant,
+			)
 			if (company instanceof Response) {
 				return company
 			}
@@ -729,7 +786,7 @@ export const integrationsApp = new Hono()
 			if (tenant instanceof Response) {
 				return tenant
 			}
-			const company = await loadTenantCompany(c, provider, 'device', tenant)
+			const company = await loadTenantCompany(c, provider, 'device', input.device_id, tenant)
 			if (company instanceof Response) {
 				return company
 			}
@@ -836,7 +893,7 @@ export const integrationsApp = new Hono()
 				return sendResult(c, link)
 			}
 			const row = link.value
-			if (row.entity_type === 'tenant') {
+			if (row.entity_type === 'tenant' || row.entity_type === 'site') {
 				const denied = requireGlobalPermission(c, 'integrations.manage')
 				if (denied) {
 					return denied
