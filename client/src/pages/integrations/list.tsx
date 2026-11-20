@@ -33,22 +33,12 @@ import {
 	integrationLayout,
 	LastRunError,
 	LastRunTime,
+	providerStatus,
 	StatusPill,
 	SyncIconButton,
 	setIntegrationLayout,
 	WarningPill,
 } from './integration_card'
-
-/** Card state of a configured provider; `syncing` is a sync started from this page. */
-function providerStatus(integration: IntegrationJson, syncing: boolean): IntegrationStatus {
-	if (!integration.enabled) {
-		return 'disabled'
-	}
-	if (integration.last_error) {
-		return 'error'
-	}
-	return syncing || integration.last_sync?.state === 'running' ? 'running' : 'connected'
-}
 
 /** Enabled, but the login or the latest sync failed. */
 function needsAttention(integration: IntegrationJson): boolean {

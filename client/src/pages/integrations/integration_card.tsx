@@ -17,6 +17,7 @@
 import { IconRefresh } from '@tabler/icons-solidjs'
 import { type Accessor, type Component, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
+import type { IntegrationJson } from '../../api/integrations'
 import { t } from '../../i18n'
 import { readStored, writeStored } from '../../lib/storage'
 import { formatRelative, formatTime } from '../../lib/time'
@@ -40,6 +41,17 @@ export function setIntegrationLayout(next: IntegrationLayout): void {
 }
 
 export type IntegrationStatus = 'connected' | 'running' | 'error' | 'disabled'
+
+/** Card state of a configured provider; `syncing` is a sync started from this page. */
+export function providerStatus(integration: IntegrationJson, syncing: boolean): IntegrationStatus {
+	if (!integration.enabled) {
+		return 'disabled'
+	}
+	if (integration.last_error) {
+		return 'error'
+	}
+	return syncing || integration.last_sync?.state === 'running' ? 'running' : 'connected'
+}
 
 const STATUS_BADGES: Record<IntegrationStatus, string> = {
 	connected: 'badge badge-connected',
