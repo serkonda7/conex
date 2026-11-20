@@ -10,7 +10,7 @@ UniFi und Microsoft Graph (für die [Outlook-Kalendersynchronisation](calendar-s
 | `mock`    | Keine Anfrage verlässt den Server; die Anbieter liefern zuvor aufgezeichnete Schnappschüsse. |
 
 Im Modus `offline` schlagen Synchronisierungen und andere Integrationsaktionen mit der
-Meldung „integrations are offline" fehl, bevor eine Verbindung aufgebaut wird. Bereits
+Meldung „integrations are offline“ fehl, bevor eine Verbindung aufgebaut wird. Bereits
 gespeicherte Daten (z. B. der letzte Abgleichbericht) bleiben sichtbar. Eingehende
 Schnittstellen wie das Kontaktverzeichnis für das [AGFEO-Dashboard](agfeo.md) sind nicht
 betroffen.
@@ -19,7 +19,7 @@ Im Modus `mock` verhält sich der Server bei Synchronisierungen und Integrations
 wie mit erreichbaren externen Systemen: Die Anbieter geben die Daten aus einer Datei
 zurück und benötigen keine Zugangsdaten. Auch hier werden keine Verbindungen nach außen
 aufgebaut – Kalendersynchronisation und M365-Einwilligung bleiben gesperrt (Meldung
-„integrations are mocked"). Schreibaktionen (Ticket, Gerät, Mitarbeiter) verändern nur
+„integrations are mocked“). Schreibaktionen (Ticket, Gerät, Mitarbeiter) verändern nur
 eine Kopie im Arbeitsspeicher und sind nach dem nächsten Sync sichtbar; die Datei auf der
 Platte wird nie überschrieben und die Änderungen gehen beim Neustart verloren.
 

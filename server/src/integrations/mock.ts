@@ -11,6 +11,8 @@ import { Result } from 'better-result'
 import {
 	EmployeeSalutationSchema,
 	type ExternalDeviceJson,
+	type ExternalEmployeeJson,
+	type ExternalTenantJson,
 	type IntegrationCapabilities,
 	IntegrationProviderSchema,
 	type IntegrationProvider as ProviderId,
@@ -34,7 +36,8 @@ import type {
 	TicketInput,
 } from './types'
 
-const ExternalTenantSchema = v.object({
+// Typed against the shared records so the snapshot schema cannot drift from them.
+const ExternalTenantSchema: v.GenericSchema<unknown, ExternalTenantJson> = v.object({
 	external_id: v.string(),
 	display_id: v.nullable(v.string()),
 	name: v.string(),
@@ -44,7 +47,7 @@ const ExternalTenantSchema = v.object({
 	domains: v.optional(v.array(v.string())),
 })
 
-const ExternalEmployeeSchema = v.object({
+const ExternalEmployeeSchema: v.GenericSchema<unknown, ExternalEmployeeJson> = v.object({
 	external_id: v.string(),
 	external_tenant_id: v.nullable(v.string()),
 	external_tenant_ids: v.array(v.string()),
@@ -59,7 +62,7 @@ const ExternalEmployeeSchema = v.object({
 	active: v.boolean(),
 })
 
-const ExternalDeviceSchema = v.object({
+const ExternalDeviceSchema: v.GenericSchema<unknown, ExternalDeviceJson> = v.object({
 	external_id: v.string(),
 	external_tenant_id: v.string(),
 	kind: v.string(),
@@ -74,7 +77,7 @@ const ExternalDeviceSchema = v.object({
 })
 
 /** Normalized ticket without the locally resolved priority (see `ExternalTicket`). */
-const ExternalTicketSchema = v.object({
+const ExternalTicketSchema: v.GenericSchema<unknown, ExternalTicket> = v.object({
 	id: v.number(),
 	title: v.string(),
 	status: v.nullable(v.string()),
@@ -83,7 +86,7 @@ const ExternalTicketSchema = v.object({
 	tags: v.array(v.string()),
 })
 
-const ExternalTagSchema = v.object({
+const ExternalTagSchema: v.GenericSchema<unknown, ExternalTag> = v.object({
 	external_id: v.string(),
 	name: v.string(),
 })
@@ -303,10 +306,12 @@ export function mockProvider(provider: ProviderId): IntegrationProvider {
 			input: DeviceInput,
 		): Promise<Result<ExternalDeviceJson, Error>> =>
 			loadSnapshot(provider).map((state) => {
+				// Type-prefixed like real ids (`pc:123`), so code splitting them keeps working.
+				const kind = input.server ? 'server' : 'pc'
 				const device: ExternalDeviceJson = {
-					external_id: `mock-${state.nextDevice++}`,
+					external_id: `pc:mock-${state.nextDevice++}`,
 					external_tenant_id: input.externalTenantId,
-					kind: 'pc',
+					kind,
 					name: input.name,
 					serial: input.serial,
 					asset_tag: input.asset_tag,
