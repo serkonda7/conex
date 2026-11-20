@@ -45,6 +45,22 @@ import {
 import { Empty, InlineError, Loading } from './feedback'
 import { MoreActionsButton } from './more_actions_button'
 
+/** Empty-list text: a search or filter miss, else the page's own empty text. */
+export function emptyListText(opts: {
+	noun: string
+	search: string
+	filtered: boolean
+	empty: string
+}): string {
+	if (opts.search) {
+		return t('list.noMatch', { noun: opts.noun, search: opts.search })
+	}
+	if (opts.filtered) {
+		return t('list.noMatchFilters', { noun: opts.noun })
+	}
+	return opts.empty
+}
+
 /** Sortable-column state for a DataTable: toggle on repeat, restore the initial order on clear. */
 export function useSort<T extends string>(
 	initial: T | undefined,
@@ -449,11 +465,14 @@ export function EntityListPage<Row extends { id: number }>(props: {
 	})
 
 	function emptyMessage(): string {
-		if (props.filtered === true || filters.filtered()) {
-			return t('list.noMatchFilters', { noun: nouns() })
-		}
-		const search = list.search()
-		return search ? t('list.noMatch', { noun: nouns(), search }) : props.emptyText
+		// A filtered list reports the filter message even with a search set.
+		const filtered = props.filtered === true || filters.filtered()
+		return emptyListText({
+			noun: nouns(),
+			search: filtered ? '' : list.search(),
+			filtered,
+			empty: props.emptyText,
+		})
 	}
 
 	const cloneable = (): boolean => list.canEdit() && props.cloneHref !== undefined
