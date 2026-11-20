@@ -14,6 +14,7 @@ import {
 } from './errors'
 import {
 	allIdsExist,
+	exists,
 	findOne,
 	isPatchEmpty,
 	type ListParams,
@@ -90,9 +91,8 @@ export async function createLocalUser(
 }
 
 /** True when at least one user exists. Drives first-run setup gating. */
-export async function hasAnyUser(): Promise<boolean> {
-	const row = (await getDb().select({ id: users.id }).from(users).limit(1))[0]
-	return row !== undefined && row !== null
+export function hasAnyUser(): Promise<boolean> {
+	return exists(users, undefined)
 }
 
 // ---------------------------------------------------------------------------
