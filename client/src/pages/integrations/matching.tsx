@@ -406,13 +406,6 @@ export function MatchingPage(): JSX.Element {
 		}
 	}
 
-	function suggestionCount(column: Column): number {
-		return visibleRows().filter((row) => suggestion(column, row.id) !== null).length
-	}
-	const totalSuggestions = createMemo(() =>
-		usableColumns().reduce((sum, c) => sum + suggestionCount(c), 0),
-	)
-
 	function rowStates(rowId: number): CellState[] {
 		return usableColumns()
 			.filter((c) => c.local.has(rowId))
@@ -440,6 +433,15 @@ export function MatchingPage(): JSX.Element {
 		),
 	)
 	const doneCount = createMemo(() => rows().filter((row) => rowDone(row.id)).length)
+
+	// Declared after `visibleRows`: memos evaluate at once, and with cached
+	// boards (a revisit) the columns are already there.
+	function suggestionCount(column: Column): number {
+		return visibleRows().filter((row) => suggestion(column, row.id) !== null).length
+	}
+	const totalSuggestions = createMemo(() =>
+		usableColumns().reduce((sum, c) => sum + suggestionCount(c), 0),
+	)
 
 	function columnProgress(column: Column): { done: number; total: number } {
 		const ids = rows().filter((row) => column.local.has(row.id))

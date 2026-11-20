@@ -5972,14 +5972,27 @@ a.rack-shelf-plate:hover {
 
 /* The header's own layout replaces the page-title underline. */
 .app-content .integrations-header h2:first-of-type {
-	flex: 1 1 12rem;
+	flex: 0 1 auto;
 	min-width: 0;
 	margin: 0;
 	padding-bottom: 0;
 	border-bottom: none;
 }
 
+/* Primary action of the page, right beside its title. */
+.integrations-match {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.integrations-match:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
 .integrations-summary {
+	flex: 1 1 12rem;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.4rem 1rem;
