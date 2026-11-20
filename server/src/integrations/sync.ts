@@ -14,6 +14,7 @@ import { getDb } from '../db/connection'
 import { memberOf } from '../db/employees'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { checkTenantExists, errOf } from '../db/list'
+import { failInterruptedRuns } from '../db/runs'
 import { devices, employees, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
 import { listLinks, setLink } from './links'
@@ -324,10 +325,7 @@ export async function getSyncRun(
 	return row ? Result.ok(syncRunJson(row)) : Result.err(new NotFoundError('Sync run not found'))
 }
 
-/** Marks runs interrupted by a restart as failed. Called once at startup. */
+/** Marks interrupted integration sync runs as failed. Called once at startup. */
 export async function failInterruptedSyncs(): Promise<void> {
-	await getDb()
-		.update(sync_runs)
-		.set({ state: 'error', finished_at: nowSeconds(), error: 'Interrupted by server restart' })
-		.where(eq(sync_runs.state, 'running'))
+	await failInterruptedRuns(sync_runs)
 }
