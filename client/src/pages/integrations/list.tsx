@@ -247,7 +247,7 @@ export function IntegrationsPage(): JSX.Element {
 			classList={{ 'integrations-list': integrationLayout() === 'list' }}
 		>
 			<div class="integrations-header">
-				<span class="integrations-header-icon" aria-hidden="true">
+				<span class="page-header-icon" aria-hidden="true">
 					<IconPlugConnected size={20} />
 				</span>
 				<h2>{tp('entity.integration', 2)}</h2>

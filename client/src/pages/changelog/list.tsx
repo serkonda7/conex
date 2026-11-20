@@ -1,3 +1,4 @@
+import { IconListDetails } from '@tabler/icons-solidjs'
 import type { ChangeAction, ChangeObjectType } from 'shared/src/schemas'
 import { createSignal, type JSX } from 'solid-js'
 import { type ChangelogSort, fetch_changelog, type ObjectChangeJson } from '../../api/changelog'
@@ -123,7 +124,12 @@ export function ChangelogPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>{t('entity.changelog')}</h2>
+				<div class="page-header-title">
+					<span class="page-header-icon" aria-hidden="true">
+						<IconListDetails size={20} />
+					</span>
+					<h2>{t('entity.changelog')}</h2>
+				</div>
 			</div>
 
 			<FilterTable

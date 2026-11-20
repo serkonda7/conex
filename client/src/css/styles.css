@@ -1797,6 +1797,28 @@ tbody tr:last-child td {
 	border-bottom: none;
 }
 
+/* Keeps a leading icon next to the heading instead of letting the header's
+   space-between push them to opposite ends on pages without actions. */
+.page-header-title {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+/* Boxed title icon, shared by the list-page headers that use one. */
+.page-header-icon {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex: none;
+	border-radius: 0.5rem;
+	border: 1px solid var(--border);
+	background-color: var(--bg-raised);
+	color: var(--primary-text);
+}
+
 /* Sibling-list tabs (tenants ↔ tenant groups, sites ↔ site groups) in
    place of the list title: compact links whose active underline
    sits on the page-header rule, so they cost no extra row. */
@@ -6056,18 +6078,6 @@ a.rack-shelf-plate:hover {
 	align-items: center;
 	gap: 0.75rem 1rem;
 	margin-bottom: 1.25rem;
-}
-
-.integrations-header-icon {
-	display: grid;
-	place-items: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	flex: none;
-	border-radius: 0.5rem;
-	border: 1px solid var(--border);
-	background-color: var(--bg-raised);
-	color: var(--primary-text);
 }
 
 /* The header's own layout replaces the page-title underline. */

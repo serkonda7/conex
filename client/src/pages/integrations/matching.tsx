@@ -819,7 +819,7 @@ export function MatchingPage(): JSX.Element {
 	return (
 		<div class="matching-page">
 			<div class="integrations-header">
-				<span class="integrations-header-icon" aria-hidden="true">
+				<span class="page-header-icon" aria-hidden="true">
 					<IconArrowsJoin2 size={20} />
 				</span>
 				<div class="matching-heading">
