@@ -298,6 +298,10 @@ export function mockProvider(provider: ProviderId): IntegrationProvider {
 			if (changes.active !== undefined) {
 				employee.active = changes.active
 			}
+			// Same derivation as `updateExternalEmployee`, so the next sync keeps the name.
+			employee.name = [employee.first_name, employee.last_name]
+				.filter((part) => part !== null)
+				.join(' ')
 			return Result.ok(undefined)
 		}
 	}

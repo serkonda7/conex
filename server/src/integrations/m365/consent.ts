@@ -10,7 +10,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Result } from 'better-result'
 import type { M365ConsentLinkJson } from 'shared/src/schemas'
-import { getConfig } from '../../config'
+import { ensureIntegrationsLive, getConfig } from '../../config'
 import { ConflictError, ValidationError } from '../../db/errors'
 import { checkTenantExists } from '../../db/list'
 import { getConsentStateKey } from '../../keys'
@@ -75,6 +75,11 @@ function publicBase(origin: string | undefined): Result<string, Error> {
 }
 
 async function m365Provider(): Promise<Result<M365Provider, Error>> {
+	// Explicit, so mock mode reports the mode instead of "unexpected provider".
+	const live = ensureIntegrationsLive('Microsoft Graph')
+	if (Result.isError(live)) {
+		return live
+	}
 	const instance = await enabledProvider('m365')
 	if (Result.isError(instance)) {
 		return instance

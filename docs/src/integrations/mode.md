@@ -17,7 +17,9 @@ betroffen.
 
 Im Modus `mock` verhält sich der Server bei Synchronisierungen und Integrationsaktionen
 wie mit erreichbaren externen Systemen: Die Anbieter geben die Daten aus einer Datei
-zurück und benötigen keine Zugangsdaten. Auch hier werden keine Verbindungen nach außen
+zurück; gespeicherte Zugangsdaten werden weder geprüft noch verwendet. Das
+Einrichtungsformular verlangt trotzdem Werte für die Pflichtfelder – hier genügen
+Platzhalter. Auch hier werden keine Verbindungen nach außen
 aufgebaut – Kalendersynchronisation und M365-Einwilligung bleiben gesperrt (Meldung
 „integrations are mocked“). Schreibaktionen (Ticket, Gerät, Mitarbeiter) verändern nur
 eine Kopie im Arbeitsspeicher und sind nach dem nächsten Sync sichtbar; die Datei auf der

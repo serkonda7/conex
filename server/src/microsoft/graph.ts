@@ -21,6 +21,7 @@ import {
 } from '@microsoft/msgraph-sdk'
 import { GraphAzureIdentityAuthenticationProvider } from '@microsoft/msgraph-sdk-core'
 import { Result } from 'better-result'
+import { ensureIntegrationsLive } from '../config'
 
 export interface GraphCredentials {
 	ms_tenant_id: string
@@ -152,7 +153,10 @@ interface CollectionRequestBuilder<T, C> {
 	withUrl(rawUrl: string): CollectionRequestBuilder<T, C>
 }
 
-/** One app registration in one Entra tenant. */
+/**
+ * One app registration in one Entra tenant. `token` and `call` are its network
+ * choke points (guarded by `ensureIntegrationsLive`); use `api` only inside `call`.
+ */
 export class GraphClient {
 	readonly api: GraphServiceClient
 	private readonly credential: ClientSecretCredential
@@ -165,6 +169,10 @@ export class GraphClient {
 
 	/** Access token from MSAL's cache or a new client-credentials request. */
 	async token(): Promise<Result<string, Error>> {
+		const live = ensureIntegrationsLive('Microsoft Graph')
+		if (Result.isError(live)) {
+			return live
+		}
 		return Result.tryPromise({
 			try: async () => {
 				const token = await this.credential.getToken(SCOPE)
@@ -185,6 +193,10 @@ export class GraphClient {
 		what: string,
 		fn: (api: GraphServiceClient) => Promise<T>,
 	): Promise<Result<T, GraphApiError>> {
+		const live = ensureIntegrationsLive('Microsoft Graph')
+		if (Result.isError(live)) {
+			return Result.err(new GraphApiError(live.error.message, null))
+		}
 		return Result.tryPromise({
 			try: () => fn(this.api),
 			catch: (e: unknown) => toGraphError(what, e),
