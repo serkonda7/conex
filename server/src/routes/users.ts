@@ -15,6 +15,7 @@ import { onValidationError } from '../middleware/validation'
 import { invalidateUserSessions } from '../sessions'
 import { auditRequest } from '../util/audit'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /**
  * User management (`users.manage`): create accounts with a role, link them
@@ -31,14 +32,10 @@ export const usersApp = new Hono()
 		const query = c.req.valid('query')
 		return c.json(
 			await listUsers({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				role: query.role,
 				tenant: query.tenant,
 				employee: query.employee,
-				sort: query.sort,
-				order: query.order,
 			}),
 		)
 	})

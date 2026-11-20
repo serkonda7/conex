@@ -40,6 +40,7 @@ import { onValidationError } from '../middleware/validation'
 import { attachmentPath } from '../storage'
 import { contentDisposition, jsonError } from '../util/http'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /** Room for the multipart boundaries and the small text fields next to the file. */
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024
@@ -91,11 +92,7 @@ export const attachmentsApp = new Hono()
 			}
 			return c.json(
 				await listFloorplans({
-					search: query.search,
-					page: query.page,
-					limit: query.limit,
-					sort: query.sort,
-					order: query.order,
+					...listQueryParams(query),
 					...scope,
 				}),
 			)

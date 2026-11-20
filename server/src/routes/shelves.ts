@@ -21,6 +21,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 /** Loads a shelf the requester may access (via its rack): the row, or the 404/403 response. */
 async function loadShelf(c: Context, id: number): Promise<ShelfRow | Response> {
@@ -49,12 +50,8 @@ export const shelvesApp = new Hono()
 		}
 		return c.json(
 			await listShelves({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				rack: query.rack,
-				sort: query.sort,
-				order: query.order,
 				...scope,
 			}),
 		)

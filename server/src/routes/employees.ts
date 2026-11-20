@@ -21,6 +21,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 const OTHER_TENANTS = 'Forbidden: the employee also belongs to tenants outside your scope'
 const TENANTS_PERMISSION = 'Forbidden: employees.tenants permission required to change tenants'
@@ -86,11 +87,7 @@ export const employeesApp = new Hono()
 		}
 		return c.json(
 			await listEmployees({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
-				sort: query.sort,
-				order: query.order,
+				...listQueryParams(query),
 				active: query.active === undefined ? undefined : query.active === 'true',
 				...scope,
 			}),

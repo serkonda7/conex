@@ -37,6 +37,7 @@ import {
 import { onValidationError } from '../middleware/validation'
 import { sendCsv } from '../util/http'
 import { sendCreated, sendResult } from '../util/result_response'
+import { listQueryParams } from './crud'
 
 export const deviceTypesApp = new Hono()
 	.use(authMiddleware)
@@ -45,15 +46,11 @@ export const deviceTypesApp = new Hono()
 		const query = c.req.valid('query')
 		return c.json(
 			await listDeviceTypes({
-				search: query.search,
-				page: query.page,
-				limit: query.limit,
+				...listQueryParams(query),
 				manufacturer: query.manufacturer,
 				role: query.role,
 				full_depth: query.full_depth,
 				eol: query.eol,
-				sort: query.sort,
-				order: query.order,
 			}),
 		)
 	})
