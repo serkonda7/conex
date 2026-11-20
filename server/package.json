@@ -11,6 +11,7 @@
   "dependencies": {
     "@hono/valibot-validator": "catalog:",
     "@serkonda7/conex-device-schema": "workspace:*",
+    "@serkonda7/unifi-api": "~0.1.1",
     "better-result": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

@@ -20,7 +20,8 @@ export type ExternalTicket = Omit<ExternalTicketJson, 'priority'>
 
 /**
  * Credentials handed to a provider by the factory. Providers ignore the
- * fields they do not use: Octoja leaves `erp_token` empty (TANSS only).
+ * fields they do not use: Octoja leaves `erp_token` empty (TANSS only), UniFi
+ * stores its API key in `password` and leaves `username` and `erp_token` empty.
  */
 export interface ProviderCredentials {
 	base_url: string
@@ -36,14 +37,14 @@ export interface ProviderCredentials {
  */
 export interface IntegrationProvider {
 	id: ProviderId
-	/** TANSS/Octoja: one external tenant; UniFi (later): many sites per tenant. */
+	/** TANSS/Octoja: one company/customer per tenant; UniFi: one console (host) per tenant. */
 	tenantCardinality: 'one' | 'many'
 	/** Logs in with every stored credential; used before saving. */
 	verify(): Promise<Result<void, Error>>
 	/**
 	 * Tenants plus their employees. With `modifiedSince` only records
 	 * changed since then (both lists come from one call in TANSS); providers
-	 * without a delta (Octoja) ignore it. Employees are empty when the
+	 * without a delta (Octoja, UniFi) ignore it. Employees are empty when the
 	 * external system has none.
 	 */
 	listTenants(modifiedSince?: number): Promise<Result<ExternalDirectory, Error>>

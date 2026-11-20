@@ -1266,6 +1266,10 @@ export const en = {
 	'integration.mailAddressHint':
 		'Mail address of a dedicated read-only Octoja user without two-factor auth: syncs run unattended.',
 	'integration.mailAddressRequired': 'Mail address is required.',
+	'integration.apiKey': 'API key',
+	'integration.apiKeyHint':
+		'Site Manager API key from unifi.ui.com → API. An organization key reaches every console of the organization, a personal key only your own consoles.',
+	'integration.apiKeyRequired': 'API key is required.',
 	'integration.erpToken': 'ERP API token',
 	'integration.erpTokenHint':
 		'API token of the ERP external API role, including the "Bearer" prefix. Used for the company list.',
@@ -1278,6 +1282,7 @@ export const en = {
 	'integration.testing': 'Testing…',
 	'integration.testOk': 'Login and ERP token work.',
 	'integration.testOkNoErp': 'Login works.',
+	'integration.testOkApiKey': 'API key works.',
 	'integration.testFailed': 'Connection test failed',
 	'integration.neverSynced': 'Never synced.',
 	'integration.syncedAt': 'Data as of {time}.',
@@ -1442,6 +1447,8 @@ export const en = {
 	'provider.tanss.description': 'Sync companies, devices and employees.',
 	'provider.octoja': 'Octoja',
 	'provider.octoja.description': 'Link customers and devices with Octoja RMM.',
+	'provider.unifi': 'UniFi',
+	'provider.unifi.description': 'Link consoles and devices with the UniFi Site Manager.',
 	'calendarSync.title': 'Outlook calendar sync',
 	'calendarSync.description': 'Sync technician appointments to Outlook.',
 	'calendarSync.requiresTanss':

@@ -1283,6 +1283,10 @@ export const de: Messages = {
 	'integration.mailAddressHint':
 		'E-Mail-Adresse eines eigenen Octoja-Benutzers mit Leserechten und ohne Zwei-Faktor-Authentifizierung: Synchronisierungen laufen unbeaufsichtigt.',
 	'integration.mailAddressRequired': 'E-Mail-Adresse ist erforderlich.',
+	'integration.apiKey': 'API-Schlüssel',
+	'integration.apiKeyHint':
+		'Site-Manager-API-Schlüssel von unifi.ui.com → API. Ein Organisationsschlüssel erreicht alle Konsolen der Organisation, ein persönlicher Schlüssel nur Ihre eigenen Konsolen.',
+	'integration.apiKeyRequired': 'API-Schlüssel ist erforderlich.',
 	'integration.erpToken': 'ERP-API-Token',
 	'integration.erpTokenHint':
 		'API-Token der externen API-Rolle ERP, inklusive Präfix „Bearer“. Wird für die Firmenliste verwendet.',
@@ -1295,6 +1299,7 @@ export const de: Messages = {
 	'integration.testing': 'Wird getestet…',
 	'integration.testOk': 'Anmeldung und ERP-Token funktionieren.',
 	'integration.testOkNoErp': 'Anmeldung funktioniert.',
+	'integration.testOkApiKey': 'API-Schlüssel funktioniert.',
 	'integration.testFailed': 'Verbindungstest fehlgeschlagen',
 	'integration.neverSynced': 'Noch nie synchronisiert.',
 	'integration.syncedAt': 'Datenstand: {time}.',
@@ -1463,6 +1468,8 @@ export const de: Messages = {
 	'provider.tanss.description': 'Firmen, Geräte und Mitarbeiter abgleichen.',
 	'provider.octoja': 'Octoja',
 	'provider.octoja.description': 'Kunden und Geräte mit Octoja RMM verknüpfen.',
+	'provider.unifi': 'UniFi',
+	'provider.unifi.description': 'Konsolen und Geräte mit dem UniFi Site Manager verknüpfen.',
 	'calendarSync.title': 'Outlook-Kalendersynchronisation',
 	'calendarSync.description': 'Technikertermine nach Outlook übertragen.',
 	'calendarSync.requiresTanss':

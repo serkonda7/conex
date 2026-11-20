@@ -1,4 +1,9 @@
-import { INTEGRATION_PROVIDERS, providerNeedsErpToken } from 'shared/src/schemas'
+import {
+	INTEGRATION_PROVIDERS,
+	providerDefaultBaseUrl,
+	providerNeedsErpToken,
+	providerNeedsUsername,
+} from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { create_integration, type IntegrationProvider } from '../../api/integrations'
 import { FormPage } from '../../components/form'
@@ -7,7 +12,7 @@ import { providerLabel } from '../../i18n/labels'
 import { submit_form, useFormState } from '../../lib/form'
 import { queryParam } from '../../lib/router'
 import { IntegrationFormFields, useIntegrationForm } from './form_fields'
-import { providerUsesMailLogin } from './provider_capabilities'
+import { providerUsesApiKey, providerUsesMailLogin } from './provider_capabilities'
 
 /** Provider of `?provider=`, defaulting to TANSS when missing or unknown. */
 function selectedProvider(): IntegrationProvider {
@@ -22,22 +27,25 @@ function selectedProvider(): IntegrationProvider {
  * (`integrations.manage`), TANSS when no provider is given. Saving logs in to
  * the external system first; the integration is only stored when the
  * credentials work. Providers without an ERP token (Octoja) neither ask for
- * nor send one.
+ * nor send one; UniFi authenticates with an API key in the password field and
+ * leaves the username empty.
  */
 export function IntegrationAddPage(): JSX.Element {
 	const form = useFormState()
-	const fields = useIntegrationForm()
 	const provider = selectedProvider()
+	const fields = useIntegrationForm(providerDefaultBaseUrl(provider) ?? '')
 	const needsErpToken = (): boolean => providerNeedsErpToken(provider)
 
 	function validate(): string | null {
-		if (fields.username().trim() === '') {
+		if (providerNeedsUsername(provider) && fields.username().trim() === '') {
 			return providerUsesMailLogin(provider)
 				? t('integration.mailAddressRequired')
 				: t('auth.usernameRequired')
 		}
 		if (fields.password() === '') {
-			return t('auth.passwordRequired')
+			return providerUsesApiKey(provider)
+				? t('integration.apiKeyRequired')
+				: t('auth.passwordRequired')
 		}
 		return needsErpToken() && fields.erpToken() === ''
 			? t('integration.erpTokenRequired')
@@ -55,7 +63,7 @@ export function IntegrationAddPage(): JSX.Element {
 				create_integration({
 					provider,
 					base_url: fields.baseUrl().trim(),
-					username: fields.username().trim(),
+					username: providerNeedsUsername(provider) ? fields.username().trim() : '',
 					password: fields.password(),
 					erp_token: needsErpToken() ? fields.erpToken() : undefined,
 				}),

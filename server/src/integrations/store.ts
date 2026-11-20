@@ -13,7 +13,7 @@ import type {
 	IntegrationProvider as ProviderId,
 	SyncRunJson,
 } from 'shared/src/schemas'
-import { providerNeedsErpToken } from 'shared/src/schemas'
+import { providerNeedsErpToken, providerNeedsUsername } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getDb, withTransaction } from '../db/connection'
 import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
@@ -162,7 +162,7 @@ export async function createIntegration(
 		return Result.err(new DuplicateError('This integration already exists'))
 	}
 	const secrets = { password: input.password, erp_token: input.erp_token ?? '' }
-	const missing = missingSecret(input.provider, secrets)
+	const missing = missingSecret(input.provider, input.username, secrets)
 	if (missing) {
 		return Result.err(missing)
 	}
@@ -211,9 +211,18 @@ function mergedSecrets(
 	}
 }
 
-function missingSecret(provider: ProviderId, secrets: IntegrationSecrets): ValidationError | null {
+function missingSecret(
+	provider: ProviderId,
+	username: string,
+	secrets: IntegrationSecrets,
+): ValidationError | null {
+	if (providerNeedsUsername(provider) && username === '') {
+		return new ValidationError('Username is required')
+	}
 	if (secrets.password === '') {
-		return new ValidationError('Password is required')
+		return new ValidationError(
+			provider === 'unifi' ? 'API key is required' : 'Password is required',
+		)
 	}
 	if (providerNeedsErpToken(provider) && secrets.erp_token === '') {
 		return new ValidationError('ERP API token is required')
@@ -240,7 +249,7 @@ export async function updateIntegration(
 		patch.erp_token !== undefined
 	const now = nowSeconds()
 	if (credentialsChanged) {
-		const missing = missingSecret(provider, secrets)
+		const missing = missingSecret(provider, username, secrets)
 		if (missing) {
 			return Result.err(missing)
 		}
@@ -281,7 +290,7 @@ export async function testIntegration(
 	const current = await getIntegrationRow(provider)
 	const row = Result.isOk(current) ? current.value : null
 	const secrets = mergedSecrets(row, input)
-	const missing = missingSecret(provider, secrets)
+	const missing = missingSecret(provider, input.username, secrets)
 	if (missing) {
 		return Result.err(missing)
 	}

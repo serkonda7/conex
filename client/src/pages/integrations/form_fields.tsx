@@ -4,12 +4,16 @@
  * leaves them empty and blank means "keep the stored value".
  */
 import { Result } from 'better-result'
-import { providerNeedsErpToken } from 'shared/src/schemas'
+import {
+	providerDefaultBaseUrl,
+	providerNeedsErpToken,
+	providerNeedsUsername,
+} from 'shared/src/schemas'
 import { createSignal, type JSX, type Setter, Show } from 'solid-js'
 import { type IntegrationProvider, test_integration } from '../../api/integrations'
 import { Field, Hint, TextField } from '../../components/form'
 import { t } from '../../i18n'
-import { providerUsesMailLogin } from './provider_capabilities'
+import { providerUsesApiKey, providerUsesMailLogin } from './provider_capabilities'
 
 export interface IntegrationFormState {
 	baseUrl: () => string
@@ -22,8 +26,9 @@ export interface IntegrationFormState {
 	setErpToken: Setter<string>
 }
 
-export function useIntegrationForm(): IntegrationFormState {
-	const [baseUrl, setBaseUrl] = createSignal('')
+/** `initialBaseUrl` prefills providers with a fixed API endpoint (UniFi). */
+export function useIntegrationForm(initialBaseUrl = ''): IntegrationFormState {
+	const [baseUrl, setBaseUrl] = createSignal(initialBaseUrl)
 	const [username, setUsername] = createSignal('')
 	const [password, setPassword] = createSignal('')
 	const [erpToken, setErpToken] = createSignal('')
@@ -89,7 +94,7 @@ export function IntegrationFormFields(props: {
 		setTestResult(null)
 		const res = await test_integration(props.provider, {
 			base_url: f.baseUrl().trim(),
-			username: f.username().trim(),
+			username: providerNeedsUsername(props.provider) ? f.username().trim() : '',
 			...secrets(f, props.provider),
 		})
 		setTesting(false)
@@ -99,9 +104,11 @@ export function IntegrationFormFields(props: {
 				: {
 						ok: true,
 						message: t(
-							providerNeedsErpToken(props.provider)
-								? 'integration.testOk'
-								: 'integration.testOkNoErp',
+							providerUsesApiKey(props.provider)
+								? 'integration.testOkApiKey'
+								: providerNeedsErpToken(props.provider)
+									? 'integration.testOk'
+									: 'integration.testOkNoErp',
 						),
 					},
 		)
@@ -114,9 +121,10 @@ export function IntegrationFormFields(props: {
 				label={t('integration.baseUrl')}
 				required
 				placeholder={
-					props.provider === 'octoja'
+					providerDefaultBaseUrl(props.provider) ??
+					(props.provider === 'octoja'
 						? 'https://acme.eu1.octoja.cloud'
-						: 'https://tanss.example.com'
+						: 'https://tanss.example.com')
 				}
 				maxLength={500}
 				autocomplete="off"
@@ -124,35 +132,46 @@ export function IntegrationFormFields(props: {
 				value={f.baseUrl()}
 				onInput={f.setBaseUrl}
 			/>
-			<TextField
-				id="integration-username"
-				label={
-					providerUsesMailLogin(props.provider)
-						? t('integration.mailAddress')
-						: t('integration.username')
-				}
-				required
-				maxLength={200}
-				autocomplete="off"
-				value={f.username()}
-				onInput={f.setUsername}
-				hint={
-					providerUsesMailLogin(props.provider) ? (
-						<Hint>{t('integration.mailAddressHint')}</Hint>
-					) : (
-						<Hint>{t('integration.usernameHint')}</Hint>
-					)
-				}
-			/>
+			<Show when={providerNeedsUsername(props.provider)}>
+				<TextField
+					id="integration-username"
+					label={
+						providerUsesMailLogin(props.provider)
+							? t('integration.mailAddress')
+							: t('integration.username')
+					}
+					required
+					maxLength={200}
+					autocomplete="off"
+					value={f.username()}
+					onInput={f.setUsername}
+					hint={
+						providerUsesMailLogin(props.provider) ? (
+							<Hint>{t('integration.mailAddressHint')}</Hint>
+						) : (
+							<Hint>{t('integration.usernameHint')}</Hint>
+						)
+					}
+				/>
+			</Show>
 			<TextField
 				id="integration-password"
-				label={t('auth.password')}
+				label={
+					providerUsesApiKey(props.provider)
+						? t('integration.apiKey')
+						: t('auth.password')
+				}
 				type="password"
 				required={!props.editing}
 				placeholder={props.editing ? t('integration.keepSecret') : undefined}
 				autocomplete="new-password"
 				value={f.password()}
 				onInput={f.setPassword}
+				hint={
+					<Show when={providerUsesApiKey(props.provider)}>
+						<Hint>{t('integration.apiKeyHint')}</Hint>
+					</Show>
+				}
 			/>
 			<Show when={providerNeedsErpToken(props.provider)}>
 				<TextField

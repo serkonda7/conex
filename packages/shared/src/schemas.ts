@@ -2665,12 +2665,12 @@ export interface DeviceTypeUpdatePreview {
 }
 
 // ---------------------------------------------------------------------------
-// Integrations (TANSS; UniFi and servereye later). External systems are
+// Integrations (TANSS, Octoja, UniFi; servereye later). External systems are
 // read-only sources: conex links its tenants/devices to external objects and
 // reports where the data disagrees. See `docs/integrations.md`.
 // ---------------------------------------------------------------------------
 
-export const INTEGRATION_PROVIDERS = ['tanss', 'octoja'] as const
+export const INTEGRATION_PROVIDERS = ['tanss', 'octoja', 'unifi'] as const
 
 export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
 
@@ -2681,7 +2681,21 @@ export function providerNeedsErpToken(provider: IntegrationProvider): boolean {
 	return provider === 'tanss'
 }
 
-/** Whether the provider has employees to link (TANSS only; Octoja knows customers and assets). */
+/**
+ * Whether the provider logs in with a username (TANSS) or mail address
+ * (Octoja). UniFi authenticates with an API key alone: it is stored as the
+ * password and the username stays empty.
+ */
+export function providerNeedsUsername(provider: IntegrationProvider): boolean {
+	return provider !== 'unifi'
+}
+
+/** Default base URL prefilled in the setup form; `null` when there is none (self-hosted). */
+export function providerDefaultBaseUrl(provider: IntegrationProvider): string | null {
+	return provider === 'unifi' ? 'https://api.ui.com' : null
+}
+
+/** Whether the provider has employees to link (TANSS only; Octoja and UniFi know none). */
 export function providerHasEmployees(provider: IntegrationProvider): boolean {
 	return provider === 'tanss'
 }
@@ -2695,7 +2709,8 @@ const BaseUrlSchema = v.pipe(
 	v.transform((raw) => raw.replace(/\/+$/, '')),
 )
 
-const IntegrationUsernameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+/** Empty for providers without a username (UniFi); required otherwise, checked by the server. */
+const IntegrationUsernameSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), '')
 
 const SecretSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(4096))
 
@@ -2715,7 +2730,7 @@ export const IntegrationCreateSchema = v.strictObject({
 /** Integration patch: omitted secrets keep the stored ones. */
 export const IntegrationUpdateSchema = v.strictObject({
 	base_url: v.optional(BaseUrlSchema, undefined),
-	username: v.optional(IntegrationUsernameSchema, undefined),
+	username: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), undefined),
 	password: v.optional(SecretSchema, undefined),
 	erp_token: v.optional(SecretSchema, undefined),
 	enabled: v.optional(v.boolean(), undefined),

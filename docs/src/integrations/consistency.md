@@ -1,15 +1,16 @@
 # Datenabgleich der Integrationen
 
 Der Abgleichbericht vergleicht conex mit den Daten der letzten Synchronisierung aus einem
-externen System (**TANSS** oder **Octoja**) und listet jede Abweichung als *Befund*. Er umfasst
+externen System (**TANSS**, **Octoja** oder **UniFi**) und listet jede Abweichung als *Befund*. Er umfasst
 die Mandanten des ausgewählten Mandantenkontexts und lädt sich neu, wenn der Kontext
 gewechselt wird.
 
 ## Synchronisierung
 
 - **Firmen:** bei der ersten oder einer erzwungenen vollständigen Synchronisierung alle,
-  sonst nur die seit der letzten Synchronisierung geänderten. Octoja liefert keine
-  Änderungsliste; dort werden immer alle Kunden abgerufen.
+  sonst nur die seit der letzten Synchronisierung geänderten. Octoja und UniFi liefern
+  keine Änderungsliste; dort werden immer alle Kunden bzw. alle Konsolen (Hosts)
+  abgerufen.
 - **Geräte:** nur für Firmen, die mit einem Mandanten verknüpft sind.
 - **Tags:** alle, bei jeder Synchronisierung (nur TANSS).
 - Eindeutige Gerätezuordnungen werden [automatisch verknüpft](#gerätezuordnung).
@@ -41,6 +42,20 @@ Existiert dieser Tag nicht in TANSS, wird kein Ticket angelegt.
 Die Anmeldung erfolgt mit E-Mail-Adresse und Passwort eines Octoja-Benutzers ohne
 Zwei-Faktor-Anmeldung. Octoja kennt in conex keine Mitarbeiter und keine Tickets; Geräte
 werden nur verknüpft und verglichen, nicht in Octoja angelegt oder geändert.
+
+### UniFi-Zuordnung
+
+| conex   | UniFi             |
+| ------- | ----------------- |
+| Mandant | Konsole (Host)    |
+| Gerät   | Gerät der Konsole |
+
+Die Anmeldung erfolgt mit einem Site-Manager-API-Schlüssel aus unifi.ui.com. Ein
+Organisationsschlüssel erreicht alle Konsolen der Organisation, ein persönlicher
+Schlüssel nur die eigenen Konsolen. Die Basis-URL ist `https://api.ui.com`. UniFi
+kennt in conex keine Mitarbeiter und keine Tickets; Geräte werden nur verknüpft
+und verglichen, nicht in UniFi angelegt oder geändert. Bei zu vielen Anfragen
+antwortet die API mit HTTP 429 (Rate Limit).
 
 ## Verknüpfungen
 

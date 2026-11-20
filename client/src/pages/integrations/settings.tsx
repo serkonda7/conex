@@ -4,6 +4,7 @@
  * ones; a changed URL or credentials log in again before saving. The
  * Enabled switch lives in the page header, not here.
  */
+import { providerNeedsUsername } from 'shared/src/schemas'
 import { createSignal, type JSX, Show } from 'solid-js'
 import {
 	delete_integration,
@@ -35,7 +36,9 @@ export function ProviderSettings(props: { integration: IntegrationJson }): JSX.E
 		const ok = await save.run(() =>
 			update_integration(props.integration.provider, {
 				base_url: fields.baseUrl().trim(),
-				username: fields.username().trim(),
+				username: providerNeedsUsername(props.integration.provider)
+					? fields.username().trim()
+					: '',
 				...secrets(fields, props.integration.provider),
 			}),
 		)

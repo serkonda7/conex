@@ -447,9 +447,10 @@ export function deviceRoleIconOptions(): (FormOption & { value: DeviceRoleIcon }
 const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {
 	tanss: 'provider.tanss',
 	octoja: 'provider.octoja',
+	unifi: 'provider.unifi',
 }
 
-/** Integration provider name (`tanss` → TANSS, `octoja` → Octoja). */
+/** Integration provider name (`tanss` → TANSS, `octoja` → Octoja, `unifi` → UniFi). */
 export function providerLabel(value: string): string {
 	return lookup(PROVIDER_KEYS, value)
 }
@@ -457,6 +458,7 @@ export function providerLabel(value: string): string {
 const PROVIDER_DESCRIPTION_KEYS: Record<IntegrationProvider, MessageKey> = {
 	tanss: 'provider.tanss.description',
 	octoja: 'provider.octoja.description',
+	unifi: 'provider.unifi.description',
 }
 
 /** One-line summary of what an integration provider does, for its card. */

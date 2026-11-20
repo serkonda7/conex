@@ -15,3 +15,8 @@ export function providerCanWriteDevices(provider: IntegrationProvider): boolean 
 export function providerUsesMailLogin(provider: IntegrationProvider): boolean {
 	return provider === 'octoja'
 }
+
+/** Whether the external system authenticates with an API key alone (UniFi). */
+export function providerUsesApiKey(provider: IntegrationProvider): boolean {
+	return provider === 'unifi'
+}

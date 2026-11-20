@@ -64,6 +64,7 @@
       "dependencies": {
         "@hono/valibot-validator": "catalog:",
         "@serkonda7/conex-device-schema": "workspace:*",
+        "@serkonda7/unifi-api": "~0.1.1",
         "better-result": "catalog:",
         "drizzle-orm": "catalog:",
         "hono": "catalog:",
@@ -259,6 +260,8 @@
     "@serkonda7/conex-device-schema": ["@serkonda7/conex-device-schema@workspace:packages/device-schema"],
 
     "@serkonda7/solid-components": ["@serkonda7/solid-components@0.7.0", "", { "dependencies": { "@tanstack/solid-table": "~9.3.1" }, "peerDependencies": { "solid-js": ">=1.9.0", "vite": ">=8.0.0" }, "optionalPeers": ["vite"] }, "sha512-1OwbHC2+vi7SMX1Qc1vEeC8ijtS2PCqilaHcyM3cA/DxA7nKEmQsXEqYb14hljhefqNfkH35uKHjjU76jr0yXw=="],
+
+    "@serkonda7/unifi-api": ["@serkonda7/unifi-api@0.1.1", "", {}, "sha512-GjskQhWvzPQVfeN3QBLZeKNcZOVW5m/JJ023Fs+Hliv60hh7E68gKIAw+gb01zFka1b/vmwqtOZYRbWylBV/5g=="],
 
     "@solid-devtools/debugger": ["@solid-devtools/debugger@0.28.1", "", { "dependencies": { "@nothing-but/utils": "~0.17.0", "@solid-devtools/shared": "^0.20.0", "@solid-primitives/bounds": "^0.1.1", "@solid-primitives/event-listener": "^2.4.1", "@solid-primitives/keyboard": "^1.3.1", "@solid-primitives/rootless": "^1.5.1", "@solid-primitives/scheduled": "^1.5.1", "@solid-primitives/static-store": "^0.1.1", "@solid-primitives/utils": "^6.3.1" }, "peerDependencies": { "solid-js": "^1.9.0" } }, "sha512-6qIUI6VYkXoRnL8oF5bvh2KgH71qlJ18hNw/mwSyY6v48eb80ZR48/5PDXufUa3q+MBSuYa1uqTMwLewpay9eg=="],
 
