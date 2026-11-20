@@ -2665,16 +2665,35 @@ export interface DeviceTypeUpdatePreview {
 }
 
 // ---------------------------------------------------------------------------
-// Integrations (TANSS; UniFi and servereye later). External systems are
-// read-only sources: conex links its tenants/devices to external objects and
-// reports where the data disagrees. See `docs/integrations.md`.
+// Integrations (TANSS, Octoja, UniFi, Microsoft 365). External systems are
+// read-only sources: conex links its tenants/devices/employees to external
+// objects and reports where the data disagrees. See `docs/integrations.md`.
 // ---------------------------------------------------------------------------
 
-export const INTEGRATION_PROVIDERS = ['tanss'] as const
+export const INTEGRATION_PROVIDERS = ['tanss', 'octoja', 'unifi', 'm365'] as const
 
 export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
 
 export type IntegrationProvider = v.InferOutput<typeof IntegrationProviderSchema>
+
+/** Whether the provider needs an ERP API token besides username and password (TANSS only). */
+export function providerNeedsErpToken(provider: IntegrationProvider): boolean {
+	return provider === 'tanss'
+}
+
+/**
+ * Whether the provider logs in with a username (TANSS) or mail address
+ * (Octoja). UniFi authenticates with an API key alone: it is stored as the
+ * password and the username stays empty.
+ */
+export function providerNeedsUsername(provider: IntegrationProvider): boolean {
+	return provider !== 'unifi' && provider !== 'm365'
+}
+
+/** Default base URL prefilled in the setup form; `null` when there is none (self-hosted). */
+export function providerDefaultBaseUrl(provider: IntegrationProvider): string | null {
+	return provider === 'unifi' ? 'https://api.ui.com' : null
+}
 
 const BaseUrlSchema = v.pipe(
 	v.string(),
@@ -2685,41 +2704,185 @@ const BaseUrlSchema = v.pipe(
 	v.transform((raw) => raw.replace(/\/+$/, '')),
 )
 
-const IntegrationUsernameSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+/** Empty for providers without a username (UniFi); required otherwise, checked by the server. */
+const IntegrationUsernameSchema = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), '')
 
 const SecretSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(4096))
 
 /**
- * Integration create body. Saving logs in to the external system first; the
- * row is only stored when the credentials work.
+ * Secret fields per provider: write-only, encrypted at rest and only
+ * reported back as set / not set (`IntegrationJson.secrets_set`). Every
+ * other body field except `provider` and `enabled` is plain configuration:
+ * `base_url` and `username` have columns, the rest is stored in `settings`.
  */
-export const IntegrationCreateSchema = v.strictObject({
-	provider: IntegrationProviderSchema,
-	base_url: BaseUrlSchema,
-	username: IntegrationUsernameSchema,
-	password: SecretSchema,
-	erp_token: SecretSchema,
+export interface IntegrationSecretFields {
+	tanss: readonly ['password', 'erp_token']
+	octoja: readonly ['password']
+	unifi: readonly ['password']
+	m365: readonly ['client_secret']
+}
+
+export const INTEGRATION_SECRET_FIELDS: IntegrationSecretFields = {
+	tanss: ['password', 'erp_token'],
+	octoja: ['password'],
+	unifi: ['password'],
+	m365: ['client_secret'],
+}
+
+/** Entra tenant id (a GUID). */
+export const EntraTenantGuidSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'Must be a GUID'),
+)
+
+/** Entra tenant id or one of its domains (`contoso.onmicrosoft.com`). */
+const EntraTenantSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.regex(
+		/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|([a-z0-9-]+\.)+[a-z]{2,})$/,
+		'Must be a tenant id or domain',
+	),
+	v.maxLength(253),
+)
+
+/** Application (client) id of the MSP's multi-tenant Entra app. */
+const EntraClientIdSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.toLowerCase(),
+	v.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'Must be a GUID'),
+)
+
+/** Expiry date of the client secret (`YYYY-MM-DD`); empty = unknown. */
+const SecretExpirySchema = v.union([v.literal(''), CalendarDateSchema])
+
+/**
+ * Plain settings of the M365 integration (stored in `integrations.settings`).
+ * `home_tenant` is the MSP's own tenant (id or domain), where "Test
+ * connection" gets a token.
+ */
+export const M365SettingsSchema = v.object({
+	client_id: EntraClientIdSchema,
+	home_tenant: EntraTenantSchema,
+	/** Only users with a license (skips shared/room mailboxes and service accounts). */
+	licensed_only: v.optional(v.boolean(), true),
+	secret_expires: v.optional(SecretExpirySchema, ''),
 })
 
-/** Integration patch: omitted secrets keep the stored ones. */
-export const IntegrationUpdateSchema = v.strictObject({
-	base_url: v.optional(BaseUrlSchema, undefined),
-	username: v.optional(IntegrationUsernameSchema, undefined),
-	password: v.optional(SecretSchema, undefined),
-	erp_token: v.optional(SecretSchema, undefined),
-	enabled: v.optional(v.boolean(), undefined),
-})
+export type M365Settings = v.InferOutput<typeof M365SettingsSchema>
+
+export type IntegrationSecretField<P extends IntegrationProvider = IntegrationProvider> =
+	IntegrationSecretFields[P][number]
+
+/**
+ * Integration create body, one variant per provider. Saving logs in to the
+ * external system first; the row is only stored when the credentials work.
+ */
+export const IntegrationCreateSchema = v.variant('provider', [
+	v.strictObject({
+		provider: v.literal('tanss'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: SecretSchema,
+		erp_token: SecretSchema,
+	}),
+	v.strictObject({
+		provider: v.literal('octoja'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: SecretSchema,
+	}),
+	v.strictObject({
+		provider: v.literal('unifi'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: SecretSchema,
+	}),
+	v.strictObject({
+		provider: v.literal('m365'),
+		client_id: EntraClientIdSchema,
+		home_tenant: EntraTenantSchema,
+		licensed_only: v.optional(v.boolean(), true),
+		secret_expires: v.optional(SecretExpirySchema, ''),
+		client_secret: SecretSchema,
+	}),
+])
+
+/**
+ * Integration patch: omitted fields keep the stored values (secrets too).
+ * `provider` selects the variant and must match the route.
+ */
+export const IntegrationUpdateSchema = v.variant('provider', [
+	v.strictObject({
+		provider: v.literal('tanss'),
+		base_url: v.optional(BaseUrlSchema, undefined),
+		username: v.optional(IntegrationUsernameSchema, undefined),
+		password: v.optional(SecretSchema, undefined),
+		erp_token: v.optional(SecretSchema, undefined),
+		enabled: v.optional(v.boolean(), undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('octoja'),
+		base_url: v.optional(BaseUrlSchema, undefined),
+		username: v.optional(IntegrationUsernameSchema, undefined),
+		password: v.optional(SecretSchema, undefined),
+		enabled: v.optional(v.boolean(), undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('unifi'),
+		base_url: v.optional(BaseUrlSchema, undefined),
+		username: v.optional(IntegrationUsernameSchema, undefined),
+		password: v.optional(SecretSchema, undefined),
+		enabled: v.optional(v.boolean(), undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('m365'),
+		client_id: v.optional(EntraClientIdSchema, undefined),
+		home_tenant: v.optional(EntraTenantSchema, undefined),
+		licensed_only: v.optional(v.boolean(), undefined),
+		secret_expires: v.optional(SecretExpirySchema, undefined),
+		client_secret: v.optional(SecretSchema, undefined),
+		enabled: v.optional(v.boolean(), undefined),
+	}),
+])
 
 /**
  * "Test connection" body: the unsaved form values. Missing secrets fall back
  * to the stored ones of an existing integration.
  */
-export const IntegrationTestSchema = v.strictObject({
-	base_url: BaseUrlSchema,
-	username: IntegrationUsernameSchema,
-	password: v.optional(SecretSchema, undefined),
-	erp_token: v.optional(SecretSchema, undefined),
-})
+export const IntegrationTestSchema = v.variant('provider', [
+	v.strictObject({
+		provider: v.literal('tanss'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: v.optional(SecretSchema, undefined),
+		erp_token: v.optional(SecretSchema, undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('octoja'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: v.optional(SecretSchema, undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('unifi'),
+		base_url: BaseUrlSchema,
+		username: IntegrationUsernameSchema,
+		password: v.optional(SecretSchema, undefined),
+	}),
+	v.strictObject({
+		provider: v.literal('m365'),
+		client_id: EntraClientIdSchema,
+		home_tenant: EntraTenantSchema,
+		licensed_only: v.optional(v.boolean(), undefined),
+		secret_expires: v.optional(SecretExpirySchema, undefined),
+		client_secret: v.optional(SecretSchema, undefined),
+	}),
+])
 
 export type IntegrationCreate = v.InferOutput<typeof IntegrationCreateSchema>
 export type IntegrationUpdate = v.InferOutput<typeof IntegrationUpdateSchema>
@@ -2752,13 +2915,14 @@ export const ExternalIgnoreSchema = v.strictObject({
 })
 
 /**
- * Marks a conex device or employee as intentionally absent from the
- * external system (suppresses its `*_missing_in_external` finding). Stored
+ * Marks a conex tenant, device or employee as intentionally absent from the
+ * external system (suppresses its `tenant_unlinked` / `*_missing_in_external`
+ * finding). Stored
  * as an `ignored` link row keyed by the conex entity; see `ignoreLocal` in
  * `server/src/integrations/links.ts` for the synthetic `external_id`.
  */
 export const ExternalIgnoreLocalSchema = v.strictObject({
-	entity_type: v.picklist(['device', 'employee']),
+	entity_type: LinkEntityTypeSchema,
 	entity_id: IdSchema,
 })
 
@@ -2899,14 +3063,40 @@ export interface SyncRunJson {
 	counts: { tenants: number; devices: number; employees: number; auto_linked: number }
 }
 
+/**
+ * What a provider supports, so the client gates features on it instead of
+ * on the provider id. Static per provider.
+ */
+export interface IntegrationCapabilities {
+	/** Syncs employees (contacts / users); without them the report has no employee level. */
+	employees: boolean
+	/** Syncs devices; without them the report has no device level. */
+	devices: boolean
+	/** Opens and lists tickets, with priorities as ticket tags. */
+	tickets: boolean
+	/** Overwrites external device/employee fields with conex values (and deactivates employees). */
+	push: boolean
+	/** Creates conex devices in the external system. */
+	create_device: boolean
+	/** External tenants carry a customer number that is compared with the conex one. */
+	customer_numbers: boolean
+	/** How many external tenants one conex tenant may link to. */
+	tenant_cardinality: 'one' | 'many'
+}
+
 /** Integration without secrets: only whether they are set. */
 export interface IntegrationJson {
 	id: number
 	provider: IntegrationProvider
-	base_url: string
-	username: string
-	has_password: boolean
-	has_erp_token: boolean
+	/** Null for providers without a configurable server. */
+	base_url: string | null
+	/** Null for providers that do not log in with a user. */
+	username: string | null
+	/** Provider-specific plain settings. */
+	settings: Record<string, unknown>
+	/** Per secret field of the provider: whether a value is stored. */
+	secrets_set: Record<string, boolean>
+	capabilities: IntegrationCapabilities
 	enabled: boolean
 	created_at: number
 	updated_at: number
@@ -2915,10 +3105,10 @@ export interface IntegrationJson {
 	last_sync: SyncRunJson | null
 }
 
-/** Normalized external tenant (TANSS company). */
+/** Normalized external tenant (TANSS company, UniFi site, Entra tenant). */
 export interface ExternalTenantJson {
 	external_id: string
-	/** TANSS customer number. */
+	/** Customer number (TANSS); null for providers without one. */
 	display_id: string | null
 	name: string
 	active: boolean
@@ -2926,6 +3116,11 @@ export interface ExternalTenantJson {
 	private: boolean
 	/** Headquarter company of a branch. */
 	headquarter_id: string | null
+	/**
+	 * Verified mail domains (M365), compared with the tenant's primary mail
+	 * address; absent for providers without them.
+	 */
+	domains?: string[]
 }
 
 /** External tenant plus the conex tenant it is linked to (picker rows). */
@@ -3012,6 +3207,7 @@ export const FINDING_KINDS = [
 	'tenant_stale',
 	'tenant_inactive',
 	'tenant_customer_number_mismatch',
+	'tenant_domain_unverified',
 	'device_missing_in_conex',
 	'device_missing_in_external',
 	'device_suggestion',
@@ -3022,6 +3218,7 @@ export const FINDING_KINDS = [
 	'employee_suggestion',
 	'employee_stale',
 	'employee_mismatch',
+	'employee_inactive_in_external',
 	'priority_tag_missing',
 ] as const
 
@@ -3048,6 +3245,7 @@ export interface IntegrationFinding {
 		| DeviceCompareField
 		| EmployeeCompareField
 		| 'customer_number'
+		| 'domain'
 		| 'tenant'
 		| 'status'
 		| 'priority'
@@ -3111,16 +3309,19 @@ export interface LinkBoard {
 	entity_type: LinkEntityType
 	/** Finish time of the last successful sync (unix seconds), null = never. */
 	synced_at: number | null
-	/** Device/employee board: company linked to the tenant (null = not linked). */
-	external_tenant: ExternalTenantJson | null
+	/** Device/employee board: external tenants linked to the tenant (empty = not linked). */
+	external_tenants: ExternalTenantJson[]
 	local: LinkBoardLocal[]
 	external: LinkBoardExternal[]
 }
 
 /** Integration card on the tenant detail page. */
 export interface TenantIntegrationStatus {
-	link: ExternalLinkJson | null
-	external: ExternalTenantJson | null
+	/**
+	 * Linked external tenants (at most one unless the provider's
+	 * `tenant_cardinality` is `many`); `external` is null when it no longer exists.
+	 */
+	links: { link: ExternalLinkJson; external: ExternalTenantJson | null }[]
 	finding_counts: Partial<Record<FindingKind, number>>
 }
 
@@ -3129,9 +3330,9 @@ export interface DeviceIntegrationStatus {
 	link: ExternalLinkJson | null
 	external: ExternalDeviceJson | null
 	fields: FieldComparison[]
-	/** Company linked to the device's tenant, if any. */
-	external_tenant: ExternalTenantJson | null
-	/** Unlinked, not ignored external devices of that company (link picker). */
+	/** External tenants linked to the device's tenant. */
+	external_tenants: ExternalTenantJson[]
+	/** Unlinked, not ignored external devices of those tenants (link picker). */
 	candidates: ExternalDeviceJson[]
 }
 
@@ -3140,11 +3341,66 @@ export interface EmployeeIntegrationStatus {
 	link: ExternalLinkJson | null
 	external: ExternalEmployeeJson | null
 	fields: FieldComparison[]
-	/** Company linked to the employee's tenant, if any. */
-	external_tenant: ExternalTenantJson | null
-	/** Unlinked, not ignored external employees of that company (link picker). */
+	/** External tenants linked to the employee's tenant. */
+	external_tenants: ExternalTenantJson[]
+	/** Unlinked, not ignored external employees of those tenants (link picker). */
 	candidates: ExternalEmployeeJson[]
 }
+
+// ---------------------------------------------------------------------------
+// Microsoft 365: customer Entra tenants that consented to the MSP's
+// multi-tenant app. The app cannot ask Graph which tenants consented, so
+// conex keeps the list (`m365_tenants`); it feeds the sync.
+// ---------------------------------------------------------------------------
+
+/** Consented customer tenant and the outcome of its last fetch. */
+export interface M365TenantJson {
+	ms_tenant_id: string
+	display_name: string | null
+	default_domain: string | null
+	consented_at: number
+	last_ok_at: number | null
+	last_error: string | null
+	/** conex tenant linked to it, null when none. */
+	linked_tenant_id: number | null
+}
+
+/** Admin consent link for one conex tenant; `?tenant=` and the client's origin. */
+export const M365ConsentLinkQuerySchema = v.object({
+	tenant: IdSchema,
+	/** `window.location.origin`; ignored when `frontendUrl` is configured. */
+	origin: v.optional(v.pipe(v.string(), v.url(), v.maxLength(500)), undefined),
+})
+
+export interface M365ConsentLinkJson {
+	url: string
+	/** The redirect URI to register in the app (`…/api/integrations/m365/consent`). */
+	redirect_uri: string
+	/** Unix seconds; the link's signed state expires then. */
+	expires_at: number
+}
+
+/**
+ * Connects a conex tenant to an Entra tenant whose admin already consented
+ * (another way than the consent link): proven by reading `/organization`.
+ */
+export const M365ConnectSchema = v.strictObject({
+	tenant_id: IdSchema,
+	ms_tenant: EntraTenantSchema,
+})
+
+export type M365Connect = v.InferOutput<typeof M365ConnectSchema>
+
+export const M365TenantParamsSchema = v.object({ ms_tenant_id: EntraTenantGuidSchema })
+
+/** Query Entra appends to the consent redirect (all optional, nothing trusted). */
+export const M365ConsentCallbackQuerySchema = v.object({
+	tenant: v.optional(v.pipe(v.string(), v.maxLength(253)), undefined),
+	state: v.optional(v.pipe(v.string(), v.maxLength(500)), undefined),
+	admin_consent: v.optional(v.pipe(v.string(), v.maxLength(10)), undefined),
+	error: v.optional(v.pipe(v.string(), v.maxLength(200)), undefined),
+	error_description: v.optional(v.pipe(v.string(), v.maxLength(2000)), undefined),
+})
 
 // ---------------------------------------------------------------------------
 // Saved filters: named FilterTable filter sets, stored per table for all

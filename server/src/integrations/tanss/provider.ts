@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import { trimmedText } from '../external_call'
 import type {
 	DeviceInput,
 	DeviceUpdate,
@@ -53,11 +54,6 @@ function toEmployee(employee: TanssEmployee): ExternalEmployee {
 	}
 }
 
-function text(value: string | undefined): string | null {
-	const trimmed = value?.trim() ?? ''
-	return trimmed === '' ? null : trimmed
-}
-
 function addresses(entries: TanssPc['ips']): { macs: string[]; ips: string[] } {
 	const macs: string[] = []
 	const ips: string[] = []
@@ -82,12 +78,12 @@ function toDevice(
 		external_id: `pc:${pc.id}`,
 		external_tenant_id: companyId,
 		kind: pc.server === true ? 'server' : 'pc',
-		name: text(pc.name) ?? `#${pc.id}`,
-		serial: text(pc.serialNumber),
-		asset_tag: text(pc.inventoryNumber),
+		name: trimmedText(pc.name) ?? `#${pc.id}`,
+		serial: trimmedText(pc.serialNumber),
+		asset_tag: trimmedText(pc.inventoryNumber),
 		manufacturer:
 			pc.manufacturerId !== undefined ? (manufacturers.get(pc.manufacturerId) ?? null) : null,
-		model: text(pc.model),
+		model: trimmedText(pc.model),
 		macs,
 		ips,
 		active: pc.active !== false,
@@ -105,14 +101,14 @@ function peripheryToDevice(
 		external_id: `periphery:${periphery.id}`,
 		external_tenant_id: companyId,
 		kind: 'periphery',
-		name: text(periphery.name) ?? text(periphery.type) ?? `#${periphery.id}`,
-		serial: text(periphery.serialNumber),
-		asset_tag: text(periphery.inventoryNumber),
+		name: trimmedText(periphery.name) ?? trimmedText(periphery.type) ?? `#${periphery.id}`,
+		serial: trimmedText(periphery.serialNumber),
+		asset_tag: trimmedText(periphery.inventoryNumber),
 		manufacturer:
 			periphery.manufacturerId !== undefined
 				? (manufacturers.get(periphery.manufacturerId) ?? null)
 				: null,
-		model: text(periphery.type),
+		model: trimmedText(periphery.type),
 		macs,
 		ips,
 		active: periphery.active !== false,
@@ -123,12 +119,12 @@ function peripheryToDevice(
 function toTicket({ ticket, statusName }: TanssTicket): ExternalTicket {
 	return {
 		id: ticket.id ?? 0,
-		title: text(ticket.title) ?? `#${ticket.id}`,
+		title: trimmedText(ticket.title) ?? `#${ticket.id}`,
 		status: statusName,
 		created_at: ticket.creationDate ?? null,
 		modified_at: ticket.modified ?? ticket.lastStateChangeDate ?? null,
 		tags: ((ticket as { tags?: { name?: unknown }[] }).tags ?? [])
-			.map((tag) => text(tag.name as string | undefined))
+			.map((tag) => trimmedText(tag.name as string | undefined))
 			.filter((name): name is string => name !== null),
 	}
 }
@@ -144,7 +140,15 @@ function parseDeviceId(
 	return Result.ok({ type: match[1] as 'pc' | 'periphery', id: Number(match[2]) })
 }
 
-/** Manufacturer id by name (case-insensitive). */
+/** Parses a TANSS company or employee id, rejecting non-integers. */
+function tanssId(raw: string, what: 'company' | 'employee'): Result<number, Error> {
+	const id = Number(raw)
+	if (!Number.isInteger(id)) {
+		return Result.err(new Error(`Invalid TANSS ${what} id ${raw}`))
+	}
+	return Result.ok(id)
+}
+
 /** Id of the manufacturer or tag named `name` (case-insensitive). */
 function idByName(names: Map<number, string>, name: string | null): number | undefined {
 	const wanted = name?.trim().toLowerCase()
@@ -158,7 +162,6 @@ function idByName(names: Map<number, string>, name: string | null): number | und
  */
 export class TanssProvider implements IntegrationProvider {
 	readonly id = 'tanss' as const
-	readonly tenantCardinality = 'one' as const
 	private readonly session: TanssSession
 	private manufacturers: Map<number, string> | null = null
 
@@ -187,10 +190,11 @@ export class TanssProvider implements IntegrationProvider {
 	}
 
 	async fetchDevices(externalTenantId: string): Promise<Result<ExternalDevice[], Error>> {
-		const companyId = Number(externalTenantId)
-		if (!Number.isInteger(companyId)) {
-			return Result.err(new Error(`Invalid TANSS company id ${externalTenantId}`))
+		const parsedCompany = tanssId(externalTenantId, 'company')
+		if (Result.isError(parsedCompany)) {
+			return parsedCompany
 		}
+		const companyId = parsedCompany.value
 		const manufacturers = await this.manufacturerNames()
 		if (Result.isError(manufacturers)) {
 			return manufacturers
@@ -229,10 +233,11 @@ export class TanssProvider implements IntegrationProvider {
 
 	/** Creates a PC; the manufacturer is matched by name (case-insensitive). */
 	async createDevice(input: DeviceInput): Promise<Result<ExternalDevice, Error>> {
-		const companyId = Number(input.externalTenantId)
-		if (!Number.isInteger(companyId)) {
-			return Result.err(new Error(`Invalid TANSS company id ${input.externalTenantId}`))
+		const parsedCompany = tanssId(input.externalTenantId, 'company')
+		if (Result.isError(parsedCompany)) {
+			return parsedCompany
 		}
+		const companyId = parsedCompany.value
 		const manufacturers = await this.manufacturerNames()
 		if (Result.isError(manufacturers)) {
 			return manufacturers
@@ -252,10 +257,11 @@ export class TanssProvider implements IntegrationProvider {
 	}
 
 	async createTicket(input: TicketInput): Promise<Result<number, Error>> {
-		const companyId = Number(input.externalTenantId)
-		if (!Number.isInteger(companyId)) {
-			return Result.err(new Error(`Invalid TANSS company id ${input.externalTenantId}`))
+		const parsedCompany = tanssId(input.externalTenantId, 'company')
+		if (Result.isError(parsedCompany)) {
+			return parsedCompany
 		}
+		const companyId = parsedCompany.value
 		let link: { typeId: number; id: number } | undefined
 		if (input.externalDeviceId !== undefined) {
 			const device = parseDeviceId(input.externalDeviceId)
@@ -269,12 +275,11 @@ export class TanssProvider implements IntegrationProvider {
 		}
 		let remitterId: number | undefined
 		if (input.externalEmployeeId !== undefined) {
-			remitterId = Number(input.externalEmployeeId)
-			if (!Number.isInteger(remitterId)) {
-				return Result.err(
-					new Error(`Invalid TANSS employee id ${input.externalEmployeeId}`),
-				)
+			const remitter = tanssId(input.externalEmployeeId, 'employee')
+			if (Result.isError(remitter)) {
+				return remitter
 			}
+			remitterId = remitter.value
 		}
 		// Resolved first: a priority without its tag must not leave an untagged ticket.
 		let tagId: number | undefined
@@ -317,10 +322,11 @@ export class TanssProvider implements IntegrationProvider {
 	}
 
 	async listTickets(externalTenantId: string): Promise<Result<ExternalTicket[], Error>> {
-		const companyId = Number(externalTenantId)
-		if (!Number.isInteger(companyId)) {
-			return Result.err(new Error(`Invalid TANSS company id ${externalTenantId}`))
+		const parsedCompany = tanssId(externalTenantId, 'company')
+		if (Result.isError(parsedCompany)) {
+			return parsedCompany
 		}
+		const companyId = parsedCompany.value
 		const res = await this.session.listOpenTickets(companyId)
 		return res.map((tickets) => tickets.filter((t) => t.ticket.id !== undefined).map(toTicket))
 	}
@@ -395,11 +401,11 @@ export class TanssProvider implements IntegrationProvider {
 		externalId: string,
 		changes: EmployeeUpdate,
 	): Promise<Result<void, Error>> {
-		const id = Number(externalId)
-		if (!Number.isInteger(id)) {
-			return Result.err(new Error(`Invalid TANSS employee id ${externalId}`))
+		const employee = tanssId(externalId, 'employee')
+		if (Result.isError(employee)) {
+			return employee
 		}
-		return this.session.updateEmployee(id, {
+		return this.session.updateEmployee(employee.value, {
 			...(changes.active !== undefined ? { active: changes.active } : {}),
 			...(changes.first_name !== undefined ? { firstName: changes.first_name } : {}),
 			...(changes.last_name !== undefined ? { lastName: changes.last_name } : {}),

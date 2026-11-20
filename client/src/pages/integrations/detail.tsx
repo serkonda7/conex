@@ -188,7 +188,7 @@ function LinkBoardPanel(props: {
 							<Show
 								when={
 									current().entity_type === 'tenant' ||
-									current().external_tenant !== null
+									current().external_tenants.length > 0
 								}
 								fallback={
 									<Empty
@@ -222,8 +222,9 @@ function LinkBoardPanel(props: {
 /**
  * /integrations/:id — detail page of one provider (design decision 0006): header with
  * status, Enabled switch and "Sync now", then tabs: the consistency report,
- * link boards (`?view=tenants|devices|employees`) for side-by-side linking, and
- * the settings (`?view=settings`). The report, the device/employee boards and
+ * link boards (`?view=tenants|devices|employees`, employees only for providers
+ * that have them) for side-by-side linking, and the settings (`?view=settings`).
+ * The report, the device/employee boards and
  * "Sync now" follow the tenant selector; `?tenant=` (from a tenant's integration
  * card) wins until the selector is switched. Rows offer the fitting fix: link,
  * confirm a suggestion, create the device externally, ignore, or unlink.
@@ -238,18 +239,27 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 	// Single selected tenant (the user's only one, if so) of the boards and syncs.
 	const selectedTenant = (): number | null =>
 		queryTenant() ?? sessionTenantId() ?? contextTenantId()
+
+	const [integration, { mutate }] = createRecord(() => props.id, fetch_integration, setError)
+
+	// Providers without employees (Octoja, UniFi) hide the tab and ignore `?view=employees`.
+	const hasEmployees = (): boolean => integration()?.capabilities.employees === true
+	const effectiveView = (): View =>
+		view() === 'employees' && !hasEmployees() ? 'report' : view()
+
 	const views = (): DetailTab<View>[] => [
 		{ key: 'report', label: t('integration.viewReport') },
 		// The tenant board lists every external company: global users only.
 		...(isScoped() ? [] : [{ key: 'tenants' as const, label: t('integration.viewTenants') }]),
 		{ key: 'devices', label: t('integration.viewDevices') },
-		{ key: 'employees', label: t('integration.viewEmployees') },
+		...(hasEmployees()
+			? [{ key: 'employees' as const, label: t('integration.viewEmployees') }]
+			: []),
 		...(can('integrations.manage')
 			? [{ key: 'settings' as const, label: t('integration.settings') }]
 			: []),
 	]
 
-	const [integration, { mutate }] = createRecord(() => props.id, fetch_integration, setError)
 	usePageMeta(() => ({
 		name: integration() ? providerLabel(integration()?.provider ?? '') : undefined,
 	}))
@@ -291,7 +301,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			return
 		}
 		await toggle.run(async () => {
-			const res = await update_integration(row.provider, { enabled })
+			const res = await update_integration(row.provider, { provider: row.provider, enabled })
 			if (Result.isOk(res)) {
 				mutate(res.value)
 			}
@@ -349,6 +359,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			return null
 		}
 		const provider = row.provider
+		const capabilities = row.capabilities
 		const deactivate: JSX.Element = (
 			<button
 				type="button"
@@ -455,15 +466,22 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'device_missing_in_external':
 				return (
 					<Show when={can('integrations.manage')}>
-						<button
-							type="button"
-							class="btn-small"
-							onClick={() =>
-								void run(() => create_external_device(provider, f.device_id ?? 0))
-							}
-						>
-							{t('integration.createExternal', { provider: providerLabel(provider) })}
-						</button>
+						{/* Providers without create_device cannot accept a device created in conex. */}
+						<Show when={capabilities.create_device}>
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										create_external_device(provider, f.device_id ?? 0),
+									)
+								}
+							>
+								{t('integration.createExternal', {
+									provider: providerLabel(provider),
+								})}
+							</button>
+						</Show>
 						{ignoreButton(() => ignore_local(provider, 'device', f.device_id ?? 0))}
 					</Show>
 				)
@@ -474,7 +492,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{field !== null && (
+						{capabilities.push && field !== null && (
 							<button
 								type="button"
 								class="btn-small"
@@ -495,7 +513,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'employee_suggestion':
 				return (
 					<Show when={can('integrations.manage')}>
-						{provider === 'tanss' &&
+						{capabilities.push &&
 							f.remote === 'active' &&
 							f.external_id !== null &&
 							deactivate}
@@ -512,7 +530,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'employee_missing_in_conex':
 				return (
 					<Show when={can('integrations.manage')}>
-						{provider === 'tanss' && f.external_id !== null && deactivate}
+						{capabilities.push && f.external_id !== null && deactivate}
 						<Show when={can('edit') && f.tenant_id !== null}>
 							<button
 								type="button"
@@ -546,13 +564,13 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
-						{provider === 'tanss' &&
+						{capabilities.push &&
 							f.field === 'status' &&
 							f.local === 'inactive' &&
 							f.remote === 'active' &&
 							f.external_id !== null &&
 							deactivate}
-						{field !== null && (
+						{capabilities.push && field !== null && (
 							<button
 								type="button"
 								class="btn-small"
@@ -584,7 +602,9 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			key: 'kind',
 			label: t('integration.finding'),
 			getValue: (f: IntegrationFinding): JSX.Element => (
-				<span class="badge">{findingKindLabel(f.kind)}</span>
+				<span class="badge">
+					{findingKindLabel(f.kind, integration()?.provider ?? 'tanss')}
+				</span>
 			),
 		},
 		{
@@ -673,10 +693,10 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 					<DetailTabs
 						label={t('integration.views')}
 						tabs={views()}
-						active={view()}
+						active={effectiveView()}
 						onSelect={selectView}
 					/>
-					<Show when={view() === 'settings'}>
+					<Show when={effectiveView() === 'settings'}>
 						{/* Not keyed: a refetch after a sync or toggle must not reset typed values. */}
 						<Show when={integration()}>
 							{(row: () => IntegrationJson): JSX.Element => (
@@ -685,7 +705,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 						</Show>
 					</Show>
 					{/* Separate instances: selections must not carry over between levels. */}
-					<Show when={view() === 'tenants'}>
+					<Show when={effectiveView() === 'tenants'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="tenant"
@@ -693,7 +713,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							on_error={setError}
 						/>
 					</Show>
-					<Show when={view() === 'devices'}>
+					<Show when={effectiveView() === 'devices'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="device"
@@ -701,7 +721,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							on_error={setError}
 						/>
 					</Show>
-					<Show when={view() === 'employees'}>
+					<Show when={effectiveView() === 'employees'}>
 						<LinkBoardPanel
 							provider={integration()?.provider ?? 'tanss'}
 							entity_type="employee"
@@ -709,7 +729,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							on_error={setError}
 						/>
 					</Show>
-					<Show when={view() === 'report'}>
+					<Show when={effectiveView() === 'report'}>
 						<p class="integration-meta integration-report-asof">
 							{report()?.synced_at
 								? t('integration.syncedAt', {
@@ -729,7 +749,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 								options={FINDING_KINDS.filter((kind) => counts().has(kind)).map(
 									(kind) => ({
 										value: kind,
-										label: `${findingKindLabel(kind)} (${counts().get(kind) ?? 0})`,
+										label: `${findingKindLabel(kind, integration()?.provider ?? 'tanss')} (${counts().get(kind) ?? 0})`,
 									}),
 								)}
 							/>
@@ -763,6 +783,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			<Show when={linkingTenant() !== null && integration()}>
 				<ExternalTenantPicker
 					provider={integration()?.provider ?? 'tanss'}
+					customer_numbers={integration()?.capabilities.customer_numbers ?? false}
 					on_select={handleLinkTenant}
 					on_close={() => setLinkingTenant(null)}
 				/>

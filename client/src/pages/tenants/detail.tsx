@@ -63,6 +63,7 @@ import {
 	tenantReportHref,
 	useTenantIntegrations,
 } from '../integrations/cards'
+import { M365TenantCard } from '../integrations/m365'
 import { rackHeightColumn } from '../racks/columns'
 import { TenantTickets } from '../tickets/tenant_tickets'
 
@@ -276,6 +277,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					<div>
 						<NeedsAttention tenantId={props.id} integrations={integrations() ?? []} />
 						<TenantTickets tenantId={props.id} />
+						<M365TenantCard tenantId={props.id} />
 						<SitesCard
 							tenantId={props.id}
 							sites={sites() ?? []}
@@ -434,7 +436,7 @@ function AttentionRow(props: { tenantId: number; item: AttentionItem }): JSX.Ele
 			<span class="tenant-tag">{providerLabel(props.item.entry.integration.provider)}</span>
 			<span class="tenant-row-text">
 				{t('tenant.findingCount', {
-					kind: findingKindLabel(props.item.kind),
+					kind: findingKindLabel(props.item.kind, props.item.entry.integration.provider),
 					count: props.item.count,
 				})}
 			</span>

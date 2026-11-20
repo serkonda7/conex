@@ -1,16 +1,18 @@
 # Datenabgleich der Integrationen
 
 Der Abgleichbericht vergleicht conex mit den Daten der letzten Synchronisierung aus einem
-externen System (derzeit **TANSS**) und listet jede Abweichung als *Befund*. Er umfasst
+externen System (**TANSS**, **Octoja** oder **UniFi**) und listet jede Abweichung als *Befund*. Er umfasst
 die Mandanten des ausgewählten Mandantenkontexts und lädt sich neu, wenn der Kontext
 gewechselt wird.
 
 ## Synchronisierung
 
 - **Firmen:** bei der ersten oder einer erzwungenen vollständigen Synchronisierung alle,
-  sonst nur die seit der letzten Synchronisierung geänderten.
+  sonst nur die seit der letzten Synchronisierung geänderten. Octoja und UniFi liefern
+  keine Änderungsliste; dort werden immer alle Kunden bzw. alle Konsolen (Hosts)
+  abgerufen.
 - **Geräte:** nur für Firmen, die mit einem Mandanten verknüpft sind.
-- **Tags:** alle, bei jeder Synchronisierung.
+- **Tags:** alle, bei jeder Synchronisierung (nur TANSS).
 - Eindeutige Gerätezuordnungen werden [automatisch verknüpft](#gerätezuordnung).
 
 ### TANSS-Zuordnung
@@ -29,6 +31,32 @@ Ein neues Ticket erhält den Tag, der zu seiner Priorität gehört: die Bezeichn
 `P<rank> - <name>`, z. B. `P1 - Critical` (Groß-/Kleinschreibung wird ignoriert).
 Existiert dieser Tag nicht in TANSS, wird kein Ticket angelegt.
 
+### Octoja-Zuordnung
+
+| conex          | Octoja                          |
+| -------------- | ------------------------------- |
+| Mandant        | Kunde                           |
+| Gerät          | Asset                           |
+| Kundennummer   | externe Referenz des Kunden     |
+
+Die Anmeldung erfolgt mit E-Mail-Adresse und Passwort eines Octoja-Benutzers ohne
+Zwei-Faktor-Anmeldung. Octoja kennt in conex keine Mitarbeiter und keine Tickets; Geräte
+werden nur verknüpft und verglichen, nicht in Octoja angelegt oder geändert.
+
+### UniFi-Zuordnung
+
+| conex   | UniFi             |
+| ------- | ----------------- |
+| Mandant | Konsole (Host)    |
+| Gerät   | Gerät der Konsole |
+
+Die Anmeldung erfolgt mit einem Site-Manager-API-Schlüssel aus unifi.ui.com. Ein
+Organisationsschlüssel erreicht alle Konsolen der Organisation, ein persönlicher
+Schlüssel nur die eigenen Konsolen. Die Basis-URL ist `https://api.ui.com`. UniFi
+kennt in conex keine Mitarbeiter und keine Tickets; Geräte werden nur verknüpft
+und verglichen, nicht in UniFi angelegt oder geändert. Bei zu vielen Anfragen
+antwortet die API mit HTTP 429 (Rate Limit).
+
 ## Verknüpfungen
 
 Mandanten und Geräte werden manuell oder durch die Synchronisierung mit ihrem externen
@@ -46,6 +74,7 @@ gemeldet.
 | **Firma existiert nicht mehr** | Die verknüpfte Firma wurde gelöscht. Ihre Geräte werden nicht geprüft.                                                                                                                                                                |
 | **Firma inaktiv**              | Die verknüpfte Firma ist inaktiv.                                                                                                                                                                                                     |
 | **Abweichende Kundennummer**   | Die Kundennummern von Mandant und Firma unterscheiden sich. Eine fehlende Nummer auf einer Seite zählt ebenfalls als Abweichung (nur wenn beide leer sind, sind sie gleich); beim Vergleich wird die Groß-/Kleinschreibung ignoriert. |
+| **Mail-Domain nicht verifiziert** | Nur Microsoft 365: Die Domain der ersten Mail-Adresse des Mandanten ist keine verifizierte Domain des Entra-Mandanten. |
 
 #### Geräte
 
@@ -59,6 +88,10 @@ gemeldet.
 Ist ein verknüpfter Mitarbeiter in conex inaktiv, aber in TANSS aktiv, kann er im
 Bericht auch in TANSS inaktiv gesetzt werden. Dies betrifft alle Firmen, denen er in
 TANSS zugeordnet ist.
+
+Ist er umgekehrt extern inaktiv, in conex aber noch aktiv, meldet der Bericht
+**Extern inaktiv, in conex noch aktiv** (bei Microsoft 365: Konto deaktiviert, also
+ein Offboarding). **In conex inaktiv setzen** behebt den Befund.
 
 ### Nicht verknüpfte Objekte
 

@@ -1,15 +1,18 @@
 import type { IntegrationProvider as ProviderId } from 'shared/src/schemas'
-import type { TanssCredentials } from './tanss/client'
-import { TanssProvider } from './tanss/provider'
-import type { IntegrationProvider } from './types'
+import { m365Definition } from './m365/definition'
+import { octojaDefinition } from './octoja/definition'
+import { tanssDefinition } from './tanss/definition'
+import type { ProviderDefinition } from './types'
+import { unifiDefinition } from './unifi/definition'
 
-/**
- * Provider factory keyed by provider id. UniFi and servereye plug in here
- * with their own credential shapes once they exist.
- */
-export function buildProvider(provider: ProviderId, creds: TanssCredentials): IntegrationProvider {
-	switch (provider) {
-		case 'tanss':
-			return new TanssProvider(creds)
-	}
+/** Maps every provider id to its definition. */
+const DEFINITIONS: { [P in ProviderId]: ProviderDefinition<P> } = {
+	tanss: tanssDefinition,
+	octoja: octojaDefinition,
+	unifi: unifiDefinition,
+	m365: m365Definition,
+}
+
+export function providerDefinition<P extends ProviderId>(provider: P): ProviderDefinition<P> {
+	return DEFINITIONS[provider]
 }

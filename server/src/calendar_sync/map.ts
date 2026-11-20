@@ -4,7 +4,7 @@
  */
 import { createHash } from 'node:crypto'
 import type { TnsSupportList } from 'tanss-api'
-import { type GraphEvent, TANSS_CATEGORY, TANSS_ID_PROPERTY } from './graph'
+import { type GraphEvent, TANSS_CATEGORY, TANSS_ID_PROPERTY } from './calendar'
 
 /** One Outlook event: an appointment, an absence or a drive time. */
 export interface CalendarItem {

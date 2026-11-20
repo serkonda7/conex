@@ -22,6 +22,9 @@ import {
 	IntegrationTestSchema,
 	IntegrationUpdateSchema,
 	LinkBoardQuerySchema,
+	M365ConnectSchema,
+	M365ConsentLinkQuerySchema,
+	M365TenantParamsSchema,
 	type IntegrationProvider as ProviderId,
 	TicketCreateSchema,
 	TicketListQuerySchema,
@@ -54,7 +57,10 @@ import {
 	linkOf,
 	listLinks,
 	setLink,
+	tenantLinks,
 } from '../integrations/links'
+import { connectTenant, consentLink } from '../integrations/m365/consent'
+import { deleteM365Tenant, listM365Tenants } from '../integrations/m365/tenants'
 import { buildReport, deviceStatus, employeeStatus, tenantStatus } from '../integrations/report'
 import { readDevice, readEmployee, readTenant, readTenants } from '../integrations/snapshot'
 import {
@@ -194,16 +200,20 @@ async function loadTenantCompany(
 	return (await checkExternalWrite(c, provider, tenantLink.external_id)) ?? tenantLink.external_id
 }
 
-/** First company among `externalTenantIds` linked to one of the `tenantIds`, null for none. */
+/**
+ * First external tenant among `externalTenantIds` linked to one of the
+ * `tenantIds`, null for none.
+ */
 async function scopeCompany(
 	provider: ProviderId,
 	tenantIds: readonly number[],
 	externalTenantIds: readonly (string | null)[],
 ): Promise<string | null> {
 	for (const tenantId of tenantIds) {
-		const company = await linkOf(provider, 'tenant', tenantId)
-		if (company && externalTenantIds.includes(company.external_id)) {
-			return company.external_id
+		for (const link of await tenantLinks(provider, tenantId)) {
+			if (externalTenantIds.includes(link.external_id)) {
+				return link.external_id
+			}
 		}
 	}
 	return null
@@ -221,11 +231,57 @@ async function scopeCompany(
  * `integrations.manage` may also create conex devices in the external system,
  * overwrite external device fields with conex values and (with `edit`)
  * import external employees into conex.
+ * Microsoft 365 consent (links, connecting and forgetting customer tenants)
+ * is global `integrations.manage`; the consent callback itself is public
+ * (`m365ConsentApp`).
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
 	.get('/', requirePermissionMiddleware('integrations.manage'), async (c) =>
 		c.json(await listIntegrations()),
+	)
+	.get('/m365/consented', async (c) => {
+		const denied = requireGlobalPermission(c, 'integrations.manage')
+		return denied ?? c.json(await listM365Tenants())
+	})
+	.get(
+		'/m365/consent-link',
+		vValidator('query', M365ConsentLinkQuerySchema, onValidationError),
+		async (c) => {
+			const denied = requireGlobalPermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const query = c.req.valid('query')
+			return sendResult(c, await consentLink(query.tenant, query.origin))
+		},
+	)
+	.post('/m365/connect', vValidator('json', M365ConnectSchema, onValidationError), async (c) => {
+		const denied = requireGlobalPermission(c, 'integrations.manage')
+		if (denied) {
+			return denied
+		}
+		const input = c.req.valid('json')
+		const res = await connectTenant(input.ms_tenant, input.tenant_id, requestUser(c).id)
+		return sendResult(
+			c,
+			res.map((row) => ({ ms_tenant_id: row.ms_tenant_id })),
+		)
+	})
+	.delete(
+		'/m365/consented/:ms_tenant_id',
+		vValidator('param', M365TenantParamsSchema, onValidationError),
+		async (c) => {
+			const denied = requireGlobalPermission(c, 'integrations.manage')
+			if (denied) {
+				return denied
+			}
+			const res = await deleteM365Tenant(c.req.valid('param').ms_tenant_id)
+			return sendResult(
+				c,
+				res.map(() => ({ ok: true })),
+			)
+		},
 	)
 	.post(
 		'/',
@@ -628,6 +684,18 @@ export const integrationsApp = new Hono()
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
 			const userId = requestUser(c).id
+			if (input.entity_type === 'tenant') {
+				// Tenants are global-write; an ignored one has no company.
+				const denied = requireGlobalPermission(c, 'integrations.manage')
+				if (denied) {
+					return denied
+				}
+				if (!(await exists(tenants, eq(tenants.id, input.entity_id)))) {
+					return jsonError(c, 'Tenant not found', 404)
+				}
+				const res = await ignoreLocal(provider, 'tenant', input.entity_id, null, userId)
+				return sendResult(c, res.map(linkJson))
+			}
 			const tenant =
 				input.entity_type === 'employee'
 					? await loadEmployeeTenant(c, input.entity_id)

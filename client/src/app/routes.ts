@@ -118,6 +118,9 @@ const CalendarSyncDetailPage = lazyPage(() =>
 const IntegrationDetailPage = lazyPage(() =>
 	import('../pages/integrations/detail').then((m) => m.IntegrationDetailPage),
 )
+const MatchingPage = lazyPage(() =>
+	import('../pages/integrations/matching').then((m) => m.MatchingPage),
+)
 const IntegrationsPage = lazyPage(() =>
 	import('../pages/integrations/list').then((m) => m.IntegrationsPage),
 )
@@ -488,6 +491,16 @@ export const SECTIONS: readonly Section[] = [
 		permission: 'integrations.manage',
 		hideInNav: true,
 		list: CalendarSyncDetailPage,
+	},
+	{
+		// Cross-integration matching of tenants, devices and employees, opened
+		// from the integrations page and the link boards.
+		path: 'integrations/matching',
+		parent: 'integrations',
+		noun: (): string => t('matching.title'),
+		permission: 'integrations.manage',
+		hideInNav: true,
+		list: MatchingPage,
 	},
 	{
 		// Reached from the top-bar ticket button.

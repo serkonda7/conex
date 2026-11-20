@@ -2807,13 +2807,13 @@
           "name": "base_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "username": {
           "name": "username",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "secrets": {
           "name": "secrets",
@@ -2857,6 +2857,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "settings": {
+          "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
         }
       },
       "indexes": {},
@@ -5758,6 +5765,55 @@
           "value": "\"virtual_machines\".\"employee_id\" IS NULL OR \"virtual_machines\".\"tenant_id\" IS NOT NULL"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.m365_tenants": {
+      "name": "m365_tenants",
+      "schema": "",
+      "columns": {
+        "ms_tenant_id": {
+          "name": "ms_tenant_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_domain": {
+          "name": "default_domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consented_at": {
+          "name": "consented_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_ok_at": {
+          "name": "last_ok_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },

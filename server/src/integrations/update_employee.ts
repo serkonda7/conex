@@ -12,13 +12,13 @@ import type {
 	ExternalEmployeeJson,
 	IntegrationProvider as ProviderId,
 } from 'shared/src/schemas'
-import { ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
+import { NotFoundError, ValidationError } from '../db/errors'
 import { employees } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
 import { compareEmployeeFields, localEmployees } from './report'
 import { mergeEmployees, readEmployee } from './snapshot'
-import { enabledProvider } from './store'
+import { enabledProviderMethod } from './store'
 
 export async function updateExternalEmployee(
 	provider: ProviderId,
@@ -41,17 +41,17 @@ export async function updateExternalEmployee(
 	if (value == null) {
 		return Result.err(new ValidationError(`Employee has no ${field}`))
 	}
-	const built = await enabledProvider(provider)
-	if (Result.isError(built)) {
-		return built
+	const updateEmployee = await enabledProviderMethod(
+		provider,
+		'updateEmployee',
+		'updating employees',
+	)
+	if (Result.isError(updateEmployee)) {
+		return updateEmployee
 	}
-	const instance = built.value
-	if (!instance.updateEmployee) {
-		return Result.err(new ValidationError('Integration does not support updating employees'))
-	}
-	const updated = await instance.updateEmployee(link.external_id, { [field]: value })
+	const updated = await updateEmployee.value(link.external_id, { [field]: value })
 	if (Result.isError(updated)) {
-		return Result.err(new ExternalServiceError(updated.error.message))
+		return updated
 	}
 	const patched: ExternalEmployeeJson = { ...external, [field]: value }
 	patched.name = [patched.first_name, patched.last_name].filter((p) => p !== null).join(' ')
@@ -68,19 +68,20 @@ export async function deactivateExternalEmployee(
 	if (!external) {
 		return Result.err(new NotFoundError('External employee not found'))
 	}
-	const built = await enabledProvider(provider)
-	if (Result.isError(built)) {
-		return built
-	}
-	if (!built.value.updateEmployee) {
-		return Result.err(new ValidationError('Integration does not support updating employees'))
+	const updateEmployee = await enabledProviderMethod(
+		provider,
+		'updateEmployee',
+		'updating employees',
+	)
+	if (Result.isError(updateEmployee)) {
+		return updateEmployee
 	}
 	if (!external.active) {
 		return Result.ok(external)
 	}
-	const updated = await built.value.updateEmployee(externalId, { active: false })
+	const updated = await updateEmployee.value(externalId, { active: false })
 	if (Result.isError(updated)) {
-		return Result.err(new ExternalServiceError(updated.error.message))
+		return updated
 	}
 	const patched: ExternalEmployeeJson = { ...external, active: false }
 	await mergeEmployees(provider, [patched], nowSeconds())

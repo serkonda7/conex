@@ -52,6 +52,7 @@ import {
 import * as v from 'valibot'
 import { ensureIntegrationsLive } from '../../config'
 
+/** Login credentials of the TANSS user API plus the ERP API token. */
 export interface TanssCredentials {
 	base_url: string
 	username: string

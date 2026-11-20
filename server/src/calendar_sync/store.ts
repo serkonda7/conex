@@ -20,6 +20,7 @@ import { NotFoundError, ValidationError } from '../db/errors'
 import { errOf, tryWrite } from '../db/list'
 import { failInterruptedRuns } from '../db/runs'
 import { decryptJson, encryptJson } from '../integrations/secrets'
+import { GraphClient, type GraphCredentials } from '../microsoft/graph'
 import {
 	calendar_sync_config,
 	calendar_sync_items,
@@ -27,7 +28,7 @@ import {
 	calendar_sync_runs,
 } from '../schema'
 import { nowSeconds } from '../util/time'
-import { GraphClient, type GraphCredentials } from './graph'
+import { CalendarClient } from './calendar'
 
 export type ConfigRow = typeof calendar_sync_config.$inferSelect
 export type MappingRow = typeof calendar_sync_mappings.$inferSelect
@@ -167,7 +168,7 @@ async function verifyCredentials(
 		return Result.err(new ValidationError(token.error.message))
 	}
 	if (mailboxUpn !== undefined) {
-		const calendar = await graph.verify(mailboxUpn)
+		const calendar = await new CalendarClient(graph).verify(mailboxUpn)
 		if (Result.isError(calendar)) {
 			return Result.err(new ValidationError(calendar.error.message))
 		}

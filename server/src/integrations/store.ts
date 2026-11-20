@@ -5,22 +5,25 @@
  */
 import { Result } from 'better-result'
 import { and, desc, eq, inArray } from 'drizzle-orm'
-import type {
-	IntegrationCreate,
-	IntegrationJson,
-	IntegrationTest,
-	IntegrationUpdate,
-	IntegrationProvider as ProviderId,
-	SyncRunJson,
+import {
+	INTEGRATION_SECRET_FIELDS,
+	type IntegrationCreate,
+	type IntegrationJson,
+	type IntegrationTest,
+	type IntegrationUpdate,
+	type IntegrationProvider as ProviderId,
+	providerNeedsUsername,
+	type SyncRunJson,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getDb, withTransaction } from '../db/connection'
-import { DuplicateError, NotFoundError, ValidationError } from '../db/errors'
+import { DuplicateError, ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { tryWrite } from '../db/list'
 import { external_links, external_objects, integrations, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
-import { buildProvider } from './registry'
-import { decryptSecrets, encryptSecrets, type IntegrationSecrets } from './secrets'
+import { providerDefinition } from './registry'
+import { decryptSecrets, emptySecrets, encryptSecrets, type IntegrationSecrets } from './secrets'
+import type { IntegrationConfig, IntegrationProvider } from './types'
 
 export type IntegrationRow = typeof integrations.$inferSelect
 export type SyncRunRow = typeof sync_runs.$inferSelect
@@ -61,14 +64,20 @@ async function lastSync(provider: string): Promise<SyncRunJson | null> {
 }
 
 async function toJson(row: IntegrationRow, last?: SyncRunJson | null): Promise<IntegrationJson> {
-	const secrets = decryptSecrets(row.secrets)
+	const provider = row.provider as ProviderId
+	const secrets = decryptSecrets(provider, row.secrets)
+	const secrets_set: Record<string, boolean> = {}
+	for (const field of INTEGRATION_SECRET_FIELDS[provider]) {
+		secrets_set[field] = Result.isOk(secrets) && secrets.value[field] !== ''
+	}
 	return {
 		id: row.id,
-		provider: row.provider as ProviderId,
+		provider,
 		base_url: row.base_url,
 		username: row.username,
-		has_password: Result.isOk(secrets) && secrets.value.password !== '',
-		has_erp_token: Result.isOk(secrets) && secrets.value.erp_token !== '',
+		settings: row.settings,
+		secrets_set,
+		capabilities: providerDefinition(provider).capabilities,
 		enabled: row.enabled === 1,
 		created_at: row.created_at,
 		updated_at: row.updated_at,
@@ -137,19 +146,84 @@ export async function getIntegration(
 	return Result.ok(await toJson(row.value))
 }
 
+/** Configuration and secret fields of a create/update/test body. */
+interface BodyFields {
+	base_url?: string
+	username?: string
+	settings: Record<string, unknown>
+	secrets: Partial<IntegrationSecrets>
+}
+
+/**
+ * Splits a validated body by the provider's secret fields: `base_url` and
+ * `username` have columns, other plain fields go to `settings`. Omitted
+ * (undefined) fields are left out.
+ */
+function bodyFields(provider: ProviderId, body: object): BodyFields {
+	const secretFields: readonly string[] = INTEGRATION_SECRET_FIELDS[provider]
+	const out: BodyFields = { settings: {}, secrets: {} }
+	for (const [key, value] of Object.entries(body)) {
+		if (value === undefined || key === 'provider' || key === 'enabled') {
+			continue
+		}
+		if (secretFields.includes(key)) {
+			;(out.secrets as Record<string, unknown>)[key] = value
+		} else if (key === 'base_url' || key === 'username') {
+			out[key] = value as string
+		} else {
+			out.settings[key] = value
+		}
+	}
+	return out
+}
+
+function configOf(row: IntegrationRow): IntegrationConfig {
+	return { base_url: row.base_url, username: row.username, settings: row.settings }
+}
+
 /** Logs in with every credential; a refusal becomes a 422 with the reason. */
 async function verify(
 	provider: ProviderId,
-	base_url: string,
-	username: string,
+	config: IntegrationConfig,
 	secrets: IntegrationSecrets,
 ): Promise<Result<void, Error>> {
-	const instance = buildProvider(provider, { base_url, username, ...secrets })
-	const res = await instance.verify()
+	const instance = providerDefinition(provider).build(config, secrets)
+	if (Result.isError(instance)) {
+		return Result.err(new ValidationError(instance.error.message))
+	}
+	const res = await instance.value.verify()
 	if (Result.isError(res)) {
 		return Result.err(new ValidationError(res.error.message))
 	}
 	return Result.ok(undefined)
+}
+
+/** Stored secrets overlaid with the given ones; a broken store counts as empty. */
+function mergedSecrets(
+	provider: ProviderId,
+	row: IntegrationRow | null,
+	patch: Partial<IntegrationSecrets>,
+): IntegrationSecrets {
+	const stored = row ? decryptSecrets(provider, row.secrets) : null
+	const base = stored && Result.isOk(stored) ? stored.value : emptySecrets(provider)
+	return { ...base, ...patch }
+}
+
+function missingSecret(
+	provider: ProviderId,
+	secrets: IntegrationSecrets,
+	username?: string | null,
+): ValidationError | null {
+	if (providerNeedsUsername(provider) && (username ?? '') === '') {
+		return new ValidationError('Username is required')
+	}
+	const labels: Record<string, string> = providerDefinition(provider).secretLabels
+	for (const field of INTEGRATION_SECRET_FIELDS[provider]) {
+		if (secrets[field] === '') {
+			return new ValidationError(`${labels[field] ?? field} is required`)
+		}
+	}
+	return null
 }
 
 export async function createIntegration(
@@ -160,8 +234,18 @@ export async function createIntegration(
 	if (Result.isOk(existing)) {
 		return Result.err(new DuplicateError('This integration already exists'))
 	}
-	const secrets = { password: input.password, erp_token: input.erp_token }
-	const ok = await verify(input.provider, input.base_url, input.username, secrets)
+	const fields = bodyFields(input.provider, input)
+	const config: IntegrationConfig = {
+		base_url: fields.base_url ?? null,
+		username: fields.username ?? null,
+		settings: fields.settings,
+	}
+	const secrets = mergedSecrets(input.provider, null, fields.secrets)
+	const missing = missingSecret(input.provider, secrets, config.username)
+	if (missing) {
+		return Result.err(missing)
+	}
+	const ok = await verify(input.provider, config, secrets)
 	if (Result.isError(ok)) {
 		return ok
 	}
@@ -172,8 +256,7 @@ export async function createIntegration(
 				.insert(integrations)
 				.values({
 					provider: input.provider,
-					base_url: input.base_url,
-					username: input.username,
+					...config,
 					secrets: encryptSecrets(secrets),
 					created_by: userId,
 					created_at: now,
@@ -193,53 +276,45 @@ export async function createIntegration(
 	return Result.ok(await toJson(row))
 }
 
-/** Stored secrets overlaid with the given ones; a broken store counts as empty. */
-function mergedSecrets(
-	row: IntegrationRow | null,
-	patch: { password?: string; erp_token?: string },
-): IntegrationSecrets {
-	const stored = row ? decryptSecrets(row.secrets) : null
-	const base = stored && Result.isOk(stored) ? stored.value : { password: '', erp_token: '' }
-	return {
-		password: patch.password ?? base.password,
-		erp_token: patch.erp_token ?? base.erp_token,
-	}
-}
-
-function missingSecret(secrets: IntegrationSecrets): ValidationError | null {
-	if (secrets.password === '') {
-		return new ValidationError('Password is required')
-	}
-	if (secrets.erp_token === '') {
-		return new ValidationError('ERP API token is required')
-	}
-	return null
+/** The body's `provider` must name the integration of the route. */
+function checkBodyProvider(provider: ProviderId, body: { provider: ProviderId }): Error | null {
+	return body.provider === provider
+		? null
+		: new ValidationError(`Body is for ${body.provider}, not ${provider}`)
 }
 
 export async function updateIntegration(
 	provider: ProviderId,
 	patch: IntegrationUpdate,
 ): Promise<Result<IntegrationJson, Error>> {
+	const mismatch = checkBodyProvider(provider, patch)
+	if (mismatch) {
+		return Result.err(mismatch)
+	}
 	const current = await getIntegrationRow(provider)
 	if (Result.isError(current)) {
 		return current
 	}
 	const row = current.value
-	const secrets = mergedSecrets(row, patch)
-	const base_url = patch.base_url ?? row.base_url
-	const username = patch.username ?? row.username
+	const fields = bodyFields(provider, patch)
+	const secrets = mergedSecrets(provider, row, fields.secrets)
+	const config: IntegrationConfig = {
+		base_url: fields.base_url ?? row.base_url,
+		username: fields.username ?? row.username,
+		settings: { ...row.settings, ...fields.settings },
+	}
 	const credentialsChanged =
-		base_url !== row.base_url ||
-		username !== row.username ||
-		patch.password !== undefined ||
-		patch.erp_token !== undefined
+		config.base_url !== row.base_url ||
+		config.username !== row.username ||
+		JSON.stringify(config.settings) !== JSON.stringify(row.settings) ||
+		Object.keys(fields.secrets).length > 0
 	const now = nowSeconds()
 	if (credentialsChanged) {
-		const missing = missingSecret(secrets)
+		const missing = missingSecret(provider, secrets, config.username)
 		if (missing) {
 			return Result.err(missing)
 		}
-		const ok = await verify(provider, base_url, username, secrets)
+		const ok = await verify(provider, config, secrets)
 		if (Result.isError(ok)) {
 			return ok
 		}
@@ -248,8 +323,7 @@ export async function updateIntegration(
 		getDb()
 			.update(integrations)
 			.set({
-				base_url,
-				username,
+				...config,
 				secrets: encryptSecrets(secrets),
 				...(patch.enabled !== undefined ? { enabled: patch.enabled ? 1 : 0 } : {}),
 				updated_at: now,
@@ -273,14 +347,27 @@ export async function testIntegration(
 	provider: ProviderId,
 	input: IntegrationTest,
 ): Promise<Result<void, Error>> {
+	const mismatch = checkBodyProvider(provider, input)
+	if (mismatch) {
+		return Result.err(mismatch)
+	}
 	const current = await getIntegrationRow(provider)
 	const row = Result.isOk(current) ? current.value : null
-	const secrets = mergedSecrets(row, input)
-	const missing = missingSecret(secrets)
+	const fields = bodyFields(provider, input)
+	const secrets = mergedSecrets(provider, row, fields.secrets)
+	const missing = missingSecret(provider, secrets, fields.username)
 	if (missing) {
 		return Result.err(missing)
 	}
-	return verify(provider, input.base_url, input.username, secrets)
+	return verify(
+		provider,
+		{
+			base_url: fields.base_url ?? null,
+			username: fields.username ?? null,
+			settings: { ...(row?.settings ?? {}), ...fields.settings },
+		},
+		secrets,
+	)
 }
 
 /** Deletes the integration with its links, snapshot and sync history. */
@@ -298,6 +385,7 @@ export async function deleteIntegration(
 			await db.delete(external_objects).where(eq(external_objects.provider, provider))
 			await db.delete(sync_runs).where(eq(sync_runs.provider, provider))
 			await db.delete(integrations).where(eq(integrations.provider, provider))
+			await providerDefinition(provider).deleteData?.()
 		}),
 	)
 	if (Result.isError(deleted)) {
@@ -318,25 +406,27 @@ export async function recordConnection(provider: ProviderId, error: string | nul
 		.where(eq(integrations.provider, provider))
 }
 
+/** Plain configuration plus decrypted secrets of an integration row. */
+export function credentialsOf<P extends ProviderId>(
+	row: IntegrationRow,
+	provider: P,
+): Result<{ config: IntegrationConfig; secrets: IntegrationSecrets<P> }, Error> {
+	return decryptSecrets(provider, row.secrets).map((secrets) => ({
+		config: configOf(row),
+		secrets,
+	}))
+}
+
 /** Provider instance with decrypted credentials, for one sync run. */
-export function providerFor(row: IntegrationRow): Result<ReturnType<typeof buildProvider>, Error> {
-	const secrets = decryptSecrets(row.secrets)
-	if (Result.isError(secrets)) {
-		return secrets
-	}
-	return Result.ok(
-		buildProvider(row.provider as ProviderId, {
-			base_url: row.base_url,
-			username: row.username,
-			...secrets.value,
-		}),
+export function providerFor(row: IntegrationRow): Result<IntegrationProvider, Error> {
+	const provider = row.provider as ProviderId
+	return credentialsOf(row, provider).andThen(({ config, secrets }) =>
+		providerDefinition(provider).build(config, secrets),
 	)
 }
 
 /** Provider instance of `row`; a `ValidationError` when the integration is disabled. */
-export function enabledProviderFor(
-	row: IntegrationRow,
-): Result<ReturnType<typeof buildProvider>, Error> {
+export function enabledProviderFor(row: IntegrationRow): Result<IntegrationProvider, Error> {
 	if (!row.enabled) {
 		return Result.err(new ValidationError('Integration is disabled'))
 	}
@@ -346,7 +436,67 @@ export function enabledProviderFor(
 /** Provider instance of the enabled integration `provider`. */
 export async function enabledProvider(
 	provider: ProviderId,
-): Promise<Result<ReturnType<typeof buildProvider>, Error>> {
+): Promise<Result<IntegrationProvider, Error>> {
 	const row = await getIntegrationRow(provider)
 	return Result.isError(row) ? row : enabledProviderFor(row.value)
+}
+
+/** Optional provider methods that write to or read from an external system. */
+type OptionalMethod =
+	| 'createDevice'
+	| 'updateDevice'
+	| 'updateEmployee'
+	| 'createTicket'
+	| 'listTickets'
+	| 'listTags'
+
+/**
+ * One optional method of an enabled provider, bound to its instance, whose
+ * failures become `ExternalServiceError`s; a `ValidationError` naming
+ * `action` when the provider lacks it.
+ */
+export function providerMethod<M extends OptionalMethod>(
+	instance: IntegrationProvider,
+	method: M,
+	action: string,
+): Result<
+	(
+		...args: Parameters<NonNullable<IntegrationProvider[M]>>
+	) => ReturnType<NonNullable<IntegrationProvider[M]>>,
+	Error
+> {
+	const fn = instance[method] as
+		| ((...args: never[]) => Promise<Result<unknown, Error>>)
+		| undefined
+	if (!fn) {
+		return Result.err(new ValidationError(`Integration does not support ${action}`))
+	}
+	const bound = ((...args: never[]) =>
+		fn
+			.call(instance, ...args)
+			.then((result) =>
+				Result.isError(result)
+					? Result.err(new ExternalServiceError(result.error.message))
+					: result,
+			)) as unknown as (
+		...args: Parameters<NonNullable<IntegrationProvider[M]>>
+	) => ReturnType<NonNullable<IntegrationProvider[M]>>
+	return Result.ok(bound)
+}
+
+/** {@link providerMethod} of the enabled integration `provider`. */
+export async function enabledProviderMethod<M extends OptionalMethod>(
+	provider: ProviderId,
+	method: M,
+	action: string,
+): Promise<
+	Result<
+		(
+			...args: Parameters<NonNullable<IntegrationProvider[M]>>
+		) => ReturnType<NonNullable<IntegrationProvider[M]>>,
+		Error
+	>
+> {
+	const built = await enabledProvider(provider)
+	return Result.isError(built) ? built : providerMethod(built.value, method, action)
 }
