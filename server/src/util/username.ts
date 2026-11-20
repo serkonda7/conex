@@ -1,3 +1,1 @@
-export function normalize_username(username: string): string {
-	return username.trim().toLowerCase()
-}
+export { normalizeLogin as normalize_username } from 'shared/src/login'

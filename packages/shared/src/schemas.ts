@@ -31,7 +31,7 @@ import * as v from 'valibot'
 export * from '@serkonda7/conex-device-schema'
 
 // Username identity for local auth. Stored lowercase (see
-// `server/src/util/username.ts`); 1-254 chars of letters, digits, dot,
+// `normalizeLogin` in `shared/src/login.ts`); 1-254 chars of letters, digits, dot,
 // dash, underscore, plus or `@` (accounts of employees sign in with their
 // primary mail address), unambiguous in logs.
 export const UsernameSchema = v.pipe(
