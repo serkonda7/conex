@@ -8,7 +8,7 @@ import { hc } from 'hono/client'
 import type { AppType } from 'server/src/index'
 import type { FloorplanImpactJson, Page } from 'shared/src/types'
 import { type PluralKey, t, tp } from '../i18n'
-import { api_fetch } from '../lib/query'
+import { api_fetch, invalidate_queries } from '../lib/query'
 
 /** RPC client */
 export const client = hc<AppType>('/api', { fetch: api_fetch })
@@ -119,6 +119,28 @@ export async function fetch_all_pages<T>(
 		rows.push(...result.value.items)
 		if (rows.length >= result.value.total || result.value.items.length === 0) {
 			return Result.ok(rows)
+		}
+	}
+}
+
+/**
+ * Polls `load` in 1.5 s steps until `isRunning` is false, then invalidates
+ * cached queries: a finished run changed server data without a write from
+ * this client. A failed load returns its error without invalidating.
+ */
+export async function poll_run<T>(
+	load: () => Promise<Result<T, Error>>,
+	isRunning: (value: T) => boolean,
+): Promise<Result<T, Error>> {
+	for (;;) {
+		await new Promise((resolve) => setTimeout(resolve, 1500))
+		const res = await load()
+		if (Result.isError(res)) {
+			return res
+		}
+		if (!isRunning(res.value)) {
+			invalidate_queries()
+			return Result.ok(res.value)
 		}
 	}
 }
