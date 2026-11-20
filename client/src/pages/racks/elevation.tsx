@@ -1,3 +1,4 @@
+import { shelfBlockedRange } from 'shared/src/shelves'
 import type {
 	DeviceFace,
 	ElevationDeviceRef,
@@ -41,22 +42,13 @@ function shelf_footprint(shelf: ElevationShelfRef): USpan {
 	}
 }
 
-/**
- * Blocked U range of a shelf (mirrors `shelfBlockedRange` on the server):
- * the mount span counts unless `mount_usable` is set; the reserved span
- * always counts.
- */
+/** Blocked U range of a shelf as an inclusive `{first, last}` span. */
 function shelf_blocked(shelf: ElevationShelfRef): USpan | null {
-	if (shelf.mount_usable) {
-		if (shelf.reserved_height <= 0) {
-			return null
-		}
-		return {
-			first: shelf.position_u + shelf.mount_height,
-			last: shelf.position_u + shelf.mount_height + shelf.reserved_height - 1,
-		}
+	const blocked = shelfBlockedRange(shelf)
+	if (blocked === null) {
+		return null
 	}
-	return shelf_footprint(shelf)
+	return { first: blocked.position_u, last: blocked.position_u + blocked.height_u - 1 }
 }
 
 /** Mount hardware span of a shelf. */
