@@ -31,6 +31,7 @@ import {
 	IconStopwatch,
 	IconTag,
 	IconTemplate,
+	IconUserCog,
 	IconUsers,
 } from '@tabler/icons-solidjs'
 import type { Permission } from 'shared/src/types'
@@ -195,6 +196,7 @@ const SavedFiltersPage = lazyPage(() =>
 const SavedLayoutsPage = lazyPage(() =>
 	import('../pages/saved_layouts/list').then((m) => m.SavedLayoutsPage),
 )
+const SettingsPage = lazyPage(() => import('../pages/settings/view').then((m) => m.SettingsPage))
 const ServiceLevelDetailPage = lazyPage(() =>
 	import('../pages/service-levels/detail').then((m) => m.ServiceLevelDetailPage),
 )
@@ -562,6 +564,16 @@ export const SECTIONS: readonly Section[] = [
 		permission: null,
 		hideAddInNav: true,
 		list: SavedLayoutsPage,
+	},
+	{
+		// Reached from the account button at the right end of the top bar.
+		path: 'settings',
+		noun: (): string => t('account.settings'),
+		icon: IconUserCog,
+		permission: null,
+		hideInNav: true,
+		hideAddInNav: true,
+		list: SettingsPage,
 	},
 ]
 

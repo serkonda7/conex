@@ -555,13 +555,18 @@ tbody tr:last-child td {
 	align-items: center;
 	gap: 0.35rem;
 	max-width: 12rem;
+	padding: 0.36rem 0.6rem;
+	border-radius: 0.3rem;
 	font-size: var(--font-size-base);
+	color: var(--text);
+	text-decoration: none;
 	border: none;
 	background: transparent;
 }
 
 .app-user-button:hover {
 	background-color: var(--bg-hover);
+	text-decoration: none;
 }
 
 .app-user-info {
@@ -6501,6 +6506,46 @@ a.rack-shelf-plate:hover {
 
 .integration-report-asof {
 	margin-bottom: 0.5rem;
+}
+
+/* User settings: flat key-value groups stacked with horizontal rules, like the
+   detail pages' spec sheets — no cards. */
+.settings-page {
+	max-width: 48rem;
+}
+
+/* The heading icons sit in a 1.4rem gutter; titles and key-value rows both
+   start after it, and the shared label width lines values up across groups. */
+.settings-page .spec-sheet h4 {
+	display: grid;
+	grid-template-columns: 1.4rem minmax(0, 1fr);
+	align-items: center;
+}
+
+.settings-page .spec-sheet dl {
+	padding-left: 1.4rem;
+	grid-template-columns: 24rem minmax(0, 1fr);
+}
+
+.settings-icon-auth {
+	color: var(--success);
+}
+
+.settings-icon-prefs {
+	color: var(--link);
+}
+
+@media (max-width: 30rem) {
+	.settings-page .spec-sheet dl {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.settings-hint {
+	display: block;
+	margin-top: 0.25rem;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
 }
 
 .integration-settings {
