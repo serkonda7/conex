@@ -22,6 +22,13 @@
       "when": 1795180562359,
       "tag": "0002_unifi_site_links",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795345267934,
+      "tag": "0003_floorplan_drawings",
+      "breakpoints": true
     }
   ]
 }

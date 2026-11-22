@@ -1066,6 +1066,91 @@ export const floorplan_calibrations = pgTable('floorplan_calibrations', {
 	origin: jsonb('origin').$type<[number, number]>(),
 })
 
+// Drawn floor plan (v2) of a site or location, at most one per owner: a
+// sheet of `width` × `height` cm with walls and openings (doors, windows)
+// drawn on it, optionally over a reference image (an attachment of the same
+// owner, placed by `reference_frame` in cm). Walls and openings reference
+// nothing else, so they are one JSON document each; an opening points at its
+// wall by index.
+export const floorplan_drawings = pgTable(
+	'floorplan_drawings',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		site_id: integer('site_id')
+			.unique()
+			.references(() => sites.id, { onDelete: 'cascade' }),
+		location_id: integer('location_id')
+			.unique()
+			.references(() => locations.id, { onDelete: 'cascade' }),
+		width: doublePrecision('width').notNull(),
+		height: doublePrecision('height').notNull(),
+		reference_id: integer('reference_id').references(() => attachments.id, {
+			onDelete: 'set null',
+		}),
+		reference_frame: jsonb('reference_frame').$type<{ x: number; y: number; width: number }>(),
+		walls: jsonb('walls')
+			.$type<{ a: [number, number]; b: [number, number]; thickness: number }[]>()
+			.notNull()
+			.default([]),
+		openings: jsonb('openings')
+			.$type<
+				{
+					wall: number
+					kind: 'door' | 'window'
+					offset: number
+					width: number
+					hinge: 'start' | 'end'
+					side: 'left' | 'right'
+				}[]
+			>()
+			.notNull()
+			.default([]),
+		created_at: bigint('created_at', { mode: 'number' }).notNull(),
+		updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+	},
+	(table) => [
+		check(
+			'floorplan_drawings_owner_check',
+			sql`num_nonnulls(${table.site_id}, ${table.location_id}) = 1`,
+		),
+		index('floorplan_drawings_reference_id_idx').on(table.reference_id),
+	],
+)
+
+// Rack, device or outlet marker on a drawn floor plan, at `x` / `y` cm. Each
+// object sits on at most one drawn plan (unique FK), independent of the image
+// plans' `floorplan_placements`.
+export const floorplan_drawing_placements = pgTable(
+	'floorplan_drawing_placements',
+	{
+		id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+		drawing_id: integer('drawing_id')
+			.notNull()
+			.references(() => floorplan_drawings.id, { onDelete: 'cascade' }),
+		rack_id: integer('rack_id')
+			.unique()
+			.references(() => racks.id, { onDelete: 'cascade' }),
+		device_id: integer('device_id')
+			.unique()
+			.references(() => devices.id, { onDelete: 'cascade' }),
+		interface_id: integer('interface_id')
+			.unique()
+			.references(() => interfaces.id, { onDelete: 'cascade' }),
+		jack_id: integer('jack_id')
+			.unique()
+			.references(() => panel_jacks.id, { onDelete: 'cascade' }),
+		x: doublePrecision('x').notNull(),
+		y: doublePrecision('y').notNull(),
+	},
+	(table) => [
+		check(
+			'floorplan_drawing_placements_object_check',
+			sql`num_nonnulls(${table.rack_id}, ${table.device_id}, ${table.interface_id}, ${table.jack_id}) = 1`,
+		),
+		index('floorplan_drawing_placements_drawing_id_idx').on(table.drawing_id),
+	],
+)
+
 // ---------------------------------------------------------------------------
 // Integrations: read-only links to external systems (TANSS; UniFi and
 // servereye later). One row per provider in `integrations`; secrets are

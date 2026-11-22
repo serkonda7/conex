@@ -150,6 +150,8 @@ export const en = {
 	'entity.savedLayout.other': 'Saved layouts',
 	'entity.floorplan.one': 'Floor plan',
 	'entity.floorplan.other': 'Floor plans',
+	'entity.drawnFloorplan.one': 'Drawn floor plan',
+	'entity.drawnFloorplan.other': 'Drawn floor plans',
 	'noun.tenant.one': 'tenant',
 	'noun.tenant.other': 'tenants',
 	'noun.tenantGroup.one': 'tenant group',
@@ -212,6 +214,8 @@ export const en = {
 	'noun.attachment.other': 'images',
 	'noun.floorplan.one': 'floor plan',
 	'noun.floorplan.other': 'floor plans',
+	'noun.drawnFloorplan.one': 'drawn floor plan',
+	'noun.drawnFloorplan.other': 'drawn floor plans',
 
 	// components
 	'form.nameRequired': 'Name is required.',
@@ -253,8 +257,7 @@ export const en = {
 	'account.sectionPreferences': 'Preferences',
 	'account.password': 'Password',
 	'account.openItemsInNewTab': 'Open items in new tab',
-	'account.openItemsInNewTabDescription':
-		'Open links to items in a new browser tab.',
+	'account.openItemsInNewTabDescription': 'Open links to items in a new browser tab.',
 	'account.loadFailed': 'Could not load your account.',
 	'account.changePassword': 'Change password',
 	'account.currentPassword': 'Current password',
@@ -1070,6 +1073,7 @@ export const en = {
 	'changeObject.cable': 'Cable',
 	'changeObject.interfaceTemplate': 'Interface stub',
 	'changeObject.attachment': 'Image',
+	'changeObject.floorplanDrawing': 'Drawn floor plan',
 
 	// attachment
 	'attachment.title': 'Images',
@@ -1215,6 +1219,67 @@ export const en = {
 	'floorplan.deleteAreaNamed': 'Delete area {name}',
 	'floorplan.listEmpty':
 		'No floor plans yet. Mark an image of a site or location as its floor plan.',
+
+	// drawn floor plan (v2)
+	'drawnPlan.loading': 'Loading drawn floor plan…',
+	'drawnPlan.notFound': 'Drawn floor plan not found.',
+	'drawnPlan.pageName': 'Drawn floor plan {name}',
+	'drawnPlan.edit': 'Edit drawing',
+	'drawnPlan.open': 'Open drawn floor plan',
+	'drawnPlan.create': 'Draw floor plan',
+	'drawnPlan.creating': 'Creating…',
+	'drawnPlan.empty':
+		'Nothing is drawn yet. Edit the drawing to draw walls, doors and windows, optionally over a reference image, and to place racks, devices and outlets.',
+	'drawnPlan.listEmpty':
+		'No drawn floor plans yet. Draw one from the page of a site or location.',
+	'drawnPlan.walls': 'Walls',
+	'drawnPlan.impact': 'its drawn floor plan',
+	'drawnPlan.drawTab': 'Drawing',
+	'drawnPlan.addTab': 'Add ({count})',
+	'drawnPlan.planTab': 'Plan',
+	'drawnPlan.elements': 'Elements',
+	'drawnPlan.drawHint':
+		'Pick an element, then click on the plan. Drag doors and windows onto a wall.',
+	'drawnPlan.openingPlaceHint': 'Drag onto a wall, or click and then click a wall',
+	'drawnPlan.tools': 'Drawing tools',
+	'drawnPlan.toolWall': 'Wall',
+	'drawnPlan.toolDoor': 'Door',
+	'drawnPlan.toolWindow': 'Window',
+	'drawnPlan.wallHint': 'Click where the wall starts. Shift keeps it at 45° steps.',
+	'drawnPlan.wallNextHint':
+		'Click the next corner. Click the first corner, double-click or press Enter to finish.',
+	'drawnPlan.openingHint': 'Click a wall to put it there.',
+	'drawnPlan.moveImageHint': 'Drag to move the reference image.',
+	'drawnPlan.calibrateHint':
+		'Click two points on the image a known distance apart (the second snaps to 45° steps; Alt places it freely). Only the image is scaled.',
+	'drawnPlan.newWallThickness': 'New wall thickness (cm)',
+	'drawnPlan.snap': 'Snap',
+	'drawnPlan.snapHint':
+		'Snap corners to wall ends, onto walls and to the grid. Hold Alt to place freely.',
+	'drawnPlan.wallEnd': 'Wall end, drag to move',
+	'drawnPlan.length': 'Length (cm)',
+	'drawnPlan.thickness': 'Thickness (cm)',
+	'drawnPlan.width': 'Width (cm)',
+	'drawnPlan.door': 'Door',
+	'drawnPlan.window': 'Window',
+	'drawnPlan.flipHinge': 'Flip hinge',
+	'drawnPlan.flipSwing': 'Flip swing',
+	'drawnPlan.deleteWall': 'Delete wall',
+	'drawnPlan.deleteDoor': 'Delete door',
+	'drawnPlan.deleteWindow': 'Delete window',
+	'drawnPlan.sheet': 'Sheet',
+	'drawnPlan.sheetWidth': 'Width (m)',
+	'drawnPlan.sheetHeight': 'Height (m)',
+	'drawnPlan.reference': 'Reference image',
+	'drawnPlan.referenceImage': 'Image',
+	'drawnPlan.noReference': 'None',
+	'drawnPlan.uploadReference': 'Upload image',
+	'drawnPlan.opacity': 'Opacity',
+	'drawnPlan.moveImage': 'Move',
+	'drawnPlan.calibrate': 'Set scale',
+	'drawnPlan.fitSheet': 'Fit sheet to image',
+	'drawnPlan.showReference': 'Show the reference image',
+	'drawnPlan.hideReference': 'Hide the reference image',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',

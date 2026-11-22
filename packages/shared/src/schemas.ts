@@ -2149,29 +2149,36 @@ const FloorplanAreaInputSchema = v.pipe(
 	),
 )
 
+/** What a marker places: exactly one of a rack, device, outlet port or jack. */
+const PlacementTargetEntries = {
+	rack_id: v.optional(IdSchema, undefined),
+	device_id: v.optional(IdSchema, undefined),
+	interface_id: v.optional(IdSchema, undefined),
+	jack_id: v.optional(IdSchema, undefined),
+}
+
+function placesOneObject(placement: {
+	rack_id?: number
+	device_id?: number
+	interface_id?: number
+	jack_id?: number
+}): boolean {
+	return (
+		[placement.rack_id, placement.device_id, placement.interface_id, placement.jack_id].filter(
+			(id) => id !== undefined,
+		).length === 1
+	)
+}
+
+const PLACES_ONE_OBJECT = 'Exactly one of rack, device, port or jack is required'
+
 /**
  * Rack, device or outlet marker at a normalized position. An outlet is a
  * single-position rear port of a patch panel outside any jack, or a jack.
  */
 const FloorplanPlacementInputSchema = v.pipe(
-	v.strictObject({
-		rack_id: v.optional(IdSchema, undefined),
-		device_id: v.optional(IdSchema, undefined),
-		interface_id: v.optional(IdSchema, undefined),
-		jack_id: v.optional(IdSchema, undefined),
-		x: FloorplanCoordSchema,
-		y: FloorplanCoordSchema,
-	}),
-	v.check(
-		(placement) =>
-			[
-				placement.rack_id,
-				placement.device_id,
-				placement.interface_id,
-				placement.jack_id,
-			].filter((id) => id !== undefined).length === 1,
-		'Exactly one of rack, device, port or jack is required',
-	),
+	v.strictObject({ ...PlacementTargetEntries, x: FloorplanCoordSchema, y: FloorplanCoordSchema }),
+	v.check((placement) => placesOneObject(placement), PLACES_ONE_OBJECT),
 )
 
 /**
@@ -2313,6 +2320,8 @@ export interface FloorplanImpactJson {
 	placements: number
 	/** Areas on floor plans that link to (or outline) the deleted object. */
 	linkedFrom: number
+	/** The deleted object's own drawn floor plan with content (0 or 1). */
+	drawings: number
 }
 
 /** 409 body of a delete that needs `?confirm=floorplan`. */
@@ -2438,6 +2447,226 @@ export interface FloorplanListJson {
 }
 
 // ---------------------------------------------------------------------------
+// Drawn floor plans (v2): walls, doors, windows and markers drawn on a sheet
+// in centimeters, optionally over a reference image
+// ---------------------------------------------------------------------------
+
+/** Largest sheet side and coordinate of a drawn plan: 1 km. */
+export const MAX_DRAWING_CM = 100_000
+
+/** Default sheet of a new drawn plan: 20 m × 15 m. */
+export const DEFAULT_DRAWING_SIZE = { width: 2000, height: 1500 } as const
+
+/** Position on a drawn plan's sheet in centimeters, from its top-left corner. */
+const DrawingCoordSchema = v.pipe(
+	v.number('Coordinate must be a number'),
+	v.minValue(0, 'Coordinate must lie on the sheet'),
+	v.maxValue(MAX_DRAWING_CM, 'Coordinate must lie on the sheet'),
+)
+
+const DrawingPointSchema = v.tuple([DrawingCoordSchema, DrawingCoordSchema])
+
+const SheetSideSchema = v.pipe(
+	v.number('Sheet size must be a number'),
+	v.minValue(100, 'The sheet must be at least 1 m wide and high'),
+	v.maxValue(MAX_DRAWING_CM, 'The sheet must be at most 1 km wide and high'),
+)
+
+/** Rack, device or outlet marker on a drawn plan, at a position in cm. */
+const DrawingPlacementInputSchema = v.pipe(
+	v.strictObject({ ...PlacementTargetEntries, x: DrawingCoordSchema, y: DrawingCoordSchema }),
+	v.check((placement) => placesOneObject(placement), PLACES_ONE_OBJECT),
+)
+
+/** Thinnest and thickest wall, cm. */
+export const MIN_WALL_THICKNESS = 1
+export const MAX_WALL_THICKNESS = 200
+
+/** A straight wall from `a` to `b` (cm) with its thickness (cm), centered on the line. */
+export const FloorplanWallSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		thickness: v.pipe(
+			v.number('Wall thickness must be a number'),
+			v.minValue(MIN_WALL_THICKNESS, `Walls are at least ${MIN_WALL_THICKNESS} cm thick`),
+			v.maxValue(MAX_WALL_THICKNESS, `Walls are at most ${MAX_WALL_THICKNESS} cm thick`),
+		),
+	}),
+	v.check((wall) => wall.a[0] !== wall.b[0] || wall.a[1] !== wall.b[1], 'A wall needs a length'),
+)
+
+export type FloorplanWall = v.InferOutput<typeof FloorplanWallSchema>
+
+export const OPENING_KINDS = ['door', 'window'] as const
+
+export type OpeningKind = (typeof OPENING_KINDS)[number]
+
+/** Narrowest and widest door or window, cm. */
+export const MIN_OPENING_WIDTH = 10
+export const MAX_OPENING_WIDTH = 2000
+
+/**
+ * Door or window in a wall (`wall` is its index in `walls`): centered
+ * `offset` cm from the wall's start `a`, `width` cm wide. A door hinges at the
+ * end of the opening facing `hinge` and swings to `side`, seen from `a` to
+ * `b`; a window ignores both.
+ */
+export const FloorplanOpeningSchema = v.strictObject({
+	wall: v.pipe(v.number(), v.integer(), v.minValue(0)),
+	kind: v.picklist(OPENING_KINDS),
+	offset: v.pipe(v.number('Offset must be a number'), v.minValue(0)),
+	width: v.pipe(
+		v.number('Width must be a number'),
+		v.minValue(
+			MIN_OPENING_WIDTH,
+			`Doors and windows are at least ${MIN_OPENING_WIDTH} cm wide`,
+		),
+		v.maxValue(MAX_OPENING_WIDTH, `Doors and windows are at most ${MAX_OPENING_WIDTH} cm wide`),
+	),
+	hinge: v.picklist(['start', 'end']),
+	side: v.picklist(['left', 'right']),
+})
+
+export type FloorplanOpening = v.InferOutput<typeof FloorplanOpeningSchema>
+
+/**
+ * Reference image under a drawn plan: an image attachment of the same
+ * owner, its top-left corner at (`x`, `y`) cm (it may stick out of the
+ * sheet) and `width` cm wide; the height follows from its aspect ratio.
+ */
+export const FloorplanReferenceSchema = v.strictObject({
+	attachment_id: IdSchema,
+	x: v.pipe(v.number(), v.minValue(-10 * MAX_DRAWING_CM), v.maxValue(MAX_DRAWING_CM)),
+	y: v.pipe(v.number(), v.minValue(-10 * MAX_DRAWING_CM), v.maxValue(MAX_DRAWING_CM)),
+	width: v.pipe(
+		v.number('Image width must be a number'),
+		v.minValue(1, 'The image must be at least 1 cm wide'),
+		v.maxValue(10 * MAX_DRAWING_CM, 'The image is too wide'),
+	),
+})
+
+export type FloorplanReference = v.InferOutput<typeof FloorplanReferenceSchema>
+
+/** Length of a wall, cm. */
+export function wallLength(wall: Pick<FloorplanWall, 'a' | 'b'>): number {
+	return Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1])
+}
+
+/** How far a door or window may reach past its wall's ends: rounding slack, cm. */
+const OPENING_SLACK = 0.5
+
+/**
+ * `PUT /floorplan-drawings/:id`: the sheet, the reference image and the
+ * full set of walls, openings and markers, replaced atomically. Walls and
+ * markers lie on the sheet; each opening fits into its wall.
+ */
+export const FloorplanDrawingPutSchema = v.pipe(
+	v.strictObject({
+		width: SheetSideSchema,
+		height: SheetSideSchema,
+		reference: v.optional(v.nullable(FloorplanReferenceSchema), null),
+		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
+		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
+		placements: v.pipe(v.array(DrawingPlacementInputSchema), v.maxLength(2000)),
+	}),
+	v.check(
+		(plan) =>
+			[
+				...plan.walls.flatMap((wall) => [wall.a, wall.b]),
+				...plan.placements.map((p): [number, number] => [p.x, p.y]),
+			].every(([x, y]) => x <= plan.width && y <= plan.height),
+		'Walls and markers must lie on the sheet',
+	),
+	v.check((plan) => {
+		return plan.openings.every((opening) => {
+			const wall = plan.walls[opening.wall]
+			if (!wall) {
+				return false
+			}
+			const half = opening.width / 2
+			return (
+				opening.offset - half >= -OPENING_SLACK &&
+				opening.offset + half <= wallLength(wall) + OPENING_SLACK
+			)
+		})
+	}, 'Each door and window must fit into its wall'),
+)
+
+export type FloorplanDrawingPut = v.InferOutput<typeof FloorplanDrawingPutSchema>
+
+/** `POST /floorplan-drawings`: an empty drawn plan for a site or location. */
+export const FloorplanDrawingCreateSchema = v.pipe(
+	v.strictObject({
+		site_id: v.optional(IdSchema, undefined),
+		location_id: v.optional(IdSchema, undefined),
+		width: v.optional(SheetSideSchema, DEFAULT_DRAWING_SIZE.width),
+		height: v.optional(SheetSideSchema, DEFAULT_DRAWING_SIZE.height),
+	}),
+	v.check(
+		(body) => hasOneOwner(body.site_id, body.location_id),
+		'Exactly one of site or location is required',
+	),
+)
+
+export type FloorplanDrawingCreate = v.InferOutput<typeof FloorplanDrawingCreateSchema>
+
+/** `GET /floorplan-drawings/owner?site=|location=`: the owner's drawn plan, if any. */
+export const FloorplanDrawingOwnerQuerySchema = v.pipe(
+	v.object({ site: OptionalIdEntry, location: OptionalIdEntry }),
+	v.check((q) => hasOneOwner(q.site, q.location), 'Exactly one of site or location is required'),
+)
+
+export type FloorplanDrawingOwnerQuery = v.InferOutput<typeof FloorplanDrawingOwnerQuerySchema>
+
+/**
+ * `GET /floorplan-drawings/:id`. Markers whose object lies outside the
+ * requester's tenant scope are left out; their `x` / `y` are centimeters.
+ */
+export interface FloorplanDrawingJson {
+	id: number
+	/** Owner: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+	/** Sheet size, cm. */
+	width: number
+	height: number
+	/** The reference image and where it lies; `null` without one. */
+	reference: (FloorplanReference & { attachment: AttachmentJson }) | null
+	walls: FloorplanWall[]
+	openings: FloorplanOpening[]
+	placements: FloorplanPlacementJson[]
+	/** Some markers are outside the requester's scope (a save keeps them). */
+	has_hidden_content: boolean
+	/** Unix seconds. */
+	updated_at: number
+}
+
+/** `GET /floorplan-drawings/owner`: the owner's drawn plan, or `null`. */
+export interface FloorplanDrawingRefJson {
+	id: number
+}
+
+/** `GET /floorplan-drawings?search=&page=&limit=&tenant=&tenant_group=`. */
+export const FloorplanDrawingListQuerySchema: typeof FloorplanListQuerySchema =
+	FloorplanListQuerySchema
+
+/** Drawn floor plan row of the `/floorplans-v2` list. */
+export interface FloorplanDrawingListJson {
+	id: number
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+	location_type: LocationType | null
+	site_name: string
+	tenant_id: number | null
+	tenant_name: string | null
+	walls: number
+	placements: number
+}
+
+// ---------------------------------------------------------------------------
 // Changelog (NetBox-style object change history, read-only)
 // ---------------------------------------------------------------------------
 
@@ -2467,6 +2696,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'interface_template',
 	'device_role',
 	'attachment',
+	'floorplan_drawing',
 	'priority',
 	'service_level',
 	'managed_bundle',

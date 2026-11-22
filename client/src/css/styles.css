@@ -2461,7 +2461,12 @@ tbody tr:last-child td {
 	min-height: 2.1rem;
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle {
 	appearance: none;
 	position: relative;
@@ -2477,7 +2482,12 @@ tbody tr:last-child td {
 	transition: background-color 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle::before {
 	content: "";
 	position: absolute;
@@ -2490,17 +2500,32 @@ tbody tr:last-child td {
 	transition: transform 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle:checked {
 	background-color: var(--primary);
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle:checked::before {
 	transform: translateX(1rem);
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle:disabled {
 	cursor: not-allowed;
 	opacity: 0.5;
@@ -6379,4 +6404,223 @@ a.rack-shelf-plate:hover {
 	margin: 0;
 	max-width: 36rem;
 	color: var(--text-secondary);
+}
+
+/* Drawn floor plan (v2): the sheet in a fill-layout zoom viewport with the
+   walls drawn in sheet centimeters (SVG user units) and HTML overlay pieces
+   on top. Line widths of guides stay on screen size through
+   non-scaling-stroke and --line-zoom. */
+.drawn-plan-frame {
+	margin: 0.6rem 0;
+}
+
+.drawn-plan-frame .zoom-viewport {
+	max-height: 70vh;
+}
+
+.drawn-plan-svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+.drawn-plan-sheet {
+	fill: var(--bg-surface);
+}
+
+.drawn-plan-grid line {
+	stroke: var(--border);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+	opacity: 0.6;
+}
+
+.drawn-plan-grid-major line {
+	stroke: var(--border-strong);
+	opacity: 0.9;
+}
+
+.drawn-plan-wall {
+	fill: var(--text-secondary);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-wall.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-wall.editable:hover {
+	fill: var(--text);
+}
+
+.drawn-plan-wall.selected {
+	fill: var(--primary-text);
+	stroke: var(--primary-text);
+}
+
+/* Doors and windows: the gap through the wall, then the leaf and swing or the glass. */
+.drawn-plan-opening-gap {
+	fill: var(--bg-surface);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-window,
+.drawn-plan-door-leaf,
+.drawn-plan-door-swing {
+	fill: none;
+	stroke: var(--text-secondary);
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-window {
+	stroke: var(--link);
+}
+
+.drawn-plan-door-swing {
+	stroke-dasharray: 4 3;
+}
+
+.drawn-plan-opening.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-opening.selected .drawn-plan-opening-gap,
+.drawn-plan-opening.selected .drawn-plan-door-leaf,
+.drawn-plan-opening.selected .drawn-plan-door-swing {
+	stroke: var(--primary-text);
+}
+
+.drawn-plan-ghost {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* The wall being drawn, at the new wall's thickness. */
+.drawn-plan-draft {
+	stroke: var(--link);
+	stroke-linecap: square;
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* Length of the wall being drawn or selected. */
+.drawn-plan-label {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--inv-zoom)) translate(-50%, -150%);
+	padding: 0 0.35rem;
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+	color: var(--primary-contrast);
+	background-color: var(--primary);
+	border-radius: 0.25rem;
+	pointer-events: none;
+}
+
+.drawn-plan-move-layer {
+	cursor: move;
+}
+
+/* Stage left, side panel right; the stage fills its column. */
+.drawn-plan-layout {
+	display: grid;
+	grid-template-columns: 17rem minmax(0, 1fr);
+	gap: 0.75rem;
+	align-items: start;
+}
+
+.drawn-plan-tools {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.3rem;
+	margin-bottom: 0.5rem;
+}
+
+.drawn-plan-tool.active {
+	border-color: var(--primary);
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.drawn-plan-fields {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.4rem;
+	margin-bottom: 0.5rem;
+}
+
+.drawn-plan-fields label,
+.drawn-plan-opacity {
+	display: grid;
+	gap: 0.2rem;
+	font-size: var(--font-size-sm);
+}
+
+.drawn-plan-control {
+	width: 100%;
+	min-width: 0;
+}
+
+.drawn-plan-opacity {
+	margin-bottom: 0.5rem;
+}
+
+/* The file input hides behind its label, which looks like a button. */
+.drawn-plan-upload {
+	align-self: end;
+	display: inline-flex;
+	justify-content: center;
+	padding: 0.35rem 0.5rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.3rem;
+	background-color: var(--bg-raised);
+	cursor: pointer;
+}
+
+.drawn-plan-upload-input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+}
+
+.drawn-plan-upload:focus-within {
+	outline: 2px solid var(--primary);
+}
+
+/* Draw tab: elements look like the Add tab's palette items; the active one is highlighted. */
+.drawn-plan-element {
+	cursor: pointer;
+}
+
+.drawn-plan-element[draggable="true"] {
+	cursor: grab;
+}
+
+.drawn-plan-element.active {
+	border-color: var(--primary);
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+/* Tabs size to their labels, so a longer one ("Add (12)") does not wrap. */
+.drawn-plan-tab {
+	flex: 1 1 auto;
+	padding: 0.2rem 0.35rem;
+	white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+	.drawn-plan-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }

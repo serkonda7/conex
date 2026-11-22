@@ -44,6 +44,8 @@ import {
 	devices,
 	floorplan_areas,
 	floorplan_calibrations,
+	floorplan_drawing_placements,
+	floorplan_drawings,
 	floorplan_placements,
 	interfaces,
 	locations,
@@ -123,7 +125,7 @@ const NO_RACK_FLOORPLAN = 'Rack images cannot be marked as the floor plan'
 const ALREADY_PLACED = 'A rack, device or outlet is already placed on another floor plan'
 
 /** Panel device of a placed outlet (rear port); `devices` itself is the placed device. */
-const portDevice = alias(devices, 'port_device')
+export const portDevice = alias(devices, 'port_device')
 
 /** Device an area outlines, and its role. */
 const areaDevice = alias(devices, 'area_device')
@@ -135,7 +137,7 @@ const areaTenantSql: SQL<number | null> = sql<
 >`coalesce(${sites.tenant_id}, ${locations.tenant_id}, ${areaDevice.tenant_id})`
 
 /** First port of a jack: it stands for the jack's panel and tenant. */
-function firstJackPort(jackId: SQL | PgColumn): SQL<number | null> {
+export function firstJackPort(jackId: SQL | PgColumn): SQL<number | null> {
 	return sql<
 		number | null
 	>`(select min(jp.id) from ${interfaces} jp where jp.jack_id = ${jackId})`
@@ -153,13 +155,13 @@ const placementTenantSql: SQL<number | null> = sql<
 >`coalesce(${racks.tenant_id}, ${devices.tenant_id}, ${portDevice.tenant_id})`
 
 /** An outlet: a single rear port, or a jack of several. */
-interface OutletKey {
+export interface OutletKey {
 	interface_id: number | null
 	jack_id: number | null
 }
 
 /** Ports of each outlet in `keys`, in port order (`FloorplanPortJson.ports`). */
-async function outletPorts(
+export async function outletPorts(
 	keys: OutletKey[],
 ): Promise<(key: OutletKey) => FloorplanOutletPortJson[]> {
 	const ids = keys.flatMap((key) => (key.jack_id === null ? (key.interface_id ?? []) : []))
@@ -196,7 +198,7 @@ async function outletPorts(
 }
 
 /** Outlet details of a placement or candidate row, or `null` when it is no outlet. */
-function portOf(
+export function portOf(
 	row: {
 		port_device_id: number | null
 		port_device_name: string | null
@@ -219,10 +221,10 @@ function portOf(
 const outletPortNameSql: SQL<string> = sql<string>`coalesce(${panel_jacks.name}, ${interfaces.name})`
 
 /** `PP-A 12`: an outlet's label on plans and in palettes. */
-const outletNameSql: SQL<string> = sql<string>`${portDevice.name} || ' ' || ${outletPortNameSql}`
+export const outletNameSql: SQL<string> = sql<string>`${portDevice.name} || ' ' || ${outletPortNameSql}`
 
 /** Outlet columns selected alongside a placement or candidate (`portOf`). */
-const portColumns: {
+export const portColumns: {
 	port_device_id: typeof portDevice.id
 	port_device_name: typeof portDevice.name
 	port_name: SQL<string>
@@ -237,7 +239,7 @@ const STORED_FILE = new RegExp(
 	`^[0-9a-f-]{36}\\.(?:tmp|${Object.values(IMAGE_EXTENSIONS).join('|')})$`,
 )
 
-function toJson(row: AttachmentRow): AttachmentJson {
+export function toJson(row: AttachmentRow): AttachmentJson {
 	return { ...row, is_floorplan: row.is_floorplan !== 0 }
 }
 
@@ -688,7 +690,7 @@ function ownerOf(row: AttachmentRow): AttachmentOwner {
  * Locations a plan owner contains: `null` for a site (all of it), else the
  * location itself and its descendants.
  */
-async function ownerLocations(owner: AttachmentOwner): Promise<number[] | null> {
+export async function ownerLocations(owner: AttachmentOwner): Promise<number[] | null> {
 	if (owner.location_id === undefined) {
 		return null
 	}
@@ -713,7 +715,7 @@ async function ownerLocations(owner: AttachmentOwner): Promise<number[] | null> 
 }
 
 /** Rack or device columns lying in the owner's scope (see `ownerLocations`). */
-function containedIn(
+export function containedIn(
 	columns: { site_id: PgColumn; location_id: PgColumn },
 	owner: AttachmentOwner,
 	locationIds: number[] | null,
@@ -724,11 +726,14 @@ function containedIn(
 }
 
 /** SQL twin of `!visibleTo`: shared (`NULL`) tenants lie outside too. */
-function outsideScope(tenant: SQL, scopeTenantIds: readonly number[]): SQL {
+export function outsideScope(tenant: SQL, scopeTenantIds: readonly number[]): SQL {
 	return sql`not coalesce(${inTenants(tenant, scopeTenantIds)}, false)`
 }
 
-function visibleTo(tenant: number | null, scopeTenantIds: readonly number[] | undefined): boolean {
+export function visibleTo(
+	tenant: number | null,
+	scopeTenantIds: readonly number[] | undefined,
+): boolean {
 	return inScope(tenant, scopeTenantIds)
 }
 
@@ -862,7 +867,7 @@ export async function listPlanCandidates(
 }
 
 /** Site of a plan owner: the site itself, or the site of the owning location. */
-async function siteOfOwner(owner: AttachmentOwner): Promise<number | null> {
+export async function siteOfOwner(owner: AttachmentOwner): Promise<number | null> {
 	if (owner.site_id !== undefined) {
 		return owner.site_id
 	}
@@ -1049,7 +1054,7 @@ async function checkPlanInput(
  * jack, or jacks, and their panels lie in the owner's site. Missing and
  * invisible ports and jacks get the same message.
  */
-async function checkOutlets(
+export async function checkOutlets(
 	owner: AttachmentOwner,
 	interfaceIds: number[],
 	jackIds: number[],
@@ -1505,6 +1510,33 @@ export async function prunePlacements(): Promise<void> {
 	`)
 }
 
+/**
+ * 1 when the owner has a drawn floor plan with walls or markers, which its
+ * delete removes too. Lives here, not in `floorplan_drawings.ts`, which
+ * imports this module.
+ */
+async function drawingImpact(owner: AttachmentOwner): Promise<number> {
+	const [row] = await getDb()
+		.select({
+			id: floorplan_drawings.id,
+			walls: sql<number>`jsonb_array_length(${floorplan_drawings.walls})`,
+		})
+		.from(floorplan_drawings)
+		.where(
+			owner.site_id !== undefined
+				? eq(floorplan_drawings.site_id, owner.site_id)
+				: eq(floorplan_drawings.location_id, owner.location_id ?? 0),
+		)
+	if (!row) {
+		return 0
+	}
+	const placed = await getDb().$count(
+		floorplan_drawing_placements,
+		eq(floorplan_drawing_placements.drawing_id, row.id),
+	)
+	return row.walls + placed > 0 ? 1 : 0
+}
+
 /** Object whose delete can remove floor-plan data: a plan owner, or a device areas outline. */
 export type FloorplanDeleteTarget = AttachmentOwner | { device_id: number }
 
@@ -1522,6 +1554,7 @@ async function floorplanImpact(target: FloorplanDeleteTarget): Promise<Floorplan
 				floorplan_areas,
 				eq(floorplan_areas.device_id, target.device_id),
 			),
+			drawings: 0,
 		}
 	}
 	const owner = target
@@ -1544,6 +1577,7 @@ async function floorplanImpact(target: FloorplanDeleteTarget): Promise<Floorplan
 				)
 			: 0,
 		linkedFrom: await getDb().$count(floorplan_areas, linked),
+		drawings: await drawingImpact(owner),
 	}
 }
 
@@ -1559,7 +1593,7 @@ export async function checkFloorplanDelete(
 		return Result.ok(undefined)
 	}
 	const impact = await floorplanImpact(target)
-	return impact.areas + impact.placements + impact.linkedFrom > 0
+	return impact.areas + impact.placements + impact.linkedFrom + impact.drawings > 0
 		? Result.err(new FloorplanImpactError(impact))
 		: Result.ok(undefined)
 }
@@ -1825,6 +1859,7 @@ export async function deleteAttachment(
 				eq(floorplan_placements.attachment_id, id),
 			),
 			linkedFrom: 0,
+			drawings: 0,
 		}
 		if (impact.areas + impact.placements > 0) {
 			return Result.err(new FloorplanImpactError(impact))

@@ -31,6 +31,7 @@ import {
 	RelatedTabs,
 	useDetailDelete,
 } from '../../components/detail_page'
+import { DrawnPlanLink } from '../../components/drawn_plan_link'
 import { InlineError } from '../../components/feedback'
 import { FloorplanLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
@@ -302,6 +303,7 @@ export function SiteDetailPage(props: { id: number }): JSX.Element {
 								</>
 							)}
 						</Show>
+						<DrawnPlanLink owner={{ site: props.id }} onError={setError} />
 						<FloorplanLinks
 							target={{ site: props.id }}
 							label="floorplan.linkedFrom"

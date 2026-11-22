@@ -26,6 +26,7 @@ import {
 	IconMapPin,
 	IconPackages,
 	IconPlugConnected,
+	IconRuler2,
 	IconShieldLock,
 	IconStack3,
 	IconStopwatch,
@@ -109,6 +110,12 @@ const FloorplanDetailPage = lazyPage(() =>
 )
 const FloorplansPage = lazyPage(() =>
 	import('../pages/floorplans/list').then((m) => m.FloorplansPage),
+)
+const DrawnFloorplanDetailPage = lazyPage(() =>
+	import('../pages/floorplans_v2/detail').then((m) => m.DrawnFloorplanDetailPage),
+)
+const DrawnFloorplansPage = lazyPage(() =>
+	import('../pages/floorplans_v2/list').then((m) => m.DrawnFloorplansPage),
 )
 const IntegrationAddPage = lazyPage(() =>
 	import('../pages/integrations/add').then((m) => m.IntegrationAddPage),
@@ -307,6 +314,16 @@ export const SECTIONS: readonly Section[] = [
 		hideAddInNav: true,
 		list: FloorplansPage,
 		detail: FloorplanDetailPage,
+	},
+	{
+		// Drawn floor plans (v2), created from their site's or location's page.
+		path: 'floorplans-v2',
+		noun: (n: number): string => tp('entity.drawnFloorplan', n),
+		permission: 'view',
+		icon: IconRuler2,
+		hideAddInNav: true,
+		list: DrawnFloorplansPage,
+		detail: DrawnFloorplanDetailPage,
 	},
 	{
 		path: 'employees',

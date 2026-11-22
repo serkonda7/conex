@@ -32,6 +32,7 @@ const OBJECT_ROUTES: Partial<Record<ChangeObjectType, string>> = {
 	priority: 'priorities',
 	service_level: 'service-levels',
 	managed_bundle: 'managed-bundles',
+	floorplan_drawing: 'floorplans-v2',
 }
 
 /** Object name at the time of the change, linked while the object can still exist. */

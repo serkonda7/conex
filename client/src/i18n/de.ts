@@ -152,6 +152,8 @@ export const de: Messages = {
 	'entity.savedLayout.other': 'Gespeicherte Layouts',
 	'entity.floorplan.one': 'Grundriss',
 	'entity.floorplan.other': 'Grundrisse',
+	'entity.drawnFloorplan.one': 'Gezeichneter Grundriss',
+	'entity.drawnFloorplan.other': 'Gezeichnete Grundrisse',
 	'noun.tenant.one': 'Firma',
 	'noun.tenant.other': 'Firmen',
 	'noun.tenantGroup.one': 'Firmengruppe',
@@ -214,6 +216,8 @@ export const de: Messages = {
 	'noun.attachment.other': 'Bilder',
 	'noun.floorplan.one': 'Grundriss',
 	'noun.floorplan.other': 'Grundrisse',
+	'noun.drawnFloorplan.one': 'gezeichneter Grundriss',
+	'noun.drawnFloorplan.other': 'gezeichnete Grundrisse',
 
 	// components
 	'form.nameRequired': 'Name ist erforderlich.',
@@ -255,8 +259,7 @@ export const de: Messages = {
 	'account.sectionPreferences': 'Voreinstellungen',
 	'account.password': 'Passwort',
 	'account.openItemsInNewTab': 'Objekte in neuem Tab öffnen',
-	'account.openItemsInNewTabDescription':
-		'Links zu Objekten in einem neuen Browser-Tab öffnen.',
+	'account.openItemsInNewTabDescription': 'Links zu Objekten in einem neuen Browser-Tab öffnen.',
 	'account.loadFailed': 'Konto konnte nicht geladen werden.',
 	'account.changePassword': 'Passwort ändern',
 	'account.currentPassword': 'Aktuelles Passwort',
@@ -1077,6 +1080,7 @@ export const de: Messages = {
 	'changeObject.cable': 'Kabel',
 	'changeObject.interfaceTemplate': 'Anschlussplatzhalter',
 	'changeObject.attachment': 'Bild',
+	'changeObject.floorplanDrawing': 'Gezeichneter Grundriss',
 
 	// attachment
 	'attachment.title': 'Bilder',
@@ -1227,6 +1231,68 @@ export const de: Messages = {
 	'floorplan.deleteAreaNamed': 'Bereich {name} löschen',
 	'floorplan.listEmpty':
 		'Noch keine Grundrisse. Markiere ein Bild eines Standorts oder Bereichs als Grundriss.',
+
+	// drawn floor plan (v2)
+	'drawnPlan.loading': 'Gezeichneter Grundriss wird geladen…',
+	'drawnPlan.notFound': 'Gezeichneter Grundriss nicht gefunden.',
+	'drawnPlan.pageName': 'Gezeichneter Grundriss {name}',
+	'drawnPlan.edit': 'Zeichnung bearbeiten',
+	'drawnPlan.open': 'Gezeichneten Grundriss öffnen',
+	'drawnPlan.create': 'Grundriss zeichnen',
+	'drawnPlan.creating': 'Wird angelegt…',
+	'drawnPlan.empty':
+		'Noch nichts gezeichnet. Bearbeite die Zeichnung, um Wände, Türen und Fenster zu zeichnen, optional über einem Referenzbild, und um Racks, Geräte und Dosen zu platzieren.',
+	'drawnPlan.listEmpty':
+		'Noch keine gezeichneten Grundrisse. Zeichne einen auf der Seite eines Standorts oder Ortes.',
+	'drawnPlan.walls': 'Wände',
+	'drawnPlan.impact': 'seinen gezeichneten Grundriss',
+	'drawnPlan.drawTab': 'Zeichnen',
+	'drawnPlan.addTab': 'Hinzufügen ({count})',
+	'drawnPlan.planTab': 'Plan',
+	'drawnPlan.elements': 'Bauteile',
+	'drawnPlan.drawHint':
+		'Wähle ein Bauteil und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen.',
+	'drawnPlan.openingPlaceHint':
+		'Auf eine Wand ziehen, oder anklicken und dann eine Wand anklicken',
+	'drawnPlan.tools': 'Zeichenwerkzeuge',
+	'drawnPlan.toolWall': 'Wand',
+	'drawnPlan.toolDoor': 'Tür',
+	'drawnPlan.toolWindow': 'Fenster',
+	'drawnPlan.wallHint': 'Klicke dort, wo die Wand beginnt. Umschalt hält sie in 45°-Schritten.',
+	'drawnPlan.wallNextHint':
+		'Klicke die nächste Ecke. Klicke die erste Ecke, doppelklicke oder drücke Enter zum Beenden.',
+	'drawnPlan.openingHint': 'Klicke auf eine Wand, um es dort einzusetzen.',
+	'drawnPlan.moveImageHint': 'Ziehe, um das Referenzbild zu verschieben.',
+	'drawnPlan.calibrateHint':
+		'Klicke zwei Punkte auf dem Bild mit bekanntem Abstand (der zweite rastet in 45°-Schritten ein; Alt setzt ihn frei). Nur das Bild wird skaliert.',
+	'drawnPlan.newWallThickness': 'Stärke neuer Wände (cm)',
+	'drawnPlan.snap': 'Einrasten',
+	'drawnPlan.snapHint':
+		'Ecken rasten an Wandenden, auf Wänden und am Raster ein. Alt gedrückt halten, um frei zu platzieren.',
+	'drawnPlan.wallEnd': 'Wandende, zum Verschieben ziehen',
+	'drawnPlan.length': 'Länge (cm)',
+	'drawnPlan.thickness': 'Stärke (cm)',
+	'drawnPlan.width': 'Breite (cm)',
+	'drawnPlan.door': 'Tür',
+	'drawnPlan.window': 'Fenster',
+	'drawnPlan.flipHinge': 'Anschlag tauschen',
+	'drawnPlan.flipSwing': 'Öffnungsrichtung tauschen',
+	'drawnPlan.deleteWall': 'Wand löschen',
+	'drawnPlan.deleteDoor': 'Tür löschen',
+	'drawnPlan.deleteWindow': 'Fenster löschen',
+	'drawnPlan.sheet': 'Blatt',
+	'drawnPlan.sheetWidth': 'Breite (m)',
+	'drawnPlan.sheetHeight': 'Höhe (m)',
+	'drawnPlan.reference': 'Referenzbild',
+	'drawnPlan.referenceImage': 'Bild',
+	'drawnPlan.noReference': 'Keines',
+	'drawnPlan.uploadReference': 'Bild hochladen',
+	'drawnPlan.opacity': 'Deckkraft',
+	'drawnPlan.moveImage': 'Verschieben',
+	'drawnPlan.calibrate': 'Maßstab setzen',
+	'drawnPlan.fitSheet': 'Blatt an Bild anpassen',
+	'drawnPlan.showReference': 'Referenzbild anzeigen',
+	'drawnPlan.hideReference': 'Referenzbild ausblenden',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',

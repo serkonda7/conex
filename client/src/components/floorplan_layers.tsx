@@ -108,7 +108,7 @@ export function markerNamesVisible(): boolean {
 	return markerNames()
 }
 
-function toggleMarkerNames(): void {
+export function toggleMarkerNames(): void {
 	const next = !markerNames()
 	setMarkerNames(next)
 	writeStored(NAMES_STORAGE_KEY, String(next))

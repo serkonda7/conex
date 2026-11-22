@@ -325,6 +325,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	interface_template: 'changeObject.interfaceTemplate',
 	device_role: 'entity.deviceRole.one',
 	attachment: 'changeObject.attachment',
+	floorplan_drawing: 'changeObject.floorplanDrawing',
 	priority: 'entity.priority.one',
 	service_level: 'entity.serviceLevel.one',
 	managed_bundle: 'entity.managedBundle.one',

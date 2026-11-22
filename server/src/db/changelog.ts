@@ -102,6 +102,10 @@ async function tenantOf(
 		case 'device':
 		case 'virtual_machine':
 			return ref('tenant_id')
+		case 'floorplan_drawing':
+			return cached(`owner:${ref('site_id')}:${ref('location_id')}:null`, () =>
+				ownerTenant({ site_id: ref('site_id'), location_id: ref('location_id') }),
+			)
 		case 'attachment': {
 			const owner = {
 				site_id: ref('site_id'),

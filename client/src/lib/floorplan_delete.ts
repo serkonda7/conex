@@ -14,11 +14,12 @@ export type RemoveFn = (id: number, opts?: DeleteQuery) => Promise<Result<unknow
 
 /** Second confirm: names the floor-plan data that would be deleted too. */
 function confirmImpact(name: string, error: FloorplanImpactError): boolean {
-	const { areas, placements, linkedFrom } = error.floorplan
+	const { areas, placements, linkedFrom, drawings } = error.floorplan
 	const parts = [
 		areas > 0 ? tp('floorplan.areaCount', areas) : null,
 		placements > 0 ? tp('floorplan.markerCount', placements) : null,
 		linkedFrom > 0 ? tp('floorplan.linkedCount', linkedFrom) : null,
+		drawings > 0 ? t('drawnPlan.impact') : null,
 	].filter((part) => part !== null)
 	return window.confirm(t('floorplan.confirmDelete', { name, impact: parts.join(', ') }))
 }

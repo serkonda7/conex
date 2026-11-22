@@ -147,7 +147,7 @@ interface NavGroup {
 const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: 'app.navGroup.organization',
-		paths: ['floorplans', 'employees', 'sites', 'locations'],
+		paths: ['floorplans', 'floorplans-v2', 'employees', 'sites', 'locations'],
 	},
 	{ label: 'entity.device.other', paths: ['racks', 'devices'] },
 	{
