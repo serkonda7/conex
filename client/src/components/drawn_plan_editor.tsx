@@ -2,15 +2,18 @@
  * Edit mode of a drawn floor plan. Works on a draft copy and sends it with
  * one `PUT` on save; cancel discards it.
  *
- * - Select (default): click a wall, door, window or marker to select it,
- *   drag it to move it. A selected wall shows handles on its ends; walls
- *   joined at a moved end follow it. The inspector below the stage edits
- *   the selection (length, thickness, width, swing) and deletes it.
+ * - Select (default): click a wall, door, window, stairs or marker to select
+ *   it, drag it to move it. A selected wall or flight of stairs shows
+ *   handles on its ends; walls joined at a moved end follow it. The
+ *   inspector below the stage edits the selection (length, thickness,
+ *   width, swing, steps) and deletes it.
  * - Wall: each click adds a corner, chaining walls; clicking the chain's
  *   first corner closes it, a double click, Enter or Escape ends it.
- * - Door / window: a click on a wall puts one there.
+ * - Door / sliding door / window: a click on a wall puts one there.
+ * - Stairs: a click at the foot, then one at the head of the flight.
  * - Snap (toggle; Alt skips it): points snap to wall ends, then onto walls,
- *   then to the grid. Shift keeps a wall at a multiple of 45°.
+ *   then to 10 cm steps. Walls and scale lines keep multiples of 15°;
+ *   Shift frees the angle.
  * - Reference image: one of the owner's images (or a new upload) under the
  *   drawing, moved by dragging and scaled by two points a known distance
  *   apart.
@@ -21,10 +24,12 @@
 import {
 	IconArrowBackUp,
 	IconArrowForwardUp,
+	IconArrowsHorizontal,
 	IconDoor,
 	IconMagnet,
 	IconPhotoUp,
 	IconRulerMeasure,
+	IconStairsUp,
 	IconWall,
 	IconWindow,
 	IconX,
@@ -33,8 +38,12 @@ import { Result } from 'better-result'
 import {
 	MAX_DRAWING_CM,
 	MAX_OPENING_WIDTH,
+	MAX_STAIR_STEPS,
+	MAX_STAIR_WIDTH,
 	MAX_WALL_THICKNESS,
 	MIN_OPENING_WIDTH,
+	MIN_STAIR_STEPS,
+	MIN_STAIR_WIDTH,
 	MIN_WALL_THICKNESS,
 	type OpeningKind,
 } from 'shared/src/schemas'
@@ -62,11 +71,12 @@ import {
 	type FloorplanDrawingJson,
 	type FloorplanDrawingPut,
 	type FloorplanOpening,
+	type FloorplanStair,
 	type FloorplanWall,
 	fetch_drawing_candidates,
 	put_drawing,
 } from '../api/floorplan_drawings'
-import { t } from '../i18n'
+import { type MessageKey, t } from '../i18n'
 import { createRows, createRowsFor, useAction } from '../lib/resource'
 import { useLeaveGuard } from '../lib/router'
 import { readStored, writeStored } from '../lib/storage'
@@ -76,16 +86,19 @@ import {
 	constrainAngle,
 	contentExtent,
 	DEFAULT_OPENING_WIDTH,
+	DEFAULT_STAIR_WIDTH,
 	DEFAULT_WALL_THICKNESS,
+	defaultSteps,
 	direction,
 	distance,
+	lineHitsSegment,
 	openingShape,
 	openingSpan,
 	type Point,
 	projectOnSegment,
 	roundTo,
 	samePoint,
-	snapToGrid,
+	stairShape,
 	wallLength,
 } from './drawn_plan_geometry'
 import {
@@ -97,7 +110,10 @@ import {
 	referenceOpacity,
 	type Sheet,
 	type StageReference,
+	type StageStair,
 	type StageWall,
+	StairGlyph,
+	StairLayer,
 	setReferenceOpacity,
 	WallLayer,
 } from './drawn_plan_stage'
@@ -111,6 +127,9 @@ import type { StageZoom } from './zoom_viewport'
 
 /** Snap range on screen, px. */
 const SNAP_PX = 10
+
+/** Snap step of points, lengths and moves, cm, whatever the grid size. */
+const SNAP_STEP = 10
 
 /** Shortest wall kept, cm. */
 const MIN_WALL = 1
@@ -145,12 +164,45 @@ interface EditOpening extends Omit<FloorplanOpening, 'wall'> {
 	wall_id: number
 }
 
-type Tool = 'select' | 'wall' | 'door' | 'window' | 'image' | 'calibrate'
+interface EditStair extends FloorplanStair {
+	id: number
+}
+
+type Tool = 'select' | 'wall' | OpeningKind | 'stairs' | 'image' | 'calibrate'
+
+function isOpeningKind(value: unknown): value is OpeningKind {
+	return value === 'door' || value === 'sliding_door' || value === 'window'
+}
+
+/** Palette label, delete label and icon of each kind of opening. */
+const OPENING_UI: Record<
+	OpeningKind,
+	{ tool: MessageKey; name: MessageKey; remove: MessageKey; icon: typeof IconDoor }
+> = {
+	door: {
+		tool: 'drawnPlan.toolDoor',
+		name: 'drawnPlan.door',
+		remove: 'drawnPlan.deleteDoor',
+		icon: IconDoor,
+	},
+	sliding_door: {
+		tool: 'drawnPlan.toolSlidingDoor',
+		name: 'drawnPlan.slidingDoor',
+		remove: 'drawnPlan.deleteSlidingDoor',
+		icon: IconArrowsHorizontal,
+	},
+	window: {
+		tool: 'drawnPlan.toolWindow',
+		name: 'drawnPlan.window',
+		remove: 'drawnPlan.deleteWindow',
+		icon: IconWindow,
+	},
+}
 
 /** Tabs of the side panel: drawing elements, adding objects, and the plan's sheet and image. */
 type SideTab = 'draw' | 'add' | 'plan'
 
-type SelectedKind = 'wall' | 'opening' | 'marker'
+type SelectedKind = 'wall' | 'opening' | 'stair' | 'marker'
 
 interface Selected {
 	kind: SelectedKind
@@ -163,6 +215,7 @@ interface Snapshot {
 	reference: StageReference | null
 	walls: EditWall[]
 	openings: EditOpening[]
+	stairs: EditStair[]
 	placements: FloorplanPlacementJson[]
 }
 
@@ -226,6 +279,14 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 				},
 			]
 		}),
+		stairs: state.stairs
+			.filter((stair: EditStair) => distance(stair.a, stair.b) >= MIN_WALL)
+			.map((stair: EditStair) => ({
+				a: roundPoint(stair.a),
+				b: roundPoint(stair.b),
+				width: round2(stair.width),
+				steps: stair.steps,
+			})),
 		placements: state.placements.map((placement: FloorplanPlacementJson) => ({
 			...(placement.rack_id !== null
 				? { rack_id: placement.rack_id }
@@ -303,6 +364,9 @@ export function DrawnPlanEditor(props: {
 			wall_id: wall + 1,
 		})),
 	)
+	const [stairs, setStairs] = createSignal<EditStair[]>(
+		props.drawing.stairs.map((stair: FloorplanStair, i: number) => ({ ...stair, id: i + 1 })),
+	)
 	const [placements, setPlacements] = createSignal<FloorplanPlacementJson[]>(
 		props.drawing.placements,
 	)
@@ -311,6 +375,8 @@ export function DrawnPlanEditor(props: {
 	const [thickness, setThickness] = createSignal(DEFAULT_WALL_THICKNESS)
 	/** Corner the next wall of a chain starts at, and the chain's first corner. */
 	const [chain, setChain] = createSignal<{ first: Point; last: Point } | null>(null)
+	/** Foot of the stairs being drawn. */
+	const [stairFoot, setStairFoot] = createSignal<Point | null>(null)
 	/** Pointer on the sheet (cm), snapped while a tool draws. */
 	const [hover, setHover] = createSignal<Point | null>(null)
 	const [pointer, setPointer] = createSignal<Point | null>(null)
@@ -342,6 +408,7 @@ export function DrawnPlanEditor(props: {
 		reference: reference(),
 		walls: walls(),
 		openings: openings(),
+		stairs: stairs(),
 		placements: placements(),
 	})
 	const initial = JSON.stringify(toPut(snapshot()))
@@ -384,6 +451,16 @@ export function DrawnPlanEditor(props: {
 			? openings().find((opening: EditOpening) => opening.id === current.id)
 			: undefined
 	})
+	const stageStairs = createMemo((): StageStair[] =>
+		stairs().map((stair: EditStair) => ({ key: `stair:${stair.id}`, stair })),
+	)
+
+	const selectedStair = createMemo(() => {
+		const current = selected()
+		return current?.kind === 'stair'
+			? stairs().find((stair: EditStair) => stair.id === current.id)
+			: undefined
+	})
 	const selectedMarker = createMemo(() => {
 		const current = selected()
 		return current?.kind === 'marker'
@@ -404,6 +481,7 @@ export function DrawnPlanEditor(props: {
 		setReference(state.reference)
 		setWalls(state.walls)
 		setOpenings(state.openings)
+		setStairs(state.stairs)
 		setPlacements(state.placements)
 		const current = selected()
 		const exists =
@@ -411,6 +489,8 @@ export function DrawnPlanEditor(props: {
 			(current.kind === 'wall' && state.walls.some((w: EditWall) => w.id === current.id)) ||
 			(current.kind === 'opening' &&
 				state.openings.some((o: EditOpening) => o.id === current.id)) ||
+			(current.kind === 'stair' &&
+				state.stairs.some((s: EditStair) => s.id === current.id)) ||
 			(current.kind === 'marker' &&
 				state.placements.some((p: FloorplanPlacementJson) => p.id === current.id))
 		if (!exists) {
@@ -467,10 +547,23 @@ export function DrawnPlanEditor(props: {
 		return snapEnabled() && !e.altKey
 	}
 
+	/** One coordinate snapped to the 10 cm step. */
+	function snapAxis(value: number): number {
+		return roundTo(value, SNAP_STEP)
+	}
+
+	/** A point snapped to the 10 cm step. */
+	function snapPosition(p: Point): Point {
+		return [snapAxis(p[0]), snapAxis(p[1])]
+	}
+
 	/**
-	 * A wall corner at `raw`: snapped to a wall end, then onto a wall, then
-	 * to the grid; with Shift at a multiple of 45° from `from`. Walls in
-	 * `exclude` are no snap targets. Marks the point snapped to.
+	 * A wall corner at `raw` while snapping (Alt places it freely): a wall
+	 * end within range wins. From a previous corner `from` the wall keeps a
+	 * multiple of 15° (Shift frees the angle) with a length in 10 cm steps,
+	 * and ends on a wall it meets near the pointer. Otherwise the corner
+	 * snaps onto a wall, else to the 10 cm step. Walls in `exclude` are no
+	 * snap targets. Marks the point snapped to.
 	 */
 	function snapCorner(
 		e: { altKey: boolean; shiftKey: boolean },
@@ -481,9 +574,7 @@ export function DrawnPlanEditor(props: {
 		setSnapMark(null)
 		const { width, height } = sheet()
 		if (!snapping(e)) {
-			return from && e.shiftKey
-				? clampPoint(constrainAngle(from, raw, 0), width, height)
-				: raw
+			return raw
 		}
 		const range = snapRange()
 		const targets = walls().filter((wall: EditWall) => !exclude.has(wall.id))
@@ -502,20 +593,25 @@ export function DrawnPlanEditor(props: {
 			setSnapMark(best)
 			return best
 		}
-		if (from && e.shiftKey) {
-			return clampPoint(constrainAngle(from, raw, gridStep()), width, height)
+		if (from && !e.shiftKey) {
+			const constrained = clampPoint(constrainAngle(from, raw, SNAP_STEP), width, height)
+			for (const wall of targets) {
+				const hit = lineHitsSegment(from, constrained, wall.a, wall.b)
+				if (hit && distance(hit, constrained) <= Math.max(range, wall.thickness / 2)) {
+					setSnapMark(hit)
+					return hit
+				}
+			}
+			return constrained
 		}
 		for (const wall of targets) {
 			const hit = projectOnSegment(raw, wall.a, wall.b)
-			if (
-				hit.distance <= Math.max(range, wall.thickness / 2) &&
-				hit.distance <= bestDistance + range
-			) {
+			if (hit.distance <= Math.max(range, wall.thickness / 2)) {
 				setSnapMark(hit.point)
 				return hit.point
 			}
 		}
-		return clampPoint(snapToGrid(raw, gridStep()), width, height)
+		return clampPoint(snapPosition(raw), width, height)
 	}
 
 	/** Nearest wall under `at` (within its thickness or the snap range), with the hit. */
@@ -619,7 +715,7 @@ export function DrawnPlanEditor(props: {
 			let dx = at[0] - from[0]
 			let dy = at[1] - from[1]
 			if (snapping(ev)) {
-				const snapped = snapToGrid([startA[0] + dx, startA[1] + dy], gridStep())
+				const snapped = snapPosition([startA[0] + dx, startA[1] + dy])
 				dx = snapped[0] - startA[0]
 				dy = snapped[1] - startA[1]
 			}
@@ -650,8 +746,43 @@ export function DrawnPlanEditor(props: {
 				return
 			}
 			const hit = projectOnSegment(at, wall.a, wall.b)
-			const offset = snapping(ev) ? roundTo(hit.offset, gridStep()) : hit.offset
+			const offset = snapping(ev) ? roundTo(hit.offset, SNAP_STEP) : hit.offset
 			patchOpening(id, { offset: clampOffset(wall, opening.width, offset) })
+		})
+	}
+
+	function pressStair(e: PointerEvent, key: string): void {
+		const id = Number(key.split(':')[1])
+		const stair = stairs().find((s: EditStair) => s.id === id)
+		if (!stair || tool() !== 'select') {
+			return
+		}
+		setSelected({ kind: 'stair', id })
+		const { a, b } = stair
+		const from = stagePoint(e)
+		const { width, height } = sheet()
+		startEdit(e, (at: Point, ev: PointerEvent) => {
+			let dx = at[0] - from[0]
+			let dy = at[1] - from[1]
+			if (snapping(ev)) {
+				const snapped = snapPosition([a[0] + dx, a[1] + dy])
+				dx = snapped[0] - a[0]
+				dy = snapped[1] - a[1]
+			}
+			// Keep both ends on the sheet.
+			dx = Math.min(width - Math.max(a[0], b[0]), Math.max(-Math.min(a[0], b[0]), dx))
+			dy = Math.min(height - Math.max(a[1], b[1]), Math.max(-Math.min(a[1], b[1]), dy))
+			patchStair(id, { a: [a[0] + dx, a[1] + dy], b: [b[0] + dx, b[1] + dy] })
+		})
+	}
+
+	function dragStairEnd(e: PointerEvent, stair: EditStair, end: 'a' | 'b'): void {
+		const other = end === 'a' ? stair.b : stair.a
+		startEdit(e, (at: Point, ev: PointerEvent) => {
+			const to = snapCorner(ev, at, other)
+			if (distance(to, other) >= MIN_WALL) {
+				patchStair(stair.id, { [end]: to })
+			}
 		})
 	}
 
@@ -665,7 +796,7 @@ export function DrawnPlanEditor(props: {
 		startEdit(e, (at: Point, ev: PointerEvent) => {
 			let next: Point = [placement.x + at[0] - from[0], placement.y + at[1] - from[1]]
 			if (snapping(ev)) {
-				next = snapToGrid(next, gridStep())
+				next = snapPosition(next)
 			}
 			const [x, y] = clampPoint(next, width, height)
 			patchPlacement(placement.id, { x, y })
@@ -682,8 +813,8 @@ export function DrawnPlanEditor(props: {
 			let x = start.x + at[0] - from[0]
 			let y = start.y + at[1] - from[1]
 			if (snapping(ev)) {
-				x = roundTo(x, gridStep())
-				y = roundTo(y, gridStep())
+				x = snapAxis(x)
+				y = snapAxis(y)
 			}
 			setReference({ ...start, x, y })
 		})
@@ -702,6 +833,12 @@ export function DrawnPlanEditor(props: {
 			all.map((opening: EditOpening) =>
 				opening.id === id ? { ...opening, ...patch } : opening,
 			),
+		)
+	}
+
+	function patchStair(id: number, patch: Partial<EditStair>): void {
+		setStairs((all: EditStair[]) =>
+			all.map((stair: EditStair) => (stair.id === id ? { ...stair, ...patch } : stair)),
 		)
 	}
 
@@ -729,7 +866,7 @@ export function DrawnPlanEditor(props: {
 		}
 		checkpoint()
 		const width = Math.min(DEFAULT_OPENING_WIDTH[kind], wallLength(hit.wall))
-		const offset = snapping({ altKey: false }) ? roundTo(hit.offset, gridStep()) : hit.offset
+		const offset = snapping({ altKey: false }) ? roundTo(hit.offset, SNAP_STEP) : hit.offset
 		const id = freshId()
 		setOpenings((all: EditOpening[]) => [
 			...all,
@@ -744,6 +881,30 @@ export function DrawnPlanEditor(props: {
 			},
 		])
 		setSelected({ kind: 'opening', id })
+	}
+
+	function addStair(a: Point, b: Point): void {
+		checkpoint()
+		const id = freshId()
+		setStairs((all: EditStair[]) => [
+			...all,
+			{
+				id,
+				a,
+				b,
+				width: DEFAULT_STAIR_WIDTH,
+				steps: defaultSteps(distance(a, b), MIN_STAIR_STEPS, MAX_STAIR_STEPS),
+			},
+		])
+		setSelected({ kind: 'stair', id })
+	}
+
+	/** Sets the length of stairs, moving their head `b` along them. */
+	function setStairLength(stair: EditStair, length: number): void {
+		const u = direction(stair.a, stair.b)
+		const { width, height } = sheet()
+		checkpoint()
+		patchStair(stair.id, { b: clampPoint(along(stair.a, u, length), width, height) })
 	}
 
 	/** Sets a wall's length, moving its end `b` (and the walls joined there) along it. */
@@ -769,6 +930,10 @@ export function DrawnPlanEditor(props: {
 		} else if (current.kind === 'opening') {
 			setOpenings((all: EditOpening[]) =>
 				all.filter((opening: EditOpening) => opening.id !== current.id),
+			)
+		} else if (current.kind === 'stair') {
+			setStairs((all: EditStair[]) =>
+				all.filter((stair: EditStair) => stair.id !== current.id),
 			)
 		} else {
 			setPlacements((all: FloorplanPlacementJson[]) =>
@@ -837,8 +1002,8 @@ export function DrawnPlanEditor(props: {
 
 	/** Door or window being dragged from the Draw tab, if any. */
 	const draggedOpening = (): OpeningKind | null => {
-		const key = dragged()
-		return key === 'opening:door' ? 'door' : key === 'opening:window' ? 'window' : null
+		const kind = dragged()?.match(/^opening:(.+)$/)?.[1]
+		return isOpeningKind(kind) ? kind : null
 	}
 
 	function onDrop(e: DragEvent): void {
@@ -846,8 +1011,9 @@ export function DrawnPlanEditor(props: {
 		const key = dragged() ?? e.dataTransfer?.getData('text/plain')
 		setDragged(null)
 		setHover(null)
-		if (key === 'opening:door' || key === 'opening:window') {
-			addOpening(key === 'opening:door' ? 'door' : 'window', stagePoint(e))
+		const kind = key?.match(/^opening:(.+)$/)?.[1]
+		if (isOpeningKind(kind)) {
+			addOpening(kind, stagePoint(e))
 			return
 		}
 		const candidate = candidates()?.find(
@@ -862,7 +1028,7 @@ export function DrawnPlanEditor(props: {
 
 	/** The smallest sheet side that still holds the drawing, cm. */
 	function minSheet(): Point {
-		const [x, y] = contentExtent(walls(), placements())
+		const [x, y] = contentExtent([...walls(), ...stairs()], placements())
 		return [Math.max(100, Math.ceil(x)), Math.max(100, Math.ceil(y))]
 	}
 
@@ -959,6 +1125,7 @@ export function DrawnPlanEditor(props: {
 	function setTool(next: Tool): void {
 		setToolSignal(next)
 		setChain(null)
+		setStairFoot(null)
 		setHover(null)
 		setSnapMark(null)
 		setCalibration(null)
@@ -992,9 +1159,22 @@ export function DrawnPlanEditor(props: {
 				return
 			}
 			case 'door':
+			case 'sliding_door':
 			case 'window':
 				addOpening(tool() as OpeningKind, raw)
 				return
+			case 'stairs': {
+				const foot = stairFoot()
+				const at = snapCorner(e, raw, foot)
+				if (!foot) {
+					setStairFoot(at)
+				} else if (distance(foot, at) >= MIN_WALL) {
+					setStairFoot(null)
+					addStair(foot, at)
+					setTool('select')
+				}
+				return
+			}
 			case 'image':
 				dragReference(e)
 				return
@@ -1015,13 +1195,15 @@ export function DrawnPlanEditor(props: {
 	}
 
 	/**
-	 * Second scale point: at a multiple of 45° from the first while snapping
-	 * (Alt places it freely), so a scale along a wall in the image stays
-	 * exactly horizontal or vertical.
+	 * Second scale point: at a multiple of 15° from the first while snapping
+	 * (Shift or Alt places it freely), so a scale along a wall in the image
+	 * stays exactly horizontal or vertical.
 	 */
-	function scaleEnd(e: { altKey: boolean }, a: Point, raw: Point): Point {
+	function scaleEnd(e: { altKey: boolean; shiftKey: boolean }, a: Point, raw: Point): Point {
 		const { width, height } = sheet()
-		return snapping(e) ? clampPoint(constrainAngle(a, raw, 0), width, height) : raw
+		return snapping(e) && !e.shiftKey
+			? clampPoint(constrainAngle(a, raw, 0), width, height)
+			: raw
 	}
 
 	function toolHover(e: PointerEvent): void {
@@ -1029,6 +1211,8 @@ export function DrawnPlanEditor(props: {
 		const first = calibration()?.a
 		if (tool() === 'wall') {
 			setHover(snapCorner(e, raw, chain()?.last ?? null))
+		} else if (tool() === 'stairs') {
+			setHover(snapCorner(e, raw, stairFoot()))
 		} else if (tool() === 'calibrate' && first) {
 			setHover(scaleEnd(e, first, raw))
 		} else {
@@ -1040,7 +1224,7 @@ export function DrawnPlanEditor(props: {
 	const ghostOpening = createMemo(() => {
 		const kind = draggedOpening() ?? tool()
 		const at = hover()
-		if ((kind !== 'door' && kind !== 'window') || !at) {
+		if (!isOpeningKind(kind) || !at) {
 			return null
 		}
 		const hit = wallAt(at)
@@ -1080,9 +1264,10 @@ export function DrawnPlanEditor(props: {
 			return
 		}
 		if (e.key === 'Escape' || e.key === 'Enter') {
-			if (chain() || calibration() || sequence() !== null) {
+			if (chain() || stairFoot() || calibration() || sequence() !== null) {
 				e.preventDefault()
 				setChain(null)
+				setStairFoot(null)
 				setCalibration(null)
 				setSequence(null)
 				return
@@ -1147,6 +1332,15 @@ export function DrawnPlanEditor(props: {
 		const current = chain()
 		const at = hover()
 		return current && at && tool() === 'wall' ? { a: current.last, b: at } : null
+	}
+
+	/** The stairs being drawn: from their foot to the pointer. */
+	const draftStair = (): { a: Point; b: Point } | null => {
+		const foot = stairFoot()
+		const at = hover()
+		return foot && at && tool() === 'stairs' && distance(foot, at) >= MIN_WALL
+			? { a: foot, b: at }
+			: null
 	}
 
 	const calibrationLine = (): { a: Point; b: Point } | null => {
@@ -1262,60 +1456,57 @@ export function DrawnPlanEditor(props: {
 											<span>{t('drawnPlan.toolWall')}</span>
 										</button>
 									</li>
+									<For each={['door', 'sliding_door', 'window'] as const}>
+										{(kind: OpeningKind) => {
+											const ui = OPENING_UI[kind]
+											const Icon = ui.icon
+											return (
+												<li>
+													<button
+														type="button"
+														class="floorplan-palette-item drawn-plan-element"
+														classList={{ active: tool() === kind }}
+														aria-pressed={tool() === kind}
+														title={t('drawnPlan.openingPlaceHint')}
+														draggable="true"
+														onDragStart={(e: DragEvent) => {
+															e.dataTransfer?.setData(
+																'text/plain',
+																`opening:${kind}`,
+															)
+															setTool('select')
+															setDragged(`opening:${kind}`)
+														}}
+														onDragEnd={() => {
+															setDragged(null)
+															setHover(null)
+														}}
+														onClick={() =>
+															setTool(
+																tool() === kind ? 'select' : kind,
+															)
+														}
+													>
+														<Icon size={14} />
+														<span>{t(ui.tool)}</span>
+													</button>
+												</li>
+											)
+										}}
+									</For>
 									<li>
 										<button
 											type="button"
 											class="floorplan-palette-item drawn-plan-element"
-											classList={{ active: tool() === 'door' }}
-											aria-pressed={tool() === 'door'}
-											title={t('drawnPlan.openingPlaceHint')}
-											draggable="true"
-											onDragStart={(e: DragEvent) => {
-												e.dataTransfer?.setData(
-													'text/plain',
-													'opening:door',
-												)
-												setTool('select')
-												setDragged('opening:door')
-											}}
-											onDragEnd={() => {
-												setDragged(null)
-												setHover(null)
-											}}
+											classList={{ active: tool() === 'stairs' }}
+											aria-pressed={tool() === 'stairs'}
+											title={t('drawnPlan.stairsHint')}
 											onClick={() =>
-												setTool(tool() === 'door' ? 'select' : 'door')
+												setTool(tool() === 'stairs' ? 'select' : 'stairs')
 											}
 										>
-											<IconDoor size={14} />
-											<span>{t('drawnPlan.toolDoor')}</span>
-										</button>
-									</li>
-									<li>
-										<button
-											type="button"
-											class="floorplan-palette-item drawn-plan-element"
-											classList={{ active: tool() === 'window' }}
-											aria-pressed={tool() === 'window'}
-											title={t('drawnPlan.openingPlaceHint')}
-											draggable="true"
-											onDragStart={(e: DragEvent) => {
-												e.dataTransfer?.setData(
-													'text/plain',
-													'opening:window',
-												)
-												setTool('select')
-												setDragged('opening:window')
-											}}
-											onDragEnd={() => {
-												setDragged(null)
-												setHover(null)
-											}}
-											onClick={() =>
-												setTool(tool() === 'window' ? 'select' : 'window')
-											}
-										>
-											<IconWindow size={14} />
-											<span>{t('drawnPlan.toolWindow')}</span>
+											<IconStairsUp size={14} />
+											<span>{t('drawnPlan.toolStairs')}</span>
 										</button>
 									</li>
 								</ul>
@@ -1340,8 +1531,15 @@ export function DrawnPlanEditor(props: {
 												: 'drawnPlan.wallHint',
 										)}
 									</Match>
-									<Match when={tool() === 'door' || tool() === 'window'}>
+									<Match when={isOpeningKind(tool())}>
 										{t('drawnPlan.openingHint')}
+									</Match>
+									<Match when={tool() === 'stairs'}>
+										{t(
+											stairFoot()
+												? 'drawnPlan.stairsNextHint'
+												: 'drawnPlan.stairsHint',
+										)}
 									</Match>
 								</Switch>
 							</p>
@@ -1566,12 +1764,19 @@ export function DrawnPlanEditor(props: {
 							</>
 						}
 						walls={
-							<WallLayer
-								walls={stageWalls()}
-								selected={selected() ? keyOf(selected() as Selected) : null}
-								on_wall_press={pressWall}
-								on_opening_press={pressOpening}
-							/>
+							<>
+								<StairLayer
+									stairs={stageStairs()}
+									selected={selected() ? keyOf(selected() as Selected) : null}
+									on_press={pressStair}
+								/>
+								<WallLayer
+									walls={stageWalls()}
+									selected={selected() ? keyOf(selected() as Selected) : null}
+									on_wall_press={pressWall}
+									on_opening_press={pressOpening}
+								/>
+							</>
 						}
 						svg={
 							<>
@@ -1579,6 +1784,23 @@ export function DrawnPlanEditor(props: {
 									{(shape: () => ReturnType<typeof openingShape>) => (
 										<g class="drawn-plan-opening drawn-plan-ghost">
 											<OpeningGlyph shape={shape()} />
+										</g>
+									)}
+								</Show>
+								<Show when={draftStair()}>
+									{(line: () => { a: Point; b: Point }) => (
+										<g class="drawn-plan-stairs drawn-plan-ghost">
+											<StairGlyph
+												shape={stairShape({
+													...line(),
+													width: DEFAULT_STAIR_WIDTH,
+													steps: defaultSteps(
+														distance(line().a, line().b),
+														MIN_STAIR_STEPS,
+														MAX_STAIR_STEPS,
+													),
+												})}
+											/>
 										</g>
 									)}
 								</Show>
@@ -1665,7 +1887,35 @@ export function DrawnPlanEditor(props: {
 								</>
 							)}
 						</Show>
-						<Show when={draftWall()}>
+						<Show when={selectedStair()}>
+							{(stair: () => EditStair) => (
+								<>
+									<For each={['a', 'b'] as const}>
+										{(end: 'a' | 'b') => (
+											<div
+												class="floorplan-handle floorplan-handle-vertex"
+												style={toPercent(stair()[end])}
+												title={t(
+													end === 'a'
+														? 'drawnPlan.stairFoot'
+														: 'drawnPlan.stairHead',
+												)}
+												onPointerDown={(e: PointerEvent) =>
+													dragStairEnd(e, stair(), end)
+												}
+											/>
+										)}
+									</For>
+									<span
+										class="drawn-plan-label"
+										style={toPercent(midpoint(stair().a, stair().b))}
+									>
+										{formatLength(distance(stair().a, stair().b))}
+									</span>
+								</>
+							)}
+						</Show>
+						<Show when={draftStair() ?? draftWall()}>
 							{(line: () => { a: Point; b: Point }) => (
 								<span
 									class="drawn-plan-label"
@@ -1740,17 +1990,20 @@ export function DrawnPlanEditor(props: {
 											onChange={(
 												e: Event & { currentTarget: HTMLSelectElement },
 											) => {
-												checkpoint()
-												patchOpening(opening().id, {
-													kind:
-														e.currentTarget.value === 'window'
-															? 'window'
-															: 'door',
-												})
+												const kind = e.currentTarget.value
+												if (isOpeningKind(kind)) {
+													checkpoint()
+													patchOpening(opening().id, { kind })
+												}
 											}}
 										>
-											<option value="door">{t('drawnPlan.door')}</option>
-											<option value="window">{t('drawnPlan.window')}</option>
+											<For each={['door', 'sliding_door', 'window'] as const}>
+												{(kind: OpeningKind) => (
+													<option value={kind}>
+														{t(OPENING_UI[kind].name)}
+													</option>
+												)}
+											</For>
 										</select>
 									</label>
 									<NumberField
@@ -1774,7 +2027,7 @@ export function DrawnPlanEditor(props: {
 											})
 										}}
 									/>
-									<Show when={opening().kind === 'door'}>
+									<Show when={opening().kind !== 'window'}>
 										<button
 											type="button"
 											onClick={() => {
@@ -1787,7 +2040,11 @@ export function DrawnPlanEditor(props: {
 												})
 											}}
 										>
-											{t('drawnPlan.flipHinge')}
+											{t(
+												opening().kind === 'sliding_door'
+													? 'drawnPlan.flipSlide'
+													: 'drawnPlan.flipHinge',
+											)}
 										</button>
 										<button
 											type="button"
@@ -1801,15 +2058,62 @@ export function DrawnPlanEditor(props: {
 												})
 											}}
 										>
-											{t('drawnPlan.flipSwing')}
+											{t(
+												opening().kind === 'sliding_door'
+													? 'drawnPlan.flipSlideSide'
+													: 'drawnPlan.flipSwing',
+											)}
 										</button>
 									</Show>
 									<button type="button" onClick={deleteSelected}>
-										{t(
-											opening().kind === 'door'
-												? 'drawnPlan.deleteDoor'
-												: 'drawnPlan.deleteWindow',
-										)}
+										{t(OPENING_UI[opening().kind].remove)}
+									</button>
+								</div>
+							)}
+						</Match>
+						<Match when={selectedStair()}>
+							{(stair: () => EditStair) => (
+								<div class="floorplan-inspector">
+									<NumberField
+										label={t('drawnPlan.length')}
+										value={distance(stair().a, stair().b)}
+										min={MIN_WALL}
+										max={MAX_DRAWING_CM}
+										on_commit={(value: number) =>
+											setStairLength(stair(), value)
+										}
+									/>
+									<NumberField
+										label={t('drawnPlan.width')}
+										value={stair().width}
+										min={MIN_STAIR_WIDTH}
+										max={MAX_STAIR_WIDTH}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchStair(stair().id, { width: value })
+										}}
+									/>
+									<NumberField
+										label={t('drawnPlan.steps')}
+										value={stair().steps}
+										min={MIN_STAIR_STEPS}
+										max={MAX_STAIR_STEPS}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchStair(stair().id, { steps: Math.round(value) })
+										}}
+									/>
+									<button
+										type="button"
+										onClick={() => {
+											checkpoint()
+											patchStair(stair().id, { a: stair().b, b: stair().a })
+										}}
+									>
+										{t('drawnPlan.flipStairs')}
+									</button>
+									<button type="button" onClick={deleteSelected}>
+										{t('drawnPlan.deleteStairs')}
 									</button>
 								</div>
 							)}

@@ -2447,7 +2447,7 @@ export interface FloorplanListJson {
 }
 
 // ---------------------------------------------------------------------------
-// Drawn floor plans (v2): walls, doors, windows and markers drawn on a sheet
+// Drawn floor plans (v2): walls, doors, windows, stairs and markers drawn on a sheet
 // in centimeters, optionally over a reference image
 // ---------------------------------------------------------------------------
 
@@ -2498,7 +2498,7 @@ export const FloorplanWallSchema = v.pipe(
 
 export type FloorplanWall = v.InferOutput<typeof FloorplanWallSchema>
 
-export const OPENING_KINDS = ['door', 'window'] as const
+export const OPENING_KINDS = ['door', 'sliding_door', 'window'] as const
 
 export type OpeningKind = (typeof OPENING_KINDS)[number]
 
@@ -2508,9 +2508,10 @@ export const MAX_OPENING_WIDTH = 2000
 
 /**
  * Door or window in a wall (`wall` is its index in `walls`): centered
- * `offset` cm from the wall's start `a`, `width` cm wide. A door hinges at the
- * end of the opening facing `hinge` and swings to `side`, seen from `a` to
- * `b`; a window ignores both.
+ * `offset` cm from the wall's start `a`, `width` cm wide. Seen from `a` to
+ * `b`, a door hinges at the end of the opening facing `hinge` and swings to
+ * `side`; a sliding door runs along the wall's `side` face and slides open
+ * toward `hinge`. A window ignores both.
  */
 export const FloorplanOpeningSchema = v.strictObject({
 	wall: v.pipe(v.number(), v.integer(), v.minValue(0)),
@@ -2529,6 +2530,43 @@ export const FloorplanOpeningSchema = v.strictObject({
 })
 
 export type FloorplanOpening = v.InferOutput<typeof FloorplanOpeningSchema>
+
+/** Narrowest and widest stairs, cm. */
+export const MIN_STAIR_WIDTH = 30
+export const MAX_STAIR_WIDTH = 1000
+
+/** Fewest and most steps of one flight of stairs. */
+export const MIN_STAIR_STEPS = 2
+export const MAX_STAIR_STEPS = 100
+
+/**
+ * A straight flight of stairs from `a` (its foot) up to `b` (its head), cm,
+ * `width` cm wide and centered on that line, with `steps` treads of equal
+ * depth.
+ */
+export const FloorplanStairSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		width: v.pipe(
+			v.number('Stair width must be a number'),
+			v.minValue(MIN_STAIR_WIDTH, `Stairs are at least ${MIN_STAIR_WIDTH} cm wide`),
+			v.maxValue(MAX_STAIR_WIDTH, `Stairs are at most ${MAX_STAIR_WIDTH} cm wide`),
+		),
+		steps: v.pipe(
+			v.number('Steps must be a number'),
+			v.integer('Steps must be a whole number'),
+			v.minValue(MIN_STAIR_STEPS, `Stairs have at least ${MIN_STAIR_STEPS} steps`),
+			v.maxValue(MAX_STAIR_STEPS, `Stairs have at most ${MAX_STAIR_STEPS} steps`),
+		),
+	}),
+	v.check(
+		(stair) => stair.a[0] !== stair.b[0] || stair.a[1] !== stair.b[1],
+		'Stairs need a length',
+	),
+)
+
+export type FloorplanStair = v.InferOutput<typeof FloorplanStairSchema>
 
 /**
  * Reference image under a drawn plan: an image attachment of the same
@@ -2558,8 +2596,9 @@ const OPENING_SLACK = 0.5
 
 /**
  * `PUT /floorplan-drawings/:id`: the sheet, the reference image and the
- * full set of walls, openings and markers, replaced atomically. Walls and
- * markers lie on the sheet; each opening fits into its wall.
+ * full set of walls, openings, stairs and markers, replaced atomically.
+ * Walls, stairs and markers lie on the sheet; each opening fits into its
+ * wall.
  */
 export const FloorplanDrawingPutSchema = v.pipe(
 	v.strictObject({
@@ -2568,15 +2607,17 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		reference: v.optional(v.nullable(FloorplanReferenceSchema), null),
 		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
 		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
+		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
 		placements: v.pipe(v.array(DrawingPlacementInputSchema), v.maxLength(2000)),
 	}),
 	v.check(
 		(plan) =>
 			[
 				...plan.walls.flatMap((wall) => [wall.a, wall.b]),
+				...plan.stairs.flatMap((stair) => [stair.a, stair.b]),
 				...plan.placements.map((p): [number, number] => [p.x, p.y]),
 			].every(([x, y]) => x <= plan.width && y <= plan.height),
-		'Walls and markers must lie on the sheet',
+		'Walls, stairs and markers must lie on the sheet',
 	),
 	v.check((plan) => {
 		return plan.openings.every((opening) => {
@@ -2636,6 +2677,7 @@ export interface FloorplanDrawingJson {
 	reference: (FloorplanReference & { attachment: AttachmentJson }) | null
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
+	stairs: FloorplanStair[]
 	placements: FloorplanPlacementJson[]
 	/** Some markers are outside the requester's scope (a save keeps them). */
 	has_hidden_content: boolean

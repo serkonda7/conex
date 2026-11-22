@@ -1,7 +1,7 @@
 /**
  * Stage of a drawn floor plan, shared by the view and the editor: the sheet
  * in a `ZoomViewport` (design decision 0003) with the reference image, the
- * grid, the walls with their doors and windows, and the owner's overlay
+ * grid, the stairs, the walls with their doors and windows, and the owner's overlay
  * pieces (`children`) on top.
  *
  * The SVG's user units are the sheet's centimeters (`viewBox` = sheet), so
@@ -9,12 +9,24 @@
  * handles) are positioned in percent of the sheet like on image plans and
  * keep their screen size through `--inv-zoom`.
  */
-import type { FloorplanOpening, FloorplanReference, FloorplanWall } from 'shared/src/schemas'
+import type {
+	FloorplanOpening,
+	FloorplanReference,
+	FloorplanStair,
+	FloorplanWall,
+} from 'shared/src/schemas'
 import { createMemo, createSignal, createUniqueId, For, type JSX, Show } from 'solid-js'
 import { type AttachmentJson, attachment_file_url } from '../api/attachments'
 import { locale, t } from '../i18n'
 import { readStored, writeStored } from '../lib/storage'
-import { type OpeningShape, openingShape, type Point, wallPieces } from './drawn_plan_geometry'
+import {
+	type OpeningShape,
+	openingShape,
+	type Point,
+	type StairShape,
+	stairShape,
+	wallPieces,
+} from './drawn_plan_geometry'
 import { type StageZoom, ZoomViewport } from './zoom_viewport'
 
 /**
@@ -116,9 +128,15 @@ function GridLines(props: { sheet: Sheet; step: number; zoom: StageZoom }): JSX.
 			Array.from({ length: Math.floor(extent / step) + 1 }, (_, i) => i * step)
 		return { x: axis(props.sheet.width), y: axis(props.sheet.height) }
 	}
-	// Below 1 m the grid adds meter lines; from 1 m on it is just its own lines.
-	const minor = createMemo(() => (props.step < 100 ? lines(props.step) : { x: [], y: [] }))
-	const major = createMemo(() => lines(Math.max(100, props.step)))
+	// Stronger lines every meter below a 1 m grid, every 5 m on a 1 m grid;
+	// the 5 m and 10 m grids are coarse enough on their own.
+	const majorStep = (): number | null =>
+		props.step < 100 ? 100 : props.step === 100 ? 500 : null
+	const minor = createMemo(() => lines(props.step))
+	const major = createMemo(() => {
+		const step = majorStep()
+		return step === null ? { x: [], y: [] } : lines(step)
+	})
 	const Lines = (p: { set: { x: number[]; y: number[] }; class: string }): JSX.Element => (
 		<g class={p.class}>
 			<For each={p.set.x}>
@@ -137,7 +155,7 @@ function GridLines(props: { sheet: Sheet; step: number; zoom: StageZoom }): JSX.
 	)
 }
 
-/** One door or window: its gap, then the leaf and swing or the glass. */
+/** One door or window: its gap, then the leaf and swing, the sliding panel or the glass. */
 export function OpeningGlyph(props: { shape: OpeningShape }): JSX.Element {
 	return (
 		<>
@@ -167,7 +185,66 @@ export function OpeningGlyph(props: { shape: OpeningShape }): JSX.Element {
 			<Show when={props.shape.arc}>
 				{(arc: () => string) => <path class="drawn-plan-door-swing" d={arc()} />}
 			</Show>
+			<Show when={props.shape.panel}>
+				{(panel: () => Point[]) => (
+					<polygon class="drawn-plan-door-panel" points={svgPoints(panel())} />
+				)}
+			</Show>
+			<Show when={props.shape.slide}>
+				{(slide: () => string) => <path class="drawn-plan-door-slide" d={slide()} />}
+			</Show>
 		</>
+	)
+}
+
+/** One flight of stairs: outline, treads and the arrow up. */
+export function StairGlyph(props: { shape: StairShape }): JSX.Element {
+	return (
+		<>
+			<polygon class="drawn-plan-stair" points={svgPoints(props.shape.outline)} />
+			<For each={props.shape.treads}>
+				{(tread: [Point, Point]) => (
+					<line
+						class="drawn-plan-stair-tread"
+						x1={tread[0][0]}
+						y1={tread[0][1]}
+						x2={tread[1][0]}
+						y2={tread[1][1]}
+					/>
+				)}
+			</For>
+			<path class="drawn-plan-stair-arrow" d={props.shape.arrow} />
+		</>
+	)
+}
+
+/** Stairs as the stage draws them. */
+export interface StageStair {
+	key: string
+	stair: FloorplanStair
+}
+
+/** Stairs, under the walls. The editor passes a press handler and the selection. */
+export function StairLayer(props: {
+	stairs: StageStair[]
+	selected?: string | null
+	on_press?: (e: PointerEvent, key: string) => void
+}): JSX.Element {
+	return (
+		<For each={props.stairs}>
+			{(item: StageStair) => (
+				<g
+					class="drawn-plan-stairs"
+					classList={{
+						selected: props.selected === item.key,
+						editable: props.on_press !== undefined,
+					}}
+					onPointerDown={(e: PointerEvent) => props.on_press?.(e, item.key)}
+				>
+					<StairGlyph shape={stairShape(item.stair)} />
+				</g>
+			)}
+		</For>
 	)
 }
 

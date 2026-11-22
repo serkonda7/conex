@@ -1,9 +1,9 @@
 /**
  * Drawn floor plans (v2): a sheet in centimeters per site or location with
- * walls, doors and windows drawn on it, optionally over a reference image
+ * walls, doors, windows and stairs drawn on it, optionally over a reference image
  * (an attachment of the same owner), and rack, device and outlet markers.
  *
- * Walls and openings are one JSON document each, replaced with every save.
+ * Walls, openings and stairs are one JSON document each, replaced with every save.
  * Markers reference racks, devices, rear ports and jacks, so they live in
  * `floorplan_drawing_placements`; each object sits on at most one drawn
  * plan. Like the image plans (`attachments.ts`), markers outside a scoped
@@ -282,6 +282,7 @@ export async function getDrawing(
 				: null,
 		walls: row.walls,
 		openings: row.openings,
+		stairs: row.stairs,
 		placements,
 		has_hidden_content: total > placements.length,
 		updated_at: row.updated_at,
@@ -584,7 +585,7 @@ async function drawingSnapshot(row: DrawingRow): Promise<
 }
 
 /**
- * Replaces the sheet, reference image, walls, openings and markers in one
+ * Replaces the sheet, reference image, walls, openings, stairs and markers in one
  * transaction with one changelog entry. Markers hidden from a scoped
  * requester stay unchanged. Returns the saved plan as `getDrawing`
  * resolves it for the requester.
@@ -648,6 +649,7 @@ export async function putDrawing(
 							: null,
 						walls: input.walls,
 						openings: input.openings,
+						stairs: input.stairs,
 						updated_at: nowSeconds(),
 					})
 					.where(eq(floorplan_drawings.id, id))

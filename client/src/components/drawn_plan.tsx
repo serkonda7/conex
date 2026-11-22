@@ -1,6 +1,6 @@
 /**
  * Drawn floor plan (v2) of a site or location, the body of
- * `/floorplans-v2/:id`: the sheet with its walls, doors and windows over the
+ * `/floorplans-v2/:id`: the sheet with its walls, doors, windows and stairs over the
  * optional reference image, and the rack, device and outlet markers. A
  * marker links to its rack or device; an outlet opens its popover (trace
  * and connect) like on image plans. Edit swaps the view for the editor on
@@ -22,6 +22,7 @@ import {
 	referenceOpacity,
 	referenceVisible,
 	type StageWall,
+	StairLayer,
 	toggleReferenceVisible,
 	WallLayer,
 } from './drawn_plan_stage'
@@ -73,7 +74,9 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 		)
 	}
 	const empty = (): boolean =>
-		props.drawing.walls.length === 0 && props.drawing.placements.length === 0
+		props.drawing.walls.length === 0 &&
+		props.drawing.stairs.length === 0 &&
+		props.drawing.placements.length === 0
 
 	return (
 		<div class="drawn-plan-view">
@@ -92,7 +95,17 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 				}}
 				onPointerMove={trackPointer}
 				onPointerLeave={() => setPointer(null)}
-				walls={<WallLayer walls={drawingWalls(props.drawing)} />}
+				walls={
+					<>
+						<StairLayer
+							stairs={props.drawing.stairs.map((stair, i: number) => ({
+								key: `stair:${i}`,
+								stair,
+							}))}
+						/>
+						<WallLayer walls={drawingWalls(props.drawing)} />
+					</>
+				}
 				bar={
 					<>
 						<Show when={props.drawing.reference}>

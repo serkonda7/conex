@@ -13,6 +13,7 @@ import type {
 	FloorplanListQuery,
 	FloorplanOpening,
 	FloorplanReference,
+	FloorplanStair,
 	FloorplanWall,
 	Page,
 } from 'shared/src/types'
@@ -24,6 +25,7 @@ export type {
 	FloorplanDrawingPut,
 	FloorplanOpening,
 	FloorplanReference,
+	FloorplanStair,
 	FloorplanWall,
 }
 

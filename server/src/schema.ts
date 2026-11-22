@@ -1067,10 +1067,10 @@ export const floorplan_calibrations = pgTable('floorplan_calibrations', {
 })
 
 // Drawn floor plan (v2) of a site or location, at most one per owner: a
-// sheet of `width` × `height` cm with walls and openings (doors, windows)
-// drawn on it, optionally over a reference image (an attachment of the same
-// owner, placed by `reference_frame` in cm). Walls and openings reference
-// nothing else, so they are one JSON document each; an opening points at its
+// sheet of `width` × `height` cm with walls, openings (doors, sliding doors,
+// windows) and stairs drawn on it, optionally over a reference image (an attachment of the same
+// owner, placed by `reference_frame` in cm). Walls, openings and stairs
+// reference nothing else, so they are one JSON document each; an opening points at its
 // wall by index.
 export const floorplan_drawings = pgTable(
 	'floorplan_drawings',
@@ -1096,13 +1096,17 @@ export const floorplan_drawings = pgTable(
 			.$type<
 				{
 					wall: number
-					kind: 'door' | 'window'
+					kind: 'door' | 'sliding_door' | 'window'
 					offset: number
 					width: number
 					hinge: 'start' | 'end'
 					side: 'left' | 'right'
 				}[]
 			>()
+			.notNull()
+			.default([]),
+		stairs: jsonb('stairs')
+			.$type<{ a: [number, number]; b: [number, number]; width: number; steps: number }[]>()
 			.notNull()
 			.default([]),
 		created_at: bigint('created_at', { mode: 'number' }).notNull(),

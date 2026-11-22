@@ -29,6 +29,13 @@
       "when": 1795345267934,
       "tag": "0003_floorplan_drawings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795349836803,
+      "tag": "0004_floorplan_stairs",
+      "breakpoints": true
     }
   ]
 }

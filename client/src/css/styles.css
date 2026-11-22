@@ -6431,15 +6431,15 @@ a.rack-shelf-plate:hover {
 }
 
 .drawn-plan-grid line {
-	stroke: var(--border);
-	stroke-width: calc(1px * var(--line-zoom, 1));
+	stroke: var(--border-strong);
+	stroke-width: calc(0.5px * var(--line-zoom, 1));
 	vector-effect: non-scaling-stroke;
-	opacity: 0.6;
+	opacity: 0.45;
 }
 
 .drawn-plan-grid-major line {
-	stroke: var(--border-strong);
-	opacity: 0.9;
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	opacity: 0.7;
 }
 
 .drawn-plan-wall {
@@ -6463,7 +6463,7 @@ a.rack-shelf-plate:hover {
 	stroke: var(--primary-text);
 }
 
-/* Doors and windows: the gap through the wall, then the leaf and swing or the glass. */
+/* Doors and windows: the gap through the wall, then the leaf and swing, the sliding panel or the glass. */
 .drawn-plan-opening-gap {
 	fill: var(--bg-surface);
 	stroke: var(--text-secondary);
@@ -6473,7 +6473,8 @@ a.rack-shelf-plate:hover {
 
 .drawn-plan-window,
 .drawn-plan-door-leaf,
-.drawn-plan-door-swing {
+.drawn-plan-door-swing,
+.drawn-plan-door-slide {
 	fill: none;
 	stroke: var(--text-secondary);
 	stroke-width: calc(1.5px * var(--line-zoom, 1));
@@ -6488,6 +6489,17 @@ a.rack-shelf-plate:hover {
 	stroke-dasharray: 4 3;
 }
 
+.drawn-plan-door-panel {
+	fill: var(--bg-surface);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-door-slide {
+	stroke-width: calc(1px * var(--line-zoom, 1));
+}
+
 .drawn-plan-opening.editable {
 	cursor: move;
 	touch-action: none;
@@ -6495,8 +6507,43 @@ a.rack-shelf-plate:hover {
 
 .drawn-plan-opening.selected .drawn-plan-opening-gap,
 .drawn-plan-opening.selected .drawn-plan-door-leaf,
-.drawn-plan-opening.selected .drawn-plan-door-swing {
+.drawn-plan-opening.selected .drawn-plan-door-swing,
+.drawn-plan-opening.selected .drawn-plan-door-panel,
+.drawn-plan-opening.selected .drawn-plan-door-slide {
 	stroke: var(--primary-text);
+}
+
+/* Stairs: the flight's outline, the lines between its treads and the arrow up. */
+.drawn-plan-stair {
+	fill: var(--bg-surface);
+}
+
+.drawn-plan-stair,
+.drawn-plan-stair-tread,
+.drawn-plan-stair-arrow {
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-stair-arrow {
+	fill: none;
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
+}
+
+.drawn-plan-stairs.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-stairs.selected .drawn-plan-stair,
+.drawn-plan-stairs.selected .drawn-plan-stair-tread,
+.drawn-plan-stairs.selected .drawn-plan-stair-arrow {
+	stroke: var(--primary-text);
+}
+
+.drawn-plan-stairs.editable:hover .drawn-plan-stair {
+	fill: var(--bg-hover);
 }
 
 .drawn-plan-ghost {
