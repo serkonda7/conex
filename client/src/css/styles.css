@@ -6714,6 +6714,56 @@ a.drawn-plan-name:hover {
 	cursor: move;
 }
 
+/* A length typed while drawing: outlined, so it reads as input. */
+.drawn-plan-label-typed {
+	color: var(--text);
+	background-color: var(--bg-raised);
+	outline: 2px solid var(--primary);
+}
+
+/* Distance from the selection to its neighbors. */
+.drawn-plan-dimension {
+	stroke: var(--text-secondary);
+	stroke-width: 1;
+	stroke-dasharray: 2 3;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.drawn-plan-label-dimension {
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
+	color: var(--text);
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border-strong);
+}
+
+/* Quick actions below the selection, at screen size. */
+.drawn-plan-actions {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--inv-zoom)) translate(-50%, 0.6rem);
+	display: flex;
+	gap: 0.15rem;
+	padding: 0.15rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+}
+
+.drawn-plan-action {
+	display: inline-grid;
+	place-items: center;
+	padding: 0.25rem;
+	border: none;
+	background: none;
+	color: var(--text);
+}
+
+.drawn-plan-action:hover {
+	background-color: var(--bg-hover);
+}
+
 /* Stage left, side panel right; the stage fills its column. */
 .drawn-plan-layout {
 	display: grid;
@@ -6793,6 +6843,23 @@ a.drawn-plan-name:hover {
 .drawn-plan-element.active {
 	border-color: var(--primary);
 	background-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+/* Number key that picks the element, at the end of its palette entry. */
+.drawn-plan-key {
+	margin-left: auto;
+	padding: 0 0.3rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.25rem;
+	color: var(--text-secondary);
+	font-family: inherit;
+	font-size: var(--font-size-sm);
+	line-height: 1.3;
+}
+
+.drawn-plan-element.active .drawn-plan-key {
+	border-color: var(--primary-contrast);
 	color: var(--primary-contrast);
 }
 

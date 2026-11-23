@@ -1256,7 +1256,7 @@ export const de: Messages = {
 	'drawnPlan.planTab': 'Plan',
 	'drawnPlan.elements': 'Bauteile',
 	'drawnPlan.drawHint':
-		'Wähle ein Bauteil und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen.',
+		'Wähle ein Bauteil (oder drücke seine Zifferntaste) und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen. Strg + D dupliziert die Auswahl daneben (erneut, um den Abstand zu wiederholen); die Pfeiltasten verschieben sie um 10 cm, mit Umschalt um 1 m, mit Alt um 1 cm.',
 	'drawnPlan.openingPlaceHint':
 		'Auf eine Wand ziehen, oder anklicken und dann eine Wand anklicken',
 	'drawnPlan.tools': 'Zeichenwerkzeuge',
@@ -1268,17 +1268,18 @@ export const de: Messages = {
 	'drawnPlan.wallHint':
 		'Klicke dort, wo die Wand beginnt. Wände rasten in 15°-Schritten ein; Umschalt erlaubt jeden Winkel.',
 	'drawnPlan.wallNextHint':
-		'Klicke die nächste Ecke. Klicke die erste Ecke, doppelklicke oder drücke Enter zum Beenden.',
+		'Klicke die nächste Ecke oder tippe eine Länge in cm und drücke Enter. Klicke die erste Ecke, doppelklicke oder drücke Enter zum Beenden.',
 	'drawnPlan.openingHint': 'Klicke auf eine Wand, um es dort einzusetzen.',
 	'drawnPlan.stairsHint': 'Klicke auf den Fuß der Treppe, dann auf ihren Austritt.',
-	'drawnPlan.stairsNextHint': 'Klicke auf den Austritt der Treppe. Escape bricht ab.',
+	'drawnPlan.stairsNextHint':
+		'Klicke auf den Austritt der Treppe oder tippe ihre Länge in cm und drücke Enter. Escape bricht ab.',
 	'drawnPlan.moveImageHint': 'Ziehe, um das Referenzbild zu verschieben.',
 	'drawnPlan.calibrateHint':
 		'Klicke zwei Punkte auf dem Bild mit bekanntem Abstand (der zweite rastet in 15°-Schritten ein; Umschalt setzt ihn frei). Nur das Bild wird skaliert.',
 	'drawnPlan.newWallThickness': 'Stärke neuer Wände (cm)',
 	'drawnPlan.snap': 'Einrasten',
 	'drawnPlan.snapHint':
-		'Ecken rasten an Wandenden, auf Wänden und in 10-cm-Schritten ein, Wände in 15°-Schritten. Tische, Räume und Kabeltrassen rasten an Wandflächen und aneinander ein. Umschalt gibt den Winkel frei; Alt platziert frei.',
+		'Ecken rasten an Wandenden, auf Wänden und in 10-cm-Schritten ein, Wände in 15°-Schritten. Treppen, Tische, Tischgruppen, Räume und Kabeltrassen rasten an Wandflächen und aneinander ein: Ecke auf Ecke, bündig an einer Kante oder an anderen Objekten entlang der gestrichelten Hilfslinien ausgerichtet. Marker rasten an Tischen und Räumen ein und richten sich aneinander aus. Umschalt gibt den Winkel frei; Alt platziert frei.',
 	'drawnPlan.wallEnd': 'Wandende, zum Verschieben ziehen',
 	'drawnPlan.stairFoot': 'Fuß der Treppe, zum Verschieben ziehen',
 	'drawnPlan.stairHead': 'Austritt der Treppe, zum Verschieben ziehen',
@@ -1308,11 +1309,11 @@ export const de: Messages = {
 	'drawnPlan.trayHint':
 		'Klicke dort, wo die Kabeltrasse beginnt, dann auf ihre nächsten Ecken. Doppelklick oder Enter beendet sie.',
 	'drawnPlan.deskHint':
-		'Klicke auf ein Ende der Rückkante des Tischs, dann auf das andere. Der Tisch liegt links dieser Kante.',
-	'drawnPlan.deskNextHint': 'Klicke auf das andere Ende der Rückkante. Escape bricht ab.',
+		'Klicke, um einen Tisch mit dem Rücken an die nächste Wand zu stellen. Ziehe entlang seiner Rückkante, um einen beliebig langen zu zeichnen; der Tisch liegt links der Ziehrichtung.',
+	'drawnPlan.deskNextHint': 'Lass am anderen Ende der Rückkante los. Escape bricht ab.',
 	'drawnPlan.roomHint': 'Klicke auf die Ecken des Raums; sie rasten an den Wandflächen ein.',
 	'drawnPlan.roomNextHint':
-		'Klicke die nächste Ecke. Klicke die erste Ecke, doppelklicke oder drücke Enter, um den Raum zu schließen; Escape verwirft ihn.',
+		'Klicke die nächste Ecke oder tippe eine Länge in cm und drücke Enter. Klicke die erste Ecke, doppelklicke oder drücke Enter, um den Raum zu schließen; Escape verwirft ihn.',
 	'drawnPlan.newTrayWidth': 'Breite neuer Trassen (cm)',
 	'drawnPlan.depth': 'Tiefe (cm)',
 	'drawnPlan.rotation': 'Drehung (°)',
@@ -1325,6 +1326,9 @@ export const de: Messages = {
 	'drawnPlan.trayEnd': 'Trassenende, zum Verschieben ziehen',
 	'drawnPlan.deskCorner': 'Hintere Ecke des Tischs, zum Verschieben ziehen',
 	'drawnPlan.roomCorner': 'Raumecke, zum Verschieben ziehen, Doppelklick entfernt sie',
+	'drawnPlan.selectionActions': 'Auswahl',
+	'drawnPlan.rotate': 'Um 90° drehen',
+	'drawnPlan.duplicate': 'Duplizieren (Strg + D)',
 	'drawnPlan.flipDesk': 'Seite tauschen',
 	'drawnPlan.deleteTray': 'Kabeltrasse löschen',
 	'drawnPlan.deleteDesk': 'Tisch löschen',

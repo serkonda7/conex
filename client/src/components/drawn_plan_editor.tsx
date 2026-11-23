@@ -7,22 +7,39 @@
  *   it to move it. A selected wall, flight of stairs, tray or desk shows
  *   handles on its ends, a room on its corners, a desk group on its divider
  *   ends (drag to rotate); walls (and trays) joined at a moved end follow
- *   it. The inspector below the stage edits the selection (length,
- *   thickness, width, swing, steps, depth, rotation, linked locations,
- *   label) and deletes it.
+ *   it. Below the selection sit quick actions (rotate 90°, flip, duplicate,
+ *   delete); a desk, desk group or stairs shows its distances to the
+ *   nearest objects on each side, a door or window to the ends of its
+ *   stretch of wall. The inspector below the stage edits the selection
+ *   (length, thickness, width, swing, steps, depth, rotation, linked
+ *   locations, label) and deletes it.
+ * - Drawing tools stay picked after each element, until Escape or another
+ *   tool; the element just put down is selected.
  * - Wall / cable tray: each click adds a corner, chaining runs; clicking the
  *   chain's first corner closes it, a double click, Enter or Escape ends it.
+ *   While drawing a wall, tray, stairs or room, typing a number sets the
+ *   next line's length in cm toward the pointer; Enter puts it down.
  * - Door / sliding door / window: a click on a wall puts one there.
- * - Stairs / desk: a click at one end, then one at the other (a desk's back
- *   edge; the desk lies to the left of it, "Flip side" turns it over).
+ * - Stairs: a click at the foot, then one at the head.
+ * - Desk: a click puts one down at the length and depth set beside the
+ *   stage, its back against the nearest wall face within its depth; a drag
+ *   draws its back edge instead (the desk lies to the left of it, "Flip
+ *   side" turns it over).
  * - Desk group: a click puts three desks around a divider there, at the
  *   rotation and size set beside the stage.
  * - Room: each click adds a corner; clicking the first corner, a double
  *   click or Enter closes it, Escape drops it.
- * - Snap (toggle; Alt skips it): wall corners snap to wall ends, then onto
- *   walls; desk, desk group, room and tray corners to the walls' faces and
- *   to each other; otherwise to 10 cm steps. Lines from a previous point keep
+ * - Snap (toggle; Alt skips it, `drawn_plan_snap`): wall corners snap to
+ *   wall ends, then onto walls; stairs, desks, desk groups and rooms to the
+ *   walls' faces and to each other's corners and edges, trays to the faces
+ *   and other trays, markers to desks and rooms. A moved object snaps corner
+ *   on corner or flush against an edge (sliding into the next contact), else
+ *   lines up its edges or center with other objects along dashed guides;
+ *   otherwise everything takes 10 cm steps. Lines from a previous point keep
  *   multiples of 15°; Shift frees the angle.
+ * - Keys: 1–9 pick the Draw tab's elements (unless typing a length), Ctrl + D duplicates the
+ *   selection beside it (again on the copy repeats the step), the arrow
+ *   keys nudge it (10 cm, Shift 1 m, Alt 1 cm).
  * - Reference image: one of the owner's images (or a new upload) under the
  *   drawing, moved by dragging and scaled by two points a known distance
  *   apart.
@@ -34,15 +51,19 @@ import {
 	IconArrowBackUp,
 	IconArrowForwardUp,
 	IconArrowsHorizontal,
+	IconCopy,
 	IconDesk,
 	IconDoor,
+	IconFlipVertical,
 	IconMagnet,
 	IconPhotoUp,
 	IconPolygon,
+	IconRotateClockwise,
 	IconRoute,
 	IconRulerMeasure,
 	IconStairsUp,
 	IconTopologyStar3,
+	IconTrash,
 	IconWall,
 	IconWindow,
 	IconX,
@@ -117,6 +138,7 @@ import {
 	contentExtent,
 	DEFAULT_DESK_DEPTH,
 	DEFAULT_DESK_GROUP,
+	DEFAULT_DESK_LENGTH,
 	DEFAULT_OPENING_WIDTH,
 	DEFAULT_STAIR_WIDTH,
 	DEFAULT_TRAY_WIDTH,
@@ -131,18 +153,27 @@ import {
 	deskOutline,
 	direction,
 	distance,
-	lineHitsSegment,
 	openingShape,
 	openingSpan,
 	type Point,
 	polygonCenter,
 	projectOnSegment,
 	roundTo,
+	SAME_JOINT,
 	samePoint,
 	stairShape,
 	wallFaceTargets,
 	wallLength,
 } from './drawn_plan_geometry'
+import {
+	type Box,
+	boxOf,
+	rayHit,
+	ringEdges,
+	type SnapTargets,
+	snapPoint,
+	snapShift,
+} from './drawn_plan_snap'
 import {
 	DeskGroupLayer,
 	DeskLayer,
@@ -171,7 +202,7 @@ import {
 import { InlineError } from './feedback'
 import { ScaleDistanceDialog } from './floorplan_editor'
 import { candidateKey, Palette } from './floorplan_palette'
-import { snapEnabled, toggleSnap } from './floorplan_snap'
+import { type Guide, snapEnabled, toggleSnap } from './floorplan_snap'
 import { MarkerGlyph, MarkerName, markerClasses, markerTitle } from './floorplan_stage'
 import { IconLabel } from './icon_label'
 import type { StageZoom } from './zoom_viewport'
@@ -184,6 +215,15 @@ const SNAP_STEP = 10
 
 /** Shortest wall kept, cm. */
 const MIN_WALL = 1
+
+/** Pointer travel on screen (px) that turns a press of the desk tool into a drag. */
+const DRAG_PX = 4
+
+/** Longest desk put down with one click, cm. */
+const MAX_DESK_LENGTH = 1000
+
+/** Characters of a typed length. */
+const MAX_TYPED = 7
 
 /** Undo steps kept. */
 const MAX_UNDO = 100
@@ -310,14 +350,6 @@ function movedRunEnds<T extends Run>(
 	})
 }
 
-/** What a point being placed may snap to. */
-interface SnapTargets {
-	/** Points it jumps onto within the snap range. */
-	points: Point[]
-	/** Lines it lands on within `reach` (cm) or the snap range. */
-	lines: { a: Point; b: Point; reach: number }[]
-}
-
 type Tool =
 	| 'select'
 	| 'wall'
@@ -378,6 +410,24 @@ const ELEMENT_TOOLS: ElementTool[] = [
 	},
 	{ tool: 'room', icon: IconPolygon, label: 'drawnPlan.toolRoom', hint: 'drawnPlan.roomHint' },
 ]
+
+/** Tools of the Draw tab in palette order; the number keys 1–9 pick them. */
+const SHORTCUT_TOOLS: Tool[] = [
+	'wall',
+	'door',
+	'sliding_door',
+	'window',
+	'stairs',
+	'tray',
+	'desk',
+	'deskGroup',
+	'room',
+]
+
+/** The number key of a tool, shown on its palette entry. */
+function ToolKey(props: { tool: Tool }): JSX.Element {
+	return <kbd class="drawn-plan-key">{SHORTCUT_TOOLS.indexOf(props.tool) + 1}</kbd>
+}
 
 /** Tabs of the side panel: drawing elements, adding objects, and the plan's sheet and image. */
 type SideTab = 'draw' | 'add' | 'plan'
@@ -729,12 +779,21 @@ export function DrawnPlanEditor(props: {
 	const [chain, setChain] = createSignal<{ first: Point; last: Point } | null>(null)
 	/** First end of the stairs or desk being drawn. */
 	const [lineStart, setLineStart] = createSignal<Point | null>(null)
+	/** Length typed while drawing a wall, tray, stairs or room edge (cm), as typed. */
+	const [typed, setTyped] = createSignal('')
+	/** The desk a click would put down under the pointer. */
+	const [quickGhost, setQuickGhost] = createSignal<{ a: Point; b: Point } | null>(null)
+	const [deskLength, setDeskLength] = createSignal(DEFAULT_DESK_LENGTH)
+	/** True while an object or handle is dragged; hides the selection's actions. */
+	const [dragging, setDragging] = createSignal(false)
 	/** Corners of the room being drawn. */
 	const [roomDraft, setRoomDraft] = createSignal<Point[] | null>(null)
 	/** Pointer on the sheet (cm), snapped while a tool draws. */
 	const [hover, setHover] = createSignal<Point | null>(null)
 	const [pointer, setPointer] = createSignal<Point | null>(null)
 	const [snapMark, setSnapMark] = createSignal<Point | null>(null)
+	/** Alignment guides of the point or object being placed. */
+	const [guides, setGuides] = createSignal<Guide[]>([])
 	/** Scale points on the reference image: the first, then both while the distance is asked. */
 	const [calibration, setCalibration] = createSignal<{ a: Point; b: Point | null } | null>(null)
 	const [askDistance, setAskDistance] = createSignal(false)
@@ -962,11 +1021,6 @@ export function DrawnPlanEditor(props: {
 		return roundTo(value, SNAP_STEP)
 	}
 
-	/** A point snapped to the 10 cm step. */
-	function snapPosition(p: Point): Point {
-		return [snapAxis(p[0]), snapAxis(p[1])]
-	}
-
 	/** Wall ends and wall lines (reaching half their thickness), but not of the walls in `exclude`. */
 	function wallTargets(exclude: Set<number> = new Set()): SnapTargets {
 		const targets = walls().filter((wall: EditWall) => !exclude.has(wall.id))
@@ -977,82 +1031,105 @@ export function DrawnPlanEditor(props: {
 				b: wall.b,
 				reach: wall.thickness / 2,
 			})),
+			boxes: [],
 		}
 	}
 
 	const faces = createMemo(() => wallFaceTargets(walls()))
 
+	/** Extents of the walls along a screen axis (diagonal walls' boxes would mislead), faces included. */
+	const wallBoxes = createMemo((): Box[] => {
+		const all = faces().faces
+		return walls().flatMap((wall: EditWall, i: number): Box[] => {
+			const [first, second] = [all[2 * i], all[2 * i + 1]]
+			const straight =
+				Math.abs(wall.a[0] - wall.b[0]) < SAME_JOINT ||
+				Math.abs(wall.a[1] - wall.b[1]) < SAME_JOINT
+			return straight && first && second ? [boxOf([...first, ...second])] : []
+		})
+	})
+
+	/** Corners and edges of every object other things snap to, keyed like the selection. */
+	const outlines = createMemo((): { key: string; points: Point[]; edges: [Point, Point][] }[] => [
+		...stairs().map((stair: EditStair) => {
+			const outline = stairShape(stair).outline
+			return { key: `stair:${stair.id}`, points: outline, edges: ringEdges(outline) }
+		}),
+		...desks().map((desk: EditDesk) => {
+			const outline = deskOutline(desk)
+			return { key: `desk:${desk.id}`, points: outline, edges: ringEdges(outline) }
+		}),
+		...deskGroups().map((group: EditDeskGroup) => ({
+			key: `deskGroup:${group.id}`,
+			points: deskGroupCorners(group),
+			edges: deskGroupEdges(group),
+		})),
+		...rooms().map((room: EditRoom) => ({
+			key: `room:${room.id}`,
+			points: room.points,
+			edges: ringEdges(room.points),
+		})),
+	])
+
 	/**
-	 * The walls' faces and their corners, plus what a tray, desk or room
-	 * lines up with: the trays' ends and lines (but not those in `exclude`),
-	 * the other desks' and desk groups' corners and outer edges (not the desk
-	 * in `exclude` or the group `excludeGroup` being edited), or the other
-	 * rooms' corners and edges.
+	 * What stairs, desks, desk groups and rooms snap to: the walls' faces and
+	 * their corners, and the corners and edges of the other objects (not
+	 * those keyed in `exclude`, which are being edited).
 	 */
-	function faceTargets(
-		kind: 'tray' | 'desk' | 'room',
-		exclude: Set<number>,
-		excludeGroup: number | null = null,
-	): SnapTargets {
+	function objectTargets(exclude: Set<string> = new Set()): SnapTargets {
 		const { points, faces: lines } = faces()
-		const edges = (corners: Point[]): { a: Point; b: Point; reach: number }[] =>
-			corners.map((corner: Point, i: number) => ({
-				a: corner,
-				b: corners[(i + 1) % corners.length] as Point,
-				reach: 0,
-			}))
-		const own: SnapTargets =
-			kind === 'tray'
-				? {
-						points: trays()
-							.filter((tray: EditTray) => !exclude.has(tray.id))
-							.flatMap((tray: EditTray) => [tray.a, tray.b]),
-						lines: trays()
-							.filter((tray: EditTray) => !exclude.has(tray.id))
-							.map((tray: EditTray) => ({
-								a: tray.a,
-								b: tray.b,
-								reach: tray.width / 2,
-							})),
-					}
-				: (() => {
-						const shapes =
-							kind === 'desk'
-								? desks()
-										.filter((desk: EditDesk) => !exclude.has(desk.id))
-										.map((desk: EditDesk) => deskOutline(desk))
-								: rooms()
-										.filter((room: EditRoom) => !exclude.has(room.id))
-										.map((room: EditRoom) => room.points)
-						const groups =
-							kind === 'desk'
-								? deskGroups().filter(
-										(group: EditDeskGroup) => group.id !== excludeGroup,
-									)
-								: []
-						return {
-							points: [...shapes.flat(), ...groups.flatMap(deskGroupCorners)],
-							lines: [
-								...shapes.flatMap(edges),
-								...groups.flatMap((group: EditDeskGroup) =>
-									deskGroupEdges(group).map(([a, b]) => ({ a, b, reach: 0 })),
-								),
-							],
-						}
-					})()
+		const others = outlines().filter((outline) => !exclude.has(outline.key))
 		return {
-			points: [...own.points, ...points],
-			lines: [...own.lines, ...lines.map(([a, b]) => ({ a, b, reach: 0 }))],
+			points: [...points, ...others.flatMap((outline) => outline.points)],
+			lines: [
+				...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+				...others.flatMap((outline) => outline.edges.map(([a, b]) => ({ a, b, reach: 0 }))),
+			],
+			boxes: [...wallBoxes(), ...others.map((outline) => boxOf(outline.points))],
+		}
+	}
+
+	/** What a cable tray snaps to: the walls' faces and the other trays' ends and lines (not those in `exclude`). */
+	function trayTargets(exclude: Set<number> = new Set()): SnapTargets {
+		const { points, faces: lines } = faces()
+		const others = trays().filter((tray: EditTray) => !exclude.has(tray.id))
+		return {
+			points: [...points, ...others.flatMap((tray: EditTray) => [tray.a, tray.b])],
+			lines: [
+				...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+				...others.map((tray: EditTray) => ({
+					a: tray.a,
+					b: tray.b,
+					reach: tray.width / 2,
+				})),
+			],
+			boxes: wallBoxes(),
+		}
+	}
+
+	/** What a new object snaps to, while drawing it. */
+	const allObjectTargets = createMemo(() => objectTargets())
+	const allTrayTargets = createMemo(() => trayTargets())
+
+	/** What a marker snaps to: the desks' and rooms' centers, and lines up with the other markers. */
+	function markerTargets(exclude: number): SnapTargets {
+		return {
+			points: [
+				...seats().map((seat: DeskSeat) => seat.at),
+				...rooms().map((room: EditRoom) => polygonCenter(room.points)),
+				...placements()
+					.filter((p: FloorplanPlacementJson) => p.id !== exclude)
+					.map((p: FloorplanPlacementJson): Point => [p.x, p.y]),
+			],
+			lines: [],
+			boxes: [],
 		}
 	}
 
 	/**
-	 * A point at `raw` while snapping (Alt places it freely): a target point
-	 * within range wins. From a previous point `from` the line keeps a
-	 * multiple of 15° (Shift frees the angle) with a length in 10 cm steps,
-	 * and ends on a target line it meets near the pointer. Otherwise the
-	 * point lands on a target line, else on the 10 cm step. Marks the point
-	 * snapped to.
+	 * A point at `raw` while snapping (Alt places it freely), drawn from a
+	 * previous point `from` (Shift frees the angle): see `snapPoint`. Marks
+	 * the point snapped to and shows the guides it lines up on.
 	 */
 	function snapTo(
 		e: { altKey: boolean; shiftKey: boolean },
@@ -1061,43 +1138,22 @@ export function DrawnPlanEditor(props: {
 		targets: SnapTargets,
 	): Point {
 		setSnapMark(null)
-		const { width, height } = sheet()
+		setGuides([])
 		if (!snapping(e)) {
 			return raw
 		}
-		const range = snapRange()
-		let best: Point | null = null
-		let bestDistance = range
-		for (const point of targets.points) {
-			const d = distance(raw, point)
-			if (d <= bestDistance) {
-				best = point
-				bestDistance = d
-			}
-		}
-		if (best) {
-			setSnapMark(best)
-			return best
-		}
-		if (from && !e.shiftKey) {
-			const constrained = clampPoint(constrainAngle(from, raw, SNAP_STEP), width, height)
-			for (const line of targets.lines) {
-				const hit = lineHitsSegment(from, constrained, line.a, line.b)
-				if (hit && distance(hit, constrained) <= Math.max(range, line.reach)) {
-					setSnapMark(hit)
-					return hit
-				}
-			}
-			return constrained
-		}
-		for (const line of targets.lines) {
-			const hit = projectOnSegment(raw, line.a, line.b)
-			if (hit.distance <= Math.max(range, line.reach)) {
-				setSnapMark(hit.point)
-				return hit.point
-			}
-		}
-		return clampPoint(snapPosition(raw), width, height)
+		const { width, height } = sheet()
+		const snapped = snapPoint(
+			raw,
+			e.shiftKey ? null : from,
+			targets,
+			snapRange(),
+			SNAP_STEP,
+			(p: Point) => clampPoint(p, width, height),
+		)
+		setSnapMark(snapped.mark)
+		setGuides(snapped.guides)
+		return snapped.value
 	}
 
 	/** A wall corner at `raw`: `snapTo` the walls other than those in `exclude`. */
@@ -1111,42 +1167,26 @@ export function DrawnPlanEditor(props: {
 	}
 
 	/**
-	 * The move `delta` of a shape with `corners`, snapped while snapping: the
-	 * corner nearest to a target point within range lands on it, else the
-	 * first corner on the 10 cm step.
+	 * The move `delta` of a shape with `corners` and `edges`, snapped to
+	 * `targets` while snapping: see `snapShift`. Marks the point snapped to
+	 * and shows the guides it lines up on.
 	 */
 	function snapMove(
 		e: { altKey: boolean },
 		corners: Point[],
+		edges: [Point, Point][],
 		delta: Point,
 		targets: SnapTargets,
 	): Point {
 		setSnapMark(null)
-		if (!snapping(e) || corners.length === 0) {
+		setGuides([])
+		if (!snapping(e)) {
 			return delta
 		}
-		let best: { delta: Point; distance: number; at: Point } | null = null
-		const range = snapRange()
-		for (const corner of corners) {
-			const moved: Point = [corner[0] + delta[0], corner[1] + delta[1]]
-			for (const point of targets.points) {
-				const d = distance(moved, point)
-				if (d <= range && (!best || d < best.distance)) {
-					best = {
-						delta: [point[0] - corner[0], point[1] - corner[1]],
-						distance: d,
-						at: point,
-					}
-				}
-			}
-		}
-		if (best) {
-			setSnapMark(best.at)
-			return best.delta
-		}
-		const first = corners[0] as Point
-		const snapped = snapPosition([first[0] + delta[0], first[1] + delta[1]])
-		return [snapped[0] - first[0], snapped[1] - first[1]]
+		const snapped = snapShift(corners, edges, delta, targets, snapRange(), SNAP_STEP)
+		setSnapMark(snapped.mark)
+		setGuides(snapped.guides)
+		return snapped.value
 	}
 
 	/** `delta` cut down so every point of `points` stays on the sheet. */
@@ -1195,6 +1235,7 @@ export function DrawnPlanEditor(props: {
 			if (!recorded) {
 				recorded = true
 				checkpoint()
+				setDragging(true)
 			}
 			move(stagePoint(ev), ev)
 		}
@@ -1202,7 +1243,9 @@ export function DrawnPlanEditor(props: {
 			window.removeEventListener('pointermove', onMove)
 			window.removeEventListener('pointerup', onUp)
 			window.removeEventListener('pointercancel', onUp)
+			setDragging(false)
 			setSnapMark(null)
+			setGuides([])
 			end?.()
 		}
 		window.addEventListener('pointermove', onMove)
@@ -1240,24 +1283,19 @@ export function DrawnPlanEditor(props: {
 		const startB = wall.b
 		const endsA = jointAt(startA)
 		const endsB = jointAt(startB)
+		// The walls joined to it follow, so they are no targets.
+		const targets = wallTargets(new Set([...endsA, ...endsB].map((entry) => entry.id)))
 		const from = stagePoint(e)
-		const { width, height } = sheet()
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			let dx = at[0] - from[0]
-			let dy = at[1] - from[1]
-			if (snapping(ev)) {
-				const snapped = snapPosition([startA[0] + dx, startA[1] + dy])
-				dx = snapped[0] - startA[0]
-				dy = snapped[1] - startA[1]
-			}
-			// Keep both ends on the sheet.
-			dx = Math.min(
-				width - Math.max(startA[0], startB[0]),
-				Math.max(-Math.min(startA[0], startB[0]), dx),
-			)
-			dy = Math.min(
-				height - Math.max(startA[1], startB[1]),
-				Math.max(-Math.min(startA[1], startB[1]), dy),
+			const [dx, dy] = keepOnSheet(
+				[startA, startB],
+				snapMove(
+					ev,
+					[startA, startB],
+					[[startA, startB]],
+					[at[0] - from[0], at[1] - from[1]],
+					targets,
+				),
 			)
 			moveEnds(endsA, [startA[0] + dx, startA[1] + dy])
 			moveEnds(endsB, [startB[0] + dx, startB[1] + dy])
@@ -1290,27 +1328,29 @@ export function DrawnPlanEditor(props: {
 		}
 		setSelected({ kind: 'stair', id })
 		const { a, b } = stair
+		const outline = stairShape(stair).outline
+		const targets = objectTargets(new Set([key]))
 		const from = stagePoint(e)
-		const { width, height } = sheet()
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			let dx = at[0] - from[0]
-			let dy = at[1] - from[1]
-			if (snapping(ev)) {
-				const snapped = snapPosition([a[0] + dx, a[1] + dy])
-				dx = snapped[0] - a[0]
-				dy = snapped[1] - a[1]
-			}
-			// Keep both ends on the sheet.
-			dx = Math.min(width - Math.max(a[0], b[0]), Math.max(-Math.min(a[0], b[0]), dx))
-			dy = Math.min(height - Math.max(a[1], b[1]), Math.max(-Math.min(a[1], b[1]), dy))
+			const [dx, dy] = keepOnSheet(
+				[a, b],
+				snapMove(
+					ev,
+					outline,
+					ringEdges(outline),
+					[at[0] - from[0], at[1] - from[1]],
+					targets,
+				),
+			)
 			patchStair(id, { a: [a[0] + dx, a[1] + dy], b: [b[0] + dx, b[1] + dy] })
 		})
 	}
 
 	function dragStairEnd(e: PointerEvent, stair: EditStair, end: 'a' | 'b'): void {
 		const other = end === 'a' ? stair.b : stair.a
+		const targets = objectTargets(new Set([`stair:${stair.id}`]))
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			const to = snapCorner(ev, at, other)
+			const to = snapTo(ev, at, other, targets)
 			if (distance(to, other) >= MIN_WALL) {
 				patchStair(stair.id, { [end]: to })
 			}
@@ -1327,17 +1367,12 @@ export function DrawnPlanEditor(props: {
 		const { a, b } = tray
 		const endsA = runEndsAt(trays(), a)
 		const endsB = runEndsAt(trays(), b)
-		const exclude = new Set([...endsA, ...endsB].map((entry) => entry.id))
+		const targets = trayTargets(new Set([...endsA, ...endsB].map((entry) => entry.id)))
 		const from = stagePoint(e)
 		startEdit(e, (at: Point, ev: PointerEvent) => {
 			const delta = keepOnSheet(
 				[a, b],
-				snapMove(
-					ev,
-					[a, b],
-					[at[0] - from[0], at[1] - from[1]],
-					faceTargets('tray', exclude),
-				),
+				snapMove(ev, [a, b], [[a, b]], [at[0] - from[0], at[1] - from[1]], targets),
 			)
 			setTrays((all: EditTray[]) =>
 				movedRunEnds(movedRunEnds(all, endsA, [a[0] + delta[0], a[1] + delta[1]]), endsB, [
@@ -1350,10 +1385,10 @@ export function DrawnPlanEditor(props: {
 
 	function dragTrayEnd(e: PointerEvent, tray: EditTray, end: 'a' | 'b'): void {
 		const ends = runEndsAt(trays(), tray[end])
-		const exclude = new Set(ends.map((entry) => entry.id))
+		const targets = trayTargets(new Set(ends.map((entry) => entry.id)))
 		const other = end === 'a' ? tray.b : tray.a
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			const to = snapTo(ev, at, other, faceTargets('tray', exclude))
+			const to = snapTo(ev, at, other, targets)
 			if (distance(to, other) >= MIN_WALL) {
 				setTrays((all: EditTray[]) => movedRunEnds(all, ends, to))
 			}
@@ -1369,6 +1404,7 @@ export function DrawnPlanEditor(props: {
 		setSelected({ kind: 'desk', id })
 		const { a, b } = desk
 		const corners = deskOutline(desk)
+		const targets = objectTargets(new Set([key]))
 		const from = stagePoint(e)
 		startEdit(e, (at: Point, ev: PointerEvent) => {
 			const delta = keepOnSheet(
@@ -1376,8 +1412,9 @@ export function DrawnPlanEditor(props: {
 				snapMove(
 					ev,
 					corners,
+					ringEdges(corners),
 					[at[0] - from[0], at[1] - from[1]],
-					faceTargets('desk', new Set([id])),
+					targets,
 				),
 			)
 			patchDesk(id, {
@@ -1389,8 +1426,9 @@ export function DrawnPlanEditor(props: {
 
 	function dragDeskEnd(e: PointerEvent, desk: EditDesk, end: 'a' | 'b'): void {
 		const other = end === 'a' ? desk.b : desk.a
+		const targets = objectTargets(new Set([`desk:${desk.id}`]))
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			const to = snapTo(ev, at, other, faceTargets('desk', new Set([desk.id])))
+			const to = snapTo(ev, at, other, targets)
 			if (distance(to, other) >= MIN_WALL) {
 				patchDesk(desk.id, { [end]: to })
 			}
@@ -1398,20 +1436,21 @@ export function DrawnPlanEditor(props: {
 	}
 
 	/**
-	 * Where a desk group `shape` put at `raw` goes: while snapping, its
-	 * corner nearest to a target lands on it, else its center on the 10 cm
-	 * step; it stays on the sheet.
+	 * Where a desk group `shape` put at `raw` goes: while snapping, it snaps
+	 * to the other objects like a moved one (`targets`, without the group
+	 * itself); it stays on the sheet.
 	 */
 	function groupCenter(
 		e: { altKey: boolean },
 		shape: NewDeskGroup,
 		raw: Point,
-		excludeGroup: number | null,
+		targets: SnapTargets,
 	): Point {
-		const corners = deskGroupCorners({ ...shape, center: raw })
+		const group = { ...shape, center: raw }
+		const corners = deskGroupCorners(group)
 		const delta = keepOnSheet(
 			corners,
-			snapMove(e, corners, [0, 0], faceTargets('desk', new Set(), excludeGroup)),
+			snapMove(e, corners, deskGroupEdges(group), [0, 0], targets),
 		)
 		return [raw[0] + delta[0], raw[1] + delta[1]]
 	}
@@ -1425,13 +1464,14 @@ export function DrawnPlanEditor(props: {
 		setSelected({ kind: 'deskGroup', id })
 		const from = stagePoint(e)
 		const { center } = group
+		const targets = objectTargets(new Set([key]))
 		startEdit(e, (at: Point, ev: PointerEvent) => {
 			patchDeskGroup(id, {
 				center: groupCenter(
 					ev,
 					group,
 					[center[0] + at[0] - from[0], center[1] + at[1] - from[1]],
-					id,
+					targets,
 				),
 			})
 		})
@@ -1462,16 +1502,12 @@ export function DrawnPlanEditor(props: {
 		}
 		setSelected({ kind: 'room', id })
 		const start = room.points
+		const targets = objectTargets(new Set([key]))
 		const from = stagePoint(e)
 		startEdit(e, (at: Point, ev: PointerEvent) => {
 			const delta = keepOnSheet(
 				start,
-				snapMove(
-					ev,
-					start,
-					[at[0] - from[0], at[1] - from[1]],
-					faceTargets('room', new Set([id])),
-				),
+				snapMove(ev, start, ringEdges(start), [at[0] - from[0], at[1] - from[1]], targets),
 			)
 			patchRoom(id, {
 				points: start.map((p: Point): Point => [p[0] + delta[0], p[1] + delta[1]]),
@@ -1480,8 +1516,9 @@ export function DrawnPlanEditor(props: {
 	}
 
 	function dragRoomCorner(e: PointerEvent, room: EditRoom, index: number): void {
+		const targets = objectTargets(new Set([`room:${room.id}`]))
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			const to = snapTo(ev, at, null, faceTargets('room', new Set([room.id])))
+			const to = snapTo(ev, at, null, targets)
 			patchRoom(room.id, {
 				points: room.points.map((p: Point, i: number) => (i === index ? to : p)),
 			})
@@ -1503,14 +1540,14 @@ export function DrawnPlanEditor(props: {
 		}
 		setSelected({ kind: 'marker', id: placement.id })
 		const from = stagePoint(e)
-		const { width, height } = sheet()
+		const start: Point = [placement.x, placement.y]
+		const targets = markerTargets(placement.id)
 		startEdit(e, (at: Point, ev: PointerEvent) => {
-			let next: Point = [placement.x + at[0] - from[0], placement.y + at[1] - from[1]]
-			if (snapping(ev)) {
-				next = snapPosition(next)
-			}
-			const [x, y] = clampPoint(next, width, height)
-			patchPlacement(placement.id, { x, y })
+			const [dx, dy] = keepOnSheet(
+				[start],
+				snapMove(ev, [start], [], [at[0] - from[0], at[1] - from[1]], targets),
+			)
+			patchPlacement(placement.id, { x: start[0] + dx, y: start[1] + dy })
 		})
 	}
 
@@ -1577,7 +1614,7 @@ export function DrawnPlanEditor(props: {
 		const next = resized(group, patch)
 		patchDeskGroup(group.id, {
 			...next,
-			center: groupCenter({ altKey: true }, next, next.center, group.id),
+			center: groupCenter({ altKey: true }, next, next.center, allObjectTargets()),
 		})
 	}
 
@@ -1684,7 +1721,6 @@ export function DrawnPlanEditor(props: {
 		checkpoint()
 		const id = freshId()
 		setRooms((all: EditRoom[]) => [...all, { id, points }])
-		setTool('select')
 		setSelected({ kind: 'room', id })
 	}
 
@@ -1747,6 +1783,410 @@ export function DrawnPlanEditor(props: {
 		}
 		setSelected(null)
 	}
+
+	/** The points that place `current` on the sheet; the first one anchors it. */
+	function selectionPoints(current: Selected): Point[] {
+		const { kind, id } = current
+		const find = <T extends { id: number }>(all: T[]): T | undefined =>
+			all.find((x: T) => x.id === id)
+		if (kind === 'wall' || kind === 'stair' || kind === 'tray' || kind === 'desk') {
+			const line = find<EditWall | EditStair | EditTray | EditDesk>(
+				kind === 'wall'
+					? walls()
+					: kind === 'stair'
+						? stairs()
+						: kind === 'tray'
+							? trays()
+							: desks(),
+			)
+			return line ? [line.a, line.b] : []
+		}
+		if (kind === 'opening') {
+			const opening = find(openings())
+			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
+			return opening && wall ? [along(wall.a, direction(wall.a, wall.b), opening.offset)] : []
+		}
+		if (kind === 'deskGroup') {
+			const group = find(deskGroups())
+			return group ? [group.center, ...deskGroupCorners(group)] : []
+		}
+		if (kind === 'room') {
+			return find(rooms())?.points ?? []
+		}
+		const placement = placements().find((p: FloorplanPlacementJson) => p.id === id)
+		return placement ? [[placement.x, placement.y]] : []
+	}
+
+	/** Moves `current` by `delta` (kept on the sheet); joined walls and trays follow, a door or window slides along its wall. */
+	function translate(current: Selected, delta: Point): void {
+		const points = selectionPoints(current)
+		if (points.length === 0) {
+			return
+		}
+		const { id } = current
+		const [dx, dy] = current.kind === 'opening' ? delta : keepOnSheet(points, delta)
+		const shift = (p: Point): Point => [p[0] + dx, p[1] + dy]
+		if (current.kind === 'wall' || current.kind === 'tray') {
+			const [a, b] = points as [Point, Point]
+			const move = <T extends Run>(all: T[]): T[] =>
+				movedRunEnds(
+					movedRunEnds(all, runEndsAt(all, a), shift(a)),
+					runEndsAt(all, b),
+					shift(b),
+				)
+			if (current.kind === 'wall') {
+				setWalls(move)
+			} else {
+				setTrays(move)
+			}
+		} else if (current.kind === 'opening') {
+			const opening = openings().find((o: EditOpening) => o.id === id)
+			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
+			if (opening && wall) {
+				const u = direction(wall.a, wall.b)
+				const offset = opening.offset + dx * u[0] + dy * u[1]
+				patchOpening(id, { offset: clampOffset(wall, opening.width, offset) })
+			}
+		} else if (current.kind === 'stair') {
+			const [a, b] = points as [Point, Point]
+			patchStair(id, { a: shift(a), b: shift(b) })
+		} else if (current.kind === 'desk') {
+			const [a, b] = points as [Point, Point]
+			patchDesk(id, { a: shift(a), b: shift(b) })
+		} else if (current.kind === 'deskGroup') {
+			patchDeskGroup(id, { center: shift(points[0] as Point) })
+		} else if (current.kind === 'room') {
+			patchRoom(id, { points: points.map(shift) })
+		} else {
+			const [x, y] = shift(points[0] as Point)
+			patchPlacement(id, { x, y })
+		}
+	}
+
+	/** The last nudge, so a held arrow key records one undo step. */
+	let lastNudge = { key: '', at: 0 }
+
+	/** Moves the selection with an arrow key: 10 cm, Shift 1 m, Alt 1 cm. */
+	function nudge(e: KeyboardEvent): boolean {
+		const current = selected()
+		const unit: Point | undefined = (
+			{
+				ArrowLeft: [-1, 0],
+				ArrowRight: [1, 0],
+				ArrowUp: [0, -1],
+				ArrowDown: [0, 1],
+			} as Record<string, Point>
+		)[e.key]
+		// While a line is drawn the arrow keys are left alone; otherwise they move the selection in any tool.
+		if (!current || !unit || drawFrom() !== null || lineStart() !== null) {
+			return false
+		}
+		const by = e.altKey ? 1 : e.shiftKey ? 100 : SNAP_STEP
+		const now = Date.now()
+		if (lastNudge.key !== keyOf(current) || now - lastNudge.at > 1000) {
+			checkpoint()
+		}
+		lastNudge = { key: keyOf(current), at: now }
+		translate(current, [unit[0] * by, unit[1] * by])
+		return true
+	}
+
+	/** The last duplicate, so the next one of the copy repeats the step between them. */
+	let lastCopy: { source: Selected; copy: Selected } | null = null
+
+	/**
+	 * Where a duplicate goes, from the original: beside it (a desk along its
+	 * back edge, a door or window along its wall, stairs across them, a
+	 * wall or tray a meter across it, anything else its width to the
+	 * right), or the step from the previous duplicate to this one.
+	 */
+	function copyOffset(current: Selected): Point {
+		const points = selectionPoints(current)
+		const previous = lastCopy
+		if (previous && keyOf(previous.copy) === keyOf(current)) {
+			const before = selectionPoints(previous.source)[0]
+			const now = points[0]
+			if (before && now && distance(before, now) >= MIN_WALL) {
+				return [now[0] - before[0], now[1] - before[1]]
+			}
+		}
+		const [a, b] = points as [Point, Point]
+		if (current.kind === 'desk') {
+			return [b[0] - a[0], b[1] - a[1]]
+		}
+		if (current.kind === 'opening') {
+			const opening = openings().find((o: EditOpening) => o.id === current.id)
+			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
+			const u = wall ? direction(wall.a, wall.b) : ([1, 0] as Point)
+			const step = (opening?.width ?? 0) + SNAP_STEP * 5
+			return [u[0] * step, u[1] * step]
+		}
+		if (current.kind === 'wall' || current.kind === 'tray' || current.kind === 'stair') {
+			const u = direction(a, b)
+			const across =
+				current.kind === 'stair'
+					? (stairs().find((x: EditStair) => x.id === current.id)?.width ?? 100)
+					: 100
+			return [u[1] * across, -u[0] * across]
+		}
+		const box = boxOf(points)
+		return [box.x1 - box.x0, 0]
+	}
+
+	/** Duplicates the selection beside it (markers stand for one object each and are not copied) and selects the copy. */
+	function duplicateSelected(): void {
+		const current = selected()
+		if (!current || current.kind === 'marker' || selectionPoints(current).length === 0) {
+			return
+		}
+		const offset = copyOffset(current)
+		const { id } = current
+		const copyId = freshId()
+		// Walls and trays are put in place directly (a nudge would drag the original's joints along).
+		const [dx, dy] = keepOnSheet(selectionPoints(current), offset)
+		const move = (p: Point): Point => [p[0] + dx, p[1] + dy]
+		checkpoint()
+		if (current.kind === 'wall') {
+			const wall = walls().find((w: EditWall) => w.id === id) as EditWall
+			setWalls((all: EditWall[]) => [
+				...all,
+				{ ...wall, id: copyId, a: move(wall.a), b: move(wall.b) },
+			])
+			setOpenings((all: EditOpening[]) => [
+				...all,
+				...all
+					.filter((opening: EditOpening) => opening.wall_id === id)
+					.map((opening: EditOpening) => ({
+						...opening,
+						id: freshId(),
+						wall_id: copyId,
+					})),
+			])
+		} else if (current.kind === 'opening') {
+			const opening = openings().find((o: EditOpening) => o.id === id) as EditOpening
+			setOpenings((all: EditOpening[]) => [...all, { ...opening, id: copyId }])
+		} else if (current.kind === 'stair') {
+			const stair = stairs().find((x: EditStair) => x.id === id) as EditStair
+			setStairs((all: EditStair[]) => [...all, { ...stair, id: copyId }])
+		} else if (current.kind === 'tray') {
+			const tray = trays().find((x: EditTray) => x.id === id) as EditTray
+			setTrays((all: EditTray[]) => [
+				...all,
+				{ ...tray, id: copyId, a: move(tray.a), b: move(tray.b) },
+			])
+		} else if (current.kind === 'desk') {
+			// A location is linked to one desk: the copy starts unlinked.
+			const { location_id: _, ...desk } = desks().find(
+				(x: EditDesk) => x.id === id,
+			) as EditDesk
+			setDesks((all: EditDesk[]) => [...all, { ...desk, id: copyId }])
+		} else if (current.kind === 'deskGroup') {
+			const group = deskGroups().find((x: EditDeskGroup) => x.id === id) as EditDeskGroup
+			setDeskGroups((all: EditDeskGroup[]) => [
+				...all,
+				{ ...group, id: copyId, location_ids: [null, null, null] },
+			])
+		} else if (current.kind === 'room') {
+			const room = rooms().find((x: EditRoom) => x.id === id) as EditRoom
+			setRooms((all: EditRoom[]) => [...all, { id: copyId, points: room.points }])
+		}
+		const copy: Selected = { kind: current.kind, id: copyId }
+		// Stairs, desks, desk groups and rooms move into place like a nudge, kept on the sheet.
+		if (current.kind !== 'wall' && current.kind !== 'tray') {
+			translate(copy, offset)
+		}
+		setSelected(copy)
+		lastCopy = { source: current, copy }
+	}
+
+	/** The outline of `current` on the sheet, for its box. */
+	function selectionOutline(current: Selected): Point[] {
+		const { kind, id } = current
+		if (kind === 'stair') {
+			const stair = stairs().find((x: EditStair) => x.id === id)
+			return stair ? stairShape(stair).outline : []
+		}
+		if (kind === 'desk') {
+			const desk = desks().find((x: EditDesk) => x.id === id)
+			return desk ? deskOutline(desk) : []
+		}
+		if (kind === 'opening') {
+			const opening = openings().find((o: EditOpening) => o.id === id)
+			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
+			return opening && wall ? openingShape(wall, { ...opening, wall: 0 }).gap : []
+		}
+		return selectionPoints(current)
+	}
+
+	/** Whether the selection turns by 90° and flips (a window does not flip). */
+	const canRotate = (current: Selected): boolean =>
+		current.kind === 'desk' ||
+		current.kind === 'deskGroup' ||
+		current.kind === 'room' ||
+		current.kind === 'stair'
+	const canFlip = (current: Selected): boolean =>
+		current.kind === 'desk' ||
+		current.kind === 'stair' ||
+		(current.kind === 'opening' && selectedOpening()?.kind !== 'window')
+
+	/** Turns the selection 90° clockwise around its center, kept on the sheet. */
+	function rotateSelected(): void {
+		const current = selected()
+		if (!current || !canRotate(current)) {
+			return
+		}
+		const turn =
+			(c: Point) =>
+			(p: Point): Point => [c[0] - (p[1] - c[1]), c[1] + (p[0] - c[0])]
+		const onSheet = (outline: Point[]): ((p: Point) => Point) => {
+			const [dx, dy] = keepOnSheet(outline, [0, 0])
+			return (p: Point): Point => [p[0] + dx, p[1] + dy]
+		}
+		const { id } = current
+		checkpoint()
+		if (current.kind === 'desk') {
+			const desk = desks().find((x: EditDesk) => x.id === id) as EditDesk
+			const r = turn(polygonCenter(deskOutline(desk)))
+			const next = { ...desk, a: r(desk.a), b: r(desk.b) }
+			const shift = onSheet(deskOutline(next))
+			patchDesk(id, { a: shift(next.a), b: shift(next.b) })
+		} else if (current.kind === 'stair') {
+			const stair = stairs().find((x: EditStair) => x.id === id) as EditStair
+			const r = turn([(stair.a[0] + stair.b[0]) / 2, (stair.a[1] + stair.b[1]) / 2])
+			const next = { ...stair, a: r(stair.a), b: r(stair.b) }
+			const shift = onSheet(stairShape(next).outline)
+			patchStair(id, { a: shift(next.a), b: shift(next.b) })
+		} else if (current.kind === 'room') {
+			const room = rooms().find((x: EditRoom) => x.id === id) as EditRoom
+			const turned = room.points.map(turn(polygonCenter(room.points)))
+			patchRoom(id, { points: turned.map(onSheet(turned)) })
+		} else {
+			const group = deskGroups().find((x: EditDeskGroup) => x.id === id) as EditDeskGroup
+			const next = { ...group, rotation: normalDegrees(group.rotation + 90) }
+			patchDeskGroup(id, { ...next, center: onSheet(deskGroupCorners(next))(next.center) })
+		}
+	}
+
+	/** Flips the selection: a desk to the other side of its back edge, stairs' direction, a door's swing side. */
+	function flipSelected(): void {
+		const current = selected()
+		if (!current || !canFlip(current)) {
+			return
+		}
+		const { id } = current
+		checkpoint()
+		if (current.kind === 'desk') {
+			const desk = desks().find((x: EditDesk) => x.id === id) as EditDesk
+			patchDesk(id, { a: desk.b, b: desk.a })
+		} else if (current.kind === 'stair') {
+			const stair = stairs().find((x: EditStair) => x.id === id) as EditStair
+			patchStair(id, { a: stair.b, b: stair.a })
+		} else {
+			const opening = openings().find((o: EditOpening) => o.id === id) as EditOpening
+			patchOpening(id, { side: opening.side === 'left' ? 'right' : 'left' })
+		}
+	}
+
+	/** Title of the flip action of the selection. */
+	function flipLabel(current: Selected): string {
+		if (current.kind === 'desk') {
+			return t('drawnPlan.flipDesk')
+		}
+		if (current.kind === 'stair') {
+			return t('drawnPlan.flipStairs')
+		}
+		return t(
+			selectedOpening()?.kind === 'sliding_door'
+				? 'drawnPlan.flipSlideSide'
+				: 'drawnPlan.flipSwing',
+		)
+	}
+
+	/** Box of the selection the actions sit below; none for a marker, which has its own remove button. */
+	const selectionBox = createMemo((): Box | null => {
+		const current = selected()
+		if (!current || current.kind === 'marker') {
+			return null
+		}
+		const outline = selectionOutline(current)
+		return outline.length > 0 ? boxOf(outline) : null
+	})
+
+	/**
+	 * Distances to show for the selection: from a desk, desk group or stairs
+	 * to the nearest object on each side (from the middle of each side of
+	 * its box), from a door or window to what ends its stretch of wall (a
+	 * crossing wall's face, another opening, or the wall's end).
+	 */
+	const dimensions = createMemo((): { a: Point; b: Point }[] => {
+		const current = selected()
+		if (!current) {
+			return []
+		}
+		const keep = (a: Point, b: Point): { a: Point; b: Point }[] =>
+			distance(a, b) >= 1 ? [{ a, b }] : []
+		if (current.kind === 'opening') {
+			const opening = selectedOpening()
+			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
+			if (!opening || !wall) {
+				return []
+			}
+			const length = wallLength(wall)
+			const u = direction(wall.a, wall.b)
+			const [from, to] = openingSpan(wall, { ...opening, wall: 0 })
+			const crossing = faces().faces.map(([a, b]) => ({ a, b, reach: 0 }))
+			const others = openings()
+				.filter((o: EditOpening) => o.wall_id === wall.id && o.id !== opening.id)
+				.map((o: EditOpening) => openingSpan(wall, { ...o, wall: 0 }))
+			const ahead = rayHit(along(wall.a, u, to), u, crossing)
+			const behind = rayHit(along(wall.a, u, from), [-u[0], -u[1]], crossing)
+			const end = Math.min(
+				length,
+				ahead === null ? length : to + ahead,
+				...others.filter(([f]) => f >= to).map(([f]) => f),
+			)
+			const start = Math.max(
+				0,
+				behind === null ? 0 : from - behind,
+				...others.filter(([, e]) => e <= from).map(([, e]) => e),
+			)
+			return [
+				...keep(along(wall.a, u, to), along(wall.a, u, end)),
+				...keep(along(wall.a, u, from), along(wall.a, u, start)),
+			]
+		}
+		if (current.kind !== 'desk' && current.kind !== 'deskGroup' && current.kind !== 'stair') {
+			return []
+		}
+		const box = selectionBox()
+		if (!box) {
+			return []
+		}
+		const lines = objectTargets(new Set([keyOf(current)])).lines
+		const [cx, cy] = [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2]
+		const rays: [Point, Point][] = [
+			[
+				[box.x0, cy],
+				[-1, 0],
+			],
+			[
+				[box.x1, cy],
+				[1, 0],
+			],
+			[
+				[cx, box.y0],
+				[0, -1],
+			],
+			[
+				[cx, box.y1],
+				[0, 1],
+			],
+		]
+		return rays.flatMap(([from, u]) => {
+			const by = rayHit(from, u, lines)
+			return by === null ? [] : keep(from, along(from, u, by))
+		})
+	})
 
 	function removeMarker(id: number): void {
 		checkpoint()
@@ -1943,8 +2383,11 @@ export function DrawnPlanEditor(props: {
 		setChain(null)
 		setLineStart(null)
 		setRoomDraft(null)
+		setTyped('')
+		setQuickGhost(null)
 		setHover(null)
 		setSnapMark(null)
+		setGuides([])
 		setCalibration(null)
 		setSequence(null)
 		if (next !== 'select') {
@@ -1952,18 +2395,47 @@ export function DrawnPlanEditor(props: {
 		}
 	}
 
-	/** Pointer down on the draw layer of the active tool. */
-	function toolPress(e: PointerEvent): void {
-		if (e.pointerType === 'mouse' && e.button !== 0) {
-			return
+	/** Where the line being drawn starts: the chain's last corner, the stairs' foot or the room's last corner. */
+	const drawFrom = (): Point | null => {
+		const current = tool()
+		if (current === 'wall' || current === 'tray') {
+			return chain()?.last ?? null
 		}
-		e.preventDefault()
-		e.stopPropagation()
-		const raw = stagePoint(e)
+		if (current === 'stairs') {
+			return lineStart()
+		}
+		if (current === 'room') {
+			return roomDraft()?.at(-1) ?? null
+		}
+		return null
+	}
+
+	/** The typed length in cm, `null` while none (or none valid) is typed. */
+	const typedLength = (): number | null => {
+		const value = Number(typed().replace(',', '.'))
+		return typed() !== '' && Number.isFinite(value) && value >= MIN_WALL ? value : null
+	}
+
+	/** End of the line being drawn: the typed length from its start toward the pointer, else the pointer. */
+	const drawEnd = (): Point | null => {
+		const from = drawFrom()
+		const length = typedLength()
+		const at = hover()
+		if (!from || length === null) {
+			return at
+		}
+		const u: Point = at && distance(from, at) > 0 ? direction(from, at) : [1, 0]
+		const { width, height } = sheet()
+		return clampPoint(along(from, u, length), width, height)
+	}
+
+	/** Puts down the next corner `at` (already snapped) of the wall, tray, stairs or room being drawn. */
+	function placePoint(at: Point): void {
+		setTyped('')
 		switch (tool()) {
-			case 'wall': {
+			case 'wall':
+			case 'tray': {
 				const current = chain()
-				const at = snapCorner(e, raw, current?.last ?? null)
 				if (!current) {
 					setChain({ first: at, last: at })
 					return
@@ -1971,60 +2443,26 @@ export function DrawnPlanEditor(props: {
 				if (distance(current.last, at) < MIN_WALL) {
 					return
 				}
-				addWall(current.last, at)
+				if (tool() === 'wall') {
+					addWall(current.last, at)
+				} else {
+					addTray(current.last, at)
+				}
 				setChain(samePoint(at, current.first) ? null : { first: current.first, last: at })
 				return
 			}
-			case 'door':
-			case 'sliding_door':
-			case 'window':
-				addOpening(tool() as OpeningKind, raw)
-				return
-			case 'stairs':
-			case 'desk': {
+			case 'stairs': {
 				const start = lineStart()
-				const isDesk = tool() === 'desk'
-				const at = isDesk
-					? snapTo(e, raw, start, faceTargets('desk', new Set()))
-					: snapCorner(e, raw, start)
 				if (!start) {
 					setLineStart(at)
 				} else if (distance(start, at) >= MIN_WALL) {
 					setLineStart(null)
-					if (isDesk) {
-						addDesk(start, at)
-					} else {
-						addStair(start, at)
-						setTool('select')
-					}
+					addStair(start, at)
 				}
-				return
-			}
-			case 'deskGroup':
-				addDeskGroup(groupCenter(e, newGroup(), raw, null))
-				return
-			case 'tray': {
-				const current = chain()
-				const at = snapTo(e, raw, current?.last ?? null, faceTargets('tray', new Set()))
-				if (!current) {
-					setChain({ first: at, last: at })
-					return
-				}
-				if (distance(current.last, at) < MIN_WALL) {
-					return
-				}
-				addTray(current.last, at)
-				setChain(samePoint(at, current.first) ? null : { first: current.first, last: at })
 				return
 			}
 			case 'room': {
 				const points = roomDraft() ?? []
-				const at = snapTo(
-					e,
-					raw,
-					points[points.length - 1] ?? null,
-					faceTargets('room', new Set()),
-				)
 				// The second click of a double click lands on the corner just added.
 				if (points.length > 0 && samePoint(points[points.length - 1] as Point, at)) {
 					return
@@ -2036,6 +2474,120 @@ export function DrawnPlanEditor(props: {
 				if (points.length < MAX_ROOM_POINTS) {
 					setRoomDraft([...points, at])
 				}
+				return
+			}
+		}
+	}
+
+	/**
+	 * A desk `deskLength` long put down with one click at `at`: while
+	 * snapping, with its back against the nearest wall face within its depth
+	 * (on the face's open side), else level with its back edge below `at`;
+	 * then snapped like a moved desk.
+	 */
+	function quickDesk(e: { altKey: boolean }, at: Point): { a: Point; b: Point } {
+		const length = deskLength()
+		const depth = deskDepth()
+		let a: Point = [at[0] - length / 2, at[1] + depth / 2]
+		let b: Point = [at[0] + length / 2, at[1] + depth / 2]
+		if (snapping(e)) {
+			let best: {
+				face: [Point, Point]
+				wall: EditWall
+				point: Point
+				distance: number
+			} | null = null
+			faces().faces.forEach((face: [Point, Point], index: number) => {
+				const hit = projectOnSegment(at, face[0], face[1])
+				// `wallFaceTargets` lists two faces per wall, in wall order.
+				const wall = walls()[Math.floor(index / 2)]
+				if (wall && hit.distance <= depth && (!best || hit.distance < best.distance)) {
+					best = { face, wall, point: hit.point, distance: hit.distance }
+				}
+			})
+			const found = best as { face: [Point, Point]; wall: EditWall; point: Point } | null
+			if (found) {
+				const u = direction(found.face[0], found.face[1])
+				const center = projectOnSegment(found.point, found.wall.a, found.wall.b).point
+				// The desk lies left of its back edge: run that edge so left points away from the wall.
+				const away =
+					(found.point[0] - center[0]) * u[1] - (found.point[1] - center[1]) * u[0] >= 0
+				const v: Point = away ? u : [-u[0], -u[1]]
+				a = along(found.point, v, -length / 2)
+				b = along(found.point, v, length / 2)
+			}
+		}
+		const corners = deskOutline({ a, b, depth })
+		const [dx, dy] = keepOnSheet(
+			corners,
+			snapMove(e, corners, ringEdges(corners), [0, 0], allObjectTargets()),
+		)
+		return { a: [a[0] + dx, a[1] + dy], b: [b[0] + dx, b[1] + dy] }
+	}
+
+	/**
+	 * Desk tool: a click puts a desk down (`quickDesk`); a drag draws its
+	 * back edge from the press to the release.
+	 */
+	function pressDeskTool(e: PointerEvent, raw: Point): void {
+		const start = snapTo(e, raw, null, allObjectTargets())
+		const [x0, y0] = [e.clientX, e.clientY]
+		setQuickGhost(null)
+		setLineStart(start)
+		const onUp = (ev: PointerEvent): void => {
+			window.removeEventListener('pointerup', onUp)
+			window.removeEventListener('pointercancel', onUp)
+			setLineStart(null)
+			if (ev.type === 'pointerup') {
+				if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > DRAG_PX) {
+					const end = snapTo(ev, stagePoint(ev), start, allObjectTargets())
+					if (distance(start, end) >= MIN_WALL) {
+						addDesk(start, end)
+					}
+				} else {
+					const desk = quickDesk(ev, raw)
+					addDesk(desk.a, desk.b)
+				}
+			}
+			setSnapMark(null)
+			setGuides([])
+		}
+		window.addEventListener('pointerup', onUp)
+		window.addEventListener('pointercancel', onUp)
+	}
+
+	/** Pointer down on the draw layer of the active tool. */
+	function toolPress(e: PointerEvent): void {
+		if (e.pointerType === 'mouse' && e.button !== 0) {
+			return
+		}
+		e.preventDefault()
+		e.stopPropagation()
+		const raw = stagePoint(e)
+		switch (tool()) {
+			case 'wall':
+				placePoint(snapCorner(e, raw, chain()?.last ?? null))
+				return
+			case 'door':
+			case 'sliding_door':
+			case 'window':
+				addOpening(tool() as OpeningKind, raw)
+				return
+			case 'stairs':
+				placePoint(snapTo(e, raw, lineStart(), allObjectTargets()))
+				return
+			case 'desk':
+				pressDeskTool(e, raw)
+				return
+			case 'deskGroup':
+				addDeskGroup(groupCenter(e, newGroup(), raw, allObjectTargets()))
+				return
+			case 'tray':
+				placePoint(snapTo(e, raw, chain()?.last ?? null, allTrayTargets()))
+				return
+			case 'room': {
+				const points = roomDraft() ?? []
+				placePoint(snapTo(e, raw, points[points.length - 1] ?? null, allObjectTargets()))
 				return
 			}
 			case 'image':
@@ -2075,18 +2627,18 @@ export function DrawnPlanEditor(props: {
 		if (tool() === 'wall') {
 			setHover(snapCorner(e, raw, chain()?.last ?? null))
 		} else if (tool() === 'stairs') {
-			setHover(snapCorner(e, raw, lineStart()))
+			setHover(snapTo(e, raw, lineStart(), allObjectTargets()))
 		} else if (tool() === 'desk') {
-			setHover(snapTo(e, raw, lineStart(), faceTargets('desk', new Set())))
+			const start = lineStart()
+			setHover(start ? snapTo(e, raw, start, allObjectTargets()) : raw)
+			setQuickGhost(start ? null : quickDesk(e, raw))
 		} else if (tool() === 'deskGroup') {
-			setHover(groupCenter(e, newGroup(), raw, null))
+			setHover(groupCenter(e, newGroup(), raw, allObjectTargets()))
 		} else if (tool() === 'tray') {
-			setHover(snapTo(e, raw, chain()?.last ?? null, faceTargets('tray', new Set())))
+			setHover(snapTo(e, raw, chain()?.last ?? null, allTrayTargets()))
 		} else if (tool() === 'room') {
 			const points = roomDraft() ?? []
-			setHover(
-				snapTo(e, raw, points[points.length - 1] ?? null, faceTargets('room', new Set())),
-			)
+			setHover(snapTo(e, raw, points[points.length - 1] ?? null, allObjectTargets()))
 		} else if (tool() === 'calibrate' && first) {
 			setHover(scaleEnd(e, first, raw))
 		} else {
@@ -2137,6 +2689,31 @@ export function DrawnPlanEditor(props: {
 			redo()
 			return
 		}
+		if (drawFrom() && !mod && !e.altKey) {
+			// While drawing, digits type the next line's length instead of picking a tool.
+			const decimal = (e.key === '.' || e.key === ',') && !/[.,]/.test(typed())
+			if ((/^[0-9]$/.test(e.key) || decimal) && typed().length < MAX_TYPED) {
+				e.preventDefault()
+				setTyped(typed() + e.key)
+				return
+			}
+			if (e.key === 'Backspace' && typed() !== '') {
+				e.preventDefault()
+				setTyped(typed().slice(0, -1))
+				return
+			}
+			if (e.key === 'Escape' && typed() !== '') {
+				e.preventDefault()
+				setTyped('')
+				return
+			}
+			const end = drawEnd()
+			if (e.key === 'Enter' && typedLength() !== null && end) {
+				e.preventDefault()
+				placePoint(end)
+				return
+			}
+		}
 		if (e.key === 'Enter' && roomDraft()) {
 			e.preventDefault()
 			finishRoom()
@@ -2145,6 +2722,7 @@ export function DrawnPlanEditor(props: {
 		if (e.key === 'Escape' || e.key === 'Enter') {
 			if (chain() || lineStart() || roomDraft() || calibration() || sequence() !== null) {
 				e.preventDefault()
+				setTyped('')
 				setChain(null)
 				setLineStart(null)
 				setRoomDraft(null)
@@ -2164,6 +2742,22 @@ export function DrawnPlanEditor(props: {
 		if ((e.key === 'Delete' || e.key === 'Backspace') && selected()) {
 			e.preventDefault()
 			deleteSelected()
+			return
+		}
+		if (mod && e.key.toLowerCase() === 'd') {
+			e.preventDefault()
+			duplicateSelected()
+			return
+		}
+		if (nudge(e)) {
+			e.preventDefault()
+			return
+		}
+		const shortcut = SHORTCUT_TOOLS[Number(e.key) - 1]
+		if (shortcut && !mod && !e.altKey) {
+			e.preventDefault()
+			setTab('draw')
+			setTool(tool() === shortcut ? 'select' : shortcut)
 		}
 	}
 	onMount(() => window.addEventListener('keydown', onKeyDown))
@@ -2210,7 +2804,7 @@ export function DrawnPlanEditor(props: {
 	/** The wall or tray being drawn: from the chain's last corner to the pointer. */
 	const draftRun = (kind: 'wall' | 'tray'): { a: Point; b: Point } | null => {
 		const current = chain()
-		const at = hover()
+		const at = drawEnd()
 		return current && at && tool() === kind ? { a: current.last, b: at } : null
 	}
 	const draftWall = (): { a: Point; b: Point } | null => draftRun('wall')
@@ -2219,7 +2813,7 @@ export function DrawnPlanEditor(props: {
 	/** The stairs or desk being drawn: from their first end to the pointer. */
 	const draftLine = (kind: 'stairs' | 'desk'): { a: Point; b: Point } | null => {
 		const start = lineStart()
-		const at = hover()
+		const at = drawEnd()
 		return start && at && tool() === kind && distance(start, at) >= MIN_WALL
 			? { a: start, b: at }
 			: null
@@ -2253,8 +2847,15 @@ export function DrawnPlanEditor(props: {
 	/** The room being drawn, closed through the pointer. */
 	const draftRoom = (): Point[] | null => {
 		const points = roomDraft()
-		const at = hover()
+		const at = drawEnd()
 		return points && tool() === 'room' ? (at ? [...points, at] : points) : null
+	}
+
+	/** The room edge being drawn: from its last corner to the pointer. */
+	const draftRoomEdge = (): { a: Point; b: Point } | null => {
+		const from = tool() === 'room' ? drawFrom() : null
+		const at = drawEnd()
+		return from && at && distance(from, at) >= MIN_WALL ? { a: from, b: at } : null
 	}
 
 	/** Label of a room or desk in the editor: the room's label, else the location's name. */
@@ -2373,6 +2974,7 @@ export function DrawnPlanEditor(props: {
 										>
 											<IconWall size={14} />
 											<span>{t('drawnPlan.toolWall')}</span>
+											<ToolKey tool="wall" />
 										</button>
 									</li>
 									<For each={['door', 'sliding_door', 'window'] as const}>
@@ -2408,6 +3010,7 @@ export function DrawnPlanEditor(props: {
 													>
 														<Icon size={14} />
 														<span>{t(ui.tool)}</span>
+														<ToolKey tool={kind} />
 													</button>
 												</li>
 											)
@@ -2426,6 +3029,7 @@ export function DrawnPlanEditor(props: {
 										>
 											<IconStairsUp size={14} />
 											<span>{t('drawnPlan.toolStairs')}</span>
+											<ToolKey tool="stairs" />
 										</button>
 									</li>
 									<For each={ELEMENT_TOOLS}>
@@ -2448,6 +3052,7 @@ export function DrawnPlanEditor(props: {
 													>
 														<Icon size={14} />
 														<span>{t(entry.label)}</span>
+														<ToolKey tool={value} />
 													</button>
 												</li>
 											)
@@ -2479,6 +3084,13 @@ export function DrawnPlanEditor(props: {
 							</Show>
 							<Show when={tool() === 'desk'}>
 								<div class="drawn-plan-fields">
+									<NumberField
+										label={t('drawnPlan.length')}
+										value={deskLength()}
+										min={MIN_DESK_DEPTH}
+										max={MAX_DESK_LENGTH}
+										on_commit={setDeskLength}
+									/>
 									<NumberField
 										label={t('drawnPlan.depth')}
 										value={deskDepth()}
@@ -2832,7 +3444,9 @@ export function DrawnPlanEditor(props: {
 										/>
 									)}
 								</Show>
-								<Show when={draftDesk()}>
+								<Show
+									when={draftDesk() ?? (tool() === 'desk' ? quickGhost() : null)}
+								>
 									{(line: () => { a: Point; b: Point }) => (
 										<polygon
 											class="drawn-plan-desk drawn-plan-ghost"
@@ -2884,6 +3498,28 @@ export function DrawnPlanEditor(props: {
 										/>
 									)}
 								</Show>
+								<For each={dimensions()}>
+									{(line: { a: Point; b: Point }) => (
+										<line
+											class="drawn-plan-dimension"
+											x1={line.a[0]}
+											y1={line.a[1]}
+											x2={line.b[0]}
+											y2={line.b[1]}
+										/>
+									)}
+								</For>
+								<For each={guides()}>
+									{(guide: Guide) => (
+										<line
+											class="floorplan-guide"
+											x1={guide.axis === 'x' ? guide.at : guide.from}
+											x2={guide.axis === 'x' ? guide.at : guide.to}
+											y1={guide.axis === 'x' ? guide.from : guide.at}
+											y2={guide.axis === 'x' ? guide.to : guide.at}
+										/>
+									)}
+								</For>
 								<Show when={calibrationLine()}>
 									{(line: () => { a: Point; b: Point }) => (
 										<line
@@ -3101,13 +3737,24 @@ export function DrawnPlanEditor(props: {
 								</For>
 							)}
 						</Show>
-						<Show when={draftStair() ?? draftDesk() ?? draftTray() ?? draftWall()}>
+						<Show
+							when={
+								draftStair() ??
+								draftDesk() ??
+								draftTray() ??
+								draftWall() ??
+								draftRoomEdge()
+							}
+						>
 							{(line: () => { a: Point; b: Point }) => (
 								<span
 									class="drawn-plan-label"
+									classList={{ 'drawn-plan-label-typed': typed() !== '' }}
 									style={toPercent(midpoint(line().a, line().b))}
 								>
-									{formatLength(distance(line().a, line().b))}
+									{typed() !== ''
+										? t('floorplan.centimeters', { value: typed() })
+										: formatLength(distance(line().a, line().b))}
 								</span>
 							)}
 						</Show>
@@ -3133,7 +3780,9 @@ export function DrawnPlanEditor(props: {
 								onPointerMove={toolHover}
 								onPointerLeave={() => {
 									setHover(null)
+									setQuickGhost(null)
 									setSnapMark(null)
+									setGuides([])
 								}}
 								onDblClick={() => {
 									setChain(null)
@@ -3142,6 +3791,68 @@ export function DrawnPlanEditor(props: {
 									}
 								}}
 							/>
+						</Show>
+						<For each={dimensions()}>
+							{(line: { a: Point; b: Point }) => (
+								<span
+									class="drawn-plan-label drawn-plan-label-dimension"
+									style={toPercent(midpoint(line.a, line.b))}
+								>
+									{formatLength(distance(line.a, line.b))}
+								</span>
+							)}
+						</For>
+						<Show when={!dragging() && selected() && selectionBox()}>
+							{(box: () => Box) => (
+								<div
+									class="drawn-plan-actions"
+									role="toolbar"
+									aria-label={t('drawnPlan.selectionActions')}
+									style={toPercent([(box().x0 + box().x1) / 2, box().y1])}
+									onPointerDown={(e: PointerEvent) => e.stopPropagation()}
+								>
+									<Show when={canRotate(selected() as Selected)}>
+										<button
+											type="button"
+											class="drawn-plan-action"
+											aria-label={t('drawnPlan.rotate')}
+											title={t('drawnPlan.rotate')}
+											onClick={rotateSelected}
+										>
+											<IconRotateClockwise size={14} />
+										</button>
+									</Show>
+									<Show when={canFlip(selected() as Selected)}>
+										<button
+											type="button"
+											class="drawn-plan-action"
+											aria-label={flipLabel(selected() as Selected)}
+											title={flipLabel(selected() as Selected)}
+											onClick={flipSelected}
+										>
+											<IconFlipVertical size={14} />
+										</button>
+									</Show>
+									<button
+										type="button"
+										class="drawn-plan-action"
+										aria-label={t('drawnPlan.duplicate')}
+										title={t('drawnPlan.duplicate')}
+										onClick={duplicateSelected}
+									>
+										<IconCopy size={14} />
+									</button>
+									<button
+										type="button"
+										class="drawn-plan-action"
+										aria-label={t('common.delete')}
+										title={t('common.delete')}
+										onClick={deleteSelected}
+									>
+										<IconTrash size={14} />
+									</button>
+								</div>
+							)}
 						</Show>
 					</DrawnPlanStage>
 					<Switch>

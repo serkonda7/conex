@@ -1244,7 +1244,7 @@ export const en = {
 	'drawnPlan.planTab': 'Plan',
 	'drawnPlan.elements': 'Elements',
 	'drawnPlan.drawHint':
-		'Pick an element, then click on the plan. Drag doors and windows onto a wall.',
+		'Pick an element (or press its number key), then click on the plan. Drag doors and windows onto a wall. Ctrl + D duplicates the selection beside it (again to repeat the step); the arrow keys move it by 10 cm, with Shift by 1 m, with Alt by 1 cm.',
 	'drawnPlan.openingPlaceHint': 'Drag onto a wall, or click and then click a wall',
 	'drawnPlan.tools': 'Drawing tools',
 	'drawnPlan.toolWall': 'Wall',
@@ -1255,17 +1255,18 @@ export const en = {
 	'drawnPlan.wallHint':
 		'Click where the wall starts. Walls snap to 15° steps; hold Shift for any angle.',
 	'drawnPlan.wallNextHint':
-		'Click the next corner. Click the first corner, double-click or press Enter to finish.',
+		'Click the next corner, or type a length in cm and press Enter. Click the first corner, double-click or press Enter to finish.',
 	'drawnPlan.openingHint': 'Click a wall to put it there.',
 	'drawnPlan.stairsHint': 'Click the foot of the stairs, then their head.',
-	'drawnPlan.stairsNextHint': 'Click the head of the stairs. Escape cancels.',
+	'drawnPlan.stairsNextHint':
+		'Click the head of the stairs, or type their length in cm and press Enter. Escape cancels.',
 	'drawnPlan.moveImageHint': 'Drag to move the reference image.',
 	'drawnPlan.calibrateHint':
 		'Click two points on the image a known distance apart (the second snaps to 15° steps; Shift places it freely). Only the image is scaled.',
 	'drawnPlan.newWallThickness': 'New wall thickness (cm)',
 	'drawnPlan.snap': 'Snap',
 	'drawnPlan.snapHint':
-		'Snap corners to wall ends, onto walls and to 10 cm steps, and walls to 15° steps. Desks, rooms and cable trays snap to wall faces and to each other. Shift frees the angle; Alt places freely.',
+		'Snap corners to wall ends, onto walls and to 10 cm steps, and walls to 15° steps. Stairs, desks, desk groups, rooms and cable trays snap to wall faces and to each other: corner on corner, flush against an edge, or lined up with other objects along the dashed guides. Markers snap to desks and rooms and line up with each other. Shift frees the angle; Alt places freely.',
 	'drawnPlan.wallEnd': 'Wall end, drag to move',
 	'drawnPlan.stairFoot': 'Foot of the stairs, drag to move',
 	'drawnPlan.stairHead': 'Head of the stairs, drag to move',
@@ -1295,11 +1296,11 @@ export const en = {
 	'drawnPlan.trayHint':
 		'Click where the cable tray starts, then its next corners. Double-click or press Enter to finish.',
 	'drawnPlan.deskHint':
-		"Click one end of the desk's back edge, then the other. The desk lies to the left of that edge.",
-	'drawnPlan.deskNextHint': 'Click the other end of the back edge. Escape cancels.',
+		'Click to put a desk down, its back against the nearest wall. Drag along its back edge to draw one of any length; the desk lies to the left of the drag.',
+	'drawnPlan.deskNextHint': 'Release at the other end of the back edge. Escape cancels.',
 	'drawnPlan.roomHint': "Click the room's corners; they snap to the faces of the walls.",
 	'drawnPlan.roomNextHint':
-		'Click the next corner. Click the first corner, double-click or press Enter to close the room; Escape drops it.',
+		'Click the next corner, or type a length in cm and press Enter. Click the first corner, double-click or press Enter to close the room; Escape drops it.',
 	'drawnPlan.newTrayWidth': 'New tray width (cm)',
 	'drawnPlan.depth': 'Depth (cm)',
 	'drawnPlan.rotation': 'Rotation (°)',
@@ -1312,6 +1313,9 @@ export const en = {
 	'drawnPlan.trayEnd': 'Tray end, drag to move',
 	'drawnPlan.deskCorner': 'Back corner of the desk, drag to move',
 	'drawnPlan.roomCorner': 'Room corner, drag to move, double-click to remove',
+	'drawnPlan.selectionActions': 'Selection',
+	'drawnPlan.rotate': 'Rotate 90°',
+	'drawnPlan.duplicate': 'Duplicate (Ctrl + D)',
 	'drawnPlan.flipDesk': 'Flip side',
 	'drawnPlan.deleteTray': 'Delete cable tray',
 	'drawnPlan.deleteDesk': 'Delete desk',

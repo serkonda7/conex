@@ -42,6 +42,9 @@ export const DEFAULT_STAIR_WIDTH = 100
 /** Default width of a new cable tray, cm. */
 export const DEFAULT_TRAY_WIDTH = 30
 
+/** Default length of a desk put down with one click, cm. */
+export const DEFAULT_DESK_LENGTH = 160
+
 /** Default depth of a new desk, cm. */
 export const DEFAULT_DESK_DEPTH = 80
 
