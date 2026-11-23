@@ -1285,6 +1285,12 @@ export const de: Messages = {
 	'drawnPlan.stairHead': 'Austritt der Treppe, zum Verschieben ziehen',
 	'drawnPlan.length': 'Länge (cm)',
 	'drawnPlan.thickness': 'Stärke (cm)',
+	'drawnPlan.height': 'Höhe (cm)',
+	'drawnPlan.sill': 'Brüstungshöhe (cm)',
+	'drawnPlan.stairRise': 'Gesamthöhe (cm)',
+	'drawnPlan.mountingHeight': 'Montagehöhe (cm)',
+	'drawnPlan.newWallHeight': 'Höhe neuer Wände (cm)',
+	'drawnPlan.newTrayElevation': 'Montagehöhe neuer Trassen (cm)',
 	'drawnPlan.width': 'Breite (cm)',
 	'drawnPlan.door': 'Tür',
 	'drawnPlan.window': 'Fenster',
@@ -1352,6 +1358,13 @@ export const de: Messages = {
 	'drawnPlan.fitSheet': 'Blatt an Bild anpassen',
 	'drawnPlan.showReference': 'Referenzbild anzeigen',
 	'drawnPlan.hideReference': 'Referenzbild ausblenden',
+	'drawnPlan.view3d': '3D',
+	'drawnPlan.show3d': 'Plan in 3D anzeigen',
+	'drawnPlan.show2d': 'Plan in 2D anzeigen',
+	'drawnPlan.resetView': 'Ansicht zurücksetzen',
+	'drawnPlan.hint3d':
+		'Ziehen dreht, Rechts- oder Umschalt-Ziehen verschiebt, Strg + Scrollen oder Zwei-Finger-Geste zoomt',
+	'drawnPlan.noWebgl': 'Die 3D-Ansicht braucht WebGL, das dieser Browser nicht bietet.',
 
 	// elevation
 	'elevation.section': 'Rackansicht ({face})',

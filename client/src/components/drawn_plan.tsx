@@ -5,19 +5,22 @@
  * image, and the rack, device and outlet markers. A marker links to its rack
  * or device; an outlet opens its popover (trace and connect) like on image
  * plans. Rooms and desks linked to a location carry a label linking to it.
- * Edit swaps the view for the editor on the same zoom.
+ * The view switches between the 2D stage and a 3D view (kept per browser;
+ * three.js loads on first use). Edit swaps the view for the editor on the
+ * same zoom, always in 2D.
  */
-import { IconPencil, IconPhoto, IconTag, IconTrash } from '@tabler/icons-solidjs'
-import { createSignal, For, type JSX, onMount, Show } from 'solid-js'
-import type { FloorplanPlacementJson } from '../api/attachments'
+import { IconCube, IconPencil, IconPhoto, IconTag, IconTrash } from '@tabler/icons-solidjs'
+import { createSignal, For, type JSX, lazy, onMount, Show, Suspense } from 'solid-js'
 import {
 	delete_drawing,
 	type FloorplanDrawingJson,
+	type FloorplanDrawingPlacementJson,
 	type FloorplanRoom,
 } from '../api/floorplan_drawings'
 import { t } from '../i18n'
 import { queryParam } from '../lib/router'
 import { can } from '../lib/session'
+import { readStored, writeStored } from '../lib/storage'
 import { useDetailDelete } from './detail_page'
 import { DrawnPlanEditor } from './drawn_plan_editor'
 import { type Point, polygonCenter } from './drawn_plan_geometry'
@@ -39,12 +42,25 @@ import {
 	toggleReferenceVisible,
 	WallLayer,
 } from './drawn_plan_stage'
-import { InlineError } from './feedback'
+import { InlineError, Loading } from './feedback'
 import { markerNamesVisible, toggleMarkerNames } from './floorplan_layers'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
-import { MarkerGlyph, MarkerName, markerClasses, markerTitle } from './floorplan_stage'
+import { MarkerGlyph, MarkerName, markerClasses, markerHref, markerTitle } from './floorplan_stage'
 import { IconLabel } from './icon_label'
 import { createStageZoom, type StageZoom } from './zoom_viewport'
+
+/** The 3D view, in its own chunk with three.js. */
+const DrawnPlan3D = lazy(() => import('./drawn_plan_3d'))
+
+const MODE_STORAGE_KEY = 'conex:drawn-plan-3d'
+
+const [shown3d, setShown3d] = createSignal(readStored(MODE_STORAGE_KEY) === 'true')
+
+function toggle3d(): void {
+	const next = !shown3d()
+	setShown3d(next)
+	writeStored(MODE_STORAGE_KEY, String(next))
+}
 
 /** The plan's walls with their openings, keyed by index. */
 export function drawingWalls(drawing: FloorplanDrawingJson): StageWall[] {
@@ -63,9 +79,11 @@ export function stageItems<T>(kind: string, items: T[]): StageItem<T>[] {
 }
 
 /** A room's or desk's label: on the stage at `at`, linking to its location when visible. */
-interface PlanLabel {
+export interface PlanLabel {
 	key: string
 	at: Point
+	/** Height above the floor in 3D, cm: a desk's top, a room's floor. */
+	height: number
 	text: string
 	location_id: number | null
 	kind: 'room' | 'desk'
@@ -92,6 +110,7 @@ export function planLabels(
 						{
 							key,
 							at: polygonCenter(room.points),
+							height: 0,
 							text,
 							location_id:
 								name(room.location_id) === undefined
@@ -109,6 +128,7 @@ export function planLabels(
 						{
 							key: seat.key,
 							at: seat.at,
+							height: seat.height,
 							text,
 							location_id: seat.location_id ?? null,
 							kind: 'desk' as const,
@@ -119,16 +139,10 @@ export function planLabels(
 	]
 }
 
-function markerHref(placement: FloorplanPlacementJson): string {
-	if (placement.port) {
-		return `/devices/${placement.port.device_id}`
-	}
-	return placement.rack_id !== null
-		? `/racks/${placement.rack_id}`
-		: `/devices/${placement.device_id}`
-}
-
-/** The plan as viewed: inert walls, linked markers, toggles for the reference image and names. */
+/**
+ * The plan as viewed, in 2D or 3D: inert walls, linked markers, toggles for
+ * the mode, the reference image and the names.
+ */
 function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom }): JSX.Element {
 	const [outlet, setOutlet] = createSignal<OutletPlacement | null>(null)
 	const [pointer, setPointer] = createSignal<Point | null>(null)
@@ -165,155 +179,185 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 			),
 			locationNames(props.drawing.linked_locations),
 		)
+	/** The bar's toggles; a function, as each mode mounts its own copy. */
+	const toggles = (): JSX.Element => (
+		<>
+			<button
+				type="button"
+				class="floorplan-layer-toggle floorplan-names-toggle"
+				aria-pressed={shown3d()}
+				title={t(shown3d() ? 'drawnPlan.show2d' : 'drawnPlan.show3d')}
+				onClick={toggle3d}
+			>
+				<IconCube size={12} aria-hidden="true" />
+				<span>{t('drawnPlan.view3d')}</span>
+			</button>
+			<Show when={props.drawing.reference}>
+				<button
+					type="button"
+					class="floorplan-layer-toggle floorplan-names-toggle"
+					aria-pressed={referenceVisible()}
+					title={t(
+						referenceVisible() ? 'drawnPlan.hideReference' : 'drawnPlan.showReference',
+					)}
+					onClick={toggleReferenceVisible}
+				>
+					<IconPhoto size={12} aria-hidden="true" />
+					<span>{t('drawnPlan.reference')}</span>
+				</button>
+			</Show>
+			<Show when={props.drawing.placements.length > 0}>
+				<button
+					type="button"
+					class="floorplan-layer-toggle floorplan-names-toggle"
+					aria-pressed={markerNamesVisible()}
+					title={t(
+						markerNamesVisible()
+							? 'floorplan.hideMarkerNames'
+							: 'floorplan.showMarkerNames',
+					)}
+					onClick={toggleMarkerNames}
+				>
+					<IconTag size={12} aria-hidden="true" />
+					<span>{t('floorplan.markerNames')}</span>
+				</button>
+			</Show>
+		</>
+	)
 
 	return (
 		<div class="drawn-plan-view">
 			<Show when={empty()}>
 				<p class="floorplan-hint">{t('drawnPlan.empty')}</p>
 			</Show>
-			<DrawnPlanStage
-				sheet={{ width: props.drawing.width, height: props.drawing.height }}
-				zoom={props.zoom}
-				reference={referenceVisible() ? props.drawing.reference : null}
-				reference_opacity={referenceOpacity()}
-				grid={null}
-				pointer={pointer()}
-				ref={(el: HTMLDivElement) => {
-					stage = el
-				}}
-				onPointerMove={trackPointer}
-				onPointerLeave={() => setPointer(null)}
-				walls={
-					<>
-						<RoomLayer rooms={stageItems('room', props.drawing.rooms)} />
-						<StairLayer
-							stairs={props.drawing.stairs.map((stair, i: number) => ({
-								key: `stair:${i}`,
-								stair,
-							}))}
+			<Show
+				when={!shown3d()}
+				fallback={
+					<Suspense fallback={<Loading message={t('common.loading')} />}>
+						<DrawnPlan3D
+							drawing={props.drawing}
+							labels={labels()}
+							reference_opacity={referenceVisible() ? referenceOpacity() : null}
+							bar={toggles()}
 						/>
-						<DeskLayer desks={stageItems('desk', props.drawing.desks)} />
-						<DeskGroupLayer groups={stageItems('group', props.drawing.desk_groups)} />
-						<TrayLayer trays={stageItems('tray', props.drawing.trays)} />
-						<WallLayer walls={drawingWalls(props.drawing)} />
-					</>
-				}
-				bar={
-					<>
-						<Show when={props.drawing.reference}>
-							<button
-								type="button"
-								class="floorplan-layer-toggle floorplan-names-toggle"
-								aria-pressed={referenceVisible()}
-								title={t(
-									referenceVisible()
-										? 'drawnPlan.hideReference'
-										: 'drawnPlan.showReference',
-								)}
-								onClick={toggleReferenceVisible}
-							>
-								<IconPhoto size={12} aria-hidden="true" />
-								<span>{t('drawnPlan.reference')}</span>
-							</button>
-						</Show>
-						<Show when={props.drawing.placements.length > 0}>
-							<button
-								type="button"
-								class="floorplan-layer-toggle floorplan-names-toggle"
-								aria-pressed={markerNamesVisible()}
-								title={t(
-									markerNamesVisible()
-										? 'floorplan.hideMarkerNames'
-										: 'floorplan.showMarkerNames',
-								)}
-								onClick={toggleMarkerNames}
-							>
-								<IconTag size={12} aria-hidden="true" />
-								<span>{t('floorplan.markerNames')}</span>
-							</button>
-						</Show>
-					</>
+					</Suspense>
 				}
 			>
-				<For each={labels()}>
-					{(label: PlanLabel) => (
-						<Show
-							when={label.location_id}
-							fallback={
-								<span
-									class="drawn-plan-name"
-									classList={{ 'drawn-plan-name-desk': label.kind === 'desk' }}
-									style={at({ x: label.at[0], y: label.at[1] })}
-								>
-									{label.text}
-								</span>
-							}
-						>
-							{(id: () => number) => (
-								<a
-									href={`/locations/${id()}`}
-									class="drawn-plan-name"
-									classList={{ 'drawn-plan-name-desk': label.kind === 'desk' }}
-									style={at({ x: label.at[0], y: label.at[1] })}
-									title={label.text}
-									draggable={false}
-								>
-									{label.text}
-								</a>
-							)}
-						</Show>
-					)}
-				</For>
-				<For each={props.drawing.placements}>
-					{(placement: FloorplanPlacementJson) => (
-						<Show
-							when={isOutlet(placement) ? placement : undefined}
-							fallback={
-								<a
-									href={markerHref(placement)}
-									class="floorplan-marker"
-									classList={markerClasses(placement)}
-									style={at(placement)}
-									title={markerTitle(placement)}
-									aria-label={markerTitle(placement)}
-									draggable={false}
-								>
-									<MarkerGlyph placement={placement} size={16} />
-									<MarkerName placement={placement} />
-								</a>
-							}
-						>
-							{(outletPlacement: () => OutletPlacement) => (
-								<button
-									type="button"
-									class="floorplan-marker"
-									classList={markerClasses(placement)}
-									style={at(placement)}
-									title={markerTitle(placement)}
-									aria-label={markerTitle(placement)}
-									onClick={() => setOutlet(outletPlacement())}
-								>
-									<MarkerGlyph placement={placement} size={16} />
-									<MarkerName placement={placement} />
-								</button>
-							)}
-						</Show>
-					)}
-				</For>
-				<Show when={outlet()}>
-					{(open: () => OutletPlacement) => (
-						// The popover positions itself in normalized coordinates.
-						<OutletPopover
-							placement={{
-								...open(),
-								x: open().x / props.drawing.width,
-								y: open().y / props.drawing.height,
-							}}
-							on_close={() => setOutlet(null)}
-						/>
-					)}
-				</Show>
-			</DrawnPlanStage>
+				<DrawnPlanStage
+					sheet={{ width: props.drawing.width, height: props.drawing.height }}
+					zoom={props.zoom}
+					reference={referenceVisible() ? props.drawing.reference : null}
+					reference_opacity={referenceOpacity()}
+					grid={null}
+					pointer={pointer()}
+					ref={(el: HTMLDivElement) => {
+						stage = el
+					}}
+					onPointerMove={trackPointer}
+					onPointerLeave={() => setPointer(null)}
+					walls={
+						<>
+							<RoomLayer rooms={stageItems('room', props.drawing.rooms)} />
+							<StairLayer
+								stairs={props.drawing.stairs.map((stair, i: number) => ({
+									key: `stair:${i}`,
+									stair,
+								}))}
+							/>
+							<DeskLayer desks={stageItems('desk', props.drawing.desks)} />
+							<DeskGroupLayer
+								groups={stageItems('group', props.drawing.desk_groups)}
+							/>
+							<TrayLayer trays={stageItems('tray', props.drawing.trays)} />
+							<WallLayer walls={drawingWalls(props.drawing)} />
+						</>
+					}
+					bar={toggles()}
+				>
+					<For each={labels()}>
+						{(label: PlanLabel) => (
+							<Show
+								when={label.location_id}
+								fallback={
+									<span
+										class="drawn-plan-name"
+										classList={{
+											'drawn-plan-name-desk': label.kind === 'desk',
+										}}
+										style={at({ x: label.at[0], y: label.at[1] })}
+									>
+										{label.text}
+									</span>
+								}
+							>
+								{(id: () => number) => (
+									<a
+										href={`/locations/${id()}`}
+										class="drawn-plan-name"
+										classList={{
+											'drawn-plan-name-desk': label.kind === 'desk',
+										}}
+										style={at({ x: label.at[0], y: label.at[1] })}
+										title={label.text}
+										draggable={false}
+									>
+										{label.text}
+									</a>
+								)}
+							</Show>
+						)}
+					</For>
+					<For each={props.drawing.placements}>
+						{(placement: FloorplanDrawingPlacementJson) => (
+							<Show
+								when={isOutlet(placement) ? placement : undefined}
+								fallback={
+									<a
+										href={markerHref(placement)}
+										class="floorplan-marker"
+										classList={markerClasses(placement)}
+										style={at(placement)}
+										title={markerTitle(placement)}
+										aria-label={markerTitle(placement)}
+										draggable={false}
+									>
+										<MarkerGlyph placement={placement} size={16} />
+										<MarkerName placement={placement} />
+									</a>
+								}
+							>
+								{(outletPlacement: () => OutletPlacement) => (
+									<button
+										type="button"
+										class="floorplan-marker"
+										classList={markerClasses(placement)}
+										style={at(placement)}
+										title={markerTitle(placement)}
+										aria-label={markerTitle(placement)}
+										onClick={() => setOutlet(outletPlacement())}
+									>
+										<MarkerGlyph placement={placement} size={16} />
+										<MarkerName placement={placement} />
+									</button>
+								)}
+							</Show>
+						)}
+					</For>
+					<Show when={outlet()}>
+						{(open: () => OutletPlacement) => (
+							// The popover positions itself in normalized coordinates.
+							<OutletPopover
+								placement={{
+									...open(),
+									x: open().x / props.drawing.width,
+									y: open().y / props.drawing.height,
+								}}
+								on_close={() => setOutlet(null)}
+							/>
+						)}
+					</Show>
+				</DrawnPlanStage>
+			</Show>
 		</div>
 	)
 }

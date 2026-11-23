@@ -218,6 +218,16 @@ export function MarkerName(props: { placement: FloorplanPlacementJson }): JSX.El
 	)
 }
 
+/** Page a marker links to: its rack or device; an outlet's panel. */
+export function markerHref(placement: FloorplanPlacementJson): string {
+	if (placement.port) {
+		return `/devices/${placement.port.device_id}`
+	}
+	return placement.rack_id !== null
+		? `/racks/${placement.rack_id}`
+		: `/devices/${placement.device_id}`
+}
+
 /**
  * Marker classes shared by the view and edit modes.
  */

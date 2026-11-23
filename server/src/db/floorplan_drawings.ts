@@ -13,6 +13,9 @@
  * `floorplan_drawing_placements`; each object sits on at most one drawn
  * plan. Like the image plans (`attachments.ts`), markers outside a scoped
  * requester's tenants are left out of reads and kept as they are on save.
+ * Walls, doors, windows, stairs, trays, desks and markers carry their
+ * heights above the floor (cm); a placed rack reads its height in units
+ * from its rack type.
  */
 import { Result } from 'better-result'
 import {
@@ -49,6 +52,7 @@ import {
 	interfaces,
 	locations,
 	panel_jacks,
+	rack_types,
 	racks,
 	sites,
 	tenants,
@@ -304,6 +308,8 @@ export async function getDrawing(
 				jack_id: floorplan_drawing_placements.jack_id,
 				x: floorplan_drawing_placements.x,
 				y: floorplan_drawing_placements.y,
+				elevation: floorplan_drawing_placements.elevation,
+				rack_units: rack_types.u_height,
 				name: sql<string>`coalesce(${racks.name}, ${devices.name}, ${outletNameSql})`,
 				status: devices.status,
 				role_icon: device_roles.icon,
@@ -311,6 +317,7 @@ export async function getDrawing(
 			})
 			.from(floorplan_drawing_placements)
 			.leftJoin(racks, eq(racks.id, floorplan_drawing_placements.rack_id))
+			.leftJoin(rack_types, eq(rack_types.id, racks.rack_type_id))
 			.leftJoin(devices, eq(devices.id, floorplan_drawing_placements.device_id))
 			.leftJoin(device_roles, eq(device_roles.id, devices.device_role_id))
 			.leftJoin(interfaces, placedPortJoin)
@@ -680,6 +687,7 @@ async function drawingSnapshot(row: DrawingRow): Promise<
 			jack_id: number | null
 			x: number
 			y: number
+			elevation: number
 		}[]
 	}
 > {
@@ -691,6 +699,7 @@ async function drawingSnapshot(row: DrawingRow): Promise<
 			jack_id: floorplan_drawing_placements.jack_id,
 			x: floorplan_drawing_placements.x,
 			y: floorplan_drawing_placements.y,
+			elevation: floorplan_drawing_placements.elevation,
 		})
 		.from(floorplan_drawing_placements)
 		.where(eq(floorplan_drawing_placements.drawing_id, row.id))
@@ -748,6 +757,7 @@ export async function putDrawing(
 								jack_id: placement.jack_id ?? null,
 								x: placement.x,
 								y: placement.y,
+								elevation: placement.elevation,
 							})),
 						)
 				}

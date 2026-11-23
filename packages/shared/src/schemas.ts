@@ -2472,17 +2472,82 @@ const SheetSideSchema = v.pipe(
 	v.maxValue(MAX_DRAWING_CM, 'The sheet must be at most 1 km wide and high'),
 )
 
-/** Rack, device or outlet marker on a drawn plan, at a position in cm. */
+/** Highest anything stands or hangs above the floor of a drawn plan, cm. */
+export const MAX_DRAWING_HEIGHT = 2000
+
+/** A height or elevation above the floor, cm; `min` is the lowest allowed. */
+function heightSchema(
+	what: string,
+	min: number,
+): v.SchemaWithPipe<
+	readonly [
+		v.NumberSchema<string>,
+		v.MinValueAction<number, number, string>,
+		v.MaxValueAction<number, number, string>,
+	]
+> {
+	return v.pipe(
+		v.number(`${what} must be a number`),
+		v.minValue(min, `${what} is at least ${min} cm`),
+		v.maxValue(MAX_DRAWING_HEIGHT, `${what} is at most ${MAX_DRAWING_HEIGHT} cm`),
+	)
+}
+
+/**
+ * Default mounting height of a new marker, cm: racks stand on the floor,
+ * outlets sit in the lower installation zone (DIN 18015-3).
+ */
+export const DEFAULT_MARKER_ELEVATION = { rack: 0, device: 120, outlet: 30 } as const
+
+/** The default mounting height of a marker of `placement`'s kind, cm. */
+export function defaultMarkerElevation(placement: {
+	rack_id?: number | null
+	device_id?: number | null
+}): number {
+	if (placement.rack_id !== undefined && placement.rack_id !== null) {
+		return DEFAULT_MARKER_ELEVATION.rack
+	}
+	return placement.device_id !== undefined && placement.device_id !== null
+		? DEFAULT_MARKER_ELEVATION.device
+		: DEFAULT_MARKER_ELEVATION.outlet
+}
+
+/**
+ * Rack, device or outlet marker on a drawn plan, at a position in cm, and
+ * mounted `elevation` cm above the floor (a rack's base, a device's or
+ * outlet's center); missing, it takes its kind's default.
+ */
 const DrawingPlacementInputSchema = v.pipe(
-	v.strictObject({ ...PlacementTargetEntries, x: DrawingCoordSchema, y: DrawingCoordSchema }),
+	v.strictObject({
+		...PlacementTargetEntries,
+		x: DrawingCoordSchema,
+		y: DrawingCoordSchema,
+		elevation: v.optional(heightSchema('Mounting height', 0), undefined),
+	}),
 	v.check((placement) => placesOneObject(placement), PLACES_ONE_OBJECT),
+	v.transform((placement) => ({
+		...placement,
+		elevation: placement.elevation ?? defaultMarkerElevation(placement),
+	})),
 )
 
 /** Thinnest and thickest wall, cm. */
 export const MIN_WALL_THICKNESS = 1
 export const MAX_WALL_THICKNESS = 200
 
-/** A straight wall from `a` to `b` (cm) with its thickness (cm), centered on the line. */
+/** Lowest wall, cm. */
+export const MIN_WALL_HEIGHT = 10
+
+/** Default height of a new wall, cm: the usual clear room height of 2.50 m. */
+export const DEFAULT_WALL_HEIGHT = 250
+
+/** Usual storey height, floor to floor, cm: the room height and the floor slab. */
+export const DEFAULT_STOREY_HEIGHT = 275
+
+/**
+ * A straight wall from `a` to `b` (cm) with its thickness (cm), centered on
+ * the line, and `height` cm high.
+ */
 export const FloorplanWallSchema = v.pipe(
 	v.strictObject({
 		a: DrawingPointSchema,
@@ -2492,6 +2557,7 @@ export const FloorplanWallSchema = v.pipe(
 			v.minValue(MIN_WALL_THICKNESS, `Walls are at least ${MIN_WALL_THICKNESS} cm thick`),
 			v.maxValue(MAX_WALL_THICKNESS, `Walls are at most ${MAX_WALL_THICKNESS} cm thick`),
 		),
+		height: v.optional(heightSchema('Wall height', MIN_WALL_HEIGHT), DEFAULT_WALL_HEIGHT),
 	}),
 	v.check((wall) => wall.a[0] !== wall.b[0] || wall.a[1] !== wall.b[1], 'A wall needs a length'),
 )
@@ -2506,28 +2572,56 @@ export type OpeningKind = (typeof OPENING_KINDS)[number]
 export const MIN_OPENING_WIDTH = 10
 export const MAX_OPENING_WIDTH = 2000
 
+/** Lowest door or window, cm. */
+export const MIN_OPENING_HEIGHT = 10
+
+/**
+ * Default sill (bottom above the floor) and height of a new door, sliding
+ * door and window, cm: the 2010 mm rough opening of a standard door (DIN
+ * 18101), a window 1260 mm high above a 90 cm parapet.
+ */
+export const DEFAULT_OPENING_HEIGHT: Record<OpeningKind, { sill: number; height: number }> = {
+	door: { sill: 0, height: 201 },
+	sliding_door: { sill: 0, height: 201 },
+	window: { sill: 90, height: 126 },
+}
+
 /**
  * Door or window in a wall (`wall` is its index in `walls`): centered
  * `offset` cm from the wall's start `a`, `width` cm wide. Seen from `a` to
  * `b`, a door hinges at the end of the opening facing `hinge` and swings to
  * `side`; a sliding door runs along the wall's `side` face and slides open
- * toward `hinge`. A window ignores both.
+ * toward `hinge`. A window ignores both. The opening starts `sill` cm above
+ * the floor and is `height` cm high (missing, its kind's default); above it
+ * the wall closes again.
  */
-export const FloorplanOpeningSchema = v.strictObject({
-	wall: v.pipe(v.number(), v.integer(), v.minValue(0)),
-	kind: v.picklist(OPENING_KINDS),
-	offset: v.pipe(v.number('Offset must be a number'), v.minValue(0)),
-	width: v.pipe(
-		v.number('Width must be a number'),
-		v.minValue(
-			MIN_OPENING_WIDTH,
-			`Doors and windows are at least ${MIN_OPENING_WIDTH} cm wide`,
+export const FloorplanOpeningSchema = v.pipe(
+	v.strictObject({
+		wall: v.pipe(v.number(), v.integer(), v.minValue(0)),
+		kind: v.picklist(OPENING_KINDS),
+		offset: v.pipe(v.number('Offset must be a number'), v.minValue(0)),
+		width: v.pipe(
+			v.number('Width must be a number'),
+			v.minValue(
+				MIN_OPENING_WIDTH,
+				`Doors and windows are at least ${MIN_OPENING_WIDTH} cm wide`,
+			),
+			v.maxValue(
+				MAX_OPENING_WIDTH,
+				`Doors and windows are at most ${MAX_OPENING_WIDTH} cm wide`,
+			),
 		),
-		v.maxValue(MAX_OPENING_WIDTH, `Doors and windows are at most ${MAX_OPENING_WIDTH} cm wide`),
-	),
-	hinge: v.picklist(['start', 'end']),
-	side: v.picklist(['left', 'right']),
-})
+		hinge: v.picklist(['start', 'end']),
+		side: v.picklist(['left', 'right']),
+		sill: v.optional(heightSchema('Sill height', 0), undefined),
+		height: v.optional(heightSchema('Door and window height', MIN_OPENING_HEIGHT), undefined),
+	}),
+	v.transform((opening) => ({
+		...opening,
+		sill: opening.sill ?? DEFAULT_OPENING_HEIGHT[opening.kind].sill,
+		height: opening.height ?? DEFAULT_OPENING_HEIGHT[opening.kind].height,
+	})),
+)
 
 export type FloorplanOpening = v.InferOutput<typeof FloorplanOpeningSchema>
 
@@ -2539,10 +2633,21 @@ export const MAX_STAIR_WIDTH = 1000
 export const MIN_STAIR_STEPS = 2
 export const MAX_STAIR_STEPS = 100
 
+/** Lowest rise of a flight of stairs, cm. */
+export const MIN_STAIR_RISE = 10
+
+/** Usual rise of one step, cm (17/29 stairs, DIN 18065). */
+export const STAIR_RISER = 17
+
+/** Default rise of a new flight of `steps` steps, cm: usual steps, a storey at most. */
+export function defaultStairRise(steps: number): number {
+	return Math.min(steps * STAIR_RISER, DEFAULT_STOREY_HEIGHT)
+}
+
 /**
  * A straight flight of stairs from `a` (its foot) up to `b` (its head), cm,
  * `width` cm wide and centered on that line, with `steps` treads of equal
- * depth.
+ * depth, climbing `rise` cm in all (missing, usual steps up to a storey).
  */
 export const FloorplanStairSchema = v.pipe(
 	v.strictObject({
@@ -2559,11 +2664,13 @@ export const FloorplanStairSchema = v.pipe(
 			v.minValue(MIN_STAIR_STEPS, `Stairs have at least ${MIN_STAIR_STEPS} steps`),
 			v.maxValue(MAX_STAIR_STEPS, `Stairs have at most ${MAX_STAIR_STEPS} steps`),
 		),
+		rise: v.optional(heightSchema('The rise of stairs', MIN_STAIR_RISE), undefined),
 	}),
 	v.check(
 		(stair) => stair.a[0] !== stair.b[0] || stair.a[1] !== stair.b[1],
 		'Stairs need a length',
 	),
+	v.transform((stair) => ({ ...stair, rise: stair.rise ?? defaultStairRise(stair.steps) })),
 )
 
 export type FloorplanStair = v.InferOutput<typeof FloorplanStairSchema>
@@ -2572,10 +2679,13 @@ export type FloorplanStair = v.InferOutput<typeof FloorplanStairSchema>
 export const MIN_TRAY_WIDTH = 5
 export const MAX_TRAY_WIDTH = 200
 
+/** Default mounting height of a new cable tray (its bottom), cm: 20 cm below a 2.50 m ceiling. */
+export const DEFAULT_TRAY_ELEVATION = 230
+
 /**
  * A straight run of cable tray from `a` to `b` (cm), `width` cm wide and
- * centered on that line. Runs meeting at an end form bends and junctions,
- * like walls.
+ * centered on that line, its bottom `elevation` cm above the floor (0 lies
+ * on the floor). Runs meeting at an end form bends and junctions, like walls.
  */
 export const FloorplanTraySchema = v.pipe(
 	v.strictObject({
@@ -2586,6 +2696,7 @@ export const FloorplanTraySchema = v.pipe(
 			v.minValue(MIN_TRAY_WIDTH, `Cable trays are at least ${MIN_TRAY_WIDTH} cm wide`),
 			v.maxValue(MAX_TRAY_WIDTH, `Cable trays are at most ${MAX_TRAY_WIDTH} cm wide`),
 		),
+		elevation: v.optional(heightSchema('Cable tray height', 0), DEFAULT_TRAY_ELEVATION),
 	}),
 	v.check(
 		(tray) => tray.a[0] !== tray.b[0] || tray.a[1] !== tray.b[1],
@@ -2599,12 +2710,27 @@ export type FloorplanTray = v.InferOutput<typeof FloorplanTraySchema>
 export const MIN_DESK_DEPTH = 20
 export const MAX_DESK_DEPTH = 500
 
+/** Lowest and highest desk top, and the default of a new desk (DIN EN 527-1), cm. */
+export const MIN_DESK_HEIGHT = 20
+export const MAX_DESK_HEIGHT = 200
+export const DEFAULT_DESK_HEIGHT = 74
+
+const DeskHeightSchema = v.optional(
+	v.pipe(
+		v.number('Desk height must be a number'),
+		v.minValue(MIN_DESK_HEIGHT, `Desks are at least ${MIN_DESK_HEIGHT} cm high`),
+		v.maxValue(MAX_DESK_HEIGHT, `Desks are at most ${MAX_DESK_HEIGHT} cm high`),
+	),
+	DEFAULT_DESK_HEIGHT,
+)
+
 /** A location a drawn desk or room links to; missing for a plain drawing. */
 const LinkedLocationEntry = v.optional(IdSchema, undefined)
 
 /**
  * A rectangular desk: its back edge from `a` to `b` (cm) and `depth` cm
- * toward the left of `a`→`b` (on screen, y down).
+ * toward the left of `a`→`b` (on screen, y down), its top `height` cm above
+ * the floor.
  */
 export const FloorplanDeskSchema = v.pipe(
 	v.strictObject({
@@ -2615,6 +2741,7 @@ export const FloorplanDeskSchema = v.pipe(
 			v.minValue(MIN_DESK_DEPTH, `Desks are at least ${MIN_DESK_DEPTH} cm deep`),
 			v.maxValue(MAX_DESK_DEPTH, `Desks are at most ${MAX_DESK_DEPTH} cm deep`),
 		),
+		height: DeskHeightSchema,
 		location_id: LinkedLocationEntry,
 	}),
 	v.check((desk) => desk.a[0] !== desk.b[0] || desk.a[1] !== desk.b[1], 'A desk needs a length'),
@@ -2648,7 +2775,8 @@ const DeskGroupLinkSchema = v.nullable(IdSchema)
  * `arm` cm long. Each desk reaches `depth` cm from the center to its front
  * corners; its front edge curves `curve` cm in toward the center. At
  * `rotation` 0° the first desk faces down and a divider points up; the
- * others follow clockwise. `location_ids` holds each desk's link.
+ * others follow clockwise. The desk tops lie `height` cm above the floor.
+ * `location_ids` holds each desk's link.
  */
 export const FloorplanDeskGroupSchema = v.pipe(
 	v.strictObject({
@@ -2672,6 +2800,7 @@ export const FloorplanDeskGroupSchema = v.pipe(
 			),
 		),
 		curve: v.pipe(v.number('Front curve must be a number'), v.minValue(0)),
+		height: DeskHeightSchema,
 		location_ids: v.tuple([DeskGroupLinkSchema, DeskGroupLinkSchema, DeskGroupLinkSchema]),
 	}),
 	v.check(
@@ -2816,8 +2945,17 @@ export const FloorplanDrawingOwnerQuerySchema = v.pipe(
 export type FloorplanDrawingOwnerQuery = v.InferOutput<typeof FloorplanDrawingOwnerQuerySchema>
 
 /**
+ * Marker of a drawn plan: its position (`x` / `y`, cm), its mounting height
+ * (cm) and, for a rack with a rack type, the rack's height in units.
+ */
+export interface FloorplanDrawingPlacementJson extends FloorplanPlacementJson {
+	elevation: number
+	rack_units: number | null
+}
+
+/**
  * `GET /floorplan-drawings/:id`. Markers whose object lies outside the
- * requester's tenant scope are left out; their `x` / `y` are centimeters.
+ * requester's tenant scope are left out.
  */
 export interface FloorplanDrawingJson {
 	id: number
@@ -2842,7 +2980,7 @@ export interface FloorplanDrawingJson {
 	 * requester may see them; a link missing here is kept on save.
 	 */
 	linked_locations: FloorplanLinkLocationJson[]
-	placements: FloorplanPlacementJson[]
+	placements: FloorplanDrawingPlacementJson[]
 	/** Some markers are outside the requester's scope (a save keeps them). */
 	has_hidden_content: boolean
 	/** Unix seconds. */

@@ -272,6 +272,8 @@ export interface StageItem<T> {
 export interface DeskSeat {
 	key: string
 	at: Point
+	/** Height of the desk top above the floor, cm. */
+	height: number
 	location_id: number | undefined
 }
 
@@ -284,12 +286,14 @@ export function deskSeats(
 		...desks.map((entry: StageItem<FloorplanDesk>) => ({
 			key: entry.key,
 			at: polygonCenter(deskOutline(entry.item)),
+			height: entry.item.height,
 			location_id: entry.item.location_id,
 		})),
 		...groups.flatMap((entry: StageItem<FloorplanDeskGroup>) =>
 			DESK_GROUP_DESKS.map((index: number) => ({
 				key: `${entry.key}:${index}`,
 				at: polygonCenter(deskGroupDesk(entry.item, index)),
+				height: entry.item.height,
 				location_id: entry.item.location_ids[index] ?? undefined,
 			})),
 		),

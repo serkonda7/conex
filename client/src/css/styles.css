@@ -6643,6 +6643,67 @@ a.rack-shelf-plate:hover {
 	pointer-events: none;
 }
 
+/* 3D view of a drawn plan: the WebGL canvas with the markers and labels
+   as HTML on top (positioned by three.js), as wide as the 2D stage. */
+.drawn-plan-3d-frame {
+	margin: 0.6rem 0;
+}
+
+.drawn-plan-3d {
+	position: relative;
+	/* The overlay pieces keep their screen size, as on an unzoomed stage. */
+	--inv-zoom: 1;
+	--line-zoom: 1;
+	width: 100%;
+	height: 70vh;
+	min-height: 18rem;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	overflow: hidden;
+	background-color: var(--bg-raised);
+}
+
+.drawn-plan-3d-canvas {
+	display: block;
+	cursor: grab;
+}
+
+.drawn-plan-3d-canvas:active {
+	cursor: grabbing;
+}
+
+/* Drags pass through to the canvas; only the markers and labels take clicks. */
+.drawn-plan-3d-labels {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.drawn-plan-3d-labels > .floorplan-marker,
+.drawn-plan-3d-labels > a.drawn-plan-name {
+	pointer-events: auto;
+}
+
+/* A marker or label a wall hides from the camera. */
+.drawn-plan-3d-labels > .drawn-plan-3d-hidden {
+	opacity: 0.3;
+}
+
+.drawn-plan-3d-popover {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	pointer-events: none;
+}
+
+.drawn-plan-3d-popover > .floorplan-popover {
+	pointer-events: auto;
+}
+
+.drawn-plan-3d-hint {
+	color: var(--text-muted);
+}
+
 /* Name of a room or linked desk, centered on it; a link to its location in the view. */
 .drawn-plan-name {
 	position: absolute;

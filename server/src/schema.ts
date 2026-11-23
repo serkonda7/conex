@@ -1091,7 +1091,9 @@ export const floorplan_drawings = pgTable(
 		}),
 		reference_frame: jsonb('reference_frame').$type<{ x: number; y: number; width: number }>(),
 		walls: jsonb('walls')
-			.$type<{ a: [number, number]; b: [number, number]; thickness: number }[]>()
+			.$type<
+				{ a: [number, number]; b: [number, number]; thickness: number; height: number }[]
+			>()
 			.notNull()
 			.default([]),
 		openings: jsonb('openings')
@@ -1103,16 +1105,28 @@ export const floorplan_drawings = pgTable(
 					width: number
 					hinge: 'start' | 'end'
 					side: 'left' | 'right'
+					sill: number
+					height: number
 				}[]
 			>()
 			.notNull()
 			.default([]),
 		stairs: jsonb('stairs')
-			.$type<{ a: [number, number]; b: [number, number]; width: number; steps: number }[]>()
+			.$type<
+				{
+					a: [number, number]
+					b: [number, number]
+					width: number
+					steps: number
+					rise: number
+				}[]
+			>()
 			.notNull()
 			.default([]),
 		trays: jsonb('trays')
-			.$type<{ a: [number, number]; b: [number, number]; width: number }[]>()
+			.$type<
+				{ a: [number, number]; b: [number, number]; width: number; elevation: number }[]
+			>()
 			.notNull()
 			.default([]),
 		desks: jsonb('desks')
@@ -1121,6 +1135,7 @@ export const floorplan_drawings = pgTable(
 					a: [number, number]
 					b: [number, number]
 					depth: number
+					height: number
 					location_id?: number
 				}[]
 			>()
@@ -1134,6 +1149,7 @@ export const floorplan_drawings = pgTable(
 					arm: number
 					depth: number
 					curve: number
+					height: number
 					location_ids: [number | null, number | null, number | null]
 				}[]
 			>()
@@ -1179,6 +1195,8 @@ export const floorplan_drawing_placements = pgTable(
 			.references(() => panel_jacks.id, { onDelete: 'cascade' }),
 		x: doublePrecision('x').notNull(),
 		y: doublePrecision('y').notNull(),
+		// Mounting height above the floor, cm: a rack's base, a device's or outlet's center.
+		elevation: doublePrecision('elevation').notNull(),
 	},
 	(table) => [
 		check(

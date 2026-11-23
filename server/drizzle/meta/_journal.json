@@ -50,6 +50,13 @@
       "when": 1795425650874,
       "tag": "0006_floorplan_desk_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795471281550,
+      "tag": "0007_floorplan_heights",
+      "breakpoints": true
     }
   ]
 }

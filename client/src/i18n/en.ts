@@ -1272,6 +1272,12 @@ export const en = {
 	'drawnPlan.stairHead': 'Head of the stairs, drag to move',
 	'drawnPlan.length': 'Length (cm)',
 	'drawnPlan.thickness': 'Thickness (cm)',
+	'drawnPlan.height': 'Height (cm)',
+	'drawnPlan.sill': 'Sill height (cm)',
+	'drawnPlan.stairRise': 'Total rise (cm)',
+	'drawnPlan.mountingHeight': 'Mounting height (cm)',
+	'drawnPlan.newWallHeight': 'New wall height (cm)',
+	'drawnPlan.newTrayElevation': 'New tray mounting height (cm)',
 	'drawnPlan.width': 'Width (cm)',
 	'drawnPlan.door': 'Door',
 	'drawnPlan.window': 'Window',
@@ -1339,6 +1345,13 @@ export const en = {
 	'drawnPlan.fitSheet': 'Fit sheet to image',
 	'drawnPlan.showReference': 'Show the reference image',
 	'drawnPlan.hideReference': 'Hide the reference image',
+	'drawnPlan.view3d': '3D',
+	'drawnPlan.show3d': 'Show the plan in 3D',
+	'drawnPlan.show2d': 'Show the plan in 2D',
+	'drawnPlan.resetView': 'Reset the view',
+	'drawnPlan.hint3d':
+		'Drag to rotate, right-drag or Shift + drag to pan, Ctrl + scroll or pinch to zoom',
+	'drawnPlan.noWebgl': 'The 3D view needs WebGL, which this browser does not offer.',
 
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',

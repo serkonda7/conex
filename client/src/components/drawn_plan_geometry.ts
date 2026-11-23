@@ -26,23 +26,31 @@ import {
 
 export type Point = [number, number]
 
-/** Default thickness of a new wall, cm. */
-export const DEFAULT_WALL_THICKNESS = 12
+/*
+ * Defaults of new elements follow common German building practice.
+ */
 
-/** Default width of a new door, sliding door and window, cm. */
+/** Default thickness of a new wall, cm: an 11.5 cm interior masonry wall. */
+export const DEFAULT_WALL_THICKNESS = 11.5
+
+/**
+ * Default width of a new door, sliding door and window, cm: the rough
+ * openings (Rohbaurichtmaß) of a standard door (DIN 18101, 885 mm) and a
+ * wide one (1010 mm), and a window on the eighth-meter grid (1135 mm).
+ */
 export const DEFAULT_OPENING_WIDTH: Record<OpeningKind, number> = {
-	door: 90,
-	sliding_door: 100,
-	window: 120,
+	door: 88.5,
+	sliding_door: 101,
+	window: 113.5,
 }
 
-/** Default width of new stairs, cm. */
+/** Default width of new stairs, cm: the usual clear width (DIN 18065). */
 export const DEFAULT_STAIR_WIDTH = 100
 
-/** Default width of a new cable tray, cm. */
+/** Default width of a new cable tray, cm: a 300 mm tray. */
 export const DEFAULT_TRAY_WIDTH = 30
 
-/** Default length of a desk put down with one click, cm. */
+/** Default length of a desk put down with one click, cm: a 160 × 80 cm desk (ASR A1.2). */
 export const DEFAULT_DESK_LENGTH = 160
 
 /** Default depth of a new desk, cm. */
@@ -57,8 +65,8 @@ export const DESK_GROUP_DESKS = [0, 1, 2] as const
 /** Straight pieces a desk group's curved front edge is drawn with. */
 const ARC_SEGMENTS = 16
 
-/** Usual depth of one tread, cm: new stairs get as many steps as fit. */
-export const TREAD_DEPTH = 28
+/** Usual depth of one tread, cm (17/29 stairs, DIN 18065): new stairs get as many steps as fit. */
+export const TREAD_DEPTH = 29
 
 /** Thickness of a sliding door's panel drawn beside its wall, cm. */
 const PANEL_THICKNESS = 4
@@ -308,7 +316,10 @@ export function wallFaceTargets(walls: Pick<FloorplanWall, 'a' | 'b' | 'thicknes
 }
 
 /** Opening's extent along its wall (cm from the wall's start), kept on the wall. */
-export function openingSpan(wall: FloorplanWall, opening: FloorplanOpening): [number, number] {
+/** What places a door or window along its wall, and how it opens. */
+export type OpeningPlan = Pick<FloorplanOpening, 'kind' | 'offset' | 'width' | 'hinge' | 'side'>
+
+export function openingSpan(wall: FloorplanWall, opening: OpeningPlan): [number, number] {
 	const length = wallLength(wall)
 	const half = Math.min(opening.width, length) / 2
 	const center = Math.min(length - half, Math.max(half, opening.offset))
@@ -323,11 +334,11 @@ export function wallLength(wall: Pick<FloorplanWall, 'a' | 'b'>): number {
  * Polygons of the solid pieces of a wall between its openings. The pieces
  * at the wall's ends reach half the thickness past them.
  */
-export function wallPieces(wall: FloorplanWall, openings: FloorplanOpening[]): Point[][] {
+export function wallPieces(wall: FloorplanWall, openings: OpeningPlan[]): Point[][] {
 	const length = wallLength(wall)
 	const half = wall.thickness / 2
 	const gaps = openings
-		.map((opening: FloorplanOpening) => openingSpan(wall, opening))
+		.map((opening: OpeningPlan) => openingSpan(wall, opening))
 		.sort((x, y) => x[0] - y[0])
 	const pieces: Point[][] = []
 	let at = -half
@@ -370,7 +381,7 @@ function arrowPath(from: Point, to: Point, head: number): string {
 	return `M ${from[0]} ${from[1]} L ${to[0]} ${to[1]} M ${left[0]} ${left[1]} L ${to[0]} ${to[1]} L ${right[0]} ${right[1]}`
 }
 
-export function openingShape(wall: FloorplanWall, opening: FloorplanOpening): OpeningShape {
+export function openingShape(wall: FloorplanWall, opening: OpeningPlan): OpeningShape {
 	const [from, to] = openingSpan(wall, opening)
 	const u = direction(wall.a, wall.b)
 	const start = along(wall.a, u, from)

@@ -11,8 +11,8 @@
  *   delete); a desk, desk group or stairs shows its distances to the
  *   nearest objects on each side, a door or window to the ends of its
  *   stretch of wall. The inspector below the stage edits the selection
- *   (length, thickness, width, swing, steps, depth, rotation, linked
- *   locations, label) and deletes it.
+ *   (length, thickness, width, heights, swing, steps, depth, rotation,
+ *   linked locations, label) and deletes it.
  * - Drawing tools stay picked after each element, until Escape or another
  *   tool; the element just put down is selected.
  * - Wall / cable tray: each click adds a corner, chaining runs; clicking the
@@ -70,11 +70,19 @@ import {
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import {
+	DEFAULT_DESK_HEIGHT,
+	DEFAULT_OPENING_HEIGHT,
+	DEFAULT_TRAY_ELEVATION,
+	DEFAULT_WALL_HEIGHT,
+	defaultMarkerElevation,
+	defaultStairRise,
 	deskGroupFrontHalf,
 	MAX_DESK_DEPTH,
 	MAX_DESK_GROUP_ARM,
 	MAX_DESK_GROUP_DEPTH,
+	MAX_DESK_HEIGHT,
 	MAX_DRAWING_CM,
+	MAX_DRAWING_HEIGHT,
 	MAX_OPENING_WIDTH,
 	MAX_ROOM_POINTS,
 	MAX_STAIR_STEPS,
@@ -83,10 +91,14 @@ import {
 	MAX_WALL_THICKNESS,
 	MIN_DESK_DEPTH,
 	MIN_DESK_GROUP_ARM,
+	MIN_DESK_HEIGHT,
+	MIN_OPENING_HEIGHT,
 	MIN_OPENING_WIDTH,
+	MIN_STAIR_RISE,
 	MIN_STAIR_STEPS,
 	MIN_STAIR_WIDTH,
 	MIN_TRAY_WIDTH,
+	MIN_WALL_HEIGHT,
 	MIN_WALL_THICKNESS,
 	type OpeningKind,
 } from 'shared/src/schemas'
@@ -106,7 +118,6 @@ import {
 	type AttachmentJson,
 	type AttachmentOwner,
 	type FloorplanCandidateJson,
-	type FloorplanPlacementJson,
 	fetch_attachments,
 	upload_attachment,
 } from '../api/attachments'
@@ -114,6 +125,7 @@ import {
 	type FloorplanDesk,
 	type FloorplanDeskGroup,
 	type FloorplanDrawingJson,
+	type FloorplanDrawingPlacementJson,
 	type FloorplanDrawingPut,
 	type FloorplanLinkLocationJson,
 	type FloorplanOpening,
@@ -450,7 +462,7 @@ interface Snapshot {
 	desks: EditDesk[]
 	deskGroups: EditDeskGroup[]
 	rooms: EditRoom[]
-	placements: FloorplanPlacementJson[]
+	placements: FloorplanDrawingPlacementJson[]
 }
 
 /** True while focus is in a text field, which keeps its own keys (undo, Delete). */
@@ -475,6 +487,22 @@ function keyOf(selected: Selected): string {
 	return `${selected.kind}:${selected.id}`
 }
 
+/**
+ * Sill and height of `opening` turned into a `kind`: its kind's defaults
+ * become the new kind's, heights set by hand stay.
+ */
+function switchedHeights(
+	opening: Pick<FloorplanOpening, 'kind' | 'sill' | 'height'>,
+	kind: OpeningKind,
+): Pick<FloorplanOpening, 'sill' | 'height'> {
+	const before = DEFAULT_OPENING_HEIGHT[opening.kind]
+	const after = DEFAULT_OPENING_HEIGHT[kind]
+	return {
+		sill: opening.sill === before.sill ? after.sill : opening.sill,
+		height: opening.height === before.height ? after.height : opening.height,
+	}
+}
+
 /** The wire form of a draft; also what "changed" is measured on. */
 function toPut(state: Snapshot): FloorplanDrawingPut {
 	const walls = state.walls.filter((wall: EditWall) => wallLength(wall) >= MIN_WALL)
@@ -494,6 +522,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 			a: roundPoint(wall.a),
 			b: roundPoint(wall.b),
 			thickness: round2(wall.thickness),
+			height: round2(wall.height),
 		})),
 		openings: state.openings.flatMap((opening: EditOpening) => {
 			const wallIndex = index.get(opening.wall_id)
@@ -501,7 +530,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 			if (wallIndex === undefined || !wall || wallLength(wall) < MIN_OPENING_WIDTH) {
 				return []
 			}
-			const [from, to] = openingSpan(wall, { ...opening, wall: wallIndex })
+			const [from, to] = openingSpan(wall, opening)
 			return [
 				{
 					wall: wallIndex,
@@ -510,6 +539,8 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 					width: Math.max(MIN_OPENING_WIDTH, Math.floor((to - from) * 100) / 100),
 					hinge: opening.hinge,
 					side: opening.side,
+					sill: round2(opening.sill),
+					height: round2(opening.height),
 				},
 			]
 		}),
@@ -520,6 +551,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 				b: roundPoint(stair.b),
 				width: round2(stair.width),
 				steps: stair.steps,
+				rise: round2(stair.rise),
 			})),
 		trays: state.trays
 			.filter((tray: EditTray) => distance(tray.a, tray.b) >= MIN_WALL)
@@ -527,6 +559,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 				a: roundPoint(tray.a),
 				b: roundPoint(tray.b),
 				width: round2(tray.width),
+				elevation: round2(tray.elevation),
 			})),
 		desks: state.desks
 			.filter((desk: EditDesk) => distance(desk.a, desk.b) >= MIN_WALL)
@@ -534,6 +567,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 				a: roundPoint(desk.a),
 				b: roundPoint(desk.b),
 				depth: round2(desk.depth),
+				height: round2(desk.height),
 				...(desk.location_id === undefined ? {} : { location_id: desk.location_id }),
 			})),
 		desk_groups: state.deskGroups.map((group: EditDeskGroup) => {
@@ -545,6 +579,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 				arm,
 				depth,
 				curve: Math.min(round2(group.curve), maxCurve({ arm, depth })),
+				height: round2(group.height),
 				location_ids: group.location_ids,
 			}
 		}),
@@ -553,7 +588,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 			...(room.location_id === undefined ? {} : { location_id: room.location_id }),
 			...(room.label ? { label: room.label } : {}),
 		})),
-		placements: state.placements.map((placement: FloorplanPlacementJson) => ({
+		placements: state.placements.map((placement: FloorplanDrawingPlacementJson) => ({
 			...(placement.rack_id !== null
 				? { rack_id: placement.rack_id }
 				: placement.jack_id !== null
@@ -563,6 +598,7 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 						: { device_id: placement.device_id ?? undefined }),
 			x: round2(placement.x),
 			y: round2(placement.y),
+			elevation: round2(placement.elevation),
 		})),
 	}
 }
@@ -763,13 +799,15 @@ export function DrawnPlanEditor(props: {
 	const [rooms, setRooms] = createSignal<EditRoom[]>(
 		props.drawing.rooms.map((room: FloorplanRoom, i: number) => ({ ...room, id: i + 1 })),
 	)
-	const [placements, setPlacements] = createSignal<FloorplanPlacementJson[]>(
+	const [placements, setPlacements] = createSignal<FloorplanDrawingPlacementJson[]>(
 		props.drawing.placements,
 	)
 	const [selected, setSelected] = createSignal<Selected | null>(null)
 	const [tool, setToolSignal] = createSignal<Tool>('select')
 	const [thickness, setThickness] = createSignal(DEFAULT_WALL_THICKNESS)
+	const [wallHeight, setWallHeight] = createSignal(DEFAULT_WALL_HEIGHT)
 	const [trayWidth, setTrayWidth] = createSignal(DEFAULT_TRAY_WIDTH)
+	const [trayElevation, setTrayElevation] = createSignal(DEFAULT_TRAY_ELEVATION)
 	const [deskDepth, setDeskDepth] = createSignal(DEFAULT_DESK_DEPTH)
 	const [newGroup, setNewGroup] = createSignal<NewDeskGroup>({
 		rotation: 0,
@@ -837,7 +875,7 @@ export function DrawnPlanEditor(props: {
 	const dirty = createMemo(() => JSON.stringify(toPut(snapshot())) !== initial)
 
 	const placed = createMemo(
-		() => new Set(placements().map((p: FloorplanPlacementJson) => candidateKey(p))),
+		() => new Set(placements().map((p: FloorplanDrawingPlacementJson) => candidateKey(p))),
 	)
 
 	/** Candidates not yet on the draft, for the Add tab's count. */
@@ -924,7 +962,7 @@ export function DrawnPlanEditor(props: {
 	const selectedMarker = createMemo(() => {
 		const current = selected()
 		return current?.kind === 'marker'
-			? placements().find((p: FloorplanPlacementJson) => p.id === current.id)
+			? placements().find((p: FloorplanDrawingPlacementJson) => p.id === current.id)
 			: undefined
 	})
 
@@ -961,7 +999,7 @@ export function DrawnPlanEditor(props: {
 			(current.kind === 'stair' &&
 				state.stairs.some((s: EditStair) => s.id === current.id)) ||
 			(current.kind === 'marker' &&
-				state.placements.some((p: FloorplanPlacementJson) => p.id === current.id))
+				state.placements.some((p: FloorplanDrawingPlacementJson) => p.id === current.id))
 		if (!exists) {
 			setSelected(null)
 		}
@@ -1118,8 +1156,8 @@ export function DrawnPlanEditor(props: {
 				...seats().map((seat: DeskSeat) => seat.at),
 				...rooms().map((room: EditRoom) => polygonCenter(room.points)),
 				...placements()
-					.filter((p: FloorplanPlacementJson) => p.id !== exclude)
-					.map((p: FloorplanPlacementJson): Point => [p.x, p.y]),
+					.filter((p: FloorplanDrawingPlacementJson) => p.id !== exclude)
+					.map((p: FloorplanDrawingPlacementJson): Point => [p.x, p.y]),
 			],
 			lines: [],
 			boxes: [],
@@ -1534,7 +1572,7 @@ export function DrawnPlanEditor(props: {
 		patchRoom(room.id, { points: room.points.filter((_, i: number) => i !== index) })
 	}
 
-	function dragMarker(e: PointerEvent, placement: FloorplanPlacementJson): void {
+	function dragMarker(e: PointerEvent, placement: FloorplanDrawingPlacementJson): void {
 		if (tool() !== 'select') {
 			return
 		}
@@ -1632,9 +1670,9 @@ export function DrawnPlanEditor(props: {
 		)
 	}
 
-	function patchPlacement(id: number, patch: Partial<FloorplanPlacementJson>): void {
-		setPlacements((all: FloorplanPlacementJson[]) =>
-			all.map((p: FloorplanPlacementJson) => (p.id === id ? { ...p, ...patch } : p)),
+	function patchPlacement(id: number, patch: Partial<FloorplanDrawingPlacementJson>): void {
+		setPlacements((all: FloorplanDrawingPlacementJson[]) =>
+			all.map((p: FloorplanDrawingPlacementJson) => (p.id === id ? { ...p, ...patch } : p)),
 		)
 	}
 
@@ -1646,7 +1684,10 @@ export function DrawnPlanEditor(props: {
 
 	function addWall(a: Point, b: Point): void {
 		checkpoint()
-		setWalls((all: EditWall[]) => [...all, { id: freshId(), a, b, thickness: thickness() }])
+		setWalls((all: EditWall[]) => [
+			...all,
+			{ id: freshId(), a, b, thickness: thickness(), height: wallHeight() },
+		])
 	}
 
 	function addOpening(kind: OpeningKind, at: Point): void {
@@ -1668,6 +1709,7 @@ export function DrawnPlanEditor(props: {
 				width,
 				hinge: 'start',
 				side: 'left',
+				...DEFAULT_OPENING_HEIGHT[kind],
 			},
 		])
 		setSelected({ kind: 'opening', id })
@@ -1676,28 +1718,29 @@ export function DrawnPlanEditor(props: {
 	function addStair(a: Point, b: Point): void {
 		checkpoint()
 		const id = freshId()
+		const steps = defaultSteps(distance(a, b), MIN_STAIR_STEPS, MAX_STAIR_STEPS)
 		setStairs((all: EditStair[]) => [
 			...all,
-			{
-				id,
-				a,
-				b,
-				width: DEFAULT_STAIR_WIDTH,
-				steps: defaultSteps(distance(a, b), MIN_STAIR_STEPS, MAX_STAIR_STEPS),
-			},
+			{ id, a, b, width: DEFAULT_STAIR_WIDTH, steps, rise: defaultStairRise(steps) },
 		])
 		setSelected({ kind: 'stair', id })
 	}
 
 	function addTray(a: Point, b: Point): void {
 		checkpoint()
-		setTrays((all: EditTray[]) => [...all, { id: freshId(), a, b, width: trayWidth() }])
+		setTrays((all: EditTray[]) => [
+			...all,
+			{ id: freshId(), a, b, width: trayWidth(), elevation: trayElevation() },
+		])
 	}
 
 	function addDesk(a: Point, b: Point): void {
 		checkpoint()
 		const id = freshId()
-		setDesks((all: EditDesk[]) => [...all, { id, a, b, depth: deskDepth() }])
+		setDesks((all: EditDesk[]) => [
+			...all,
+			{ id, a, b, depth: deskDepth(), height: DEFAULT_DESK_HEIGHT },
+		])
 		setSelected({ kind: 'desk', id })
 	}
 
@@ -1706,7 +1749,13 @@ export function DrawnPlanEditor(props: {
 		const id = freshId()
 		setDeskGroups((all: EditDeskGroup[]) => [
 			...all,
-			{ id, center, ...newGroup(), location_ids: [null, null, null] },
+			{
+				id,
+				center,
+				...newGroup(),
+				height: DEFAULT_DESK_HEIGHT,
+				location_ids: [null, null, null],
+			},
 		])
 		setSelected({ kind: 'deskGroup', id })
 	}
@@ -1777,8 +1826,8 @@ export function DrawnPlanEditor(props: {
 		} else if (current.kind === 'room') {
 			setRooms((all: EditRoom[]) => all.filter((x: EditRoom) => x.id !== current.id))
 		} else {
-			setPlacements((all: FloorplanPlacementJson[]) =>
-				all.filter((p: FloorplanPlacementJson) => p.id !== current.id),
+			setPlacements((all: FloorplanDrawingPlacementJson[]) =>
+				all.filter((p: FloorplanDrawingPlacementJson) => p.id !== current.id),
 			)
 		}
 		setSelected(null)
@@ -1813,7 +1862,7 @@ export function DrawnPlanEditor(props: {
 		if (kind === 'room') {
 			return find(rooms())?.points ?? []
 		}
-		const placement = placements().find((p: FloorplanPlacementJson) => p.id === id)
+		const placement = placements().find((p: FloorplanDrawingPlacementJson) => p.id === id)
 		return placement ? [[placement.x, placement.y]] : []
 	}
 
@@ -2013,7 +2062,7 @@ export function DrawnPlanEditor(props: {
 		if (kind === 'opening') {
 			const opening = openings().find((o: EditOpening) => o.id === id)
 			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
-			return opening && wall ? openingShape(wall, { ...opening, wall: 0 }).gap : []
+			return opening && wall ? openingShape(wall, opening).gap : []
 		}
 		return selectionPoints(current)
 	}
@@ -2133,11 +2182,11 @@ export function DrawnPlanEditor(props: {
 			}
 			const length = wallLength(wall)
 			const u = direction(wall.a, wall.b)
-			const [from, to] = openingSpan(wall, { ...opening, wall: 0 })
+			const [from, to] = openingSpan(wall, opening)
 			const crossing = faces().faces.map(([a, b]) => ({ a, b, reach: 0 }))
 			const others = openings()
 				.filter((o: EditOpening) => o.wall_id === wall.id && o.id !== opening.id)
-				.map((o: EditOpening) => openingSpan(wall, { ...o, wall: 0 }))
+				.map((o: EditOpening) => openingSpan(wall, o))
 			const ahead = rayHit(along(wall.a, u, to), u, crossing)
 			const behind = rayHit(along(wall.a, u, from), [-u[0], -u[1]], crossing)
 			const end = Math.min(
@@ -2190,8 +2239,8 @@ export function DrawnPlanEditor(props: {
 
 	function removeMarker(id: number): void {
 		checkpoint()
-		setPlacements((all: FloorplanPlacementJson[]) =>
-			all.filter((p: FloorplanPlacementJson) => p.id !== id),
+		setPlacements((all: FloorplanDrawingPlacementJson[]) =>
+			all.filter((p: FloorplanDrawingPlacementJson) => p.id !== id),
 		)
 		if (selected()?.kind === 'marker' && selected()?.id === id) {
 			setSelected(null)
@@ -2205,7 +2254,7 @@ export function DrawnPlanEditor(props: {
 		}
 		checkpoint()
 		const id = freshId()
-		setPlacements((all: FloorplanPlacementJson[]) => [
+		setPlacements((all: FloorplanDrawingPlacementJson[]) => [
 			...all,
 			{
 				id,
@@ -2219,6 +2268,8 @@ export function DrawnPlanEditor(props: {
 				name: candidate.name,
 				status: candidate.status,
 				role_icon: candidate.role_icon,
+				elevation: defaultMarkerElevation(candidate),
+				rack_units: null,
 			},
 		])
 		setSelected({ kind: 'marker', id })
@@ -2659,7 +2710,6 @@ export function DrawnPlanEditor(props: {
 		}
 		const width = Math.min(DEFAULT_OPENING_WIDTH[kind], wallLength(hit.wall))
 		return openingShape(hit.wall, {
-			wall: 0,
 			kind,
 			offset: clampOffset(hit.wall, width, hit.offset),
 			width,
@@ -3064,10 +3114,18 @@ export function DrawnPlanEditor(props: {
 								<div class="drawn-plan-fields">
 									<NumberField
 										label={t('drawnPlan.newWallThickness')}
+										step={0.5}
 										value={thickness()}
 										min={MIN_WALL_THICKNESS}
 										max={MAX_WALL_THICKNESS}
 										on_commit={setThickness}
+									/>
+									<NumberField
+										label={t('drawnPlan.newWallHeight')}
+										value={wallHeight()}
+										min={MIN_WALL_HEIGHT}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={setWallHeight}
 									/>
 								</div>
 							</Show>
@@ -3079,6 +3137,13 @@ export function DrawnPlanEditor(props: {
 										min={MIN_TRAY_WIDTH}
 										max={MAX_TRAY_WIDTH}
 										on_commit={setTrayWidth}
+									/>
+									<NumberField
+										label={t('drawnPlan.newTrayElevation')}
+										value={trayElevation()}
+										min={0}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={setTrayElevation}
 									/>
 								</div>
 							</Show>
@@ -3571,7 +3636,7 @@ export function DrawnPlanEditor(props: {
 							)}
 						</For>
 						<For each={placements()}>
-							{(placement: FloorplanPlacementJson) => (
+							{(placement: FloorplanDrawingPlacementJson) => (
 								<div
 									class="floorplan-marker floorplan-marker-editing"
 									classList={{
@@ -3868,12 +3933,23 @@ export function DrawnPlanEditor(props: {
 									/>
 									<NumberField
 										label={t('drawnPlan.thickness')}
+										step={0.5}
 										value={wall().thickness}
 										min={MIN_WALL_THICKNESS}
 										max={MAX_WALL_THICKNESS}
 										on_commit={(value: number) => {
 											checkpoint()
 											patchWall(wall().id, { thickness: value })
+										}}
+									/>
+									<NumberField
+										label={t('drawnPlan.height')}
+										value={wall().height}
+										min={MIN_WALL_HEIGHT}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchWall(wall().id, { height: value })
 										}}
 									/>
 									<button type="button" onClick={deleteSelected}>
@@ -3895,7 +3971,10 @@ export function DrawnPlanEditor(props: {
 												const kind = e.currentTarget.value
 												if (isOpeningKind(kind)) {
 													checkpoint()
-													patchOpening(opening().id, { kind })
+													patchOpening(opening().id, {
+														kind,
+														...switchedHeights(opening(), kind),
+													})
 												}
 											}}
 										>
@@ -3911,6 +3990,7 @@ export function DrawnPlanEditor(props: {
 									<NumberField
 										label={t('drawnPlan.width')}
 										value={opening().width}
+										step={0.5}
 										min={MIN_OPENING_WIDTH}
 										max={MAX_OPENING_WIDTH}
 										on_commit={(value: number) => {
@@ -3927,6 +4007,28 @@ export function DrawnPlanEditor(props: {
 													? clampOffset(wall, width, opening().offset)
 													: opening().offset,
 											})
+										}}
+									/>
+									<Show when={opening().kind === 'window'}>
+										<NumberField
+											label={t('drawnPlan.sill')}
+											value={opening().sill}
+											min={0}
+											max={MAX_DRAWING_HEIGHT}
+											on_commit={(value: number) => {
+												checkpoint()
+												patchOpening(opening().id, { sill: value })
+											}}
+										/>
+									</Show>
+									<NumberField
+										label={t('drawnPlan.height')}
+										value={opening().height}
+										min={MIN_OPENING_HEIGHT}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchOpening(opening().id, { height: value })
 										}}
 									/>
 									<Show when={opening().kind !== 'window'}>
@@ -4005,6 +4107,16 @@ export function DrawnPlanEditor(props: {
 											patchStair(stair().id, { steps: Math.round(value) })
 										}}
 									/>
+									<NumberField
+										label={t('drawnPlan.stairRise')}
+										value={stair().rise}
+										min={MIN_STAIR_RISE}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchStair(stair().id, { rise: value })
+										}}
+									/>
 									<button
 										type="button"
 										onClick={() => {
@@ -4046,6 +4158,16 @@ export function DrawnPlanEditor(props: {
 											patchTray(tray().id, { width: value })
 										}}
 									/>
+									<NumberField
+										label={t('drawnPlan.mountingHeight')}
+										value={tray().elevation}
+										min={0}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchTray(tray().id, { elevation: value })
+										}}
+									/>
 									<button type="button" onClick={deleteSelected}>
 										{t('drawnPlan.deleteTray')}
 									</button>
@@ -4075,6 +4197,16 @@ export function DrawnPlanEditor(props: {
 										on_commit={(value: number) => {
 											checkpoint()
 											patchDesk(desk().id, { depth: value })
+										}}
+									/>
+									<NumberField
+										label={t('drawnPlan.height')}
+										value={desk().height}
+										min={MIN_DESK_HEIGHT}
+										max={MAX_DESK_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchDesk(desk().id, { height: value })
 										}}
 									/>
 									<LocationField
@@ -4109,6 +4241,16 @@ export function DrawnPlanEditor(props: {
 										on_commit={(patch: Partial<NewDeskGroup>) =>
 											resizeDeskGroup(group(), patch)
 										}
+									/>
+									<NumberField
+										label={t('drawnPlan.height')}
+										value={group().height}
+										min={MIN_DESK_HEIGHT}
+										max={MAX_DESK_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchDeskGroup(group().id, { height: value })
+										}}
 									/>
 									<For each={DESK_GROUP_DESKS}>
 										{(index: number) => (
@@ -4164,9 +4306,19 @@ export function DrawnPlanEditor(props: {
 							)}
 						</Match>
 						<Match when={selectedMarker()}>
-							{(marker: () => FloorplanPlacementJson) => (
+							{(marker: () => FloorplanDrawingPlacementJson) => (
 								<div class="floorplan-inspector">
 									<span>{marker().name}</span>
+									<NumberField
+										label={t('drawnPlan.mountingHeight')}
+										value={marker().elevation}
+										min={0}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchPlacement(marker().id, { elevation: value })
+										}}
+									/>
 									<button type="button" onClick={() => removeMarker(marker().id)}>
 										{t('floorplan.removeMarker', { name: marker().name })}
 									</button>

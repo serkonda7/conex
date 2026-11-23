@@ -52,6 +52,7 @@ import {
 	MarkerGlyph,
 	MarkerName,
 	markerClasses,
+	markerHref,
 	markerTitle,
 	percent,
 	type ShownMarker,
@@ -103,15 +104,6 @@ function areaHref(area: FloorplanAreaJson): string {
 		return `/floorplans/${area.target_plan_id}`
 	}
 	return area.site_id !== null ? `/sites/${area.site_id}` : `/locations/${area.location_id}`
-}
-
-function markerHref(placement: FloorplanPlacementJson): string {
-	if (placement.port) {
-		return `/devices/${placement.port.device_id}`
-	}
-	return placement.rack_id !== null
-		? `/racks/${placement.rack_id}`
-		: `/devices/${placement.device_id}`
 }
 
 /**
