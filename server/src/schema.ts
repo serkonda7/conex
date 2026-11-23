@@ -1068,10 +1068,12 @@ export const floorplan_calibrations = pgTable('floorplan_calibrations', {
 
 // Drawn floor plan (v2) of a site or location, at most one per owner: a
 // sheet of `width` × `height` cm with walls, openings (doors, sliding doors,
-// windows) and stairs drawn on it, optionally over a reference image (an attachment of the same
-// owner, placed by `reference_frame` in cm). Walls, openings and stairs
-// reference nothing else, so they are one JSON document each; an opening points at its
-// wall by index.
+// windows), stairs, cable trays, desks, desk groups and rooms drawn on it,
+// optionally over a reference image (an attachment of the same owner, placed
+// by `reference_frame` in cm). Each kind is one JSON document; an opening
+// points at its wall by index. Desks and rooms may name a location by id without a
+// foreign key: the service checks new links on save and resolves them on
+// read, so a link to a deleted location just stops showing.
 export const floorplan_drawings = pgTable(
 	'floorplan_drawings',
 	{
@@ -1107,6 +1109,38 @@ export const floorplan_drawings = pgTable(
 			.default([]),
 		stairs: jsonb('stairs')
 			.$type<{ a: [number, number]; b: [number, number]; width: number; steps: number }[]>()
+			.notNull()
+			.default([]),
+		trays: jsonb('trays')
+			.$type<{ a: [number, number]; b: [number, number]; width: number }[]>()
+			.notNull()
+			.default([]),
+		desks: jsonb('desks')
+			.$type<
+				{
+					a: [number, number]
+					b: [number, number]
+					depth: number
+					location_id?: number
+				}[]
+			>()
+			.notNull()
+			.default([]),
+		desk_groups: jsonb('desk_groups')
+			.$type<
+				{
+					center: [number, number]
+					rotation: number
+					arm: number
+					depth: number
+					curve: number
+					location_ids: [number | null, number | null, number | null]
+				}[]
+			>()
+			.notNull()
+			.default([]),
+		rooms: jsonb('rooms')
+			.$type<{ points: [number, number][]; location_id?: number; label?: string | null }[]>()
 			.notNull()
 			.default([]),
 		created_at: bigint('created_at', { mode: 'number' }).notNull(),

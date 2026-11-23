@@ -1,9 +1,14 @@
 /**
  * Drawn floor plans (v2): a sheet in centimeters per site or location with
- * walls, doors, windows and stairs drawn on it, optionally over a reference image
- * (an attachment of the same owner), and rack, device and outlet markers.
+ * walls, doors, windows, stairs, cable trays, desks, desk groups and rooms
+ * drawn on it,
+ * optionally over a reference image (an attachment of the same owner), and
+ * rack, device and outlet markers.
  *
- * Walls, openings and stairs are one JSON document each, replaced with every save.
+ * The drawn elements are one JSON document per kind, replaced with every
+ * save. Desks (also those of desk groups) and rooms may link to a location of the owner's scope by id:
+ * new links are checked on save, and reads resolve them (`linked_locations`)
+ * as far as the location exists and the requester may see it.
  * Markers reference racks, devices, rear ports and jacks, so they live in
  * `floorplan_drawing_placements`; each object sits on at most one drawn
  * plan. Like the image plans (`attachments.ts`), markers outside a scoped
@@ -32,6 +37,7 @@ import type {
 	FloorplanDrawingListJson,
 	FloorplanDrawingPut,
 	FloorplanDrawingRefJson,
+	FloorplanLinkLocationJson,
 	FloorplanReference,
 } from 'shared/src/schemas'
 import {
@@ -204,6 +210,77 @@ async function drawingOwnerName(row: Pick<DrawingRow, 'id'>): Promise<string> {
 	return owner?.name ?? `#${row.id}`
 }
 
+/** Location ids the plan's desks, desk groups and rooms link to, each once. */
+function linkedLocationIds(plan: {
+	desks: { location_id?: number }[]
+	desk_groups: { location_ids: (number | null)[] }[]
+	rooms: { location_id?: number }[]
+}): number[] {
+	return [
+		...new Set([
+			...[...plan.desks, ...plan.rooms].flatMap((item) =>
+				item.location_id === undefined ? [] : [item.location_id],
+			),
+			...plan.desk_groups.flatMap((group) =>
+				group.location_ids.filter((id): id is number => id !== null),
+			),
+		]),
+	]
+}
+
+// biome-ignore lint/nursery/useExplicitType: drizzle infers the selected row from this column map
+const linkLocationColumns = {
+	id: locations.id,
+	name: locations.name,
+	type: locations.type,
+	parent_id: locations.parent_id,
+}
+
+/** The linked locations that exist and lie in `scopeTenantIds`. */
+async function linkedLocations(
+	ids: number[],
+	scopeTenantIds: readonly number[] | undefined,
+): Promise<FloorplanLinkLocationJson[]> {
+	if (ids.length === 0) {
+		return []
+	}
+	return getDb()
+		.select(linkLocationColumns)
+		.from(locations)
+		.where(and(inArray(locations.id, ids), scopeCondition(locations.tenant_id, scopeTenantIds)))
+		.orderBy(asc(locations.name), asc(locations.id))
+}
+
+/**
+ * Locations in the owner's scope that desks and rooms may link to: the
+ * site's locations, or the owning location and those below it. Leaves out
+ * locations outside `scopeTenantIds`.
+ */
+export async function listDrawingLocations(
+	id: number,
+	scopeTenantIds?: readonly number[],
+): Promise<Result<FloorplanLinkLocationJson[], Error>> {
+	const found = await findById(floorplan_drawings, id, NOT_FOUND)
+	if (Result.isError(found)) {
+		return found
+	}
+	const owner = ownerOf(found.value)
+	const scope = await ownerLocations(owner)
+	const rows = await getDb()
+		.select(linkLocationColumns)
+		.from(locations)
+		.where(
+			and(
+				scope === null
+					? eq(locations.site_id, owner.site_id ?? 0)
+					: inArray(locations.id, scope),
+				scopeCondition(locations.tenant_id, scopeTenantIds),
+			),
+		)
+		.orderBy(asc(locations.name), asc(locations.id))
+	return Result.ok(rows)
+}
+
 /**
  * The drawn plan with its markers resolved. `scopeTenantIds` (a scoped
  * requester) leaves out markers whose object belongs to another tenant.
@@ -217,7 +294,7 @@ export async function getDrawing(
 		return found
 	}
 	const row = found.value
-	const [placementRows, reference, name, total] = await Promise.all([
+	const [placementRows, reference, name, total, linked] = await Promise.all([
 		getDb()
 			.select({
 				id: floorplan_drawing_placements.id,
@@ -256,6 +333,7 @@ export async function getDrawing(
 					floorplan_drawing_placements,
 					eq(floorplan_drawing_placements.drawing_id, id),
 				),
+		linkedLocations(linkedLocationIds(row), scopeTenantIds),
 	])
 	const portsOf = await outletPorts(placementRows)
 	const placements = placementRows.map(
@@ -283,6 +361,11 @@ export async function getDrawing(
 		walls: row.walls,
 		openings: row.openings,
 		stairs: row.stairs,
+		trays: row.trays,
+		desks: row.desks,
+		desk_groups: row.desk_groups,
+		rooms: row.rooms,
+		linked_locations: linked,
 		placements,
 		has_hidden_content: total > placements.length,
 		updated_at: row.updated_at,
@@ -419,16 +502,19 @@ export async function listDrawingCandidates(
 
 /**
  * Checks a save against the owner: the reference image is one of the
- * owner's attachments; placed racks and devices exist, are visible, occur
+ * owner's attachments; desks, desk groups and rooms link to visible locations in the
+ * owner's scope (links already stored pass as they are, so a hidden or
+ * deleted location never blocks a save); placed racks and devices exist, are visible, occur
  * once, lie in the owner's scope and are not on another drawn plan; placed
  * outlets pass `checkOutlets`.
  */
 async function checkDrawingInput(
-	id: number,
-	owner: AttachmentOwner,
+	stored: DrawingRow,
 	input: FloorplanDrawingPut,
 	scopeTenantIds: readonly number[] | undefined,
 ): Promise<Result<undefined, Error>> {
+	const id = stored.id
+	const owner = ownerOf(stored)
 	if (input.reference) {
 		const [image] = await getDb()
 			.select({ site_id: attachments.site_id, location_id: attachments.location_id })
@@ -461,6 +547,34 @@ async function checkDrawingInput(
 		return outlets
 	}
 	const scope = await ownerLocations(owner)
+	const kept = new Set(linkedLocationIds(stored))
+	const linkIds = linkedLocationIds(input).filter((locationId) => !kept.has(locationId))
+	if (linkIds.length > 0) {
+		const rows = await getDb()
+			.select({
+				id: locations.id,
+				name: locations.name,
+				site_id: locations.site_id,
+				tenant_id: locations.tenant_id,
+			})
+			.from(locations)
+			.where(inArray(locations.id, linkIds))
+		for (const locationId of linkIds) {
+			const row = rows.find((location) => location.id === locationId)
+			if (!row || !visibleTo(row.tenant_id, scopeTenantIds)) {
+				return Result.err(new ValidationError(`Location #${locationId} not found`))
+			}
+			const contained =
+				scope === null ? row.site_id === owner.site_id : scope.includes(row.id)
+			if (!contained) {
+				return Result.err(
+					new ValidationError(
+						`Location "${row.name}" is outside this floor plan's site or location`,
+					),
+				)
+			}
+		}
+	}
 	const placedRacks =
 		rackIds.length === 0
 			? []
@@ -585,7 +699,7 @@ async function drawingSnapshot(row: DrawingRow): Promise<
 }
 
 /**
- * Replaces the sheet, reference image, walls, openings, stairs and markers in one
+ * Replaces the sheet, reference image, drawn elements and markers in one
  * transaction with one changelog entry. Markers hidden from a scoped
  * requester stay unchanged. Returns the saved plan as `getDrawing`
  * resolves it for the requester.
@@ -606,7 +720,7 @@ export async function putDrawing(
 				if (!row) {
 					return Result.err(new NotFoundError(NOT_FOUND))
 				}
-				const checked = await checkDrawingInput(id, ownerOf(row), input, scopeTenantIds)
+				const checked = await checkDrawingInput(row, input, scopeTenantIds)
 				if (Result.isError(checked)) {
 					return checked
 				}
@@ -650,6 +764,10 @@ export async function putDrawing(
 						walls: input.walls,
 						openings: input.openings,
 						stairs: input.stairs,
+						trays: input.trays,
+						desks: input.desks,
+						desk_groups: input.desk_groups,
+						rooms: input.rooms,
 						updated_at: nowSeconds(),
 					})
 					.where(eq(floorplan_drawings.id, id))

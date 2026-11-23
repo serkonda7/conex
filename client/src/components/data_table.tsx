@@ -137,6 +137,11 @@ export function FilterTable<TRow>(
 			noLayoutLabel: t('table.noLayout'),
 			clearSavedFilterLabel: t('table.clearSavedFilter'),
 			removeLabel: t('table.removeValue'),
+			isLabel: t('table.is'),
+			isNotLabel: t('table.isNot'),
+			conditionLabel: t('table.condition'),
+			noneLabel: t('table.none'),
+			customLabel: t('table.customRange'),
 		},
 		saved
 			? {

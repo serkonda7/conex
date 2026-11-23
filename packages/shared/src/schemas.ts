@@ -2568,6 +2568,153 @@ export const FloorplanStairSchema = v.pipe(
 
 export type FloorplanStair = v.InferOutput<typeof FloorplanStairSchema>
 
+/** Narrowest and widest cable tray, cm. */
+export const MIN_TRAY_WIDTH = 5
+export const MAX_TRAY_WIDTH = 200
+
+/**
+ * A straight run of cable tray from `a` to `b` (cm), `width` cm wide and
+ * centered on that line. Runs meeting at an end form bends and junctions,
+ * like walls.
+ */
+export const FloorplanTraySchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		width: v.pipe(
+			v.number('Tray width must be a number'),
+			v.minValue(MIN_TRAY_WIDTH, `Cable trays are at least ${MIN_TRAY_WIDTH} cm wide`),
+			v.maxValue(MAX_TRAY_WIDTH, `Cable trays are at most ${MAX_TRAY_WIDTH} cm wide`),
+		),
+	}),
+	v.check(
+		(tray) => tray.a[0] !== tray.b[0] || tray.a[1] !== tray.b[1],
+		'A cable tray needs a length',
+	),
+)
+
+export type FloorplanTray = v.InferOutput<typeof FloorplanTraySchema>
+
+/** Shallowest and deepest desk, cm. */
+export const MIN_DESK_DEPTH = 20
+export const MAX_DESK_DEPTH = 500
+
+/** A location a drawn desk or room links to; missing for a plain drawing. */
+const LinkedLocationEntry = v.optional(IdSchema, undefined)
+
+/**
+ * A rectangular desk: its back edge from `a` to `b` (cm) and `depth` cm
+ * toward the left of `a`→`b` (on screen, y down).
+ */
+export const FloorplanDeskSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		depth: v.pipe(
+			v.number('Desk depth must be a number'),
+			v.minValue(MIN_DESK_DEPTH, `Desks are at least ${MIN_DESK_DEPTH} cm deep`),
+			v.maxValue(MAX_DESK_DEPTH, `Desks are at most ${MAX_DESK_DEPTH} cm deep`),
+		),
+		location_id: LinkedLocationEntry,
+	}),
+	v.check((desk) => desk.a[0] !== desk.b[0] || desk.a[1] !== desk.b[1], 'A desk needs a length'),
+)
+
+export type FloorplanDesk = v.InferOutput<typeof FloorplanDeskSchema>
+
+/** Shortest and longest divider of a desk group, cm. */
+export const MIN_DESK_GROUP_ARM = 30
+export const MAX_DESK_GROUP_ARM = 400
+
+/** Deepest desk group, center to the front corners, cm. */
+export const MAX_DESK_GROUP_DEPTH = 800
+
+/**
+ * Half the width of the front edge of each desk of a desk group with
+ * dividers `arm` cm long, its front corners `depth` cm from the center; not
+ * positive when the sides would cross. Each side leaves its divider's outer
+ * end at a right angle, so neighboring desks' sides line up.
+ */
+export function deskGroupFrontHalf(arm: number, depth: number): number {
+	const side = ((depth - arm / 2) * 2) / Math.sqrt(3)
+	return (arm * Math.sqrt(3)) / 2 - side / 2
+}
+
+/** A desk of a desk group links to a location by id, or not (`null`). */
+const DeskGroupLinkSchema = v.nullable(IdSchema)
+
+/**
+ * Three desks around a center (cm), 120° apart, split by three dividers
+ * `arm` cm long. Each desk reaches `depth` cm from the center to its front
+ * corners; its front edge curves `curve` cm in toward the center. At
+ * `rotation` 0° the first desk faces down and a divider points up; the
+ * others follow clockwise. `location_ids` holds each desk's link.
+ */
+export const FloorplanDeskGroupSchema = v.pipe(
+	v.strictObject({
+		center: DrawingPointSchema,
+		rotation: v.pipe(
+			v.number('Rotation must be a number'),
+			v.minValue(0, 'Rotation is at least 0°'),
+			v.maxValue(360, 'Rotation is at most 360°'),
+		),
+		arm: v.pipe(
+			v.number('Divider length must be a number'),
+			v.minValue(MIN_DESK_GROUP_ARM, `Dividers are at least ${MIN_DESK_GROUP_ARM} cm long`),
+			v.maxValue(MAX_DESK_GROUP_ARM, `Dividers are at most ${MAX_DESK_GROUP_ARM} cm long`),
+		),
+		depth: v.pipe(
+			v.number('Desk depth must be a number'),
+			v.minValue(MIN_DESK_DEPTH, `Desks are at least ${MIN_DESK_DEPTH} cm deep`),
+			v.maxValue(
+				MAX_DESK_GROUP_DEPTH,
+				`Desk groups are at most ${MAX_DESK_GROUP_DEPTH} cm deep`,
+			),
+		),
+		curve: v.pipe(v.number('Front curve must be a number'), v.minValue(0)),
+		location_ids: v.tuple([DeskGroupLinkSchema, DeskGroupLinkSchema, DeskGroupLinkSchema]),
+	}),
+	v.check(
+		(group) => group.depth > group.arm / 2 && deskGroupFrontHalf(group.arm, group.depth) > 0,
+		"A desk group's depth must be more than half and less than twice its divider length",
+	),
+	v.check(
+		(group) =>
+			group.curve <=
+			Math.min(deskGroupFrontHalf(group.arm, group.depth), group.depth - group.arm / 2),
+		'The front curve is too deep for this desk group',
+	),
+)
+
+export type FloorplanDeskGroup = v.InferOutput<typeof FloorplanDeskGroupSchema>
+
+/** Most corners of a drawn room. */
+export const MAX_ROOM_POINTS = 200
+
+/**
+ * A room: a polygon of at least three corners (cm), optionally linked to a
+ * location and labelled (the label shows instead of the location's name).
+ */
+export const FloorplanRoomSchema = v.strictObject({
+	points: v.pipe(
+		v.array(DrawingPointSchema),
+		v.minLength(3, 'A room needs at least 3 corners'),
+		v.maxLength(MAX_ROOM_POINTS, `A room has at most ${MAX_ROOM_POINTS} corners`),
+	),
+	location_id: LinkedLocationEntry,
+	label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+})
+
+export type FloorplanRoom = v.InferOutput<typeof FloorplanRoomSchema>
+
+/** A location a desk or room of a drawn plan links to, or may link to. */
+export interface FloorplanLinkLocationJson {
+	id: number
+	name: string
+	type: LocationType
+	parent_id: number | null
+}
+
 /**
  * Reference image under a drawn plan: an image attachment of the same
  * owner, its top-left corner at (`x`, `y`) cm (it may stick out of the
@@ -2596,9 +2743,9 @@ const OPENING_SLACK = 0.5
 
 /**
  * `PUT /floorplan-drawings/:id`: the sheet, the reference image and the
- * full set of walls, openings, stairs and markers, replaced atomically.
- * Walls, stairs and markers lie on the sheet; each opening fits into its
- * wall.
+ * full set of walls, openings, stairs, cable trays, desks, desk groups,
+ * rooms and markers, replaced atomically. Everything lies on the sheet; each opening
+ * fits into its wall.
  */
 export const FloorplanDrawingPutSchema = v.pipe(
 	v.strictObject({
@@ -2608,6 +2755,10 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
 		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
 		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
+		trays: v.optional(v.pipe(v.array(FloorplanTraySchema), v.maxLength(2000)), []),
+		desks: v.optional(v.pipe(v.array(FloorplanDeskSchema), v.maxLength(2000)), []),
+		desk_groups: v.optional(v.pipe(v.array(FloorplanDeskGroupSchema), v.maxLength(1000)), []),
+		rooms: v.optional(v.pipe(v.array(FloorplanRoomSchema), v.maxLength(500)), []),
 		placements: v.pipe(v.array(DrawingPlacementInputSchema), v.maxLength(2000)),
 	}),
 	v.check(
@@ -2615,9 +2766,13 @@ export const FloorplanDrawingPutSchema = v.pipe(
 			[
 				...plan.walls.flatMap((wall) => [wall.a, wall.b]),
 				...plan.stairs.flatMap((stair) => [stair.a, stair.b]),
+				...plan.trays.flatMap((tray) => [tray.a, tray.b]),
+				...plan.desks.flatMap((desk) => [desk.a, desk.b]),
+				...plan.desk_groups.map((group) => group.center),
+				...plan.rooms.flatMap((room) => room.points),
 				...plan.placements.map((p): [number, number] => [p.x, p.y]),
 			].every(([x, y]) => x <= plan.width && y <= plan.height),
-		'Walls, stairs and markers must lie on the sheet',
+		'Walls, stairs, trays, desks, rooms and markers must lie on the sheet',
 	),
 	v.check((plan) => {
 		return plan.openings.every((opening) => {
@@ -2678,6 +2833,15 @@ export interface FloorplanDrawingJson {
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
 	stairs: FloorplanStair[]
+	trays: FloorplanTray[]
+	desks: FloorplanDesk[]
+	desk_groups: FloorplanDeskGroup[]
+	rooms: FloorplanRoom[]
+	/**
+	 * The locations desks, desk groups and rooms link to, as far as they exist and the
+	 * requester may see them; a link missing here is kept on save.
+	 */
+	linked_locations: FloorplanLinkLocationJson[]
 	placements: FloorplanPlacementJson[]
 	/** Some markers are outside the requester's scope (a save keeps them). */
 	has_hidden_content: boolean

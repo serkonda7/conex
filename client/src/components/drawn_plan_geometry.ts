@@ -8,13 +8,20 @@
  * it without a notch.
  *
  * Stairs are a strip `width` wide from their foot `a` to their head `b`,
- * divided into treads, with an arrow pointing up the flight.
+ * divided into treads, with an arrow pointing up the flight. A cable tray is
+ * a strip like a wall. A desk stands on its back edge `a`–`b` and reaches
+ * `depth` to the left of it. A desk group is three desks around a center,
+ * 120° apart, split by dividers; each desk's sides leave the outer ends of
+ * its dividers at a right angle, and its front edge curves in.
  */
-import type {
-	FloorplanOpening,
-	FloorplanStair,
-	FloorplanWall,
-	OpeningKind,
+import {
+	deskGroupFrontHalf,
+	type FloorplanDesk,
+	type FloorplanDeskGroup,
+	type FloorplanOpening,
+	type FloorplanStair,
+	type FloorplanWall,
+	type OpeningKind,
 } from 'shared/src/schemas'
 
 export type Point = [number, number]
@@ -31,6 +38,21 @@ export const DEFAULT_OPENING_WIDTH: Record<OpeningKind, number> = {
 
 /** Default width of new stairs, cm. */
 export const DEFAULT_STAIR_WIDTH = 100
+
+/** Default width of a new cable tray, cm. */
+export const DEFAULT_TRAY_WIDTH = 30
+
+/** Default depth of a new desk, cm. */
+export const DEFAULT_DESK_DEPTH = 80
+
+/** Divider length, depth (center to front corners) and front curve of a new desk group, cm. */
+export const DEFAULT_DESK_GROUP = { arm: 118, depth: 126, curve: 18 } as const
+
+/** Desks in a desk group. */
+export const DESK_GROUP_DESKS = [0, 1, 2] as const
+
+/** Straight pieces a desk group's curved front edge is drawn with. */
+const ARC_SEGMENTS = 16
 
 /** Usual depth of one tread, cm: new stairs get as many steps as fit. */
 export const TREAD_DEPTH = 28
@@ -89,6 +111,197 @@ function strip(a: Point, b: Point, thickness: number, from: number, to: number):
 	const p0 = along(a, u, from)
 	const p1 = along(a, u, to)
 	return [along(p0, n, half), along(p1, n, half), along(p1, n, -half), along(p0, n, -half)]
+}
+
+/** Corners of a desk: back edge `a`, `b`, then the front edge. */
+export function deskOutline(desk: Pick<FloorplanDesk, 'a' | 'b' | 'depth'>): Point[] {
+	const n = leftNormal(direction(desk.a, desk.b))
+	return [desk.a, desk.b, along(desk.b, n, desk.depth), along(desk.a, n, desk.depth)]
+}
+
+/** The shape of a desk group, without its links. */
+export type DeskGroupShape = Pick<
+	FloorplanDeskGroup,
+	'center' | 'rotation' | 'arm' | 'depth' | 'curve'
+>
+
+/** Unit vector `degrees` clockwise from the x axis on screen (y down). */
+function heading(degrees: number): Point {
+	const radians = (degrees * Math.PI) / 180
+	return [Math.cos(radians), Math.sin(radians)]
+}
+
+/** Direction desk `index` of a group faces, degrees: the first one down at rotation 0. */
+function deskFacing(group: DeskGroupShape, index: number): number {
+	return group.rotation + 90 + 120 * index
+}
+
+/** Outer ends of a desk group's three dividers, the first one up at rotation 0. */
+export function deskGroupArms(group: DeskGroupShape): Point[] {
+	return DESK_GROUP_DESKS.map((index: number) =>
+		along(group.center, heading(deskFacing(group, index) + 180), group.arm),
+	)
+}
+
+/**
+ * Corners of desk `index` of a group: the divider ends on either side and
+ * the front corners, from the divider before it clockwise.
+ */
+function deskCorners(
+	group: DeskGroupShape,
+	index: number,
+): { armA: Point; frontA: Point; frontB: Point; armB: Point } {
+	const facing = deskFacing(group, index)
+	const side = ((group.depth - group.arm / 2) * 2) / Math.sqrt(3)
+	const armA = along(group.center, heading(facing - 60), group.arm)
+	const armB = along(group.center, heading(facing + 60), group.arm)
+	return {
+		armA,
+		frontA: along(armA, heading(facing + 30), side),
+		frontB: along(armB, heading(facing - 30), side),
+		armB,
+	}
+}
+
+/**
+ * Outline of desk `index` (0–2) of a group: the center, a divider end, the
+ * front corners with the curved front edge between them, and the other
+ * divider end.
+ */
+export function deskGroupDesk(group: DeskGroupShape, index: number): Point[] {
+	const { armA, frontA, frontB, armB } = deskCorners(group, index)
+	const half = deskGroupFrontHalf(group.arm, group.depth)
+	const curve = Math.min(group.curve, half)
+	if (curve <= 0 || half <= 0) {
+		return [group.center, armA, frontA, frontB, armB]
+	}
+	// The front edge is an arc through both front corners, `curve` deep.
+	const u = heading(deskFacing(group, index))
+	const p = direction(frontA, frontB)
+	const radius = (half * half + curve * curve) / (2 * curve)
+	const circle = along(group.center, u, group.depth - curve + radius)
+	const reach = Math.asin(Math.min(1, half / radius))
+	const arc: Point[] = []
+	for (let i = 1; i < ARC_SEGMENTS; i++) {
+		const angle = -reach + (2 * reach * i) / ARC_SEGMENTS
+		arc.push(along(along(circle, u, -radius * Math.cos(angle)), p, radius * Math.sin(angle)))
+	}
+	return [group.center, armA, frontA, ...arc, frontB, armB]
+}
+
+/** The corners of a desk group other things snap to: the center, divider ends and front corners. */
+export function deskGroupCorners(group: DeskGroupShape): Point[] {
+	return [
+		group.center,
+		...deskGroupArms(group),
+		...DESK_GROUP_DESKS.flatMap((index: number) => {
+			const { frontA, frontB } = deskCorners(group, index)
+			return [frontA, frontB]
+		}),
+	]
+}
+
+/** The straight outer edges of a desk group: from each divider end to the front corners beside it. */
+export function deskGroupEdges(group: DeskGroupShape): [Point, Point][] {
+	return DESK_GROUP_DESKS.flatMap((index: number): [Point, Point][] => {
+		const { armA, frontA, frontB, armB } = deskCorners(group, index)
+		return [
+			[armA, frontA],
+			[armB, frontB],
+		]
+	})
+}
+
+/** Center of mass of a polygon; the mean of its corners when it has no area. */
+export function polygonCenter(points: Point[]): Point {
+	let area = 0
+	let x = 0
+	let y = 0
+	for (let i = 0; i < points.length; i++) {
+		const [x0, y0] = points[i] as Point
+		const [x1, y1] = points[(i + 1) % points.length] as Point
+		const cross = x0 * y1 - x1 * y0
+		area += cross
+		x += (x0 + x1) * cross
+		y += (y0 + y1) * cross
+	}
+	if (Math.abs(area) < 1e-9) {
+		const n = Math.max(1, points.length)
+		return [
+			points.reduce((sum, p) => sum + p[0], 0) / n,
+			points.reduce((sum, p) => sum + p[1], 0) / n,
+		]
+	}
+	return [x / (3 * area), y / (3 * area)]
+}
+
+/** Where the lines through `a`–`b` and `c`–`d` cross; `null` when parallel. */
+function lineCross(a: Point, b: Point, c: Point, d: Point): Point | null {
+	const r: Point = [b[0] - a[0], b[1] - a[1]]
+	const s: Point = [d[0] - c[0], d[1] - c[1]]
+	const denominator = r[0] * s[1] - r[1] * s[0]
+	if (Math.abs(denominator) < 1e-9) {
+		return null
+	}
+	const t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / denominator
+	return [a[0] + r[0] * t, a[1] + r[1] * t]
+}
+
+/** The two faces of a wall, reaching half the thickness past its ends like its pieces. */
+function wallFaces(wall: Pick<FloorplanWall, 'a' | 'b' | 'thickness'>): [Point, Point][] {
+	const [p0, p1, p2, p3] = strip(
+		wall.a,
+		wall.b,
+		wall.thickness,
+		-wall.thickness / 2,
+		wallLength(wall) + wall.thickness / 2,
+	) as [Point, Point, Point, Point]
+	return [
+		[p0, p1],
+		[p3, p2],
+	]
+}
+
+/**
+ * Snap targets on the walls' faces, for what stands against a wall (desks,
+ * rooms, trays): the faces, and the corners where the faces of walls joined
+ * at an end meet (inside and outside), or a free end's corners.
+ */
+export function wallFaceTargets(walls: Pick<FloorplanWall, 'a' | 'b' | 'thickness'>[]): {
+	points: Point[]
+	faces: [Point, Point][]
+} {
+	const faces = walls.map(wallFaces)
+	const points: Point[] = []
+	walls.forEach((wall, i: number) => {
+		for (const end of [wall.a, wall.b]) {
+			const joined = walls.flatMap((other, j: number) =>
+				j !== i && (samePoint(other.a, end) || samePoint(other.b, end)) ? [j] : [],
+			)
+			if (joined.length === 0) {
+				const cap = end === wall.a ? 0 : 1
+				for (const face of faces[i] ?? []) {
+					points.push(face[cap])
+				}
+				continue
+			}
+			for (const j of joined) {
+				if (j < i) {
+					continue
+				}
+				const reach = Math.max(wall.thickness, walls[j]?.thickness ?? 0) * 2
+				for (const mine of faces[i] ?? []) {
+					for (const theirs of faces[j] ?? []) {
+						const hit = lineCross(mine[0], mine[1], theirs[0], theirs[1])
+						if (hit && distance(hit, end) <= reach) {
+							points.push(hit)
+						}
+					}
+				}
+			}
+		}
+	})
+	return { points, faces: faces.flat() }
 }
 
 /** Opening's extent along its wall (cm from the wall's start), kept on the wall. */
@@ -275,15 +488,12 @@ export function clampPoint(p: Point, width: number, height: number): Point {
 	return [Math.min(width, Math.max(0, p[0])), Math.min(height, Math.max(0, p[1]))]
 }
 
-/** Bounding box of every wall and stair end and marker: the smallest sheet that holds the drawing. */
-export function contentExtent(
-	lines: Pick<FloorplanWall, 'a' | 'b'>[],
-	markers: { x: number; y: number }[],
-): Point {
+/** Bounding box of every drawn point and marker: the smallest sheet that holds the drawing. */
+export function contentExtent(points: Point[], markers: { x: number; y: number }[]): Point {
 	let [x, y] = [0, 0]
-	for (const line of lines) {
-		x = Math.max(x, line.a[0], line.b[0])
-		y = Math.max(y, line.a[1], line.b[1])
+	for (const point of points) {
+		x = Math.max(x, point[0])
+		y = Math.max(y, point[1])
 	}
 	for (const marker of markers) {
 		x = Math.max(x, marker.x)

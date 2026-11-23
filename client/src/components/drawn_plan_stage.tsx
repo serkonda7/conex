@@ -1,8 +1,8 @@
 /**
  * Stage of a drawn floor plan, shared by the view and the editor: the sheet
  * in a `ZoomViewport` (design decision 0003) with the reference image, the
- * grid, the stairs, the walls with their doors and windows, and the owner's overlay
- * pieces (`children`) on top.
+ * grid, the rooms, stairs, desks, desk groups and cable trays, the walls with their doors
+ * and windows, and the owner's overlay pieces (`children`) on top.
  *
  * The SVG's user units are the sheet's centimeters (`viewBox` = sheet), so
  * walls are drawn at their real size. HTML overlay pieces (markers, labels,
@@ -10,9 +10,13 @@
  * keep their screen size through `--inv-zoom`.
  */
 import type {
+	FloorplanDesk,
+	FloorplanDeskGroup,
 	FloorplanOpening,
 	FloorplanReference,
+	FloorplanRoom,
 	FloorplanStair,
+	FloorplanTray,
 	FloorplanWall,
 } from 'shared/src/schemas'
 import { createMemo, createSignal, createUniqueId, For, type JSX, Show } from 'solid-js'
@@ -20,9 +24,14 @@ import { type AttachmentJson, attachment_file_url } from '../api/attachments'
 import { locale, t } from '../i18n'
 import { readStored, writeStored } from '../lib/storage'
 import {
+	DESK_GROUP_DESKS,
+	deskGroupArms,
+	deskGroupDesk,
+	deskOutline,
 	type OpeningShape,
 	openingShape,
 	type Point,
+	polygonCenter,
 	type StairShape,
 	stairShape,
 	wallPieces,
@@ -104,7 +113,7 @@ export function formatLength(centimeters: number): string {
 		: t('floorplan.centimeters', { value: format(centimeters, 1) })
 }
 
-function svgPoints(points: Point[]): string {
+export function svgPoints(points: Point[]): string {
 	return points.map((point: Point) => point.join(',')).join(' ')
 }
 
@@ -245,6 +254,190 @@ export function StairLayer(props: {
 				</g>
 			)}
 		</For>
+	)
+}
+
+/** Names of `locations` by id. */
+export function locationNames(locations: { id: number; name: string }[]): Map<number, string> {
+	return new Map(locations.map((location) => [location.id, location.name]))
+}
+
+/** A drawn element as the stage draws it, keyed for selection. */
+export interface StageItem<T> {
+	key: string
+	item: T
+}
+
+/** One desk, alone or of a desk group: where its label goes and the location it links to. */
+export interface DeskSeat {
+	key: string
+	at: Point
+	location_id: number | undefined
+}
+
+/** Every desk of `desks` and `groups`; a group's desks are keyed `<group key>:<index>`. */
+export function deskSeats(
+	desks: StageItem<FloorplanDesk>[],
+	groups: StageItem<FloorplanDeskGroup>[],
+): DeskSeat[] {
+	return [
+		...desks.map((entry: StageItem<FloorplanDesk>) => ({
+			key: entry.key,
+			at: polygonCenter(deskOutline(entry.item)),
+			location_id: entry.item.location_id,
+		})),
+		...groups.flatMap((entry: StageItem<FloorplanDeskGroup>) =>
+			DESK_GROUP_DESKS.map((index: number) => ({
+				key: `${entry.key}:${index}`,
+				at: polygonCenter(deskGroupDesk(entry.item, index)),
+				location_id: entry.item.location_ids[index] ?? undefined,
+			})),
+		),
+	]
+}
+
+/** Press handler and selection the editor passes to a layer; the view passes neither. */
+interface LayerEditing {
+	selected?: string | null
+	on_press?: (e: PointerEvent, key: string) => void
+}
+
+/**
+ * Rooms, under everything else. Only their outline takes presses (the
+ * editor also selects a room by its label), so clicks inside reach the
+ * floor below.
+ */
+export function RoomLayer(
+	props: { rooms: StageItem<FloorplanRoom>[] } & LayerEditing,
+): JSX.Element {
+	return (
+		<For each={props.rooms}>
+			{(entry: StageItem<FloorplanRoom>) => (
+				<g
+					class="drawn-plan-room"
+					classList={{
+						selected: props.selected === entry.key,
+						editable: props.on_press !== undefined,
+						linked: entry.item.location_id !== undefined,
+					}}
+				>
+					<polygon class="drawn-plan-room-area" points={svgPoints(entry.item.points)} />
+					<polygon
+						class="drawn-plan-room-edge"
+						points={svgPoints(entry.item.points)}
+						onPointerDown={(e: PointerEvent) => props.on_press?.(e, entry.key)}
+					/>
+				</g>
+			)}
+		</For>
+	)
+}
+
+/** Desks, over rooms and stairs. */
+export function DeskLayer(
+	props: { desks: StageItem<FloorplanDesk>[] } & LayerEditing,
+): JSX.Element {
+	return (
+		<For each={props.desks}>
+			{(entry: StageItem<FloorplanDesk>) => (
+				<polygon
+					class="drawn-plan-desk"
+					classList={{
+						selected: props.selected === entry.key,
+						editable: props.on_press !== undefined,
+						linked: entry.item.location_id !== undefined,
+					}}
+					points={svgPoints(deskOutline(entry.item))}
+					onPointerDown={(e: PointerEvent) => props.on_press?.(e, entry.key)}
+				/>
+			)}
+		</For>
+	)
+}
+
+/**
+ * Desk groups, beside the desks: three desks each, a tint on those linked
+ * to a location, and the dividers between them.
+ */
+export function DeskGroupLayer(
+	props: { groups: StageItem<FloorplanDeskGroup>[] } & LayerEditing,
+): JSX.Element {
+	return (
+		<For each={props.groups}>
+			{(entry: StageItem<FloorplanDeskGroup>) => (
+				<g
+					class="drawn-plan-desk-group"
+					onPointerDown={(e: PointerEvent) => props.on_press?.(e, entry.key)}
+				>
+					<For each={DESK_GROUP_DESKS}>
+						{(index: number) => (
+							<polygon
+								class="drawn-plan-desk"
+								classList={{
+									selected: props.selected === entry.key,
+									editable: props.on_press !== undefined,
+									linked: entry.item.location_ids[index] !== null,
+								}}
+								points={svgPoints(deskGroupDesk(entry.item, index))}
+							/>
+						)}
+					</For>
+					<For each={deskGroupArms(entry.item)}>
+						{(end: Point) => (
+							<line
+								class="drawn-plan-desk-divider"
+								x1={entry.item.center[0]}
+								y1={entry.item.center[1]}
+								x2={end[0]}
+								y2={end[1]}
+							/>
+						)}
+					</For>
+				</g>
+			)}
+		</For>
+	)
+}
+
+/**
+ * Cable trays, over desks and under the walls. The runs share one
+ * translucent group, so where they meet or cross they do not darken.
+ */
+export function TrayLayer(
+	props: { trays: StageItem<FloorplanTray>[] } & LayerEditing,
+): JSX.Element {
+	const line = (entry: StageItem<FloorplanTray>, cls: string, width?: number): JSX.Element => (
+		<line
+			class={cls}
+			x1={entry.item.a[0]}
+			y1={entry.item.a[1]}
+			x2={entry.item.b[0]}
+			y2={entry.item.b[1]}
+			stroke-width={width}
+		/>
+	)
+	return (
+		<>
+			<g class="drawn-plan-trays">
+				<For each={props.trays}>
+					{(entry: StageItem<FloorplanTray>) => (
+						<g
+							class="drawn-plan-tray"
+							classList={{
+								selected: props.selected === entry.key,
+								editable: props.on_press !== undefined,
+							}}
+							onPointerDown={(e: PointerEvent) => props.on_press?.(e, entry.key)}
+						>
+							{line(entry, 'drawn-plan-tray-body', entry.item.width)}
+						</g>
+					)}
+				</For>
+			</g>
+			<For each={props.trays}>
+				{(entry: StageItem<FloorplanTray>) => line(entry, 'drawn-plan-tray-axis')}
+			</For>
+		</>
 	)
 }
 

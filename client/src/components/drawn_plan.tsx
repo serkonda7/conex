@@ -1,28 +1,41 @@
 /**
  * Drawn floor plan (v2) of a site or location, the body of
- * `/floorplans-v2/:id`: the sheet with its walls, doors, windows and stairs over the
- * optional reference image, and the rack, device and outlet markers. A
- * marker links to its rack or device; an outlet opens its popover (trace
- * and connect) like on image plans. Edit swaps the view for the editor on
- * the same zoom.
+ * `/floorplans-v2/:id`: the sheet with its walls, doors, windows, stairs,
+ * cable trays, desks, desk groups and rooms over the optional reference
+ * image, and the rack, device and outlet markers. A marker links to its rack
+ * or device; an outlet opens its popover (trace and connect) like on image
+ * plans. Rooms and desks linked to a location carry a label linking to it.
+ * Edit swaps the view for the editor on the same zoom.
  */
 import { IconPencil, IconPhoto, IconTag, IconTrash } from '@tabler/icons-solidjs'
 import { createSignal, For, type JSX, onMount, Show } from 'solid-js'
 import type { FloorplanPlacementJson } from '../api/attachments'
-import { delete_drawing, type FloorplanDrawingJson } from '../api/floorplan_drawings'
+import {
+	delete_drawing,
+	type FloorplanDrawingJson,
+	type FloorplanRoom,
+} from '../api/floorplan_drawings'
 import { t } from '../i18n'
 import { queryParam } from '../lib/router'
 import { can } from '../lib/session'
 import { useDetailDelete } from './detail_page'
 import { DrawnPlanEditor } from './drawn_plan_editor'
-import type { Point } from './drawn_plan_geometry'
+import { type Point, polygonCenter } from './drawn_plan_geometry'
 import {
+	DeskGroupLayer,
+	DeskLayer,
+	type DeskSeat,
 	DrawnPlanStage,
+	deskSeats,
+	locationNames,
 	percentOf,
+	RoomLayer,
 	referenceOpacity,
 	referenceVisible,
+	type StageItem,
 	type StageWall,
 	StairLayer,
+	TrayLayer,
 	toggleReferenceVisible,
 	WallLayer,
 } from './drawn_plan_stage'
@@ -44,6 +57,68 @@ export function drawingWalls(drawing: FloorplanDrawingJson): StageWall[] {
 	}))
 }
 
+/** The plan's elements of one kind, keyed by kind and index. */
+export function stageItems<T>(kind: string, items: T[]): StageItem<T>[] {
+	return items.map((item: T, i: number) => ({ key: `${kind}:${i}`, item }))
+}
+
+/** A room's or desk's label: on the stage at `at`, linking to its location when visible. */
+interface PlanLabel {
+	key: string
+	at: Point
+	text: string
+	location_id: number | null
+	kind: 'room' | 'desk'
+}
+
+/**
+ * Labels of the rooms (their label, else the linked location's name) and of
+ * the linked desks, also those of desk groups (the location's name). `names` holds the locations the
+ * requester may see; a link to another stays unlabelled unless the room has
+ * its own label.
+ */
+export function planLabels(
+	rooms: { key: string; room: FloorplanRoom }[],
+	desks: DeskSeat[],
+	names: Map<number, string>,
+): PlanLabel[] {
+	const name = (id: number | undefined): string | undefined =>
+		id === undefined ? undefined : names.get(id)
+	return [
+		...rooms.flatMap(({ key, room }) => {
+			const text = room.label || name(room.location_id)
+			return text
+				? [
+						{
+							key,
+							at: polygonCenter(room.points),
+							text,
+							location_id:
+								name(room.location_id) === undefined
+									? null
+									: (room.location_id ?? null),
+							kind: 'room' as const,
+						},
+					]
+				: []
+		}),
+		...desks.flatMap((seat: DeskSeat) => {
+			const text = name(seat.location_id)
+			return text
+				? [
+						{
+							key: seat.key,
+							at: seat.at,
+							text,
+							location_id: seat.location_id ?? null,
+							kind: 'desk' as const,
+						},
+					]
+				: []
+		}),
+	]
+}
+
 function markerHref(placement: FloorplanPlacementJson): string {
 	if (placement.port) {
 		return `/devices/${placement.port.device_id}`
@@ -58,7 +133,7 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 	const [outlet, setOutlet] = createSignal<OutletPlacement | null>(null)
 	const [pointer, setPointer] = createSignal<Point | null>(null)
 	let stage: HTMLDivElement | undefined
-	const at = (placement: FloorplanPlacementJson): { left: string; top: string } => ({
+	const at = (placement: { x: number; y: number }): { left: string; top: string } => ({
 		left: percentOf(placement.x, props.drawing.width),
 		top: percentOf(placement.y, props.drawing.height),
 	})
@@ -76,7 +151,20 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 	const empty = (): boolean =>
 		props.drawing.walls.length === 0 &&
 		props.drawing.stairs.length === 0 &&
+		props.drawing.trays.length === 0 &&
+		props.drawing.desks.length === 0 &&
+		props.drawing.desk_groups.length === 0 &&
+		props.drawing.rooms.length === 0 &&
 		props.drawing.placements.length === 0
+	const labels = (): PlanLabel[] =>
+		planLabels(
+			props.drawing.rooms.map((room, i: number) => ({ key: `room:${i}`, room })),
+			deskSeats(
+				stageItems('desk', props.drawing.desks),
+				stageItems('group', props.drawing.desk_groups),
+			),
+			locationNames(props.drawing.linked_locations),
+		)
 
 	return (
 		<div class="drawn-plan-view">
@@ -97,12 +185,16 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 				onPointerLeave={() => setPointer(null)}
 				walls={
 					<>
+						<RoomLayer rooms={stageItems('room', props.drawing.rooms)} />
 						<StairLayer
 							stairs={props.drawing.stairs.map((stair, i: number) => ({
 								key: `stair:${i}`,
 								stair,
 							}))}
 						/>
+						<DeskLayer desks={stageItems('desk', props.drawing.desks)} />
+						<DeskGroupLayer groups={stageItems('group', props.drawing.desk_groups)} />
+						<TrayLayer trays={stageItems('tray', props.drawing.trays)} />
 						<WallLayer walls={drawingWalls(props.drawing)} />
 					</>
 				}
@@ -143,6 +235,35 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 					</>
 				}
 			>
+				<For each={labels()}>
+					{(label: PlanLabel) => (
+						<Show
+							when={label.location_id}
+							fallback={
+								<span
+									class="drawn-plan-name"
+									classList={{ 'drawn-plan-name-desk': label.kind === 'desk' }}
+									style={at({ x: label.at[0], y: label.at[1] })}
+								>
+									{label.text}
+								</span>
+							}
+						>
+							{(id: () => number) => (
+								<a
+									href={`/locations/${id()}`}
+									class="drawn-plan-name"
+									classList={{ 'drawn-plan-name-desk': label.kind === 'desk' }}
+									style={at({ x: label.at[0], y: label.at[1] })}
+									title={label.text}
+									draggable={false}
+								>
+									{label.text}
+								</a>
+							)}
+						</Show>
+					)}
+				</For>
 				<For each={props.drawing.placements}>
 					{(placement: FloorplanPlacementJson) => (
 						<Show

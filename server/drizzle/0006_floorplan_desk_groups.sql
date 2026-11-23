@@ -1,0 +1,1 @@
+ALTER TABLE "floorplan_drawings" ADD COLUMN "desk_groups" jsonb DEFAULT '[]'::jsonb NOT NULL;

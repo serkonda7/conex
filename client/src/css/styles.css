@@ -6546,6 +6546,143 @@ a.rack-shelf-plate:hover {
 	fill: var(--bg-hover);
 }
 
+/* Rooms: a light tint under everything; only the outline takes presses. */
+.drawn-plan-room-area {
+	fill: color-mix(in srgb, var(--link) 7%, transparent);
+	stroke: none;
+	pointer-events: none;
+}
+
+.drawn-plan-room-edge {
+	fill: none;
+	stroke: color-mix(in srgb, var(--link) 45%, transparent);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	stroke-dasharray: 6 4;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.drawn-plan-room.editable .drawn-plan-room-edge {
+	cursor: move;
+	pointer-events: stroke;
+	touch-action: none;
+}
+
+.drawn-plan-room.selected .drawn-plan-room-area {
+	fill: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.drawn-plan-room.selected .drawn-plan-room-edge {
+	stroke: var(--primary-text);
+	stroke-dasharray: none;
+}
+
+/* Desks: a light top with an outline; linked desks show a tint. */
+.drawn-plan-desk {
+	fill: var(--bg-raised);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-desk.linked {
+	fill: color-mix(in srgb, var(--link) 18%, var(--bg-raised));
+}
+
+.drawn-plan-desk.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-desk.editable:hover {
+	fill: var(--bg-hover);
+}
+
+.drawn-plan-desk.selected {
+	stroke: var(--primary-text);
+	stroke-width: calc(2px * var(--line-zoom, 1));
+}
+
+/* The dividers between the desks of a desk group. */
+.drawn-plan-desk-divider {
+	stroke: var(--text-secondary);
+	stroke-width: calc(2px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+/* Cable trays: the runs at their real width in one translucent group, so
+   joints and crossings stay even, with a dashed axis on top. */
+.drawn-plan-trays {
+	opacity: 0.45;
+}
+
+.drawn-plan-tray-body {
+	stroke: var(--warning);
+	stroke-linecap: square;
+}
+
+.drawn-plan-tray.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-tray.editable:hover .drawn-plan-tray-body {
+	stroke: color-mix(in srgb, var(--warning) 70%, var(--text));
+}
+
+.drawn-plan-tray.selected .drawn-plan-tray-body {
+	stroke: var(--primary);
+}
+
+.drawn-plan-tray-axis {
+	stroke: var(--warning);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	stroke-dasharray: 8 4;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+/* Name of a room or linked desk, centered on it; a link to its location in the view. */
+.drawn-plan-name {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
+	max-width: 30%;
+	padding: 0.05rem 0.4rem;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	color: var(--text-secondary);
+	text-decoration: none;
+	border-radius: 0.25rem;
+}
+
+a.drawn-plan-name:hover {
+	color: var(--link);
+	text-decoration: underline;
+}
+
+.drawn-plan-name-desk {
+	font-size: 0.7rem;
+	font-weight: 500;
+}
+
+.drawn-plan-name-editing {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-name-editing.selected {
+	outline: 2px solid var(--primary);
+}
+
+.drawn-plan-name-passive {
+	pointer-events: none;
+}
+
 .drawn-plan-ghost {
 	opacity: 0.6;
 	pointer-events: none;

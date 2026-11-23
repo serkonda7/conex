@@ -150,6 +150,8 @@ export function useListFilters<Row>(opts: {
 					label: f.label,
 					type: 'select',
 					options: f.options,
+					// The server filters only match ids/values, not `!`-prefixed exclusions.
+					exclude: false,
 				}),
 			),
 		filterValues: () => {

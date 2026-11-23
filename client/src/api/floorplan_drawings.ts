@@ -1,31 +1,41 @@
 /**
  * Drawn floor plans (v2) over the hono RPC client: the owner's plan, create,
  * load, save (one PUT of the whole plan), delete, the editor's candidates
- * and the paged list.
+ * and link locations, and the paged list.
  */
 import type { Result } from 'better-result'
 import type {
 	FloorplanCandidateJson,
+	FloorplanDesk,
+	FloorplanDeskGroup,
 	FloorplanDrawingJson,
 	FloorplanDrawingListJson,
 	FloorplanDrawingPut,
 	FloorplanDrawingRefJson,
+	FloorplanLinkLocationJson,
 	FloorplanListQuery,
 	FloorplanOpening,
 	FloorplanReference,
+	FloorplanRoom,
 	FloorplanStair,
+	FloorplanTray,
 	FloorplanWall,
 	Page,
 } from 'shared/src/types'
 import { by_id, client, failed, getPage, paging, to_query, to_result } from './client'
 
 export type {
+	FloorplanDesk,
+	FloorplanDeskGroup,
 	FloorplanDrawingJson,
 	FloorplanDrawingListJson,
 	FloorplanDrawingPut,
+	FloorplanLinkLocationJson,
 	FloorplanOpening,
 	FloorplanReference,
+	FloorplanRoom,
 	FloorplanStair,
+	FloorplanTray,
 	FloorplanWall,
 }
 
@@ -80,6 +90,14 @@ export async function fetch_drawing_candidates(
 ): Promise<Result<FloorplanCandidateJson[], Error>> {
 	const res = await client['floorplan-drawings'][':id'].candidates.$get(by_id(id))
 	return to_result<FloorplanCandidateJson[]>(res, failed.load('noun.drawnFloorplan'))
+}
+
+/** Locations desks and rooms of this plan may link to. */
+export async function fetch_drawing_locations(
+	id: number,
+): Promise<Result<FloorplanLinkLocationJson[], Error>> {
+	const res = await client['floorplan-drawings'][':id'].locations.$get(by_id(id))
+	return to_result<FloorplanLinkLocationJson[]>(res, failed.load('noun.drawnFloorplan'))
 }
 
 export type DrawingSort = FloorplanListQuery['sort']

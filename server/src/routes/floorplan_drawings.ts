@@ -15,6 +15,7 @@ import {
 	getDrawingRef,
 	getDrawingWithTenant,
 	listDrawingCandidates,
+	listDrawingLocations,
 	listDrawings,
 	putDrawing,
 } from '../db/floorplan_drawings'
@@ -106,6 +107,18 @@ export const floorplanDrawingsApp = new Hono()
 			return (
 				(await gateDrawing(c, id)) ??
 				sendResult(c, await listDrawingCandidates(id, requestScope(c)))
+			)
+		},
+	)
+	.get(
+		'/:id/locations',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			return (
+				(await gateDrawing(c, id)) ??
+				sendResult(c, await listDrawingLocations(id, requestScope(c)))
 			)
 		},
 	)
