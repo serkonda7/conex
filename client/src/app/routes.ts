@@ -1,7 +1,7 @@
 /**
  * Route table: one entry per top-level URL section. The route parser, the
- * page switch, the sidebar and the tab titles are all derived from it, so a
- * new entity only needs a row here.
+ * page switch, the sidebar and the document titles are all derived from it,
+ * so a new entity only needs a row here.
  *
  * URL shape per section: `/<path>` (list), `/<path>/add`, `/<path>/import`,
  * `/<path>/:id` (detail) and `/<path>/:id/edit`. A kind without a page
@@ -26,11 +26,13 @@ import {
 	IconMapPin,
 	IconPackages,
 	IconPlugConnected,
+	IconRuler2,
 	IconShieldLock,
 	IconStack3,
 	IconStopwatch,
 	IconTag,
 	IconTemplate,
+	IconUserCog,
 	IconUsers,
 } from '@tabler/icons-solidjs'
 import type { Permission } from 'shared/src/types'
@@ -108,6 +110,12 @@ const FloorplanDetailPage = lazyPage(() =>
 )
 const FloorplansPage = lazyPage(() =>
 	import('../pages/floorplans/list').then((m) => m.FloorplansPage),
+)
+const DrawnFloorplanDetailPage = lazyPage(() =>
+	import('../pages/floorplans_v2/detail').then((m) => m.DrawnFloorplanDetailPage),
+)
+const DrawnFloorplansPage = lazyPage(() =>
+	import('../pages/floorplans_v2/list').then((m) => m.DrawnFloorplansPage),
 )
 const IntegrationAddPage = lazyPage(() =>
 	import('../pages/integrations/add').then((m) => m.IntegrationAddPage),
@@ -195,6 +203,7 @@ const SavedFiltersPage = lazyPage(() =>
 const SavedLayoutsPage = lazyPage(() =>
 	import('../pages/saved_layouts/list').then((m) => m.SavedLayoutsPage),
 )
+const SettingsPage = lazyPage(() => import('../pages/settings/view').then((m) => m.SettingsPage))
 const ServiceLevelDetailPage = lazyPage(() =>
 	import('../pages/service-levels/detail').then((m) => m.ServiceLevelDetailPage),
 )
@@ -253,7 +262,7 @@ export interface Section {
 	path: string
 	/** Section whose list heads the breadcrumbs of a section without its own list, or of a sub-page. */
 	parent?: string
-	/** Localized entity name for tab titles and the sidebar. */
+	/** Localized entity name for document titles and the sidebar. */
 	noun: (count: number) => string
 	/** Sidebar label overriding the plural noun (e.g. a page that heads several tabbed lists). */
 	navLabel?: () => string
@@ -305,6 +314,16 @@ export const SECTIONS: readonly Section[] = [
 		hideAddInNav: true,
 		list: FloorplansPage,
 		detail: FloorplanDetailPage,
+	},
+	{
+		// Drawn floor plans (v2), created from their site's or location's page.
+		path: 'floorplans-v2',
+		noun: (n: number): string => tp('entity.drawnFloorplan', n),
+		permission: 'view',
+		icon: IconRuler2,
+		hideAddInNav: true,
+		list: DrawnFloorplansPage,
+		detail: DrawnFloorplanDetailPage,
 	},
 	{
 		path: 'employees',
@@ -563,6 +582,16 @@ export const SECTIONS: readonly Section[] = [
 		hideAddInNav: true,
 		list: SavedLayoutsPage,
 	},
+	{
+		// Reached from the account button at the right end of the top bar.
+		path: 'settings',
+		noun: (): string => t('account.settings'),
+		icon: IconUserCog,
+		permission: null,
+		hideInNav: true,
+		hideAddInNav: true,
+		list: SettingsPage,
+	},
 ]
 
 /** Section of a route plus the segments after its path; the bare root maps to the home section. */
@@ -609,8 +638,8 @@ export function canAddInSection(section: Section): boolean {
 
 /**
  * Resolves a route path to its page, or null for not-found (or not
- * permitted; `checkPermission: false` resolves the shape only, e.g. for tab
- * labels).
+ * permitted; `checkPermission: false` resolves the shape only, e.g. for
+ * page labels).
  */
 export function matchRoute(raw: string, checkPermission = true): RouteMatch | null {
 	const matched = sectionMatch(raw)
@@ -643,10 +672,10 @@ export function matchRoute(raw: string, checkPermission = true): RouteMatch | nu
 }
 
 /**
- * Short human label for a tab button, derived from the route and the name
- * its page reported once loaded.
+ * Short human label for the document title, derived from the route and the
+ * name its page reported once loaded.
  */
-export function tabTitle(raw: string): string {
+export function pageTitle(raw: string): string {
 	const matched = sectionMatch(raw)
 	const name = pageMetaFor(raw)?.name
 	if (!matched) {
@@ -683,7 +712,7 @@ export function routeCrumbs(raw: string, match: RouteMatch): Crumb[] {
 		// A sub-page listed under another section's list (calendar sync technicians).
 		const parent = SECTIONS.find((s) => s.path === section.parent)
 		return parent?.list
-			? [{ label: parent.noun(2), href: `/${parent.path}` }, { label: tabTitle(raw) }]
+			? [{ label: parent.noun(2), href: `/${parent.path}` }, { label: pageTitle(raw) }]
 			: []
 	}
 	const meta = pageMetaFor(raw)
@@ -692,7 +721,7 @@ export function routeCrumbs(raw: string, match: RouteMatch): Crumb[] {
 	if (match.kind === 'edit') {
 		const detailPath = `/${section.path}/${match.id}`
 		const detail = pageMetaFor(detailPath)
-		const name = meta?.name ?? detail?.name ?? tabTitle(detailPath)
+		const name = meta?.name ?? detail?.name ?? pageTitle(detailPath)
 		return [
 			...trail,
 			...(meta?.crumbs ?? detail?.crumbs ?? []),
@@ -700,5 +729,5 @@ export function routeCrumbs(raw: string, match: RouteMatch): Crumb[] {
 			{ label: t('common.edit') },
 		]
 	}
-	return [...trail, ...(meta?.crumbs ?? []), { label: tabTitle(raw) }]
+	return [...trail, ...(meta?.crumbs ?? []), { label: pageTitle(raw) }]
 }

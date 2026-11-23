@@ -93,7 +93,7 @@ export function useSort<T extends string>(
 }
 
 /**
- * Filter value seeded from the tab's `?<key>=` query (deep links such as
+ * Filter value seeded from the route's `?<key>=` query (deep links such as
  * `/sites?tenant=<id>` from detail pages); the toolbar changes it from there.
  */
 export function useQueryFilter(key: string): [Accessor<string>, Setter<string>] {
@@ -150,6 +150,8 @@ export function useListFilters<Row>(opts: {
 					label: f.label,
 					type: 'select',
 					options: f.options,
+					// The server filters only match ids/values, not `!`-prefixed exclusions.
+					exclude: false,
 				}),
 			),
 		filterValues: () => {
@@ -582,8 +584,7 @@ function ListPageHeader(props: {
 	)
 	return (
 		<div class="page-header">
-			{/* The app tab already names the page; keep the heading for screen readers. */}
-			<Show when={props.tabs} fallback={<h2 class="visually-hidden">{props.title}</h2>}>
+			<Show when={props.tabs} fallback={<h2>{props.title}</h2>}>
 				{(tabs: () => readonly ListTab[]): JSX.Element => (
 					<ListTabs title={props.title} tabs={tabs()} />
 				)}

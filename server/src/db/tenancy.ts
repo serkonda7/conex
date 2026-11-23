@@ -673,6 +673,7 @@ export async function deleteSite(
 	const deleted = await tryWrite(() =>
 		withTransaction(async (): Promise<AttachmentRow[]> => {
 			const removed = await deleteOwnerAttachments({ site_id: id })
+			await deleteExternalLinks('site', id)
 			await getDb().delete(sites).where(eq(sites.id, id))
 			return removed
 		}),

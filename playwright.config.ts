@@ -36,16 +36,6 @@ export default defineConfig({
 	retries: 0,
 	fullyParallel: true,
 	workers: process.env.CI ? 4 : undefined,
-	// Visual baselines are Linux-CI canonical at 1920x1080. Regenerate with
-	// `bun run test:visual:update` and review the PNG diff before committing.
-	snapshotPathTemplate: './tests/e2e/__snapshots__/{testFileName}/{arg}-{projectName}{ext}',
-	expect: {
-		toHaveScreenshot: {
-			maxDiffPixels: 100,
-			threshold: 0.2,
-			animations: 'disabled',
-		},
-	},
 	use: {
 		baseURL: process.env.CONEX_E2E_BASE_URL ?? `http://localhost:${clientPort}`,
 		trace: 'retain-on-failure',
@@ -83,20 +73,7 @@ export default defineConfig({
 	projects: [
 		{ name: 'setup', testMatch: /.*\.setup\.ts/ },
 		{
-			// Functional suite (`bun run test:e2e`); visual baselines run
-			// separately as the `visual` project (`bun run test:visual`).
 			name: 'chromium',
-			testIgnore: /visual\.test\.ts/,
-			use: {
-				...devices['Desktop Chrome'],
-				viewport: { width: 1920, height: 1080 },
-				storageState: e2eAuthFile,
-			},
-			dependencies: ['setup'],
-		},
-		{
-			name: 'visual',
-			testMatch: /visual\.test\.ts/,
 			use: {
 				...devices['Desktop Chrome'],
 				viewport: { width: 1920, height: 1080 },

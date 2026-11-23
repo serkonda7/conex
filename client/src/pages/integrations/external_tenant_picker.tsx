@@ -22,7 +22,7 @@ function label(item: ExternalTenantListItem): string {
 	if (!item.active) {
 		parts.push(`· ${t('integration.inactive')}`)
 	}
-	if (item.linked_tenant_id !== null) {
+	if (item.linked_entity_id !== null) {
 		parts.push(`· ${t('integration.alreadyLinked')}`)
 	}
 	return parts.join(' ')

@@ -4,7 +4,6 @@ import {
 	IconList,
 	IconPlugConnected,
 	IconPlus,
-	IconTicket,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { INTEGRATION_PROVIDERS } from 'shared/src/schemas'
@@ -21,6 +20,7 @@ import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { providerDescription, providerLabel } from '../../i18n/labels'
+import { providerIcon } from '../../lib/icons'
 import { createRecord, createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
@@ -72,7 +72,7 @@ function ProviderCard(props: {
 		get description(): string {
 			return providerDescription(props.provider)
 		},
-		icon: IconTicket,
+		icon: providerIcon(props.provider),
 	}
 	return (
 		<Show
@@ -247,10 +247,19 @@ export function IntegrationsPage(): JSX.Element {
 			classList={{ 'integrations-list': integrationLayout() === 'list' }}
 		>
 			<div class="integrations-header">
-				<span class="integrations-header-icon" aria-hidden="true">
+				<span class="page-header-icon" aria-hidden="true">
 					<IconPlugConnected size={20} />
 				</span>
 				<h2>{tp('entity.integration', 2)}</h2>
+				<Show when={(integrations() ?? []).some((i) => i.enabled)}>
+					<button
+						type="button"
+						class="integrations-match"
+						onClick={(): void => navigate('/integrations/matching')}
+					>
+						<IconLabel icon={IconArrowsJoin2}>{t('matching.open')}</IconLabel>
+					</button>
+				</Show>
 				<div class="integrations-summary">
 					<Show when={connectedCount() > 0}>
 						<span>
@@ -268,11 +277,6 @@ export function IntegrationsPage(): JSX.Element {
 						</span>
 					</Show>
 				</div>
-				<Show when={(integrations() ?? []).some((i) => i.enabled)}>
-					<button type="button" onClick={(): void => navigate('/integrations/matching')}>
-						<IconLabel icon={IconArrowsJoin2}>{t('matching.open')}</IconLabel>
-					</button>
-				</Show>
 				<LayoutToggle />
 			</div>
 			<Show

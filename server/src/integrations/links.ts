@@ -1,13 +1,13 @@
 /**
- * `external_links`: which conex tenant/device/employee is which external object, plus
+ * `external_links`: which conex tenant/site/device/employee is which external object, plus
  * external objects marked as intentionally absent (`ignored`). An external
- * object has at most one row per entity type; linking or ignoring it again
- * replaces that row. A conex entity has at most one link per provider,
- * except tenants of a provider with `tenant_cardinality: 'many'` (UniFi:
- * several sites per tenant). Route handlers do the RBAC/scope checks.
+ * object has at most one row per entity type, and a conex entity at most one
+ * link per provider; linking or ignoring again replaces those rows. External
+ * tenants link to tenants, or to sites for providers with `link_level: 'site'`
+ * (UniFi consoles). Route handlers do the RBAC/scope checks.
  */
 import { Result } from 'better-result'
-import { and, asc, eq, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import type {
 	ExternalLinkJson,
 	LinkEntityType,
@@ -16,7 +16,7 @@ import type {
 import { getDb, withTransaction } from '../db/connection'
 import { NotFoundError } from '../db/errors'
 import { tryWrite } from '../db/list'
-import { external_links } from '../schema'
+import { devices, external_links, sites } from '../schema'
 import { nowSeconds } from '../util/time'
 import { providerDefinition } from './registry'
 
@@ -63,11 +63,7 @@ export async function getLink(
 	return row ? Result.ok(row) : Result.err(new NotFoundError('Link not found'))
 }
 
-/**
- * The `linked` row of one conex entity, if any. For tenants of a provider
- * with many links per tenant use {@link tenantLinks}; this returns the
- * oldest of them.
- */
+/** The `linked` row of one conex entity, if any. */
 export async function linkOf(
 	provider: ProviderId,
 	entityType: LinkEntityType,
@@ -92,23 +88,96 @@ export async function linkOf(
 	)
 }
 
-/** Every `linked` row of a conex tenant, oldest first (at most one unless cardinality `many`). */
+/** Entity type external tenants of the provider link to: `tenant` or `site`. */
+export function tenantLevel(provider: ProviderId): 'tenant' | 'site' {
+	return providerDefinition(provider).capabilities.link_level
+}
+
+/** A `linked` external-tenant link with the conex tenant (and site) it covers. */
+export interface ScopeLink {
+	link: ExternalLinkRow
+	/** Linked tenant, or the tenant of the linked site (null for a tenant-less site). */
+	tenant_id: number | null
+	/** Linked site (`link_level: 'site'`), else null. */
+	site_id: number | null
+}
+
+/**
+ * Every `linked` external-tenant link of the provider, oldest first, limited
+ * to the conex tenants in `tenantIds` when given. Site links count for the
+ * tenant of their site, so a tenant may have one per site.
+ */
+export async function scopeLinks(
+	provider: ProviderId,
+	tenantIds?: readonly number[],
+): Promise<ScopeLink[]> {
+	if (tenantIds !== undefined && tenantIds.length === 0) {
+		return []
+	}
+	if (tenantLevel(provider) === 'tenant') {
+		const rows = await getDb()
+			.select()
+			.from(external_links)
+			.where(
+				and(
+					eq(external_links.provider, provider),
+					eq(external_links.entity_type, 'tenant'),
+					eq(external_links.state, 'linked'),
+					tenantIds === undefined
+						? undefined
+						: inArray(external_links.entity_id, [...tenantIds]),
+				),
+			)
+			.orderBy(asc(external_links.id))
+		return rows.map((link) => ({ link, tenant_id: link.entity_id, site_id: null }))
+	}
+	const rows = await getDb()
+		.select({ link: external_links, tenant_id: sites.tenant_id, site_id: sites.id })
+		.from(external_links)
+		.innerJoin(sites, eq(sites.id, external_links.entity_id))
+		.where(
+			and(
+				eq(external_links.provider, provider),
+				eq(external_links.entity_type, 'site'),
+				eq(external_links.state, 'linked'),
+				tenantIds === undefined ? undefined : inArray(sites.tenant_id, [...tenantIds]),
+			),
+		)
+		.orderBy(asc(external_links.id))
+	return rows
+}
+
+/** External-tenant links covering a conex tenant, oldest first (see {@link scopeLinks}). */
 export async function tenantLinks(
 	provider: ProviderId,
 	tenantId: number,
 ): Promise<ExternalLinkRow[]> {
-	return getDb()
-		.select()
-		.from(external_links)
-		.where(
-			and(
-				eq(external_links.provider, provider),
-				eq(external_links.entity_type, 'tenant'),
-				eq(external_links.entity_id, tenantId),
-				eq(external_links.state, 'linked'),
-			),
-		)
-		.orderBy(asc(external_links.id))
+	return (await scopeLinks(provider, [tenantId])).map((s) => s.link)
+}
+
+/**
+ * External-tenant links a conex device is matched against: those of its
+ * tenant, or the one of its site for providers with `link_level: 'site'`.
+ */
+export async function deviceScopeLinks(
+	provider: ProviderId,
+	deviceId: number,
+): Promise<ExternalLinkRow[]> {
+	const device = (
+		await getDb()
+			.select({ tenant_id: devices.tenant_id, site_id: devices.site_id })
+			.from(devices)
+			.where(eq(devices.id, deviceId))
+			.limit(1)
+	)[0]
+	if (!device) {
+		return []
+	}
+	if (tenantLevel(provider) === 'tenant') {
+		return device.tenant_id === null ? [] : tenantLinks(provider, device.tenant_id)
+	}
+	const link = device.site_id === null ? null : await linkOf(provider, 'site', device.site_id)
+	return link ? [link] : []
 }
 
 export interface LinkInput {
@@ -121,45 +190,27 @@ export interface LinkInput {
 type NewLink = Omit<ExternalLinkRow, 'id' | 'created_at'>
 
 /**
- * Whether a new row for `link` replaces the other rows of its conex entity:
- * always, except tenant links of a provider that allows many per tenant.
- */
-function replacesEntityRows(link: NewLink): boolean {
-	return !(
-		link.entity_type === 'tenant' &&
-		link.state === 'linked' &&
-		providerDefinition(link.provider as ProviderId).capabilities.tenant_cardinality === 'many'
-	)
-}
-
-/**
  * Writes a link row, replacing every other row of the same provider and
- * entity type for the same external object and, unless the entity may have
- * many links (see {@link replacesEntityRows}), for the same conex entity.
+ * entity type for the same external object or the same conex entity.
  */
 async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error>> {
-	const byEntity = replacesEntityRows(link)
 	return tryWrite(() =>
 		withTransaction(async () => {
 			const db = getDb()
-			await db.delete(external_links).where(
-				and(
-					eq(external_links.provider, link.provider),
-					eq(external_links.entity_type, link.entity_type),
-					or(
-						eq(external_links.external_id, link.external_id),
-						link.entity_id === null
-							? undefined
-							: byEntity
-								? eq(external_links.entity_id, link.entity_id)
-								: // Many-link tenants keep their other links, but a link ends an ignore.
-									and(
-										eq(external_links.entity_id, link.entity_id),
-										eq(external_links.state, 'ignored'),
-									),
+			await db
+				.delete(external_links)
+				.where(
+					and(
+						eq(external_links.provider, link.provider),
+						eq(external_links.entity_type, link.entity_type),
+						or(
+							eq(external_links.external_id, link.external_id),
+							link.entity_id === null
+								? undefined
+								: eq(external_links.entity_id, link.entity_id),
+						),
 					),
-				),
-			)
+				)
 			const row = (
 				await db
 					.insert(external_links)
@@ -177,7 +228,7 @@ async function replaceLink(link: NewLink): Promise<Result<ExternalLinkRow, Error
 /**
  * Links an entity to an external object. Any other row for the external
  * object is replaced, and so is the entity's previous link (one-to-one per
- * provider, except tenants of a `many` provider, which keep their other links).
+ * provider).
  */
 export function setLink(
 	provider: ProviderId,

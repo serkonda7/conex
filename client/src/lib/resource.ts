@@ -28,7 +28,6 @@ import {
 	untrack,
 } from 'solid-js'
 import { is_current, mark_fetch, queryClient, track_fetch, writeSettled } from './query'
-import { usePaneVisible } from './router'
 
 /** Receives the message of a failed request (usually a page's `setError`). */
 export type ErrorSink = (message: string) => void
@@ -119,15 +118,13 @@ function observe<S, D, T>(opts: {
 		),
 	)
 
-	// Outdated by a write that reaches its resources: refresh now if this pane
-	// shows, else when it does.
+	// Outdated by a write that reaches its resources: refresh now.
 	// Fetches that started after the write count as current, and marking the
 	// key keeps other observers of the query from repeating the request.
-	const visible = usePaneVisible()
 	createEffect(() => {
 		writeSettled()
 		const key = opts.key()
-		if (visible() && key !== null && !is_current(key)) {
+		if (key !== null && !is_current(key)) {
 			mark_fetch(key)
 			void observer.refetch()
 		}

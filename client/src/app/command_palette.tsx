@@ -22,7 +22,7 @@ import {
 } from 'solid-js'
 import { type GlobalSearchResponse, search_objects } from '../api/search'
 import { type PluralKey, t, tp } from '../i18n'
-import { goTo, navigate } from '../lib/router'
+import { goTo, navigate, opensInNewTab } from '../lib/router'
 import { can } from '../lib/session'
 import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
@@ -47,6 +47,8 @@ interface PaletteItem {
 	icon?: Component<{ size?: number }>
 	/** Extra words the item matches without showing them (`+` for add forms). */
 	keywords?: string
+	/** Server hit for an object: a plain click follows the new-tab preference. */
+	isItem?: boolean
 }
 
 interface PaletteGroup {
@@ -162,6 +164,7 @@ function resultGroups(res: GlobalSearchResponse): PaletteGroup[] {
 						: (row.tenant_name ?? t('common.noTenant')),
 				href: `${base}/${row.id}`,
 				icon,
+				isItem: true,
 			})),
 		}
 	}
@@ -311,7 +314,10 @@ export function CommandPalette(props: {
 
 	function open(item: PaletteItem, newTab: boolean): void {
 		close()
-		navigate(item.href, newTab ? { openInTab: true } : {})
+		// Commands (add, go to a section) stay in this tab; object hits follow
+		// the same preference as a plain click on their detail link.
+		const useNewTab = newTab || (item.isItem === true && opensInNewTab(item.href))
+		navigate(item.href, { newTab: useNewTab })
 	}
 
 	function onKeyDown(e: KeyboardEvent): void {

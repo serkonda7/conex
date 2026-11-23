@@ -27,7 +27,7 @@ export function Breadcrumbs(props: { crumbs: readonly Crumb[] }): JSX.Element {
 										<a
 											href={crumb.href}
 											onClick={(e: MouseEvent): void =>
-												goTo(e, crumb.href ?? '')
+												goTo(e, crumb.href ?? '', { sameTab: true })
 											}
 										>
 											{crumb.label}

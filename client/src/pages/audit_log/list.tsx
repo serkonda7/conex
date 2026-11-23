@@ -1,3 +1,4 @@
+import { IconHistory } from '@tabler/icons-solidjs'
 import type { AuditEvent } from 'shared/src/schemas'
 import { createSignal, type JSX, Show } from 'solid-js'
 import { type AuditLogEntryJson, type AuditLogSort, fetch_audit_log } from '../../api/audit_log'
@@ -127,7 +128,12 @@ export function AuditLogPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<h2>{tp('entity.auditLog', 1)}</h2>
+				<div class="page-header-title">
+					<span class="page-header-icon" aria-hidden="true">
+						<IconHistory size={20} />
+					</span>
+					<h2>{tp('entity.auditLog', 1)}</h2>
+				</div>
 			</div>
 
 			<FilterTable

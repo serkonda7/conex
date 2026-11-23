@@ -43,6 +43,7 @@ export type {
 	LinkBoard,
 	LinkBoardExternal,
 	LinkBoardLocal,
+	LinkEntityType,
 	M365ConsentLinkJson,
 	M365TenantJson,
 	SyncRunJson,

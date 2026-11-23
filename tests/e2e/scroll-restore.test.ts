@@ -1,15 +1,10 @@
-import { expect, type Locator, type Page, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 // Auth comes from `auth.setup.ts` storageState — no per-test login.
 //
-// Tab and link switches use dispatched clicks: a real click first scrolls its
-// target into view (the tab bar sits above the page), moving the very
-// position under test.
-
-/** The active tab's pane; background tabs stay mounted but hidden. */
-function activePane(page: Page): Locator {
-	return page.locator('.tab-pane:not([hidden])')
-}
+// The page remounts on every route change, so scroll positions are restored
+// by the router from history.state once the asynchronously loaded page is
+// tall enough.
 
 function scrollY(page: Page): Promise<number> {
 	return page.evaluate(() => window.scrollY)
@@ -34,7 +29,9 @@ async function openRack(page: Page): Promise<string> {
 	return rackPath
 }
 
-test('each tab keeps its scroll position across tab switches and form cancel', async ({ page }) => {
+test('Back restores the previous page scroll and a cancelled form returns to the opener position', async ({
+	page,
+}) => {
 	const rackPath = await openRack(page)
 
 	// Scroll down to a free U; hovering reveals its add button.
@@ -44,26 +41,28 @@ test('each tab keeps its scroll position across tab switches and form cancel', a
 	const rackScroll = await scrollY(page)
 	expect(rackScroll).toBeGreaterThan(100)
 
-	// The add form opens in its own tab, starting at the top.
+	// The add form is a new history entry and starts at the top.
 	await freeSlot.getByRole('button', { name: '+ Gerät', exact: true }).click()
 	await expect(page).toHaveURL(/\/devices\/add\?/)
-	await expect(page.locator('[data-tab-button]')).toHaveCount(2)
 	await expect.poll(() => scrollY(page)).toBe(0)
 
-	// Switching to the rack tab restores its position, and back the form's.
-	await page.locator('[data-tab-button]').first().dispatchEvent('click')
+	// Browser Back restores the rack's scroll position.
+	await page.goBack()
 	await expect(page).toHaveURL(new RegExp(`${rackPath}$`))
 	await expect.poll(() => scrollY(page)).toBe(rackScroll)
-	await page.locator('[data-tab-button]').last().dispatchEvent('click')
-	await expect(page).toHaveURL(/\/devices\/add\?/)
-	await expect.poll(() => scrollY(page)).toBe(0)
-
-	// Cancelling the form returns to the rack where it was left.
-	await activePane(page).locator('.form-actions > button').first().click()
-	await expect(page).toHaveURL(new RegExp(`${rackPath}$`))
-	await expect(page.locator('[data-tab-button]')).toHaveCount(1)
-	await expect.poll(() => scrollY(page)).toBe(rackScroll)
-	// Stays there once the page settles (autofocus, tab bar re-measure).
 	await page.waitForTimeout(300)
 	expect(await scrollY(page)).toBe(rackScroll)
+
+	// Open the form again; cancelling must return to the rack where it was left.
+	const slotAgain = page.getByTestId('rack-elevation').locator('.rack-u-free').last()
+	await slotAgain.scrollIntoViewIfNeeded()
+	await slotAgain.hover()
+	const openerScroll = await scrollY(page)
+	expect(openerScroll).toBeGreaterThan(100)
+	await slotAgain.getByRole('button', { name: '+ Gerät', exact: true }).click()
+	await expect(page).toHaveURL(/\/devices\/add\?/)
+	await page.locator('#main .form-actions > button').first().click()
+
+	await expect(page).toHaveURL(new RegExp(`${rackPath}$`))
+	await expect.poll(() => scrollY(page)).toBe(openerScroll)
 })

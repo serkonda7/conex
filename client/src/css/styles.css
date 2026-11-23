@@ -555,13 +555,18 @@ tbody tr:last-child td {
 	align-items: center;
 	gap: 0.35rem;
 	max-width: 12rem;
+	padding: 0.36rem 0.6rem;
+	border-radius: 0.3rem;
 	font-size: var(--font-size-base);
+	color: var(--text);
+	text-decoration: none;
 	border: none;
 	background: transparent;
 }
 
 .app-user-button:hover {
 	background-color: var(--bg-hover);
+	text-decoration: none;
 }
 
 .app-user-info {
@@ -609,7 +614,7 @@ tbody tr:last-child td {
 	max-width: none;
 }
 
-.app-user-logout {
+.app-user-menu-item {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.45rem;
@@ -619,7 +624,21 @@ tbody tr:last-child td {
 	text-align: left;
 }
 
-.app-user-logout:hover {
+.app-user-menu-item:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Always-visible logout button to the right of the account menu. */
+.app-logout-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.3rem;
+	border: none;
+	background: transparent;
+}
+
+.app-logout-button:hover {
 	background-color: var(--bg-hover);
 }
 
@@ -1745,7 +1764,12 @@ tbody tr:last-child td {
 		opacity: 1;
 	}
 
-	.app-user-logout {
+	.app-user-menu-item {
+		min-height: 2.75rem;
+	}
+
+	.app-logout-button {
+		min-width: 2.75rem;
 		min-height: 2.75rem;
 	}
 
@@ -1795,6 +1819,28 @@ tbody tr:last-child td {
 	margin: 0;
 	padding: 0;
 	border-bottom: none;
+}
+
+/* Keeps a leading icon next to the heading instead of letting the header's
+   space-between push them to opposite ends on pages without actions. */
+.page-header-title {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+/* Boxed title icon, shared by the list-page headers that use one. */
+.page-header-icon {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex: none;
+	border-radius: 0.5rem;
+	border: 1px solid var(--border);
+	background-color: var(--bg-raised);
+	color: var(--primary-text);
 }
 
 /* Sibling-list tabs (tenants ↔ tenant groups, sites ↔ site groups) in
@@ -1854,9 +1900,7 @@ tbody tr:last-child td {
 
 /* Centered column for create/edit views (NetBox-style two-column rows:
    label on the left, control on the right). Pages render inside
-   `.tab-pane`, so this must be a descendant selector — a child combinator
-   off `.app-content` never matches and the max-width silently stops
-   applying. */
+   `.app-content`, so this is a descendant selector. */
 .app-content .form-page {
 	max-width: 66rem;
 	margin-inline: auto;
@@ -2417,7 +2461,12 @@ tbody tr:last-child td {
 	min-height: 2.1rem;
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle {
 	appearance: none;
 	position: relative;
@@ -2433,7 +2482,12 @@ tbody tr:last-child td {
 	transition: background-color 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle::before {
 	content: "";
 	position: absolute;
@@ -2446,17 +2500,32 @@ tbody tr:last-child td {
 	transition: transform 150ms ease;
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle:checked {
 	background-color: var(--primary);
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle:checked::before {
 	transform: translateX(1rem);
 }
 
-:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch)
+:is(
+		.field .field-toggle,
+		.panel-row-switch,
+		.integration-detail-switch,
+		.settings-switch
+	)
 	input.toggle:disabled {
 	cursor: not-allowed;
 	opacity: 0.5;
@@ -5332,169 +5401,16 @@ a.rack-shelf-plate:hover {
 	display: inline-flex;
 }
 
-/* Smart tabs: add/edit forms open as new tabs so the page behind keeps its
-   state. Only the active pane is visible; the rest stay mounted. */
-.tab-bar-wrap {
-	display: flex;
-	align-items: stretch;
-	border-bottom: 1px solid var(--border);
-}
-
-.tab-bar {
-	display: flex;
-	flex: 1;
-	min-width: 0;
-	align-items: stretch;
-	gap: 0;
-	overflow-x: auto;
-	padding: 0;
-	margin: 0;
-	scrollbar-width: thin;
-}
-
-.tab-item {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
-	flex-shrink: 0;
-	max-width: 14rem;
-	padding: 0.3rem 0.35rem 0.3rem 0.6rem;
-	border: 1px solid var(--border);
-	border-radius: 0;
-	background-color: var(--bg-surface);
-	color: var(--text-secondary);
-	font-size: var(--font-size-base);
-	cursor: pointer;
-	user-select: none;
-	white-space: nowrap;
-}
-
-.tab-item:hover {
-	background-color: var(--bg-hover);
-	color: var(--text);
-}
-
-.tab-item.active {
-	background-color: var(--bg-raised);
-	border-color: var(--border-strong);
-	color: var(--text);
-	font-weight: 600;
-}
-
-.tab-title {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 10rem;
-}
-
-.tab-close {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	padding: 0.15rem;
-	border: 1px solid transparent;
-	border-radius: 0;
-	background: transparent;
-	color: var(--text-muted);
-}
-
-.tab-close:hover {
-	background-color: var(--bg-hover);
-	border-color: var(--border);
-	color: var(--text);
-}
-
-.tab-close-icon {
-	display: inline-flex;
-}
-
-.tab-pane[hidden] {
-	display: none;
-}
-
-.tab-icon {
-	display: inline-flex;
-	flex-shrink: 0;
-	color: var(--text-muted);
-}
-
-.tab-item.active .tab-icon {
-	color: var(--text-secondary);
-}
-
-/* Dropdown of all tabs, shown once they overflow the strip. */
-.tab-list {
-	position: relative;
-	display: flex;
-	flex-shrink: 0;
-}
-
-.tab-list-toggle {
-	display: inline-flex;
-	align-items: center;
-	padding: 0 0.45rem;
-	border: 1px solid var(--border);
-	border-radius: 0;
-	background-color: var(--bg-surface);
-	color: var(--text-secondary);
-}
-
-.tab-list-toggle:hover {
-	background-color: var(--bg-hover);
-	color: var(--text);
-}
-
-.tab-menu {
-	display: flex;
-	flex-direction: column;
-	min-width: 12rem;
-	max-width: 22rem;
-	background-color: var(--bg-raised);
-	border: 1px solid var(--border);
-	border-radius: 0.35rem;
-	box-shadow: var(--shadow);
-	padding: 0.25rem;
-	z-index: 20;
-}
-
-.tab-list-menu {
-	position: absolute;
-	right: 0;
-	top: calc(100% + 0.2rem);
-	max-height: 60vh;
-	overflow-y: auto;
-}
-
-.tab-context-menu {
-	position: fixed;
-}
-
-.tab-menu-item {
-	display: flex;
-	align-items: center;
-	gap: 0.45rem;
-	width: 100%;
-	border: none;
-	border-radius: 0.25rem;
-	background: transparent;
-	color: var(--text);
-	text-align: left;
-	white-space: nowrap;
-}
-
-.tab-menu-item:hover,
-.tab-menu-item.active {
-	background-color: var(--bg-hover);
-}
-
-.tab-menu .tab-title {
-	max-width: none;
-}
-
-/* Path to the shown object above detail and form pages. */
+/* Path to the shown object above detail and form pages; it stays below the
+   topbar while the page scrolls. The bar spans the content padding so the
+   page scrolls under an opaque strip. */
 .breadcrumbs {
-	margin: 0 0 0.75rem;
+	position: sticky;
+	top: var(--topbar-height);
+	z-index: 4;
+	margin: -0.9rem -1rem 0.75rem;
+	padding: 0.5rem 1rem;
+	background-color: var(--bg-base);
 	font-size: var(--font-size-base);
 }
 
@@ -5518,37 +5434,7 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
-/* Link board (integration detail): summary, status switch + search + bulk
-   actions, then suggestion pairs and two pick columns (Open), a pair table
-   (Linked) or two columns with Restore (Ignored). */
-.link-board-summary {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.4rem 0.75rem;
-	font-size: var(--font-size-sm);
-}
-
-.link-board-progress {
-	flex: 0 0 10rem;
-	height: 0.4rem;
-	overflow: hidden;
-	border-radius: 999px;
-	background-color: var(--bg-raised);
-}
-
-.link-board-progress-bar {
-	height: 100%;
-	border-radius: inherit;
-	background-color: var(--primary);
-	transition: width 0.2s ease;
-}
-
-.link-board-toolbar .link-board-search {
-	flex: 1 1 14rem;
-	width: auto;
-}
-
+/* Shared controls of the cross-integration matching page. */
 .link-board-filter {
 	display: inline-flex;
 	min-width: 0;
@@ -5580,138 +5466,16 @@ a.rack-shelf-plate:hover {
 	color: var(--text);
 }
 
-.link-board-section + .link-board-section {
-	margin-top: 1.5rem;
-}
-
-.link-board-section h3 {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	margin: 0.75rem 0 0.25rem;
-}
-
 .link-board-hint {
 	margin: 0 0 0.5rem;
 	color: var(--text-muted);
 	font-size: var(--font-size-sm);
 }
 
-/* Shown instead of the hint while a row is picked. */
-.link-board-pickbar {
-	position: sticky;
-	top: var(--topbar-height);
-	z-index: 1;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	margin: 0 0 0.5rem;
-	padding: 0.4rem 0.6rem;
-	border: 1px solid var(--primary);
-	border-radius: 0.4rem;
-	background-color: var(--primary-tint);
-	font-size: var(--font-size-sm);
-}
-
-.link-board-columns {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-	gap: 1rem;
-	align-items: start;
-}
-
-.link-board-heading {
-	margin: 0 0 0.35rem;
-	font-size: var(--font-size-base);
-}
-
-.link-board-heading .text-muted {
-	font-weight: 400;
-	font-size: var(--font-size-sm);
-}
-
-.app-content .link-board-scroll {
-	max-height: 70vh;
-	overflow: auto;
-	border: 1px solid var(--border);
-	border-radius: 0.35rem;
-	background-color: var(--bg-surface);
-}
-
-/* The wrapper scrolls and draws the frame, so the sticky head works. */
-.app-content .link-board-scroll table {
-	width: 100%;
-	margin: 0;
-	border: none;
-	border-radius: 0;
-	overflow: visible;
-}
-
-.link-board-pairs thead {
-	position: sticky;
-	top: 0;
-	z-index: 1;
-}
-
-.link-board-row.pickable {
-	cursor: pointer;
-}
-
-.link-board-row.inactive {
-	color: var(--text-muted);
-}
-
-/* Likely partner of the picked row. */
-.link-board-row.highlighted {
-	background-color: color-mix(in srgb, var(--link) 12%, transparent);
-}
-
-.link-board-row.selected {
-	background-color: var(--primary-tint);
-	outline: 1px solid var(--primary);
-	outline-offset: -1px;
-}
-
 .link-board-detail {
 	display: block;
 	color: var(--text-muted);
 	font-size: var(--font-size-sm);
-}
-
-.link-board-arrow {
-	width: 1%;
-	white-space: nowrap;
-	text-align: center;
-	color: var(--text-muted);
-}
-
-.link-board-via {
-	font-size: var(--font-size-sm);
-	color: var(--link);
-}
-
-.link-board-actions {
-	width: 1%;
-	white-space: nowrap;
-	text-align: right;
-}
-
-/* Ignore only shows on hover/focus of its row on pointer devices, so the
-   pick lists read as names rather than buttons. */
-@media (hover: hover) {
-	.link-board-row.pickable .link-board-actions .icon-btn {
-		opacity: 0;
-	}
-
-	.link-board-row.pickable:hover .link-board-actions .icon-btn,
-	.link-board-row.pickable:focus-within .link-board-actions .icon-btn {
-		opacity: 1;
-	}
-}
-
-.link-board-matching {
-	margin-left: auto;
 }
 
 /* Cross-integration matching: conex objects as rows, one column per
@@ -5797,6 +5561,23 @@ a.rack-shelf-plate:hover {
 	max-width: 22rem;
 	background-color: var(--bg-surface);
 	font-weight: 400;
+}
+
+/* The opaque sticky cell repeats the row's zebra stripe and hover tint. */
+.app-content .matching-table tbody tr:nth-child(even) > .matching-object {
+	background: linear-gradient(
+			color-mix(in srgb, var(--bg-hover) 45%, transparent),
+			color-mix(in srgb, var(--bg-hover) 45%, transparent)
+		)
+		var(--bg-surface);
+}
+
+.app-content .matching-table tbody tr:hover > .matching-object {
+	background: linear-gradient(
+			color-mix(in srgb, var(--bg-hover) 35%, transparent),
+			color-mix(in srgb, var(--bg-hover) 35%, transparent)
+		)
+		var(--bg-hover);
 }
 
 .matching-table thead .matching-object {
@@ -5920,9 +5701,20 @@ a.rack-shelf-plate:hover {
 	font-style: italic;
 }
 
-.matching-clear {
-	flex: none;
-	padding: 0.3rem;
+/* The built-in "ignore" entry (the only one with an icon) reads as muted. */
+.matching-pick .combobox-option:has(.combobox-option-icon) {
+	color: var(--text-muted);
+}
+
+/* Dropdowns overflow the scrolling table: pinned to the viewport at the
+   field, positioned by `placeList` in matching.tsx. */
+.matching-scroll .combobox-list {
+	position: fixed;
+	top: var(--list-top, auto);
+	bottom: var(--list-bottom, auto);
+	left: var(--list-left, 0);
+	min-width: var(--list-width, 100%);
+	max-height: var(--list-max, 16rem);
 }
 
 /* Unsaved cell: accent bar on the left edge and an accent border. */
@@ -5980,7 +5772,7 @@ a.rack-shelf-plate:hover {
 .matching-footer {
 	position: sticky;
 	bottom: 0;
-	z-index: 4;
+	z-index: 3;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -6018,14 +5810,64 @@ a.rack-shelf-plate:hover {
 	gap: 0.5rem;
 }
 
-.integration-report .row-actions .icon-btn {
-	padding: 0.45rem;
+/* External-only objects, grouped by integration: they have no row to match. */
+.matching-external {
+	margin-top: 1.5rem;
 }
 
-@media (max-width: 900px) {
-	.link-board-columns {
-		grid-template-columns: minmax(0, 1fr);
-	}
+.matching-external h3 {
+	margin: 0 0 0.25rem;
+}
+
+.matching-external-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+	gap: 1rem;
+	align-items: start;
+}
+
+.matching-external-col {
+	min-width: 0;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+}
+
+.matching-external-col h4 {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.4rem;
+}
+
+.matching-external-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.5rem;
+	padding: 0.2rem 0;
+}
+
+.matching-external-item + .matching-external-item {
+	border-top: 1px solid var(--border);
+}
+
+.matching-external-item.inactive {
+	color: var(--text-muted);
+}
+
+.matching-external-name {
+	flex: 1 1 10rem;
+	min-width: 0;
+}
+
+.matching-external-col .btn-small {
+	margin-top: 0.4rem;
+}
+
+.integration-report .row-actions .icon-btn {
+	padding: 0.45rem;
 }
 
 /* Changelog before/after table: changed values tinted red (old) / green (new). */
@@ -6058,28 +5900,29 @@ a.rack-shelf-plate:hover {
 	margin-bottom: 1.25rem;
 }
 
-.integrations-header-icon {
-	display: grid;
-	place-items: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	flex: none;
-	border-radius: 0.5rem;
-	border: 1px solid var(--border);
-	background-color: var(--bg-raised);
-	color: var(--primary-text);
-}
-
 /* The header's own layout replaces the page-title underline. */
 .app-content .integrations-header h2:first-of-type {
-	flex: 1 1 12rem;
+	flex: 0 1 auto;
 	min-width: 0;
 	margin: 0;
 	padding-bottom: 0;
 	border-bottom: none;
 }
 
+/* Primary action of the page, right beside its title. */
+.integrations-match {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.integrations-match:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
 .integrations-summary {
+	flex: 1 1 12rem;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.4rem 1rem;
@@ -6474,6 +6317,60 @@ a.rack-shelf-plate:hover {
 	margin-bottom: 0.5rem;
 }
 
+/* User settings: flat key-value groups stacked with horizontal rules, like the
+   detail pages' spec sheets — no cards. */
+.settings-page {
+	max-width: 56rem;
+}
+
+/* The heading icons sit in a 1.4rem gutter; titles and key-value rows both
+   start after it, and the shared label width lines values up across groups. */
+.settings-page .spec-sheet h4 {
+	display: grid;
+	grid-template-columns: 1.4rem minmax(0, 1fr);
+	align-items: center;
+}
+
+.settings-page .spec-sheet dl {
+	padding-left: 1.4rem;
+	grid-template-columns: 30rem minmax(0, 1fr);
+}
+
+.settings-page .spec-sheet dt {
+	color: var(--text);
+}
+
+.settings-switch {
+	display: flex;
+	align-items: center;
+}
+
+/* A switch row centers on the label plus its hint. */
+.settings-page .spec-sheet dd:has(> .settings-switch) {
+	align-self: center;
+}
+
+.settings-icon-auth {
+	color: var(--success);
+}
+
+.settings-icon-prefs {
+	color: var(--link);
+}
+
+@media (max-width: 30rem) {
+	.settings-page .spec-sheet dl {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.settings-hint {
+	display: block;
+	margin-top: 0.25rem;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+}
+
 .integration-settings {
 	max-width: 48rem;
 }
@@ -6507,4 +6404,535 @@ a.rack-shelf-plate:hover {
 	margin: 0;
 	max-width: 36rem;
 	color: var(--text-secondary);
+}
+
+/* Drawn floor plan (v2): the sheet in a fill-layout zoom viewport with the
+   walls drawn in sheet centimeters (SVG user units) and HTML overlay pieces
+   on top. Line widths of guides stay on screen size through
+   non-scaling-stroke and --line-zoom. */
+.drawn-plan-frame {
+	margin: 0.6rem 0;
+}
+
+.drawn-plan-frame .zoom-viewport {
+	max-height: 70vh;
+}
+
+.drawn-plan-svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+.drawn-plan-sheet {
+	fill: var(--bg-surface);
+}
+
+.drawn-plan-grid line {
+	stroke: var(--border-strong);
+	stroke-width: calc(0.5px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+	opacity: 0.45;
+}
+
+.drawn-plan-grid-major line {
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	opacity: 0.7;
+}
+
+.drawn-plan-wall {
+	fill: var(--text-secondary);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-wall.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-wall.editable:hover {
+	fill: var(--text);
+}
+
+.drawn-plan-wall.selected {
+	fill: var(--primary-text);
+	stroke: var(--primary-text);
+}
+
+/* Doors and windows: the gap through the wall, then the leaf and swing, the sliding panel or the glass. */
+.drawn-plan-opening-gap {
+	fill: var(--bg-surface);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-window,
+.drawn-plan-door-leaf,
+.drawn-plan-door-swing,
+.drawn-plan-door-slide {
+	fill: none;
+	stroke: var(--text-secondary);
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-window {
+	stroke: var(--link);
+}
+
+.drawn-plan-door-swing {
+	stroke-dasharray: 4 3;
+}
+
+.drawn-plan-door-panel {
+	fill: var(--bg-surface);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-door-slide {
+	stroke-width: calc(1px * var(--line-zoom, 1));
+}
+
+.drawn-plan-opening.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-opening.selected .drawn-plan-opening-gap,
+.drawn-plan-opening.selected .drawn-plan-door-leaf,
+.drawn-plan-opening.selected .drawn-plan-door-swing,
+.drawn-plan-opening.selected .drawn-plan-door-panel,
+.drawn-plan-opening.selected .drawn-plan-door-slide {
+	stroke: var(--primary-text);
+}
+
+/* Stairs: the flight's outline, the lines between its treads and the arrow up. */
+.drawn-plan-stair {
+	fill: var(--bg-surface);
+}
+
+.drawn-plan-stair,
+.drawn-plan-stair-tread,
+.drawn-plan-stair-arrow {
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-stair-arrow {
+	fill: none;
+	stroke-width: calc(1.5px * var(--line-zoom, 1));
+}
+
+.drawn-plan-stairs.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-stairs.selected .drawn-plan-stair,
+.drawn-plan-stairs.selected .drawn-plan-stair-tread,
+.drawn-plan-stairs.selected .drawn-plan-stair-arrow {
+	stroke: var(--primary-text);
+}
+
+.drawn-plan-stairs.editable:hover .drawn-plan-stair {
+	fill: var(--bg-hover);
+}
+
+/* Rooms: a light tint under everything; only the outline takes presses. */
+.drawn-plan-room-area {
+	fill: color-mix(in srgb, var(--link) 7%, transparent);
+	stroke: none;
+	pointer-events: none;
+}
+
+.drawn-plan-room-edge {
+	fill: none;
+	stroke: color-mix(in srgb, var(--link) 45%, transparent);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	stroke-dasharray: 6 4;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.drawn-plan-room.editable .drawn-plan-room-edge {
+	cursor: move;
+	pointer-events: stroke;
+	touch-action: none;
+}
+
+.drawn-plan-room.selected .drawn-plan-room-area {
+	fill: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.drawn-plan-room.selected .drawn-plan-room-edge {
+	stroke: var(--primary-text);
+	stroke-dasharray: none;
+}
+
+/* Desks: a light top with an outline; linked desks show a tint. */
+.drawn-plan-desk {
+	fill: var(--bg-raised);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-desk.linked {
+	fill: color-mix(in srgb, var(--link) 18%, var(--bg-raised));
+}
+
+.drawn-plan-desk.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-desk.editable:hover {
+	fill: var(--bg-hover);
+}
+
+.drawn-plan-desk.selected {
+	stroke: var(--primary-text);
+	stroke-width: calc(2px * var(--line-zoom, 1));
+}
+
+/* The dividers between the desks of a desk group. */
+.drawn-plan-desk-divider {
+	stroke: var(--text-secondary);
+	stroke-width: calc(2px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+/* Cable trays: the runs at their real width in one translucent group, so
+   joints and crossings stay even, with a dashed axis on top. */
+.drawn-plan-trays {
+	opacity: 0.45;
+}
+
+.drawn-plan-tray-body {
+	stroke: var(--warning);
+	stroke-linecap: square;
+}
+
+.drawn-plan-tray.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-tray.editable:hover .drawn-plan-tray-body {
+	stroke: color-mix(in srgb, var(--warning) 70%, var(--text));
+}
+
+.drawn-plan-tray.selected .drawn-plan-tray-body {
+	stroke: var(--primary);
+}
+
+.drawn-plan-tray-axis {
+	stroke: var(--warning);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	stroke-dasharray: 8 4;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+/* 3D view of a drawn plan: the WebGL canvas with the markers and labels
+   as HTML on top (positioned by three.js), as wide as the 2D stage. */
+.drawn-plan-3d-frame {
+	margin: 0.6rem 0;
+}
+
+.drawn-plan-3d {
+	position: relative;
+	/* The overlay pieces keep their screen size, as on an unzoomed stage. */
+	--inv-zoom: 1;
+	--line-zoom: 1;
+	width: 100%;
+	height: 70vh;
+	min-height: 18rem;
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	overflow: hidden;
+	background-color: var(--bg-raised);
+}
+
+.drawn-plan-3d-canvas {
+	display: block;
+	cursor: grab;
+}
+
+.drawn-plan-3d-canvas:active {
+	cursor: grabbing;
+}
+
+/* Drags pass through to the canvas; only the markers and labels take clicks. */
+.drawn-plan-3d-labels {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.drawn-plan-3d-labels > .floorplan-marker,
+.drawn-plan-3d-labels > a.drawn-plan-name {
+	pointer-events: auto;
+}
+
+/* A marker or label a wall hides from the camera. */
+.drawn-plan-3d-labels > .drawn-plan-3d-hidden {
+	opacity: 0.3;
+}
+
+.drawn-plan-3d-popover {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	pointer-events: none;
+}
+
+.drawn-plan-3d-popover > .floorplan-popover {
+	pointer-events: auto;
+}
+
+.drawn-plan-3d-hint {
+	color: var(--text-muted);
+}
+
+/* Name of a room or linked desk, centered on it; a link to its location in the view. */
+.drawn-plan-name {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
+	max-width: 30%;
+	padding: 0.05rem 0.4rem;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	color: var(--text-secondary);
+	text-decoration: none;
+	border-radius: 0.25rem;
+}
+
+a.drawn-plan-name:hover {
+	color: var(--link);
+	text-decoration: underline;
+}
+
+.drawn-plan-name-desk {
+	font-size: 0.7rem;
+	font-weight: 500;
+}
+
+.drawn-plan-name-editing {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-name-editing.selected {
+	outline: 2px solid var(--primary);
+}
+
+.drawn-plan-name-passive {
+	pointer-events: none;
+}
+
+.drawn-plan-ghost {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* The wall being drawn, at the new wall's thickness. */
+.drawn-plan-draft {
+	stroke: var(--link);
+	stroke-linecap: square;
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* Length of the wall being drawn or selected. */
+.drawn-plan-label {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--inv-zoom)) translate(-50%, -150%);
+	padding: 0 0.35rem;
+	font-size: var(--font-size-sm);
+	white-space: nowrap;
+	color: var(--primary-contrast);
+	background-color: var(--primary);
+	border-radius: 0.25rem;
+	pointer-events: none;
+}
+
+.drawn-plan-move-layer {
+	cursor: move;
+}
+
+/* A length typed while drawing: outlined, so it reads as input. */
+.drawn-plan-label-typed {
+	color: var(--text);
+	background-color: var(--bg-raised);
+	outline: 2px solid var(--primary);
+}
+
+/* Distance from the selection to its neighbors. */
+.drawn-plan-dimension {
+	stroke: var(--text-secondary);
+	stroke-width: 1;
+	stroke-dasharray: 2 3;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.drawn-plan-label-dimension {
+	transform: scale(var(--inv-zoom)) translate(-50%, -50%);
+	color: var(--text);
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border-strong);
+}
+
+/* Quick actions below the selection, at screen size. */
+.drawn-plan-actions {
+	position: absolute;
+	transform-origin: 0 0;
+	transform: scale(var(--inv-zoom)) translate(-50%, 0.6rem);
+	display: flex;
+	gap: 0.15rem;
+	padding: 0.15rem;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+}
+
+.drawn-plan-action {
+	display: inline-grid;
+	place-items: center;
+	padding: 0.25rem;
+	border: none;
+	background: none;
+	color: var(--text);
+}
+
+.drawn-plan-action:hover {
+	background-color: var(--bg-hover);
+}
+
+/* Stage left, side panel right; the stage fills its column. */
+.drawn-plan-layout {
+	display: grid;
+	grid-template-columns: 17rem minmax(0, 1fr);
+	gap: 0.75rem;
+	align-items: start;
+}
+
+.drawn-plan-tools {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.3rem;
+	margin-bottom: 0.5rem;
+}
+
+.drawn-plan-tool.active {
+	border-color: var(--primary);
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.drawn-plan-fields {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.4rem;
+	margin-bottom: 0.5rem;
+}
+
+.drawn-plan-fields label,
+.drawn-plan-opacity {
+	display: grid;
+	gap: 0.2rem;
+	font-size: var(--font-size-sm);
+}
+
+.drawn-plan-control {
+	width: 100%;
+	min-width: 0;
+}
+
+.drawn-plan-opacity {
+	margin-bottom: 0.5rem;
+}
+
+/* The file input hides behind its label, which looks like a button. */
+.drawn-plan-upload {
+	align-self: end;
+	display: inline-flex;
+	justify-content: center;
+	padding: 0.35rem 0.5rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.3rem;
+	background-color: var(--bg-raised);
+	cursor: pointer;
+}
+
+.drawn-plan-upload-input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+}
+
+.drawn-plan-upload:focus-within {
+	outline: 2px solid var(--primary);
+}
+
+/* Draw tab: elements look like the Add tab's palette items; the active one is highlighted. */
+.drawn-plan-element {
+	cursor: pointer;
+}
+
+.drawn-plan-element[draggable="true"] {
+	cursor: grab;
+}
+
+.drawn-plan-element.active {
+	border-color: var(--primary);
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+/* Number key that picks the element, at the end of its palette entry. */
+.drawn-plan-key {
+	margin-left: auto;
+	padding: 0 0.3rem;
+	border: 1px solid var(--border-strong);
+	border-radius: 0.25rem;
+	color: var(--text-secondary);
+	font-family: inherit;
+	font-size: var(--font-size-sm);
+	line-height: 1.3;
+}
+
+.drawn-plan-element.active .drawn-plan-key {
+	border-color: var(--primary-contrast);
+	color: var(--primary-contrast);
+}
+
+/* Tabs size to their labels, so a longer one ("Add (12)") does not wrap. */
+.drawn-plan-tab {
+	flex: 1 1 auto;
+	padding: 0.2rem 0.35rem;
+	white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+	.drawn-plan-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }

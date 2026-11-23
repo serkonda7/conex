@@ -10,7 +10,7 @@ import type { Page } from 'shared/src/types'
 import { type Accessor, batch, createEffect, createMemo, createSignal } from 'solid-js'
 import type { DataTablePagination } from '../components/data_table'
 import { createRecord, type QueryResource } from './resource'
-import { historyEntryKey, useTabPath } from './router'
+import { historyEntryKey, useRoutePath } from './router'
 import { readStored, writeStored } from './storage'
 
 const STORAGE_KEY = 'conex:page-size'
@@ -31,8 +31,8 @@ interface ListPosition {
 }
 
 /**
- * Last position per history entry. Lists remount when the tab returns to
- * them, and going back must land on the page the user left.
+ * Last position per history entry. Lists remount when their page is shown
+ * again, and going back must land on the page the user left.
  */
 const positions = new Map<string, ListPosition>()
 
@@ -49,7 +49,7 @@ export function usePagedList<Query extends object, Row>(opts: {
 	fetch: (query: Query & { page: number; limit: number }) => Promise<Result<Page<Row>, Error>>
 	setError: (message: string | null) => void
 }): PagedList<Row> {
-	const entry = historyEntryKey(useTabPath())
+	const entry = historyEntryKey(useRoutePath())
 	const query = createMemo(opts.query, undefined, {
 		equals: (a: Query, b: Query): boolean => JSON.stringify(a) === JSON.stringify(b),
 	})

@@ -1,47 +1,34 @@
-/** In-app tab navigation. Every tab keeps its own back/forward history and
- * stays mounted in the background (keep-alive in app/App.tsx). Plain link clicks
- * navigate inside the active tab; Ctrl/Cmd/Shift or middle click opens a new
- * tab. Add/edit/import forms always open as their own tab and close again
- * on save or cancel.
+/**
+ * Browser-based navigation: exactly one page is shown, the one for the
+ * current URL. Links use the normal browser history (pushState /
+ * replaceState / popstate); "open in new tab" means a real browser tab.
  *
- * Browser Back/Forward step through the active tab's history. Switching
- * tabs replaces the current browser history entry instead of pushing one.
- * Tabs are saved in `sessionStorage`, so a reload brings them back.
+ * Each history entry carries `{ seq, key, from, scroll }` in `history.state`:
+ * `seq` tells Back from Forward, `key` identifies the entry for paging and
+ * scroll positions, `from` is the in-app path the entry was pushed from
+ * (null for a direct URL or a reload), and `scroll` is the last scroll
+ * position. Leaving a form (save or cancel) closes back into its opener when
+ * the form was opened as a nested popup, and otherwise reuses the previous
+ * history entry so Back never lands in a submitted form again.
  *
- * A route may end in an in-page anchor (`/sites/3#attachments`). It is part
- * of the tab's path and ignored by route matching.
+ * A route may end in an in-page anchor (`/sites/3#attachments`); it is part
+ * of the path and ignored by route matching.
  */
-import { Result } from 'better-result'
-import {
-	createContext,
-	createEffect,
-	createRoot,
-	createSignal,
-	onCleanup,
-	untrack,
-	useContext,
-} from 'solid-js'
-
-export interface TabState {
-	id: number
-	/** Visited paths, oldest first; `index` points at the shown one. */
-	entries: readonly string[]
-	index: number
-	/** Shown path, always `entries[index]`. */
-	path: string
-	openerId: number | null
-}
+import { createEffect, createSignal, onCleanup, untrack } from 'solid-js'
+import { openItemsInNewTab } from './preferences'
 
 export interface NavigateOptions {
-	/** Force opening `to` in a new tab (e.g. Ctrl/Cmd+click). */
-	openInTab?: boolean
-	/** Replace the tab's current history entry instead of pushing. */
+	/** Force opening `to` in a new browser tab (e.g. Ctrl/Cmd+click). */
+	newTab?: boolean
+	/** Replace the current history entry instead of pushing one. */
 	replace?: boolean
 	/**
-	 * Leaving a form without saving (cancel): return to the tab that opened
-	 * it as it is; `to` is only the fallback when there is no opener.
+	 * Leaving a form without saving (cancel): return to the path this form
+	 * was opened from, if any. `to` is only the fallback otherwise.
 	 */
 	back?: boolean
+	/** Navigation (breadcrumbs, sidebar): never open an item in a new tab. */
+	sameTab?: boolean
 }
 
 /** One breadcrumb link; the last crumb of a trail has no `href`. */
@@ -50,7 +37,7 @@ export interface Crumb {
 	href?: string
 }
 
-/** What a loaded page reports about itself for tab titles and breadcrumbs. */
+/** What a loaded page reports about itself for the document title and breadcrumbs. */
 export interface PageMeta {
 	/** Display name of the shown object. */
 	name?: string
@@ -58,19 +45,33 @@ export interface PageMeta {
 	crumbs?: readonly Crumb[]
 }
 
-const DEFAULT_PATH = '/dashboard'
-const STORAGE_KEY = 'conex:tabs'
-
-let nextTabId = 1
-
-function makeTab(
-	id: number,
-	entries: readonly string[],
-	index: number,
-	openerId: number | null,
-): TabState {
-	return { id, entries, index, path: entries[index] ?? DEFAULT_PATH, openerId }
+interface HistoryState {
+	seq: number
+	key: string
+	from: string | null
+	scroll?: number
 }
+
+const DEFAULT_PATH = '/dashboard'
+
+const [currentPath, setCurrentPath] = createSignal<string>(initialPath())
+
+/** Scroll positions and paged-list state, keyed by history entry. */
+const scrollByKey = new Map<string, number>()
+
+let historySeq = 0
+let currentKey = ''
+let currentFrom: string | null = null
+let keyCounter = 0
+
+/** Set while the browser undoes a Back / Forward step a leave guard refused. */
+let undoingStep = false
+
+/** Set while a Back step the router started runs: its guards already passed. */
+let routerBack = false
+
+/** Cancels an in-progress scroll restore (the page remounts and loads async). */
+let cancelScrollRestore: (() => void) | null = null
 
 function currentUrl(): string {
 	return window.location.pathname + window.location.search + window.location.hash
@@ -83,9 +84,29 @@ function initialPath(): string {
 	return currentUrl() || DEFAULT_PATH
 }
 
-interface SavedTabs {
-	tabs: TabState[]
-	activeId: number
+function newKey(): string {
+	keyCounter += 1
+	return `${Date.now()}-${keyCounter}`
+}
+
+function readState(state: unknown): HistoryState | null {
+	if (typeof state !== 'object' || state === null) {
+		return null
+	}
+	const raw = state as Record<string, unknown>
+	if (typeof raw.seq !== 'number' || typeof raw.key !== 'string') {
+		return null
+	}
+	return {
+		seq: raw.seq,
+		key: raw.key,
+		from: typeof raw.from === 'string' ? raw.from : null,
+		...(typeof raw.scroll === 'number' ? { scroll: raw.scroll } : {}),
+	}
+}
+
+function stateFor(seq: number, key: string, from: string | null, scroll?: number): HistoryState {
+	return scroll === undefined ? { seq, key, from } : { seq, key, from, scroll }
 }
 
 /** Guard for stored JSON that must be a list of strings. */
@@ -93,148 +114,9 @@ export function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((v) => typeof v === 'string')
 }
 
-/** Rebuilds a saved tab, or null when the stored shape is off. */
-function reviveTab(raw: unknown): TabState | null {
-	if (typeof raw !== 'object' || raw === null) {
-		return null
-	}
-	const { id, entries, index, openerId } = raw as Record<string, unknown>
-	if (
-		typeof id !== 'number' ||
-		!isStringArray(entries) ||
-		entries.length === 0 ||
-		typeof index !== 'number' ||
-		index < 0 ||
-		index >= entries.length ||
-		(openerId !== null && typeof openerId !== 'number')
-	) {
-		return null
-	}
-	return makeTab(id, entries, index, openerId)
-}
-
-function loadSavedTabs(): SavedTabs | null {
-	const raw = Result.try(() => window.sessionStorage.getItem(STORAGE_KEY))
-	if (Result.isError(raw) || raw.value === null) {
-		return null
-	}
-	const stored = raw.value
-	const parsed = Result.try((): unknown => JSON.parse(stored))
-	if (Result.isError(parsed) || typeof parsed.value !== 'object' || parsed.value === null) {
-		return null
-	}
-	const { tabs: rawTabs, activeId } = parsed.value as Record<string, unknown>
-	if (!Array.isArray(rawTabs) || typeof activeId !== 'number') {
-		return null
-	}
-	const revived = rawTabs.map(reviveTab)
-	const valid = revived.filter((t): t is TabState => t !== null)
-	if (valid.length === 0 || valid.length !== revived.length) {
-		return null
-	}
-	return { tabs: valid, activeId }
-}
-
-/**
- * Tabs to start with: the saved ones when the reloaded URL is still shown
- * by one of them, else the saved ones plus a new tab for the URL. The home
- * routes (`/` and `/dashboard`) redirect to the home tenant page on login
- * (see DashboardPage), so they never get their own tab: materializing one
- * would duplicate the restored home tab once the redirect runs.
- */
-function initialTabs(): SavedTabs {
-	const url = initialPath()
-	const saved = typeof window === 'undefined' ? null : loadSavedTabs()
-	if (!saved) {
-		const tab = makeTab(nextTabId++, [url], 0, null)
-		return { tabs: [tab], activeId: tab.id }
-	}
-	nextTabId = Math.max(...saved.tabs.map((t) => t.id)) + 1
-	const active = saved.tabs.find((t) => t.id === saved.activeId)
-	if (active?.path === url) {
-		return saved
-	}
-	const showing = saved.tabs.find((t) => t.path === url)
-	if (showing) {
-		return { tabs: saved.tabs, activeId: showing.id }
-	}
-	if (isHomeRoute(url)) {
-		return active ? saved : { tabs: saved.tabs, activeId: saved.tabs[0].id }
-	}
-	const tab = makeTab(nextTabId++, [url], 0, active?.id ?? null)
-	return { tabs: [...saved.tabs, tab], activeId: tab.id }
-}
-
-/** Home routes: the bare root and `/dashboard` redirect to the home tenant page. */
-function isHomeRoute(raw: string): boolean {
-	const segments = routeSegments(raw)
-	return segments.length === 0 || (segments.length === 1 && segments[0] === 'dashboard')
-}
-
-const initial = initialTabs()
-const [tabs, setTabs] = createSignal<TabState[]>(initial.tabs)
-const [activeTabId, setActiveTabId] = createSignal<number>(initial.activeId)
-/** Metadata reported by loaded pages, keyed by route path. */
-const [pageMeta, setPageMeta] = createSignal<Record<string, PageMeta>>({})
-
-if (typeof window !== 'undefined') {
-	createRoot(() => {
-		createEffect(() => {
-			const saved: SavedTabs = { tabs: tabs(), activeId: activeTabId() }
-			// Storage can be full or disabled; tabs then just don't survive a reload.
-			Result.try(() => window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved)))
-		})
-	})
-}
-
-/** Per-tab scroll positions, indexed like the tab's history entries. */
-const scrollByTab = new Map<number, number[]>()
-
-/**
- * Position of the current browser history entry. Stored in `history.state`
- * so popstate can tell Back (lower) from Forward (higher).
- */
-let historySeq = 0
-
-/** Set while the browser undoes a Back / Forward step a leave guard refused. */
-let undoingStep = false
-
-function readSeq(state: unknown): number | null {
-	if (typeof state !== 'object' || state === null || !('seq' in state)) {
-		return null
-	}
-	return typeof state.seq === 'number' ? state.seq : null
-}
-
-function pushUrl(to: string): void {
-	historySeq += 1
-	window.history.pushState({ seq: historySeq }, '', to)
-}
-
-function replaceUrl(to: string): void {
-	window.history.replaceState({ seq: historySeq }, '', to)
-}
-
-function rememberScroll(tab: TabState): void {
-	const list = scrollByTab.get(tab.id) ?? []
-	list[tab.index] = window.scrollY
-	scrollByTab.set(tab.id, list)
-}
-
-function restoreScroll(tab: TabState): void {
-	window.scrollTo(0, scrollByTab.get(tab.id)?.[tab.index] ?? 0)
-}
-
-/** Active tab record (null only before init). A plain function (not a memo)
- * so it stays fresh at module scope, where a memo would have no owner. */
-export function activeTab(): TabState | null {
-	const id = activeTabId()
-	return tabs().find((t) => t.id === id) ?? null
-}
-
-/** Current route path: the active tab's path. */
+/** Current route path: the URL shown by the one mounted page. */
 export function path(): string {
-	return activeTab()?.path ?? DEFAULT_PATH
+	return currentPath()
 }
 
 /** A route without its query string and anchor. */
@@ -249,11 +131,24 @@ export function routeSegments(raw: string): string[] {
 		.filter((p) => p.length > 0)
 }
 
-/** Last path segment is add/edit/import: the route opens as a form tab. */
+/** Last path segment is add/edit/import: the route is a form. */
 function isFormRoute(raw: string): boolean {
 	const last = routeSegments(raw).at(-1)
 	return last === 'add' || last === 'edit' || last === 'import'
 }
+
+/** An item route is an object's detail page (its last segment is a positive id). */
+function isItemRoute(raw: string): boolean {
+	return parseId(routeSegments(raw).at(-1)) !== null
+}
+
+/** Whether a plain click on `to` should open a new browser tab. */
+export function opensInNewTab(to: string): boolean {
+	return openItemsInNewTab() && isItemRoute(to)
+}
+
+/** Metadata reported by loaded pages, keyed by route path. */
+const [pageMeta, setPageMeta] = createSignal<Record<string, PageMeta>>({})
 
 /** Metadata the page at `forPath` last reported, if it has loaded. */
 export function pageMetaFor(forPath: string): PageMeta | undefined {
@@ -261,12 +156,12 @@ export function pageMetaFor(forPath: string): PageMeta | undefined {
 }
 
 /**
- * Lets a page report its object's name and ancestors for the tab title and
- * the breadcrumb bar. Kept after the page unmounts, so edit forms and
+ * Lets a page report its object's name and ancestors for the document title
+ * and the breadcrumb bar. Kept after the page unmounts, so edit forms and
  * history entries can reuse it.
  */
 export function usePageMeta(meta: () => PageMeta): void {
-	const forPath = useTabPath()
+	const forPath = useRoutePath()
 	createEffect(() => {
 		const next = meta()
 		const current = untrack(() => pageMeta()[forPath])
@@ -277,161 +172,266 @@ export function usePageMeta(meta: () => PageMeta): void {
 	})
 }
 
-function updateTab(next: TabState): void {
-	setTabs((prev) => prev.map((t) => (t.id === next.id ? next : t)))
-}
-
-function removeTab(id: number): void {
-	setTabs((prev) => prev.filter((t) => t.id !== id))
-	scrollByTab.delete(id)
-}
-
-/** Makes `tab` the visible one and mirrors its path in the address bar. */
-function show(tab: TabState, url: 'push' | 'replace' = 'replace'): void {
-	setActiveTabId(tab.id)
-	if (url === 'push') {
-		pushUrl(tab.path)
-	} else {
-		replaceUrl(tab.path)
-	}
-	restoreScroll(tab)
-}
-
-/** Adds `to` to the tab's history, dropping any forward entries. */
-function visit(tab: TabState, to: string, replace = false): TabState {
-	const kept = tab.entries.slice(0, replace ? tab.index : tab.index + 1)
-	const next = makeTab(tab.id, [...kept, to], kept.length, tab.openerId)
-	scrollByTab.get(tab.id)?.splice(next.index)
-	updateTab(next)
-	return next
-}
-
-function openTab(to: string, openerId: number | null): void {
-	const tab = makeTab(nextTabId++, [to], 0, openerId)
-	setTabs((prev) => [...prev, tab])
-	show(tab)
-}
-
-/** Opens a copy of a tab, history included, right after it. */
-export function duplicateTab(id: number): void {
-	const source = tabs().find((t) => t.id === id)
-	const active = activeTab()
-	if (!source) {
-		return
-	}
-	if (active) {
-		rememberScroll(active)
-	}
-	const copy = makeTab(nextTabId++, source.entries, source.index, source.id)
-	scrollByTab.set(copy.id, [...(scrollByTab.get(source.id) ?? [])])
-	setTabs((prev) => prev.flatMap((t) => (t.id === id ? [t, copy] : [t])))
-	show(copy)
-}
-
-/** Switch to an existing tab, preserving every tab's mounted state. */
-export function activateTab(id: number): void {
-	const tab = tabs().find((t) => t.id === id)
-	if (!tab) {
-		return
-	}
-	const active = activeTab()
-	if (active?.id === id) {
-		return
-	}
-	if (active) {
-		rememberScroll(active)
-	}
-	show(tab)
-}
-
 /**
- * Unsaved-work checks per tab. A guard asks the user and returns true when
- * the tab's page must stay (see `useLeaveGuard`).
+ * Route path at component creation, for data fetching and metadata. Pages
+ * remount whenever the path changes, so this stays stable for their lifetime.
  */
-const leaveGuards = new Map<number, Set<() => boolean>>()
+export function useRoutePath(): string {
+	return untrack(path)
+}
 
-/** True when a guard of one of `tabIds` keeps its page: the user declined to leave. */
-function leaveBlocked(...tabIds: number[]): boolean {
-	return tabIds.some((id) => [...(leaveGuards.get(id) ?? [])].some((guard) => guard()))
+/** Saves the current scroll position in the map and in history.state. */
+function rememberScroll(): void {
+	const scroll = window.scrollY
+	scrollByKey.set(currentKey, scroll)
+	window.history.replaceState(stateFor(historySeq, currentKey, currentFrom, scroll), '', path())
+}
+
+/** Retry a scroll restore until the async-loaded page is tall enough (max ~2s). */
+function restoreScroll(target: number): void {
+	cancelScrollRestore?.()
+	if (target <= 0) {
+		window.scrollTo(0, 0)
+		return
+	}
+	const started = performance.now()
+	let frame = 0
+	let stopped = false
+	let detach = (): void => {}
+	const stop = (): void => {
+		if (stopped) {
+			return
+		}
+		stopped = true
+		cancelAnimationFrame(frame)
+		detach()
+		cancelScrollRestore = null
+	}
+	// Only user input cancels: plain `scroll` events also fire when the old
+	// page unmounts and the browser clamps the position.
+	const onUserInput = (): void => stop()
+	const options: AddEventListenerOptions = { passive: true }
+	const events = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const
+	for (const name of events) {
+		window.addEventListener(name, onUserInput, options)
+	}
+	detach = (): void => {
+		for (const name of events) {
+			window.removeEventListener(name, onUserInput, options)
+		}
+	}
+	cancelScrollRestore = stop
+	const attempt = (): void => {
+		if (stopped) {
+			return
+		}
+		const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+		if (maxScroll >= target || performance.now() - started >= 2000) {
+			stop()
+			window.scrollTo(0, target)
+			return
+		}
+		frame = requestAnimationFrame(attempt)
+	}
+	frame = requestAnimationFrame(attempt)
+}
+
+/** Applies a history entry after a push/replace (top) or Back/Forward (restore). */
+function enter(state: HistoryState, url: string, restore: boolean): void {
+	historySeq = state.seq
+	currentKey = state.key
+	currentFrom = state.from
+	setCurrentPath(url)
+	if (restore) {
+		restoreScroll(scrollByKey.get(state.key) ?? state.scroll ?? 0)
+	} else {
+		scrollByKey.set(state.key, 0)
+		window.scrollTo(0, 0)
+	}
+}
+
+/** Pushes `to` as a new entry, remembering where the user came from. */
+function push(to: string): void {
+	rememberScroll()
+	const key = newKey()
+	const state = stateFor(historySeq + 1, key, path())
+	window.history.pushState(state, '', to)
+	enter(state, to, false)
+}
+
+/** Replaces the current entry, keeping its key and opener path. */
+function replace(to: string): void {
+	rememberScroll()
+	const state = stateFor(historySeq, currentKey, currentFrom)
+	window.history.replaceState(state, '', to)
+	enter(state, to, false)
+}
+
+/** Leaves a form without saving; returns to its opener when there is one. */
+function leaveFormBack(to: string): void {
+	rememberScroll()
+	if (currentFrom !== null) {
+		stepBack()
+		return
+	}
+	replace(to)
+}
+
+/** Browser Back for a step whose leave guards the caller already checked. */
+function stepBack(): void {
+	routerBack = true
+	window.history.back()
 }
 
 /**
- * Asks with `message` before the calling component's page is left while
- * `isDirty()`: navigating its tab elsewhere, Back / Forward, refreshing or
- * closing the tab. Inactive tabs stay mounted, so switching tabs keeps the
- * work. Registers for the active tab, which is the one being edited.
+ * A nested add form is a popup opened with an opener (see `SelectField`).
+ * On save or cancel it closes instead of navigating; the opener refetches
+ * its options when the dropdown opens again.
+ */
+function closeOpenerWindow(): boolean {
+	if (window.opener !== null && window.history.length === 1) {
+		window.close()
+		return window.closed
+	}
+	return false
+}
+
+/**
+ * Navigate:
+ * - `newTab`: open `to` in a real browser tab
+ * - form route being left (save/cancel): close a nested popup, step back to
+ *   the opener when possible, else replace the form's entry
+ * - otherwise: push (or replace) `to` in the browser history
+ */
+export function navigate(to: string, opts: NavigateOptions = {}): void {
+	if (opts.newTab === true) {
+		window.open(to, '_blank', 'noopener')
+		return
+	}
+	const current = path()
+	const leavingForm = isFormRoute(current)
+	if (to === current && !leavingForm) {
+		return
+	}
+	if (to !== current && leaveBlocked()) {
+		return
+	}
+	if (leavingForm && closeOpenerWindow()) {
+		return
+	}
+	if (opts.back === true) {
+		leaveFormBack(to)
+		return
+	}
+	if (leavingForm) {
+		// Saving a form opened from `to` reuses that entry instead of adding
+		// a duplicate list entry; any other target replaces the form entry.
+		if (currentFrom === to) {
+			leaveFormBack(to)
+		} else {
+			replace(to)
+		}
+		return
+	}
+	if (opts.replace === true) {
+		replace(to)
+	} else {
+		push(to)
+	}
+}
+
+/**
+ * Click handler for in-app links. Modified clicks open a new browser tab; a
+ * plain click on an item does so too when that preference is on, unless
+ * `sameTab` (navigation links) is set.
+ */
+export function goTo(e: MouseEvent, to: string, opts?: NavigateOptions): void {
+	e.preventDefault()
+	const newTab =
+		e.ctrlKey ||
+		e.metaKey ||
+		e.shiftKey ||
+		e.button === 1 ||
+		(opts?.sameTab !== true && opensInNewTab(to))
+	navigate(to, { ...opts, newTab })
+}
+
+/**
+ * Unsaved-work checks. A guard asks before its page is left and returns true
+ * when the page must stay (the user declined to leave).
+ */
+interface LeaveGuard {
+	isDirty: () => boolean
+	message: () => string
+}
+
+const leaveGuards = new Set<LeaveGuard>()
+
+/** True when a guard keeps the page: the user declined to leave. */
+function leaveBlocked(): boolean {
+	return [...leaveGuards].some((guard) => guard.isDirty() && !window.confirm(guard.message()))
+}
+
+/**
+ * Asks with `message` before the calling page is left while `isDirty()`:
+ * in-app navigation, Back / Forward, refreshing or closing the tab.
  */
 export function useLeaveGuard(isDirty: () => boolean, message: () => string): void {
-	const tabId = activeTabId()
-	const guard = (): boolean => isDirty() && !window.confirm(message())
-	const set = leaveGuards.get(tabId) ?? new Set()
-	set.add(guard)
-	leaveGuards.set(tabId, set)
-	onCleanup(() => {
-		set.delete(guard)
-		if (set.size === 0 && leaveGuards.get(tabId) === set) {
-			leaveGuards.delete(tabId)
+	const guard: LeaveGuard = { isDirty, message }
+	leaveGuards.add(guard)
+	onCleanup(() => leaveGuards.delete(guard))
+}
+
+if (typeof window !== 'undefined') {
+	if ('scrollRestoration' in window.history) {
+		window.history.scrollRestoration = 'manual'
+	}
+	const initial = readState(window.history.state)
+	if (initial === null) {
+		historySeq = 0
+		currentKey = newKey()
+		currentFrom = null
+		window.history.replaceState(stateFor(historySeq, currentKey, currentFrom), '', currentUrl())
+	} else {
+		historySeq = initial.seq
+		currentKey = initial.key
+		currentFrom = initial.from
+		if (initial.scroll !== undefined) {
+			scrollByKey.set(currentKey, initial.scroll)
+		}
+	}
+	setCurrentPath(currentUrl())
+
+	window.addEventListener('popstate', (e: PopStateEvent) => {
+		const next = readState(e.state)
+		// Entries without a seq are in-page `#anchor` jumps: leave them alone.
+		if (next === null) {
+			return
+		}
+		const step = next.seq - historySeq
+		historySeq = next.seq
+		if (undoingStep) {
+			undoingStep = false
+			return
+		}
+		const url = currentUrl()
+		const checked = routerBack
+		routerBack = false
+		if (!checked && url !== path() && leaveBlocked()) {
+			// Undo the browser's step; the popstate that fires keeps the page.
+			undoingStep = true
+			window.history.go(-step)
+			return
+		}
+		enter(next, url, true)
+	})
+
+	window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
+		if ([...leaveGuards].some((guard) => guard.isDirty())) {
+			e.preventDefault()
+			e.returnValue = ''
 		}
 	})
-}
-
-/** Close a tab and focus its opener (or the nearest neighbor). */
-export function closeTab(id: number): void {
-	const list = tabs()
-	const closing = list.find((t) => t.id === id)
-	if (!closing || list.length === 1 || leaveBlocked(id)) {
-		return
-	}
-	const remaining = list.filter((t) => t.id !== id)
-	removeTab(id)
-	if (activeTabId() !== id) {
-		return
-	}
-	const opener =
-		closing.openerId !== null ? remaining.find((t) => t.id === closing.openerId) : undefined
-	const index = list.findIndex((t) => t.id === id)
-	const fallback = opener ?? remaining[Math.min(index, remaining.length - 1)]
-	if (fallback) {
-		show(fallback)
-	}
-}
-
-/** Closes every tab except `id` and shows it. */
-export function closeOtherTabs(id: number): void {
-	const keep = tabs().find((t) => t.id === id)
-	if (!keep || leaveBlocked(...tabs().flatMap((t) => (t.id === id ? [] : [t.id])))) {
-		return
-	}
-	for (const tab of tabs()) {
-		if (tab.id !== id) {
-			scrollByTab.delete(tab.id)
-		}
-	}
-	setTabs([keep])
-	if (activeTabId() !== id) {
-		show(keep)
-	}
-}
-
-/** Closes the tabs after `id`; shows `id` if the active tab was among them. */
-export function closeTabsToRight(id: number): void {
-	const list = tabs()
-	const index = list.findIndex((t) => t.id === id)
-	const keep = list[index]
-	if (!keep) {
-		return
-	}
-	const closing = list.slice(index + 1)
-	if (leaveBlocked(...closing.map((t) => t.id))) {
-		return
-	}
-	for (const tab of closing) {
-		scrollByTab.delete(tab.id)
-	}
-	setTabs(list.slice(0, index + 1))
-	if (closing.some((t) => t.id === activeTabId())) {
-		show(keep)
-	}
 }
 
 /** The route shows the object at `objectPath` or one of its sub-pages. */
@@ -441,240 +441,30 @@ function showsObject(route: string, objectPath: string): boolean {
 }
 
 /**
- * After the object at `objectPath` (e.g. `/devices/12`) was deleted: drop
- * it and its edit page from every tab's history and close tabs left with
- * nothing. The active tab falls back to its previous entry, else the list
- * tab at `listRoute` or its opener.
+ * After the object at `objectPath` (e.g. `/devices/12`) was deleted: step
+ * back to the entry it was opened from when that does not show the object,
+ * else replace the current entry with the list at `listRoute`.
  */
 export function forgetDeleted(objectPath: string, listRoute: string): void {
-	const list = tabs()
-	const activeId = activeTabId()
-	const next: TabState[] = []
-	for (const tab of list) {
-		const kept = tab.entries.flatMap((entry, i) => (showsObject(entry, objectPath) ? [] : [i]))
-		if (kept.length === tab.entries.length) {
-			next.push(tab)
-			continue
-		}
-		if (kept.length === 0) {
-			continue
-		}
-		// Stay on the current entry if it survived, else step back to the
-		// nearest earlier one.
-		const before = kept.filter((i) => i <= tab.index)
-		const index = before.length > 0 ? before.length - 1 : 0
-		const scroll = scrollByTab.get(tab.id)
-		if (scroll) {
-			scrollByTab.set(
-				tab.id,
-				kept.map((i) => scroll[i] ?? 0),
-			)
-		}
-		next.push(
-			makeTab(
-				tab.id,
-				kept.map((i) => tab.entries[i] ?? listRoute),
-				index,
-				tab.openerId,
-			),
-		)
-	}
-	for (const tab of list) {
-		if (!next.some((t) => t.id === tab.id)) {
-			scrollByTab.delete(tab.id)
-		}
-	}
-	const survivor = next.find((t) => t.id === activeId)
-	if (survivor) {
-		setTabs(next)
-		show(survivor)
+	rememberScroll()
+	if (currentFrom !== null && !showsObject(currentFrom, objectPath)) {
+		stepBack()
 		return
 	}
-	const closed = list.find((t) => t.id === activeId)
-	const target =
-		next.find((t) => barePath(t.path) === listRoute) ??
-		next.find((t) => t.id === closed?.openerId)
-	if (target) {
-		setTabs(next)
-		show(target)
-		return
-	}
-	// Nothing to fall back to: the tab stays and shows the list instead.
-	const replacement = makeTab(activeId, [listRoute], 0, closed?.openerId ?? null)
-	const at = list.findIndex((t) => t.id === activeId)
-	const withReplacement = [...next]
-	withReplacement.splice(Math.min(at, withReplacement.length), 0, replacement)
-	setTabs(withReplacement)
-	show(replacement)
-}
-
-/**
- * Leaves a form tab for `to` (save, cancel, back link): a cancelled form
- * (`back`) or one opened from another form (the "+" beside a select)
- * closes back into its opener, leaving it untouched; otherwise the form
- * closes like a dialog and the target shows in an existing tab, else in
- * the opener's history, else in place of the form.
- */
-function closeForm(form: TabState, to: string, back: boolean): void {
-	const others = tabs().filter((t) => t.id !== form.id)
-	const opener = others.find((t) => t.id === form.openerId)
-	if (opener && (back || isFormRoute(opener.path))) {
-		removeTab(form.id)
-		show(opener)
-		return
-	}
-	const shown = others.find((t) => t.path === to)
-	if (shown) {
-		removeTab(form.id)
-		show(shown)
-		return
-	}
-	if (opener && !isFormRoute(opener.path)) {
-		removeTab(form.id)
-		show(visit(opener, to), 'push')
-		return
-	}
-	// Direct URL entry, or the opener is gone: turn the form tab into
-	// the target.
-	scrollByTab.delete(form.id)
-	const next = makeTab(form.id, [to], 0, form.openerId)
-	updateTab(next)
-	show(next)
-}
-
-/**
- * Navigate:
- * - form route (add/edit/import): focus the tab already showing it, else
- *   open a new tab
- * - `openInTab`: open a new tab
- * - from a form tab: close the form and show the target (see `closeForm`)
- * - otherwise: push `to` onto the active tab's history.
- */
-export function navigate(to: string, opts: NavigateOptions = {}): void {
-	const active = activeTab()
-	if (!active) {
-		openTab(to, null)
-		return
-	}
-	rememberScroll(active)
-	if (isFormRoute(to)) {
-		const open = tabs().find((t) => t.path === to)
-		if (open) {
-			show(open)
-		} else {
-			openTab(to, active.id)
-		}
-		return
-	}
-	if (opts.openInTab === true) {
-		openTab(to, active.id)
-		return
-	}
-	if (to !== active.path && leaveBlocked(active.id)) {
-		return
-	}
-	if (isFormRoute(active.path)) {
-		closeForm(active, to, opts.back === true)
-		return
-	}
-	if (to === active.path) {
-		return
-	}
-	show(visit(active, to, opts.replace), opts.replace === true ? 'replace' : 'push')
-}
-
-/**
- * Click handler for in-app links: a plain click follows `navigate`,
- * Ctrl/Cmd/Shift or middle click opens the target in a new tab.
- */
-export function goTo(e: MouseEvent, to: string, opts?: NavigateOptions): void {
-	e.preventDefault()
-	const newTab = e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1
-	navigate(to, newTab ? { ...opts, openInTab: true } : opts)
-}
-
-if (typeof window !== 'undefined') {
-	historySeq = readSeq(window.history.state) ?? 0
-	replaceUrl(path())
-
-	window.addEventListener('popstate', (e: PopStateEvent) => {
-		const seq = readSeq(e.state)
-		// Entries without a seq are in-page `#anchor` jumps: leave them alone.
-		if (seq === null) {
-			return
-		}
-		const step = seq - historySeq
-		historySeq = seq
-		if (undoingStep) {
-			undoingStep = false
-			return
-		}
-		const active = activeTab()
-		if (!active) {
-			return
-		}
-		const index = Math.max(0, Math.min(active.entries.length - 1, active.index + step))
-		if (index !== active.index && leaveBlocked(active.id)) {
-			// Undo the browser's step; the popstate that fires keeps the page.
-			undoingStep = true
-			window.history.go(-step)
-			return
-		}
-		if (index !== active.index) {
-			rememberScroll(active)
-			const next = makeTab(active.id, active.entries, index, active.openerId)
-			updateTab(next)
-			show(next)
-			return
-		}
-		// The tab has no history left in that direction: keep showing it.
-		if (currentUrl() !== active.path) {
-			replaceUrl(active.path)
-		}
-	})
-}
-
-/**
- * Tab-local route path for data fetching. Pages keep calling `queryParam`
- * with no args; inside a tab pane it reads that tab's path instead of the
- * globally active one, so background tabs never cross-talk.
- */
-const TabContext = createContext<{ id: number; path: string } | null>(null)
-
-export function tabContext(): typeof TabContext {
-	return TabContext
-}
-
-export function useTabPath(): string {
-	return useContext(TabContext)?.path ?? path()
-}
-
-/** Whether the calling component's tab is shown; true outside a tab pane (the app shell). */
-export function usePaneVisible(): () => boolean {
-	const id = useContext(TabContext)?.id
-	return () => id === undefined || activeTabId() === id
+	replace(listRoute)
 }
 
 /**
  * Identifies the history entry a page mounts into, so it can pick up where it
- * left off when the user comes back; null for tabs in the background.
+ * left off when the user comes back; null when `forPath` is not shown.
  */
 export function historyEntryKey(forPath: string): string | null {
-	const active = activeTab()
-	return active?.path === forPath ? `${active.id}:${active.index}:${forPath}` : null
+	return forPath === path() ? `${currentKey}:${forPath}` : null
 }
 
-/**
- * Path the tab that opened the current form tab now shows, or null when
- * the form was entered directly or its opener is gone.
- */
+/** Path the form's history entry was opened from, or null for a direct entry. */
 export function useOpenerPath(): () => string | null {
-	const formPath = useTabPath()
-	return () => {
-		const all = tabs()
-		const form = all.find((t) => t.path === formPath)
-		return all.find((t) => t.id === form?.openerId)?.path ?? null
-	}
+	return () => currentFrom
 }
 
 /**
@@ -701,9 +491,9 @@ export function useFormReturnRoute(
 	}
 }
 
-/** Reads one query param from the current tab's route (e.g. `?tenant=<id>`). */
+/** Reads one query param from the current route (e.g. `?tenant=<id>`). */
 export function queryParam(key: string, fromPath?: string): string {
-	const current = (fromPath ?? useTabPath()).split('#')[0] ?? ''
+	const current = (fromPath ?? useRoutePath()).split('#')[0] ?? ''
 	const query = current.includes('?') ? (current.split('?')[1] ?? '') : ''
 	return new URLSearchParams(query).get(key) ?? ''
 }
@@ -725,5 +515,3 @@ export function parseId(raw: string | null | undefined): number | null {
 	const id = Number(raw)
 	return Number.isInteger(id) && id >= 1 ? id : null
 }
-
-export { activeTabId, tabs }

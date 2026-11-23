@@ -325,6 +325,7 @@ const CHANGE_OBJECT_KEYS: Record<ChangeObjectType, MessageKey> = {
 	interface_template: 'changeObject.interfaceTemplate',
 	device_role: 'entity.deviceRole.one',
 	attachment: 'changeObject.attachment',
+	floorplan_drawing: 'changeObject.floorplanDrawing',
 	priority: 'entity.priority.one',
 	service_level: 'entity.serviceLevel.one',
 	managed_bundle: 'entity.managedBundle.one',
@@ -452,7 +453,7 @@ const PROVIDER_KEYS: Record<IntegrationProvider, MessageKey> = {
 	m365: 'provider.m365',
 }
 
-/** Integration provider name (`tanss` → TANSS, `octoja` → Octoja, `unifi` → UniFi). */
+/** Integration provider name (`tanss` → TANSS, `octoja` → Octoja, `unifi` → Unifi Site Manager). */
 export function providerLabel(value: string): string {
 	return lookup(PROVIDER_KEYS, value)
 }
@@ -472,8 +473,8 @@ const EXTERNAL_TENANT_KEYS: Record<IntegrationProvider, PluralKey> = {
 }
 
 /**
- * What the provider calls the external side of a conex tenant, lowercase
- * where the language allows (TANSS: company, Octoja: customer, UniFi: site,
+ * What the provider calls the external side of a conex tenant (or site), lowercase
+ * where the language allows (TANSS: company, Octoja: customer, UniFi: console,
  * M365: Entra tenant).
  */
 export function externalTenantLabel(provider: string, count = 1): string {
@@ -505,6 +506,7 @@ export function providerDescription(value: string): string {
 
 const FINDING_KEYS: Record<FindingKind, MessageKey> = {
 	tenant_unlinked: 'finding.tenant_unlinked',
+	site_unlinked: 'finding.site_unlinked',
 	tenant_missing_in_conex: 'finding.tenant_missing_in_conex',
 	tenant_stale: 'finding.tenant_stale',
 	tenant_inactive: 'finding.tenant_inactive',
@@ -532,13 +534,20 @@ export function findingKindLabel(value: string, provider: string): string {
 }
 
 const COMPARE_FIELD_KEYS: Record<
-	DeviceCompareField | EmployeeCompareField | 'customer_number' | 'domain' | 'tenant' | 'status',
+	| DeviceCompareField
+	| EmployeeCompareField
+	| 'customer_number'
+	| 'domain'
+	| 'tenant'
+	| 'site'
+	| 'status',
 	MessageKey
 > = {
 	name: 'common.name',
 	customer_number: 'tenant.customerNumber',
 	domain: 'compareField.domain',
 	tenant: 'entity.tenant.one',
+	site: 'entity.site.one',
 	status: 'common.status',
 	serial: 'device.serial',
 	asset_tag: 'compareField.asset_tag',

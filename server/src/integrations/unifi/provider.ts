@@ -1,6 +1,7 @@
 /**
- * UniFi Site Manager: tenant ↔ console (host), device ↔ device managed by
- * that console. One conex tenant links to exactly one console. UniFi knows
+ * UniFi Site Manager: site ↔ console (host), device ↔ device managed by
+ * that console. One conex site links to exactly one console (the console is
+ * the "external tenant" of the snapshot), so a tenant has one per site. UniFi knows
  * neither employees nor tickets, so only the three read methods are
  * implemented; devices are never written back.
  *

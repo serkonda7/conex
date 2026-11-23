@@ -15,6 +15,48 @@
       "when": 1795179496787,
       "tag": "0001_integration_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795180562359,
+      "tag": "0002_unifi_site_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795345267934,
+      "tag": "0003_floorplan_drawings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795349836803,
+      "tag": "0004_floorplan_stairs",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795350585249,
+      "tag": "0005_floorplan_trays_desks_rooms",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795425650874,
+      "tag": "0006_floorplan_desk_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795471281550,
+      "tag": "0007_floorplan_heights",
+      "breakpoints": true
     }
   ]
 }

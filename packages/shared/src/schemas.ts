@@ -2149,29 +2149,36 @@ const FloorplanAreaInputSchema = v.pipe(
 	),
 )
 
+/** What a marker places: exactly one of a rack, device, outlet port or jack. */
+const PlacementTargetEntries = {
+	rack_id: v.optional(IdSchema, undefined),
+	device_id: v.optional(IdSchema, undefined),
+	interface_id: v.optional(IdSchema, undefined),
+	jack_id: v.optional(IdSchema, undefined),
+}
+
+function placesOneObject(placement: {
+	rack_id?: number
+	device_id?: number
+	interface_id?: number
+	jack_id?: number
+}): boolean {
+	return (
+		[placement.rack_id, placement.device_id, placement.interface_id, placement.jack_id].filter(
+			(id) => id !== undefined,
+		).length === 1
+	)
+}
+
+const PLACES_ONE_OBJECT = 'Exactly one of rack, device, port or jack is required'
+
 /**
  * Rack, device or outlet marker at a normalized position. An outlet is a
  * single-position rear port of a patch panel outside any jack, or a jack.
  */
 const FloorplanPlacementInputSchema = v.pipe(
-	v.strictObject({
-		rack_id: v.optional(IdSchema, undefined),
-		device_id: v.optional(IdSchema, undefined),
-		interface_id: v.optional(IdSchema, undefined),
-		jack_id: v.optional(IdSchema, undefined),
-		x: FloorplanCoordSchema,
-		y: FloorplanCoordSchema,
-	}),
-	v.check(
-		(placement) =>
-			[
-				placement.rack_id,
-				placement.device_id,
-				placement.interface_id,
-				placement.jack_id,
-			].filter((id) => id !== undefined).length === 1,
-		'Exactly one of rack, device, port or jack is required',
-	),
+	v.strictObject({ ...PlacementTargetEntries, x: FloorplanCoordSchema, y: FloorplanCoordSchema }),
+	v.check((placement) => placesOneObject(placement), PLACES_ONE_OBJECT),
 )
 
 /**
@@ -2313,6 +2320,8 @@ export interface FloorplanImpactJson {
 	placements: number
 	/** Areas on floor plans that link to (or outline) the deleted object. */
 	linkedFrom: number
+	/** The deleted object's own drawn floor plan with content (0 or 1). */
+	drawings: number
 }
 
 /** 409 body of a delete that needs `?confirm=floorplan`. */
@@ -2438,6 +2447,570 @@ export interface FloorplanListJson {
 }
 
 // ---------------------------------------------------------------------------
+// Drawn floor plans (v2): walls, doors, windows, stairs and markers drawn on a sheet
+// in centimeters, optionally over a reference image
+// ---------------------------------------------------------------------------
+
+/** Largest sheet side and coordinate of a drawn plan: 1 km. */
+export const MAX_DRAWING_CM = 100_000
+
+/** Default sheet of a new drawn plan: 20 m × 15 m. */
+export const DEFAULT_DRAWING_SIZE = { width: 2000, height: 1500 } as const
+
+/** Position on a drawn plan's sheet in centimeters, from its top-left corner. */
+const DrawingCoordSchema = v.pipe(
+	v.number('Coordinate must be a number'),
+	v.minValue(0, 'Coordinate must lie on the sheet'),
+	v.maxValue(MAX_DRAWING_CM, 'Coordinate must lie on the sheet'),
+)
+
+const DrawingPointSchema = v.tuple([DrawingCoordSchema, DrawingCoordSchema])
+
+const SheetSideSchema = v.pipe(
+	v.number('Sheet size must be a number'),
+	v.minValue(100, 'The sheet must be at least 1 m wide and high'),
+	v.maxValue(MAX_DRAWING_CM, 'The sheet must be at most 1 km wide and high'),
+)
+
+/** Highest anything stands or hangs above the floor of a drawn plan, cm. */
+export const MAX_DRAWING_HEIGHT = 2000
+
+/** A height or elevation above the floor, cm; `min` is the lowest allowed. */
+function heightSchema(
+	what: string,
+	min: number,
+): v.SchemaWithPipe<
+	readonly [
+		v.NumberSchema<string>,
+		v.MinValueAction<number, number, string>,
+		v.MaxValueAction<number, number, string>,
+	]
+> {
+	return v.pipe(
+		v.number(`${what} must be a number`),
+		v.minValue(min, `${what} is at least ${min} cm`),
+		v.maxValue(MAX_DRAWING_HEIGHT, `${what} is at most ${MAX_DRAWING_HEIGHT} cm`),
+	)
+}
+
+/**
+ * Default mounting height of a new marker, cm: racks stand on the floor,
+ * outlets sit in the lower installation zone (DIN 18015-3).
+ */
+export const DEFAULT_MARKER_ELEVATION = { rack: 0, device: 120, outlet: 30 } as const
+
+/** The default mounting height of a marker of `placement`'s kind, cm. */
+export function defaultMarkerElevation(placement: {
+	rack_id?: number | null
+	device_id?: number | null
+}): number {
+	if (placement.rack_id !== undefined && placement.rack_id !== null) {
+		return DEFAULT_MARKER_ELEVATION.rack
+	}
+	return placement.device_id !== undefined && placement.device_id !== null
+		? DEFAULT_MARKER_ELEVATION.device
+		: DEFAULT_MARKER_ELEVATION.outlet
+}
+
+/**
+ * Rack, device or outlet marker on a drawn plan, at a position in cm, and
+ * mounted `elevation` cm above the floor (a rack's base, a device's or
+ * outlet's center); missing, it takes its kind's default.
+ */
+const DrawingPlacementInputSchema = v.pipe(
+	v.strictObject({
+		...PlacementTargetEntries,
+		x: DrawingCoordSchema,
+		y: DrawingCoordSchema,
+		elevation: v.optional(heightSchema('Mounting height', 0), undefined),
+	}),
+	v.check((placement) => placesOneObject(placement), PLACES_ONE_OBJECT),
+	v.transform((placement) => ({
+		...placement,
+		elevation: placement.elevation ?? defaultMarkerElevation(placement),
+	})),
+)
+
+/** Thinnest and thickest wall, cm. */
+export const MIN_WALL_THICKNESS = 1
+export const MAX_WALL_THICKNESS = 200
+
+/** Lowest wall, cm. */
+export const MIN_WALL_HEIGHT = 10
+
+/** Default height of a new wall, cm: the usual clear room height of 2.50 m. */
+export const DEFAULT_WALL_HEIGHT = 250
+
+/** Usual storey height, floor to floor, cm: the room height and the floor slab. */
+export const DEFAULT_STOREY_HEIGHT = 275
+
+/**
+ * A straight wall from `a` to `b` (cm) with its thickness (cm), centered on
+ * the line, and `height` cm high.
+ */
+export const FloorplanWallSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		thickness: v.pipe(
+			v.number('Wall thickness must be a number'),
+			v.minValue(MIN_WALL_THICKNESS, `Walls are at least ${MIN_WALL_THICKNESS} cm thick`),
+			v.maxValue(MAX_WALL_THICKNESS, `Walls are at most ${MAX_WALL_THICKNESS} cm thick`),
+		),
+		height: v.optional(heightSchema('Wall height', MIN_WALL_HEIGHT), DEFAULT_WALL_HEIGHT),
+	}),
+	v.check((wall) => wall.a[0] !== wall.b[0] || wall.a[1] !== wall.b[1], 'A wall needs a length'),
+)
+
+export type FloorplanWall = v.InferOutput<typeof FloorplanWallSchema>
+
+export const OPENING_KINDS = ['door', 'sliding_door', 'window'] as const
+
+export type OpeningKind = (typeof OPENING_KINDS)[number]
+
+/** Narrowest and widest door or window, cm. */
+export const MIN_OPENING_WIDTH = 10
+export const MAX_OPENING_WIDTH = 2000
+
+/** Lowest door or window, cm. */
+export const MIN_OPENING_HEIGHT = 10
+
+/**
+ * Default sill (bottom above the floor) and height of a new door, sliding
+ * door and window, cm: the 2010 mm rough opening of a standard door (DIN
+ * 18101), a window 1260 mm high above a 90 cm parapet.
+ */
+export const DEFAULT_OPENING_HEIGHT: Record<OpeningKind, { sill: number; height: number }> = {
+	door: { sill: 0, height: 201 },
+	sliding_door: { sill: 0, height: 201 },
+	window: { sill: 90, height: 126 },
+}
+
+/**
+ * Door or window in a wall (`wall` is its index in `walls`): centered
+ * `offset` cm from the wall's start `a`, `width` cm wide. Seen from `a` to
+ * `b`, a door hinges at the end of the opening facing `hinge` and swings to
+ * `side`; a sliding door runs along the wall's `side` face and slides open
+ * toward `hinge`. A window ignores both. The opening starts `sill` cm above
+ * the floor and is `height` cm high (missing, its kind's default); above it
+ * the wall closes again.
+ */
+export const FloorplanOpeningSchema = v.pipe(
+	v.strictObject({
+		wall: v.pipe(v.number(), v.integer(), v.minValue(0)),
+		kind: v.picklist(OPENING_KINDS),
+		offset: v.pipe(v.number('Offset must be a number'), v.minValue(0)),
+		width: v.pipe(
+			v.number('Width must be a number'),
+			v.minValue(
+				MIN_OPENING_WIDTH,
+				`Doors and windows are at least ${MIN_OPENING_WIDTH} cm wide`,
+			),
+			v.maxValue(
+				MAX_OPENING_WIDTH,
+				`Doors and windows are at most ${MAX_OPENING_WIDTH} cm wide`,
+			),
+		),
+		hinge: v.picklist(['start', 'end']),
+		side: v.picklist(['left', 'right']),
+		sill: v.optional(heightSchema('Sill height', 0), undefined),
+		height: v.optional(heightSchema('Door and window height', MIN_OPENING_HEIGHT), undefined),
+	}),
+	v.transform((opening) => ({
+		...opening,
+		sill: opening.sill ?? DEFAULT_OPENING_HEIGHT[opening.kind].sill,
+		height: opening.height ?? DEFAULT_OPENING_HEIGHT[opening.kind].height,
+	})),
+)
+
+export type FloorplanOpening = v.InferOutput<typeof FloorplanOpeningSchema>
+
+/** Narrowest and widest stairs, cm. */
+export const MIN_STAIR_WIDTH = 30
+export const MAX_STAIR_WIDTH = 1000
+
+/** Fewest and most steps of one flight of stairs. */
+export const MIN_STAIR_STEPS = 2
+export const MAX_STAIR_STEPS = 100
+
+/** Lowest rise of a flight of stairs, cm. */
+export const MIN_STAIR_RISE = 10
+
+/** Usual rise of one step, cm (17/29 stairs, DIN 18065). */
+export const STAIR_RISER = 17
+
+/** Default rise of a new flight of `steps` steps, cm: usual steps, a storey at most. */
+export function defaultStairRise(steps: number): number {
+	return Math.min(steps * STAIR_RISER, DEFAULT_STOREY_HEIGHT)
+}
+
+/**
+ * A straight flight of stairs from `a` (its foot) up to `b` (its head), cm,
+ * `width` cm wide and centered on that line, with `steps` treads of equal
+ * depth, climbing `rise` cm in all (missing, usual steps up to a storey).
+ */
+export const FloorplanStairSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		width: v.pipe(
+			v.number('Stair width must be a number'),
+			v.minValue(MIN_STAIR_WIDTH, `Stairs are at least ${MIN_STAIR_WIDTH} cm wide`),
+			v.maxValue(MAX_STAIR_WIDTH, `Stairs are at most ${MAX_STAIR_WIDTH} cm wide`),
+		),
+		steps: v.pipe(
+			v.number('Steps must be a number'),
+			v.integer('Steps must be a whole number'),
+			v.minValue(MIN_STAIR_STEPS, `Stairs have at least ${MIN_STAIR_STEPS} steps`),
+			v.maxValue(MAX_STAIR_STEPS, `Stairs have at most ${MAX_STAIR_STEPS} steps`),
+		),
+		rise: v.optional(heightSchema('The rise of stairs', MIN_STAIR_RISE), undefined),
+	}),
+	v.check(
+		(stair) => stair.a[0] !== stair.b[0] || stair.a[1] !== stair.b[1],
+		'Stairs need a length',
+	),
+	v.transform((stair) => ({ ...stair, rise: stair.rise ?? defaultStairRise(stair.steps) })),
+)
+
+export type FloorplanStair = v.InferOutput<typeof FloorplanStairSchema>
+
+/** Narrowest and widest cable tray, cm. */
+export const MIN_TRAY_WIDTH = 5
+export const MAX_TRAY_WIDTH = 200
+
+/** Default mounting height of a new cable tray (its bottom), cm: 20 cm below a 2.50 m ceiling. */
+export const DEFAULT_TRAY_ELEVATION = 230
+
+/**
+ * A straight run of cable tray from `a` to `b` (cm), `width` cm wide and
+ * centered on that line, its bottom `elevation` cm above the floor (0 lies
+ * on the floor). Runs meeting at an end form bends and junctions, like walls.
+ */
+export const FloorplanTraySchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		width: v.pipe(
+			v.number('Tray width must be a number'),
+			v.minValue(MIN_TRAY_WIDTH, `Cable trays are at least ${MIN_TRAY_WIDTH} cm wide`),
+			v.maxValue(MAX_TRAY_WIDTH, `Cable trays are at most ${MAX_TRAY_WIDTH} cm wide`),
+		),
+		elevation: v.optional(heightSchema('Cable tray height', 0), DEFAULT_TRAY_ELEVATION),
+	}),
+	v.check(
+		(tray) => tray.a[0] !== tray.b[0] || tray.a[1] !== tray.b[1],
+		'A cable tray needs a length',
+	),
+)
+
+export type FloorplanTray = v.InferOutput<typeof FloorplanTraySchema>
+
+/** Shallowest and deepest desk, cm. */
+export const MIN_DESK_DEPTH = 20
+export const MAX_DESK_DEPTH = 500
+
+/** Lowest and highest desk top, and the default of a new desk (DIN EN 527-1), cm. */
+export const MIN_DESK_HEIGHT = 20
+export const MAX_DESK_HEIGHT = 200
+export const DEFAULT_DESK_HEIGHT = 74
+
+const DeskHeightSchema = v.optional(
+	v.pipe(
+		v.number('Desk height must be a number'),
+		v.minValue(MIN_DESK_HEIGHT, `Desks are at least ${MIN_DESK_HEIGHT} cm high`),
+		v.maxValue(MAX_DESK_HEIGHT, `Desks are at most ${MAX_DESK_HEIGHT} cm high`),
+	),
+	DEFAULT_DESK_HEIGHT,
+)
+
+/** A location a drawn desk or room links to; missing for a plain drawing. */
+const LinkedLocationEntry = v.optional(IdSchema, undefined)
+
+/**
+ * A rectangular desk: its back edge from `a` to `b` (cm) and `depth` cm
+ * toward the left of `a`→`b` (on screen, y down), its top `height` cm above
+ * the floor.
+ */
+export const FloorplanDeskSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		depth: v.pipe(
+			v.number('Desk depth must be a number'),
+			v.minValue(MIN_DESK_DEPTH, `Desks are at least ${MIN_DESK_DEPTH} cm deep`),
+			v.maxValue(MAX_DESK_DEPTH, `Desks are at most ${MAX_DESK_DEPTH} cm deep`),
+		),
+		height: DeskHeightSchema,
+		location_id: LinkedLocationEntry,
+	}),
+	v.check((desk) => desk.a[0] !== desk.b[0] || desk.a[1] !== desk.b[1], 'A desk needs a length'),
+)
+
+export type FloorplanDesk = v.InferOutput<typeof FloorplanDeskSchema>
+
+/** Shortest and longest divider of a desk group, cm. */
+export const MIN_DESK_GROUP_ARM = 30
+export const MAX_DESK_GROUP_ARM = 400
+
+/** Deepest desk group, center to the front corners, cm. */
+export const MAX_DESK_GROUP_DEPTH = 800
+
+/**
+ * Half the width of the front edge of each desk of a desk group with
+ * dividers `arm` cm long, its front corners `depth` cm from the center; not
+ * positive when the sides would cross. Each side leaves its divider's outer
+ * end at a right angle, so neighboring desks' sides line up.
+ */
+export function deskGroupFrontHalf(arm: number, depth: number): number {
+	const side = ((depth - arm / 2) * 2) / Math.sqrt(3)
+	return (arm * Math.sqrt(3)) / 2 - side / 2
+}
+
+/** A desk of a desk group links to a location by id, or not (`null`). */
+const DeskGroupLinkSchema = v.nullable(IdSchema)
+
+/**
+ * Three desks around a center (cm), 120° apart, split by three dividers
+ * `arm` cm long. Each desk reaches `depth` cm from the center to its front
+ * corners; its front edge curves `curve` cm in toward the center. At
+ * `rotation` 0° the first desk faces down and a divider points up; the
+ * others follow clockwise. The desk tops lie `height` cm above the floor.
+ * `location_ids` holds each desk's link.
+ */
+export const FloorplanDeskGroupSchema = v.pipe(
+	v.strictObject({
+		center: DrawingPointSchema,
+		rotation: v.pipe(
+			v.number('Rotation must be a number'),
+			v.minValue(0, 'Rotation is at least 0°'),
+			v.maxValue(360, 'Rotation is at most 360°'),
+		),
+		arm: v.pipe(
+			v.number('Divider length must be a number'),
+			v.minValue(MIN_DESK_GROUP_ARM, `Dividers are at least ${MIN_DESK_GROUP_ARM} cm long`),
+			v.maxValue(MAX_DESK_GROUP_ARM, `Dividers are at most ${MAX_DESK_GROUP_ARM} cm long`),
+		),
+		depth: v.pipe(
+			v.number('Desk depth must be a number'),
+			v.minValue(MIN_DESK_DEPTH, `Desks are at least ${MIN_DESK_DEPTH} cm deep`),
+			v.maxValue(
+				MAX_DESK_GROUP_DEPTH,
+				`Desk groups are at most ${MAX_DESK_GROUP_DEPTH} cm deep`,
+			),
+		),
+		curve: v.pipe(v.number('Front curve must be a number'), v.minValue(0)),
+		height: DeskHeightSchema,
+		location_ids: v.tuple([DeskGroupLinkSchema, DeskGroupLinkSchema, DeskGroupLinkSchema]),
+	}),
+	v.check(
+		(group) => group.depth > group.arm / 2 && deskGroupFrontHalf(group.arm, group.depth) > 0,
+		"A desk group's depth must be more than half and less than twice its divider length",
+	),
+	v.check(
+		(group) =>
+			group.curve <=
+			Math.min(deskGroupFrontHalf(group.arm, group.depth), group.depth - group.arm / 2),
+		'The front curve is too deep for this desk group',
+	),
+)
+
+export type FloorplanDeskGroup = v.InferOutput<typeof FloorplanDeskGroupSchema>
+
+/** Most corners of a drawn room. */
+export const MAX_ROOM_POINTS = 200
+
+/**
+ * A room: a polygon of at least three corners (cm), optionally linked to a
+ * location and labelled (the label shows instead of the location's name).
+ */
+export const FloorplanRoomSchema = v.strictObject({
+	points: v.pipe(
+		v.array(DrawingPointSchema),
+		v.minLength(3, 'A room needs at least 3 corners'),
+		v.maxLength(MAX_ROOM_POINTS, `A room has at most ${MAX_ROOM_POINTS} corners`),
+	),
+	location_id: LinkedLocationEntry,
+	label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(100))), undefined),
+})
+
+export type FloorplanRoom = v.InferOutput<typeof FloorplanRoomSchema>
+
+/** A location a desk or room of a drawn plan links to, or may link to. */
+export interface FloorplanLinkLocationJson {
+	id: number
+	name: string
+	type: LocationType
+	parent_id: number | null
+}
+
+/**
+ * Reference image under a drawn plan: an image attachment of the same
+ * owner, its top-left corner at (`x`, `y`) cm (it may stick out of the
+ * sheet) and `width` cm wide; the height follows from its aspect ratio.
+ */
+export const FloorplanReferenceSchema = v.strictObject({
+	attachment_id: IdSchema,
+	x: v.pipe(v.number(), v.minValue(-10 * MAX_DRAWING_CM), v.maxValue(MAX_DRAWING_CM)),
+	y: v.pipe(v.number(), v.minValue(-10 * MAX_DRAWING_CM), v.maxValue(MAX_DRAWING_CM)),
+	width: v.pipe(
+		v.number('Image width must be a number'),
+		v.minValue(1, 'The image must be at least 1 cm wide'),
+		v.maxValue(10 * MAX_DRAWING_CM, 'The image is too wide'),
+	),
+})
+
+export type FloorplanReference = v.InferOutput<typeof FloorplanReferenceSchema>
+
+/** Length of a wall, cm. */
+export function wallLength(wall: Pick<FloorplanWall, 'a' | 'b'>): number {
+	return Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1])
+}
+
+/** How far a door or window may reach past its wall's ends: rounding slack, cm. */
+const OPENING_SLACK = 0.5
+
+/**
+ * `PUT /floorplan-drawings/:id`: the sheet, the reference image and the
+ * full set of walls, openings, stairs, cable trays, desks, desk groups,
+ * rooms and markers, replaced atomically. Everything lies on the sheet; each opening
+ * fits into its wall.
+ */
+export const FloorplanDrawingPutSchema = v.pipe(
+	v.strictObject({
+		width: SheetSideSchema,
+		height: SheetSideSchema,
+		reference: v.optional(v.nullable(FloorplanReferenceSchema), null),
+		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
+		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
+		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
+		trays: v.optional(v.pipe(v.array(FloorplanTraySchema), v.maxLength(2000)), []),
+		desks: v.optional(v.pipe(v.array(FloorplanDeskSchema), v.maxLength(2000)), []),
+		desk_groups: v.optional(v.pipe(v.array(FloorplanDeskGroupSchema), v.maxLength(1000)), []),
+		rooms: v.optional(v.pipe(v.array(FloorplanRoomSchema), v.maxLength(500)), []),
+		placements: v.pipe(v.array(DrawingPlacementInputSchema), v.maxLength(2000)),
+	}),
+	v.check(
+		(plan) =>
+			[
+				...plan.walls.flatMap((wall) => [wall.a, wall.b]),
+				...plan.stairs.flatMap((stair) => [stair.a, stair.b]),
+				...plan.trays.flatMap((tray) => [tray.a, tray.b]),
+				...plan.desks.flatMap((desk) => [desk.a, desk.b]),
+				...plan.desk_groups.map((group) => group.center),
+				...plan.rooms.flatMap((room) => room.points),
+				...plan.placements.map((p): [number, number] => [p.x, p.y]),
+			].every(([x, y]) => x <= plan.width && y <= plan.height),
+		'Walls, stairs, trays, desks, rooms and markers must lie on the sheet',
+	),
+	v.check((plan) => {
+		return plan.openings.every((opening) => {
+			const wall = plan.walls[opening.wall]
+			if (!wall) {
+				return false
+			}
+			const half = opening.width / 2
+			return (
+				opening.offset - half >= -OPENING_SLACK &&
+				opening.offset + half <= wallLength(wall) + OPENING_SLACK
+			)
+		})
+	}, 'Each door and window must fit into its wall'),
+)
+
+export type FloorplanDrawingPut = v.InferOutput<typeof FloorplanDrawingPutSchema>
+
+/** `POST /floorplan-drawings`: an empty drawn plan for a site or location. */
+export const FloorplanDrawingCreateSchema = v.pipe(
+	v.strictObject({
+		site_id: v.optional(IdSchema, undefined),
+		location_id: v.optional(IdSchema, undefined),
+		width: v.optional(SheetSideSchema, DEFAULT_DRAWING_SIZE.width),
+		height: v.optional(SheetSideSchema, DEFAULT_DRAWING_SIZE.height),
+	}),
+	v.check(
+		(body) => hasOneOwner(body.site_id, body.location_id),
+		'Exactly one of site or location is required',
+	),
+)
+
+export type FloorplanDrawingCreate = v.InferOutput<typeof FloorplanDrawingCreateSchema>
+
+/** `GET /floorplan-drawings/owner?site=|location=`: the owner's drawn plan, if any. */
+export const FloorplanDrawingOwnerQuerySchema = v.pipe(
+	v.object({ site: OptionalIdEntry, location: OptionalIdEntry }),
+	v.check((q) => hasOneOwner(q.site, q.location), 'Exactly one of site or location is required'),
+)
+
+export type FloorplanDrawingOwnerQuery = v.InferOutput<typeof FloorplanDrawingOwnerQuerySchema>
+
+/**
+ * Marker of a drawn plan: its position (`x` / `y`, cm), its mounting height
+ * (cm) and, for a rack with a rack type, the rack's height in units.
+ */
+export interface FloorplanDrawingPlacementJson extends FloorplanPlacementJson {
+	elevation: number
+	rack_units: number | null
+}
+
+/**
+ * `GET /floorplan-drawings/:id`. Markers whose object lies outside the
+ * requester's tenant scope are left out.
+ */
+export interface FloorplanDrawingJson {
+	id: number
+	/** Owner: exactly one of `site_id` / `location_id` is set. */
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+	/** Sheet size, cm. */
+	width: number
+	height: number
+	/** The reference image and where it lies; `null` without one. */
+	reference: (FloorplanReference & { attachment: AttachmentJson }) | null
+	walls: FloorplanWall[]
+	openings: FloorplanOpening[]
+	stairs: FloorplanStair[]
+	trays: FloorplanTray[]
+	desks: FloorplanDesk[]
+	desk_groups: FloorplanDeskGroup[]
+	rooms: FloorplanRoom[]
+	/**
+	 * The locations desks, desk groups and rooms link to, as far as they exist and the
+	 * requester may see them; a link missing here is kept on save.
+	 */
+	linked_locations: FloorplanLinkLocationJson[]
+	placements: FloorplanDrawingPlacementJson[]
+	/** Some markers are outside the requester's scope (a save keeps them). */
+	has_hidden_content: boolean
+	/** Unix seconds. */
+	updated_at: number
+}
+
+/** `GET /floorplan-drawings/owner`: the owner's drawn plan, or `null`. */
+export interface FloorplanDrawingRefJson {
+	id: number
+}
+
+/** `GET /floorplan-drawings?search=&page=&limit=&tenant=&tenant_group=`. */
+export const FloorplanDrawingListQuerySchema: typeof FloorplanListQuerySchema =
+	FloorplanListQuerySchema
+
+/** Drawn floor plan row of the `/floorplans-v2` list. */
+export interface FloorplanDrawingListJson {
+	id: number
+	site_id: number | null
+	location_id: number | null
+	owner_name: string
+	location_type: LocationType | null
+	site_name: string
+	tenant_id: number | null
+	tenant_name: string | null
+	walls: number
+	placements: number
+}
+
+// ---------------------------------------------------------------------------
 // Changelog (NetBox-style object change history, read-only)
 // ---------------------------------------------------------------------------
 
@@ -2467,6 +3040,7 @@ export const CHANGE_OBJECT_TYPES = [
 	'interface_template',
 	'device_role',
 	'attachment',
+	'floorplan_drawing',
 	'priority',
 	'service_level',
 	'managed_bundle',
@@ -2895,13 +3469,18 @@ export const IntegrationEntityParamsSchema = v.object({
 	id: IdSchema,
 })
 
-export const LinkEntityTypeSchema = v.picklist(['tenant', 'device', 'employee'])
+/**
+ * conex object an external object is linked to. External tenants link to a
+ * `tenant` or, for providers whose `link_level` is `site` (UniFi consoles),
+ * to a `site`.
+ */
+export const LinkEntityTypeSchema = v.picklist(['tenant', 'site', 'device', 'employee'])
 
 export type LinkEntityType = v.InferOutput<typeof LinkEntityTypeSchema>
 
 const ExternalIdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
 
-/** Links a conex tenant/device/employee to an external object (replaces its old link). */
+/** Links a conex tenant/site/device/employee to an external object (replaces its old link). */
 export const ExternalLinkCreateSchema = v.strictObject({
 	entity_type: LinkEntityTypeSchema,
 	entity_id: IdSchema,
@@ -2915,9 +3494,9 @@ export const ExternalIgnoreSchema = v.strictObject({
 })
 
 /**
- * Marks a conex tenant, device or employee as intentionally absent from the
- * external system (suppresses its `tenant_unlinked` / `*_missing_in_external`
- * finding). Stored
+ * Marks a conex tenant, site, device or employee as intentionally absent from
+ * the external system (suppresses its `tenant_unlinked` / `site_unlinked` /
+ * `*_missing_in_external` finding). Stored
  * as an `ignored` link row keyed by the conex entity; see `ignoreLocal` in
  * `server/src/integrations/links.ts` for the synthetic `external_id`.
  */
@@ -2989,7 +3568,7 @@ export const IntegrationReportQuerySchema = v.object({
 	tenant_group: OptionalIdEntry,
 })
 
-/** Link board: tenants, or the devices/employees of one conex tenant. */
+/** Link board: tenants or sites (per `link_level`), or the devices/employees of one conex tenant. */
 export const LinkBoardQuerySchema = v.object({
 	entity_type: LinkEntityTypeSchema,
 	/** Device/employee board only: the conex tenant whose objects are shown. */
@@ -3080,8 +3659,12 @@ export interface IntegrationCapabilities {
 	create_device: boolean
 	/** External tenants carry a customer number that is compared with the conex one. */
 	customer_numbers: boolean
-	/** How many external tenants one conex tenant may link to. */
-	tenant_cardinality: 'one' | 'many'
+	/**
+	 * conex object an external tenant links to, one each way: a tenant (TANSS
+	 * company), or a site (UniFi console; a tenant then has one per site, and
+	 * devices are compared per site instead of per tenant).
+	 */
+	link_level: 'tenant' | 'site'
 }
 
 /** Integration without secrets: only whether they are set. */
@@ -3105,7 +3688,7 @@ export interface IntegrationJson {
 	last_sync: SyncRunJson | null
 }
 
-/** Normalized external tenant (TANSS company, UniFi site, Entra tenant). */
+/** Normalized external tenant (TANSS company, UniFi console, Entra tenant). */
 export interface ExternalTenantJson {
 	external_id: string
 	/** Customer number (TANSS); null for providers without one. */
@@ -3123,9 +3706,9 @@ export interface ExternalTenantJson {
 	domains?: string[]
 }
 
-/** External tenant plus the conex tenant it is linked to (picker rows). */
+/** External tenant plus the conex tenant or site (`link_level`) it is linked to (picker rows). */
 export interface ExternalTenantListItem extends ExternalTenantJson {
-	linked_tenant_id: number | null
+	linked_entity_id: number | null
 	ignored: boolean
 }
 
@@ -3203,6 +3786,7 @@ export type EmployeeCompareField = (typeof EMPLOYEE_COMPARE_FIELDS)[number]
 
 export const FINDING_KINDS = [
 	'tenant_unlinked',
+	'site_unlinked',
 	'tenant_missing_in_conex',
 	'tenant_stale',
 	'tenant_inactive',
@@ -3229,6 +3813,9 @@ export interface IntegrationFinding {
 	kind: FindingKind
 	tenant_id: number | null
 	tenant_name: string | null
+	/** Site of site-level findings (`link_level: 'site'`) and their devices. */
+	site_id: number | null
+	site_name: string | null
 	device_id: number | null
 	device_name: string | null
 	employee_id: number | null
@@ -3238,8 +3825,9 @@ export interface IntegrationFinding {
 	external_name: string | null
 	external_tenant_id: string | null
 	/**
-	 * `tenant`/`status` only on `device_mismatch` and `employee_mismatch`;
-	 * `priority` on `priority_tag_missing` (priority label in `local`).
+	 * `tenant`/`status` only on `device_mismatch` and `employee_mismatch`
+	 * (`site` instead of `tenant` for site-level providers); `priority` on
+	 * `priority_tag_missing` (priority label in `local`).
 	 */
 	field:
 		| DeviceCompareField
@@ -3247,6 +3835,7 @@ export interface IntegrationFinding {
 		| 'customer_number'
 		| 'domain'
 		| 'tenant'
+		| 'site'
 		| 'status'
 		| 'priority'
 		| null
@@ -3274,7 +3863,7 @@ export interface FieldComparison {
 export interface LinkBoardLocal {
 	id: number
 	name: string
-	/** Tenant group, device manufacturer + model, or employee title + email. */
+	/** Tenant group, site tenant, device manufacturer + model, or employee title + email. */
 	detail: string | null
 	serial: string | null
 	active: boolean
@@ -3318,10 +3907,15 @@ export interface LinkBoard {
 /** Integration card on the tenant detail page. */
 export interface TenantIntegrationStatus {
 	/**
-	 * Linked external tenants (at most one unless the provider's
-	 * `tenant_cardinality` is `many`); `external` is null when it no longer exists.
+	 * Linked external tenants: at most one, or one per site of the tenant for
+	 * providers with `link_level: 'site'` (`site` set); `external` is null
+	 * when it no longer exists.
 	 */
-	links: { link: ExternalLinkJson; external: ExternalTenantJson | null }[]
+	links: {
+		link: ExternalLinkJson
+		external: ExternalTenantJson | null
+		site: { id: number; name: string } | null
+	}[]
 	finding_counts: Partial<Record<FindingKind, number>>
 }
 
@@ -3330,7 +3924,7 @@ export interface DeviceIntegrationStatus {
 	link: ExternalLinkJson | null
 	external: ExternalDeviceJson | null
 	fields: FieldComparison[]
-	/** External tenants linked to the device's tenant. */
+	/** External tenants linked to the device's tenant (to its site for `link_level: 'site'`). */
 	external_tenants: ExternalTenantJson[]
 	/** Unlinked, not ignored external devices of those tenants (link picker). */
 	candidates: ExternalDeviceJson[]

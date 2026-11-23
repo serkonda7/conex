@@ -154,8 +154,8 @@ export function createStageZoom(): StageZoom {
 			]
 		},
 		setSize(width: number, height: number): void {
-			// A hidden stage (its in-app tab in the background) measures 0 × 0;
-			// keep the last size so zoom and pan come back unchanged.
+			// A hidden stage still measures 0 × 0; keep the last size so zoom
+			// and pan come back unchanged when it is shown again.
 			if (width === 0 || height === 0) {
 				return
 			}

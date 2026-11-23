@@ -16,11 +16,13 @@ import {
 	type SyncRunJson,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
+import { isMockMode } from '../config'
 import { getDb, withTransaction } from '../db/connection'
 import { DuplicateError, ExternalServiceError, NotFoundError, ValidationError } from '../db/errors'
 import { tryWrite } from '../db/list'
 import { external_links, external_objects, integrations, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
+import { buildProvider } from './mock'
 import { providerDefinition } from './registry'
 import { decryptSecrets, emptySecrets, encryptSecrets, type IntegrationSecrets } from './secrets'
 import type { IntegrationConfig, IntegrationProvider } from './types'
@@ -187,7 +189,7 @@ async function verify(
 	config: IntegrationConfig,
 	secrets: IntegrationSecrets,
 ): Promise<Result<void, Error>> {
-	const instance = providerDefinition(provider).build(config, secrets)
+	const instance = buildProvider(provider, config, secrets)
 	if (Result.isError(instance)) {
 		return Result.err(new ValidationError(instance.error.message))
 	}
@@ -214,6 +216,9 @@ function missingSecret(
 	secrets: IntegrationSecrets,
 	username?: string | null,
 ): ValidationError | null {
+	if (isMockMode()) {
+		return null
+	}
 	if (providerNeedsUsername(provider) && (username ?? '') === '') {
 		return new ValidationError('Username is required')
 	}
@@ -420,8 +425,13 @@ export function credentialsOf<P extends ProviderId>(
 /** Provider instance with decrypted credentials, for one sync run. */
 export function providerFor(row: IntegrationRow): Result<IntegrationProvider, Error> {
 	const provider = row.provider as ProviderId
+	// Mock mode never needs credentials; a missing or undecryptable secret must
+	// not keep the snapshot-backed provider from being built.
+	if (isMockMode()) {
+		return buildProvider(provider, configOf(row), emptySecrets(provider))
+	}
 	return credentialsOf(row, provider).andThen(({ config, secrets }) =>
-		providerDefinition(provider).build(config, secrets),
+		buildProvider(provider, config, secrets),
 	)
 }
 

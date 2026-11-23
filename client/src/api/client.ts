@@ -46,11 +46,11 @@ function floorplan_impact(data: unknown): FloorplanImpactJson | null {
 	if (typeof impact !== 'object' || !impact) {
 		return null
 	}
-	const { areas, placements, linkedFrom } = impact as Record<string, unknown>
+	const { areas, placements, linkedFrom, drawings } = impact as Record<string, unknown>
 	return typeof areas === 'number' &&
 		typeof placements === 'number' &&
 		typeof linkedFrom === 'number'
-		? { areas, placements, linkedFrom }
+		? { areas, placements, linkedFrom, drawings: typeof drawings === 'number' ? drawings : 0 }
 		: null
 }
 

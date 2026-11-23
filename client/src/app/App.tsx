@@ -1,13 +1,12 @@
 /**
  * App shell: the session gate (first-run setup, login) and, once signed in,
- * the top bar, sidebar, tab strip and one mounted page per tab.
+ * the top bar, sidebar and the one page shown for the current URL.
  */
 import { IconMenu2 } from '@tabler/icons-solidjs'
 import {
 	createEffect,
 	createSignal,
 	createUniqueId,
-	For,
 	type JSX,
 	Match,
 	onCleanup,
@@ -19,8 +18,9 @@ import { fetchMe, fetchSetupStatus, logout, type SessionUser } from '../api/auth
 import { set_unauthorized_handler } from '../api/client'
 import { Loading } from '../components/feedback'
 import { type Locale, locale, t } from '../i18n'
+import { loadUserPreferences } from '../lib/preferences'
 import { queryClient } from '../lib/query'
-import { activeTabId, goTo, type TabState, tabs } from '../lib/router'
+import { goTo, path } from '../lib/router'
 import { setSessionAccess } from '../lib/session'
 import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
 import { formatTime } from '../lib/time'
@@ -28,18 +28,21 @@ import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { CommandPalette, CommandPaletteButton } from './command_palette'
 import { RouteContent } from './route_content'
+import { pageTitle } from './routes'
 import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
-import { TabBar } from './tab_bar'
 import { TenantContextSelector } from './tenant_context_selector'
-import { UserMenu } from './user_menu'
+import { LogoutButton, UserMenu } from './user_menu'
 
 /**
  * Routes in-app anchors that have no click handler of their own through
- * `goTo`, and middle clicks (which never fire `click`) to a new tab.
- * Anchors whose handler already called `goTo` are skipped.
+ * `goTo`. Modified and middle clicks are left to the browser, which opens
+ * its own tab; anchors whose handler already called `goTo` are skipped.
  */
 function onLinkClick(e: MouseEvent): void {
-	if (e.defaultPrevented || e.button > 1 || !(e.target instanceof Element)) {
+	if (e.defaultPrevented || e.button !== 0 || !(e.target instanceof Element)) {
+		return
+	}
+	if (e.ctrlKey || e.metaKey || e.shiftKey) {
 		return
 	}
 	const anchor = e.target.closest('a[href]')
@@ -87,6 +90,10 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 	const canAddTenants = (): boolean => props.user.permissions.includes('edit') && !isScoped()
 
 	createEffect(() => {
+		document.title = `${pageTitle(path())} · ${APP_TITLE}`
+	})
+	createEffect(() => {
+		loadUserPreferences(props.user.username)
 		setSessionAccess({
 			permissions: props.user.permissions,
 			tenantIds: props.user.tenant_ids,
@@ -98,6 +105,7 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 		}
 	})
 	onCleanup(() => {
+		loadUserPreferences(null)
 		setSessionAccess({ permissions: [], tenantIds: null, employeeId: null })
 		// Cached rows belong to the session's user and tenant scope.
 		queryClient.clear()
@@ -139,7 +147,8 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 				</Show>
 				<div class="app-topbar-user">
 					<CommandPaletteButton onOpen={() => setPaletteOpen(true)} />
-					<UserMenu user={props.user} onLogout={props.onLogout} />
+					<UserMenu user={props.user} />
+					<LogoutButton onLogout={props.onLogout} />
 				</div>
 			</header>
 			<CommandPalette open={paletteOpen()} setOpen={setPaletteOpen} />
@@ -152,20 +161,11 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 					/>
 				</Show>
 				<div class="app-main">
-					<TabBar />
 					<main class="app-content" id="main">
-						<For each={tabs()}>
-							{(tab: TabState) => (
-								<div
-									class="tab-pane"
-									data-tab-id={tab.id}
-									hidden={tab.id !== activeTabId()}
-									aria-hidden={tab.id !== activeTabId()}
-								>
-									<RouteContent routePath={tab.path} tabId={tab.id} />
-								</div>
-							)}
-						</For>
+						{/* Remount the page for each path so it fetches fresh data. */}
+						<Show when={path()} keyed>
+							{(routePath: string) => <RouteContent routePath={routePath} />}
+						</Show>
 					</main>
 					<footer class="app-footer">
 						{t('app.buildInfo', {

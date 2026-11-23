@@ -31,6 +31,7 @@ import {
 	RelatedTabs,
 	useDetailDelete,
 } from '../../components/detail_page'
+import { DrawnPlanLink } from '../../components/drawn_plan_link'
 import { Empty, InlineError } from '../../components/feedback'
 import { FloorplanPreview } from '../../components/floorplan_preview'
 import { IconLabel } from '../../components/icon_label'
@@ -392,6 +393,7 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 										)}
 									</Show>
 								</dd>
+								<DrawnPlanLink owner={{ location: props.id }} onError={setError} />
 								<dt>{t('floorplan.linkedFrom')}</dt>
 								<dd>
 									<Show when={(planLinks() ?? []).length > 0} fallback="—">

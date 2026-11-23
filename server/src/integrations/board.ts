@@ -1,9 +1,10 @@
 /**
  * Link board: conex objects and external objects of one link level side by
- * side, with their link state and unambiguous match suggestions. Tenants are
- * listed in full (global users only; inactive and private customers only when linked);
- * devices and employees per conex tenant, against the ones of the external
- * tenants linked to it. Inactive devices and external employees are ignored by default
+ * side, with their link state and unambiguous match suggestions. Tenants, or
+ * sites for providers with `link_level: 'site'`, are listed in full (global
+ * users only; inactive and private customers only when linked); devices and
+ * employees per conex tenant, against the ones of the external tenants linked
+ * to it (devices of a site only against its console's). Inactive devices and external employees are ignored by default
  * (hidden unless toggled on, never suggested); linked ones stay visible as linked.
  */
 import { eq, inArray } from 'drizzle-orm'
@@ -16,11 +17,19 @@ import type {
 import { primaryEmail } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { memberOf } from '../db/employees'
-import { devices, employees, tenant_groups, tenants } from '../schema'
-import { type ExternalLinkRow, listLinks } from './links'
-import { group, matchDevices, matchEmployees, normalizeName } from './match'
+import { devices, employees, sites, tenant_groups, tenants } from '../schema'
+import { type ExternalLinkRow, listLinks, scopeLinks, tenantLevel } from './links'
+import {
+	group,
+	type LocalDevice,
+	type MatchResult,
+	matchDevices,
+	matchEmployees,
+	normalizeName,
+} from './match'
 import { lastSyncedAt, linkedExternalTenants, localDevices, localEmployees } from './report'
 import { readDevices, readEmployees, readTenants } from './snapshot'
+import type { ExternalDevice } from './types'
 
 function joinDetail(...parts: (string | null)[]): string | null {
 	const text = parts.filter((p) => p !== null && p !== '').join(' ')
@@ -126,12 +135,21 @@ function compareExternal(a: LinkBoardExternal, b: LinkBoardExternal): number {
 	return order(a) - order(b) || a.name.localeCompare(b.name)
 }
 
+/** Top-level board: tenants (detail: group), or sites (detail: tenant) for site links. */
 export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
-	const rows = await getDb()
-		.select({ id: tenants.id, name: tenants.name, group: tenant_groups.name })
-		.from(tenants)
-		.leftJoin(tenant_groups, eq(tenants.tenant_group_id, tenant_groups.id))
-		.orderBy(tenants.name)
+	const level = tenantLevel(provider)
+	const rows =
+		level === 'site'
+			? await getDb()
+					.select({ id: sites.id, name: sites.name, group: tenants.name })
+					.from(sites)
+					.leftJoin(tenants, eq(sites.tenant_id, tenants.id))
+					.orderBy(sites.name)
+			: await getDb()
+					.select({ id: tenants.id, name: tenants.name, group: tenant_groups.name })
+					.from(tenants)
+					.leftJoin(tenant_groups, eq(tenants.tenant_group_id, tenant_groups.id))
+					.orderBy(tenants.name)
 	const tenantName = new Map(rows.map((r) => [r.id, r.name]))
 	const allExternal = [...(await readTenants(provider)).values()].sort((a, b) =>
 		a.name.localeCompare(b.name),
@@ -141,7 +159,7 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 		byExternal: linkByExternal,
 		linked: linkByTenant,
 		ignored: ignoredByTenant,
-	} = indexLinks(await listLinks(provider, 'tenant'))
+	} = indexLinks(await listLinks(provider, level))
 	// Inactive and private customers are not offered for linking; ones
 	// already linked stay listed so they can be unlinked.
 	const externals = allExternal.filter(
@@ -193,12 +211,37 @@ export async function tenantBoard(provider: ProviderId): Promise<LinkBoard> {
 		.sort(compareExternal)
 	return {
 		provider,
-		entity_type: 'tenant',
+		entity_type: level,
 		synced_at: await lastSyncedAt(provider),
 		external_tenants: [],
 		local,
 		external,
 	}
+}
+
+/**
+ * Match candidates of a tenant's free devices: against all its external
+ * tenants' devices, or per site against the site's console for site links.
+ */
+async function boardDeviceMatches(
+	provider: ProviderId,
+	tenantId: number,
+	locals: (LocalDevice & { site_id: number | null })[],
+	externals: ExternalDevice[],
+): Promise<MatchResult> {
+	if (tenantLevel(provider) === 'tenant') {
+		return matchDevices(locals, externals)
+	}
+	const out: MatchResult = { auto: [], suggestions: [] }
+	for (const scope of await scopeLinks(provider, [tenantId])) {
+		const { auto, suggestions } = matchDevices(
+			locals.filter((d) => d.site_id === scope.site_id),
+			externals.filter((e) => e.external_tenant_id === scope.link.external_id),
+		)
+		out.auto.push(...auto)
+		out.suggestions.push(...suggestions)
+	}
+	return out
 }
 
 export async function deviceBoard(provider: ProviderId, tenantId: number): Promise<LinkBoard> {
@@ -238,7 +281,9 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 	}
 
 	// Inactive devices are ignored by default: never suggested or auto-linked.
-	const { auto, suggestions } = matchDevices(
+	const { auto, suggestions } = await boardDeviceMatches(
+		provider,
+		tenantId,
 		locals.filter(
 			(d) => d.status === 'active' && !linkByDevice.has(d.id) && !ignoredByDevice.has(d.id),
 		),

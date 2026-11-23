@@ -24,7 +24,7 @@ export const tanssDefinition: ProviderDefinition<'tanss'> = {
 		push: true,
 		create_device: true,
 		customer_numbers: true,
-		tenant_cardinality: 'one',
+		link_level: 'tenant',
 	},
 	incremental: true,
 	secretLabels: { password: 'Password', erp_token: 'ERP API token' },
