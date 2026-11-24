@@ -58,7 +58,7 @@ function ManagedBundleForm(props: { id?: number }): JSX.Element {
 				placeholder={t('managedBundle.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

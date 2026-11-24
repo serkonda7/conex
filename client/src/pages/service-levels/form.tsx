@@ -263,7 +263,7 @@ function ServiceLevelForm(props: { id?: number }): JSX.Element {
 				placeholder={t('serviceLevel.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

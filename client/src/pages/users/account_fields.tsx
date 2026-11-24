@@ -1,5 +1,5 @@
 import { normalizeLogin } from 'shared/src/login'
-import { For, type JSX, Show } from 'solid-js'
+import { createEffect, For, type JSX, Show } from 'solid-js'
 import { type EmployeeRow, fetch_all_employees } from '../../api/employees'
 import type { RoleJson } from '../../api/roles'
 import { fetch_tenants, type TenantRow } from '../../api/tenancy'
@@ -51,7 +51,17 @@ export function EmployeeField(props: {
 	employeeId: string
 	onEmployeeChange: (value: string) => void
 	ownLogin?: string
+	autofocus?: boolean
 }): JSX.Element {
+	const id = (): string => `${props.idPrefix}-employee`
+	// The picker is disabled until the employees load, so focus it only then.
+	let focused = false
+	createEffect(() => {
+		if (props.autofocus === true && !focused && !props.data.employees.loading) {
+			focused = true
+			document.querySelector<HTMLElement>(`#${CSS.escape(id())}`)?.focus()
+		}
+	})
 	const options = (): FormOption[] => {
 		const free = (props.data.employees() ?? []).filter(
 			(row) => row.login === null || row.login === props.ownLogin,
@@ -65,7 +75,7 @@ export function EmployeeField(props: {
 
 	return (
 		<SelectField
-			id={`${props.idPrefix}-employee`}
+			id={id()}
 			label={t('user.employee')}
 			value={props.employeeId}
 			onChange={props.onEmployeeChange}

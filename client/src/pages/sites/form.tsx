@@ -171,7 +171,7 @@ function SiteForm(props: { id?: number }): JSX.Element {
 				placeholder={t('site.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<Show when={form.editing}>
 				<TenantSelectField

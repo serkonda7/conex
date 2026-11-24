@@ -84,7 +84,7 @@ function PriorityForm(props: { id?: number }): JSX.Element {
 				placeholder={t('priority.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<TextField
 				id={`${prefix}-rank`}

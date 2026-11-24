@@ -220,7 +220,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				maxLength={100}
 				value={firstName()}
 				onInput={setFirstName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<TextField
 				id={`${prefix}-last-name`}

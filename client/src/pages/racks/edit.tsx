@@ -104,6 +104,7 @@ export function RackEditPage(props: { id: number }): JSX.Element {
 				onChange={setLocationId}
 				options={locationOptions()}
 				emptyLabel={t('rack.noLocation')}
+				autofocus
 			/>
 			<NameField id="rack-edit-name" placeholder="A1" value={name()} onInput={setName} />
 			<DescriptionField

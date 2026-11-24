@@ -75,7 +75,7 @@ function SiteGroupForm(props: { id?: number }): JSX.Element {
 				placeholder={t('siteGroup.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<Show when={form.editing}>
 				<TenantSelectField

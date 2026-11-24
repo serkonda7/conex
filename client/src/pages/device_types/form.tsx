@@ -138,6 +138,7 @@ export function DeviceTypeEditPage(props: { id: number }): JSX.Element {
 				options={row_options(manufacturers() ?? [])}
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				reload={refetchManufacturers}
+				autofocus
 			/>
 			<TextField
 				id={`${prefix}-model`}

@@ -89,7 +89,7 @@ function RoleForm(props: { id?: number }): JSX.Element {
 				placeholder={t('role.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

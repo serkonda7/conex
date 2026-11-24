@@ -85,6 +85,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				employeeId={employeeId()}
 				onEmployeeChange={setEmployeeId}
 				ownLogin={form.record()?.username}
+				autofocus
 			/>
 			<LoginField idPrefix="user-edit" employee={employee()} />
 			<SelectField
