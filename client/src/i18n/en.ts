@@ -795,8 +795,6 @@ export const en = {
 	'rackType.notFound': 'Rack type not found.',
 	'rackType.details': 'Rack type details',
 	'rackType.noRacks': 'No racks of this type yet.',
-	'rackType.elevation': 'Elevation',
-	'rackType.image': 'Empty rack, {height} U, {formFactor}',
 	'formFactor.twoPostFrame': '2-post frame',
 	'formFactor.fourPostFrame': '4-post frame',
 	'formFactor.fourPostCabinet': '4-post cabinet',

@@ -1,12 +1,7 @@
-import { createSignal, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import type { RackRow } from '../../api/racks'
 import { fetch_racks } from '../../api/racks'
-import {
-	delete_rack_type,
-	fetch_manufacturer,
-	fetch_rack_type,
-	type RackTypeRow,
-} from '../../api/templates'
+import { delete_rack_type, fetch_manufacturer, fetch_rack_type } from '../../api/templates'
 import { nameColumn } from '../../components/data_table'
 import {
 	DetailHeader,
@@ -18,7 +13,6 @@ import {
 	useDetailDelete,
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
-import { RackImage } from '../../components/rack_image'
 import { t, tp } from '../../i18n'
 import { formFactorLabel } from '../../i18n/labels'
 import { createRecord, createRowsFor } from '../../lib/resource'
@@ -86,17 +80,6 @@ export function RackTypeDetailPage(props: { id: number }): JSX.Element {
 					<SpecSheetComments text={rackType()?.comments} />
 				</section>
 			</DetailShell>
-
-			<Show when={rackType()}>
-				{(type: () => RackTypeRow): JSX.Element => (
-					<section class="component-section" id="rack-type-elevation">
-						<div class="card-header">
-							<h3>{t('rackType.elevation')}</h3>
-						</div>
-						<RackImage u_height={type().u_height} form_factor={type().form_factor} />
-					</section>
-				)}
-			</Show>
 
 			<RelatedSection
 				id="rack-type-racks"

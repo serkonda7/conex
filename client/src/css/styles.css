@@ -5142,47 +5142,6 @@ span.attachment-star,
 	font-size: var(--font-size-sm);
 }
 
-/* Symbolic empty rack of a rack type (`components/rack_image.tsx`). */
-.rack-image {
-	display: block;
-	width: min(100%, 20rem);
-	height: auto;
-}
-
-.rack-image-cabinet {
-	fill: var(--bg-hover);
-	stroke: var(--border-strong);
-	stroke-width: 1;
-}
-
-.rack-image-post {
-	fill: var(--bg-raised);
-	stroke: var(--border-strong);
-	stroke-width: 1;
-}
-
-.rack-image-vent,
-.rack-image-bay,
-.rack-image-hole {
-	fill: var(--bg-base);
-}
-
-.rack-image-unit {
-	stroke: var(--border);
-	stroke-width: 0.6;
-}
-
-.rack-image-rail {
-	fill: var(--bg-raised);
-	stroke: var(--border-strong);
-	stroke-width: 0.6;
-}
-
-.rack-image-number {
-	fill: var(--text-subtle);
-	font-variant-numeric: tabular-nums;
-}
-
 /* Images mode: one U is as tall as the faceplate's 19" aspect allows. */
 .rack-elev-face {
 	container-type: inline-size;

@@ -802,8 +802,6 @@ export const de: Messages = {
 	'rackType.notFound': 'Racktyp nicht gefunden.',
 	'rackType.details': 'Racktyp-Details',
 	'rackType.noRacks': 'Noch keine Racks dieses Typs vorhanden.',
-	'rackType.elevation': 'Rackansicht',
-	'rackType.image': 'Leeres Rack, {height} HE, {formFactor}',
 	'formFactor.twoPostFrame': '2-Pfosten-Gestell',
 	'formFactor.fourPostFrame': '4-Pfosten-Gestell',
 	'formFactor.fourPostCabinet': '4-Pfosten-Schrank',
