@@ -26,6 +26,8 @@ import type {
 	AttachmentJson,
 	AttachmentMime,
 	AttachmentUpdate,
+	DeleteContentsJson,
+	DeleteQuery,
 	FloorplanCandidateJson,
 	FloorplanImpactJson,
 	FloorplanJson,
@@ -68,7 +70,7 @@ import { cableEnds } from './cables'
 import { logCreate, logDelete, logDeletes, logUpdate, logUpdates } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { type InterfaceJson, toInterfaceJson } from './devices'
-import { ConflictError, FloorplanImpactError, NotFoundError, ValidationError } from './errors'
+import { ConflictError, DeleteImpactError, NotFoundError, ValidationError } from './errors'
 import {
 	checkExists,
 	countWhere,
@@ -1593,9 +1595,39 @@ export async function checkFloorplanDelete(
 		return Result.ok(undefined)
 	}
 	const impact = await floorplanImpact(target)
-	return impact.areas + impact.placements + impact.linkedFrom + impact.drawings > 0
-		? Result.err(new FloorplanImpactError(impact))
-		: Result.ok(undefined)
+	return hasImpact(impact) ? Result.err(new DeleteImpactError(impact)) : Result.ok(undefined)
+}
+
+function hasImpact(counts: FloorplanImpactJson | DeleteContentsJson): boolean {
+	return Object.values(counts).some((n) => n > 0)
+}
+
+/**
+ * Delete guard for an owner deleted together with its `contents` (all of
+ * `targets` go): contents need `?confirm=contents`, which also covers the
+ * floor-plan data; without contents, floor-plan data needs
+ * `?confirm=floorplan`. The error carries both for the client.
+ */
+export async function checkContentsDelete(
+	targets: FloorplanDeleteTarget[],
+	contents: DeleteContentsJson,
+	confirm: DeleteQuery['confirm'],
+): Promise<Result<undefined, Error>> {
+	if (confirm === 'contents' || (confirm === 'floorplan' && !hasImpact(contents))) {
+		return Result.ok(undefined)
+	}
+	const impact: FloorplanImpactJson = { areas: 0, placements: 0, linkedFrom: 0, drawings: 0 }
+	for (const target of targets) {
+		const one = await floorplanImpact(target)
+		impact.areas += one.areas
+		impact.placements += one.placements
+		impact.linkedFrom += one.linkedFrom
+		impact.drawings += one.drawings
+	}
+	if (hasImpact(contents)) {
+		return Result.err(new DeleteImpactError(impact, contents))
+	}
+	return hasImpact(impact) ? Result.err(new DeleteImpactError(impact)) : Result.ok(undefined)
 }
 
 /**
@@ -1862,7 +1894,7 @@ export async function deleteAttachment(
 			drawings: 0,
 		}
 		if (impact.areas + impact.placements > 0) {
-			return Result.err(new FloorplanImpactError(impact))
+			return Result.err(new DeleteImpactError(impact))
 		}
 	}
 	const deleted = await tryWrite(() => getDb().delete(attachments).where(eq(attachments.id, id)))

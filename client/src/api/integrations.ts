@@ -6,6 +6,7 @@
 import { Result } from 'better-result'
 import type {
 	EmployeePushField,
+	ExternalDeviceImport,
 	ExternalDeviceJson,
 	ExternalEmployeeJson,
 	ExternalLinkJson,
@@ -32,6 +33,7 @@ import type {
 import { t } from '../i18n'
 import { invalidate_queries } from '../lib/query'
 import { client, failed, poll_run, to_query, to_result } from './client'
+import type { DeviceRow } from './devices'
 
 export type {
 	ExternalEmployeeJson,
@@ -270,6 +272,18 @@ export async function import_external_employees(
 		json: { tenant_id, external_ids },
 	})
 	return to_result<{ created: number }>(res, t('integration.importEmployeesFailed'))
+}
+
+/** Creates a conex device from an external one and links the two. */
+export async function import_external_device(
+	provider: IntegrationProvider,
+	input: ExternalDeviceImport,
+): Promise<Result<DeviceRow, Error>> {
+	const res = await client.integrations[':provider'].devices.import.$post({
+		param: { provider },
+		json: input,
+	})
+	return to_result<DeviceRow>(res, t('integration.importDeviceFailed'))
 }
 
 /** Creates a conex device in the external system and links the two. */

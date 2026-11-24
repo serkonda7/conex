@@ -3,7 +3,7 @@
  * `DrizzleQueryError` whose `cause` is the Bun `PostgresError`.
  */
 
-import type { FloorplanImpactJson } from 'shared/src/schemas'
+import type { DeleteContentsJson, FloorplanImpactJson } from 'shared/src/schemas'
 
 const PG_UNIQUE_VIOLATION = '23505'
 
@@ -50,13 +50,21 @@ export class ConflictError extends Error {
 }
 
 /**
- * Wrapped in a `Result.err` when a delete would remove floor-plan data and
- * the request lacks `?confirm=floorplan`. Mapped to 409 with the impact.
+ * Wrapped in a `Result.err` when a delete would remove floor-plan data
+ * (without `?confirm=floorplan`) or contained rows (`contents`, without
+ * `?confirm=contents`). Mapped to 409 with the impact.
  */
-export class FloorplanImpactError extends ConflictError {
-	constructor(readonly floorplan: FloorplanImpactJson) {
-		super('Deleting this also removes floor-plan data; confirm to continue')
-		this.name = 'FloorplanImpactError'
+export class DeleteImpactError extends ConflictError {
+	constructor(
+		readonly floorplan: FloorplanImpactJson,
+		readonly contents?: DeleteContentsJson,
+	) {
+		super(
+			contents
+				? 'Deleting this also removes its contents; confirm to continue'
+				: 'Deleting this also removes floor-plan data; confirm to continue',
+		)
+		this.name = 'DeleteImpactError'
 	}
 }
 
@@ -76,6 +84,17 @@ export class ValidationError extends Error {
 	constructor(message: string) {
 		super(message)
 		this.name = 'ValidationError'
+	}
+}
+
+/**
+ * Wrapped in a `Result.err` when a feature is switched off by configuration
+ * (e.g. no `[ai]` section). Mapped to 503.
+ */
+export class ServiceUnavailableError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = 'ServiceUnavailableError'
 	}
 }
 

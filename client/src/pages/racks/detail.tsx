@@ -1,8 +1,14 @@
 import { Result } from 'better-result'
 import type { ElevationShelfDeviceRef, ElevationShelfRef } from 'shared/src/types'
-import { createMemo, createSignal, type JSX, Show } from 'solid-js'
+import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import { type DeviceRow, fetch_devices, update_device } from '../../api/devices'
-import { delete_rack, fetch_elevation, fetch_rack, fetch_racks } from '../../api/racks'
+import {
+	delete_rack,
+	fetch_elevation,
+	fetch_rack,
+	fetch_rack_faceplates,
+	fetch_racks,
+} from '../../api/racks'
 import {
 	type DeviceTypeRow,
 	fetch_device_types,
@@ -21,19 +27,28 @@ import {
 	RecordLink,
 	useDetailDelete,
 } from '../../components/detail_page'
+import type { FaceplateViewPort } from '../../components/faceplate'
 import { InlineError, Loading } from '../../components/feedback'
 import { FloorplanLinks } from '../../components/floorplan_links'
 import { useSort } from '../../components/list_page'
 import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
 import { faceLabel } from '../../i18n/labels'
+import { FEATURES } from '../../lib/features'
 import { useNameOf } from '../../lib/lookup'
 import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
 import { can } from '../../lib/session'
+import { readStored, writeStored } from '../../lib/storage'
 import { siteTrail } from '../../lib/trails'
 import { useDeviceSearch } from '../devices/device_search'
 import { RackElevation, type RackFace } from './elevation'
+
+/** How the elevation shows devices; remembered per browser. */
+type ElevationDisplay = 'labels' | 'images'
+
+const DISPLAY_KEY = 'conex:rackElevationDisplay'
+const DISPLAYS: ElevationDisplay[] = ['labels', 'images']
 
 /**
  * /racks/:id — rack detail: header with name/description, two-column
@@ -66,6 +81,25 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 			siteTrail(siteRow, locationKey),
 	)
 	const [elevation] = createRecord(id, fetch_elevation, setError)
+	const [display, setDisplayState] = createSignal<ElevationDisplay>(
+		FEATURES.schematics && readStored(DISPLAY_KEY) === 'images' ? 'images' : 'labels',
+	)
+	const setDisplay = (value: ElevationDisplay): void => {
+		setDisplayState(value)
+		writeStored(DISPLAY_KEY, value)
+	}
+	// Ports load only once the images show.
+	const faceplateKey = (): number | undefined => (display() === 'images' ? id() : undefined)
+	const [faceplates] = createRecord(faceplateKey, fetch_rack_faceplates, setError)
+	const faceplatePorts = createMemo(
+		(): ReadonlyMap<number, readonly FaceplateViewPort[]> | undefined => {
+			const loaded = faceplates()
+			if (display() !== 'images' || !loaded) {
+				return undefined
+			}
+			return new Map(loaded.devices.map((entry) => [entry.device_id, entry.ports]))
+		},
+	)
 	const [rackDevices] = createRowsFor(
 		id,
 		(key: number) => fetch_devices({ rack: [key] }),
@@ -365,11 +399,40 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
 							</span>
 						</div>
+						<Show when={FEATURES.schematics}>
+							<div class="rack-elev-toolbar">
+								<div
+									class="segmented"
+									role="radiogroup"
+									aria-label={t('elevation.display')}
+								>
+									<For each={DISPLAYS}>
+										{(value: ElevationDisplay): JSX.Element => (
+											<label class="segmented-option">
+												<input
+													type="radio"
+													name="rack-elevation-display"
+													value={value}
+													checked={display() === value}
+													onChange={() => setDisplay(value)}
+												/>
+												<span>
+													{value === 'images'
+														? t('elevation.displayImages')
+														: t('elevation.displayLabels')}
+												</span>
+											</label>
+										)}
+									</For>
+								</div>
+							</div>
+						</Show>
 						<Show
 							when={elevation()}
 							fallback={<Loading message={t('rack.loadingElevation')} />}
 						>
 							<RackElevation
+								faceplates={faceplatePorts()}
 								units={elevation()?.units ?? []}
 								shelves={elevation()?.shelves ?? []}
 								selected_u={pendingU()}

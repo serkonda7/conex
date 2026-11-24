@@ -9,12 +9,14 @@ import {
 	IconTrash,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import { expandStub } from 'shared/src/schemas'
 import { createMemo, createSignal, type JSX, onCleanup, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { fetch_device_role } from '../../api/device_roles'
 import { type DeviceListDevice, fetch_all_devices_of_type } from '../../api/devices'
 import { fetch_racks } from '../../api/racks'
 import {
+	type DeviceTypeRow,
 	delete_device_type,
 	delete_stub,
 	fetch_device_type,
@@ -36,6 +38,7 @@ import {
 	useDetailDelete,
 	ViewAllLink,
 } from '../../components/detail_page'
+import { type FaceplateViewPort, FaceplateViews } from '../../components/faceplate'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { ScrollLink } from '../../components/scroll_link'
@@ -47,6 +50,7 @@ import {
 	poeTypeShortLabel,
 	yesNo,
 } from '../../i18n/labels'
+import { FEATURES } from '../../lib/features'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import { can } from '../../lib/session'
@@ -314,6 +318,24 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 
 	const rearStubs = (): StubRow[] => (stubs() ?? []).filter((row) => row.side === 'rear')
 
+	/** The ports the stubs expand to, in creation order, one group per stub. */
+	const faceplatePorts = createMemo((): FaceplateViewPort[] =>
+		(stubs() ?? [])
+			.toSorted((a, b) => a.id - b.id)
+			.flatMap((stub) => {
+				const names = expandStub(stub.prefix, stub.count, stub.digits, stub.start)
+				return names.ok
+					? names.value.map((name) => ({
+							name,
+							kind: stub.kind,
+							side: stub.side,
+							face: stub.face,
+							group: stub.id,
+						}))
+					: []
+			}),
+	)
+
 	const handleDelete = useDetailDelete({
 		noun: 'noun.deviceType',
 		name: () => deviceType()?.model,
@@ -459,6 +481,20 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				</section>
 			</DetailShell>
 
+			<Show when={FEATURES.schematics ? deviceType() : undefined}>
+				{(type: () => DeviceTypeRow): JSX.Element => (
+					<section class="component-section" id="device-type-views">
+						<div class="card-header">
+							<h3>{t('faceplate.heading')}</h3>
+						</div>
+						<FaceplateViews
+							ports={faceplatePorts()}
+							u_height={type().u_height}
+							label={type().model}
+						/>
+					</section>
+				)}
+			</Show>
 			<section class="component-section" id="device-type-components">
 				<div class="card-header">
 					<h3>

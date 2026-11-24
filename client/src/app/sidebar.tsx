@@ -157,7 +157,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{ label: 'app.navGroup.customization', paths: ['saved-filters', 'saved-layouts'] },
 	{
 		label: 'app.navGroup.administration',
-		paths: ['integrations', 'users', 'roles', 'audit-log', 'changelog'],
+		paths: ['integrations', 'users', 'roles', 'global-settings', 'audit-log', 'changelog'],
 	},
 ]
 

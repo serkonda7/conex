@@ -7,6 +7,7 @@ import type {
 	ElevationUnit,
 } from 'shared/src/types'
 import { For, type JSX, Show } from 'solid-js'
+import { Faceplate, type FaceplateViewPort } from '../../components/faceplate'
 import { t } from '../../i18n'
 import { deviceStatusLabel, faceLabel } from '../../i18n/labels'
 
@@ -354,6 +355,11 @@ interface ElevationProps {
 	shelf_actions: ShelfDeviceActions
 	/** Read-only session: no add / select / remove actions. */
 	readonly?: boolean
+	/**
+	 * Images mode: devices show their symbolic faceplate with these ports
+	 * (by device id) instead of name and model.
+	 */
+	faceplates?: ReadonlyMap<number, readonly FaceplateViewPort[]>
 }
 
 /** Props of one segment row: the elevation, its face and the grid row. */
@@ -581,6 +587,12 @@ function DeviceBlock(props: RowProps<'device'> & { topU: number }): JSX.Element 
 	const device = (): ElevationDeviceRef => props.segment.device
 	const status = (): string => device().status ?? 'active'
 	const shelfUnit = (): string => u_label(props.segment.shelf?.position_u)
+	const title = (): string =>
+		t('elevation.deviceTitle', {
+			name: device().name,
+			model: device().device_type_model,
+			height: device().u_height,
+		})
 	return (
 		<>
 			<BlockGutters topU={props.topU} row={props.row} rows={props.segment.rows} />
@@ -589,42 +601,67 @@ function DeviceBlock(props: RowProps<'device'> & { topU: number }): JSX.Element 
 				classList={{ 'rack-u-device-rear': props.segment.rear }}
 				style={blockStyle(props.row, props.segment.rows)}
 			>
-				<a
-					href={`/devices/${device().id}`}
-					class="rack-dev"
-					title={t('elevation.deviceTitle', {
-						name: device().name,
-						model: device().device_type_model,
-						height: device().u_height,
-					})}
+				<Show
+					when={props.elevation.faceplates}
+					fallback={<DeviceLabel {...props} title={title()} shelfUnit={shelfUnit()} />}
 				>
-					<span class="rack-dev-name">{device().name}</span>
-					<span class="rack-dev-meta">{device().device_type_model}</span>
-					<Show when={props.segment.rear}>
-						<span class="visually-hidden">{t('elevation.rearSide')}</span>
-					</Show>
-					<Show when={props.segment.shelf}>
-						<span
-							class="rack-child-shelf"
-							title={t('elevation.onShelfTitle', {
-								name: props.segment.shelf?.name || '',
-								unit: shelfUnit(),
-							})}
-						>
-							▤
-							<span class="visually-hidden">
-								{t('elevation.shelfUnit', { unit: shelfUnit() })}
-							</span>
-						</span>
-					</Show>
-					<Show when={status() !== 'active'}>
-						<span class={`badge badge-${device().status}`}>
-							{deviceStatusLabel(status())}
-						</span>
-					</Show>
-				</a>
+					{(
+						faceplates: () => ReadonlyMap<number, readonly FaceplateViewPort[]>,
+					): JSX.Element => (
+						<a href={`/devices/${device().id}`} class="rack-dev-image" title={title()}>
+							<Faceplate
+								ports={faceplates().get(device().id) ?? []}
+								face={props.segment.rear ? 'rear' : 'front'}
+								u_height={device().u_height}
+								label={device().name}
+								hideLabel
+							/>
+							<span class="rack-dev-image-name">{device().name}</span>
+							<Show when={status() !== 'active'}>
+								<span class={`badge badge-${device().status}`}>
+									{deviceStatusLabel(status())}
+								</span>
+							</Show>
+						</a>
+					)}
+				</Show>
 			</li>
 		</>
+	)
+}
+
+/** Name, model and markers of a device block in labels mode. */
+function DeviceLabel(
+	props: RowProps<'device'> & { title: string; shelfUnit: string },
+): JSX.Element {
+	const device = (): ElevationDeviceRef => props.segment.device
+	const status = (): string => device().status ?? 'active'
+	const shelfUnit = (): string => props.shelfUnit
+	return (
+		<a href={`/devices/${device().id}`} class="rack-dev" title={props.title}>
+			<span class="rack-dev-name">{device().name}</span>
+			<span class="rack-dev-meta">{device().device_type_model}</span>
+			<Show when={props.segment.rear}>
+				<span class="visually-hidden">{t('elevation.rearSide')}</span>
+			</Show>
+			<Show when={props.segment.shelf}>
+				<span
+					class="rack-child-shelf"
+					title={t('elevation.onShelfTitle', {
+						name: props.segment.shelf?.name || '',
+						unit: shelfUnit(),
+					})}
+				>
+					▤
+					<span class="visually-hidden">
+						{t('elevation.shelfUnit', { unit: shelfUnit() })}
+					</span>
+				</span>
+			</Show>
+			<Show when={status() !== 'active'}>
+				<span class={`badge badge-${device().status}`}>{deviceStatusLabel(status())}</span>
+			</Show>
+		</a>
 	)
 }
 
@@ -659,10 +696,14 @@ function ElevationFace(props: { elevation: ElevationProps; face: RackFace }): JS
 	}
 
 	return (
-		<section aria-label={t('elevation.section', { face: faceLabel(props.face) })}>
+		<section
+			class="rack-elev-face"
+			aria-label={t('elevation.section', { face: faceLabel(props.face) })}
+		>
 			<h4 class="rack-face-title">{faceLabel(props.face)}</h4>
 			<ol
 				class="rack-elev"
+				classList={{ 'rack-elev-images': props.elevation.faceplates !== undefined }}
 				style={{ 'grid-template-rows': `repeat(${units().length}, var(--rack-row-h))` }}
 			>
 				<For each={placed()}>{render}</For>

@@ -1,10 +1,12 @@
 import type { Context, MiddlewareHandler, Next } from 'hono'
+import { requestUser } from '../authz'
 import { getConfig } from '../config'
 import { client_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
 
 /**
- * Fixed-window login rate limiter keyed by client IP.
+ * Fixed-window rate limiters: login attempts by client IP, public
+ * endpoints by IP, expensive calls by user.
  *
  * In-memory by design: unlike sessions, losing counters on restart is a minor
  * availability-favouring failure, not a correctness bug. Note that this is per
@@ -28,18 +30,7 @@ export function rate_limit(): MiddlewareHandler {
 		const now = Date.now()
 		const ip = client_ip(c)
 
-		let bucket = buckets.get(ip)
-		if (!bucket || bucket.resetAt <= now) {
-			while (buckets.size >= MAX_BUCKETS) {
-				const oldest = buckets.keys().next().value
-				if (oldest === undefined) {
-					break
-				}
-				buckets.delete(oldest)
-			}
-			bucket = { count: 0, resetAt: now + windowSeconds * 1000 }
-			buckets.set(ip, bucket)
-		}
+		const bucket = bucketFor(buckets, ip, windowSeconds, now)
 		bucket.count++
 
 		if (bucket.count > maxAttempts) {
@@ -58,27 +49,41 @@ export function rate_limit(): MiddlewareHandler {
 	}
 }
 
+/** The live bucket of `key`, opening a new window when the last one ended. */
+function bucketFor(
+	map: Map<string, Bucket>,
+	key: string,
+	windowSeconds: number,
+	now: number,
+): Bucket {
+	let bucket = map.get(key)
+	if (!bucket || bucket.resetAt <= now) {
+		while (map.size >= MAX_BUCKETS) {
+			const oldest = map.keys().next().value
+			if (oldest === undefined) {
+				break
+			}
+			map.delete(oldest)
+		}
+		bucket = { count: 0, resetAt: now + windowSeconds * 1000 }
+		map.set(key, bucket)
+	}
+	return bucket
+}
+
 /**
- * Fixed-window limiter for public endpoints, keyed by client IP, with its
- * own buckets (independent of the login limiter). Every request counts.
+ * Fixed-window limiter with its own buckets, keyed by `key(c)`; every
+ * request counts. `limits` is read per request, so config changes apply.
  */
-export function ip_rate_limit(maxRequests: number, windowSeconds: number): MiddlewareHandler {
+function keyed_rate_limit(
+	key: (c: Context) => string,
+	limits: () => { maxRequests: number; windowSeconds: number },
+): MiddlewareHandler {
 	const own = new Map<string, Bucket>()
 	return async (c: Context, next: Next): Promise<Response | undefined> => {
+		const { maxRequests, windowSeconds } = limits()
 		const now = Date.now()
-		const ip = client_ip(c)
-		let bucket = own.get(ip)
-		if (!bucket || bucket.resetAt <= now) {
-			while (own.size >= MAX_BUCKETS) {
-				const oldest = own.keys().next().value
-				if (oldest === undefined) {
-					break
-				}
-				own.delete(oldest)
-			}
-			bucket = { count: 0, resetAt: now + windowSeconds * 1000 }
-			own.set(ip, bucket)
-		}
+		const bucket = bucketFor(own, key(c), windowSeconds, now)
 		bucket.count++
 		if (bucket.count > maxRequests) {
 			return jsonError(c, 'Too many requests', 429, {
@@ -87,4 +92,19 @@ export function ip_rate_limit(maxRequests: number, windowSeconds: number): Middl
 		}
 		await next()
 	}
+}
+
+/**
+ * Fixed-window limiter for public endpoints, keyed by client IP, with its
+ * own buckets (independent of the login limiter). Every request counts.
+ */
+export function ip_rate_limit(maxRequests: number, windowSeconds: number): MiddlewareHandler {
+	return keyed_rate_limit(client_ip, () => ({ maxRequests, windowSeconds }))
+}
+
+/** Fixed-window limiter keyed by the signed-in user; mount after `authMiddleware`. */
+export function user_rate_limit(
+	limits: () => { maxRequests: number; windowSeconds: number },
+): MiddlewareHandler {
+	return keyed_rate_limit((c) => String(requestUser(c).id), limits)
 }

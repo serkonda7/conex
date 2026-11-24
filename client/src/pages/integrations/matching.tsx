@@ -6,6 +6,7 @@ import {
 	IconCircleCheck,
 	IconCircleDashed,
 	IconDeviceFloppy,
+	IconDownload,
 	IconSparkles,
 	IconX,
 } from '@tabler/icons-solidjs'
@@ -36,6 +37,7 @@ import { createRecord, createRows, useAction } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
 import { contextTenantId } from '../../lib/tenant_context'
+import { ImportDeviceDialog } from './import_device_dialog'
 
 type Kind = LinkEntityType
 
@@ -78,6 +80,12 @@ interface Change {
 }
 
 type CellState = 'linked' | 'ignored' | 'open'
+
+/** External device of one column, being imported into conex. */
+interface ImportTarget {
+	column: Column
+	row: LinkBoardExternal
+}
 
 function parseKind(raw: string): Kind {
 	return raw === 'devices'
@@ -219,7 +227,8 @@ function placeFocusedList(): void {
  * Edits are drafts until "Save matches"; the sticky footer counts the fully
  * matched rows and the unsaved changes. External objects without a conex
  * counterpart stay visible below the table, where they can be ignored,
- * restored or (for employees) imported into conex.
+ * restored or imported into conex (employees all at once, devices one by
+ * one: each needs a device type and role).
  */
 export function MatchingPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -241,6 +250,8 @@ export function MatchingPage(): JSX.Element {
 	const [saved, setSaved] = createSignal(new Map<string, string>())
 	// External-only objects have no cell to draft: their actions write at once.
 	const write = useAction(setError)
+	// External device whose import dialog is open.
+	const [importing, setImporting] = createSignal<ImportTarget | null>(null)
 
 	usePageMeta(() => ({ name: t('matching.title') }))
 
@@ -377,6 +388,28 @@ export function MatchingPage(): JSX.Element {
 		return external ? { external, via: s.via } : null
 	}
 
+	/** A cell offers its own value and the external objects no other row has taken. */
+	function cellOptions(column: Column, rowId: number): ComboboxOption[] {
+		const current = value(column, rowId)
+		const used = taken().get(column.provider)
+		return column.options.filter((o) => {
+			const id = String(o.value)
+			if (id === IGNORE || id === current) {
+				return true
+			}
+			if (used?.has(id) === true) {
+				return false
+			}
+			// Linked to a conex object outside this board (another tenant).
+			const e = column.external.get(id)
+			return !(
+				e?.state === 'linked' &&
+				e.entity_id !== null &&
+				!column.local.has(e.entity_id)
+			)
+		})
+	}
+
 	function setCell(column: Column, rowId: number, next: string): void {
 		setDrafts((prev) => {
 			const out = new Map(prev)
@@ -475,9 +508,9 @@ export function MatchingPage(): JSX.Element {
 	function ignoredExternal(column: Column): LinkBoardExternal[] {
 		return column.board.external.filter((e) => e.state === 'ignored')
 	}
-	/** External employees with a suggested counterpart are linked, not imported. */
+	/** External devices and employees with a suggested counterpart are linked, not imported. */
 	function importable(column: Column): LinkBoardExternal[] {
-		if (kind() !== 'employee') {
+		if (kind() !== 'employee' && kind() !== 'device') {
 			return []
 		}
 		const suggested = new Set(
@@ -486,6 +519,14 @@ export function MatchingPage(): JSX.Element {
 				.filter((id): id is string => id !== undefined && id !== ''),
 		)
 		return leftoverRows(column).filter((e) => !suggested.has(e.external_id))
+	}
+	const canImport = (): boolean => can('edit') && tenant() !== null
+	function importableDevice(column: Column, row: LinkBoardExternal): boolean {
+		return (
+			kind() === 'device' &&
+			canImport() &&
+			importable(column).some((e) => e.external_id === row.external_id)
+		)
 	}
 	const columnsWithExternal = createMemo(() =>
 		usableColumns().filter((c) => leftoverRows(c).length > 0 || ignoredExternal(c).length > 0),
@@ -731,7 +772,7 @@ export function MatchingPage(): JSX.Element {
 									? (next: string): void => setCell(column, row.id, next)
 									: undefined
 							}
-							options={column.options}
+							options={cellOptions(column, row.id)}
 							ariaLabel={t('matching.pickLabel', { name: row.name, provider: label })}
 							placeholder={t('matching.select')}
 							searchLabel={t('common.search')}
@@ -923,6 +964,24 @@ export function MatchingPage(): JSX.Element {
 														{t('integration.inactive')}
 													</span>
 												</Show>
+												<Show
+													when={
+														editable() && importableDevice(column, row)
+													}
+												>
+													<button
+														type="button"
+														class="icon-btn"
+														title={t('integration.importToConex')}
+														aria-label={t('integration.importToConex')}
+														disabled={write.pending()}
+														onClick={(): void => {
+															setImporting({ column, row })
+														}}
+													>
+														<IconDownload size={18} />
+													</button>
+												</Show>
 												<Show when={editable()}>
 													<button
 														type="button"
@@ -946,8 +1005,7 @@ export function MatchingPage(): JSX.Element {
 									<Show
 										when={
 											kind() === 'employee' &&
-											can('edit') &&
-											tenant() !== null &&
+											canImport() &&
 											importable(column).length > 0
 										}
 									>
@@ -957,16 +1015,15 @@ export function MatchingPage(): JSX.Element {
 											disabled={write.pending()}
 											onClick={(): void => void importAll(column)}
 										>
-											{tp(
-												'integration.importEmployees',
-												importable(column).length,
-											)}
+											{t('integration.importToConex')}
 										</button>
 									</Show>
 									<For each={ignoredExternal(column)}>
 										{(row: LinkBoardExternal): JSX.Element => (
 											<div class="matching-external-item">
-												<span class="matching-external-name">{row.name}</span>
+												<span class="matching-external-name">
+													{row.name}
+												</span>
 												<Show when={editable() && row.link_id !== null}>
 													<button
 														type="button"
@@ -1082,6 +1139,22 @@ export function MatchingPage(): JSX.Element {
 			</Show>
 
 			{externalSection()}
+
+			<Show when={importing()}>
+				{(target: () => ImportTarget): JSX.Element => (
+					<ImportDeviceDialog
+						provider={target().column.provider}
+						tenant_id={tenant() ?? 0}
+						row={target().row}
+						on_imported={(): void => {
+							setImporting(null)
+						}}
+						on_close={(): void => {
+							setImporting(null)
+						}}
+					/>
+				)}
+			</Show>
 
 			<Show when={boards() && rows().length > 0}>
 				<div class="matching-footer">

@@ -9,6 +9,7 @@ import type {
 	ElevationResponse,
 	Page,
 	RackCreate,
+	RackFaceplatesResponse,
 	RackListQuery,
 	RackUpdate,
 } from 'shared/src/types'
@@ -47,6 +48,13 @@ export async function fetch_rack(id: number): Promise<Result<RackRow, Error>> {
 export async function fetch_elevation(id: number): Promise<Result<ElevationResponse, Error>> {
 	const res = await client.racks[':id'].elevation.$get(by_id(id))
 	return to_result<ElevationResponse>(res, t('api.loadElevationFailed'))
+}
+
+export async function fetch_rack_faceplates(
+	id: number,
+): Promise<Result<RackFaceplatesResponse, Error>> {
+	const res = await client.racks[':id'].faceplates.$get(by_id(id))
+	return to_result<RackFaceplatesResponse>(res, t('api.loadFaceplatesFailed'))
 }
 
 export async function create_rack(input: RackCreate): Promise<Result<RackRow, Error>> {

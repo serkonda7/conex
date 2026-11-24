@@ -1,21 +1,22 @@
 import { Result } from 'better-result'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import type { FloorplanImpactErrorJson } from 'shared/src/schemas'
+import type { DeleteImpactErrorJson } from 'shared/src/schemas'
 import {
 	ConflictError,
+	DeleteImpactError,
 	DuplicateError,
 	ExternalServiceError,
-	FloorplanImpactError,
 	ForbiddenError,
 	NotFoundError,
+	ServiceUnavailableError,
 	ValidationError,
 } from '../db/errors'
 import { jsonError } from './http'
 
 /**
  * Sends a service `Result` as JSON. Success serializes the value; known
- * domain errors map to 404/409/422/502 through the shared `{ error }` shape and
+ * domain errors map to 404/409/422/502/503 through the shared `{ error }` shape and
  * unexpected failures stay a 500 (logged server-side).
  */
 export function sendResult<T>(
@@ -33,8 +34,12 @@ export function sendResult<T>(
 	if (err instanceof ForbiddenError) {
 		return jsonError(c, err.message, 403)
 	}
-	if (err instanceof FloorplanImpactError) {
-		const body: FloorplanImpactErrorJson = { error: err.message, floorplan: err.floorplan }
+	if (err instanceof DeleteImpactError) {
+		const body: DeleteImpactErrorJson = {
+			error: err.message,
+			floorplan: err.floorplan,
+			...(err.contents && { contents: err.contents }),
+		}
 		return c.json(body, 409)
 	}
 	if (err instanceof DuplicateError || err instanceof ConflictError) {
@@ -45,6 +50,9 @@ export function sendResult<T>(
 	}
 	if (err instanceof ExternalServiceError) {
 		return jsonError(c, err.message, 502)
+	}
+	if (err instanceof ServiceUnavailableError) {
+		return jsonError(c, err.message, 503)
 	}
 	console.error(err)
 	return jsonError(c, 'Internal server error', 500)

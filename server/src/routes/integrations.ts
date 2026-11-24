@@ -5,6 +5,7 @@ import { type Context, Hono, type MiddlewareHandler } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import {
 	ExternalDeviceCreateSchema,
+	ExternalDeviceImportSchema,
 	ExternalDeviceUpdateSchema,
 	ExternalEmployeeDeactivateSchema,
 	ExternalEmployeeImportSchema,
@@ -48,6 +49,7 @@ import { exists } from '../db/list'
 import { deviceTenant, employeeTenants } from '../db/owners'
 import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
 import { createExternalDevice } from '../integrations/create_device'
+import { importExternalDevice } from '../integrations/import_device'
 import { importExternalEmployees } from '../integrations/import_employees'
 import {
 	deleteLink,
@@ -794,6 +796,24 @@ export const integrationsApp = new Hono()
 				c,
 				await createExternalDevice(provider, input.device_id, requestUser(c).id),
 			)
+		},
+	)
+	.post(
+		'/:provider/devices/import',
+		vValidator('param', IntegrationParamsSchema, onValidationError),
+		vValidator('json', ExternalDeviceImportSchema, onValidationError),
+		async (c) => {
+			const { provider } = c.req.valid('param')
+			const input = c.req.valid('json')
+			// Imports create inventory, so they need `edit` as well.
+			const denied =
+				requirePermission(c, 'integrations.manage') ??
+				requirePermission(c, 'edit') ??
+				(await checkTenantRow(c, input.tenant_id))
+			if (denied) {
+				return denied
+			}
+			return sendCreated(c, await importExternalDevice(provider, input, requestUser(c).id))
 		},
 	)
 	.put(

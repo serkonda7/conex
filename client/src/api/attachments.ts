@@ -99,7 +99,7 @@ export async function replace_attachment_file(
 	return to_result<AttachmentJson>(res, t('api.uploadFailed', { name: file.name }))
 }
 
-/** `opts.confirm` also deletes the floor-plan data of a marked image (see `FloorplanImpactError`). */
+/** `opts.confirm` also deletes the floor-plan data of a marked image (see `DeleteImpactError`). */
 export async function delete_attachment(
 	id: number,
 	opts?: DeleteQuery,

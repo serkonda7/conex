@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "~1.13.0",
     "@azure/identity": "~4.14.1",
     "@hono/valibot-validator": "catalog:",
     "@microsoft/msgraph-sdk": "1.0.0-preview.92",

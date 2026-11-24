@@ -140,7 +140,7 @@ export async function update_device(
 	return to_result<DeviceRow>(res, failed.update('noun.device'))
 }
 
-/** `opts.confirm` also deletes the device's floor-plan area (see `FloorplanImpactError`). */
+/** `opts.confirm` also deletes the device's floor-plan area (see `DeleteImpactError`). */
 export async function delete_device(
 	id: number,
 	opts?: DeleteQuery,

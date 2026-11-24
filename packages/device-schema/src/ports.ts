@@ -3,7 +3,9 @@ import {
 	DISPLAY_PORT_KINDS,
 	GENERAL_PORT_KINDS,
 	NETBOX_INTERFACE_TYPES,
+	PANEL_FACES,
 	PASS_THROUGH_PORT_TYPES,
+	type PanelFace,
 	POWER_INPUT_KINDS,
 	POWER_OUTLET_KINDS,
 } from './constants'
@@ -66,6 +68,20 @@ function nameOf(port: Mapping): string {
 function passThroughKindOf(port: Mapping): string | null {
 	const type = typeof port.type === 'string' ? port.type.trim() : ''
 	return Object.keys(PASS_THROUGH_PORT_TYPES).includes(type) ? type : null
+}
+
+/**
+ * conex extension `face` of a YAML port entry: the panel face it sits on.
+ * Missing answers undefined (inferred); anything but `front`/`rear` fails.
+ */
+function faceOf(label: string, port: Mapping): Checked<PanelFace | undefined> {
+	if (port.face === undefined || port.face === null) {
+		return { ok: true, value: undefined }
+	}
+	const face = typeof port.face === 'string' ? port.face.trim() : port.face
+	return (PANEL_FACES as readonly unknown[]).includes(face)
+		? { ok: true, value: face as PanelFace }
+		: { ok: false, error: `${label}: face must be one of ${PANEL_FACES.join(', ')}` }
 }
 
 /** The plan so far; each stub must fit the ones before it, as on the stub API. */
@@ -136,7 +152,12 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 	if (!rears.ok) {
 		return rears.error
 	}
-	const rearPorts: { name: string; kind: string; positions: number }[] = []
+	const rearPorts: {
+		name: string
+		kind: string
+		positions: number
+		face: PanelFace | undefined
+	}[] = []
 	for (const port of rears.value) {
 		const name = nameOf(port)
 		if (!name) {
@@ -150,15 +171,25 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 		if (kind === null) {
 			return `rear-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
 		}
+		const face = faceOf(`rear-ports "${name}"`, port)
+		if (!face.ok) {
+			return face.error
+		}
 		const names = expandNameTemplate(name)
 		if (!names.ok) {
 			return `rear-ports "${name}": ${names.error}`
 		}
-		rearPorts.push(...names.value.map((prefix) => ({ name: prefix, kind, positions })))
+		rearPorts.push(
+			...names.value.map((prefix) => ({ name: prefix, kind, positions, face: face.value })),
+		)
 	}
 	const rearSegments = segmentsOf(
 		rearPorts,
-		(prev, next) => prev.positions === 1 && next.positions === 1 && prev.kind === next.kind,
+		(prev, next) =>
+			prev.positions === 1 &&
+			next.positions === 1 &&
+			prev.kind === next.kind &&
+			prev.face === next.face,
 	)
 	for (const segment of rearSegments) {
 		const first = segment[0]
@@ -172,6 +203,7 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 				kind: first.kind,
 				side: 'rear',
 				positions: first.positions,
+				...(first.face === undefined ? {} : { face: first.face }),
 			})
 			if (!stub.ok) {
 				return stub.error
@@ -207,7 +239,13 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 	if (!fronts.ok) {
 		return fronts.error
 	}
-	const frontPorts: { name: string; kind: string; rear: number; slot: number }[] = []
+	const frontPorts: {
+		name: string
+		kind: string
+		rear: number
+		slot: number
+		face: PanelFace | undefined
+	}[] = []
 	for (const port of fronts.value) {
 		const name = nameOf(port)
 		if (!name) {
@@ -239,7 +277,12 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 		if (kind === null) {
 			return `front-ports "${name}": type must be one of ${Object.keys(PASS_THROUGH_PORT_TYPES).join(', ')}`
 		}
+		const face = faceOf(`front-ports "${name}"`, port)
+		if (!face.ok) {
+			return face.error
+		}
 		frontPorts.push({
+			face: face.value,
 			name: names.value[0] ?? name,
 			kind,
 			rear: rear.stub,
@@ -249,7 +292,10 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 	const frontSegments = segmentsOf(
 		frontPorts,
 		(prev, next) =>
-			prev.kind === next.kind && prev.rear === next.rear && next.slot === prev.slot + 1,
+			prev.kind === next.kind &&
+			prev.rear === next.rear &&
+			next.slot === prev.slot + 1 &&
+			prev.face === next.face,
 	)
 	for (const segment of frontSegments) {
 		let offset = 0
@@ -264,6 +310,7 @@ function planPassThroughPorts(plan: Plan, item: Mapping): string | null {
 				side: 'front',
 				rear_index: first.rear,
 				rear_position: first.slot + 1,
+				...(first.face === undefined ? {} : { face: first.face }),
 			})
 			if (!stub.ok) {
 				return stub.error
@@ -302,6 +349,7 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 		{
 			key: string
 			kind: string
+			face: PanelFace | undefined
 			power: v.InferOutput<typeof ImportedPowerSchema>
 			names: string[]
 		}
@@ -354,11 +402,16 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 			if (!power.success) {
 				return `${key} "${name}": ${formatValibotIssues(power.issues)}`
 			}
-			// A stub carries one kind and power setup, so both must match to collapse ports.
-			const groupKey = JSON.stringify([key, kind, power.output])
+			const face = faceOf(`${key} "${name}"`, port)
+			if (!face.ok) {
+				return face.error
+			}
+			// A stub carries one kind, face and power setup, so all must match to collapse ports.
+			const groupKey = JSON.stringify([key, kind, face.value ?? null, power.output])
 			const group = groups.get(groupKey) ?? {
 				key,
 				kind,
+				face: face.value,
 				power: power.output,
 				names: [],
 			}
@@ -371,6 +424,7 @@ function planComponents(plan: Plan, item: Mapping): string | null {
 			const stub = plan.add(group.key, {
 				...runFields(run),
 				kind: group.kind,
+				...(group.face === undefined ? {} : { face: group.face }),
 				...group.power,
 			})
 			if (!stub.ok) {

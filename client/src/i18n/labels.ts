@@ -249,6 +249,7 @@ const DEVICE_TYPE_UPDATE_FIELD_KEYS: Record<string, MessageKey> = {
 	kind: 'device.templateSync.field.kind',
 	positions: 'device.templateSync.field.positions',
 	rear_port: 'device.templateSync.field.rear_port',
+	face: 'deviceType.component.face',
 	maximum_draw: 'deviceType.component.maximumDraw',
 	poe_mode: 'deviceType.component.poeMode',
 	poe_type: 'deviceType.component.poeType',
@@ -354,11 +355,44 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'integrations.manage': 'permission.integrationsManage',
 	'tickets.create': 'permission.ticketsCreate',
 	'contacts.directory': 'permission.contactsDirectory',
+	'ai.use': 'permission.aiUse',
+	'settings.manage': 'permission.settingsManage',
 }
 
 /** Role permission (`view`, `users.manage`, …). */
 export function permissionLabel(value: string): string {
 	return lookup(PERMISSION_KEYS, value)
+}
+
+const PERMISSION_SHORT_KEYS: Record<Permission, MessageKey> = {
+	view: 'permissionShort.view',
+	edit: 'permissionShort.edit',
+	delete: 'permissionShort.delete',
+	'users.manage': 'permissionShort.usersManage',
+	'employees.tenants': 'permissionShort.employeesTenants',
+	'changelog.view': 'permissionShort.changelogView',
+	'audit_log.view': 'permissionShort.auditLogView',
+	'integrations.manage': 'permissionShort.integrationsManage',
+	'tickets.create': 'permissionShort.ticketsCreate',
+	'contacts.directory': 'permissionShort.contactsDirectory',
+	'ai.use': 'permissionShort.aiUse',
+	'settings.manage': 'permissionShort.settingsManage',
+}
+
+/** Compact permission label for badges; pair with `permissionLabel` as tooltip. */
+export function permissionShortLabel(value: string): string {
+	return lookup(PERMISSION_SHORT_KEYS, value)
+}
+
+const OBJECT_ACCESS_KEYS: Record<string, MessageKey> = {
+	read: 'objectAccess.read',
+	write: 'objectAccess.write',
+	manage: 'objectAccess.manage',
+}
+
+/** Role object access level (`read`, `write`, `manage`). */
+export function objectAccessLabel(value: string): string {
+	return lookup(OBJECT_ACCESS_KEYS, value)
 }
 
 const LOCATION_TYPE_KEYS: Record<LocationType, MessageKey> = {

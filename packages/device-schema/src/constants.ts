@@ -118,6 +118,14 @@ export const PORT_SIDES = ['front', 'rear'] as const
 export type PortSide = (typeof PORT_SIDES)[number]
 
 /**
+ * Faces of a device's panel a port can sit on, for the symbolic front and
+ * rear images. A stub without a face takes the inferred one (`portFace` in
+ * `shared/src/faceplate.ts`).
+ */
+export const PANEL_FACES = ['front', 'rear'] as const
+export type PanelFace = (typeof PANEL_FACES)[number]
+
+/**
  * Known connector types of front and rear ports (NetBox port types) with their
  * display names. Includes legacy types for imports and existing ports. Copper
  * connectors cable like network ports, every other type only to its own kind.

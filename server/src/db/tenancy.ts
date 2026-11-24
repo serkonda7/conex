@@ -7,11 +7,13 @@ import {
 	inArray,
 	isNotNull,
 	notExists,
+	notInArray,
 	or,
 	type SQL,
 	sql,
 } from 'drizzle-orm'
 import {
+	type DeleteQuery,
 	LOCATION_TYPES,
 	type LocationCreate,
 	type LocationType,
@@ -58,12 +60,13 @@ import {
 import { removeAttachmentFiles } from '../storage'
 import {
 	type AttachmentRow,
+	checkContentsDelete,
 	checkFloorplanDelete,
 	deleteOwnerAttachments,
 	inferOutletLocations,
 	prunePlacements,
 } from './attachments'
-import { logCreate, logDelete, logUpdate } from './changelog'
+import { logCreate, logDelete, logDeletes, logUpdate } from './changelog'
 import { getDb, withTransaction } from './connection'
 import { ConflictError, DuplicateError, NotFoundError } from './errors'
 import { deleteExternalLinks } from './external_links'
@@ -490,20 +493,37 @@ export async function updateTenant(
 	return await logUpdate('tenant', current.value, await getTenant(id))
 }
 
-export async function deleteTenant(id: number): Promise<Result<TenantDetail, Error>> {
+/**
+ * Deletes a tenant together with its sites (their locations included) and
+ * site groups; those, and their floor-plan data, need `confirm: 'contents'`.
+ * Inventory (racks, devices, VMs), employees and users still block.
+ */
+export async function deleteTenant(
+	id: number,
+	confirm?: DeleteQuery['confirm'],
+): Promise<Result<TenantDetail, Error>> {
 	const current = await getTenant(id)
 	if (Result.isError(current)) {
 		return current
 	}
+	const ownSites = await getDb().select().from(sites).where(eq(sites.tenant_id, id))
+	const siteIds = ownSites.map((site) => site.id)
+	const ownGroups = await getDb().select().from(site_groups).where(eq(site_groups.tenant_id, id))
+	const siteLocations = await getDb()
+		.select()
+		.from(locations)
+		.where(inArray(locations.site_id, siteIds))
 	const blocked = await checkNoDependents([
-		[sites, eq(sites.tenant_id, id), 'Tenant still has sites; move or delete them first'],
 		[
-			site_groups,
-			eq(site_groups.tenant_id, id),
-			'Tenant still has site groups; move or delete them first',
+			racks,
+			or(eq(racks.tenant_id, id), inArray(racks.site_id, siteIds)) as SQL,
+			'Tenant or its sites still have racks; move or delete them first',
 		],
-		[racks, eq(racks.tenant_id, id), 'Tenant still has racks; move or delete them first'],
-		[devices, eq(devices.tenant_id, id), 'Tenant still has devices; move or delete them first'],
+		[
+			devices,
+			or(eq(devices.tenant_id, id), inArray(devices.site_id, siteIds)) as SQL,
+			'Tenant or its sites still have devices; move or delete them first',
+		],
 		[
 			virtual_machines,
 			eq(virtual_machines.tenant_id, id),
@@ -519,20 +539,52 @@ export async function deleteTenant(id: number): Promise<Result<TenantDetail, Err
 			eq(user_tenants.tenant_id, id),
 			'Tenant still has users; reassign them before deleting',
 		],
+		[
+			locations,
+			and(eq(locations.tenant_id, id), notInArray(locations.site_id, siteIds)) as SQL,
+			"Tenant still has locations at other tenants' sites; move or delete them first",
+		],
+		[
+			sites,
+			and(inArray(sites.site_group_id, ids(ownGroups)), notInArray(sites.id, siteIds)) as SQL,
+			"Tenant's site groups still contain other tenants' sites; move them first",
+		],
+		[
+			interfaces,
+			unplacedOutletsAt(inArray(interfaces.location_id, ids(siteLocations))),
+			"Tenant's sites still have outlets; move them to another location first",
+		],
 	])
 	if (Result.isError(blocked)) {
 		return blocked
 	}
+	const impact = await checkContentsDelete(
+		[
+			...siteIds.map((site_id) => ({ site_id })),
+			...siteLocations.map((location) => ({ location_id: location.id })),
+		],
+		{ sites: ownSites.length, site_groups: ownGroups.length, locations: siteLocations.length },
+		confirm,
+	)
+	if (Result.isError(impact)) {
+		return impact
+	}
 	const deleted = await tryWrite(() =>
-		withTransaction(async () => {
-			const db = getDb()
+		withTransaction(async (): Promise<AttachmentRow[]> => {
+			const removed = await removeSites(ownSites, siteLocations)
+			await getDb()
+				.delete(site_groups)
+				.where(inArray(site_groups.id, ids(ownGroups)))
+			await logDeletes('site_group', ownGroups)
 			await deleteExternalLinks('tenant', id)
-			await db.delete(tenants).where(eq(tenants.id, id))
+			await getDb().delete(tenants).where(eq(tenants.id, id))
+			return removed
 		}),
 	)
 	if (Result.isError(deleted)) {
 		return deleted
 	}
+	await removeAttachmentFiles(deleted.value)
 	return await logDelete('tenant', current.value)
 }
 
@@ -642,47 +694,131 @@ export async function updateSite(id: number, input: SiteUpdate): Promise<Result<
 	return await logUpdate('site', current.value, await getSite(id))
 }
 
+function ids(rows: readonly { id: number }[]): number[] {
+	return rows.map((row) => row.id)
+}
+
 /**
- * Deletes a site with its attachments. Floor-plan data (its own plan's
- * content, areas linking to it elsewhere) needs `confirmFloorplan`.
+ * Outlets matching `where` that no floor plan places; placed ones take their
+ * location from their plan, which follows a deleted location.
+ */
+function unplacedOutletsAt(where: SQL): SQL {
+	return and(
+		where,
+		notExists(
+			getDb()
+				.select({ id: floorplan_placements.id })
+				.from(floorplan_placements)
+				.where(
+					or(
+						eq(floorplan_placements.interface_id, interfaces.id),
+						and(
+							isNotNull(interfaces.jack_id),
+							eq(floorplan_placements.jack_id, interfaces.jack_id),
+						),
+					),
+				),
+		),
+	) as SQL
+}
+
+/**
+ * Removes `rows` (child locations among them or already gone) with their
+ * attachments on the caller's transaction; returns the removed attachments
+ * for `removeAttachmentFiles` after the commit.
+ */
+async function removeLocations(rows: LocationRow[]): Promise<AttachmentRow[]> {
+	if (rows.length === 0) {
+		return []
+	}
+	const removed: AttachmentRow[] = []
+	for (const row of rows) {
+		removed.push(...(await deleteOwnerAttachments({ location_id: row.id })))
+	}
+	// Plans with an area of a location: their outlets there move on.
+	const linked = await getDb()
+		.selectDistinct({ id: floorplan_areas.attachment_id })
+		.from(floorplan_areas)
+		.where(inArray(floorplan_areas.location_id, ids(rows)))
+	// One statement, so parent links among the rows don't block each other.
+	await getDb()
+		.delete(locations)
+		.where(inArray(locations.id, ids(rows)))
+	await inferOutletLocations(linked.map((row) => row.id))
+	await logDeletes('location', rows)
+	return removed
+}
+
+/**
+ * Removes `rows` with `siteLocations` (all locations of those sites) and
+ * their attachments on the caller's transaction; see `removeLocations`.
+ */
+async function removeSites(
+	rows: SiteRow[],
+	siteLocations: LocationRow[],
+): Promise<AttachmentRow[]> {
+	if (rows.length === 0) {
+		return []
+	}
+	const removed = await removeLocations(siteLocations)
+	for (const row of rows) {
+		removed.push(...(await deleteOwnerAttachments({ site_id: row.id })))
+		await deleteExternalLinks('site', row.id)
+	}
+	await getDb()
+		.delete(sites)
+		.where(inArray(sites.id, ids(rows)))
+	await logDeletes('site', rows)
+	return removed
+}
+
+/**
+ * Deletes a site together with its locations and the attachments of both.
+ * Locations need `confirm: 'contents'`, which also covers the floor-plan
+ * data; without locations, floor-plan data needs `confirm: 'floorplan'`.
  */
 export async function deleteSite(
 	id: number,
-	confirmFloorplan = false,
+	confirm?: DeleteQuery['confirm'],
 ): Promise<Result<SiteRow, Error>> {
 	const current = await getSite(id)
 	if (Result.isError(current)) {
 		return current
 	}
+	const siteLocations = await getDb().select().from(locations).where(eq(locations.site_id, id))
 	const blocked = await checkNoDependents([
-		[
-			locations,
-			eq(locations.site_id, id),
-			'Site still has locations; move or delete them first',
-		],
 		[racks, eq(racks.site_id, id), 'Site still has racks; move or delete them first'],
+		[
+			devices,
+			or(eq(devices.site_id, id), inArray(devices.location_id, ids(siteLocations))) as SQL,
+			'Site still has devices; move or delete them first',
+		],
+		[
+			interfaces,
+			unplacedOutletsAt(inArray(interfaces.location_id, ids(siteLocations))),
+			'Site still has outlets in its locations; move them to another location first',
+		],
 	])
 	if (Result.isError(blocked)) {
 		return blocked
 	}
-	const floorplan = await checkFloorplanDelete({ site_id: id }, confirmFloorplan)
-	if (Result.isError(floorplan)) {
-		return floorplan
+	const impact = await checkContentsDelete(
+		[{ site_id: id }, ...siteLocations.map((location) => ({ location_id: location.id }))],
+		{ sites: 0, site_groups: 0, locations: siteLocations.length },
+		confirm,
+	)
+	if (Result.isError(impact)) {
+		return impact
 	}
-	// Attachments go with their site; their files only after the commit.
+	// Attachments go with their owner; their files only after the commit.
 	const deleted = await tryWrite(() =>
-		withTransaction(async (): Promise<AttachmentRow[]> => {
-			const removed = await deleteOwnerAttachments({ site_id: id })
-			await deleteExternalLinks('site', id)
-			await getDb().delete(sites).where(eq(sites.id, id))
-			return removed
-		}),
+		withTransaction(() => removeSites([current.value], siteLocations)),
 	)
 	if (Result.isError(deleted)) {
 		return deleted
 	}
 	await removeAttachmentFiles(deleted.value)
-	return await logDelete('site', current.value)
+	return Result.ok(current.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -1050,26 +1186,9 @@ export async function deleteLocation(
 			'Location still has child locations; move or delete them first',
 		],
 		[racks, eq(racks.location_id, id), 'Location still has racks; move or delete them first'],
-		// Placed outlets take their location from their plan, which follows.
 		[
 			interfaces,
-			and(
-				eq(interfaces.location_id, id),
-				notExists(
-					getDb()
-						.select({ id: floorplan_placements.id })
-						.from(floorplan_placements)
-						.where(
-							or(
-								eq(floorplan_placements.interface_id, interfaces.id),
-								and(
-									isNotNull(interfaces.jack_id),
-									eq(floorplan_placements.jack_id, interfaces.jack_id),
-								),
-							),
-						),
-				),
-			) as SQL,
+			unplacedOutletsAt(eq(interfaces.location_id, id)),
 			'Location still has outlets; move them to another location first',
 		],
 	])
@@ -1081,22 +1200,10 @@ export async function deleteLocation(
 		return floorplan
 	}
 	// Attachments go with their location; their files only after the commit.
-	const deleted = await tryWrite(() =>
-		withTransaction(async (): Promise<AttachmentRow[]> => {
-			const removed = await deleteOwnerAttachments({ location_id: id })
-			// Plans with an area of the location: their outlets there move on.
-			const linked = await getDb()
-				.selectDistinct({ id: floorplan_areas.attachment_id })
-				.from(floorplan_areas)
-				.where(eq(floorplan_areas.location_id, id))
-			await getDb().delete(locations).where(eq(locations.id, id))
-			await inferOutletLocations(linked.map((row) => row.id))
-			return removed
-		}),
-	)
+	const deleted = await tryWrite(() => withTransaction(() => removeLocations([current.value])))
 	if (Result.isError(deleted)) {
 		return deleted
 	}
 	await removeAttachmentFiles(deleted.value)
-	return await logDelete('location', current.value)
+	return Result.ok(current.value)
 }

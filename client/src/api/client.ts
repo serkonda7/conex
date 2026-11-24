@@ -6,7 +6,7 @@
 import { Result } from 'better-result'
 import { hc } from 'hono/client'
 import type { AppType } from 'server/src/index'
-import type { FloorplanImpactJson, Page } from 'shared/src/types'
+import type { DeleteContentsJson, FloorplanImpactJson, Page } from 'shared/src/types'
 import { type PluralKey, t, tp } from '../i18n'
 import { api_fetch, invalidate_queries } from '../lib/query'
 
@@ -25,15 +25,22 @@ class UnauthorizedError extends Error {
 
 /**
  * A delete the server refused with 409 until the caller confirms that the
- * floor-plan data in `floorplan` goes with it (retry with `confirm: 'floorplan'`).
+ * floor-plan data in `floorplan` goes with it (retry with `confirm: 'floorplan'`),
+ * or, when set, the contained rows in `contents` too (`confirm: 'contents'`).
  */
-export class FloorplanImpactError extends Error {
+export class DeleteImpactError extends Error {
 	readonly floorplan: FloorplanImpactJson
+	readonly contents: DeleteContentsJson | null
 
-	constructor(message: string, floorplan: FloorplanImpactJson) {
+	constructor(
+		message: string,
+		floorplan: FloorplanImpactJson,
+		contents: DeleteContentsJson | null,
+	) {
 		super(message)
-		this.name = 'FloorplanImpactError'
+		this.name = 'DeleteImpactError'
 		this.floorplan = floorplan
+		this.contents = contents
 	}
 }
 
@@ -52,6 +59,20 @@ function floorplan_impact(data: unknown): FloorplanImpactJson | null {
 		typeof linkedFrom === 'number'
 		? { areas, placements, linkedFrom, drawings: typeof drawings === 'number' ? drawings : 0 }
 		: null
+}
+
+/** The contained rows of a 409 body, if it carries them. */
+function delete_contents(data: unknown): DeleteContentsJson | null {
+	if (typeof data !== 'object' || !data || !('contents' in data)) {
+		return null
+	}
+	const contents = (data as { contents: unknown }).contents
+	if (typeof contents !== 'object' || !contents) {
+		return null
+	}
+	const { sites, site_groups, locations } = contents as Record<string, unknown>
+	const count = (value: unknown): number => (typeof value === 'number' ? value : 0)
+	return { sites: count(sites), site_groups: count(site_groups), locations: count(locations) }
 }
 
 /** Notified on every 401, so the UI can return to the login page. */
@@ -90,7 +111,9 @@ export async function to_result<T>(res: ApiResponse, fallback: string): Promise<
 		const data = await res.json().catch(() => null)
 		const msg = error_message(data, `${fallback} (${res.status})`)
 		const impact = res.status === 409 ? floorplan_impact(data) : null
-		return Result.err(impact ? new FloorplanImpactError(msg, impact) : new Error(msg))
+		return Result.err(
+			impact ? new DeleteImpactError(msg, impact, delete_contents(data)) : new Error(msg),
+		)
 	}
 	return Result.ok((await res.json()) as T)
 }

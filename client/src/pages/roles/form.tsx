@@ -4,13 +4,31 @@ import { createSignal, For, type JSX } from 'solid-js'
 import { create_role, fetch_role, type RoleJson, update_role } from '../../api/roles'
 import { DescriptionField, FormPage, NameField } from '../../components/form'
 import { t } from '../../i18n'
-import { permissionLabel } from '../../i18n/labels'
+import { objectAccessLabel, permissionLabel } from '../../i18n/labels'
 import { type FormValues, submit_entity_form, text, useEntityForm } from '../../lib/form'
+import {
+	OBJECT_ACCESS_LEVELS,
+	OBJECT_PERMISSIONS,
+	type ObjectAccess,
+	objectAccess,
+	objectPermissions,
+} from './object_access'
 
-/** Role create (`id` omitted) or edit form: name, description and permission checkboxes. */
+/** Permissions with their own checkbox; view/edit/delete go through the object access select. */
+const OTHER_PERMISSIONS = PERMISSIONS.filter((p) => !OBJECT_PERMISSIONS.includes(p))
+
+/** Segments of the object access control, weakest first. */
+const ACCESS_CHOICES: readonly ObjectAccess[] = ['', ...OBJECT_ACCESS_LEVELS]
+
+/**
+ * Role create (`id` omitted) or edit form: name, description, the object
+ * access level (view/edit/delete as one cumulative choice) and checkboxes
+ * for the remaining permissions.
+ */
 function RoleForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
+	const [access, setAccess] = createSignal<ObjectAccess>('')
 	const [permissions, setPermissions] = createSignal<ReadonlySet<Permission>>(new Set())
 	const form = useEntityForm({
 		id: props.id,
@@ -18,7 +36,8 @@ function RoleForm(props: { id?: number }): JSX.Element {
 		fill: (row: RoleJson) => {
 			setName(row.name)
 			setDescription(row.description ?? '')
-			setPermissions(new Set(row.permissions))
+			setAccess(objectAccess(row.permissions))
+			setPermissions(new Set(row.permissions.filter((p) => !OBJECT_PERMISSIONS.includes(p))))
 		},
 	})
 	const prefix = form.editing ? 'role-edit' : 'role'
@@ -34,7 +53,8 @@ function RoleForm(props: { id?: number }): JSX.Element {
 	}
 
 	async function handleSubmit(e: SubmitEvent): Promise<void> {
-		const granted = PERMISSIONS.filter((p) => permissions().has(p))
+		const objects = objectPermissions(access())
+		const granted = PERMISSIONS.filter((p) => objects.includes(p) || permissions().has(p))
 		await submit_entity_form(e, {
 			form,
 			name: name(),
@@ -49,6 +69,7 @@ function RoleForm(props: { id?: number }): JSX.Element {
 			reset: () => {
 				setName('')
 				setDescription('')
+				setAccess('')
 				setPermissions(new Set<Permission>())
 			},
 		})
@@ -81,21 +102,60 @@ function RoleForm(props: { id?: number }): JSX.Element {
 					<span class="field-group-label" aria-hidden="true">
 						{t('role.permissions')}
 					</span>
-					<div class="field-control">
-						<For each={PERMISSIONS}>
-							{(permission: Permission): JSX.Element => (
-								<label class="field-checkbox-label">
-									<input
-										type="checkbox"
-										checked={permissions().has(permission)}
-										onChange={(
-											e: Event & { currentTarget: HTMLInputElement },
-										) => toggle(permission, e.currentTarget.checked)}
-									/>
-									{permissionLabel(permission)}
-								</label>
-							)}
-						</For>
+					<div class="field-control permission-groups">
+						<div
+							class="permission-group"
+							role="radiogroup"
+							aria-labelledby={`${prefix}-object-access-label`}
+						>
+							<span
+								class="permission-group-title"
+								id={`${prefix}-object-access-label`}
+							>
+								{t('role.objectAccess')}
+							</span>
+							<div class="segmented">
+								<For each={ACCESS_CHOICES}>
+									{(level: ObjectAccess): JSX.Element => (
+										<label class="segmented-option">
+											<input
+												type="radio"
+												name={`${prefix}-object-access`}
+												value={level}
+												checked={access() === level}
+												onChange={() => setAccess(level)}
+											/>
+											<span>
+												{level === ''
+													? t('role.noObjectAccess')
+													: objectAccessLabel(level)}
+											</span>
+										</label>
+									)}
+								</For>
+							</div>
+						</div>
+						<div class="permission-group">
+							<span class="permission-group-title" aria-hidden="true">
+								{t('role.otherPermissions')}
+							</span>
+							<div class="permission-group-items">
+								<For each={OTHER_PERMISSIONS}>
+									{(permission: Permission): JSX.Element => (
+										<label class="field-checkbox-label">
+											<input
+												type="checkbox"
+												checked={permissions().has(permission)}
+												onChange={(
+													e: Event & { currentTarget: HTMLInputElement },
+												) => toggle(permission, e.currentTarget.checked)}
+											/>
+											{permissionLabel(permission)}
+										</label>
+									)}
+								</For>
+							</div>
+						</div>
 					</div>
 				</div>
 			</fieldset>

@@ -93,9 +93,9 @@ export function SettingsPage(): JSX.Element {
 										aria-label={t('account.openItemsInNewTab')}
 										aria-checked={openItemsInNewTab()}
 										checked={openItemsInNewTab()}
-										onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-											setOpenItemsInNewTab(e.currentTarget.checked)
-										}
+										onChange={(
+											e: Event & { currentTarget: HTMLInputElement },
+										) => setOpenItemsInNewTab(e.currentTarget.checked)}
 									/>
 								</span>
 							</dd>

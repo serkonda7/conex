@@ -1,32 +1,15 @@
 # AGFEO-Dashboard
+Mitarbeiter aus CoNex können von AGFEO-Dashboard als Kontakte ausgelesen werden.
+Der optionale Dienst `packages/plugins/agfeo-ldap` stellt das conex-Kontaktverzeichnis schreibgeschützt über LDAP
+bereit, das das Dashboard mit seinem integrierten LDAP-Client liest.
 
-Zeigt die conex-Mitarbeiter im AGFEO-Dashboard (v2) als Kontakte an: eingehende Anrufe
-werden zu einem Namen aufgelöst, und die Dashboard-Suche findet sie. Der optionale Dienst
-`packages/plugins/agfeo-ldap` stellt das conex-Kontaktverzeichnis schreibgeschützt über LDAP
-bereit, das das Dashboard mit seinem integrierten LDAP-Client liest. Die Kontakte sind
-nur im Dashboard verfügbar, nicht auf Systemtelefonen oder in Apps.
+> [!IMPORTANT]
+> Die Kontakte sind _nicht_ auf Systemtelefonen oder in der App verfügbar.
 
-## Schnellstart mit conex-docker
 
-1. In conex eine Rolle anlegen, die nur die Berechtigung **Kontaktverzeichnis lesen
-   (Telefonie)** hat, sowie einen Benutzer `agfeo` mit dieser Rolle.
-
-2. Dienst starten
-   ```sh
-   echo 'COMPOSE_PROFILES=agfeo-ldap' >> .env
-   docker compose up -d --build
-   ```
-
-   Das Image setzt bereits `AGFEO_LDAP_CONEX_URL=http://conex:3000` und lauscht im
-   Container auf `1389`, veröffentlicht als Host-Port `389`.
-
-3. Prüfen, ob Kontakte ausgeliefert werden
-   ```sh
-   ldapsearch -x -H ldap://localhost:389 -D agfeo -W \
-     -b ou=contacts,dc=conex '(objectClass=*)' cn telephoneNumber
-   ```
-
-4. In den Dashboard-Einstellungen ein Konto vom Typ **LDAP** hinzufügen:
+## Konfiguration
+### Agfeo Dashboard
+In den Dashboard-Einstellungen ein Konto vom Typ **LDAP** hinzufügen:
 | Feld                    | Wert                   |
 | ----------------------- | ---------------------- |
 | Benutzername (Bind-DN)  | `agfeo`                |
@@ -38,7 +21,23 @@ nur im Dashboard verfügbar, nicht auf Systemtelefonen oder in Apps.
 | Zusätzlicher Filter     | _Standard belassen_    |
 | Argumente               | _Standard belassen_    |
 
-   Danach die Dashboard-Felder per Drag-and-drop den [Attributen](#kontakte) zuordnen.
+Danach die Dashboard-Felder per Drag-and-drop den [Attributen](#kontakte) zuordnen.
+
+
+### conex-docker
+1. In conex eine Rolle anlegen, die nur die Berechtigung **Kontaktverzeichnis lesen
+   (Telefonie)** hat, sowie einen Benutzer `agfeo` mit dieser Rolle.
+2. Dienst starten
+   ```sh
+   echo 'COMPOSE_PROFILES=agfeo-ldap' >> .env
+   docker compose up -d --build
+   ```
+3. Prüfen, ob Kontakte ausgeliefert werden
+   ```sh
+   ldapsearch -x -H ldap://localhost:389 -D agfeo -W \
+     -b ou=contacts,dc=conex '(objectClass=*)' cn telephoneNumber
+   ```
+
 
 ## Kontakte
 Ein Eintrag `uid=<Mitarbeiter-ID>,<Base-DN>` pro **aktivem** Mitarbeiter.

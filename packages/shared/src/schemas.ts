@@ -14,6 +14,7 @@ import {
 	InterfaceKindSchema,
 	looseBoolean,
 	NameSchema,
+	PanelFaceSchema,
 	type PoeType,
 	PortPositionsSchema,
 	type PortSide,
@@ -690,6 +691,23 @@ export interface ElevationUnit {
 	shelves?: ElevationShelfRef[]
 }
 
+/** A port of a device in the elevation's device images. */
+export interface FaceplatePortJson {
+	id: number
+	name: string
+	kind: string
+	side: PortSide | null
+	/** Resolved panel face: the stub's, else inferred (`portFace`). */
+	face: 'front' | 'rear'
+	connected: boolean
+	enabled: boolean
+}
+
+/** `GET /racks/:id/faceplates`: the ports of each U-mounted device with ports. */
+export interface RackFaceplatesResponse {
+	devices: { device_id: number; ports: FaceplatePortJson[] }[]
+}
+
 export interface ElevationResponse {
 	rack_id: number
 	height_u: number
@@ -857,6 +875,7 @@ export const StubUpdateSchema = v.strictObject({
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
+	face: v.optional(v.nullable(PanelFaceSchema), undefined),
 	...StubPowerEntries,
 })
 
@@ -1843,7 +1862,9 @@ export const TraceQuerySchema = v.object({
  * `contacts.directory` reads the contact directory (`/directory/contacts`),
  * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
  * tenants of existing employees (with `edit`), which also changes the
- * tenant scope of the employee's account.
+ * tenant scope of the employee's account. `ai.use` sends prompts to the
+ * configured AI provider (`[ai]` in the server config). `settings.manage`
+ * edits the global settings (`/global-settings`), e.g. the default AI models.
  */
 export const PERMISSIONS = [
 	'view',
@@ -1856,6 +1877,8 @@ export const PERMISSIONS = [
 	'integrations.manage',
 	'tickets.create',
 	'contacts.directory',
+	'ai.use',
+	'settings.manage',
 ] as const
 
 export const PermissionSchema = v.picklist(PERMISSIONS)
@@ -2305,9 +2328,11 @@ export interface FloorplanJson {
 /**
  * `?confirm=floorplan` on `DELETE /sites/:id`, `/locations/:id` and
  * `/attachments/:id`: also delete when floor-plan data is affected.
+ * `?confirm=contents` on `DELETE /sites/:id` and `/tenants/:id`: also delete
+ * the contained rows (`DeleteContentsJson`) and their floor-plan data.
  */
 export const DeleteQuerySchema = v.object({
-	confirm: v.optional(v.picklist(['floorplan']), undefined),
+	confirm: v.optional(v.picklist(['floorplan', 'contents']), undefined),
 })
 
 export type DeleteQuery = v.InferOutput<typeof DeleteQuerySchema>
@@ -2324,10 +2349,21 @@ export interface FloorplanImpactJson {
 	drawings: number
 }
 
-/** 409 body of a delete that needs `?confirm=floorplan`. */
-export interface FloorplanImpactErrorJson {
+/** Contained rows a site or tenant delete takes with it (the 409 body's `contents`). */
+export interface DeleteContentsJson {
+	sites: number
+	site_groups: number
+	locations: number
+}
+
+/**
+ * 409 body of a delete that needs confirming: `?confirm=contents` when it
+ * carries `contents`, else `?confirm=floorplan`.
+ */
+export interface DeleteImpactErrorJson {
 	error: string
 	floorplan: FloorplanImpactJson
+	contents?: DeleteContentsJson
 }
 
 /**
@@ -3204,6 +3240,7 @@ export const DEVICE_TYPE_UPDATE_FIELDS = [
 /** Port fields a YAML update can change, beyond the ones a device syncs. */
 export const DEVICE_TYPE_UPDATE_PORT_FIELDS = [
 	...TEMPLATE_SYNC_FIELDS,
+	'face',
 	'maximum_draw',
 	'poe_mode',
 	'poe_type',
@@ -3523,6 +3560,19 @@ export const ExternalDeviceCreateSchema = v.strictObject({
 	device_id: IdSchema,
 })
 
+/**
+ * Creates a conex device of a tenant from an external device of an external
+ * tenant linked to it (resolves `device_missing_in_conex`) and links the two.
+ * Serial, asset tag and status come from the external device.
+ */
+export const ExternalDeviceImportSchema = v.strictObject({
+	tenant_id: IdSchema,
+	external_id: ExternalIdSchema,
+	name: NameSchema,
+	device_type_id: IdSchema,
+	device_role_id: IdSchema,
+})
+
 /** Device fields whose conex value can overwrite the external one on a mismatch. */
 export const EXTERNAL_PUSH_FIELDS = ['name', 'manufacturer', 'model'] as const
 
@@ -3551,6 +3601,7 @@ export const ExternalEmployeeDeactivateSchema = v.strictObject({
 })
 
 export type ExternalEmployeeImport = v.InferOutput<typeof ExternalEmployeeImportSchema>
+export type ExternalDeviceImport = v.InferOutput<typeof ExternalDeviceImportSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */
@@ -3890,6 +3941,8 @@ export interface LinkBoardExternal {
 	entity_id: number | null
 	/** Name of the linked conex object (may lie outside the board). */
 	entity_name: string | null
+	/** Device boards: the conex device type matching its model (and manufacturer), if unique. */
+	device_type_id?: number | null
 }
 
 /** Both sides of one link level, for side-by-side linking. */
@@ -4254,4 +4307,124 @@ export interface CalendarTechnicianJson {
 	name: string
 	email: string | null
 	mapping: CalendarMappingJson | null
+}
+
+// ---------------------------------------------------------------------------
+// AI assistant (`routes/ai.ts`)
+// ---------------------------------------------------------------------------
+
+/** Providers the server can be configured with (`[ai] provider`). */
+export const AI_PROVIDERS = ['claude', 'opencode'] as const
+
+export type AiProvider = (typeof AI_PROVIDERS)[number]
+
+/** opencode model reference: `"<providerID>/<modelID>"` (the model id may contain slashes). */
+export const OPENCODE_MODEL_PATTERN = /^[^/\s]+\/\S+$/
+
+/** Longest single chat message, in characters. */
+export const AI_MESSAGE_MAX_LENGTH = 20_000
+/** Most messages one chat request may carry (history included). */
+export const AI_CHAT_MAX_MESSAGES = 50
+
+const AiChatMessageSchema = v.strictObject({
+	role: v.picklist(['user', 'assistant']),
+	text: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(AI_MESSAGE_MAX_LENGTH)),
+})
+
+/**
+ * One assistant turn: the whole conversation so far, oldest first. The server
+ * keeps no chat state; the client resends the history with each request.
+ */
+export const AiChatSchema = v.strictObject({
+	messages: v.pipe(
+		v.array(AiChatMessageSchema),
+		v.minLength(1),
+		v.maxLength(AI_CHAT_MAX_MESSAGES),
+		v.check(
+			(list) => list[0]?.role === 'user' && list[list.length - 1]?.role === 'user',
+			'The conversation must start and end with a user message',
+		),
+	),
+})
+
+export type AiChat = v.InferOutput<typeof AiChatSchema>
+export type AiChatMessage = AiChat['messages'][number]
+
+/** `GET /ai/status`: whether the assistant can be offered. */
+export interface AiStatusJson {
+	/** An `[ai]` section is configured and integrations are not offline. */
+	enabled: boolean
+	/** Configured provider; `mock` while `[integrations] mode = "mock"`. */
+	provider: AiProvider | 'mock' | null
+	model: string | null
+}
+
+/** `POST /ai/chat` reply. */
+export interface AiChatReplyJson {
+	text: string
+	provider: AiProvider | 'mock'
+	/** Model that answered; with server-side fallback it may differ from the configured one. */
+	model: string
+	/** The reply hit the output token limit and is cut off. */
+	truncated: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Global settings (`routes/global_settings.ts`)
+// ---------------------------------------------------------------------------
+
+const ClaudeModelSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1),
+	v.maxLength(200),
+	v.regex(/^\S+$/, 'The model id must not contain spaces'),
+)
+
+const OpencodeModelSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.maxLength(200),
+	v.regex(OPENCODE_MODEL_PATTERN, 'Expected "<provider>/<model>"'),
+)
+
+/**
+ * `PATCH /global-settings`: only the given fields change. `null` clears a
+ * setting, so the value from the server config applies again.
+ */
+export const GlobalSettingsUpdateSchema = v.strictObject({
+	ai_claude_model: v.optional(v.nullable(ClaudeModelSchema), undefined),
+	ai_opencode_model: v.optional(v.nullable(OpencodeModelSchema), undefined),
+})
+
+export type GlobalSettingsUpdate = v.InferOutput<typeof GlobalSettingsUpdateSchema>
+
+/** `GET /global-settings`. */
+export interface GlobalSettingsJson {
+	/** Default Claude model; null = `[ai.claude] model` of the server config. */
+	ai_claude_model: string | null
+	/** Default opencode model; null = `[ai.opencode] model`, else opencode's own default. */
+	ai_opencode_model: string | null
+	/** Server config values that apply while a setting is null. */
+	config: {
+		/** `[ai] provider`; null when the assistant is not configured. */
+		ai_provider: AiProvider | null
+		ai_claude_model: string | null
+		ai_opencode_model: string | null
+	}
+	updated_at: number | null
+}
+
+/** `GET /global-settings/ai-models?provider=…`: models the provider offers. */
+export const AiModelListQuerySchema = v.object({
+	provider: v.picklist(AI_PROVIDERS),
+})
+
+export type AiModelListQuery = v.InferOutput<typeof AiModelListQuerySchema>
+
+export interface AiModelJson {
+	/** Value of the setting: a Claude model id, or `"<provider>/<model>"` for opencode. */
+	id: string
+	/** Display name reported by the provider. */
+	name: string
 }

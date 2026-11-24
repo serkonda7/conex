@@ -6,6 +6,7 @@ import {
 	RackUpdateSchema,
 } from 'shared/src/schemas'
 import { checkTenant } from '../authz'
+import { getRackFaceplates } from '../db/devices'
 import { rackTenant } from '../db/owners'
 import { createRack, deleteRack, getElevation, getRack, listRacks, updateRack } from '../db/racks'
 import { onValidationError } from '../middleware/validation'
@@ -29,12 +30,23 @@ const baseRacksApp = makeTenantApp({
 	}),
 })
 
-export const racksApp = baseRacksApp.get(
-	'/:id/elevation',
-	vValidator('param', EntityParamsSchema, onValidationError),
-	async (c) => {
-		const id = c.req.valid('param').id
-		// A missing rack passes the gate and answers 404 from `getElevation`.
-		return checkTenant(c, await rackTenant(id)) ?? sendResult(c, await getElevation(id))
-	},
-)
+export const racksApp = baseRacksApp
+	.get(
+		'/:id/elevation',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			// A missing rack passes the gate and answers 404 from `getElevation`.
+			return checkTenant(c, await rackTenant(id)) ?? sendResult(c, await getElevation(id))
+		},
+	)
+	.get(
+		'/:id/faceplates',
+		vValidator('param', EntityParamsSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			return (
+				checkTenant(c, await rackTenant(id)) ?? sendResult(c, await getRackFaceplates(id))
+			)
+		},
+	)

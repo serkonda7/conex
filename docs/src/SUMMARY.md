@@ -14,6 +14,7 @@
 - [Microsoft 365](integrations/m365.md)
 - [Outlook-Kalendersynchronisation](integrations/calendar-sync.md)
 - [AGFEO-Dashboard](integrations/agfeo.md)
+- [KI-Assistent](integrations/ai.md)
 
 # Datenbank
 
