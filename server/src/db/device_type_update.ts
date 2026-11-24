@@ -153,6 +153,9 @@ function portEntry(port: TypePort, list: PortList): YamlEntry {
 		name: port.name,
 		type: yamlTypeOf(port, list),
 		positions: port.side === 'rear' ? port.positions : undefined,
+		rear_port: port.rear_name,
+		// Position 1 is the import default, so a plain outlet maps by name alone.
+		rear_port_position: port.rear_port_position === 1 ? undefined : port.rear_port_position,
 		face: port.face,
 		maximum_draw: port.maximum_draw,
 		poe_mode: port.poe_mode,
@@ -184,21 +187,6 @@ function definitionOf(
 		if (entries.length > 0) {
 			definition[list] = entries.map((port) => portEntry(port, list))
 		}
-	}
-	const mappings = ports.flatMap((port) =>
-		port.rear_name === null
-			? []
-			: [
-					{
-						front_port: port.name,
-						front_port_position: 1,
-						rear_port: port.rear_name,
-						rear_port_position: port.rear_port_position,
-					},
-				],
-	)
-	if (mappings.length > 0) {
-		definition['port-mappings'] = mappings
 	}
 	return definition
 }
@@ -290,13 +278,42 @@ function mergePorts(current: unknown, incoming: unknown[]): unknown[] {
 	})
 }
 
-/** Incoming mappings win per front port; the importer ignores any left over. */
-function mergeMappings(current: unknown, incoming: unknown[]): unknown[] {
-	const fronts = new Set(incoming.filter(isMapping).map((entry) => entry.front_port))
-	const kept = Array.isArray(current)
-		? current.filter(isMapping).filter((entry) => !fronts.has(entry.front_port))
-		: []
-	return [...incoming, ...kept]
+/**
+ * Front ports with the NetBox 4.3+ `port-mappings` of an update moved inline,
+ * where the importer reads them first. A front port the update maps inline
+ * keeps that; any other takes its first mapping over its current rear port.
+ */
+function inlineMappings(merged: unknown, update: unknown, mappings: unknown[]): unknown {
+	if (!Array.isArray(merged)) {
+		return merged
+	}
+	const byFront = new Map<unknown, YamlEntry>()
+	for (const mapping of mappings.filter(isMapping)) {
+		const front = typeof mapping.front_port === 'string' ? mapping.front_port.trim() : ''
+		if (front && !byFront.has(front)) {
+			byFront.set(front, mapping)
+		}
+	}
+	// Front ports take no name templates, so the names match as written.
+	const inline = new Set(
+		(Array.isArray(update) ? update : [])
+			.filter((entry) => isMapping(entry) && entry.rear_port !== undefined)
+			.map((entry) => (entry as YamlEntry).name),
+	)
+	return merged.map((entry) => {
+		const mapping = isMapping(entry) ? byFront.get(entry.name) : undefined
+		if (!isMapping(entry) || mapping === undefined || inline.has(entry.name)) {
+			return entry
+		}
+		const { rear_port_position: _position, ...port } = entry
+		return {
+			...port,
+			rear_port: mapping.rear_port,
+			...(mapping.rear_port_position === undefined
+				? {}
+				: { rear_port_position: mapping.rear_port_position }),
+		}
+	})
 }
 
 /**
@@ -321,9 +338,10 @@ function mergeDefinition(
 			merged[list] = mergePorts(current[list], incoming)
 		}
 	}
-	const mappings = update['port-mappings']
+	const { 'port-mappings': mappings, ...rest } = merged
 	if (Array.isArray(mappings)) {
-		merged['port-mappings'] = mergeMappings(current['port-mappings'], mappings)
+		rest['front-ports'] = inlineMappings(rest['front-ports'], update['front-ports'], mappings)
+		return rest
 	}
 	return merged
 }

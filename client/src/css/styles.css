@@ -2366,10 +2366,6 @@ tbody tr:last-child td {
 	gap: 0.35rem;
 }
 
-.permission-group .segmented {
-	justify-self: start;
-}
-
 @media (max-width: 36rem) {
 	.permission-group {
 		grid-template-columns: 1fr;
@@ -2387,6 +2383,10 @@ tbody tr:last-child td {
 	background-color: var(--bg-input);
 }
 
+.permission-group .segmented {
+	justify-self: start;
+}
+
 .segmented-option {
 	position: relative;
 	cursor: pointer;
@@ -2396,6 +2396,7 @@ tbody tr:last-child td {
 	border-left: 1px solid var(--border-strong);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .segmented-option input {
 	position: absolute;
 	opacity: 0;
@@ -4613,6 +4614,7 @@ span.attachment-star,
 	min-width: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-target-text > * {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -4882,6 +4884,7 @@ span.attachment-star,
 	text-align: left;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-object span {
 	overflow: hidden;
 	white-space: nowrap;
@@ -5796,6 +5799,7 @@ a.rack-shelf-plate:hover {
 	overflow: visible;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table thead th {
 	position: sticky;
 	top: 0;
@@ -5804,6 +5808,7 @@ a.rack-shelf-plate:hover {
 	vertical-align: bottom;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table tfoot td {
 	position: sticky;
 	bottom: 0;
@@ -5812,7 +5817,9 @@ a.rack-shelf-plate:hover {
 	font-size: var(--font-size-sm);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table th,
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table td {
 	padding: 0.45rem 0.75rem;
 	border-bottom: 1px solid var(--border);
@@ -5820,6 +5827,7 @@ a.rack-shelf-plate:hover {
 	vertical-align: top;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table tbody tr:hover > * {
 	background-color: color-mix(in srgb, var(--bg-hover) 35%, transparent);
 }
@@ -5833,6 +5841,12 @@ a.rack-shelf-plate:hover {
 	max-width: 22rem;
 	background-color: var(--bg-surface);
 	font-weight: 400;
+}
+
+.matching-table thead .matching-object {
+	z-index: 3;
+	background-color: var(--bg-raised);
+	font-weight: 600;
 }
 
 /* The opaque sticky cell repeats the row's zebra stripe and hover tint. */
@@ -5852,12 +5866,6 @@ a.rack-shelf-plate:hover {
 		var(--bg-hover);
 }
 
-.matching-table thead .matching-object {
-	z-index: 3;
-	background-color: var(--bg-raised);
-	font-weight: 600;
-}
-
 .matching-object-line {
 	display: flex;
 	align-items: center;
@@ -5865,6 +5873,7 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-object-line a {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -5955,19 +5964,23 @@ a.rack-shelf-plate:hover {
 	gap: 0.25rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick .combobox {
 	flex: 1 1 auto;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick .combobox-input {
 	padding-block: 0.3rem;
 }
 
 /* Linked cells read as values, open ones as empty inputs. */
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick:has(.combobox-input:placeholder-shown) .combobox-input {
 	border-style: dashed;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick.ignored .combobox-input {
 	color: var(--text-muted);
 	font-style: italic;
@@ -5994,6 +6007,7 @@ a.rack-shelf-plate:hover {
 	box-shadow: inset 3px 0 0 var(--primary);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-cell.changed .combobox-input {
 	border-color: var(--primary);
 }
@@ -6201,6 +6215,7 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .integrations-summary > span {
 	display: inline-flex;
 	align-items: center;
@@ -6899,12 +6914,12 @@ a.rack-shelf-plate:hover {
 	touch-action: none;
 }
 
-.drawn-plan-tray.editable:hover .drawn-plan-tray-body {
-	stroke: color-mix(in srgb, var(--warning) 70%, var(--text));
-}
-
 .drawn-plan-tray.selected .drawn-plan-tray-body {
 	stroke: var(--primary);
+}
+
+.drawn-plan-tray.editable:hover .drawn-plan-tray-body {
+	stroke: color-mix(in srgb, var(--warning) 70%, var(--text));
 }
 
 .drawn-plan-tray-axis {
