@@ -9,6 +9,7 @@
  * (`devices/vm`); the longest matching section wins.
  */
 import {
+	IconArrowsJoin2,
 	IconBuildingFactory2,
 	IconBuildingSkyscraper,
 	IconCpu,
@@ -516,13 +517,13 @@ export const SECTIONS: readonly Section[] = [
 		list: CalendarSyncDetailPage,
 	},
 	{
-		// Cross-integration matching of tenants, devices and employees, opened
-		// from the integrations page and the link boards.
+		// Cross-integration matching of tenants, devices and employees; also
+		// opened from the integrations page and the link boards.
 		path: 'integrations/matching',
-		parent: 'integrations',
 		noun: (): string => t('matching.title'),
+		icon: IconArrowsJoin2,
 		permission: 'integrations.manage',
-		hideInNav: true,
+		hideAddInNav: true,
 		list: MatchingPage,
 	},
 	{

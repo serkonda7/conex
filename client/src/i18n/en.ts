@@ -301,6 +301,7 @@ export const en = {
 	'app.navGroup.catalog': 'Catalog',
 	'app.nav.managedService': 'MSP',
 	'app.navGroup.customization': 'Customization',
+	'app.navGroup.integrations': 'Integrations',
 	'app.navGroup.administration': 'Administration',
 	'app.tenantContext': 'Tenant context',
 	'app.tenantContextGroup': 'All of {name}',
@@ -1574,7 +1575,6 @@ export const en = {
 
 	// cross-integration matching
 	'matching.title': 'Matching',
-	'matching.open': 'Match objects',
 	'matching.intro': 'Pair each conex object with its counterpart in every connected system.',
 	'matching.kind': 'Object type',
 	'matching.pickTenant': 'Select a tenant to match its devices and employees.',

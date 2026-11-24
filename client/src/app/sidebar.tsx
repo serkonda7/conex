@@ -176,9 +176,10 @@ const NAV_GROUPS: readonly NavGroup[] = [
 		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types', 'managed-bundles'],
 	},
 	{ label: 'app.navGroup.customization', paths: ['saved-filters', 'saved-layouts'] },
+	{ label: 'app.navGroup.integrations', paths: ['integrations', 'integrations/matching'] },
 	{
 		label: 'app.navGroup.administration',
-		paths: ['integrations', 'users', 'roles', 'global-settings', 'audit-log', 'changelog'],
+		paths: ['users', 'roles', 'global-settings', 'audit-log', 'changelog'],
 	},
 ]
 

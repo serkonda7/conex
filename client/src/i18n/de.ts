@@ -302,6 +302,7 @@ export const de: Messages = {
 	'app.navGroup.catalog': 'Katalog',
 	'app.nav.managedService': 'MSP',
 	'app.navGroup.customization': 'Anpassung',
+	'app.navGroup.integrations': 'Integrationen',
 	'app.navGroup.administration': 'Administration',
 	'app.tenantContext': 'Firmenkontext',
 	'app.tenantContextGroup': 'Alle aus {name}',
@@ -1589,7 +1590,6 @@ export const de: Messages = {
 
 	// cross-integration matching
 	'matching.title': 'Zuordnung',
-	'matching.open': 'Objekte zuordnen',
 	'matching.intro': 'Ordne jedem conex-Objekt sein Gegenstück in jedem angebundenen System zu.',
 	'matching.kind': 'Objekttyp',
 	'matching.pickTenant': 'Wähle einen Mandanten, um seine Geräte und Mitarbeiter zuzuordnen.',

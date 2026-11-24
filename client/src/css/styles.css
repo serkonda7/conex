@@ -6201,18 +6201,6 @@ a.rack-shelf-plate:hover {
 	border-bottom: none;
 }
 
-/* Primary action of the page, right beside its title. */
-.integrations-match {
-	background-color: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-contrast);
-}
-
-.integrations-match:hover {
-	background-color: var(--primary-hover);
-	border-color: var(--primary-hover);
-}
-
 .integrations-summary {
 	flex: 1 1 12rem;
 	display: flex;
