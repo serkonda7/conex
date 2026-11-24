@@ -139,8 +139,15 @@ export async function update_tenant(
 	return to_result<TenantDetail>(res, failed.update('noun.tenant'))
 }
 
-export async function delete_tenant(id: number): Promise<Result<unknown, Error>> {
-	const res = await client.tenants[':id'].$delete(by_id(id))
+/** `opts.confirm` also deletes the tenant's sites and site groups (see `DeleteImpactError`). */
+export async function delete_tenant(
+	id: number,
+	opts?: DeleteQuery,
+): Promise<Result<unknown, Error>> {
+	const res = await client.tenants[':id'].$delete({
+		...by_id(id),
+		query: to_query({ confirm: opts?.confirm }),
+	})
 	return to_result<unknown>(res, failed.delete('noun.tenant'))
 }
 
@@ -183,7 +190,7 @@ export async function update_site(id: number, patch: SiteUpdate): Promise<Result
 	return to_result<SiteRow>(res, failed.update('noun.site'))
 }
 
-/** `opts.confirm` also deletes the site's floor-plan data (see `FloorplanImpactError`). */
+/** `opts.confirm` also deletes the site's locations and floor-plan data (see `DeleteImpactError`). */
 export async function delete_site(id: number, opts?: DeleteQuery): Promise<Result<unknown, Error>> {
 	const res = await client.sites[':id'].$delete({
 		...by_id(id),
@@ -251,7 +258,7 @@ export async function fetch_location_outlets(
 	return to_result<LocationOutletJson[]>(res, failed.list('noun.outlet'))
 }
 
-/** `opts.confirm` also deletes the location's floor-plan data (see `FloorplanImpactError`). */
+/** `opts.confirm` also deletes the location's floor-plan data (see `DeleteImpactError`). */
 export async function delete_location(
 	id: number,
 	opts?: DeleteQuery,

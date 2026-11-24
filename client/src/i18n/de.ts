@@ -1161,6 +1161,13 @@ export const de: Messages = {
 	'floorplan.confirmCancel': 'Die nicht gespeicherten Änderungen an diesem Grundriss verwerfen?',
 	'floorplan.linkedFrom': 'Verlinkt von',
 	'floorplan.onPlanOf': 'Auf dem Grundriss von',
+	'delete.confirmContents': '"{name}" samt Inhalt löschen? Das löscht auch {impact}.',
+	'delete.siteCount.one': '{count} Standort',
+	'delete.siteCount.other': '{count} Standorte',
+	'delete.siteGroupCount.one': '{count} Standortgruppe',
+	'delete.siteGroupCount.other': '{count} Standortgruppen',
+	'delete.locationCount.one': '{count} Bereich',
+	'delete.locationCount.other': '{count} Bereiche',
 	'floorplan.confirmDelete':
 		'"{name}" und die zugehörigen Grundrissdaten löschen? Das löscht auch {impact}.',
 	'floorplan.linkedCount.one': '{count} Bereich auf anderen Grundrissen, der hierher verlinkt',

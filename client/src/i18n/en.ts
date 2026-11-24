@@ -1151,6 +1151,14 @@ export const en = {
 	'floorplan.confirmCancel': 'Discard the unsaved changes to this floor plan?',
 	'floorplan.linkedFrom': 'Linked from',
 	'floorplan.onPlanOf': 'On floor plan of',
+	'delete.confirmContents':
+		'Delete "{name}" together with its contents? This also deletes {impact}.',
+	'delete.siteCount.one': '{count} site',
+	'delete.siteCount.other': '{count} sites',
+	'delete.siteGroupCount.one': '{count} site group',
+	'delete.siteGroupCount.other': '{count} site groups',
+	'delete.locationCount.one': '{count} location',
+	'delete.locationCount.other': '{count} locations',
 	'floorplan.confirmDelete':
 		'Delete "{name}" and its floor-plan data? This also deletes {impact}.',
 	'floorplan.linkedCount.one': '{count} area on other floor plans linking here',

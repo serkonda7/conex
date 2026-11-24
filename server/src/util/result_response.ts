@@ -1,12 +1,12 @@
 import { Result } from 'better-result'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import type { FloorplanImpactErrorJson } from 'shared/src/schemas'
+import type { DeleteImpactErrorJson } from 'shared/src/schemas'
 import {
 	ConflictError,
+	DeleteImpactError,
 	DuplicateError,
 	ExternalServiceError,
-	FloorplanImpactError,
 	ForbiddenError,
 	NotFoundError,
 	ValidationError,
@@ -33,8 +33,12 @@ export function sendResult<T>(
 	if (err instanceof ForbiddenError) {
 		return jsonError(c, err.message, 403)
 	}
-	if (err instanceof FloorplanImpactError) {
-		const body: FloorplanImpactErrorJson = { error: err.message, floorplan: err.floorplan }
+	if (err instanceof DeleteImpactError) {
+		const body: DeleteImpactErrorJson = {
+			error: err.message,
+			floorplan: err.floorplan,
+			...(err.contents && { contents: err.contents }),
+		}
 		return c.json(body, 409)
 	}
 	if (err instanceof DuplicateError || err instanceof ConflictError) {

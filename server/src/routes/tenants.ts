@@ -2,6 +2,7 @@ import { vValidator } from '@hono/valibot-validator'
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import {
+	DeleteQuerySchema,
 	EntityParamsSchema,
 	TenantCreateSchema,
 	TenantListQuerySchema,
@@ -69,10 +70,14 @@ export const tenantsApp = new Hono()
 		'/:id',
 		requirePermissionMiddleware('delete'),
 		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('query', DeleteQuerySchema, onValidationError),
 		async (c) => {
 			return (
 				requireGlobalScope(c, 'Tenant-scoped users cannot delete tenants') ??
-				sendResult(c, await deleteTenant(c.req.valid('param').id))
+				sendResult(
+					c,
+					await deleteTenant(c.req.valid('param').id, c.req.valid('query').confirm),
+				)
 			)
 		},
 	)

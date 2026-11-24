@@ -2305,9 +2305,11 @@ export interface FloorplanJson {
 /**
  * `?confirm=floorplan` on `DELETE /sites/:id`, `/locations/:id` and
  * `/attachments/:id`: also delete when floor-plan data is affected.
+ * `?confirm=contents` on `DELETE /sites/:id` and `/tenants/:id`: also delete
+ * the contained rows (`DeleteContentsJson`) and their floor-plan data.
  */
 export const DeleteQuerySchema = v.object({
-	confirm: v.optional(v.picklist(['floorplan']), undefined),
+	confirm: v.optional(v.picklist(['floorplan', 'contents']), undefined),
 })
 
 export type DeleteQuery = v.InferOutput<typeof DeleteQuerySchema>
@@ -2324,10 +2326,21 @@ export interface FloorplanImpactJson {
 	drawings: number
 }
 
-/** 409 body of a delete that needs `?confirm=floorplan`. */
-export interface FloorplanImpactErrorJson {
+/** Contained rows a site or tenant delete takes with it (the 409 body's `contents`). */
+export interface DeleteContentsJson {
+	sites: number
+	site_groups: number
+	locations: number
+}
+
+/**
+ * 409 body of a delete that needs confirming: `?confirm=contents` when it
+ * carries `contents`, else `?confirm=floorplan`.
+ */
+export interface DeleteImpactErrorJson {
 	error: string
 	floorplan: FloorplanImpactJson
+	contents?: DeleteContentsJson
 }
 
 /**
