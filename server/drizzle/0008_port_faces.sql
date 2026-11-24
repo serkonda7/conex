@@ -1,0 +1,1 @@
+ALTER TABLE "device_type_interfaces" ADD COLUMN "face" text;

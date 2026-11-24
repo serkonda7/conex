@@ -17,6 +17,7 @@ import {
 	sql,
 } from 'drizzle-orm'
 import { alias, unionAll } from 'drizzle-orm/pg-core'
+import { portFace } from 'shared/src/faceplate'
 import { passThroughGroup, portKindsCompatible } from 'shared/src/ports'
 import type {
 	DeviceCreate,
@@ -29,8 +30,10 @@ import type {
 	InterfaceCreate,
 	InterfaceUpdate,
 	LocationOutletJson,
+	PanelFace,
 	PoeType,
 	PortSide,
+	RackFaceplatesResponse,
 } from 'shared/src/schemas'
 import {
 	attachments,
@@ -83,7 +86,7 @@ import {
 	tenantConditions,
 	tryWrite,
 } from './list'
-import { rackHeightOf, rackSpansOf } from './racks'
+import { getRack, rackHeightOf, rackSpansOf } from './racks'
 import { getDeviceType, stubsOf } from './templates'
 import {
 	deviceHasVirtualMachines,
@@ -139,9 +142,13 @@ export interface InterfaceJson extends Omit<InterfaceRow, 'connected' | 'enabled
 	patched: boolean
 }
 
-/** A port of a device's port list, with the PoE type of its device-type stub. */
+/**
+ * A port of a device's port list, with the PoE type of its device-type stub
+ * and the panel face it sits on (the stub's, else inferred).
+ */
 export interface DevicePortJson extends InterfaceJson {
 	poe_type: PoeType | null
+	face: PanelFace
 }
 
 export function toInterfaceJson(row: InterfaceRow): InterfaceJson {
@@ -1370,22 +1377,43 @@ export async function deleteDevice(
 
 const INTERFACE_NAME_IN_USE = 'This device already has an interface with this name on this side'
 
+/** What a device port takes from its device-type stub. */
+interface TemplatePortInfo {
+	poe_type: PoeType | null
+	face: PanelFace | null
+}
+
+const templateKey = (side: string | null, name: string): string => `${side ?? ''}:${name}`
+
 /**
- * PoE type per template port name of a device type's normal (non pass-through)
- * stubs; ports match on `template_name ?? name`.
+ * PoE type and panel face per template port of a device type, keyed by side
+ * and name; ports match on `template_name ?? name`.
  */
-async function poeTypesOf(deviceTypeId: number): Promise<Map<string, PoeType>> {
-	const byName = new Map<string, PoeType>()
+async function templatePortsOf(deviceTypeId: number): Promise<Map<string, TemplatePortInfo>> {
+	const byKey = new Map<string, TemplatePortInfo>()
 	for (const stub of await stubsOf(deviceTypeId)) {
-		if (stub.side !== null || stub.poe_type === null) {
-			continue
-		}
 		const names = expandStub(stub)
 		for (const name of Result.isOk(names) ? names.value : []) {
-			byName.set(name, stub.poe_type)
+			byKey.set(templateKey(stub.side, name), {
+				poe_type: stub.side === null ? stub.poe_type : null,
+				face: stub.face,
+			})
 		}
 	}
-	return byName
+	return byKey
+}
+
+/** A port row with what its template adds: PoE type and resolved panel face. */
+function devicePortJson(
+	row: InterfaceRow,
+	templates: Map<string, TemplatePortInfo>,
+): DevicePortJson {
+	const template = templates.get(templateKey(row.side, row.template_name ?? row.name))
+	return {
+		...toInterfaceJson(row),
+		poe_type: template?.poe_type ?? null,
+		face: portFace({ kind: row.kind, side: row.side, face: template?.face }),
+	}
 }
 
 export async function listInterfaces(deviceId: number): Promise<Result<DevicePortJson[], Error>> {
@@ -1396,7 +1424,7 @@ export async function listInterfaces(deviceId: number): Promise<Result<DevicePor
 	if (!device) {
 		return Result.err(new NotFoundError('Device not found'))
 	}
-	const poeTypes = await poeTypesOf(device.device_type_id)
+	const templates = await templatePortsOf(device.device_type_id)
 	const rows = await getDb()
 		.select()
 		.from(interfaces)
@@ -1405,13 +1433,62 @@ export async function listInterfaces(deviceId: number): Promise<Result<DevicePor
 		// sequentially, so the list reads back in natural port order
 		// (lexicographic name order would put eth10 before eth2).
 		.orderBy(asc(interfaces.id))
-	return Result.ok(
-		rows.map((row) => ({
-			...toInterfaceJson(row),
-			poe_type:
-				row.side === null ? (poeTypes.get(row.template_name ?? row.name) ?? null) : null,
+	return Result.ok(rows.map((row) => devicePortJson(row, templates)))
+}
+
+/**
+ * Ports of every U-mounted device of a rack, for the elevation's device
+ * images. Devices without ports are left out.
+ */
+export async function getRackFaceplates(
+	rackId: number,
+): Promise<Result<RackFaceplatesResponse, Error>> {
+	const rack = await getRack(rackId)
+	if (Result.isError(rack)) {
+		return rack
+	}
+	const mounted = await getDb()
+		.select({ id: devices.id, device_type_id: devices.device_type_id })
+		.from(devices)
+		.where(and(eq(devices.rack_id, rackId), isNotNull(devices.position_u)))
+	if (mounted.length === 0) {
+		return Result.ok({ devices: [] })
+	}
+	const templates = new Map<number, Map<string, TemplatePortInfo>>()
+	for (const typeId of new Set(mounted.map((device) => device.device_type_id))) {
+		templates.set(typeId, await templatePortsOf(typeId))
+	}
+	const typeOf = new Map(mounted.map((device) => [device.id, device.device_type_id]))
+	const rows = await getDb()
+		.select()
+		.from(interfaces)
+		.where(
+			inArray(
+				interfaces.device_id,
+				mounted.map((device) => device.id),
+			),
+		)
+		.orderBy(asc(interfaces.id))
+	const byDevice = new Map<number, DevicePortJson[]>()
+	for (const row of rows) {
+		const ports = byDevice.get(row.device_id) ?? []
+		ports.push(devicePortJson(row, templates.get(typeOf.get(row.device_id) ?? -1) ?? new Map()))
+		byDevice.set(row.device_id, ports)
+	}
+	return Result.ok({
+		devices: [...byDevice].map(([device_id, ports]) => ({
+			device_id,
+			ports: ports.map(({ id, name, kind, side, face, connected, enabled }) => ({
+				id,
+				name,
+				kind,
+				side,
+				face,
+				connected,
+				enabled,
+			})),
 		})),
-	)
+	})
 }
 
 export interface InterfaceListParams extends ListParams {

@@ -575,6 +575,9 @@ export const en = {
 	'deviceType.component.noPoe': 'No PoE',
 	'deviceType.component.poeType': 'PoE type',
 	'deviceType.component.noPoeType': 'Not specified',
+	'deviceType.component.face': 'Face',
+	'deviceType.component.faceAuto': 'Automatic ({face})',
+	'deviceType.component.faceHint': 'Side of the device the ports sit on in the device images.',
 	'poeMode.pse': 'Supply (PSE)',
 	'poeMode.pd': 'Draw (PD)',
 	'deviceType.component.existingDevicesHint':
@@ -792,6 +795,8 @@ export const en = {
 	'rackType.notFound': 'Rack type not found.',
 	'rackType.details': 'Rack type details',
 	'rackType.noRacks': 'No racks of this type yet.',
+	'rackType.elevation': 'Elevation',
+	'rackType.image': 'Empty rack, {height} U, {formFactor}',
 	'formFactor.twoPostFrame': '2-post frame',
 	'formFactor.fourPostFrame': '4-post frame',
 	'formFactor.fourPostCabinet': '4-post cabinet',
@@ -1379,8 +1384,21 @@ export const en = {
 		'Drag to rotate, right-drag or Shift + drag to pan, Ctrl + scroll or pinch to zoom',
 	'drawnPlan.noWebgl': 'The 3D view needs WebGL, which this browser does not offer.',
 
+	// faceplate (symbolic device images)
+	'faceplate.heading': 'Views',
+	'faceplate.image': '{face} of {name}',
+	'faceplate.port': '{name} ({kind})',
+	'faceplate.portState': '{port} · {state}',
+	'faceplate.connected': 'connected',
+	'faceplate.disabled': 'disabled',
+	'faceplate.undrawn.one': '{count} port without a socket (Wi-Fi, virtual)',
+	'faceplate.undrawn.other': '{count} ports without a socket (Wi-Fi, virtual)',
+
 	// elevation
 	'elevation.section': 'Rack elevation ({face})',
+	'elevation.display': 'Display',
+	'elevation.displayLabels': 'Labels',
+	'elevation.displayImages': 'Images',
 	'elevation.unnamedShelf': 'shelf',
 	'elevation.devicesOnShelf': 'Devices on shelf {name}',
 	'elevation.removeFromShelf': 'Remove {name} from shelf',
@@ -1741,6 +1759,7 @@ export const en = {
 	'api.updateStubFailed': 'Failed to update interface stub',
 	'api.deleteStubFailed': 'Failed to delete interface stub',
 	'api.loadElevationFailed': 'Failed to load rack elevation',
+	'api.loadFaceplatesFailed': 'Failed to load the device images',
 	'api.importFailed': 'Failed to import {noun}',
 	'api.uploadFailed': 'Failed to upload {name}',
 	'api.setupFailed': 'Setup failed.',

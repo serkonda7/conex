@@ -1,5 +1,10 @@
 # Racks
+## Rackansicht
+Die Rackansicht zeigt Vorder- und Rückseite eines Racks. Über **Darstellung** wechselt sie zwischen **Beschriftung** (Name und Modell je Gerät) und **Bilder**: Dann erscheint jedes Gerät als [Gerätebild](port-types.md#gerätebilder) der jeweiligen Seite mit seinen Ports, verbundene Ports grün. Beim Überfahren mit der Maus verschwindet der Name, und die Ports darunter werden sichtbar. Die Wahl merkt sich der Browser.
+
 ## Racktypen
+Die Detailseite eines Racktyps zeigt ein leeres Rack in seiner Höhe.
+
 ### Bauform
 
 <div class="rack-gallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 1.25rem; margin: 1.5rem 0;">

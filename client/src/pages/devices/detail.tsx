@@ -16,6 +16,7 @@ import {
 	fetch_jacks,
 	type InterfaceJson,
 } from '../../api/devices'
+import { fetch_device_type } from '../../api/templates'
 import { fetch_locations } from '../../api/tenancy'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
 import {
@@ -26,6 +27,7 @@ import {
 	RelatedPreview,
 	useDetailDelete,
 } from '../../components/detail_page'
+import { FaceplateViews } from '../../components/faceplate'
 import { Empty, InlineError } from '../../components/feedback'
 import { FloorplanLinks, OutletLinks } from '../../components/floorplan_links'
 import { IconLabel } from '../../components/icon_label'
@@ -92,6 +94,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	// Starts with the device; a device write (role, tenant) outdates it in the cache.
 	const [service] = createRecord(id, fetch_device_service, setError)
 	const typeId = (): number | undefined => device()?.device_type_id
+	const [deviceType] = createRecord(typeId, fetch_device_type, setError)
 	const roleId = (): number | undefined => device()?.device_role_id
 	const siteId = (): number | null | undefined => device()?.site_id
 	const locationId = (): number | null | undefined => device()?.location_id
@@ -464,6 +467,18 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</section>
 			</DetailShell>
 			<div class="detail-sections">
+				<Show when={deviceType() && ifaces()}>
+					<section class="component-section" id="device-views">
+						<div class="card-header">
+							<h3>{t('faceplate.heading')}</h3>
+						</div>
+						<FaceplateViews
+							ports={ifaces() ?? []}
+							u_height={deviceType()?.u_height ?? 1}
+							label={device()?.name ?? ''}
+						/>
+					</section>
+				</Show>
 				<Show when={panelPorts().length > 0}>
 					<section class="component-section flat-table" id="device-panel-ports">
 						<div class="card-header">

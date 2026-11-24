@@ -59,6 +59,8 @@ const POWER_KIND = 'power'
 /** One concrete port of a type, with what its stub adds to the expansion. */
 interface TypePort extends ExpandedInterface {
 	rear_name: string | null
+	/** Panel face set on the stub; null infers it. */
+	face: string | null
 	maximum_draw: number | null
 	poe_mode: string | null
 	poe_type: string | null
@@ -94,6 +96,7 @@ function portsOf(stubs: Awaited<ReturnType<typeof stubsOf>>): Result<TypePort[],
 					port.rear_index === null
 						? null
 						: (expanded.value[port.rear_index]?.name ?? null),
+				face: stub?.face ?? null,
 				maximum_draw: stub?.maximum_draw ?? null,
 				poe_mode: stub?.poe_mode ?? null,
 				poe_type: stub?.poe_type ?? null,
@@ -150,6 +153,7 @@ function portEntry(port: TypePort, list: PortList): YamlEntry {
 		name: port.name,
 		type: yamlTypeOf(port, list),
 		positions: port.side === 'rear' ? port.positions : undefined,
+		face: port.face,
 		maximum_draw: port.maximum_draw,
 		poe_mode: port.poe_mode,
 		poe_type: port.poe_type,

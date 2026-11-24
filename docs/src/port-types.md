@@ -86,3 +86,22 @@ Ein Rückport mit genau einer Position ist eine Dose. Ihr Bereich ist der Raum, 
 - Die Detailseite eines Bereichs listet seine Dosen und die seiner Unterbereiche.
 - Wird eine Dose auf dem Grundriss eines Bereichs platziert, erhält sie diesen Bereich, falls sie noch keinen hat. Liegt sie danach in einem anderen Bereich, wird sie vom Grundriss entfernt.
 - Ein Bereich mit Dosen kann nicht gelöscht werden.
+
+## Gerätebilder
+Gerätetypen und Geräte zeigen unter **Ansichten** ein symbolisches Bild ihrer Vorder- und Rückseite. conex zeichnet es aus den Ports: jeder Port erscheint als Buchse seines Typs (RJ45, SFP, USB, Kaltgerätebuchse, …), Ports einer Komponente stehen als Block zusammen. Lange Reihen von Netzwerkschnittstellen werden wie bei einem Switch zweireihig gesetzt (ungerade oben, gerade unten), Patchpanel-Ports zeilenweise; Stromanschlüsse sitzen rechts. Am Gerät sind verbundene Ports grün, deaktivierte blass. Virtuelle Schnittstellen, WLAN und Mobilfunk haben keine Buchse und erscheinen nicht im Bild.
+
+Die Seite eines Ports bestimmt **Seite** in der Komponente. Ohne Angabe gilt:
+
+| Ports                                      | Seite  |
+| ------------------------------------------ | ------ |
+| Rückports, Stromeingänge und Stromausgänge | Hinten |
+| alle anderen                               | Vorne  |
+
+In YAML heißt das Feld `face` (`front` oder `rear`) und steht am einzelnen Port, z. B. für den Konsolenport auf der Rückseite eines Switches:
+
+```yaml
+ports:
+  - name: Console
+    type: rj-45
+    face: rear
+```

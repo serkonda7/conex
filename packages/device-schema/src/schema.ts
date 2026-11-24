@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import {
 	DEVICE_TYPE_DESCRIPTION_MAX_LENGTH,
 	MAX_POWER_DRAW,
+	PANEL_FACES,
 	POE_MODES,
 	POE_TYPES,
 	PORT_SIDES,
@@ -62,6 +63,9 @@ export function looseBoolean(emptyAsTrue: boolean) {
 
 export const PortSideSchema = v.picklist(PORT_SIDES)
 
+/** conex extension: the panel face a port sits on; unset infers it. */
+export const PanelFaceSchema = v.picklist(PANEL_FACES)
+
 /** Positions of one rear port: 1 for a plain outlet, N for a trunk (MPO). */
 export const PortPositionsSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1024))
 
@@ -119,6 +123,7 @@ export const StubFieldEntries = {
 	side: v.optional(v.nullable(PortSideSchema), undefined),
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
+	face: v.optional(v.nullable(PanelFaceSchema), undefined),
 	...StubPowerEntries,
 }
 

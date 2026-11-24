@@ -1,9 +1,12 @@
 import { IconChevronDown, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
+import { portFace } from 'shared/src/faceplate'
 import {
 	MAX_POWER_DRAW,
 	MAX_STUB_DIGITS,
 	MAX_STUB_START,
+	PANEL_FACES,
+	type PanelFace,
 	POE_MODES,
 	POE_TYPES,
 	type PoeMode,
@@ -19,7 +22,7 @@ import { Hint, SelectField, TextField } from '../../components/form'
 import { IconLabel } from '../../components/icon_label'
 import { confirmDiscard, Modal } from '../../components/modal'
 import { type MessageKey, t } from '../../i18n'
-import { poeModeLabel, poeTypeOption, portKindOption } from '../../i18n/labels'
+import { faceLabel, poeModeLabel, poeTypeOption, portKindOption } from '../../i18n/labels'
 import { useDismiss } from '../../lib/dismiss'
 import { cleared, text } from '../../lib/form'
 import { useAction } from '../../lib/resource'
@@ -184,6 +187,9 @@ export function ComponentDialog(props: {
 	const [maximumDraw, setMaximumDraw] = createSignal(String(stub?.maximum_draw ?? ''))
 	const [poeMode, setPoeMode] = createSignal<PoeMode | ''>(stub?.poe_mode ?? '')
 	const [poeType, setPoeType] = createSignal<PoeType | ''>(stub?.poe_type ?? '')
+	const [face, setFace] = createSignal<PanelFace | ''>(stub?.face ?? '')
+	/** The face an unset face infers from the kind and side. */
+	const inferredFace = (): PanelFace => portFace({ kind: kind(), side: props.info.side ?? null })
 	const [error, setError] = createSignal<string | null>(null)
 	const save = useAction(setError)
 	/** The form's fields, compared to their initial values to find unsaved changes. */
@@ -200,6 +206,7 @@ export function ComponentDialog(props: {
 			maximumDraw(),
 			poeMode(),
 			poeType(),
+			face(),
 		])
 	const initialState = formState()
 	const dirty = (): boolean => formState() !== initialState
@@ -271,6 +278,7 @@ export function ComponentDialog(props: {
 			digits: digits(),
 			start: parsedStart(),
 			kind: kind(),
+			face: face() || undefined,
 			...(isPowerInput ? { maximum_draw: parsedDraw } : {}),
 			...(isInterface
 				? {
@@ -430,6 +438,19 @@ export function ComponentDialog(props: {
 					onChange={setKind}
 					class="combobox-fit combobox-port-kind"
 					options={kinds.map(portKindOption)}
+				/>
+				<SelectField
+					id={`${prefix}-face`}
+					label={t('deviceType.component.face')}
+					value={face()}
+					onChange={(value: string): void => {
+						setFace(value as PanelFace | '')
+					}}
+					emptyLabel={t('deviceType.component.faceAuto', {
+						face: faceLabel(inferredFace()),
+					})}
+					options={PANEL_FACES.map((value) => ({ value, label: faceLabel(value) }))}
+					hint={<Hint>{t('deviceType.component.faceHint')}</Hint>}
 				/>
 				<Show when={isPowerInput}>
 					<TextField

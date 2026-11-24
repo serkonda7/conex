@@ -26,6 +26,7 @@ import {
 	type EmployeePhone,
 	HOLIDAY_REGIONS,
 	LOCATION_TYPES,
+	PANEL_FACES,
 	POE_MODES,
 	POE_TYPES,
 	PORT_SIDES,
@@ -462,6 +463,9 @@ export const device_type_interfaces = pgTable(
 			(): AnyPgColumn => device_type_interfaces.id,
 		),
 		rear_position: integer('rear_position').notNull().default(1),
+		// Panel face of the ports in the symbolic device images
+		// (`PANEL_FACES`); null infers it from the kind and side.
+		face: text('face', { enum: PANEL_FACES }),
 		// Power inputs: NetBox `maximum_draw`, in watts.
 		maximum_draw: integer('maximum_draw'),
 		// Network interfaces: `POE_MODES` / `POE_TYPES`; a type needs a mode.

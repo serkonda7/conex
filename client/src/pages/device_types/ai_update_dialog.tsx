@@ -19,6 +19,7 @@ import { Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import {
 	deviceTypeUpdateFieldLabel,
+	faceLabel,
 	poeModeLabel,
 	poeTypeLabel,
 	portKindLabel,
@@ -38,6 +39,8 @@ function fieldValue(field: DeviceTypeUpdateChange['field'], value: string): stri
 			return poeTypeLabel(value as PoeType)
 		case 'is_full_depth':
 			return yesNo(value === 'true')
+		case 'face':
+			return faceLabel(value)
 		default:
 			return value
 	}

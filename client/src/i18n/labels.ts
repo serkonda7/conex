@@ -249,6 +249,7 @@ const DEVICE_TYPE_UPDATE_FIELD_KEYS: Record<string, MessageKey> = {
 	kind: 'device.templateSync.field.kind',
 	positions: 'device.templateSync.field.positions',
 	rear_port: 'device.templateSync.field.rear_port',
+	face: 'deviceType.component.face',
 	maximum_draw: 'deviceType.component.maximumDraw',
 	poe_mode: 'deviceType.component.poeMode',
 	poe_type: 'deviceType.component.poeType',

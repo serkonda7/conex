@@ -14,6 +14,7 @@ import {
 	InterfaceKindSchema,
 	looseBoolean,
 	NameSchema,
+	PanelFaceSchema,
 	type PoeType,
 	PortPositionsSchema,
 	type PortSide,
@@ -690,6 +691,23 @@ export interface ElevationUnit {
 	shelves?: ElevationShelfRef[]
 }
 
+/** A port of a device in the elevation's device images. */
+export interface FaceplatePortJson {
+	id: number
+	name: string
+	kind: string
+	side: PortSide | null
+	/** Resolved panel face: the stub's, else inferred (`portFace`). */
+	face: 'front' | 'rear'
+	connected: boolean
+	enabled: boolean
+}
+
+/** `GET /racks/:id/faceplates`: the ports of each U-mounted device with ports. */
+export interface RackFaceplatesResponse {
+	devices: { device_id: number; ports: FaceplatePortJson[] }[]
+}
+
 export interface ElevationResponse {
 	rack_id: number
 	height_u: number
@@ -857,6 +875,7 @@ export const StubUpdateSchema = v.strictObject({
 	positions: v.optional(PortPositionsSchema, undefined),
 	rear_stub_id: v.optional(IdSchema, undefined),
 	rear_position: v.optional(PortPositionsSchema, undefined),
+	face: v.optional(v.nullable(PanelFaceSchema), undefined),
 	...StubPowerEntries,
 })
 
@@ -3217,6 +3236,7 @@ export const DEVICE_TYPE_UPDATE_FIELDS = [
 /** Port fields a YAML update can change, beyond the ones a device syncs. */
 export const DEVICE_TYPE_UPDATE_PORT_FIELDS = [
 	...TEMPLATE_SYNC_FIELDS,
+	'face',
 	'maximum_draw',
 	'poe_mode',
 	'poe_type',
