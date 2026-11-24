@@ -58,8 +58,7 @@ function resolve_config_path(serverRoot: string): string {
  * (production startup, tests) get a clean instance with no shared state.
  * `AppType` stays derived from here so `client/src/api/client.ts` RPC typing is stable.
  */
-// biome-ignore lint/nursery/useExplicitType: return type intentionally inferred —
-// biome-ignore lint/nursery/useExplicitReturnType: naming it `: Hono` erases the chained-route generics that `hc<AppType>` depends on
+// biome-ignore lint/nursery/useExplicitType: naming it `: Hono` erases the chained-route generics that `hc<AppType>` depends on
 export function createApp() {
 	return (
 		new Hono()

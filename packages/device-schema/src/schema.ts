@@ -31,7 +31,6 @@ export const CalendarDateSchema = v.pipe(
 )
 
 // biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
-// biome-ignore lint/nursery/useExplicitReturnType: valibot schema inference must stay unannotated
 export function looseBoolean(emptyAsTrue: boolean) {
 	return v.pipe(
 		v.union([v.string(), v.number(), v.boolean()]),

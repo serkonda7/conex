@@ -457,7 +457,6 @@ export type SiteGroupUpdate = v.InferOutput<typeof SiteGroupUpdateSchema>
 // Query-string contracts. Query values always arrive as strings, so page/limit
 // coerce through Number instead of demanding JSON numbers like ListQuerySchema.
 // biome-ignore lint/nursery/useExplicitType: valibot schema inference must stay unannotated
-// biome-ignore lint/nursery/useExplicitReturnType: valibot schema inference must stay unannotated
 function coercedInt(min: number, max: number, fallback: number) {
 	return v.optional(
 		v.pipe(

@@ -63,9 +63,7 @@ body,
 }
 
 body {
-	font-family:
-		system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-		sans-serif;
+	font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	margin: 0;
 	padding: 0;
 	background-color: var(--bg-base);
@@ -189,7 +187,6 @@ a:focus-visible {
 	outline-offset: 1px;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 button {
 	padding: 0.36rem 0.6rem;
 	font-size: var(--font-size-base);
@@ -1137,7 +1134,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 
 /* NetBox-style quick-add "+" on each nav row. Hidden until the row is
    hovered, active, or focus-within; dummy buttons stay disabled. */
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-item {
 	position: relative;
 	display: flex;
@@ -1146,7 +1142,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	border-radius: 0.3rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-item > a {
 	flex: 1;
 	min-width: 0;
@@ -1186,7 +1181,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 .app-nav-item:hover .app-nav-add,
 .app-nav-item.active .app-nav-add,
 .app-nav-item:focus-within .app-nav-add,
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-add:focus-visible {
 	opacity: 1;
 }
@@ -1197,7 +1191,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	color: var(--text);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-add:disabled {
 	cursor: default;
 }
@@ -1610,12 +1603,10 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 /* Tables scroll horizontally instead of clipping on narrow screens. */
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content div:has(> table) {
 	overflow-x: auto;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content thead th {
 	position: sticky;
 	top: 0;
@@ -1687,7 +1678,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content form button {
 	flex-shrink: 0;
 }
@@ -1877,7 +1867,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin-bottom: 0.5rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .page-header h2 {
 	margin: 0;
 	padding: 0;
@@ -1917,7 +1906,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .list-tabs a {
 	margin-bottom: calc(-0.4rem - 1px);
 	padding-bottom: 0.4rem;
@@ -1976,8 +1964,8 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 
 .app-content .device-type-import-page .import-data {
 	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-		"Liberation Mono", "Courier New", monospace;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+		monospace;
 }
 
 .import-similar-types {
@@ -2058,7 +2046,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	color: var(--primary-contrast);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .form-actions button:disabled {
 	opacity: 0.55;
 	cursor: not-allowed;
@@ -2174,7 +2161,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	list-style: none;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .service-hours-list > li {
 	display: grid;
 	grid-column: 1 / -1;
@@ -2216,7 +2202,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 .copy-value:hover .copy-value-btn,
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .copy-value-btn:focus-visible,
 .copy-value-done {
 	opacity: 1;
@@ -2237,7 +2222,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	grid-template-columns: max-content max-content auto;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .contact-list > li {
 	display: grid;
 	grid-column: 1 / -1;
@@ -2379,7 +2363,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	gap: 0.4rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field .address-place-row input {
 	flex: 1 1 auto;
 	width: auto;
@@ -2458,7 +2441,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	border-left: 1px solid var(--border-strong);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .segmented-option input {
 	position: absolute;
 	opacity: 0;
@@ -2530,7 +2512,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	padding-left: 1.7rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field input:disabled,
 .app-content .form-stacked .field textarea:disabled {
 	cursor: not-allowed;
@@ -2571,14 +2552,8 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	gap: 0.4rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field .vm-host-row input,
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
-	.app-content
-	.form-stacked
-	.field
-	.input-with-button
-	input {
+.app-content .form-stacked .field .input-with-button input {
 	flex: 1 1 auto;
 	width: auto;
 	min-width: 0;
@@ -2621,12 +2596,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	min-height: 2.1rem;
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle {
 	appearance: none;
 	position: relative;
@@ -2642,12 +2612,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	transition: background-color 150ms ease;
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle::before {
 	content: "";
 	position: absolute;
@@ -2660,45 +2625,24 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	transition: transform 150ms ease;
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle:checked {
 	background-color: var(--primary);
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle:checked::before {
 	transform: translateX(1rem);
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle:disabled {
 	cursor: not-allowed;
 	opacity: 0.5;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field .field-checkbox-label input,
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
-	.app-content
-	.form-stacked
-	.jack-outlet-list
-	.field-checkbox-label
-	input {
+.app-content .form-stacked .jack-outlet-list .field-checkbox-label input {
 	flex: none;
 	width: auto;
 }
@@ -3004,11 +2948,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	height: var(--port-icon-size);
 }
 
-.app-content
-	.form-stacked
-	.field
-	.combobox-port-kind.combobox-with-icon
-	.combobox-input {
+.app-content .form-stacked .field .combobox-port-kind.combobox-with-icon .combobox-input {
 	padding-left: calc(0.55rem + var(--port-icon-size) + var(--port-icon-gap));
 }
 
@@ -3031,9 +2971,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin-right: var(--port-icon-gap);
 }
 
-.combobox-port-kind
-	.combobox-list
-	.combobox-option-label:not(:has(.combobox-option-icon)) {
+.combobox-port-kind .combobox-list .combobox-option-label:not(:has(.combobox-option-icon)) {
 	padding-left: calc(var(--port-icon-size) + var(--port-icon-gap));
 }
 
@@ -3058,22 +2996,18 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 /* Connect and disconnect buttons in the port tables only show on row hover (or focus). */
-:is(.panel-port-table, .device-port-table)
-	:is(.icon-btn-connect, .icon-btn-disconnect) {
+:is(.panel-port-table, .device-port-table) :is(.icon-btn-connect, .icon-btn-disconnect) {
 	opacity: 0;
 }
 
-:is(.panel-port-table, .device-port-table)
-	tr:hover
-	:is(.icon-btn-connect, .icon-btn-disconnect),
+:is(.panel-port-table, .device-port-table) tr:hover :is(.icon-btn-connect, .icon-btn-disconnect),
 :is(.panel-port-table, .device-port-table)
 	:is(.icon-btn-connect, .icon-btn-disconnect):focus-visible {
 	opacity: 1;
 }
 
 @media (hover: none) {
-	:is(.panel-port-table, .device-port-table)
-		:is(.icon-btn-connect, .icon-btn-disconnect) {
+	:is(.panel-port-table, .device-port-table) :is(.icon-btn-connect, .icon-btn-disconnect) {
 		opacity: 1;
 	}
 }
@@ -3217,7 +3151,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	gap: 0.3rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .panel-row-field > span:first-child {
 	font-weight: 500;
 	color: #d6d6d6;
@@ -3285,19 +3218,13 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	place-items: center;
 	width: 100%;
 	min-height: 2.5rem;
-	background:
-		linear-gradient(var(--primary), var(--primary)) center / 100% 2px
-		no-repeat;
+	background: linear-gradient(var(--primary), var(--primary)) center / 100% 2px no-repeat;
 }
 
 .panel-row-bridge.is-off .panel-row-switch {
 	background:
-		repeating-linear-gradient(
-			90deg,
-			var(--border-strong) 0 6px,
-			transparent 6px 10px
-		)
-		center / 100% 2px no-repeat;
+		repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 10px) center /
+		100% 2px no-repeat;
 }
 
 .panel-row-switch > .toggle {
@@ -3390,7 +3317,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .object-selector-results li {
 	display: grid;
 	grid-column: 1 / -1;
@@ -3490,7 +3416,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	box-shadow: inset 0 0 0 1px var(--primary);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .port-grid .port-tile:disabled {
 	opacity: 0.45;
 	cursor: not-allowed;
@@ -3502,8 +3427,8 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-		"Liberation Mono", "Courier New", monospace;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+		monospace;
 }
 
 .port-tile small {
@@ -3552,7 +3477,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin-left: auto;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .modal-actions button:disabled {
 	opacity: 0.45;
 	cursor: not-allowed;
@@ -3686,7 +3610,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	padding: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .location-tree li {
 	margin: 0;
 	padding-left: calc(var(--tree-depth, 0) * 1rem);
@@ -3784,9 +3707,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	background-color: transparent;
 }
 
-.app-content
-	tbody.data-table-group
-	tr:nth-child(odd):not(.data-table-group-row, :hover) {
+.app-content tbody.data-table-group tr:nth-child(odd):not(.data-table-group-row, :hover) {
 	background-color: color-mix(in srgb, var(--bg-hover) 45%, transparent);
 }
 
@@ -3863,7 +3784,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 /* Device detail: port and VM sections, split by the same rule. */
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .detail-sections > section + section {
 	padding-top: 1.1rem;
 	border-top: 1px solid var(--border);
@@ -4237,11 +4157,7 @@ span.attachment-star,
 	height: 0.85rem;
 	border: 2px solid var(--area-color, var(--link));
 	border-radius: 0.15rem;
-	background-color: color-mix(
-		in srgb,
-		var(--area-color, var(--link)) 30%,
-		transparent
-	);
+	background-color: color-mix(in srgb, var(--area-color, var(--link)) 30%, transparent);
 }
 
 .floorplan-swatch-marker {
@@ -4349,10 +4265,7 @@ span.attachment-star,
 	transform-origin: 0 0;
 	/* --floorplan-dx / -dy spread a crowd at full zoom. */
 	transform: scale(var(--inv-zoom))
-		translate(
-			calc(-50% + var(--floorplan-dx, 0px)),
-			calc(-50% + var(--floorplan-dy, 0px))
-		);
+		translate(calc(-50% + var(--floorplan-dx, 0px)), calc(-50% + var(--floorplan-dy, 0px)));
 	display: grid;
 	place-items: center;
 	width: 1.75rem;
@@ -4462,11 +4375,7 @@ span.attachment-star,
 }
 
 .floorplan-marker-outlet.floorplan-marker-partial:not(.floorplan-marker-jack) {
-	background: linear-gradient(
-		135deg,
-		var(--success) 50%,
-		var(--text-muted) 50%
-	);
+	background: linear-gradient(135deg, var(--success) 50%, var(--text-muted) 50%);
 }
 
 .floorplan-jack-count {
@@ -4519,7 +4428,6 @@ span.attachment-star,
 	list-style: none;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-status-legend li {
 	display: inline-flex;
 	align-items: center;
@@ -4696,7 +4604,6 @@ span.attachment-star,
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-target-text > * {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -4950,7 +4857,6 @@ span.attachment-star,
 	font-size: var(--font-size-sm);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-objects li {
 	display: flex;
 	align-items: center;
@@ -4967,7 +4873,6 @@ span.attachment-star,
 	text-align: left;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-object span {
 	overflow: hidden;
 	white-space: nowrap;
@@ -5232,10 +5137,7 @@ span.attachment-star,
 
 .rack-elev.rack-elev-images {
 	/* Device column width (minus the borders) at the 19":1 U aspect, plus a row's border. */
-	--rack-row-h: max(
-		1.9rem,
-		calc((100cqw - 2rem - 2px) * 44.45 / 482.6 + 1px)
-	);
+	--rack-row-h: max(1.9rem, calc((100cqw - 2rem - 2px) * 44.45 / 482.6 + 1px));
 }
 
 .rack-dev-image {
@@ -5532,11 +5434,7 @@ span.attachment-star,
 	padding: 0.2rem 0.4rem;
 	outline: 1px dashed var(--border-strong);
 	outline-offset: -1px;
-	background: repeating-linear-gradient(
-		-45deg,
-		transparent 0 6px,
-		var(--bg-hover) 6px 7px
-	);
+	background: repeating-linear-gradient(-45deg, transparent 0 6px, var(--bg-hover) 6px 7px);
 	overflow: hidden;
 }
 
@@ -5802,7 +5700,6 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .matching-heading h2 {
 	margin: 0;
 	padding-bottom: 0;
@@ -5842,7 +5739,6 @@ a.rack-shelf-plate:hover {
 	overflow: visible;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table thead th {
 	position: sticky;
 	top: 0;
@@ -5851,7 +5747,6 @@ a.rack-shelf-plate:hover {
 	vertical-align: bottom;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table tfoot td {
 	position: sticky;
 	bottom: 0;
@@ -5860,9 +5755,7 @@ a.rack-shelf-plate:hover {
 	font-size: var(--font-size-sm);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table th,
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table td {
 	padding: 0.45rem 0.75rem;
 	border-bottom: 1px solid var(--border);
@@ -5870,7 +5763,6 @@ a.rack-shelf-plate:hover {
 	vertical-align: top;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table tbody tr:hover > * {
 	background-color: color-mix(in srgb, var(--bg-hover) 35%, transparent);
 }
@@ -5916,7 +5808,6 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-object-line a {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -5975,7 +5866,6 @@ a.rack-shelf-plate:hover {
 	background-color: var(--bg-hover);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-col-bar > div {
 	height: 100%;
 	border-radius: inherit;
@@ -6008,23 +5898,19 @@ a.rack-shelf-plate:hover {
 	gap: 0.25rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick .combobox {
 	flex: 1 1 auto;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick .combobox-input {
 	padding-block: 0.3rem;
 }
 
 /* Linked cells read as values, open ones as empty inputs. */
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick:has(.combobox-input:placeholder-shown) .combobox-input {
 	border-style: dashed;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick.ignored .combobox-input {
 	color: var(--text-muted);
 	font-style: italic;
@@ -6051,7 +5937,6 @@ a.rack-shelf-plate:hover {
 	box-shadow: inset 3px 0 0 var(--primary);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-cell.changed .combobox-input {
 	border-color: var(--primary);
 }
@@ -6201,7 +6086,6 @@ a.rack-shelf-plate:hover {
 }
 
 /* Changelog before/after table: changed values tinted red (old) / green (new). */
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .changelog-diff td {
 	vertical-align: top;
 	overflow-wrap: anywhere;
@@ -6248,7 +6132,6 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .integrations-summary > span {
 	display: inline-flex;
 	align-items: center;
@@ -6420,7 +6303,6 @@ a.rack-shelf-plate:hover {
 	display: none;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .integration-card-fix {
 	font-size: var(--font-size-sm);
 }
@@ -6582,7 +6464,6 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .integration-detail-header h2 {
 	margin: 0;
 	padding-bottom: 0;

@@ -10,7 +10,8 @@
   },
   "formatter": {
     "enabled": true,
-    "useEditorconfig": true
+    "useEditorconfig": true,
+    "lineWidth": 100
   },
   "linter": {
     "enabled": true,
@@ -20,23 +21,15 @@
         "noVar": "error",
         "noShadow": "error",
         "noReturnAssign": "error",
-        "noEvolvingTypes": "error",
-        "noUnknownAttribute": "off" // TODO enable
+        "noEvolvingTypes": "error"
       },
       "style": {
         "useBlockStatements": "error",
-        "useDomQuerySelector": "error"
+        "useDomQuerySelector": "error",
+        "noDescendingSpecificity": "off"
       },
       "nursery": {
-        "useExplicitType": "error", // TODO implicit pbjects in function param are not catched
-        "useExplicitReturnType": {
-          "level": "error",
-          "options": {
-            "allowExpressions": true
-          }
-        },
-        "useExhaustiveSwitchCases": "off", // off due to performance impact
-        "useNullishCoalescing": "off" // off due to performance impact
+        "useExplicitType": "error" // TODO implicit objects in function params are not caught
       }
     }
   },
@@ -44,8 +37,7 @@
     "formatter": {
       "semicolons": "asNeeded",
       "trailingCommas": "all",
-      "quoteStyle": "single",
-      "lineWidth": 100
+      "quoteStyle": "single"
     }
   },
   "html": {
@@ -56,11 +48,6 @@
   "css": {
     "formatter": {
       "enabled": true
-    }
-  },
-  "json": {
-    "formatter": {
-      "lineWidth": 100
     }
   }
 }

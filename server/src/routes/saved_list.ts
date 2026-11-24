@@ -22,7 +22,6 @@ import { sendResult } from '../util/result_response'
  * picks the new item.
  */
 // biome-ignore lint/nursery/useExplicitType: return type intentionally inferred — naming it erases chained-route generics
-// biome-ignore lint/nursery/useExplicitReturnType: return type intentionally inferred — naming it erases chained-route generics
 export function savedListApp<
 	T extends { name: string },
 	E extends SavedListEntryBase,
