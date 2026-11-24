@@ -3536,6 +3536,19 @@ export const ExternalDeviceCreateSchema = v.strictObject({
 	device_id: IdSchema,
 })
 
+/**
+ * Creates a conex device of a tenant from an external device of an external
+ * tenant linked to it (resolves `device_missing_in_conex`) and links the two.
+ * Serial, asset tag and status come from the external device.
+ */
+export const ExternalDeviceImportSchema = v.strictObject({
+	tenant_id: IdSchema,
+	external_id: ExternalIdSchema,
+	name: NameSchema,
+	device_type_id: IdSchema,
+	device_role_id: IdSchema,
+})
+
 /** Device fields whose conex value can overwrite the external one on a mismatch. */
 export const EXTERNAL_PUSH_FIELDS = ['name', 'manufacturer', 'model'] as const
 
@@ -3564,6 +3577,7 @@ export const ExternalEmployeeDeactivateSchema = v.strictObject({
 })
 
 export type ExternalEmployeeImport = v.InferOutput<typeof ExternalEmployeeImportSchema>
+export type ExternalDeviceImport = v.InferOutput<typeof ExternalDeviceImportSchema>
 
 export const IntegrationSyncQuerySchema = v.object({
 	/** Sync only this tenant's company; omitted = all linked tenants. */
@@ -3903,6 +3917,8 @@ export interface LinkBoardExternal {
 	entity_id: number | null
 	/** Name of the linked conex object (may lie outside the board). */
 	entity_name: string | null
+	/** Device boards: the conex device type matching its model (and manufacturer), if unique. */
+	device_type_id?: number | null
 }
 
 /** Both sides of one link level, for side-by-side linking. */

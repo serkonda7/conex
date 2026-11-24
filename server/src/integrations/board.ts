@@ -18,6 +18,7 @@ import { primaryEmail } from 'shared/src/schemas'
 import { getDb } from '../db/connection'
 import { memberOf } from '../db/employees'
 import { devices, employees, sites, tenant_groups, tenants } from '../schema'
+import { deviceTypeMatcher } from './import_device'
 import { type ExternalLinkRow, listLinks, scopeLinks, tenantLevel } from './links'
 import {
 	group,
@@ -316,6 +317,8 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 			}
 		})
 		.sort(compareLocal)
+	// Preselects the device type when the device is imported into conex.
+	const typeOf = await deviceTypeMatcher()
 	const external = externals
 		.map((e) => {
 			const row = externalRow(
@@ -325,6 +328,7 @@ export async function deviceBoard(provider: ProviderId, tenantId: number): Promi
 					detail: joinDetail(e.manufacturer, e.model),
 					serial: e.serial,
 					active: e.active,
+					device_type_id: typeOf(e),
 				},
 				linkByExternal.get(e.external_id),
 				(id) => localName.get(id) ?? null,
