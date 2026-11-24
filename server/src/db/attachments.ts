@@ -275,8 +275,7 @@ async function checkOwner(owner: AttachmentOwner): Promise<Result<undefined, Err
  */
 function cleanFilename(name: string, mime: AttachmentMime): string {
 	const base = (name.split(/[/\\]/).pop() ?? '')
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
-		.replace(/[\u0000-\u001f\u007f]/g, '')
+		.replace(/\p{Cc}/gu, '')
 		.trim()
 		.slice(0, 200)
 	return base || `image.${IMAGE_EXTENSIONS[mime]}`

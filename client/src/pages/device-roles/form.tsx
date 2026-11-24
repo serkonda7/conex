@@ -119,7 +119,7 @@ function DeviceRoleForm(props: { id?: number }): JSX.Element {
 				placeholder={t('deviceRole.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 				disabled={form.record()?.key != null}
 			/>
 			<SelectField

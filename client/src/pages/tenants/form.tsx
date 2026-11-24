@@ -136,7 +136,7 @@ function TenantForm(props: { id?: number }): JSX.Element {
 				placeholder={t('tenant.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<SelectField
 				id={`${prefix}-group`}

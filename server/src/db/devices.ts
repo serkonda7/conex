@@ -597,6 +597,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			status: devices.status,
 			device_role_id: devices.device_role_id,
 			tenant_id: devices.tenant_id,
+			backed_up: devices.backed_up,
 			employee_id: nullInt('employee_id'),
 			employees: deviceEmployeeRefs.as('employees'),
 			description: devices.description,
@@ -674,6 +675,7 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 			status: virtual_machines.status,
 			device_role_id: virtual_machines.device_role_id,
 			tenant_id: virtual_machines.tenant_id,
+			backed_up: virtual_machines.backed_up,
 			employee_id: virtual_machines.employee_id,
 			employees: sql<EmployeeRef[]>`coalesce((
 				select jsonb_build_array(jsonb_build_object('id', "e"."id", 'name', "e"."name"))
@@ -815,6 +817,7 @@ function toListItem(row: DeviceListRow, outOfSync: Set<number>): DeviceListItem 
 		status: row.status,
 		device_role_id: row.device_role_id,
 		tenant_id: row.tenant_id,
+		backed_up: row.backed_up,
 		description: row.description,
 		device_role_name: row.sort_role,
 		device_role_key: row.device_role_key,
@@ -1112,6 +1115,7 @@ export async function createDevice(rawInput: DeviceCreate): Promise<Result<Devic
 		asset_tag: input.asset_tag ?? null,
 		device_id: input.device_id ?? null,
 		tenant_id: input.tenant_id ?? null,
+		backed_up: input.backed_up ? 1 : 0,
 		description: input.description ?? null,
 	}
 	// Expansion lists rear ports before the front ports that map onto them:
@@ -1228,6 +1232,9 @@ export async function updateDevice(
 		'tenant_id',
 		'description',
 	])
+	if (input.backed_up !== undefined) {
+		patch.backed_up = input.backed_up ? 1 : 0
+	}
 	if (input.site_id !== undefined || relocated) {
 		patch.site_id = deviceSiteId
 	}

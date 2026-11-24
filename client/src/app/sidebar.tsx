@@ -2,9 +2,12 @@
  * Main navigation: routed sections in labeled groups (NetBox-style, with
  * quick add/import buttons for writers).
  * The whole sidebar collapses to an icon rail (persisted to localStorage);
- * its toggle sits in the top bar's corner cell above it.
+ * its toggle sits in the top bar's corner cell above it. Each group folds
+ * away under its label (also persisted); the rail always shows every group.
  */
 import {
+	IconChevronDown,
+	IconChevronRight,
 	IconChevronsLeft,
 	IconChevronsRight,
 	IconDownload,
@@ -14,7 +17,7 @@ import {
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from 'solid-js'
 import { type MessageKey, t } from '../i18n'
 import { goTo, path } from '../lib/router'
-import { readStored, writeStored } from '../lib/storage'
+import { readStored, readStoredJson, writeStored, writeStoredJson } from '../lib/storage'
 import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
 /** Hover shortcut next to a nav row; without `href` a disabled placeholder. */
@@ -58,6 +61,24 @@ const [collapsed, setCollapsedSignal] = createSignal(loadCollapsed())
 function setCollapsed(next: boolean): void {
 	setCollapsedSignal(next)
 	writeStored(COLLAPSED_KEY, next ? '1' : '0')
+}
+
+const COLLAPSED_GROUPS_KEY = 'conex:sidebar-collapsed-groups'
+
+/** Labels of the folded groups; labels of removed groups are harmless. */
+function loadCollapsedGroups(): string[] {
+	const raw = readStoredJson<unknown>(COLLAPSED_GROUPS_KEY, [])
+	return Array.isArray(raw) ? raw.filter((key): key is string => typeof key === 'string') : []
+}
+
+const [collapsedGroups, setCollapsedGroups] = createSignal(loadCollapsedGroups())
+
+function toggleGroup(label: string): void {
+	const next = collapsedGroups().includes(label)
+		? collapsedGroups().filter((key) => key !== label)
+		: [...collapsedGroups(), label]
+	setCollapsedGroups(next)
+	writeStoredJson(COLLAPSED_GROUPS_KEY, next)
 }
 
 /**
@@ -155,9 +176,10 @@ const NAV_GROUPS: readonly NavGroup[] = [
 		paths: ['manufacturers', 'device-types', 'device-roles', 'rack-types', 'managed-bundles'],
 	},
 	{ label: 'app.navGroup.customization', paths: ['saved-filters', 'saved-layouts'] },
+	{ label: 'app.navGroup.integrations', paths: ['integrations', 'integrations/matching'] },
 	{
 		label: 'app.navGroup.administration',
-		paths: ['integrations', 'users', 'roles', 'global-settings', 'audit-log', 'changelog'],
+		paths: ['billing', 'users', 'roles', 'global-settings', 'audit-log', 'changelog'],
 	},
 ]
 
@@ -185,25 +207,48 @@ function navSections(paths: readonly string[]): Section[] {
 		)
 }
 
-/** Labeled group; collapsed, the label gives way to a divider. */
+/**
+ * Labeled group whose label folds its sections away; in the icon rail the
+ * label gives way to a divider and the sections always show.
+ */
 function NavGroupSection(props: {
 	group: NavGroup
 	sections: Section[]
 	collapsed: boolean
 	onNavigate?: () => void
 }): JSX.Element {
+	const id = `app-nav-group-${props.group.label.replace(/\W+/g, '-')}`
+	const folded = (): boolean => !props.collapsed && collapsedGroups().includes(props.group.label)
 	return (
 		<div class="app-nav-group">
-			<div class="app-nav-label">{t(props.group.label)}</div>
-			<For each={props.sections}>
-				{(section: Section): JSX.Element => (
-					<NavItem
-						section={section}
-						collapsed={props.collapsed}
-						onNavigate={props.onNavigate}
-					/>
-				)}
-			</For>
+			<Show
+				when={!props.collapsed}
+				fallback={<div class="app-nav-label">{t(props.group.label)}</div>}
+			>
+				<button
+					type="button"
+					class="app-nav-label"
+					aria-expanded={!folded()}
+					aria-controls={id}
+					onClick={(): void => toggleGroup(props.group.label)}
+				>
+					<span class="app-nav-label-text">{t(props.group.label)}</span>
+					<span aria-hidden="true" class="app-nav-label-chevron">
+						{folded() ? <IconChevronRight size={14} /> : <IconChevronDown size={14} />}
+					</span>
+				</button>
+			</Show>
+			<div id={id} class="app-nav-group-items" hidden={folded()}>
+				<For each={props.sections}>
+					{(section: Section): JSX.Element => (
+						<NavItem
+							section={section}
+							collapsed={props.collapsed}
+							onNavigate={props.onNavigate}
+						/>
+					)}
+				</For>
+			</div>
 		</div>
 	)
 }

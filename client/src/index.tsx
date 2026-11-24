@@ -5,6 +5,8 @@ import '@serkonda7/solid-components/styles.css'
 import './css/styles.css'
 
 const root = document.querySelector('#root')
+if (root === null) {
+	throw new Error('Missing #root element')
+}
 
-// biome-ignore lint/style/noNonNullAssertion: we know it exists
-render(() => <App />, root!)
+render(() => <App />, root)

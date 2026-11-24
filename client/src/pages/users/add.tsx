@@ -90,6 +90,7 @@ export function UserAddPage(): JSX.Element {
 				data={data}
 				employeeId={employeeId()}
 				onEmployeeChange={setEmployeeId}
+				autofocus
 			/>
 			<LoginField idPrefix="user" employee={employee()}>
 				<TextField

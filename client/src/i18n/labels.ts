@@ -7,6 +7,9 @@
 import {
 	AUDIT_EVENTS,
 	type AuditEvent,
+	BILLING_METRICS,
+	type BillingExceptionKind,
+	type BillingMetric,
 	CHANGE_ACTIONS,
 	CHANGE_OBJECT_TYPES,
 	type ChangeAction,
@@ -273,6 +276,57 @@ export function deviceStatusLabel(value: string): string {
 	return lookup(DEVICE_STATUS_KEYS, value)
 }
 
+const BILLING_METRIC_KEYS: Record<BillingMetric, MessageKey> = {
+	objects: 'billingMetric.objects',
+	base: 'billingMetric.base',
+	wlan: 'billingMetric.wlan',
+	switch_ports: 'billingMetric.switchPorts',
+	m365_users: 'billingMetric.m365Users',
+	backed_up: 'billingMetric.backedUp',
+	storage: 'billingMetric.storage',
+}
+
+const BILLING_METRIC_HINT_KEYS: Record<BillingMetric, MessageKey> = {
+	objects: 'billingMetricHint.objects',
+	base: 'billingMetricHint.base',
+	wlan: 'billingMetricHint.wlan',
+	switch_ports: 'billingMetricHint.switchPorts',
+	m365_users: 'billingMetricHint.m365Users',
+	backed_up: 'billingMetricHint.backedUp',
+	storage: 'billingMetricHint.storage',
+}
+
+/** Billing metric of a managed bundle (`objects`, `switch_ports`, …). */
+export function billingMetricLabel(value: string): string {
+	return lookup(BILLING_METRIC_KEYS, value)
+}
+
+/** What a billing metric counts, one sentence. */
+export function billingMetricHint(value: string): string {
+	return lookup(BILLING_METRIC_HINT_KEYS, value)
+}
+
+/** `<select>` options for the billing metrics, in catalog order. */
+export function billingMetricOptions(): { value: BillingMetric; label: string }[] {
+	return BILLING_METRICS.map((value) => ({ value, label: billingMetricLabel(value) }))
+}
+
+const BILLING_EXCEPTION_KEYS: Record<BillingExceptionKind, PluralKey> = {
+	not_contracted: 'billingException.notContracted',
+	backup_not_contracted: 'billingException.backupNotContracted',
+	no_tenant: 'billingException.noTenant',
+	hostless_vm: 'billingException.hostlessVm',
+	m365_not_linked: 'billingException.m365NotLinked',
+	m365_stale: 'billingException.m365Stale',
+	m365_unlicensed: 'billingException.m365Unlicensed',
+	storage_missing: 'billingException.storageMissing',
+}
+
+/** Heading of a group of billing exceptions, with their count. */
+export function billingExceptionLabel(kind: BillingExceptionKind, count: number): string {
+	return tp(BILLING_EXCEPTION_KEYS[kind], count)
+}
+
 const AUDIT_EVENT_KEYS: Record<AuditEvent, MessageKey> = {
 	'login.success': 'auditEvent.loginSuccess',
 	'login.failure': 'auditEvent.loginFailure',
@@ -357,6 +411,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'contacts.directory': 'permission.contactsDirectory',
 	'ai.use': 'permission.aiUse',
 	'settings.manage': 'permission.settingsManage',
+	'billing.manage': 'permission.billingManage',
 }
 
 /** Role permission (`view`, `users.manage`, …). */
@@ -377,6 +432,7 @@ const PERMISSION_SHORT_KEYS: Record<Permission, MessageKey> = {
 	'contacts.directory': 'permissionShort.contactsDirectory',
 	'ai.use': 'permissionShort.aiUse',
 	'settings.manage': 'permissionShort.settingsManage',
+	'billing.manage': 'permissionShort.billingManage',
 }
 
 /** Compact permission label for badges; pair with `permissionLabel` as tooltip. */

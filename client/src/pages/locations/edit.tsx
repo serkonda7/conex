@@ -90,6 +90,7 @@ export function LocationEditPage(props: { id: number }): JSX.Element {
 				placeholder={t('location.namePlaceholder')}
 				value={name()}
 				onInput={setName}
+				autofocus
 			/>
 			<SelectField
 				id="location-edit-type"

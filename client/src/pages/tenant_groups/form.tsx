@@ -60,7 +60,7 @@ function TenantGroupForm(props: { id?: number }): JSX.Element {
 				placeholder={t('tenantGroup.namePlaceholder')}
 				value={name()}
 				onInput={setName}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<DescriptionField
 				id={`${prefix}-description`}

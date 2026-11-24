@@ -73,7 +73,6 @@ function listParams<Row>(opts: CrudOptions<Row>, query: ListQuery): Record<strin
 
 /** Five-route tenant-bearing CRUD: list/create/get/patch/delete with shared gates. */
 // biome-ignore lint/nursery/useExplicitType: return type intentionally inferred — naming it erases chained-route generics
-// biome-ignore lint/nursery/useExplicitReturnType: return type intentionally inferred — naming it erases chained-route generics
 export function makeTenantApp(
 	opts: CrudOptions<{ tenant_id: number | null } & Record<string, unknown>>,
 ) {
@@ -146,7 +145,6 @@ export function makeTenantApp(
 
 /** Five-route shared-catalog CRUD: readable by all, writable by global editors. */
 // biome-ignore lint/nursery/useExplicitType: return type intentionally inferred — naming it erases chained-route generics
-// biome-ignore lint/nursery/useExplicitReturnType: return type intentionally inferred — naming it erases chained-route generics
 export function makeCatalogApp(opts: CrudOptions<unknown>) {
 	return new Hono()
 		.use(authMiddleware)

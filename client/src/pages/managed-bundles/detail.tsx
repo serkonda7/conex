@@ -1,4 +1,5 @@
-import { createSignal, type JSX } from 'solid-js'
+import type { BillingMetricConfig } from 'shared/src/schemas'
+import { createSignal, For, type JSX, Show } from 'solid-js'
 import { type DeviceRoleListRow, fetch_device_roles } from '../../api/device_roles'
 import { delete_managed_bundle, fetch_managed_bundle } from '../../api/service_catalog'
 import { nameColumn } from '../../components/data_table'
@@ -11,7 +12,7 @@ import {
 } from '../../components/detail_page'
 import { InlineError } from '../../components/feedback'
 import { t, tp } from '../../i18n'
-import { deviceRoleLabel } from '../../i18n/labels'
+import { billingMetricHint, billingMetricLabel, deviceRoleLabel } from '../../i18n/labels'
 import { createRecord, createRows } from '../../lib/resource'
 
 /**
@@ -48,6 +49,24 @@ export function ManagedBundleDetailPage(props: { id: number }): JSX.Element {
 					onDelete={handleDelete}
 				/>
 				<DetailSubtitle description={bundle()?.description} />
+				<p class="billing-bundle-metrics">
+					<span class="text-muted">{t('managedBundle.billingMetrics')}:</span>{' '}
+					<Show
+						when={(bundle()?.billing_metrics ?? []).length > 0}
+						fallback={<span class="text-muted">{t('managedBundle.notBilled')}</span>}
+					>
+						<For each={bundle()?.billing_metrics ?? []}>
+							{(m: BillingMetricConfig) => (
+								<span class="badge" title={billingMetricHint(m.metric)}>
+									{billingMetricLabel(m.metric)}
+									<Show when={m.metric === 'storage' && m.step_gb}>
+										{(step: () => number) => ` · ${step()} GB`}
+									</Show>
+								</span>
+							)}
+						</For>
+					</Show>
+				</p>
 			</DetailShell>
 
 			<RelatedSection

@@ -134,6 +134,7 @@ export async function createVirtualMachine(
 		name: input.name,
 		tenant_id: tenantId,
 		employee_id: input.employee_id ?? null,
+		backed_up: input.backed_up ? 1 : 0,
 		description: input.description ?? null,
 	}
 	const id = await tryWrite(
@@ -199,6 +200,9 @@ export async function updateVirtualMachine(
 		'status',
 		'description',
 	])
+	if (input.backed_up !== undefined) {
+		patch.backed_up = input.backed_up ? 1 : 0
+	}
 	if (tenantChanged) {
 		patch.tenant_id = tenantId
 	}

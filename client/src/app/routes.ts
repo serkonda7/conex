@@ -9,6 +9,7 @@
  * (`devices/vm`); the longest matching section wins.
  */
 import {
+	IconArrowsJoin2,
 	IconBuildingFactory2,
 	IconBuildingSkyscraper,
 	IconCpu,
@@ -26,6 +27,7 @@ import {
 	IconMapPin,
 	IconPackages,
 	IconPlugConnected,
+	IconReceipt2,
 	IconRuler2,
 	IconSettings,
 	IconShieldLock,
@@ -53,6 +55,7 @@ function lazyPage<P extends object>(load: () => Promise<Component<P>>): Componen
 }
 
 const AuditLogPage = lazyPage(() => import('../pages/audit_log/list').then((m) => m.AuditLogPage))
+const BillingPage = lazyPage(() => import('../pages/billing/view').then((m) => m.BillingPage))
 const ChangeDetailPage = lazyPage(() =>
 	import('../pages/changelog/detail').then((m) => m.ChangeDetailPage),
 )
@@ -516,13 +519,13 @@ export const SECTIONS: readonly Section[] = [
 		list: CalendarSyncDetailPage,
 	},
 	{
-		// Cross-integration matching of tenants, devices and employees, opened
-		// from the integrations page and the link boards.
+		// Cross-integration matching of tenants, devices and employees; also
+		// opened from the integrations page and the link boards.
 		path: 'integrations/matching',
-		parent: 'integrations',
 		noun: (): string => t('matching.title'),
+		icon: IconArrowsJoin2,
 		permission: 'integrations.manage',
-		hideInNav: true,
+		hideAddInNav: true,
 		list: MatchingPage,
 	},
 	{
@@ -550,6 +553,14 @@ export const SECTIONS: readonly Section[] = [
 		list: RolesPage,
 		add: RoleAddPage,
 		edit: RoleEditPage,
+	},
+	{
+		path: 'billing',
+		noun: (): string => t('billing.title'),
+		icon: IconReceipt2,
+		permission: 'billing.manage',
+		hideAddInNav: true,
+		list: BillingPage,
 	},
 	{
 		path: 'global-settings',

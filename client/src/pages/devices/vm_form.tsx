@@ -33,7 +33,7 @@ import { createRecord, createRows, createSnapshot } from '../../lib/resource'
 import { parseId, queryParam, useFormReturnRoute } from '../../lib/router'
 import { newObjectTenantId } from '../../lib/tenant_context'
 import { deviceRoleOptions } from '../device-roles/options'
-import { DeviceStatusField } from './add'
+import { BackedUpField, DeviceStatusField } from './add'
 import { useDeviceSearch } from './device_search'
 import { EmployeeAssignmentField } from './employee_assignment'
 import { inactiveStatusChange } from './status'
@@ -106,6 +106,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 	const [name, setName] = createSignal('')
 	const [description, setDescription] = createSignal('')
 	const [inactive, setInactive] = createSignal(false)
+	const [backedUp, setBackedUp] = createSignal(false)
 	const [roleId, setRoleId] = createSignal('')
 	const [hostId, setHostId] = createSignal<number | null>(parseId(queryParam('host')))
 	const [employeeId, setEmployeeId] = createSignal('')
@@ -146,6 +147,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 	function fillFrom(row: VirtualMachineRow): void {
 		setRoleId(id_value(row.device_role_id))
 		setDescription(row.description ?? '')
+		setBackedUp(row.backed_up === 1)
 		setHostId(row.host_device_id)
 		if (props.id !== undefined) {
 			setTenantId(id_value(row.tenant_id))
@@ -202,6 +204,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 							name: values.name,
 							status: inactive() ? 'inactive' : 'active',
 							description: text(description()),
+							backed_up: backedUp(),
 							...(hostless ? { tenant_id: tenant } : {}),
 							employee_id: parseId(employeeId()),
 						})
@@ -214,6 +217,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 								form.record()?.status ?? 'active',
 							),
 							description: text(description()) ?? null,
+							backed_up: backedUp(),
 							...(hostless ? { tenant_id: tenant } : {}),
 							employee_id: parseId(employeeId()),
 						}),
@@ -243,7 +247,7 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					placeholder={t('vm.namePlaceholder')}
 					value={name()}
 					onInput={setName}
-					autofocus={!form.editing}
+					autofocus
 				/>
 				<SelectField
 					id={`${prefix}-role`}
@@ -260,6 +264,11 @@ function VirtualMachineForm(props: { id?: number }): JSX.Element {
 					id={`${prefix}-description`}
 					value={description()}
 					onInput={setDescription}
+				/>
+				<BackedUpField
+					id={`${prefix}-backed-up`}
+					checked={backedUp()}
+					onChange={setBackedUp}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

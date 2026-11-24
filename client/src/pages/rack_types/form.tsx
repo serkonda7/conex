@@ -113,7 +113,7 @@ function RackTypeForm(props: { id?: number }): JSX.Element {
 				emptyLabel={t('deviceType.manufacturerPlaceholder')}
 				add={{ label: tp('entity.manufacturer', 1), href: '/manufacturers/add' }}
 				reload={refetchManufacturers}
-				autofocus={!form.editing}
+				autofocus
 			/>
 			<TextField
 				id={`${prefix}-model`}

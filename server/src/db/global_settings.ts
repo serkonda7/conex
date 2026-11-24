@@ -11,6 +11,7 @@ import { errOf, pickDefined, tryWrite } from './list'
 export interface GlobalSettings {
 	ai_claude_model: string | null
 	ai_opencode_model: string | null
+	billing_cutoff_day: number | null
 	updated_at: number | null
 }
 
@@ -19,6 +20,7 @@ const SETTINGS_ID = 1
 const EMPTY: GlobalSettings = {
 	ai_claude_model: null,
 	ai_opencode_model: null,
+	billing_cutoff_day: null,
 	updated_at: null,
 }
 
@@ -37,6 +39,7 @@ export async function getGlobalSettings(): Promise<Result<GlobalSettings, Error>
 				? {
 						ai_claude_model: row.ai_claude_model,
 						ai_opencode_model: row.ai_opencode_model,
+						billing_cutoff_day: row.billing_cutoff_day,
 						updated_at: row.updated_at,
 					}
 				: EMPTY,
@@ -51,7 +54,7 @@ export async function updateGlobalSettings(
 	input: GlobalSettingsUpdate,
 ): Promise<Result<GlobalSettings, Error>> {
 	const values = {
-		...pickDefined(input, ['ai_claude_model', 'ai_opencode_model']),
+		...pickDefined(input, ['ai_claude_model', 'ai_opencode_model', 'billing_cutoff_day']),
 		updated_at: nowSeconds(),
 	}
 	const saved = await tryWrite(() =>
@@ -72,6 +75,7 @@ export function globalSettingsJson(settings: GlobalSettings): GlobalSettingsJson
 	return {
 		ai_claude_model: settings.ai_claude_model,
 		ai_opencode_model: settings.ai_opencode_model,
+		billing_cutoff_day: settings.billing_cutoff_day,
 		config: {
 			ai_provider: ai?.provider ?? null,
 			ai_claude_model: ai?.claude.model ?? null,

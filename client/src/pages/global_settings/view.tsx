@@ -1,7 +1,8 @@
 /**
  * /global-settings — installation-wide settings for global `settings.manage`
- * holders. For now: the default model of each AI provider. An empty choice
- * keeps the model of the server config (`[ai.claude]` / `[ai.opencode]`).
+ * holders: the default model of each AI provider (an empty choice keeps the
+ * model of the server config, `[ai.claude]` / `[ai.opencode]`) and the
+ * cutoff day of the billing periods.
  */
 import { IconSettings } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
@@ -115,6 +116,9 @@ function SettingsForm(props: {
 }): JSX.Element {
 	const [claudeModel, setClaudeModel] = createSignal(props.settings.ai_claude_model ?? '')
 	const [opencodeModel, setOpencodeModel] = createSignal(props.settings.ai_opencode_model ?? '')
+	const [cutoffDay, setCutoffDay] = createSignal(
+		props.settings.billing_cutoff_day === null ? '' : String(props.settings.billing_cutoff_day),
+	)
 	const [error, setError] = createSignal<string | null>(null)
 	const [saved, setSaved] = createSignal(false)
 	const action = useAction(setError)
@@ -122,11 +126,17 @@ function SettingsForm(props: {
 	async function handleSave(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		setSaved(false)
+		const day = cutoffDay().trim() === '' ? null : Number(cutoffDay())
+		if (day !== null && !(Number.isInteger(day) && day >= 1 && day <= 28)) {
+			setError(t('billing.cutoffDayInvalid'))
+			return
+		}
 		let next: GlobalSettingsJson | null = null
 		const ok = await action.run(async () => {
 			const res = await save_global_settings({
 				ai_claude_model: claudeModel().trim() || null,
 				ai_opencode_model: opencodeModel().trim() || null,
+				billing_cutoff_day: day,
 			})
 			if (Result.isOk(res)) {
 				next = res.value
@@ -167,6 +177,24 @@ function SettingsForm(props: {
 						configModel={props.settings.config.ai_opencode_model}
 						active={props.settings.config.ai_provider === 'opencode'}
 						placeholder="anthropic/claude-opus-5-5"
+					/>
+				</SettingsSection>
+				<SettingsSection
+					title={t('globalSettings.sectionBilling')}
+					description={t('globalSettings.sectionBillingHint')}
+				>
+					<TextField
+						id="global-settings-billing-cutoff-day"
+						label={t('billing.cutoffDay')}
+						type="number"
+						min={1}
+						max={28}
+						step={1}
+						inputmode="numeric"
+						value={cutoffDay()}
+						onInput={setCutoffDay}
+						placeholder={t('billing.cutoffDayPlaceholder')}
+						hint={<Hint>{t('billing.cutoffDayHint')}</Hint>}
 					/>
 				</SettingsSection>
 				<div class="form-actions">

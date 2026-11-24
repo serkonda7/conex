@@ -63,9 +63,7 @@ body,
 }
 
 body {
-	font-family:
-		system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-		sans-serif;
+	font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	margin: 0;
 	padding: 0;
 	background-color: var(--bg-base);
@@ -953,6 +951,16 @@ tbody tr:last-child td {
 	gap: 0.15rem;
 }
 
+.app-nav-group-items {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.app-nav-group-items[hidden] {
+	display: none;
+}
+
 .app-nav-label {
 	padding: 0.3rem 0.5rem;
 	font-size: var(--font-size-sm);
@@ -961,6 +969,43 @@ tbody tr:last-child td {
 	text-transform: uppercase;
 	color: var(--text-muted);
 	white-space: nowrap;
+}
+
+button.app-nav-label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	width: 100%;
+	border: 0;
+	border-radius: 0.3rem;
+	background: none;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+button.app-nav-label:hover,
+button.app-nav-label:focus-visible {
+	color: var(--text);
+}
+
+.app-nav-label-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.app-nav-label-chevron {
+	display: inline-flex;
+	opacity: 0;
+	transition: opacity 0.1s;
+}
+
+button.app-nav-label:hover .app-nav-label-chevron,
+button.app-nav-label:focus-visible .app-nav-label-chevron,
+button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
+	opacity: 1;
 }
 
 .app-nav-text {
@@ -1919,8 +1964,8 @@ tbody tr:last-child td {
 
 .app-content .device-type-import-page .import-data {
 	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-		"Liberation Mono", "Courier New", monospace;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+		monospace;
 }
 
 .import-similar-types {
@@ -2396,7 +2441,6 @@ tbody tr:last-child td {
 	border-left: 1px solid var(--border-strong);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .segmented-option input {
 	position: absolute;
 	opacity: 0;
@@ -2552,12 +2596,7 @@ tbody tr:last-child td {
 	min-height: 2.1rem;
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle {
 	appearance: none;
 	position: relative;
@@ -2573,12 +2612,7 @@ tbody tr:last-child td {
 	transition: background-color 150ms ease;
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle::before {
 	content: "";
 	position: absolute;
@@ -2591,32 +2625,17 @@ tbody tr:last-child td {
 	transition: transform 150ms ease;
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle:checked {
 	background-color: var(--primary);
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle:checked::before {
 	transform: translateX(1rem);
 }
 
-:is(
-		.field .field-toggle,
-		.panel-row-switch,
-		.integration-detail-switch,
-		.settings-switch
-	)
+:is(.field .field-toggle, .panel-row-switch, .integration-detail-switch, .settings-switch)
 	input.toggle:disabled {
 	cursor: not-allowed;
 	opacity: 0.5;
@@ -2929,11 +2948,7 @@ tbody tr:last-child td {
 	height: var(--port-icon-size);
 }
 
-.app-content
-	.form-stacked
-	.field
-	.combobox-port-kind.combobox-with-icon
-	.combobox-input {
+.app-content .form-stacked .field .combobox-port-kind.combobox-with-icon .combobox-input {
 	padding-left: calc(0.55rem + var(--port-icon-size) + var(--port-icon-gap));
 }
 
@@ -2956,9 +2971,7 @@ tbody tr:last-child td {
 	margin-right: var(--port-icon-gap);
 }
 
-.combobox-port-kind
-	.combobox-list
-	.combobox-option-label:not(:has(.combobox-option-icon)) {
+.combobox-port-kind .combobox-list .combobox-option-label:not(:has(.combobox-option-icon)) {
 	padding-left: calc(var(--port-icon-size) + var(--port-icon-gap));
 }
 
@@ -2983,22 +2996,18 @@ tbody tr:last-child td {
 }
 
 /* Connect and disconnect buttons in the port tables only show on row hover (or focus). */
-:is(.panel-port-table, .device-port-table)
-	:is(.icon-btn-connect, .icon-btn-disconnect) {
+:is(.panel-port-table, .device-port-table) :is(.icon-btn-connect, .icon-btn-disconnect) {
 	opacity: 0;
 }
 
-:is(.panel-port-table, .device-port-table)
-	tr:hover
-	:is(.icon-btn-connect, .icon-btn-disconnect),
+:is(.panel-port-table, .device-port-table) tr:hover :is(.icon-btn-connect, .icon-btn-disconnect),
 :is(.panel-port-table, .device-port-table)
 	:is(.icon-btn-connect, .icon-btn-disconnect):focus-visible {
 	opacity: 1;
 }
 
 @media (hover: none) {
-	:is(.panel-port-table, .device-port-table)
-		:is(.icon-btn-connect, .icon-btn-disconnect) {
+	:is(.panel-port-table, .device-port-table) :is(.icon-btn-connect, .icon-btn-disconnect) {
 		opacity: 1;
 	}
 }
@@ -3209,19 +3218,13 @@ tbody tr:last-child td {
 	place-items: center;
 	width: 100%;
 	min-height: 2.5rem;
-	background:
-		linear-gradient(var(--primary), var(--primary)) center / 100% 2px
-		no-repeat;
+	background: linear-gradient(var(--primary), var(--primary)) center / 100% 2px no-repeat;
 }
 
 .panel-row-bridge.is-off .panel-row-switch {
 	background:
-		repeating-linear-gradient(
-			90deg,
-			var(--border-strong) 0 6px,
-			transparent 6px 10px
-		)
-		center / 100% 2px no-repeat;
+		repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 10px) center /
+		100% 2px no-repeat;
 }
 
 .panel-row-switch > .toggle {
@@ -3424,8 +3427,8 @@ tbody tr:last-child td {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-family:
-		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-		"Liberation Mono", "Courier New", monospace;
+		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+		monospace;
 }
 
 .port-tile small {
@@ -3704,9 +3707,7 @@ tbody tr:last-child td {
 	background-color: transparent;
 }
 
-.app-content
-	tbody.data-table-group
-	tr:nth-child(odd):not(.data-table-group-row, :hover) {
+.app-content tbody.data-table-group tr:nth-child(odd):not(.data-table-group-row, :hover) {
 	background-color: color-mix(in srgb, var(--bg-hover) 45%, transparent);
 }
 
@@ -4156,11 +4157,7 @@ span.attachment-star,
 	height: 0.85rem;
 	border: 2px solid var(--area-color, var(--link));
 	border-radius: 0.15rem;
-	background-color: color-mix(
-		in srgb,
-		var(--area-color, var(--link)) 30%,
-		transparent
-	);
+	background-color: color-mix(in srgb, var(--area-color, var(--link)) 30%, transparent);
 }
 
 .floorplan-swatch-marker {
@@ -4268,10 +4265,7 @@ span.attachment-star,
 	transform-origin: 0 0;
 	/* --floorplan-dx / -dy spread a crowd at full zoom. */
 	transform: scale(var(--inv-zoom))
-		translate(
-			calc(-50% + var(--floorplan-dx, 0px)),
-			calc(-50% + var(--floorplan-dy, 0px))
-		);
+		translate(calc(-50% + var(--floorplan-dx, 0px)), calc(-50% + var(--floorplan-dy, 0px)));
 	display: grid;
 	place-items: center;
 	width: 1.75rem;
@@ -4381,11 +4375,7 @@ span.attachment-star,
 }
 
 .floorplan-marker-outlet.floorplan-marker-partial:not(.floorplan-marker-jack) {
-	background: linear-gradient(
-		135deg,
-		var(--success) 50%,
-		var(--text-muted) 50%
-	);
+	background: linear-gradient(135deg, var(--success) 50%, var(--text-muted) 50%);
 }
 
 .floorplan-jack-count {
@@ -4614,7 +4604,6 @@ span.attachment-star,
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-target-text > * {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -4884,7 +4873,6 @@ span.attachment-star,
 	text-align: left;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-object span {
 	overflow: hidden;
 	white-space: nowrap;
@@ -5149,10 +5137,7 @@ span.attachment-star,
 
 .rack-elev.rack-elev-images {
 	/* Device column width (minus the borders) at the 19":1 U aspect, plus a row's border. */
-	--rack-row-h: max(
-		1.9rem,
-		calc((100cqw - 2rem - 2px) * 44.45 / 482.6 + 1px)
-	);
+	--rack-row-h: max(1.9rem, calc((100cqw - 2rem - 2px) * 44.45 / 482.6 + 1px));
 }
 
 .rack-dev-image {
@@ -5449,11 +5434,7 @@ span.attachment-star,
 	padding: 0.2rem 0.4rem;
 	outline: 1px dashed var(--border-strong);
 	outline-offset: -1px;
-	background: repeating-linear-gradient(
-		-45deg,
-		transparent 0 6px,
-		var(--bg-hover) 6px 7px
-	);
+	background: repeating-linear-gradient(-45deg, transparent 0 6px, var(--bg-hover) 6px 7px);
 	overflow: hidden;
 }
 
@@ -5758,7 +5739,6 @@ a.rack-shelf-plate:hover {
 	overflow: visible;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table thead th {
 	position: sticky;
 	top: 0;
@@ -5767,7 +5747,6 @@ a.rack-shelf-plate:hover {
 	vertical-align: bottom;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table tfoot td {
 	position: sticky;
 	bottom: 0;
@@ -5776,9 +5755,7 @@ a.rack-shelf-plate:hover {
 	font-size: var(--font-size-sm);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table th,
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table td {
 	padding: 0.45rem 0.75rem;
 	border-bottom: 1px solid var(--border);
@@ -5786,7 +5763,6 @@ a.rack-shelf-plate:hover {
 	vertical-align: top;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-table tbody tr:hover > * {
 	background-color: color-mix(in srgb, var(--bg-hover) 35%, transparent);
 }
@@ -5832,7 +5808,6 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-object-line a {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -5923,23 +5898,19 @@ a.rack-shelf-plate:hover {
 	gap: 0.25rem;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick .combobox {
 	flex: 1 1 auto;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick .combobox-input {
 	padding-block: 0.3rem;
 }
 
 /* Linked cells read as values, open ones as empty inputs. */
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick:has(.combobox-input:placeholder-shown) .combobox-input {
 	border-style: dashed;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-pick.ignored .combobox-input {
 	color: var(--text-muted);
 	font-style: italic;
@@ -5966,7 +5937,6 @@ a.rack-shelf-plate:hover {
 	box-shadow: inset 3px 0 0 var(--primary);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-cell.changed .combobox-input {
 	border-color: var(--primary);
 }
@@ -6154,18 +6124,6 @@ a.rack-shelf-plate:hover {
 	border-bottom: none;
 }
 
-/* Primary action of the page, right beside its title. */
-.integrations-match {
-	background-color: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-contrast);
-}
-
-.integrations-match:hover {
-	background-color: var(--primary-hover);
-	border-color: var(--primary-hover);
-}
-
 .integrations-summary {
 	flex: 1 1 12rem;
 	display: flex;
@@ -6174,7 +6132,6 @@ a.rack-shelf-plate:hover {
 	color: var(--text-secondary);
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .integrations-summary > span {
 	display: inline-flex;
 	align-items: center;
@@ -7181,4 +7138,274 @@ a.drawn-plan-name:hover {
 	.drawn-plan-layout {
 		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+/* ---------------------------------------------------------------------------
+   Billing: monthly lot counts (/billing).
+   --------------------------------------------------------------------------- */
+
+.billing-period {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.billing-period select {
+	min-width: 10rem;
+}
+
+.billing-state.live {
+	color: var(--link);
+	border-color: var(--link);
+}
+
+.billing-state.draft {
+	color: var(--warning);
+	border-color: var(--warning);
+}
+
+.billing-state.final {
+	color: var(--success);
+	border-color: var(--success);
+}
+
+button.billing-primary {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+button.billing-primary:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+.billing-callout {
+	margin: 0.75rem 0;
+	padding: 0.6rem 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+	border-radius: 0.5rem;
+	background-color: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+}
+
+.billing-callout h3 {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.35rem;
+	font-size: var(--font-size-base);
+	color: var(--warning);
+}
+
+.billing-callout summary {
+	cursor: pointer;
+	padding: 0.15rem 0;
+}
+
+.billing-callout ul {
+	margin: 0.2rem 0 0.4rem;
+	padding-left: 1.4rem;
+}
+
+.billing-note {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0.5rem 0;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.billing-warn-icon {
+	color: var(--warning);
+	vertical-align: -1px;
+}
+
+.billing-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin: 0.75rem 0 0.25rem;
+}
+
+.billing-tabs {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.billing-tabs button {
+	background: none;
+	border-color: transparent;
+	color: var(--text-muted);
+	font-weight: 600;
+}
+
+.billing-tabs button[aria-pressed="true"] {
+	color: var(--text);
+	border-color: var(--border-strong);
+	background-color: var(--bg-raised);
+}
+
+.billing-search {
+	flex: 0 1 18rem;
+	min-width: 0;
+}
+
+.billing-grid-wrap {
+	overflow-x: auto;
+}
+
+.billing-grid th,
+.billing-grid td {
+	white-space: nowrap;
+}
+
+.billing-grid .num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.billing-grid th.billing-group {
+	text-align: center;
+}
+
+.billing-grid .billing-group-start {
+	border-left: 1px solid var(--border-strong);
+}
+
+.billing-grid td.billing-selected {
+	outline: 2px solid var(--primary);
+	outline-offset: -2px;
+}
+
+.billing-grid tfoot td {
+	font-weight: 600;
+	border-top: 1px solid var(--border-strong);
+}
+
+.billing-lots,
+.billing-cell-button {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+button.billing-cell-button {
+	padding: 0 0.2rem;
+	background: none;
+	border: none;
+	color: var(--link);
+	text-decoration: underline dotted;
+}
+
+button.billing-cell-button:hover {
+	background: none;
+	text-decoration: underline;
+}
+
+.billing-delta {
+	margin-left: 0.3rem;
+	font-size: var(--font-size-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+.billing-delta.up {
+	color: var(--success);
+}
+
+.billing-delta.down {
+	color: var(--error);
+}
+
+.billing-sla {
+	display: block;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.billing-gb {
+	display: block;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.billing-gb-input {
+	display: block;
+	width: 6.5rem;
+	margin: 0.2rem 0 0 auto;
+	text-align: right;
+}
+
+.billing-gb-input.carried {
+	font-style: italic;
+	color: var(--text-muted);
+}
+
+.billing-panel {
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+}
+
+.billing-panel-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.billing-panel-header h3 {
+	margin: 0;
+	font-size: var(--font-size-lg);
+}
+
+.billing-items tr.billing-removed td {
+	color: var(--text-muted);
+}
+
+.billing-items tr.billing-removed td:first-child span {
+	text-decoration: line-through;
+}
+
+.billing-tag {
+	padding: 0.05rem 0.4rem;
+	border-radius: 0.25rem;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+}
+
+.billing-tag.added {
+	color: var(--success);
+	background-color: color-mix(in srgb, var(--success) 15%, transparent);
+}
+
+.billing-tag.removed {
+	color: var(--error);
+	background-color: var(--error-bg);
+}
+
+/* Managed bundle form: one checkbox per billing metric, its hint below. */
+.billing-metric-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.billing-metric-list .field-checkbox-label {
+	align-items: flex-start;
+}
+
+.billing-metric-list .field-hint {
+	display: block;
+	margin: 0;
+}
+
+.billing-bundle-metrics {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.3rem;
 }
