@@ -953,6 +953,16 @@ tbody tr:last-child td {
 	gap: 0.15rem;
 }
 
+.app-nav-group-items {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.app-nav-group-items[hidden] {
+	display: none;
+}
+
 .app-nav-label {
 	padding: 0.3rem 0.5rem;
 	font-size: var(--font-size-sm);
@@ -961,6 +971,43 @@ tbody tr:last-child td {
 	text-transform: uppercase;
 	color: var(--text-muted);
 	white-space: nowrap;
+}
+
+button.app-nav-label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	width: 100%;
+	border: 0;
+	border-radius: 0.3rem;
+	background: none;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+button.app-nav-label:hover,
+button.app-nav-label:focus-visible {
+	color: var(--text);
+}
+
+.app-nav-label-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.app-nav-label-chevron {
+	display: inline-flex;
+	opacity: 0;
+	transition: opacity 0.1s;
+}
+
+button.app-nav-label:hover .app-nav-label-chevron,
+button.app-nav-label:focus-visible .app-nav-label-chevron,
+button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
+	opacity: 1;
 }
 
 .app-nav-text {
