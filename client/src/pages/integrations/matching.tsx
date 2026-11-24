@@ -377,6 +377,28 @@ export function MatchingPage(): JSX.Element {
 		return external ? { external, via: s.via } : null
 	}
 
+	/** A cell offers its own value and the external objects no other row has taken. */
+	function cellOptions(column: Column, rowId: number): ComboboxOption[] {
+		const current = value(column, rowId)
+		const used = taken().get(column.provider)
+		return column.options.filter((o) => {
+			const id = String(o.value)
+			if (id === IGNORE || id === current) {
+				return true
+			}
+			if (used?.has(id) === true) {
+				return false
+			}
+			// Linked to a conex object outside this board (another tenant).
+			const e = column.external.get(id)
+			return !(
+				e?.state === 'linked' &&
+				e.entity_id !== null &&
+				!column.local.has(e.entity_id)
+			)
+		})
+	}
+
 	function setCell(column: Column, rowId: number, next: string): void {
 		setDrafts((prev) => {
 			const out = new Map(prev)
@@ -731,7 +753,7 @@ export function MatchingPage(): JSX.Element {
 									? (next: string): void => setCell(column, row.id, next)
 									: undefined
 							}
-							options={column.options}
+							options={cellOptions(column, row.id)}
 							ariaLabel={t('matching.pickLabel', { name: row.name, provider: label })}
 							placeholder={t('matching.select')}
 							searchLabel={t('common.search')}
@@ -966,7 +988,9 @@ export function MatchingPage(): JSX.Element {
 									<For each={ignoredExternal(column)}>
 										{(row: LinkBoardExternal): JSX.Element => (
 											<div class="matching-external-item">
-												<span class="matching-external-name">{row.name}</span>
+												<span class="matching-external-name">
+													{row.name}
+												</span>
 												<Show when={editable() && row.link_id !== null}>
 													<button
 														type="button"
