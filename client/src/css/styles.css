@@ -189,6 +189,7 @@ a:focus-visible {
 	outline-offset: 1px;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 button {
 	padding: 0.36rem 0.6rem;
 	font-size: var(--font-size-base);
@@ -1136,6 +1137,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 
 /* NetBox-style quick-add "+" on each nav row. Hidden until the row is
    hovered, active, or focus-within; dummy buttons stay disabled. */
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-item {
 	position: relative;
 	display: flex;
@@ -1144,6 +1146,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	border-radius: 0.3rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-item > a {
 	flex: 1;
 	min-width: 0;
@@ -1183,6 +1186,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 .app-nav-item:hover .app-nav-add,
 .app-nav-item.active .app-nav-add,
 .app-nav-item:focus-within .app-nav-add,
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-add:focus-visible {
 	opacity: 1;
 }
@@ -1193,6 +1197,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	color: var(--text);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-nav-add:disabled {
 	cursor: default;
 }
@@ -1605,10 +1610,12 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 /* Tables scroll horizontally instead of clipping on narrow screens. */
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content div:has(> table) {
 	overflow-x: auto;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content thead th {
 	position: sticky;
 	top: 0;
@@ -1680,6 +1687,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	min-width: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content form button {
 	flex-shrink: 0;
 }
@@ -1869,6 +1877,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin-bottom: 0.5rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .page-header h2 {
 	margin: 0;
 	padding: 0;
@@ -1908,6 +1917,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	min-width: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .list-tabs a {
 	margin-bottom: calc(-0.4rem - 1px);
 	padding-bottom: 0.4rem;
@@ -2048,6 +2058,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	color: var(--primary-contrast);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .form-actions button:disabled {
 	opacity: 0.55;
 	cursor: not-allowed;
@@ -2163,6 +2174,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	list-style: none;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .service-hours-list > li {
 	display: grid;
 	grid-column: 1 / -1;
@@ -2204,6 +2216,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 .copy-value:hover .copy-value-btn,
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .copy-value-btn:focus-visible,
 .copy-value-done {
 	opacity: 1;
@@ -2224,6 +2237,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	grid-template-columns: max-content max-content auto;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .contact-list > li {
 	display: grid;
 	grid-column: 1 / -1;
@@ -2365,6 +2379,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	gap: 0.4rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field .address-place-row input {
 	flex: 1 1 auto;
 	width: auto;
@@ -2515,6 +2530,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	padding-left: 1.7rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field input:disabled,
 .app-content .form-stacked .field textarea:disabled {
 	cursor: not-allowed;
@@ -2555,8 +2571,14 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	gap: 0.4rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field .vm-host-row input,
-.app-content .form-stacked .field .input-with-button input {
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
+	.app-content
+	.form-stacked
+	.field
+	.input-with-button
+	input {
 	flex: 1 1 auto;
 	width: auto;
 	min-width: 0;
@@ -2669,8 +2691,14 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	opacity: 0.5;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .form-stacked .field .field-checkbox-label input,
-.app-content .form-stacked .jack-outlet-list .field-checkbox-label input {
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
+	.app-content
+	.form-stacked
+	.jack-outlet-list
+	.field-checkbox-label
+	input {
 	flex: none;
 	width: auto;
 }
@@ -3189,6 +3217,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	gap: 0.3rem;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .panel-row-field > span:first-child {
 	font-weight: 500;
 	color: #d6d6d6;
@@ -3361,6 +3390,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .object-selector-results li {
 	display: grid;
 	grid-column: 1 / -1;
@@ -3460,6 +3490,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	box-shadow: inset 0 0 0 1px var(--primary);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .port-grid .port-tile:disabled {
 	opacity: 0.45;
 	cursor: not-allowed;
@@ -3521,6 +3552,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin-left: auto;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .modal-actions button:disabled {
 	opacity: 0.45;
 	cursor: not-allowed;
@@ -3654,6 +3686,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	padding: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .location-tree li {
 	margin: 0;
 	padding-left: calc(var(--tree-depth, 0) * 1rem);
@@ -3830,6 +3863,7 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 /* Device detail: port and VM sections, split by the same rule. */
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .detail-sections > section + section {
 	padding-top: 1.1rem;
 	border-top: 1px solid var(--border);
@@ -4485,6 +4519,7 @@ span.attachment-star,
 	list-style: none;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-status-legend li {
 	display: inline-flex;
 	align-items: center;
@@ -4915,6 +4950,7 @@ span.attachment-star,
 	font-size: var(--font-size-sm);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .floorplan-objects li {
 	display: flex;
 	align-items: center;
@@ -5766,6 +5802,7 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .matching-heading h2 {
 	margin: 0;
 	padding-bottom: 0;
@@ -5938,6 +5975,7 @@ a.rack-shelf-plate:hover {
 	background-color: var(--bg-hover);
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .matching-col-bar > div {
 	height: 100%;
 	border-radius: inherit;
@@ -6163,6 +6201,7 @@ a.rack-shelf-plate:hover {
 }
 
 /* Changelog before/after table: changed values tinted red (old) / green (new). */
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .changelog-diff td {
 	vertical-align: top;
 	overflow-wrap: anywhere;
@@ -6381,6 +6420,7 @@ a.rack-shelf-plate:hover {
 	display: none;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .integration-card-fix {
 	font-size: var(--font-size-sm);
 }
@@ -6542,6 +6582,7 @@ a.rack-shelf-plate:hover {
 	min-width: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: unrelated to the earlier, more specific selector */
 .app-content .integration-detail-header h2 {
 	margin: 0;
 	padding-bottom: 0;
