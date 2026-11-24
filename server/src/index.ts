@@ -7,6 +7,7 @@ import { initConfig, load_config_file } from './config'
 import { sweepAttachmentFiles } from './db/attachments'
 import { initDb } from './db/connection'
 import { failInterruptedSyncs } from './integrations/sync'
+import { aiApp } from './routes/ai'
 import { attachmentsApp } from './routes/attachments'
 import { auditLogApp } from './routes/audit_log'
 import { authApp } from './routes/auth'
@@ -109,6 +110,7 @@ export function createApp() {
 			.route('/floorplan-drawings', floorplanDrawingsApp)
 			.route('/saved-filters', savedFiltersApp)
 			.route('/saved-layouts', savedLayoutsApp)
+			.route('/ai', aiApp)
 	)
 }
 

@@ -50,6 +50,7 @@ import {
 	poeTypeShortLabel,
 	yesNo,
 } from '../../i18n/labels'
+import { FEATURES } from '../../lib/features'
 import { useNameOf } from '../../lib/lookup'
 import { createRecord, createRows, createRowsFor, useAction } from '../../lib/resource'
 import { can } from '../../lib/session'
@@ -480,7 +481,7 @@ export function DeviceTypeDetailPage(props: { id: number }): JSX.Element {
 				</section>
 			</DetailShell>
 
-			<Show when={deviceType()}>
+			<Show when={FEATURES.schematics ? deviceType() : undefined}>
 				{(type: () => DeviceTypeRow): JSX.Element => (
 					<section class="component-section" id="device-type-views">
 						<div class="card-header">

@@ -87,6 +87,17 @@ export class ValidationError extends Error {
 	}
 }
 
+/**
+ * Wrapped in a `Result.err` when a feature is switched off by configuration
+ * (e.g. no `[ai]` section). Mapped to 503.
+ */
+export class ServiceUnavailableError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = 'ServiceUnavailableError'
+	}
+}
+
 /** Wrapped in a `Result.err` when an external system fails. Mapped to 502. */
 export class ExternalServiceError extends Error {
 	constructor(message: string) {

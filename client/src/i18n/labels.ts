@@ -355,6 +355,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'integrations.manage': 'permission.integrationsManage',
 	'tickets.create': 'permission.ticketsCreate',
 	'contacts.directory': 'permission.contactsDirectory',
+	'ai.use': 'permission.aiUse',
 }
 
 /** Role permission (`view`, `users.manage`, …). */
@@ -373,6 +374,7 @@ const PERMISSION_SHORT_KEYS: Record<Permission, MessageKey> = {
 	'integrations.manage': 'permissionShort.integrationsManage',
 	'tickets.create': 'permissionShort.ticketsCreate',
 	'contacts.directory': 'permissionShort.contactsDirectory',
+	'ai.use': 'permissionShort.aiUse',
 }
 
 /** Compact permission label for badges; pair with `permissionLabel` as tooltip. */

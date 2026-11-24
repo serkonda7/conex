@@ -34,6 +34,7 @@ import { IconLabel } from '../../components/icon_label'
 import { ScrollLink } from '../../components/scroll_link'
 import { t, tp } from '../../i18n'
 import { deviceRoleLabel, faceLabel } from '../../i18n/labels'
+import { FEATURES } from '../../lib/features'
 import { floorplanHref } from '../../lib/floorplan_link'
 import { deviceRoleIcon, panelKindIcon } from '../../lib/icons'
 import { createDerived, createRecord, createRowsFor, useAction } from '../../lib/resource'
@@ -467,7 +468,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 				</section>
 			</DetailShell>
 			<div class="detail-sections">
-				<Show when={deviceType() && ifaces()}>
+				<Show when={FEATURES.schematics && deviceType() && ifaces()}>
 					<section class="component-section" id="device-views">
 						<div class="card-header">
 							<h3>{t('faceplate.heading')}</h3>

@@ -23,3 +23,27 @@ mode = "live"   # live | offline | mock
 # Snapshot files of the mock mode. Absolute or relative to the data dir.
 # Snapshots contain customer data and are never written by the server itself.
 mockDir = "integrations-mock"
+
+# AI assistant (`ai.use` permission). Leave the section out to disable it.
+# Prompts are not sent while `[integrations] mode` is "offline"; in "mock"
+# mode the assistant answers with canned replies.
+# [ai]
+# provider = "claude"   # claude | opencode
+#
+# [ai.claude]
+# model = "claude-opus-5-5"
+# effort = "medium"     # low | medium | high | xhigh | max; unset = model default
+# maxTokens = 64000
+# # Prefer ANTHROPIC_API_KEY in the environment over a key in this file.
+# # apiKey = "sk-ant-..."
+#
+# [ai.opencode]
+# # Base URL of `opencode serve`; its password comes from OPENCODE_SERVER_PASSWORD.
+# url = "http://127.0.0.1:4096"
+# # "<providerID>/<modelID>"; unset = opencode's default model.
+# # model = "anthropic/claude-opus-5-5"
+# timeoutSeconds = 300
+#
+# [ai.rateLimit]        # chat requests per user
+# maxRequests = 30
+# windowSeconds = 300

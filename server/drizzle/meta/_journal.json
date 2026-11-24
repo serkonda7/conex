@@ -64,6 +64,13 @@
       "when": 1795508606566,
       "tag": "0008_port_faces",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795519200954,
+      "tag": "0009_ai_permission",
+      "breakpoints": true
     }
   ]
 }

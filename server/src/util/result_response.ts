@@ -9,13 +9,14 @@ import {
 	ExternalServiceError,
 	ForbiddenError,
 	NotFoundError,
+	ServiceUnavailableError,
 	ValidationError,
 } from '../db/errors'
 import { jsonError } from './http'
 
 /**
  * Sends a service `Result` as JSON. Success serializes the value; known
- * domain errors map to 404/409/422/502 through the shared `{ error }` shape and
+ * domain errors map to 404/409/422/502/503 through the shared `{ error }` shape and
  * unexpected failures stay a 500 (logged server-side).
  */
 export function sendResult<T>(
@@ -49,6 +50,9 @@ export function sendResult<T>(
 	}
 	if (err instanceof ExternalServiceError) {
 		return jsonError(c, err.message, 502)
+	}
+	if (err instanceof ServiceUnavailableError) {
+		return jsonError(c, err.message, 503)
 	}
 	console.error(err)
 	return jsonError(c, 'Internal server error', 500)

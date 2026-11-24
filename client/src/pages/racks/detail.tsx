@@ -34,6 +34,7 @@ import { useSort } from '../../components/list_page'
 import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
 import { faceLabel } from '../../i18n/labels'
+import { FEATURES } from '../../lib/features'
 import { useNameOf } from '../../lib/lookup'
 import { createDerived, createRecord, createRows, createRowsFor } from '../../lib/resource'
 import { type Crumb, navigate } from '../../lib/router'
@@ -81,7 +82,7 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	)
 	const [elevation] = createRecord(id, fetch_elevation, setError)
 	const [display, setDisplayState] = createSignal<ElevationDisplay>(
-		readStored(DISPLAY_KEY) === 'images' ? 'images' : 'labels',
+		FEATURES.schematics && readStored(DISPLAY_KEY) === 'images' ? 'images' : 'labels',
 	)
 	const setDisplay = (value: ElevationDisplay): void => {
 		setDisplayState(value)
@@ -398,32 +399,34 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								<span class="rack-util-fill" style={{ width: `${utilPct()}%` }} />
 							</span>
 						</div>
-						<div class="rack-elev-toolbar">
-							<div
-								class="segmented"
-								role="radiogroup"
-								aria-label={t('elevation.display')}
-							>
-								<For each={DISPLAYS}>
-									{(value: ElevationDisplay): JSX.Element => (
-										<label class="segmented-option">
-											<input
-												type="radio"
-												name="rack-elevation-display"
-												value={value}
-												checked={display() === value}
-												onChange={() => setDisplay(value)}
-											/>
-											<span>
-												{value === 'images'
-													? t('elevation.displayImages')
-													: t('elevation.displayLabels')}
-											</span>
-										</label>
-									)}
-								</For>
+						<Show when={FEATURES.schematics}>
+							<div class="rack-elev-toolbar">
+								<div
+									class="segmented"
+									role="radiogroup"
+									aria-label={t('elevation.display')}
+								>
+									<For each={DISPLAYS}>
+										{(value: ElevationDisplay): JSX.Element => (
+											<label class="segmented-option">
+												<input
+													type="radio"
+													name="rack-elevation-display"
+													value={value}
+													checked={display() === value}
+													onChange={() => setDisplay(value)}
+												/>
+												<span>
+													{value === 'images'
+														? t('elevation.displayImages')
+														: t('elevation.displayLabels')}
+												</span>
+											</label>
+										)}
+									</For>
+								</div>
 							</div>
-						</div>
+						</Show>
 						<Show
 							when={elevation()}
 							fallback={<Loading message={t('rack.loadingElevation')} />}

@@ -1862,7 +1862,8 @@ export const TraceQuerySchema = v.object({
  * `contacts.directory` reads the contact directory (`/directory/contacts`),
  * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
  * tenants of existing employees (with `edit`), which also changes the
- * tenant scope of the employee's account.
+ * tenant scope of the employee's account. `ai.use` sends prompts to the
+ * configured AI provider (`[ai]` in the server config).
  */
 export const PERMISSIONS = [
 	'view',
@@ -1875,6 +1876,7 @@ export const PERMISSIONS = [
 	'integrations.manage',
 	'tickets.create',
 	'contacts.directory',
+	'ai.use',
 ] as const
 
 export const PermissionSchema = v.picklist(PERMISSIONS)
@@ -4303,4 +4305,61 @@ export interface CalendarTechnicianJson {
 	name: string
 	email: string | null
 	mapping: CalendarMappingJson | null
+}
+
+// ---------------------------------------------------------------------------
+// AI assistant (`routes/ai.ts`)
+// ---------------------------------------------------------------------------
+
+/** Providers the server can be configured with (`[ai] provider`). */
+export const AI_PROVIDERS = ['claude', 'opencode'] as const
+
+export type AiProvider = (typeof AI_PROVIDERS)[number]
+
+/** Longest single chat message, in characters. */
+export const AI_MESSAGE_MAX_LENGTH = 20_000
+/** Most messages one chat request may carry (history included). */
+export const AI_CHAT_MAX_MESSAGES = 50
+
+const AiChatMessageSchema = v.strictObject({
+	role: v.picklist(['user', 'assistant']),
+	text: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(AI_MESSAGE_MAX_LENGTH)),
+})
+
+/**
+ * One assistant turn: the whole conversation so far, oldest first. The server
+ * keeps no chat state; the client resends the history with each request.
+ */
+export const AiChatSchema = v.strictObject({
+	messages: v.pipe(
+		v.array(AiChatMessageSchema),
+		v.minLength(1),
+		v.maxLength(AI_CHAT_MAX_MESSAGES),
+		v.check(
+			(list) => list[0]?.role === 'user' && list[list.length - 1]?.role === 'user',
+			'The conversation must start and end with a user message',
+		),
+	),
+})
+
+export type AiChat = v.InferOutput<typeof AiChatSchema>
+export type AiChatMessage = AiChat['messages'][number]
+
+/** `GET /ai/status`: whether the assistant can be offered. */
+export interface AiStatusJson {
+	/** An `[ai]` section is configured and integrations are not offline. */
+	enabled: boolean
+	/** Configured provider; `mock` while `[integrations] mode = "mock"`. */
+	provider: AiProvider | 'mock' | null
+	model: string | null
+}
+
+/** `POST /ai/chat` reply. */
+export interface AiChatReplyJson {
+	text: string
+	provider: AiProvider | 'mock'
+	/** Model that answered; with server-side fallback it may differ from the configured one. */
+	model: string
+	/** The reply hit the output token limit and is cut off. */
+	truncated: boolean
 }

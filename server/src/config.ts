@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { Result } from 'better-result'
+import { AI_PROVIDERS } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getTrimmedEnv } from './util/server_root'
 import { formatValibotIssues } from './util/valibot'
@@ -24,6 +25,42 @@ const configSchema = v.strictObject({
 		),
 		secureCookies: v.optional(v.boolean(), true), // Only disable for plain-HTTP local development
 	}),
+	// AI assistant; absent = disabled. Credentials prefer the environment
+	// (ANTHROPIC_API_KEY, OPENCODE_SERVER_PASSWORD) over this file.
+	ai: v.optional(
+		v.strictObject({
+			provider: v.picklist(AI_PROVIDERS),
+			claude: v.optional(
+				v.strictObject({
+					model: v.optional(v.pipe(v.string(), v.minLength(1)), 'claude-opus-5-5'),
+					// Unset = the model's default effort.
+					effort: v.optional(v.picklist(['low', 'medium', 'high', 'xhigh', 'max'])),
+					maxTokens: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 64_000),
+					apiKey: v.optional(v.pipe(v.string(), v.minLength(1))),
+				}),
+				{},
+			),
+			opencode: v.optional(
+				v.strictObject({
+					// Base URL of `opencode serve` (no trailing slash).
+					url: v.optional(v.pipe(v.string(), v.url()), 'http://127.0.0.1:4096'),
+					password: v.optional(v.pipe(v.string(), v.minLength(1))),
+					// "<providerID>/<modelID>"; unset = opencode's default model.
+					model: v.optional(v.pipe(v.string(), v.regex(/^[^/\s]+\/\S+$/))),
+					timeoutSeconds: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 300),
+				}),
+				{},
+			),
+			// Chat requests per user and window.
+			rateLimit: v.optional(
+				v.strictObject({
+					maxRequests: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 30),
+					windowSeconds: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 300),
+				}),
+				{},
+			),
+		}),
+	),
 	frontendUrl: v.optional(v.string()),
 	integrations: v.optional(
 		v.strictObject({
