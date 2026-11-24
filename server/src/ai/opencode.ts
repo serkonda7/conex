@@ -4,14 +4,27 @@ import type { AppConfig } from '../config'
 import { ExternalServiceError } from '../db/errors'
 import { getTrimmedEnv } from '../util/server_root'
 import { renderTranscript } from './prompt'
-import type { AiProvider, AiReply, AiRequest } from './provider'
+import type { AiModel, AiProvider, AiReply, AiRequest } from './provider'
 
 type OpencodeConfig = NonNullable<AppConfig['ai']>['opencode']
 
 // `opencode serve` uses HTTP Basic auth with this fixed user name.
 const OPENCODE_USER = 'opencode'
 
+// Listing models is quick; generation uses `timeoutSeconds` instead.
+const LIST_TIMEOUT_MS = 15_000
+
 const GenerateResponseSchema = v.object({ data: v.object({ text: v.string() }) })
+const ModelListResponseSchema = v.object({
+	data: v.array(
+		v.object({
+			id: v.string(),
+			providerID: v.string(),
+			name: v.string(),
+			enabled: v.optional(v.boolean(), true),
+		}),
+	),
+})
 const ErrorResponseSchema = v.object({ _tag: v.string(), message: v.optional(v.string()) })
 
 /**
@@ -23,8 +36,7 @@ const ErrorResponseSchema = v.object({ _tag: v.string(), message: v.optional(v.s
  * `OPENCODE_SERVER_PASSWORD`.
  */
 export function createOpencodeProvider(cfg: OpencodeConfig): Result<AiProvider, Error> {
-	const password = cfg.password ?? getTrimmedEnv('OPENCODE_SERVER_PASSWORD')
-	const endpoint = `${cfg.url.replace(/\/+$/, '')}/api/experimental/generate/text`
+	const endpoint = `${baseUrl(cfg)}/api/experimental/generate/text`
 	const model = parseModel(cfg.model)
 
 	return Result.ok({
@@ -36,12 +48,7 @@ export function createOpencodeProvider(cfg: OpencodeConfig): Result<AiProvider, 
 			try {
 				res = await fetch(endpoint, {
 					method: 'POST',
-					headers: {
-						'content-type': 'application/json',
-						...(password && {
-							authorization: `Basic ${btoa(`${OPENCODE_USER}:${password}`)}`,
-						}),
-					},
+					headers: { 'content-type': 'application/json', ...authHeader(cfg) },
 					body: JSON.stringify({
 						prompt: renderTranscript(req),
 						...(model && { model }),
@@ -78,6 +85,47 @@ export function createOpencodeProvider(cfg: OpencodeConfig): Result<AiProvider, 
 			})
 		},
 	})
+}
+
+/**
+ * Chat models of the providers opencode has enabled (`GET /api/model`), as
+ * `"<providerID>/<modelID>"` references.
+ */
+export async function listOpencodeModels(cfg: OpencodeConfig): Promise<Result<AiModel[], Error>> {
+	let res: Response
+	try {
+		res = await fetch(`${baseUrl(cfg)}/api/model`, {
+			headers: authHeader(cfg),
+			signal: AbortSignal.timeout(LIST_TIMEOUT_MS),
+		})
+	} catch (err) {
+		return Result.err(
+			new ExternalServiceError(`opencode is unreachable: ${(err as Error).message}`),
+		)
+	}
+	const body: unknown = await res.json().catch(() => null)
+	if (!res.ok) {
+		return Result.err(new ExternalServiceError(opencodeError(res.status, body)))
+	}
+	const parsed = v.safeParse(ModelListResponseSchema, body)
+	if (!parsed.success) {
+		return Result.err(new ExternalServiceError('opencode returned an unexpected response'))
+	}
+	return Result.ok(
+		parsed.output.data
+			.filter((m) => m.enabled)
+			.map((m) => ({ id: `${m.providerID}/${m.id}`, name: m.name })),
+	)
+}
+
+function baseUrl(cfg: OpencodeConfig): string {
+	return cfg.url.replace(/\/+$/, '')
+}
+
+/** Password: `password` from the config, else `OPENCODE_SERVER_PASSWORD`. */
+function authHeader(cfg: OpencodeConfig): Record<string, string> {
+	const password = cfg.password ?? getTrimmedEnv('OPENCODE_SERVER_PASSWORD')
+	return password ? { authorization: `Basic ${btoa(`${OPENCODE_USER}:${password}`)}` } : {}
 }
 
 /** `"<providerID>/<modelID>"` (the model id may itself contain slashes). */

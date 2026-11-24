@@ -29,8 +29,8 @@ function allowSlowResponse(c: Context): void {
 export const aiApp = new Hono()
 	.use(authMiddleware)
 	.use(requirePermissionMiddleware('ai.use'))
-	.get('/status', (c) => {
-		const provider = getAiProvider()
+	.get('/status', async (c) => {
+		const provider = await getAiProvider()
 		const status: AiStatusJson = Result.isOk(provider)
 			? { enabled: true, provider: provider.value.id, model: provider.value.model }
 			: { enabled: false, provider: getConfig().ai?.provider ?? null, model: null }
@@ -41,7 +41,7 @@ export const aiApp = new Hono()
 		user_rate_limit(() => getConfig().ai?.rateLimit ?? DEFAULT_LIMITS),
 		vValidator('json', AiChatSchema, onValidationError),
 		async (c) => {
-			const provider = getAiProvider()
+			const provider = await getAiProvider()
 			if (Result.isError(provider)) {
 				return sendResult(c, provider)
 			}

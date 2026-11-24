@@ -1863,7 +1863,8 @@ export const TraceQuerySchema = v.object({
  * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
  * tenants of existing employees (with `edit`), which also changes the
  * tenant scope of the employee's account. `ai.use` sends prompts to the
- * configured AI provider (`[ai]` in the server config).
+ * configured AI provider (`[ai]` in the server config). `settings.manage`
+ * edits the global settings (`/global-settings`), e.g. the default AI models.
  */
 export const PERMISSIONS = [
 	'view',
@@ -1877,6 +1878,7 @@ export const PERMISSIONS = [
 	'tickets.create',
 	'contacts.directory',
 	'ai.use',
+	'settings.manage',
 ] as const
 
 export const PermissionSchema = v.picklist(PERMISSIONS)
@@ -4316,6 +4318,9 @@ export const AI_PROVIDERS = ['claude', 'opencode'] as const
 
 export type AiProvider = (typeof AI_PROVIDERS)[number]
 
+/** opencode model reference: `"<providerID>/<modelID>"` (the model id may contain slashes). */
+export const OPENCODE_MODEL_PATTERN = /^[^/\s]+\/\S+$/
+
 /** Longest single chat message, in characters. */
 export const AI_MESSAGE_MAX_LENGTH = 20_000
 /** Most messages one chat request may carry (history included). */
@@ -4362,4 +4367,64 @@ export interface AiChatReplyJson {
 	model: string
 	/** The reply hit the output token limit and is cut off. */
 	truncated: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Global settings (`routes/global_settings.ts`)
+// ---------------------------------------------------------------------------
+
+const ClaudeModelSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.minLength(1),
+	v.maxLength(200),
+	v.regex(/^\S+$/, 'The model id must not contain spaces'),
+)
+
+const OpencodeModelSchema = v.pipe(
+	v.string(),
+	v.trim(),
+	v.maxLength(200),
+	v.regex(OPENCODE_MODEL_PATTERN, 'Expected "<provider>/<model>"'),
+)
+
+/**
+ * `PATCH /global-settings`: only the given fields change. `null` clears a
+ * setting, so the value from the server config applies again.
+ */
+export const GlobalSettingsUpdateSchema = v.strictObject({
+	ai_claude_model: v.optional(v.nullable(ClaudeModelSchema), undefined),
+	ai_opencode_model: v.optional(v.nullable(OpencodeModelSchema), undefined),
+})
+
+export type GlobalSettingsUpdate = v.InferOutput<typeof GlobalSettingsUpdateSchema>
+
+/** `GET /global-settings`. */
+export interface GlobalSettingsJson {
+	/** Default Claude model; null = `[ai.claude] model` of the server config. */
+	ai_claude_model: string | null
+	/** Default opencode model; null = `[ai.opencode] model`, else opencode's own default. */
+	ai_opencode_model: string | null
+	/** Server config values that apply while a setting is null. */
+	config: {
+		/** `[ai] provider`; null when the assistant is not configured. */
+		ai_provider: AiProvider | null
+		ai_claude_model: string | null
+		ai_opencode_model: string | null
+	}
+	updated_at: number | null
+}
+
+/** `GET /global-settings/ai-models?provider=…`: models the provider offers. */
+export const AiModelListQuerySchema = v.object({
+	provider: v.picklist(AI_PROVIDERS),
+})
+
+export type AiModelListQuery = v.InferOutput<typeof AiModelListQuerySchema>
+
+export interface AiModelJson {
+	/** Value of the setting: a Claude model id, or `"<provider>/<model>"` for opencode. */
+	id: string
+	/** Display name reported by the provider. */
+	name: string
 }

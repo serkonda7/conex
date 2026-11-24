@@ -1,10 +1,11 @@
 import { Result } from 'better-result'
-import type { AiChatMessage, AiProvider as AiProviderId } from 'shared/src/schemas'
+import type { AiChatMessage, AiModelJson, AiProvider as AiProviderId } from 'shared/src/schemas'
 import { type AppConfig, getConfig } from '../config'
 import { ServiceUnavailableError } from '../db/errors'
-import { createClaudeProvider } from './claude'
-import { mockProvider } from './mock'
-import { createOpencodeProvider } from './opencode'
+import { getGlobalSettings } from '../db/global_settings'
+import { createClaudeProvider, listClaudeModels } from './claude'
+import { MOCK_MODELS, mockProvider } from './mock'
+import { createOpencodeProvider, listOpencodeModels } from './opencode'
 
 /** One stateless generation: the full conversation, oldest first. */
 export interface AiRequest {
@@ -32,19 +33,23 @@ export interface AiProvider {
 	generate(req: AiRequest, signal?: AbortSignal): Promise<Result<AiReply, Error>>
 }
 
-// Clients are built once per loaded config (tests swap the config object).
-let cache: { config: AppConfig; provider: AiProvider } | null = null
+/** One model a provider offers (`AiModelJson`). */
+export type AiModel = AiModelJson
+
+type AiConfig = NonNullable<AppConfig['ai']>
+
+// Clients are built once per loaded config and model (tests swap the config object).
+let cache: { config: AppConfig; model: string | null; provider: AiProvider } | null = null
 
 /**
- * The configured provider. Errs with `ServiceUnavailableError` (503) when
- * `[ai]` is missing or `[integrations] mode = "offline"` (prompts can carry
- * customer data, so the safety switch covers them too). `mock` mode answers
- * with canned replies instead of contacting anyone.
+ * `[ai]` of the server config, unless no provider may be contacted: errs
+ * with `ServiceUnavailableError` (503) when `[ai]` is missing or
+ * `[integrations] mode = "offline"` (prompts can carry customer data, so
+ * the safety switch covers them too). `mock` signals the mock mode.
  */
-export function getAiProvider(): Result<AiProvider, Error> {
+function aiConfig(): Result<AiConfig | 'mock', Error> {
 	const config = getConfig()
-	const ai = config.ai
-	if (!ai) {
+	if (!config.ai) {
 		return Result.err(
 			new ServiceUnavailableError(
 				'The AI assistant is not configured ([ai] in the server config)',
@@ -59,19 +64,61 @@ export function getAiProvider(): Result<AiProvider, Error> {
 			),
 		)
 	}
-	if (mode === 'mock') {
+	return Result.ok(mode === 'mock' ? 'mock' : config.ai)
+}
+
+/**
+ * The configured provider with the default model of the global settings
+ * (`/global-settings`), else the one of the server config. Errors as in
+ * {@link aiConfig}; `mock` mode answers with canned replies instead of
+ * contacting anyone.
+ */
+export async function getAiProvider(): Promise<Result<AiProvider, Error>> {
+	const ai = aiConfig()
+	if (Result.isError(ai)) {
+		return ai
+	}
+	if (ai.value === 'mock') {
 		return Result.ok(mockProvider)
 	}
-	if (cache?.config === config) {
+	const settings = await getGlobalSettings()
+	if (Result.isError(settings)) {
+		return settings
+	}
+	const { provider, claude, opencode } = ai.value
+	const model =
+		provider === 'claude'
+			? (settings.value.ai_claude_model ?? claude.model)
+			: (settings.value.ai_opencode_model ?? opencode.model ?? null)
+
+	const config = getConfig()
+	if (cache?.config === config && cache.model === model) {
 		return Result.ok(cache.provider)
 	}
-
 	const created =
-		ai.provider === 'claude'
-			? createClaudeProvider(ai.claude)
-			: createOpencodeProvider(ai.opencode)
+		provider === 'claude'
+			? createClaudeProvider({ ...claude, model: model ?? claude.model })
+			: createOpencodeProvider({ ...opencode, model: model ?? undefined })
 	if (Result.isOk(created)) {
-		cache = { config, provider: created.value }
+		cache = { config, model, provider: created.value }
 	}
 	return created
+}
+
+/**
+ * Models `provider` offers with the credentials of the server config, for
+ * picking the default model. Either provider can be listed, not only the
+ * active one; errors as in {@link aiConfig}.
+ */
+export async function listAiModels(provider: AiProviderId): Promise<Result<AiModel[], Error>> {
+	const ai = aiConfig()
+	if (Result.isError(ai)) {
+		return ai
+	}
+	if (ai.value === 'mock') {
+		return Result.ok(MOCK_MODELS[provider])
+	}
+	return provider === 'claude'
+		? listClaudeModels(ai.value.claude)
+		: listOpencodeModels(ai.value.opencode)
 }

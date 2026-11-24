@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { Result } from 'better-result'
-import { AI_PROVIDERS } from 'shared/src/schemas'
+import { AI_PROVIDERS, OPENCODE_MODEL_PATTERN } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getTrimmedEnv } from './util/server_root'
 import { formatValibotIssues } from './util/valibot'
@@ -46,7 +46,7 @@ const configSchema = v.strictObject({
 					url: v.optional(v.pipe(v.string(), v.url()), 'http://127.0.0.1:4096'),
 					password: v.optional(v.pipe(v.string(), v.minLength(1))),
 					// "<providerID>/<modelID>"; unset = opencode's default model.
-					model: v.optional(v.pipe(v.string(), v.regex(/^[^/\s]+\/\S+$/))),
+					model: v.optional(v.pipe(v.string(), v.regex(OPENCODE_MODEL_PATTERN))),
 					timeoutSeconds: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 300),
 				}),
 				{},

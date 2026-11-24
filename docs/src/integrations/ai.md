@@ -42,6 +42,19 @@ Zugangsdaten gehören in die Umgebung des Servers, nicht in die Datei:
 | Claude   | `ANTHROPIC_API_KEY`        | alternativ `apiKey` in `[ai.claude]`                        |
 | opencode | `OPENCODE_SERVER_PASSWORD` | dasselbe Passwort, mit dem `opencode serve` gestartet wurde |
 
+### Standardmodell in den globalen Einstellungen
+
+Unter **Administration → Globale Einstellungen** (`/global-settings`) wählen Administratoren
+das Standardmodell je Anbieter aus der Modellliste, die der Anbieter selbst meldet (Claude:
+Models API, opencode: `GET /api/model`). Eine Auswahl dort hat Vorrang vor `model` in
+`[ai.claude]` bzw. `[ai.opencode]`; ohne Auswahl gilt weiter die Datei. Ist die Liste nicht
+abrufbar (Anbieter nicht erreichbar, keine Zugangsdaten), lässt sich die Modell-ID von Hand
+eintragen.
+
+Die Seite erfordert die Berechtigung **Globale Einstellungen bearbeiten**
+(`settings.manage`) und ein globales Konto (ohne Mandantenbeschränkung). Bestehende Rollen
+mit Benutzerverwaltung erhalten sie beim Update automatisch.
+
 Bei Claude-Modellen, die es unterstützen, ist der serverseitige Fallback aktiv: Lehnt das
 Modell eine Anfrage ab, beantwortet sie die API in derselben Anfrage mit einem
 Ausweichmodell.
@@ -67,10 +80,11 @@ Fragen noch Antworten.
 
 ## Schnittstelle
 
-| Anfrage           | Zweck                                                                     |
-| ----------------- | ------------------------------------------------------------------------- |
-| `GET /ai/status`  | Ob der Assistent verfügbar ist, mit Anbieter und Modell                   |
-| `POST /ai/chat`   | Nächste Antwort; der Client sendet jedes Mal den gesamten Verlauf mit     |
+| Anfrage                                     | Zweck                                                                 |
+| ------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /ai/status`                            | Ob der Assistent verfügbar ist, mit Anbieter und Modell               |
+| `POST /ai/chat`                             | Nächste Antwort; der Client sendet jedes Mal den gesamten Verlauf mit |
+| `GET /global-settings/ai-models?provider=…` | Modelle eines Anbieters (`claude`, `opencode`); nur `settings.manage` |
 
 `POST /ai/chat` erwartet `{ "messages": [{ "role": "user", "text": "…" }] }`; der Verlauf
 beginnt und endet mit einer Benutzernachricht. Antworten: `503`, wenn der Assistent

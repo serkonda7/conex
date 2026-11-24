@@ -27,6 +27,7 @@ import {
 	IconPackages,
 	IconPlugConnected,
 	IconRuler2,
+	IconSettings,
 	IconShieldLock,
 	IconStack3,
 	IconStopwatch,
@@ -116,6 +117,9 @@ const DrawnFloorplanDetailPage = lazyPage(() =>
 )
 const DrawnFloorplansPage = lazyPage(() =>
 	import('../pages/floorplans_v2/list').then((m) => m.DrawnFloorplansPage),
+)
+const GlobalSettingsPage = lazyPage(() =>
+	import('../pages/global_settings/view').then((m) => m.GlobalSettingsPage),
 )
 const IntegrationAddPage = lazyPage(() =>
 	import('../pages/integrations/add').then((m) => m.IntegrationAddPage),
@@ -546,6 +550,14 @@ export const SECTIONS: readonly Section[] = [
 		list: RolesPage,
 		add: RoleAddPage,
 		edit: RoleEditPage,
+	},
+	{
+		path: 'global-settings',
+		noun: (): string => t('globalSettings.title'),
+		icon: IconSettings,
+		permission: 'settings.manage',
+		hideAddInNav: true,
+		list: GlobalSettingsPage,
 	},
 	{
 		path: 'audit-log',

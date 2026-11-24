@@ -1,5 +1,5 @@
 import { Result } from 'better-result'
-import type { AiProvider, AiReply, AiRequest } from './provider'
+import type { AiModel, AiProvider, AiReply, AiRequest } from './provider'
 
 /**
  * Canned replies for `[integrations] mode = "mock"` (development, e2e):
@@ -18,4 +18,17 @@ export const mockProvider: AiProvider = {
 			}),
 		)
 	},
+}
+
+/** Model lists of the mock mode, so the settings page works without a provider. */
+export const MOCK_MODELS: Record<'claude' | 'opencode', AiModel[]> = {
+	claude: [
+		{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+		{ id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+		{ id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+	],
+	opencode: [
+		{ id: 'anthropic/claude-opus-5-5', name: 'Claude Opus 5.5' },
+		{ id: 'anthropic/claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+	],
 }

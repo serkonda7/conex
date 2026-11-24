@@ -20,6 +20,7 @@ import { devicesApp } from './routes/devices'
 import { directoryApp } from './routes/directory'
 import { employeesApp } from './routes/employees'
 import { floorplanDrawingsApp } from './routes/floorplan_drawings'
+import { globalSettingsApp } from './routes/global_settings'
 import { integrationsApp } from './routes/integrations'
 import { interfacesApp } from './routes/interfaces'
 import { locationsApp } from './routes/locations'
@@ -111,6 +112,7 @@ export function createApp() {
 			.route('/saved-filters', savedFiltersApp)
 			.route('/saved-layouts', savedLayoutsApp)
 			.route('/ai', aiApp)
+			.route('/global-settings', globalSettingsApp)
 	)
 }
 

@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { Result } from 'better-result'
 import type { AppConfig } from '../config'
 import { ExternalServiceError, ValidationError } from '../db/errors'
-import type { AiProvider, AiReply, AiRequest } from './provider'
+import type { AiModel, AiProvider, AiReply, AiRequest } from './provider'
 
 type ClaudeConfig = NonNullable<AppConfig['ai']>['claude']
 
@@ -22,14 +22,11 @@ const FALLBACK_MODELS = new Set([
  * hit HTTP timeouts, and returns the final message.
  */
 export function createClaudeProvider(cfg: ClaudeConfig): Result<AiProvider, Error> {
-	let client: Anthropic
-	try {
-		client = new Anthropic(cfg.apiKey ? { apiKey: cfg.apiKey } : {})
-	} catch (err) {
-		return Result.err(
-			new ExternalServiceError(`Claude client could not be created: ${errorMessage(err)}`),
-		)
+	const created = createClient(cfg)
+	if (Result.isError(created)) {
+		return created
 	}
+	const client = created.value
 	const fallback = FALLBACK_MODELS.has(cfg.model)
 
 	return Result.ok({
@@ -71,6 +68,33 @@ export function createClaudeProvider(cfg: ClaudeConfig): Result<AiProvider, Erro
 			}
 		},
 	})
+}
+
+/** Models the credentials can use (Models API), newest first. */
+export async function listClaudeModels(cfg: ClaudeConfig): Promise<Result<AiModel[], Error>> {
+	const created = createClient(cfg)
+	if (Result.isError(created)) {
+		return created
+	}
+	try {
+		const models: AiModel[] = []
+		for await (const info of created.value.models.list()) {
+			models.push({ id: info.id, name: info.display_name })
+		}
+		return Result.ok(models)
+	} catch (err) {
+		return Result.err(claudeError(err))
+	}
+}
+
+function createClient(cfg: ClaudeConfig): Result<Anthropic, Error> {
+	try {
+		return Result.ok(new Anthropic(cfg.apiKey ? { apiKey: cfg.apiKey } : {}))
+	} catch (err) {
+		return Result.err(
+			new ExternalServiceError(`Claude client could not be created: ${errorMessage(err)}`),
+		)
+	}
 }
 
 function claudeError(err: unknown): Error {

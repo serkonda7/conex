@@ -1433,3 +1433,15 @@ export const calendar_sync_runs = pgTable(
 	},
 	(table) => [index('calendar_sync_runs_started_at_idx').on(table.started_at)],
 )
+
+// ---------------------------------------------------------------------------
+// Global settings: one row (id 1), edited by `settings.manage` holders on
+// /global-settings. A null column falls back to the server config.
+// ---------------------------------------------------------------------------
+
+export const global_settings = pgTable('global_settings', {
+	id: integer('id').primaryKey().default(1),
+	ai_claude_model: text('ai_claude_model'),
+	ai_opencode_model: text('ai_opencode_model'),
+	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+})
