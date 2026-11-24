@@ -1,9 +1,12 @@
-import type { JSX } from 'solid-js'
+import { PERMISSIONS } from 'shared/src/schemas'
+import type { Permission } from 'shared/src/types'
+import { For, type JSX, Show } from 'solid-js'
 import { delete_role, fetch_roles, type RoleJson, type RoleSort } from '../../api/roles'
 import { CountLink, descriptionColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
-import { permissionLabel } from '../../i18n/labels'
+import { objectAccessLabel, permissionLabel, permissionShortLabel } from '../../i18n/labels'
+import { OBJECT_PERMISSIONS, objectAccess } from './object_access'
 
 /**
  * /roles — role list (`users.manage`): search, sortable columns plus
@@ -36,10 +39,9 @@ export function RolesPage(): JSX.Element {
 				{
 					key: 'permissions',
 					label: t('role.permissions'),
-					getValue: (r: RoleJson): string =>
-						r.permissions.length === 0
-							? t('role.noPermissions')
-							: r.permissions.map(permissionLabel).join(', '),
+					getValue: (r: RoleJson): JSX.Element => (
+						<PermissionBadges list={r.permissions} />
+					),
 				},
 				{
 					key: 'users',
@@ -55,5 +57,37 @@ export function RolesPage(): JSX.Element {
 			editHref={(r: RoleJson): string => `/roles/${r.id}/edit`}
 			emptyText={t('role.empty')}
 		/>
+	)
+}
+
+/**
+ * Permissions as short badges (full label as tooltip): view/edit/delete
+ * collapse to one object access badge, matching the role form, and a role
+ * granting every permission to a single "All permissions" badge.
+ */
+function PermissionBadges(props: { list: Permission[] }): JSX.Element {
+	if (props.list.length === 0) {
+		return <span class="text-muted">{t('role.noPermissions')}</span>
+	}
+	if (props.list.length === PERMISSIONS.length) {
+		return <span class="badge badge-active">{t('role.allPermissions')}</span>
+	}
+	const level = (): string => objectAccess(props.list)
+	const others = (): Permission[] => props.list.filter((p) => !OBJECT_PERMISSIONS.includes(p))
+	return (
+		<span class="badge-list">
+			<Show when={level() !== ''}>
+				<span class="badge">
+					{t('role.objectAccessBadge', { level: objectAccessLabel(level()) })}
+				</span>
+			</Show>
+			<For each={others()}>
+				{(p: Permission): JSX.Element => (
+					<span class="badge" title={permissionLabel(p)}>
+						{permissionShortLabel(p)}
+					</span>
+				)}
+			</For>
+		</span>
 	)
 }

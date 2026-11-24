@@ -361,6 +361,35 @@ export function permissionLabel(value: string): string {
 	return lookup(PERMISSION_KEYS, value)
 }
 
+const PERMISSION_SHORT_KEYS: Record<Permission, MessageKey> = {
+	view: 'permissionShort.view',
+	edit: 'permissionShort.edit',
+	delete: 'permissionShort.delete',
+	'users.manage': 'permissionShort.usersManage',
+	'employees.tenants': 'permissionShort.employeesTenants',
+	'changelog.view': 'permissionShort.changelogView',
+	'audit_log.view': 'permissionShort.auditLogView',
+	'integrations.manage': 'permissionShort.integrationsManage',
+	'tickets.create': 'permissionShort.ticketsCreate',
+	'contacts.directory': 'permissionShort.contactsDirectory',
+}
+
+/** Compact permission label for badges; pair with `permissionLabel` as tooltip. */
+export function permissionShortLabel(value: string): string {
+	return lookup(PERMISSION_SHORT_KEYS, value)
+}
+
+const OBJECT_ACCESS_KEYS: Record<string, MessageKey> = {
+	read: 'objectAccess.read',
+	write: 'objectAccess.write',
+	manage: 'objectAccess.manage',
+}
+
+/** Role object access level (`read`, `write`, `manage`). */
+export function objectAccessLabel(value: string): string {
+	return lookup(OBJECT_ACCESS_KEYS, value)
+}
+
 const LOCATION_TYPE_KEYS: Record<LocationType, MessageKey> = {
 	building: 'locationType.building',
 	floor: 'locationType.floor',
