@@ -20,6 +20,8 @@ import {
 } from 'drizzle-orm/pg-core'
 import {
 	ATTACHMENT_MIMES,
+	type BillingExceptionJson,
+	type BillingMetricConfig,
 	DEVICE_ROLE_ICONS,
 	EMPLOYEE_SALUTATIONS,
 	type EmployeeEmail,
@@ -595,6 +597,12 @@ export const managed_bundles = pgTable('managed_bundles', {
 	id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
 	name: text('name').notNull().unique(),
 	description: text('description'),
+	// How the bundle's monthly lots are counted (`BILLING_METRICS`), in
+	// display order; validated by `BillingMetricConfigSchema` on write.
+	billing_metrics: jsonb('billing_metrics')
+		.$type<BillingMetricConfig[]>()
+		.notNull()
+		.default(sql`'[{"metric":"objects"}]'::jsonb`),
 })
 
 export const tenant_bundles = pgTable(
@@ -663,6 +671,8 @@ export const devices = pgTable(
 		asset_tag: text('asset_tag').unique(),
 		device_id: text('device_id').unique(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
+		// 0/1: counted for the `backed_up` billing metric.
+		backed_up: integer('backed_up').notNull().default(0),
 		// Assigned contacts live in `device_employees`.
 		description: text('description'),
 	},
@@ -739,6 +749,8 @@ export const virtual_machines = pgTable(
 		name: text('name').notNull(),
 		tenant_id: integer('tenant_id').references(() => tenants.id),
 		employee_id: integer('employee_id'),
+		// 0/1: counted for the `backed_up` billing metric.
+		backed_up: integer('backed_up').notNull().default(0),
 		description: text('description'),
 	},
 	(table) => [
@@ -1443,5 +1455,116 @@ export const global_settings = pgTable('global_settings', {
 	id: integer('id').primaryKey().default(1),
 	ai_claude_model: text('ai_claude_model'),
 	ai_opencode_model: text('ai_opencode_model'),
+	// Day of month (1–28) the billing period ends; null = the last day.
+	billing_cutoff_day: integer('billing_cutoff_day'),
 	updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// Billing (`billing.manage`): monthly lot counts of the managed bundles.
+// `billing_periods` holds one row per stored snapshot; its counts and the
+// objects behind them go with it (cascade). Tenant, bundle and service level
+// are copied by id and name without FKs, so a snapshot outlives renames and
+// deletes like the changelog does. `billing_inputs` holds values typed in
+// per period (stored backup data); an input applies to later periods until
+// one of them gets its own, so it is not tied to a snapshot.
+// ---------------------------------------------------------------------------
+
+export const billing_periods = pgTable('billing_periods', {
+	// `YYYY-MM`.
+	period: text('period').primaryKey(),
+	// `draft` | `final` (service-enforced).
+	state: text('state').notNull().default('draft'),
+	cutoff_at: bigint('cutoff_at', { mode: 'number' }).notNull(),
+	taken_at: bigint('taken_at', { mode: 'number' }).notNull(),
+	// NULL = taken automatically.
+	taken_by: text('taken_by'),
+	finalized_at: bigint('finalized_at', { mode: 'number' }),
+	finalized_by: text('finalized_by'),
+	// Bundles as column groups (`BillingBundleJson[]` without the ids'
+	// current names) and the findings that were not billed.
+	bundles: jsonb('bundles')
+		.$type<{ id: number; name: string; metrics: BillingMetricConfig[] }[]>()
+		.notNull()
+		.default(sql`'[]'::jsonb`),
+	exceptions: jsonb('exceptions')
+		.$type<BillingExceptionJson[]>()
+		.notNull()
+		.default(sql`'[]'::jsonb`),
+})
+
+export const billing_counts = pgTable(
+	'billing_counts',
+	{
+		period: text('period')
+			.notNull()
+			.references(() => billing_periods.period, { onDelete: 'cascade' }),
+		tenant_id: integer('tenant_id').notNull(),
+		tenant_name: text('tenant_name').notNull(),
+		customer_number: text('customer_number'),
+		bundle_id: integer('bundle_id').notNull(),
+		bundle_name: text('bundle_name').notNull(),
+		service_level_name: text('service_level_name').notNull(),
+		metric: text('metric').notNull(),
+		// Objects counted, or GB for `storage`.
+		quantity: integer('quantity').notNull(),
+		lots: integer('lots').notNull(),
+		// 0/1: `storage` value carried over from an earlier period.
+		carried: integer('carried').notNull().default(0),
+	},
+	(table) => [
+		primaryKey({ columns: [table.period, table.tenant_id, table.bundle_id, table.metric] }),
+	],
+)
+
+export const billing_items = pgTable(
+	'billing_items',
+	{
+		period: text('period')
+			.notNull()
+			.references(() => billing_periods.period, { onDelete: 'cascade' }),
+		tenant_id: integer('tenant_id').notNull(),
+		bundle_id: integer('bundle_id').notNull(),
+		metric: text('metric').notNull(),
+		// `BILLING_ITEM_TYPES`; `item_id` is the conex id, or the external id
+		// of an M365 user.
+		item_type: text('item_type').notNull(),
+		item_id: text('item_id').notNull(),
+		// Device / VM the item links to (the device of a port).
+		ref_id: integer('ref_id'),
+		item_repr: text('item_repr').notNull(),
+		detail: text('detail'),
+	},
+	(table) => [
+		primaryKey({
+			columns: [
+				table.period,
+				table.tenant_id,
+				table.bundle_id,
+				table.metric,
+				table.item_type,
+				table.item_id,
+			],
+		}),
+	],
+)
+
+export const billing_inputs = pgTable(
+	'billing_inputs',
+	{
+		period: text('period').notNull(),
+		tenant_id: integer('tenant_id')
+			.notNull()
+			.references(() => tenants.id, { onDelete: 'cascade' }),
+		bundle_id: integer('bundle_id')
+			.notNull()
+			.references(() => managed_bundles.id, { onDelete: 'cascade' }),
+		metric: text('metric').notNull(),
+		quantity: integer('quantity').notNull(),
+		updated_at: bigint('updated_at', { mode: 'number' }).notNull(),
+		updated_by: text('updated_by'),
+	},
+	(table) => [
+		primaryKey({ columns: [table.tenant_id, table.bundle_id, table.metric, table.period] }),
+	],
+)

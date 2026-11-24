@@ -388,6 +388,8 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 							<dd>{device()?.serial || '—'}</dd>
 							<dt>{t('device.deviceId')}</dt>
 							<dd>{device()?.device_id || '—'}</dd>
+							<dt>{t('device.backedUp')}</dt>
+							<dd>{device()?.backed_up === 1 ? t('common.yes') : t('common.no')}</dd>
 						</dl>
 					</section>
 					<section>

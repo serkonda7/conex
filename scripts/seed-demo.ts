@@ -58,7 +58,10 @@ await getSqlClient().unsafe(`
 	TRUNCATE floorplan_placements, floorplan_areas, attachments, cables, interfaces, devices,
 		shelves, racks, rack_types, locations, sites, site_groups, device_type_interfaces, device_types,
 		manufacturers, sessions, auth_states, users, tenants, tenant_groups, employee_tenants, employees,
-		integrations, sync_runs, external_links, object_changes, audit_log
+		integrations, sync_runs, external_links, object_changes, audit_log, floorplan_calibrations,
+		floorplan_drawings, floorplan_drawing_placements, virtual_machines, device_employees,
+		panel_jacks, tenant_bundles, user_tenants, calendar_sync_mappings, billing_inputs,
+		billing_periods, billing_counts, billing_items
 	RESTART IDENTITY
 `)
 // The truncated attachments leave their files behind; the sweep removes them.

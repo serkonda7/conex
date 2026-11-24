@@ -7139,3 +7139,273 @@ a.drawn-plan-name:hover {
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
+
+/* ---------------------------------------------------------------------------
+   Billing: monthly lot counts (/billing).
+   --------------------------------------------------------------------------- */
+
+.billing-period {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.billing-period select {
+	min-width: 10rem;
+}
+
+.billing-state.live {
+	color: var(--link);
+	border-color: var(--link);
+}
+
+.billing-state.draft {
+	color: var(--warning);
+	border-color: var(--warning);
+}
+
+.billing-state.final {
+	color: var(--success);
+	border-color: var(--success);
+}
+
+button.billing-primary {
+	background-color: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-contrast);
+}
+
+button.billing-primary:hover {
+	background-color: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+.billing-callout {
+	margin: 0.75rem 0;
+	padding: 0.6rem 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+	border-radius: 0.5rem;
+	background-color: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+}
+
+.billing-callout h3 {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.35rem;
+	font-size: var(--font-size-base);
+	color: var(--warning);
+}
+
+.billing-callout summary {
+	cursor: pointer;
+	padding: 0.15rem 0;
+}
+
+.billing-callout ul {
+	margin: 0.2rem 0 0.4rem;
+	padding-left: 1.4rem;
+}
+
+.billing-note {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0.5rem 0;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.billing-warn-icon {
+	color: var(--warning);
+	vertical-align: -1px;
+}
+
+.billing-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin: 0.75rem 0 0.25rem;
+}
+
+.billing-tabs {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.billing-tabs button {
+	background: none;
+	border-color: transparent;
+	color: var(--text-muted);
+	font-weight: 600;
+}
+
+.billing-tabs button[aria-pressed="true"] {
+	color: var(--text);
+	border-color: var(--border-strong);
+	background-color: var(--bg-raised);
+}
+
+.billing-search {
+	flex: 0 1 18rem;
+	min-width: 0;
+}
+
+.billing-grid-wrap {
+	overflow-x: auto;
+}
+
+.billing-grid th,
+.billing-grid td {
+	white-space: nowrap;
+}
+
+.billing-grid .num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.billing-grid th.billing-group {
+	text-align: center;
+}
+
+.billing-grid .billing-group-start {
+	border-left: 1px solid var(--border-strong);
+}
+
+.billing-grid td.billing-selected {
+	outline: 2px solid var(--primary);
+	outline-offset: -2px;
+}
+
+.billing-grid tfoot td {
+	font-weight: 600;
+	border-top: 1px solid var(--border-strong);
+}
+
+.billing-lots,
+.billing-cell-button {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+button.billing-cell-button {
+	padding: 0 0.2rem;
+	background: none;
+	border: none;
+	color: var(--link);
+	text-decoration: underline dotted;
+}
+
+button.billing-cell-button:hover {
+	background: none;
+	text-decoration: underline;
+}
+
+.billing-delta {
+	margin-left: 0.3rem;
+	font-size: var(--font-size-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+.billing-delta.up {
+	color: var(--success);
+}
+
+.billing-delta.down {
+	color: var(--error);
+}
+
+.billing-sla {
+	display: block;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.billing-gb {
+	display: block;
+	font-size: var(--font-size-sm);
+	color: var(--text-muted);
+}
+
+.billing-gb-input {
+	display: block;
+	width: 6.5rem;
+	margin: 0.2rem 0 0 auto;
+	text-align: right;
+}
+
+.billing-gb-input.carried {
+	font-style: italic;
+	color: var(--text-muted);
+}
+
+.billing-panel {
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background-color: var(--bg-surface);
+}
+
+.billing-panel-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.billing-panel-header h3 {
+	margin: 0;
+	font-size: var(--font-size-lg);
+}
+
+.billing-items tr.billing-removed td {
+	color: var(--text-muted);
+}
+
+.billing-items tr.billing-removed td:first-child span {
+	text-decoration: line-through;
+}
+
+.billing-tag {
+	padding: 0.05rem 0.4rem;
+	border-radius: 0.25rem;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+}
+
+.billing-tag.added {
+	color: var(--success);
+	background-color: color-mix(in srgb, var(--success) 15%, transparent);
+}
+
+.billing-tag.removed {
+	color: var(--error);
+	background-color: var(--error-bg);
+}
+
+/* Managed bundle form: one checkbox per billing metric, its hint below. */
+.billing-metric-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.billing-metric-list .field-checkbox-label {
+	align-items: flex-start;
+}
+
+.billing-metric-list .field-hint {
+	display: block;
+	margin: 0;
+}
+
+.billing-bundle-metrics {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.3rem;
+}

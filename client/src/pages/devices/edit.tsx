@@ -30,7 +30,7 @@ import { createRows, createRowsFor } from '../../lib/resource'
 import { parseId, useFormReturnRoute } from '../../lib/router'
 import { deviceRoleOptions } from '../device-roles/options'
 import { locationOptions } from '../locations/options'
-import { DeviceStatusField } from './add'
+import { BackedUpField, DeviceStatusField } from './add'
 import { DeviceEmployeesField } from './employee_assignment'
 import { RackMountField } from './rack_mount'
 import { inactiveStatusChange } from './status'
@@ -49,6 +49,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
 	const [inactive, setInactive] = createSignal(false)
+	const [backedUp, setBackedUp] = createSignal(false)
 	const [roleId, setRoleId] = createSignal('')
 	const [siteId, setSiteId] = createSignal('')
 	const [locationId, setLocationId] = createSignal('')
@@ -66,6 +67,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 			setSerial(row.serial ?? '')
 			setDeviceId(row.device_id ?? '')
 			setInactive(row.status === 'inactive')
+			setBackedUp(row.backed_up === 1)
 			setRoleId(id_value(row.device_role_id))
 			setSiteId(id_value(row.site_id))
 			setLocationId(id_value(row.location_id))
@@ -127,6 +129,7 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					description: text(description()) ?? null,
 					serial: text(serial()) ?? null,
 					device_id: text(deviceId()) ?? null,
+					backed_up: backedUp(),
 					device_role_id: Number(roleId()),
 					site_id: parseId(siteId()),
 					location_id: parseId(locationId()),
@@ -196,6 +199,11 @@ export function DeviceEditPage(props: { id: number }): JSX.Element {
 					maxLength={100}
 					value={deviceId()}
 					onInput={setDeviceId}
+				/>
+				<BackedUpField
+					id="device-edit-backed-up"
+					checked={backedUp()}
+					onChange={setBackedUp}
 				/>
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>

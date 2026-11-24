@@ -179,7 +179,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{ label: 'app.navGroup.integrations', paths: ['integrations', 'integrations/matching'] },
 	{
 		label: 'app.navGroup.administration',
-		paths: ['users', 'roles', 'global-settings', 'audit-log', 'changelog'],
+		paths: ['billing', 'users', 'roles', 'global-settings', 'audit-log', 'changelog'],
 	},
 ]
 

@@ -119,6 +119,8 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 					<dd>
 						<RecordLink id={employeeId()} record={employee} base="/employees" />
 					</dd>
+					<dt>{t('device.backedUp')}</dt>
+					<dd>{vm()?.backed_up === 1 ? t('common.yes') : t('common.no')}</dd>
 				</DetailCard>
 			</DetailShell>
 			<Show when={movingTenant() ? vm() : undefined}>

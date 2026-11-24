@@ -407,6 +407,7 @@ export async function createManagedBundle(
 	const row: Omit<ManagedBundleRow, 'id'> = {
 		name: input.name,
 		description: input.description ?? null,
+		billing_metrics: input.billing_metrics,
 	}
 	const id = await tryWrite(
 		async () =>
@@ -438,7 +439,7 @@ export async function updateManagedBundle(
 	) {
 		return Result.err(new DuplicateError(MANAGED_BUNDLE_NAME_IN_USE))
 	}
-	const patch = pickDefined(input, ['name', 'description'])
+	const patch = pickDefined(input, ['name', 'description', 'billing_metrics'])
 	if (!isPatchEmpty(patch)) {
 		const written = await tryWrite(
 			() => getDb().update(managed_bundles).set(patch).where(eq(managed_bundles.id, id)),

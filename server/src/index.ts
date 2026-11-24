@@ -1,6 +1,7 @@
 import { Result } from 'better-result'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { autoBillingSnapshot } from './billing/store'
 import { runCalendarSyncIfEnabled } from './calendar_sync/run'
 import { failInterruptedCalendarSyncs } from './calendar_sync/store'
 import { initConfig, load_config_file } from './config'
@@ -11,6 +12,7 @@ import { aiApp } from './routes/ai'
 import { attachmentsApp } from './routes/attachments'
 import { auditLogApp } from './routes/audit_log'
 import { authApp } from './routes/auth'
+import { billingApp } from './routes/billing'
 import { cablesApp } from './routes/cables'
 import { calendarSyncApp } from './routes/calendar_sync'
 import { changelogApp } from './routes/changelog'
@@ -112,6 +114,7 @@ export function createApp() {
 			.route('/saved-layouts', savedLayoutsApp)
 			.route('/ai', aiApp)
 			.route('/global-settings', globalSettingsApp)
+			.route('/billing', billingApp)
 	)
 }
 
@@ -160,6 +163,11 @@ if (import.meta.main) {
 	await failInterruptedCalendarSyncs()
 	// Ticks every minute; runs only when enabled and its interval has passed.
 	start_sweep(runCalendarSyncIfEnabled, 60_000)
+	// Snapshots the billing period whose cutoff passed; a no-op once stored.
+	await autoBillingSnapshot().catch((err: unknown) =>
+		console.error('Billing snapshot failed:', err),
+	)
+	start_sweep(autoBillingSnapshot, 60 * 60_000)
 
 	const server = Bun.serve({
 		hostname: '0.0.0.0',

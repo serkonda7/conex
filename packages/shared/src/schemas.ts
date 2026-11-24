@@ -1293,15 +1293,67 @@ export interface ServiceLevelTargetJson {
 	around_the_clock: boolean
 }
 
+/**
+ * How a bundle's monthly lots are counted (`/billing`). A bundle bills one
+ * or more metrics, each at most once:
+ * - `objects`: devices and VMs whose role falls under the bundle
+ * - `base`: one per contract (base price)
+ * - `wlan`: one when the tenant has an access point (`ap` role subtree)
+ * - `switch_ports`: connected ports of the tenant's switches (`switch`
+ *   role subtree); stands in for active ports until a source reports them
+ * - `m365_users`: users of the last Microsoft 365 sync of the tenant
+ * - `backed_up`: devices and VMs of the tenant marked as backed up
+ * - `storage`: stored backup data in GB, entered per month; one lot per
+ *   started `step_gb`
+ */
+export const BILLING_METRICS = [
+	'objects',
+	'base',
+	'wlan',
+	'switch_ports',
+	'm365_users',
+	'backed_up',
+	'storage',
+] as const
+
+export const BillingMetricSchema = v.picklist(BILLING_METRICS)
+
+export type BillingMetric = v.InferOutput<typeof BillingMetricSchema>
+
+/** Default size of one storage lot. */
+export const STORAGE_STEP_GB_DEFAULT = 500
+
+export const BillingMetricConfigSchema = v.strictObject({
+	metric: BillingMetricSchema,
+	/** `storage` only: GB per lot; defaults to `STORAGE_STEP_GB_DEFAULT`. */
+	step_gb: v.optional(
+		v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1_000_000)),
+		undefined,
+	),
+})
+
+export type BillingMetricConfig = v.InferOutput<typeof BillingMetricConfigSchema>
+
+const BillingMetricsSchema = v.pipe(
+	v.array(BillingMetricConfigSchema),
+	v.maxLength(BILLING_METRICS.length),
+	v.check(
+		(list) => new Set(list.map((m) => m.metric)).size === list.length,
+		'Each billing metric may appear only once',
+	),
+)
+
 /** Managed-service bundles (`Workplace`, `Server`, …) device roles map onto. */
 export const ManagedBundleCreateSchema = v.strictObject({
 	name: NameSchema,
 	description: DescriptionSchema,
+	billing_metrics: v.optional(BillingMetricsSchema, [{ metric: 'objects' }]),
 })
 
 export const ManagedBundleUpdateSchema = v.strictObject({
 	name: v.optional(NameSchema, undefined),
 	description: NullableDescriptionSchema,
+	billing_metrics: v.optional(BillingMetricsSchema, undefined),
 })
 
 export type ManagedBundleCreate = v.InferOutput<typeof ManagedBundleCreateSchema>
@@ -1384,6 +1436,8 @@ export const DeviceCreateSchema = v.strictObject({
 	device_id: DeviceIdSchema,
 	tenant_id: NullableIdSchema,
 	employee_ids: v.optional(DeviceEmployeeIdsSchema, []),
+	/** Counted for the `backed_up` billing metric; omitted = false. */
+	backed_up: v.optional(v.boolean(), undefined),
 	description: DescriptionSchema,
 })
 
@@ -1405,6 +1459,7 @@ export const DeviceUpdateSchema = v.strictObject({
 	tenant_id: NullableIdSchema,
 	/** Replaces the whole assignment; omitted keeps it. */
 	employee_ids: v.optional(DeviceEmployeeIdsSchema, undefined),
+	backed_up: v.optional(v.boolean(), undefined),
 	description: NullableDescriptionSchema,
 })
 
@@ -1558,6 +1613,8 @@ export const VirtualMachineCreateSchema = v.strictObject({
 	status: v.optional(DeviceStatusSchema, 'active'),
 	tenant_id: NullableIdSchema,
 	employee_id: NullableIdSchema,
+	/** Counted for the `backed_up` billing metric; omitted = false. */
+	backed_up: v.optional(v.boolean(), undefined),
 	description: DescriptionSchema,
 })
 
@@ -1568,6 +1625,7 @@ export const VirtualMachineUpdateSchema = v.strictObject({
 	status: v.optional(DeviceStatusSchema, undefined),
 	tenant_id: NullableIdSchema,
 	employee_id: NullableIdSchema,
+	backed_up: v.optional(v.boolean(), undefined),
 	description: NullableDescriptionSchema,
 })
 
@@ -1864,6 +1922,8 @@ export const TraceQuerySchema = v.object({
  * tenant scope of the employee's account. `ai.use` sends prompts to the
  * configured AI provider (`[ai]` in the server config). `settings.manage`
  * edits the global settings (`/global-settings`), e.g. the default AI models.
+ * `billing.manage` reads, snapshots and finalizes the monthly lot counts
+ * (`/billing`).
  */
 export const PERMISSIONS = [
 	'view',
@@ -1878,6 +1938,7 @@ export const PERMISSIONS = [
 	'contacts.directory',
 	'ai.use',
 	'settings.manage',
+	'billing.manage',
 ] as const
 
 export const PermissionSchema = v.picklist(PERMISSIONS)
@@ -4394,6 +4455,11 @@ const OpencodeModelSchema = v.pipe(
 export const GlobalSettingsUpdateSchema = v.strictObject({
 	ai_claude_model: v.optional(v.nullable(ClaudeModelSchema), undefined),
 	ai_opencode_model: v.optional(v.nullable(OpencodeModelSchema), undefined),
+	/** Day of month the billing period ends (1–28); null = the last day. */
+	billing_cutoff_day: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(28))),
+		undefined,
+	),
 })
 
 export type GlobalSettingsUpdate = v.InferOutput<typeof GlobalSettingsUpdateSchema>
@@ -4404,6 +4470,8 @@ export interface GlobalSettingsJson {
 	ai_claude_model: string | null
 	/** Default opencode model; null = `[ai.opencode] model`, else opencode's own default. */
 	ai_opencode_model: string | null
+	/** Day of month the billing period ends; null = the last day. */
+	billing_cutoff_day: number | null
 	/** Server config values that apply while a setting is null. */
 	config: {
 		/** `[ai] provider`; null when the assistant is not configured. */
@@ -4427,3 +4495,157 @@ export interface AiModelJson {
 	/** Display name reported by the provider. */
 	name: string
 }
+
+// ---------------------------------------------------------------------------
+// Billing: monthly lot counts of the managed bundles (`billing.manage`).
+// A period (`YYYY-MM`) ends at the cutoff day (global setting) at midnight,
+// Europe/Berlin; a snapshot then freezes the counts and the objects behind
+// them. Drafts may be retaken and edited, final periods never change.
+// ---------------------------------------------------------------------------
+
+/** Billing period: a calendar month, `YYYY-MM`. */
+export const BillingPeriodSchema = v.pipe(
+	v.string(),
+	v.regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Period must be YYYY-MM'),
+)
+
+export const BillingPeriodParamsSchema = v.object({ period: BillingPeriodSchema })
+
+export const BILLING_PERIOD_STATES = ['draft', 'final'] as const
+
+export type BillingPeriodState = (typeof BILLING_PERIOD_STATES)[number]
+
+/** Kinds of objects behind a count. */
+export const BILLING_ITEM_TYPES = ['device', 'vm', 'interface', 'm365_user'] as const
+
+export type BillingItemType = (typeof BILLING_ITEM_TYPES)[number]
+
+/**
+ * Findings that are not billed:
+ * - `not_contracted`: an object falls under a bundle its tenant has no contract for
+ * - `backup_not_contracted`: backed up, but no contracted bundle bills backups
+ * - `no_tenant`: a billable object (bundle or backed up) without tenant
+ * - `hostless_vm`: VMs without host are not billed yet
+ * - `m365_not_linked`: M365 users are billed, but the tenant has no linked M365 tenant
+ * - `m365_stale`: the last successful M365 fetch is older than a week
+ * - `m365_unlicensed`: the M365 integration also syncs users without a license
+ * - `storage_missing`: no stored data entered for this or an earlier period
+ */
+export const BILLING_EXCEPTION_KINDS = [
+	'not_contracted',
+	'backup_not_contracted',
+	'no_tenant',
+	'hostless_vm',
+	'm365_not_linked',
+	'm365_stale',
+	'm365_unlicensed',
+	'storage_missing',
+] as const
+
+export type BillingExceptionKind = (typeof BILLING_EXCEPTION_KINDS)[number]
+
+export interface BillingExceptionJson {
+	kind: BillingExceptionKind
+	tenant_id: number | null
+	tenant_name: string | null
+	bundle_id: number | null
+	bundle_name: string | null
+	item_type: BillingItemType | null
+	/** Device / VM id the item links to; null for other items. */
+	ref_id: number | null
+	item_repr: string | null
+}
+
+/** One billed line: a metric of a contracted bundle for one tenant. */
+export interface BillingCountJson {
+	tenant_id: number
+	tenant_name: string
+	customer_number: string | null
+	bundle_id: number
+	bundle_name: string
+	service_level_name: string
+	metric: BillingMetric
+	/** Counted objects, or GB for `storage`. */
+	quantity: number
+	lots: number
+	/** Lots of the previous snapshot; null when it has no such line. */
+	previous_lots: number | null
+	/** `storage`: the GB value is carried over from an earlier period. */
+	carried: boolean
+}
+
+export interface BillingPeriodJson {
+	period: string
+	state: BillingPeriodState
+	cutoff_at: number
+	taken_at: number
+	/** Null when the snapshot was taken automatically. */
+	taken_by: string | null
+	finalized_at: number | null
+	finalized_by: string | null
+}
+
+/** A bundle as a column group of the report: its metrics in display order. */
+export interface BillingBundleJson {
+	id: number
+	name: string
+	metrics: BillingMetricConfig[]
+}
+
+/** `GET /billing/periods/:period`. */
+export interface BillingReportJson {
+	period: string
+	cutoff_at: number
+	/** Null while the period is not stored (live counts). */
+	snapshot: BillingPeriodJson | null
+	/** Stored period the changes compare against. */
+	previous_period: string | null
+	bundles: BillingBundleJson[]
+	counts: BillingCountJson[]
+	exceptions: BillingExceptionJson[]
+	added: number
+	removed: number
+}
+
+/** `GET /billing`: stored periods and where the calendar stands. */
+export interface BillingOverviewJson {
+	/** Newest first. */
+	periods: BillingPeriodJson[]
+	/** Period running now (live counts). */
+	current_period: string
+	/** Latest period whose cutoff has passed: the one to snapshot. */
+	due_period: string
+	cutoff_day: number | null
+}
+
+export const BillingItemsQuerySchema = v.object({
+	tenant: IdSchema,
+	bundle: IdSchema,
+	metric: BillingMetricSchema,
+})
+
+export type BillingItemsQuery = v.InferOutput<typeof BillingItemsQuerySchema>
+
+/** An object behind a count, with its change against the previous snapshot. */
+export interface BillingItemJson {
+	tenant_id: number
+	tenant_name: string
+	bundle_id: number
+	bundle_name: string
+	metric: BillingMetric
+	item_type: BillingItemType
+	item_id: string
+	ref_id: number | null
+	item_repr: string
+	detail: string | null
+	change: 'added' | 'removed' | null
+}
+
+/** `PUT /billing/periods/:period/storage`: stored data of one contract; null clears it. */
+export const BillingStorageInputSchema = v.strictObject({
+	tenant_id: IdSchema,
+	bundle_id: IdSchema,
+	gb: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000_000))),
+})
+
+export type BillingStorageInput = v.InferOutput<typeof BillingStorageInputSchema>

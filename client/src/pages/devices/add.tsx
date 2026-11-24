@@ -6,6 +6,7 @@ import { fetch_rack, fetch_racks } from '../../api/racks'
 import { fetch_shelf } from '../../api/shelves'
 import { fetch_locations, fetch_sites } from '../../api/tenancy'
 import {
+	CheckboxField,
 	DescriptionField,
 	FormPage,
 	FormSection,
@@ -55,6 +56,23 @@ export function DeviceStatusField(props: {
 	)
 }
 
+/** "Backed up" box of the device and virtual machine forms (backup billing). */
+export function BackedUpField(props: {
+	id: string
+	checked: boolean
+	onChange: (checked: boolean) => void
+}): JSX.Element {
+	return (
+		<CheckboxField
+			id={props.id}
+			label={t('device.backedUp')}
+			title={t('device.backedUpHint')}
+			checked={props.checked}
+			onChange={props.onChange}
+		/>
+	)
+}
+
 /**
  * /devices/add — NetBox-style device instantiate form. `?clone=<id>`
  * pre-fills it from that device, except the name, serial, device ID,
@@ -73,6 +91,7 @@ export function DeviceAddPage(): JSX.Element {
 	const [serial, setSerial] = createSignal('')
 	const [deviceId, setDeviceId] = createSignal('')
 	const [inactive, setInactive] = createSignal(false)
+	const [backedUp, setBackedUp] = createSignal(false)
 	const [employeeIds, setEmployeeIds] = createSignal<string[]>([])
 	const [siteId, setSiteId] = createSignal(queryParam('site'))
 	const [locationId, setLocationId] = createSignal(queryParam('location'))
@@ -158,6 +177,7 @@ export function DeviceAddPage(): JSX.Element {
 		setTypeId(id_value(row.device_type_id))
 		setRoleId(id_value(row.device_role_id))
 		setDescription(row.description ?? '')
+		setBackedUp(row.backed_up === 1)
 		setSiteId(id_value(row.site_id))
 		setLocationId(id_value(row.location_id))
 		setRackId(id_value(row.rack_id))
@@ -204,6 +224,7 @@ export function DeviceAddPage(): JSX.Element {
 					description: text(description()),
 					serial: text(serial()),
 					device_id: text(deviceId()),
+					backed_up: backedUp(),
 					site_id: parseId(siteId()),
 					location_id: parseId(locationId()),
 					rack_id: parseId(rackId()),
@@ -284,6 +305,7 @@ export function DeviceAddPage(): JSX.Element {
 					value={deviceId()}
 					onInput={setDeviceId}
 				/>
+				<BackedUpField id="device-backed-up" checked={backedUp()} onChange={setBackedUp} />
 			</FormSection>
 			<FormSection title={t('device.locationSection')}>
 				<SelectField
