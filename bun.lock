@@ -16,7 +16,7 @@
       "name": "client",
       "version": "0.0.0-dev",
       "dependencies": {
-        "@serkonda7/solid-components": "~0.8.0",
+        "@serkonda7/solid-components": "~0.9.0",
         "@tabler/icons-solidjs": "~3.52.0",
         "@tanstack/solid-query": "~5.108.4",
         "better-result": "catalog:",
@@ -318,7 +318,7 @@
 
     "@serkonda7/conex-device-schema": ["@serkonda7/conex-device-schema@workspace:packages/device-schema"],
 
-    "@serkonda7/solid-components": ["@serkonda7/solid-components@0.8.0", "", { "dependencies": { "@tanstack/solid-table": "~9.3.1" }, "peerDependencies": { "solid-js": "^1.9.0", "vite": "^8.0.0" }, "optionalPeers": ["vite"] }, "sha512-YyAJzqCi5nZSpTQhtptjryKE8UbTYFp2cIQa388mkn3unUOasAENd6652glUCk00jlUv0NT57V7JleF2cGYA5Q=="],
+    "@serkonda7/solid-components": ["@serkonda7/solid-components@0.9.0", "", { "dependencies": { "@tanstack/solid-table": "~9.3.1" }, "peerDependencies": { "solid-js": "^1.9.0", "vite": "^8.0.0" }, "optionalPeers": ["vite"] }, "sha512-BrdOimct8waprLTjeU9ipgabnMyywL9kRYo/mGTUmpS1GmhkB1aFsXGsVkVD9HczIstdj8eHAfmNmXcytFSQqQ=="],
 
     "@serkonda7/unifi-api": ["@serkonda7/unifi-api@0.1.1", "", {}, "sha512-GjskQhWvzPQVfeN3QBLZeKNcZOVW5m/JJ023Fs+Hliv60hh7E68gKIAw+gb01zFka1b/vmwqtOZYRbWylBV/5g=="],
 

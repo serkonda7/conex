@@ -1016,15 +1016,22 @@ export interface TemplateSyncPreview {
 		suggestion: string | null
 	}[]
 	added: { name: string; side: PortSide | null; kind: string }[]
+	/**
+	 * The device's role and its type's default role when they differ; null
+	 * when they match or the type has no default role.
+	 */
+	role: { from: { id: number; name: string }; to: { id: number; name: string } } | null
 }
 
 /**
  * `POST /devices/:id/template-sync`: the decision for every orphaned port.
  * `map` takes on the name of the added port in `target`; `link` makes the
  * port that template port under its own name; `keep` leaves the port as it
- * is; `remove` deletes it (refused while it is cabled).
+ * is; `remove` deletes it (refused while it is cabled). `device_role_id`
+ * takes on the type's default role, which must still be that role.
  */
 export const TemplateSyncApplySchema = v.strictObject({
+	device_role_id: v.optional(IdSchema),
 	assignments: v.pipe(
 		v.array(
 			v.strictObject({

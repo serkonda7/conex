@@ -7,10 +7,9 @@
  * popovers rendered outside the page keep working. Leaving the browser's
  * fullscreen (Esc) leaves the view too; so does leaving the page.
  */
-import { IconMaximize, IconMinimize } from '@tabler/icons-solidjs'
-import { createSignal, type JSX, onCleanup } from 'solid-js'
+import { IconChevronLeft, IconMaximize } from '@tabler/icons-solidjs'
+import { createSignal, type JSX, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
-import { IconLabel } from './icon_label'
 
 const ROOT_CLASS = 'plan-fullscreen'
 
@@ -37,8 +36,11 @@ function leave(): void {
 	}
 }
 
-/** Header button that switches the page's fullscreen view on and off. */
-export function PlanFullscreenButton(): JSX.Element {
+/**
+ * Title of a plan page with the fullscreen switch before the heading: an
+ * icon button enters the view, "Back" in its place leaves it.
+ */
+export function PlanFullscreenTitle(props: { children: JSX.Element }): JSX.Element {
 	const onChange = (): void => {
 		if (!document.fullscreenElement && active()) {
 			apply(false)
@@ -52,14 +54,27 @@ export function PlanFullscreenButton(): JSX.Element {
 		}
 	})
 	return (
-		<button
-			type="button"
-			aria-pressed={active()}
-			onClick={() => (active() ? leave() : enter())}
-		>
-			<IconLabel icon={active() ? IconMinimize : IconMaximize}>
-				{t(active() ? 'floorplan.exitFullscreen' : 'floorplan.fullscreen')}
-			</IconLabel>
-		</button>
+		<div class="page-header-title plan-fullscreen-title">
+			<Show
+				when={active()}
+				fallback={
+					<button
+						type="button"
+						class="icon-btn"
+						aria-label={t('floorplan.fullscreen')}
+						title={t('floorplan.fullscreen')}
+						onClick={enter}
+					>
+						<IconMaximize size={16} aria-hidden="true" />
+					</button>
+				}
+			>
+				<button type="button" class="plan-fullscreen-back" onClick={leave}>
+					<IconChevronLeft size={16} aria-hidden="true" />
+					{t('common.back')}
+				</button>
+			</Show>
+			<h2>{props.children}</h2>
+		</div>
 	)
 }

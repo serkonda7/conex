@@ -103,7 +103,7 @@ export function buildPreview(
 	expected: ExpandedInterface[],
 	ports: Port[],
 	placed: Set<number>,
-): TemplateSyncPreview {
+): Omit<TemplateSyncPreview, 'role'> {
 	const { slots, orphans } = matchPorts(expected, ports)
 	const added = expected.filter((_, i) => !slots[i])
 	const suggestions = suggestTargets(orphans, added)

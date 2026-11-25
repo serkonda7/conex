@@ -2498,6 +2498,11 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	color: var(--primary-text);
 }
 
+/* Star on the first chip of an ordered multi-select, e.g. the primary tenant. */
+.primary-chip-mark {
+	display: inline-flex;
+}
+
 .app-content .form-stacked .field .combobox {
 	width: 100%;
 }
@@ -2506,6 +2511,17 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	padding: 0.36rem 1.8rem 0.36rem 0.5rem;
 	font-size: var(--font-size-base);
 	border-radius: 0.3rem;
+}
+
+/* The search input of a multi-select sits inline beside the chips inside the
+   bordered control; undo the single-select input spacing and the generic
+   full-width field input. */
+.app-content .form-stacked .field .combobox-control .combobox-input {
+	flex: 1 1 4rem;
+	width: auto;
+	min-width: 4rem;
+	padding: 0.125rem;
+	border-radius: 0;
 }
 
 .app-content .form-stacked .field .combobox-with-icon .combobox-input {
@@ -7418,6 +7434,27 @@ button.billing-cell-button:hover {
 .plan-fullscreen .app-footer,
 .plan-fullscreen .breadcrumbs {
 	display: none;
+}
+
+/* Title row of a plan page: the enter icon before the heading, "Back" in
+   its place in the fullscreen view. */
+.plan-fullscreen-title {
+	gap: 0.5rem;
+}
+
+.plan-fullscreen-title .icon-btn {
+	color: var(--text-muted);
+}
+
+.plan-fullscreen-title .icon-btn:hover {
+	color: var(--text);
+}
+
+.plan-fullscreen-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	padding-left: 0.4rem;
 }
 
 .plan-fullscreen .app-content {

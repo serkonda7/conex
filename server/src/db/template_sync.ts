@@ -2,12 +2,13 @@ import { Result } from 'better-result'
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm'
 import { portKindsCompatible } from 'shared/src/ports'
 import type { ExpandedInterface, TemplateSyncApply, TemplateSyncPreview } from 'shared/src/schemas'
-import { cables, floorplan_placements, interfaces } from '../schema'
+import { cables, device_roles, devices, floorplan_placements, interfaces } from '../schema'
 import { buildPreview, planSync, type SyncPlan } from '../services/template_sync'
 import { expandStubs } from '../services/templates'
-import { createChanges, deleteChanges, logChanges, updateChanges } from './changelog'
+import { createChanges, deleteChanges, logChanges, logUpdate, updateChanges } from './changelog'
 import { getDb, withTransaction } from './connection'
 import {
+	type DeviceRow,
 	getDevice,
 	type InterfaceJson,
 	type InterfaceRow,
@@ -18,22 +19,31 @@ import {
 import { ConflictError } from './errors'
 import { removeEmptyJacks } from './jacks'
 import { tryWrite } from './list'
-import { stubsOf } from './templates'
+import { getDeviceType, stubsOf } from './templates'
 
 /** Above any real position, so parked front ports never meet a real slot. */
 const PARKED_POSITION = 1_000_000
+
+const STALE = 'The device or its type changed; reopen the preview'
 
 const NAME_OR_SLOT_TAKEN = 'A kept port blocks a name or rear position of the device type'
 
 interface SyncState {
 	expected: ExpandedInterface[]
 	ports: InterfaceRow[]
+	device: DeviceRow
+	/** The type's default role; null when it sets none. */
+	default_role_id: number | null
 }
 
 async function loadState(deviceId: number): Promise<Result<SyncState, Error>> {
 	const device = await getDevice(deviceId)
 	if (Result.isError(device)) {
 		return device
+	}
+	const type = await getDeviceType(device.value.device_type_id)
+	if (Result.isError(type)) {
+		return type
 	}
 	const expected = expandStubs(await stubsOf(device.value.device_type_id))
 	if (Result.isError(expected)) {
@@ -44,7 +54,31 @@ async function loadState(deviceId: number): Promise<Result<SyncState, Error>> {
 		.from(interfaces)
 		.where(eq(interfaces.device_id, deviceId))
 		.orderBy(asc(interfaces.id))
-	return Result.ok({ expected: expected.value, ports })
+	return Result.ok({
+		expected: expected.value,
+		ports,
+		device: device.value,
+		default_role_id: type.value.default_device_role_id,
+	})
+}
+
+/** Whether syncing would change the device's role. */
+function roleDiffers(state: SyncState): boolean {
+	return state.default_role_id !== null && state.default_role_id !== state.device.device_role_id
+}
+
+async function rolePreview(state: SyncState): Promise<TemplateSyncPreview['role']> {
+	if (!roleDiffers(state) || state.default_role_id === null) {
+		return null
+	}
+	const ids = [state.device.device_role_id, state.default_role_id]
+	const rows = await getDb()
+		.select({ id: device_roles.id, name: device_roles.name })
+		.from(device_roles)
+		.where(inArray(device_roles.id, ids))
+	const from = rows.find((row) => row.id === state.device.device_role_id)
+	const to = rows.find((row) => row.id === state.default_role_id)
+	return from && to ? { from, to } : null
 }
 
 export async function getTemplateSync(
@@ -60,7 +94,10 @@ export async function getTemplateSync(
 		.from(floorplan_placements)
 		.where(inArray(floorplan_placements.interface_id, ids))
 	const placed = new Set(placements.flatMap((row) => row.id ?? []))
-	return Result.ok(buildPreview(state.value.expected, state.value.ports, placed))
+	return Result.ok({
+		...buildPreview(state.value.expected, state.value.ports, placed),
+		role: await rolePreview(state.value),
+	})
 }
 
 /** A kind change must leave every cable on the device between compatible ports. */
@@ -248,7 +285,8 @@ async function writePlan(deviceId: number, state: SyncState, plan: SyncPlan): Pr
 }
 
 /**
- * Brings a device's ports in line with its device type: matched ports take
+ * Brings a device's ports (and, when asked, its role) in line with its
+ * device type: matched ports take
  * the type's fields (a linked port keeps its name), orphaned ports follow
  * their assignment, ports the device lacks are created. Remapped ports keep their id, so cables,
  * floor plan placements, `enabled` and `patched` stay with them.
@@ -265,16 +303,35 @@ export async function applyTemplateSync(
 	if (Result.isError(plan)) {
 		return Result.err(new ConflictError(plan.error.message))
 	}
+	const roleId = input.device_role_id
+	if (
+		roleId !== undefined &&
+		(!roleDiffers(state.value) || roleId !== state.value.default_role_id)
+	) {
+		return Result.err(new ConflictError(STALE))
+	}
 	const cabled = await checkCabledKinds(state.value, plan.value)
 	if (Result.isError(cabled)) {
 		return cabled
 	}
 	const written = await tryWrite(
-		() => withTransaction(() => writePlan(deviceId, state.value, plan.value)),
+		() =>
+			withTransaction(async () => {
+				await writePlan(deviceId, state.value, plan.value)
+				if (roleId !== undefined) {
+					await getDb()
+						.update(devices)
+						.set({ device_role_id: roleId })
+						.where(eq(devices.id, deviceId))
+				}
+			}),
 		NAME_OR_SLOT_TAKEN,
 	)
 	if (Result.isError(written)) {
 		return written
+	}
+	if (roleId !== undefined) {
+		await logUpdate('device', state.value.device, await getDevice(deviceId))
 	}
 	return listInterfaces(deviceId)
 }

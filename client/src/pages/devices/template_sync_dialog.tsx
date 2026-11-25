@@ -7,7 +7,7 @@ import type {
 import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import { apply_template_sync, fetch_template_sync } from '../../api/devices'
 import { InlineError, Loading } from '../../components/feedback'
-import { Hint, SelectField } from '../../components/form'
+import { CheckboxField, Hint, SelectField } from '../../components/form'
 import { Modal } from '../../components/modal'
 import { t } from '../../i18n'
 import { portKindLabel, portSideLabel, templateSyncFieldLabel } from '../../i18n/labels'
@@ -60,7 +60,7 @@ function changeText(change: TemplateSyncChange): string {
 }
 
 /**
- * Previews how a device's ports would change to match its device type and
+ * Previews how a device's ports and role would change to match its device type and
  * lets the user decide what happens to ports the type no longer has:
  * remapped ports keep their cables. The server re-validates on apply.
  */
@@ -75,6 +75,7 @@ export function TemplateSyncDialog(props: {
 	const [error, setError] = createSignal<string | null>(null)
 	const [preview] = createRecord(() => props.device.id, fetch_template_sync, setError)
 	const [choices, setChoices] = createSignal<Record<number, string>>({})
+	const [syncRole, setSyncRole] = createSignal(true)
 	const save = useAction(setError)
 
 	const choiceOf = (orphan: Orphan): string =>
@@ -127,7 +128,8 @@ export function TemplateSyncDialog(props: {
 			p !== undefined &&
 			p.updated.length === 0 &&
 			p.orphaned.length === 0 &&
-			p.added.length === 0
+			p.added.length === 0 &&
+			p.role === null
 		)
 	}
 	const assignments = (): TemplateSyncAssignment[] =>
@@ -146,7 +148,11 @@ export function TemplateSyncDialog(props: {
 	async function handleApply(e: SubmitEvent): Promise<void> {
 		e.preventDefault()
 		const next = (e.submitter as HTMLButtonElement | null)?.value === NEXT
-		const input = { assignments: assignments() }
+		const role = preview()?.role
+		const input = {
+			assignments: assignments(),
+			...(role && syncRole() ? { device_role_id: role.to.id } : {}),
+		}
 		if (await save.run(() => apply_template_sync(props.device.id, input))) {
 			props.on_synced(next)
 		}
@@ -166,6 +172,22 @@ export function TemplateSyncDialog(props: {
 					<form class="form-stacked" onSubmit={handleApply}>
 						<Show when={upToDate()}>
 							<p>{t('device.templateSync.upToDate')}</p>
+						</Show>
+						<Show when={p().role} keyed>
+							{(role: NonNullable<TemplateSyncPreview['role']>): JSX.Element => (
+								<>
+									<h3>{t('device.templateSync.role')}</h3>
+									<CheckboxField
+										id="template-sync-role"
+										label={t('device.templateSync.roleChange', {
+											from: role.from.name,
+											to: role.to.name,
+										})}
+										checked={syncRole()}
+										onChange={setSyncRole}
+									/>
+								</>
+							)}
 						</Show>
 						<Show when={p().orphaned.length > 0}>
 							<h3>

@@ -377,7 +377,7 @@ export type DeviceListItem =
 			shelf_name: string | null
 			shelf_position_u: number | null
 			/**
-			 * Ports differ from the device type (see `db/template_sync.ts`);
+			 * Ports or role differ from the device type (see `db/template_sync.ts`);
 			 * only computed when listing by `device_type`.
 			 */
 			out_of_sync: boolean
@@ -742,9 +742,14 @@ export async function listDevices(params: DeviceListParams): Promise<Page<Device
 	)
 }
 
-/** Ids of the listed devices whose ports differ from their device type. */
+/** Ids of the listed devices whose ports or role differ from their device type. */
 async function outOfSyncDevices(
-	rows: { kind: DeviceListKind; id: number; device_type_id: number | null }[],
+	rows: {
+		kind: DeviceListKind
+		id: number
+		device_type_id: number | null
+		device_role_id: number
+	}[],
 ): Promise<Set<number>> {
 	const listed = rows.filter((row) => row.kind === 'device')
 	if (listed.length === 0) {
@@ -752,6 +757,14 @@ async function outOfSyncDevices(
 	}
 	const db = getDb()
 	const typeIds = [...new Set(listed.flatMap((row) => row.device_type_id ?? []))]
+	const defaultRoles = new Map(
+		(
+			await db
+				.select({ id: device_types.id, role: device_types.default_device_role_id })
+				.from(device_types)
+				.where(inArray(device_types.id, typeIds))
+		).map((row) => [row.id, row.role]),
+	)
 	const stubs = await db
 		.select()
 		.from(device_type_interfaces)
@@ -772,13 +785,15 @@ async function outOfSyncDevices(
 	)
 	const portsOf = Map.groupBy(ports, (port) => port.device_id)
 	const out = new Set<number>()
-	for (const { id, device_type_id } of listed) {
+	for (const { id, device_type_id, device_role_id } of listed) {
 		const expected = expansions.get(device_type_id ?? 0)
+		const defaultRole = defaultRoles.get(device_type_id ?? 0) ?? null
 		// A broken type cannot be applied, so it offers no sync either.
 		if (
 			expected &&
 			Result.isOk(expected) &&
-			isOutOfSync(expected.value, portsOf.get(id) ?? [])
+			((defaultRole !== null && defaultRole !== device_role_id) ||
+				isOutOfSync(expected.value, portsOf.get(id) ?? []))
 		) {
 			out.add(id)
 		}

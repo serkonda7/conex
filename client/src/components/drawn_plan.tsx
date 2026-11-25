@@ -47,7 +47,7 @@ import { markerNamesVisible, toggleMarkerNames } from './floorplan_layers'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import { MarkerGlyph, MarkerName, markerClasses, markerHref, markerTitle } from './floorplan_stage'
 import { IconLabel } from './icon_label'
-import { PlanFullscreenButton } from './plan_fullscreen'
+import { PlanFullscreenTitle } from './plan_fullscreen'
 import { createStageZoom, type StageZoom } from './zoom_viewport'
 
 /** The 3D view, in its own chunk with three.js. */
@@ -395,9 +395,8 @@ export function DrawnPlanView(props: {
 	return (
 		<>
 			<div class="page-header">
-				<h2>{props.title}</h2>
+				<PlanFullscreenTitle>{props.title}</PlanFullscreenTitle>
 				<div class="page-header-actions">
-					<PlanFullscreenButton />
 					<Show when={can('edit') || can('delete')}>
 						{/* The editor puts Undo / Save / Cancel here, so the header keeps its height. */}
 						<div class="form-actions" ref={setActions}>

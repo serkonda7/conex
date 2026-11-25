@@ -16,6 +16,22 @@ function roleList(roles: readonly PromptRole[]): string {
 	return `Available device roles (name: description):\n${lines.join('\n')}`
 }
 
+/** Catch-all role used when no specific role fits, e.g. "Sonstige". */
+function fallbackRole(roles: readonly PromptRole[]): PromptRole | undefined {
+	return roles.find((r) => /^sonstig/i.test(r.name.trim()))
+}
+
+/** Rule for `default_device_role`, falling back to the catch-all role if one exists. */
+function roleRule(roles: readonly PromptRole[]): string {
+	const base =
+		'- default_device_role (conex extension): the role preselected for devices of this type. Use the exact name of one role from the list below that clearly fits the device class (e.g. switch, firewall, patch panel, server).'
+	const fallback = fallbackRole(roles)
+	const tail = fallback
+		? ` If none fits or the choice is ambiguous, always use "${fallback.name}" instead of omitting the key.`
+		: ' Omit the key if none fits or the choice is ambiguous.'
+	return `${base}${tail} Never invent a role name, and drop a role from an upstream file that is not in the list.`
+}
+
 /** Format and field rules shared by the prompts. */
 function outputRules(roles: readonly PromptRole[]): string {
 	return `Output one YAML document starting with --- in a fenced YAML block, plus the target path device-types/<Manufacturer>/<model-slug>.yaml outside the block. Keep the source summary outside the YAML so the block can be pasted directly into conex.
@@ -39,7 +55,7 @@ Rules:
 - Patch panels and fiber cassettes: rear-ports {name, type, positions} (positions 1 for a plain outlet, N for an MPO trunk), front-ports {name, type, rear_port, rear_port_position}, where rear_port names a rear port of the same document and rear_port_position (default 1, omit it for a plain outlet) is the slot on it. Convert a NetBox port-mappings list into these inline keys and drop it. Common types: ${SELECTABLE_PASS_THROUGH_PORT_TYPES.join(', ')}. Legacy types 110-punch, st, fc and mtrj are also supported when needed to represent the actual hardware. Each slot of a rear port takes at most one front port.
 - power-ports type: NetBox slug, e.g. iec-60320-c14, iec-60320-c20, ita-ef, dc-terminal or usb-c, or dc-barrel (conex extension); add maximum_draw (watts, whole number of at least 1) only if stated in the datasheet. power-outlets type: NetBox slug, e.g. iec-60320-c13, iec-60320-c19, ita-f, dc-terminal or usb-a. Other connector types import as a generic power port or outlet.
 - face (conex extension, on any port entry): front or rear, the side of the device the port sits on, for the device images. conex assumes power-ports and power-outlets on the rear, rear-ports on the rear and every other port on the front; set face only on ports that sit elsewhere according to the datasheet, product photos or baseline (e.g. the management and console ports on the rear of a switch, the outlets on the front of a PDU), and omit it otherwise.
-- default_device_role (conex extension): the role preselected for devices of this type. Use the exact name of one role from the list below that clearly fits the device class (e.g. switch, firewall, patch panel, server); omit the key if none fits or the choice is ambiguous. Never invent a role name, and drop a role from an upstream file that is not in the list.
+${roleRule(roles)}
 - part_number (conex extension): the manufacturer's article/part number of this exact model, at most 100 characters; omit if not found in a primary source. spec_url (conex extension): plain URL (https://...) of the manufacturer's specification/datasheet page, at most 200 characters; omit if none is known. Never invent either.
 - eol_date (conex extension): last day the manufacturer supports this exact model (end of life / end of support), as an ISO date YYYY-MM-DD. Only set it from an official manufacturer EOL/EOS notice, lifecycle page or support policy that names this model and states a full date, or a month and year (then use the first day of that month, e.g. March 2027 becomes 2027-03-01, and say so in the summary); cite that source in the summary. Omit it otherwise: never take it from memory, resellers, forums or third-party trackers, never estimate or calculate it (e.g. from the release date, a support duration or a lifecycle policy), never carry it over from a sibling model or series, never use an end-of-sale, end-of-production or announcement date, and never turn a quarter, half-year or bare year into a day. A missing eol_date is correct; a made-up one is not.
 - description: one line, at most 250 characters. comments: omit by default; use it only for short, useful notes that fit nowhere else, and never repeat spec_url or a source link there. Ports have no description: never emit one, and drop port descriptions from a baseline. Put information a port name must carry into the name itself (e.g. "Management", "Uplink").

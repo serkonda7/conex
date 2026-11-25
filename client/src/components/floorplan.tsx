@@ -58,7 +58,7 @@ import {
 	type ShownMarker,
 } from './floorplan_stage'
 import { IconLabel } from './icon_label'
-import { PlanFullscreenButton } from './plan_fullscreen'
+import { PlanFullscreenTitle } from './plan_fullscreen'
 import { createStageZoom, type StageZoom } from './zoom_viewport'
 
 /**
@@ -453,9 +453,8 @@ export function FloorplanView(props: {
 	return (
 		<>
 			<div class="page-header">
-				<h2>{props.title}</h2>
+				<PlanFullscreenTitle>{props.title}</PlanFullscreenTitle>
 				<div class="page-header-actions">
-					<PlanFullscreenButton />
 					{/* The editor puts Cancel / Save here, so the header keeps its height. */}
 					<Show when={can('edit') && plan()}>
 						<div class="form-actions" ref={setActions}>
