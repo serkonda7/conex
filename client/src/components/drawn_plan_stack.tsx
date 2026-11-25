@@ -1,13 +1,13 @@
 /**
- * Floors of a building, stacked: the plans of a location's child locations
- * that carry a storey share the building's frame through their offsets (a
- * sheet point `p` lies at `p + offset` in the building). A plan lists the
+ * Floors of a building, stacked: the plans of a location's child locations,
+ * or of a site's top-level floors, share the building's frame through their
+ * offsets (a sheet point `p` lies at `p + offset` in the building). A plan lists the
  * other floors of its building, may show one of them faded beneath its
  * drawing (the underlay, a view setting kept while the page is open, shared
- * by the view and the editor), and the editor offers the stairs arriving
- * from the floor directly below as ghosts to take over.
+ * by the view and the editor), and the editor may snap to it and offers the
+ * stairs arriving from the floor directly below as ghosts to take over.
  */
-import { IconStack2 } from '@tabler/icons-solidjs'
+import { IconMagnet, IconStack2 } from '@tabler/icons-solidjs'
 import { type Accessor, createMemo, createSignal, For, type JSX, Show } from 'solid-js'
 import {
 	type FloorplanDrawingJson,
@@ -19,7 +19,9 @@ import {
 } from '../api/floorplan_drawings'
 import { t } from '../i18n'
 import { createRecord, createRowsFor, type ErrorSink, type QueryReturn } from '../lib/resource'
-import { type Point, stairShape } from './drawn_plan_geometry'
+import { readStored, writeStored } from '../lib/storage'
+import { type Point, stairShape, wallFaceTargets } from './drawn_plan_geometry'
+import { ringEdges, type SnapTargets } from './drawn_plan_snap'
 import {
 	drawingWalls,
 	RoomLayer,
@@ -33,14 +35,31 @@ import {
 /** How far ends of stairs may lie apart and still be the same stairs, cm. */
 const SAME_STAIR_CM = 1
 
+const SNAP_STORAGE_KEY = 'conex:drawn-plan-snap-underlay'
+
+const [underlaySnap, setUnderlaySnap] = createSignal(readStored(SNAP_STORAGE_KEY) !== 'false')
+
+/** Whether the editor also snaps to the floor beneath (on by default, kept per browser). */
+export function underlaySnapEnabled(): boolean {
+	return underlaySnap()
+}
+
+function toggleUnderlaySnap(): void {
+	const next = !underlaySnap()
+	setUnderlaySnap(next)
+	writeStored(SNAP_STORAGE_KEY, String(next))
+}
+
 /** What to add to a point of the floor at `other` to get the same building point on the floor at `own`. */
 export function floorShift(own: FloorplanOffset, other: FloorplanOffset): Point {
 	return [other.x - own.x, other.y - own.y]
 }
 
-/** A floor as the pickers name it: its storey and its location. */
-export function floorLabel(floor: { level: number; owner_name: string }): string {
-	return t('drawnPlan.floorOption', { level: floor.level, name: floor.owner_name })
+/** A floor as the pickers name it: its storey, if any, and its location. */
+export function floorLabel(floor: { level: number | null; owner_name: string }): string {
+	return floor.level === null
+		? floor.owner_name
+		: t('drawnPlan.floorOption', { level: floor.level, name: floor.owner_name })
 }
 
 /** The nearest floor below `level` of `floors` (lowest first); none without a storey. */
@@ -50,7 +69,11 @@ export function floorBelow(
 ): FloorplanStackFloorJson | undefined {
 	return level === null
 		? undefined
-		: floors.filter((floor: FloorplanStackFloorJson) => floor.level < level).at(-1)
+		: floors
+				.filter(
+					(floor: FloorplanStackFloorJson) => floor.level !== null && floor.level < level,
+				)
+				.at(-1)
 }
 
 /** The other floors of a plan's building and the one shown beneath it. */
@@ -119,6 +142,77 @@ export function UnderlayPicker(props: { stack: FloorStack }): JSX.Element {
 			</label>
 		</Show>
 	)
+}
+
+/** The editor's toggle for snapping to the floor beneath; shown while one is. */
+export function UnderlaySnapToggle(props: { stack: FloorStack }): JSX.Element {
+	return (
+		<Show when={props.stack.underlay()}>
+			<button
+				type="button"
+				class="floorplan-layer-toggle floorplan-names-toggle"
+				aria-pressed={underlaySnap()}
+				title={t('drawnPlan.snapUnderlayHint')}
+				onClick={toggleUnderlaySnap}
+			>
+				<IconMagnet size={12} aria-hidden="true" />
+				<span>{t('drawnPlan.snapUnderlay')}</span>
+			</button>
+		</Show>
+	)
+}
+
+/** What the floor beneath offers to snap to, moved into this floor's sheet (`offset`). */
+export interface UnderlayTargets {
+	/** For walls: the walls' ends and center lines (reaching half their thickness). */
+	walls: SnapTargets
+	/** For everything else: the walls' faces and corners, and the stairs' and rooms' outlines. */
+	objects: SnapTargets
+}
+
+export function underlayTargets(
+	drawing: FloorplanDrawingJson,
+	offset: FloorplanOffset,
+): UnderlayTargets {
+	const [dx, dy] = floorShift(offset, drawing.offset)
+	const move = (p: Point): Point => [p[0] + dx, p[1] + dy]
+	const walls = drawing.walls.map((wall) => ({ ...wall, a: move(wall.a), b: move(wall.b) }))
+	const faces = wallFaceTargets(walls)
+	const outlines = [
+		...drawing.stairs.map(
+			(stair: FloorplanStair) =>
+				stairShape({ ...stair, a: move(stair.a), b: move(stair.b) }).outline,
+		),
+		...drawing.rooms.map((room) => room.points.map(move)),
+	]
+	return {
+		walls: {
+			points: walls.flatMap((wall) => [wall.a, wall.b]),
+			lines: walls.map((wall) => ({ a: wall.a, b: wall.b, reach: wall.thickness / 2 })),
+			boxes: [],
+		},
+		objects: {
+			points: [...faces.points, ...outlines.flat()],
+			lines: [
+				...faces.faces.map(([a, b]) => ({ a, b, reach: 0 })),
+				...outlines.flatMap((outline) =>
+					ringEdges(outline).map(([a, b]) => ({ a, b, reach: 0 })),
+				),
+			],
+			boxes: [],
+		},
+	}
+}
+
+/** `targets` with `extra` added, if any. */
+export function withTargets(targets: SnapTargets, extra: SnapTargets | undefined): SnapTargets {
+	return extra
+		? {
+				points: [...targets.points, ...extra.points],
+				lines: [...targets.lines, ...extra.lines],
+				boxes: [...targets.boxes, ...extra.boxes],
+			}
+		: targets
 }
 
 /** Rooms, stairs and walls of another floor, inert, moved into this floor's sheet (`offset`). */

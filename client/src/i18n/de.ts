@@ -1417,9 +1417,9 @@ export const de: Messages = {
 	'drawnPlan.fitSheet': 'Blatt an Bild anpassen',
 	'drawnPlan.building': 'Gebäude',
 	'drawnPlan.noBuilding':
-		'Um diesen Plan mit anderen Etagen zu stapeln, ordne seinen Ort einem Gebäude (einem anderen Ort) unter.',
+		'Um diesen Plan mit anderen Etagen zu stapeln, mache seinen Ort zur Etage oder ordne ihn einem Gebäude (einem anderen Ort) unter.',
 	'drawnPlan.buildingHint':
-		'Etagen von {name} mit Geschoss teilen ein Bezugssystem: der Versatz legt die linke obere Ecke dieses Blatts darin fest.',
+		'Die Etagen von {name} teilen ein Bezugssystem: der Versatz legt die linke obere Ecke dieses Blatts darin fest. Das Geschoss ordnet sie; Treppen kommen aus dem Geschoss darunter.',
 	'drawnPlan.storey': 'Geschoss',
 	'drawnPlan.notStacked': 'Nicht gestapelt',
 	'drawnPlan.offsetX': 'Versatz X (m)',
@@ -1437,6 +1437,9 @@ export const de: Messages = {
 	'drawnPlan.underlay': 'Etage darunter',
 	'drawnPlan.underlayHint': 'Eine andere Etage des Gebäudes blass unter diesem Plan zeigen',
 	'drawnPlan.noUnderlay': 'Keine',
+	'drawnPlan.snapUnderlay': 'An Etage einrasten',
+	'drawnPlan.snapUnderlayHint':
+		'Auch an Wänden, Treppen und Räumen der Etage darunter einrasten (bei eingeschaltetem Einrasten)',
 	'drawnPlan.floorOption': '{level}: {name}',
 	'drawnPlan.showReference': 'Referenzbild anzeigen',
 	'drawnPlan.hideReference': 'Referenzbild ausblenden',

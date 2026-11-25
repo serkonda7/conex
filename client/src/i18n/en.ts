@@ -1404,9 +1404,9 @@ export const en = {
 	'drawnPlan.fitSheet': 'Fit sheet to image',
 	'drawnPlan.building': 'Building',
 	'drawnPlan.noBuilding':
-		'To stack this plan with other floors, put its location inside a building (another location).',
+		'To stack this plan with other floors, make its location a floor or put it inside a building (another location).',
 	'drawnPlan.buildingHint':
-		"Floors of {name} with a storey share one frame: the offset places this sheet's top-left corner in it.",
+		"The floors of {name} share one frame: the offset places this sheet's top-left corner in it. The storey orders them; stairs arrive from the storey below.",
 	'drawnPlan.storey': 'Storey',
 	'drawnPlan.notStacked': 'Not stacked',
 	'drawnPlan.offsetX': 'Offset X (m)',
@@ -1423,6 +1423,9 @@ export const en = {
 	'drawnPlan.underlay': 'Floor beneath',
 	'drawnPlan.underlayHint': 'Show another floor of the building faded under this plan',
 	'drawnPlan.noUnderlay': 'None',
+	'drawnPlan.snapUnderlay': 'Snap to floor',
+	'drawnPlan.snapUnderlayHint':
+		'Also snap to the walls, stairs and rooms of the floor beneath (needs snapping on)',
 	'drawnPlan.floorOption': '{level}: {name}',
 	'drawnPlan.showReference': 'Show the reference image',
 	'drawnPlan.hideReference': 'Hide the reference image',

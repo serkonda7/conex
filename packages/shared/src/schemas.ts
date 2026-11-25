@@ -3114,10 +3114,12 @@ export interface FloorplanDrawingJson {
 	/** Where the sheet lies in the building's frame. */
 	offset: FloorplanOffset
 	/**
-	 * The location the owner lies in, whose other floors' plans stack with
-	 * this one; `null` for a site's plan or a top-level location's.
+	 * The building whose floors' plans stack with this one: the location the
+	 * owner lies in (`location_id`), or for a top-level floor its site
+	 * (`location_id` null); `null` for a site's plan or another top-level
+	 * location's.
 	 */
-	building: { id: number; name: string } | null
+	building: { location_id: number | null; site_id: number; name: string } | null
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
 	stairs: FloorplanStair[]
@@ -3138,15 +3140,15 @@ export interface FloorplanDrawingJson {
 }
 
 /**
- * `GET /floorplan-drawings/:id/stack`: the other stacked floors of the
- * plan's building (plans of the owner's sibling locations with a storey),
- * lowest first, as far as the requester may see them.
+ * `GET /floorplan-drawings/:id/stack`: the plans of the other floors of the
+ * plan's building, lowest storey first (those without a storey last), as
+ * far as the requester may see them.
  */
 export interface FloorplanStackFloorJson {
 	id: number
 	location_id: number
 	owner_name: string
-	level: number
+	level: number | null
 	offset: FloorplanOffset
 }
 

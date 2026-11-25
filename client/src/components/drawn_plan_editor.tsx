@@ -198,6 +198,11 @@ import {
 	GhostStairLayer,
 	UnderlayLayer,
 	UnderlayPicker,
+	UnderlaySnapToggle,
+	type UnderlayTargets,
+	underlaySnapEnabled,
+	underlayTargets,
+	withTargets,
 } from './drawn_plan_stack'
 import {
 	DeskGroupLayer,
@@ -1096,16 +1101,25 @@ export function DrawnPlanEditor(props: {
 	/** Wall ends and wall lines (reaching half their thickness), but not of the walls in `exclude`. */
 	function wallTargets(exclude: Set<number> = new Set()): SnapTargets {
 		const targets = walls().filter((wall: EditWall) => !exclude.has(wall.id))
-		return {
-			points: targets.flatMap((wall: EditWall) => [wall.a, wall.b]),
-			lines: targets.map((wall: EditWall) => ({
-				a: wall.a,
-				b: wall.b,
-				reach: wall.thickness / 2,
-			})),
-			boxes: [],
-		}
+		return withTargets(
+			{
+				points: targets.flatMap((wall: EditWall) => [wall.a, wall.b]),
+				lines: targets.map((wall: EditWall) => ({
+					a: wall.a,
+					b: wall.b,
+					reach: wall.thickness / 2,
+				})),
+				boxes: [],
+			},
+			belowTargets()?.walls,
+		)
 	}
+
+	/** What the floor beneath offers to snap to, while shown and snapped to. */
+	const belowTargets = createMemo((): UnderlayTargets | null => {
+		const other = props.stack.underlayDrawing()
+		return other && underlaySnapEnabled() ? underlayTargets(other, sheetOffset()) : null
+	})
 
 	const faces = createMemo(() => wallFaceTargets(walls()))
 
@@ -1151,32 +1165,40 @@ export function DrawnPlanEditor(props: {
 	function objectTargets(exclude: Set<string> = new Set()): SnapTargets {
 		const { points, faces: lines } = faces()
 		const others = outlines().filter((outline) => !exclude.has(outline.key))
-		return {
-			points: [...points, ...others.flatMap((outline) => outline.points)],
-			lines: [
-				...lines.map(([a, b]) => ({ a, b, reach: 0 })),
-				...others.flatMap((outline) => outline.edges.map(([a, b]) => ({ a, b, reach: 0 }))),
-			],
-			boxes: [...wallBoxes(), ...others.map((outline) => boxOf(outline.points))],
-		}
+		return withTargets(
+			{
+				points: [...points, ...others.flatMap((outline) => outline.points)],
+				lines: [
+					...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+					...others.flatMap((outline) =>
+						outline.edges.map(([a, b]) => ({ a, b, reach: 0 })),
+					),
+				],
+				boxes: [...wallBoxes(), ...others.map((outline) => boxOf(outline.points))],
+			},
+			belowTargets()?.objects,
+		)
 	}
 
 	/** What a cable tray snaps to: the walls' faces and the other trays' ends and lines (not those in `exclude`). */
 	function trayTargets(exclude: Set<number> = new Set()): SnapTargets {
 		const { points, faces: lines } = faces()
 		const others = trays().filter((tray: EditTray) => !exclude.has(tray.id))
-		return {
-			points: [...points, ...others.flatMap((tray: EditTray) => [tray.a, tray.b])],
-			lines: [
-				...lines.map(([a, b]) => ({ a, b, reach: 0 })),
-				...others.map((tray: EditTray) => ({
-					a: tray.a,
-					b: tray.b,
-					reach: tray.width / 2,
-				})),
-			],
-			boxes: wallBoxes(),
-		}
+		return withTargets(
+			{
+				points: [...points, ...others.flatMap((tray: EditTray) => [tray.a, tray.b])],
+				lines: [
+					...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+					...others.map((tray: EditTray) => ({
+						a: tray.a,
+						b: tray.b,
+						reach: tray.width / 2,
+					})),
+				],
+				boxes: wallBoxes(),
+			},
+			belowTargets()?.objects,
+		)
 	}
 
 	/** What a new object snaps to, while drawing it. */
@@ -3457,7 +3479,7 @@ export function DrawnPlanEditor(props: {
 								when={props.drawing.building}
 								fallback={<p class="floorplan-hint">{t('drawnPlan.noBuilding')}</p>}
 							>
-								{(building: () => { id: number; name: string }) => (
+								{(building: () => { name: string }) => (
 									<>
 										<p class="floorplan-hint">
 											{t('drawnPlan.buildingHint', { name: building().name })}
@@ -3617,6 +3639,7 @@ export function DrawnPlanEditor(props: {
 									<span>{t('drawnPlan.snap')}</span>
 								</button>
 								<UnderlayPicker stack={props.stack} />
+								<UnderlaySnapToggle stack={props.stack} />
 							</>
 						}
 						walls={

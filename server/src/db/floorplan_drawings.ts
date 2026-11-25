@@ -17,10 +17,12 @@
  * heights above the floor (cm); a placed rack reads its height in units
  * from its rack type.
  *
- * Plans of locations sharing a parent (the floors of a building) stack: each
- * may carry its storey (`level`, unique per building) and the building
- * point of its sheet's top-left corner (`offset_x` / `offset_y`), so the
- * floors share one frame and each can show another under its drawing.
+ * Plans of locations sharing a parent (the floors of a building) stack, as
+ * do the plans of a site's top-level floors (`type` floor, the site then
+ * being the one building). Each may carry its storey (`level`, unique per
+ * building) and the building point of its sheet's top-left corner
+ * (`offset_x` / `offset_y`), so the floors share one frame and each can
+ * show another under its drawing.
  */
 import { Result } from 'better-result'
 import {
@@ -30,7 +32,6 @@ import {
 	eq,
 	getTableColumns,
 	inArray,
-	isNotNull,
 	isNull,
 	ne,
 	notInArray,
@@ -223,25 +224,60 @@ async function drawingOwnerName(row: Pick<DrawingRow, 'id'>): Promise<string> {
 
 const parentLocation = alias(locations, 'parent_location')
 
-/** The parent of the owning location, whose child locations' plans stack; `null` without. */
-async function buildingOf(
-	row: Pick<DrawingRow, 'location_id'>,
-): Promise<{ id: number; name: string } | null> {
+/** A building of stacked floors: a location, or a site whose top-level floors stack. */
+type Building = { location_id: number | null; site_id: number; name: string }
+
+/**
+ * The building whose floors' plans stack with the owner's: the owning
+ * location's parent, or for a top-level floor its site; `null` for a site's
+ * plan or another top-level location's.
+ */
+async function buildingOf(row: Pick<DrawingRow, 'location_id'>): Promise<Building | null> {
 	if (row.location_id === null) {
 		return null
 	}
 	const [found] = await getDb()
-		.select({ id: parentLocation.id, name: parentLocation.name })
+		.select({
+			type: locations.type,
+			site_id: locations.site_id,
+			parent_id: parentLocation.id,
+			parent_name: parentLocation.name,
+			site_name: sites.name,
+		})
 		.from(locations)
-		.innerJoin(parentLocation, eq(parentLocation.id, locations.parent_id))
+		.innerJoin(sites, eq(sites.id, locations.site_id))
+		.leftJoin(parentLocation, eq(parentLocation.id, locations.parent_id))
 		.where(eq(locations.id, row.location_id))
-	return found ?? null
+	if (!found) {
+		return null
+	}
+	if (found.parent_id !== null) {
+		return {
+			location_id: found.parent_id,
+			site_id: found.site_id,
+			name: found.parent_name ?? '',
+		}
+	}
+	return found.type === 'floor'
+		? { location_id: null, site_id: found.site_id, name: found.site_name }
+		: null
+}
+
+/** Locations whose plans stack in `building`: its children, or the site's top-level floors. */
+function floorsOf(building: Building): SQL | undefined {
+	return building.location_id !== null
+		? eq(locations.parent_id, building.location_id)
+		: and(
+				eq(locations.site_id, building.site_id),
+				isNull(locations.parent_id),
+				eq(locations.type, 'floor'),
+			)
 }
 
 /**
- * The other stacked floors of the plan's building: plans of the owner's
- * sibling locations with a storey, lowest first, leaving out locations
- * outside `scopeTenantIds`. Empty without a building.
+ * The other floors of the plan's building with a plan, by storey (those
+ * without one last), then name, leaving out locations outside
+ * `scopeTenantIds`. Empty without a building.
  */
 export async function listDrawingStack(
 	id: number,
@@ -268,17 +304,19 @@ export async function listDrawingStack(
 		.innerJoin(locations, eq(locations.id, floorplan_drawings.location_id))
 		.where(
 			and(
-				eq(locations.parent_id, building.id),
+				floorsOf(building),
 				ne(floorplan_drawings.id, id),
-				isNotNull(floorplan_drawings.level),
 				scopeCondition(locations.tenant_id, scopeTenantIds),
 			),
 		)
-		.orderBy(asc(floorplan_drawings.level), asc(floorplan_drawings.id))
+		.orderBy(
+			sql`${floorplan_drawings.level} asc nulls last`,
+			asc(locations.name),
+			asc(floorplan_drawings.id),
+		)
 	return Result.ok(
-		rows.map(({ level, offset_x, offset_y, ...floor }) => ({
+		rows.map(({ offset_x, offset_y, ...floor }) => ({
 			...floor,
-			level: level ?? 0,
 			offset: { x: offset_x, y: offset_y },
 		})),
 	)
@@ -733,15 +771,17 @@ async function checkDrawingInput(
 }
 
 /**
- * A storey needs a building (the owner is a location inside another), and
- * no other floor of that building may have it. Checks against every
+ * A storey needs a building (the owner lies in another location or is a
+ * top-level floor), and no other floor of that building may have it. Checks against every
  * sibling's plan, also those hidden from the requester.
  */
 async function checkLevel(stored: DrawingRow, level: number): Promise<Result<undefined, Error>> {
 	const building = await buildingOf(stored)
 	if (building === null) {
 		return Result.err(
-			new ValidationError('Only the plan of a location inside another one can have a storey'),
+			new ValidationError(
+				'Only the plan of a floor or of a location inside another one can have a storey',
+			),
 		)
 	}
 	const [taken] = await getDb()
@@ -750,7 +790,7 @@ async function checkLevel(stored: DrawingRow, level: number): Promise<Result<und
 		.innerJoin(locations, eq(locations.id, floorplan_drawings.location_id))
 		.where(
 			and(
-				eq(locations.parent_id, building.id),
+				floorsOf(building),
 				ne(floorplan_drawings.id, stored.id),
 				eq(floorplan_drawings.level, level),
 			),
