@@ -6766,6 +6766,40 @@ a.rack-shelf-plate:hover {
 	fill: var(--bg-hover);
 }
 
+/* Another floor of the building beneath the plan: faded and inert. */
+.drawn-plan-underlay {
+	opacity: 0.35;
+	pointer-events: none;
+}
+
+.drawn-plan-underlay .drawn-plan-opening-gap,
+.drawn-plan-underlay .drawn-plan-stair,
+.drawn-plan-underlay .drawn-plan-door-panel {
+	fill: none;
+}
+
+/* Stairs arriving from the floor below: dashed until taken over. */
+.drawn-plan-stair-ghost {
+	cursor: copy;
+}
+
+.drawn-plan-stair-ghost .drawn-plan-stair {
+	fill: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.drawn-plan-stair-ghost .drawn-plan-stair,
+.drawn-plan-stair-ghost .drawn-plan-stair-tread,
+.drawn-plan-stair-ghost .drawn-plan-stair-arrow {
+	stroke: var(--primary-text);
+	stroke-dasharray: 5 4;
+	opacity: 0.8;
+}
+
+.drawn-plan-stair-ghost:hover .drawn-plan-stair-arrow,
+.drawn-plan-stair-ghost:hover .drawn-plan-stair {
+	opacity: 1;
+}
+
 /* Rooms: a light tint under everything; only the outline takes presses. */
 .drawn-plan-room-area {
 	fill: color-mix(in srgb, var(--link) 7%, transparent);

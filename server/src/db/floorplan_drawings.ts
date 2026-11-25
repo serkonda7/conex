@@ -16,6 +16,11 @@
  * Walls, doors, windows, stairs, trays, desks and markers carry their
  * heights above the floor (cm); a placed rack reads its height in units
  * from its rack type.
+ *
+ * Plans of locations sharing a parent (the floors of a building) stack: each
+ * may carry its storey (`level`, unique per building) and the building
+ * point of its sheet's top-left corner (`offset_x` / `offset_y`), so the
+ * floors share one frame and each can show another under its drawing.
  */
 import { Result } from 'better-result'
 import {
@@ -25,6 +30,7 @@ import {
 	eq,
 	getTableColumns,
 	inArray,
+	isNotNull,
 	isNull,
 	ne,
 	notInArray,
@@ -32,7 +38,7 @@ import {
 	type SQL,
 	sql,
 } from 'drizzle-orm'
-import type { PgColumn } from 'drizzle-orm/pg-core'
+import { alias, type PgColumn } from 'drizzle-orm/pg-core'
 import type {
 	FloorplanCandidateJson,
 	FloorplanDrawingCreate,
@@ -42,6 +48,7 @@ import type {
 	FloorplanDrawingRefJson,
 	FloorplanLinkLocationJson,
 	FloorplanReference,
+	FloorplanStackFloorJson,
 } from 'shared/src/schemas'
 import {
 	attachments,
@@ -214,6 +221,69 @@ async function drawingOwnerName(row: Pick<DrawingRow, 'id'>): Promise<string> {
 	return owner?.name ?? `#${row.id}`
 }
 
+const parentLocation = alias(locations, 'parent_location')
+
+/** The parent of the owning location, whose child locations' plans stack; `null` without. */
+async function buildingOf(
+	row: Pick<DrawingRow, 'location_id'>,
+): Promise<{ id: number; name: string } | null> {
+	if (row.location_id === null) {
+		return null
+	}
+	const [found] = await getDb()
+		.select({ id: parentLocation.id, name: parentLocation.name })
+		.from(locations)
+		.innerJoin(parentLocation, eq(parentLocation.id, locations.parent_id))
+		.where(eq(locations.id, row.location_id))
+	return found ?? null
+}
+
+/**
+ * The other stacked floors of the plan's building: plans of the owner's
+ * sibling locations with a storey, lowest first, leaving out locations
+ * outside `scopeTenantIds`. Empty without a building.
+ */
+export async function listDrawingStack(
+	id: number,
+	scopeTenantIds?: readonly number[],
+): Promise<Result<FloorplanStackFloorJson[], Error>> {
+	const found = await findById(floorplan_drawings, id, NOT_FOUND)
+	if (Result.isError(found)) {
+		return found
+	}
+	const building = await buildingOf(found.value)
+	if (building === null) {
+		return Result.ok([])
+	}
+	const rows = await getDb()
+		.select({
+			id: floorplan_drawings.id,
+			location_id: locations.id,
+			owner_name: locations.name,
+			level: floorplan_drawings.level,
+			offset_x: floorplan_drawings.offset_x,
+			offset_y: floorplan_drawings.offset_y,
+		})
+		.from(floorplan_drawings)
+		.innerJoin(locations, eq(locations.id, floorplan_drawings.location_id))
+		.where(
+			and(
+				eq(locations.parent_id, building.id),
+				ne(floorplan_drawings.id, id),
+				isNotNull(floorplan_drawings.level),
+				scopeCondition(locations.tenant_id, scopeTenantIds),
+			),
+		)
+		.orderBy(asc(floorplan_drawings.level), asc(floorplan_drawings.id))
+	return Result.ok(
+		rows.map(({ level, offset_x, offset_y, ...floor }) => ({
+			...floor,
+			level: level ?? 0,
+			offset: { x: offset_x, y: offset_y },
+		})),
+	)
+}
+
 /** Location ids the plan's desks, desk groups and rooms link to, each once. */
 function linkedLocationIds(plan: {
 	desks: { location_id?: number }[]
@@ -298,7 +368,7 @@ export async function getDrawing(
 		return found
 	}
 	const row = found.value
-	const [placementRows, reference, name, total, linked] = await Promise.all([
+	const [placementRows, reference, name, total, linked, building] = await Promise.all([
 		getDb()
 			.select({
 				id: floorplan_drawing_placements.id,
@@ -341,6 +411,7 @@ export async function getDrawing(
 					eq(floorplan_drawing_placements.drawing_id, id),
 				),
 		linkedLocations(linkedLocationIds(row), scopeTenantIds),
+		buildingOf(row),
 	])
 	const portsOf = await outletPorts(placementRows)
 	const placements = placementRows.map(
@@ -365,6 +436,9 @@ export async function getDrawing(
 						attachment: attachmentJson(reference.value),
 					}
 				: null,
+		level: row.level,
+		offset: { x: row.offset_x, y: row.offset_y },
+		building,
 		walls: row.walls,
 		openings: row.openings,
 		stairs: row.stairs,
@@ -538,6 +612,12 @@ async function checkDrawingInput(
 			)
 		}
 	}
+	if (input.level !== null) {
+		const stacked = await checkLevel(stored, input.level)
+		if (Result.isError(stacked)) {
+			return stacked
+		}
+	}
 	const pick = (key: 'rack_id' | 'device_id' | 'interface_id' | 'jack_id'): number[] =>
 		input.placements.flatMap((p) => (p[key] === undefined ? [] : [p[key]]))
 	const rackIds = pick('rack_id')
@@ -649,6 +729,39 @@ async function checkDrawingInput(
 		.limit(1)
 	return elsewhere.length > 0
 		? Result.err(new ConflictError(ALREADY_PLACED))
+		: Result.ok(undefined)
+}
+
+/**
+ * A storey needs a building (the owner is a location inside another), and
+ * no other floor of that building may have it. Checks against every
+ * sibling's plan, also those hidden from the requester.
+ */
+async function checkLevel(stored: DrawingRow, level: number): Promise<Result<undefined, Error>> {
+	const building = await buildingOf(stored)
+	if (building === null) {
+		return Result.err(
+			new ValidationError('Only the plan of a location inside another one can have a storey'),
+		)
+	}
+	const [taken] = await getDb()
+		.select({ name: locations.name })
+		.from(floorplan_drawings)
+		.innerJoin(locations, eq(locations.id, floorplan_drawings.location_id))
+		.where(
+			and(
+				eq(locations.parent_id, building.id),
+				ne(floorplan_drawings.id, stored.id),
+				eq(floorplan_drawings.level, level),
+			),
+		)
+		.limit(1)
+	return taken
+		? Result.err(
+				new ValidationError(
+					`Storey ${level} of "${building.name}" is already taken by "${taken.name}"`,
+				),
+			)
 		: Result.ok(undefined)
 }
 
@@ -771,6 +884,9 @@ export async function putDrawing(
 						reference_frame: reference
 							? { x: reference.x, y: reference.y, width: reference.width }
 							: null,
+						level: input.level,
+						offset_x: input.offset.x,
+						offset_y: input.offset.y,
 						walls: input.walls,
 						openings: input.openings,
 						stairs: input.stairs,

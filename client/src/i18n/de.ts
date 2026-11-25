@@ -1415,6 +1415,29 @@ export const de: Messages = {
 	'drawnPlan.moveImage': 'Verschieben',
 	'drawnPlan.calibrate': 'Maßstab setzen',
 	'drawnPlan.fitSheet': 'Blatt an Bild anpassen',
+	'drawnPlan.building': 'Gebäude',
+	'drawnPlan.noBuilding':
+		'Um diesen Plan mit anderen Etagen zu stapeln, ordne seinen Ort einem Gebäude (einem anderen Ort) unter.',
+	'drawnPlan.buildingHint':
+		'Etagen von {name} mit Geschoss teilen ein Bezugssystem: der Versatz legt die linke obere Ecke dieses Blatts darin fest.',
+	'drawnPlan.storey': 'Geschoss',
+	'drawnPlan.notStacked': 'Nicht gestapelt',
+	'drawnPlan.offsetX': 'Versatz X (m)',
+	'drawnPlan.offsetY': 'Versatz Y (m)',
+	'drawnPlan.alignFloor': 'An Etage ausrichten',
+	'drawnPlan.alignFloorHint':
+		'Ziehe die darunterliegende Etage, bis sie passt; das ändert den Versatz dieses Plans.',
+	'drawnPlan.pickUnderlayHint': 'Wähle eine Etage unter dem Plan, um diesen daran auszurichten.',
+	'drawnPlan.arrivingStairs.one':
+		'{count} Treppenlauf kommt aus der Etage darunter: klicke auf den gestrichelten Umriss, um ihn hier hinzuzufügen.',
+	'drawnPlan.arrivingStairs.other':
+		'{count} Treppenläufe kommen aus der Etage darunter: klicke auf einen gestrichelten Umriss, um ihn hier hinzuzufügen.',
+	'drawnPlan.adoptStairs':
+		'Treppe aus der Etage darunter: klicken, um sie dieser Etage hinzuzufügen',
+	'drawnPlan.underlay': 'Etage darunter',
+	'drawnPlan.underlayHint': 'Eine andere Etage des Gebäudes blass unter diesem Plan zeigen',
+	'drawnPlan.noUnderlay': 'Keine',
+	'drawnPlan.floorOption': '{level}: {name}',
 	'drawnPlan.showReference': 'Referenzbild anzeigen',
 	'drawnPlan.hideReference': 'Referenzbild ausblenden',
 	'drawnPlan.view3d': '3D',

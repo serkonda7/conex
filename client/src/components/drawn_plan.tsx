@@ -6,7 +6,8 @@
  * or device; an outlet opens its popover (trace and connect) like on image
  * plans. Rooms and desks linked to a location carry a label linking to it.
  * The view switches between the 2D stage and a 3D view (kept per browser;
- * three.js loads on first use). Edit swaps the view for the editor on the
+ * three.js loads on first use). In 2D, another floor of the building may
+ * show beneath the drawing (`drawn_plan_stack`). Edit swaps the view for the editor on the
  * same zoom, always in 2D.
  */
 import { IconCube, IconPencil, IconPhoto, IconTag, IconTrash } from '@tabler/icons-solidjs'
@@ -25,19 +26,25 @@ import { useDetailDelete } from './detail_page'
 import { DrawnPlanEditor } from './drawn_plan_editor'
 import { type Point, polygonCenter } from './drawn_plan_geometry'
 import {
+	createFloorStack,
+	type FloorStack,
+	UnderlayLayer,
+	UnderlayPicker,
+} from './drawn_plan_stack'
+import {
 	DeskGroupLayer,
 	DeskLayer,
 	type DeskSeat,
 	DrawnPlanStage,
 	deskSeats,
+	drawingWalls,
 	locationNames,
 	percentOf,
 	RoomLayer,
 	referenceOpacity,
 	referenceVisible,
-	type StageItem,
-	type StageWall,
 	StairLayer,
+	stageItems,
 	TrayLayer,
 	toggleReferenceVisible,
 	WallLayer,
@@ -61,22 +68,6 @@ function toggle3d(): void {
 	const next = !shown3d()
 	setShown3d(next)
 	writeStored(MODE_STORAGE_KEY, String(next))
-}
-
-/** The plan's walls with their openings, keyed by index. */
-export function drawingWalls(drawing: FloorplanDrawingJson): StageWall[] {
-	return drawing.walls.map((wall, index: number) => ({
-		key: `wall:${index}`,
-		wall,
-		openings: drawing.openings.flatMap((opening, i: number) =>
-			opening.wall === index ? [{ key: `opening:${i}`, opening }] : [],
-		),
-	}))
-}
-
-/** The plan's elements of one kind, keyed by kind and index. */
-export function stageItems<T>(kind: string, items: T[]): StageItem<T>[] {
-	return items.map((item: T, i: number) => ({ key: `${kind}:${i}`, item }))
 }
 
 /** A room's or desk's label: on the stage at `at`, linking to its location when visible. */
@@ -144,7 +135,11 @@ export function planLabels(
  * The plan as viewed, in 2D or 3D: inert walls, linked markers, toggles for
  * the mode, the reference image and the names.
  */
-function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom }): JSX.Element {
+function DrawnPlanViewer(props: {
+	drawing: FloorplanDrawingJson
+	zoom: StageZoom
+	stack: FloorStack
+}): JSX.Element {
 	const [outlet, setOutlet] = createSignal<OutletPlacement | null>(null)
 	const [pointer, setPointer] = createSignal<Point | null>(null)
 	let stage: HTMLDivElement | undefined
@@ -256,6 +251,13 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 					}}
 					onPointerMove={trackPointer}
 					onPointerLeave={() => setPointer(null)}
+					underlay={
+						<Show when={props.stack.underlayDrawing()}>
+							{(below: () => FloorplanDrawingJson) => (
+								<UnderlayLayer drawing={below()} offset={props.drawing.offset} />
+							)}
+						</Show>
+					}
 					walls={
 						<>
 							<RoomLayer rooms={stageItems('room', props.drawing.rooms)} />
@@ -273,7 +275,12 @@ function DrawnPlanViewer(props: { drawing: FloorplanDrawingJson; zoom: StageZoom
 							<WallLayer walls={drawingWalls(props.drawing)} />
 						</>
 					}
-					bar={toggles()}
+					bar={
+						<>
+							{toggles()}
+							<UnderlayPicker stack={props.stack} />
+						</>
+					}
 				>
 					<For each={labels()}>
 						{(label: PlanLabel) => (
@@ -378,6 +385,8 @@ export function DrawnPlanView(props: {
 	const [actions, setActions] = createSignal<HTMLElement>()
 	// Shared by the view and the editor, so switching modes keeps zoom and pan.
 	const zoom = createStageZoom()
+	// Likewise the floor shown beneath.
+	const stack = createFloorStack(() => props.drawing, setError)
 	onMount(() => {
 		if (queryParam('edit') === '1' && can('edit')) {
 			setEditing(true)
@@ -424,11 +433,12 @@ export function DrawnPlanView(props: {
 			</div>
 			<Show
 				when={editing()}
-				fallback={<DrawnPlanViewer drawing={props.drawing} zoom={zoom} />}
+				fallback={<DrawnPlanViewer drawing={props.drawing} zoom={zoom} stack={stack} />}
 			>
 				<DrawnPlanEditor
 					drawing={props.drawing}
 					zoom={zoom}
+					stack={stack}
 					on_saved={(saved: FloorplanDrawingJson) => {
 						props.on_saved(saved)
 						setEditing(false)

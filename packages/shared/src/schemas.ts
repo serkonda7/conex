@@ -2965,6 +2965,42 @@ export const FloorplanReferenceSchema = v.strictObject({
 
 export type FloorplanReference = v.InferOutput<typeof FloorplanReferenceSchema>
 
+/** Lowest and highest storey of a building: basements below 0, the ground floor 0. */
+export const MIN_FLOOR_LEVEL = -20
+export const MAX_FLOOR_LEVEL = 200
+
+/**
+ * Storey of a drawn plan in its building (the owning location's parent),
+ * or `null` for a plan that is not stacked with the other floors.
+ */
+const FloorLevelSchema = v.nullable(
+	v.pipe(
+		v.number('Storey must be a number'),
+		v.integer('Storey must be a whole number'),
+		v.minValue(MIN_FLOOR_LEVEL, `Storeys go down to ${MIN_FLOOR_LEVEL}`),
+		v.maxValue(MAX_FLOOR_LEVEL, `Storeys go up to ${MAX_FLOOR_LEVEL}`),
+	),
+)
+
+const OffsetCoordSchema = v.pipe(
+	v.number('Offset must be a number'),
+	v.minValue(-MAX_DRAWING_CM, 'The offset is at most 1 km'),
+	v.maxValue(MAX_DRAWING_CM, 'The offset is at most 1 km'),
+)
+
+/**
+ * Where a drawn plan's sheet lies in its building's frame: the building
+ * point (cm) of the sheet's top-left corner. Floors of one building share
+ * that frame, so a point `p` of one floor lies above or below `p + offset`
+ * of the building and `p + offset - other.offset` of another floor.
+ */
+export const FloorplanOffsetSchema = v.strictObject({
+	x: OffsetCoordSchema,
+	y: OffsetCoordSchema,
+})
+
+export type FloorplanOffset = v.InferOutput<typeof FloorplanOffsetSchema>
+
 /** Length of a wall, cm. */
 export function wallLength(wall: Pick<FloorplanWall, 'a' | 'b'>): number {
 	return Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1])
@@ -2984,6 +3020,8 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		width: SheetSideSchema,
 		height: SheetSideSchema,
 		reference: v.optional(v.nullable(FloorplanReferenceSchema), null),
+		level: v.optional(FloorLevelSchema, null),
+		offset: v.optional(FloorplanOffsetSchema, { x: 0, y: 0 }),
 		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
 		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
 		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
@@ -3071,6 +3109,15 @@ export interface FloorplanDrawingJson {
 	height: number
 	/** The reference image and where it lies; `null` without one. */
 	reference: (FloorplanReference & { attachment: AttachmentJson }) | null
+	/** Storey in the building; `null` when not stacked. */
+	level: number | null
+	/** Where the sheet lies in the building's frame. */
+	offset: FloorplanOffset
+	/**
+	 * The location the owner lies in, whose other floors' plans stack with
+	 * this one; `null` for a site's plan or a top-level location's.
+	 */
+	building: { id: number; name: string } | null
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
 	stairs: FloorplanStair[]
@@ -3088,6 +3135,19 @@ export interface FloorplanDrawingJson {
 	has_hidden_content: boolean
 	/** Unix seconds. */
 	updated_at: number
+}
+
+/**
+ * `GET /floorplan-drawings/:id/stack`: the other stacked floors of the
+ * plan's building (plans of the owner's sibling locations with a storey),
+ * lowest first, as far as the requester may see them.
+ */
+export interface FloorplanStackFloorJson {
+	id: number
+	location_id: number
+	owner_name: string
+	level: number
+	offset: FloorplanOffset
 }
 
 /** `GET /floorplan-drawings/owner`: the owner's drawn plan, or `null`. */

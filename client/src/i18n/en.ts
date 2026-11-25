@@ -1402,6 +1402,28 @@ export const en = {
 	'drawnPlan.moveImage': 'Move',
 	'drawnPlan.calibrate': 'Set scale',
 	'drawnPlan.fitSheet': 'Fit sheet to image',
+	'drawnPlan.building': 'Building',
+	'drawnPlan.noBuilding':
+		'To stack this plan with other floors, put its location inside a building (another location).',
+	'drawnPlan.buildingHint':
+		"Floors of {name} with a storey share one frame: the offset places this sheet's top-left corner in it.",
+	'drawnPlan.storey': 'Storey',
+	'drawnPlan.notStacked': 'Not stacked',
+	'drawnPlan.offsetX': 'Offset X (m)',
+	'drawnPlan.offsetY': 'Offset Y (m)',
+	'drawnPlan.alignFloor': 'Align with floor',
+	'drawnPlan.alignFloorHint':
+		'Drag the floor beneath until it lines up; this changes the offset of this plan.',
+	'drawnPlan.pickUnderlayHint': 'Pick a floor beneath the plan to align this one with it.',
+	'drawnPlan.arrivingStairs.one':
+		'{count} flight of stairs arrives from the floor below: click its dashed outline to add it here.',
+	'drawnPlan.arrivingStairs.other':
+		'{count} flights of stairs arrive from the floor below: click a dashed outline to add it here.',
+	'drawnPlan.adoptStairs': 'Stairs from the floor below: click to add them to this floor',
+	'drawnPlan.underlay': 'Floor beneath',
+	'drawnPlan.underlayHint': 'Show another floor of the building faded under this plan',
+	'drawnPlan.noUnderlay': 'None',
+	'drawnPlan.floorOption': '{level}: {name}',
 	'drawnPlan.showReference': 'Show the reference image',
 	'drawnPlan.hideReference': 'Hide the reference image',
 	'drawnPlan.view3d': '3D',

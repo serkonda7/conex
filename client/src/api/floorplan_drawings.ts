@@ -1,7 +1,7 @@
 /**
  * Drawn floor plans (v2) over the hono RPC client: the owner's plan, create,
  * load, save (one PUT of the whole plan), delete, the editor's candidates
- * and link locations, and the paged list.
+ * link locations and the building's other floors, and the paged list.
  */
 import type { Result } from 'better-result'
 import type {
@@ -15,9 +15,11 @@ import type {
 	FloorplanDrawingRefJson,
 	FloorplanLinkLocationJson,
 	FloorplanListQuery,
+	FloorplanOffset,
 	FloorplanOpening,
 	FloorplanReference,
 	FloorplanRoom,
+	FloorplanStackFloorJson,
 	FloorplanStair,
 	FloorplanTray,
 	FloorplanWall,
@@ -33,9 +35,11 @@ export type {
 	FloorplanDrawingPlacementJson,
 	FloorplanDrawingPut,
 	FloorplanLinkLocationJson,
+	FloorplanOffset,
 	FloorplanOpening,
 	FloorplanReference,
 	FloorplanRoom,
+	FloorplanStackFloorJson,
 	FloorplanStair,
 	FloorplanTray,
 	FloorplanWall,
@@ -100,6 +104,14 @@ export async function fetch_drawing_locations(
 ): Promise<Result<FloorplanLinkLocationJson[], Error>> {
 	const res = await client['floorplan-drawings'][':id'].locations.$get(by_id(id))
 	return to_result<FloorplanLinkLocationJson[]>(res, failed.load('noun.drawnFloorplan'))
+}
+
+/** The other stacked floors of this plan's building, lowest first. */
+export async function fetch_drawing_stack(
+	id: number,
+): Promise<Result<FloorplanStackFloorJson[], Error>> {
+	const res = await client['floorplan-drawings'][':id'].stack.$get(by_id(id))
+	return to_result<FloorplanStackFloorJson[]>(res, failed.load('noun.drawnFloorplan'))
 }
 
 export type DrawingSort = FloorplanListQuery['sort']
