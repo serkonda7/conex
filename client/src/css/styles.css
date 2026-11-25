@@ -3364,7 +3364,8 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 }
 
 /* Cable connect dialog: step indicator, peer card, port tile grid. */
-.modal.connect-dialog {
+.modal.connect-dialog,
+.modal.rack-device-dialog {
 	--modal-width: 40rem;
 }
 

@@ -972,7 +972,7 @@ export const de: Messages = {
 	'device.connected': 'verbunden',
 	'device.alreadyConnected': 'Bereits verbunden',
 	'device.incompatiblePort': 'Inkompatibler Anschlusstyp',
-	'device.rackedIn': 'Eingebaut in {place}',
+	'device.rackedIn': '{place}',
 	'device.connectToPeer': '{name} mit einem Gegenanschluss verbinden',
 	'device.connectCableFor': 'Kabel für {name} verbinden',
 	'device.editPort': 'Anschluss {name} bearbeiten',

@@ -126,14 +126,15 @@ export function DeviceAddPage(): JSX.Element {
 		(key: number) => fetch_locations({ site: [key] }),
 		form.setError,
 	)
-	// 0U types are not rack-mounted.
+	// 0U types can be assigned to a rack but take no U: no face or position.
 	const zeroHeight = (): boolean => {
 		const id = parseId(typeId())
 		return (types() ?? []).find((type) => type.id === id)?.u_height === 0
 	}
 	createEffect(() => {
-		if (zeroHeight() && shelfId() === null) {
-			handleRackChange('')
+		if (zeroHeight()) {
+			setFace('')
+			setPositionU('')
 		}
 	})
 
@@ -154,7 +155,7 @@ export function DeviceAddPage(): JSX.Element {
 
 	// The tenant comes from the global tenant selection, which also limits the sites,
 	// racks and employees.
-	const siteOptions = useNewObjectSites(sites, siteId, () => handleSiteChange(''))
+	const siteOptions = useNewObjectSites(sites, siteId, handleSiteChange)
 	createEffect(() => {
 		const rack = selectedRack()
 		const tenant = newObjectTenantId()
@@ -336,8 +337,8 @@ export function DeviceAddPage(): JSX.Element {
 					racks={row_options(racks() ?? [])}
 					rackEmptyLabel={t('common.selectPlaceholder')}
 					faceEmptyLabel={t('shelf.face')}
-					rackDisabled={shelfId() !== null || zeroHeight()}
-					mountDisabled={rackId() === '' || shelfId() !== null}
+					rackDisabled={shelfId() !== null}
+					mountDisabled={rackId() === '' || shelfId() !== null || zeroHeight()}
 					hint={
 						<Show when={shelfId() !== null}>
 							<Hint>{t('device.onShelfHint', { name: shelfName() })}</Hint>

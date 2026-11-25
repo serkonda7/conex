@@ -44,7 +44,7 @@ export function RackAddPage(): JSX.Element {
 	)
 
 	// The tenant comes from the global tenant selection, which also limits the sites.
-	const siteOptions = useNewObjectSites(sites, siteId, () => handleSiteChange(''))
+	const siteOptions = useNewObjectSites(sites, siteId, handleSiteChange)
 
 	function handleSiteChange(value: string): void {
 		setSiteId(value)
