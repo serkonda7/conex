@@ -1,8 +1,10 @@
 /**
  * Stage of a drawn floor plan, shared by the view and the editor: the sheet
- * in a `ZoomViewport` (design decision 0003) with the reference image, the
- * grid, the rooms, stairs, desks, desk groups and cable trays, the walls with their doors
- * and windows, and the owner's overlay pieces (`children`) on top.
+ * in a `ZoomViewport` (design decision 0003) with the reference image,
+ * another floor of the building faded beneath (the underlay), the grid,
+ * the rooms, stairs, desks, desk groups and cable trays, the walls with
+ * their doors and windows, and the owner's overlay pieces (`children`) on
+ * top.
  *
  * The SVG's user units are the sheet's centimeters (`viewBox` = sheet), so
  * walls are drawn at their real size. HTML overlay pieces (markers, labels,
@@ -21,6 +23,7 @@ import type {
 } from 'shared/src/schemas'
 import { createMemo, createSignal, createUniqueId, For, type JSX, Show } from 'solid-js'
 import { type AttachmentJson, attachment_file_url } from '../api/attachments'
+import type { FloorplanDrawingJson } from '../api/floorplan_drawings'
 import { locale, t } from '../i18n'
 import { readStored, writeStored } from '../lib/storage'
 import {
@@ -501,6 +504,22 @@ export function WallLayer(props: {
 	)
 }
 
+/** The plan's walls with their openings, keyed by index. */
+export function drawingWalls(drawing: FloorplanDrawingJson): StageWall[] {
+	return drawing.walls.map((wall, index: number) => ({
+		key: `wall:${index}`,
+		wall,
+		openings: drawing.openings.flatMap((opening, i: number) =>
+			opening.wall === index ? [{ key: `opening:${i}`, opening }] : [],
+		),
+	}))
+}
+
+/** The plan's elements of one kind, keyed by kind and index. */
+export function stageItems<T>(kind: string, items: T[]): StageItem<T>[] {
+	return items.map((item: T, i: number) => ({ key: `${kind}:${i}`, item }))
+}
+
 /** Pointer position on the sheet, for the readout below the stage. */
 function PointerReadout(props: { pointer: Point | null }): JSX.Element {
 	return (
@@ -527,6 +546,8 @@ export function DrawnPlanStage(props: {
 	reference_opacity: number
 	/** Grid step in cm; `null` hides the grid. */
 	grid: number | null
+	/** Another floor drawn faded under this one, clipped to the sheet. */
+	underlay?: JSX.Element
 	walls: JSX.Element
 	svg?: JSX.Element
 	children?: JSX.Element
@@ -589,6 +610,9 @@ export function DrawnPlanStage(props: {
 							opacity={props.reference_opacity}
 						/>
 					)}
+				</Show>
+				<Show when={props.underlay}>
+					<g clip-path={`url(#${clipId})`}>{props.underlay}</g>
 				</Show>
 				<Show when={props.grid}>
 					{(step: () => number) => (

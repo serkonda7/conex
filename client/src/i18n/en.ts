@@ -4,6 +4,7 @@ export const en = {
 	'common.add': '+ Add',
 	'common.edit': 'Edit',
 	'common.clone': 'Clone',
+	'common.back': 'Back',
 	'common.delete': 'Delete',
 	'common.cancel': 'Cancel',
 	'common.create': 'Create',
@@ -414,6 +415,7 @@ export const en = {
 	'employee.addEmail': 'Add email address',
 	'employee.addPhone': 'Add phone number',
 	'employee.tenants': 'Tenants',
+	'employee.primaryTenant': 'Primary tenant',
 	'employee.loginRole': 'Login role',
 	'employee.account': 'Account',
 	'employee.noAccount': 'No account.',
@@ -887,11 +889,13 @@ export const en = {
 	'device.moveTenant': 'Move',
 	'device.moveTenantTitle': 'Move device {name}',
 	'device.moveTenantHint': 'Moving clears the site, location and rack.',
-	'device.templateSync.button': 'Update ports from device type',
-	'device.templateSync.title': 'Update ports of {name}',
-	'device.templateSync.column': 'Ports',
-	'device.templateSync.loading': 'Comparing ports…',
-	'device.templateSync.upToDate': 'The ports match the device type.',
+	'device.templateSync.button': 'Update from device type',
+	'device.templateSync.title': 'Update {name} from device type',
+	'device.templateSync.column': 'Sync',
+	'device.templateSync.loading': 'Comparing with device type…',
+	'device.templateSync.upToDate': 'The ports and role match the device type.',
+	'device.templateSync.role': 'Role',
+	'device.templateSync.roleChange': 'Change role: {from} → {to}',
 	'device.templateSync.orphaned': 'Ports no longer in the device type ({count})',
 	'device.templateSync.mapTo': 'Rename to {name}',
 	'device.templateSync.linkTo': 'Keep name, link to {name}',
@@ -1177,6 +1181,7 @@ export const en = {
 	'floorplan.notFound': 'Floor plan not found.',
 	'floorplan.open': 'Open floor plan',
 	'floorplan.edit': 'Edit floor plan',
+	'floorplan.fullscreen': 'Fullscreen',
 	'floorplan.drawArea': 'Draw area',
 	'floorplan.snap': 'Snap and align',
 	'floorplan.snapHint':
@@ -1289,6 +1294,8 @@ export const en = {
 	'drawnPlan.creating': 'Creating…',
 	'drawnPlan.empty':
 		'Nothing is drawn yet. Edit the drawing to draw walls, doors and windows, optionally over a reference image, and to place racks, devices and outlets.',
+	'drawnPlan.disclaimer':
+		'The drawing is only a visualization: measurements and distances may not be accurate.',
 	'drawnPlan.listEmpty':
 		'No drawn floor plans yet. Draw one from the page of a site or location.',
 	'drawnPlan.walls': 'Walls',
@@ -1298,7 +1305,7 @@ export const en = {
 	'drawnPlan.planTab': 'Plan',
 	'drawnPlan.elements': 'Elements',
 	'drawnPlan.drawHint':
-		'Pick an element (or press its number key), then click on the plan. Drag doors and windows onto a wall. Ctrl + D duplicates the selection beside it (again to repeat the step); the arrow keys move it by 10 cm, with Shift by 1 m, with Alt by 1 cm.',
+		'Pick an element (or press its number key), then click on the plan. Drag doors and windows onto a wall. Ctrl + D duplicates the selection beside it (again to repeat the step); the arrow keys move it by 10 cm, with Shift by 1 m, with Alt by 1 cm. V (or Escape) drops the tool, then the selection.',
 	'drawnPlan.openingPlaceHint': 'Drag onto a wall, or click and then click a wall',
 	'drawnPlan.tools': 'Drawing tools',
 	'drawnPlan.toolWall': 'Wall',
@@ -1397,6 +1404,31 @@ export const en = {
 	'drawnPlan.moveImage': 'Move',
 	'drawnPlan.calibrate': 'Set scale',
 	'drawnPlan.fitSheet': 'Fit sheet to image',
+	'drawnPlan.building': 'Building',
+	'drawnPlan.noBuilding':
+		'To stack this plan with other floors, make its location a floor or put it inside a building (another location).',
+	'drawnPlan.buildingHint':
+		"The floors of {name} share one frame: the offset places this sheet's top-left corner in it. The storey orders them; stairs arrive from the storey below.",
+	'drawnPlan.storey': 'Storey',
+	'drawnPlan.notStacked': 'Not stacked',
+	'drawnPlan.offsetX': 'Offset X (m)',
+	'drawnPlan.offsetY': 'Offset Y (m)',
+	'drawnPlan.alignFloor': 'Align with floor',
+	'drawnPlan.alignFloorHint':
+		'Drag the floor beneath until it lines up; this changes the offset of this plan.',
+	'drawnPlan.pickUnderlayHint': 'Pick a floor beneath the plan to align this one with it.',
+	'drawnPlan.arrivingStairs.one':
+		'{count} flight of stairs arrives from the floor below: click its dashed outline to add it here.',
+	'drawnPlan.arrivingStairs.other':
+		'{count} flights of stairs arrive from the floor below: click a dashed outline to add it here.',
+	'drawnPlan.adoptStairs': 'Stairs from the floor below: click to add them to this floor',
+	'drawnPlan.underlay': 'Floor beneath',
+	'drawnPlan.underlayHint': 'Show another floor of the building faded under this plan',
+	'drawnPlan.noUnderlay': 'None',
+	'drawnPlan.snapUnderlay': 'Snap to floor',
+	'drawnPlan.snapUnderlayHint':
+		'Also snap to the walls, stairs and rooms of the floor beneath (needs snapping on)',
+	'drawnPlan.floorOption': '{level}: {name}',
 	'drawnPlan.showReference': 'Show the reference image',
 	'drawnPlan.hideReference': 'Hide the reference image',
 	'drawnPlan.view3d': '3D',

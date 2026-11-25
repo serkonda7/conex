@@ -58,6 +58,7 @@ import {
 	type ShownMarker,
 } from './floorplan_stage'
 import { IconLabel } from './icon_label'
+import { PlanFullscreenTitle } from './plan_fullscreen'
 import { createStageZoom, type StageZoom } from './zoom_viewport'
 
 /**
@@ -452,17 +453,19 @@ export function FloorplanView(props: {
 	return (
 		<>
 			<div class="page-header">
-				<h2>{props.title}</h2>
-				{/* The editor puts Cancel / Save here, so the header keeps its height. */}
-				<Show when={can('edit') && plan()}>
-					<div class="form-actions" ref={setActions}>
-						<Show when={!editing()}>
-							<button type="button" onClick={() => setEditing(true)}>
-								<IconLabel icon={IconPencil}>{t('floorplan.edit')}</IconLabel>
-							</button>
-						</Show>
-					</div>
-				</Show>
+				<PlanFullscreenTitle>{props.title}</PlanFullscreenTitle>
+				<div class="page-header-actions">
+					{/* The editor puts Cancel / Save here, so the header keeps its height. */}
+					<Show when={can('edit') && plan()}>
+						<div class="form-actions" ref={setActions}>
+							<Show when={!editing()}>
+								<button type="button" onClick={() => setEditing(true)}>
+									<IconLabel icon={IconPencil}>{t('floorplan.edit')}</IconLabel>
+								</button>
+							</Show>
+						</div>
+					</Show>
+				</div>
 			</div>
 			<Show when={!plan.loading} fallback={<Loading message={t('floorplan.loading')} />}>
 				<Show when={plan()}>

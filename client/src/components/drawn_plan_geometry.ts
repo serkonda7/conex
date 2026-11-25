@@ -369,6 +369,8 @@ export interface OpeningShape {
 	/** Sliding door: the half-open panel beside the wall, and the arrow it slides along. */
 	panel: Point[] | null
 	slide: string | null
+	/** Points around everything drawn (the swing arc, the panel), for the selection's box. */
+	extent: Point[]
 }
 
 /** SVG path of a line from `from` to `to` with an arrowhead `head` cm long at `to`. */
@@ -387,7 +389,7 @@ export function openingShape(wall: FloorplanWall, opening: OpeningPlan): Opening
 	const start = along(wall.a, u, from)
 	const end = along(wall.a, u, to)
 	const gap = strip(wall.a, wall.b, wall.thickness, from, to)
-	const none = { leaf: null, arc: null, glass: null, panel: null, slide: null }
+	const none = { leaf: null, arc: null, glass: null, panel: null, slide: null, extent: gap }
 	if (opening.kind === 'window') {
 		return { start, end, gap, ...none, glass: [start, end] }
 	}
@@ -412,7 +414,7 @@ export function openingShape(wall: FloorplanWall, opening: OpeningPlan): Opening
 			along(wall.a, u, tip),
 			Math.min(15, width / 4),
 		)
-		return { start, end, gap, ...none, panel, slide }
+		return { start, end, gap, ...none, panel, slide, extent: [...gap, ...panel] }
 	}
 	const hinge = opening.hinge === 'start' ? start : end
 	const closed = opening.hinge === 'start' ? end : start
@@ -423,7 +425,13 @@ export function openingShape(wall: FloorplanWall, opening: OpeningPlan): Opening
 		(closed[1] - hinge[1]) * (open[0] - hinge[0])
 	const sweep = cross > 0 ? 1 : 0
 	const arc = `M ${closed[0]} ${closed[1]} A ${width} ${width} 0 0 ${sweep} ${open[0]} ${open[1]}`
-	return { start, end, gap, ...none, leaf: [hinge, open], arc }
+	// The quarter circle from the closed leaf to the open one.
+	const shut = direction(hinge, closed)
+	const swing = Array.from({ length: 7 }, (_, i): Point => {
+		const angle = (Math.PI / 2) * (i / 6)
+		return along(along(hinge, shut, width * Math.cos(angle)), n, side * width * Math.sin(angle))
+	})
+	return { start, end, gap, ...none, leaf: [hinge, open], arc, extent: [...gap, ...swing] }
 }
 
 /** What the stage draws for stairs. */

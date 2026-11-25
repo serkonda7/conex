@@ -1106,6 +1106,11 @@ export const floorplan_drawings = pgTable(
 			onDelete: 'set null',
 		}),
 		reference_frame: jsonb('reference_frame').$type<{ x: number; y: number; width: number }>(),
+		// Storey in the building (the owning location's parent); null when not stacked.
+		level: integer('level'),
+		// Building point (cm) of the sheet's top-left corner, shared by the stacked floors.
+		offset_x: doublePrecision('offset_x').notNull().default(0),
+		offset_y: doublePrecision('offset_y').notNull().default(0),
 		walls: jsonb('walls')
 			.$type<
 				{ a: [number, number]; b: [number, number]; thickness: number; height: number }[]

@@ -7,10 +7,11 @@
  *   it to move it. A selected wall, flight of stairs, tray or desk shows
  *   handles on its ends, a room on its corners, a desk group on its divider
  *   ends (drag to rotate); walls (and trays) joined at a moved end follow
- *   it. Below the selection sit quick actions (rotate 90°, flip, duplicate,
- *   delete); a desk, desk group or stairs shows its distances to the
- *   nearest objects on each side, a door or window to the ends of its
- *   stretch of wall. The inspector below the stage edits the selection
+ *   it. Off the selection's bottom right corner (top or left near the
+ *   sheet's edges) sit quick actions (rotate 90°, flip, a door's hinge,
+ *   duplicate, delete); a desk, desk group or stairs shows its distances
+ *   to the nearest objects on each side, a door or window to the ends of
+ *   its stretch of wall. The inspector below the stage edits the selection
  *   (length, thickness, width, heights, swing, steps, depth, rotation,
  *   linked locations, label) and deletes it.
  * - Drawing tools stay picked after each element, until Escape or another
@@ -37,7 +38,9 @@
  *   lines up its edges or center with other objects along dashed guides;
  *   otherwise everything takes 10 cm steps. Lines from a previous point keep
  *   multiples of 15°; Shift frees the angle.
- * - Keys: 1–9 pick the Draw tab's elements (unless typing a length), Ctrl + D duplicates the
+ * - Keys: V does what Escape does (the browser keeps Escape in fullscreen):
+ *   drops what is being drawn, then the tool, then the selection. 1–9 pick
+ *   the Draw tab's elements (unless typing a length), Ctrl + D duplicates the
  *   selection beside it (again on the copy repeats the step), the arrow
  *   keys nudge it (10 cm, Shift 1 m, Alt 1 cm).
  * - Reference image: one of the owner's images (or a new upload) under the
@@ -51,9 +54,11 @@ import {
 	IconArrowBackUp,
 	IconArrowForwardUp,
 	IconArrowsHorizontal,
+	IconArrowsMove,
 	IconCopy,
 	IconDesk,
 	IconDoor,
+	IconFlipHorizontal,
 	IconFlipVertical,
 	IconMagnet,
 	IconPhotoUp,
@@ -83,6 +88,7 @@ import {
 	MAX_DESK_HEIGHT,
 	MAX_DRAWING_CM,
 	MAX_DRAWING_HEIGHT,
+	MAX_FLOOR_LEVEL,
 	MAX_OPENING_WIDTH,
 	MAX_ROOM_POINTS,
 	MAX_STAIR_STEPS,
@@ -92,6 +98,7 @@ import {
 	MIN_DESK_DEPTH,
 	MIN_DESK_GROUP_ARM,
 	MIN_DESK_HEIGHT,
+	MIN_FLOOR_LEVEL,
 	MIN_OPENING_HEIGHT,
 	MIN_OPENING_WIDTH,
 	MIN_STAIR_RISE,
@@ -128,6 +135,7 @@ import {
 	type FloorplanDrawingPlacementJson,
 	type FloorplanDrawingPut,
 	type FloorplanLinkLocationJson,
+	type FloorplanOffset,
 	type FloorplanOpening,
 	type FloorplanRoom,
 	type FloorplanStair,
@@ -137,7 +145,7 @@ import {
 	fetch_drawing_locations,
 	put_drawing,
 } from '../api/floorplan_drawings'
-import { type MessageKey, t } from '../i18n'
+import { type MessageKey, t, tp } from '../i18n'
 import { locationTypeLabel } from '../i18n/labels'
 import { createRows, createRowsFor, useAction } from '../lib/resource'
 import { useLeaveGuard } from '../lib/router'
@@ -187,6 +195,20 @@ import {
 	snapShift,
 } from './drawn_plan_snap'
 import {
+	arrivingStairs,
+	createFloorDrawing,
+	type FloorStack,
+	floorBelow,
+	GhostStairLayer,
+	UnderlayLayer,
+	UnderlayPicker,
+	UnderlaySnapToggle,
+	type UnderlayTargets,
+	underlaySnapEnabled,
+	underlayTargets,
+	withTargets,
+} from './drawn_plan_stack'
+import {
 	DeskGroupLayer,
 	DeskLayer,
 	type DeskSeat,
@@ -230,6 +252,9 @@ const MIN_WALL = 1
 
 /** Pointer travel on screen (px) that turns a press of the desk tool into a drag. */
 const DRAG_PX = 4
+
+/** Share of the sheet's width (height) past which the quick actions sit left of (above) the selection. */
+const ACTIONS_EDGE = 0.85
 
 /** Longest desk put down with one click, cm. */
 const MAX_DESK_LENGTH = 1000
@@ -373,6 +398,7 @@ type Tool =
 	| 'room'
 	| 'image'
 	| 'calibrate'
+	| 'align'
 
 function isOpeningKind(value: unknown): value is OpeningKind {
 	return value === 'door' || value === 'sliding_door' || value === 'window'
@@ -455,6 +481,8 @@ interface Selected {
 interface Snapshot {
 	sheet: Sheet
 	reference: StageReference | null
+	level: number | null
+	offset: FloorplanOffset
 	walls: EditWall[]
 	openings: EditOpening[]
 	stairs: EditStair[]
@@ -518,6 +546,8 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 					width: round2(state.reference.width),
 				}
 			: null,
+		level: state.level,
+		offset: { x: round2(state.offset.x), y: round2(state.offset.y) },
 		walls: walls.map((wall: EditWall) => ({
 			a: roundPoint(wall.a),
 			b: roundPoint(wall.b),
@@ -753,6 +783,8 @@ function LocationField(props: {
 export function DrawnPlanEditor(props: {
 	drawing: FloorplanDrawingJson
 	zoom: StageZoom
+	/** The building's other floors and the underlay, shared with the view. */
+	stack: FloorStack
 	on_saved: (drawing: FloorplanDrawingJson) => void
 	on_cancel: () => void
 	/** Page header slot the Cancel / Save buttons render into, in place of Edit. */
@@ -773,6 +805,8 @@ export function DrawnPlanEditor(props: {
 		height: props.drawing.height,
 	})
 	const [reference, setReference] = createSignal<StageReference | null>(props.drawing.reference)
+	const [level, setLevel] = createSignal<number | null>(props.drawing.level)
+	const [sheetOffset, setSheetOffset] = createSignal<FloorplanOffset>(props.drawing.offset)
 	const [walls, setWalls] = createSignal<EditWall[]>(initialWalls)
 	const [openings, setOpenings] = createSignal<EditOpening[]>(
 		props.drawing.openings.map(({ wall, ...opening }: FloorplanOpening, i: number) => ({
@@ -859,9 +893,19 @@ export function DrawnPlanEditor(props: {
 		locationNames([...props.drawing.linked_locations, ...(linkLocations() ?? [])]),
 	)
 
+	/** The nearest floor below at the draft's storey, whose stairs arrive here. */
+	const below = createMemo(() => floorBelow(props.stack.floors(), level()))
+	const [belowDrawing] = createFloorDrawing(() => below()?.id, setError)
+	const ghostStairs = createMemo((): FloorplanStair[] => {
+		const plan = below() ? belowDrawing() : null
+		return plan ? arrivingStairs(plan, sheetOffset(), sheet(), stairs()) : []
+	})
+
 	const snapshot = (): Snapshot => ({
 		sheet: sheet(),
 		reference: reference(),
+		level: level(),
+		offset: sheetOffset(),
 		walls: walls(),
 		openings: openings(),
 		stairs: stairs(),
@@ -910,6 +954,11 @@ export function DrawnPlanEditor(props: {
 		return current?.kind === 'opening'
 			? openings().find((opening: EditOpening) => opening.id === current.id)
 			: undefined
+	})
+	/** The selected door or sliding door, which has a hinge. */
+	const selectedDoor = createMemo(() => {
+		const opening = selectedOpening()
+		return opening && opening.kind !== 'window' ? opening : undefined
 	})
 	const stageStairs = createMemo((): StageStair[] =>
 		stairs().map((stair: EditStair) => ({ key: `stair:${stair.id}`, stair })),
@@ -977,6 +1026,8 @@ export function DrawnPlanEditor(props: {
 	function restore(state: Snapshot): void {
 		setSheet(state.sheet)
 		setReference(state.reference)
+		setLevel(state.level)
+		setSheetOffset(state.offset)
 		setWalls(state.walls)
 		setOpenings(state.openings)
 		setStairs(state.stairs)
@@ -1062,16 +1113,25 @@ export function DrawnPlanEditor(props: {
 	/** Wall ends and wall lines (reaching half their thickness), but not of the walls in `exclude`. */
 	function wallTargets(exclude: Set<number> = new Set()): SnapTargets {
 		const targets = walls().filter((wall: EditWall) => !exclude.has(wall.id))
-		return {
-			points: targets.flatMap((wall: EditWall) => [wall.a, wall.b]),
-			lines: targets.map((wall: EditWall) => ({
-				a: wall.a,
-				b: wall.b,
-				reach: wall.thickness / 2,
-			})),
-			boxes: [],
-		}
+		return withTargets(
+			{
+				points: targets.flatMap((wall: EditWall) => [wall.a, wall.b]),
+				lines: targets.map((wall: EditWall) => ({
+					a: wall.a,
+					b: wall.b,
+					reach: wall.thickness / 2,
+				})),
+				boxes: [],
+			},
+			belowTargets()?.walls,
+		)
 	}
+
+	/** What the floor beneath offers to snap to, while shown and snapped to. */
+	const belowTargets = createMemo((): UnderlayTargets | null => {
+		const other = props.stack.underlayDrawing()
+		return other && underlaySnapEnabled() ? underlayTargets(other, sheetOffset()) : null
+	})
 
 	const faces = createMemo(() => wallFaceTargets(walls()))
 
@@ -1117,32 +1177,40 @@ export function DrawnPlanEditor(props: {
 	function objectTargets(exclude: Set<string> = new Set()): SnapTargets {
 		const { points, faces: lines } = faces()
 		const others = outlines().filter((outline) => !exclude.has(outline.key))
-		return {
-			points: [...points, ...others.flatMap((outline) => outline.points)],
-			lines: [
-				...lines.map(([a, b]) => ({ a, b, reach: 0 })),
-				...others.flatMap((outline) => outline.edges.map(([a, b]) => ({ a, b, reach: 0 }))),
-			],
-			boxes: [...wallBoxes(), ...others.map((outline) => boxOf(outline.points))],
-		}
+		return withTargets(
+			{
+				points: [...points, ...others.flatMap((outline) => outline.points)],
+				lines: [
+					...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+					...others.flatMap((outline) =>
+						outline.edges.map(([a, b]) => ({ a, b, reach: 0 })),
+					),
+				],
+				boxes: [...wallBoxes(), ...others.map((outline) => boxOf(outline.points))],
+			},
+			belowTargets()?.objects,
+		)
 	}
 
 	/** What a cable tray snaps to: the walls' faces and the other trays' ends and lines (not those in `exclude`). */
 	function trayTargets(exclude: Set<number> = new Set()): SnapTargets {
 		const { points, faces: lines } = faces()
 		const others = trays().filter((tray: EditTray) => !exclude.has(tray.id))
-		return {
-			points: [...points, ...others.flatMap((tray: EditTray) => [tray.a, tray.b])],
-			lines: [
-				...lines.map(([a, b]) => ({ a, b, reach: 0 })),
-				...others.map((tray: EditTray) => ({
-					a: tray.a,
-					b: tray.b,
-					reach: tray.width / 2,
-				})),
-			],
-			boxes: wallBoxes(),
-		}
+		return withTargets(
+			{
+				points: [...points, ...others.flatMap((tray: EditTray) => [tray.a, tray.b])],
+				lines: [
+					...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+					...others.map((tray: EditTray) => ({
+						a: tray.a,
+						b: tray.b,
+						reach: tray.width / 2,
+					})),
+				],
+				boxes: wallBoxes(),
+			},
+			belowTargets()?.objects,
+		)
 	}
 
 	/** What a new object snaps to, while drawing it. */
@@ -1606,6 +1674,21 @@ export function DrawnPlanEditor(props: {
 		})
 	}
 
+	/** Drags the underlay into place: this floor's offset moves the other way. */
+	function dragUnderlay(e: PointerEvent): void {
+		const start = sheetOffset()
+		const from = stagePoint(e)
+		startEdit(e, (at: Point, ev: PointerEvent) => {
+			let x = start.x - (at[0] - from[0])
+			let y = start.y - (at[1] - from[1])
+			if (snapping(ev)) {
+				x = snapAxis(x)
+				y = snapAxis(y)
+			}
+			setSheetOffset({ x, y })
+		})
+	}
+
 	// --- edits --------------------------------------------------------------
 
 	function patchWall(id: number, patch: Partial<EditWall>): void {
@@ -1724,6 +1807,37 @@ export function DrawnPlanEditor(props: {
 			{ id, a, b, width: DEFAULT_STAIR_WIDTH, steps, rise: defaultStairRise(steps) },
 		])
 		setSelected({ kind: 'stair', id })
+	}
+
+	/** Takes over stairs arriving from the floor below as this floor's own. */
+	function adoptStair(stair: FloorplanStair): void {
+		checkpoint()
+		const id = freshId()
+		setStairs((all: EditStair[]) => [...all, { ...stair, id }])
+		setSelected({ kind: 'stair', id })
+	}
+
+	/** Sets the storey; an empty field takes the plan out of the stack. */
+	function commitLevel(raw: string): void {
+		const value = raw.trim() === '' ? null : Number(raw)
+		if (
+			value !== null &&
+			(!Number.isInteger(value) || value < MIN_FLOOR_LEVEL || value > MAX_FLOOR_LEVEL)
+		) {
+			return
+		}
+		if (value !== level()) {
+			checkpoint()
+			setLevel(value)
+		}
+	}
+
+	function setOffsetAxis(axis: 'x' | 'y', meters: number): void {
+		const value = Math.round(meters * 100)
+		if (value !== sheetOffset()[axis]) {
+			checkpoint()
+			setSheetOffset({ ...sheetOffset(), [axis]: value })
+		}
 	}
 
 	function addTray(a: Point, b: Point): void {
@@ -2062,7 +2176,7 @@ export function DrawnPlanEditor(props: {
 		if (kind === 'opening') {
 			const opening = openings().find((o: EditOpening) => o.id === id)
 			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
-			return opening && wall ? openingShape(wall, opening).gap : []
+			return opening && wall ? openingShape(wall, opening).extent : []
 		}
 		return selectionPoints(current)
 	}
@@ -2136,6 +2250,16 @@ export function DrawnPlanEditor(props: {
 		}
 	}
 
+	/** Moves a door's hinge to the opening's other end; a sliding door slides open the other way. */
+	function flipHinge(opening: EditOpening): void {
+		checkpoint()
+		patchOpening(opening.id, { hinge: opening.hinge === 'start' ? 'end' : 'start' })
+	}
+
+	/** Label of `flipHinge` for `opening`. */
+	const hingeLabel = (opening: EditOpening): string =>
+		t(opening.kind === 'sliding_door' ? 'drawnPlan.flipSlide' : 'drawnPlan.flipHinge')
+
 	/** Title of the flip action of the selection. */
 	function flipLabel(current: Selected): string {
 		if (current.kind === 'desk') {
@@ -2151,7 +2275,11 @@ export function DrawnPlanEditor(props: {
 		)
 	}
 
-	/** Box of the selection the actions sit below; none for a marker, which has its own remove button. */
+	/**
+	 * Box of the selection; the actions sit off one of its corners, clear of
+	 * the selection and of its distances (from the middle of each side).
+	 * None for a marker, which has its own remove button.
+	 */
 	const selectionBox = createMemo((): Box | null => {
 		const current = selected()
 		if (!current || current.kind === 'marker') {
@@ -2159,6 +2287,20 @@ export function DrawnPlanEditor(props: {
 		}
 		const outline = selectionOutline(current)
 		return outline.length > 0 ? boxOf(outline) : null
+	})
+
+	/**
+	 * Corner of the selection's box the actions sit off: the bottom right one,
+	 * or the left or top one near the sheet's right or bottom edge, where the
+	 * stage would cut them off.
+	 */
+	const actionsCorner = createMemo(() => {
+		const box = selectionBox()
+		const { width, height } = sheet()
+		return {
+			left: box !== null && box.x1 > width * ACTIONS_EDGE,
+			up: box !== null && box.y1 > height * ACTIONS_EDGE,
+		}
 	})
 
 	/**
@@ -2644,6 +2786,9 @@ export function DrawnPlanEditor(props: {
 			case 'image':
 				dragReference(e)
 				return
+			case 'align':
+				dragUnderlay(e)
+				return
 			case 'calibrate': {
 				const current = calibration()
 				if (!current) {
@@ -2739,6 +2884,8 @@ export function DrawnPlanEditor(props: {
 			redo()
 			return
 		}
+		// V drops like Escape, which a fullscreen browser keeps for itself.
+		const drop = e.key === 'Escape' || (!mod && !e.altKey && e.key.toLowerCase() === 'v')
 		if (drawFrom() && !mod && !e.altKey) {
 			// While drawing, digits type the next line's length instead of picking a tool.
 			const decimal = (e.key === '.' || e.key === ',') && !/[.,]/.test(typed())
@@ -2752,7 +2899,7 @@ export function DrawnPlanEditor(props: {
 				setTyped(typed().slice(0, -1))
 				return
 			}
-			if (e.key === 'Escape' && typed() !== '') {
+			if (drop && typed() !== '') {
 				e.preventDefault()
 				setTyped('')
 				return
@@ -2769,7 +2916,7 @@ export function DrawnPlanEditor(props: {
 			finishRoom()
 			return
 		}
-		if (e.key === 'Escape' || e.key === 'Enter') {
+		if (drop || e.key === 'Enter') {
 			if (chain() || lineStart() || roomDraft() || calibration() || sequence() !== null) {
 				e.preventDefault()
 				setTyped('')
@@ -2780,7 +2927,7 @@ export function DrawnPlanEditor(props: {
 				setSequence(null)
 				return
 			}
-			if (e.key === 'Escape') {
+			if (drop) {
 				if (tool() !== 'select') {
 					setTool('select')
 				} else {
@@ -3368,6 +3515,94 @@ export function DrawnPlanEditor(props: {
 									</p>
 								</Match>
 							</Switch>
+
+							<h5>{t('drawnPlan.building')}</h5>
+							<Show
+								when={props.drawing.building}
+								fallback={<p class="floorplan-hint">{t('drawnPlan.noBuilding')}</p>}
+							>
+								{(building: () => { name: string }) => (
+									<>
+										<p class="floorplan-hint">
+											{t('drawnPlan.buildingHint', { name: building().name })}
+										</p>
+										<div class="drawn-plan-fields">
+											<label>
+												<span>{t('drawnPlan.storey')}</span>
+												<input
+													type="number"
+													class="drawn-plan-control"
+													value={level() === null ? '' : String(level())}
+													min={MIN_FLOOR_LEVEL}
+													max={MAX_FLOOR_LEVEL}
+													step={1}
+													placeholder={t('drawnPlan.notStacked')}
+													onChange={(
+														e: Event & {
+															currentTarget: HTMLInputElement
+														},
+													) => {
+														commitLevel(e.currentTarget.value)
+														e.currentTarget.value =
+															level() === null ? '' : String(level())
+													}}
+												/>
+											</label>
+											<NumberField
+												label={t('drawnPlan.offsetX')}
+												value={sheetOffset().x / 100}
+												min={-MAX_DRAWING_CM / 100}
+												max={MAX_DRAWING_CM / 100}
+												step={0.01}
+												on_commit={(value: number) =>
+													setOffsetAxis('x', value)
+												}
+											/>
+											<NumberField
+												label={t('drawnPlan.offsetY')}
+												value={sheetOffset().y / 100}
+												min={-MAX_DRAWING_CM / 100}
+												max={MAX_DRAWING_CM / 100}
+												step={0.01}
+												on_commit={(value: number) =>
+													setOffsetAxis('y', value)
+												}
+											/>
+										</div>
+										<Show
+											when={props.stack.underlay()}
+											fallback={
+												<Show when={props.stack.floors().length > 0}>
+													<p class="floorplan-hint">
+														{t('drawnPlan.pickUnderlayHint')}
+													</p>
+												</Show>
+											}
+										>
+											<div class="drawn-plan-tools">
+												{toolButton(
+													'align',
+													IconArrowsMove,
+													t('drawnPlan.alignFloor'),
+												)}
+											</div>
+											<Show when={tool() === 'align'}>
+												<p class="floorplan-hint">
+													{t('drawnPlan.alignFloorHint')}
+												</p>
+											</Show>
+										</Show>
+										<Show when={ghostStairs().length > 0}>
+											<p class="floorplan-hint">
+												{tp(
+													'drawnPlan.arrivingStairs',
+													ghostStairs().length,
+												)}
+											</p>
+										</Show>
+									</>
+								)}
+							</Show>
 						</Match>
 					</Switch>
 				</aside>
@@ -3382,6 +3617,13 @@ export function DrawnPlanEditor(props: {
 						ref={setStage}
 						onPointerMove={(e: PointerEvent) => setPointer(stagePoint(e))}
 						onPointerLeave={() => setPointer(null)}
+						underlay={
+							<Show when={props.stack.underlayDrawing()}>
+								{(other: () => FloorplanDrawingJson) => (
+									<UnderlayLayer drawing={other()} offset={sheetOffset()} />
+								)}
+							</Show>
+						}
 						handlers={{
 							onPointerDown: () => {
 								if (tool() === 'select') {
@@ -3438,6 +3680,8 @@ export function DrawnPlanEditor(props: {
 									<IconMagnet size={12} aria-hidden="true" />
 									<span>{t('drawnPlan.snap')}</span>
 								</button>
+								<UnderlayPicker stack={props.stack} />
+								<UnderlaySnapToggle stack={props.stack} />
 							</>
 						}
 						walls={
@@ -3447,6 +3691,9 @@ export function DrawnPlanEditor(props: {
 									selected={selected() ? keyOf(selected() as Selected) : null}
 									on_press={pressRoom}
 								/>
+								<Show when={tool() === 'select'}>
+									<GhostStairLayer stairs={ghostStairs()} on_adopt={adoptStair} />
+								</Show>
 								<StairLayer
 									stairs={stageStairs()}
 									selected={selected() ? keyOf(selected() as Selected) : null}
@@ -3840,7 +4087,10 @@ export function DrawnPlanEditor(props: {
 							{/* biome-ignore lint/a11y/noStaticElementInteractions: Pointer-only drawing; Enter and Escape end a wall chain from the keyboard. */}
 							<div
 								class="floorplan-draw-layer"
-								classList={{ 'drawn-plan-move-layer': tool() === 'image' }}
+								classList={{
+									'drawn-plan-move-layer':
+										tool() === 'image' || tool() === 'align',
+								}}
 								onPointerDown={toolPress}
 								onPointerMove={toolHover}
 								onPointerLeave={() => {
@@ -3871,9 +4121,16 @@ export function DrawnPlanEditor(props: {
 							{(box: () => Box) => (
 								<div
 									class="drawn-plan-actions"
+									classList={{
+										'drawn-plan-actions-left': actionsCorner().left,
+										'drawn-plan-actions-up': actionsCorner().up,
+									}}
 									role="toolbar"
 									aria-label={t('drawnPlan.selectionActions')}
-									style={toPercent([(box().x0 + box().x1) / 2, box().y1])}
+									style={toPercent([
+										actionsCorner().left ? box().x0 : box().x1,
+										actionsCorner().up ? box().y0 : box().y1,
+									])}
 									onPointerDown={(e: PointerEvent) => e.stopPropagation()}
 								>
 									<Show when={canRotate(selected() as Selected)}>
@@ -3897,6 +4154,19 @@ export function DrawnPlanEditor(props: {
 										>
 											<IconFlipVertical size={14} />
 										</button>
+									</Show>
+									<Show when={selectedDoor()}>
+										{(opening: () => EditOpening) => (
+											<button
+												type="button"
+												class="drawn-plan-action"
+												aria-label={hingeLabel(opening())}
+												title={hingeLabel(opening())}
+												onClick={() => flipHinge(opening())}
+											>
+												<IconFlipHorizontal size={14} />
+											</button>
+										)}
 									</Show>
 									<button
 										type="button"
@@ -4032,23 +4302,8 @@ export function DrawnPlanEditor(props: {
 										}}
 									/>
 									<Show when={opening().kind !== 'window'}>
-										<button
-											type="button"
-											onClick={() => {
-												checkpoint()
-												patchOpening(opening().id, {
-													hinge:
-														opening().hinge === 'start'
-															? 'end'
-															: 'start',
-												})
-											}}
-										>
-											{t(
-												opening().kind === 'sliding_door'
-													? 'drawnPlan.flipSlide'
-													: 'drawnPlan.flipHinge',
-											)}
+										<button type="button" onClick={() => flipHinge(opening())}>
+											{hingeLabel(opening())}
 										</button>
 										<button
 											type="button"

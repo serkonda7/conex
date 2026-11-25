@@ -1016,15 +1016,22 @@ export interface TemplateSyncPreview {
 		suggestion: string | null
 	}[]
 	added: { name: string; side: PortSide | null; kind: string }[]
+	/**
+	 * The device's role and its type's default role when they differ; null
+	 * when they match or the type has no default role.
+	 */
+	role: { from: { id: number; name: string }; to: { id: number; name: string } } | null
 }
 
 /**
  * `POST /devices/:id/template-sync`: the decision for every orphaned port.
  * `map` takes on the name of the added port in `target`; `link` makes the
  * port that template port under its own name; `keep` leaves the port as it
- * is; `remove` deletes it (refused while it is cabled).
+ * is; `remove` deletes it (refused while it is cabled). `device_role_id`
+ * takes on the type's default role, which must still be that role.
  */
 export const TemplateSyncApplySchema = v.strictObject({
+	device_role_id: v.optional(IdSchema),
 	assignments: v.pipe(
 		v.array(
 			v.strictObject({
@@ -2958,6 +2965,42 @@ export const FloorplanReferenceSchema = v.strictObject({
 
 export type FloorplanReference = v.InferOutput<typeof FloorplanReferenceSchema>
 
+/** Lowest and highest storey of a building: basements below 0, the ground floor 0. */
+export const MIN_FLOOR_LEVEL = -20
+export const MAX_FLOOR_LEVEL = 200
+
+/**
+ * Storey of a drawn plan in its building (the owning location's parent),
+ * or `null` for a plan that is not stacked with the other floors.
+ */
+const FloorLevelSchema = v.nullable(
+	v.pipe(
+		v.number('Storey must be a number'),
+		v.integer('Storey must be a whole number'),
+		v.minValue(MIN_FLOOR_LEVEL, `Storeys go down to ${MIN_FLOOR_LEVEL}`),
+		v.maxValue(MAX_FLOOR_LEVEL, `Storeys go up to ${MAX_FLOOR_LEVEL}`),
+	),
+)
+
+const OffsetCoordSchema = v.pipe(
+	v.number('Offset must be a number'),
+	v.minValue(-MAX_DRAWING_CM, 'The offset is at most 1 km'),
+	v.maxValue(MAX_DRAWING_CM, 'The offset is at most 1 km'),
+)
+
+/**
+ * Where a drawn plan's sheet lies in its building's frame: the building
+ * point (cm) of the sheet's top-left corner. Floors of one building share
+ * that frame, so a point `p` of one floor lies above or below `p + offset`
+ * of the building and `p + offset - other.offset` of another floor.
+ */
+export const FloorplanOffsetSchema = v.strictObject({
+	x: OffsetCoordSchema,
+	y: OffsetCoordSchema,
+})
+
+export type FloorplanOffset = v.InferOutput<typeof FloorplanOffsetSchema>
+
 /** Length of a wall, cm. */
 export function wallLength(wall: Pick<FloorplanWall, 'a' | 'b'>): number {
 	return Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1])
@@ -2977,6 +3020,8 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		width: SheetSideSchema,
 		height: SheetSideSchema,
 		reference: v.optional(v.nullable(FloorplanReferenceSchema), null),
+		level: v.optional(FloorLevelSchema, null),
+		offset: v.optional(FloorplanOffsetSchema, { x: 0, y: 0 }),
 		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
 		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
 		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
@@ -3064,6 +3109,17 @@ export interface FloorplanDrawingJson {
 	height: number
 	/** The reference image and where it lies; `null` without one. */
 	reference: (FloorplanReference & { attachment: AttachmentJson }) | null
+	/** Storey in the building; `null` when not stacked. */
+	level: number | null
+	/** Where the sheet lies in the building's frame. */
+	offset: FloorplanOffset
+	/**
+	 * The building whose floors' plans stack with this one: the location the
+	 * owner lies in (`location_id`), or for a top-level floor its site
+	 * (`location_id` null); `null` for a site's plan or another top-level
+	 * location's.
+	 */
+	building: { location_id: number | null; site_id: number; name: string } | null
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
 	stairs: FloorplanStair[]
@@ -3081,6 +3137,19 @@ export interface FloorplanDrawingJson {
 	has_hidden_content: boolean
 	/** Unix seconds. */
 	updated_at: number
+}
+
+/**
+ * `GET /floorplan-drawings/:id/stack`: the plans of the other floors of the
+ * plan's building, lowest storey first (those without a storey last), as
+ * far as the requester may see them.
+ */
+export interface FloorplanStackFloorJson {
+	id: number
+	location_id: number
+	owner_name: string
+	level: number | null
+	offset: FloorplanOffset
 }
 
 /** `GET /floorplan-drawings/owner`: the owner's drawn plan, or `null`. */

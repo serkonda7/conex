@@ -187,7 +187,7 @@ async function preview(api: APIRequestContext, deviceId: number): Promise<Previe
 /** Opens the sync dialog of the type's device from the device type page. */
 async function openSync(page: Page, typeId: number): Promise<Locator> {
 	await page.goto(`/device-types/${typeId}`)
-	await page.getByRole('button', { name: 'Ports aus Gerätetyp aktualisieren' }).click()
+	await page.getByRole('button', { name: 'Aus Gerätetyp aktualisieren' }).click()
 	const dialog = page.getByRole('dialog')
 	await expect(dialog.getByRole('button', { name: 'Aktualisieren', exact: true })).toBeEnabled()
 	return dialog
@@ -646,7 +646,7 @@ test.describe('permissions', () => {
 			await viewerPage.goto(`/device-types/${typeId}`)
 			await expect(viewerPage.getByRole('link', { name: /E2E DT Device/ })).toBeVisible()
 			await expect(
-				viewerPage.getByRole('button', { name: 'Ports aus Gerätetyp aktualisieren' }),
+				viewerPage.getByRole('button', { name: 'Aus Gerätetyp aktualisieren' }),
 			).toHaveCount(0)
 			await viewer.close()
 		} finally {

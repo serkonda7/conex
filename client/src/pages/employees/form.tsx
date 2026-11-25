@@ -1,6 +1,7 @@
+import { IconStarFilled } from '@tabler/icons-solidjs'
 import { emailDomain, primaryPhone, withEmailDomain } from 'shared/src/schemas'
 import type { ContactScope, EmployeeCreate, EmployeeEmail, EmployeePhone } from 'shared/src/types'
-import { createSignal, For, type JSX, Show } from 'solid-js'
+import { createSignal, type JSX, Show } from 'solid-js'
 import {
 	create_employee,
 	type EmployeeRow,
@@ -23,15 +24,15 @@ import {
 import {
 	CommentsField,
 	DescriptionField,
-	type FormOption,
 	FormPage,
 	Hint,
+	MultiSelectField,
 	row_options,
 	SelectField,
 	TextField,
 	ToggleField,
 } from '../../components/form'
-import { t, tp } from '../../i18n'
+import { t } from '../../i18n'
 import { contactScopeOptions, employeeSalutationOptions } from '../../i18n/labels'
 import {
 	type Cleared,
@@ -45,15 +46,7 @@ import { parseId, useFormReturnRoute } from '../../lib/router'
 import { can, sessionTenantIds } from '../../lib/session'
 import { newObjectTenantId } from '../../lib/tenant_context'
 
-/** One row of the tenant list; `id` is the select value ('' = none chosen). */
-interface TenantEntry {
-	id: string
-}
-
-type SelectEvent = Event & { currentTarget: HTMLSelectElement }
-
 const blankEmail = (): EmployeeEmail => ({ address: '', scope: 'work' })
-const blankTenant = (): TenantEntry => ({ id: '' })
 const blankPhone = (): PhoneRow<EmployeePhone> => ({ number: '', type: 'phone', scope: 'work' })
 
 /** Saved employee fields; the memberships go separately. */
@@ -66,7 +59,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const [salutation, setSalutation] = createSignal('')
 	// Edit only: new employees get the tenant of the global tenant selection.
 	// First = primary tenant.
-	const [editTenants, setEditTenants] = createSignal<TenantEntry[]>([])
+	const [editTenants, setEditTenants] = createSignal<string[]>([])
 	// Memberships outside a scoped user's tenants: kept as they are.
 	const [hiddenTenants, setHiddenTenants] = createSignal<number[]>([])
 	const [title, setTitle] = createSignal('')
@@ -84,7 +77,7 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 			setSalutation(row.salutation ?? '')
 			const scope = sessionTenantIds()
 			const visible = (id: number): boolean => scope === null || scope.includes(id)
-			setEditTenants(row.tenant_ids.filter(visible).map((id) => ({ id: String(id) })))
+			setEditTenants(row.tenant_ids.filter(visible).map(String))
 			setHiddenTenants(row.tenant_ids.filter((id) => !visible(id)))
 			setTitle(row.title ?? '')
 			setEmails(row.emails.length > 0 ? row.emails : [blankEmail()])
@@ -99,17 +92,22 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 	const editTenantIds = (): number[] => [
 		...new Set(
 			editTenants()
-				.map((row) => parseId(row.id))
+				.map(parseId)
 				.filter((id): id is number => id !== null),
 		),
 	]
 	// Memberships also scope the employee's account: `employees.tenants` only.
 	const editsTenants = (): boolean => form.editing && can('employees.tenants')
+	/** The primary tenant is one the scoped user cannot see, so it stays primary. */
+	const hiddenPrimary = (): boolean => {
+		const primary = form.record()?.tenant_ids[0]
+		return primary !== undefined && hiddenTenants().includes(primary)
+	}
 	/** Memberships to save: hidden ones keep their place when primary, else go last. */
 	const savedTenantIds = (): number[] => {
 		const hidden = hiddenTenants()
 		const primary = form.record()?.tenant_ids[0]
-		const first = primary !== undefined && hidden.includes(primary) ? [primary] : []
+		const first = primary !== undefined && hiddenPrimary() ? [primary] : []
 		return [...first, ...editTenantIds(), ...hidden.filter((id) => id !== primary)]
 	}
 	/** Tenant whose mail domain and main number apply: the primary one. */
@@ -232,32 +230,25 @@ function EmployeeForm(props: { id?: number }): JSX.Element {
 				onInput={setLastName}
 			/>
 			<Show when={editsTenants()}>
-				<ContactListField
+				<MultiSelectField
 					id={`${prefix}-tenant`}
 					label={t('employee.tenants')}
-					addLabel={t('employee.addTenant')}
-					rows={editTenants()}
+					values={editTenants()}
 					onChange={setEditTenants}
-					blank={blankTenant}
-					row={(
-						entry: () => TenantEntry,
-						update: (patch: Partial<TenantEntry>) => void,
-						index: number,
-					): JSX.Element => (
-						<select
-							id={`${prefix}-tenant-${index}`}
-							aria-label={tp('entity.tenant', 1)}
-							value={entry().id}
-							required={index === 0}
-							onChange={(e: SelectEvent) => update({ id: e.currentTarget.value })}
-						>
-							<option value="">{t('common.selectPlaceholder')}</option>
-							<For each={row_options(tenants() ?? [])}>
-								{(o: FormOption): JSX.Element => (
-									<option value={o.value}>{o.label}</option>
-								)}
-							</For>
-						</select>
+					options={row_options(tenants() ?? [])}
+					required={hiddenTenants().length === 0}
+					sortable
+					chipStart={(_value: string, index: number) => (
+						<Show when={index === 0 && !hiddenPrimary()}>
+							<span
+								class="primary-chip-mark"
+								role="img"
+								title={t('employee.primaryTenant')}
+								aria-label={t('employee.primaryTenant')}
+							>
+								<IconStarFilled size={12} aria-hidden="true" />
+							</span>
+						</Show>
 					)}
 				/>
 			</Show>

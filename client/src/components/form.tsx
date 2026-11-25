@@ -354,7 +354,8 @@ export function SelectField(props: {
 	)
 }
 
-/** Searchable multi-select; the picked options show as removable chips. */
+/** Searchable multi-select; the picked options show as removable chips,
+ * which `sortable` lets the user drag into a new order. */
 export function MultiSelectField(props: {
 	id: string
 	label: string
@@ -365,6 +366,9 @@ export function MultiSelectField(props: {
 	disabled?: boolean
 	hint?: JSX.Element
 	reload?: () => unknown
+	sortable?: boolean
+	/** Rendered at the start of a chip, e.g. a marker on the first one. */
+	chipStart?: (value: string, index: number) => JSX.Element
 }): JSX.Element {
 	return (
 		<Field label={props.label} for={props.id} required={props.required} hint={props.hint}>
@@ -379,6 +383,8 @@ export function MultiSelectField(props: {
 				searchLabel={t('common.search')}
 				noMatchesLabel={t('common.noMatchingObjects')}
 				removeLabel={(label: string): string => t('common.removeValue', { value: label })}
+				sortable={props.sortable}
+				chipStart={props.chipStart}
 			/>
 		</Field>
 	)

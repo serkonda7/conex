@@ -31,7 +31,6 @@ import type { FaceplateViewPort } from '../../components/faceplate'
 import { InlineError, Loading } from '../../components/feedback'
 import { FloorplanLinks } from '../../components/floorplan_links'
 import { useSort } from '../../components/list_page'
-import { ObjectSelector } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
 import { faceLabel } from '../../i18n/labels'
 import { FEATURES } from '../../lib/features'
@@ -41,7 +40,7 @@ import { type Crumb, navigate } from '../../lib/router'
 import { can } from '../../lib/session'
 import { readStored, writeStored } from '../../lib/storage'
 import { siteTrail } from '../../lib/trails'
-import { useDeviceSearch } from '../devices/device_search'
+import { RackDeviceDialog } from './device_dialog'
 import { RackElevation, type RackFace } from './elevation'
 
 /** How the elevation shows devices; remembered per browser. */
@@ -112,30 +111,20 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 	const manufacturerName = useNameOf(manufacturers)
 	const [racks] = createRows(fetch_racks, setError)
 	const rackName = useNameOf(racks)
-	/**
-	 * Shows where a candidate device is already racked. Candidates are limited
-	 * to the rack's tenant (when it has one); U-mounting also hides 0 U devices,
-	 * which can only sit on a shelf.
-	 */
-	const deviceSearch = useDeviceSearch(
-		(device: DeviceRow) => {
-			if (device.rack_id === null) {
-				return undefined
-			}
-			const rackLabel = rackName(device.rack_id)
-			const place =
-				device.shelf_id !== null
-					? `${rackLabel} · ${t('elevation.onShelf')}`
-					: device.position_u !== null
-						? `${t('device.mountPosition', { rack: rackLabel, u: device.position_u })}${device.face ? ` (${faceLabel(device.face)})` : ''}`
-						: rackLabel
-			return t('device.rackedIn', { place })
-		},
-		() => ({
-			tenant: rack()?.tenant_id ?? undefined,
-			mountable: targetShelf() === null ? true : undefined,
-		}),
-	)
+	/** Where a candidate device is already racked, shown in the device selector. */
+	function placementNote(device: DeviceRow): string | undefined {
+		if (device.rack_id === null) {
+			return undefined
+		}
+		const rackLabel = rackName(device.rack_id)
+		const place =
+			device.shelf_id !== null
+				? `${rackLabel} · ${t('elevation.onShelf')}`
+				: device.position_u !== null
+					? `${t('device.mountPosition', { rack: rackLabel, u: device.position_u })}${device.face ? ` (${faceLabel(device.face)})` : ''}`
+					: rackLabel
+		return t('device.rackedIn', { place })
+	}
 
 	function deviceTypeOf(typeId: number): DeviceTypeRow | undefined {
 		return deviceTypes()?.find((type) => type.id === typeId)
@@ -256,34 +245,22 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		}
 	}
 
-	async function placeOnShelf(device: DeviceRow, shelf: ElevationShelfRef): Promise<void> {
-		setSelectingDevice(false)
-		setTargetShelf(null)
-		setError(null)
-		refreshPlacement(await update_device(device.id, { shelf_id: shelf.id }))
-	}
-
 	/** Takes a device off its shelf; it stays assigned to this rack. */
 	async function removeFromShelf(device: ElevationShelfDeviceRef): Promise<void> {
 		setError(null)
 		refreshPlacement(await update_device(device.id, { shelf_id: null }))
 	}
 
-	async function placeDevice(device: DeviceRow): Promise<void> {
+	/** Places the device at the pending U or onto the target shelf. */
+	function placeDevice(device: DeviceRow): Promise<Result<DeviceRow, Error>> {
 		const shelf = targetShelf()
-		if (shelf) {
-			await placeOnShelf(device, shelf)
-			return
-		}
-		const u = pendingU()
-		if (u === null) {
-			return
-		}
-		setSelectingDevice(false)
-		setError(null)
-		refreshPlacement(
-			await update_device(device.id, { rack_id: props.id, position_u: u, face: face() }),
-		)
+		return shelf
+			? update_device(device.id, { shelf_id: shelf.id })
+			: update_device(device.id, {
+					rack_id: props.id,
+					position_u: pendingU(),
+					face: face(),
+				})
 	}
 
 	return (
@@ -452,8 +429,8 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 							/>
 						</Show>
 						<Show when={selectingDevice()}>
-							<ObjectSelector
-								label={
+							<RackDeviceDialog
+								title={
 									targetShelf()
 										? t('rack.selectDeviceForShelf', {
 												name:
@@ -469,8 +446,10 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 												face: faceLabel(face()),
 											})
 								}
-								{...deviceSearch}
-								on_select={(device: DeviceRow) => void placeDevice(device)}
+								tenant_id={rack()?.tenant_id}
+								mountable={targetShelf() === null}
+								get_note={placementNote}
+								on_select={placeDevice}
 								on_close={() => {
 									setSelectingDevice(false)
 									setTargetShelf(null)

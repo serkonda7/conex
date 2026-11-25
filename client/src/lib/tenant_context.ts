@@ -9,7 +9,7 @@
  * reads as "all" and the selector shows a fixed label.
  */
 import { Result } from 'better-result'
-import { type Accessor, createEffect, createMemo, createSignal } from 'solid-js'
+import { type Accessor, createEffect, createMemo, createSignal, on, untrack } from 'solid-js'
 import {
 	fetch_tenant_groups,
 	fetch_tenants,
@@ -156,19 +156,28 @@ export function rowsOfTenant<T extends { tenant_id: number | null }>(
 
 /**
  * Site options of a new object's site picker: the sites of the global tenant
- * selection. When that selection drops the picked site, `onDropped` resets it.
+ * selection. When that selection drops the picked site, `setSite` resets it;
+ * when it leaves a single site and none is picked, `setSite` prefills that one.
  */
 export function useNewObjectSites<T extends { id: number; tenant_id: number | null }>(
 	sites: Accessor<T[] | undefined>,
 	siteId: Accessor<string>,
-	onDropped: () => void,
+	setSite: (value: string) => void,
 ): Accessor<T[]> {
 	const siteOptions = createMemo(() => rowsOfTenant(sites() ?? [], newObjectTenantId()))
 	createEffect(() => {
 		const id = parseId(siteId())
 		if (id !== null && sites() !== undefined && !siteOptions().some((row) => row.id === id)) {
-			onDropped()
+			setSite('')
 		}
 	})
+	// Tracks only the options, so clearing the prefilled site keeps it cleared.
+	createEffect(
+		on(siteOptions, (options) => {
+			if (options.length === 1 && untrack(siteId) === '') {
+				setSite(String(options[0].id))
+			}
+		}),
+	)
 	return siteOptions
 }

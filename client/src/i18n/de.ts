@@ -6,6 +6,7 @@ export const de: Messages = {
 	'common.add': '+ Hinzufügen',
 	'common.edit': 'Bearbeiten',
 	'common.clone': 'Klonen',
+	'common.back': 'Zurück',
 	'common.delete': 'Löschen',
 	'common.cancel': 'Abbrechen',
 	'common.create': 'Erstellen',
@@ -415,6 +416,7 @@ export const de: Messages = {
 	'employee.addEmail': 'E-Mail-Adresse hinzufügen',
 	'employee.addPhone': 'Telefonnummer hinzufügen',
 	'employee.tenants': 'Firmen',
+	'employee.primaryTenant': 'Primäre Firma',
 	'employee.loginRole': 'Anmelderolle',
 	'employee.account': 'CoNex-Anmeldung',
 	'employee.noAccount': 'Kein Konto.',
@@ -897,11 +899,13 @@ export const de: Messages = {
 	'device.moveTenant': 'Verschieben',
 	'device.moveTenantTitle': 'Gerät {name} verschieben',
 	'device.moveTenantHint': 'Beim Verschieben werden Standort, Bereich und Rack entfernt.',
-	'device.templateSync.button': 'Ports aus Gerätetyp aktualisieren',
-	'device.templateSync.title': 'Ports von {name} aktualisieren',
-	'device.templateSync.column': 'Ports',
-	'device.templateSync.loading': 'Ports werden verglichen…',
-	'device.templateSync.upToDate': 'Die Ports entsprechen dem Gerätetyp.',
+	'device.templateSync.button': 'Aus Gerätetyp aktualisieren',
+	'device.templateSync.title': '{name} aus Gerätetyp aktualisieren',
+	'device.templateSync.column': 'Abgleich',
+	'device.templateSync.loading': 'Wird mit Gerätetyp verglichen…',
+	'device.templateSync.upToDate': 'Ports und Rolle entsprechen dem Gerätetyp.',
+	'device.templateSync.role': 'Rolle',
+	'device.templateSync.roleChange': 'Rolle ändern: {from} → {to}',
 	'device.templateSync.orphaned': 'Ports, die der Gerätetyp nicht mehr enthält ({count})',
 	'device.templateSync.mapTo': 'Umbenennen in {name}',
 	'device.templateSync.linkTo': 'Namen behalten, mit {name} verknüpfen',
@@ -968,7 +972,7 @@ export const de: Messages = {
 	'device.connected': 'verbunden',
 	'device.alreadyConnected': 'Bereits verbunden',
 	'device.incompatiblePort': 'Inkompatibler Anschlusstyp',
-	'device.rackedIn': 'Eingebaut in {place}',
+	'device.rackedIn': '{place}',
 	'device.connectToPeer': '{name} mit einem Gegenanschluss verbinden',
 	'device.connectCableFor': 'Kabel für {name} verbinden',
 	'device.editPort': 'Anschluss {name} bearbeiten',
@@ -1188,6 +1192,7 @@ export const de: Messages = {
 	'floorplan.notFound': 'Grundriss nicht gefunden.',
 	'floorplan.open': 'Grundriss öffnen',
 	'floorplan.edit': 'Grundriss bearbeiten',
+	'floorplan.fullscreen': 'Vollbild',
 	'floorplan.drawArea': 'Bereich zeichnen',
 	'floorplan.snap': 'Einrasten und ausrichten',
 	'floorplan.snapHint':
@@ -1301,6 +1306,8 @@ export const de: Messages = {
 	'drawnPlan.creating': 'Wird angelegt…',
 	'drawnPlan.empty':
 		'Noch nichts gezeichnet. Bearbeite die Zeichnung, um Wände, Türen und Fenster zu zeichnen, optional über einem Referenzbild, und um Racks, Geräte und Dosen zu platzieren.',
+	'drawnPlan.disclaimer':
+		'Die Zeichnung dient nur der Veranschaulichung: Maße und Abstände können ungenau sein.',
 	'drawnPlan.listEmpty':
 		'Noch keine gezeichneten Grundrisse. Zeichne einen auf der Seite eines Standorts oder Ortes.',
 	'drawnPlan.walls': 'Wände',
@@ -1310,7 +1317,7 @@ export const de: Messages = {
 	'drawnPlan.planTab': 'Plan',
 	'drawnPlan.elements': 'Bauteile',
 	'drawnPlan.drawHint':
-		'Wähle ein Bauteil (oder drücke seine Zifferntaste) und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen. Strg + D dupliziert die Auswahl daneben (erneut, um den Abstand zu wiederholen); die Pfeiltasten verschieben sie um 10 cm, mit Umschalt um 1 m, mit Alt um 1 cm.',
+		'Wähle ein Bauteil (oder drücke seine Zifferntaste) und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen. Strg + D dupliziert die Auswahl daneben (erneut, um den Abstand zu wiederholen); die Pfeiltasten verschieben sie um 10 cm, mit Umschalt um 1 m, mit Alt um 1 cm. V (oder Escape) legt das Werkzeug ab, dann die Auswahl.',
 	'drawnPlan.openingPlaceHint':
 		'Auf eine Wand ziehen, oder anklicken und dann eine Wand anklicken',
 	'drawnPlan.tools': 'Zeichenwerkzeuge',
@@ -1410,6 +1417,32 @@ export const de: Messages = {
 	'drawnPlan.moveImage': 'Verschieben',
 	'drawnPlan.calibrate': 'Maßstab setzen',
 	'drawnPlan.fitSheet': 'Blatt an Bild anpassen',
+	'drawnPlan.building': 'Gebäude',
+	'drawnPlan.noBuilding':
+		'Um diesen Plan mit anderen Etagen zu stapeln, mache seinen Ort zur Etage oder ordne ihn einem Gebäude (einem anderen Ort) unter.',
+	'drawnPlan.buildingHint':
+		'Die Etagen von {name} teilen ein Bezugssystem: der Versatz legt die linke obere Ecke dieses Blatts darin fest. Das Geschoss ordnet sie; Treppen kommen aus dem Geschoss darunter.',
+	'drawnPlan.storey': 'Geschoss',
+	'drawnPlan.notStacked': 'Nicht gestapelt',
+	'drawnPlan.offsetX': 'Versatz X (m)',
+	'drawnPlan.offsetY': 'Versatz Y (m)',
+	'drawnPlan.alignFloor': 'An Etage ausrichten',
+	'drawnPlan.alignFloorHint':
+		'Ziehe die darunterliegende Etage, bis sie passt; das ändert den Versatz dieses Plans.',
+	'drawnPlan.pickUnderlayHint': 'Wähle eine Etage unter dem Plan, um diesen daran auszurichten.',
+	'drawnPlan.arrivingStairs.one':
+		'{count} Treppenlauf kommt aus der Etage darunter: klicke auf den gestrichelten Umriss, um ihn hier hinzuzufügen.',
+	'drawnPlan.arrivingStairs.other':
+		'{count} Treppenläufe kommen aus der Etage darunter: klicke auf einen gestrichelten Umriss, um ihn hier hinzuzufügen.',
+	'drawnPlan.adoptStairs':
+		'Treppe aus der Etage darunter: klicken, um sie dieser Etage hinzuzufügen',
+	'drawnPlan.underlay': 'Etage darunter',
+	'drawnPlan.underlayHint': 'Eine andere Etage des Gebäudes blass unter diesem Plan zeigen',
+	'drawnPlan.noUnderlay': 'Keine',
+	'drawnPlan.snapUnderlay': 'An Etage einrasten',
+	'drawnPlan.snapUnderlayHint':
+		'Auch an Wänden, Treppen und Räumen der Etage darunter einrasten (bei eingeschaltetem Einrasten)',
+	'drawnPlan.floorOption': '{level}: {name}',
 	'drawnPlan.showReference': 'Referenzbild anzeigen',
 	'drawnPlan.hideReference': 'Referenzbild ausblenden',
 	'drawnPlan.view3d': '3D',
