@@ -10,7 +10,14 @@
  * show beneath the drawing (`drawn_plan_stack`). Edit swaps the view for the editor on the
  * same zoom, always in 2D.
  */
-import { IconCube, IconPencil, IconPhoto, IconTag, IconTrash } from '@tabler/icons-solidjs'
+import {
+	IconCube,
+	IconInfoCircle,
+	IconPencil,
+	IconPhoto,
+	IconTag,
+	IconTrash,
+} from '@tabler/icons-solidjs'
 import { createSignal, For, type JSX, lazy, onMount, Show, Suspense } from 'solid-js'
 import {
 	delete_drawing,
@@ -371,8 +378,9 @@ function DrawnPlanViewer(props: {
 }
 
 /**
- * Page header and body of a drawn plan: `title` with Edit and Delete, then
- * the plan or, while editing, the editor. `?edit=1` opens the editor right
+ * Page header and body of a drawn plan: `title`, a note that the drawing's
+ * measurements are not reliable, and Edit and Delete; then the plan or,
+ * while editing, the editor. `?edit=1` opens the editor right
  * away (a plan just created).
  */
 export function DrawnPlanView(props: {
@@ -405,6 +413,10 @@ export function DrawnPlanView(props: {
 		<>
 			<div class="page-header">
 				<PlanFullscreenTitle>{props.title}</PlanFullscreenTitle>
+				<p class="drawn-plan-disclaimer">
+					<IconInfoCircle size={14} aria-hidden="true" />
+					<span>{t('drawnPlan.disclaimer')}</span>
+				</p>
 				<div class="page-header-actions">
 					<Show when={can('edit') || can('delete')}>
 						{/* The editor puts Undo / Save / Cancel here, so the header keeps its height. */}

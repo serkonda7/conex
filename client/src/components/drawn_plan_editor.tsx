@@ -7,10 +7,11 @@
  *   it to move it. A selected wall, flight of stairs, tray or desk shows
  *   handles on its ends, a room on its corners, a desk group on its divider
  *   ends (drag to rotate); walls (and trays) joined at a moved end follow
- *   it. Below the selection sit quick actions (rotate 90°, flip, duplicate,
- *   delete); a desk, desk group or stairs shows its distances to the
- *   nearest objects on each side, a door or window to the ends of its
- *   stretch of wall. The inspector below the stage edits the selection
+ *   it. Off the selection's bottom right corner (top or left near the
+ *   sheet's edges) sit quick actions (rotate 90°, flip, a door's hinge,
+ *   duplicate, delete); a desk, desk group or stairs shows its distances
+ *   to the nearest objects on each side, a door or window to the ends of
+ *   its stretch of wall. The inspector below the stage edits the selection
  *   (length, thickness, width, heights, swing, steps, depth, rotation,
  *   linked locations, label) and deletes it.
  * - Drawing tools stay picked after each element, until Escape or another
@@ -37,7 +38,9 @@
  *   lines up its edges or center with other objects along dashed guides;
  *   otherwise everything takes 10 cm steps. Lines from a previous point keep
  *   multiples of 15°; Shift frees the angle.
- * - Keys: 1–9 pick the Draw tab's elements (unless typing a length), Ctrl + D duplicates the
+ * - Keys: V does what Escape does (the browser keeps Escape in fullscreen):
+ *   drops what is being drawn, then the tool, then the selection. 1–9 pick
+ *   the Draw tab's elements (unless typing a length), Ctrl + D duplicates the
  *   selection beside it (again on the copy repeats the step), the arrow
  *   keys nudge it (10 cm, Shift 1 m, Alt 1 cm).
  * - Reference image: one of the owner's images (or a new upload) under the
@@ -55,6 +58,7 @@ import {
 	IconCopy,
 	IconDesk,
 	IconDoor,
+	IconFlipHorizontal,
 	IconFlipVertical,
 	IconMagnet,
 	IconPhotoUp,
@@ -248,6 +252,9 @@ const MIN_WALL = 1
 
 /** Pointer travel on screen (px) that turns a press of the desk tool into a drag. */
 const DRAG_PX = 4
+
+/** Share of the sheet's width (height) past which the quick actions sit left of (above) the selection. */
+const ACTIONS_EDGE = 0.85
 
 /** Longest desk put down with one click, cm. */
 const MAX_DESK_LENGTH = 1000
@@ -947,6 +954,11 @@ export function DrawnPlanEditor(props: {
 		return current?.kind === 'opening'
 			? openings().find((opening: EditOpening) => opening.id === current.id)
 			: undefined
+	})
+	/** The selected door or sliding door, which has a hinge. */
+	const selectedDoor = createMemo(() => {
+		const opening = selectedOpening()
+		return opening && opening.kind !== 'window' ? opening : undefined
 	})
 	const stageStairs = createMemo((): StageStair[] =>
 		stairs().map((stair: EditStair) => ({ key: `stair:${stair.id}`, stair })),
@@ -2164,7 +2176,7 @@ export function DrawnPlanEditor(props: {
 		if (kind === 'opening') {
 			const opening = openings().find((o: EditOpening) => o.id === id)
 			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
-			return opening && wall ? openingShape(wall, opening).gap : []
+			return opening && wall ? openingShape(wall, opening).extent : []
 		}
 		return selectionPoints(current)
 	}
@@ -2238,6 +2250,16 @@ export function DrawnPlanEditor(props: {
 		}
 	}
 
+	/** Moves a door's hinge to the opening's other end; a sliding door slides open the other way. */
+	function flipHinge(opening: EditOpening): void {
+		checkpoint()
+		patchOpening(opening.id, { hinge: opening.hinge === 'start' ? 'end' : 'start' })
+	}
+
+	/** Label of `flipHinge` for `opening`. */
+	const hingeLabel = (opening: EditOpening): string =>
+		t(opening.kind === 'sliding_door' ? 'drawnPlan.flipSlide' : 'drawnPlan.flipHinge')
+
 	/** Title of the flip action of the selection. */
 	function flipLabel(current: Selected): string {
 		if (current.kind === 'desk') {
@@ -2253,7 +2275,11 @@ export function DrawnPlanEditor(props: {
 		)
 	}
 
-	/** Box of the selection the actions sit below; none for a marker, which has its own remove button. */
+	/**
+	 * Box of the selection; the actions sit off one of its corners, clear of
+	 * the selection and of its distances (from the middle of each side).
+	 * None for a marker, which has its own remove button.
+	 */
 	const selectionBox = createMemo((): Box | null => {
 		const current = selected()
 		if (!current || current.kind === 'marker') {
@@ -2261,6 +2287,20 @@ export function DrawnPlanEditor(props: {
 		}
 		const outline = selectionOutline(current)
 		return outline.length > 0 ? boxOf(outline) : null
+	})
+
+	/**
+	 * Corner of the selection's box the actions sit off: the bottom right one,
+	 * or the left or top one near the sheet's right or bottom edge, where the
+	 * stage would cut them off.
+	 */
+	const actionsCorner = createMemo(() => {
+		const box = selectionBox()
+		const { width, height } = sheet()
+		return {
+			left: box !== null && box.x1 > width * ACTIONS_EDGE,
+			up: box !== null && box.y1 > height * ACTIONS_EDGE,
+		}
 	})
 
 	/**
@@ -2844,6 +2884,8 @@ export function DrawnPlanEditor(props: {
 			redo()
 			return
 		}
+		// V drops like Escape, which a fullscreen browser keeps for itself.
+		const drop = e.key === 'Escape' || (!mod && !e.altKey && e.key.toLowerCase() === 'v')
 		if (drawFrom() && !mod && !e.altKey) {
 			// While drawing, digits type the next line's length instead of picking a tool.
 			const decimal = (e.key === '.' || e.key === ',') && !/[.,]/.test(typed())
@@ -2857,7 +2899,7 @@ export function DrawnPlanEditor(props: {
 				setTyped(typed().slice(0, -1))
 				return
 			}
-			if (e.key === 'Escape' && typed() !== '') {
+			if (drop && typed() !== '') {
 				e.preventDefault()
 				setTyped('')
 				return
@@ -2874,7 +2916,7 @@ export function DrawnPlanEditor(props: {
 			finishRoom()
 			return
 		}
-		if (e.key === 'Escape' || e.key === 'Enter') {
+		if (drop || e.key === 'Enter') {
 			if (chain() || lineStart() || roomDraft() || calibration() || sequence() !== null) {
 				e.preventDefault()
 				setTyped('')
@@ -2885,7 +2927,7 @@ export function DrawnPlanEditor(props: {
 				setSequence(null)
 				return
 			}
-			if (e.key === 'Escape') {
+			if (drop) {
 				if (tool() !== 'select') {
 					setTool('select')
 				} else {
@@ -4079,9 +4121,16 @@ export function DrawnPlanEditor(props: {
 							{(box: () => Box) => (
 								<div
 									class="drawn-plan-actions"
+									classList={{
+										'drawn-plan-actions-left': actionsCorner().left,
+										'drawn-plan-actions-up': actionsCorner().up,
+									}}
 									role="toolbar"
 									aria-label={t('drawnPlan.selectionActions')}
-									style={toPercent([(box().x0 + box().x1) / 2, box().y1])}
+									style={toPercent([
+										actionsCorner().left ? box().x0 : box().x1,
+										actionsCorner().up ? box().y0 : box().y1,
+									])}
 									onPointerDown={(e: PointerEvent) => e.stopPropagation()}
 								>
 									<Show when={canRotate(selected() as Selected)}>
@@ -4105,6 +4154,19 @@ export function DrawnPlanEditor(props: {
 										>
 											<IconFlipVertical size={14} />
 										</button>
+									</Show>
+									<Show when={selectedDoor()}>
+										{(opening: () => EditOpening) => (
+											<button
+												type="button"
+												class="drawn-plan-action"
+												aria-label={hingeLabel(opening())}
+												title={hingeLabel(opening())}
+												onClick={() => flipHinge(opening())}
+											>
+												<IconFlipHorizontal size={14} />
+											</button>
+										)}
 									</Show>
 									<button
 										type="button"
@@ -4240,23 +4302,8 @@ export function DrawnPlanEditor(props: {
 										}}
 									/>
 									<Show when={opening().kind !== 'window'}>
-										<button
-											type="button"
-											onClick={() => {
-												checkpoint()
-												patchOpening(opening().id, {
-													hinge:
-														opening().hinge === 'start'
-															? 'end'
-															: 'start',
-												})
-											}}
-										>
-											{t(
-												opening().kind === 'sliding_door'
-													? 'drawnPlan.flipSlide'
-													: 'drawnPlan.flipHinge',
-											)}
+										<button type="button" onClick={() => flipHinge(opening())}>
+											{hingeLabel(opening())}
 										</button>
 										<button
 											type="button"

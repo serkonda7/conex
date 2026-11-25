@@ -1306,6 +1306,8 @@ export const de: Messages = {
 	'drawnPlan.creating': 'Wird angelegt…',
 	'drawnPlan.empty':
 		'Noch nichts gezeichnet. Bearbeite die Zeichnung, um Wände, Türen und Fenster zu zeichnen, optional über einem Referenzbild, und um Racks, Geräte und Dosen zu platzieren.',
+	'drawnPlan.disclaimer':
+		'Die Zeichnung dient nur der Veranschaulichung: Maße und Abstände können ungenau sein.',
 	'drawnPlan.listEmpty':
 		'Noch keine gezeichneten Grundrisse. Zeichne einen auf der Seite eines Standorts oder Ortes.',
 	'drawnPlan.walls': 'Wände',
@@ -1315,7 +1317,7 @@ export const de: Messages = {
 	'drawnPlan.planTab': 'Plan',
 	'drawnPlan.elements': 'Bauteile',
 	'drawnPlan.drawHint':
-		'Wähle ein Bauteil (oder drücke seine Zifferntaste) und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen. Strg + D dupliziert die Auswahl daneben (erneut, um den Abstand zu wiederholen); die Pfeiltasten verschieben sie um 10 cm, mit Umschalt um 1 m, mit Alt um 1 cm.',
+		'Wähle ein Bauteil (oder drücke seine Zifferntaste) und klicke dann auf den Plan. Türen und Fenster lassen sich auf eine Wand ziehen. Strg + D dupliziert die Auswahl daneben (erneut, um den Abstand zu wiederholen); die Pfeiltasten verschieben sie um 10 cm, mit Umschalt um 1 m, mit Alt um 1 cm. V (oder Escape) legt das Werkzeug ab, dann die Auswahl.',
 	'drawnPlan.openingPlaceHint':
 		'Auf eine Wand ziehen, oder anklicken und dann eine Wand anklicken',
 	'drawnPlan.tools': 'Zeichenwerkzeuge',

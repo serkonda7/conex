@@ -1294,6 +1294,8 @@ export const en = {
 	'drawnPlan.creating': 'Creating…',
 	'drawnPlan.empty':
 		'Nothing is drawn yet. Edit the drawing to draw walls, doors and windows, optionally over a reference image, and to place racks, devices and outlets.',
+	'drawnPlan.disclaimer':
+		'The drawing is only a visualization: measurements and distances may not be accurate.',
 	'drawnPlan.listEmpty':
 		'No drawn floor plans yet. Draw one from the page of a site or location.',
 	'drawnPlan.walls': 'Walls',
@@ -1303,7 +1305,7 @@ export const en = {
 	'drawnPlan.planTab': 'Plan',
 	'drawnPlan.elements': 'Elements',
 	'drawnPlan.drawHint':
-		'Pick an element (or press its number key), then click on the plan. Drag doors and windows onto a wall. Ctrl + D duplicates the selection beside it (again to repeat the step); the arrow keys move it by 10 cm, with Shift by 1 m, with Alt by 1 cm.',
+		'Pick an element (or press its number key), then click on the plan. Drag doors and windows onto a wall. Ctrl + D duplicates the selection beside it (again to repeat the step); the arrow keys move it by 10 cm, with Shift by 1 m, with Alt by 1 cm. V (or Escape) drops the tool, then the selection.',
 	'drawnPlan.openingPlaceHint': 'Drag onto a wall, or click and then click a wall',
 	'drawnPlan.tools': 'Drawing tools',
 	'drawnPlan.toolWall': 'Wall',
