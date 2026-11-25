@@ -47,6 +47,7 @@ import { markerNamesVisible, toggleMarkerNames } from './floorplan_layers'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import { MarkerGlyph, MarkerName, markerClasses, markerHref, markerTitle } from './floorplan_stage'
 import { IconLabel } from './icon_label'
+import { PlanFullscreenButton } from './plan_fullscreen'
 import { createStageZoom, type StageZoom } from './zoom_viewport'
 
 /** The 3D view, in its own chunk with three.js. */
@@ -395,27 +396,32 @@ export function DrawnPlanView(props: {
 		<>
 			<div class="page-header">
 				<h2>{props.title}</h2>
-				<Show when={can('edit') || can('delete')}>
-					{/* The editor puts Undo / Save / Cancel here, so the header keeps its height. */}
-					<div class="form-actions" ref={setActions}>
-						<Show when={!editing()}>
-							<Show when={can('edit')}>
-								<button type="button" onClick={() => setEditing(true)}>
-									<IconLabel icon={IconPencil}>{t('drawnPlan.edit')}</IconLabel>
-								</button>
+				<div class="page-header-actions">
+					<PlanFullscreenButton />
+					<Show when={can('edit') || can('delete')}>
+						{/* The editor puts Undo / Save / Cancel here, so the header keeps its height. */}
+						<div class="form-actions" ref={setActions}>
+							<Show when={!editing()}>
+								<Show when={can('edit')}>
+									<button type="button" onClick={() => setEditing(true)}>
+										<IconLabel icon={IconPencil}>
+											{t('drawnPlan.edit')}
+										</IconLabel>
+									</button>
+								</Show>
+								<Show when={can('delete')}>
+									<button
+										type="button"
+										class="btn-danger"
+										onClick={() => void handleDelete()}
+									>
+										<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
+									</button>
+								</Show>
 							</Show>
-							<Show when={can('delete')}>
-								<button
-									type="button"
-									class="btn-danger"
-									onClick={() => void handleDelete()}
-								>
-									<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
-								</button>
-							</Show>
-						</Show>
-					</div>
-				</Show>
+						</div>
+					</Show>
+				</div>
 			</div>
 			<Show
 				when={editing()}

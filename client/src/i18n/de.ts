@@ -1188,6 +1188,8 @@ export const de: Messages = {
 	'floorplan.notFound': 'Grundriss nicht gefunden.',
 	'floorplan.open': 'Grundriss öffnen',
 	'floorplan.edit': 'Grundriss bearbeiten',
+	'floorplan.fullscreen': 'Vollbild',
+	'floorplan.exitFullscreen': 'Vollbild beenden',
 	'floorplan.drawArea': 'Bereich zeichnen',
 	'floorplan.snap': 'Einrasten und ausrichten',
 	'floorplan.snapHint':

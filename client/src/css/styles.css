@@ -7409,3 +7409,29 @@ button.billing-cell-button:hover {
 	align-items: center;
 	gap: 0.3rem;
 }
+
+/* Fullscreen view of a floor plan page (plan_fullscreen.tsx): the app's
+   chrome is hidden and the plan grows to the window's height, leaving room
+   for the page header, the toolbars above and the zoom bar below. */
+.plan-fullscreen .app-topbar,
+.plan-fullscreen .app-sidebar,
+.plan-fullscreen .app-footer,
+.plan-fullscreen .breadcrumbs {
+	display: none;
+}
+
+.plan-fullscreen .app-content {
+	padding: 0.6rem 1rem;
+}
+
+.plan-fullscreen .floorplan-frame .zoom-stage > img {
+	max-height: calc(100dvh - 10rem);
+}
+
+.plan-fullscreen .drawn-plan-frame .zoom-viewport {
+	max-height: calc(100dvh - 9rem);
+}
+
+.plan-fullscreen .drawn-plan-3d {
+	height: calc(100dvh - 9rem);
+}

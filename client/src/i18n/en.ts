@@ -1177,6 +1177,8 @@ export const en = {
 	'floorplan.notFound': 'Floor plan not found.',
 	'floorplan.open': 'Open floor plan',
 	'floorplan.edit': 'Edit floor plan',
+	'floorplan.fullscreen': 'Fullscreen',
+	'floorplan.exitFullscreen': 'Exit fullscreen',
 	'floorplan.drawArea': 'Draw area',
 	'floorplan.snap': 'Snap and align',
 	'floorplan.snapHint':
