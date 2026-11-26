@@ -60,12 +60,19 @@ function fits(port: InterfaceJson, link: TraceLink): boolean {
 	)
 }
 
+/** Last number in a port name: `Gi1/0/5` -> 5, `Port 07` -> 7, `mgmt` -> null. */
+function portNumber(name: string): number | null {
+	const match = /(\d+)\D*$/.exec(name)
+	return match ? Number(match[1]) : null
+}
+
 /**
  * Migrates a device to its replacement (a new switch, PC, …): pick the new
- * device, then which cables move to which of its ports (same name and side
- * preselected), and whether placement, tenant and employees, VMs and the
- * name go along. The old device takes on a new status, decommissioned by
- * default. The server re-validates everything in one transaction.
+ * device, then which cables move to which of its ports (by default the
+ * port with the same name, else with the same kind and number), and
+ * whether placement, tenant and employees, VMs and the name go along. The
+ * old device takes on a new status, decommissioned by default. The server
+ * re-validates everything in one transaction.
  */
 export function MigrateDeviceDialog(props: MigrateDeviceDialogProps): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -88,21 +95,48 @@ export function MigrateDeviceDialog(props: MigrateDeviceDialogProps): JSX.Elemen
 			return link ? [{ port, link }] : []
 		}),
 	)
-	/** Port of the new device with the old port's name and side, if the cable fits it. */
-	const defaultChoice = (port: InterfaceJson, link: TraceLink): string => {
-		const match = (targetPorts() ?? []).find(
-			(other) => other.side === port.side && other.name === port.name && fits(other, link),
-		)
-		return match ? String(match.id) : ''
-	}
-	const choiceOf = (port: InterfaceJson, link: TraceLink): string =>
-		choices()[port.id] ?? defaultChoice(port, link)
+	/**
+	 * Default new port per old port id: the port with the same side and name,
+	 * else one with the same side, kind and number, if the cable fits it.
+	 * Each new port takes at most one cable.
+	 */
+	const defaults = createMemo((): Map<number, string> => {
+		const free = (targetPorts() ?? []).filter((other) => other.patched && !other.connected)
+		const used = new Set<number>()
+		const result = new Map<number, string>()
+		const assign = (same: (port: InterfaceJson, other: InterfaceJson) => boolean): void => {
+			for (const { port, link } of cabled()) {
+				if (result.has(port.id)) {
+					continue
+				}
+				const match = free.find(
+					(other) =>
+						!used.has(other.id) &&
+						other.side === port.side &&
+						same(port, other) &&
+						fits(other, link),
+				)
+				if (match) {
+					used.add(match.id)
+					result.set(port.id, String(match.id))
+				}
+			}
+		}
+		assign((port, other) => other.name === port.name)
+		assign((port, other) => {
+			const number = portNumber(port.name)
+			return number !== null && other.kind === port.kind && portNumber(other.name) === number
+		})
+		return result
+	})
+	const choiceOf = (port: InterfaceJson): string =>
+		choices()[port.id] ?? defaults().get(port.id) ?? ''
 	/** New port id → old port id it takes the cable of. */
 	const taken = createMemo(
 		() =>
 			new Map(
-				cabled().flatMap(({ port, link }) => {
-					const choice = choiceOf(port, link)
+				cabled().flatMap(({ port }) => {
+					const choice = choiceOf(port)
 					return choice === '' ? [] : [[choice, port.id] as const]
 				}),
 			),
@@ -242,7 +276,7 @@ export function MigrateDeviceDialog(props: MigrateDeviceDialogProps): JSX.Elemen
 											port: portLabel(port),
 											peer: `${link.peer_device.name} ${link.peer_interface.name}`,
 										})}
-										value={choiceOf(port, link)}
+										value={choiceOf(port)}
 										onChange={(value: string): void => {
 											setChoices((all) => ({ ...all, [port.id]: value }))
 										}}
