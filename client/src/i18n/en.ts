@@ -1534,6 +1534,8 @@ export const en = {
 	'elevation.deviceTitle': '{name} ({model}, {height} U)',
 	'elevation.onShelfTitle': 'On shelf {name} ({unit})',
 	'elevation.shelfUnit': 'Shelf {unit}',
+	'elevation.dragHint': 'Drag to move; drop onto another device to swap places',
+	'elevation.swapFailed': 'Could not swap the devices.',
 	'deviceStatus.active': 'Active',
 	'deviceStatus.inactive': 'Inactive',
 	'deviceStatus.planned': 'Planned',

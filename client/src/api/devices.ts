@@ -142,6 +142,18 @@ export async function update_device(
 	return to_result<DeviceRow>(res, failed.update('noun.device'))
 }
 
+/** Two mounted devices of one rack trade places (see `DeviceSwapSchema`). */
+export async function swap_devices(
+	id: number,
+	otherId: number,
+): Promise<Result<[DeviceRow, DeviceRow], Error>> {
+	const res = await client.devices[':id'].swap.$post({
+		...by_id(id),
+		json: { other_id: otherId },
+	})
+	return to_result<[DeviceRow, DeviceRow]>(res, t('elevation.swapFailed'))
+}
+
 /** Hands the device's cables, placement, assignment and VMs to `input.target_id`; returns the new device. */
 export async function migrate_device(
 	id: number,

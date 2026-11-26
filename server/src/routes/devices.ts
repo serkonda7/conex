@@ -10,6 +10,7 @@ import {
 	DeviceListQuerySchema,
 	DeviceMigrateSchema,
 	DeviceMoveSchema,
+	DeviceSwapSchema,
 	DeviceUpdateSchema,
 	EntityParamsSchema,
 	InterfaceConnectSchema,
@@ -45,6 +46,7 @@ import {
 	listDevices,
 	listInterfaces,
 	moveDevice,
+	swapDevices,
 	updateDevice,
 	updateInterface,
 } from '../db/devices'
@@ -187,6 +189,22 @@ export const devicesApp = new Hono()
 			return (
 				checkTenant(c, await deviceTenant(id)) ??
 				sendResult(c, await moveDevice(id, c.req.valid('json')))
+			)
+		},
+	)
+	// Two mounted devices of one rack trade places; both must be writable.
+	.post(
+		'/:id/swap',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', DeviceSwapSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const otherId = c.req.valid('json').other_id
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				checkTenant(c, await deviceTenant(otherId)) ??
+				sendResult(c, await swapDevices(id, otherId))
 			)
 		},
 	)

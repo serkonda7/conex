@@ -1353,6 +1353,113 @@ export async function moveDevice(id: number, input: DeviceMove): Promise<Result<
 	return await logUpdate('device', node, await getDevice(id))
 }
 
+/**
+ * Two U-mounted devices of one rack trade places in one write. Each takes
+ * the other's face; the pair keeps the U range it covers: the upper device
+ * moves to the bottom U of the lower one and the lower device so its top
+ * meets the old top of the upper one, which keeps any gap between them.
+ */
+export async function swapDevices(
+	id: number,
+	otherId: number,
+): Promise<Result<[DeviceRow, DeviceRow], Error>> {
+	if (id === otherId) {
+		return Result.err(new ConflictError('A device cannot swap places with itself'))
+	}
+	const pair: { node: DeviceRow; height: number; is_full_depth: boolean }[] = []
+	for (const deviceId of [id, otherId]) {
+		const current = await getDevice(deviceId)
+		if (Result.isError(current)) {
+			return current
+		}
+		const template = await getDeviceType(current.value.device_type_id)
+		if (Result.isError(template)) {
+			return template
+		}
+		if (current.value.rack_id === null || current.value.position_u === null) {
+			return Result.err(
+				new ConflictError(`Device "${current.value.name}" is not mounted in a rack`),
+			)
+		}
+		pair.push({
+			node: current.value,
+			height: template.value.u_height,
+			is_full_depth: template.value.is_full_depth,
+		})
+	}
+	const [a, b] = pair as [(typeof pair)[number], (typeof pair)[number]]
+	const rackId = a.node.rack_id as number
+	if (b.node.rack_id !== rackId) {
+		return Result.err(new ConflictError('Only devices in the same rack can swap places'))
+	}
+	const aU = a.node.position_u as number
+	const bU = b.node.position_u as number
+	const [lower, upper] = aU <= bU ? [a, b] : [b, a]
+	const lowerU = lower.node.position_u as number
+	const upperTop = (upper.node.position_u as number) + upper.height
+	const targets = [
+		{ ...upper, position_u: lowerU, face: faceOf(lower.node.face) },
+		{ ...lower, position_u: upperTop - lower.height, face: faceOf(upper.node.face) },
+	]
+	const rack = await findOne(racks, eq(racks.id, rackId))
+	if (!rack) {
+		return Result.err(new NotFoundError('Rack not found'))
+	}
+	const height = await rackHeightOf(rack)
+	const others = (await rackSpansOf(rackId)).filter(
+		(span) => span.id !== id && span.id !== otherId,
+	)
+	const spans = targets.map((target) => ({
+		id: target.node.id,
+		name: target.node.name,
+		position_u: target.position_u,
+		height_u: target.height,
+		face: target.face,
+		is_full_depth: target.is_full_depth,
+	}))
+	for (const span of spans) {
+		const label = `Device "${span.name}"`
+		const bounds = checkBounds(span, height, label)
+		if (Result.isError(bounds)) {
+			return bounds
+		}
+		const overlap = checkOverlap(
+			span,
+			[...others, ...spans.filter((s) => s.id !== span.id)],
+			label,
+		)
+		if (Result.isError(overlap)) {
+			return overlap
+		}
+	}
+	const written = await tryWrite(() =>
+		withTransaction(async () => {
+			for (const target of targets) {
+				await getDb()
+					.update(devices)
+					.set({ position_u: target.position_u, face: target.face })
+					.where(eq(devices.id, target.node.id))
+			}
+		}),
+	)
+	if (Result.isError(written)) {
+		return written
+	}
+	const after: DeviceRow[] = []
+	for (const node of [a.node, b.node]) {
+		const row = await getDevice(node.id)
+		if (Result.isError(row)) {
+			return row
+		}
+		after.push(row.value)
+	}
+	await logUpdates('device', [
+		[a.node, after[0] as DeviceRow],
+		[b.node, after[1] as DeviceRow],
+	])
+	return Result.ok([after[0] as DeviceRow, after[1] as DeviceRow])
+}
+
 /** An area outlining the device on a floor plan needs `confirmFloorplan`. */
 export async function deleteDevice(
 	id: number,

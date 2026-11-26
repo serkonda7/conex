@@ -1486,6 +1486,15 @@ export const DeviceMoveSchema = v.pipe(
 )
 
 /**
+ * `POST /devices/:id/swap`: two U-mounted devices of one rack trade places.
+ * Each takes over the other's face; the pair keeps the U range it covers
+ * (the upper device ends up at the bottom of it, the lower one at the top).
+ */
+export const DeviceSwapSchema = v.strictObject({
+	other_id: IdSchema,
+})
+
+/**
  * `POST /devices/:id/migrate`: hands a device's role in the network over to
  * a replacement (`target_id`). `ports` moves the cable of each old port
  * (`from`) onto a free port of the replacement (`to`); cables of unlisted
@@ -1586,6 +1595,7 @@ export interface LocationOutletJson {
 export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
 export type DeviceUpdate = v.InferOutput<typeof DeviceUpdateSchema>
 export type DeviceMove = v.InferOutput<typeof DeviceMoveSchema>
+export type DeviceSwap = v.InferOutput<typeof DeviceSwapSchema>
 export type InterfaceCreate = v.InferOutput<typeof InterfaceCreateSchema>
 export type InterfaceUpdate = v.InferOutput<typeof InterfaceUpdateSchema>
 

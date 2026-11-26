@@ -6,7 +6,7 @@ import type {
 	ElevationShelfRef,
 	ElevationUnit,
 } from 'shared/src/types'
-import { For, type JSX, Show } from 'solid-js'
+import { type Accessor, createSignal, For, type JSX, Show } from 'solid-js'
 import { Faceplate, type FaceplateViewPort } from '../../components/faceplate'
 import { t } from '../../i18n'
 import { deviceStatusLabel, faceLabel } from '../../i18n/labels'
@@ -128,6 +128,108 @@ function shelf_block_span(
 		!shelf_on_face(shelf, face) ||
 		units.some((unit) => covers(mount, unit.u) && unit_devices(unit).length > 0)
 	return mount_taken ? shelf_blocked(shelf) : shelf_footprint(shelf)
+}
+
+/**
+ * Whether two mounts may share a U: only half-depth ones on opposite faces
+ * (mirrors the server's overlap check).
+ */
+function mounts_conflict(
+	a: { face: RackFace | null; is_full_depth: boolean },
+	b: { face: RackFace | null; is_full_depth: boolean },
+): boolean {
+	return (
+		a.face === null ||
+		b.face === null ||
+		a.face === b.face ||
+		a.is_full_depth ||
+		b.is_full_depth
+	)
+}
+
+/**
+ * Whether `device` fits at `position_u` on `face`: inside the rack, clear of
+ * other devices and of shelf blockers. The server re-validates the move.
+ */
+function can_place(
+	units: ElevationUnit[],
+	shelves: ElevationShelfRef[],
+	device: ElevationDeviceRef,
+	position_u: number,
+	face: RackFace | null,
+): boolean {
+	const span: USpan = { first: position_u, last: position_u + device.u_height - 1 }
+	const top = units[0]?.u ?? 0
+	if (span.first < 1 || span.last > top) {
+		return false
+	}
+	const moved = { face, is_full_depth: device.is_full_depth }
+	const hits = (other: USpan): boolean => other.first <= span.last && span.first <= other.last
+	for (const unit of units) {
+		if (!covers(span, unit.u)) {
+			continue
+		}
+		for (const other of unit_devices(unit)) {
+			if (other.id !== device.id && mounts_conflict(moved, other)) {
+				return false
+			}
+		}
+	}
+	return !shelves.some((shelf) => {
+		const blocked = shelf_blocked(shelf)
+		return blocked !== null && hits(blocked) && mounts_conflict(moved, shelf)
+	})
+}
+
+/** The device being dragged and where on it it was grabbed. */
+interface DragSource {
+	device: ElevationDeviceRef
+	/** Elevation face the drag started on. */
+	face: RackFace
+	/** Rows between the device's top U and the grabbed row. */
+	grab: number
+}
+
+/** Where a drop would put the dragged device. */
+type DropTarget =
+	| {
+			kind: 'move'
+			/** Elevation face under the pointer. */
+			face: RackFace
+			position_u: number
+			/** Mount face the device ends up with. */
+			device_face: RackFace | null
+			valid: boolean
+	  }
+	| { kind: 'swap'; face: RackFace; other: ElevationDeviceRef }
+
+/** Drag state shared by both faces of one elevation. */
+interface DeviceDrag {
+	source: Accessor<DragSource | null>
+	target: Accessor<DropTarget | null>
+	start: (source: DragSource) => void
+	over: (target: DropTarget | null) => void
+	end: () => void
+}
+
+function createDeviceDrag(): DeviceDrag {
+	const [source, setSource] = createSignal<DragSource | null>(null)
+	const [target, setTarget] = createSignal<DropTarget | null>(null)
+	return {
+		source,
+		target,
+		start: (next: DragSource): void => {
+			setSource(next)
+			setTarget(null)
+		},
+		over: (next: DropTarget | null): void => {
+			setTarget(next)
+		},
+		end: (): void => {
+			setSource(null)
+			setTarget(null)
+		},
+	}
 }
 
 type Segment =
@@ -360,11 +462,19 @@ interface ElevationProps {
 	 * (by device id) instead of name and model.
 	 */
 	faceplates?: ReadonlyMap<number, readonly FaceplateViewPort[]>
+	/**
+	 * Drag and drop: moves a device so its bottom U is `position_u` on the
+	 * mount face `face`. Without it devices are not draggable.
+	 */
+	on_move_device?: (device: ElevationDeviceRef, position_u: number, face: RackFace | null) => void
+	/** Drop onto another mounted device: the two trade places. */
+	on_swap_devices?: (device: ElevationDeviceRef, other: ElevationDeviceRef) => void
 }
 
 /** Props of one segment row: the elevation, its face and the grid row. */
 interface RowProps<S extends Segment['kind']> {
 	elevation: ElevationProps
+	drag: DeviceDrag
 	face: RackFace
 	segment: Extract<Segment, { kind: S }>
 	row: number
@@ -587,19 +697,54 @@ function DeviceBlock(props: RowProps<'device'> & { topU: number }): JSX.Element 
 	const device = (): ElevationDeviceRef => props.segment.device
 	const status = (): string => device().status ?? 'active'
 	const shelfUnit = (): string => u_label(props.segment.shelf?.position_u)
-	const title = (): string =>
-		t('elevation.deviceTitle', {
+	const movable = (): boolean =>
+		props.elevation.readonly !== true && props.elevation.on_move_device !== undefined
+	const title = (): string => {
+		const base = t('elevation.deviceTitle', {
 			name: device().name,
 			model: device().device_type_model,
 			height: device().u_height,
 		})
+		return movable() ? `${base}\n${t('elevation.dragHint')}` : base
+	}
+	const swapTarget = (): boolean => {
+		const target = props.drag.target()
+		return (
+			target?.kind === 'swap' && target.face === props.face && target.other.id === device().id
+		)
+	}
+	function startDrag(e: DragEvent): void {
+		const block = e.currentTarget as HTMLElement
+		const rect = block.getBoundingClientRect()
+		const rowHeight = rect.height / Math.max(1, props.segment.rows)
+		const grab = Math.min(
+			props.segment.rows - 1,
+			Math.max(0, Math.floor((e.clientY - rect.top) / rowHeight)),
+		)
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move'
+			// Firefox only starts a drag that carries data.
+			e.dataTransfer.setData('text/plain', device().name)
+			e.dataTransfer.setDragImage(block, e.clientX - rect.left, e.clientY - rect.top)
+		}
+		props.drag.start({ device: device(), face: props.face, grab })
+	}
 	return (
 		<>
 			<BlockGutters topU={props.topU} row={props.row} rows={props.segment.rows} />
 			<li
 				class="rack-block rack-u-device"
-				classList={{ 'rack-u-device-rear': props.segment.rear }}
+				classList={{
+					'rack-u-device-rear': props.segment.rear,
+					'rack-u-movable': movable(),
+					'rack-u-dragging': props.drag.source()?.device.id === device().id,
+					'rack-drop-swap': swapTarget(),
+				}}
 				style={blockStyle(props.row, props.segment.rows)}
+				data-device-id={device().id}
+				draggable={movable()}
+				onDragStart={startDrag}
+				onDragEnd={() => props.drag.end()}
 			>
 				<Show
 					when={props.elevation.faceplates}
@@ -666,7 +811,11 @@ function DeviceLabel(
 }
 
 /** One face of the rack: the unit grid with its segments. */
-function ElevationFace(props: { elevation: ElevationProps; face: RackFace }): JSX.Element {
+function ElevationFace(props: {
+	elevation: ElevationProps
+	drag: DeviceDrag
+	face: RackFace
+}): JSX.Element {
 	const units = (): ElevationUnit[] => props.elevation.units
 	const topU = (): number => (units().length > 0 ? (units()[0] as ElevationUnit).u : 0)
 	const placed = (): { segment: Segment; row: number }[] => {
@@ -680,7 +829,7 @@ function ElevationFace(props: { elevation: ElevationProps; face: RackFace }): JS
 
 	function render(placement: { segment: Segment; row: number }): JSX.Element {
 		const { segment, row } = placement
-		const common = { elevation: props.elevation, face: props.face, row }
+		const common = { elevation: props.elevation, drag: props.drag, face: props.face, row }
 		// Blocks count their gutter down from the U at their top row.
 		const blockTop = topU() - (row - 1)
 		switch (segment.kind) {
@@ -695,6 +844,114 @@ function ElevationFace(props: { elevation: ElevationProps; face: RackFace }): JS
 		}
 	}
 
+	/** Mounted device by id, for the block under the pointer. */
+	function deviceById(id: number): ElevationDeviceRef | undefined {
+		for (const unit of units()) {
+			const found = unit_devices(unit).find((device) => device.id === id)
+			if (found) {
+				return found
+			}
+		}
+		return undefined
+	}
+
+	/** What dropping the dragged device at the pointer would do. */
+	function dropTarget(e: DragEvent, source: DragSource): DropTarget | null {
+		const list = e.currentTarget as HTMLElement
+		const block = (e.target as Element | null)?.closest<HTMLElement>('[data-device-id]')
+		const other = block ? deviceById(Number(block.dataset.deviceId)) : undefined
+		if (other && other.id !== source.device.id) {
+			return { kind: 'swap', face: props.face, other }
+		}
+		const count = units().length
+		if (count === 0) {
+			return null
+		}
+		const rect = list.getBoundingClientRect()
+		const row = Math.floor(
+			((e.clientY - rect.top - list.clientTop) / list.clientHeight) * count,
+		)
+		const pointerU = topU() - Math.min(count - 1, Math.max(0, row))
+		const position_u = pointerU + source.grab - source.device.u_height + 1
+		// Within its face column a device keeps its mount face; dropped on the
+		// other column it is mounted on that face.
+		const device_face = source.face === props.face ? source.device.face : props.face
+		return {
+			kind: 'move',
+			face: props.face,
+			position_u,
+			device_face,
+			valid: can_place(
+				units(),
+				props.elevation.shelves,
+				source.device,
+				position_u,
+				device_face,
+			),
+		}
+	}
+
+	function onDragOver(e: DragEvent): void {
+		const source = props.drag.source()
+		if (!source) {
+			return
+		}
+		const target = dropTarget(e, source)
+		props.drag.over(target)
+		if (target && (target.kind === 'swap' || target.valid)) {
+			e.preventDefault()
+			if (e.dataTransfer) {
+				e.dataTransfer.dropEffect = 'move'
+			}
+		}
+	}
+
+	function onDragLeave(e: DragEvent): void {
+		// Leaving a child row also bubbles here, and browsers often leave
+		// `relatedTarget` empty on drag events: clear only once outside.
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+		const inside =
+			e.clientX > rect.left &&
+			e.clientX < rect.right &&
+			e.clientY > rect.top &&
+			e.clientY < rect.bottom
+		if (!inside) {
+			props.drag.over(null)
+		}
+	}
+
+	function onDrop(e: DragEvent): void {
+		const source = props.drag.source()
+		const target = source ? dropTarget(e, source) : null
+		props.drag.end()
+		if (!source || !target) {
+			return
+		}
+		e.preventDefault()
+		if (target.kind === 'swap') {
+			props.elevation.on_swap_devices?.(source.device, target.other)
+			return
+		}
+		const unchanged =
+			target.position_u === source.device.position_u &&
+			target.device_face === source.device.face
+		if (target.valid && !unchanged) {
+			props.elevation.on_move_device?.(source.device, target.position_u, target.device_face)
+		}
+	}
+
+	/** Grid rows the move preview covers, clipped to the rack. */
+	const preview = (): { row: number; rows: number; valid: boolean } | null => {
+		const target = props.drag.target()
+		const source = props.drag.source()
+		if (!source || target?.kind !== 'move' || target.face !== props.face) {
+			return null
+		}
+		const first = Math.max(1, topU() - (target.position_u + source.device.u_height - 1) + 1)
+		const last = Math.min(units().length, topU() - target.position_u + 1)
+		return first > last ? null : { row: first, rows: last - first + 1, valid: target.valid }
+	}
+
 	return (
 		<section
 			class="rack-elev-face"
@@ -705,8 +962,21 @@ function ElevationFace(props: { elevation: ElevationProps; face: RackFace }): JS
 				class="rack-elev"
 				classList={{ 'rack-elev-images': props.elevation.faceplates !== undefined }}
 				style={{ 'grid-template-rows': `repeat(${units().length}, var(--rack-row-h))` }}
+				onDragOver={onDragOver}
+				onDragLeave={onDragLeave}
+				onDrop={onDrop}
 			>
 				<For each={placed()}>{render}</For>
+				<Show when={preview()}>
+					{(at: () => { row: number; rows: number; valid: boolean }): JSX.Element => (
+						<li
+							class="rack-drop-preview"
+							classList={{ 'rack-drop-invalid': !at().valid }}
+							style={blockStyle(at().row, at().rows)}
+							aria-hidden="true"
+						/>
+					)}
+				</Show>
 			</ol>
 		</section>
 	)
@@ -718,10 +988,13 @@ function ElevationFace(props: { elevation: ElevationProps; face: RackFace }): JS
  * span their blocked range (mount plate plus hatched reserve above).
  */
 export function RackElevation(props: ElevationProps): JSX.Element {
+	const drag = createDeviceDrag()
 	return (
 		<div class="rack-elev-dual" data-testid="rack-elevation">
 			<For each={FACES}>
-				{(face: RackFace): JSX.Element => <ElevationFace elevation={props} face={face} />}
+				{(face: RackFace): JSX.Element => (
+					<ElevationFace elevation={props} drag={drag} face={face} />
+				)}
 			</For>
 		</div>
 	)

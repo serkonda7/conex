@@ -1547,6 +1547,9 @@ export const de: Messages = {
 	'elevation.deviceTitle': '{name} ({model}, {height} HE)',
 	'elevation.onShelfTitle': 'Auf Fachboden {name} ({unit})',
 	'elevation.shelfUnit': 'Fachboden {unit}',
+	'elevation.dragHint':
+		'Ziehen zum Verschieben; auf ein anderes Gerät ziehen, um die Plätze zu tauschen',
+	'elevation.swapFailed': 'Die Geräte konnten nicht getauscht werden.',
 	'deviceStatus.active': 'Aktiv',
 	'deviceStatus.inactive': 'Inaktiv',
 	'deviceStatus.planned': 'Geplant',

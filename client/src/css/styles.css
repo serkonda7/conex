@@ -5354,6 +5354,35 @@ span.attachment-star,
 	background-image: none;
 }
 
+/* Drag and drop: move a device to free U, or onto another to swap. */
+.rack-u-movable {
+	cursor: grab;
+}
+
+.rack-u-dragging {
+	opacity: 0.45;
+}
+
+.rack-drop-swap {
+	outline: 2px dashed var(--primary);
+	outline-offset: -2px;
+}
+
+.rack-drop-preview {
+	position: relative;
+	z-index: 1;
+	margin: 0;
+	pointer-events: none;
+	background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+	outline: 2px dashed var(--primary);
+	outline-offset: -2px;
+}
+
+.rack-drop-preview.rack-drop-invalid {
+	background-color: var(--error-bg);
+	outline-color: var(--error);
+}
+
 .rack-u-free {
 	border-style: solid;
 }
