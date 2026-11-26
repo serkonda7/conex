@@ -188,7 +188,9 @@ export function ToggleField(props: {
 	disabled?: boolean
 	/** Shown on hover, e.g. why the switch is disabled. */
 	title?: string
+	autofocus?: boolean
 }): JSX.Element {
+	const ref = useAutofocus(() => props.autofocus)
 	return (
 		<div class="field">
 			<label for={props.id}>{props.label}</label>
@@ -196,8 +198,10 @@ export function ToggleField(props: {
 				<span class="field-toggle" title={props.title}>
 					<input
 						id={props.id}
+						ref={ref}
 						type="checkbox"
 						role="switch"
+						data-autofocus={props.autofocus || undefined}
 						aria-checked={props.checked}
 						class="toggle"
 						checked={props.checked}

@@ -96,6 +96,7 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 							onChange={setEnabled}
 							on_text={t('device.enabled')}
 							off_text={t('device.disabled')}
+							autofocus
 						/>
 					</Show>
 					<TextField
@@ -104,7 +105,7 @@ export function EditPortDialog(props: EditPortDialogProps): JSX.Element {
 						value={name()}
 						onInput={setName}
 						required
-						autofocus
+						autofocus={!props.show_enabled}
 					/>
 					<div class="field">
 						<span class="field-group-label">{t('device.connection')}</span>
