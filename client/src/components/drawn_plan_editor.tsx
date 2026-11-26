@@ -473,16 +473,32 @@ const OPENING_UI: Record<
 	},
 }
 
-/** Palette entries of the elements drawn by clicking their outline. */
-interface ElementTool {
-	tool: 'tray' | 'desk' | 'deskGroup' | 'room'
+/** A tool of the Draw tab's palette. */
+interface PaletteTool {
+	tool: Exclude<Tool, 'select' | 'image' | 'calibrate' | 'align'>
 	icon: typeof IconDoor
 	label: MessageKey
 	hint: MessageKey
 }
 
-const ELEMENT_TOOLS: ElementTool[] = [
-	{ tool: 'tray', icon: IconRoute, label: 'drawnPlan.toolTray', hint: 'drawnPlan.trayHint' },
+/**
+ * The Draw tab's palette, most used first: the first nine get the number
+ * keys 1–9.
+ */
+const PALETTE_TOOLS: PaletteTool[] = [
+	{ tool: 'wall', icon: IconWall, label: 'drawnPlan.toolWall', hint: 'drawnPlan.wallHint' },
+	{
+		tool: 'door',
+		icon: OPENING_UI.door.icon,
+		label: OPENING_UI.door.tool,
+		hint: 'drawnPlan.openingPlaceHint',
+	},
+	{
+		tool: 'window',
+		icon: OPENING_UI.window.icon,
+		label: OPENING_UI.window.tool,
+		hint: 'drawnPlan.openingPlaceHint',
+	},
 	{ tool: 'desk', icon: IconDesk, label: 'drawnPlan.toolDesk', hint: 'drawnPlan.deskHint' },
 	{
 		tool: 'deskGroup',
@@ -491,17 +507,19 @@ const ELEMENT_TOOLS: ElementTool[] = [
 		hint: 'drawnPlan.deskGroupHint',
 	},
 	{ tool: 'room', icon: IconPolygon, label: 'drawnPlan.toolRoom', hint: 'drawnPlan.roomHint' },
-]
-
-/** Palette entries of the structure drawn next to the walls: room dividers and pillars (no number keys). */
-interface StructureTool {
-	tool: 'partition' | 'pillar'
-	icon: typeof IconDoor
-	label: MessageKey
-	hint: MessageKey
-}
-
-const STRUCTURE_TOOLS: StructureTool[] = [
+	{ tool: 'tray', icon: IconRoute, label: 'drawnPlan.toolTray', hint: 'drawnPlan.trayHint' },
+	{
+		tool: 'sliding_door',
+		icon: OPENING_UI.sliding_door.icon,
+		label: OPENING_UI.sliding_door.tool,
+		hint: 'drawnPlan.openingPlaceHint',
+	},
+	{
+		tool: 'stairs',
+		icon: IconStairsUp,
+		label: 'drawnPlan.toolStairs',
+		hint: 'drawnPlan.stairsHint',
+	},
 	{
 		tool: 'partition',
 		icon: IconSeparatorVertical,
@@ -517,17 +535,7 @@ const STRUCTURE_TOOLS: StructureTool[] = [
 ]
 
 /** Tools of the Draw tab with a number key (1–9), in palette order. */
-const SHORTCUT_TOOLS: Tool[] = [
-	'wall',
-	'door',
-	'sliding_door',
-	'window',
-	'stairs',
-	'tray',
-	'desk',
-	'deskGroup',
-	'room',
-]
+const SHORTCUT_TOOLS: Tool[] = PALETTE_TOOLS.slice(0, 9).map((entry) => entry.tool)
 
 /** The number key of a tool, shown on its palette entry. */
 function ToolKey(props: { tool: Tool }): JSX.Element {
@@ -3594,26 +3602,11 @@ export function DrawnPlanEditor(props: {
 							<section>
 								<h5>{t('drawnPlan.elements')}</h5>
 								<ul>
-									<li>
-										<button
-											type="button"
-											class="floorplan-palette-item drawn-plan-element"
-											classList={{ active: tool() === 'wall' }}
-											aria-pressed={tool() === 'wall'}
-											title={t('drawnPlan.wallHint')}
-											onClick={() =>
-												setTool(tool() === 'wall' ? 'select' : 'wall')
-											}
-										>
-											<IconWall size={14} />
-											<span>{t('drawnPlan.toolWall')}</span>
-											<ToolKey tool="wall" />
-										</button>
-									</li>
-									<For each={STRUCTURE_TOOLS}>
-										{(entry: StructureTool) => {
+									<For each={PALETTE_TOOLS}>
+										{(entry: PaletteTool) => {
 											const Icon = entry.icon
 											const value = entry.tool
+											const opening = isOpeningKind(value) ? value : null
 											return (
 												<li>
 													<button
@@ -3622,86 +3615,24 @@ export function DrawnPlanEditor(props: {
 														classList={{ active: tool() === value }}
 														aria-pressed={tool() === value}
 														title={t(entry.hint)}
-														onClick={() =>
-															setTool(
-																tool() === value ? 'select' : value,
-															)
-														}
-													>
-														<Icon size={14} />
-														<span>{t(entry.label)}</span>
-													</button>
-												</li>
-											)
-										}}
-									</For>
-									<For each={['door', 'sliding_door', 'window'] as const}>
-										{(kind: OpeningKind) => {
-											const ui = OPENING_UI[kind]
-											const Icon = ui.icon
-											return (
-												<li>
-													<button
-														type="button"
-														class="floorplan-palette-item drawn-plan-element"
-														classList={{ active: tool() === kind }}
-														aria-pressed={tool() === kind}
-														title={t('drawnPlan.openingPlaceHint')}
-														draggable="true"
+														draggable={opening ? 'true' : undefined}
 														onDragStart={(e: DragEvent) => {
+															if (!opening) {
+																return
+															}
 															e.dataTransfer?.setData(
 																'text/plain',
-																`opening:${kind}`,
+																`opening:${opening}`,
 															)
 															setTool('select')
-															setDragged(`opening:${kind}`)
+															setDragged(`opening:${opening}`)
 														}}
 														onDragEnd={() => {
-															setDragged(null)
-															setHover(null)
+															if (opening) {
+																setDragged(null)
+																setHover(null)
+															}
 														}}
-														onClick={() =>
-															setTool(
-																tool() === kind ? 'select' : kind,
-															)
-														}
-													>
-														<Icon size={14} />
-														<span>{t(ui.tool)}</span>
-														<ToolKey tool={kind} />
-													</button>
-												</li>
-											)
-										}}
-									</For>
-									<li>
-										<button
-											type="button"
-											class="floorplan-palette-item drawn-plan-element"
-											classList={{ active: tool() === 'stairs' }}
-											aria-pressed={tool() === 'stairs'}
-											title={t('drawnPlan.stairsHint')}
-											onClick={() =>
-												setTool(tool() === 'stairs' ? 'select' : 'stairs')
-											}
-										>
-											<IconStairsUp size={14} />
-											<span>{t('drawnPlan.toolStairs')}</span>
-											<ToolKey tool="stairs" />
-										</button>
-									</li>
-									<For each={ELEMENT_TOOLS}>
-										{(entry: ElementTool) => {
-											const Icon = entry.icon
-											const value = entry.tool
-											return (
-												<li>
-													<button
-														type="button"
-														class="floorplan-palette-item drawn-plan-element"
-														classList={{ active: tool() === value }}
-														aria-pressed={tool() === value}
-														title={t(entry.hint)}
 														onClick={() =>
 															setTool(
 																tool() === value ? 'select' : value,
