@@ -42,6 +42,7 @@ import type {
 } from 'shared/src/schemas'
 import {
 	attachments,
+	cables,
 	device_roles,
 	devices,
 	floorplan_areas,
@@ -144,6 +145,17 @@ export function firstJackPort(jackId: SQL | PgColumn): SQL<number | null> {
 		number | null
 	>`(select min(jp.id) from ${interfaces} jp where jp.jack_id = ${jackId})`
 }
+
+/**
+ * The outlet of the `interfaces` row (the port, or any port of its jack) is
+ * cabled to a rear port: a link between panels, not an outlet.
+ */
+export const panelLinkedSql: SQL<boolean> = sql<boolean>`exists (
+	select 1 from ${cables} c
+	join ${interfaces} op on op.id in (c.a_interface_id, c.b_interface_id)
+	join ${interfaces} peer on peer.id = case when c.a_interface_id = op.id then c.b_interface_id else c.a_interface_id end
+	where peer.side = 'rear' and (op.id = ${interfaces.id} or op.jack_id = ${interfaces.jack_id})
+)`
 
 /**
  * Joins `interfaces` to a placement's outlet: the placed port, or the
@@ -837,6 +849,12 @@ export async function listPlanCandidates(
 							),
 							eq(portDevice.site_id, siteId),
 							free,
+							// Rear ports cabled to another panel's rear port are not
+							// offered, unless already on this plan.
+							or(
+								sql`not ${panelLinkedSql}`,
+								eq(floorplan_placements.attachment_id, id),
+							),
 							// Unpatched outlets (a jack without a patched port) are
 							// not offered, unless already on this plan.
 							or(

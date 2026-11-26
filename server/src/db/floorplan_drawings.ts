@@ -76,6 +76,7 @@ import {
 	outletPorts,
 	outsideScope,
 	ownerLocations,
+	panelLinkedSql,
 	portColumns,
 	portDevice,
 	portOf,
@@ -591,6 +592,7 @@ export async function listDrawingCandidates(
 							),
 							eq(portDevice.site_id, siteId),
 							free,
+							or(sql`not ${panelLinkedSql}`, onThisPlan),
 							or(
 								sql`(${interfaces.jack_id} is null and ${interfaces.patched} = 1)`,
 								sql`exists (select 1 from ${interfaces} jp where jp.jack_id = ${interfaces.jack_id} and jp.patched = 1)`,
