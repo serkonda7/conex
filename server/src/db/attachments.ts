@@ -61,6 +61,7 @@ import { buildChildrenMap } from '../services/hierarchy'
 import {
 	attachmentFileName,
 	listAttachmentFiles,
+	readAttachmentHead,
 	removeAttachmentFiles,
 	removeStoredFile,
 	writeAttachmentFile,
@@ -1933,13 +1934,18 @@ export async function deleteOwnerAttachments(owner: AttachmentOwner): Promise<At
 	return rows
 }
 
+/** JPEG headers (EXIF and frame segments) fit well within this many bytes. */
+const JPEG_HEAD_BYTES = 256 * 1024
+
 /**
  * Startup sweep: removes stored files (and leftover `.tmp` files) without a
  * row, and logs rows whose file is missing. Must run before the server
  * accepts uploads. Unrelated files in the directory are left alone.
+ * Also corrects the stored size of JPEGs uploaded before the EXIF
+ * orientation was applied (rotated phone photos showed stretched).
  */
 export async function sweepAttachmentFiles(): Promise<
-	Result<{ removed: number; missing: number }, Error>
+	Result<{ removed: number; missing: number; resized: number }, Error>
 > {
 	const files = await listAttachmentFiles()
 	if (Result.isError(files)) {
@@ -1950,6 +1956,8 @@ export async function sweepAttachmentFiles(): Promise<
 			id: attachments.id,
 			storage_key: attachments.storage_key,
 			mime: attachments.mime,
+			width_px: attachments.width_px,
+			height_px: attachments.height_px,
 		})
 		.from(attachments)
 	const expected = new Set(rows.map((row) => attachmentFileName(row.storage_key, row.mime)))
@@ -1970,5 +1978,29 @@ export async function sweepAttachmentFiles(): Promise<
 	for (const row of missing) {
 		console.warn(`Attachment #${row.id}: file ${row.storage_key} is missing`)
 	}
-	return Result.ok({ removed, missing: missing.length })
+	let resized = 0
+	for (const row of rows) {
+		if (
+			row.mime !== 'image/jpeg' ||
+			!present.has(attachmentFileName(row.storage_key, row.mime))
+		) {
+			continue
+		}
+		const head = await readAttachmentHead(row.storage_key, row.mime, JPEG_HEAD_BYTES)
+		if (Result.isError(head)) {
+			return head
+		}
+		const info = readImageInfo(head.value)
+		if (
+			Result.isOk(info) &&
+			(info.value.width !== row.width_px || info.value.height !== row.height_px)
+		) {
+			await getDb()
+				.update(attachments)
+				.set({ width_px: info.value.width, height_px: info.value.height })
+				.where(eq(attachments.id, row.id))
+			resized++
+		}
+	}
+	return Result.ok({ removed, missing: missing.length, resized })
 }

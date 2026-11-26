@@ -75,6 +75,19 @@ export async function removeAttachmentFiles(
 	}
 }
 
+/** The first `limit` bytes of a stored file (fewer when it is shorter). */
+export async function readAttachmentHead(
+	storageKey: string,
+	mime: AttachmentMime,
+	limit: number,
+): Promise<Result<Uint8Array, Error>> {
+	try {
+		return Result.ok(await Bun.file(attachmentPath(storageKey, mime)).slice(0, limit).bytes())
+	} catch (e) {
+		return Result.err(errOf(e))
+	}
+}
+
 /** File names in the attachments directory. */
 export async function listAttachmentFiles(): Promise<Result<string[], Error>> {
 	try {
