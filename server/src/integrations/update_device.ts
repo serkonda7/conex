@@ -15,8 +15,9 @@ import { NotFoundError, ValidationError } from '../db/errors'
 import { devices } from '../schema'
 import { nowSeconds } from '../util/time'
 import { linkOf } from './links'
+import { providerDefinition } from './registry'
 import { localDevices } from './report'
-import { upsertDevice } from './snapshot'
+import { readDevice, upsertDevice } from './snapshot'
 import { enabledProviderMethod } from './store'
 
 export async function updateExternalDevice(
@@ -32,6 +33,13 @@ export async function updateExternalDevice(
 	if (!link) {
 		return Result.err(new ValidationError('Device is not linked'))
 	}
+	if (!providerDefinition(provider).capabilities.device_push.includes(field)) {
+		return Result.err(new ValidationError(`Integration cannot update the device ${field}`))
+	}
+	const external = await readDevice(provider, link.external_id)
+	if (!external) {
+		return Result.err(new ValidationError('Linked device is not in the last sync'))
+	}
 	const value = device[field]
 	if (value === null) {
 		return Result.err(new ValidationError(`Device has no ${field}`))
@@ -40,7 +48,11 @@ export async function updateExternalDevice(
 	if (Result.isError(updateDevice)) {
 		return updateDevice
 	}
-	const updated = await updateDevice.value(link.external_id, { [field]: value })
+	const updated = await updateDevice.value(
+		link.external_id,
+		{ [field]: value },
+		external.external_tenant_id,
+	)
 	if (Result.isError(updated)) {
 		return updated
 	}

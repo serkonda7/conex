@@ -238,7 +238,7 @@ export function mockProvider(provider: ProviderId): IntegrationProvider {
 				return id
 			})
 	}
-	if (capabilities.push) {
+	if (capabilities.device_push.length > 0) {
 		instance.updateDevice = async (
 			externalId: string,
 			changes: DeviceUpdate,
@@ -266,6 +266,8 @@ export function mockProvider(provider: ProviderId): IntegrationProvider {
 			}
 			return Result.err(new Error(`Mock device ${externalId} not found`))
 		}
+	}
+	if (capabilities.push) {
 		instance.updateEmployee = async (
 			externalId: string,
 			changes: EmployeeUpdate,

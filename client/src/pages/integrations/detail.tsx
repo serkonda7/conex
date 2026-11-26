@@ -3,7 +3,7 @@ import { Result } from 'better-result'
 import {
 	EMPLOYEE_PUSH_FIELDS,
 	type EmployeePushField,
-	EXTERNAL_PUSH_FIELDS,
+	type ExternalPullField,
 	type ExternalPushField,
 	FINDING_KINDS,
 	type FindingKind,
@@ -11,6 +11,7 @@ import {
 } from 'shared/src/schemas'
 import type { JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, on, Show } from 'solid-js'
+import { update_device } from '../../api/devices'
 import {
 	create_external_device,
 	deactivate_external_employee,
@@ -53,11 +54,27 @@ import { providerStatus } from './integration_card'
 import { ProviderSettings } from './settings'
 
 /** Field of a mismatch that can be written to the external system. */
-function pushField(f: IntegrationFinding): ExternalPushField | null {
-	return f.kind === 'device_mismatch' &&
-		(EXTERNAL_PUSH_FIELDS as readonly string[]).includes(f.field ?? '')
-		? (f.field as ExternalPushField)
+function pushField(
+	f: IntegrationFinding,
+	pushable: readonly ExternalPushField[],
+): ExternalPushField | null {
+	return f.kind === 'device_mismatch' && f.local !== null && isOneOf(pushable, f.field)
+		? f.field
 		: null
+}
+
+/** Field of a device mismatch whose external value can be taken into conex. */
+function pullField(
+	f: IntegrationFinding,
+	pullable: readonly ExternalPullField[],
+): ExternalPullField | null {
+	return f.kind === 'device_mismatch' && f.remote !== null && isOneOf(pullable, f.field)
+		? f.field
+		: null
+}
+
+function isOneOf<T extends string>(values: readonly T[], value: string | null): value is T {
+	return (values as readonly string[]).includes(value ?? '')
 }
 
 /** Field of an employee mismatch that can be written to the external system. */
@@ -393,11 +410,25 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 			case 'device_stale':
 				return <Show when={can('integrations.manage')}>{unlink}</Show>
 			case 'device_mismatch': {
-				const field = pushField(f)
+				const field = pushField(f, capabilities.device_push)
+				const pull = pullField(f, capabilities.device_pull)
 				return (
 					<Show when={can('integrations.manage')}>
 						<Show when={f.field === 'tenant' || f.field === 'site'}>{unlink}</Show>
-						{capabilities.push && field !== null && (
+						{pull !== null && can('edit') && (
+							<button
+								type="button"
+								class="btn-small"
+								onClick={() =>
+									void run(() =>
+										update_device(f.device_id ?? 0, { [pull]: f.remote }),
+									)
+								}
+							>
+								{t('integration.updateConex')}
+							</button>
+						)}
+						{field !== null && (
 							<button
 								type="button"
 								class="btn-small"

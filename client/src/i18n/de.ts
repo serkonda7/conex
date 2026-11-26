@@ -1650,6 +1650,7 @@ export const de: Messages = {
 	'integration.importDeviceSource': 'In {provider}: {source}',
 	'integration.importDeviceFailed': 'Gerät konnte nicht in conex angelegt werden',
 	'integration.createExternalFailed': 'Gerät konnte extern nicht angelegt werden',
+	'integration.updateConex': 'In conex übernehmen',
 	'integration.updateExternal': 'In {provider} aktualisieren',
 	'integration.updateExternalFailed': 'Gerät konnte extern nicht aktualisiert werden',
 	'integration.updateExternalEmployeeFailed':

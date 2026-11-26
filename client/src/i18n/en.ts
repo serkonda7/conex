@@ -1634,6 +1634,7 @@ export const en = {
 	'integration.importDeviceSource': 'In {provider}: {source}',
 	'integration.importDeviceFailed': 'Failed to create the device in conex',
 	'integration.createExternalFailed': 'Failed to create the device externally',
+	'integration.updateConex': 'Apply to conex',
 	'integration.updateExternal': 'Update in {provider}',
 	'integration.updateExternalFailed': 'Failed to update the device externally',
 	'integration.updateExternalEmployeeFailed': 'Failed to update the employee externally',

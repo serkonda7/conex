@@ -3842,6 +3842,11 @@ export const EXTERNAL_PUSH_FIELDS = ['name', 'manufacturer', 'model'] as const
 
 export type ExternalPushField = (typeof EXTERNAL_PUSH_FIELDS)[number]
 
+/** Device fields whose external value can be taken into conex on a mismatch. */
+export const EXTERNAL_PULL_FIELDS = ['serial'] as const
+
+export type ExternalPullField = (typeof EXTERNAL_PULL_FIELDS)[number]
+
 /** Writes one conex field of a linked device to the external system. */
 export const ExternalDeviceUpdateSchema = v.strictObject({
 	device_id: IdSchema,
@@ -3968,8 +3973,15 @@ export interface IntegrationCapabilities {
 	devices: boolean
 	/** Opens and lists tickets, with priorities as ticket tags. */
 	tickets: boolean
-	/** Overwrites external device/employee fields with conex values (and deactivates employees). */
+	/** Overwrites external employee fields with conex values and deactivates employees. */
 	push: boolean
+	/** Device fields whose conex value can overwrite the external one. */
+	device_push: readonly ExternalPushField[]
+	/**
+	 * Device fields whose external value can be taken into conex; a value
+	 * missing in conex is then reported as a mismatch too.
+	 */
+	device_pull: readonly ExternalPullField[]
 	/** Creates conex devices in the external system. */
 	create_device: boolean
 	/** External tenants carry a customer number that is compared with the conex one. */

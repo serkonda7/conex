@@ -133,16 +133,22 @@ function remoteValue(device: ExternalDevice, field: DeviceCompareField): string 
 
 /**
  * Field-by-field comparison. A value missing on either side is shown but not
- * counted as a mismatch (`equal: true`).
+ * counted as a mismatch (`equal: true`), except one missing in conex for a
+ * field in `pull`, since conex can take it from the external device.
  */
-function compareFields(local: LocalDeviceRow, remote: ExternalDevice): FieldComparison[] {
+function compareFields(
+	local: LocalDeviceRow,
+	remote: ExternalDevice,
+	pull: readonly DeviceCompareField[],
+): FieldComparison[] {
 	return DEVICE_COMPARE_FIELDS.map((field) => {
 		const l = localValue(local, field)
 		const r = remoteValue(remote, field)
 		const normalize = NORMALIZERS[field]
 		const nl = normalize(l)
 		const nr = normalize(r)
-		return { field, local: l, remote: r, equal: nl === null || nr === null || nl === nr }
+		const missing = nr === null || (nl === null && !pull.includes(field))
+		return { field, local: l, remote: r, equal: missing || nl === nr }
 	})
 }
 
@@ -600,7 +606,7 @@ export async function buildReport(
 				}),
 			)
 		}
-		for (const cmp of compareFields(device, external)) {
+		for (const cmp of compareFields(device, external, capabilities.device_pull)) {
 			if (!cmp.equal) {
 				findings.push(
 					finding('device_mismatch', {
@@ -989,7 +995,14 @@ export async function deviceStatus(
 	return {
 		link: link ? linkJson(link) : null,
 		external,
-		fields: local && external ? compareFields(local, external) : [],
+		fields:
+			local && external
+				? compareFields(
+						local,
+						external,
+						providerDefinition(provider).capabilities.device_pull,
+					)
+				: [],
 		external_tenants,
 		candidates,
 	}

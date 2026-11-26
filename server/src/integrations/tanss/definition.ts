@@ -1,4 +1,5 @@
 import { Result } from 'better-result'
+import { EXTERNAL_PUSH_FIELDS } from 'shared/src/schemas'
 import type { IntegrationSecrets } from '../secrets'
 import type { IntegrationConfig, IntegrationProvider, ProviderDefinition } from '../types'
 import type { TanssCredentials } from './client'
@@ -22,6 +23,8 @@ export const tanssDefinition: ProviderDefinition<'tanss'> = {
 		devices: true,
 		tickets: true,
 		push: true,
+		device_push: EXTERNAL_PUSH_FIELDS,
+		device_pull: [],
 		create_device: true,
 		customer_numbers: true,
 		link_level: 'tenant',

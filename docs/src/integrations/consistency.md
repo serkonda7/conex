@@ -60,8 +60,14 @@ für UniFi die Mandantenebene.
 Die Anmeldung erfolgt mit einem Site-Manager-API-Schlüssel aus unifi.ui.com. Ein
 Organisationsschlüssel erreicht alle Konsolen der Organisation, ein persönlicher
 Schlüssel nur die eigenen Konsolen. Die Basis-URL ist `https://api.ui.com`. UniFi
-kennt in conex keine Mitarbeiter und keine Tickets; Geräte werden nur verknüpft
-und verglichen, nicht in UniFi angelegt oder geändert. Bei zu vielen Anfragen
+kennt in conex keine Mitarbeiter und keine Tickets; Geräte werden verknüpft und
+verglichen, aber nicht in UniFi angelegt. Als Seriennummer eines UniFi-Geräts gilt
+seine MAC-Adresse (ohne Trennzeichen, in Großbuchstaben), wie sie Ubiquiti auf das
+Gerät druckt. Fehlt sie in conex, meldet der Bericht eine Abweichung, die
+**In conex übernehmen** behebt. Der Name eines Geräts kann in UniFi mit dem
+conex-Wert überschrieben werden; das geschieht über den Cloud-Connector und die
+Network-Anwendung der Konsole (Firmware ab 5.0.3), da die Site-Manager-API selbst nur
+lesen kann. Bei zu vielen Anfragen
 antwortet die API mit HTTP 429 (Rate Limit).
 
 ## Verknüpfungen
@@ -88,7 +94,7 @@ gemeldet.
 | Befund                         | Bedeutung                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Gerät existiert nicht mehr** | Das verknüpfte Gerät wurde bei der letzten Synchronisierung nicht gefunden.                                                                                                                                                                                                                                                                                                                             |
-| **Abweichung**                 | Ein Befund je abweichendem Merkmal: Mandant (das Gerät gehört zu einer anderen Firma als sein Mandant; bei UniFi Standort: zu einer anderen Konsole als sein Standort), Status (in einem System aktiv, im anderen inaktiv) oder Name, Seriennummer, Inventarnummer, Hersteller oder Modell (leere Werte werden nicht verglichen). Name, Hersteller und Modell können in TANSS mit dem conex-Wert überschrieben werden; der Hersteller muss in TANSS bereits existieren. |
+| **Abweichung**                 | Ein Befund je abweichendem Merkmal: Mandant (das Gerät gehört zu einer anderen Firma als sein Mandant; bei UniFi Standort: zu einer anderen Konsole als sein Standort), Status (in einem System aktiv, im anderen inaktiv) oder Name, Seriennummer, Inventarnummer, Hersteller oder Modell (leere Werte werden nicht verglichen; bei UniFi zählt eine in conex fehlende Seriennummer als Abweichung und kann übernommen werden). Name, Hersteller und Modell können in TANSS mit dem conex-Wert überschrieben werden, in UniFi nur der Name; der Hersteller muss in TANSS bereits existieren. |
 
 #### Mitarbeiter
 

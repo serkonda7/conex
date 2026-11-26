@@ -11,6 +11,8 @@ export const unifiDefinition: ProviderDefinition<'unifi'> = {
 		devices: true,
 		tickets: false,
 		push: false,
+		device_push: ['name'],
+		device_pull: ['serial'],
 		create_device: false,
 		customer_numbers: false,
 		link_level: 'site',
