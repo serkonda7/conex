@@ -1,7 +1,7 @@
 /**
  * Drawn floor plans (v2): a sheet in centimeters per site or location with
- * walls, doors, windows, stairs, cable trays, desks, desk groups and rooms
- * drawn on it,
+ * walls, doors, windows, pillars, room dividers, stairs, cable trays, desks,
+ * desk groups and rooms drawn on it,
  * optionally over a reference image (an attachment of the same owner), and
  * rack, device and outlet markers.
  *
@@ -13,7 +13,7 @@
  * `floorplan_drawing_placements`; each object sits on at most one drawn
  * plan. Like the image plans (`attachments.ts`), markers outside a scoped
  * requester's tenants are left out of reads and kept as they are on save.
- * Walls, doors, windows, stairs, trays, desks and markers carry their
+ * Walls, doors, windows, pillars, dividers, stairs, trays, desks and markers carry their
  * heights above the floor (cm); a placed rack reads its height in units
  * from its rack type.
  *
@@ -480,6 +480,8 @@ export async function getDrawing(
 		building,
 		walls: row.walls,
 		openings: row.openings,
+		pillars: row.pillars,
+		partitions: row.partitions,
 		stairs: row.stairs,
 		trays: row.trays,
 		desks: row.desks,
@@ -931,6 +933,8 @@ export async function putDrawing(
 						offset_y: input.offset.y,
 						walls: input.walls,
 						openings: input.openings,
+						pillars: input.pillars,
+						partitions: input.partitions,
 						stairs: input.stairs,
 						trays: input.trays,
 						desks: input.desks,

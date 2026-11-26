@@ -20,10 +20,17 @@ import {
 import { t } from '../i18n'
 import { createRecord, createRowsFor, type ErrorSink, type QueryReturn } from '../lib/resource'
 import { readStored, writeStored } from '../lib/storage'
-import { type Point, stairShape, wallFaceTargets } from './drawn_plan_geometry'
+import {
+	type Point,
+	pillarCorners,
+	pillarEdges,
+	stairShape,
+	wallFaceTargets,
+} from './drawn_plan_geometry'
 import { ringEdges, type SnapTargets } from './drawn_plan_snap'
 import {
 	drawingWalls,
+	PillarLayer,
 	RoomLayer,
 	type Sheet,
 	StairGlyph,
@@ -166,7 +173,7 @@ export function UnderlaySnapToggle(props: { stack: FloorStack }): JSX.Element {
 export interface UnderlayTargets {
 	/** For walls: the walls' ends and center lines (reaching half their thickness). */
 	walls: SnapTargets
-	/** For everything else: the walls' faces and corners, and the stairs' and rooms' outlines. */
+	/** For everything else: the walls' faces and corners, the pillars, and the stairs' and rooms' outlines. */
 	objects: SnapTargets
 }
 
@@ -185,6 +192,7 @@ export function underlayTargets(
 		),
 		...drawing.rooms.map((room) => room.points.map(move)),
 	]
+	const pillars = drawing.pillars.map((pillar) => ({ ...pillar, center: move(pillar.center) }))
 	return {
 		walls: {
 			points: walls.flatMap((wall) => [wall.a, wall.b]),
@@ -192,12 +200,13 @@ export function underlayTargets(
 			boxes: [],
 		},
 		objects: {
-			points: [...faces.points, ...outlines.flat()],
+			points: [...faces.points, ...outlines.flat(), ...pillars.flatMap(pillarCorners)],
 			lines: [
 				...faces.faces.map(([a, b]) => ({ a, b, reach: 0 })),
 				...outlines.flatMap((outline) =>
 					ringEdges(outline).map(([a, b]) => ({ a, b, reach: 0 })),
 				),
+				...pillars.flatMap(pillarEdges).map(([a, b]) => ({ a, b, reach: 0 })),
 			],
 			boxes: [],
 		},
@@ -215,7 +224,7 @@ export function withTargets(targets: SnapTargets, extra: SnapTargets | undefined
 		: targets
 }
 
-/** Rooms, stairs and walls of another floor, inert, moved into this floor's sheet (`offset`). */
+/** Rooms, stairs, walls and pillars of another floor, inert, moved into this floor's sheet (`offset`). */
 export function UnderlayLayer(props: {
 	drawing: FloorplanDrawingJson
 	offset: FloorplanOffset
@@ -231,6 +240,7 @@ export function UnderlayLayer(props: {
 				}))}
 			/>
 			<WallLayer walls={drawingWalls(props.drawing)} />
+			<PillarLayer pillars={stageItems('underlay-pillar', props.drawing.pillars)} />
 		</g>
 	)
 }

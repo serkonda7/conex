@@ -58,6 +58,8 @@ export const en = {
 	'common.unitPosition': 'U{u}',
 	'face.front': 'Front',
 	'face.rear': 'Rear',
+	'pillarShape.rect': 'Rectangular',
+	'pillarShape.round': 'Round',
 	'portSide.front': 'Front',
 	'portSide.rear': 'Rear',
 	'portKind.ethernet': 'Ethernet',
@@ -1359,7 +1361,7 @@ export const en = {
 	'drawnPlan.newWallThickness': 'New wall thickness (cm)',
 	'drawnPlan.snap': 'Snap',
 	'drawnPlan.snapHint':
-		'Snap corners to wall ends, onto walls and to 10 cm steps, and walls to 15° steps. Stairs, desks, desk groups, rooms and cable trays snap to wall faces and to each other: corner on corner, flush against an edge, or lined up with other objects along the dashed guides. Markers snap to desks and rooms and line up with each other. Shift frees the angle; Alt places freely.',
+		'Snap corners to wall ends, onto walls and to 10 cm steps, and walls to 15° steps. Pillars, stairs, desks, desk groups, rooms, cable trays and room dividers snap to wall faces and to each other: corner on corner, flush against an edge, or lined up with other objects along the dashed guides. Markers snap to desks and rooms and line up with each other. Shift frees the angle; Alt places freely.',
 	'drawnPlan.wallEnd': 'Wall end, drag to move',
 	'drawnPlan.stairFoot': 'Foot of the stairs, drag to move',
 	'drawnPlan.stairHead': 'Head of the stairs, drag to move',
@@ -1387,6 +1389,19 @@ export const en = {
 	'drawnPlan.deleteSlidingDoor': 'Delete sliding door',
 	'drawnPlan.deleteStairs': 'Delete stairs',
 	'drawnPlan.toolTray': 'Cable tray',
+	'drawnPlan.toolPillar': 'Pillar',
+	'drawnPlan.pillarHint':
+		'Click to put a pillar there, at the shape and size set here. Select a pillar to change them.',
+	'drawnPlan.toolPartition': 'Room divider',
+	'drawnPlan.partitionHint':
+		'Click where the room divider starts, then its next corners. Double-click or press Enter to finish. Dividers stay below the ceiling and take no doors or windows.',
+	'drawnPlan.newPartitionThickness': 'New divider thickness (cm)',
+	'drawnPlan.newPartitionHeight': 'New divider height (cm)',
+	'drawnPlan.partitionEnd': 'Divider end, drag to move',
+	'drawnPlan.pillarShape': 'Shape',
+	'drawnPlan.diameter': 'Diameter (cm)',
+	'drawnPlan.deletePillar': 'Delete pillar',
+	'drawnPlan.deletePartition': 'Delete room divider',
 	'drawnPlan.toolDesk': 'Desk',
 	'drawnPlan.toolDeskGroup': 'Desk group',
 	'drawnPlan.deskGroupHint':

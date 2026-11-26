@@ -6910,6 +6910,50 @@ a.rack-shelf-plate:hover {
 	pointer-events: none;
 }
 
+/* Pillars: solid like the walls they carry with. */
+.drawn-plan-pillar {
+	fill: var(--text-secondary);
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-pillar.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-pillar.editable:hover {
+	fill: var(--text);
+}
+
+.drawn-plan-pillar.selected {
+	fill: var(--primary-text);
+	stroke: var(--primary-text);
+}
+
+/* Room dividers: lighter than walls, so they read as not reaching the ceiling. */
+.drawn-plan-partition {
+	fill: color-mix(in srgb, var(--text-secondary) 30%, var(--bg-surface));
+	stroke: var(--text-secondary);
+	stroke-width: calc(1px * var(--line-zoom, 1));
+	vector-effect: non-scaling-stroke;
+}
+
+.drawn-plan-partition.editable {
+	cursor: move;
+	touch-action: none;
+}
+
+.drawn-plan-partition.editable:hover {
+	fill: color-mix(in srgb, var(--text-secondary) 55%, var(--bg-surface));
+}
+
+.drawn-plan-partition.selected {
+	fill: color-mix(in srgb, var(--primary-text) 35%, var(--bg-surface));
+	stroke: var(--primary-text);
+}
+
 /* 3D view of a drawn plan: the WebGL canvas with the markers and labels
    as HTML on top (positioned by three.js), as wide as the 2D stage. */
 .drawn-plan-3d-frame {

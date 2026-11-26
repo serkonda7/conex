@@ -1,6 +1,6 @@
 /**
  * Three.js scene of a drawn floor plan for the 3D view: the plan's walls,
- * doors, windows, stairs, cable trays, desks, desk groups and rooms at their
+ * doors, windows, pillars, room dividers, stairs, cable trays, desks, desk groups and rooms at their
  * stored heights, and stand-ins for the racks, devices and outlets at their
  * mounting heights (a rack as tall as its rack type's units).
  *
@@ -51,6 +51,8 @@ import {
 	distance,
 	openingShape,
 	type Point,
+	partitionOutline,
+	pillarOutline,
 	polygonCenter,
 	wallPieces,
 } from './drawn_plan_geometry'
@@ -115,6 +117,7 @@ export interface SceneColors {
 	wall: string
 	door: string
 	glass: string
+	partition: string
 	room: string
 	stair: string
 	tray: string
@@ -281,6 +284,7 @@ export function buildPlanScene(
 	const wall = solid(colors.wall)
 	const door = solid(colors.door)
 	const glass = see(colors.glass, 0.35)
+	const partition = solid(colors.partition)
 	const stair = solid(colors.stair)
 	const tray = see(colors.tray, 0.6)
 	const desk = solid(colors.desk)
@@ -289,6 +293,7 @@ export function buildPlanScene(
 	const rack = solid(colors.rack)
 	const pole = solid(colors.pole)
 	const edges = new Map<Material, LineBasicMaterial>([
+		[partition, line(colors.edge, 0.6)],
 		[stair, line(colors.edge, 0.6)],
 		[desk, line(colors.edge, 0.6)],
 		[deskLinked, line(colors.edge, 0.6)],
@@ -384,6 +389,14 @@ export function buildPlanScene(
 			}
 		}
 	})
+
+	// Pillars from the floor up; room dividers like low walls.
+	for (const pillar of drawing.pillars) {
+		batch.add(wall, prism(pillarOutline(pillar), 0, pillar.height))
+	}
+	for (const item of drawing.partitions) {
+		batch.add(partition, prism(partitionOutline(item), 0, item.height))
+	}
 
 	// Stairs: one block per step, each a riser higher than the one before.
 	for (const flight of drawing.stairs) {

@@ -2841,6 +2841,82 @@ export const FloorplanTraySchema = v.pipe(
 
 export type FloorplanTray = v.InferOutput<typeof FloorplanTraySchema>
 
+/** Smallest and largest side (or diameter) of a pillar, cm. */
+export const MIN_PILLAR_SIDE = 5
+export const MAX_PILLAR_SIDE = 500
+
+export const PILLAR_SHAPES = ['rect', 'round'] as const
+
+export type PillarShape = (typeof PILLAR_SHAPES)[number]
+
+const PillarSideSchema = v.pipe(
+	v.number('Pillar size must be a number'),
+	v.minValue(MIN_PILLAR_SIDE, `Pillars are at least ${MIN_PILLAR_SIDE} cm across`),
+	v.maxValue(MAX_PILLAR_SIDE, `Pillars are at most ${MAX_PILLAR_SIDE} cm across`),
+)
+
+/**
+ * A pillar (column) standing at `center` (cm): a `width` × `depth` cm
+ * rectangle, or a round one (`width` across, `depth` the same), turned
+ * `rotation` degrees clockwise, `height` cm high (missing, a room high).
+ */
+export const FloorplanPillarSchema = v.strictObject({
+	center: DrawingPointSchema,
+	shape: v.picklist(PILLAR_SHAPES),
+	width: PillarSideSchema,
+	depth: PillarSideSchema,
+	rotation: v.pipe(
+		v.number('Rotation must be a number'),
+		v.minValue(0, 'Rotation is at least 0°'),
+		v.maxValue(360, 'Rotation is at most 360°'),
+	),
+	height: v.optional(heightSchema('Pillar height', MIN_WALL_HEIGHT), DEFAULT_WALL_HEIGHT),
+})
+
+export type FloorplanPillar = v.InferOutput<typeof FloorplanPillarSchema>
+
+/** Thinnest and thickest room divider, cm. */
+export const MIN_PARTITION_THICKNESS = 1
+export const MAX_PARTITION_THICKNESS = 50
+
+/** Lowest room divider, and the default height of a new one, cm: an office partition screen. */
+export const MIN_PARTITION_HEIGHT = 10
+export const DEFAULT_PARTITION_HEIGHT = 160
+
+/**
+ * A straight room divider (a partition screen, shelf or glass partition
+ * that does not reach the ceiling) from `a` to `b` (cm), `thickness` cm
+ * thick and centered on that line, `height` cm high. Dividers meeting at
+ * an end form corners, like walls, but take no doors or windows.
+ */
+export const FloorplanPartitionSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		thickness: v.pipe(
+			v.number('Divider thickness must be a number'),
+			v.minValue(
+				MIN_PARTITION_THICKNESS,
+				`Room dividers are at least ${MIN_PARTITION_THICKNESS} cm thick`,
+			),
+			v.maxValue(
+				MAX_PARTITION_THICKNESS,
+				`Room dividers are at most ${MAX_PARTITION_THICKNESS} cm thick`,
+			),
+		),
+		height: v.optional(
+			heightSchema('Room divider height', MIN_PARTITION_HEIGHT),
+			DEFAULT_PARTITION_HEIGHT,
+		),
+	}),
+	v.check(
+		(partition) => partition.a[0] !== partition.b[0] || partition.a[1] !== partition.b[1],
+		'A room divider needs a length',
+	),
+)
+
+export type FloorplanPartition = v.InferOutput<typeof FloorplanPartitionSchema>
+
 /** Shallowest and deepest desk, cm. */
 export const MIN_DESK_DEPTH = 20
 export const MAX_DESK_DEPTH = 500
@@ -3043,8 +3119,8 @@ const OPENING_SLACK = 0.5
 
 /**
  * `PUT /floorplan-drawings/:id`: the sheet, the reference image and the
- * full set of walls, openings, stairs, cable trays, desks, desk groups,
- * rooms and markers, replaced atomically. Everything lies on the sheet; each opening
+ * full set of walls, openings, pillars, room dividers, stairs, cable trays,
+ * desks, desk groups, rooms and markers, replaced atomically. Everything lies on the sheet; each opening
  * fits into its wall.
  */
 export const FloorplanDrawingPutSchema = v.pipe(
@@ -3056,6 +3132,8 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		offset: v.optional(FloorplanOffsetSchema, { x: 0, y: 0 }),
 		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
 		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
+		pillars: v.optional(v.pipe(v.array(FloorplanPillarSchema), v.maxLength(2000)), []),
+		partitions: v.optional(v.pipe(v.array(FloorplanPartitionSchema), v.maxLength(2000)), []),
 		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
 		trays: v.optional(v.pipe(v.array(FloorplanTraySchema), v.maxLength(2000)), []),
 		desks: v.optional(v.pipe(v.array(FloorplanDeskSchema), v.maxLength(2000)), []),
@@ -3067,6 +3145,8 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		(plan) =>
 			[
 				...plan.walls.flatMap((wall) => [wall.a, wall.b]),
+				...plan.pillars.map((pillar) => pillar.center),
+				...plan.partitions.flatMap((partition) => [partition.a, partition.b]),
 				...plan.stairs.flatMap((stair) => [stair.a, stair.b]),
 				...plan.trays.flatMap((tray) => [tray.a, tray.b]),
 				...plan.desks.flatMap((desk) => [desk.a, desk.b]),
@@ -3074,7 +3154,7 @@ export const FloorplanDrawingPutSchema = v.pipe(
 				...plan.rooms.flatMap((room) => room.points),
 				...plan.placements.map((p): [number, number] => [p.x, p.y]),
 			].every(([x, y]) => x <= plan.width && y <= plan.height),
-		'Walls, stairs, trays, desks, rooms and markers must lie on the sheet',
+		'Walls, pillars, dividers, stairs, trays, desks, rooms and markers must lie on the sheet',
 	),
 	v.check((plan) => {
 		return plan.openings.every((opening) => {
@@ -3154,6 +3234,8 @@ export interface FloorplanDrawingJson {
 	building: { location_id: number | null; site_id: number; name: string } | null
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
+	pillars: FloorplanPillar[]
+	partitions: FloorplanPartition[]
 	stairs: FloorplanStair[]
 	trays: FloorplanTray[]
 	desks: FloorplanDesk[]

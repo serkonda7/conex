@@ -92,6 +92,13 @@
       "when": 1795611369088,
       "tag": "0012_floor_stacking",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795681472269,
+      "tag": "0013_floorplan_pillars_partitions",
+      "breakpoints": true
     }
   ]
 }

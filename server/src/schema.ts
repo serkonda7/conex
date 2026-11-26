@@ -1084,7 +1084,8 @@ export const floorplan_calibrations = pgTable('floorplan_calibrations', {
 
 // Drawn floor plan (v2) of a site or location, at most one per owner: a
 // sheet of `width` × `height` cm with walls, openings (doors, sliding doors,
-// windows), stairs, cable trays, desks, desk groups and rooms drawn on it,
+// windows), pillars, room dividers (partitions), stairs, cable trays, desks,
+// desk groups and rooms drawn on it,
 // optionally over a reference image (an attachment of the same owner, placed
 // by `reference_frame` in cm). Each kind is one JSON document; an opening
 // points at its wall by index. Desks and rooms may name a location by id without a
@@ -1129,6 +1130,25 @@ export const floorplan_drawings = pgTable(
 					sill: number
 					height: number
 				}[]
+			>()
+			.notNull()
+			.default([]),
+		pillars: jsonb('pillars')
+			.$type<
+				{
+					center: [number, number]
+					shape: 'rect' | 'round'
+					width: number
+					depth: number
+					rotation: number
+					height: number
+				}[]
+			>()
+			.notNull()
+			.default([]),
+		partitions: jsonb('partitions')
+			.$type<
+				{ a: [number, number]; b: [number, number]; thickness: number; height: number }[]
 			>()
 			.notNull()
 			.default([]),

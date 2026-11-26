@@ -1,7 +1,7 @@
 /**
  * Drawn floor plan (v2) of a site or location, the body of
- * `/floorplans-v2/:id`: the sheet with its walls, doors, windows, stairs,
- * cable trays, desks, desk groups and rooms over the optional reference
+ * `/floorplans-v2/:id`: the sheet with its walls, doors, windows, pillars,
+ * room dividers, stairs, cable trays, desks, desk groups and rooms over the optional reference
  * image, and the rack, device and outlet markers. A marker links to its rack
  * or device; an outlet opens its popover (trace and connect) like on image
  * plans. Rooms and desks linked to a location carry a label linking to it.
@@ -39,6 +39,8 @@ import {
 	deskSeats,
 	drawingWalls,
 	locationNames,
+	PartitionLayer,
+	PillarLayer,
 	percentOf,
 	RoomLayer,
 	referenceOpacity,
@@ -162,6 +164,8 @@ function DrawnPlanViewer(props: {
 	}
 	const empty = (): boolean =>
 		props.drawing.walls.length === 0 &&
+		props.drawing.pillars.length === 0 &&
+		props.drawing.partitions.length === 0 &&
 		props.drawing.stairs.length === 0 &&
 		props.drawing.trays.length === 0 &&
 		props.drawing.desks.length === 0 &&
@@ -274,7 +278,11 @@ function DrawnPlanViewer(props: {
 								groups={stageItems('group', props.drawing.desk_groups)}
 							/>
 							<TrayLayer trays={stageItems('tray', props.drawing.trays)} />
+							<PartitionLayer
+								partitions={stageItems('partition', props.drawing.partitions)}
+							/>
 							<WallLayer walls={drawingWalls(props.drawing)} />
+							<PillarLayer pillars={stageItems('pillar', props.drawing.pillars)} />
 						</>
 					}
 					bar={

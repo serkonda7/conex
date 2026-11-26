@@ -60,6 +60,8 @@ export const de: Messages = {
 	'common.unitPosition': 'HE{u}',
 	'face.front': 'Vorne',
 	'face.rear': 'Hinten',
+	'pillarShape.rect': 'Rechteckig',
+	'pillarShape.round': 'Rund',
 	'portSide.front': 'Frontport',
 	'portSide.rear': 'Rückport',
 	'portKind.ethernet': 'Ethernet',
@@ -1372,7 +1374,7 @@ export const de: Messages = {
 	'drawnPlan.newWallThickness': 'Stärke neuer Wände (cm)',
 	'drawnPlan.snap': 'Einrasten',
 	'drawnPlan.snapHint':
-		'Ecken rasten an Wandenden, auf Wänden und in 10-cm-Schritten ein, Wände in 15°-Schritten. Treppen, Tische, Tischgruppen, Räume und Kabeltrassen rasten an Wandflächen und aneinander ein: Ecke auf Ecke, bündig an einer Kante oder an anderen Objekten entlang der gestrichelten Hilfslinien ausgerichtet. Marker rasten an Tischen und Räumen ein und richten sich aneinander aus. Umschalt gibt den Winkel frei; Alt platziert frei.',
+		'Ecken rasten an Wandenden, auf Wänden und in 10-cm-Schritten ein, Wände in 15°-Schritten. Stützen, Treppen, Tische, Tischgruppen, Räume, Kabeltrassen und Raumteiler rasten an Wandflächen und aneinander ein: Ecke auf Ecke, bündig an einer Kante oder an anderen Objekten entlang der gestrichelten Hilfslinien ausgerichtet. Marker rasten an Tischen und Räumen ein und richten sich aneinander aus. Umschalt gibt den Winkel frei; Alt platziert frei.',
 	'drawnPlan.wallEnd': 'Wandende, zum Verschieben ziehen',
 	'drawnPlan.stairFoot': 'Fuß der Treppe, zum Verschieben ziehen',
 	'drawnPlan.stairHead': 'Austritt der Treppe, zum Verschieben ziehen',
@@ -1400,6 +1402,19 @@ export const de: Messages = {
 	'drawnPlan.deleteSlidingDoor': 'Schiebetür löschen',
 	'drawnPlan.deleteStairs': 'Treppe löschen',
 	'drawnPlan.toolTray': 'Kabeltrasse',
+	'drawnPlan.toolPillar': 'Stütze',
+	'drawnPlan.pillarHint':
+		'Klicken, um dort eine Stütze in der hier eingestellten Form und Größe zu setzen. Eine ausgewählte Stütze lässt sich ändern.',
+	'drawnPlan.toolPartition': 'Raumteiler',
+	'drawnPlan.partitionHint':
+		'Dort klicken, wo der Raumteiler beginnt, dann an seinen nächsten Ecken. Doppelklick oder Enter beendet ihn. Raumteiler reichen nicht bis zur Decke und nehmen keine Türen oder Fenster auf.',
+	'drawnPlan.newPartitionThickness': 'Stärke neuer Raumteiler (cm)',
+	'drawnPlan.newPartitionHeight': 'Höhe neuer Raumteiler (cm)',
+	'drawnPlan.partitionEnd': 'Ende des Raumteilers, zum Verschieben ziehen',
+	'drawnPlan.pillarShape': 'Form',
+	'drawnPlan.diameter': 'Durchmesser (cm)',
+	'drawnPlan.deletePillar': 'Stütze löschen',
+	'drawnPlan.deletePartition': 'Raumteiler löschen',
 	'drawnPlan.toolDesk': 'Tisch',
 	'drawnPlan.toolDeskGroup': 'Tischgruppe',
 	'drawnPlan.deskGroupHint':
