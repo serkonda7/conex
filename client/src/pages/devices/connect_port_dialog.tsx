@@ -43,7 +43,8 @@ export interface ConnectPortDialogProps {
 	on_close: () => void
 }
 
-const isFree = (p: PortOption): boolean => p.compatible && p.iface.patched && !p.iface.connected
+const isFree = (p: PortOption): boolean =>
+	p.compatible && p.iface.enabled && p.iface.patched && !p.iface.connected
 
 /**
  * Cable connect dialog on one page: a searchable device dropdown above the
@@ -51,7 +52,7 @@ const isFree = (p: PortOption): boolean => p.compatible && p.iface.patched && !p
  * for Save; double-clicking it or pressing Enter on it saves right away.
  * Save & next (Shift+Enter on a tile) keeps the dialog open for the next free
  * port of the local device, with the next free peer port selected. Only free ports show unless "free only" is
- * turned off; then incompatible and taken ports are shown disabled.
+ * turned off; then incompatible, disabled and taken ports are shown disabled.
  */
 export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	/** Local port the next cable starts at; advanced by connect & next. */
@@ -179,17 +180,25 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			}}
 			aria-pressed={peerIface()?.id === iface.id}
 			data-port-id={iface.id}
-			disabled={!compatible || !iface.patched || iface.connected || submit.pending()}
+			disabled={
+				!compatible ||
+				!iface.enabled ||
+				!iface.patched ||
+				iface.connected ||
+				submit.pending()
+			}
 			title={
 				!compatible
 					? t('device.incompatiblePort')
-					: !iface.patched
-						? t('device.panel.notPatched')
-						: link
-							? `${link.peer_device.name}: ${link.peer_interface.name}`
-							: iface.connected
-								? t('device.alreadyConnected')
-								: undefined
+					: !iface.enabled
+						? t('device.disabled')
+						: !iface.patched
+							? t('device.panel.notPatched')
+							: link
+								? `${link.peer_device.name}: ${link.peer_interface.name}`
+								: iface.connected
+									? t('device.alreadyConnected')
+									: undefined
 			}
 			onClick={(): void => {
 				setPeerIface(iface)
@@ -220,9 +229,11 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 					? `→ ${link.peer_device.name}`
 					: compatible && iface.connected
 						? t('device.connected')
-						: compatible && !iface.patched
-							? t('device.panel.notPatched')
-							: portKindLabel(iface.kind)}
+						: compatible && !iface.enabled
+							? t('device.disabled')
+							: compatible && !iface.patched
+								? t('device.panel.notPatched')
+								: portKindLabel(iface.kind)}
 			</small>
 		</button>
 	)
