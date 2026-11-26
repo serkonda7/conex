@@ -12,7 +12,9 @@ import {
 	fetch_interfaces,
 	type InterfaceJson,
 } from '../../api/devices'
+import { fetch_racks } from '../../api/racks'
 import { fetch_device_types } from '../../api/templates'
+import { fetch_locations } from '../../api/tenancy'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import type { FormOption } from '../../components/form'
 import { Modal } from '../../components/modal'
@@ -101,7 +103,26 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 	)
 	const [types] = createRows(fetch_device_types)
 	const typeName = useNameOf(types, (type) => type.model)
-	/** Device type, then the existing cables to that device, as the option detail. */
+	const [racks] = createRows(fetch_racks)
+	const rackName = useNameOf(racks)
+	const [locations] = createRows(fetch_locations)
+	const locationName = useNameOf(locations)
+	/** Rack with its U, else location: tells apart devices that share a name. */
+	const placeOf = (device: DeviceRow): string =>
+		device.rack_id !== null
+			? device.position_u !== null
+				? t('device.mountPosition', {
+						rack: rackName(device.rack_id),
+						u: device.position_u,
+					})
+				: rackName(device.rack_id)
+			: device.location_id !== null
+				? locationName(device.location_id)
+				: ''
+	/**
+	 * Device type with the existing cables to that device, then its rack or
+	 * location, each in its own detail column.
+	 */
 	const deviceOptions = createMemo((): FormOption[] =>
 		(devices() ?? []).map((device) => {
 			const links = localLinks()
@@ -111,7 +132,10 @@ export function ConnectPortDialog(props: ConnectPortDialogProps): JSX.Element {
 			return {
 				value: device.id,
 				label: device.name,
-				detail: [typeName(device.device_type_id), links].filter(Boolean).join(' · '),
+				detail: [
+					[typeName(device.device_type_id), links].filter(Boolean).join(' · '),
+					placeOf(device),
+				],
 			}
 		}),
 	)
