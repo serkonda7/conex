@@ -16,6 +16,10 @@ import {
 	fetch_jacks,
 	type InterfaceJson,
 } from '../../api/devices'
+import {
+	type FloorplanDrawingOutletJson,
+	fetch_drawing_outlets,
+} from '../../api/floorplan_drawings'
 import { fetch_device_type } from '../../api/templates'
 import { fetch_locations } from '../../api/tenancy'
 import { type DataTableColumn, nameColumn } from '../../components/data_table'
@@ -94,6 +98,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	)
 	const [trace] = createRecord(id, (key: number) => fetch_trace(key, 4), setError)
 	const [outlets] = createRowsFor(id, fetch_outlets, setError)
+	const [drawnOutlets] = createRowsFor(id, fetch_drawing_outlets, setError)
 	// Starts with the device; a device write (role, tenant) outdates it in the cache.
 	const [service] = createRecord(id, fetch_device_service, setError)
 	const typeId = (): number | undefined => device()?.device_type_id
@@ -215,16 +220,39 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const placementOf = (ifaceId: number): FloorplanOutletJson | undefined =>
 		(outlets() ?? []).find((o) => o.interface_id === ifaceId)
 
-	/** Floor plan an outlet (single-position rear port) is placed on. */
+	/** Drawn plan an outlet is placed on, itself or by its jack. */
+	const drawnPlanOf = (ifaceId: number): FloorplanDrawingOutletJson | undefined =>
+		(drawnOutlets() ?? []).find((o) => o.interface_id === ifaceId)
+
+	/** Floor plans (image and drawn) an outlet (single-position rear port) is placed on. */
 	const planColumn: DataTableColumn<PanelRow> = {
 		key: 'plan',
 		label: tp('entity.floorplan', 1),
 		getValue: (row: PanelRow): JSX.Element => {
 			const outlet = row.position === null ? placementOf(row.rear.id) : undefined
-			return outlet ? (
-				<a href={floorplanHref(outlet.attachment_id, { interface: outlet.interface_id })}>
-					{outlet.owner_name}
-				</a>
+			const drawn = row.position === null ? drawnPlanOf(row.rear.id) : undefined
+			return outlet || drawn ? (
+				<span>
+					<Show when={outlet}>
+						{(placed: () => FloorplanOutletJson): JSX.Element => (
+							<a
+								href={floorplanHref(placed().attachment_id, {
+									interface: placed().interface_id,
+								})}
+							>
+								{placed().owner_name}
+							</a>
+						)}
+					</Show>
+					<Show when={outlet && drawn}>{', '}</Show>
+					<Show when={drawn}>
+						{(placed: () => FloorplanDrawingOutletJson): JSX.Element => (
+							<a href={`/floorplans-v2/${placed().drawing_id}`}>
+								{placed().owner_name}
+							</a>
+						)}
+					</Show>
+				</span>
 			) : (
 				<span>—</span>
 			)

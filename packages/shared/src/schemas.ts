@@ -3271,6 +3271,17 @@ export interface FloorplanDrawingRefJson {
 	id: number
 }
 
+/**
+ * `GET /floorplan-drawings/outlets?device=` (`FloorplanOutletsQuerySchema`):
+ * a patch panel's rear ports placed on a drawn plan, by themselves or
+ * through their jack.
+ */
+export interface FloorplanDrawingOutletJson {
+	interface_id: number
+	drawing_id: number
+	owner_name: string
+}
+
 /** `GET /floorplan-drawings?search=&page=&limit=&tenant=&tenant_group=`. */
 export const FloorplanDrawingListQuerySchema: typeof FloorplanListQuerySchema =
 	FloorplanListQuerySchema

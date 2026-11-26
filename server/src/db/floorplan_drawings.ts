@@ -45,6 +45,7 @@ import type {
 	FloorplanDrawingCreate,
 	FloorplanDrawingJson,
 	FloorplanDrawingListJson,
+	FloorplanDrawingOutletJson,
 	FloorplanDrawingPut,
 	FloorplanDrawingRefJson,
 	FloorplanLinkLocationJson,
@@ -963,6 +964,47 @@ export async function putDrawing(
 		return written.value
 	}
 	return getDrawing(id, scopeTenantIds)
+}
+
+/**
+ * Rear ports of patch panel `deviceId` placed on a drawn plan
+ * (`FloorplanDrawingOutletJson`), by themselves or through their jack, in
+ * port order. Plans whose owner lies outside `scopeTenantIds` are left out.
+ */
+export async function listDrawingOutlets(
+	deviceId: number,
+	scopeTenantIds?: readonly number[],
+): Promise<FloorplanDrawingOutletJson[]> {
+	return await getDb()
+		.select({
+			interface_id: interfaces.id,
+			drawing_id: floorplan_drawings.id,
+			owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
+		})
+		.from(floorplan_drawing_placements)
+		.innerJoin(
+			interfaces,
+			or(
+				eq(interfaces.id, floorplan_drawing_placements.interface_id),
+				eq(interfaces.jack_id, floorplan_drawing_placements.jack_id),
+			),
+		)
+		.innerJoin(
+			floorplan_drawings,
+			eq(floorplan_drawings.id, floorplan_drawing_placements.drawing_id),
+		)
+		.leftJoin(sites, eq(sites.id, floorplan_drawings.site_id))
+		.leftJoin(locations, eq(locations.id, floorplan_drawings.location_id))
+		.where(
+			and(
+				eq(interfaces.device_id, deviceId),
+				scopeCondition(
+					sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`,
+					scopeTenantIds,
+				),
+			),
+		)
+		.orderBy(asc(interfaces.id))
 }
 
 /** Deletes a drawn plan with its markers; the reference image stays an attachment. */
