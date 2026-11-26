@@ -1,8 +1,9 @@
 /**
  * Image sniffing for attachment uploads: the type comes from the magic
  * bytes (never the client's Content-Type) and the pixel size from the PNG
- * `IHDR` chunk or the JPEG start-of-frame segment. Pure byte parsing, no
- * dependency and no I/O.
+ * `IHDR` chunk or the JPEG start-of-frame segment, swapped when the EXIF
+ * orientation rotates the image by 90° (phone photos), so the size matches
+ * what browsers display. Pure byte parsing, no dependency and no I/O.
  */
 import { Result } from 'better-result'
 import type { AttachmentMime } from 'shared/src/schemas'
@@ -45,6 +46,44 @@ function pngSize(bytes: Uint8Array): { width: number; height: number } | null {
 	return { width: u32(bytes, 16), height: u32(bytes, 20) }
 }
 
+/**
+ * EXIF orientation (tag `0x0112` in IFD0) of an `APP1` segment payload, or
+ * null when it is not EXIF or carries no orientation.
+ */
+function exifOrientation(bytes: Uint8Array, start: number, end: number): number | null {
+	const header = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00] // "Exif\0\0"
+	if (!header.every((byte, i) => bytes[start + i] === byte)) {
+		return null
+	}
+	const tiff = start + 6
+	const order = u16(bytes, tiff)
+	if (order !== 0x4949 && order !== 0x4d4d) {
+		return null
+	}
+	const little = order === 0x4949
+	const read16 = (at: number): number => {
+		const value = u16(bytes, at)
+		return little ? ((value & 0xff) << 8) | (value >> 8) : value
+	}
+	const read32 = (at: number): number =>
+		little ? read16(at) + read16(at + 2) * 0x10000 : read16(at) * 0x10000 + read16(at + 2)
+	const ifd = tiff + read32(tiff + 4)
+	if (ifd + 2 > end) {
+		return null
+	}
+	const count = read16(ifd)
+	for (let i = 0; i < count; i++) {
+		const entry = ifd + 2 + i * 12
+		if (entry + 12 > end) {
+			return null
+		}
+		if (read16(entry) === 0x0112) {
+			return read16(entry + 8)
+		}
+	}
+	return null
+}
+
 /** Start-of-frame markers carrying the dimensions (`C4`, `C8` and `CC` are not frames). */
 function isStartOfFrame(marker: number): boolean {
 	return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
@@ -52,11 +91,12 @@ function isStartOfFrame(marker: number): boolean {
 
 /**
  * Walks the JPEG segments up to the first start-of-frame. Its payload is
- * precision (1 byte), height (2), width (2). The size is the stored one;
- * an EXIF orientation is not applied.
+ * precision (1 byte), height (2), width (2). An EXIF orientation of 5–8
+ * (transposed or rotated by 90°) found on the way swaps width and height.
  */
 function jpegSize(bytes: Uint8Array): { width: number; height: number } | null {
 	let at = 2
+	let orientation: number | null = null
 	while (at + 3 < bytes.length) {
 		if (bytes[at] !== 0xff) {
 			return null
@@ -84,7 +124,14 @@ function jpegSize(bytes: Uint8Array): { width: number; height: number } | null {
 			if (at + 9 > bytes.length) {
 				return null
 			}
-			return { width: u16(bytes, at + 7), height: u16(bytes, at + 5) }
+			const width = u16(bytes, at + 7)
+			const height = u16(bytes, at + 5)
+			return orientation !== null && orientation >= 5 && orientation <= 8
+				? { width: height, height: width }
+				: { width, height }
+		}
+		if (marker === 0xe1 && orientation === null) {
+			orientation = exifOrientation(bytes, at + 4, Math.min(at + 2 + length, bytes.length))
 		}
 		at += 2 + length
 	}

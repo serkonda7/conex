@@ -25,6 +25,8 @@ export const m365Definition: ProviderDefinition<'m365'> = {
 		devices: false,
 		tickets: false,
 		push: false,
+		device_push: [],
+		device_pull: [],
 		create_device: false,
 		customer_numbers: false,
 		link_level: 'tenant',

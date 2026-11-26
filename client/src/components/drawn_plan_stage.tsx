@@ -2,8 +2,8 @@
  * Stage of a drawn floor plan, shared by the view and the editor: the sheet
  * in a `ZoomViewport` (design decision 0003) with the reference image,
  * another floor of the building faded beneath (the underlay), the grid,
- * the rooms, stairs, desks, desk groups and cable trays, the walls with
- * their doors and windows, and the owner's overlay pieces (`children`) on
+ * the rooms, stairs, desks, desk groups, cable trays and room dividers, the
+ * walls with their doors and windows, the pillars, and the owner's overlay pieces (`children`) on
  * top.
  *
  * The SVG's user units are the sheet's centimeters (`viewBox` = sheet), so
@@ -15,6 +15,8 @@ import type {
 	FloorplanDesk,
 	FloorplanDeskGroup,
 	FloorplanOpening,
+	FloorplanPartition,
+	FloorplanPillar,
 	FloorplanReference,
 	FloorplanRoom,
 	FloorplanStair,
@@ -34,6 +36,8 @@ import {
 	type OpeningShape,
 	openingShape,
 	type Point,
+	partitionOutline,
+	pillarOutline,
 	polygonCenter,
 	type StairShape,
 	stairShape,
@@ -445,6 +449,48 @@ export function TrayLayer(
 				{(entry: StageItem<FloorplanTray>) => line(entry, 'drawn-plan-tray-axis')}
 			</For>
 		</>
+	)
+}
+
+/** Room dividers, over the trays and under the walls. */
+export function PartitionLayer(
+	props: { partitions: StageItem<FloorplanPartition>[] } & LayerEditing,
+): JSX.Element {
+	return (
+		<For each={props.partitions}>
+			{(entry: StageItem<FloorplanPartition>) => (
+				<polygon
+					class="drawn-plan-partition"
+					classList={{
+						selected: props.selected === entry.key,
+						editable: props.on_press !== undefined,
+					}}
+					points={svgPoints(partitionOutline(entry.item))}
+					onPointerDown={(e: PointerEvent) => props.on_press?.(e, entry.key)}
+				/>
+			)}
+		</For>
+	)
+}
+
+/** Pillars, over the walls they may stand in. */
+export function PillarLayer(
+	props: { pillars: StageItem<FloorplanPillar>[] } & LayerEditing,
+): JSX.Element {
+	return (
+		<For each={props.pillars}>
+			{(entry: StageItem<FloorplanPillar>) => (
+				<polygon
+					class="drawn-plan-pillar"
+					classList={{
+						selected: props.selected === entry.key,
+						editable: props.on_press !== undefined,
+					}}
+					points={svgPoints(pillarOutline(entry.item))}
+					onPointerDown={(e: PointerEvent) => props.on_press?.(e, entry.key)}
+				/>
+			)}
+		</For>
 	)
 }
 

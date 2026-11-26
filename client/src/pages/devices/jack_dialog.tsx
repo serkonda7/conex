@@ -87,7 +87,10 @@ export function JackDialog(props: {
 	const [editingId, setEditingId] = createSignal<number | null>(null)
 
 	const outlets = createMemo(() => props.ports.filter(isOutlet))
-	const freeOutlets = createMemo(() => outlets().filter((port) => port.jack_id === null))
+	/** Unjacked outlets that can be grouped: unpatched ones have no front port. */
+	const freeOutlets = createMemo(() =>
+		outlets().filter((port) => port.jack_id === null && port.patched),
+	)
 	const portsOf = (jack: PanelJackJson): InterfaceJson[] =>
 		outlets().filter((port) => port.jack_id === jack.id)
 	/** The jack in the form, while it still exists. */
@@ -96,7 +99,9 @@ export function JackDialog(props: {
 	const choices = createMemo(() => {
 		const jack = editing()
 		return outlets().filter(
-			(port) => port.jack_id === null || (jack !== null && port.jack_id === jack.id),
+			(port) =>
+				(port.jack_id === null && port.patched) ||
+				(jack !== null && port.jack_id === jack.id),
 		)
 	})
 	const pickedPorts = (): InterfaceJson[] => choices().filter((port) => picked().has(port.id))

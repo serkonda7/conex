@@ -73,12 +73,15 @@ function sceneColors(host: HTMLElement): SceneColors {
 	}
 	const link = new Color(color('--link'))
 	const raised = new Color(color('--bg-raised'))
+	const wall = new Color(color('--text-secondary'))
+	const surface = new Color(color('--bg-surface'))
 	const colors: SceneColors = {
 		background: color('--bg-raised'),
 		floor: color('--bg-surface'),
 		wall: color('--text-secondary'),
 		door: color('--text-muted'),
 		glass: color('--link'),
+		partition: `#${wall.clone().lerp(surface, 0.45).getHexString()}`,
 		room: color('--link'),
 		stair: color('--bg-hover'),
 		tray: color('--warning'),

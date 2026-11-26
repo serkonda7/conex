@@ -8,8 +8,9 @@
  * it without a notch.
  *
  * Stairs are a strip `width` wide from their foot `a` to their head `b`,
- * divided into treads, with an arrow pointing up the flight. A cable tray is
- * a strip like a wall. A desk stands on its back edge `a`–`b` and reaches
+ * divided into treads, with an arrow pointing up the flight. A cable tray and
+ * a room divider are strips like a wall. A pillar is a rectangle or an
+ * ellipse around its center, turned by its rotation. A desk stands on its back edge `a`–`b` and reaches
  * `depth` to the left of it. A desk group is three desks around a center,
  * 120° apart, split by dividers; each desk's sides leave the outer ends of
  * its dividers at a right angle, and its front edge curves in.
@@ -19,6 +20,8 @@ import {
 	type FloorplanDesk,
 	type FloorplanDeskGroup,
 	type FloorplanOpening,
+	type FloorplanPartition,
+	type FloorplanPillar,
 	type FloorplanStair,
 	type FloorplanWall,
 	type OpeningKind,
@@ -46,6 +49,15 @@ export const DEFAULT_OPENING_WIDTH: Record<OpeningKind, number> = {
 
 /** Default width of new stairs, cm: the usual clear width (DIN 18065). */
 export const DEFAULT_STAIR_WIDTH = 100
+
+/** Default side of a new pillar, cm: a 30 × 30 cm reinforced concrete column. */
+export const DEFAULT_PILLAR_SIDE = 30
+
+/** Default thickness of a new room divider, cm: an office partition screen. */
+export const DEFAULT_PARTITION_THICKNESS = 5
+
+/** Straight pieces a round pillar is drawn with. */
+const PILLAR_SEGMENTS = 32
 
 /** Default width of a new cable tray, cm: a 300 mm tray. */
 export const DEFAULT_TRAY_WIDTH = 30
@@ -128,6 +140,80 @@ function strip(a: Point, b: Point, thickness: number, from: number, to: number):
 export function deskOutline(desk: Pick<FloorplanDesk, 'a' | 'b' | 'depth'>): Point[] {
 	const n = leftNormal(direction(desk.a, desk.b))
 	return [desk.a, desk.b, along(desk.b, n, desk.depth), along(desk.a, n, desk.depth)]
+}
+
+/** What places and sizes a pillar. */
+export type PillarShapeOf = Pick<
+	FloorplanPillar,
+	'center' | 'shape' | 'width' | 'depth' | 'rotation'
+>
+
+/** `p` of a pillar's own frame (x along its width, y along its depth) on the sheet. */
+function pillarPoint(pillar: PillarShapeOf, x: number, y: number): Point {
+	const u = heading(pillar.rotation)
+	const v: Point = [-u[1], u[0]]
+	return [pillar.center[0] + u[0] * x + v[0] * y, pillar.center[1] + u[1] * x + v[1] * y]
+}
+
+/** Outline of a pillar: its four corners, or a round one's circumference in straight pieces. */
+export function pillarOutline(pillar: PillarShapeOf): Point[] {
+	const [w, d] = [pillar.width / 2, pillar.depth / 2]
+	if (pillar.shape === 'round') {
+		return Array.from({ length: PILLAR_SEGMENTS }, (_, i): Point => {
+			const angle = (2 * Math.PI * i) / PILLAR_SEGMENTS
+			return pillarPoint(pillar, w * Math.cos(angle), d * Math.sin(angle))
+		})
+	}
+	return [
+		pillarPoint(pillar, -w, -d),
+		pillarPoint(pillar, w, -d),
+		pillarPoint(pillar, w, d),
+		pillarPoint(pillar, -w, d),
+	]
+}
+
+/**
+ * The points of a pillar other things snap to and it snaps with: a
+ * rectangle's corners, a round pillar's center and the ends of its axes.
+ */
+export function pillarCorners(pillar: PillarShapeOf): Point[] {
+	if (pillar.shape === 'rect') {
+		return pillarOutline(pillar)
+	}
+	const [w, d] = [pillar.width / 2, pillar.depth / 2]
+	return [
+		pillar.center,
+		pillarPoint(pillar, w, 0),
+		pillarPoint(pillar, 0, d),
+		pillarPoint(pillar, -w, 0),
+		pillarPoint(pillar, 0, -d),
+	]
+}
+
+/** The straight edges of a pillar: a rectangle's sides, none of a round one. */
+export function pillarEdges(pillar: PillarShapeOf): [Point, Point][] {
+	if (pillar.shape === 'round') {
+		return []
+	}
+	const corners = pillarOutline(pillar)
+	return corners.map((p: Point, i: number): [Point, Point] => [
+		p,
+		corners[(i + 1) % corners.length] as Point,
+	])
+}
+
+/** Outline of a room divider: a strip reaching half its thickness past its ends, like a wall. */
+export function partitionOutline(
+	partition: Pick<FloorplanPartition, 'a' | 'b' | 'thickness'>,
+): Point[] {
+	const half = partition.thickness / 2
+	return strip(
+		partition.a,
+		partition.b,
+		partition.thickness,
+		-half,
+		distance(partition.a, partition.b) + half,
+	)
 }
 
 /** The shape of a desk group, without its links. */

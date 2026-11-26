@@ -1,7 +1,7 @@
 /**
  * Drawn floor plans (v2): a sheet in centimeters per site or location with
- * walls, doors, windows, stairs, cable trays, desks, desk groups and rooms
- * drawn on it,
+ * walls, doors, windows, pillars, room dividers, stairs, cable trays, desks,
+ * desk groups and rooms drawn on it,
  * optionally over a reference image (an attachment of the same owner), and
  * rack, device and outlet markers.
  *
@@ -13,7 +13,7 @@
  * `floorplan_drawing_placements`; each object sits on at most one drawn
  * plan. Like the image plans (`attachments.ts`), markers outside a scoped
  * requester's tenants are left out of reads and kept as they are on save.
- * Walls, doors, windows, stairs, trays, desks and markers carry their
+ * Walls, doors, windows, pillars, dividers, stairs, trays, desks and markers carry their
  * heights above the floor (cm); a placed rack reads its height in units
  * from its rack type.
  *
@@ -45,6 +45,7 @@ import type {
 	FloorplanDrawingCreate,
 	FloorplanDrawingJson,
 	FloorplanDrawingListJson,
+	FloorplanDrawingOutletJson,
 	FloorplanDrawingPut,
 	FloorplanDrawingRefJson,
 	FloorplanLinkLocationJson,
@@ -76,6 +77,7 @@ import {
 	outletPorts,
 	outsideScope,
 	ownerLocations,
+	panelLinkedSql,
 	portColumns,
 	portDevice,
 	portOf,
@@ -479,6 +481,8 @@ export async function getDrawing(
 		building,
 		walls: row.walls,
 		openings: row.openings,
+		pillars: row.pillars,
+		partitions: row.partitions,
 		stairs: row.stairs,
 		trays: row.trays,
 		desks: row.desks,
@@ -591,6 +595,7 @@ export async function listDrawingCandidates(
 							),
 							eq(portDevice.site_id, siteId),
 							free,
+							or(sql`not ${panelLinkedSql}`, onThisPlan),
 							or(
 								sql`(${interfaces.jack_id} is null and ${interfaces.patched} = 1)`,
 								sql`exists (select 1 from ${interfaces} jp where jp.jack_id = ${interfaces.jack_id} and jp.patched = 1)`,
@@ -929,6 +934,8 @@ export async function putDrawing(
 						offset_y: input.offset.y,
 						walls: input.walls,
 						openings: input.openings,
+						pillars: input.pillars,
+						partitions: input.partitions,
 						stairs: input.stairs,
 						trays: input.trays,
 						desks: input.desks,
@@ -957,6 +964,47 @@ export async function putDrawing(
 		return written.value
 	}
 	return getDrawing(id, scopeTenantIds)
+}
+
+/**
+ * Rear ports of patch panel `deviceId` placed on a drawn plan
+ * (`FloorplanDrawingOutletJson`), by themselves or through their jack, in
+ * port order. Plans whose owner lies outside `scopeTenantIds` are left out.
+ */
+export async function listDrawingOutlets(
+	deviceId: number,
+	scopeTenantIds?: readonly number[],
+): Promise<FloorplanDrawingOutletJson[]> {
+	return await getDb()
+		.select({
+			interface_id: interfaces.id,
+			drawing_id: floorplan_drawings.id,
+			owner_name: sql<string>`coalesce(${sites.name}, ${locations.name})`,
+		})
+		.from(floorplan_drawing_placements)
+		.innerJoin(
+			interfaces,
+			or(
+				eq(interfaces.id, floorplan_drawing_placements.interface_id),
+				eq(interfaces.jack_id, floorplan_drawing_placements.jack_id),
+			),
+		)
+		.innerJoin(
+			floorplan_drawings,
+			eq(floorplan_drawings.id, floorplan_drawing_placements.drawing_id),
+		)
+		.leftJoin(sites, eq(sites.id, floorplan_drawings.site_id))
+		.leftJoin(locations, eq(locations.id, floorplan_drawings.location_id))
+		.where(
+			and(
+				eq(interfaces.device_id, deviceId),
+				scopeCondition(
+					sql`coalesce(${sites.tenant_id}, ${locations.tenant_id})`,
+					scopeTenantIds,
+				),
+			),
+		)
+		.orderBy(asc(interfaces.id))
 }
 
 /** Deletes a drawn plan with its markers; the reference image stays an attachment. */

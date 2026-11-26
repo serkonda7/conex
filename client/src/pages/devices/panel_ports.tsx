@@ -1,10 +1,10 @@
-import { IconChevronDown, IconChevronRight } from '@tabler/icons-solidjs'
 import type { TraceEndToEnd, TraceLink } from 'shared/src/types'
-import { createComputed, createMemo, createSignal, type JSX } from 'solid-js'
+import { createComputed, createMemo, type JSX } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import type { InterfaceJson } from '../../api/devices'
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { t, tp } from '../../i18n'
+import { collapseRuns, RunToggle, useExpandedRuns } from './port_runs'
 import { CableButtons } from './port_table'
 import { PortPeer } from './trace_peer'
 
@@ -101,36 +101,21 @@ function tableRowsOf(rows: PanelRow[], expanded: ReadonlySet<string>): PanelTabl
 			units.push([row])
 		}
 	}
-	const out: PanelTableRow[] = []
-	let run: PanelRow[][] = []
-	const flush = (): void => {
-		const first = run[0]?.[0]
-		const last = run.at(-1)?.[0]
-		if (run.length > 1 && first && last) {
-			const keys = run.map((unit) => unit[0]?.key ?? '')
-			const open = keys.some((key) => expanded.has(key))
-			out.push({
-				key: `run:${first.key}`,
-				run: { from: first.number, to: last.number, units: keys, open },
-			})
-			if (open) {
-				out.push(...run.flat())
-			}
-		} else {
-			out.push(...run.flat())
-		}
-		run = []
-	}
-	for (const unit of units) {
-		if (unit.every((row) => !rowPatched(row))) {
-			run.push(unit)
-		} else {
-			flush()
-			out.push(...unit)
-		}
-	}
-	flush()
-	return out
+	return collapseRuns(
+		units,
+		(row) => row.key,
+		(unit) => unit.every((row) => !rowPatched(row)),
+		expanded,
+		(run, keys, open): PanelRunRow => ({
+			key: `run:${keys[0]}`,
+			run: {
+				from: run[0]?.[0]?.number ?? 0,
+				to: run.at(-1)?.[0]?.number ?? 0,
+				units: keys,
+				open,
+			},
+		}),
+	)
 }
 
 /**
@@ -158,8 +143,8 @@ export function PanelPortTable(props: {
 	// retains its scroll anchor and the dialog can return focus to its button.
 	// Copy the ports: reconciliation must not mutate the query cache's objects.
 	const [storedRows, setStoredRows] = createStore<PanelTableRow[]>([])
-	// Rear ports (by row key) of the expanded runs; a split run stays expanded.
-	const [expanded, setExpanded] = createSignal<ReadonlySet<string>>(new Set())
+	// Rear ports (by row key) of the expanded runs.
+	const { expanded, toggle: toggleRun } = useExpandedRuns()
 	createComputed(() => {
 		const next = panelRowsOf(props.ports).map((row) => ({
 			...row,
@@ -169,18 +154,6 @@ export function PanelPortTable(props: {
 		setStoredRows(reconcile(tableRowsOf(next, expanded()), { key: 'key' }))
 	})
 	const rows = createMemo(() => [...storedRows])
-
-	const toggleRun = (run: PanelRunRow['run']): void => {
-		const next = new Set(expanded())
-		for (const key of run.units) {
-			if (run.open) {
-				next.delete(key)
-			} else {
-				next.add(key)
-			}
-		}
-		setExpanded(next)
-	}
 
 	const runLabel = (run: PanelRunRow['run']): string =>
 		t('device.panel.portRange', { from: run.from, to: run.to })
@@ -210,26 +183,18 @@ export function PanelPortTable(props: {
 			label: '#',
 			getValue: (row: PanelTableRow): JSX.Element => {
 				if (isRun(row)) {
-					const label = (): string =>
-						t(row.run.open ? 'device.panel.collapseRun' : 'device.panel.expandRun', {
-							range: runLabel(row.run),
-						})
 					return (
-						<button
-							type="button"
-							class="panel-run-toggle"
-							aria-expanded={row.run.open}
-							aria-label={label()}
-							title={label()}
-							onClick={(): void => toggleRun(row.run)}
-						>
-							{row.run.open ? (
-								<IconChevronDown size={14} />
-							) : (
-								<IconChevronRight size={14} />
+						<RunToggle
+							open={row.run.open}
+							range={runLabel(row.run)}
+							label={t(
+								row.run.open
+									? 'device.panel.collapseRun'
+									: 'device.panel.expandRun',
+								{ range: runLabel(row.run) },
 							)}
-							<span>{runLabel(row.run)}</span>
-						</button>
+							onToggle={(): void => toggleRun(row.run)}
+						/>
 					)
 				}
 				const label = row.position === null ? String(row.number) : `↳ ${row.position}`

@@ -16,6 +16,7 @@ import type {
 	DeleteQuery,
 	DeviceCreate,
 	DeviceListQuery,
+	DeviceMigrate,
 	DeviceServiceJson,
 	DeviceStatus,
 	DeviceUpdate,
@@ -27,6 +28,7 @@ import type {
 	TemplateSyncApply,
 	TemplateSyncPreview,
 } from 'shared/src/types'
+import { t } from '../i18n'
 import {
 	by_id,
 	client,
@@ -138,6 +140,27 @@ export async function update_device(
 ): Promise<Result<DeviceRow, Error>> {
 	const res = await client.devices[':id'].$patch({ ...by_id(id), json: patch })
 	return to_result<DeviceRow>(res, failed.update('noun.device'))
+}
+
+/** Two mounted devices of one rack trade places (see `DeviceSwapSchema`). */
+export async function swap_devices(
+	id: number,
+	otherId: number,
+): Promise<Result<[DeviceRow, DeviceRow], Error>> {
+	const res = await client.devices[':id'].swap.$post({
+		...by_id(id),
+		json: { other_id: otherId },
+	})
+	return to_result<[DeviceRow, DeviceRow]>(res, t('elevation.swapFailed'))
+}
+
+/** Hands the device's cables, placement, assignment and VMs to `input.target_id`; returns the new device. */
+export async function migrate_device(
+	id: number,
+	input: DeviceMigrate,
+): Promise<Result<DeviceRow, Error>> {
+	const res = await client.devices[':id'].migrate.$post({ ...by_id(id), json: input })
+	return to_result<DeviceRow>(res, t('device.migrate.failed'))
 }
 
 /** `opts.confirm` also deletes the device's floor-plan area (see `DeleteImpactError`). */

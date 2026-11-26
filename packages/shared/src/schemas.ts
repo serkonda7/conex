@@ -1486,6 +1486,47 @@ export const DeviceMoveSchema = v.pipe(
 )
 
 /**
+ * `POST /devices/:id/swap`: two U-mounted devices of one rack trade places.
+ * Each takes over the other's face; the pair keeps the U range it covers
+ * (the upper device ends up at the bottom of it, the lower one at the top).
+ */
+export const DeviceSwapSchema = v.strictObject({
+	other_id: IdSchema,
+})
+
+/**
+ * `POST /devices/:id/migrate`: hands a device's role in the network over to
+ * a replacement (`target_id`). `ports` moves the cable of each old port
+ * (`from`) onto a free port of the replacement (`to`); cables of unlisted
+ * ports stay. `placement` takes over site, location, rack mount or shelf and
+ * the floor-plan markers; `assignment` the tenant and the employees; `vms`
+ * the hosted virtual machines; `name` the name. `status` is the old device's
+ * new status; omitted keeps it.
+ */
+export const DeviceMigrateSchema = v.strictObject({
+	target_id: IdSchema,
+	ports: v.pipe(
+		v.array(v.strictObject({ from: IdSchema, to: IdSchema })),
+		v.maxLength(5000),
+		v.check(
+			(pairs) => new Set(pairs.map((pair) => pair.from)).size === pairs.length,
+			'Each port can only move once',
+		),
+		v.check(
+			(pairs) => new Set(pairs.map((pair) => pair.to)).size === pairs.length,
+			'Each port of the new device takes at most one cable',
+		),
+	),
+	placement: v.boolean(),
+	assignment: v.boolean(),
+	vms: v.boolean(),
+	name: v.boolean(),
+	status: v.optional(DeviceStatusSchema, undefined),
+})
+
+export type DeviceMigrate = v.InferOutput<typeof DeviceMigrateSchema>
+
+/**
  * Port create body. `side` makes it a patch-panel port: rear ports carry
  * `positions`, front ports name a rear port of the same device and a slot
  * on it.
@@ -1554,6 +1595,7 @@ export interface LocationOutletJson {
 export type DeviceCreate = v.InferOutput<typeof DeviceCreateSchema>
 export type DeviceUpdate = v.InferOutput<typeof DeviceUpdateSchema>
 export type DeviceMove = v.InferOutput<typeof DeviceMoveSchema>
+export type DeviceSwap = v.InferOutput<typeof DeviceSwapSchema>
 export type InterfaceCreate = v.InferOutput<typeof InterfaceCreateSchema>
 export type InterfaceUpdate = v.InferOutput<typeof InterfaceUpdateSchema>
 
@@ -2809,6 +2851,82 @@ export const FloorplanTraySchema = v.pipe(
 
 export type FloorplanTray = v.InferOutput<typeof FloorplanTraySchema>
 
+/** Smallest and largest side (or diameter) of a pillar, cm. */
+export const MIN_PILLAR_SIDE = 5
+export const MAX_PILLAR_SIDE = 500
+
+export const PILLAR_SHAPES = ['rect', 'round'] as const
+
+export type PillarShape = (typeof PILLAR_SHAPES)[number]
+
+const PillarSideSchema = v.pipe(
+	v.number('Pillar size must be a number'),
+	v.minValue(MIN_PILLAR_SIDE, `Pillars are at least ${MIN_PILLAR_SIDE} cm across`),
+	v.maxValue(MAX_PILLAR_SIDE, `Pillars are at most ${MAX_PILLAR_SIDE} cm across`),
+)
+
+/**
+ * A pillar (column) standing at `center` (cm): a `width` × `depth` cm
+ * rectangle, or a round one (`width` across, `depth` the same), turned
+ * `rotation` degrees clockwise, `height` cm high (missing, a room high).
+ */
+export const FloorplanPillarSchema = v.strictObject({
+	center: DrawingPointSchema,
+	shape: v.picklist(PILLAR_SHAPES),
+	width: PillarSideSchema,
+	depth: PillarSideSchema,
+	rotation: v.pipe(
+		v.number('Rotation must be a number'),
+		v.minValue(0, 'Rotation is at least 0°'),
+		v.maxValue(360, 'Rotation is at most 360°'),
+	),
+	height: v.optional(heightSchema('Pillar height', MIN_WALL_HEIGHT), DEFAULT_WALL_HEIGHT),
+})
+
+export type FloorplanPillar = v.InferOutput<typeof FloorplanPillarSchema>
+
+/** Thinnest and thickest room divider, cm. */
+export const MIN_PARTITION_THICKNESS = 1
+export const MAX_PARTITION_THICKNESS = 50
+
+/** Lowest room divider, and the default height of a new one, cm: an office partition screen. */
+export const MIN_PARTITION_HEIGHT = 10
+export const DEFAULT_PARTITION_HEIGHT = 160
+
+/**
+ * A straight room divider (a partition screen, shelf or glass partition
+ * that does not reach the ceiling) from `a` to `b` (cm), `thickness` cm
+ * thick and centered on that line, `height` cm high. Dividers meeting at
+ * an end form corners, like walls, but take no doors or windows.
+ */
+export const FloorplanPartitionSchema = v.pipe(
+	v.strictObject({
+		a: DrawingPointSchema,
+		b: DrawingPointSchema,
+		thickness: v.pipe(
+			v.number('Divider thickness must be a number'),
+			v.minValue(
+				MIN_PARTITION_THICKNESS,
+				`Room dividers are at least ${MIN_PARTITION_THICKNESS} cm thick`,
+			),
+			v.maxValue(
+				MAX_PARTITION_THICKNESS,
+				`Room dividers are at most ${MAX_PARTITION_THICKNESS} cm thick`,
+			),
+		),
+		height: v.optional(
+			heightSchema('Room divider height', MIN_PARTITION_HEIGHT),
+			DEFAULT_PARTITION_HEIGHT,
+		),
+	}),
+	v.check(
+		(partition) => partition.a[0] !== partition.b[0] || partition.a[1] !== partition.b[1],
+		'A room divider needs a length',
+	),
+)
+
+export type FloorplanPartition = v.InferOutput<typeof FloorplanPartitionSchema>
+
 /** Shallowest and deepest desk, cm. */
 export const MIN_DESK_DEPTH = 20
 export const MAX_DESK_DEPTH = 500
@@ -3011,8 +3129,8 @@ const OPENING_SLACK = 0.5
 
 /**
  * `PUT /floorplan-drawings/:id`: the sheet, the reference image and the
- * full set of walls, openings, stairs, cable trays, desks, desk groups,
- * rooms and markers, replaced atomically. Everything lies on the sheet; each opening
+ * full set of walls, openings, pillars, room dividers, stairs, cable trays,
+ * desks, desk groups, rooms and markers, replaced atomically. Everything lies on the sheet; each opening
  * fits into its wall.
  */
 export const FloorplanDrawingPutSchema = v.pipe(
@@ -3024,6 +3142,8 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		offset: v.optional(FloorplanOffsetSchema, { x: 0, y: 0 }),
 		walls: v.pipe(v.array(FloorplanWallSchema), v.maxLength(2000)),
 		openings: v.pipe(v.array(FloorplanOpeningSchema), v.maxLength(2000)),
+		pillars: v.optional(v.pipe(v.array(FloorplanPillarSchema), v.maxLength(2000)), []),
+		partitions: v.optional(v.pipe(v.array(FloorplanPartitionSchema), v.maxLength(2000)), []),
 		stairs: v.optional(v.pipe(v.array(FloorplanStairSchema), v.maxLength(500)), []),
 		trays: v.optional(v.pipe(v.array(FloorplanTraySchema), v.maxLength(2000)), []),
 		desks: v.optional(v.pipe(v.array(FloorplanDeskSchema), v.maxLength(2000)), []),
@@ -3035,6 +3155,8 @@ export const FloorplanDrawingPutSchema = v.pipe(
 		(plan) =>
 			[
 				...plan.walls.flatMap((wall) => [wall.a, wall.b]),
+				...plan.pillars.map((pillar) => pillar.center),
+				...plan.partitions.flatMap((partition) => [partition.a, partition.b]),
 				...plan.stairs.flatMap((stair) => [stair.a, stair.b]),
 				...plan.trays.flatMap((tray) => [tray.a, tray.b]),
 				...plan.desks.flatMap((desk) => [desk.a, desk.b]),
@@ -3042,7 +3164,7 @@ export const FloorplanDrawingPutSchema = v.pipe(
 				...plan.rooms.flatMap((room) => room.points),
 				...plan.placements.map((p): [number, number] => [p.x, p.y]),
 			].every(([x, y]) => x <= plan.width && y <= plan.height),
-		'Walls, stairs, trays, desks, rooms and markers must lie on the sheet',
+		'Walls, pillars, dividers, stairs, trays, desks, rooms and markers must lie on the sheet',
 	),
 	v.check((plan) => {
 		return plan.openings.every((opening) => {
@@ -3122,6 +3244,8 @@ export interface FloorplanDrawingJson {
 	building: { location_id: number | null; site_id: number; name: string } | null
 	walls: FloorplanWall[]
 	openings: FloorplanOpening[]
+	pillars: FloorplanPillar[]
+	partitions: FloorplanPartition[]
 	stairs: FloorplanStair[]
 	trays: FloorplanTray[]
 	desks: FloorplanDesk[]
@@ -3155,6 +3279,17 @@ export interface FloorplanStackFloorJson {
 /** `GET /floorplan-drawings/owner`: the owner's drawn plan, or `null`. */
 export interface FloorplanDrawingRefJson {
 	id: number
+}
+
+/**
+ * `GET /floorplan-drawings/outlets?device=` (`FloorplanOutletsQuerySchema`):
+ * a patch panel's rear ports placed on a drawn plan, by themselves or
+ * through their jack.
+ */
+export interface FloorplanDrawingOutletJson {
+	interface_id: number
+	drawing_id: number
+	owner_name: string
 }
 
 /** `GET /floorplan-drawings?search=&page=&limit=&tenant=&tenant_group=`. */
@@ -3707,6 +3842,11 @@ export const EXTERNAL_PUSH_FIELDS = ['name', 'manufacturer', 'model'] as const
 
 export type ExternalPushField = (typeof EXTERNAL_PUSH_FIELDS)[number]
 
+/** Device fields whose external value can be taken into conex on a mismatch. */
+export const EXTERNAL_PULL_FIELDS = ['serial'] as const
+
+export type ExternalPullField = (typeof EXTERNAL_PULL_FIELDS)[number]
+
 /** Writes one conex field of a linked device to the external system. */
 export const ExternalDeviceUpdateSchema = v.strictObject({
 	device_id: IdSchema,
@@ -3833,8 +3973,15 @@ export interface IntegrationCapabilities {
 	devices: boolean
 	/** Opens and lists tickets, with priorities as ticket tags. */
 	tickets: boolean
-	/** Overwrites external device/employee fields with conex values (and deactivates employees). */
+	/** Overwrites external employee fields with conex values and deactivates employees. */
 	push: boolean
+	/** Device fields whose conex value can overwrite the external one. */
+	device_push: readonly ExternalPushField[]
+	/**
+	 * Device fields whose external value can be taken into conex; a value
+	 * missing in conex is then reported as a mismatch too.
+	 */
+	device_pull: readonly ExternalPullField[]
 	/** Creates conex devices in the external system. */
 	create_device: boolean
 	/** External tenants carry a customer number that is compared with the conex one. */

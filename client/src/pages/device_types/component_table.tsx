@@ -8,9 +8,6 @@ import { portKindIcon } from '../../lib/icons'
 import { ItemIcon } from './add_component'
 import { COMPONENT_CLASSES, componentClassOf } from './components'
 
-/** Component groups with more rows than this start collapsed. */
-const COMPONENT_GROUP_OPEN_ROWS = 16
-
 /** Port kind with its glyph; the slot stays empty without one, so labels align. */
 export function ComponentKind(props: { kind: string }): JSX.Element {
 	return (
@@ -25,12 +22,11 @@ export function ComponentKind(props: { kind: string }): JSX.Element {
 
 /**
  * DataTable props that group stubs or ports by component class, in class
- * order, with the class glyph, name and `count` in the heading. Large groups
- * start collapsed.
+ * order, with the class glyph, name and `count` in the heading.
  */
 export function componentGroups<Row extends { kind: string; side: PortSide | null }>(
 	count: (rows: Row[]) => number = (rows: Row[]): number => rows.length,
-): Pick<DataTableProps<Row>, 'groupBy' | 'groupOrder' | 'groupLabel' | 'defaultGroupOpen'> {
+): Pick<DataTableProps<Row>, 'groupBy' | 'groupOrder' | 'groupLabel'> {
 	return {
 		groupBy: componentClassOf,
 		groupOrder: COMPONENT_CLASSES.map((info) => info.key),
@@ -43,7 +39,5 @@ export function componentGroups<Row extends { kind: string; side: PortSide | nul
 				</>
 			)
 		},
-		defaultGroupOpen: (_key: string, rows: Row[]): boolean =>
-			rows.length <= COMPONENT_GROUP_OPEN_ROWS,
 	}
 }

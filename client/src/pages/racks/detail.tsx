@@ -1,7 +1,11 @@
 import { Result } from 'better-result'
-import type { ElevationShelfDeviceRef, ElevationShelfRef } from 'shared/src/types'
+import type {
+	ElevationDeviceRef,
+	ElevationShelfDeviceRef,
+	ElevationShelfRef,
+} from 'shared/src/types'
 import { createMemo, createSignal, For, type JSX, Show } from 'solid-js'
-import { type DeviceRow, fetch_devices, update_device } from '../../api/devices'
+import { type DeviceRow, fetch_devices, swap_devices, update_device } from '../../api/devices'
 import {
 	delete_rack,
 	fetch_elevation,
@@ -251,6 +255,28 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 		refreshPlacement(await update_device(device.id, { shelf_id: null }))
 	}
 
+	/** Drag and drop: remounts a device at another U or face of this rack. */
+	async function moveDevice(
+		device: ElevationDeviceRef,
+		position_u: number,
+		targetFace: RackFace | null,
+	): Promise<void> {
+		setError(null)
+		refreshPlacement(await update_device(device.id, { position_u, face: targetFace }))
+	}
+
+	/** Drag and drop onto another device: the two trade places. */
+	async function swapDevices(
+		device: ElevationDeviceRef,
+		other: ElevationDeviceRef,
+	): Promise<void> {
+		setError(null)
+		const result = await swap_devices(device.id, other.id)
+		if (Result.isError(result)) {
+			setError(result.error.message)
+		}
+	}
+
 	/** Places the device at the pending U or onto the target shelf. */
 	function placeDevice(device: DeviceRow): Promise<Result<DeviceRow, Error>> {
 		const shelf = targetShelf()
@@ -418,6 +444,15 @@ export function RackDetailPage(props: { id: number }): JSX.Element {
 								on_select_device={openDeviceSelector}
 								on_add_device={installDevice}
 								on_add_shelf={installShelf}
+								on_move_device={(
+									device: ElevationDeviceRef,
+									position_u: number,
+									targetFace: RackFace | null,
+								): void => void moveDevice(device, position_u, targetFace)}
+								on_swap_devices={(
+									device: ElevationDeviceRef,
+									other: ElevationDeviceRef,
+								): void => void swapDevices(device, other)}
 								readonly={!can('edit')}
 								shelf_actions={{
 									on_add_shelf_device: addShelfDevice,

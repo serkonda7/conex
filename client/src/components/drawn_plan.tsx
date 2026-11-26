@@ -1,7 +1,7 @@
 /**
  * Drawn floor plan (v2) of a site or location, the body of
- * `/floorplans-v2/:id`: the sheet with its walls, doors, windows, stairs,
- * cable trays, desks, desk groups and rooms over the optional reference
+ * `/floorplans-v2/:id`: the sheet with its walls, doors, windows, pillars,
+ * room dividers, stairs, cable trays, desks, desk groups and rooms over the optional reference
  * image, and the rack, device and outlet markers. A marker links to its rack
  * or device; an outlet opens its popover (trace and connect) like on image
  * plans. Rooms and desks linked to a location carry a label linking to it.
@@ -10,14 +10,7 @@
  * show beneath the drawing (`drawn_plan_stack`). Edit swaps the view for the editor on the
  * same zoom, always in 2D.
  */
-import {
-	IconCube,
-	IconInfoCircle,
-	IconPencil,
-	IconPhoto,
-	IconTag,
-	IconTrash,
-} from '@tabler/icons-solidjs'
+import { IconCube, IconInfoCircle, IconPencil, IconPhoto, IconTag } from '@tabler/icons-solidjs'
 import { createSignal, For, type JSX, lazy, onMount, Show, Suspense } from 'solid-js'
 import {
 	delete_drawing,
@@ -46,6 +39,8 @@ import {
 	deskSeats,
 	drawingWalls,
 	locationNames,
+	PartitionLayer,
+	PillarLayer,
 	percentOf,
 	RoomLayer,
 	referenceOpacity,
@@ -61,6 +56,8 @@ import { markerNamesVisible, toggleMarkerNames } from './floorplan_layers'
 import { isOutlet, type OutletPlacement, OutletPopover } from './floorplan_outlet'
 import { MarkerGlyph, MarkerName, markerClasses, markerHref, markerTitle } from './floorplan_stage'
 import { IconLabel } from './icon_label'
+import { RowMenu, useRowMenu } from './list_page'
+import { MoreActionsButton } from './more_actions_button'
 import { PlanFullscreenTitle } from './plan_fullscreen'
 import { createStageZoom, type StageZoom } from './zoom_viewport'
 
@@ -167,6 +164,8 @@ function DrawnPlanViewer(props: {
 	}
 	const empty = (): boolean =>
 		props.drawing.walls.length === 0 &&
+		props.drawing.pillars.length === 0 &&
+		props.drawing.partitions.length === 0 &&
 		props.drawing.stairs.length === 0 &&
 		props.drawing.trays.length === 0 &&
 		props.drawing.desks.length === 0 &&
@@ -279,7 +278,11 @@ function DrawnPlanViewer(props: {
 								groups={stageItems('group', props.drawing.desk_groups)}
 							/>
 							<TrayLayer trays={stageItems('tray', props.drawing.trays)} />
+							<PartitionLayer
+								partitions={stageItems('partition', props.drawing.partitions)}
+							/>
 							<WallLayer walls={drawingWalls(props.drawing)} />
+							<PillarLayer pillars={stageItems('pillar', props.drawing.pillars)} />
 						</>
 					}
 					bar={
@@ -379,7 +382,7 @@ function DrawnPlanViewer(props: {
 
 /**
  * Page header and body of a drawn plan: `title`, a note that the drawing's
- * measurements are not reliable, and Edit and Delete; then the plan or,
+ * measurements are not reliable, Edit, and Delete in the more-actions menu; then the plan or,
  * while editing, the editor. `?edit=1` opens the editor right
  * away (a plan just created).
  */
@@ -400,6 +403,7 @@ export function DrawnPlanView(props: {
 			setEditing(true)
 		}
 	})
+	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 	const handleDelete = useDetailDelete({
 		noun: 'noun.drawnFloorplan',
 		name: () => props.title,
@@ -430,18 +434,27 @@ export function DrawnPlanView(props: {
 									</button>
 								</Show>
 								<Show when={can('delete')}>
-									<button
-										type="button"
-										class="btn-danger"
-										onClick={() => void handleDelete()}
-									>
-										<IconLabel icon={IconTrash}>{t('common.delete')}</IconLabel>
-									</button>
+									<MoreActionsButton
+										name={props.title}
+										open={openMenu() !== null}
+										onToggle={(
+											e: MouseEvent & { currentTarget: HTMLButtonElement },
+										) => toggleMenu(e, 'drawn-plan', props.title)}
+										onClose={closeMenu}
+									/>
 								</Show>
 							</Show>
 						</div>
 					</Show>
 				</div>
+				<RowMenu
+					menu={openMenu}
+					onClose={closeMenu}
+					cloneHref={() => undefined}
+					actions={() => []}
+					deletable={() => true}
+					onDelete={() => void handleDelete()}
+				/>
 			</div>
 			<Show
 				when={editing()}

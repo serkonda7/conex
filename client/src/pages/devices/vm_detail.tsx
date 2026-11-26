@@ -27,7 +27,7 @@ import { createRecord } from '../../lib/resource'
 import { canGlobal } from '../../lib/session'
 import { recordCrumb } from '../../lib/trails'
 import { ManagedServicePill } from '../managed-bundles/service_pill'
-import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
+import { MoveTenantDialog, moveTenantAction } from './move_tenant_dialog'
 import { DeviceStatusBadge } from './status'
 
 /**
@@ -80,10 +80,10 @@ export function VirtualMachineDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/devices/vm/${props.id}/edit`}
 					cloneHref={`/devices/vm/add?clone=${props.id}`}
 					onDelete={handleDelete}
-					actions={
-						<Show when={canGlobal('edit') && hostId() === null}>
-							<MoveTenantButton onClick={() => setMovingTenant(true)} />
-						</Show>
+					menuActions={
+						canGlobal('edit') && hostId() === null
+							? [moveTenantAction(() => setMovingTenant(true))]
+							: []
 					}
 				/>
 				<DetailSubtitle description={vm()?.description} />

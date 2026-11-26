@@ -45,10 +45,15 @@ export interface IntegrationProvider {
 	listTags?(): Promise<Result<ExternalTag[], Error>>
 	/** Creates a device and returns it as fetched by a sync; absent when unsupported. */
 	createDevice?(input: DeviceInput): Promise<Result<ExternalDeviceJson, Error>>
-	/** Overwrites fields of a device and returns it as fetched by a sync; absent when unsupported. */
+	/**
+	 * Overwrites fields of a device (only those in the definition's
+	 * `device_push`) and returns it as fetched by a sync; absent when
+	 * unsupported. `externalTenantId` is the device's tenant in the snapshot.
+	 */
 	updateDevice?(
 		externalId: string,
 		changes: DeviceUpdate,
+		externalTenantId: string,
 	): Promise<Result<ExternalDeviceJson, Error>>
 	/** Overwrites fields of an employee; absent when unsupported. */
 	updateEmployee?(externalId: string, changes: EmployeeUpdate): Promise<Result<void, Error>>

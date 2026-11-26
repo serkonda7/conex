@@ -11,6 +11,8 @@ export const octojaDefinition: ProviderDefinition<'octoja'> = {
 		devices: true,
 		tickets: false,
 		push: false,
+		device_push: [],
+		device_pull: [],
 		create_device: false,
 		customer_numbers: true,
 		link_level: 'tenant',

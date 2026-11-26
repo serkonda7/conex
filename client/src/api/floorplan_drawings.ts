@@ -10,6 +10,7 @@ import type {
 	FloorplanDeskGroup,
 	FloorplanDrawingJson,
 	FloorplanDrawingListJson,
+	FloorplanDrawingOutletJson,
 	FloorplanDrawingPlacementJson,
 	FloorplanDrawingPut,
 	FloorplanDrawingRefJson,
@@ -17,6 +18,8 @@ import type {
 	FloorplanListQuery,
 	FloorplanOffset,
 	FloorplanOpening,
+	FloorplanPartition,
+	FloorplanPillar,
 	FloorplanReference,
 	FloorplanRoom,
 	FloorplanStackFloorJson,
@@ -32,11 +35,14 @@ export type {
 	FloorplanDeskGroup,
 	FloorplanDrawingJson,
 	FloorplanDrawingListJson,
+	FloorplanDrawingOutletJson,
 	FloorplanDrawingPlacementJson,
 	FloorplanDrawingPut,
 	FloorplanLinkLocationJson,
 	FloorplanOffset,
 	FloorplanOpening,
+	FloorplanPartition,
+	FloorplanPillar,
 	FloorplanReference,
 	FloorplanRoom,
 	FloorplanStackFloorJson,
@@ -69,6 +75,16 @@ export async function create_drawing(
 		json: 'site' in owner ? { site_id: owner.site } : { location_id: owner.location },
 	})
 	return to_result<FloorplanDrawingJson>(res, failed.create('noun.drawnFloorplan'))
+}
+
+/** A patch panel's rear ports placed on drawn plans. */
+export async function fetch_drawing_outlets(
+	deviceId: number,
+): Promise<Result<FloorplanDrawingOutletJson[], Error>> {
+	const res = await client['floorplan-drawings'].outlets.$get({
+		query: to_query({ device: deviceId }),
+	})
+	return to_result<FloorplanDrawingOutletJson[]>(res, failed.list('noun.drawnFloorplan'))
 }
 
 export async function fetch_drawing(id: number): Promise<Result<FloorplanDrawingJson, Error>> {

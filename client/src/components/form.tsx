@@ -188,7 +188,9 @@ export function ToggleField(props: {
 	disabled?: boolean
 	/** Shown on hover, e.g. why the switch is disabled. */
 	title?: string
+	autofocus?: boolean
 }): JSX.Element {
+	const ref = useAutofocus(() => props.autofocus)
 	return (
 		<div class="field">
 			<label for={props.id}>{props.label}</label>
@@ -196,8 +198,10 @@ export function ToggleField(props: {
 				<span class="field-toggle" title={props.title}>
 					<input
 						id={props.id}
+						ref={ref}
 						type="checkbox"
 						role="switch"
+						data-autofocus={props.autofocus || undefined}
 						aria-checked={props.checked}
 						class="toggle"
 						checked={props.checked}
@@ -433,6 +437,7 @@ function CreateActions(props: {
 						class="btn-outline"
 						name="action"
 						value="add-another"
+						title={t('common.createAndAddAnotherHint')}
 						disabled={disabled()}
 					>
 						{t('common.createAndAddAnother')}
@@ -507,7 +512,7 @@ export function FormPage(props: {
 	name?: string
 	crumbs?: readonly Crumb[]
 	loadingText?: string
-	/** Create forms: no "Create & Add Another". */
+	/** Create forms: no "Create & Add Another" (also Shift+Enter). */
 	singleton?: boolean
 	/** Create forms: the new object gets the top-bar tenant (see above). */
 	tenant?: 'optional' | 'required'
@@ -532,7 +537,28 @@ export function FormPage(props: {
 				when={props.form.loaded()}
 				fallback={<Loading message={props.loadingText ?? t('common.loading')} />}
 			>
-				<form class="form-stacked" onSubmit={props.onSubmit}>
+				<form
+					class="form-stacked"
+					onSubmit={props.onSubmit}
+					onKeyDown={(e: KeyboardEvent & { currentTarget: HTMLFormElement }): void => {
+						// Shift+Enter = Create & Add Another (newline in a textarea).
+						if (
+							e.key !== 'Enter' ||
+							!e.shiftKey ||
+							e.defaultPrevented ||
+							e.target instanceof HTMLTextAreaElement
+						) {
+							return
+						}
+						const next = e.currentTarget.querySelector<HTMLButtonElement>(
+							'button[value="add-another"]',
+						)
+						if (next && !next.disabled) {
+							e.preventDefault()
+							e.currentTarget.requestSubmit(next)
+						}
+					}}
+				>
 					{props.children}
 					<InlineError message={props.form.error()} alert />
 					<Show

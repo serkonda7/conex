@@ -1,0 +1,2 @@
+ALTER TABLE "floorplan_drawings" ADD COLUMN "pillars" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "floorplan_drawings" ADD COLUMN "partitions" jsonb DEFAULT '[]'::jsonb NOT NULL;

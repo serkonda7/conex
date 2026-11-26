@@ -6,6 +6,7 @@ import {
 	FloorplanDrawingListQuerySchema,
 	FloorplanDrawingOwnerQuerySchema,
 	FloorplanDrawingPutSchema,
+	FloorplanOutletsQuerySchema,
 } from 'shared/src/schemas'
 import { checkTenant, listTenantScope, loadScoped, requestScope } from '../authz'
 import {
@@ -16,11 +17,12 @@ import {
 	getDrawingWithTenant,
 	listDrawingCandidates,
 	listDrawingLocations,
+	listDrawingOutlets,
 	listDrawingStack,
 	listDrawings,
 	putDrawing,
 } from '../db/floorplan_drawings'
-import { ownerTenant } from '../db/owners'
+import { deviceTenant, ownerTenant } from '../db/owners'
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
@@ -65,6 +67,17 @@ export const floorplanDrawingsApp = new Hono()
 			return (
 				checkTenant(c, await ownerTenant(owner)) ??
 				sendResult(c, await getDrawingRef(owner))
+			)
+		},
+	)
+	.get(
+		'/outlets',
+		vValidator('query', FloorplanOutletsQuerySchema, onValidationError),
+		async (c) => {
+			const { device } = c.req.valid('query')
+			return (
+				checkTenant(c, await deviceTenant(device)) ??
+				c.json(await listDrawingOutlets(device, requestScope(c)))
 			)
 		},
 	)

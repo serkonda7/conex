@@ -35,6 +35,8 @@ import {
 	type Permission,
 	PHONE_TYPES,
 	type PhoneType,
+	PILLAR_SHAPES,
+	type PillarShape,
 	POE_TYPE_NAMES,
 	POE_TYPE_SHORT_NAMES,
 	type PoeMode,
@@ -109,6 +111,21 @@ export function yesNoOptions(): { value: 'true' | 'false'; label: string }[] {
 const FACE_KEYS: Record<'front' | 'rear', MessageKey> = {
 	front: 'face.front',
 	rear: 'face.rear',
+}
+
+const PILLAR_SHAPE_KEYS: Record<PillarShape, MessageKey> = {
+	rect: 'pillarShape.rect',
+	round: 'pillarShape.round',
+}
+
+/** Shape of a drawn plan's pillar (`rect` / `round`). */
+export function pillarShapeLabel(value: string): string {
+	return lookup(PILLAR_SHAPE_KEYS, value)
+}
+
+/** `<select>` options for the pillar shapes. */
+export function pillarShapeOptions(): { value: PillarShape; label: string }[] {
+	return PILLAR_SHAPES.map((value) => ({ value, label: pillarShapeLabel(value) }))
 }
 
 /** Rack face (`front` / `rear`). */

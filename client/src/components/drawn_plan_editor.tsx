@@ -2,11 +2,12 @@
  * Edit mode of a drawn floor plan. Works on a draft copy and sends it with
  * one `PUT` on save; cancel discards it.
  *
- * - Select (default): click a wall, door, window, stairs, cable tray, desk,
- *   desk group, room (by its outline or label) or marker to select it, drag
- *   it to move it. A selected wall, flight of stairs, tray or desk shows
+ * - Select (default): click a wall, door, window, pillar, room divider,
+ *   stairs, cable tray, desk, desk group, room (by its outline or label) or
+ *   marker to select it, drag it to move it. A selected wall, room divider,
+ *   flight of stairs, tray or desk shows
  *   handles on its ends, a room on its corners, a desk group on its divider
- *   ends (drag to rotate); walls (and trays) joined at a moved end follow
+ *   ends (drag to rotate); walls (and dividers, trays) joined at a moved end follow
  *   it. Off the selection's bottom right corner (top or left near the
  *   sheet's edges) sit quick actions (rotate 90°, flip, a door's hinge,
  *   duplicate, delete); a desk, desk group or stairs shows its distances
@@ -16,11 +17,14 @@
  *   linked locations, label) and deletes it.
  * - Drawing tools stay picked after each element, until Escape or another
  *   tool; the element just put down is selected.
- * - Wall / cable tray: each click adds a corner, chaining runs; clicking the
+ * - Wall / room divider / cable tray: each click adds a corner, chaining
+ *   runs; clicking the
  *   chain's first corner closes it, a double click, Enter or Escape ends it.
  *   While drawing a wall, tray, stairs or room, typing a number sets the
  *   next line's length in cm toward the pointer; Enter puts it down.
  * - Door / sliding door / window: a click on a wall puts one there.
+ * - Pillar: a click puts one there, at the shape, size and rotation set
+ *   beside the stage.
  * - Stairs: a click at the foot, then one at the head.
  * - Desk: a click puts one down at the length and depth set beside the
  *   stage, its back against the nearest wall face within its depth; a drag
@@ -31,9 +35,10 @@
  * - Room: each click adds a corner; clicking the first corner, a double
  *   click or Enter closes it, Escape drops it.
  * - Snap (toggle; Alt skips it, `drawn_plan_snap`): wall corners snap to
- *   wall ends, then onto walls; stairs, desks, desk groups and rooms to the
- *   walls' faces and to each other's corners and edges, trays to the faces
- *   and other trays, markers to desks and rooms. A moved object snaps corner
+ *   wall ends, then onto walls; pillars, stairs, desks, desk groups and
+ *   rooms to the walls' faces and to each other's corners and edges (and
+ *   the dividers' faces), trays and dividers to the faces and others of
+ *   their kind, markers to desks and rooms. A moved object snaps corner
  *   on corner or flush against an edge (sliding into the next contact), else
  *   lines up its edges or center with other objects along dashed guides;
  *   otherwise everything takes 10 cm steps. Lines from a previous point keep
@@ -66,6 +71,8 @@ import {
 	IconRotateClockwise,
 	IconRoute,
 	IconRulerMeasure,
+	IconSeparatorVertical,
+	IconSquareFilled,
 	IconStairsUp,
 	IconTopologyStar3,
 	IconTrash,
@@ -77,6 +84,7 @@ import { Result } from 'better-result'
 import {
 	DEFAULT_DESK_HEIGHT,
 	DEFAULT_OPENING_HEIGHT,
+	DEFAULT_PARTITION_HEIGHT,
 	DEFAULT_TRAY_ELEVATION,
 	DEFAULT_WALL_HEIGHT,
 	defaultMarkerElevation,
@@ -90,6 +98,8 @@ import {
 	MAX_DRAWING_HEIGHT,
 	MAX_FLOOR_LEVEL,
 	MAX_OPENING_WIDTH,
+	MAX_PARTITION_THICKNESS,
+	MAX_PILLAR_SIDE,
 	MAX_ROOM_POINTS,
 	MAX_STAIR_STEPS,
 	MAX_STAIR_WIDTH,
@@ -101,6 +111,9 @@ import {
 	MIN_FLOOR_LEVEL,
 	MIN_OPENING_HEIGHT,
 	MIN_OPENING_WIDTH,
+	MIN_PARTITION_HEIGHT,
+	MIN_PARTITION_THICKNESS,
+	MIN_PILLAR_SIDE,
 	MIN_STAIR_RISE,
 	MIN_STAIR_STEPS,
 	MIN_STAIR_WIDTH,
@@ -108,6 +121,7 @@ import {
 	MIN_WALL_HEIGHT,
 	MIN_WALL_THICKNESS,
 	type OpeningKind,
+	type PillarShape,
 } from 'shared/src/schemas'
 import {
 	createMemo,
@@ -137,6 +151,8 @@ import {
 	type FloorplanLinkLocationJson,
 	type FloorplanOffset,
 	type FloorplanOpening,
+	type FloorplanPartition,
+	type FloorplanPillar,
 	type FloorplanRoom,
 	type FloorplanStair,
 	type FloorplanTray,
@@ -146,7 +162,7 @@ import {
 	put_drawing,
 } from '../api/floorplan_drawings'
 import { type MessageKey, t, tp } from '../i18n'
-import { locationTypeLabel } from '../i18n/labels'
+import { locationTypeLabel, pillarShapeOptions } from '../i18n/labels'
 import { createRows, createRowsFor, useAction } from '../lib/resource'
 import { useLeaveGuard } from '../lib/router'
 import { readStored, writeStored } from '../lib/storage'
@@ -160,6 +176,8 @@ import {
 	DEFAULT_DESK_GROUP,
 	DEFAULT_DESK_LENGTH,
 	DEFAULT_OPENING_WIDTH,
+	DEFAULT_PARTITION_THICKNESS,
+	DEFAULT_PILLAR_SIDE,
 	DEFAULT_STAIR_WIDTH,
 	DEFAULT_TRAY_WIDTH,
 	DEFAULT_WALL_THICKNESS,
@@ -175,7 +193,12 @@ import {
 	distance,
 	openingShape,
 	openingSpan,
+	type PillarShapeOf,
 	type Point,
+	partitionOutline,
+	pillarCorners,
+	pillarEdges,
+	pillarOutline,
 	polygonCenter,
 	projectOnSegment,
 	roundTo,
@@ -217,6 +240,8 @@ import {
 	formatLength,
 	locationNames,
 	OpeningGlyph,
+	PartitionLayer,
+	PillarLayer,
 	percentOf,
 	pxPerCm,
 	RoomLayer,
@@ -292,6 +317,14 @@ interface EditOpening extends Omit<FloorplanOpening, 'wall'> {
 	wall_id: number
 }
 
+interface EditPillar extends FloorplanPillar {
+	id: number
+}
+
+interface EditPartition extends FloorplanPartition {
+	id: number
+}
+
 interface EditStair extends FloorplanStair {
 	id: number
 }
@@ -310,6 +343,15 @@ interface EditDeskGroup extends FloorplanDeskGroup {
 
 interface EditRoom extends FloorplanRoom {
 	id: number
+}
+
+/** Shape, size and rotation of the next pillar the tool puts down. */
+type NewPillar = Omit<PillarShapeOf, 'center'>
+
+/** `pillar` with `patch`; a round pillar stays as deep as it is wide. */
+function reshaped<T extends NewPillar>(pillar: T, patch: Partial<NewPillar>): T {
+	const next = { ...pillar, ...patch }
+	return next.shape === 'round' ? { ...next, depth: next.width } : next
 }
 
 /** Size and rotation of the next desk group the tool puts down. */
@@ -353,7 +395,7 @@ function normalDegrees(degrees: number): number {
 	return round2(value) === 360 ? 0 : value
 }
 
-/** Anything with an id and two ends that chains at shared ends: walls and trays. */
+/** Anything with an id and two ends that chains at shared ends: walls, dividers and trays. */
 interface Run {
 	id: number
 	a: Point
@@ -390,6 +432,8 @@ function movedRunEnds<T extends Run>(
 type Tool =
 	| 'select'
 	| 'wall'
+	| 'partition'
+	| 'pillar'
 	| OpeningKind
 	| 'stairs'
 	| 'tray'
@@ -429,16 +473,32 @@ const OPENING_UI: Record<
 	},
 }
 
-/** Palette entries of the elements drawn by clicking their outline. */
-interface ElementTool {
-	tool: 'tray' | 'desk' | 'deskGroup' | 'room'
+/** A tool of the Draw tab's palette. */
+interface PaletteTool {
+	tool: Exclude<Tool, 'select' | 'image' | 'calibrate' | 'align'>
 	icon: typeof IconDoor
 	label: MessageKey
 	hint: MessageKey
 }
 
-const ELEMENT_TOOLS: ElementTool[] = [
-	{ tool: 'tray', icon: IconRoute, label: 'drawnPlan.toolTray', hint: 'drawnPlan.trayHint' },
+/**
+ * The Draw tab's palette, most used first: the first nine get the number
+ * keys 1–9.
+ */
+const PALETTE_TOOLS: PaletteTool[] = [
+	{ tool: 'wall', icon: IconWall, label: 'drawnPlan.toolWall', hint: 'drawnPlan.wallHint' },
+	{
+		tool: 'door',
+		icon: OPENING_UI.door.icon,
+		label: OPENING_UI.door.tool,
+		hint: 'drawnPlan.openingPlaceHint',
+	},
+	{
+		tool: 'window',
+		icon: OPENING_UI.window.icon,
+		label: OPENING_UI.window.tool,
+		hint: 'drawnPlan.openingPlaceHint',
+	},
 	{ tool: 'desk', icon: IconDesk, label: 'drawnPlan.toolDesk', hint: 'drawnPlan.deskHint' },
 	{
 		tool: 'deskGroup',
@@ -447,30 +507,60 @@ const ELEMENT_TOOLS: ElementTool[] = [
 		hint: 'drawnPlan.deskGroupHint',
 	},
 	{ tool: 'room', icon: IconPolygon, label: 'drawnPlan.toolRoom', hint: 'drawnPlan.roomHint' },
+	{ tool: 'tray', icon: IconRoute, label: 'drawnPlan.toolTray', hint: 'drawnPlan.trayHint' },
+	{
+		tool: 'sliding_door',
+		icon: OPENING_UI.sliding_door.icon,
+		label: OPENING_UI.sliding_door.tool,
+		hint: 'drawnPlan.openingPlaceHint',
+	},
+	{
+		tool: 'stairs',
+		icon: IconStairsUp,
+		label: 'drawnPlan.toolStairs',
+		hint: 'drawnPlan.stairsHint',
+	},
+	{
+		tool: 'partition',
+		icon: IconSeparatorVertical,
+		label: 'drawnPlan.toolPartition',
+		hint: 'drawnPlan.partitionHint',
+	},
+	{
+		tool: 'pillar',
+		icon: IconSquareFilled,
+		label: 'drawnPlan.toolPillar',
+		hint: 'drawnPlan.pillarHint',
+	},
 ]
 
-/** Tools of the Draw tab in palette order; the number keys 1–9 pick them. */
-const SHORTCUT_TOOLS: Tool[] = [
-	'wall',
-	'door',
-	'sliding_door',
-	'window',
-	'stairs',
-	'tray',
-	'desk',
-	'deskGroup',
-	'room',
-]
+/** Tools of the Draw tab with a number key (1–9), in palette order. */
+const SHORTCUT_TOOLS: Tool[] = PALETTE_TOOLS.slice(0, 9).map((entry) => entry.tool)
 
 /** The number key of a tool, shown on its palette entry. */
 function ToolKey(props: { tool: Tool }): JSX.Element {
-	return <kbd class="drawn-plan-key">{SHORTCUT_TOOLS.indexOf(props.tool) + 1}</kbd>
+	const index = (): number => SHORTCUT_TOOLS.indexOf(props.tool)
+	return (
+		<Show when={index() >= 0}>
+			<kbd class="drawn-plan-key">{index() + 1}</kbd>
+		</Show>
+	)
 }
 
 /** Tabs of the side panel: drawing elements, adding objects, and the plan's sheet and image. */
 type SideTab = 'draw' | 'add' | 'plan'
 
-type SelectedKind = 'wall' | 'opening' | 'stair' | 'tray' | 'desk' | 'deskGroup' | 'room' | 'marker'
+type SelectedKind =
+	| 'wall'
+	| 'opening'
+	| 'pillar'
+	| 'partition'
+	| 'stair'
+	| 'tray'
+	| 'desk'
+	| 'deskGroup'
+	| 'room'
+	| 'marker'
 
 interface Selected {
 	kind: SelectedKind
@@ -485,6 +575,8 @@ interface Snapshot {
 	offset: FloorplanOffset
 	walls: EditWall[]
 	openings: EditOpening[]
+	pillars: EditPillar[]
+	partitions: EditPartition[]
 	stairs: EditStair[]
 	trays: EditTray[]
 	desks: EditDesk[]
@@ -574,6 +666,22 @@ function toPut(state: Snapshot): FloorplanDrawingPut {
 				},
 			]
 		}),
+		pillars: state.pillars.map((pillar: EditPillar) => ({
+			center: roundPoint(pillar.center),
+			shape: pillar.shape,
+			width: round2(pillar.width),
+			depth: round2(pillar.shape === 'round' ? pillar.width : pillar.depth),
+			rotation: round2(normalDegrees(pillar.rotation)),
+			height: round2(pillar.height),
+		})),
+		partitions: state.partitions
+			.filter((partition: EditPartition) => distance(partition.a, partition.b) >= MIN_WALL)
+			.map((partition: EditPartition) => ({
+				a: roundPoint(partition.a),
+				b: roundPoint(partition.b),
+				thickness: round2(partition.thickness),
+				height: round2(partition.height),
+			})),
 		stairs: state.stairs
 			.filter((stair: EditStair) => distance(stair.a, stair.b) >= MIN_WALL)
 			.map((stair: EditStair) => ({
@@ -706,6 +814,63 @@ function DeskGroupFields(props: {
 	)
 }
 
+/** Shape, size and rotation of a pillar; a round one has one diameter. */
+function PillarFields(props: {
+	pillar: NewPillar
+	on_commit: (patch: Partial<NewPillar>) => void
+}): JSX.Element {
+	return (
+		<>
+			<label>
+				<span>{t('drawnPlan.pillarShape')}</span>
+				<select
+					class="drawn-plan-control"
+					value={props.pillar.shape}
+					onChange={(e: Event & { currentTarget: HTMLSelectElement }) => {
+						const shape = pillarShapeOptions().find(
+							(option) => option.value === e.currentTarget.value,
+						)?.value
+						if (shape) {
+							props.on_commit({ shape })
+						}
+					}}
+				>
+					<For each={pillarShapeOptions()}>
+						{(option: { value: PillarShape; label: string }) => (
+							<option value={option.value}>{option.label}</option>
+						)}
+					</For>
+				</select>
+			</label>
+			<NumberField
+				label={t(props.pillar.shape === 'round' ? 'drawnPlan.diameter' : 'drawnPlan.width')}
+				value={props.pillar.width}
+				min={MIN_PILLAR_SIDE}
+				max={MAX_PILLAR_SIDE}
+				on_commit={(width: number) => props.on_commit({ width })}
+			/>
+			<Show when={props.pillar.shape === 'rect'}>
+				<NumberField
+					label={t('drawnPlan.depth')}
+					value={props.pillar.depth}
+					min={MIN_PILLAR_SIDE}
+					max={MAX_PILLAR_SIDE}
+					on_commit={(depth: number) => props.on_commit({ depth })}
+				/>
+				<NumberField
+					label={t('drawnPlan.rotation')}
+					value={props.pillar.rotation}
+					min={0}
+					max={360}
+					on_commit={(rotation: number) =>
+						props.on_commit({ rotation: normalDegrees(rotation) })
+					}
+				/>
+			</Show>
+		</>
+	)
+}
+
 /** A text field of the inspector that commits on change. */
 function TextField(props: {
 	label: string
@@ -815,6 +980,18 @@ export function DrawnPlanEditor(props: {
 			wall_id: wall + 1,
 		})),
 	)
+	const [pillars, setPillars] = createSignal<EditPillar[]>(
+		props.drawing.pillars.map((pillar: FloorplanPillar, i: number) => ({
+			...pillar,
+			id: i + 1,
+		})),
+	)
+	const [partitions, setPartitions] = createSignal<EditPartition[]>(
+		props.drawing.partitions.map((partition: FloorplanPartition, i: number) => ({
+			...partition,
+			id: i + 1,
+		})),
+	)
 	const [stairs, setStairs] = createSignal<EditStair[]>(
 		props.drawing.stairs.map((stair: FloorplanStair, i: number) => ({ ...stair, id: i + 1 })),
 	)
@@ -840,6 +1017,14 @@ export function DrawnPlanEditor(props: {
 	const [tool, setToolSignal] = createSignal<Tool>('select')
 	const [thickness, setThickness] = createSignal(DEFAULT_WALL_THICKNESS)
 	const [wallHeight, setWallHeight] = createSignal(DEFAULT_WALL_HEIGHT)
+	const [partitionThickness, setPartitionThickness] = createSignal(DEFAULT_PARTITION_THICKNESS)
+	const [partitionHeight, setPartitionHeight] = createSignal(DEFAULT_PARTITION_HEIGHT)
+	const [newPillar, setNewPillar] = createSignal<NewPillar>({
+		shape: 'rect',
+		width: DEFAULT_PILLAR_SIDE,
+		depth: DEFAULT_PILLAR_SIDE,
+		rotation: 0,
+	})
 	const [trayWidth, setTrayWidth] = createSignal(DEFAULT_TRAY_WIDTH)
 	const [trayElevation, setTrayElevation] = createSignal(DEFAULT_TRAY_ELEVATION)
 	const [deskDepth, setDeskDepth] = createSignal(DEFAULT_DESK_DEPTH)
@@ -847,7 +1032,7 @@ export function DrawnPlanEditor(props: {
 		rotation: 0,
 		...DEFAULT_DESK_GROUP,
 	})
-	/** Corner the next wall or tray of a chain starts at, and the chain's first corner. */
+	/** Corner the next wall, divider or tray of a chain starts at, and the chain's first corner. */
 	const [chain, setChain] = createSignal<{ first: Point; last: Point } | null>(null)
 	/** First end of the stairs or desk being drawn. */
 	const [lineStart, setLineStart] = createSignal<Point | null>(null)
@@ -908,6 +1093,8 @@ export function DrawnPlanEditor(props: {
 		offset: sheetOffset(),
 		walls: walls(),
 		openings: openings(),
+		pillars: pillars(),
+		partitions: partitions(),
 		stairs: stairs(),
 		trays: trays(),
 		desks: desks(),
@@ -959,6 +1146,27 @@ export function DrawnPlanEditor(props: {
 	const selectedDoor = createMemo(() => {
 		const opening = selectedOpening()
 		return opening && opening.kind !== 'window' ? opening : undefined
+	})
+	const stagePillars = createMemo((): StageItem<EditPillar>[] =>
+		pillars().map((pillar: EditPillar) => ({ key: `pillar:${pillar.id}`, item: pillar })),
+	)
+	const stagePartitions = createMemo((): StageItem<EditPartition>[] =>
+		partitions().map((partition: EditPartition) => ({
+			key: `partition:${partition.id}`,
+			item: partition,
+		})),
+	)
+	const selectedPillar = createMemo(() => {
+		const current = selected()
+		return current?.kind === 'pillar'
+			? pillars().find((pillar: EditPillar) => pillar.id === current.id)
+			: undefined
+	})
+	const selectedPartition = createMemo(() => {
+		const current = selected()
+		return current?.kind === 'partition'
+			? partitions().find((partition: EditPartition) => partition.id === current.id)
+			: undefined
 	})
 	const stageStairs = createMemo((): StageStair[] =>
 		stairs().map((stair: EditStair) => ({ key: `stair:${stair.id}`, stair })),
@@ -1030,6 +1238,8 @@ export function DrawnPlanEditor(props: {
 		setSheetOffset(state.offset)
 		setWalls(state.walls)
 		setOpenings(state.openings)
+		setPillars(state.pillars)
+		setPartitions(state.partitions)
 		setStairs(state.stairs)
 		setTrays(state.trays)
 		setDesks(state.desks)
@@ -1039,6 +1249,10 @@ export function DrawnPlanEditor(props: {
 		const current = selected()
 		const exists =
 			current === null ||
+			(current.kind === 'pillar' &&
+				state.pillars.some((x: EditPillar) => x.id === current.id)) ||
+			(current.kind === 'partition' &&
+				state.partitions.some((x: EditPartition) => x.id === current.id)) ||
 			(current.kind === 'tray' && state.trays.some((x: EditTray) => x.id === current.id)) ||
 			(current.kind === 'desk' && state.desks.some((x: EditDesk) => x.id === current.id)) ||
 			(current.kind === 'deskGroup' &&
@@ -1149,6 +1363,15 @@ export function DrawnPlanEditor(props: {
 
 	/** Corners and edges of every object other things snap to, keyed like the selection. */
 	const outlines = createMemo((): { key: string; points: Point[]; edges: [Point, Point][] }[] => [
+		...pillars().map((pillar: EditPillar) => ({
+			key: `pillar:${pillar.id}`,
+			points: pillarCorners(pillar),
+			edges: pillarEdges(pillar),
+		})),
+		...partitions().map((partition: EditPartition) => {
+			const outline = partitionOutline(partition)
+			return { key: `partition:${partition.id}`, points: outline, edges: ringEdges(outline) }
+		}),
 		...stairs().map((stair: EditStair) => {
 			const outline = stairShape(stair).outline
 			return { key: `stair:${stair.id}`, points: outline, edges: ringEdges(outline) }
@@ -1170,9 +1393,10 @@ export function DrawnPlanEditor(props: {
 	])
 
 	/**
-	 * What stairs, desks, desk groups and rooms snap to: the walls' faces and
-	 * their corners, and the corners and edges of the other objects (not
-	 * those keyed in `exclude`, which are being edited).
+	 * What pillars, stairs, desks, desk groups and rooms snap to: the walls'
+	 * faces and their corners, and the corners and edges of the other objects
+	 * and the room dividers (not those keyed in `exclude`, which are being
+	 * edited).
 	 */
 	function objectTargets(exclude: Set<string> = new Set()): SnapTargets {
 		const { points, faces: lines } = faces()
@@ -1213,9 +1437,34 @@ export function DrawnPlanEditor(props: {
 		)
 	}
 
+	/** What a room divider snaps to: the walls' faces and the other dividers' ends and lines (not those in `exclude`). */
+	function partitionTargets(exclude: Set<number> = new Set()): SnapTargets {
+		const { points, faces: lines } = faces()
+		const others = partitions().filter((partition: EditPartition) => !exclude.has(partition.id))
+		return withTargets(
+			{
+				points: [
+					...points,
+					...others.flatMap((partition: EditPartition) => [partition.a, partition.b]),
+				],
+				lines: [
+					...lines.map(([a, b]) => ({ a, b, reach: 0 })),
+					...others.map((partition: EditPartition) => ({
+						a: partition.a,
+						b: partition.b,
+						reach: partition.thickness / 2,
+					})),
+				],
+				boxes: wallBoxes(),
+			},
+			belowTargets()?.objects,
+		)
+	}
+
 	/** What a new object snaps to, while drawing it. */
 	const allObjectTargets = createMemo(() => objectTargets())
 	const allTrayTargets = createMemo(() => trayTargets())
+	const allPartitionTargets = createMemo(() => partitionTargets())
 
 	/** What a marker snaps to: the desks' and rooms' centers, and lines up with the other markers. */
 	function markerTargets(exclude: number): SnapTargets {
@@ -1423,6 +1672,85 @@ export function DrawnPlanEditor(props: {
 			const hit = projectOnSegment(at, wall.a, wall.b)
 			const offset = snapping(ev) ? roundTo(hit.offset, SNAP_STEP) : hit.offset
 			patchOpening(id, { offset: clampOffset(wall, opening.width, offset) })
+		})
+	}
+
+	/**
+	 * Where a pillar `shape` put at `raw` goes: while snapping, it snaps to
+	 * the walls and objects like a moved one (`targets`, without the pillar
+	 * itself); it stays on the sheet.
+	 */
+	function pillarCenter(
+		e: { altKey: boolean },
+		shape: NewPillar,
+		raw: Point,
+		targets: SnapTargets,
+	): Point {
+		const pillar = { ...shape, center: raw }
+		const delta = keepOnSheet(
+			pillarOutline(pillar),
+			snapMove(e, pillarCorners(pillar), pillarEdges(pillar), [0, 0], targets),
+		)
+		return [raw[0] + delta[0], raw[1] + delta[1]]
+	}
+
+	function pressPillar(e: PointerEvent, key: string): void {
+		const id = Number(key.split(':')[1])
+		const pillar = pillars().find((x: EditPillar) => x.id === id)
+		if (!pillar || tool() !== 'select') {
+			return
+		}
+		setSelected({ kind: 'pillar', id })
+		const from = stagePoint(e)
+		const { center } = pillar
+		const targets = objectTargets(new Set([key]))
+		startEdit(e, (at: Point, ev: PointerEvent) => {
+			patchPillar(id, {
+				center: pillarCenter(
+					ev,
+					pillar,
+					[center[0] + at[0] - from[0], center[1] + at[1] - from[1]],
+					targets,
+				),
+			})
+		})
+	}
+
+	function pressPartition(e: PointerEvent, key: string): void {
+		const id = Number(key.split(':')[1])
+		const partition = partitions().find((x: EditPartition) => x.id === id)
+		if (!partition || tool() !== 'select') {
+			return
+		}
+		setSelected({ kind: 'partition', id })
+		const { a, b } = partition
+		const endsA = runEndsAt(partitions(), a)
+		const endsB = runEndsAt(partitions(), b)
+		const targets = partitionTargets(new Set([...endsA, ...endsB].map((entry) => entry.id)))
+		const from = stagePoint(e)
+		startEdit(e, (at: Point, ev: PointerEvent) => {
+			const delta = keepOnSheet(
+				[a, b],
+				snapMove(ev, [a, b], [[a, b]], [at[0] - from[0], at[1] - from[1]], targets),
+			)
+			setPartitions((all: EditPartition[]) =>
+				movedRunEnds(movedRunEnds(all, endsA, [a[0] + delta[0], a[1] + delta[1]]), endsB, [
+					b[0] + delta[0],
+					b[1] + delta[1],
+				]),
+			)
+		})
+	}
+
+	function dragPartitionEnd(e: PointerEvent, partition: EditPartition, end: 'a' | 'b'): void {
+		const ends = runEndsAt(partitions(), partition[end])
+		const targets = partitionTargets(new Set(ends.map((entry) => entry.id)))
+		const other = end === 'a' ? partition.b : partition.a
+		startEdit(e, (at: Point, ev: PointerEvent) => {
+			const to = snapTo(ev, at, other, targets)
+			if (distance(to, other) >= MIN_WALL) {
+				setPartitions((all: EditPartition[]) => movedRunEnds(all, ends, to))
+			}
 		})
 	}
 
@@ -1705,6 +2033,30 @@ export function DrawnPlanEditor(props: {
 		)
 	}
 
+	function patchPillar(id: number, patch: Partial<EditPillar>): void {
+		setPillars((all: EditPillar[]) =>
+			all.map((pillar: EditPillar) => (pillar.id === id ? { ...pillar, ...patch } : pillar)),
+		)
+	}
+
+	/** Reshapes a pillar, kept on the sheet. */
+	function reshapePillar(pillar: EditPillar, patch: Partial<NewPillar>): void {
+		checkpoint()
+		const next = reshaped(pillar, patch)
+		patchPillar(pillar.id, {
+			...next,
+			center: pillarCenter({ altKey: true }, next, next.center, allObjectTargets()),
+		})
+	}
+
+	function patchPartition(id: number, patch: Partial<EditPartition>): void {
+		setPartitions((all: EditPartition[]) =>
+			all.map((partition: EditPartition) =>
+				partition.id === id ? { ...partition, ...patch } : partition,
+			),
+		)
+	}
+
 	function patchStair(id: number, patch: Partial<EditStair>): void {
 		setStairs((all: EditStair[]) =>
 			all.map((stair: EditStair) => (stair.id === id ? { ...stair, ...patch } : stair)),
@@ -1796,6 +2148,24 @@ export function DrawnPlanEditor(props: {
 			},
 		])
 		setSelected({ kind: 'opening', id })
+	}
+
+	function addPillar(center: Point): void {
+		checkpoint()
+		const id = freshId()
+		setPillars((all: EditPillar[]) => [
+			...all,
+			{ id, center, ...newPillar(), height: wallHeight() },
+		])
+		setSelected({ kind: 'pillar', id })
+	}
+
+	function addPartition(a: Point, b: Point): void {
+		checkpoint()
+		setPartitions((all: EditPartition[]) => [
+			...all,
+			{ id: freshId(), a, b, thickness: partitionThickness(), height: partitionHeight() },
+		])
 	}
 
 	function addStair(a: Point, b: Point): void {
@@ -1925,6 +2295,12 @@ export function DrawnPlanEditor(props: {
 			setOpenings((all: EditOpening[]) =>
 				all.filter((opening: EditOpening) => opening.id !== current.id),
 			)
+		} else if (current.kind === 'pillar') {
+			setPillars((all: EditPillar[]) => all.filter((x: EditPillar) => x.id !== current.id))
+		} else if (current.kind === 'partition') {
+			setPartitions((all: EditPartition[]) =>
+				all.filter((x: EditPartition) => x.id !== current.id),
+			)
 		} else if (current.kind === 'stair') {
 			setStairs((all: EditStair[]) =>
 				all.filter((stair: EditStair) => stair.id !== current.id),
@@ -1952,17 +2328,29 @@ export function DrawnPlanEditor(props: {
 		const { kind, id } = current
 		const find = <T extends { id: number }>(all: T[]): T | undefined =>
 			all.find((x: T) => x.id === id)
-		if (kind === 'wall' || kind === 'stair' || kind === 'tray' || kind === 'desk') {
-			const line = find<EditWall | EditStair | EditTray | EditDesk>(
+		if (
+			kind === 'wall' ||
+			kind === 'partition' ||
+			kind === 'stair' ||
+			kind === 'tray' ||
+			kind === 'desk'
+		) {
+			const line = find<EditWall | EditPartition | EditStair | EditTray | EditDesk>(
 				kind === 'wall'
 					? walls()
-					: kind === 'stair'
-						? stairs()
-						: kind === 'tray'
-							? trays()
-							: desks(),
+					: kind === 'partition'
+						? partitions()
+						: kind === 'stair'
+							? stairs()
+							: kind === 'tray'
+								? trays()
+								: desks(),
 			)
 			return line ? [line.a, line.b] : []
+		}
+		if (kind === 'pillar') {
+			const pillar = find(pillars())
+			return pillar ? [pillar.center, ...pillarOutline(pillar)] : []
 		}
 		if (kind === 'opening') {
 			const opening = find(openings())
@@ -1980,7 +2368,7 @@ export function DrawnPlanEditor(props: {
 		return placement ? [[placement.x, placement.y]] : []
 	}
 
-	/** Moves `current` by `delta` (kept on the sheet); joined walls and trays follow, a door or window slides along its wall. */
+	/** Moves `current` by `delta` (kept on the sheet); joined walls, dividers and trays follow, a door or window slides along its wall. */
 	function translate(current: Selected, delta: Point): void {
 		const points = selectionPoints(current)
 		if (points.length === 0) {
@@ -1989,7 +2377,7 @@ export function DrawnPlanEditor(props: {
 		const { id } = current
 		const [dx, dy] = current.kind === 'opening' ? delta : keepOnSheet(points, delta)
 		const shift = (p: Point): Point => [p[0] + dx, p[1] + dy]
-		if (current.kind === 'wall' || current.kind === 'tray') {
+		if (current.kind === 'wall' || current.kind === 'tray' || current.kind === 'partition') {
 			const [a, b] = points as [Point, Point]
 			const move = <T extends Run>(all: T[]): T[] =>
 				movedRunEnds(
@@ -1999,9 +2387,13 @@ export function DrawnPlanEditor(props: {
 				)
 			if (current.kind === 'wall') {
 				setWalls(move)
+			} else if (current.kind === 'partition') {
+				setPartitions(move)
 			} else {
 				setTrays(move)
 			}
+		} else if (current.kind === 'pillar') {
+			patchPillar(id, { center: shift(points[0] as Point) })
 		} else if (current.kind === 'opening') {
 			const opening = openings().find((o: EditOpening) => o.id === id)
 			const wall = walls().find((w: EditWall) => w.id === opening?.wall_id)
@@ -2084,7 +2476,12 @@ export function DrawnPlanEditor(props: {
 			const step = (opening?.width ?? 0) + SNAP_STEP * 5
 			return [u[0] * step, u[1] * step]
 		}
-		if (current.kind === 'wall' || current.kind === 'tray' || current.kind === 'stair') {
+		if (
+			current.kind === 'wall' ||
+			current.kind === 'partition' ||
+			current.kind === 'tray' ||
+			current.kind === 'stair'
+		) {
 			const u = direction(a, b)
 			const across =
 				current.kind === 'stair'
@@ -2092,8 +2489,8 @@ export function DrawnPlanEditor(props: {
 					: 100
 			return [u[1] * across, -u[0] * across]
 		}
-		const box = boxOf(points)
-		return [box.x1 - box.x0, 0]
+		const box = boxOf(current.kind === 'pillar' ? points.slice(1) : points)
+		return [box.x1 - box.x0 + (current.kind === 'pillar' ? 100 : 0), 0]
 	}
 
 	/** Duplicates the selection beside it (markers stand for one object each and are not copied) and selects the copy. */
@@ -2105,7 +2502,7 @@ export function DrawnPlanEditor(props: {
 		const offset = copyOffset(current)
 		const { id } = current
 		const copyId = freshId()
-		// Walls and trays are put in place directly (a nudge would drag the original's joints along).
+		// Walls, dividers and trays are put in place directly (a nudge would drag the original's joints along).
 		const [dx, dy] = keepOnSheet(selectionPoints(current), offset)
 		const move = (p: Point): Point => [p[0] + dx, p[1] + dy]
 		checkpoint()
@@ -2131,6 +2528,15 @@ export function DrawnPlanEditor(props: {
 		} else if (current.kind === 'stair') {
 			const stair = stairs().find((x: EditStair) => x.id === id) as EditStair
 			setStairs((all: EditStair[]) => [...all, { ...stair, id: copyId }])
+		} else if (current.kind === 'pillar') {
+			const pillar = pillars().find((x: EditPillar) => x.id === id) as EditPillar
+			setPillars((all: EditPillar[]) => [...all, { ...pillar, id: copyId }])
+		} else if (current.kind === 'partition') {
+			const partition = partitions().find((x: EditPartition) => x.id === id) as EditPartition
+			setPartitions((all: EditPartition[]) => [
+				...all,
+				{ ...partition, id: copyId, a: move(partition.a), b: move(partition.b) },
+			])
 		} else if (current.kind === 'tray') {
 			const tray = trays().find((x: EditTray) => x.id === id) as EditTray
 			setTrays((all: EditTray[]) => [
@@ -2154,8 +2560,8 @@ export function DrawnPlanEditor(props: {
 			setRooms((all: EditRoom[]) => [...all, { id: copyId, points: room.points }])
 		}
 		const copy: Selected = { kind: current.kind, id: copyId }
-		// Stairs, desks, desk groups and rooms move into place like a nudge, kept on the sheet.
-		if (current.kind !== 'wall' && current.kind !== 'tray') {
+		// Pillars, stairs, desks, desk groups and rooms move into place like a nudge, kept on the sheet.
+		if (current.kind !== 'wall' && current.kind !== 'tray' && current.kind !== 'partition') {
 			translate(copy, offset)
 		}
 		setSelected(copy)
@@ -2165,6 +2571,14 @@ export function DrawnPlanEditor(props: {
 	/** The outline of `current` on the sheet, for its box. */
 	function selectionOutline(current: Selected): Point[] {
 		const { kind, id } = current
+		if (kind === 'pillar') {
+			const pillar = pillars().find((x: EditPillar) => x.id === id)
+			return pillar ? pillarOutline(pillar) : []
+		}
+		if (kind === 'partition') {
+			const partition = partitions().find((x: EditPartition) => x.id === id)
+			return partition ? partitionOutline(partition) : []
+		}
 		if (kind === 'stair') {
 			const stair = stairs().find((x: EditStair) => x.id === id)
 			return stair ? stairShape(stair).outline : []
@@ -2183,6 +2597,7 @@ export function DrawnPlanEditor(props: {
 
 	/** Whether the selection turns by 90° and flips (a window does not flip). */
 	const canRotate = (current: Selected): boolean =>
+		(current.kind === 'pillar' && selectedPillar()?.shape === 'rect') ||
 		current.kind === 'desk' ||
 		current.kind === 'deskGroup' ||
 		current.kind === 'room' ||
@@ -2207,7 +2622,11 @@ export function DrawnPlanEditor(props: {
 		}
 		const { id } = current
 		checkpoint()
-		if (current.kind === 'desk') {
+		if (current.kind === 'pillar') {
+			const pillar = pillars().find((x: EditPillar) => x.id === id) as EditPillar
+			const next = { ...pillar, rotation: normalDegrees(pillar.rotation + 90) }
+			patchPillar(id, { ...next, center: onSheet(pillarOutline(next))(next.center) })
+		} else if (current.kind === 'desk') {
 			const desk = desks().find((x: EditDesk) => x.id === id) as EditDesk
 			const r = turn(polygonCenter(deskOutline(desk)))
 			const next = { ...desk, a: r(desk.a), b: r(desk.b) }
@@ -2304,7 +2723,7 @@ export function DrawnPlanEditor(props: {
 	})
 
 	/**
-	 * Distances to show for the selection: from a desk, desk group or stairs
+	 * Distances to show for the selection: from a pillar, desk, desk group or stairs
 	 * to the nearest object on each side (from the middle of each side of
 	 * its box), from a door or window to what ends its stretch of wall (a
 	 * crossing wall's face, another opening, or the wall's end).
@@ -2346,7 +2765,12 @@ export function DrawnPlanEditor(props: {
 				...keep(along(wall.a, u, from), along(wall.a, u, start)),
 			]
 		}
-		if (current.kind !== 'desk' && current.kind !== 'deskGroup' && current.kind !== 'stair') {
+		if (
+			current.kind !== 'pillar' &&
+			current.kind !== 'desk' &&
+			current.kind !== 'deskGroup' &&
+			current.kind !== 'stair'
+		) {
 			return []
 		}
 		const box = selectionBox()
@@ -2468,10 +2892,10 @@ export function DrawnPlanEditor(props: {
 	function minSheet(): Point {
 		const [x, y] = contentExtent(
 			[
-				...[...walls(), ...stairs(), ...trays(), ...desks()].flatMap((line) => [
-					line.a,
-					line.b,
-				]),
+				...[...walls(), ...partitions(), ...stairs(), ...trays(), ...desks()].flatMap(
+					(line) => [line.a, line.b],
+				),
+				...pillars().flatMap((pillar: EditPillar) => pillarOutline(pillar)),
 				...desks().flatMap((desk: EditDesk) => deskOutline(desk)),
 				...deskGroups().flatMap((group: EditDeskGroup) => deskGroupCorners(group)),
 				...rooms().flatMap((room: EditRoom) => room.points),
@@ -2591,7 +3015,7 @@ export function DrawnPlanEditor(props: {
 	/** Where the line being drawn starts: the chain's last corner, the stairs' foot or the room's last corner. */
 	const drawFrom = (): Point | null => {
 		const current = tool()
-		if (current === 'wall' || current === 'tray') {
+		if (current === 'wall' || current === 'tray' || current === 'partition') {
 			return chain()?.last ?? null
 		}
 		if (current === 'stairs') {
@@ -2622,11 +3046,12 @@ export function DrawnPlanEditor(props: {
 		return clampPoint(along(from, u, length), width, height)
 	}
 
-	/** Puts down the next corner `at` (already snapped) of the wall, tray, stairs or room being drawn. */
+	/** Puts down the next corner `at` (already snapped) of the wall, divider, tray, stairs or room being drawn. */
 	function placePoint(at: Point): void {
 		setTyped('')
 		switch (tool()) {
 			case 'wall':
+			case 'partition':
 			case 'tray': {
 				const current = chain()
 				if (!current) {
@@ -2638,6 +3063,8 @@ export function DrawnPlanEditor(props: {
 				}
 				if (tool() === 'wall') {
 					addWall(current.last, at)
+				} else if (tool() === 'partition') {
+					addPartition(current.last, at)
 				} else {
 					addTray(current.last, at)
 				}
@@ -2766,6 +3193,12 @@ export function DrawnPlanEditor(props: {
 			case 'window':
 				addOpening(tool() as OpeningKind, raw)
 				return
+			case 'partition':
+				placePoint(snapTo(e, raw, chain()?.last ?? null, allPartitionTargets()))
+				return
+			case 'pillar':
+				addPillar(pillarCenter(e, newPillar(), raw, allObjectTargets()))
+				return
 			case 'stairs':
 				placePoint(snapTo(e, raw, lineStart(), allObjectTargets()))
 				return
@@ -2822,6 +3255,10 @@ export function DrawnPlanEditor(props: {
 		const first = calibration()?.a
 		if (tool() === 'wall') {
 			setHover(snapCorner(e, raw, chain()?.last ?? null))
+		} else if (tool() === 'partition') {
+			setHover(snapTo(e, raw, chain()?.last ?? null, allPartitionTargets()))
+		} else if (tool() === 'pillar') {
+			setHover(pillarCenter(e, newPillar(), raw, allObjectTargets()))
 		} else if (tool() === 'stairs') {
 			setHover(snapTo(e, raw, lineStart(), allObjectTargets()))
 		} else if (tool() === 'desk') {
@@ -2998,14 +3435,21 @@ export function DrawnPlanEditor(props: {
 
 	const midpoint = (a: Point, b: Point): Point => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
 
-	/** The wall or tray being drawn: from the chain's last corner to the pointer. */
-	const draftRun = (kind: 'wall' | 'tray'): { a: Point; b: Point } | null => {
+	/** The wall, divider or tray being drawn: from the chain's last corner to the pointer. */
+	const draftRun = (kind: 'wall' | 'partition' | 'tray'): { a: Point; b: Point } | null => {
 		const current = chain()
 		const at = drawEnd()
 		return current && at && tool() === kind ? { a: current.last, b: at } : null
 	}
 	const draftWall = (): { a: Point; b: Point } | null => draftRun('wall')
 	const draftTray = (): { a: Point; b: Point } | null => draftRun('tray')
+	const draftPartition = (): { a: Point; b: Point } | null => draftRun('partition')
+
+	/** The pillar the tool would put under the pointer. */
+	const draftPillar = (): PillarShapeOf | null => {
+		const at = hover()
+		return at && tool() === 'pillar' ? { ...newPillar(), center: at } : null
+	}
 
 	/** The stairs or desk being drawn: from their first end to the pointer. */
 	const draftLine = (kind: 'stairs' | 'desk'): { a: Point; b: Point } | null => {
@@ -3158,81 +3602,11 @@ export function DrawnPlanEditor(props: {
 							<section>
 								<h5>{t('drawnPlan.elements')}</h5>
 								<ul>
-									<li>
-										<button
-											type="button"
-											class="floorplan-palette-item drawn-plan-element"
-											classList={{ active: tool() === 'wall' }}
-											aria-pressed={tool() === 'wall'}
-											title={t('drawnPlan.wallHint')}
-											onClick={() =>
-												setTool(tool() === 'wall' ? 'select' : 'wall')
-											}
-										>
-											<IconWall size={14} />
-											<span>{t('drawnPlan.toolWall')}</span>
-											<ToolKey tool="wall" />
-										</button>
-									</li>
-									<For each={['door', 'sliding_door', 'window'] as const}>
-										{(kind: OpeningKind) => {
-											const ui = OPENING_UI[kind]
-											const Icon = ui.icon
-											return (
-												<li>
-													<button
-														type="button"
-														class="floorplan-palette-item drawn-plan-element"
-														classList={{ active: tool() === kind }}
-														aria-pressed={tool() === kind}
-														title={t('drawnPlan.openingPlaceHint')}
-														draggable="true"
-														onDragStart={(e: DragEvent) => {
-															e.dataTransfer?.setData(
-																'text/plain',
-																`opening:${kind}`,
-															)
-															setTool('select')
-															setDragged(`opening:${kind}`)
-														}}
-														onDragEnd={() => {
-															setDragged(null)
-															setHover(null)
-														}}
-														onClick={() =>
-															setTool(
-																tool() === kind ? 'select' : kind,
-															)
-														}
-													>
-														<Icon size={14} />
-														<span>{t(ui.tool)}</span>
-														<ToolKey tool={kind} />
-													</button>
-												</li>
-											)
-										}}
-									</For>
-									<li>
-										<button
-											type="button"
-											class="floorplan-palette-item drawn-plan-element"
-											classList={{ active: tool() === 'stairs' }}
-											aria-pressed={tool() === 'stairs'}
-											title={t('drawnPlan.stairsHint')}
-											onClick={() =>
-												setTool(tool() === 'stairs' ? 'select' : 'stairs')
-											}
-										>
-											<IconStairsUp size={14} />
-											<span>{t('drawnPlan.toolStairs')}</span>
-											<ToolKey tool="stairs" />
-										</button>
-									</li>
-									<For each={ELEMENT_TOOLS}>
-										{(entry: ElementTool) => {
+									<For each={PALETTE_TOOLS}>
+										{(entry: PaletteTool) => {
 											const Icon = entry.icon
 											const value = entry.tool
+											const opening = isOpeningKind(value) ? value : null
 											return (
 												<li>
 													<button
@@ -3241,6 +3615,24 @@ export function DrawnPlanEditor(props: {
 														classList={{ active: tool() === value }}
 														aria-pressed={tool() === value}
 														title={t(entry.hint)}
+														draggable={opening ? 'true' : undefined}
+														onDragStart={(e: DragEvent) => {
+															if (!opening) {
+																return
+															}
+															e.dataTransfer?.setData(
+																'text/plain',
+																`opening:${opening}`,
+															)
+															setTool('select')
+															setDragged(`opening:${opening}`)
+														}}
+														onDragEnd={() => {
+															if (opening) {
+																setDragged(null)
+																setHover(null)
+															}
+														}}
 														onClick={() =>
 															setTool(
 																tool() === value ? 'select' : value,
@@ -3273,6 +3665,35 @@ export function DrawnPlanEditor(props: {
 										min={MIN_WALL_HEIGHT}
 										max={MAX_DRAWING_HEIGHT}
 										on_commit={setWallHeight}
+									/>
+								</div>
+							</Show>
+							<Show when={tool() === 'partition'}>
+								<div class="drawn-plan-fields">
+									<NumberField
+										label={t('drawnPlan.newPartitionThickness')}
+										step={0.5}
+										value={partitionThickness()}
+										min={MIN_PARTITION_THICKNESS}
+										max={MAX_PARTITION_THICKNESS}
+										on_commit={setPartitionThickness}
+									/>
+									<NumberField
+										label={t('drawnPlan.newPartitionHeight')}
+										value={partitionHeight()}
+										min={MIN_PARTITION_HEIGHT}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={setPartitionHeight}
+									/>
+								</div>
+							</Show>
+							<Show when={tool() === 'pillar'}>
+								<div class="drawn-plan-fields">
+									<PillarFields
+										pillar={newPillar()}
+										on_commit={(patch: Partial<NewPillar>) =>
+											setNewPillar(reshaped(newPillar(), patch))
+										}
 									/>
 								</div>
 							</Show>
@@ -3330,6 +3751,16 @@ export function DrawnPlanEditor(props: {
 												? 'drawnPlan.wallNextHint'
 												: 'drawnPlan.wallHint',
 										)}
+									</Match>
+									<Match when={tool() === 'partition'}>
+										{t(
+											chain()
+												? 'drawnPlan.wallNextHint'
+												: 'drawnPlan.partitionHint',
+										)}
+									</Match>
+									<Match when={tool() === 'pillar'}>
+										{t('drawnPlan.pillarHint')}
 									</Match>
 									<Match when={isOpeningKind(tool())}>
 										{t('drawnPlan.openingHint')}
@@ -3714,11 +4145,21 @@ export function DrawnPlanEditor(props: {
 									selected={selected() ? keyOf(selected() as Selected) : null}
 									on_press={pressTray}
 								/>
+								<PartitionLayer
+									partitions={stagePartitions()}
+									selected={selected() ? keyOf(selected() as Selected) : null}
+									on_press={pressPartition}
+								/>
 								<WallLayer
 									walls={stageWalls()}
 									selected={selected() ? keyOf(selected() as Selected) : null}
 									on_wall_press={pressWall}
 									on_opening_press={pressOpening}
+								/>
+								<PillarLayer
+									pillars={stagePillars()}
+									selected={selected() ? keyOf(selected() as Selected) : null}
+									on_press={pressPillar}
 								/>
 							</>
 						}
@@ -3796,6 +4237,27 @@ export function DrawnPlanEditor(props: {
 												stroke-width={trayWidth()}
 											/>
 										</g>
+									)}
+								</Show>
+								<Show when={draftPartition()}>
+									{(line: () => { a: Point; b: Point }) => (
+										<polygon
+											class="drawn-plan-partition drawn-plan-ghost"
+											points={svgPoints(
+												partitionOutline({
+													...line(),
+													thickness: partitionThickness(),
+												}),
+											)}
+										/>
+									)}
+								</Show>
+								<Show when={draftPillar()}>
+									{(pillar: () => PillarShapeOf) => (
+										<polygon
+											class="drawn-plan-pillar drawn-plan-ghost"
+											points={svgPoints(pillarOutline(pillar()))}
+										/>
 									)}
 								</Show>
 								<Show when={draftWall()}>
@@ -3967,6 +4429,30 @@ export function DrawnPlanEditor(props: {
 								</>
 							)}
 						</Show>
+						<Show when={selectedPartition()}>
+							{(partition: () => EditPartition) => (
+								<>
+									<For each={['a', 'b'] as const}>
+										{(end: 'a' | 'b') => (
+											<div
+												class="floorplan-handle floorplan-handle-vertex"
+												style={toPercent(partition()[end])}
+												title={t('drawnPlan.partitionEnd')}
+												onPointerDown={(e: PointerEvent) =>
+													dragPartitionEnd(e, partition(), end)
+												}
+											/>
+										)}
+									</For>
+									<span
+										class="drawn-plan-label"
+										style={toPercent(midpoint(partition().a, partition().b))}
+									>
+										{formatLength(distance(partition().a, partition().b))}
+									</span>
+								</>
+							)}
+						</Show>
 						<Show when={selectedTray()}>
 							{(tray: () => EditTray) => (
 								<>
@@ -4054,6 +4540,7 @@ export function DrawnPlanEditor(props: {
 								draftStair() ??
 								draftDesk() ??
 								draftTray() ??
+								draftPartition() ??
 								draftWall() ??
 								draftRoomEdge()
 							}
@@ -4326,6 +4813,82 @@ export function DrawnPlanEditor(props: {
 									</Show>
 									<button type="button" onClick={deleteSelected}>
 										{t(OPENING_UI[opening().kind].remove)}
+									</button>
+								</div>
+							)}
+						</Match>
+						<Match when={selectedPillar()}>
+							{(pillar: () => EditPillar) => (
+								<div class="floorplan-inspector">
+									<PillarFields
+										pillar={pillar()}
+										on_commit={(patch: Partial<NewPillar>) =>
+											reshapePillar(pillar(), patch)
+										}
+									/>
+									<NumberField
+										label={t('drawnPlan.height')}
+										value={pillar().height}
+										min={MIN_WALL_HEIGHT}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchPillar(pillar().id, { height: value })
+										}}
+									/>
+									<button type="button" onClick={deleteSelected}>
+										{t('drawnPlan.deletePillar')}
+									</button>
+								</div>
+							)}
+						</Match>
+						<Match when={selectedPartition()}>
+							{(partition: () => EditPartition) => (
+								<div class="floorplan-inspector">
+									<NumberField
+										label={t('drawnPlan.length')}
+										value={distance(partition().a, partition().b)}
+										min={MIN_WALL}
+										max={MAX_DRAWING_CM}
+										on_commit={(value: number) => {
+											const to = lengthened(
+												partition().a,
+												partition().b,
+												value,
+											)
+											checkpoint()
+											setPartitions((all: EditPartition[]) =>
+												movedRunEnds(
+													all,
+													runEndsAt(all, partition().b),
+													to,
+												),
+											)
+										}}
+									/>
+									<NumberField
+										label={t('drawnPlan.thickness')}
+										step={0.5}
+										value={partition().thickness}
+										min={MIN_PARTITION_THICKNESS}
+										max={MAX_PARTITION_THICKNESS}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchPartition(partition().id, { thickness: value })
+										}}
+									/>
+									<NumberField
+										label={t('drawnPlan.height')}
+										value={partition().height}
+										min={MIN_PARTITION_HEIGHT}
+										max={MAX_DRAWING_HEIGHT}
+										on_commit={(value: number) => {
+											checkpoint()
+											patchPartition(partition().id, { height: value })
+										}}
+									/>
+									<button type="button" onClick={deleteSelected}>
+										{t('drawnPlan.deletePartition')}
 									</button>
 								</div>
 							)}

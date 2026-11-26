@@ -159,6 +159,9 @@ if (import.meta.main) {
 	} else if (swept.value.removed > 0) {
 		console.log(`Removed ${swept.value.removed} orphaned attachment file(s)`)
 	}
+	if (Result.isOk(swept) && swept.value.resized > 0) {
+		console.log(`Corrected the size of ${swept.value.resized} rotated JPEG attachment(s)`)
+	}
 	await failInterruptedSyncs()
 	await failInterruptedCalendarSyncs()
 	// Ticks every minute; runs only when enabled and its interval has passed.

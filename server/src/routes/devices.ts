@@ -8,7 +8,9 @@ import {
 	DeviceIfaceParamsSchema,
 	DeviceJackParamsSchema,
 	DeviceListQuerySchema,
+	DeviceMigrateSchema,
 	DeviceMoveSchema,
+	DeviceSwapSchema,
 	DeviceUpdateSchema,
 	EntityParamsSchema,
 	InterfaceConnectSchema,
@@ -31,6 +33,7 @@ import {
 } from '../authz'
 import { connectCable } from '../db/cables'
 import { exportDevicesCsv, importDevicesCsv } from '../db/csv_transfer'
+import { migrateDevice } from '../db/device_migration'
 import { serviceOf } from '../db/device_roles'
 import {
 	addInterface,
@@ -43,6 +46,7 @@ import {
 	listDevices,
 	listInterfaces,
 	moveDevice,
+	swapDevices,
 	updateDevice,
 	updateInterface,
 } from '../db/devices'
@@ -185,6 +189,39 @@ export const devicesApp = new Hono()
 			return (
 				checkTenant(c, await deviceTenant(id)) ??
 				sendResult(c, await moveDevice(id, c.req.valid('json')))
+			)
+		},
+	)
+	// Two mounted devices of one rack trade places; both must be writable.
+	.post(
+		'/:id/swap',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', DeviceSwapSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const otherId = c.req.valid('json').other_id
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				checkTenant(c, await deviceTenant(otherId)) ??
+				sendResult(c, await swapDevices(id, otherId))
+			)
+		},
+	)
+	// Replacement: hands cables, placement, assignment and VMs to another device.
+	// Both devices must be writable; they end up in the same tenant.
+	.post(
+		'/:id/migrate',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', DeviceMigrateSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const body = c.req.valid('json')
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				checkTenant(c, await deviceTenant(body.target_id)) ??
+				sendResult(c, await migrateDevice(id, body))
 			)
 		},
 	)
