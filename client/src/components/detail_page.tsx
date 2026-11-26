@@ -18,7 +18,7 @@ import { can } from '../lib/session'
 import { DataTable, type DataTableColumn } from './data_table'
 import { Empty, Loading } from './feedback'
 import { IconLabel } from './icon_label'
-import { RowMenu, useRowMenu } from './list_page'
+import { RowMenu, type RowMenuAction, useRowMenu } from './list_page'
 import { Markdown } from './markdown'
 import { MoreActionsButton } from './more_actions_button'
 
@@ -65,8 +65,12 @@ export function DetailHeader(props: {
 	deletable?: boolean
 	/** Leading buttons before Edit; the caller gates them on permissions. */
 	actions?: JSX.Element
+	/** Items of the ⋯ menu before Delete; the caller gates them on permissions. */
+	menuActions?: readonly RowMenuAction[]
 }): JSX.Element {
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
+	const canDelete = (): boolean => can('delete') && props.deletable !== false
+	const hasMenu = (): boolean => canDelete() || (props.menuActions ?? []).length > 0
 	return (
 		<div class="page-header detail-header">
 			<h2 data-testid={props.testId}>
@@ -80,7 +84,7 @@ export function DetailHeader(props: {
 				{props.name}
 				<Show when={props.extra}> {props.extra}</Show>
 			</h2>
-			<Show when={can('edit') || (can('delete') && props.deletable !== false)}>
+			<Show when={can('edit') || hasMenu()}>
 				<div class="form-actions">
 					{props.actions}
 					<Show when={can('edit')}>
@@ -95,7 +99,7 @@ export function DetailHeader(props: {
 							</button>
 						)}
 					</Show>
-					<Show when={can('delete') && props.deletable !== false}>
+					<Show when={hasMenu()}>
 						<MoreActionsButton
 							name={props.name ?? ''}
 							open={openMenu() !== null}
@@ -111,8 +115,8 @@ export function DetailHeader(props: {
 				menu={openMenu}
 				onClose={closeMenu}
 				cloneHref={() => undefined}
-				actions={() => []}
-				deletable={() => true}
+				actions={() => props.menuActions ?? []}
+				deletable={canDelete}
 				onDelete={props.onDelete}
 			/>
 		</div>

@@ -49,8 +49,8 @@ import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { EmployeeLinks } from './employee_assignment'
 import { JackDialog } from './jack_dialog'
-import { MigrateDeviceButton, MigrateDeviceDialog } from './migrate_dialog'
-import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
+import { MigrateDeviceDialog, migrateDeviceAction } from './migrate_dialog'
+import { MoveTenantDialog, moveTenantAction } from './move_tenant_dialog'
 import { PanelPortTable, type PanelRow, panelRowsOf } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
 import { DevicePortTable } from './port_table'
@@ -348,21 +348,19 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					editHref={`/devices/${props.id}/edit`}
 					cloneHref={`/devices/add?clone=${props.id}`}
 					onDelete={handleDelete}
-					actions={
-						<>
-							<Show when={can('edit')}>
-								<MigrateDeviceButton
-									onClick={() => {
+					menuActions={[
+						...(can('edit')
+							? [
+									migrateDeviceAction(() => {
 										setError(null)
 										setMigrating(true)
-									}}
-								/>
-							</Show>
-							<Show when={canGlobal('edit')}>
-								<MoveTenantButton onClick={() => setMovingTenant(true)} />
-							</Show>
-						</>
-					}
+									}),
+								]
+							: []),
+						...(canGlobal('edit')
+							? [moveTenantAction(() => setMovingTenant(true))]
+							: []),
+					]}
 				/>
 				<DetailSubtitle description={device()?.description} />
 				<ManagedServicePill service={service} />

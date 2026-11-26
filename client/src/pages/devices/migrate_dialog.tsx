@@ -12,7 +12,7 @@ import {
 } from '../../api/devices'
 import { InlineError, Loading } from '../../components/feedback'
 import { CheckboxField, type FormOption, Hint, SelectField } from '../../components/form'
-import { IconLabel } from '../../components/icon_label'
+import type { RowMenuAction } from '../../components/list_page'
 import { Modal } from '../../components/modal'
 import { ObjectSearch } from '../../components/object_selector'
 import { t, tp } from '../../i18n'
@@ -32,13 +32,9 @@ const STATUSES: readonly DeviceStatus[] = [
 	'active',
 ]
 
-/** Detail page header action that opens the {@link MigrateDeviceDialog}. */
-export function MigrateDeviceButton(props: { onClick: () => void }): JSX.Element {
-	return (
-		<button type="button" onClick={() => props.onClick()}>
-			<IconLabel icon={IconReplace}>{t('device.migrate.button')}</IconLabel>
-		</button>
-	)
+/** Detail page ⋯ menu item that opens the {@link MigrateDeviceDialog}. */
+export function migrateDeviceAction(onSelect: () => void): RowMenuAction {
+	return { label: t('device.migrate.button'), icon: IconReplace, onSelect }
 }
 
 export interface MigrateDeviceDialogProps {

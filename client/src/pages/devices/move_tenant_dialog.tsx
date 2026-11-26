@@ -6,19 +6,15 @@ import { fetch_tenants } from '../../api/tenancy'
 import { update_virtual_machine } from '../../api/virtual_machines'
 import { InlineError } from '../../components/feedback'
 import { Hint, row_options, SelectField } from '../../components/form'
-import { IconLabel } from '../../components/icon_label'
+import type { RowMenuAction } from '../../components/list_page'
 import { Modal } from '../../components/modal'
 import { t, tp } from '../../i18n'
 import { createRows, useAction } from '../../lib/resource'
 import { parseId } from '../../lib/router'
 
-/** Detail page header action that opens the {@link MoveTenantDialog}. */
-export function MoveTenantButton(props: { onClick: () => void }): JSX.Element {
-	return (
-		<button type="button" onClick={() => props.onClick()}>
-			<IconLabel icon={IconArrowsExchange}>{t('device.moveTenant')}</IconLabel>
-		</button>
-	)
+/** Detail page ⋯ menu item that opens the {@link MoveTenantDialog}. */
+export function moveTenantAction(onSelect: () => void): RowMenuAction {
+	return { label: t('device.moveTenant'), icon: IconArrowsExchange, onSelect }
 }
 
 export interface MoveTenantDialogProps {
