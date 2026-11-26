@@ -12,6 +12,7 @@ export const de: Messages = {
 	'common.create': 'Erstellen',
 	'common.creating': 'Wird erstellt…',
 	'common.createAndAddAnother': 'Erstellen & weiteres hinzufügen',
+	'common.createAndAddAnotherHint': 'Erstellen, dann ein weiteres anlegen (Umschalt+Enter)',
 	'common.noTenantSelected':
 		'Keine Firma in der oberen Leiste ausgewählt: Das neue Objekt wird ohne Firma angelegt.',
 	'common.noTenantSelectedRequired':

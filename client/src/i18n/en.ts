@@ -10,6 +10,7 @@ export const en = {
 	'common.create': 'Create',
 	'common.creating': 'Creating…',
 	'common.createAndAddAnother': 'Create & Add Another',
+	'common.createAndAddAnotherHint': 'Create, then start a new one (Shift+Enter)',
 	'common.noTenantSelected':
 		'No tenant selected in the top bar: the new object is created without a tenant.',
 	'common.noTenantSelectedRequired':
