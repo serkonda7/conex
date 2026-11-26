@@ -8,6 +8,7 @@ import {
 	DeviceIfaceParamsSchema,
 	DeviceJackParamsSchema,
 	DeviceListQuerySchema,
+	DeviceMigrateSchema,
 	DeviceMoveSchema,
 	DeviceUpdateSchema,
 	EntityParamsSchema,
@@ -31,6 +32,7 @@ import {
 } from '../authz'
 import { connectCable } from '../db/cables'
 import { exportDevicesCsv, importDevicesCsv } from '../db/csv_transfer'
+import { migrateDevice } from '../db/device_migration'
 import { serviceOf } from '../db/device_roles'
 import {
 	addInterface,
@@ -185,6 +187,23 @@ export const devicesApp = new Hono()
 			return (
 				checkTenant(c, await deviceTenant(id)) ??
 				sendResult(c, await moveDevice(id, c.req.valid('json')))
+			)
+		},
+	)
+	// Replacement: hands cables, placement, assignment and VMs to another device.
+	// Both devices must be writable; they end up in the same tenant.
+	.post(
+		'/:id/migrate',
+		requirePermissionMiddleware('edit'),
+		vValidator('param', EntityParamsSchema, onValidationError),
+		vValidator('json', DeviceMigrateSchema, onValidationError),
+		async (c) => {
+			const id = c.req.valid('param').id
+			const body = c.req.valid('json')
+			return (
+				checkTenant(c, await deviceTenant(id)) ??
+				checkTenant(c, await deviceTenant(body.target_id)) ??
+				sendResult(c, await migrateDevice(id, body))
 			)
 		},
 	)

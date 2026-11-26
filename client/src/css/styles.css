@@ -3122,6 +3122,19 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	--modal-width: 40rem;
 }
 
+/* Device migration: the picked replacement with its change button, then the cable mapping. */
+.modal.migrate-dialog {
+	--modal-width: 40rem;
+}
+
+.migrate-target {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
 /* Patch-panel row dialog: front port, patched switch and rear port side by
    side, the way the signal runs through the panel. */
 .modal.panel-row-dialog {

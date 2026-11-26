@@ -1486,6 +1486,38 @@ export const DeviceMoveSchema = v.pipe(
 )
 
 /**
+ * `POST /devices/:id/migrate`: hands a device's role in the network over to
+ * a replacement (`target_id`). `ports` moves the cable of each old port
+ * (`from`) onto a free port of the replacement (`to`); cables of unlisted
+ * ports stay. `placement` takes over site, location, rack mount or shelf and
+ * the floor-plan markers; `assignment` the tenant and the employees; `vms`
+ * the hosted virtual machines; `name` the name. `status` is the old device's
+ * new status; omitted keeps it.
+ */
+export const DeviceMigrateSchema = v.strictObject({
+	target_id: IdSchema,
+	ports: v.pipe(
+		v.array(v.strictObject({ from: IdSchema, to: IdSchema })),
+		v.maxLength(5000),
+		v.check(
+			(pairs) => new Set(pairs.map((pair) => pair.from)).size === pairs.length,
+			'Each port can only move once',
+		),
+		v.check(
+			(pairs) => new Set(pairs.map((pair) => pair.to)).size === pairs.length,
+			'Each port of the new device takes at most one cable',
+		),
+	),
+	placement: v.boolean(),
+	assignment: v.boolean(),
+	vms: v.boolean(),
+	name: v.boolean(),
+	status: v.optional(DeviceStatusSchema, undefined),
+})
+
+export type DeviceMigrate = v.InferOutput<typeof DeviceMigrateSchema>
+
+/**
  * Port create body. `side` makes it a patch-panel port: rear ports carry
  * `positions`, front ports name a rear port of the same device and a slot
  * on it.

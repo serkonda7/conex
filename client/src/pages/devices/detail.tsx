@@ -49,6 +49,7 @@ import { ConnectPortDialog } from './connect_port_dialog'
 import { EditPortDialog } from './edit_port_dialog'
 import { EmployeeLinks } from './employee_assignment'
 import { JackDialog } from './jack_dialog'
+import { MigrateDeviceButton, MigrateDeviceDialog } from './migrate_dialog'
 import { MoveTenantButton, MoveTenantDialog } from './move_tenant_dialog'
 import { PanelPortTable, type PanelRow, panelRowsOf } from './panel_ports'
 import { PanelRowDialog } from './panel_row_dialog'
@@ -81,6 +82,7 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 	const [editingRow, setEditingRow] = createSignal<PanelRow | null>(null)
 	const [managingJacks, setManagingJacks] = createSignal(false)
 	const [movingTenant, setMovingTenant] = createSignal(false)
+	const [migrating, setMigrating] = createSignal(false)
 	const id = (): number => props.id
 
 	const [device] = createRecord(id, fetch_device, setError)
@@ -347,9 +349,19 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 					cloneHref={`/devices/add?clone=${props.id}`}
 					onDelete={handleDelete}
 					actions={
-						<Show when={canGlobal('edit')}>
-							<MoveTenantButton onClick={() => setMovingTenant(true)} />
-						</Show>
+						<>
+							<Show when={can('edit')}>
+								<MigrateDeviceButton
+									onClick={() => {
+										setError(null)
+										setMigrating(true)
+									}}
+								/>
+							</Show>
+							<Show when={canGlobal('edit')}>
+								<MoveTenantButton onClick={() => setMovingTenant(true)} />
+							</Show>
+						</>
 					}
 				/>
 				<DetailSubtitle description={device()?.description} />
@@ -640,6 +652,17 @@ export function DeviceDetailPage(props: { id: number }): JSX.Element {
 						row={{ kind: 'device', ...row() }}
 						on_moved={() => setMovingTenant(false)}
 						on_close={() => setMovingTenant(false)}
+					/>
+				)}
+			</Show>
+			<Show when={migrating() ? device() : undefined}>
+				{(row: () => DeviceDetail): JSX.Element => (
+					<MigrateDeviceDialog
+						device={row()}
+						ports={ifaces() ?? []}
+						links={linksByIface()}
+						vm_count={(vms() ?? []).length}
+						on_close={() => setMigrating(false)}
 					/>
 				)}
 			</Show>
