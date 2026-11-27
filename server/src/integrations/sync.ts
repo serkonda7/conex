@@ -5,17 +5,19 @@
  *
  * A run is started in the background and tracked in `sync_runs`; the API
  * answers right away with the `running` row and the client polls. One run
- * per provider at a time.
+ * per provider at a time. Enabled integrations also sync on their own every
+ * 30 minutes (`runDueSyncs`).
  */
 import { Result } from 'better-result'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { IntegrationProvider as ProviderId, SyncRunJson } from 'shared/src/schemas'
+import { getConfig } from '../config'
 import { getDb } from '../db/connection'
 import { memberOf } from '../db/employees'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { checkTenantExists, errOf } from '../db/list'
 import { failInterruptedRuns } from '../db/runs'
-import { devices, employees, sync_runs } from '../schema'
+import { devices, employees, integrations, sync_runs } from '../schema'
 import { nowSeconds } from '../util/time'
 import { listLinks, type ScopeLink, scopeLinks, setLink } from './links'
 import { matchDevices, matchEmployees } from './match'
@@ -340,4 +342,51 @@ export async function getSyncRun(
 /** Marks interrupted integration sync runs as failed. Called once at startup. */
 export async function failInterruptedSyncs(): Promise<void> {
 	await failInterruptedRuns(sync_runs)
+}
+
+/** A full sync starts on its own once the last one is this old. */
+export const AUTO_SYNC_INTERVAL_SECONDS = 30 * 60
+
+/**
+ * Sweep task (every minute): starts a full sync for every enabled integration
+ * whose last full run (any outcome, so a failing one retries on the same
+ * schedule, not every tick) started at least `AUTO_SYNC_INTERVAL_SECONDS`
+ * ago, or that never ran.
+ * Tenant-scoped runs do not count, since they skip the other tenants' devices.
+ * Skipped in `offline` mode, where every run would only fail.
+ */
+export async function runDueSyncs(): Promise<void> {
+	if (getConfig().integrations.mode === 'offline') {
+		return
+	}
+	const enabled = await getDb()
+		.select({ provider: integrations.provider })
+		.from(integrations)
+		.where(eq(integrations.enabled, 1))
+	if (enabled.length === 0) {
+		return
+	}
+	const lastFull = await getDb()
+		.selectDistinctOn([sync_runs.provider], {
+			provider: sync_runs.provider,
+			started_at: sync_runs.started_at,
+		})
+		.from(sync_runs)
+		.where(isNull(sync_runs.tenant_id))
+		.orderBy(sync_runs.provider, desc(sync_runs.started_at), desc(sync_runs.id))
+	const startedAt = new Map(lastFull.map((run) => [run.provider, run.started_at]))
+	const now = nowSeconds()
+	for (const { provider } of enabled) {
+		const last = startedAt.get(provider)
+		if (running.has(provider as ProviderId)) {
+			continue
+		}
+		if (last !== undefined && now - last < AUTO_SYNC_INTERVAL_SECONDS) {
+			continue
+		}
+		const started = await startSync(provider as ProviderId, null)
+		if (Result.isError(started)) {
+			console.error(`Automatic ${provider} sync failed to start:`, started.error.message)
+		}
+	}
 }
