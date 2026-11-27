@@ -44,12 +44,13 @@
 	--font-size-xl: 1.15rem;
 	--font-size-2xl: 1.3rem;
 	/* Fixed top bar height; the sticky sidebar sizes itself against it. */
-	--topbar-height: 3.5rem;
+	--topbar-height: 2.75rem;
 	/* Sidebar widths; the top bar's corner cell above it matches them. */
 	--sidebar-width: 13rem;
 	/* Sidebar padding (2 × 0.5rem) + link padding (2 × 0.5rem) + icon (20px)
-	   + borders (4px) + vertical scrollbar (1rem). */
-	--sidebar-collapsed-width: calc(3rem + 24px);
+	   + row borders (2px) + sidebar border (1px). The collapsed rail hides
+	   its scrollbar, so no gutter is reserved for it. */
+	--sidebar-collapsed-width: calc(2rem + 23px);
 }
 
 html {
@@ -318,7 +319,7 @@ tbody tr:last-child td {
 	gap: 0.75rem;
 	background-color: var(--bg-surface);
 	border-bottom: 1px solid var(--border);
-	padding: 0.35rem 0.75rem;
+	padding: 0.25rem 0.75rem;
 	height: var(--topbar-height);
 }
 
@@ -415,20 +416,26 @@ tbody tr:last-child td {
 .app-tenant-context {
 	position: relative;
 	display: inline-flex;
-	align-items: center;
+	align-items: stretch;
 	min-width: 0;
 }
 
-/* List button right of the dropdown: opens the tenants page. */
+/* List button attached right of the dropdown (one group): opens the
+   tenants page. */
 .app-tenant-context-list {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	margin-left: 0.35rem;
 	padding: 0.3rem;
 	border: 1px solid var(--border-strong);
-	border-radius: 0.3rem;
+	border-left: none;
+	border-radius: 0 0.3rem 0.3rem 0;
 	color: var(--text-muted);
+}
+
+.app-tenant-context-button:has(~ .app-tenant-context-list) {
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
 }
 
 .app-tenant-context-list:hover {
@@ -820,7 +827,7 @@ tbody tr:last-child td {
 	flex-shrink: 0;
 	align-self: stretch;
 	width: var(--sidebar-width);
-	margin: -0.35rem 0.5rem -0.35rem -0.75rem;
+	margin: -0.25rem 0.5rem -0.25rem -0.75rem;
 	padding: 0 calc(var(--knob-size) / 2 + 0.5rem) 0 1rem;
 	border-right: 1px solid var(--border);
 }
@@ -1169,6 +1176,11 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 
 .app-sidebar.collapsed .app-nav {
 	overflow-x: hidden;
+	scrollbar-width: none;
+}
+
+.app-sidebar.collapsed .app-nav::-webkit-scrollbar {
+	display: none;
 }
 
 .app-sidebar.collapsed .app-nav-text {
