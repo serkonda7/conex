@@ -21,10 +21,10 @@ function clip(value: string | null): string | null {
 	return value === null ? null : value.slice(0, MAX_TEXT)
 }
 
-/** Clips the client-derived target username; device details come from the DB. */
+/** Clips the client-derived target username; role and device details come from the DB. */
 function clipDetail(detail: AuditDetail | null): AuditDetail | null {
 	return detail !== null && 'target_username' in detail
-		? { target_username: clip(detail.target_username) ?? '' }
+		? { ...detail, target_username: clip(detail.target_username) ?? '' }
 		: detail
 }
 
@@ -68,6 +68,7 @@ export async function listAuditLog(
 		searchCondition(params.search, [
 			audit_log.username,
 			sql`${audit_log.detail}->>'target_username'`,
+			sql`${audit_log.detail}->>'role_name'`,
 			sql`${audit_log.detail}->>'device_name'`,
 			audit_log.ip,
 			audit_log.forwarded_for,

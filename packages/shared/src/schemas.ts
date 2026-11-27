@@ -2139,12 +2139,19 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 /**
  * `password.change`: a user changed their own password. `password.reset`: a
  * user manager set another account's password (`AuditUserDetail`).
+ * `user.role_change`: an account got a role, on creation or by a change
+ * (`AuditUserDetail` with the roles). `role.*`: a role was created, deleted,
+ * renamed or had its permissions changed (`AuditRoleDetail`).
  */
 export const AUDIT_EVENTS = [
 	'login.success',
 	'login.failure',
 	'password.change',
 	'password.reset',
+	'user.role_change',
+	'role.create',
+	'role.update',
+	'role.delete',
 	'integration.device_create',
 	'integration.device_update',
 ] as const
@@ -2153,7 +2160,7 @@ export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
 
 export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
 
-/** `search` matches username, target user, device name, peer IP or forwarded-for. Defaults to newest first. */
+/** `search` matches username, target user, role name, device name, peer IP or forwarded-for. Defaults to newest first. */
 export const AuditLogListQuerySchema = v.object({
 	...ListQueryEntries,
 	event: v.optional(
@@ -2185,12 +2192,30 @@ export interface AuditDeviceDetail {
 	to?: string | null
 }
 
-/** Account a `password.reset` acted upon. */
+/**
+ * Account a `password.reset` or `user.role_change` acted upon. Role changes
+ * carry the role names; `from_role` is null when the account was created.
+ */
 export interface AuditUserDetail {
 	target_username: string
+	from_role?: string | null
+	to_role?: string
 }
 
-export type AuditDetail = AuditDeviceDetail | AuditUserDetail
+/**
+ * Role a `role.*` event acted upon, by its name after the change. For
+ * `role.create`/`role.delete`, `added`/`removed` list all its permissions.
+ */
+export interface AuditRoleDetail {
+	role_id: number
+	role_name: string
+	/** Previous name when `role.update` renamed it. */
+	renamed_from?: string
+	added?: Permission[]
+	removed?: Permission[]
+}
+
+export type AuditDetail = AuditDeviceDetail | AuditUserDetail | AuditRoleDetail
 
 export interface AuditLogEntryJson {
 	id: number

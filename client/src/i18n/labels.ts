@@ -342,6 +342,10 @@ const AUDIT_EVENT_KEYS: Record<AuditEvent, MessageKey> = {
 	'login.failure': 'auditEvent.loginFailure',
 	'password.change': 'auditEvent.passwordChange',
 	'password.reset': 'auditEvent.passwordReset',
+	'user.role_change': 'auditEvent.userRoleChange',
+	'role.create': 'auditEvent.roleCreate',
+	'role.update': 'auditEvent.roleUpdate',
+	'role.delete': 'auditEvent.roleDelete',
 	'integration.device_create': 'auditEvent.integrationDeviceCreate',
 	'integration.device_update': 'auditEvent.integrationDeviceUpdate',
 }
