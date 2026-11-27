@@ -120,27 +120,23 @@ export function LastRunTime(props: { run: RunSummary | null }): JSX.Element {
 	)
 }
 
-/** The error of the latest sync, when it failed. */
-export function LastRunError(props: { run: RunSummary | null }): JSX.Element {
+/**
+ * The error of the latest sync, when it failed. A failed sync also records
+ * its error as the connection error; `shown` is that message, already on the
+ * card, so the same text is not listed twice.
+ */
+export function LastRunError(props: {
+	run: RunSummary | null
+	shown?: string | null
+}): JSX.Element {
 	return (
-		<Show when={props.run?.state === 'error' && props.run.error}>
+		<Show
+			when={
+				props.run?.state === 'error' && props.run.error && props.run.error !== props.shown
+			}
+		>
 			<p class="integration-error">{props.run?.error}</p>
 		</Show>
-	)
-}
-
-/**
- * When the latest sync ran (relative, exact time on hover). A failed run
- * adds its error on a second line.
- */
-export function LastRunLine(props: { run: RunSummary | null }): JSX.Element {
-	return (
-		<>
-			<p class="integration-meta">
-				<LastRunTime run={props.run} />
-			</p>
-			<LastRunError run={props.run} />
-		</>
 	)
 }
 

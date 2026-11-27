@@ -5765,24 +5765,19 @@ a.rack-shelf-plate:hover {
 	border-bottom: none;
 }
 
-.matching-heading p {
-	margin: 0.15rem 0 0;
-	font-size: var(--font-size-sm);
-}
-
 .matching-toolbar .link-board-search {
 	flex: 1 1 12rem;
 	width: auto;
 }
 
-.matching-tenant {
-	flex: 0 1 16rem;
-}
-
+/* No inner scrolling: the table, the external objects below it and the page
+   scroll as one, with the header sticking under the topbar. Narrow screens
+   scroll the table sideways instead (the object column stays put) and give up
+   the sticky header for it. */
 .app-content .matching-scroll {
-	max-height: calc(100vh - var(--topbar-height) - 15rem);
-	min-height: 12rem;
-	overflow: auto;
+	/* Overrides the generic `div:has(> table)` scroller, which would trap
+	   the sticky header inside this box. */
+	overflow: visible;
 	border: 1px solid var(--border);
 	border-radius: 0.5rem;
 	background-color: var(--bg-surface);
@@ -5800,16 +5795,22 @@ a.rack-shelf-plate:hover {
 
 .matching-table thead th {
 	position: sticky;
-	top: 0;
+	top: var(--topbar-height);
 	z-index: 2;
 	background-color: var(--bg-raised);
 	vertical-align: bottom;
 }
 
+/* The wrapper no longer clips: round the header's outer corners itself. */
+.matching-table thead th:first-child {
+	border-top-left-radius: 0.5rem;
+}
+
+.matching-table thead th:last-child {
+	border-top-right-radius: 0.5rem;
+}
+
 .matching-table tfoot td {
-	position: sticky;
-	bottom: 0;
-	z-index: 2;
 	background-color: var(--bg-raised);
 	font-size: var(--font-size-sm);
 }
@@ -5824,6 +5825,16 @@ a.rack-shelf-plate:hover {
 
 .matching-table tbody tr:hover > * {
 	background-color: color-mix(in srgb, var(--bg-hover) 35%, transparent);
+}
+
+@media (max-width: 48rem) {
+	.app-content .matching-scroll {
+		overflow-x: auto;
+	}
+
+	.matching-table thead th {
+		top: 0;
+	}
 }
 
 /* The object column stays put while the integration columns scroll sideways. */
@@ -6204,8 +6215,8 @@ a.rack-shelf-plate:hover {
 	background-color: var(--success);
 }
 
-.integrations-summary-dot-warning {
-	background-color: var(--warning);
+.integrations-summary-dot-error {
+	background-color: var(--error);
 }
 
 .integration-grid {
@@ -6554,33 +6565,12 @@ a.rack-shelf-plate:hover {
 	cursor: pointer;
 }
 
-.integration-detail-alert {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.5rem 1rem;
-	margin-bottom: 1rem;
-	padding: 0.75rem 1rem;
-	border: 1px solid color-mix(in srgb, var(--error) 50%, transparent);
-	border-radius: 0.5rem;
-	background-color: color-mix(in srgb, var(--error) 7%, var(--bg-surface));
-}
-
-.integration-detail-alert strong {
-	color: var(--error);
-}
-
 .integration-detail-tabs {
 	margin-bottom: 0.75rem;
 }
 
 .integration-report-asof {
 	margin-bottom: 0.5rem;
-}
-
-.integration-detail-report-link {
-	margin-bottom: 0.75rem;
 }
 
 /* User settings: flat key-value groups stacked with horizontal rules, like the

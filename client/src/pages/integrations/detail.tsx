@@ -17,7 +17,6 @@ import { createRecord, useAction } from '../../lib/resource'
 import { usePageMeta } from '../../lib/router'
 import { can, canGlobal, sessionTenantId } from '../../lib/session'
 import { contextTenantId } from '../../lib/tenant_context'
-import { integrationReportHref } from './cards'
 import { IntegrationDetailHeader } from './detail_parts'
 import { providerStatus } from './integration_card'
 import { ProviderSettings } from './settings'
@@ -80,13 +79,6 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 				]
 			: []
 
-	// Settings are right below the header: "Fix connection" jumps to the first field.
-	function focusSettings(): void {
-		document
-			.querySelector<HTMLElement>('.integration-settings-section :is(input, select)')
-			?.focus()
-	}
-
 	return (
 		<div class="integration-detail">
 			<Show
@@ -112,15 +104,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 								syncing={sync.pending() || row().last_sync?.state === 'running'}
 								onSync={() => void handleSync()}
 								menuActions={menuActions()}
-								onOpenSettings={focusSettings}
 							/>
-							<Show when={row().enabled}>
-								<p class="integration-meta integration-detail-report-link">
-									<a href={integrationReportHref(row().provider)}>
-										{t('integration.openReport')}
-									</a>
-								</p>
-							</Show>
 							<InlineError message={error()} />
 							{/* Not keyed: a refetch after a sync or toggle must not reset typed values. */}
 							<ProviderSettings integration={row()} />

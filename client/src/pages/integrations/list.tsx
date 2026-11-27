@@ -125,7 +125,10 @@ function ProviderCard(props: {
 								<Show when={integration().enabled && integration().last_error}>
 									<p class="integration-error">{integration().last_error}</p>
 								</Show>
-								<LastRunError run={integration().last_sync} />
+								<LastRunError
+									run={integration().last_sync}
+									shown={integration().enabled ? integration().last_error : null}
+								/>
 							</>
 						}
 						link={
@@ -217,9 +220,10 @@ export function IntegrationsPage(): JSX.Element {
 
 	const connectedCount = (): number =>
 		(integrations() ?? []).length + (calendar()?.configured ? 1 : 0)
-	const attentionCount = (): number =>
+	const errorCount = (): number =>
 		(integrations() ?? []).filter(needsAttention).length +
 		(calendarNeedsAttention(calendar() ?? null) ? 1 : 0)
+	const okCount = (): number => connectedCount() - errorCount()
 
 	async function handleSync(provider: IntegrationProvider, clean: boolean): Promise<void> {
 		const name = providerLabel(provider)
@@ -246,19 +250,19 @@ export function IntegrationsPage(): JSX.Element {
 				</span>
 				<h2>{tp('entity.integration', 2)}</h2>
 				<div class="integrations-summary">
-					<Show when={connectedCount() > 0}>
+					<Show when={okCount() > 0}>
 						<span>
 							<span aria-hidden="true" class="integrations-summary-dot" />
-							{t('integration.summaryConnected', { count: connectedCount() })}
+							{t('integration.summaryOk', { count: okCount() })}
 						</span>
 					</Show>
-					<Show when={attentionCount() > 0}>
+					<Show when={errorCount() > 0}>
 						<span>
 							<span
 								aria-hidden="true"
-								class="integrations-summary-dot integrations-summary-dot-warning"
+								class="integrations-summary-dot integrations-summary-dot-error"
 							/>
-							{tp('integration.summaryAttention', attentionCount())}
+							{t('integration.summaryError', { count: errorCount() })}
 						</span>
 					</Show>
 				</div>

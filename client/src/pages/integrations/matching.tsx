@@ -28,15 +28,14 @@ import {
 	start_sync,
 	unlink_external,
 } from '../../api/integrations'
-import { fetch_tenants } from '../../api/tenancy'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { compareFieldLabel, providerLabel } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
-import { parseId, queryParam, usePageMeta } from '../../lib/router'
-import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
-import { contextTenantId } from '../../lib/tenant_context'
+import { queryParam, usePageMeta } from '../../lib/router'
+import { can, canGlobal, isScoped } from '../../lib/session'
+import { newObjectTenantId } from '../../lib/tenant_context'
 import { ImportDeviceDialog } from './import_device_dialog'
 
 type Kind = LinkEntityType
@@ -237,9 +236,8 @@ export function MatchingPage(): JSX.Element {
 			? 'device'
 			: parseKind(queryParam('type')),
 	)
-	const [tenant, setTenant] = createSignal<number | null>(
-		parseId(queryParam('tenant')) ?? sessionTenantId() ?? contextTenantId(),
-	)
+	// Devices and employees are matched for the tenant of the global selection.
+	const tenant = newObjectTenantId
 	const [filter, setFilter] = createSignal<Filter>('all')
 	const [search, setSearch] = createSignal('')
 	const [drafts, setDrafts] = createSignal(new Map<string, string>())
@@ -256,7 +254,6 @@ export function MatchingPage(): JSX.Element {
 	usePageMeta(() => ({ name: t('matching.title') }))
 
 	const [integrations] = createRows(fetch_integrations, setError)
-	const [tenants] = createRows(fetch_tenants, setError)
 
 	const enabled = createMemo(() =>
 		(integrations() ?? []).filter(
@@ -594,13 +591,8 @@ export function MatchingPage(): JSX.Element {
 		setKind(next)
 	}
 
-	function switchTenant(next: string): void {
-		if (!confirmDiscard()) {
-			return
-		}
-		discard()
-		setTenant(parseId(next))
-	}
+	// The global tenant selection changes outside this page: drop its drafts.
+	createEffect(on(tenant, discard, { defer: true }))
 
 	/**
 	 * Removals first, so an object moved between rows is free before it is
@@ -1056,7 +1048,6 @@ export function MatchingPage(): JSX.Element {
 				</span>
 				<div class="matching-heading">
 					<h2>{t('matching.title')}</h2>
-					<p class="text-muted">{t('matching.intro')}</p>
 				</div>
 			</div>
 
@@ -1067,18 +1058,6 @@ export function MatchingPage(): JSX.Element {
 					{kindOption('device')}
 					{kindOption('employee')}
 				</fieldset>
-				<Show when={!isTopLevel(kind())}>
-					<Combobox
-						class="combobox-fit matching-tenant"
-						value={tenant() === null ? '' : String(tenant())}
-						onChange={switchTenant}
-						options={(tenants() ?? []).map((r) => ({ value: r.id, label: r.name }))}
-						ariaLabel={kindNoun('tenant', 1)}
-						placeholder={t('matching.pickTenantShort')}
-						searchLabel={t('common.search')}
-						noMatchesLabel={t('common.noMatchingObjects')}
-					/>
-				</Show>
 				<input
 					type="search"
 					class="toolbar-search-input link-board-search"

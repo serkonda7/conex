@@ -552,7 +552,6 @@ export function IntegrationReportPage(): JSX.Element {
 				</span>
 				<div class="matching-heading">
 					<h2>{t('integration.viewReport')}</h2>
-					<p class="text-muted">{t('integration.reportIntro')}</p>
 				</div>
 			</div>
 			<InlineError message={error()} />
@@ -609,12 +608,7 @@ export function IntegrationReportPage(): JSX.Element {
 									? t('integration.syncedAt', {
 											time: formatTime(report()?.synced_at ?? 0),
 										})
-									: t('integration.neverSynced')}{' '}
-								<a href={`/integrations/${row().id}`}>
-									{t('integration.openIntegration', {
-										name: providerLabel(row().provider),
-									})}
-								</a>
+									: t('integration.neverSynced')}
 							</p>
 							<Show
 								when={!report.loading}

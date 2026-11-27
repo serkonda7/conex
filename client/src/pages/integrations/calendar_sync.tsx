@@ -514,7 +514,6 @@ export function CalendarSyncDetailPage(): JSX.Element {
 								syncing={runs.syncing()}
 								onSync={() => void runs.sync()}
 								menuActions={[]}
-								onOpenSettings={() => setView('settings')}
 							/>
 							<InlineError message={error()} />
 							<Show
@@ -584,7 +583,10 @@ function SyncErrors(props: {
 			<Show when={props.config.enabled && props.config.last_error}>
 				<p class="integration-error">{props.config.last_error}</p>
 			</Show>
-			<LastRunError run={props.lastRun} />
+			<LastRunError
+				run={props.lastRun}
+				shown={props.config.enabled ? props.config.last_error : null}
+			/>
 		</>
 	)
 }

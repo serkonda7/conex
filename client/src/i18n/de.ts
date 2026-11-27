@@ -1605,9 +1605,8 @@ export const de: Messages = {
 	'integration.layout': 'Ansicht',
 	'integration.layoutGrid': 'Kacheln',
 	'integration.layoutList': 'Liste',
-	'integration.summaryConnected': '{count} verbunden',
-	'integration.summaryAttention.one': '{count} benötigt Aufmerksamkeit',
-	'integration.summaryAttention.other': '{count} benötigen Aufmerksamkeit',
+	'integration.summaryOk': '{count} fehlerfrei verbunden',
+	'integration.summaryError': '{count} mit Fehler verbunden',
 	'integration.status.connected': 'Verbunden',
 	'integration.status.error': 'Verbindung fehlgeschlagen',
 	'integration.connectedAt': 'OK ({time})',
@@ -1617,7 +1616,6 @@ export const de: Messages = {
 	'integration.syncStarted': 'Gestartet: {time}',
 	'integration.runFirstSync': 'Erste Synchronisierung starten',
 	'integration.fixConnection': 'Verbindung prüfen →',
-	'integration.openSettings': 'Einstellungen öffnen',
 	'integration.settings': 'Einstellungen',
 	'integration.views': 'Bereiche',
 	'integration.saved': 'Gespeichert.',
@@ -1667,11 +1665,8 @@ export const de: Messages = {
 	'integration.active': 'Aktiv',
 	'integration.inactive': 'Inaktiv',
 	'integration.viewReport': 'Datenabgleich',
-	'integration.reportIntro':
-		'Unterschiede zwischen conex und einem angebundenen System, jeweils mit passender Korrektur.',
 	'integration.reportNoIntegrations':
 		'Keine Integration ist aktiviert. Richte eine ein, um ihre Daten abzugleichen.',
-	'integration.openIntegration': 'Einstellungen von {name} →',
 	'integration.boardFailed': 'Verknüpfungsübersicht konnte nicht geladen werden',
 	'integration.loadingBoard': 'Verknüpfungsübersicht wird geladen…',
 	'integration.restore': 'Nicht ignorieren',
@@ -1683,10 +1678,8 @@ export const de: Messages = {
 
 	// cross-integration matching
 	'matching.title': 'Zuordnung',
-	'matching.intro': 'Ordne jedem conex-Objekt sein Gegenstück in jedem angebundenen System zu.',
 	'matching.kind': 'Objekttyp',
-	'matching.pickTenant': 'Wähle einen Mandanten, um seine Geräte und Mitarbeiter zuzuordnen.',
-	'matching.pickTenantShort': 'Mandant wählen',
+	'matching.pickTenant': 'Wähle oben einen Mandanten, um seine Geräte und Mitarbeiter zuzuordnen.',
 	'matching.noIntegrations':
 		'Keine Integration ist aktiviert. Richte eine ein, um Objekte zuzuordnen.',
 	'matching.search': 'Name, Seriennummer oder Treffer suchen…',

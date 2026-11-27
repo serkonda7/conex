@@ -1590,9 +1590,8 @@ export const en = {
 	'integration.layout': 'Layout',
 	'integration.layoutGrid': 'Grid',
 	'integration.layoutList': 'List',
-	'integration.summaryConnected': '{count} connected',
-	'integration.summaryAttention.one': '{count} needs attention',
-	'integration.summaryAttention.other': '{count} need attention',
+	'integration.summaryOk': '{count} connected OK',
+	'integration.summaryError': '{count} connected with error',
 	'integration.status.connected': 'Connected',
 	'integration.status.error': 'Connection failed',
 	'integration.connectedAt': 'OK ({time})',
@@ -1602,7 +1601,6 @@ export const en = {
 	'integration.syncStarted': 'Started: {time}',
 	'integration.runFirstSync': 'Run first sync',
 	'integration.fixConnection': 'Fix connection →',
-	'integration.openSettings': 'Open settings',
 	'integration.settings': 'Settings',
 	'integration.views': 'Sections',
 	'integration.saved': 'Saved.',
@@ -1649,11 +1647,8 @@ export const en = {
 	'integration.active': 'Active',
 	'integration.inactive': 'Inactive',
 	'integration.viewReport': 'Data consistency',
-	'integration.reportIntro':
-		'Differences between conex and a connected system, with a fix for each.',
 	'integration.reportNoIntegrations':
 		'No integration is enabled. Set one up to compare its data.',
-	'integration.openIntegration': '{name} settings →',
 	'integration.boardFailed': 'Failed to load the link overview',
 	'integration.loadingBoard': 'Loading link overview…',
 	'integration.restore': 'Restore',
@@ -1665,10 +1660,8 @@ export const en = {
 
 	// cross-integration matching
 	'matching.title': 'Matching',
-	'matching.intro': 'Pair each conex object with its counterpart in every connected system.',
 	'matching.kind': 'Object type',
-	'matching.pickTenant': 'Select a tenant to match its devices and employees.',
-	'matching.pickTenantShort': 'Select a tenant',
+	'matching.pickTenant': 'Select a tenant in the top bar to match its devices and employees.',
 	'matching.noIntegrations': 'No integration is enabled. Set one up to match objects.',
 	'matching.search': 'Search name, serial or match…',
 	'matching.filterAll': 'All',
