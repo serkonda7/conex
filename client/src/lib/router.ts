@@ -184,7 +184,12 @@ export function useRoutePath(): string {
 function rememberScroll(): void {
 	const scroll = window.scrollY
 	scrollByKey.set(currentKey, scroll)
-	window.history.replaceState(stateFor(historySeq, currentKey, currentFrom, scroll), '', path())
+	// The URL, not `path()`: `replaceAnchor` may have changed its anchor since.
+	window.history.replaceState(
+		stateFor(historySeq, currentKey, currentFrom, scroll),
+		'',
+		currentUrl(),
+	)
 }
 
 /** Retry a scroll restore until the async-loaded page is tall enough (max ~2s). */
@@ -496,6 +501,24 @@ export function queryParam(key: string, fromPath?: string): string {
 	const current = (fromPath ?? useRoutePath()).split('#')[0] ?? ''
 	const query = current.includes('?') ? (current.split('?')[1] ?? '') : ''
 	return new URLSearchParams(query).get(key) ?? ''
+}
+
+/** In-page anchor of the current route, without the `#` (e.g. `devices`). */
+export function routeAnchor(fromPath?: string): string {
+	const current = fromPath ?? useRoutePath()
+	const at = current.indexOf('#')
+	return at < 0 ? '' : current.slice(at + 1)
+}
+
+/**
+ * Replaces the anchor of the current URL (e.g. a page's selected tab) in its
+ * history entry, without remounting the page or adding an entry. `path()`
+ * keeps the anchor the page mounted with.
+ */
+export function replaceAnchor(anchor: string): void {
+	const { pathname, search } = window.location
+	const url = pathname + search + (anchor === '' ? '' : `#${anchor}`)
+	window.history.replaceState(window.history.state, '', url)
 }
 
 /** `?face=` of a rack-elevation deep link, if it names a face. */

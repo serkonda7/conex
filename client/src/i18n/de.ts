@@ -1683,7 +1683,6 @@ export const de: Messages = {
 		'Wähle oben einen Mandanten, um seine Geräte und Mitarbeiter zuzuordnen.',
 	'matching.noIntegrations':
 		'Keine Integration ist aktiviert. Richte eine ein, um Objekte zuzuordnen.',
-	'matching.search': 'Name, Seriennummer oder Treffer suchen…',
 	'matching.filterAll': 'Alle',
 	'matching.filterOpen': 'Unvollständig',
 	'matching.filterDone': 'Vollständig',
@@ -1828,8 +1827,6 @@ export const de: Messages = {
 	'calendarSync.techniciansHint':
 		'Nur Techniker mit gespeichertem, aktiviertem Postfach werden synchronisiert. Entfernen löscht die synchronisierten Termine beim nächsten Lauf; Deaktivieren pausiert die Synchronisation.',
 	'calendarSync.viewTechnicians': 'Techniker',
-	'calendarSync.scheduleHint':
-		'Solange aktiviert, läuft die Synchronisierung in diesem Abstand von selbst.',
 	'calendarSync.saveAndEnable': 'Speichern und aktivieren',
 	'calendarSync.confirmRemoveSync':
 		'Outlook-Kalendersynchronisation entfernen? Bereits in Outlook angelegte Termine bleiben dort und werden nicht mehr aktualisiert.',

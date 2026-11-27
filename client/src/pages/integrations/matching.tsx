@@ -34,7 +34,7 @@ import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { compareFieldLabel, providerLabel } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
-import { queryParam, usePageMeta } from '../../lib/router'
+import { replaceAnchor, routeAnchor, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped } from '../../lib/session'
 import { contextTenantRows, newObjectTenantId } from '../../lib/tenant_context'
 import { ImportDeviceDialog } from './import_device_dialog'
@@ -85,6 +85,11 @@ type CellState = 'linked' | 'ignored' | 'open'
 interface ImportTarget {
 	column: Column
 	row: LinkBoardExternal
+}
+
+/** URL anchor of a level's tab (`#devices`). */
+function kindAnchor(kind: Kind): string {
+	return `${kind}s`
 }
 
 function parseKind(raw: string): Kind {
@@ -217,7 +222,7 @@ function placeFocusedList(): void {
 }
 
 /**
- * /integrations/matching — every conex object of one level (tenants, sites
+ * /integrations/matching#<level> — every conex object of one level (tenants, sites
  * for integrations that link sites (UniFi), or the devices or employees of
  * one tenant) as a row, with one column per enabled integration. Each cell picks the object's counterpart in that system
  * (searchable; picking one linked to another row moves it there), shows an
@@ -232,10 +237,9 @@ function placeFocusedList(): void {
  */
 export function MatchingPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
+	const initialKind = parseKind(routeAnchor())
 	const [kind, setKind] = createSignal<Kind>(
-		isScoped() && isTopLevel(parseKind(queryParam('type')))
-			? 'device'
-			: parseKind(queryParam('type')),
+		isScoped() && isTopLevel(initialKind) ? 'device' : initialKind,
 	)
 	// Devices and employees are matched for the tenant of the global selection.
 	const tenant = newObjectTenantId
@@ -592,6 +596,7 @@ export function MatchingPage(): JSX.Element {
 		}
 		discard()
 		setKind(next)
+		replaceAnchor(kindAnchor(next))
 	}
 
 	// The global tenant selection changes outside this page: drop its drafts.
@@ -1078,8 +1083,8 @@ export function MatchingPage(): JSX.Element {
 				<input
 					type="search"
 					class="toolbar-search-input link-board-search"
-					aria-label={t('matching.search')}
-					placeholder={t('matching.search')}
+					aria-label={t('common.search')}
+					placeholder={t('common.search')}
 					value={search()}
 					onInput={(e: InputEvent & { currentTarget: HTMLInputElement }): void => {
 						setSearch(e.currentTarget.value)

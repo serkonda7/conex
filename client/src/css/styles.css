@@ -5714,8 +5714,9 @@ a.rack-shelf-plate:hover {
 }
 
 .matching-toolbar .link-board-search {
-	flex: 1 1 12rem;
+	flex: 0 1 16rem;
 	width: auto;
+	min-width: 10rem;
 }
 
 /* No inner scrolling: the table, the external objects below it and the page

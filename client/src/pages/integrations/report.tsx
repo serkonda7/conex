@@ -48,7 +48,7 @@ import {
 	providerLabel,
 } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
-import { parseId, queryParam, usePageMeta } from '../../lib/router'
+import { parseId, queryParam, replaceAnchor, routeAnchor, usePageMeta } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import {
 	contextGroups,
@@ -145,7 +145,7 @@ function parseKind(raw: string): FindingKind | '' {
 
 /**
  * /integrations/report — consistency report of one enabled integration
- * (`?provider=`, else the first one), switched in the toolbar. It follows the
+ * (`#<provider>`, else the first one), switched in the toolbar. It follows the
  * tenant selector; `?tenant=` (from a tenant's "Needs attention" list) wins
  * until the selector is switched, and `?kind=` preselects the finding filter.
  * Rows offer the fitting fix: link, confirm a suggestion, create the device
@@ -157,7 +157,7 @@ export function IntegrationReportPage(): JSX.Element {
 	const [kindFilter, setKindFilter] = createSignal<string>(parseKind(queryParam('kind')))
 	// Tenant (or site, for site-level providers) being linked via the picker.
 	const [linkingTenant, setLinkingTenant] = createSignal<number | null>(null)
-	const [chosen, setChosen] = createSignal(queryParam('provider'))
+	const [chosen, setChosen] = createSignal(routeAnchor())
 	const [queryTenant, setQueryTenant] = createSignal(parseId(queryParam('tenant')))
 	createEffect(on(tenantContext, () => setQueryTenant(null), { defer: true }))
 
@@ -228,6 +228,7 @@ export function IntegrationReportPage(): JSX.Element {
 		// Finding kinds differ per provider.
 		setKindFilter('')
 		setChosen(provider)
+		replaceAnchor(provider)
 	}
 
 	function handleLinkTenant(item: ExternalTenantListItem): void {

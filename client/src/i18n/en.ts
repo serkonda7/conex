@@ -1662,7 +1662,6 @@ export const en = {
 	'matching.tenantScopeEmployees': 'Only employees of {tenant}',
 	'matching.pickTenant': 'Select a tenant in the top bar to match its devices and employees.',
 	'matching.noIntegrations': 'No integration is enabled. Set one up to match objects.',
-	'matching.search': 'Search name, serial or match…',
 	'matching.filterAll': 'All',
 	'matching.filterOpen': 'Incomplete',
 	'matching.filterDone': 'Complete',
@@ -1802,7 +1801,6 @@ export const en = {
 	'calendarSync.techniciansHint':
 		'Only technicians with a saved, enabled mailbox are synced. Removing a mapping deletes its synced events on the next run; disabling it pauses the sync.',
 	'calendarSync.viewTechnicians': 'Technicians',
-	'calendarSync.scheduleHint': 'While enabled, the sync runs on its own at this interval.',
 	'calendarSync.saveAndEnable': 'Save and enable',
 	'calendarSync.confirmRemoveSync':
 		'Remove the Outlook calendar sync? Events already written to Outlook stay there and are no longer updated.',

@@ -45,7 +45,7 @@ export function useTenantIntegrations(tenantId: () => number): QueryResource<Ten
 
 /** Consistency report page of the provider. */
 export function integrationReportHref(provider: IntegrationProvider): string {
-	return `/integrations/report?provider=${provider}`
+	return `/integrations/report#${provider}`
 }
 
 /** Consistency report of the provider, narrowed to the tenant (and a finding kind). */
@@ -54,6 +54,6 @@ export function tenantReportHref(
 	tenantId: number,
 	kind?: FindingKind,
 ): string {
-	const base = `${integrationReportHref(integration.provider)}&tenant=${tenantId}`
-	return kind === undefined ? base : `${base}&kind=${kind}`
+	const query = kind === undefined ? `tenant=${tenantId}` : `tenant=${tenantId}&kind=${kind}`
+	return `/integrations/report?${query}#${integration.provider}`
 }
