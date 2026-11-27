@@ -28,6 +28,7 @@ import {
 	IconPackages,
 	IconPlugConnected,
 	IconReceipt2,
+	IconReportAnalytics,
 	IconRuler2,
 	IconSettings,
 	IconShieldLock,
@@ -135,6 +136,9 @@ const IntegrationDetailPage = lazyPage(() =>
 )
 const MatchingPage = lazyPage(() =>
 	import('../pages/integrations/matching').then((m) => m.MatchingPage),
+)
+const IntegrationReportPage = lazyPage(() =>
+	import('../pages/integrations/report').then((m) => m.IntegrationReportPage),
 )
 const IntegrationsPage = lazyPage(() =>
 	import('../pages/integrations/list').then((m) => m.IntegrationsPage),
@@ -527,6 +531,16 @@ export const SECTIONS: readonly Section[] = [
 		permission: 'integrations.manage',
 		hideAddInNav: true,
 		list: MatchingPage,
+	},
+	{
+		// Consistency report of one integration at a time; also opened from the
+		// integration detail page and a tenant's "Needs attention" list.
+		path: 'integrations/report',
+		noun: (): string => t('integration.viewReport'),
+		icon: IconReportAnalytics,
+		permission: 'integrations.manage',
+		hideAddInNav: true,
+		list: IntegrationReportPage,
 	},
 	{
 		// Reached from the top-bar ticket button.

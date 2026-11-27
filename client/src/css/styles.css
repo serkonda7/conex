@@ -6579,6 +6579,10 @@ a.rack-shelf-plate:hover {
 	margin-bottom: 0.5rem;
 }
 
+.integration-detail-report-link {
+	margin-bottom: 0.75rem;
+}
+
 /* User settings: flat key-value groups stacked with horizontal rules, like the
    detail pages' spec sheets — no cards. */
 .settings-page {

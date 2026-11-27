@@ -5,6 +5,7 @@ import {
 	fetch_integrations,
 	fetch_tenant_integration,
 	type IntegrationJson,
+	type IntegrationProvider,
 } from '../../api/integrations'
 import { createDerived, createRowsFor, type QueryResource } from '../../lib/resource'
 import { can } from '../../lib/session'
@@ -42,12 +43,17 @@ export function useTenantIntegrations(tenantId: () => number): QueryResource<Ten
 	)
 }
 
-/** Integration report of the provider, narrowed to the tenant (and a finding kind). */
+/** Consistency report page of the provider. */
+export function integrationReportHref(provider: IntegrationProvider): string {
+	return `/integrations/report?provider=${provider}`
+}
+
+/** Consistency report of the provider, narrowed to the tenant (and a finding kind). */
 export function tenantReportHref(
 	integration: IntegrationJson,
 	tenantId: number,
 	kind?: FindingKind,
 ): string {
-	const base = `/integrations/${integration.id}?tenant=${tenantId}`
+	const base = `${integrationReportHref(integration.provider)}&tenant=${tenantId}`
 	return kind === undefined ? base : `${base}&kind=${kind}`
 }

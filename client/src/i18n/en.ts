@@ -1586,7 +1586,7 @@ export const en = {
 		'Run a full sync for {name}? This fetches the complete list of {tenants}.',
 	'integration.syncing': 'Syncing…',
 	'integration.syncFailed': 'Sync failed',
-	'integration.openReport': 'Consistency report →',
+	'integration.openReport': 'Data consistency →',
 	'integration.layout': 'Layout',
 	'integration.layoutGrid': 'Grid',
 	'integration.layoutList': 'List',
@@ -1649,6 +1649,11 @@ export const en = {
 	'integration.active': 'Active',
 	'integration.inactive': 'Inactive',
 	'integration.viewReport': 'Data consistency',
+	'integration.reportIntro':
+		'Differences between conex and a connected system, with a fix for each.',
+	'integration.reportNoIntegrations':
+		'No integration is enabled. Set one up to compare its data.',
+	'integration.openIntegration': '{name} settings →',
 	'integration.boardFailed': 'Failed to load the link overview',
 	'integration.loadingBoard': 'Loading link overview…',
 	'integration.restore': 'Restore',

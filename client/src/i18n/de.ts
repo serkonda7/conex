@@ -1667,6 +1667,11 @@ export const de: Messages = {
 	'integration.active': 'Aktiv',
 	'integration.inactive': 'Inaktiv',
 	'integration.viewReport': 'Datenabgleich',
+	'integration.reportIntro':
+		'Unterschiede zwischen conex und einem angebundenen System, jeweils mit passender Korrektur.',
+	'integration.reportNoIntegrations':
+		'Keine Integration ist aktiviert. Richte eine ein, um ihre Daten abzugleichen.',
+	'integration.openIntegration': 'Einstellungen von {name} →',
 	'integration.boardFailed': 'Verknüpfungsübersicht konnte nicht geladen werden',
 	'integration.loadingBoard': 'Verknüpfungsübersicht wird geladen…',
 	'integration.restore': 'Nicht ignorieren',
