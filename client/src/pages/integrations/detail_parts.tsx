@@ -45,8 +45,10 @@ export function IntegrationDetailHeader(props: {
 	lastRun: RunSummary | null
 	/** Login / sign-in error of the stored credentials. */
 	connectionError: string | null
-	/** Shows the switch, "Sync now" and the menu (`integrations.manage`). */
+	/** Shows the Enabled switch (`integrations.manage`). */
 	manageable: boolean
+	/** Shows "Sync now" (`integrations.write`). */
+	syncable: boolean
 	enabled: boolean
 	toggling: boolean
 	onToggle: (enabled: boolean) => void
@@ -85,33 +87,41 @@ export function IntegrationDetailHeader(props: {
 					</div>
 				</Show>
 			</div>
-			<Show when={props.configured && props.manageable}>
+			<Show when={props.configured && (props.manageable || props.syncable)}>
 				<div class="integration-detail-actions">
-					<label class="field-toggle integration-detail-switch">
-						<input
-							type="checkbox"
-							role="switch"
-							class="toggle"
-							aria-checked={props.enabled}
-							checked={props.enabled}
-							disabled={props.toggling}
-							onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-								props.onToggle(e.currentTarget.checked)
-							}
-						/>
-						<span>
-							{props.enabled ? t('integration.enabled') : t('integration.disabled')}
-						</span>
-					</label>
-					<button
-						type="button"
-						disabled={!props.enabled || props.syncing}
-						onClick={() => props.onSync()}
-					>
-						<IconLabel icon={IconRefresh}>
-							{props.syncing ? t('integration.syncing') : t('integration.syncNow')}
-						</IconLabel>
-					</button>
+					<Show when={props.manageable}>
+						<label class="field-toggle integration-detail-switch">
+							<input
+								type="checkbox"
+								role="switch"
+								class="toggle"
+								aria-checked={props.enabled}
+								checked={props.enabled}
+								disabled={props.toggling}
+								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+									props.onToggle(e.currentTarget.checked)
+								}
+							/>
+							<span>
+								{props.enabled
+									? t('integration.enabled')
+									: t('integration.disabled')}
+							</span>
+						</label>
+					</Show>
+					<Show when={props.syncable}>
+						<button
+							type="button"
+							disabled={!props.enabled || props.syncing}
+							onClick={() => props.onSync()}
+						>
+							<IconLabel icon={IconRefresh}>
+								{props.syncing
+									? t('integration.syncing')
+									: t('integration.syncNow')}
+							</IconLabel>
+						</button>
+					</Show>
 					<Show when={props.menuActions.length > 0}>
 						<MoreActionsButton
 							name={props.name}

@@ -38,6 +38,7 @@ import { replaceAnchor, routeAnchor, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped } from '../../lib/session'
 import { contextTenantRows, newObjectTenantId } from '../../lib/tenant_context'
 import { ImportDeviceDialog } from './import_device_dialog'
+import { DataAsOf } from './integration_card'
 
 type Kind = LinkEntityType
 
@@ -284,9 +285,18 @@ export function MatchingPage(): JSX.Element {
 		return { providers, kind: kind(), tenant: isTopLevel(kind()) ? null : tenant() }
 	})
 	const [boards] = createRecord(source, fetchBoards, setError)
+	/** Oldest sync among the shown boards: the data is only as fresh as that. */
+	const syncedAt = (): number | null | undefined => {
+		const loaded = boards()
+		if (loaded == null) {
+			return undefined
+		}
+		const times = loaded.flatMap((b) => (b.synced_at === null ? [] : [b.synced_at]))
+		return times.length > 0 ? Math.min(...times) : null
+	}
 
 	const editable = (): boolean =>
-		isTopLevel(kind()) ? canGlobal('integrations.manage') : can('integrations.manage')
+		isTopLevel(kind()) ? canGlobal('integrations.write') : can('integrations.write')
 
 	const columns = createMemo((): Column[] => {
 		const loaded = boards() ?? []
@@ -1071,6 +1081,7 @@ export function MatchingPage(): JSX.Element {
 						</Show>
 					</p>
 				</div>
+				<DataAsOf at={boards.loading ? undefined : syncedAt()} />
 			</div>
 
 			<div class="toolbar-row matching-toolbar">

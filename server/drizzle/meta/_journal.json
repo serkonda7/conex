@@ -99,6 +99,13 @@
       "when": 1795681472269,
       "tag": "0013_floorplan_pillars_partitions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795786287325,
+      "tag": "0014_integrations_write",
+      "breakpoints": true
     }
   ]
 }

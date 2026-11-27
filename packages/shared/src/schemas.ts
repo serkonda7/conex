@@ -1962,8 +1962,12 @@ export const TraceQuerySchema = v.object({
 /**
  * Permissions a role can grant. `view` / `edit` / `delete` cover every
  * inventory and catalog resource at once (`edit` = create + update,
- * including CSV import). The rest gate the admin areas; `integrations.manage`
- * covers both configuring providers and running syncs / links;
+ * including CSV import). The rest gate the admin areas. The two
+ * integration permissions are cumulative like view / edit / delete:
+ * `integrations.write` uses the configured providers (reports, syncs,
+ * links, imports, pushing changes), `integrations.manage` (granted together
+ * with `integrations.write`) also configures them (credentials, enable,
+ * remove, full syncs, Microsoft 365 consent, the calendar sync);
  * `tickets.create` opens tickets in the external ticket system (TANSS);
  * `contacts.directory` reads the contact directory (`/directory/contacts`),
  * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
@@ -1982,6 +1986,7 @@ export const PERMISSIONS = [
 	'employees.tenants',
 	'changelog.view',
 	'audit_log.view',
+	'integrations.write',
 	'integrations.manage',
 	'tickets.create',
 	'contacts.directory',

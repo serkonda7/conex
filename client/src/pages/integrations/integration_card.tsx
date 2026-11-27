@@ -122,6 +122,23 @@ export function LastRunTime(props: { run: RunSummary | null }): JSX.Element {
 }
 
 /**
+ * "Data as of …" at the end of a page header (report, matching): when the
+ * shown data was last synced. `at` undefined = still loading (nothing shown),
+ * null = never synced.
+ */
+export function DataAsOf(props: { at: number | null | undefined }): JSX.Element {
+	return (
+		<Show when={props.at !== undefined}>
+			<p class="integration-meta page-header-asof">
+				{props.at
+					? t('integration.syncedAt', { time: formatTime(props.at) })
+					: t('integration.neverSynced')}
+			</p>
+		</Show>
+	)
+}
+
+/**
  * The error of the latest sync, when it failed. A failed sync also records
  * its error as the connection error; `shown` is that message, already on the
  * card, so the same text is not listed twice.

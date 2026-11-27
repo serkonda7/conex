@@ -416,6 +416,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'employees.tenants': 'permission.employeesTenants',
 	'changelog.view': 'permission.changelogView',
 	'audit_log.view': 'permission.auditLogView',
+	'integrations.write': 'permission.integrationsWrite',
 	'integrations.manage': 'permission.integrationsManage',
 	'tickets.create': 'permission.ticketsCreate',
 	'contacts.directory': 'permission.contactsDirectory',
@@ -437,6 +438,7 @@ const PERMISSION_SHORT_KEYS: Record<Permission, MessageKey> = {
 	'employees.tenants': 'permissionShort.employeesTenants',
 	'changelog.view': 'permissionShort.changelogView',
 	'audit_log.view': 'permissionShort.auditLogView',
+	'integrations.write': 'permissionShort.integrationsWrite',
 	'integrations.manage': 'permissionShort.integrationsManage',
 	'tickets.create': 'permissionShort.ticketsCreate',
 	'contacts.directory': 'permissionShort.contactsDirectory',
@@ -456,7 +458,7 @@ const OBJECT_ACCESS_KEYS: Record<string, MessageKey> = {
 	manage: 'objectAccess.manage',
 }
 
-/** Role object access level (`read`, `write`, `manage`). */
+/** Role object or integration access level (`read`, `write`, `manage`). */
 export function objectAccessLabel(value: string): string {
 	return lookup(OBJECT_ACCESS_KEYS, value)
 }

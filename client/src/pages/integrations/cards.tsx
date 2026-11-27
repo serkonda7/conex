@@ -12,7 +12,7 @@ import { can } from '../../lib/session'
 
 /** Configured, enabled integrations visible to users who can manage them. */
 function useIntegrations(): () => IntegrationJson[] {
-	const [integrations] = createRowsFor(() => can('integrations.manage'), fetch_integrations)
+	const [integrations] = createRowsFor(() => can('integrations.write'), fetch_integrations)
 	return () => (integrations() ?? []).filter((i) => i.enabled)
 }
 

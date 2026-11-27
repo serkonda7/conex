@@ -35,3 +35,38 @@ export function objectAccess(permissions: Iterable<Permission>): ObjectAccess {
 	}
 	return set.has('view') ? 'read' : ''
 }
+
+/**
+ * The integration permissions are cumulative the same way:
+ * `write` = `integrations.write` (use providers: syncs, links, imports),
+ * `manage` = write + `integrations.manage` (configure providers).
+ */
+export const INTEGRATION_ACCESS_LEVELS = ['write', 'manage'] as const
+
+export type IntegrationAccess = (typeof INTEGRATION_ACCESS_LEVELS)[number] | ''
+
+/** Permissions covered by the integration access level. */
+export const INTEGRATION_PERMISSIONS: readonly Permission[] = [
+	'integrations.write',
+	'integrations.manage',
+]
+
+const INTEGRATION_GRANTS: Record<IntegrationAccess, readonly Permission[]> = {
+	'': [],
+	write: ['integrations.write'],
+	manage: ['integrations.write', 'integrations.manage'],
+}
+
+/** Integration permissions granted by `level`. */
+export function integrationPermissions(level: IntegrationAccess): readonly Permission[] {
+	return INTEGRATION_GRANTS[level]
+}
+
+/** Highest integration level a permission set reaches. */
+export function integrationAccess(permissions: Iterable<Permission>): IntegrationAccess {
+	const set = new Set(permissions)
+	if (set.has('integrations.manage')) {
+		return 'manage'
+	}
+	return set.has('integrations.write') ? 'write' : ''
+}

@@ -99,6 +99,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 								lastRun={row().last_sync}
 								connectionError={row().last_error}
 								manageable={can('integrations.manage')}
+								syncable={can('integrations.write')}
 								enabled={row().enabled}
 								toggling={toggle.pending()}
 								onToggle={(enabled: boolean) => void handleToggle(enabled)}
@@ -107,8 +108,11 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 								menuActions={menuActions()}
 							/>
 							<InlineError message={error()} />
-							{/* Not keyed: a refetch after a sync or toggle must not reset typed values. */}
-							<ProviderSettings integration={row()} />
+							{/* Not keyed: a refetch after a sync or toggle must not reset typed values.
+								Configuring the connection needs `integrations.manage`. */}
+							<Show when={can('integrations.manage')}>
+								<ProviderSettings integration={row()} />
+							</Show>
 						</>
 					)}
 				</Show>

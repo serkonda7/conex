@@ -57,8 +57,8 @@ import {
 	tenantContext,
 	tenantContextFilters,
 } from '../../lib/tenant_context'
-import { formatTime } from '../../lib/time'
 import { ExternalTenantPicker } from './external_tenant_picker'
+import { DataAsOf } from './integration_card'
 
 /** Field of a mismatch that can be written to the external system. */
 function pushField(
@@ -311,7 +311,7 @@ export function IntegrationReportPage(): JSX.Element {
 				const level = f.kind === 'site_unlinked' ? 'site' : 'tenant'
 				const id = level === 'site' ? f.site_id : f.tenant_id
 				return (
-					<Show when={canGlobal('integrations.manage') && id !== null}>
+					<Show when={canGlobal('integrations.write') && id !== null}>
 						<button
 							type="button"
 							class="icon-btn icon-btn-connect"
@@ -329,17 +329,17 @@ export function IntegrationReportPage(): JSX.Element {
 			}
 			case 'tenant_missing_in_conex':
 				return (
-					<Show when={canGlobal('integrations.manage')}>
+					<Show when={canGlobal('integrations.write')}>
 						{ignoreButton(() =>
 							ignore_external(provider, tenantLevel(), f.external_id ?? ''),
 						)}
 					</Show>
 				)
 			case 'tenant_stale':
-				return <Show when={canGlobal('integrations.manage')}>{unlink}</Show>
+				return <Show when={canGlobal('integrations.write')}>{unlink}</Show>
 			case 'device_suggestion':
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						{confirmLinkButton(() =>
 							link_external(
 								provider,
@@ -352,7 +352,7 @@ export function IntegrationReportPage(): JSX.Element {
 				)
 			case 'device_missing_in_conex':
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						{ignoreButton(() =>
 							ignore_external(provider, 'device', f.external_id ?? ''),
 						)}
@@ -360,7 +360,7 @@ export function IntegrationReportPage(): JSX.Element {
 				)
 			case 'device_missing_in_external':
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						{/* Providers without create_device cannot accept a device created in conex. */}
 						<Show when={capabilities.create_device}>
 							<button
@@ -381,12 +381,12 @@ export function IntegrationReportPage(): JSX.Element {
 					</Show>
 				)
 			case 'device_stale':
-				return <Show when={can('integrations.manage')}>{unlink}</Show>
+				return <Show when={can('integrations.write')}>{unlink}</Show>
 			case 'device_mismatch': {
 				const field = pushField(f, capabilities.device_push)
 				const pull = pullField(f, capabilities.device_pull)
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						<Show when={f.field === 'tenant' || f.field === 'site'}>{unlink}</Show>
 						{pull !== null && can('edit') && (
 							<button
@@ -421,7 +421,7 @@ export function IntegrationReportPage(): JSX.Element {
 			}
 			case 'employee_suggestion':
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						{capabilities.push &&
 							f.remote === 'active' &&
 							f.external_id !== null &&
@@ -438,7 +438,7 @@ export function IntegrationReportPage(): JSX.Element {
 				)
 			case 'employee_missing_in_conex':
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						{capabilities.push && f.external_id !== null && deactivate}
 						<Show when={can('edit') && f.tenant_id !== null}>
 							<button
@@ -462,16 +462,16 @@ export function IntegrationReportPage(): JSX.Element {
 				)
 			case 'employee_missing_in_external':
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						{ignoreButton(() => ignore_local(provider, 'employee', f.employee_id ?? 0))}
 					</Show>
 				)
 			case 'employee_stale':
-				return <Show when={can('integrations.manage')}>{unlink}</Show>
+				return <Show when={can('integrations.write')}>{unlink}</Show>
 			case 'employee_mismatch': {
 				const field = employeePushField(f)
 				return (
-					<Show when={can('integrations.manage')}>
+					<Show when={can('integrations.write')}>
 						<Show when={f.field === 'tenant'}>{unlink}</Show>
 						{capabilities.push &&
 							f.field === 'status' &&
@@ -591,6 +591,7 @@ export function IntegrationReportPage(): JSX.Element {
 						</Show>
 					</p>
 				</div>
+				<DataAsOf at={report.loading ? undefined : report()?.synced_at} />
 			</div>
 			<InlineError message={error()} />
 			<Show
@@ -641,13 +642,6 @@ export function IntegrationReportPage(): JSX.Element {
 									)}
 								/>
 							</div>
-							<p class="integration-meta integration-report-asof">
-								{report()?.synced_at
-									? t('integration.syncedAt', {
-											time: formatTime(report()?.synced_at ?? 0),
-										})
-									: t('integration.neverSynced')}
-							</p>
 							<Show
 								when={!report.loading}
 								fallback={<Loading message={t('integration.loadingReport')} />}

@@ -268,15 +268,17 @@ async function scopeCompany(
 }
 
 /**
- * Integrations: `integrations.manage` configures and lists providers
- * (credentials verified before saving, secrets never returned), runs syncs
- * and edits links; the reports and boards only need `view`. Links of
- * tenants and sites are global-write like tenants themselves; device and employee
- * links follow the object's tenant scope.
+ * Integrations: `integrations.manage` configures providers (credentials
+ * verified before saving, secrets never returned; enable, remove, test) and
+ * runs full syncs; `integrations.write` lists them, runs syncs and edits
+ * links (role form: write = `integrations.write`, manage = both). The reports
+ * and boards only need `view`. Links of tenants and sites are global-write
+ * like tenants themselves; device and employee links follow the object's
+ * tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers. `tickets.create` opens tickets for tenants in scope and lists
  * their open tickets.
- * `integrations.manage` may also create conex devices in the external system,
+ * `integrations.write` may also create conex devices in the external system,
  * overwrite external device fields with conex values and (with `edit`)
  * import external employees into conex.
  * Microsoft 365 consent (links, connecting and forgetting customer tenants)
@@ -285,10 +287,10 @@ async function scopeCompany(
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
-	.get('/', requirePermissionMiddleware('integrations.manage'), async (c) =>
+	.get('/', requirePermissionMiddleware('integrations.write'), async (c) =>
 		c.json(await listIntegrations()),
 	)
-	.get('/mode', requirePermissionMiddleware('integrations.manage'), (c) =>
+	.get('/mode', requirePermissionMiddleware('integrations.write'), (c) =>
 		c.json<IntegrationModeJson>({ mode: getConfig().integrations.mode }),
 	)
 	.get('/m365/consented', async (c) => {
@@ -349,7 +351,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider',
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		async (c) => sendResult(c, await getIntegration(c.req.valid('param').provider)),
 	)
@@ -390,7 +392,7 @@ export const integrationsApp = new Hono()
 		async (c) => {
 			// Syncs create and update inventory, so they need `edit` as well.
 			const denied =
-				requirePermission(c, 'integrations.manage') ?? requirePermission(c, 'edit')
+				requirePermission(c, 'integrations.write') ?? requirePermission(c, 'edit')
 			if (denied) {
 				return denied
 			}
@@ -603,7 +605,7 @@ export const integrationsApp = new Hono()
 			const userId = requestUser(c).id
 			if (isTenantLevel(input.entity_type)) {
 				const denied =
-					requireGlobalPermission(c, 'integrations.manage') ??
+					requireGlobalPermission(c, 'integrations.write') ??
 					(await checkTenantLevel(c, provider, input.entity_type, input.entity_id))
 				if (denied) {
 					return denied
@@ -620,7 +622,7 @@ export const integrationsApp = new Hono()
 				)
 				return sendResult(c, res.map(linkJson))
 			}
-			const denied = requirePermission(c, 'integrations.manage')
+			const denied = requirePermission(c, 'integrations.write')
 			if (denied) {
 				return denied
 			}
@@ -671,7 +673,7 @@ export const integrationsApp = new Hono()
 			const userId = requestUser(c).id
 			if (isTenantLevel(input.entity_type)) {
 				const denied =
-					requireGlobalPermission(c, 'integrations.manage') ??
+					requireGlobalPermission(c, 'integrations.write') ??
 					(await checkTenantLevel(c, provider, input.entity_type, null))
 				if (denied) {
 					return denied
@@ -689,7 +691,7 @@ export const integrationsApp = new Hono()
 				)
 				return sendResult(c, res.map(linkJson))
 			}
-			const denied = requirePermission(c, 'integrations.manage')
+			const denied = requirePermission(c, 'integrations.write')
 			if (denied) {
 				return denied
 			}
@@ -732,7 +734,7 @@ export const integrationsApp = new Hono()
 		'/:provider/links/ignore-local',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalIgnoreLocalSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -740,7 +742,7 @@ export const integrationsApp = new Hono()
 			if (isTenantLevel(input.entity_type)) {
 				// Tenants and sites are global-write; an ignored one has no company.
 				const denied =
-					requireGlobalPermission(c, 'integrations.manage') ??
+					requireGlobalPermission(c, 'integrations.write') ??
 					(await checkTenantLevel(c, provider, input.entity_type, input.entity_id))
 				if (denied) {
 					return denied
@@ -785,7 +787,7 @@ export const integrationsApp = new Hono()
 		'/:provider/devices',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalDeviceCreateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -812,7 +814,7 @@ export const integrationsApp = new Hono()
 			const input = c.req.valid('json')
 			// Imports create inventory, so they need `edit` as well.
 			const denied =
-				requirePermission(c, 'integrations.manage') ??
+				requirePermission(c, 'integrations.write') ??
 				requirePermission(c, 'edit') ??
 				(await checkTenantRow(c, input.tenant_id))
 			if (denied) {
@@ -825,7 +827,7 @@ export const integrationsApp = new Hono()
 		'/:provider/devices',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalDeviceUpdateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -848,7 +850,7 @@ export const integrationsApp = new Hono()
 		'/:provider/employees/deactivate',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalEmployeeDeactivateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const { external_id } = c.req.valid('json')
@@ -863,7 +865,7 @@ export const integrationsApp = new Hono()
 		'/:provider/employees',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalEmployeeUpdateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -899,7 +901,7 @@ export const integrationsApp = new Hono()
 			const input = c.req.valid('json')
 			// Imports create inventory, so they need `edit` as well.
 			const denied =
-				requirePermission(c, 'integrations.manage') ??
+				requirePermission(c, 'integrations.write') ??
 				requirePermission(c, 'edit') ??
 				(await checkTenantRow(c, input.tenant_id))
 			if (denied) {
@@ -919,12 +921,12 @@ export const integrationsApp = new Hono()
 			}
 			const row = link.value
 			if (row.entity_type === 'tenant' || row.entity_type === 'site') {
-				const denied = requireGlobalPermission(c, 'integrations.manage')
+				const denied = requireGlobalPermission(c, 'integrations.write')
 				if (denied) {
 					return denied
 				}
 			} else {
-				const denied = requirePermission(c, 'integrations.manage')
+				const denied = requirePermission(c, 'integrations.write')
 				if (denied) {
 					return denied
 				}
