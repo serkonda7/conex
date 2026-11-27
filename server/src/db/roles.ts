@@ -17,10 +17,11 @@ import {
 	type RoleCreate,
 	type RoleJson,
 	type RoleUpdate,
+	type ViewAsRoleJson,
 } from 'shared/src/schemas'
 import { role_permissions, roles, user_tenants, users } from '../schema'
 import { getDb, withTransaction } from './connection'
-import { ConflictError, DuplicateError, NotFoundError } from './errors'
+import { ConflictError, DuplicateError, ForbiddenError, NotFoundError } from './errors'
 import {
 	checkExists,
 	countWhere,
@@ -276,4 +277,52 @@ export async function fullAccessRoleId(): Promise<number> {
 	}
 	const name = (await nameTaken('Admin')) ? 'Admin (setup)' : 'Admin'
 	return await insertRole(name, null, [...PERMISSIONS])
+}
+
+// ---------------------------------------------------------------------------
+// View as role: a session may act with another role's permissions, so its
+// user can try the app as that role's users see it. Offered roles follow the
+// subset rule: a role granting nothing the user's own role lacks. Viewing can
+// therefore only take permissions away, so it needs no permission of its own
+// and cannot escalate; tenant scope stays the user's own.
+// ---------------------------------------------------------------------------
+
+/** The requester's own role and permissions, which decide the roles offered. */
+export interface ViewAsOwner {
+	role_id: number
+	permissions: ReadonlySet<Permission>
+}
+
+/** True when `owner` may view the app as `role` (another role, no extra permission). */
+export function canViewAs(
+	owner: ViewAsOwner,
+	role: { id: number; permissions: readonly Permission[] },
+): boolean {
+	return role.id !== owner.role_id && role.permissions.every((p) => owner.permissions.has(p))
+}
+
+/** Roles `owner` may view the app as, by name. */
+export async function listViewAsRoles(owner: ViewAsOwner): Promise<ViewAsRoleJson[]> {
+	const rows = await getDb()
+		.select({ ...getTableColumns(roles), ...roleExtras })
+		.from(roles)
+		.orderBy(asc(roles.name), asc(roles.id))
+	return rows
+		.map(toRoleJson)
+		.filter((role) => canViewAs(owner, role))
+		.map(({ id, name, description }) => ({ id, name, description }))
+}
+
+/** The role to view the app as, when `owner` may: 404 when missing, 403 when not offered. */
+export async function viewAsRole(
+	owner: ViewAsOwner,
+	roleId: number,
+): Promise<Result<RoleJson, Error>> {
+	const role = await getRole(roleId)
+	if (Result.isOk(role) && !canViewAs(owner, role.value)) {
+		return Result.err(
+			new ForbiddenError('Forbidden: the role grants permissions your own role lacks'),
+		)
+	}
+	return role
 }

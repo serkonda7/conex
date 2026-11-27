@@ -580,6 +580,11 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+/* The role the session views the app as, not the own one. */
+.app-user-role.view-as {
+	color: var(--warning);
+}
+
 .app-user-username {
 	max-width: 100%;
 	overflow: hidden;
@@ -1238,6 +1243,54 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 .tenant-bundle {
 	border-radius: 999px;
 	padding: 0.15rem 0.6rem;
+}
+
+/* Service level pill of the tenant subheading: level, then its bundles. */
+.tenant-level {
+	position: relative;
+	display: inline-flex;
+	align-items: stretch;
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+	font-size: var(--font-size-sm);
+	line-height: 1.4;
+	white-space: nowrap;
+}
+
+.tenant-level-name {
+	padding: 0.15rem 0.6rem;
+	border-radius: 999px 0 0 999px;
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+	font-weight: 600;
+}
+
+.tenant-level-bundles {
+	padding: 0.15rem 0.6rem 0.15rem 0.5rem;
+}
+
+.tenant-level[tabindex] {
+	cursor: default;
+}
+
+.tenant-level-popover {
+	display: none;
+	position: absolute;
+	top: calc(100% + 0.3rem);
+	left: 0;
+	z-index: 20;
+	margin: 0;
+	padding: 0.4rem 0.7rem;
+	list-style: none;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+}
+
+.tenant-level:hover .tenant-level-popover,
+.tenant-level:focus-visible .tenant-level-popover {
+	display: block;
 }
 
 .card {
@@ -6168,6 +6221,27 @@ a.rack-shelf-plate:hover {
 }
 
 /* Outside live mode: says the integrations are mocked or offline. */
+/* Shown above every page while viewing the app as another role. */
+.view-as-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	padding: 0.5rem 1rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+	background-color: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+}
+
+.view-as-banner > svg {
+	flex: none;
+	color: var(--warning);
+}
+
+.view-as-banner-text {
+	flex: 1;
+	min-width: 12rem;
+}
+
 .integrations-mode-banner {
 	display: flex;
 	align-items: center;
@@ -6587,6 +6661,10 @@ a.rack-shelf-plate:hover {
 
 .settings-icon-prefs {
 	color: var(--link);
+}
+
+.settings-icon-view-as {
+	color: var(--warning);
 }
 
 @media (max-width: 30rem) {

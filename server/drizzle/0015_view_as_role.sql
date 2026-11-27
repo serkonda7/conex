@@ -1,0 +1,2 @@
+ALTER TABLE "sessions" ADD COLUMN "view_as_role_id" integer;--> statement-breakpoint
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_view_as_role_id_roles_id_fk" FOREIGN KEY ("view_as_role_id") REFERENCES "public"."roles"("id") ON DELETE set null ON UPDATE no action;

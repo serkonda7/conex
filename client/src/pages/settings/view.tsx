@@ -1,22 +1,124 @@
 /**
  * /settings — the signed-in user's own account settings: read-only identity,
- * UI language, the "open items in a new tab" preference and a self-service
- * password change. Available to every signed-in user, so the section needs no
- * permission beyond the session.
+ * UI language, the "open items in a new tab" preference, a self-service
+ * password change and "view as role". Available to every signed-in user, so
+ * the section needs no permission beyond the session.
  */
-import { IconAdjustments, IconLock, IconShieldCheck, IconUserCog } from '@tabler/icons-solidjs'
-import { createResource, createSignal, type JSX, Show } from 'solid-js'
-import { fetchMe } from '../../api/auth'
+import {
+	IconAdjustments,
+	IconEye,
+	IconLock,
+	IconShieldCheck,
+	IconUserCog,
+} from '@tabler/icons-solidjs'
+import { Result } from 'better-result'
+import { createResource, createSignal, createUniqueId, For, type JSX, Show } from 'solid-js'
+import {
+	fetchMe,
+	fetchViewAsRoles,
+	type SessionUser,
+	setViewAs,
+	type ViewAsRoleJson,
+} from '../../api/auth'
 import { LanguageSwitcher } from '../../app/language_switcher'
 import { PasswordDialog } from '../../app/password_dialog'
 import { InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t } from '../../i18n'
 import { openItemsInNewTab, setOpenItemsInNewTab } from '../../lib/preferences'
+import { updateSessionUser } from '../../lib/session'
+
+/**
+ * "View as role": try the app with the permissions of a role that grants
+ * nothing beyond the user's own (the server decides which are offered).
+ * Hidden when no role is offered and the session is not viewing as one.
+ */
+function ViewAsSection(props: {
+	user: SessionUser
+	onChange: (user: SessionUser) => void
+}): JSX.Element {
+	const id = createUniqueId()
+	const [roles] = createResource(fetchViewAsRoles)
+	const [busy, setBusy] = createSignal(false)
+	const [error, setError] = createSignal<string | null>(null)
+	const offered = (): ViewAsRoleJson[] => {
+		const res = roles()
+		return res && Result.isOk(res) ? res.value : []
+	}
+	const loadError = (): string | null => {
+		const res = roles()
+		return res && Result.isError(res) ? res.error.message : null
+	}
+	const shown = (): boolean =>
+		props.user.view_as !== null || offered().length > 0 || loadError() !== null
+	const hint = (): string | null => {
+		const viewed = props.user.view_as
+		const role = viewed && offered().find((r) => r.id === viewed.id)
+		return role ? role.description : null
+	}
+
+	async function handleChange(value: string): Promise<void> {
+		setBusy(true)
+		setError(null)
+		const res = await setViewAs(value === '' ? null : Number(value))
+		setBusy(false)
+		if (Result.isError(res)) {
+			setError(res.error.message)
+			return
+		}
+		props.onChange(res.value)
+		updateSessionUser(res.value)
+	}
+
+	return (
+		<Show when={shown()}>
+			<section aria-label={t('viewAs.section')}>
+				<h4>
+					<IconEye class="settings-icon-view-as" size={16} aria-hidden="true" />
+					<span>{t('viewAs.section')}</span>
+				</h4>
+				<dl>
+					<dt>
+						<label for={id}>{t('viewAs.role')}</label>
+						<span class="settings-hint">{t('viewAs.description')}</span>
+					</dt>
+					<dd>
+						<select
+							id={id}
+							disabled={busy() || roles.loading}
+							onChange={(e: Event & { currentTarget: HTMLSelectElement }): void => {
+								void handleChange(e.currentTarget.value)
+							}}
+						>
+							{/* `selected` per option: the offered roles arrive after the select renders. */}
+							<option value="" selected={props.user.view_as === null}>
+								{t('viewAs.ownRole', { role: props.user.role.name })}
+							</option>
+							<For each={offered()}>
+								{(role: ViewAsRoleJson): JSX.Element => (
+									<option
+										value={role.id}
+										selected={props.user.view_as?.id === role.id}
+									>
+										{role.name}
+									</option>
+								)}
+							</For>
+						</select>
+						<Show when={hint()}>
+							{(text: () => string) => <span class="settings-hint">{text()}</span>}
+						</Show>
+						<InlineError message={error() ?? loadError()} alert />
+					</dd>
+				</dl>
+			</section>
+		</Show>
+	)
+}
 
 /** Account settings of the signed-in user. */
 export function SettingsPage(): JSX.Element {
-	const [user] = createResource(fetchMe)
+	const [user, { mutate }] = createResource(fetchMe)
 	const [changingPassword, setChangingPassword] = createSignal(false)
 
 	return (
@@ -101,6 +203,15 @@ export function SettingsPage(): JSX.Element {
 							</dd>
 						</dl>
 					</section>
+
+					<Show when={user()}>
+						{(current: () => SessionUser) => (
+							<ViewAsSection
+								user={current()}
+								onChange={(next: SessionUser) => mutate(next)}
+							/>
+						)}
+					</Show>
 				</section>
 			</Show>
 

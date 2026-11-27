@@ -2013,9 +2013,27 @@ export const SessionUserSchema = v.object({
 	tenant_ids: v.nullable(v.array(v.number())),
 	/** The employee behind the account, if linked. */
 	employee_id: v.nullable(v.number()),
+	/**
+	 * Role the session views the app as ("view as role" in the account
+	 * settings); null = own role. `permissions` are this role's while set,
+	 * `role` stays the user's own.
+	 */
+	view_as: v.nullable(v.object({ id: v.number(), name: v.string() })),
 })
 
 export type SessionUser = v.InferOutput<typeof SessionUserSchema>
+
+/** `PUT /auth/view-as`: the role to view the app as, null to return to the own role. */
+export const ViewAsSchema = v.strictObject({
+	role_id: v.nullable(IdSchema),
+})
+
+/** A role offered by `GET /auth/view-as`: one granting nothing the user's own role lacks. */
+export interface ViewAsRoleJson {
+	id: number
+	name: string
+	description: string | null
+}
 
 /**
  * Roles bundle permissions and are assigned to users (one role per user).

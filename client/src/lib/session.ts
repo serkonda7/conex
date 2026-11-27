@@ -5,7 +5,7 @@
  * such requests with 403 either way).
  */
 
-import type { Permission } from 'shared/src/types'
+import type { Permission, SessionUser } from 'shared/src/types'
 import { createSignal } from 'solid-js'
 
 const [permissions, setPermissions] = createSignal<ReadonlySet<Permission>>(new Set())
@@ -52,4 +52,19 @@ export function sessionEmployeeId(): number | null {
 /** `permission` on shared data (catalog, tenants, tenant links): global users only. */
 export function canGlobal(permission: Permission): boolean {
 	return can(permission) && !isScoped()
+}
+
+let sessionUserHandler: ((user: SessionUser) => void) | null = null
+
+/** Registers the shell's handler for a changed session identity (set by `App`). */
+export function setSessionUserHandler(handler: ((user: SessionUser) => void) | null): void {
+	sessionUserHandler = handler
+}
+
+/**
+ * Hands the shell the session's new identity, e.g. after switching the role
+ * the app is viewed as, so navigation, permissions and cached rows follow.
+ */
+export function updateSessionUser(user: SessionUser): void {
+	sessionUserHandler?.(user)
 }

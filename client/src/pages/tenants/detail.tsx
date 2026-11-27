@@ -71,10 +71,10 @@ import { TenantTickets } from '../tickets/tenant_tickets'
 const RECENT_CHANGES = 5
 
 /**
- * /tenants/:id — tenant dashboard: "Needs attention" (integration
- * findings), open tickets, site cards and the related devices/employees/
- * racks/VMs/site groups (if any) as tabs on the left; the details and the recent
- * changes on the right.
+ * /tenants/:id — tenant dashboard: the details, open tickets, site cards and
+ * the related devices/employees/racks/VMs/site groups (if any) as tabs on the
+ * left; "Needs attention" (integration findings) and the recent changes on
+ * the right.
  */
 export function TenantDetailPage(props: { id: number }): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -275,7 +275,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 
 				<div class="tenant-dashboard">
 					<div>
-						<NeedsAttention tenantId={props.id} integrations={integrations() ?? []} />
+						<DetailsCard tenant={tenant()} />
 						<TenantTickets tenantId={props.id} />
 						<M365TenantCard tenantId={props.id} />
 						<SitesCard
@@ -294,7 +294,7 @@ export function TenantDetailPage(props: { id: number }): JSX.Element {
 					</div>
 
 					<div>
-						<DetailsCard tenant={tenant()} />
+						<NeedsAttention tenantId={props.id} integrations={integrations() ?? []} />
 						<Show when={can('changelog.view')}>
 							<RecentChanges
 								tenantId={props.id}
@@ -334,14 +334,64 @@ function Subheading(props: {
 			<Show when={hasBundles() && (hasNumber() || hasGroup())}>
 				<span class="page-subtitle">·</span>
 			</Show>
-			<For each={props.tenant?.bundles}>
-				{(bundle: TenantBundleJson): JSX.Element => (
-					<span class="badge tenant-bundle">
-						{bundle.managed_bundle_name} · {bundle.service_level_name}
-					</span>
-				)}
+			<For each={groupByLevel(props.tenant?.bundles ?? [])}>
+				{(group: LevelGroup): JSX.Element => <BundleLevelPill group={group} />}
 			</For>
 		</div>
+	)
+}
+
+/** Bundle names shown in a service level pill before "+N" takes over. */
+const VISIBLE_BUNDLES = 3
+
+/** The contracted bundles of one service level. */
+interface LevelGroup {
+	level: string
+	bundles: string[]
+}
+
+/** Bundles grouped by service level, in the order the levels first appear. */
+function groupByLevel(bundles: readonly TenantBundleJson[]): LevelGroup[] {
+	const groups = new Map<number, LevelGroup>()
+	for (const bundle of bundles) {
+		const group = groups.get(bundle.service_level_id)
+		if (group) {
+			group.bundles.push(bundle.managed_bundle_name)
+		} else {
+			groups.set(bundle.service_level_id, {
+				level: bundle.service_level_name,
+				bundles: [bundle.managed_bundle_name],
+			})
+		}
+	}
+	return [...groups.values()]
+}
+
+/**
+ * One pill per service level: the level, then its first bundles and "+N";
+ * hovering or focusing a truncated pill lists all of its bundles.
+ */
+function BundleLevelPill(props: { group: LevelGroup }): JSX.Element {
+	const shown = (): string[] => props.group.bundles.slice(0, VISIBLE_BUNDLES)
+	const hidden = (): number => props.group.bundles.length - shown().length
+	return (
+		<span class="tenant-level" tabindex={hidden() > 0 ? 0 : undefined}>
+			<span class="tenant-level-name">{props.group.level}</span>
+			<span class="tenant-level-bundles">
+				{shown().join(', ')}
+				<Show when={hidden() > 0}>
+					{' '}
+					<span class="text-muted">{t('tenant.moreBundles', { count: hidden() })}</span>
+				</Show>
+			</span>
+			<Show when={hidden() > 0}>
+				<ul class="tenant-level-popover" role="tooltip">
+					<For each={props.group.bundles}>
+						{(name: string): JSX.Element => <li>{name}</li>}
+					</For>
+				</ul>
+			</Show>
+		</span>
 	)
 }
 

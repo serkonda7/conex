@@ -21,7 +21,7 @@ import { type Locale, locale, t } from '../i18n'
 import { loadUserPreferences } from '../lib/preferences'
 import { queryClient } from '../lib/query'
 import { goTo, path } from '../lib/router'
-import { setSessionAccess } from '../lib/session'
+import { setSessionAccess, setSessionUserHandler } from '../lib/session'
 import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
 import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
@@ -32,6 +32,7 @@ import { pageTitle } from './routes'
 import { MobileSidebar, Sidebar, SidebarCorner } from './sidebar'
 import { TenantContextSelector } from './tenant_context_selector'
 import { LogoutButton, UserMenu } from './user_menu'
+import { ViewAsBanner } from './view_as_banner'
 
 /**
  * Routes in-app anchors that have no click handler of their own through
@@ -161,6 +162,11 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 					/>
 				</Show>
 				<div class="app-main">
+					<Show when={props.user.view_as}>
+						{(role: () => { id: number; name: string }) => (
+							<ViewAsBanner roleName={role().name} />
+						)}
+					</Show>
 					<main class="app-content" id="main">
 						{/* Remount the page for each path so it fetches fresh data. */}
 						<Show when={path()} keyed>
@@ -204,6 +210,11 @@ function App(): JSX.Element {
 
 	// A 401 can answer any request once the server session timed out.
 	set_unauthorized_handler(() => setUser(null))
+	// Viewing as another role changes permissions: cached rows reload under them.
+	setSessionUserHandler((next: SessionUser) => {
+		setUser(next)
+		void queryClient.resetQueries()
+	})
 
 	async function handleLogout(): Promise<void> {
 		await logout()

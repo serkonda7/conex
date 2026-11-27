@@ -73,6 +73,7 @@ export function LoginPage(props: { onLogin: (user: SessionUser) => void }): JSX.
 			permissions: [],
 			tenant_ids: null,
 			employee_id: null,
+			view_as: null,
 		}
 		props.onLogin((await fetchMe()) ?? fallback)
 	}
@@ -147,6 +148,7 @@ export function SetupPage(props: {
 				permissions: [],
 				tenant_ids: null,
 				employee_id: null,
+				view_as: null,
 			},
 		)
 	}

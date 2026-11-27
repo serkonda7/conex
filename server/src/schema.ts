@@ -133,6 +133,14 @@ export const sessions = pgTable(
 		created_at: bigint('created_at', { mode: 'number' }).notNull(),
 		last_seen_at: bigint('last_seen_at', { mode: 'number' }).notNull(),
 		expires_at: bigint('expires_at', { mode: 'number' }).notNull(),
+		/**
+		 * "View as role": the session acts with this role's permissions instead
+		 * of the user's own (see `authenticate`); null = own role. Per session,
+		 * so signing out always ends it.
+		 */
+		view_as_role_id: integer('view_as_role_id').references(() => roles.id, {
+			onDelete: 'set null',
+		}),
 	},
 	(table) => [
 		index('sessions_expires_at_idx').on(table.expires_at),

@@ -1,7 +1,8 @@
+import { Result } from 'better-result'
 import { and, eq, gt, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { sign } from 'hono/jwt'
 import type { CookieOptions } from 'hono/utils/cookie'
-import { PERMISSIONS } from 'shared/src/schemas'
+import { PERMISSIONS, type Permission, type RoleJson } from 'shared/src/schemas'
 import {
 	SESSION_ABSOLUTE_TIMEOUT_S,
 	SESSION_IDLE_TIMEOUT_S,
@@ -11,6 +12,7 @@ import { getConfig } from './config'
 import { pruneAuditLog } from './db/audit'
 import { pruneChangelog } from './db/changelog'
 import { getDb } from './db/connection'
+import { type ViewAsOwner, viewAsRole } from './db/roles'
 import { getSigningKey } from './keys'
 import { JWT_ALGO, type JwtPayload } from './middleware/auth'
 import {
@@ -67,7 +69,8 @@ function idleCutoff(now: number): number {
  * at most every `SESSION_TOUCH_INTERVAL_S`, and loads the role name,
  * permissions and tenant scope live, so role and membership edits apply on
  * the next request. Null when any check fails; invalid sessions are left to
- * `sweepExpired`.
+ * `sweepExpired`. A session viewing the app as another role gets that role's
+ * permissions (`viewedRole`).
  *
  * Tenant scope: the employee's tenants in membership order (`[]` when none)
  * for employee-linked accounts, else the account's `user_tenants`, where
@@ -83,7 +86,12 @@ export async function authenticate(sid: string, sub: string): Promise<CurrentUse
 	)
 	const session = db
 		.$with('s')
-		.as(db.select({ user_id: sessions.user_id }).from(sessions).where(live))
+		.as(
+			db
+				.select({ user_id: sessions.user_id, view_as_role_id: sessions.view_as_role_id })
+				.from(sessions)
+				.where(live),
+		)
 	// Runs although unreferenced; matches no row (and writes nothing) while
 	// `last_seen_at` is recent.
 	const touch = db.$with('touch').as(
@@ -118,6 +126,7 @@ export async function authenticate(sid: string, sub: string): Promise<CurrentUse
 			role_id: users.role_id,
 			role_name: roles.name,
 			employee_id: users.employee_id,
+			view_as_role_id: session.view_as_role_id,
 			permissions: sql<string[]>`coalesce((${permissions}), '[]'::jsonb)`,
 			tenant_ids: sql<number[] | null>`case when ${users.employee_id} is not null
 				then coalesce((${employeeScope}), '[]'::jsonb) else (${ownScope}) end`,
@@ -138,15 +147,51 @@ export async function authenticate(sid: string, sub: string): Promise<CurrentUse
 	}
 	// Catalog order; unknown stored strings are dropped (as `rolePermissions`).
 	const granted = new Set(row.permissions)
+	const own: ReadonlySet<Permission> = new Set(PERMISSIONS.filter((p) => granted.has(p)))
+	const viewed =
+		row.view_as_role_id === null
+			? null
+			: await viewedRole({ role_id: row.role_id, permissions: own }, row.view_as_role_id)
 	return {
 		id: row.id,
 		username: row.username,
 		role_id: row.role_id,
 		role_name: row.role_name,
-		permissions: new Set(PERMISSIONS.filter((p) => granted.has(p))),
+		permissions: viewed ? new Set(viewed.permissions) : own,
+		own_permissions: own,
+		view_as: viewed ? { role_id: viewed.id, role_name: viewed.name } : null,
 		tenant_ids: row.tenant_ids,
 		employee_id: row.employee_id,
 	}
+}
+
+/**
+ * The role a session views the app as, re-checked per request: when the
+ * user's role changed so that it is no longer offered (`canViewAs`), the
+ * session falls back to the own role.
+ */
+async function viewedRole(owner: ViewAsOwner, roleId: number): Promise<RoleJson | null> {
+	const role = await viewAsRole(owner, roleId)
+	return Result.isOk(role) ? role.value : null
+}
+
+/**
+ * Lets session `sid` view the app as role `roleId` (null = own role again).
+ * 404 for a missing role, 403 for one `owner` may not view as.
+ */
+export async function setSessionViewAs(
+	sid: string,
+	owner: ViewAsOwner,
+	roleId: number | null,
+): Promise<Result<undefined, Error>> {
+	if (roleId !== null) {
+		const role = await viewAsRole(owner, roleId)
+		if (Result.isError(role)) {
+			return role
+		}
+	}
+	await getDb().update(sessions).set({ view_as_role_id: roleId }).where(eq(sessions.id, sid))
+	return Result.ok(undefined)
 }
 
 export async function invalidateSession(sid: string): Promise<void> {

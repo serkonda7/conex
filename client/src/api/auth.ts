@@ -5,13 +5,14 @@
  * bypass the typed `hono/client` RPC in `client.ts`. They still live here instead
  * of inline in components, so endpoint paths and `{ error }` parsing exist once.
  */
-import type { Result } from 'better-result'
-import { type SessionUser, SessionUserSchema } from 'shared/src/schemas'
+import { Result } from 'better-result'
+import { type SessionUser, SessionUserSchema, type ViewAsRoleJson } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { t } from '../i18n'
-import { post_json } from './client'
+import { api_fetch } from '../lib/query'
+import { post_json, to_result } from './client'
 
-export type { SessionUser }
+export type { SessionUser, ViewAsRoleJson }
 
 /** True when no admin account exists yet. Never throws: null on network error. */
 export async function fetchSetupStatus(): Promise<boolean | null> {
@@ -83,5 +84,38 @@ export async function logout(): Promise<void> {
 		await fetch('/api/auth/logout', { method: 'POST' })
 	} catch (err) {
 		console.error('Logout failed', err)
+	}
+}
+
+/** Roles the signed-in user may view the app as (none granting more than the own role). */
+export async function fetchViewAsRoles(): Promise<Result<ViewAsRoleJson[], Error>> {
+	try {
+		return await to_result<ViewAsRoleJson[]>(
+			await api_fetch('/api/auth/view-as'),
+			t('api.viewAsRolesFailed'),
+		)
+	} catch {
+		return Result.err(new Error(t('api.networkError')))
+	}
+}
+
+/** Views the app as role `roleId` (null = own role); returns the session's new identity. */
+export async function setViewAs(roleId: number | null): Promise<Result<SessionUser, Error>> {
+	try {
+		const res = await api_fetch('/api/auth/view-as', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ role_id: roleId }),
+		})
+		const body = await to_result<unknown>(res, t('api.viewAsFailed'))
+		if (Result.isError(body)) {
+			return body
+		}
+		const parsed = v.safeParse(SessionUserSchema, body.value)
+		return parsed.success
+			? Result.ok(parsed.output)
+			: Result.err(new Error(t('api.viewAsFailed')))
+	} catch {
+		return Result.err(new Error(t('api.networkError')))
 	}
 }
