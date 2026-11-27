@@ -1568,19 +1568,16 @@ export const de: Messages = {
 	'integration.baseUrl': 'Server-URL',
 	'integration.baseUrlRequired': 'Server-URL ist erforderlich.',
 	'integration.username': 'Benutzername',
-	'integration.usernameHint':
-		'Eigener Benutzer mit Leserechten und ohne Zwei-Faktor-Authentifizierung: Synchronisierungen laufen unbeaufsichtigt.',
+	'integration.usernameHint': 'Nutzer ohne 2FA. Für Synchronisierung von Daten',
 	'integration.mailAddress': 'E-Mail-Adresse',
-	'integration.mailAddressHint':
-		'E-Mail-Adresse eines eigenen Octoja-Benutzers mit Leserechten und ohne Zwei-Faktor-Authentifizierung: Synchronisierungen laufen unbeaufsichtigt.',
+	'integration.mailAddressHint': 'Nutzer ohne 2FA. Für Synchronisierung von Daten',
 	'integration.mailAddressRequired': 'E-Mail-Adresse ist erforderlich.',
 	'integration.apiKey': 'API-Schlüssel',
 	'integration.apiKeyHint':
-		'Site-Manager-API-Schlüssel von unifi.ui.com → API. Ein Organisationsschlüssel erreicht alle Konsolen der Organisation, ein persönlicher Schlüssel nur Ihre eigenen Konsolen.',
+		'Site-Manager-API-Schlüssel von unifi.ui.com. Für Zugriff auf alle verwalteten Konsolen',
 	'integration.apiKeyRequired': 'API-Schlüssel ist erforderlich.',
 	'integration.erpToken': 'ERP-API-Token',
-	'integration.erpTokenHint':
-		'API-Token der externen API-Rolle ERP, inklusive Präfix „Bearer“. Wird für die Firmenliste verwendet.',
+	'integration.erpTokenHint': '„Bearer <token>“. Zum Abruf der Firmenliste',
 	'integration.erpTokenRequired': 'ERP-API-Token ist erforderlich.',
 	'integration.keepSecret': 'Leer lassen, um den gespeicherten Wert zu behalten',
 	'integration.enabled': 'Aktiviert',
@@ -1603,6 +1600,11 @@ export const de: Messages = {
 	'integration.layoutGrid': 'Kacheln',
 	'integration.layoutList': 'Liste',
 	'integration.summaryOk': '{count} fehlerfrei verbunden',
+	'integration.modeFailed': 'Integrationsmodus konnte nicht geladen werden',
+	'integration.modeMockBanner':
+		'Entwicklungsmodus: Integrationen sind simuliert. Die Daten stammen aus gespeicherten Momentaufnahmen; externe Systeme werden nicht kontaktiert.',
+	'integration.modeOfflineBanner':
+		'Entwicklungsmodus: Integrationen sind offline. Externe Systeme werden nicht kontaktiert, daher schlagen Verbindungen und Synchronisierungen fehl.',
 	'integration.summaryError': '{count} mit Fehler verbunden',
 	'integration.status.connected': 'Verbunden',
 	'integration.status.error': 'Verbindung fehlgeschlagen',
@@ -1612,7 +1614,6 @@ export const de: Messages = {
 	'integration.lastSyncFailed': 'Letzte Synchronisierung fehlgeschlagen',
 	'integration.syncStarted': 'Gestartet: {time}',
 	'integration.runFirstSync': 'Erste Synchronisierung starten',
-	'integration.fixConnection': 'Verbindung prüfen →',
 	'integration.settings': 'Einstellungen',
 	'integration.views': 'Bereiche',
 	'integration.saved': 'Gespeichert.',
@@ -1620,8 +1621,6 @@ export const de: Messages = {
 	'integration.dangerZone': 'Gefahrenbereich',
 	'integration.remove': 'Entfernen',
 	'integration.removeTitle': '{name} entfernen',
-	'integration.removeText':
-		'Löscht die Zugangsdaten, alle Verknüpfungen mit {name}-Objekten, ignorierte Einträge und den Synchronisierungsverlauf. Um die Integration nur anzuhalten, deaktivieren Sie sie stattdessen.',
 	'integration.reportFailed': 'Datenabgleich konnte nicht geladen werden',
 	'integration.loadingReport': 'Bericht wird geladen…',
 	'integration.statusFailed': 'Integrationsstatus konnte nicht geladen werden',
@@ -1661,6 +1660,8 @@ export const de: Messages = {
 	'integration.alreadyLinked': 'verknüpft',
 	'integration.active': 'Aktiv',
 	'integration.inactive': 'Inaktiv',
+	'integration.reportScopeTenant': 'Nur Befunde von {tenant}',
+	'integration.reportScopeGroup': 'Nur Befunde der Gruppe {group}',
 	'integration.viewReport': 'Datenabgleich',
 	'integration.reportNoIntegrations':
 		'Keine Integration ist aktiviert. Richte eine ein, um ihre Daten abzugleichen.',
@@ -1676,7 +1677,10 @@ export const de: Messages = {
 	// cross-integration matching
 	'matching.title': 'Zuordnung',
 	'matching.kind': 'Objekttyp',
-	'matching.pickTenant': 'Wähle oben einen Mandanten, um seine Geräte und Mitarbeiter zuzuordnen.',
+	'matching.tenantScopeDevices': 'Zeigt nur Geräte von {tenant}',
+	'matching.tenantScopeEmployees': 'Zeigt nur Mitarbeiter von {tenant}',
+	'matching.pickTenant':
+		'Wähle oben einen Mandanten, um seine Geräte und Mitarbeiter zuzuordnen.',
 	'matching.noIntegrations':
 		'Keine Integration ist aktiviert. Richte eine ein, um Objekte zuzuordnen.',
 	'matching.search': 'Name, Seriennummer oder Treffer suchen…',
@@ -1827,8 +1831,6 @@ export const de: Messages = {
 	'calendarSync.scheduleHint':
 		'Solange aktiviert, läuft die Synchronisierung in diesem Abstand von selbst.',
 	'calendarSync.saveAndEnable': 'Speichern und aktivieren',
-	'calendarSync.removeText':
-		'Löscht die Einstellungen der Microsoft-365-App, die Technikerzuordnungen und den Synchronisierungsverlauf. Bereits in Outlook angelegte Termine bleiben dort und werden nicht mehr aktualisiert. Um die Synchronisierung nur anzuhalten, deaktivieren Sie sie stattdessen.',
 	'calendarSync.confirmRemoveSync':
 		'Outlook-Kalendersynchronisation entfernen? Bereits in Outlook angelegte Termine bleiben dort und werden nicht mehr aktualisiert.',
 	'calendarSync.removeFailed': 'Kalendersynchronisation konnte nicht entfernt werden',

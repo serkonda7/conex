@@ -189,22 +189,17 @@ export function SettingsSection(props: {
 }
 
 /**
- * Last block of the Settings tab: removing the integration, with what it
- * deletes. Disabling is the everyday off switch; this is for good.
+ * Last block of the Settings tab: removing the integration. Disabling is the
+ * everyday off switch; this is for good.
  */
 export function DangerZone(props: {
 	name: string
-	/** What removing deletes and what stays. */
-	text: string
 	pending: boolean
 	onRemove: () => void
 }): JSX.Element {
 	return (
 		<section class="card integration-danger-zone" aria-label={t('integration.dangerZone')}>
-			<div>
-				<h3>{t('integration.removeTitle', { name: props.name })}</h3>
-				<p>{props.text}</p>
-			</div>
+			<h3>{t('integration.removeTitle', { name: props.name })}</h3>
 			<button
 				type="button"
 				class="btn-danger"

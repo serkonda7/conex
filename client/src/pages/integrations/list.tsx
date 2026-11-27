@@ -19,10 +19,10 @@ import { createRecord, createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { CalendarSyncCard, calendarNeedsAttention } from './calendar_sync'
-import { settingsHref } from './detail_parts'
 import {
 	IntegrationCard,
 	type IntegrationLayout,
+	IntegrationModeBanner,
 	type IntegrationStatus,
 	integrationLayout,
 	LastRunError,
@@ -131,13 +131,6 @@ function ProviderCard(props: {
 								/>
 							</>
 						}
-						link={
-							<Show when={status() === 'error' && can('integrations.manage')}>
-								<a href={settingsHref(detailHref(integration()))}>
-									{t('integration.fixConnection')}
-								</a>
-							</Show>
-						}
 						action={
 							<Show when={can('integrations.manage')}>
 								<Show
@@ -201,6 +194,7 @@ function LayoutToggle(): JSX.Element {
  * connected / needs-attention summary in the header. A card opens the detail
  * page (an unconfigured one its setup), never a form in place; it has no ⋯
  * menu and no remove action (design decision 0006). Admins set up providers here.
+ * Outside `live` mode a banner says the integrations are mocked or offline.
  */
 export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -268,6 +262,7 @@ export function IntegrationsPage(): JSX.Element {
 				</div>
 				<LayoutToggle />
 			</div>
+			<IntegrationModeBanner />
 			<Show
 				when={!integrations.loading || integrations() !== undefined}
 				fallback={

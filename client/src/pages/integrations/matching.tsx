@@ -7,11 +7,12 @@ import {
 	IconCircleDashed,
 	IconDeviceFloppy,
 	IconDownload,
+	IconInfoCircle,
 	IconSparkles,
 	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { JSX } from 'solid-js'
+import type { Accessor, JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import {
 	fetch_integrations,
@@ -35,7 +36,7 @@ import { compareFieldLabel, providerLabel } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
 import { queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal, isScoped } from '../../lib/session'
-import { newObjectTenantId } from '../../lib/tenant_context'
+import { contextTenantRows, newObjectTenantId } from '../../lib/tenant_context'
 import { ImportDeviceDialog } from './import_device_dialog'
 
 type Kind = LinkEntityType
@@ -238,6 +239,8 @@ export function MatchingPage(): JSX.Element {
 	)
 	// Devices and employees are matched for the tenant of the global selection.
 	const tenant = newObjectTenantId
+	const tenantName = (): string | undefined =>
+		contextTenantRows().find((row) => row.id === tenant())?.name
 	const [filter, setFilter] = createSignal<Filter>('all')
 	const [search, setSearch] = createSignal('')
 	const [drafts, setDrafts] = createSignal(new Map<string, string>())
@@ -1048,6 +1051,20 @@ export function MatchingPage(): JSX.Element {
 				</span>
 				<div class="matching-heading">
 					<h2>{t('matching.title')}</h2>
+					<p class="link-board-hint matching-tenant-hint">
+						<Show when={!isTopLevel(kind()) && tenantName()}>
+							{(name: Accessor<string>): JSX.Element => (
+								<IconLabel icon={IconInfoCircle}>
+									{t(
+										kind() === 'device'
+											? 'matching.tenantScopeDevices'
+											: 'matching.tenantScopeEmployees',
+										{ tenant: name() },
+									)}
+								</IconLabel>
+							)}
+						</Show>
+					</p>
 				</div>
 			</div>
 

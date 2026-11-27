@@ -44,6 +44,7 @@ import {
 import { type TestResult, TestResultLine } from './form_fields'
 import {
 	IntegrationCard,
+	IntegrationModeBanner,
 	type IntegrationStatus,
 	LastRunError,
 	LastRunTime,
@@ -239,7 +240,6 @@ function SettingsPanel(props: {
 			<Show when={props.config.configured}>
 				<DangerZone
 					name={t('calendarSync.title')}
-					text={t('calendarSync.removeText')}
 					pending={remove.pending()}
 					onRemove={() => void handleRemove()}
 				/>
@@ -491,6 +491,7 @@ export function CalendarSyncDetailPage(): JSX.Element {
 
 	return (
 		<div class="integration-detail">
+			<IntegrationModeBanner />
 			<Show
 				when={!config.loading || config() !== undefined}
 				fallback={<Loading message={t('calendarSync.loading')} />}
@@ -648,13 +649,6 @@ function ConfigurableSyncCard(): JSX.Element {
 								<InlineError message={error()} />
 							</>
 						) : undefined
-					}
-					link={
-						<Show when={c().configured && status(c()) === 'error'}>
-							<a href={settingsHref(CALENDAR_SYNC_HREF)}>
-								{t('integration.fixConnection')}
-							</a>
-						</Show>
 					}
 					action={
 						<Show

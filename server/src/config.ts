@@ -1,12 +1,9 @@
 import fs from 'node:fs'
 import { Result } from 'better-result'
-import { AI_PROVIDERS, OPENCODE_MODEL_PATTERN } from 'shared/src/schemas'
+import { AI_PROVIDERS, INTEGRATION_MODES, OPENCODE_MODEL_PATTERN } from 'shared/src/schemas'
 import * as v from 'valibot'
 import { getTrimmedEnv } from './util/server_root'
 import { formatValibotIssues } from './util/valibot'
-
-export const INTEGRATION_MODES = ['live', 'offline', 'mock'] as const
-export type IntegrationMode = (typeof INTEGRATION_MODES)[number]
 
 /**
  * Schema definition of config file structure and fields.

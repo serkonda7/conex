@@ -12,6 +12,7 @@ import {
 	useIntegrationForm,
 	validateIntegrationForm,
 } from './form_fields'
+import { IntegrationModeBanner } from './integration_card'
 
 /** `?provider=` of the add page; TANSS when missing or unknown. */
 function parseProvider(raw: string): IntegrationProvider {
@@ -49,6 +50,7 @@ export function IntegrationAddPage(): JSX.Element {
 			singleton
 			onSubmit={handleCreate}
 		>
+			<IntegrationModeBanner />
 			<IntegrationFormFields provider={provider} form={fields} editing={false} />
 		</FormPage>
 	)

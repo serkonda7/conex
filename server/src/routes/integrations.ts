@@ -17,6 +17,7 @@ import {
 	ExternalTenantQuerySchema,
 	IntegrationCreateSchema,
 	IntegrationEntityParamsSchema,
+	type IntegrationModeJson,
 	IntegrationParamsSchema,
 	IntegrationReportQuerySchema,
 	IntegrationSyncQuerySchema,
@@ -45,6 +46,7 @@ import {
 	requireGlobalScope,
 	requirePermission,
 } from '../authz'
+import { getConfig } from '../config'
 import { exists } from '../db/list'
 import { deviceTenant, employeeTenants } from '../db/owners'
 import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
@@ -285,6 +287,9 @@ export const integrationsApp = new Hono()
 	.use(authMiddleware)
 	.get('/', requirePermissionMiddleware('integrations.manage'), async (c) =>
 		c.json(await listIntegrations()),
+	)
+	.get('/mode', requirePermissionMiddleware('integrations.manage'), (c) =>
+		c.json<IntegrationModeJson>({ mode: getConfig().integrations.mode }),
 	)
 	.get('/m365/consented', async (c) => {
 		const denied = requireGlobalPermission(c, 'integrations.manage')

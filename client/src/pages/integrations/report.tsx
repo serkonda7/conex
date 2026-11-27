@@ -1,4 +1,10 @@
-import { IconBan, IconLinkPlus, IconReportAnalytics, IconUnlink } from '@tabler/icons-solidjs'
+import {
+	IconBan,
+	IconInfoCircle,
+	IconLinkPlus,
+	IconReportAnalytics,
+	IconUnlink,
+} from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import {
 	EMPLOYEE_PUSH_FIELDS,
@@ -9,7 +15,7 @@ import {
 	type FindingKind,
 	type IntegrationFinding,
 } from 'shared/src/schemas'
-import type { JSX } from 'solid-js'
+import type { Accessor, JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { update_device } from '../../api/devices'
 import {
@@ -31,6 +37,7 @@ import {
 import { DataTable, type DataTableColumn } from '../../components/data_table'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { SelectField } from '../../components/form'
+import { IconLabel } from '../../components/icon_label'
 import { useTableColumns } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import {
@@ -43,7 +50,13 @@ import {
 import { createRecord, createRows, useAction } from '../../lib/resource'
 import { parseId, queryParam, usePageMeta } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
-import { tenantContext, tenantContextFilters } from '../../lib/tenant_context'
+import {
+	contextGroups,
+	contextTenantId,
+	contextTenantRows,
+	tenantContext,
+	tenantContextFilters,
+} from '../../lib/tenant_context'
 import { formatTime } from '../../lib/time'
 import { ExternalTenantPicker } from './external_tenant_picker'
 
@@ -149,6 +162,23 @@ export function IntegrationReportPage(): JSX.Element {
 	createEffect(on(tenantContext, () => setQueryTenant(null), { defer: true }))
 
 	usePageMeta(() => ({ name: t('integration.viewReport') }))
+
+	// Findings are limited to the tenant (or group) of the selection.
+	const scopeHint = (): string | undefined => {
+		const tenantId = queryTenant() ?? contextTenantId()
+		if (tenantId !== null) {
+			const name = contextTenantRows().find((row) => row.id === tenantId)?.name
+			return name === undefined
+				? undefined
+				: t('integration.reportScopeTenant', { tenant: name })
+		}
+		const ctx = tenantContext()
+		if (ctx.kind !== 'group') {
+			return undefined
+		}
+		const name = contextGroups().find((g) => g.id === ctx.id)?.name
+		return name === undefined ? undefined : t('integration.reportScopeGroup', { group: name })
+	}
 
 	const [integrations] = createRows(fetch_integrations, setError)
 	const enabled = createMemo(() => (integrations() ?? []).filter((i) => i.enabled))
@@ -552,6 +582,13 @@ export function IntegrationReportPage(): JSX.Element {
 				</span>
 				<div class="matching-heading">
 					<h2>{t('integration.viewReport')}</h2>
+					<p class="link-board-hint matching-tenant-hint">
+						<Show when={scopeHint()}>
+							{(hint: Accessor<string>): JSX.Element => (
+								<IconLabel icon={IconInfoCircle}>{hint()}</IconLabel>
+							)}
+						</Show>
+					</p>
 				</div>
 			</div>
 			<InlineError message={error()} />

@@ -4,7 +4,7 @@
  * synced items and the run history.
  */
 import { Result } from 'better-result'
-import { desc, eq, inArray } from 'drizzle-orm'
+import { desc, eq, inArray, ne } from 'drizzle-orm'
 import type {
 	CalendarMapping,
 	CalendarMappingJson,
@@ -15,6 +15,7 @@ import type {
 	CalendarSyncTest,
 } from 'shared/src/schemas'
 import * as v from 'valibot'
+import { isMockMode } from '../config'
 import { getDb, withTransaction } from '../db/connection'
 import { NotFoundError, ValidationError } from '../db/errors'
 import { errOf, tryWrite } from '../db/list'
@@ -71,10 +72,15 @@ export async function lastRun(): Promise<RunRow | null> {
 	return row ?? null
 }
 
+/**
+ * Latest runs, newest first. Mock mode never fails a run, so failed ones
+ * (e.g. from before switching to mock) are left out there.
+ */
 export async function listRuns(limit = 20): Promise<CalendarSyncRunJson[]> {
 	const rows = await getDb()
 		.select()
 		.from(calendar_sync_runs)
+		.where(isMockMode() ? ne(calendar_sync_runs.state, 'error') : undefined)
 		.orderBy(desc(calendar_sync_runs.started_at), desc(calendar_sync_runs.id))
 		.limit(limit)
 	return rows.map(runJson)
@@ -105,7 +111,7 @@ function storedSecret(row: ConfigRow | null): Result<string, Error> {
 export async function getCalendarSyncConfig(): Promise<CalendarSyncConfigJson> {
 	const row = await getConfigRow()
 	const secret = storedSecret(row)
-	const run = await lastRun()
+	const run = (await listRuns(1))[0] ?? null
 	return {
 		configured: row !== null,
 		ms_tenant_id: row?.ms_tenant_id ?? '',
@@ -113,9 +119,13 @@ export async function getCalendarSyncConfig(): Promise<CalendarSyncConfigJson> {
 		has_secret: Result.isOk(secret) && secret.value !== '',
 		enabled: row?.enabled === 1,
 		interval_minutes: row?.interval_minutes ?? 5,
-		last_error: Result.isError(secret) ? secret.error.message : (row?.last_error ?? null),
+		last_error: Result.isError(secret)
+			? secret.error.message
+			: isMockMode()
+				? null
+				: (row?.last_error ?? null),
 		updated_at: row?.updated_at ?? null,
-		last_run: run ? runJson(run) : null,
+		last_run: run,
 	}
 }
 
@@ -157,11 +167,17 @@ async function mergedCredentials(input: {
 	})
 }
 
-/** Token request (and optional calendar read); a refusal becomes a 422. */
+/**
+ * Token request (and optional calendar read); a refusal becomes a 422.
+ * Accepted unchecked in mock mode, where Microsoft is not contacted.
+ */
 async function verifyCredentials(
 	creds: GraphCredentials,
 	mailboxUpn?: string,
 ): Promise<Result<void, Error>> {
+	if (isMockMode()) {
+		return Result.ok(undefined)
+	}
 	const graph = new GraphClient(creds)
 	const token = await graph.token()
 	if (Result.isError(token)) {

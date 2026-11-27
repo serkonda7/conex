@@ -1584,6 +1584,11 @@ export const en = {
 	'integration.layoutGrid': 'Grid',
 	'integration.layoutList': 'List',
 	'integration.summaryOk': '{count} connected OK',
+	'integration.modeFailed': 'Failed to load the integration mode',
+	'integration.modeMockBanner':
+		'Development mode: integrations are mocked. Data comes from captured snapshots; no external system is contacted.',
+	'integration.modeOfflineBanner':
+		'Development mode: integrations are offline. No external system is contacted, so connections and syncs fail.',
 	'integration.summaryError': '{count} connected with error',
 	'integration.status.connected': 'Connected',
 	'integration.status.error': 'Connection failed',
@@ -1593,7 +1598,6 @@ export const en = {
 	'integration.lastSyncFailed': 'Last sync failed',
 	'integration.syncStarted': 'Started: {time}',
 	'integration.runFirstSync': 'Run first sync',
-	'integration.fixConnection': 'Fix connection →',
 	'integration.settings': 'Settings',
 	'integration.views': 'Sections',
 	'integration.saved': 'Saved.',
@@ -1601,8 +1605,6 @@ export const en = {
 	'integration.dangerZone': 'Danger zone',
 	'integration.remove': 'Remove',
 	'integration.removeTitle': 'Remove {name}',
-	'integration.removeText':
-		'Deletes the credentials, all links to {name} objects, ignored entries and the sync history. To pause the integration, switch it off instead.',
 	'integration.reportFailed': 'Failed to load the consistency report',
 	'integration.loadingReport': 'Loading report…',
 	'integration.statusFailed': 'Failed to load the integration status',
@@ -1639,6 +1641,8 @@ export const en = {
 	'integration.alreadyLinked': 'linked',
 	'integration.active': 'Active',
 	'integration.inactive': 'Inactive',
+	'integration.reportScopeTenant': 'Only findings of {tenant}',
+	'integration.reportScopeGroup': 'Only findings of the group {group}',
 	'integration.viewReport': 'Data consistency',
 	'integration.reportNoIntegrations':
 		'No integration is enabled. Set one up to compare its data.',
@@ -1654,6 +1658,8 @@ export const en = {
 	// cross-integration matching
 	'matching.title': 'Matching',
 	'matching.kind': 'Object type',
+	'matching.tenantScopeDevices': 'Only devices of {tenant}',
+	'matching.tenantScopeEmployees': 'Only employees of {tenant}',
 	'matching.pickTenant': 'Select a tenant in the top bar to match its devices and employees.',
 	'matching.noIntegrations': 'No integration is enabled. Set one up to match objects.',
 	'matching.search': 'Search name, serial or match…',
@@ -1798,8 +1804,6 @@ export const en = {
 	'calendarSync.viewTechnicians': 'Technicians',
 	'calendarSync.scheduleHint': 'While enabled, the sync runs on its own at this interval.',
 	'calendarSync.saveAndEnable': 'Save and enable',
-	'calendarSync.removeText':
-		'Deletes the Microsoft 365 app settings, the technician mappings and the sync history. Events already written to Outlook stay there and are no longer updated. To pause the sync, switch it off instead.',
 	'calendarSync.confirmRemoveSync':
 		'Remove the Outlook calendar sync? Events already written to Outlook stay there and are no longer updated.',
 	'calendarSync.removeFailed': 'Failed to remove the calendar sync',

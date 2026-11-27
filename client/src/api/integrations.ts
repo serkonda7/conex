@@ -14,6 +14,7 @@ import type {
 	ExternalTenantListItem,
 	IntegrationCreate,
 	IntegrationJson,
+	IntegrationModeJson,
 	IntegrationProvider,
 	IntegrationReport,
 	IntegrationTest,
@@ -56,6 +57,12 @@ export type {
 export async function fetch_integrations(): Promise<Result<IntegrationJson[], Error>> {
 	const res = await client.integrations.$get()
 	return to_result<IntegrationJson[]>(res, failed.list('noun.integration'))
+}
+
+/** How the server reaches external systems (`live`, or blocked / mocked for development). */
+export async function fetch_integration_mode(): Promise<Result<IntegrationModeJson, Error>> {
+	const res = await client.integrations.mode.$get()
+	return to_result<IntegrationModeJson>(res, t('integration.modeFailed'))
 }
 
 /** One integration by id, from the list endpoint (there is no single-row route). */

@@ -3547,6 +3547,15 @@ export interface DeviceTypeUpdatePreview {
 
 export const INTEGRATION_PROVIDERS = ['tanss', 'octoja', 'unifi', 'm365'] as const
 
+/** `[integrations] mode`: `offline` blocks every integration, `mock` serves captured snapshots. */
+export const INTEGRATION_MODES = ['live', 'offline', 'mock'] as const
+export type IntegrationMode = (typeof INTEGRATION_MODES)[number]
+
+/** `GET /integrations/mode`: how the server reaches external systems. */
+export interface IntegrationModeJson {
+	mode: IntegrationMode
+}
+
 export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
 
 export type IntegrationProvider = v.InferOutput<typeof IntegrationProviderSchema>

@@ -5697,12 +5697,20 @@ a.rack-shelf-plate:hover {
 .matching-heading {
 	flex: 1 1 16rem;
 	min-width: 0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 1rem;
 }
 
 .app-content .matching-heading h2 {
 	margin: 0;
 	padding-bottom: 0;
 	border-bottom: none;
+}
+
+.matching-tenant-hint {
+	margin: 0;
 }
 
 .matching-toolbar .link-board-search {
@@ -6153,6 +6161,23 @@ a.rack-shelf-plate:hover {
 	background-color: var(--error);
 }
 
+/* Outside live mode: says the integrations are mocked or offline. */
+.integrations-mode-banner {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0 0 1rem;
+	padding: 0.6rem 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+	border-radius: 0.5rem;
+	background-color: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+}
+
+.integrations-mode-banner > svg {
+	flex: none;
+	color: var(--warning);
+}
+
 .integration-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
@@ -6182,7 +6207,7 @@ a.rack-shelf-plate:hover {
 }
 
 /* The whole card opens the detail page: the name's link covers the card,
-   while buttons and links stay on top of it. */
+   while its buttons stay on top of it. */
 .integration-card-linked {
 	position: relative;
 	cursor: pointer;
@@ -6209,7 +6234,7 @@ a.rack-shelf-plate:hover {
 	outline-offset: 2px;
 }
 
-.integration-card-linked :is(button, .integration-card-fix a) {
+.integration-card-linked button {
 	position: relative;
 	z-index: 1;
 }
@@ -6302,13 +6327,8 @@ a.rack-shelf-plate:hover {
 }
 
 .integration-card-action:empty,
-.integration-card-fix:empty,
 .integration-card-body:not(:has(> :not(:empty))) {
 	display: none;
-}
-
-.integration-card-fix {
-	font-size: var(--font-size-sm);
 }
 
 /* Dimmed, but the footer stays readable to switch it back on. */
@@ -6403,10 +6423,12 @@ a.rack-shelf-plate:hover {
 	color: var(--text);
 }
 
-/* List layout: one row per integration in one shared box;
-   head, status and action wrap below each other on narrow screens. */
+/* List layout: one row per integration in one shared box. The rows share
+   the grid's two columns (subgrid), so every status column starts at the
+   same place, as wide as the widest row needs (up to 36rem for long
+   errors). Narrow screens stack head and status. */
 .integrations-list .integration-grid {
-	grid-template-columns: minmax(0, 1fr);
+	grid-template-columns: minmax(0, 1fr) fit-content(min(36rem, 50%));
 	gap: 0;
 	border: 1px solid var(--border);
 	border-radius: 0.5rem;
@@ -6414,10 +6436,12 @@ a.rack-shelf-plate:hover {
 }
 
 .integrations-list .integration-card {
-	flex-direction: row;
-	flex-wrap: wrap;
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
 	align-items: center;
-	gap: 0.5rem 1.5rem;
+	column-gap: 1.5rem;
+	row-gap: 0.5rem;
 	padding: 0.75rem 1rem;
 	border: none;
 	border-bottom: 1px solid var(--border);
@@ -6437,14 +6461,23 @@ a.rack-shelf-plate:hover {
 }
 
 .integrations-list .integration-card-head {
-	flex: 999 1 18rem;
 	min-width: 0;
 	align-items: center;
 }
 
 .integrations-list .integration-card-body {
-	flex: 1 1 18rem;
+	grid-column: 2;
 	min-width: 0;
+}
+
+@media (max-width: 48rem) {
+	.integrations-list .integration-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.integrations-list .integration-card-body {
+		grid-column: 1;
+	}
 }
 
 /* Integration detail page: identity and status left,
@@ -6586,14 +6619,8 @@ a.rack-shelf-plate:hover {
 }
 
 .integration-danger-zone h3 {
-	margin: 0 0 0.25rem;
-	color: var(--error);
-}
-
-.integration-danger-zone p {
 	margin: 0;
-	max-width: 36rem;
-	color: var(--text-secondary);
+	color: var(--error);
 }
 
 /* Drawn floor plan (v2): the sheet in a fill-layout zoom viewport with the

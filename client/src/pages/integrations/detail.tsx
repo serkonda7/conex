@@ -18,7 +18,7 @@ import { usePageMeta } from '../../lib/router'
 import { can, canGlobal, sessionTenantId } from '../../lib/session'
 import { contextTenantId } from '../../lib/tenant_context'
 import { IntegrationDetailHeader } from './detail_parts'
-import { providerStatus } from './integration_card'
+import { IntegrationModeBanner, providerStatus } from './integration_card'
 import { ProviderSettings } from './settings'
 
 /**
@@ -81,6 +81,7 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 
 	return (
 		<div class="integration-detail">
+			<IntegrationModeBanner />
 			<Show
 				when={!integration.loading}
 				fallback={<Loading message={t('integration.loadingOne')} />}

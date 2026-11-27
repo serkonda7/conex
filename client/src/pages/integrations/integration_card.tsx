@@ -4,21 +4,22 @@
  * failed, Disabled) plus yellow warning pills for problems that keep the
  * connection working, followed in the same row by when it last synced
  * (relative, exact time on hover) and the action (a sync icon, "Set up");
- * then the server's error and a link only when something needs fixing.
+ * then the server's error when something needs fixing.
  *
  * The whole card opens the integration's detail page (the name is the link,
- * stretched over the card; buttons and links stay on top). A failing card gets
+ * stretched over the card; buttons stay on top). A failing card gets
  * an error-tinted border, a disabled one is dimmed, and one with a missing
  * prerequisite stays visible and says what it needs. The green primary style
  * is kept for the one action that matters most (e.g. "Run first sync"). The
  * list layout lays the same parts out as one row per integration.
  */
 
-import { IconRefresh } from '@tabler/icons-solidjs'
+import { IconAlertTriangle, IconRefresh } from '@tabler/icons-solidjs'
 import { type Accessor, type Component, createSignal, type JSX, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import type { IntegrationJson } from '../../api/integrations'
+import { fetch_integration_mode, type IntegrationJson } from '../../api/integrations'
 import { t } from '../../i18n'
+import { createRecord } from '../../lib/resource'
 import { readStored, writeStored } from '../../lib/storage'
 import { formatRelative, formatTime } from '../../lib/time'
 
@@ -173,8 +174,6 @@ export function IntegrationCard(props: {
 	status?: JSX.Element
 	/** Lines below the status row: errors, prerequisites. */
 	details?: JSX.Element
-	/** Below the details: a link that needs attention (e.g. "Fix connection →"). */
-	link?: JSX.Element
 	/** The one action: at the end of the status row, or last without one. */
 	action?: JSX.Element
 	tone?: 'error' | 'disabled'
@@ -214,11 +213,28 @@ export function IntegrationCard(props: {
 					</div>
 				</Show>
 				{props.details}
-				<span class="integration-card-fix">{props.link}</span>
 				<Show when={!props.status}>
 					<span class="integration-card-action">{props.action}</span>
 				</Show>
 			</div>
 		</section>
+	)
+}
+
+/**
+ * Top of the integrations page and the detail pages: says the server does not
+ * reach external systems (`mock` or `offline` mode); nothing in `live` mode.
+ */
+export function IntegrationModeBanner(): JSX.Element {
+	const [mode] = createRecord(() => true, fetch_integration_mode)
+	return (
+		<Show when={mode()?.mode === 'mock' || mode()?.mode === 'offline'}>
+			<p class="integrations-mode-banner" role="status">
+				<IconAlertTriangle size={16} aria-hidden="true" />
+				{mode()?.mode === 'mock'
+					? t('integration.modeMockBanner')
+					: t('integration.modeOfflineBanner')}
+			</p>
+		</Show>
 	)
 }

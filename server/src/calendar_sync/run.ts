@@ -18,6 +18,7 @@
 import { Result } from 'better-result'
 import type { CalendarSyncRunCounts, CalendarSyncRunJson } from 'shared/src/schemas'
 import type { TnsPlanningType, TnsSupportList } from 'tanss-api'
+import { isMockMode } from '../config'
 import { ConflictError, NotFoundError } from '../db/errors'
 import { errOf } from '../db/list'
 import { credentialsOf, getIntegrationRow } from '../integrations/store'
@@ -271,6 +272,11 @@ async function execute(): Promise<Result<Tally, Error>> {
 	const creds = await storedCredentials()
 	if (Result.isError(creds)) {
 		return creds
+	}
+	// Neither TANSS nor Outlook is contacted in mock mode, and there are no
+	// snapshots of either: the run succeeds without changes instead of failing.
+	if (isMockMode()) {
+		return Result.ok(new Tally())
 	}
 	const tanss = await tanssSession()
 	if (Result.isError(tanss)) {
