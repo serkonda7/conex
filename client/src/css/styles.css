@@ -587,45 +587,6 @@ tbody tr:last-child td {
 	white-space: nowrap;
 }
 
-.app-user-dropdown {
-	position: absolute;
-	right: 0;
-	top: calc(100% + 0.3rem);
-	min-width: 10rem;
-	background-color: var(--bg-raised);
-	border: 1px solid var(--border);
-	border-radius: 0.35rem;
-	box-shadow: var(--shadow);
-	padding: 0.25rem;
-	z-index: 10;
-}
-
-.app-user-language {
-	padding: 0.25rem;
-	border-bottom: 1px solid var(--border);
-	margin-bottom: 0.25rem;
-}
-
-.app-user-language .app-language-switcher,
-.app-user-language .app-language-select {
-	width: 100%;
-	max-width: none;
-}
-
-.app-user-menu-item {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.45rem;
-	width: 100%;
-	border: none;
-	background: transparent;
-	text-align: left;
-}
-
-.app-user-menu-item:hover {
-	background-color: var(--bg-hover);
-}
-
 /* Always-visible logout button to the right of the account menu. */
 .app-logout-button {
 	display: inline-flex;
@@ -1444,11 +1405,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	color: var(--text);
 }
 
-.tenant-site-links {
-	display: flex;
-	gap: 0.75rem;
-}
-
 .toolbar {
 	display: flex;
 	flex-wrap: wrap;
@@ -1816,10 +1772,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 		opacity: 1;
 	}
 
-	.app-user-menu-item {
-		min-height: 2.75rem;
-	}
-
 	.app-logout-button {
 		min-width: 2.75rem;
 		min-height: 2.75rem;
@@ -1845,14 +1797,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	align-items: center;
 	justify-content: space-between;
 	gap: 0.75rem;
-}
-
-.status-dot-connected {
-	color: var(--success);
-}
-
-.status-dot-free {
-	color: var(--muted-dot);
 }
 
 /* Page header: title left, primary action right (NetBox-style). */
@@ -3491,10 +3435,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 .connect-summary-peer {
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.connect-summary-hint {
-	color: var(--text-muted);
 }
 
 .connect-summary-done {
@@ -6167,12 +6107,6 @@ a.rack-shelf-plate:hover {
 
 .app-content .changelog-diff .diff-added {
 	background-color: color-mix(in srgb, var(--success) 16%, transparent);
-}
-
-/* Calendar sync: the German labels ("Anwendungs-ID (Client-ID)") need a
-   wider label column. */
-.calendar-sync-form {
-	--label-width: 12rem;
 }
 
 /* Integrations page: icon header with a connected /

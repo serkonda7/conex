@@ -7,7 +7,6 @@
 import {
 	AUDIT_EVENTS,
 	type AuditEvent,
-	BILLING_METRICS,
 	type BillingExceptionKind,
 	type BillingMetric,
 	CHANGE_ACTIONS,
@@ -44,7 +43,6 @@ import {
 	type PortKind,
 	type PortSide,
 	RACK_FORM_FACTORS,
-	type SyncRunState,
 	type TemplateSyncField,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
@@ -323,11 +321,6 @@ export function billingMetricHint(value: string): string {
 	return lookup(BILLING_METRIC_HINT_KEYS, value)
 }
 
-/** `<select>` options for the billing metrics, in catalog order. */
-export function billingMetricOptions(): { value: BillingMetric; label: string }[] {
-	return BILLING_METRICS.map((value) => ({ value, label: billingMetricLabel(value) }))
-}
-
 const BILLING_EXCEPTION_KEYS: Record<BillingExceptionKind, PluralKey> = {
 	not_contracted: 'billingException.notContracted',
 	backup_not_contracted: 'billingException.backupNotContracted',
@@ -593,17 +586,6 @@ export function externalTenantLabel(provider: string, count = 1): string {
 function externalTenantTitle(provider: string): string {
 	const label = externalTenantLabel(provider)
 	return label.charAt(0).toUpperCase() + label.slice(1)
-}
-
-const SYNC_STATE_KEYS: Record<SyncRunState, MessageKey> = {
-	running: 'syncState.running',
-	ok: 'syncState.ok',
-	error: 'syncState.error',
-}
-
-/** Sync run state (`running` / `ok` / `error`). */
-export function syncStateLabel(value: string): string {
-	return lookup(SYNC_STATE_KEYS, value)
 }
 
 /** One-line summary of what an integration provider does, for its card. */

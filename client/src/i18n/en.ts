@@ -1136,10 +1136,6 @@ export const en = {
 	'auditEvent.loginFailure': 'Login failed',
 	'auditEvent.passwordChange': 'Password changed',
 	'auditEvent.passwordReset': 'Password reset',
-	'auditEvent.calendarSyncConfigUpdate': 'Calendar sync settings changed',
-	'auditEvent.calendarSyncMappingUpdate': 'Calendar sync mapping saved',
-	'auditEvent.calendarSyncMappingDelete': 'Calendar sync mapping removed',
-	'auditEvent.calendarSyncRun': 'Calendar sync started',
 	'changelog.time': 'Time',
 	'changelog.action': 'Action',
 	'changelog.object': 'Object',
@@ -1574,12 +1570,9 @@ export const en = {
 	'integration.test': 'Test connection',
 	'integration.testing': 'Testing…',
 	'integration.testOk': 'Login and ERP token work.',
-	'integration.testOkNoErp': 'Login works.',
-	'integration.testOkApiKey': 'API key works.',
 	'integration.testFailed': 'Connection test failed',
 	'integration.neverSynced': 'Never synced.',
 	'integration.syncedAt': 'Data as of {time}.',
-	'integration.syncCounts': '{tenantCount} {tenants}, {devices} devices',
 	'integration.syncNow': 'Sync now',
 	'integration.forceFullSync': 'Force full sync',
 	'integration.confirmFullSync':
@@ -1698,9 +1691,6 @@ export const en = {
 	// Microsoft 365
 	'noun.m365Tenant.one': 'Entra tenant',
 	'noun.m365Tenant.other': 'Entra tenants',
-	'integration.syncCountsEmployees': '{tenantCount} {tenants}, {employees} employees',
-	'integration.deactivateInConex': 'Set inactive in conex',
-	'integration.confirmDeactivateInConex': 'Set "{name}" inactive in conex?',
 	'provider.m365': 'Microsoft 365',
 	'provider.m365.description': 'Sync Entra tenants, users and their directory data.',
 	'externalTenant.m365.one': 'Entra tenant',
@@ -1754,9 +1744,6 @@ export const en = {
 	'm365.disconnect': 'Disconnect',
 	'm365.confirmDisconnect':
 		'Disconnect this tenant from its Entra tenant? Employee links stay until the next sync reports them.',
-	'syncState.running': 'Running',
-	'syncState.ok': 'OK',
-	'syncState.error': 'Failed',
 
 	// tickets
 	'ticket.create': 'Create ticket',
