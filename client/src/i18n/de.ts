@@ -305,6 +305,7 @@ export const de: Messages = {
 	'app.navGroup.organization': 'Firma',
 	'app.navGroup.catalog': 'Katalog',
 	'app.nav.managedService': 'MSP',
+	'app.nav.usersRoles': 'Nutzer und Rollen',
 	'app.navGroup.customization': 'Anpassung',
 	'app.navGroup.integrations': 'Integrationen',
 	'app.navGroup.administration': 'Administration',

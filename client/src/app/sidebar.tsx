@@ -182,7 +182,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	},
 	{
 		label: 'app.navGroup.administration',
-		paths: ['billing', 'users', 'roles', 'global-settings', 'audit-log', 'changelog'],
+		paths: ['billing', 'users', 'global-settings', 'audit-log', 'changelog'],
 	},
 ]
 
@@ -193,6 +193,7 @@ const NAV_PARENT: Record<string, string> = {
 	'site-groups': 'sites',
 	'service-levels': 'managed-bundles',
 	priorities: 'managed-bundles',
+	roles: 'users',
 	'devices/vm': 'devices',
 }
 

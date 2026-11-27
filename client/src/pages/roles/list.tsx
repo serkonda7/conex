@@ -6,6 +6,7 @@ import { CountLink, descriptionColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { objectAccessLabel, permissionLabel, permissionShortLabel } from '../../i18n/labels'
+import { userTabs } from '../users/list'
 import { OBJECT_PERMISSIONS, objectAccess } from './object_access'
 
 /**
@@ -28,6 +29,7 @@ export function RolesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.role', 2)}
 			addHref="/roles/add"
+			tabs={userTabs('roles')}
 			columns={[
 				{
 					key: 'name',

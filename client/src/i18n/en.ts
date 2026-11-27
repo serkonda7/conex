@@ -304,6 +304,7 @@ export const en = {
 	'app.navGroup.organization': 'Organization',
 	'app.navGroup.catalog': 'Catalog',
 	'app.nav.managedService': 'MSP',
+	'app.nav.usersRoles': 'Users & roles',
 	'app.navGroup.customization': 'Customization',
 	'app.navGroup.integrations': 'Integrations',
 	'app.navGroup.administration': 'Administration',

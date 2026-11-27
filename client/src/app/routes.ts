@@ -554,6 +554,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'users',
 		noun: (n: number): string => tp('entity.user', n),
 		icon: IconLock,
+		navLabel: (): string => t('app.nav.usersRoles'),
 		permission: 'users.manage',
 		list: UsersPage,
 		add: UserAddPage,
@@ -564,6 +565,8 @@ export const SECTIONS: readonly Section[] = [
 		noun: (n: number): string => tp('entity.role', n),
 		permission: 'users.manage',
 		icon: IconShieldLock,
+		// A tab of the users page.
+		hideInNav: true,
 		list: RolesPage,
 		add: RoleAddPage,
 		edit: RoleEditPage,
