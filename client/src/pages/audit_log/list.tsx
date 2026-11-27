@@ -1,4 +1,3 @@
-import { IconHistory } from '@tabler/icons-solidjs'
 import type {
 	AuditDetail,
 	AuditDeviceDetail,
@@ -223,12 +222,7 @@ export function AuditLogPage(): JSX.Element {
 	return (
 		<div>
 			<div class="page-header">
-				<div class="page-header-title">
-					<span class="page-header-icon" aria-hidden="true">
-						<IconHistory size={20} />
-					</span>
-					<h2>{tp('entity.auditLog', 1)}</h2>
-				</div>
+				<h2>{tp('entity.auditLog', 1)}</h2>
 			</div>
 
 			<FilterTable

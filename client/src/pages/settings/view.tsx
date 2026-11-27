@@ -4,13 +4,7 @@
  * password change and "view as role". Available to every signed-in user, so
  * the section needs no permission beyond the session.
  */
-import {
-	IconAdjustments,
-	IconEye,
-	IconLock,
-	IconShieldCheck,
-	IconUserCog,
-} from '@tabler/icons-solidjs'
+import { IconAdjustments, IconEye, IconLock, IconShieldCheck } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { createResource, createSignal, createUniqueId, For, type JSX, Show } from 'solid-js'
 import {
@@ -124,12 +118,7 @@ export function SettingsPage(): JSX.Element {
 	return (
 		<div class="settings-page">
 			<div class="page-header">
-				<div class="page-header-title">
-					<span class="page-header-icon" aria-hidden="true">
-						<IconUserCog size={20} />
-					</span>
-					<h2>{t('account.settings')}</h2>
-				</div>
+				<h2>{t('account.settings')}</h2>
 			</div>
 			<p class="page-subtitle">{t('account.settingsSubtitle')}</p>
 

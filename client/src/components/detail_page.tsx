@@ -8,10 +8,8 @@
 import { IconCopy, IconPencil } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { createSignal, For, type JSX, type Setter, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
 import { type PluralKey, t, tp } from '../i18n'
 import { type RemoveFn, removeConfirmingFloorplan } from '../lib/floorplan_delete'
-import type { IconComponent } from '../lib/icons'
 import type { QueryResource } from '../lib/resource'
 import { type Crumb, forgetDeleted, navigate, usePageMeta } from '../lib/router'
 import { can } from '../lib/session'
@@ -49,12 +47,10 @@ export function DetailShell(props: {
 /**
  * Title header with the Edit / Clone / Delete actions, each shown only with
  * the matching permission.
- * `icon` precedes and `extra` follows the name inside the heading (e.g. the
- * device role icon, the rack height).
+ * `extra` follows the name inside the heading (e.g. the rack height).
  */
 export function DetailHeader(props: {
 	name: string | undefined
-	icon?: IconComponent
 	extra?: JSX.Element
 	testId?: string
 	editHref: string
@@ -74,13 +70,6 @@ export function DetailHeader(props: {
 	return (
 		<div class="page-header detail-header">
 			<h2 data-testid={props.testId}>
-				<Show when={props.icon}>
-					{(icon: () => IconComponent): JSX.Element => (
-						<span aria-hidden="true" class="detail-header-icon">
-							<Dynamic component={icon()} size={20} />
-						</span>
-					)}
-				</Show>
 				{props.name}
 				<Show when={props.extra}> {props.extra}</Show>
 			</h2>

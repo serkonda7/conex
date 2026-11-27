@@ -22,7 +22,6 @@ import {
 	IconLayoutDashboard,
 	IconListDetails,
 	IconLocation,
-	IconLock,
 	IconMap,
 	IconMapPin,
 	IconPackages,
@@ -36,6 +35,7 @@ import {
 	IconStopwatch,
 	IconTag,
 	IconTemplate,
+	IconUser,
 	IconUserCog,
 	IconUsers,
 } from '@tabler/icons-solidjs'
@@ -553,7 +553,7 @@ export const SECTIONS: readonly Section[] = [
 	{
 		path: 'users',
 		noun: (n: number): string => tp('entity.user', n),
-		icon: IconLock,
+		icon: IconUser,
 		navLabel: (): string => t('app.nav.usersRoles'),
 		permission: 'users.manage',
 		list: UsersPage,

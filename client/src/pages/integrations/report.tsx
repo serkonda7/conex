@@ -1,10 +1,4 @@
-import {
-	IconBan,
-	IconInfoCircle,
-	IconLinkPlus,
-	IconReportAnalytics,
-	IconUnlink,
-} from '@tabler/icons-solidjs'
+import { IconBan, IconInfoCircle, IconLinkPlus, IconUnlink } from '@tabler/icons-solidjs'
 import type { Result } from 'better-result'
 import {
 	EMPLOYEE_PUSH_FIELDS,
@@ -578,9 +572,6 @@ export function IntegrationReportPage(): JSX.Element {
 	return (
 		<div class="integration-report">
 			<div class="integrations-header">
-				<span class="page-header-icon" aria-hidden="true">
-					<IconReportAnalytics size={20} />
-				</span>
 				<div class="matching-heading">
 					<h2>{t('integration.viewReport')}</h2>
 					<p class="link-board-hint matching-tenant-hint">

@@ -1246,12 +1246,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	margin: 0;
 }
 
-.detail-header-icon {
-	display: inline-flex;
-	vertical-align: -0.1em;
-	margin-right: 0.4rem;
-}
-
 .app-content .detail-header {
 	border-bottom: none;
 	padding-bottom: 0;
@@ -1889,26 +1883,12 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	border-bottom: none;
 }
 
-/* Keeps a leading icon next to the heading instead of letting the header's
-   space-between push them to opposite ends on pages without actions. */
+/* Keeps controls next to the heading instead of pushing them to opposite ends. */
 .page-header-title {
 	display: flex;
 	align-items: center;
 	gap: 0.75rem;
 	min-width: 0;
-}
-
-/* Boxed title icon, shared by the list-page headers that use one. */
-.page-header-icon {
-	display: grid;
-	place-items: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	flex: none;
-	border-radius: 0.5rem;
-	border: 1px solid var(--border);
-	background-color: var(--bg-raised);
-	color: var(--primary-text);
 }
 
 /* Sibling-list tabs (tenants ↔ tenant groups, sites ↔ site groups) in
@@ -6195,7 +6175,7 @@ a.rack-shelf-plate:hover {
 	background-color: color-mix(in srgb, var(--success) 16%, transparent);
 }
 
-/* Integrations page: icon header with a connected /
+/* Integrations page: header with a connected /
    needs-attention summary, then cards grouped by category. */
 .integrations-header {
 	display: flex;
@@ -6587,12 +6567,6 @@ a.rack-shelf-plate:hover {
 	align-items: flex-start;
 	gap: 0.75rem 1rem;
 	margin-bottom: 1rem;
-}
-
-.integration-detail-logo {
-	width: 3rem;
-	height: 3rem;
-	color: var(--primary-text);
 }
 
 .integration-detail-title {

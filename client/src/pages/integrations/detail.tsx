@@ -12,7 +12,6 @@ import { Empty, InlineError, Loading } from '../../components/feedback'
 import type { RowMenuAction } from '../../components/list_page'
 import { t } from '../../i18n'
 import { providerDescription, providerLabel } from '../../i18n/labels'
-import { providerIcon } from '../../lib/icons'
 import { createRecord, useAction } from '../../lib/resource'
 import { usePageMeta } from '../../lib/router'
 import { can, canGlobal, sessionTenantId } from '../../lib/session'
@@ -92,7 +91,6 @@ export function IntegrationDetailPage(props: { id: number }): JSX.Element {
 							<IntegrationDetailHeader
 								name={providerLabel(row().provider)}
 								description={providerDescription(row().provider)}
-								icon={providerIcon(row().provider)}
 								configured
 								status={providerStatus(row(), sync.pending())}
 								lastSyncFailed={row().last_sync?.state === 'error'}

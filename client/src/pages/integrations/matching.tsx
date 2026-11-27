@@ -1,7 +1,6 @@
 import { Combobox, type ComboboxOption } from '@serkonda7/solid-components'
 import {
 	IconAlertCircle,
-	IconArrowsJoin2,
 	IconBan,
 	IconCircleCheck,
 	IconCircleDashed,
@@ -1061,9 +1060,6 @@ export function MatchingPage(): JSX.Element {
 	return (
 		<div class="matching-page">
 			<div class="integrations-header">
-				<span class="page-header-icon" aria-hidden="true">
-					<IconArrowsJoin2 size={20} />
-				</span>
 				<div class="matching-heading">
 					<h2>{t('matching.title')}</h2>
 					<p class="link-board-hint matching-tenant-hint">

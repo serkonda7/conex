@@ -11,7 +11,6 @@ import {
 	IconChevronLeft,
 	IconChevronRight,
 	IconDownload,
-	IconReceipt2,
 	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
@@ -763,9 +762,6 @@ export function BillingPage(): JSX.Element {
 		<div class="billing-page">
 			<div class="page-header">
 				<div class="page-header-title">
-					<span class="page-header-icon" aria-hidden="true">
-						<IconReceipt2 size={20} />
-					</span>
 					<h2>{t('billing.title')}</h2>
 					<Show when={period()}>
 						{(p: () => string) => (

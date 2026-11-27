@@ -1,4 +1,4 @@
-import { IconLayoutGrid, IconList, IconPlugConnected, IconPlus } from '@tabler/icons-solidjs'
+import { IconLayoutGrid, IconList, IconPlus } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import { INTEGRATION_PROVIDERS } from 'shared/src/schemas'
 import { createSignal, For, type JSX, Show } from 'solid-js'
@@ -239,9 +239,6 @@ export function IntegrationsPage(): JSX.Element {
 			classList={{ 'integrations-list': integrationLayout() === 'list' }}
 		>
 			<div class="integrations-header">
-				<span class="page-header-icon" aria-hidden="true">
-					<IconPlugConnected size={20} />
-				</span>
 				<h2>{tp('entity.integration', 2)}</h2>
 				<div class="integrations-summary">
 					<Show when={okCount() > 0}>

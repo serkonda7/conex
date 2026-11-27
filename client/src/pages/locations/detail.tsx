@@ -353,7 +353,6 @@ export function LocationDetailPage(props: { id: number }): JSX.Element {
 			>
 				<DetailHeader
 					name={location()?.name}
-					icon={locationTypeIcon(location()?.type ?? 'other')}
 					editHref={`/locations/${props.id}/edit`}
 					onDelete={handleDelete}
 				/>

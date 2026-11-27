@@ -4,7 +4,6 @@
  * model of the server config, `[ai.claude]` / `[ai.opencode]`) and the
  * cutoff day of the billing periods.
  */
-import { IconSettings } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
 import type { AiProvider } from 'shared/src/types'
 import { createResource, createSignal, type JSX, Show } from 'solid-js'
@@ -228,12 +227,7 @@ export function GlobalSettingsPage(): JSX.Element {
 	return (
 		<div class="settings-page">
 			<div class="page-header">
-				<div class="page-header-title">
-					<span class="page-header-icon" aria-hidden="true">
-						<IconSettings size={20} />
-					</span>
-					<h2>{t('globalSettings.title')}</h2>
-				</div>
+				<h2>{t('globalSettings.title')}</h2>
 			</div>
 			<p class="page-subtitle">{t('globalSettings.subtitle')}</p>
 

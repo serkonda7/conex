@@ -542,7 +542,6 @@ export function CalendarSyncDetailPage(): JSX.Element {
 							<IntegrationDetailHeader
 								name={t('calendarSync.title')}
 								description={t('calendarSync.description')}
-								icon={IconCalendarEvent}
 								configured={c().configured}
 								status={syncStatus(c(), runs.syncing())}
 								lastSyncFailed={runs.lastRun()?.state === 'error'}

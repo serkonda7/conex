@@ -7,8 +7,7 @@
  * them, so every integration reads and behaves the same.
  */
 import { IconRefresh } from '@tabler/icons-solidjs'
-import { type Component, For, type JSX, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { For, type JSX, Show } from 'solid-js'
 import { IconLabel } from '../../components/icon_label'
 import { RowMenu, type RowMenuAction, useRowMenu } from '../../components/list_page'
 import { MoreActionsButton } from '../../components/more_actions_button'
@@ -28,7 +27,7 @@ export function settingsHref(detailHref: string): string {
 }
 
 /**
- * Detail page header: icon tile, name and description; once set up, the
+ * Detail page header: name and description; once set up, the
  * status pills and last sync on the left, the Enabled switch, "Sync now" and
  * the ⋯ menu on the right. A failing login or sync shows its message once,
  * under the last sync time.
@@ -36,7 +35,6 @@ export function settingsHref(detailHref: string): string {
 export function IntegrationDetailHeader(props: {
 	name: string
 	description: string
-	icon: Component<{ size?: number }>
 	/** False before setup: no status, switch, sync or menu. */
 	configured: boolean
 	status: IntegrationStatus
@@ -58,9 +56,6 @@ export function IntegrationDetailHeader(props: {
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 	return (
 		<div class="integration-detail-header">
-			<span class="integration-logo integration-detail-logo" aria-hidden="true">
-				<Dynamic component={props.icon} size={22} />
-			</span>
 			<div class="integration-detail-title">
 				<h2>{props.name}</h2>
 				<p>{props.description}</p>
