@@ -1073,6 +1073,7 @@ export const de: Messages = {
 	'user.employeeNoMail': 'Der Mitarbeiter hat keine E-Mail-Adresse zum Anmelden.',
 	'user.addMail': 'Hinzufügen →',
 	'user.selectRole': 'Bitte eine Rolle auswählen.',
+	'user.pickerSearchHint': 'Tippen, um die Optionen zu filtern.',
 	'user.roleGrants': 'Gewährt: {permissions}.',
 	'user.newPassword': 'Neues Passwort',
 	'user.keepPassword': 'Leer lassen, um das aktuelle Passwort beizubehalten',

@@ -52,6 +52,7 @@ export function EmployeeField(props: {
 	onEmployeeChange: (value: string) => void
 	ownLogin?: string
 	autofocus?: boolean
+	describedBy?: string
 }): JSX.Element {
 	const id = (): string => `${props.idPrefix}-employee`
 	// The picker is disabled until the employees load, so focus it only then.
@@ -82,6 +83,7 @@ export function EmployeeField(props: {
 			options={options()}
 			emptyLabel={t('user.noEmployee')}
 			disabled={props.data.employees.loading}
+			describedBy={props.describedBy}
 		/>
 	)
 }

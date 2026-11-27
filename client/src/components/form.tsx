@@ -85,6 +85,7 @@ export function TextField(props: {
 	onChange?: (value: string) => void
 	placeholder?: string
 	type?: 'text' | 'password' | 'number' | 'email' | 'tel' | 'date'
+	class?: string
 	maxLength?: number
 	min?: number
 	max?: number
@@ -104,6 +105,7 @@ export function TextField(props: {
 				id={props.id}
 				ref={ref}
 				type={props.type}
+				class={props.class}
 				placeholder={props.placeholder}
 				required={props.required}
 				disabled={props.disabled}

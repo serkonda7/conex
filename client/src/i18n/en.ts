@@ -1062,6 +1062,7 @@ export const en = {
 	'user.employeeNoMail': 'The employee has no mail address to sign in with.',
 	'user.addMail': 'Add one →',
 	'user.selectRole': 'Select a role.',
+	'user.pickerSearchHint': 'Type to filter the options.',
 	'user.roleGrants': 'Grants: {permissions}.',
 	'user.newPassword': 'New password',
 	'user.keepPassword': 'Leave empty to keep the current password',

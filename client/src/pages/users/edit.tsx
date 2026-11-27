@@ -79,6 +79,10 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 			cancelTo="/users"
 			onSubmit={handleSave}
 		>
+			{/* KeePassXC skips inputs with "search" in an attribute; keep it in this description's id. */}
+			<span id="user-edit-picker-search-hint" class="visually-hidden">
+				{t('user.pickerSearchHint')}
+			</span>
 			<EmployeeField
 				idPrefix="user-edit"
 				data={data}
@@ -86,6 +90,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				onEmployeeChange={setEmployeeId}
 				ownLogin={form.record()?.username}
 				autofocus
+				describedBy="user-edit-picker-search-hint"
 			/>
 			<LoginField idPrefix="user-edit" employee={employee()} />
 			<SelectField
@@ -95,6 +100,7 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				value={roleId()}
 				onChange={setRoleId}
 				options={row_options(roles() ?? [])}
+				describedBy="user-edit-picker-search-hint"
 				hint={<RoleHint role={role()} />}
 			/>
 			<ScopeField
@@ -105,10 +111,12 @@ export function UserEditPage(props: { id: number }): JSX.Element {
 				tenants={tenants()}
 				onTenantsChange={setTenants}
 			/>
+			{/* KeePassXC skips inputs whose attributes contain "search"; avoid filling the admin's password. */}
 			<TextField
 				id="user-edit-password"
 				label={t('user.newPassword')}
 				type="password"
+				class="keepassxc-ignore-search"
 				placeholder={t('user.keepPassword')}
 				value={password()}
 				onInput={setPassword}
