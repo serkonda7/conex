@@ -6,12 +6,21 @@ import {
 	EntityListPage,
 	idOptions,
 	idsOf,
+	type ListTab,
 	useEntityList,
 	useQueryFilterList,
 } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { useNameOf } from '../../lib/lookup'
 import { createRows } from '../../lib/resource'
+
+/** Users ↔ roles tabs. */
+export function userTabs(active: 'users' | 'roles'): ListTab[] {
+	return [
+		{ label: tp('entity.user', 2), href: '/users', active: active === 'users' },
+		{ label: tp('entity.role', 2), href: '/roles', active: active === 'roles' },
+	]
+}
 
 /**
  * /users — account list (`users.manage`): search (username or employee),
@@ -42,6 +51,7 @@ export function UsersPage(): JSX.Element {
 			list={list}
 			title={tp('entity.user', 2)}
 			addHref="/users/add"
+			tabs={userTabs('users')}
 			filters={[
 				{
 					key: 'role',
@@ -56,7 +66,9 @@ export function UsersPage(): JSX.Element {
 					key: 'username',
 					label: t('auth.username'),
 					sortable: true,
-					getValue: (u: UserJson): string => u.username,
+					getValue: (u: UserJson): JSX.Element => (
+						<a href={`/users/${u.id}/edit`}>{u.username}</a>
+					),
 				},
 				{
 					key: 'employee',

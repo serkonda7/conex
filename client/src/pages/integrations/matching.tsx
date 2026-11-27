@@ -7,11 +7,12 @@ import {
 	IconCircleDashed,
 	IconDeviceFloppy,
 	IconDownload,
+	IconInfoCircle,
 	IconSparkles,
 	IconX,
 } from '@tabler/icons-solidjs'
 import { Result } from 'better-result'
-import type { JSX } from 'solid-js'
+import type { Accessor, JSX } from 'solid-js'
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import {
 	fetch_integrations,
@@ -28,16 +29,16 @@ import {
 	start_sync,
 	unlink_external,
 } from '../../api/integrations'
-import { fetch_tenants } from '../../api/tenancy'
 import { Empty, InlineError, Loading } from '../../components/feedback'
 import { IconLabel } from '../../components/icon_label'
 import { t, tp } from '../../i18n'
 import { compareFieldLabel, providerLabel } from '../../i18n/labels'
 import { createRecord, createRows, useAction } from '../../lib/resource'
-import { parseId, queryParam, usePageMeta } from '../../lib/router'
-import { can, canGlobal, isScoped, sessionTenantId } from '../../lib/session'
-import { contextTenantId } from '../../lib/tenant_context'
+import { replaceAnchor, routeAnchor, usePageMeta } from '../../lib/router'
+import { can, canGlobal, isScoped } from '../../lib/session'
+import { contextTenantRows, newObjectTenantId } from '../../lib/tenant_context'
 import { ImportDeviceDialog } from './import_device_dialog'
+import { DataAsOf } from './integration_card'
 
 type Kind = LinkEntityType
 
@@ -85,6 +86,11 @@ type CellState = 'linked' | 'ignored' | 'open'
 interface ImportTarget {
 	column: Column
 	row: LinkBoardExternal
+}
+
+/** URL anchor of a level's tab (`#devices`). */
+function kindAnchor(kind: Kind): string {
+	return `${kind}s`
 }
 
 function parseKind(raw: string): Kind {
@@ -217,7 +223,7 @@ function placeFocusedList(): void {
 }
 
 /**
- * /integrations/matching — every conex object of one level (tenants, sites
+ * /integrations/matching#<level> — every conex object of one level (tenants, sites
  * for integrations that link sites (UniFi), or the devices or employees of
  * one tenant) as a row, with one column per enabled integration. Each cell picks the object's counterpart in that system
  * (searchable; picking one linked to another row moves it there), shows an
@@ -232,14 +238,14 @@ function placeFocusedList(): void {
  */
 export function MatchingPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
+	const initialKind = parseKind(routeAnchor())
 	const [kind, setKind] = createSignal<Kind>(
-		isScoped() && isTopLevel(parseKind(queryParam('type')))
-			? 'device'
-			: parseKind(queryParam('type')),
+		isScoped() && isTopLevel(initialKind) ? 'device' : initialKind,
 	)
-	const [tenant, setTenant] = createSignal<number | null>(
-		parseId(queryParam('tenant')) ?? sessionTenantId() ?? contextTenantId(),
-	)
+	// Devices and employees are matched for the tenant of the global selection.
+	const tenant = newObjectTenantId
+	const tenantName = (): string | undefined =>
+		contextTenantRows().find((row) => row.id === tenant())?.name
 	const [filter, setFilter] = createSignal<Filter>('all')
 	const [search, setSearch] = createSignal('')
 	const [drafts, setDrafts] = createSignal(new Map<string, string>())
@@ -256,7 +262,6 @@ export function MatchingPage(): JSX.Element {
 	usePageMeta(() => ({ name: t('matching.title') }))
 
 	const [integrations] = createRows(fetch_integrations, setError)
-	const [tenants] = createRows(fetch_tenants, setError)
 
 	const enabled = createMemo(() =>
 		(integrations() ?? []).filter(
@@ -280,9 +285,18 @@ export function MatchingPage(): JSX.Element {
 		return { providers, kind: kind(), tenant: isTopLevel(kind()) ? null : tenant() }
 	})
 	const [boards] = createRecord(source, fetchBoards, setError)
+	/** Oldest sync among the shown boards: the data is only as fresh as that. */
+	const syncedAt = (): number | null | undefined => {
+		const loaded = boards()
+		if (loaded == null) {
+			return undefined
+		}
+		const times = loaded.flatMap((b) => (b.synced_at === null ? [] : [b.synced_at]))
+		return times.length > 0 ? Math.min(...times) : null
+	}
 
 	const editable = (): boolean =>
-		isTopLevel(kind()) ? canGlobal('integrations.manage') : can('integrations.manage')
+		isTopLevel(kind()) ? canGlobal('integrations.write') : can('integrations.write')
 
 	const columns = createMemo((): Column[] => {
 		const loaded = boards() ?? []
@@ -592,15 +606,11 @@ export function MatchingPage(): JSX.Element {
 		}
 		discard()
 		setKind(next)
+		replaceAnchor(kindAnchor(next))
 	}
 
-	function switchTenant(next: string): void {
-		if (!confirmDiscard()) {
-			return
-		}
-		discard()
-		setTenant(parseId(next))
-	}
+	// The global tenant selection changes outside this page: drop its drafts.
+	createEffect(on(tenant, discard, { defer: true }))
 
 	/**
 	 * Removals first, so an object moved between rows is free before it is
@@ -1056,8 +1066,22 @@ export function MatchingPage(): JSX.Element {
 				</span>
 				<div class="matching-heading">
 					<h2>{t('matching.title')}</h2>
-					<p class="text-muted">{t('matching.intro')}</p>
+					<p class="link-board-hint matching-tenant-hint">
+						<Show when={!isTopLevel(kind()) && tenantName()}>
+							{(name: Accessor<string>): JSX.Element => (
+								<IconLabel icon={IconInfoCircle}>
+									{t(
+										kind() === 'device'
+											? 'matching.tenantScopeDevices'
+											: 'matching.tenantScopeEmployees',
+										{ tenant: name() },
+									)}
+								</IconLabel>
+							)}
+						</Show>
+					</p>
 				</div>
+				<DataAsOf at={boards.loading ? undefined : syncedAt()} />
 			</div>
 
 			<div class="toolbar-row matching-toolbar">
@@ -1067,23 +1091,11 @@ export function MatchingPage(): JSX.Element {
 					{kindOption('device')}
 					{kindOption('employee')}
 				</fieldset>
-				<Show when={!isTopLevel(kind())}>
-					<Combobox
-						class="combobox-fit matching-tenant"
-						value={tenant() === null ? '' : String(tenant())}
-						onChange={switchTenant}
-						options={(tenants() ?? []).map((r) => ({ value: r.id, label: r.name }))}
-						ariaLabel={kindNoun('tenant', 1)}
-						placeholder={t('matching.pickTenantShort')}
-						searchLabel={t('common.search')}
-						noMatchesLabel={t('common.noMatchingObjects')}
-					/>
-				</Show>
 				<input
 					type="search"
 					class="toolbar-search-input link-board-search"
-					aria-label={t('matching.search')}
-					placeholder={t('matching.search')}
+					aria-label={t('common.search')}
+					placeholder={t('common.search')}
 					value={search()}
 					onInput={(e: InputEvent & { currentTarget: HTMLInputElement }): void => {
 						setSearch(e.currentTarget.value)

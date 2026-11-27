@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { type Context, Hono, type MiddlewareHandler } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import {
+	type AuditDeviceDetail,
 	ExternalDeviceCreateSchema,
 	ExternalDeviceImportSchema,
 	ExternalDeviceUpdateSchema,
@@ -17,6 +18,7 @@ import {
 	ExternalTenantQuerySchema,
 	IntegrationCreateSchema,
 	IntegrationEntityParamsSchema,
+	type IntegrationModeJson,
 	IntegrationParamsSchema,
 	IntegrationReportQuerySchema,
 	IntegrationSyncQuerySchema,
@@ -45,6 +47,8 @@ import {
 	requireGlobalScope,
 	requirePermission,
 } from '../authz'
+import { getConfig } from '../config'
+import { getDb } from '../db/connection'
 import { exists } from '../db/list'
 import { deviceTenant, employeeTenants } from '../db/owners'
 import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
@@ -85,7 +89,9 @@ import { deactivateExternalEmployee, updateExternalEmployee } from '../integrati
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sites, tenants } from '../schema'
+import { devices, sites, tenants } from '../schema'
+import { auditRequest } from '../util/audit'
+import { peer_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
 import { sendCreated, sendResult } from '../util/result_response'
 
@@ -115,6 +121,34 @@ async function checkTenantRow(c: Context, tenantId: number): Promise<Response | 
 		return jsonError(c, 'Tenant not found', 404)
 	}
 	return checkTenant(c, tenantId)
+}
+
+/**
+ * Audit log entry for a conex device written to an external system. `ip` is
+ * read before the provider call, since Bun forgets the peer of a client that
+ * disconnected while waiting.
+ */
+async function auditDeviceWrite(
+	c: Context,
+	ip: string,
+	event: 'integration.device_create' | 'integration.device_update',
+	detail: Omit<AuditDeviceDetail, 'device_name'>,
+): Promise<void> {
+	const [device] = await getDb()
+		.select({ name: devices.name })
+		.from(devices)
+		.where(eq(devices.id, detail.device_id))
+	const actor = requestUser(c)
+	await auditRequest(
+		c,
+		{
+			event,
+			username: actor.username,
+			user_id: actor.id,
+			detail: { ...detail, device_name: device?.name ?? '' },
+		},
+		ip,
+	)
 }
 
 /** Tenant of a device in the requester's scope, or the 404/403 response. */
@@ -266,15 +300,18 @@ async function scopeCompany(
 }
 
 /**
- * Integrations: `integrations.manage` configures and lists providers
- * (credentials verified before saving, secrets never returned), runs syncs
- * and edits links; the reports and boards only need `view`. Links of
- * tenants and sites are global-write like tenants themselves; device and employee
- * links follow the object's tenant scope.
+ * Integrations: `integrations.manage` configures providers (credentials
+ * verified before saving, secrets never returned; enable, remove, test) and
+ * runs syncs; `integrations.write` lists them and edits links from the
+ * matching and report pages (role form: write = `integrations.write`,
+ * manage = both). The reports
+ * and boards only need `view`. Links of tenants and sites are global-write
+ * like tenants themselves; device and employee links follow the object's
+ * tenant scope.
  * External company lists are global-only: scoped users must not see other
  * customers. `tickets.create` opens tickets for tenants in scope and lists
  * their open tickets.
- * `integrations.manage` may also create conex devices in the external system,
+ * `integrations.write` may also create conex devices in the external system,
  * overwrite external device fields with conex values and (with `edit`)
  * import external employees into conex.
  * Microsoft 365 consent (links, connecting and forgetting customer tenants)
@@ -283,8 +320,11 @@ async function scopeCompany(
  */
 export const integrationsApp = new Hono()
 	.use(authMiddleware)
-	.get('/', requirePermissionMiddleware('integrations.manage'), async (c) =>
+	.get('/', requirePermissionMiddleware('integrations.write'), async (c) =>
 		c.json(await listIntegrations()),
+	)
+	.get('/mode', requirePermissionMiddleware('integrations.write'), (c) =>
+		c.json<IntegrationModeJson>({ mode: getConfig().integrations.mode }),
 	)
 	.get('/m365/consented', async (c) => {
 		const denied = requireGlobalPermission(c, 'integrations.manage')
@@ -598,7 +638,7 @@ export const integrationsApp = new Hono()
 			const userId = requestUser(c).id
 			if (isTenantLevel(input.entity_type)) {
 				const denied =
-					requireGlobalPermission(c, 'integrations.manage') ??
+					requireGlobalPermission(c, 'integrations.write') ??
 					(await checkTenantLevel(c, provider, input.entity_type, input.entity_id))
 				if (denied) {
 					return denied
@@ -615,7 +655,7 @@ export const integrationsApp = new Hono()
 				)
 				return sendResult(c, res.map(linkJson))
 			}
-			const denied = requirePermission(c, 'integrations.manage')
+			const denied = requirePermission(c, 'integrations.write')
 			if (denied) {
 				return denied
 			}
@@ -666,7 +706,7 @@ export const integrationsApp = new Hono()
 			const userId = requestUser(c).id
 			if (isTenantLevel(input.entity_type)) {
 				const denied =
-					requireGlobalPermission(c, 'integrations.manage') ??
+					requireGlobalPermission(c, 'integrations.write') ??
 					(await checkTenantLevel(c, provider, input.entity_type, null))
 				if (denied) {
 					return denied
@@ -684,7 +724,7 @@ export const integrationsApp = new Hono()
 				)
 				return sendResult(c, res.map(linkJson))
 			}
-			const denied = requirePermission(c, 'integrations.manage')
+			const denied = requirePermission(c, 'integrations.write')
 			if (denied) {
 				return denied
 			}
@@ -727,7 +767,7 @@ export const integrationsApp = new Hono()
 		'/:provider/links/ignore-local',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalIgnoreLocalSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -735,7 +775,7 @@ export const integrationsApp = new Hono()
 			if (isTenantLevel(input.entity_type)) {
 				// Tenants and sites are global-write; an ignored one has no company.
 				const denied =
-					requireGlobalPermission(c, 'integrations.manage') ??
+					requireGlobalPermission(c, 'integrations.write') ??
 					(await checkTenantLevel(c, provider, input.entity_type, input.entity_id))
 				if (denied) {
 					return denied
@@ -780,7 +820,7 @@ export const integrationsApp = new Hono()
 		'/:provider/devices',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalDeviceCreateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -792,10 +832,16 @@ export const integrationsApp = new Hono()
 			if (company instanceof Response) {
 				return company
 			}
-			return sendCreated(
-				c,
-				await createExternalDevice(provider, input.device_id, requestUser(c).id),
-			)
+			const ip = peer_ip(c)
+			const res = await createExternalDevice(provider, input.device_id, requestUser(c).id)
+			if (Result.isOk(res)) {
+				await auditDeviceWrite(c, ip, 'integration.device_create', {
+					provider,
+					device_id: input.device_id,
+					external_id: res.value.external_id,
+				})
+			}
+			return sendCreated(c, res)
 		},
 	)
 	.post(
@@ -807,7 +853,7 @@ export const integrationsApp = new Hono()
 			const input = c.req.valid('json')
 			// Imports create inventory, so they need `edit` as well.
 			const denied =
-				requirePermission(c, 'integrations.manage') ??
+				requirePermission(c, 'integrations.write') ??
 				requirePermission(c, 'edit') ??
 				(await checkTenantRow(c, input.tenant_id))
 			if (denied) {
@@ -820,7 +866,7 @@ export const integrationsApp = new Hono()
 		'/:provider/devices',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalDeviceUpdateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -836,14 +882,27 @@ export const integrationsApp = new Hono()
 			if (externalDenied) {
 				return externalDenied
 			}
-			return sendResult(c, await updateExternalDevice(provider, input.device_id, input.field))
+			const ip = peer_ip(c)
+			const before = await readDevice(provider, link.external_id)
+			const res = await updateExternalDevice(provider, input.device_id, input.field)
+			if (Result.isOk(res)) {
+				await auditDeviceWrite(c, ip, 'integration.device_update', {
+					provider,
+					device_id: input.device_id,
+					external_id: link.external_id,
+					field: input.field,
+					from: before?.[input.field] ?? null,
+					to: res.value[input.field],
+				})
+			}
+			return sendResult(c, res)
 		},
 	)
 	.put(
 		'/:provider/employees/deactivate',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalEmployeeDeactivateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const { external_id } = c.req.valid('json')
@@ -858,7 +917,7 @@ export const integrationsApp = new Hono()
 		'/:provider/employees',
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		vValidator('json', ExternalEmployeeUpdateSchema, onValidationError),
-		requirePermissionMiddleware('integrations.manage'),
+		requirePermissionMiddleware('integrations.write'),
 		async (c) => {
 			const { provider } = c.req.valid('param')
 			const input = c.req.valid('json')
@@ -894,7 +953,7 @@ export const integrationsApp = new Hono()
 			const input = c.req.valid('json')
 			// Imports create inventory, so they need `edit` as well.
 			const denied =
-				requirePermission(c, 'integrations.manage') ??
+				requirePermission(c, 'integrations.write') ??
 				requirePermission(c, 'edit') ??
 				(await checkTenantRow(c, input.tenant_id))
 			if (denied) {
@@ -914,12 +973,12 @@ export const integrationsApp = new Hono()
 			}
 			const row = link.value
 			if (row.entity_type === 'tenant' || row.entity_type === 'site') {
-				const denied = requireGlobalPermission(c, 'integrations.manage')
+				const denied = requireGlobalPermission(c, 'integrations.write')
 				if (denied) {
 					return denied
 				}
 			} else {
-				const denied = requirePermission(c, 'integrations.manage')
+				const denied = requirePermission(c, 'integrations.write')
 				if (denied) {
 					return denied
 				}

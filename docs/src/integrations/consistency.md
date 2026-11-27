@@ -7,6 +7,11 @@ gewechselt wird.
 
 ## Synchronisierung
 
+Jede aktivierte Integration synchronisiert sich alle 30 Minuten automatisch vollständig
+(alle verknüpften Mandanten), sobald der letzte vollständige Lauf 30 Minuten zurückliegt –
+auch wenn dieser fehlgeschlagen ist. Im Modus `offline` entfällt das. Über
+**Jetzt synchronisieren** lässt sich jederzeit zusätzlich ein Lauf starten.
+
 - **Firmen:** bei der ersten oder einer erzwungenen vollständigen Synchronisierung alle,
   sonst nur die seit der letzten Synchronisierung geänderten. Octoja und UniFi liefern
   keine Änderungsliste; dort werden immer alle Kunden bzw. alle Konsolen (Hosts)

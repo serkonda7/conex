@@ -44,6 +44,7 @@ import {
 import { type TestResult, TestResultLine } from './form_fields'
 import {
 	IntegrationCard,
+	IntegrationModeBanner,
 	type IntegrationStatus,
 	LastRunError,
 	LastRunTime,
@@ -63,8 +64,8 @@ interface Credentials {
 }
 
 /**
- * Settings tab: the Microsoft 365 app with its connection test, the sync
- * interval, and the danger zone once set up. The first save turns the sync
+ * Settings tab: the sync interval (saved on change once set up), the
+ * Microsoft 365 app with its connection test, and the danger zone once set up. The first save turns the sync
  * on; afterwards the header's switch does.
  */
 function SettingsPanel(props: {
@@ -81,7 +82,9 @@ function SettingsPanel(props: {
 	const [testing, setTesting] = createSignal(false)
 	const [testResult, setTestResult] = createSignal<TestResult | null>(null)
 	const [saved, setSaved] = createSignal(false)
+	const [intervalSaved, setIntervalSaved] = createSignal(false)
 	const action = useAction(setError)
+	const intervalAction = useAction(setError)
 	const remove = useAction(setError)
 
 	const credentials = (): Credentials => ({
@@ -134,6 +137,35 @@ function SettingsPanel(props: {
 		}
 	}
 
+	/**
+	 * Once set up, a valid interval saves on its own (stored settings, no new
+	 * sign-in); before that it goes with the first save.
+	 */
+	async function handleIntervalChange(): Promise<void> {
+		const minutes = Number(interval())
+		if (
+			!props.config.configured ||
+			!Number.isInteger(minutes) ||
+			minutes < CALENDAR_SYNC_MIN_INTERVAL ||
+			minutes > CALENDAR_SYNC_MAX_INTERVAL ||
+			minutes === props.config.interval_minutes
+		) {
+			return
+		}
+		let next: CalendarSyncConfigJson | null = null
+		const ok = await intervalAction.run(async () => {
+			const res = await saveStored(props.config, { interval_minutes: minutes })
+			if (Result.isOk(res)) {
+				next = res.value
+			}
+			return res
+		})
+		if (ok && next) {
+			setIntervalSaved(true)
+			props.onSaved(next)
+		}
+	}
+
 	async function handleRemove(): Promise<void> {
 		if (!window.confirm(t('calendarSync.confirmRemoveSync'))) {
 			return
@@ -146,6 +178,30 @@ function SettingsPanel(props: {
 	return (
 		<div class="integration-settings">
 			<form class="form-stacked" onSubmit={(e: SubmitEvent) => void handleSave(e)}>
+				<SettingsSection title={t('integration.schedule')}>
+					<TextField
+						id="calendar-sync-interval"
+						label={t('calendarSync.interval')}
+						type="number"
+						required
+						min={CALENDAR_SYNC_MIN_INTERVAL}
+						max={CALENDAR_SYNC_MAX_INTERVAL}
+						step={1}
+						value={interval()}
+						onInput={(value: string) => {
+							setIntervalSaved(false)
+							setIntervalMinutes(value)
+						}}
+						onChange={() => void handleIntervalChange()}
+						hint={
+							<Show when={intervalSaved() && !intervalAction.pending()}>
+								<span class="text-success" role="status">
+									{t('integration.saved')}
+								</span>
+							</Show>
+						}
+					/>
+				</SettingsSection>
 				<SettingsSection title={t('calendarSync.settings')}>
 					<TextField
 						id="calendar-sync-tenant-id"
@@ -204,22 +260,6 @@ function SettingsPanel(props: {
 						<TestResultLine result={testResult()} />
 					</Field>
 				</SettingsSection>
-				<SettingsSection
-					title={t('integration.schedule')}
-					description={t('calendarSync.scheduleHint')}
-				>
-					<TextField
-						id="calendar-sync-interval"
-						label={t('calendarSync.interval')}
-						type="number"
-						required
-						min={CALENDAR_SYNC_MIN_INTERVAL}
-						max={CALENDAR_SYNC_MAX_INTERVAL}
-						step={1}
-						value={interval()}
-						onInput={setIntervalMinutes}
-					/>
-				</SettingsSection>
 				<div class="form-actions">
 					<button type="submit" disabled={action.pending()}>
 						{action.pending()
@@ -239,7 +279,6 @@ function SettingsPanel(props: {
 			<Show when={props.config.configured}>
 				<DangerZone
 					name={t('calendarSync.title')}
-					text={t('calendarSync.removeText')}
 					pending={remove.pending()}
 					onRemove={() => void handleRemove()}
 				/>
@@ -434,16 +473,17 @@ function useCalendarRuns(setError: (message: string | null) => void): {
 	return { lastRun: () => runs()?.[0] ?? null, syncing, sync }
 }
 
-/** Saves the stored settings with only `enabled` changed (no new sign-in). */
-function saveEnabled(
+/** Saves the stored settings with `enabled` or the interval changed (no new sign-in). */
+function saveStored(
 	config: CalendarSyncConfigJson,
-	enabled: boolean,
+	changes: { enabled?: boolean; interval_minutes?: number },
 ): ReturnType<typeof save_calendar_sync_config> {
 	return save_calendar_sync_config({
 		ms_tenant_id: config.ms_tenant_id,
 		client_id: config.client_id,
-		enabled,
+		enabled: config.enabled,
 		interval_minutes: config.interval_minutes,
+		...changes,
 	})
 }
 
@@ -481,7 +521,7 @@ export function CalendarSyncDetailPage(): JSX.Element {
 			return
 		}
 		await toggle.run(async () => {
-			const res = await saveEnabled(current, enabled)
+			const res = await saveStored(current, { enabled })
 			if (Result.isOk(res)) {
 				mutate(res.value)
 			}
@@ -491,6 +531,7 @@ export function CalendarSyncDetailPage(): JSX.Element {
 
 	return (
 		<div class="integration-detail">
+			<IntegrationModeBanner />
 			<Show
 				when={!config.loading || config() !== undefined}
 				fallback={<Loading message={t('calendarSync.loading')} />}
@@ -514,7 +555,6 @@ export function CalendarSyncDetailPage(): JSX.Element {
 								syncing={runs.syncing()}
 								onSync={() => void runs.sync()}
 								menuActions={[]}
-								onOpenSettings={() => setView('settings')}
 							/>
 							<InlineError message={error()} />
 							<Show
@@ -584,7 +624,10 @@ function SyncErrors(props: {
 			<Show when={props.config.enabled && props.config.last_error}>
 				<p class="integration-error">{props.config.last_error}</p>
 			</Show>
-			<LastRunError run={props.lastRun} />
+			<LastRunError
+				run={props.lastRun}
+				shown={props.config.enabled ? props.config.last_error : null}
+			/>
 		</>
 	)
 }
@@ -646,13 +689,6 @@ function ConfigurableSyncCard(): JSX.Element {
 								<InlineError message={error()} />
 							</>
 						) : undefined
-					}
-					link={
-						<Show when={c().configured && status(c()) === 'error'}>
-							<a href={settingsHref(CALENDAR_SYNC_HREF)}>
-								{t('integration.fixConnection')}
-							</a>
-						</Show>
 					}
 					action={
 						<Show

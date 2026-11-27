@@ -7,7 +7,7 @@ import { failInterruptedCalendarSyncs } from './calendar_sync/store'
 import { initConfig, load_config_file } from './config'
 import { sweepAttachmentFiles } from './db/attachments'
 import { initDb } from './db/connection'
-import { failInterruptedSyncs } from './integrations/sync'
+import { failInterruptedSyncs, runDueSyncs } from './integrations/sync'
 import { aiApp } from './routes/ai'
 import { attachmentsApp } from './routes/attachments'
 import { auditLogApp } from './routes/audit_log'
@@ -166,6 +166,8 @@ if (import.meta.main) {
 	await failInterruptedCalendarSyncs()
 	// Ticks every minute; runs only when enabled and its interval has passed.
 	start_sweep(runCalendarSyncIfEnabled, 60_000)
+	// Full sync of each enabled integration every 30 minutes; checked every minute.
+	start_sweep(runDueSyncs, 60_000)
 	// Snapshots the billing period whose cutoff passed; a no-op once stored.
 	await autoBillingSnapshot().catch((err: unknown) =>
 		console.error('Billing snapshot failed:', err),

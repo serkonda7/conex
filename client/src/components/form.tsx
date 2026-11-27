@@ -81,6 +81,8 @@ export function TextField(props: {
 	label: string
 	value: string
 	onInput: (value: string) => void
+	/** Committed value (blur, Enter, spinner), e.g. to save on change. */
+	onChange?: (value: string) => void
 	placeholder?: string
 	type?: 'text' | 'password' | 'number' | 'email' | 'tel' | 'date'
 	maxLength?: number
@@ -115,6 +117,9 @@ export function TextField(props: {
 				data-autofocus={props.autofocus || undefined}
 				value={props.value}
 				onInput={(e: InputEventAndTarget) => props.onInput(e.currentTarget.value)}
+				onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+					props.onChange?.(e.currentTarget.value)
+				}
 			/>
 		</Field>
 	)

@@ -613,6 +613,7 @@ export function DrawnPlanStage(props: {
 		<ZoomViewport
 			class="drawn-plan-frame"
 			zoom={props.zoom}
+			keyPan
 			fill={{
 				width: props.sheet.width * STAGE_PX_PER_CM,
 				height: props.sheet.height * STAGE_PX_PER_CM,

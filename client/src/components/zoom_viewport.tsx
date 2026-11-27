@@ -9,7 +9,9 @@
  *
  * The stage zooms by the buttons in the bar below, Ctrl + wheel and pinch,
  * and pans by a drag while zoomed in. Pieces on the stage that take a press
- * for their own drag still pan with the middle mouse button.
+ * for their own drag still pan with the middle mouse button. With `keyPan`
+ * (the drawn plan) W A S D pan too, also during a drag or while placing:
+ * the pointer is replayed after each step so what follows it keeps up.
  *
  * Every zoomable image uses this component (design decision 0003). It has
  * two layouts:
@@ -48,6 +50,27 @@ const ZOOM_STEP = 1.5
 
 /** Pointer travel (px) after which a press on the stage pans instead of clicking. */
 const PAN_THRESHOLD = 4
+
+/** Pan speed of the W A S D keys, px per second on screen. */
+const KEY_PAN_SPEED = 700
+
+/** Direction each pan key moves the view in (the stage moves the other way). */
+const KEY_PAN: Record<string, [number, number]> = {
+	KeyW: [0, -1],
+	KeyA: [-1, 0],
+	KeyS: [0, 1],
+	KeyD: [1, 0],
+}
+
+/** True while focus is in a text field, which keeps its letter keys. */
+function typingIn(target: EventTarget | null): boolean {
+	return (
+		target instanceof HTMLInputElement ||
+		target instanceof HTMLTextAreaElement ||
+		target instanceof HTMLSelectElement ||
+		(target instanceof HTMLElement && target.isContentEditable)
+	)
+}
 
 /** Normalized box on the stage. */
 export interface PlanBox {
@@ -182,9 +205,9 @@ export function createStageZoom(): StageZoom {
 }
 
 /** Zoom in / out / fit buttons below the stage. */
-function ZoomControls(props: { zoom: StageZoom }): JSX.Element {
+function ZoomControls(props: { zoom: StageZoom; keyPan?: boolean }): JSX.Element {
 	return (
-		<div class="zoom-controls" title={t('zoom.hint')}>
+		<div class="zoom-controls" title={t(props.keyPan ? 'zoom.hintKeys' : 'zoom.hint')}>
 			<button
 				type="button"
 				class="zoom-button"
@@ -240,6 +263,8 @@ export function ZoomViewport(props: {
 	onPointerLeave?: () => void
 	/** Natural image size: the viewport becomes a box the image is fitted into. */
 	fill?: { width: number; height: number }
+	/** W A S D pan the stage while it is shown and zoomed in. */
+	keyPan?: boolean
 }): JSX.Element {
 	let viewport!: HTMLDivElement
 	let stage!: HTMLDivElement
@@ -361,6 +386,124 @@ export function ZoomViewport(props: {
 		}
 	}
 
+	// --- W A S D pan -------------------------------------------------------
+
+	/** Pan keys held down, by `KeyboardEvent.code` (the same keys on any layout). */
+	const held = new Set<string>()
+	let frame = 0
+	let lastFrame = 0
+	/** Last real pointer move, replayed after a key pan step. */
+	let lastPointer: PointerEventInit | null = null
+	const modifiers = { altKey: false, shiftKey: false, ctrlKey: false, metaKey: false }
+
+	const shown = (): boolean => viewport.getClientRects().length > 0
+
+	const onAnyPointerMove = (e: PointerEvent): void => {
+		if (!e.isTrusted) {
+			return
+		}
+		lastPointer = {
+			bubbles: true,
+			cancelable: true,
+			composed: true,
+			clientX: e.clientX,
+			clientY: e.clientY,
+			screenX: e.screenX,
+			screenY: e.screenY,
+			pointerId: e.pointerId,
+			pointerType: e.pointerType,
+			isPrimary: e.isPrimary,
+			buttons: e.buttons,
+		}
+	}
+
+	/**
+	 * The stage moved under a resting pointer: a move at the same screen
+	 * point lets drags, hover and placement previews follow the new spot.
+	 */
+	const replayPointer = (): void => {
+		if (!lastPointer) {
+			return
+		}
+		const { clientX = 0, clientY = 0 } = lastPointer
+		const target = document.elementFromPoint(clientX, clientY) ?? document.body
+		target.dispatchEvent(new PointerEvent('pointermove', { ...lastPointer, ...modifiers }))
+	}
+
+	const step = (now: number): void => {
+		const seconds = Math.min(0.05, (now - lastFrame) / 1000)
+		lastFrame = now
+		let [x, y] = [0, 0]
+		for (const code of held) {
+			x += KEY_PAN[code][0]
+			y += KEY_PAN[code][1]
+		}
+		const length = Math.hypot(x, y)
+		if (length > 0 && shown()) {
+			const before = props.zoom.offset()
+			const by = (KEY_PAN_SPEED * seconds) / length
+			props.zoom.panBy(-x * by, -y * by)
+			const after = props.zoom.offset()
+			if (after.x !== before.x || after.y !== before.y) {
+				replayPointer()
+			}
+		}
+		frame = held.size > 0 ? requestAnimationFrame(step) : 0
+	}
+
+	const stopKeyPan = (): void => {
+		held.clear()
+		cancelAnimationFrame(frame)
+		frame = 0
+	}
+
+	const onKeyDown = (e: KeyboardEvent): void => {
+		Object.assign(modifiers, {
+			altKey: e.altKey,
+			shiftKey: e.shiftKey,
+			ctrlKey: e.ctrlKey,
+			metaKey: e.metaKey,
+		})
+		if (!(e.code in KEY_PAN) || e.ctrlKey || e.metaKey || typingIn(e.target)) {
+			return
+		}
+		if (!zoomed() || !shown()) {
+			return
+		}
+		e.preventDefault()
+		held.add(e.code)
+		if (frame === 0) {
+			lastFrame = performance.now()
+			frame = requestAnimationFrame(step)
+		}
+	}
+
+	const onKeyUp = (e: KeyboardEvent): void => {
+		Object.assign(modifiers, {
+			altKey: e.altKey,
+			shiftKey: e.shiftKey,
+			ctrlKey: e.ctrlKey,
+			metaKey: e.metaKey,
+		})
+		held.delete(e.code)
+	}
+
+	onMount(() => {
+		if (props.keyPan) {
+			window.addEventListener('pointermove', onAnyPointerMove, true)
+			window.addEventListener('keydown', onKeyDown)
+			window.addEventListener('keyup', onKeyUp)
+			window.addEventListener('blur', stopKeyPan)
+			onCleanup(() => {
+				stopKeyPan()
+				window.removeEventListener('pointermove', onAnyPointerMove, true)
+				window.removeEventListener('keydown', onKeyDown)
+				window.removeEventListener('keyup', onKeyUp)
+				window.removeEventListener('blur', stopKeyPan)
+			})
+		}
+	})
+
 	onMount(() => {
 		// Non-passive, so Ctrl + wheel does not also zoom the page.
 		viewport.addEventListener('wheel', onWheel, { passive: false })
@@ -423,7 +566,7 @@ export function ZoomViewport(props: {
 				</Show>
 			</div>
 			<div class="zoom-bar">
-				<ZoomControls zoom={props.zoom} />
+				<ZoomControls zoom={props.zoom} keyPan={props.keyPan} />
 				{props.bar}
 			</div>
 		</div>

@@ -3,8 +3,7 @@
  * the Enabled switch, "Sync now" and the ⋯ menu for rarer actions (Force full
  * sync), the tab bar (the integration's data first, Settings last; before
  * setup Settings is the only tab), and the danger zone at the end of the
- * Settings tab (design decision 0006). A failing login shows an error box
- * with a way to the settings. The TANSS page and the calendar sync page share
+ * Settings tab (design decision 0006). The TANSS page and the calendar sync page share
  * them, so every integration reads and behaves the same.
  */
 import { IconRefresh } from '@tabler/icons-solidjs'
@@ -16,7 +15,8 @@ import { MoreActionsButton } from '../../components/more_actions_button'
 import { t } from '../../i18n'
 import {
 	type IntegrationStatus,
-	LastRunLine,
+	LastRunError,
+	LastRunTime,
 	type RunSummary,
 	StatusPill,
 	WarningPill,
@@ -30,8 +30,8 @@ export function settingsHref(detailHref: string): string {
 /**
  * Detail page header: icon tile, name and description; once set up, the
  * status pills and last sync on the left, the Enabled switch, "Sync now" and
- * the ⋯ menu on the right. A failing login shows its message under the
- * header with a way to the settings.
+ * the ⋯ menu on the right. A failing login or sync shows its message once,
+ * under the last sync time.
  */
 export function IntegrationDetailHeader(props: {
 	name: string
@@ -54,96 +54,85 @@ export function IntegrationDetailHeader(props: {
 	onSync: () => void
 	/** Rarer actions behind ⋯ (e.g. "Force full sync"). */
 	menuActions: RowMenuAction[]
-	onOpenSettings: () => void
 }): JSX.Element {
 	const { openMenu, closeMenu, toggleMenu } = useRowMenu()
 	return (
-		<>
-			<div class="integration-detail-header">
-				<span class="integration-logo integration-detail-logo" aria-hidden="true">
-					<Dynamic component={props.icon} size={22} />
-				</span>
-				<div class="integration-detail-title">
-					<h2>{props.name}</h2>
-					<p>{props.description}</p>
-					<Show when={props.configured}>
-						<div class="integration-detail-status">
-							<div class="integration-status">
-								<StatusPill status={props.status} />
-								<Show when={props.enabled && props.lastSyncFailed}>
-									<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
-								</Show>
-							</div>
-							<LastRunLine run={props.lastRun} />
+		<div class="integration-detail-header">
+			<span class="integration-logo integration-detail-logo" aria-hidden="true">
+				<Dynamic component={props.icon} size={22} />
+			</span>
+			<div class="integration-detail-title">
+				<h2>{props.name}</h2>
+				<p>{props.description}</p>
+				<Show when={props.configured}>
+					<div class="integration-detail-status">
+						<div class="integration-status">
+							<StatusPill status={props.status} />
+							<Show when={props.enabled && props.lastSyncFailed}>
+								<WarningPill>{t('integration.lastSyncFailed')}</WarningPill>
+							</Show>
 						</div>
-					</Show>
-				</div>
-				<Show when={props.configured && props.manageable}>
-					<div class="integration-detail-actions">
-						<label class="field-toggle integration-detail-switch">
-							<input
-								type="checkbox"
-								role="switch"
-								class="toggle"
-								aria-checked={props.enabled}
-								checked={props.enabled}
-								disabled={props.toggling}
-								onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
-									props.onToggle(e.currentTarget.checked)
-								}
-							/>
-							<span>
-								{props.enabled
-									? t('integration.enabled')
-									: t('integration.disabled')}
-							</span>
-						</label>
-						<button
-							type="button"
-							disabled={!props.enabled || props.syncing}
-							onClick={() => props.onSync()}
-						>
-							<IconLabel icon={IconRefresh}>
-								{props.syncing
-									? t('integration.syncing')
-									: t('integration.syncNow')}
-							</IconLabel>
-						</button>
-						<Show when={props.menuActions.length > 0}>
-							<MoreActionsButton
-								name={props.name}
-								open={openMenu() !== null}
-								onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
-									toggleMenu(e, 'integration', props.name)
-								}
-								onClose={closeMenu}
-							/>
-							<RowMenu
-								menu={openMenu}
-								onClose={closeMenu}
-								cloneHref={() => undefined}
-								actions={() => props.menuActions}
-								deletable={() => false}
-								onDelete={() => undefined}
-							/>
+						<p class="integration-meta">
+							<LastRunTime run={props.lastRun} />
+						</p>
+						<Show when={props.enabled && props.connectionError}>
+							<p class="integration-error">{props.connectionError}</p>
 						</Show>
+						<LastRunError
+							run={props.lastRun}
+							shown={props.enabled ? props.connectionError : null}
+						/>
 					</div>
 				</Show>
 			</div>
-			<Show when={props.configured && props.enabled && props.connectionError}>
-				<div class="integration-detail-alert" role="alert">
-					<div>
-						<strong>{t('integration.status.error')}</strong>
-						<p class="integration-error">{props.connectionError}</p>
-					</div>
-					<Show when={props.manageable}>
-						<button type="button" onClick={() => props.onOpenSettings()}>
-							{t('integration.openSettings')}
-						</button>
+			<Show when={props.configured && props.manageable}>
+				<div class="integration-detail-actions">
+					<label class="field-toggle integration-detail-switch">
+						<input
+							type="checkbox"
+							role="switch"
+							class="toggle"
+							aria-checked={props.enabled}
+							checked={props.enabled}
+							disabled={props.toggling}
+							onChange={(e: Event & { currentTarget: HTMLInputElement }) =>
+								props.onToggle(e.currentTarget.checked)
+							}
+						/>
+						<span>
+							{props.enabled ? t('integration.enabled') : t('integration.disabled')}
+						</span>
+					</label>
+					<button
+						type="button"
+						disabled={!props.enabled || props.syncing}
+						onClick={() => props.onSync()}
+					>
+						<IconLabel icon={IconRefresh}>
+							{props.syncing ? t('integration.syncing') : t('integration.syncNow')}
+						</IconLabel>
+					</button>
+					<Show when={props.menuActions.length > 0}>
+						<MoreActionsButton
+							name={props.name}
+							open={openMenu() !== null}
+							onToggle={(e: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+								toggleMenu(e, 'integration', props.name)
+							}
+							onClose={closeMenu}
+						/>
+						<RowMenu
+							menu={openMenu}
+							onClose={closeMenu}
+							cloneHref={() => undefined}
+							actions={() => props.menuActions}
+							deletable={() => false}
+							onDelete={() => undefined}
+						/>
 					</Show>
 				</div>
 			</Show>
-		</>
+		</div>
 	)
 }
 
@@ -200,22 +189,17 @@ export function SettingsSection(props: {
 }
 
 /**
- * Last block of the Settings tab: removing the integration, with what it
- * deletes. Disabling is the everyday off switch; this is for good.
+ * Last block of the Settings tab: removing the integration. Disabling is the
+ * everyday off switch; this is for good.
  */
 export function DangerZone(props: {
 	name: string
-	/** What removing deletes and what stays. */
-	text: string
 	pending: boolean
 	onRemove: () => void
 }): JSX.Element {
 	return (
 		<section class="card integration-danger-zone" aria-label={t('integration.dangerZone')}>
-			<div>
-				<h3>{t('integration.removeTitle', { name: props.name })}</h3>
-				<p>{props.text}</p>
-			</div>
+			<h3>{t('integration.removeTitle', { name: props.name })}</h3>
 			<button
 				type="button"
 				class="btn-danger"

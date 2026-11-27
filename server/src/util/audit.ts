@@ -10,7 +10,7 @@ import { forwarded_for, peer_ip } from './client_ip'
  */
 export async function auditRequest(
 	c: Context,
-	entry: Pick<AuditRecord, 'event' | 'username' | 'user_id' | 'target_username'>,
+	entry: Pick<AuditRecord, 'event' | 'username' | 'user_id' | 'detail'>,
 	ip: string = peer_ip(c),
 ): Promise<void> {
 	const res = await recordAudit({

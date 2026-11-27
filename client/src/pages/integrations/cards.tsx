@@ -5,13 +5,14 @@ import {
 	fetch_integrations,
 	fetch_tenant_integration,
 	type IntegrationJson,
+	type IntegrationProvider,
 } from '../../api/integrations'
 import { createDerived, createRowsFor, type QueryResource } from '../../lib/resource'
 import { can } from '../../lib/session'
 
 /** Configured, enabled integrations visible to users who can manage them. */
 function useIntegrations(): () => IntegrationJson[] {
-	const [integrations] = createRowsFor(() => can('integrations.manage'), fetch_integrations)
+	const [integrations] = createRowsFor(() => can('integrations.write'), fetch_integrations)
 	return () => (integrations() ?? []).filter((i) => i.enabled)
 }
 
@@ -42,12 +43,17 @@ export function useTenantIntegrations(tenantId: () => number): QueryResource<Ten
 	)
 }
 
-/** Integration report of the provider, narrowed to the tenant (and a finding kind). */
+/** Consistency report page of the provider. */
+export function integrationReportHref(provider: IntegrationProvider): string {
+	return `/integrations/report#${provider}`
+}
+
+/** Consistency report of the provider, narrowed to the tenant (and a finding kind). */
 export function tenantReportHref(
 	integration: IntegrationJson,
 	tenantId: number,
 	kind?: FindingKind,
 ): string {
-	const base = `/integrations/${integration.id}?tenant=${tenantId}`
-	return kind === undefined ? base : `${base}&kind=${kind}`
+	const query = kind === undefined ? `tenant=${tenantId}` : `tenant=${tenantId}&kind=${kind}`
+	return `/integrations/report?${query}#${integration.provider}`
 }

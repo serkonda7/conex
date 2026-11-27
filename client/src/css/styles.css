@@ -580,50 +580,16 @@ tbody tr:last-child td {
 	color: var(--text-muted);
 }
 
+/* The role the session views the app as, not the own one. */
+.app-user-role.view-as {
+	color: var(--warning);
+}
+
 .app-user-username {
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-.app-user-dropdown {
-	position: absolute;
-	right: 0;
-	top: calc(100% + 0.3rem);
-	min-width: 10rem;
-	background-color: var(--bg-raised);
-	border: 1px solid var(--border);
-	border-radius: 0.35rem;
-	box-shadow: var(--shadow);
-	padding: 0.25rem;
-	z-index: 10;
-}
-
-.app-user-language {
-	padding: 0.25rem;
-	border-bottom: 1px solid var(--border);
-	margin-bottom: 0.25rem;
-}
-
-.app-user-language .app-language-switcher,
-.app-user-language .app-language-select {
-	width: 100%;
-	max-width: none;
-}
-
-.app-user-menu-item {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.45rem;
-	width: 100%;
-	border: none;
-	background: transparent;
-	text-align: left;
-}
-
-.app-user-menu-item:hover {
-	background-color: var(--bg-hover);
 }
 
 /* Always-visible logout button to the right of the account menu. */
@@ -1279,6 +1245,54 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	padding: 0.15rem 0.6rem;
 }
 
+/* Service level pill of the tenant subheading: level, then its bundles. */
+.tenant-level {
+	position: relative;
+	display: inline-flex;
+	align-items: stretch;
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+	font-size: var(--font-size-sm);
+	line-height: 1.4;
+	white-space: nowrap;
+}
+
+.tenant-level-name {
+	padding: 0.15rem 0.6rem;
+	border-radius: 999px 0 0 999px;
+	background-color: var(--primary);
+	color: var(--primary-contrast);
+	font-weight: 600;
+}
+
+.tenant-level-bundles {
+	padding: 0.15rem 0.6rem 0.15rem 0.5rem;
+}
+
+.tenant-level[tabindex] {
+	cursor: default;
+}
+
+.tenant-level-popover {
+	display: none;
+	position: absolute;
+	top: calc(100% + 0.3rem);
+	left: 0;
+	z-index: 20;
+	margin: 0;
+	padding: 0.4rem 0.7rem;
+	list-style: none;
+	background-color: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: 0.35rem;
+	box-shadow: var(--shadow);
+}
+
+.tenant-level:hover .tenant-level-popover,
+.tenant-level:focus-visible .tenant-level-popover {
+	display: block;
+}
+
 .card {
 	background-color: var(--bg-surface);
 	border: 1px solid var(--border);
@@ -1442,11 +1456,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 .tenant-site-name {
 	font-weight: 600;
 	color: var(--text);
-}
-
-.tenant-site-links {
-	display: flex;
-	gap: 0.75rem;
 }
 
 .toolbar {
@@ -1816,10 +1825,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 		opacity: 1;
 	}
 
-	.app-user-menu-item {
-		min-height: 2.75rem;
-	}
-
 	.app-logout-button {
 		min-width: 2.75rem;
 		min-height: 2.75rem;
@@ -1845,14 +1850,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	align-items: center;
 	justify-content: space-between;
 	gap: 0.75rem;
-}
-
-.status-dot-connected {
-	color: var(--success);
-}
-
-.status-dot-free {
-	color: var(--muted-dot);
 }
 
 /* Page header: title left, primary action right (NetBox-style). */
@@ -2398,6 +2395,11 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	grid-template-columns: 5.5rem minmax(0, 1fr);
 	align-items: baseline;
 	column-gap: 0.75rem;
+}
+
+/* Stacked access level rows (objects, integrations) sit closer than the other groups. */
+.permission-group[role="radiogroup"] + .permission-group[role="radiogroup"] {
+	margin-top: -0.5rem;
 }
 
 .permission-group-title {
@@ -3491,10 +3493,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 .connect-summary-peer {
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.connect-summary-hint {
-	color: var(--text-muted);
 }
 
 .connect-summary-done {
@@ -5757,6 +5755,10 @@ a.rack-shelf-plate:hover {
 .matching-heading {
 	flex: 1 1 16rem;
 	min-width: 0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 1rem;
 }
 
 .app-content .matching-heading h2 {
@@ -5765,24 +5767,24 @@ a.rack-shelf-plate:hover {
 	border-bottom: none;
 }
 
-.matching-heading p {
-	margin: 0.15rem 0 0;
-	font-size: var(--font-size-sm);
+.matching-tenant-hint {
+	margin: 0;
 }
 
 .matching-toolbar .link-board-search {
-	flex: 1 1 12rem;
-	width: auto;
-}
-
-.matching-tenant {
 	flex: 0 1 16rem;
+	width: auto;
+	min-width: 10rem;
 }
 
+/* No inner scrolling: the table, the external objects below it and the page
+   scroll as one, with the header sticking under the topbar. Narrow screens
+   scroll the table sideways instead (the object column stays put) and give up
+   the sticky header for it. */
 .app-content .matching-scroll {
-	max-height: calc(100vh - var(--topbar-height) - 15rem);
-	min-height: 12rem;
-	overflow: auto;
+	/* Overrides the generic `div:has(> table)` scroller, which would trap
+	   the sticky header inside this box. */
+	overflow: visible;
 	border: 1px solid var(--border);
 	border-radius: 0.5rem;
 	background-color: var(--bg-surface);
@@ -5800,16 +5802,22 @@ a.rack-shelf-plate:hover {
 
 .matching-table thead th {
 	position: sticky;
-	top: 0;
+	top: var(--topbar-height);
 	z-index: 2;
 	background-color: var(--bg-raised);
 	vertical-align: bottom;
 }
 
+/* The wrapper no longer clips: round the header's outer corners itself. */
+.matching-table thead th:first-child {
+	border-top-left-radius: 0.5rem;
+}
+
+.matching-table thead th:last-child {
+	border-top-right-radius: 0.5rem;
+}
+
 .matching-table tfoot td {
-	position: sticky;
-	bottom: 0;
-	z-index: 2;
 	background-color: var(--bg-raised);
 	font-size: var(--font-size-sm);
 }
@@ -5824,6 +5832,16 @@ a.rack-shelf-plate:hover {
 
 .matching-table tbody tr:hover > * {
 	background-color: color-mix(in srgb, var(--bg-hover) 35%, transparent);
+}
+
+@media (max-width: 48rem) {
+	.app-content .matching-scroll {
+		overflow-x: auto;
+	}
+
+	.matching-table thead th {
+		top: 0;
+	}
 }
 
 /* The object column stays put while the integration columns scroll sideways. */
@@ -6158,12 +6176,6 @@ a.rack-shelf-plate:hover {
 	background-color: color-mix(in srgb, var(--success) 16%, transparent);
 }
 
-/* Calendar sync: the German labels ("Anwendungs-ID (Client-ID)") need a
-   wider label column. */
-.calendar-sync-form {
-	--label-width: 12rem;
-}
-
 /* Integrations page: icon header with a connected /
    needs-attention summary, then cards grouped by category. */
 .integrations-header {
@@ -6204,8 +6216,46 @@ a.rack-shelf-plate:hover {
 	background-color: var(--success);
 }
 
-.integrations-summary-dot-warning {
-	background-color: var(--warning);
+.integrations-summary-dot-error {
+	background-color: var(--error);
+}
+
+/* Outside live mode: says the integrations are mocked or offline. */
+/* Shown above every page while viewing the app as another role. */
+.view-as-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	padding: 0.5rem 1rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+	background-color: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+}
+
+.view-as-banner > svg {
+	flex: none;
+	color: var(--warning);
+}
+
+.view-as-banner-text {
+	flex: 1;
+	min-width: 12rem;
+}
+
+.integrations-mode-banner {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0 0 1rem;
+	padding: 0.6rem 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+	border-radius: 0.5rem;
+	background-color: color-mix(in srgb, var(--warning) 8%, var(--bg-surface));
+}
+
+.integrations-mode-banner > svg {
+	flex: none;
+	color: var(--warning);
 }
 
 .integration-grid {
@@ -6237,7 +6287,7 @@ a.rack-shelf-plate:hover {
 }
 
 /* The whole card opens the detail page: the name's link covers the card,
-   while buttons and links stay on top of it. */
+   while its buttons stay on top of it. */
 .integration-card-linked {
 	position: relative;
 	cursor: pointer;
@@ -6264,7 +6314,7 @@ a.rack-shelf-plate:hover {
 	outline-offset: 2px;
 }
 
-.integration-card-linked :is(button, .integration-card-fix a) {
+.integration-card-linked button {
 	position: relative;
 	z-index: 1;
 }
@@ -6357,13 +6407,8 @@ a.rack-shelf-plate:hover {
 }
 
 .integration-card-action:empty,
-.integration-card-fix:empty,
 .integration-card-body:not(:has(> :not(:empty))) {
 	display: none;
-}
-
-.integration-card-fix {
-	font-size: var(--font-size-sm);
 }
 
 /* Dimmed, but the footer stays readable to switch it back on. */
@@ -6458,10 +6503,12 @@ a.rack-shelf-plate:hover {
 	color: var(--text);
 }
 
-/* List layout: one row per integration in one shared box;
-   head, status and action wrap below each other on narrow screens. */
+/* List layout: one row per integration in one shared box. The rows share
+   the grid's two columns (subgrid), so every status column starts at the
+   same place, as wide as the widest row needs (up to 36rem for long
+   errors). Narrow screens stack head and status. */
 .integrations-list .integration-grid {
-	grid-template-columns: minmax(0, 1fr);
+	grid-template-columns: minmax(0, 1fr) fit-content(min(36rem, 50%));
 	gap: 0;
 	border: 1px solid var(--border);
 	border-radius: 0.5rem;
@@ -6469,10 +6516,12 @@ a.rack-shelf-plate:hover {
 }
 
 .integrations-list .integration-card {
-	flex-direction: row;
-	flex-wrap: wrap;
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
 	align-items: center;
-	gap: 0.5rem 1.5rem;
+	column-gap: 1.5rem;
+	row-gap: 0.5rem;
 	padding: 0.75rem 1rem;
 	border: none;
 	border-bottom: 1px solid var(--border);
@@ -6492,14 +6541,23 @@ a.rack-shelf-plate:hover {
 }
 
 .integrations-list .integration-card-head {
-	flex: 999 1 18rem;
 	min-width: 0;
 	align-items: center;
 }
 
 .integrations-list .integration-card-body {
-	flex: 1 1 18rem;
+	grid-column: 2;
 	min-width: 0;
+}
+
+@media (max-width: 48rem) {
+	.integrations-list .integration-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.integrations-list .integration-card-body {
+		grid-column: 1;
+	}
 }
 
 /* Integration detail page: identity and status left,
@@ -6554,29 +6612,14 @@ a.rack-shelf-plate:hover {
 	cursor: pointer;
 }
 
-.integration-detail-alert {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.5rem 1rem;
-	margin-bottom: 1rem;
-	padding: 0.75rem 1rem;
-	border: 1px solid color-mix(in srgb, var(--error) 50%, transparent);
-	border-radius: 0.5rem;
-	background-color: color-mix(in srgb, var(--error) 7%, var(--bg-surface));
-}
-
-.integration-detail-alert strong {
-	color: var(--error);
-}
-
 .integration-detail-tabs {
 	margin-bottom: 0.75rem;
 }
 
-.integration-report-asof {
-	margin-bottom: 0.5rem;
+/* "Data as of …" shares the header row (right-aligned) instead of taking its own. */
+.page-header-asof {
+	margin-left: auto;
+	white-space: nowrap;
 }
 
 /* User settings: flat key-value groups stacked with horizontal rules, like the
@@ -6620,6 +6663,10 @@ a.rack-shelf-plate:hover {
 	color: var(--link);
 }
 
+.settings-icon-view-as {
+	color: var(--warning);
+}
+
 @media (max-width: 30rem) {
 	.settings-page .spec-sheet dl {
 		grid-template-columns: minmax(0, 1fr);
@@ -6658,14 +6705,8 @@ a.rack-shelf-plate:hover {
 }
 
 .integration-danger-zone h3 {
-	margin: 0 0 0.25rem;
-	color: var(--error);
-}
-
-.integration-danger-zone p {
 	margin: 0;
-	max-width: 36rem;
-	color: var(--text-secondary);
+	color: var(--error);
 }
 
 /* Drawn floor plan (v2): the sheet in a fill-layout zoom viewport with the

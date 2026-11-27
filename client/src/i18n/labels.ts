@@ -7,7 +7,6 @@
 import {
 	AUDIT_EVENTS,
 	type AuditEvent,
-	BILLING_METRICS,
 	type BillingExceptionKind,
 	type BillingMetric,
 	CHANGE_ACTIONS,
@@ -44,7 +43,6 @@ import {
 	type PortKind,
 	type PortSide,
 	RACK_FORM_FACTORS,
-	type SyncRunState,
 	type TemplateSyncField,
 } from 'shared/src/schemas'
 import type { RackFormFactor } from '../api/templates'
@@ -323,11 +321,6 @@ export function billingMetricHint(value: string): string {
 	return lookup(BILLING_METRIC_HINT_KEYS, value)
 }
 
-/** `<select>` options for the billing metrics, in catalog order. */
-export function billingMetricOptions(): { value: BillingMetric; label: string }[] {
-	return BILLING_METRICS.map((value) => ({ value, label: billingMetricLabel(value) }))
-}
-
 const BILLING_EXCEPTION_KEYS: Record<BillingExceptionKind, PluralKey> = {
 	not_contracted: 'billingException.notContracted',
 	backup_not_contracted: 'billingException.backupNotContracted',
@@ -349,6 +342,12 @@ const AUDIT_EVENT_KEYS: Record<AuditEvent, MessageKey> = {
 	'login.failure': 'auditEvent.loginFailure',
 	'password.change': 'auditEvent.passwordChange',
 	'password.reset': 'auditEvent.passwordReset',
+	'user.role_change': 'auditEvent.userRoleChange',
+	'role.create': 'auditEvent.roleCreate',
+	'role.update': 'auditEvent.roleUpdate',
+	'role.delete': 'auditEvent.roleDelete',
+	'integration.device_create': 'auditEvent.integrationDeviceCreate',
+	'integration.device_update': 'auditEvent.integrationDeviceUpdate',
 }
 
 /** Audit log event (`login.success`, `password.reset`, …). */
@@ -423,6 +422,7 @@ const PERMISSION_KEYS: Record<Permission, MessageKey> = {
 	'employees.tenants': 'permission.employeesTenants',
 	'changelog.view': 'permission.changelogView',
 	'audit_log.view': 'permission.auditLogView',
+	'integrations.write': 'permission.integrationsWrite',
 	'integrations.manage': 'permission.integrationsManage',
 	'tickets.create': 'permission.ticketsCreate',
 	'contacts.directory': 'permission.contactsDirectory',
@@ -444,6 +444,7 @@ const PERMISSION_SHORT_KEYS: Record<Permission, MessageKey> = {
 	'employees.tenants': 'permissionShort.employeesTenants',
 	'changelog.view': 'permissionShort.changelogView',
 	'audit_log.view': 'permissionShort.auditLogView',
+	'integrations.write': 'permissionShort.integrationsWrite',
 	'integrations.manage': 'permissionShort.integrationsManage',
 	'tickets.create': 'permissionShort.ticketsCreate',
 	'contacts.directory': 'permissionShort.contactsDirectory',
@@ -463,7 +464,7 @@ const OBJECT_ACCESS_KEYS: Record<string, MessageKey> = {
 	manage: 'objectAccess.manage',
 }
 
-/** Role object access level (`read`, `write`, `manage`). */
+/** Role object or integration access level (`read`, `write`, `manage`). */
 export function objectAccessLabel(value: string): string {
 	return lookup(OBJECT_ACCESS_KEYS, value)
 }
@@ -593,17 +594,6 @@ export function externalTenantLabel(provider: string, count = 1): string {
 function externalTenantTitle(provider: string): string {
 	const label = externalTenantLabel(provider)
 	return label.charAt(0).toUpperCase() + label.slice(1)
-}
-
-const SYNC_STATE_KEYS: Record<SyncRunState, MessageKey> = {
-	running: 'syncState.running',
-	ok: 'syncState.ok',
-	error: 'syncState.error',
-}
-
-/** Sync run state (`running` / `ok` / `error`). */
-export function syncStateLabel(value: string): string {
-	return lookup(SYNC_STATE_KEYS, value)
 }
 
 /** One-line summary of what an integration provider does, for its card. */

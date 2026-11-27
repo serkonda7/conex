@@ -19,10 +19,10 @@ import { createRecord, createRows } from '../../lib/resource'
 import { navigate } from '../../lib/router'
 import { can, canGlobal } from '../../lib/session'
 import { CalendarSyncCard, calendarNeedsAttention } from './calendar_sync'
-import { settingsHref } from './detail_parts'
 import {
 	IntegrationCard,
 	type IntegrationLayout,
+	IntegrationModeBanner,
 	type IntegrationStatus,
 	integrationLayout,
 	LastRunError,
@@ -125,15 +125,11 @@ function ProviderCard(props: {
 								<Show when={integration().enabled && integration().last_error}>
 									<p class="integration-error">{integration().last_error}</p>
 								</Show>
-								<LastRunError run={integration().last_sync} />
+								<LastRunError
+									run={integration().last_sync}
+									shown={integration().enabled ? integration().last_error : null}
+								/>
 							</>
-						}
-						link={
-							<Show when={status() === 'error' && can('integrations.manage')}>
-								<a href={settingsHref(detailHref(integration()))}>
-									{t('integration.fixConnection')}
-								</a>
-							</Show>
 						}
 						action={
 							<Show when={can('integrations.manage')}>
@@ -198,6 +194,7 @@ function LayoutToggle(): JSX.Element {
  * connected / needs-attention summary in the header. A card opens the detail
  * page (an unconfigured one its setup), never a form in place; it has no ⋯
  * menu and no remove action (design decision 0006). Admins set up providers here.
+ * Outside `live` mode a banner says the integrations are mocked or offline.
  */
 export function IntegrationsPage(): JSX.Element {
 	const [error, setError] = createSignal<string | null>(null)
@@ -217,9 +214,10 @@ export function IntegrationsPage(): JSX.Element {
 
 	const connectedCount = (): number =>
 		(integrations() ?? []).length + (calendar()?.configured ? 1 : 0)
-	const attentionCount = (): number =>
+	const errorCount = (): number =>
 		(integrations() ?? []).filter(needsAttention).length +
 		(calendarNeedsAttention(calendar() ?? null) ? 1 : 0)
+	const okCount = (): number => connectedCount() - errorCount()
 
 	async function handleSync(provider: IntegrationProvider, clean: boolean): Promise<void> {
 		const name = providerLabel(provider)
@@ -246,24 +244,25 @@ export function IntegrationsPage(): JSX.Element {
 				</span>
 				<h2>{tp('entity.integration', 2)}</h2>
 				<div class="integrations-summary">
-					<Show when={connectedCount() > 0}>
+					<Show when={okCount() > 0}>
 						<span>
 							<span aria-hidden="true" class="integrations-summary-dot" />
-							{t('integration.summaryConnected', { count: connectedCount() })}
+							{t('integration.summaryOk', { count: okCount() })}
 						</span>
 					</Show>
-					<Show when={attentionCount() > 0}>
+					<Show when={errorCount() > 0}>
 						<span>
 							<span
 								aria-hidden="true"
-								class="integrations-summary-dot integrations-summary-dot-warning"
+								class="integrations-summary-dot integrations-summary-dot-error"
 							/>
-							{tp('integration.summaryAttention', attentionCount())}
+							{t('integration.summaryError', { count: errorCount() })}
 						</span>
 					</Show>
 				</div>
 				<LayoutToggle />
 			</div>
+			<IntegrationModeBanner />
 			<Show
 				when={!integrations.loading || integrations() !== undefined}
 				fallback={

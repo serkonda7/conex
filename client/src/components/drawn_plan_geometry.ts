@@ -575,23 +575,6 @@ export function constrainAngle(from: Point, to: Point, step: number): Point {
 	return [from[0] + Math.cos(snapped) * length, from[1] + Math.sin(snapped) * length]
 }
 
-/**
- * Where the line from `from` through `through` crosses segment `a`–`b`
- * ahead of `from`; `null` when it misses or runs parallel.
- */
-export function lineHitsSegment(from: Point, through: Point, a: Point, b: Point): Point | null {
-	const d: Point = [through[0] - from[0], through[1] - from[1]]
-	const e: Point = [b[0] - a[0], b[1] - a[1]]
-	const denominator = d[0] * e[1] - d[1] * e[0]
-	if (Math.abs(denominator) < 1e-9) {
-		return null
-	}
-	const w: Point = [a[0] - from[0], a[1] - from[1]]
-	const t = (w[0] * e[1] - w[1] * e[0]) / denominator
-	const u = (w[0] * d[1] - w[1] * d[0]) / denominator
-	return t > 0 && u >= 0 && u <= 1 ? [from[0] + d[0] * t, from[1] + d[1] * t] : null
-}
-
 export function clampPoint(p: Point, width: number, height: number): Point {
 	return [Math.min(width, Math.max(0, p[0])), Math.min(height, Math.max(0, p[1]))]
 }

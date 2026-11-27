@@ -5,8 +5,8 @@ import type { QueryResource } from '../../lib/resource'
 
 /**
  * Pill above the detail card of a device or VM: the managed bundle its role
- * falls under and the SLA its tenant contracted for that bundle. Styled like
- * the bundle pills of the tenant page; hidden when no bundle applies.
+ * falls under and the SLA its tenant contracted for that bundle; hidden when
+ * no bundle applies.
  */
 export function ManagedServicePill(props: {
 	service: QueryResource<DeviceServiceJson | null>

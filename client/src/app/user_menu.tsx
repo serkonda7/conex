@@ -22,7 +22,9 @@ export function UserMenu(props: { user: SessionUser | null }): JSX.Element {
 					<span class="app-user-username">{name()}</span>
 					<Show when={props.user}>
 						{(user: () => SessionUser) => (
-							<span class="app-user-role">{user().role.name}</span>
+							<span class="app-user-role" classList={{ 'view-as': !!user().view_as }}>
+								{user().view_as?.name ?? user().role.name}
+							</span>
 						)}
 					</Show>
 				</span>

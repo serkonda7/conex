@@ -6,7 +6,13 @@ import { CountLink, descriptionColumn } from '../../components/data_table'
 import { EntityListPage, useEntityList } from '../../components/list_page'
 import { t, tp } from '../../i18n'
 import { objectAccessLabel, permissionLabel, permissionShortLabel } from '../../i18n/labels'
-import { OBJECT_PERMISSIONS, objectAccess } from './object_access'
+import { userTabs } from '../users/list'
+import {
+	INTEGRATION_PERMISSIONS,
+	integrationAccess,
+	OBJECT_PERMISSIONS,
+	objectAccess,
+} from './object_access'
 
 /**
  * /roles — role list (`users.manage`): search, sortable columns plus
@@ -28,12 +34,15 @@ export function RolesPage(): JSX.Element {
 			list={list}
 			title={tp('entity.role', 2)}
 			addHref="/roles/add"
+			tabs={userTabs('roles')}
 			columns={[
 				{
 					key: 'name',
 					label: t('common.name'),
 					sortable: true,
-					getValue: (r: RoleJson): string => r.name,
+					getValue: (r: RoleJson): JSX.Element => (
+						<a href={`/roles/${r.id}/edit`}>{r.name}</a>
+					),
 				},
 				descriptionColumn({ sortable: true }),
 				{
@@ -62,7 +71,8 @@ export function RolesPage(): JSX.Element {
 
 /**
  * Permissions as short badges (full label as tooltip): view/edit/delete
- * collapse to one object access badge, matching the role form, and a role
+ * collapse to one object access badge and the integration permissions to
+ * one integration access badge, matching the role form, and a role
  * granting every permission to a single "All permissions" badge.
  */
 function PermissionBadges(props: { list: Permission[] }): JSX.Element {
@@ -73,12 +83,21 @@ function PermissionBadges(props: { list: Permission[] }): JSX.Element {
 		return <span class="badge badge-active">{t('role.allPermissions')}</span>
 	}
 	const level = (): string => objectAccess(props.list)
-	const others = (): Permission[] => props.list.filter((p) => !OBJECT_PERMISSIONS.includes(p))
+	const integrations = (): string => integrationAccess(props.list)
+	const others = (): Permission[] =>
+		props.list.filter(
+			(p) => !OBJECT_PERMISSIONS.includes(p) && !INTEGRATION_PERMISSIONS.includes(p),
+		)
 	return (
 		<span class="badge-list">
 			<Show when={level() !== ''}>
 				<span class="badge">
 					{t('role.objectAccessBadge', { level: objectAccessLabel(level()) })}
+				</span>
+			</Show>
+			<Show when={integrations() !== ''}>
+				<span class="badge">
+					{t('role.integrationAccessBadge', { level: objectAccessLabel(integrations()) })}
 				</span>
 			</Show>
 			<For each={others()}>

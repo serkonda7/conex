@@ -7,10 +7,11 @@ import {
 	PasswordChangeSchema,
 	type SessionUser,
 	SetupSchema,
+	ViewAsSchema,
 } from 'shared/src/schemas'
 import { requestUser } from '../authz'
 import { isUniqueViolation } from '../db/errors'
-import { fullAccessRoleId } from '../db/roles'
+import { fullAccessRoleId, listViewAsRoles, type ViewAsOwner } from '../db/roles'
 import {
 	canSignIn,
 	changeOwnPassword,
@@ -22,12 +23,14 @@ import { authMiddleware } from '../middleware/auth'
 import { rate_limit } from '../middleware/rate_limit'
 import { onValidationError } from '../middleware/validation'
 import {
+	authenticate,
 	get_signed_jwt,
 	getSessionCookieOpts,
 	invalidateSession,
 	invalidateUserSessions,
+	setSessionViewAs,
 } from '../sessions'
-import type { User } from '../types'
+import type { CurrentUser, User } from '../types'
 import { auditRequest } from '../util/audit'
 import { peer_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
@@ -175,14 +178,48 @@ authApp.post(
 	},
 )
 
-authApp.get('/me', authMiddleware, (c) => {
-	const user = requestUser(c)
-	const me: SessionUser = {
+function sessionUser(user: CurrentUser): SessionUser {
+	return {
 		username: user.username,
 		role: { id: user.role_id, name: user.role_name },
 		permissions: [...user.permissions],
 		tenant_ids: user.tenant_ids === null ? null : [...user.tenant_ids],
 		employee_id: user.employee_id,
+		view_as: user.view_as && { id: user.view_as.role_id, name: user.view_as.role_name },
 	}
-	return c.json(me)
+}
+
+authApp.get('/me', authMiddleware, (c) => {
+	return c.json(sessionUser(requestUser(c)))
 })
+
+/** The user's own role and permissions, which decide the roles offered for viewing as. */
+function viewAsOwner(user: CurrentUser): ViewAsOwner {
+	return { role_id: user.role_id, permissions: user.own_permissions }
+}
+
+// "View as role": the roles this session may view the app as, and switching
+// to one or back. Open to every signed-in user: the offered roles grant
+// nothing beyond the own role (`canViewAs`), so viewing never escalates.
+authApp.get('/view-as', authMiddleware, async (c) => {
+	return c.json(await listViewAsRoles(viewAsOwner(requestUser(c))))
+})
+
+authApp.put(
+	'/view-as',
+	authMiddleware,
+	vValidator('json', ViewAsSchema, onValidationError),
+	async (c) => {
+		const sid = c.get('jwtPayload').jti
+		const res = await setSessionViewAs(
+			sid,
+			viewAsOwner(requestUser(c)),
+			c.req.valid('json').role_id,
+		)
+		if (Result.isError(res)) {
+			return sendResult(c, res)
+		}
+		const user = await authenticate(sid, c.get('jwtPayload').sub)
+		return user ? c.json(sessionUser(user)) : jsonError(c, 'Unauthorized', 401)
+	},
+)

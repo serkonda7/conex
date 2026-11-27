@@ -1,6 +1,11 @@
 import { Result } from 'better-result'
-import { and, inArray, lte } from 'drizzle-orm'
-import type { AuditEvent, AuditLogEntryJson, AuditLogListQuery } from 'shared/src/schemas'
+import { and, inArray, lte, sql } from 'drizzle-orm'
+import type {
+	AuditDetail,
+	AuditEvent,
+	AuditLogEntryJson,
+	AuditLogListQuery,
+} from 'shared/src/schemas'
 import { audit_log } from '../schema'
 import { nowSeconds } from '../util/time'
 import { getDb } from './connection'
@@ -16,11 +21,18 @@ function clip(value: string | null): string | null {
 	return value === null ? null : value.slice(0, MAX_TEXT)
 }
 
+/** Clips the client-derived target username; role and device details come from the DB. */
+function clipDetail(detail: AuditDetail | null): AuditDetail | null {
+	return detail !== null && 'target_username' in detail
+		? { ...detail, target_username: clip(detail.target_username) ?? '' }
+		: detail
+}
+
 export interface AuditRecord {
 	event: AuditEvent
 	username: string
 	user_id: number | null
-	target_username?: string | null
+	detail?: AuditDetail | null
 	ip: string
 	forwarded_for: string | null
 	user_agent: string | null
@@ -35,7 +47,7 @@ export async function recordAudit(entry: AuditRecord): Promise<Result<unknown, E
 				event: entry.event,
 				username: clip(entry.username) ?? '',
 				user_id: entry.user_id,
-				target_username: clip(entry.target_username ?? null),
+				detail: clipDetail(entry.detail ?? null),
 				ip: clip(entry.ip) ?? 'unknown',
 				forwarded_for: clip(entry.forwarded_for),
 				user_agent: clip(entry.user_agent),
@@ -55,7 +67,9 @@ export async function listAuditLog(
 	const where = and(
 		searchCondition(params.search, [
 			audit_log.username,
-			audit_log.target_username,
+			sql`${audit_log.detail}->>'target_username'`,
+			sql`${audit_log.detail}->>'role_name'`,
+			sql`${audit_log.detail}->>'device_name'`,
 			audit_log.ip,
 			audit_log.forwarded_for,
 		]),
@@ -65,7 +79,6 @@ export async function listAuditLog(
 		created_at: audit_log.created_at,
 		event: audit_log.event,
 		username: audit_log.username,
-		target_username: audit_log.target_username,
 		ip: audit_log.ip,
 		user_agent: audit_log.user_agent,
 	}[params.sort]

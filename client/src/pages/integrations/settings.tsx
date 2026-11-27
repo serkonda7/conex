@@ -84,7 +84,6 @@ export function ProviderSettings(props: { integration: IntegrationJson }): JSX.E
 			<Show when={canGlobal('integrations.manage')}>
 				<DangerZone
 					name={name()}
-					text={t('integration.removeText', { name: name() })}
 					pending={remove.pending()}
 					onRemove={() => void handleRemove()}
 				/>

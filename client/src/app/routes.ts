@@ -28,6 +28,7 @@ import {
 	IconPackages,
 	IconPlugConnected,
 	IconReceipt2,
+	IconReportAnalytics,
 	IconRuler2,
 	IconSettings,
 	IconShieldLock,
@@ -135,6 +136,9 @@ const IntegrationDetailPage = lazyPage(() =>
 )
 const MatchingPage = lazyPage(() =>
 	import('../pages/integrations/matching').then((m) => m.MatchingPage),
+)
+const IntegrationReportPage = lazyPage(() =>
+	import('../pages/integrations/report').then((m) => m.IntegrationReportPage),
 )
 const IntegrationsPage = lazyPage(() =>
 	import('../pages/integrations/list').then((m) => m.IntegrationsPage),
@@ -524,9 +528,19 @@ export const SECTIONS: readonly Section[] = [
 		path: 'integrations/matching',
 		noun: (): string => t('matching.title'),
 		icon: IconArrowsJoin2,
-		permission: 'integrations.manage',
+		permission: 'integrations.write',
 		hideAddInNav: true,
 		list: MatchingPage,
+	},
+	{
+		// Consistency report of one integration at a time; also opened from the
+		// integration detail page and a tenant's "Needs attention" list.
+		path: 'integrations/report',
+		noun: (): string => t('integration.viewReport'),
+		icon: IconReportAnalytics,
+		permission: 'integrations.write',
+		hideAddInNav: true,
+		list: IntegrationReportPage,
 	},
 	{
 		// Reached from the top-bar ticket button.
@@ -540,6 +554,7 @@ export const SECTIONS: readonly Section[] = [
 		path: 'users',
 		noun: (n: number): string => tp('entity.user', n),
 		icon: IconLock,
+		navLabel: (): string => t('app.nav.usersRoles'),
 		permission: 'users.manage',
 		list: UsersPage,
 		add: UserAddPage,
@@ -550,6 +565,8 @@ export const SECTIONS: readonly Section[] = [
 		noun: (n: number): string => tp('entity.role', n),
 		permission: 'users.manage',
 		icon: IconShieldLock,
+		// A tab of the users page.
+		hideInNav: true,
 		list: RolesPage,
 		add: RoleAddPage,
 		edit: RoleEditPage,

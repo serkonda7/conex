@@ -1962,8 +1962,12 @@ export const TraceQuerySchema = v.object({
 /**
  * Permissions a role can grant. `view` / `edit` / `delete` cover every
  * inventory and catalog resource at once (`edit` = create + update,
- * including CSV import). The rest gate the admin areas; `integrations.manage`
- * covers both configuring providers and running syncs / links;
+ * including CSV import). The rest gate the admin areas. The two
+ * integration permissions are cumulative like view / edit / delete:
+ * `integrations.write` works on the matching and report pages (links,
+ * imports, pushing changes), `integrations.manage` (granted together with
+ * `integrations.write`) also opens the integrations page: credentials,
+ * enable, remove, syncs, Microsoft 365 consent, the calendar sync;
  * `tickets.create` opens tickets in the external ticket system (TANSS);
  * `contacts.directory` reads the contact directory (`/directory/contacts`),
  * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
@@ -1982,6 +1986,7 @@ export const PERMISSIONS = [
 	'employees.tenants',
 	'changelog.view',
 	'audit_log.view',
+	'integrations.write',
 	'integrations.manage',
 	'tickets.create',
 	'contacts.directory',
@@ -2008,9 +2013,27 @@ export const SessionUserSchema = v.object({
 	tenant_ids: v.nullable(v.array(v.number())),
 	/** The employee behind the account, if linked. */
 	employee_id: v.nullable(v.number()),
+	/**
+	 * Role the session views the app as ("view as role" in the account
+	 * settings); null = own role. `permissions` are this role's while set,
+	 * `role` stays the user's own.
+	 */
+	view_as: v.nullable(v.object({ id: v.number(), name: v.string() })),
 })
 
 export type SessionUser = v.InferOutput<typeof SessionUserSchema>
+
+/** `PUT /auth/view-as`: the role to view the app as, null to return to the own role. */
+export const ViewAsSchema = v.strictObject({
+	role_id: v.nullable(IdSchema),
+})
+
+/** A role offered by `GET /auth/view-as`: one granting nothing the user's own role lacks. */
+export interface ViewAsRoleJson {
+	id: number
+	name: string
+	description: string | null
+}
 
 /**
  * Roles bundle permissions and are assigned to users (one role per user).
@@ -2115,20 +2138,29 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 
 /**
  * `password.change`: a user changed their own password. `password.reset`: a
- * user manager set another account's password (`target_username`).
+ * user manager set another account's password (`AuditUserDetail`).
+ * `user.role_change`: an account got a role, on creation or by a change
+ * (`AuditUserDetail` with the roles). `role.*`: a role was created, deleted,
+ * renamed or had its permissions changed (`AuditRoleDetail`).
  */
 export const AUDIT_EVENTS = [
 	'login.success',
 	'login.failure',
 	'password.change',
 	'password.reset',
+	'user.role_change',
+	'role.create',
+	'role.update',
+	'role.delete',
+	'integration.device_create',
+	'integration.device_update',
 ] as const
 
 export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
 
 export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
 
-/** `search` matches username, target username, peer IP or forwarded-for. Defaults to newest first. */
+/** `search` matches username, target user, role name, device name, peer IP or forwarded-for. Defaults to newest first. */
 export const AuditLogListQuerySchema = v.object({
 	...ListQueryEntries,
 	event: v.optional(
@@ -2136,13 +2168,54 @@ export const AuditLogListQuerySchema = v.object({
 		undefined,
 	),
 	sort: v.optional(
-		v.picklist(['created_at', 'event', 'username', 'target_username', 'ip', 'user_agent']),
+		v.picklist(['created_at', 'event', 'username', 'ip', 'user_agent']),
 		'created_at',
 	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'desc'),
 })
 
 export type AuditLogListQuery = v.InferOutput<typeof AuditLogListQuerySchema>
+
+/**
+ * A conex device written to an external system: created there
+ * (`integration.device_create`) or one field overwritten
+ * (`integration.device_update`, with `field`, `from` and `to`).
+ */
+export interface AuditDeviceDetail {
+	provider: IntegrationProvider
+	device_id: number
+	/** Conex device name at the time of the change. */
+	device_name: string
+	external_id: string
+	field?: ExternalPushField
+	from?: string | null
+	to?: string | null
+}
+
+/**
+ * Account a `password.reset` or `user.role_change` acted upon. Role changes
+ * carry the role names; `from_role` is null when the account was created.
+ */
+export interface AuditUserDetail {
+	target_username: string
+	from_role?: string | null
+	to_role?: string
+}
+
+/**
+ * Role a `role.*` event acted upon, by its name after the change. For
+ * `role.create`/`role.delete`, `added`/`removed` list all its permissions.
+ */
+export interface AuditRoleDetail {
+	role_id: number
+	role_name: string
+	/** Previous name when `role.update` renamed it. */
+	renamed_from?: string
+	added?: Permission[]
+	removed?: Permission[]
+}
+
+export type AuditDetail = AuditDeviceDetail | AuditUserDetail | AuditRoleDetail
 
 export interface AuditLogEntryJson {
 	id: number
@@ -2152,8 +2225,8 @@ export interface AuditLogEntryJson {
 	/** Acting user (for logins, the attempted username). */
 	username: string
 	user_id: number | null
-	/** Account acted upon when it differs from the actor (`password.reset`). */
-	target_username: string | null
+	/** Event-specific context; null for logins and own password changes. */
+	detail: AuditDetail | null
 	/** Socket peer address. */
 	ip: string
 	/** Raw `X-Forwarded-For` header, if sent (client-controlled). */
@@ -3546,6 +3619,15 @@ export interface DeviceTypeUpdatePreview {
 // ---------------------------------------------------------------------------
 
 export const INTEGRATION_PROVIDERS = ['tanss', 'octoja', 'unifi', 'm365'] as const
+
+/** `[integrations] mode`: `offline` blocks every integration, `mock` serves captured snapshots. */
+export const INTEGRATION_MODES = ['live', 'offline', 'mock'] as const
+export type IntegrationMode = (typeof INTEGRATION_MODES)[number]
+
+/** `GET /integrations/mode`: how the server reaches external systems. */
+export interface IntegrationModeJson {
+	mode: IntegrationMode
+}
 
 export const IntegrationProviderSchema = v.picklist(INTEGRATION_PROVIDERS)
 

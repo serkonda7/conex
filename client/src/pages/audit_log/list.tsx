@@ -1,12 +1,25 @@
 import { IconHistory } from '@tabler/icons-solidjs'
-import type { AuditEvent } from 'shared/src/schemas'
+import type {
+	AuditDetail,
+	AuditDeviceDetail,
+	AuditEvent,
+	AuditRoleDetail,
+	AuditUserDetail,
+	Permission,
+} from 'shared/src/schemas'
 import { createSignal, type JSX, Show } from 'solid-js'
 import { type AuditLogEntryJson, type AuditLogSort, fetch_audit_log } from '../../api/audit_log'
 import { type DataTableColumn, FilterTable } from '../../components/data_table'
 import { Empty, InlineError } from '../../components/feedback'
 import { emptyListText, ListLoading, useListFilters, useSort } from '../../components/list_page'
 import { t, tp } from '../../i18n'
-import { auditEventLabel, auditEventOptions } from '../../i18n/labels'
+import {
+	auditEventLabel,
+	auditEventOptions,
+	compareFieldLabel,
+	permissionLabel,
+	providerLabel,
+} from '../../i18n/labels'
 import { usePagedList } from '../../lib/paged_list'
 import { formatRelative, formatTime } from '../../lib/time'
 import { shortUserAgent } from '../../lib/user_agent'
@@ -16,11 +29,90 @@ const AUDIT_EVENT_BADGE: Record<AuditEvent, string> = {
 	'login.failure': 'badge-decommissioned',
 	'password.change': 'badge-planned',
 	'password.reset': 'badge-planned',
+	'user.role_change': 'badge-planned',
+	'role.create': 'badge-planned',
+	'role.update': 'badge-planned',
+	'role.delete': 'badge-decommissioned',
+	'integration.device_create': 'badge-planned',
+	'integration.device_update': 'badge-planned',
+}
+
+/** Device a `integration.*` event wrote, with what changed externally. */
+function DeviceDetail(props: { detail: AuditDeviceDetail }): JSX.Element {
+	const d = (): AuditDeviceDetail => props.detail
+	const value = (v: string | null | undefined): string => v || t('audit.emptyValue')
+	return (
+		<span>
+			<a href={`/devices/${d().device_id}`}>{d().device_name}</a>{' '}
+			<span class="text-muted">
+				{d().field
+					? t('audit.deviceUpdated', {
+							field: compareFieldLabel(d().field ?? ''),
+							provider: providerLabel(d().provider),
+							from: value(d().from),
+							to: value(d().to),
+						})
+					: t('audit.deviceCreated', { provider: providerLabel(d().provider) })}
+			</span>
+		</span>
+	)
+}
+
+/** Account a reset or role change hit, with the role it moved between. */
+function UserDetail(props: { detail: AuditUserDetail }): JSX.Element {
+	const d = (): AuditUserDetail => props.detail
+	return (
+		<span>
+			{t('audit.targetUser', { username: d().target_username })}
+			<Show when={d().to_role}>
+				{(to: () => string): JSX.Element => (
+					<>
+						{' '}
+						<span class="text-muted">
+							{d().from_role
+								? t('audit.roleChanged', { from: d().from_role ?? '', to: to() })
+								: t('audit.roleAssigned', { role: to() })}
+						</span>
+					</>
+				)}
+			</Show>
+		</span>
+	)
+}
+
+/** Role a `role.*` event changed: its rename and permissions gained or lost. */
+function RoleDetail(props: { detail: AuditRoleDetail }): JSX.Element {
+	const d = (): AuditRoleDetail => props.detail
+	const list = (permissions: Permission[]): string => permissions.map(permissionLabel).join(', ')
+	const changes = (): string[] => [
+		...(d().renamed_from ? [t('audit.renamedFrom', { name: d().renamed_from ?? '' })] : []),
+		...(d().added?.length
+			? [t('audit.permissionsAdded', { permissions: list(d().added ?? []) })]
+			: []),
+		...(d().removed?.length
+			? [t('audit.permissionsRemoved', { permissions: list(d().removed ?? []) })]
+			: []),
+	]
+	return (
+		<span>
+			{d().role_name} <span class="text-muted">{changes().join('; ')}</span>
+		</span>
+	)
+}
+
+/** Event-specific context: the account hit, the role changed, or the device written. */
+function AuditDetailCell(props: { detail: AuditDetail }): JSX.Element {
+	const detail = props.detail
+	if ('target_username' in detail) {
+		return <UserDetail detail={detail} />
+	}
+	return 'role_name' in detail ? <RoleDetail detail={detail} /> : <DeviceDetail detail={detail} />
 }
 
 /**
- * /audit-log — admin-only, read-only list of login attempts and password
- * changes with their source address. Sortable by every column, newest first
+ * /audit-log — admin-only, read-only list of login attempts, password
+ * changes, role assignments and role edits, and devices written to external
+ * systems, with their source address. Sortable by every column, newest first
  * by default; searchable by username or IP and filterable by event.
  */
 export function AuditLogPage(): JSX.Element {
@@ -83,10 +175,13 @@ export function AuditLogPage(): JSX.Element {
 			getValue: (e: AuditLogEntryJson): string => e.username,
 		},
 		{
-			key: 'target_username',
-			label: t('audit.target'),
-			sortable: true,
-			getValue: (e: AuditLogEntryJson): string => e.target_username ?? '',
+			key: 'detail',
+			label: t('audit.detail'),
+			getValue: (e: AuditLogEntryJson): JSX.Element => (
+				<Show when={e.detail}>
+					{(d: () => AuditDetail): JSX.Element => <AuditDetailCell detail={d()} />}
+				</Show>
+			),
 		},
 		{
 			key: 'ip',

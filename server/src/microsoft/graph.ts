@@ -48,12 +48,6 @@ export function isGraphNotFound(error: Error): boolean {
 
 const SCOPE = 'https://graph.microsoft.com/.default'
 
-/**
- * Request headers for advanced queries (`$count`, `$search`, `endsWith`,
- * `ne` filters on directory objects).
- */
-export const EVENTUAL_CONSISTENCY = { ConsistencyLevel: 'eventual' }
-
 /** Upper bound for `getAll`, against a server that keeps returning next links. */
 const MAX_PAGES = 1000
 
