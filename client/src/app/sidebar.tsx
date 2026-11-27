@@ -4,6 +4,7 @@
  * The whole sidebar collapses to an icon rail (persisted to localStorage);
  * its toggle sits in the top bar's corner cell above it. Each group folds
  * away under its label (also persisted); the rail always shows every group.
+ * Version, commit and build date sit below the nav (hover on the rail).
  */
 import {
 	IconChevronDown,
@@ -18,6 +19,7 @@ import { createEffect, createSignal, For, type JSX, onCleanup, Show } from 'soli
 import { type MessageKey, t } from '../i18n'
 import { goTo, path } from '../lib/router'
 import { readStored, readStoredJson, writeStored, writeStoredJson } from '../lib/storage'
+import { formatTime } from '../lib/time'
 import { canAddInSection, canOpenSection, routeSection, SECTIONS, type Section } from './routes'
 
 /** Hover shortcut next to a nav row; without `href` a disabled placeholder. */
@@ -257,6 +259,14 @@ function NavGroupSection(props: {
 	)
 }
 
+/** Version (with commit when known) and build date of the client bundle. */
+function buildInfo(): string {
+	return t('app.buildInfo', {
+		version: __APP_COMMIT__ ? `${__APP_VERSION__} · ${__APP_COMMIT__}` : __APP_VERSION__,
+		date: formatTime(__BUILD_TIME__),
+	})
+}
+
 interface SidebarProps {
 	mobile?: boolean
 	onClose?: () => void
@@ -308,6 +318,16 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 					}}
 				</For>
 			</nav>
+			<Show
+				when={!isCollapsed()}
+				fallback={
+					<span class="app-build-info" title={buildInfo()}>
+						{__APP_VERSION__}
+					</span>
+				}
+			>
+				<span class="app-build-info">{buildInfo()}</span>
+			</Show>
 		</aside>
 	)
 }

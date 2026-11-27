@@ -261,7 +261,7 @@ export const de: Messages = {
 	'app.pageNotFound': 'Seite nicht gefunden.',
 	'app.accountNamed': 'Konto: {name}',
 	'app.logout': 'Abmelden',
-	'app.buildInfo': '{version} ({date})',
+	'app.buildInfo': '{version}\n{date}',
 	'account.settings': 'Einstellungen',
 	'account.settingsSubtitle': 'Verwalten Sie Ihr Konto und Ihre Einstellungen.',
 	'account.sectionAuthentication': 'Authentifizierung',

@@ -1,6 +1,6 @@
 /**
  * Optional fullscreen view of a floor plan page (image and drawn plans):
- * hides the app's top bar, sidebar, breadcrumbs and footer so the plan
+ * hides the app's top bar, sidebar and breadcrumbs so the plan
  * fills the window, and puts the browser into fullscreen where it allows.
  *
  * The whole document goes fullscreen, not the plan alone, so dialogs and

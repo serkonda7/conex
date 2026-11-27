@@ -259,7 +259,7 @@ export const en = {
 	'app.pageNotFound': 'Page not found.',
 	'app.accountNamed': 'Account: {name}',
 	'app.logout': 'Log out',
-	'app.buildInfo': '{version} ({date})',
+	'app.buildInfo': '{version}\n{date}',
 	'account.settings': 'Settings',
 	'account.settingsSubtitle': 'Manage your account and preferences.',
 	'account.sectionAuthentication': 'Authentication',

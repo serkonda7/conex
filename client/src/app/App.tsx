@@ -23,7 +23,6 @@ import { queryClient } from '../lib/query'
 import { goTo, navigate, path } from '../lib/router'
 import { setSessionAccess, setSessionUserHandler } from '../lib/session'
 import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
-import { formatTime } from '../lib/time'
 import { CreateTicketButton } from '../pages/tickets/button'
 import { APP_TITLE, LoginPage, SetupPage } from './auth_page'
 import { CommandPalette, CommandPaletteButton } from './command_palette'
@@ -173,14 +172,6 @@ function Workspace(props: { user: SessionUser; onLogout: () => void }): JSX.Elem
 							{(routePath: string) => <RouteContent routePath={routePath} />}
 						</Show>
 					</main>
-					<footer class="app-footer">
-						{t('app.buildInfo', {
-							version: __APP_COMMIT__
-								? `${__APP_VERSION__} · ${__APP_COMMIT__}`
-								: __APP_VERSION__,
-							date: formatTime(__BUILD_TIME__),
-						})}
-					</footer>
 				</div>
 			</div>
 		</>

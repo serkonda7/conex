@@ -903,6 +903,22 @@ tbody tr:last-child td {
 	margin-right: 0.5rem;
 }
 
+/* Version, commit and build date below the nav; just the version on the rail. */
+.app-build-info {
+	flex-shrink: 0;
+	padding: 0.4rem 0.25rem 0;
+	border-top: 1px solid var(--border);
+	color: var(--text-muted);
+	font-size: 0.7rem;
+	overflow-wrap: anywhere;
+	/* The version and the date are on separate lines. */
+	white-space: pre-line;
+}
+
+.app-sidebar.collapsed .app-build-info {
+	text-align: center;
+}
+
 /* The nav scrolls instead of the sidebar so the account dropdown can
    overflow the (collapsed) sidebar's edge. Its right padding keeps the rows
    clear of the thin scrollbar on the sidebar's edge. */
@@ -1200,15 +1216,6 @@ button.app-nav-label[aria-expanded="false"] .app-nav-label-chevron {
 	min-width: 0;
 	width: 100%;
 	padding: 0.9rem 1rem 2rem;
-}
-
-/* Version, commit and build date, right-aligned below the page content. */
-.app-footer {
-	padding: 0.4rem 1rem;
-	border-top: 1px solid var(--border);
-	color: var(--text-muted);
-	font-size: 0.75rem;
-	text-align: right;
 }
 
 .app-content > div:not(.app-auth) {
@@ -7615,7 +7622,6 @@ button.billing-cell-button:hover {
    for the page header, the toolbars above and the zoom bar below. */
 .plan-fullscreen .app-topbar,
 .plan-fullscreen .app-sidebar,
-.plan-fullscreen .app-footer,
 .plan-fullscreen .breadcrumbs {
 	display: none;
 }
