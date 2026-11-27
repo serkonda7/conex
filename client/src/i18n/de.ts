@@ -1306,6 +1306,8 @@ export const de: Messages = {
 	'zoom.reset': 'Ganzes Bild zeigen',
 	'zoom.hint':
 		'Strg + Scrollen oder Zwei-Finger-Geste zum Zoomen; vergrößert zum Verschieben ziehen',
+	'zoom.hintKeys':
+		'Strg + Scrollen oder Zwei-Finger-Geste zum Zoomen; vergrößert zum Verschieben ziehen oder W A S D',
 	'floorplan.clusterZoom': '{count} Markierungen: {names}. Vergrößern',
 	'floorplan.objects': 'Auf diesem Grundriss',
 	'floorplan.objectsTab': 'Auf dem Plan ({count})',

@@ -1294,6 +1294,7 @@ export const en = {
 	'zoom.out': 'Zoom out',
 	'zoom.reset': 'Show the whole image',
 	'zoom.hint': 'Ctrl + scroll or pinch to zoom; drag to pan while zoomed in',
+	'zoom.hintKeys': 'Ctrl + scroll or pinch to zoom; drag or W A S D to pan while zoomed in',
 	'floorplan.clusterZoom': '{count} markers: {names}. Zoom in',
 	'floorplan.objects': 'On this plan',
 	'floorplan.objectsTab': 'On the plan ({count})',
