@@ -20,7 +20,7 @@ import { Loading } from '../components/feedback'
 import { type Locale, locale, t } from '../i18n'
 import { loadUserPreferences } from '../lib/preferences'
 import { queryClient } from '../lib/query'
-import { goTo, path } from '../lib/router'
+import { goTo, navigate, path } from '../lib/router'
 import { setSessionAccess, setSessionUserHandler } from '../lib/session'
 import { homePath, refreshTenantContext, setTenantContextScoped } from '../lib/tenant_context'
 import { formatTime } from '../lib/time'
@@ -216,7 +216,13 @@ function App(): JSX.Element {
 		void queryClient.resetQueries()
 	})
 
+	// A deliberate logout starts the next login on the home page (the next user
+	// may be someone else); a timed-out session (401) keeps the URL to resume.
 	async function handleLogout(): Promise<void> {
+		navigate('/')
+		if (path() !== '/') {
+			return // unsaved work: the user chose to stay
+		}
 		await logout()
 		setUser(null)
 	}

@@ -132,7 +132,7 @@ function ProviderCard(props: {
 							</>
 						}
 						action={
-							<Show when={can('integrations.write')}>
+							<Show when={can('integrations.manage')}>
 								<Show
 									when={!neverSynced() || running()}
 									fallback={

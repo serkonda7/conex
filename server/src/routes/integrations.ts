@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { type Context, Hono, type MiddlewareHandler } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import {
+	type AuditDeviceDetail,
 	ExternalDeviceCreateSchema,
 	ExternalDeviceImportSchema,
 	ExternalDeviceUpdateSchema,
@@ -47,6 +48,7 @@ import {
 	requirePermission,
 } from '../authz'
 import { getConfig } from '../config'
+import { getDb } from '../db/connection'
 import { exists } from '../db/list'
 import { deviceTenant, employeeTenants } from '../db/owners'
 import { deviceBoard, employeeBoard, tenantBoard } from '../integrations/board'
@@ -87,7 +89,9 @@ import { deactivateExternalEmployee, updateExternalEmployee } from '../integrati
 import { authMiddleware } from '../middleware/auth'
 import { requirePermissionMiddleware } from '../middleware/permissions'
 import { onValidationError } from '../middleware/validation'
-import { sites, tenants } from '../schema'
+import { devices, sites, tenants } from '../schema'
+import { auditRequest } from '../util/audit'
+import { peer_ip } from '../util/client_ip'
 import { jsonError } from '../util/http'
 import { sendCreated, sendResult } from '../util/result_response'
 
@@ -117,6 +121,34 @@ async function checkTenantRow(c: Context, tenantId: number): Promise<Response | 
 		return jsonError(c, 'Tenant not found', 404)
 	}
 	return checkTenant(c, tenantId)
+}
+
+/**
+ * Audit log entry for a conex device written to an external system. `ip` is
+ * read before the provider call, since Bun forgets the peer of a client that
+ * disconnected while waiting.
+ */
+async function auditDeviceWrite(
+	c: Context,
+	ip: string,
+	event: 'integration.device_create' | 'integration.device_update',
+	detail: Omit<AuditDeviceDetail, 'device_name'>,
+): Promise<void> {
+	const [device] = await getDb()
+		.select({ name: devices.name })
+		.from(devices)
+		.where(eq(devices.id, detail.device_id))
+	const actor = requestUser(c)
+	await auditRequest(
+		c,
+		{
+			event,
+			username: actor.username,
+			user_id: actor.id,
+			detail: { ...detail, device_name: device?.name ?? '' },
+		},
+		ip,
+	)
 }
 
 /** Tenant of a device in the requester's scope, or the 404/403 response. */
@@ -270,8 +302,9 @@ async function scopeCompany(
 /**
  * Integrations: `integrations.manage` configures providers (credentials
  * verified before saving, secrets never returned; enable, remove, test) and
- * runs full syncs; `integrations.write` lists them, runs syncs and edits
- * links (role form: write = `integrations.write`, manage = both). The reports
+ * runs syncs; `integrations.write` lists them and edits links from the
+ * matching and report pages (role form: write = `integrations.write`,
+ * manage = both). The reports
  * and boards only need `view`. Links of tenants and sites are global-write
  * like tenants themselves; device and employee links follow the object's
  * tenant scope.
@@ -351,7 +384,7 @@ export const integrationsApp = new Hono()
 	)
 	.get(
 		'/:provider',
-		requirePermissionMiddleware('integrations.write'),
+		requirePermissionMiddleware('integrations.manage'),
 		vValidator('param', IntegrationParamsSchema, onValidationError),
 		async (c) => sendResult(c, await getIntegration(c.req.valid('param').provider)),
 	)
@@ -392,7 +425,7 @@ export const integrationsApp = new Hono()
 		async (c) => {
 			// Syncs create and update inventory, so they need `edit` as well.
 			const denied =
-				requirePermission(c, 'integrations.write') ?? requirePermission(c, 'edit')
+				requirePermission(c, 'integrations.manage') ?? requirePermission(c, 'edit')
 			if (denied) {
 				return denied
 			}
@@ -799,10 +832,16 @@ export const integrationsApp = new Hono()
 			if (company instanceof Response) {
 				return company
 			}
-			return sendCreated(
-				c,
-				await createExternalDevice(provider, input.device_id, requestUser(c).id),
-			)
+			const ip = peer_ip(c)
+			const res = await createExternalDevice(provider, input.device_id, requestUser(c).id)
+			if (Result.isOk(res)) {
+				await auditDeviceWrite(c, ip, 'integration.device_create', {
+					provider,
+					device_id: input.device_id,
+					external_id: res.value.external_id,
+				})
+			}
+			return sendCreated(c, res)
 		},
 	)
 	.post(
@@ -843,7 +882,20 @@ export const integrationsApp = new Hono()
 			if (externalDenied) {
 				return externalDenied
 			}
-			return sendResult(c, await updateExternalDevice(provider, input.device_id, input.field))
+			const ip = peer_ip(c)
+			const before = await readDevice(provider, link.external_id)
+			const res = await updateExternalDevice(provider, input.device_id, input.field)
+			if (Result.isOk(res)) {
+				await auditDeviceWrite(c, ip, 'integration.device_update', {
+					provider,
+					device_id: input.device_id,
+					external_id: link.external_id,
+					field: input.field,
+					from: before?.[input.field] ?? null,
+					to: res.value[input.field],
+				})
+			}
+			return sendResult(c, res)
 		},
 	)
 	.put(

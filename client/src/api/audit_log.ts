@@ -1,6 +1,6 @@
 /**
  * Audit log API wrapper: admin-only, read-only list of security events
- * (login attempts), newest first.
+ * (login attempts, password changes, external device writes), newest first.
  */
 import type { Result } from 'better-result'
 import type { AuditLogEntryJson, AuditLogListQuery, Page } from 'shared/src/types'

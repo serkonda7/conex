@@ -60,7 +60,7 @@ export const usersApp = new Hono()
 					event: 'password.reset',
 					username: actor.username,
 					user_id: actor.id,
-					target_username: res.value.username,
+					detail: { target_username: res.value.username },
 				})
 			}
 			return sendResult(c, res)

@@ -281,8 +281,6 @@ export interface Section {
 	icon?: Component<{ size?: number }>
 	/** Permission needed to open the section (and see it in the sidebar); `null` = none. */
 	permission: Permission | null
-	/** Stronger permission for the add page (e.g. `integrations.manage`); defaults to `permission`. */
-	addPermission?: Permission
 	/** Routed but left out of the sidebar (reached another way). */
 	hideInNav?: boolean
 	/** No sidebar "+" shortcut (the add page is reached from the list). */
@@ -507,9 +505,8 @@ export const SECTIONS: readonly Section[] = [
 		path: 'integrations',
 		noun: (n: number): string => tp('entity.integration', n),
 		icon: IconPlugConnected,
-		// One integration per provider; setting one up is configuring.
-		permission: 'integrations.write',
-		addPermission: 'integrations.manage',
+		// One integration per provider.
+		permission: 'integrations.manage',
 		hideAddInNav: true,
 		list: IntegrationsPage,
 		add: IntegrationAddPage,
@@ -674,9 +671,6 @@ export function canOpenSection(section: Section): boolean {
  * need `edit`, admin sections their own permission.
  */
 export function canAddInSection(section: Section): boolean {
-	if (section.addPermission !== undefined) {
-		return can(section.addPermission)
-	}
 	return section.permission === null || section.permission === 'view'
 		? can('edit')
 		: can(section.permission)
@@ -702,10 +696,6 @@ export function matchRoute(raw: string, checkPermission = true): RouteMatch | nu
 	}
 	if (third === undefined && (second === 'add' || second === 'import')) {
 		const page = section[second]
-		const addPermission = second === 'add' ? section.addPermission : undefined
-		if (checkPermission && addPermission !== undefined && !can(addPermission)) {
-			return null
-		}
 		return page ? { kind: second, section, page } : null
 	}
 	const id = parseId(second)

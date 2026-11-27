@@ -1964,10 +1964,10 @@ export const TraceQuerySchema = v.object({
  * inventory and catalog resource at once (`edit` = create + update,
  * including CSV import). The rest gate the admin areas. The two
  * integration permissions are cumulative like view / edit / delete:
- * `integrations.write` uses the configured providers (reports, syncs,
- * links, imports, pushing changes), `integrations.manage` (granted together
- * with `integrations.write`) also configures them (credentials, enable,
- * remove, full syncs, Microsoft 365 consent, the calendar sync);
+ * `integrations.write` works on the matching and report pages (links,
+ * imports, pushing changes), `integrations.manage` (granted together with
+ * `integrations.write`) also opens the integrations page: credentials,
+ * enable, remove, syncs, Microsoft 365 consent, the calendar sync;
  * `tickets.create` opens tickets in the external ticket system (TANSS);
  * `contacts.directory` reads the contact directory (`/directory/contacts`),
  * e.g. for the AGFEO Dashboard LDAP plugin. `employees.tenants` changes the
@@ -2138,20 +2138,22 @@ export type UserListQuery = v.InferOutput<typeof UserListQuerySchema>
 
 /**
  * `password.change`: a user changed their own password. `password.reset`: a
- * user manager set another account's password (`target_username`).
+ * user manager set another account's password (`AuditUserDetail`).
  */
 export const AUDIT_EVENTS = [
 	'login.success',
 	'login.failure',
 	'password.change',
 	'password.reset',
+	'integration.device_create',
+	'integration.device_update',
 ] as const
 
 export const AuditEventSchema = v.picklist(AUDIT_EVENTS)
 
 export type AuditEvent = v.InferOutput<typeof AuditEventSchema>
 
-/** `search` matches username, target username, peer IP or forwarded-for. Defaults to newest first. */
+/** `search` matches username, target user, device name, peer IP or forwarded-for. Defaults to newest first. */
 export const AuditLogListQuerySchema = v.object({
 	...ListQueryEntries,
 	event: v.optional(
@@ -2159,13 +2161,36 @@ export const AuditLogListQuerySchema = v.object({
 		undefined,
 	),
 	sort: v.optional(
-		v.picklist(['created_at', 'event', 'username', 'target_username', 'ip', 'user_agent']),
+		v.picklist(['created_at', 'event', 'username', 'ip', 'user_agent']),
 		'created_at',
 	),
 	order: v.optional(v.picklist(['asc', 'desc']), 'desc'),
 })
 
 export type AuditLogListQuery = v.InferOutput<typeof AuditLogListQuerySchema>
+
+/**
+ * A conex device written to an external system: created there
+ * (`integration.device_create`) or one field overwritten
+ * (`integration.device_update`, with `field`, `from` and `to`).
+ */
+export interface AuditDeviceDetail {
+	provider: IntegrationProvider
+	device_id: number
+	/** Conex device name at the time of the change. */
+	device_name: string
+	external_id: string
+	field?: ExternalPushField
+	from?: string | null
+	to?: string | null
+}
+
+/** Account a `password.reset` acted upon. */
+export interface AuditUserDetail {
+	target_username: string
+}
+
+export type AuditDetail = AuditDeviceDetail | AuditUserDetail
 
 export interface AuditLogEntryJson {
 	id: number
@@ -2175,8 +2200,8 @@ export interface AuditLogEntryJson {
 	/** Acting user (for logins, the attempted username). */
 	username: string
 	user_id: number | null
-	/** Account acted upon when it differs from the actor (`password.reset`). */
-	target_username: string | null
+	/** Event-specific context; null for logins and own password changes. */
+	detail: AuditDetail | null
 	/** Socket peer address. */
 	ip: string
 	/** Raw `X-Forwarded-For` header, if sent (client-controlled). */

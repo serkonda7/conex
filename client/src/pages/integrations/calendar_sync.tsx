@@ -549,7 +549,6 @@ export function CalendarSyncDetailPage(): JSX.Element {
 								lastRun={runs.lastRun()}
 								connectionError={c().last_error}
 								manageable
-								syncable
 								enabled={c().enabled}
 								toggling={toggle.pending()}
 								onToggle={(enabled: boolean) => void handleToggle(enabled)}

@@ -38,8 +38,9 @@ export function objectAccess(permissions: Iterable<Permission>): ObjectAccess {
 
 /**
  * The integration permissions are cumulative the same way:
- * `write` = `integrations.write` (use providers: syncs, links, imports),
- * `manage` = write + `integrations.manage` (configure providers).
+ * `write` = `integrations.write` (matching and report pages),
+ * `manage` = write + `integrations.manage` (the integrations page: configure
+ * and sync providers).
  */
 export const INTEGRATION_ACCESS_LEVELS = ['write', 'manage'] as const
 

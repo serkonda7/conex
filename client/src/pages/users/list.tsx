@@ -66,7 +66,9 @@ export function UsersPage(): JSX.Element {
 					key: 'username',
 					label: t('auth.username'),
 					sortable: true,
-					getValue: (u: UserJson): string => u.username,
+					getValue: (u: UserJson): JSX.Element => (
+						<a href={`/users/${u.id}/edit`}>{u.username}</a>
+					),
 				},
 				{
 					key: 'employee',

@@ -166,6 +166,16 @@ export const auth_states = pgTable(
 // `ip` is the socket peer; `forwarded_for` the raw, client-controlled
 // `X-Forwarded-For` header, kept separately so a spoofed header never
 // replaces the address the connection actually came from.
+/**
+ * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
+ * stringifies first, and Bun's SQL driver then stores that string as a JSON
+ * string instead of an object.
+ */
+const jsonb = customType<{ data: unknown; driverData: unknown }>({
+	dataType: () => 'jsonb',
+	toDriver: (value: unknown): unknown => value,
+})
+
 export const audit_log = pgTable(
 	'audit_log',
 	{
@@ -174,7 +184,8 @@ export const audit_log = pgTable(
 		event: text('event').notNull(),
 		username: text('username').notNull(),
 		user_id: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
-		target_username: text('target_username'),
+		/** `AuditDetail`: the target account or the external device write. */
+		detail: jsonb('detail'),
 		ip: text('ip').notNull(),
 		forwarded_for: text('forwarded_for'),
 		user_agent: text('user_agent'),
@@ -187,16 +198,6 @@ export const audit_log = pgTable(
 // no row-level isolation; grouping is by nullable FK, delete-blocked when
 // children exist (enforced in the service layer, not by FK cascade).
 // ---------------------------------------------------------------------------
-
-/**
- * `jsonb` that hands values to the driver as-is. Drizzle's own `jsonb`
- * stringifies first, and Bun's SQL driver then stores that string as a JSON
- * string instead of an object.
- */
-const jsonb = customType<{ data: unknown; driverData: unknown }>({
-	dataType: () => 'jsonb',
-	toDriver: (value: unknown): unknown => value,
-})
 
 // Tenant groups are flat (no nesting) and own no inventory: they only
 // bundle tenants so several can be selected at once. A tenant sits in at

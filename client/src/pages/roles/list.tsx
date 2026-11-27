@@ -40,7 +40,9 @@ export function RolesPage(): JSX.Element {
 					key: 'name',
 					label: t('common.name'),
 					sortable: true,
-					getValue: (r: RoleJson): string => r.name,
+					getValue: (r: RoleJson): JSX.Element => (
+						<a href={`/roles/${r.id}/edit`}>{r.name}</a>
+					),
 				},
 				descriptionColumn({ sortable: true }),
 				{
